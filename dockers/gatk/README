@@ -1,0 +1,4 @@
+git clone https://github.com/populationgenomics/gatk.git
+./gradlew localJar
+cp /Users/vlad/git/populationgenomics/gatk/build/libs/gatk-package-4.2.2.0-5-g2f11391-SNAPSHOT-local.jar gatk-package.jar
+docker build . -t australia-southeast1-docker.pkg.dev/cpg-common/images/gatk:4.2.2.0-cpgfix00
