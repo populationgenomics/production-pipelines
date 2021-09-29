@@ -1,0 +1,47 @@
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v2.3.0
+  hooks:
+  - id: check-yaml
+    exclude: '\.*conda/.*'
+  - id: end-of-file-fixer
+  - id: check-case-conflict
+  - id: check-merge-conflict
+  - id: detect-private-key
+  - id: debug-statements
+  - id: check-added-large-files
+
+- repo: https://github.com/igorshubovych/markdownlint-cli
+  rev: v0.22.0
+  hooks:
+  - id: markdownlint
+
+- repo: https://github.com/ambv/black
+  rev: 20.8b1
+  hooks:
+  - id: black
+    exclude: workflows/vqsr_janis.py
+
+- repo: https://gitlab.com/pycqa/flake8
+  rev: '3.8.4'
+  hooks:
+  - id: flake8
+    additional_dependencies: [flake8-bugbear, flake8-quotes]
+    exclude: workflows/vqsr_janis.py
+
+# Using system installation of pylint to support checking python module imports
+- repo: local
+  hooks:
+  - id: pylint
+    name: pylint
+    entry: pylint
+    language: system
+    types: [python]
+    exclude: workflows/vqsr_janis.py
+
+# Static type analysis (as much as it's possible in python using type hints)
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: v0.812
+  hooks:
+  - id: mypy
+    exclude: workflows/vqsr_janis.py

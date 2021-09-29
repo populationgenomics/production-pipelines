@@ -1,0 +1,20 @@
+[flake8]
+# We disable the following inspections:
+# 1. F541: f-string is missing placeholders (we allow f-strings that don't do
+#    any formatting for consistent looks and for future safety)
+# 2. Inspections incompatible with Black (see https://github.com/psf/black/blob/master/docs/compatible_configs.md#why-those-options-above-1):
+#    E203: whitespace before ':'
+# 3. Q003 ("Change outer quotes to avoid escaping inner quotes")
+# 4. E501 "line too long" (covered by black)
+# 5. F841 (covered by pylint)
+# 6. W291 (trailing-whitespace)
+# 7. W293 (blank line contains whitespace)
+extend-ignore: F541,E203,Q003,E501,F841,W291,W293
+
+# Maximum number of characters on a single line. Default for black, see:
+# https://black.readthedocs.io/en/stable/the_black_code_style.html#line-length
+max-line-length: 88
+
+inline-quotes = single
+multiline-quotes = """
+docstring-quotes = """
