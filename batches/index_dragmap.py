@@ -24,47 +24,17 @@ DRAGMAP_INDEX_FILES = [
 ]
 
 
-def _index_dragmap_job(b: hb.Batch):
-    reference = b.read_input_group(
-        base=REF_FASTA,
-        fai=REF_FASTA + '.fai',
-        dict=REF_FASTA.replace('.fasta', '').replace('.fna', '').replace('.fa', '')
-        + '.dict',
-    )
-    j = b.new_job('Index DRAGMAP')
-    j.image(DRAGMAP_IMAGE)
-    j.memory('standard')
-    j.cpu('32')
-    j.storage('40G')
-    cmd = f"""
-set -o pipefail
-set -ex
-
-DIR=$(dirname {j.hash_table_cfg})
-
-dragen-os \\
---build-hash-table true \\
---ht-reference {reference.base} \\
---ht-num-threads 32 \\
---output-directory $DIR
-
-    """
-    for f in DRAGMAP_INDEX_FILES:
-        cmd += f'ln $DIR/{f} {getattr(j, f.replace(".", "_"))}\n'
-    cmd += 'df -h; pwd; ls | grep -v proc | xargs du -sh'
-    j.command(cmd)
-    for f in DRAGMAP_INDEX_FILES:
-        b.write_output(getattr(j, f.replace('.', '_')), join(DRAGMAP_INDEX_BUCKET, f))
-    return j
-
-
 def _test_dragmap_job(b: hb.Batch):
-    dragmap_index = b.read_input_group(**{
-        k.replace('.', '_'): join(DRAGMAP_INDEX_BUCKET, k) for k in DRAGMAP_INDEX_FILES
-    })
+    dragmap_index = b.read_input_group(
+        **{
+            k.replace('.', '_'): join(DRAGMAP_INDEX_BUCKET, k)
+            for k in DRAGMAP_INDEX_FILES
+        }
+    )
     fq1 = b.read_input('gs://cpg-seqr-test/batches/test/tmp_fq')
     j = b.new_job('Test BWA')
     j.image(DRAGMAP_IMAGE)
+    j.cpu(32)
     j.memory('standard')
     j.storage('300G')
     j.declare_resource_group(
@@ -98,7 +68,7 @@ print(
 backend = hb.ServiceBackend(
     billing_project=billing_project,
     bucket=hail_bucket.replace('gs://', ''),
-    token=os.environ.get('HAIL_TOKEN')
+    token=os.environ.get('HAIL_TOKEN'),
 )
 b = hb.Batch(backend=backend, name='Create DRAGMAP index')
 j1 = _index_dragmap_job(b)
