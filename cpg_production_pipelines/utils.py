@@ -41,7 +41,7 @@ DATAPROC_PACKAGES = [
     'selenium',
 ]
 
-SCRIPTS_DIR = 'scripts'
+QUERY_SCRIPTS_DIR = 'query_scripts'
 PACKAGE_DIR = package_name
 
 
@@ -404,3 +404,7 @@ class AlignmentInput:
     index_path: Optional[str] = None
     fqs1: Optional[List[str]] = None
     fqs2: Optional[List[str]] = None
+
+
+def NUMBER_OF_HAPLOTYPE_CALLER_INTERVALS():
+    return None

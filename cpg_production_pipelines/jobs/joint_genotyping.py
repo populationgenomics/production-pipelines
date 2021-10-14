@@ -26,7 +26,7 @@ def _make_joint_genotype_jobs(
     depends_on: Optional[List[Job]] = None,
     analysis_project: str = None,
     use_gnarly: bool = False,
-    use_as_vqsr: bool = False,
+    use_as_vqsr: bool = True,
 ) -> Job:
     """
     Assumes all samples have a 'file' of 'type'='gvcf' in `samples_df`.
@@ -179,15 +179,23 @@ def _make_joint_genotype_jobs(
                     last_job = exccess_filter_job
                 else:
                     last_job = genotype_vcf_job
-
+                
+                if use_as_vqsr:
+                    last_job = _add_make_sites_only_job(
+                        b=b,
+                        input_vcf=last_job.output_vcf,
+                        overwrite=overwrite,
+                    )
                 scattered_vcf_by_interval[idx] = last_job.output_vcf
 
+    scattered_vcfs = list(scattered_vcf_by_interval.values())
     logger.info(f'Queueing gather-VCF job')
     final_gathered_vcf_job = _add_final_gather_vcf_job(
         b,
-        input_vcfs=list(scattered_vcf_by_interval.values()),
+        input_vcfs=scattered_vcfs,
         overwrite=overwrite,
         output_vcf_path=pre_vqsr_vcf_path,
+        is_allele_specific=use_as_vqsr,
     )
 
     tmp_vqsr_bucket = f'{joint_calling_tmp_bucket}/vqsr'
@@ -195,7 +203,7 @@ def _make_joint_genotype_jobs(
     vqsr_job = make_vqsr_jobs(
         b,
         input_vcf_gathered=pre_vqsr_vcf_path,
-        input_vcfs_scattered=list(scattered_vcf_by_interval.values()),
+        input_vcfs_scattered=scattered_vcfs,
         is_small_callset=is_small_callset,
         is_huge_callset=is_huge_callset,
         work_bucket=tmp_vqsr_bucket,
@@ -366,6 +374,9 @@ def _add_import_gvcfs_job(
     echo "Adding {len(sample_names_to_add)} samples: {', '.join(sample_names_to_add)}"
     {f'echo "Skipping adding {len(sample_names_to_skip)} samples that are already in the DB: '
      f'{", ".join(sample_names_to_skip)}"' if sample_names_to_skip else ''}
+
+    export GOOGLE_APPLICATION_CREDENTIALS=/gsa-key/key.json
+    gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
 
     gatk --java-options -Xms{java_mem}g \\
       GenomicsDBImport \\
@@ -634,6 +645,7 @@ def _add_final_gather_vcf_job(
     input_vcfs: List[hb.ResourceGroup],
     overwrite: bool,
     output_vcf_path: str = None,
+    is_allele_specific: bool = True,
 ) -> Job:
     """
     Combines per-interval scattered VCFs into a single VCF.
@@ -644,11 +656,11 @@ def _add_final_gather_vcf_job(
         return b.new_job(job_name + ' [reuse]')
 
     j = b.new_job(job_name)
-    j.image(utils.GATK_IMAGE)
+    j.image(resources.GATK_IMAGE)
     j.cpu(2)
     java_mem = 7
     j.memory('standard')  # ~ 4G/core ~ 7.5G
-    j.storage(f'{1 + len(input_vcfs) * 2}G')
+    j.storage(f'{1 + len(input_vcfs) * (0.1 if is_allele_specific else 2)}G')
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )

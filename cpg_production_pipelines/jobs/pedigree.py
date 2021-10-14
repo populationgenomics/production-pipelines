@@ -144,7 +144,7 @@ def job(
             subprocess.check_output(f'which {script_name}', shell=True).decode().strip()
         )
     except subprocess.CalledProcessError:
-        script_path = join(utils.SCRIPTS_DIR, script_name)
+        script_path = join(utils.QUERY_SCRIPTS_DIR, script_name)
 
     with open(script_path) as f:
         script = f.read()

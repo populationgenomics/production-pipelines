@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
 from typing import Optional, List, Tuple
@@ -12,6 +11,7 @@ from cpg_production_pipelines import resources
 from cpg_production_pipelines.jobs import wrap_command
 from cpg_production_pipelines.jobs import picard
 from cpg_production_pipelines.smdb import SMDB
+from cpg_production_pipelines.utils import AlignmentInput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')

@@ -184,7 +184,7 @@ def main(
         input_projects = [f'{p}-test' for p in input_projects]
         output_projects = [f'{p}-test' for p in output_projects]
 
-    pipeline = Pipeline(
+    pipeline = SeqrLoaderPipeline(
         analysis_project=analysis_project,
         name='seqr_loader',
         output_version=output_version,
@@ -196,37 +196,35 @@ def main(
             f'{", ".join(output_projects)}, '
             f'v{output_version}'
         ),
-        check_inputs_existence=check_inputs_existence,
+        do_update_analyses=update_smdb,
+        do_check_existence=check_inputs_existence,
     )
-
-    _add_jobs(
-        pipeline=pipeline,
-        smdb=smdb,
-        overwrite=overwrite,
-        input_projects=input_projects,
-        output_projects=output_projects or input_projects,
-        vep_block_size=vep_block_size,
-        start_from_stage=start_from_stage,
-        end_with_stage=end_with_stage,
-        skip_samples=skip_samples,
-        use_gnarly=use_gnarly,
-        use_as_vqsr=use_as_vqsr,
-        hc_shards_num=hc_shards_num,
-        check_inputs_existence=check_inputs_existence,
-    )
+    
     pipeline.run(dry_run)
 
 
 class SeqrLoaderPipeline(Pipeline):
     def __init__(
         self,
-        update_smdb: bool,
         *args,
         **kwargs,
     ):
-        super().__init__(update_smdb, *args, **kwargs)
-        self.smdb = SMDB(self.analysis_project, update_smdb)
+        super().__init__(*args, **kwargs)
         self.fingerprints_bucket = f'{self.analysis_bucket}/fingerprints'
+
+        # pipeline=pipeline,
+        # smdb=smdb,
+        # overwrite=overwrite,
+        # input_projects=input_projects,
+        # output_projects=output_projects or input_projects,
+        # vep_block_size=vep_block_size,
+        # start_from_stage=start_from_stage,
+        # end_with_stage=end_with_stage,
+        # skip_samples=skip_samples,
+        # use_gnarly=use_gnarly,
+        # use_as_vqsr=use_as_vqsr,
+        # hc_shards_num=hc_shards_num,
+        # check_inputs_existence=check_inputs_existence,
 
     def add_jobs(
         self,
@@ -246,44 +244,25 @@ class SeqrLoaderPipeline(Pipeline):
         if first_stage <= Stage.CRAM:
             self._cram()
 
-        if end_with_stage == 'cram':
-            logger.info(
-                f'Latest stage is {end_with_stage}, stopping the pipeline here.'
-            )
-            rturn
-
-    def _prepare_inputs(
-        self,
-        input_projects: List[str],
-        skip_samples: List[str],
-    ):
-        self.samples_by_project = self.smdb.get_samples_by_project(
-            projects=input_projects,
-            namespace=self.output_suf,
-            skip_samples=skip_samples,
-        )
-
     def _cram(
         self,
     ):
-        # after dropping samples with incorrect metadata, missing inputs, etc
-        good_samples: List[Dict] = []
         cram_jobs = []
         for proj, samples in self.samples_by_project.items():
             logger.info(f'Submitting CRAMs for project {proj}')
             proj_bucket = f'gs://cpg-{proj}-{self.output_suf}'
             sample_ids = [s['id'] for s in samples]
 
-            cram_analysis_per_sid = self.smdb.find_analyses_by_sid(
+            cram_analysis_per_sid = self.db.find_analyses_by_sid(
                 sample_ids=sample_ids,
                 analysis_type='cram',
             )
-            seq_info_by_sid = self.smdb.find_seq_info_by_sid(sample_ids)
+            seq_info_by_sid = self.db.find_seq_info_by_sid(sample_ids)
 
             for s in samples:
                 logger.info(f'Project {proj}. Processing CRAM for {s["id"]}')
                 expected_cram_path = f'{proj_bucket}/cram/{s["id"]}.cram'
-                found_cram_path = self.smdb.process_existing_analysis(
+                found_cram_path = self.db.process_existing_analysis(
                     sample_ids=[s['id']],
                     completed_analysis=cram_analysis_per_sid.get(s['id']),
                     analysis_type='cram',
@@ -291,30 +270,20 @@ class SeqrLoaderPipeline(Pipeline):
                     expected_output_fpath=expected_cram_path,
                 )
                 seq_info = seq_info_by_sid[s['id']]
-                logger.info('Checking sequence.meta:')
-                alignment_input = parse_reads_from_metadata(
-                    seq_info['meta'], check_existence=self.check_inputs_existence
-                )
+                alignment_input = self.db.parse_reads_from_metadata(seq_info['meta'])
                 if not alignment_input:
-                    logger.info('Checking sample.meta:')
-                    alignment_input = parse_reads_from_metadata(
-                        s['meta'], check_existence=self.check_inputs_existence
-                    )
-                if alignment_input:
-                    cram_job = align.bwa(
-                        b=self.b,
-                        alignment_input=alignment_input,
-                        output_path=expected_cram_path,
-                        sample_name=s['id'],
-                        project_name=proj,
-                    )
-                else:
-                    cram_job = self.add_job(
-                        'BWA [reuse: no input found, but output exists]'
-                    )
+                    logger.critical(f'Could not find read data for sample {s["id"]}')
+                    continue
+                cram_job = align.bwa(
+                    b=self.b,
+                    alignment_input=alignment_input,
+                    output_path=expected_cram_path,
+                    sample_name=s['id'],
+                    project_name=proj,
+                )
+                cram_jobs.append(cram_job)
                 found_cram_path = expected_cram_path
-                good_samples.append(s)
-        return good_samples
+        return cram_jobs
 
     def _gvcf(self, hc_shards_num):
         # after dropping samples with incorrect metadata, missing inputs, etc
@@ -327,7 +296,7 @@ class SeqrLoaderPipeline(Pipeline):
             proj_bucket = f'gs://cpg-{proj}-{self.output_suf}'
             sample_ids = [s['id'] for s in samples]
 
-            gvcf_analysis_per_sid = self.smdb.find_analyses_by_sid(
+            gvcf_analysis_per_sid = self.db.find_analyses_by_sid(
                 sample_ids=sample_ids,
                 analysis_type='gvcf',
             )
@@ -335,7 +304,7 @@ class SeqrLoaderPipeline(Pipeline):
             for s in samples:
                 logger.info(f'Project {proj}. Processing GVCF {s["id"]}')
                 expected_gvcf_path = f'{proj_bucket}/gvcf/{s["id"]}.g.vcf.gz'
-                found_gvcf_path = self.smdb.process_existing_analysis(
+                found_gvcf_path = self.db.process_existing_analysis(
                     sample_ids=[s['id']],
                     completed_analysis=gvcf_analysis_per_sid.get(s['id']),
                     analysis_type='gvcf',

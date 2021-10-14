@@ -43,12 +43,26 @@ class SMDB:
     Abstracting the communication with the SampleMetadata database.
     """
 
-    def __init__(self, analysis_project: str, do_update_analyses: bool):
+    def __init__(
+        self, 
+        analysis_project: str, 
+        do_update_analyses: bool = True,
+        do_check_existence: bool = True,
+    ):
+        """
+        :param analysis_project: project where to create the "analysis" entries.
+        :param do_update_analyses: if not set, won't update "analysis" entries' 
+            statuses.
+        :param do_check_existence: when querying "sequence" or "analysis" entries
+            with files, check those files existence with gsutil. For "sequence", will
+            throw an error. For "analysis", will invalidate by setting status=failure.
+        """
         self.sapi = SampleApi()
         self.aapi = AnalysisApi()
         self.seqapi = SequenceApi()
-        self.do_update_analyses = do_update_analyses
         self.analysis_project = analysis_project
+        self.do_update_analyses = do_update_analyses
+        self.do_check_existence = do_check_existence
 
     def get_samples_by_project(
         self,
@@ -122,19 +136,21 @@ class SMDB:
         self,
         sample_ids: Collection[str],
         analysis_type: str,
+        project: Optional[str] = None,
     ) -> Dict[str, Analysis]:
         """
         Query the DB to find the last completed analysis for the type and samples,
         one Analysis object per sample. Assumes the analysis is defined for a single
         sample (e.g. cram, gvcf)
         """
+        project = project or self.analysis_project
         analysis_per_sid: Dict[str, Analysis] = dict()
         try:
             logger.info(
-                f'Querying analysis entries for project {self.analysis_project}'
+                f'Querying analysis entries for project {project}'
             )
             datas = self.aapi.get_latest_analysis_for_samples_and_type(
-                project=self.analysis_project,
+                project=project,
                 analysis_type=analysis_type,
                 request_body=sample_ids,
             )
@@ -382,6 +398,12 @@ class SMDB:
             sm_in_progress_j.depends_on(*depends_on)
         last_j = sm_completed_j
         return last_j
+    
+    def parse_reads_from_metadata(self, metadata):
+        return parse_reads_from_metadata(
+            metadata,
+            check_existence=self.do_check_existence
+        )
 
 
 def _parse_analysis(data: Dict) -> Optional[Analysis]:
