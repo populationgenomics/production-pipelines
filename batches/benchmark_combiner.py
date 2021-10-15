@@ -18,9 +18,9 @@ logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
-BENCHMARK_BUCKET = 'gs://cpg-tob-wgs-test/benchmark_combiner'
+BENCHMARK_BUCKET = 'gs://cpg-fewgenomes-test-analysis/benchmark_combiner'
 
-INPUT_PROJECT = 'tob-wgs'
+INPUT_PROJECT = 'fewgenomes'
 
 pipe = Pipeline(
     analysis_project='fewgenomes',
