@@ -30,7 +30,7 @@ pipe = Pipeline(
     title='Benchmark GVCF combiner',
     smdb_check_existence=False,
 )
-pipe.find_samples(input_projects=[INPUT_PROJECT], namespace='main')
+pipe.find_samples(input_projects=[INPUT_PROJECT], namespace='test')
 samples = pipe.get_all_samples()
 gvcf_analysis_per_sid = pipe.db.find_analyses_by_sid(
     sample_ids=[s.id for s in samples],
