@@ -30,7 +30,7 @@ logger.setLevel(logging.INFO)
 DEFAULT_REF = 'GRCh38'
 
 DATAPROC_PACKAGES = [
-    'joint-calling',
+    'cpg_production_pipelines',
     'click',
     'cpg-gnomad',
     'google',

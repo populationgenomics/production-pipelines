@@ -18,36 +18,57 @@ logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
-BENCHMARK_BUCKET = 'gs://cpg-fewgenomes-test-analysis/benchmark_combiner'
-
 INPUT_PROJECT = 'fewgenomes'
+NAMESPACE = 'main'
+BENCHMARK_BUCKET = f'gs://cpg-{INPUT_PROJECT}-{NAMESPACE}-analysis/benchmark_combiner'
+
 
 pipe = Pipeline(
     analysis_project='fewgenomes',
     name='benchmark_combiner',
     output_version='v0',
-    namespace='test',
+    namespace=NAMESPACE,
     title='Benchmark GVCF combiner',
     smdb_check_existence=False,
 )
-pipe.find_samples(input_projects=[INPUT_PROJECT], namespace='test')
+pipe.find_samples(input_projects=[INPUT_PROJECT], namespace=NAMESPACE)
 samples = pipe.get_all_samples()
+sample_ids = [s.id for s in samples]
 gvcf_analysis_per_sid = pipe.db.find_analyses_by_sid(
-    sample_ids=[s.id for s in samples],
+    sample_ids=sample_ids,
     analysis_type='gvcf',
     project=INPUT_PROJECT,
 )
+gvcf_by_sid = dict()
+if gvcf_analysis_per_sid:
+    logger.info(f'Found {len(gvcf_analysis_per_sid)} GVCF analysis enteies in {INPUT_PROJECT}')
+    gvcf_by_sid = {sid: a.output for sid, a in gvcf_analysis_per_sid.items()}
+if not gvcf_analysis_per_sid:
+    logger.info(f'Found no GVCF analysis for {INPUT_PROJECT}, '
+                f'looking for GVCFs in sequence meta')
+    seqs = pipe.db.seqapi.get_sequences_by_sample_ids(request_body=sample_ids)
+    gvcf_seq_per_sid = {seq['sample_id']: seq for seq in seqs if seq['meta'].get('gvcf')}
+    if not gvcf_seq_per_sid:
+        logger.error('Could not find GVCF in sequence meta either')
+        exit(1)
+    logger.info(f'Found {len(gvcf_seq_per_sid)} GVCF sequence entries in {INPUT_PROJECT}')
+    gvcf_by_sid = {sid: seq['meta']['gvcf'][0]['location'] for sid, seq in gvcf_seq_per_sid.items()}
+if not gvcf_by_sid:
+    logger.error('No GVCFs found, exiting')
+    exit(1)
+logger.info(f'Found {len(gvcf_by_sid)} GVCFs')
+
 df = pd.DataFrame(
     [
-        {'s': s.id, 'gvcf': gvcf_analysis_per_sid[s.id]}
+        {'s': s.id, 'gvcf': gvcf_by_sid[s.id]}
         for s in samples
-        if s.id in gvcf_analysis_per_sid
+        if s.id in gvcf_by_sid
     ]
 )
 logger.info(f'Found {len(df)} samples in {INPUT_PROJECT} with gvcfs')
 
 for n_workers in [20, 40]:
-    for n_samples in [100, 200, 400]:
+    for n_samples in [100, 200]:
         label = f'nsamples-{n_samples}-nworkers-{n_workers}'
         out_mt_path = join(BENCHMARK_BUCKET, label, 'combined.mt')
 
