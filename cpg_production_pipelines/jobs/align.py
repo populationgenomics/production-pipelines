@@ -188,11 +188,13 @@ def _align_one(
     if alignment_input.bam_or_cram_path:
         assert alignment_input.index_path
         assert not alignment_input.fqs1 and not alignment_input.fqs2
-        storage = (
-            '400G' if alignment_input.bam_or_cram_path.endswith('.cram') else '1000G'
-        )
+        if alignment_input.bam_or_cram_path.endswith('.cram'):
+            storage = '400G'  # 150G input CRAM, 150G output CRAM, plus some tmp storage
+        else:
+            storage = '600G'  # input BAM is 1.5-2 times larger
     else:
         assert alignment_input.fqs1 and alignment_input.fqs2
+        # Allow for 300G input FQ, 150G output CRAM, plus some tmp storage
         storage = '600G'
     j.storage(storage)
 
@@ -221,37 +223,48 @@ def _align_one(
         )
     else:
         j.image(resources.DRAGMAP_IMAGE)
-        # Allow for 400G of extacted FQ, 150G of output CRAMs,
-        # plus some tmp storage for sorting
-        j.storage('700G')
-
+        # # Allow for 400G of extacted FQ, 150G of output CRAMs,
+        # # plus some tmp storage for sorting
+        # j.storage('700G')
         prep_inp_cmd = ''
         if alignment_input.bam_or_cram_path:
-            extract_j = extract_fastq(
-                b=b,
-                alignment_input=alignment_input,
-                sample_name=sample_name,
-                project_name=project_name,
-            )
-            input_param = f'-1 {extract_j.fq1} -2 {extract_j.fq2}'
-        elif len(alignment_input.fqs1) == 1:
-            input_param = (
-                f'-1 {b.read_input(alignment_input.fqs1[0])} '
-                f'-2 {b.read_input(alignment_input.fqs2[0])}'
-            )
-        else:
-            files1 = [b.read_input(f1) for f1 in alignment_input.fqs1]
-            files2 = [b.read_input(f1) for f1 in alignment_input.fqs2]
-            prep_inp_cmd = dedent(
-                f"""
-            cat {" ".join(files1)} >reads.R1.fq.gz
-            cat {" ".join(files2)} >reads.R2.fq.gz
-            # After merging lanes, we don't need input FQs anymore:
-            rm {" ".join(files1 + files2)}  
-            """
-            )
-            input_param = f'-1 reads.R1.fq.gz -2 reads.R2.fq.gz'
+            assert alignment_input.index_path
+            assert not alignment_input.fqs1 and not alignment_input.fqs2
 
+            # extract_j = extract_fastq(
+            #     b=b,
+            #     alignment_input=alignment_input,
+            #     sample_name=sample_name,
+            #     project_name=project_name,
+            # )
+            # input_param = f'-1 {extract_j.fq1} -2 {extract_j.fq2}'
+            reference = b.read_input_group(**resources.REF_D)
+            input_param = (
+                f'-b {alignment_input.bam_or_cram_path} '
+                f'--interleaved=1 '
+                f'--ht-reference {reference.fasta} '
+            )
+
+        else:
+            # Allow for 300G input FQ, 150G output CRAM, plus some tmp storage
+            if len(alignment_input.fqs1) == 1:
+                input_param = (
+                    f'-1 {b.read_input(alignment_input.fqs1[0])} '
+                    f'-2 {b.read_input(alignment_input.fqs2[0])}'
+                )
+            else:
+                files1 = [b.read_input(f1) for f1 in alignment_input.fqs1]
+                files2 = [b.read_input(f1) for f1 in alignment_input.fqs2]
+                prep_inp_cmd = dedent(
+                    f"""
+                cat {" ".join(files1)} >reads.R1.fq.gz
+                cat {" ".join(files2)} >reads.R2.fq.gz
+                # After merging lanes, we don't need input FQs anymore:
+                rm {" ".join(files1 + files2)}  
+                """
+                )
+                input_param = f'-1 reads.R1.fq.gz -2 reads.R2.fq.gz'
+        
         dragmap_index = b.read_input_group(
             **{
                 k.replace('.', '_'): join(resources.DRAGMAP_INDEX_BUCKET, k)
@@ -395,7 +408,7 @@ def create_dragmap_index(b: hb.Batch) -> Job:
     j.storage('40G')
     cmd = f"""
     DIR=$(dirname {j.hash_table_cfg})
-    
+
     dragen-os \\
     --build-hash-table true \\
     --ht-reference {reference.base} \\
