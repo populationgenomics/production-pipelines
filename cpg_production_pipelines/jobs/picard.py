@@ -1,4 +1,3 @@
-from os.path import join, dirname
 from typing import Optional
 
 import hailtop.batch as hb
@@ -41,21 +40,10 @@ def markdup(
     
     samtools index -@2 {j.output_cram.cram} {j.output_cram['cram.crai']}
     """
-    j.command(
-        wrap_command(
-            cmd,
-            out_cram_path,
-            overwrite,
-            monitor_space=True,
-        )
-    )
-    if out_cram_path:
-        b.write_output(
-            j.duplicate_metrics,
-            join(
-                dirname(out_cram_path),
-                'duplicate-metrics',
-                f'{sample_name}-duplicate-metrics.csv',
-            ),
-        )
+    j.command(wrap_command(
+        cmd,
+        out_cram_path,
+        overwrite,
+        monitor_space=True,
+    ))
     return j

@@ -1,0 +1,17 @@
+name: production-pipelines
+
+channels:
+  - cpg
+  - conda-forge
+
+dependencies:
+  - pre-commit
+  - pylint
+  - bumpversion
+  - hail
+  - click
+  - pandas
+  - google-cloud-sdk
+  - google-cloud-storage
+  - gnomad
+  - analysis-runner

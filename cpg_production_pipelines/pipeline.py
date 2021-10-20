@@ -10,7 +10,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_production_pipelines.smdb import SMDB
-from cpg_production_pipelines.utils import AlignmentInput
+from cpg_production_pipelines.jobs import align, haplotype_caller
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -31,7 +31,7 @@ class Sample:
     id: str
     external_id: str
     project: str
-    alignment_input: Optional[AlignmentInput] = None
+    alignment_input: Optional[align.AlignmentInput] = None
     good: bool = True
    
     
@@ -44,6 +44,41 @@ class Project:
     samples: List[Sample]
     is_test: bool = False
 
+
+class Batch(hb.Batch):
+    """
+    Overriding hail Batch object so we have control over registering new jobs
+    and can collect statistics
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Job stats registry
+        self.labelled_jobs = dict()
+        self.other_job_num = 0
+        self.total_job_num = 0
+        
+    def new_job(
+        self,
+        name: Optional[str] = None,
+        attributes: Optional[Dict[str, str]] = None,
+        shell: Optional[str] = None,
+        label: Optional[str] = None,
+        samples: Optional[Set[Sample]] = None,
+    ):
+        """
+        Adds job to the Batch, and also registers it in `self.job_stats` for
+        statistics.
+        """
+        if label and samples is not None:
+            if label not in self.labelled_jobs:
+                self.labelled_jobs[label] = {'job_n': 0, 'samples': set()}
+            self.labelled_jobs[label]['job_n'] += 1
+            self.labelled_jobs[label]['samples'] |= samples
+        else:
+            self.other_job_num += 1
+        self.total_job_num += 1
+        return super().new_job(name, attributes, shell)
+        
 
 class Pipeline:
     """
@@ -59,7 +94,8 @@ class Pipeline:
         title: str,
         keep_scratch: bool = False,
         smdb_update_analyses: bool = False,
-        smdb_check_existence: bool = False
+        smdb_check_existence: bool = False,
+        hail_billing_project: Optional[str] = None,
     ):
         self.analysis_project = analysis_project
         self.name = name
@@ -100,48 +136,23 @@ class Pipeline:
         self.web_bucket = path_ptrn.format(suffix=web_suf)
 
         self.keep_scratch = keep_scratch
-        self.b = setup_batch(self.tmp_bucket, title, keep_scratch)
+        self.b = self._setup_batch(title, keep_scratch, hail_billing_project)
         self.local_tmp_dir = tempfile.mkdtemp()
 
         self.projects: List[Project] = []
         
-        # Job stats registry
-        self.labelled_jobs = dict()
-        self.other_job_num = 0
-        self.total_job_num = 0
-
     def get_all_samples(self) -> List[Sample]:
         all_samples = []
         for proj in self.projects:
             all_samples.extend(proj.samples)
         return all_samples
 
-    def add_job(
-        self, 
-        name: str, 
-        label: Optional[str], 
-        samples: Optional[Set[Sample]],
-    ) -> Job:
-        """
-        Adds job to the Batch, and also registers it in `self.job_stats` for
-        statistics.
-        """
-        if label and samples is not None:
-            if label not in self.labelled_jobs:
-                self.labelled_jobs[label] = {'job_n': 0, 'samples': set()}
-            self.labelled_jobs[label]['job_n'] += 1
-            self.labelled_jobs[label]['samples'] |= samples
-        else:
-            self.other_job_num += 1
-        self.total_job_num += 1
-        return self.b.new_job(name)
-
     def run(self, dry_run: bool = False) -> None:
         if self.b:
-            logger.info(f'Will submit {self.total_job_num} jobs:')
-            for label, stat in self.labelled_jobs.items():
+            logger.info(f'Will submit {self.b.total_job_num} jobs:')
+            for label, stat in self.b.labelled_jobs.items():
                 logger.info(f'  {label}: {stat["job_n"]} for {len(stat["samples"])} samples')
-            logger.info(f'  Other jobs: {self.other_job_num}')
+            logger.info(f'  Other jobs: {self.b.other_job_num}')
 
             self.b.run(
                 dry_run=dry_run,
@@ -176,22 +187,33 @@ class Pipeline:
                 ) for s in samples]
             )
             self.projects.append(p)
+    
+    def _setup_batch(
+        self,
+        title, 
+        keep_scratch,
+        billing_project: Optional[str] = None,
+    ) -> Batch:
+        hail_bucket = os.environ.get('HAIL_BUCKET')
+        if not hail_bucket or keep_scratch:
+            # Scratch files are large, so we want to use the temporary bucket to put them in
+            hail_bucket = f'{self.tmp_bucket}/hail'
+        billing_project = (
+            billing_project or
+            os.getenv('HAIL_BILLING_PROJECT') or
+            self.analysis_project
+        )
+        logger.info(
+            f'Starting Hail Batch with the project {billing_project}, '
+            f'bucket {hail_bucket}'
+        )
+        backend = hb.ServiceBackend(
+            billing_project=billing_project,
+            bucket=hail_bucket.replace('gs://', ''),
+            token=os.getenv('HAIL_TOKEN'),
+        )
+        b = Batch(title, backend=backend)
+        return b
 
-
-def setup_batch(tmp_bucket, title, keep_scratch) -> hb.Batch:
-    hail_bucket = os.environ.get('HAIL_BUCKET')
-    if not hail_bucket or keep_scratch:
-        # Scratch files are large, so we want to use the temporary bucket to put them in
-        hail_bucket = f'{tmp_bucket}/hail'
-    billing_project = os.getenv('HAIL_BILLING_PROJECT') or 'seqr'
-    logger.info(
-        f'Starting Hail Batch with the project {billing_project}, '
-        f'bucket {hail_bucket}'
-    )
-    backend = hb.ServiceBackend(
-        billing_project=billing_project,
-        bucket=hail_bucket.replace('gs://', ''),
-        token=os.getenv('HAIL_TOKEN'),
-    )
-    b = hb.Batch(title, backend=backend)
-    return b
+    def add_align(self, *args, **kwargs):
+        align.align(b=self.b, *args, **kwargs)

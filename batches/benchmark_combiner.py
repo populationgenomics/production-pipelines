@@ -7,7 +7,9 @@ from analysis_runner import dataproc
 from sample_metadata import (
     AnalysisApi,
     SampleApi,
+    SequenceUpdateModel,
 )
+
 from cpg_production_pipelines import utils
 from cpg_production_pipelines.pipeline import Pipeline
 
@@ -18,13 +20,14 @@ logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
-INPUT_PROJECT = 'fewgenomes'
+# INPUT_PROJECT = 'fewgenomes'
+INPUT_PROJECT = 'tob-wgs'
 NAMESPACE = 'main'
 BENCHMARK_BUCKET = f'gs://cpg-{INPUT_PROJECT}-{NAMESPACE}-analysis/benchmark_combiner'
 
 
 pipe = Pipeline(
-    analysis_project='fewgenomes',
+    analysis_project=INPUT_PROJECT,
     name='benchmark_combiner',
     output_version='v0',
     namespace=NAMESPACE,
@@ -53,6 +56,10 @@ if not gvcf_analysis_per_sid:
         exit(1)
     logger.info(f'Found {len(gvcf_seq_per_sid)} GVCF sequence entries in {INPUT_PROJECT}')
     gvcf_by_sid = {sid: seq['meta']['gvcf'][0]['location'] for sid, seq in gvcf_seq_per_sid.items()}
+    for gvcf_path, sid in gvcf_by_sid.items():
+        if gvcf_path.endswith('.haplotypeCalls.er.raw.g.vcf.gz'):
+            pipe.db.sapi.update_sample(sid, SampleUpdateModel)
+        
 if not gvcf_by_sid:
     logger.error('No GVCFs found, exiting')
     exit(1)
@@ -67,8 +74,30 @@ df = pd.DataFrame(
 )
 logger.info(f'Found {len(df)} samples in {INPUT_PROJECT} with gvcfs')
 
-for n_workers in [20, 40]:
-    for n_samples in [100, 200]:
+for n_workers in [10, 20, 40]:
+    for n_samples in [400, 500]:  #[100, 200, 300]:
+        label = f'nsamples-{n_samples}-nworkers-{n_workers}'
+        out_mt_path = join(BENCHMARK_BUCKET, label, 'combined.mt')
+
+        meta_csv_path = join(BENCHMARK_BUCKET, label, 'meta.csv')
+        subset_df = df.sample(n=n_samples)
+        logger.info(f'Subset dataframe to {len(subset_df)} samples')
+        subset_df.to_csv(meta_csv_path, index=False, sep='\t', na_rep='NA')
+
+        combiner_job = dataproc.hail_dataproc_job(
+            pipe.b,
+            f'{utils.QUERY_SCRIPTS_DIR}/combine_gvcfs.py '
+            f'--meta-csv {meta_csv_path} '
+            f'--out-mt {out_mt_path} '
+            f'--bucket {BENCHMARK_BUCKET}/work',
+            max_age='8h',
+            packages=utils.DATAPROC_PACKAGES,
+            num_secondary_workers=n_workers,
+            job_name=f'Combine {n_samples} GVCFs on {n_workers} workers',
+        )
+
+for n_workers in [30, 50]:
+    for n_samples in [100, 200, 300, 400, 500]:
         label = f'nsamples-{n_samples}-nworkers-{n_workers}'
         out_mt_path = join(BENCHMARK_BUCKET, label, 'combined.mt')
 

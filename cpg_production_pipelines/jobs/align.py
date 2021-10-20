@@ -113,7 +113,7 @@ def align(
         # 300G for input BAMs, 300G for output BAM
         merge_j.storage('600G')
 
-        align_cmd = f"""
+        align_cmd = f"""\
         samtools merge -@{nthreads-1} - {' '.join([j.sorted_bam for j in align_jobs])}
         """
         align_j = merge_j
@@ -132,7 +132,7 @@ def align(
         first_j = align_j
         stdout_is_sorted = False
 
-    align_cmd, last_j = finalise_alignment(
+    last_j = finalise_alignment(
         b=b,
         align_cmd=align_cmd,
         stdout_is_sorted=stdout_is_sorted,
@@ -144,7 +144,6 @@ def align(
         overwrite=overwrite,
         markdup_tool=markdup_tool,
     )
-    align_j.command(wrap_command(align_cmd, output_path, overwrite, monitor_space=True))
 
     if depends_on:
         first_j.depends_on(*depends_on)
@@ -238,11 +237,12 @@ def _align_one(
             #     project_name=project_name,
             # )
             # input_param = f'-1 {extract_j.fq1} -2 {extract_j.fq2}'
+            cram = b.read_input_group(
+                base=alignment_input.bam_or_cram_path, index=alignment_input.index_path
+            )
             reference = b.read_input_group(**resources.REF_D)
             input_param = (
-                f'-b {alignment_input.bam_or_cram_path} '
-                f'--interleaved=1 '
-                f'--ht-reference {reference.fasta} '
+                f'-b {cram.base} --interleaved=1 --ht-reference {reference.base} '
             )
 
         else:
@@ -255,14 +255,12 @@ def _align_one(
             else:
                 files1 = [b.read_input(f1) for f1 in alignment_input.fqs1]
                 files2 = [b.read_input(f1) for f1 in alignment_input.fqs2]
-                prep_inp_cmd = dedent(
-                    f"""
+                prep_inp_cmd = dedent(f"""\
                 cat {" ".join(files1)} >reads.R1.fq.gz
                 cat {" ".join(files2)} >reads.R2.fq.gz
                 # After merging lanes, we don't need input FQs anymore:
                 rm {" ".join(files1 + files2)}  
-                """
-                )
+                """)
                 input_param = f'-1 reads.R1.fq.gz -2 reads.R2.fq.gz'
         
         dragmap_index = b.read_input_group(
@@ -271,8 +269,7 @@ def _align_one(
                 for k in resources.DRAGMAP_INDEX_FILES
             }
         )
-        align_cmd = dedent(
-            f"""
+        align_cmd = dedent(f"""\
         {prep_inp_cmd}
         dragen-os -r {dragmap_index} {input_param} \\
         --RGID {sample_name} --RGSM {sample_name}
@@ -348,8 +345,7 @@ def _build_bwa_command(
     # -t16 threads
     # -Y   use soft clipping for supplementary alignments
     # -R   read group header line such as '@RG\tID:foo\tSM:bar'
-    return dedent(
-        f"""
+    return dedent(f"""\
     {pull_inputs_cmd}
     {tool} mem -K 100000000 {'-p' if use_bazam else ''} -t{nthreads} -Y \\
     -R '{rg_line}' {bwa_reference.base} {r1_param} {r2_param}
@@ -380,7 +376,7 @@ def extract_fastq(
     cram = b.read_input_group(
         base=alignment_input.bam_or_cram_path, index=alignment_input.index_path
     )
-    cmd = f"""
+    cmd = f"""\
     samtools fastq -@{nthreads-1} {cram.base} -T {reference.base} \\
     -@{nthreads} -1 {j.fq1} -2 {j.fq2} -0 /dev/null -s /dev/null
     # After converting to FQ, we don't need input CRAMs anymore:
@@ -406,7 +402,7 @@ def create_dragmap_index(b: hb.Batch) -> Job:
     j.memory('standard')
     j.cpu(32)
     j.storage('40G')
-    cmd = f"""
+    cmd = f"""\
     DIR=$(dirname {j.hash_table_cfg})
 
     dragen-os \\
@@ -428,13 +424,9 @@ def create_dragmap_index(b: hb.Batch) -> Job:
 
 
 def sort_cmd(nthreads):
-    return dedent(
-        f"""
-    | samtools sort -@{nthreads-1} \\
-    -T $(dirname /io/batch/samtools-sort-tmp \\ 
-    -Obam
-    """
-    ).strip()
+    return dedent(f"""\
+    | samtools sort -@{nthreads-1} -T /io/batch/samtools-sort-tmp -Obam
+    """).strip()
 
 
 def finalise_alignment(
@@ -452,6 +444,7 @@ def finalise_alignment(
 
     reference = b.read_input_group(**resources.REF_D)
 
+    md_j = None
     if markdup_tool == MarkDupTool.BIOBAMBAM:
         j.declare_resource_group(
             output_cram={
@@ -459,21 +452,22 @@ def finalise_alignment(
                 'cram.crai': '{root}.cram.crai',
             }
         )
-        align_cmd += dedent(
-            f"""
+        align_cmd += dedent(f"""\
         | bamsormadup inputformat=sam threads={nthreads} SO=coordinate \\
         M={j.duplicate_metrics} outputformat=sam \\
         tmpfile=$(dirname {j.output_cram.cram})/bamsormadup-tmp \\
         | samtools view -@{nthreads-1} -T {reference.base} -Ocram -o {j.output_cram.cram}        
         samtools index -@{nthreads-1} {j.output_cram.cram} {j.output_cram["cram.crai"]}
-        """
-        ).strip()
+        """).strip()
         md_j = j
-
     else:
         if not stdout_is_sorted:
-            align_cmd += sort_cmd(nthreads)
-        align_cmd += f'> {j.sorted_bam}'
+            align_cmd += f' {sort_cmd(nthreads)}'
+        align_cmd += f' > {j.sorted_bam}'
+
+    j.command(wrap_command(align_cmd, output_path, overwrite, monitor_space=True))
+
+    if markdup_tool == MarkDupTool.PICARD:
         md_j = picard.markdup(
             b,
             j.sorted_bam,
@@ -483,13 +477,17 @@ def finalise_alignment(
         )
 
     if output_path:
-        b.write_output(md_j.output_cram, splitext(output_path)[0])
-        b.write_output(
-            md_j.duplicate_metrics,
-            join(
-                dirname(output_path),
-                'duplicate-metrics',
-                f'{sample_name}-duplicate-metrics.csv',
-            ),
-        )
-    return align_cmd, md_j
+        if md_j is not None:
+            b.write_output(md_j.output_cram, splitext(output_path)[0])
+            b.write_output(
+                md_j.duplicate_metrics,
+                join(
+                    dirname(output_path),
+                    'duplicate-metrics',
+                    f'{sample_name}-duplicate-metrics.csv',
+                ),
+            )
+        else:
+            b.write_output(j.sorted_bam, splitext(output_path)[0])
+
+    return md_j

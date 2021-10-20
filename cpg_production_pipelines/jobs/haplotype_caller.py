@@ -28,6 +28,7 @@ def produce_gvcf(
     depends_on: Optional[List[Job]] = None,
     smdb: Optional[SMDB] = None,
     external_id: Optional[str] = None,
+    dragen_mode: bool = False,
 ) -> Job:
     """
     Takes all samples with a 'file' of 'type'='bam' in `samples_df`,
@@ -69,6 +70,7 @@ def produce_gvcf(
                     interval_idx=idx,
                     number_of_intervals=number_of_intervals,
                     depends_on=depends_on,
+                    dragen_mode=dragen_mode,
                 )
             )
         hc_j = merge_gvcfs_job(
@@ -136,6 +138,7 @@ def hc_job(
     depends_on: Optional[List[Job]] = None,
     output_path: Optional[str] = None,
     overwrite: bool = False,
+    dragen_mode: bool = False,
 ) -> Job:
     """
     Run HaplotypeCaller on an input BAM or CRAM, and output GVCF
@@ -166,6 +169,8 @@ def hc_job(
     -I {cram_fpath} \\
     --read-index {crai_fpath} \\
     {f"-L {interval} " if interval is not None else ""} \\
+    --disable-spanning-event-genotyping \\
+    {"--dragen-mode " if dragen_mode else ""} \\
     -O {j.output_gvcf['g.vcf.gz']} \\
     -G AS_StandardAnnotation \\
     -GQB 20 \\

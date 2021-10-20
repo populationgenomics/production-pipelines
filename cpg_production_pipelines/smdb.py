@@ -9,14 +9,6 @@ from typing import List, Dict, Optional, Set, Collection
 
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
-from sample_metadata import (
-    AnalysisApi,
-    SequenceApi,
-    SampleApi,
-    AnalysisUpdateModel,
-    AnalysisModel,
-    exceptions,
-)
 
 from cpg_production_pipelines import utils, resources
 
@@ -57,6 +49,7 @@ class SMDB:
             with files, check those files existence with gsutil. For "sequence", will
             throw an error. For "analysis", will invalidate by setting status=failure.
         """
+        from sample_metadata import AnalysisApi, SequenceApi, SampleApi
         self.sapi = SampleApi()
         self.aapi = AnalysisApi()
         self.seqapi = SequenceApi()
@@ -105,6 +98,8 @@ class SMDB:
         """
         Update "status" of an Analysis entry
         """
+        from sample_metadata import AnalysisUpdateModel
+
         if not self.do_update_analyses:
             return
         self.aapi.update_analysis_status(
@@ -143,6 +138,8 @@ class SMDB:
         one Analysis object per sample. Assumes the analysis is defined for a single
         sample (e.g. cram, gvcf)
         """
+        from sample_metadata import exceptions
+        
         project = project or self.analysis_project
         analysis_per_sid: Dict[str, Analysis] = dict()
         try:
@@ -247,6 +244,8 @@ class SMDB:
         """
         Tries to create an Analysis entry, returns its id if successfuly
         """
+        from sample_metadata import AnalysisModel
+
         if not self.do_update_analyses:
             return None
 
