@@ -1,5 +1,5 @@
 from enum import Enum
-from textwrap import dedent
+from textwrap import dedent, indent
 from typing import Optional, List, Tuple
 from os.path import splitext, basename, dirname, join
 import logging
@@ -8,7 +8,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_production_pipelines import resources
-from cpg_production_pipelines.jobs import wrap_command
+from cpg_production_pipelines.jobs import wrap_command, new_job
 from cpg_production_pipelines.jobs import picard
 from cpg_production_pipelines.smdb import SMDB
 from cpg_production_pipelines.utils import AlignmentInput
@@ -57,7 +57,7 @@ def bwamem2(*args, **kwargs):
 
 
 def align(
-    b: hb.Batch,
+    b,
     alignment_input: AlignmentInput,
     output_path: str,
     sample_name: str,
@@ -94,8 +94,8 @@ def align(
                 b=b,
                 alignment_input=AlignmentInput(fqs1=[fq1], fqs2=[fq2]),
                 ncpu=ncpu,
-                sample_name=sample_name,
-                project_name=project_name,
+                sample=sample_name,
+                project=project_name,
                 aligner=aligner,
                 extra_label=f'{i+1}/{alignment_input.fqs1} {extra_label}',
             )
@@ -104,8 +104,7 @@ def align(
             align_jobs.append(j)
         first_j = align_jobs[0]
 
-        job_name = f'{project_name}/{sample_name}: merge BAMs'
-        merge_j = b.new_job(job_name)
+        merge_j = new_job('merge BAMs', sample_name, project_name)
         ncpu = 2
         nthreads = ncpu * 2  # multithreading
         merge_j.cpu(ncpu)
@@ -124,8 +123,8 @@ def align(
             b=b,
             alignment_input=alignment_input,
             ncpu=ncpu,
-            sample_name=sample_name,
-            project_name=project_name,
+            sample=sample_name,
+            project=project_name,
             aligner=aligner,
             extra_label=extra_label,
         )
@@ -162,11 +161,11 @@ def align(
 
 
 def _align_one(
-    b: hb.Batch,
+    b,
     alignment_input: AlignmentInput,
     ncpu: int,
-    sample_name: str,
-    project_name: Optional[str] = None,
+    sample: str,
+    project: Optional[str] = None,
     aligner: Aligner = Aligner.BWA,
     extra_label: Optional[str] = None,
 ) -> Tuple[Job, str]:
@@ -176,26 +175,14 @@ def _align_one(
     It leaves sorting and duplicate marking to the user, thus returns a command in
     a raw string in addition to the Job object.
     """
-    job_name = f'{project_name}/{sample_name}: {aligner.name}'
+    job_name = aligner.name
     if extra_label:
         job_name += f' {extra_label}'
-    j = b.new_job(job_name)
+
+    j = new_job(b, job_name, sample, project)
     nthreads = ncpu * 2  # multithreading
     j.cpu(ncpu)
     j.memory('standard')
-
-    if alignment_input.bam_or_cram_path:
-        assert alignment_input.index_path
-        assert not alignment_input.fqs1 and not alignment_input.fqs2
-        if alignment_input.bam_or_cram_path.endswith('.cram'):
-            storage = '400G'  # 150G input CRAM, 150G output CRAM, plus some tmp storage
-        else:
-            storage = '600G'  # input BAM is 1.5-2 times larger
-    else:
-        assert alignment_input.fqs1 and alignment_input.fqs2
-        # Allow for 300G input FQ, 150G output CRAM, plus some tmp storage
-        storage = '600G'
-    j.storage(storage)
 
     if aligner in [Aligner.BWAMEM2, Aligner.BWA]:
         if aligner == Aligner.BWAMEM2:
@@ -217,33 +204,23 @@ def _align_one(
             alignment_input=alignment_input,
             bwa_reference=bwa_reference,
             nthreads=nthreads,
-            sample_name=sample_name,
+            sample_name=sample,
             tool=tool,
         )
     else:
         j.image(resources.DRAGMAP_IMAGE)
-        # # Allow for 400G of extacted FQ, 150G of output CRAMs,
-        # # plus some tmp storage for sorting
-        # j.storage('700G')
+        # Allow for 400G of extacted FQ, 150G of output CRAMs,
+        # plus some tmp storage for sorting
+        j.storage('700G')
         prep_inp_cmd = ''
         if alignment_input.bam_or_cram_path:
-            assert alignment_input.index_path
-            assert not alignment_input.fqs1 and not alignment_input.fqs2
-
-            # extract_j = extract_fastq(
-            #     b=b,
-            #     alignment_input=alignment_input,
-            #     sample_name=sample_name,
-            #     project_name=project_name,
-            # )
-            # input_param = f'-1 {extract_j.fq1} -2 {extract_j.fq2}'
-            cram = b.read_input_group(
-                base=alignment_input.bam_or_cram_path, index=alignment_input.index_path
+            extract_j = extract_fastq(
+                b=b,
+                cram=alignment_input.get_cram_input_group(b),
+                sample_name=sample,
+                project_name=project,
             )
-            reference = b.read_input_group(**resources.REF_D)
-            input_param = (
-                f'-b {cram.base} --interleaved=1 --ht-reference {reference.base} '
-            )
+            input_param = f'-1 {extract_j.fq1} -2 {extract_j.fq2}'
 
         else:
             # Allow for 300G input FQ, 150G output CRAM, plus some tmp storage
@@ -255,26 +232,25 @@ def _align_one(
             else:
                 files1 = [b.read_input(f1) for f1 in alignment_input.fqs1]
                 files2 = [b.read_input(f1) for f1 in alignment_input.fqs2]
-                prep_inp_cmd = dedent(f"""\
+                prep_inp_cmd = f"""\
                 cat {" ".join(files1)} >reads.R1.fq.gz
                 cat {" ".join(files2)} >reads.R2.fq.gz
                 # After merging lanes, we don't need input FQs anymore:
                 rm {" ".join(files1 + files2)}  
-                """)
+                """
                 input_param = f'-1 reads.R1.fq.gz -2 reads.R2.fq.gz'
-        
+
         dragmap_index = b.read_input_group(
             **{
                 k.replace('.', '_'): join(resources.DRAGMAP_INDEX_BUCKET, k)
                 for k in resources.DRAGMAP_INDEX_FILES
             }
         )
-        align_cmd = dedent(f"""\
-        {prep_inp_cmd}
+        align_cmd = f"""\
+        {indent(dedent(prep_inp_cmd), ' '*8)}
         dragen-os -r {dragmap_index} {input_param} \\
-        --RGID {sample_name} --RGSM {sample_name}
+        --RGID {sample} --RGSM {sample}
         """
-        ).strip()
 
     return j, align_cmd
 
@@ -355,15 +331,14 @@ def _build_bwa_command(
 
 def extract_fastq(
     b: hb.Batch,
-    alignment_input: AlignmentInput,
+    cram: hb.ResourceGroup,
     sample_name: str,
     project_name: Optional[str] = None,
 ) -> Job:
     """
     Job that converts a bam or a cram to a pair of compressed fastq files
     """
-    job_name = f'{project_name}/{sample_name}: extract fastq'
-    j = b.new_job(job_name)
+    j = new_job(b, 'extract fastq', sample_name, project_name)
     ncpu = 32
     nthreads = ncpu * 2  # multithreading
     j.cpu(ncpu)
@@ -373,13 +348,11 @@ def extract_fastq(
     j.storage('600G')
 
     reference = b.read_input_group(**resources.REF_D)
-    cram = b.read_input_group(
-        base=alignment_input.bam_or_cram_path, index=alignment_input.index_path
-    )
     cmd = f"""\
     samtools fastq -@{nthreads-1} {cram.base} -T {reference.base} \\
     -@{nthreads} -1 {j.fq1} -2 {j.fq2} -0 /dev/null -s /dev/null
     # After converting to FQ, we don't need input CRAMs anymore:
+    rm {cram.base} {cram.index}
     """
     j.command(wrap_command(cmd, monitor_space=True))
     return j
@@ -452,11 +425,12 @@ def finalise_alignment(
                 'cram.crai': '{root}.cram.crai',
             }
         )
-        align_cmd += dedent(f"""\
+        align_cmd = dedent(f"""\
+        {indent(dedent(align_cmd).strip(), ' '*8)} \\
         | bamsormadup inputformat=sam threads={nthreads} SO=coordinate \\
         M={j.duplicate_metrics} outputformat=sam \\
         tmpfile=$(dirname {j.output_cram.cram})/bamsormadup-tmp \\
-        | samtools view -@{nthreads-1} -T {reference.base} -Ocram -o {j.output_cram.cram}        
+        | samtools view -@{nthreads-1} -T {reference.base} -Ocram -o {j.output_cram.cram}       
         samtools index -@{nthreads-1} {j.output_cram.cram} {j.output_cram["cram.crai"]}
         """).strip()
         md_j = j
@@ -465,7 +439,7 @@ def finalise_alignment(
             align_cmd += f' {sort_cmd(nthreads)}'
         align_cmd += f' > {j.sorted_bam}'
 
-    j.command(wrap_command(align_cmd, output_path, overwrite, monitor_space=True))
+    j.command(wrap_command(align_cmd, monitor_space=True))
 
     if markdup_tool == MarkDupTool.PICARD:
         md_j = picard.markdup(

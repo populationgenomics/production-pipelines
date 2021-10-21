@@ -4,13 +4,13 @@ import tempfile
 from dataclasses import dataclass
 from enum import Enum
 import logging
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_production_pipelines.smdb import SMDB
-from cpg_production_pipelines.jobs import align, haplotype_caller
+from cpg_production_pipelines.utils import AlignmentInput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -31,10 +31,10 @@ class Sample:
     id: str
     external_id: str
     project: str
-    alignment_input: Optional[align.AlignmentInput] = None
+    alignment_input: Optional[AlignmentInput] = None
     good: bool = True
-   
-    
+
+
 @dataclass
 class Project:
     """
@@ -47,38 +47,50 @@ class Project:
 
 class Batch(hb.Batch):
     """
-    Overriding hail Batch object so we have control over registering new jobs
-    and can collect statistics
+    Batch wrapper that registers job statistics
     """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, name, backend, *args, **kwargs):
+        super().__init__(name, backend, *args, **kwargs)
         # Job stats registry
         self.labelled_jobs = dict()
         self.other_job_num = 0
         self.total_job_num = 0
-        
+
     def new_job(
         self,
         name: Optional[str] = None,
         attributes: Optional[Dict[str, str]] = None,
-        shell: Optional[str] = None,
-        label: Optional[str] = None,
-        samples: Optional[Set[Sample]] = None,
-    ):
+        **kwargs,
+    ) -> Job:
         """
         Adds job to the Batch, and also registers it in `self.job_stats` for
         statistics.
         """
-        if label and samples is not None:
+        if not name:
+            logger.critical('Error: job name must be defined')
+        
+        attributes = attributes or dict()
+        project = attributes.get('project')
+        sample = attributes.get('sample')
+        samples = attributes.get('samples')
+        label = attributes.get('label', name)
+
+        if sample and project:
+            sample = f'{project}/{sample}'
+        if sample:
+            name = f'{sample}: {name}'
+
+        if label and (sample or samples):
             if label not in self.labelled_jobs:
                 self.labelled_jobs[label] = {'job_n': 0, 'samples': set()}
             self.labelled_jobs[label]['job_n'] += 1
-            self.labelled_jobs[label]['samples'] |= samples
+            self.labelled_jobs[label]['samples'] |= (samples or {sample})
         else:
             self.other_job_num += 1
         self.total_job_num += 1
-        return super().new_job(name, attributes, shell)
-        
+        j = super().new_job(name, attributes=attributes, **kwargs)
+        return j
+
 
 class Pipeline:
     """
@@ -187,7 +199,7 @@ class Pipeline:
                 ) for s in samples]
             )
             self.projects.append(p)
-    
+
     def _setup_batch(
         self,
         title, 
@@ -212,8 +224,5 @@ class Pipeline:
             bucket=hail_bucket.replace('gs://', ''),
             token=os.getenv('HAIL_TOKEN'),
         )
-        b = Batch(title, backend=backend)
+        b = Batch(name=title, backend=backend)
         return b
-
-    def add_align(self, *args, **kwargs):
-        align.align(b=self.b, *args, **kwargs)

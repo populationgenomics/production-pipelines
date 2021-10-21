@@ -6,6 +6,7 @@ from os.path import join
 import os
 
 from cpg_production_pipelines import resources
+from cpg_production_pipelines.jobs import wrap_command
 
 AR_REPO = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
 BWAMEM2_IMAGE = f'{AR_REPO}/alignment:v4'
@@ -26,18 +27,14 @@ def _index_bwa_job(b: hb.Batch):
     j.declare_resource_group(
         bwa_index={e: '{root}.' + e for e in resources.BWAMEM2_INDEX_EXTS}
     )
-    j.command(
-        dedent(
-            f"""
+    j.command(wrap_command(f"""\
     set -o pipefail
     set -ex
-
+    
     bwa-mem2 index {reference.base} -p {j.bwa_index}
-
+    
     df -h; pwd; ls | grep -v proc | xargs du -sh
-    """
-        )
-    )
+    """))
     b.write_output(j.bwa_index, resources.BWAMEM2_INDEX_PREFIX)
     return j
 

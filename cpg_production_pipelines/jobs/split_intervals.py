@@ -12,10 +12,9 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-def intervals(
+def make_resource_group(
     b: hb.Batch,
     scatter_count: int,
-    ref_fasta: str,
     out_bucket: Optional[str] = None,
 ) -> hb.ResourceGroup:
     """
@@ -26,12 +25,10 @@ def intervals(
     """
     if scatter_count in resources.PRECOMPUTED_INTERVALS:
         intervals_bucket = resources.PRECOMPUTED_INTERVALS[scatter_count]
-        return b.read_input_group(
-            intervals={
-                f'interval_{idx}': f'{intervals_bucket}/{str(idx).zfill(4)}-scattered.interval_list'
-                for idx in range(scatter_count)
-            }
-        )
+        return b.read_input_group(**{
+            f'interval_{idx}': f'{intervals_bucket}/{str(idx).zfill(4)}-scattered.interval_list'
+            for idx in range(scatter_count)
+        })
 
     j = b.new_job(f'Make {scatter_count} intervals')
     j.image(resources.GATK_IMAGE)
@@ -53,7 +50,7 @@ def intervals(
     -L {resources.UNPADDED_INTERVALS} \\
     -O {j.intervals} \\
     -scatter {scatter_count} \\
-    -R {ref_fasta} \\
+    -R {resources.REF_FASTA} \\
     -mode INTERVAL_SUBDIVISION
     """
     output_bucket_path_to_check = None
@@ -66,7 +63,7 @@ def intervals(
                 out_bucket, f'{str(scatter_count-1).zfill(4)}-scattered.interval_list'
             ),
         ]
-    j.command(wrap_command(cmd, output_bucket_path_to_check))
+    j.command(wrap_command(cmd))
     if out_bucket:
         b.write_output(j.intervals, out_bucket)
     return j.intervals

@@ -6,8 +6,10 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_production_pipelines import resources, utils
-from cpg_production_pipelines.jobs import wrap_command
+from cpg_production_pipelines.jobs import wrap_command, new_job
+from cpg_production_pipelines.pipeline import Batch
 from cpg_production_pipelines.smdb import SMDB
+from cpg_production_pipelines.jobs import split_intervals
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -19,12 +21,12 @@ def produce_gvcf(
     output_path: str,
     sample_name: str,
     project_name: str,
-    cram_path: str,
-    crai_path: str,
-    intervals: Optional[hb.ResourceGroup],
-    number_of_intervals: int,
     tmp_bucket: str,
-    overwrite: bool,
+    cram_path: str,
+    crai_path: Optional[str] = None,
+    number_of_intervals: Optional[int] = 1,
+    intervals: Optional[hb.ResourceGroup] = None,
+    overwrite: bool = True,
     depends_on: Optional[List[Job]] = None,
     smdb: Optional[SMDB] = None,
     external_id: Optional[str] = None,
@@ -37,7 +39,9 @@ def produce_gvcf(
     HaplotypeCaller is run in an interval-based sharded way, with per-interval
     HaplotypeCaller jobs defined in a nested loop.
     """
-    job_name = f'{project_name}/{sample_name}: make GVCF'
+    job_name = f'{sample_name}: make GVCF'
+    if project_name:
+        job_name = f'{project_name}/{job_name}'
     if utils.file_exists(output_path):
         return b.new_job(f'{job_name} [reuse]')
     logger.info(
@@ -55,7 +59,14 @@ def produce_gvcf(
 
     hc_gvcf_path = join(tmp_bucket, 'haplotypecaller', f'{sample_name}.g.vcf.gz')
     hc_jobs = []
-    if intervals is not None:
+    if number_of_intervals is not None and number_of_intervals > 1:
+        if intervals is None:
+            intervals = split_intervals.make_resource_group(
+                b=b,
+                scatter_count=number_of_intervals,
+                out_bucket=join(tmp_bucket, 'intervals'),
+            )
+
         # Splitting variant calling by intervals
         for idx in range(number_of_intervals):
             hc_jobs.append(
@@ -63,10 +74,10 @@ def produce_gvcf(
                     b,
                     sample_name=sample_name,
                     project_name=project_name,
+                    reference=reference,
                     cram_fpath=cram_path,
                     crai_fpath=crai_path,
                     interval=intervals[f'interval_{idx}'],
-                    reference=reference,
                     interval_idx=idx,
                     number_of_intervals=number_of_intervals,
                     depends_on=depends_on,
@@ -78,7 +89,7 @@ def produce_gvcf(
             sample_name=sample_name,
             project_name=project_name,
             gvcfs=[j.output_gvcf for j in hc_jobs],
-            output_path=hc_gvcf_path,
+            out_gvcf_path=hc_gvcf_path,
             overwrite=overwrite,
         )
     else:
@@ -86,11 +97,11 @@ def produce_gvcf(
             b,
             sample_name=sample_name,
             project_name=project_name,
+            reference=reference,
             cram_fpath=cram_path,
             crai_fpath=crai_path,
-            reference=reference,
             depends_on=depends_on,
-            output_path=hc_gvcf_path,
+            out_gvcf_path=hc_gvcf_path,
             overwrite=overwrite,
         )
         hc_jobs.append(hc_j)
@@ -126,28 +137,31 @@ def produce_gvcf(
 
 
 def hc_job(
-    b: hb.Batch,
+    b: Batch,
     sample_name: str,
     project_name: str,
-    cram_fpath: str,
-    crai_fpath: str,
     reference: hb.ResourceGroup,
+    cram_fpath: str,
+    crai_fpath: Optional[str] = None,
     interval: Optional[hb.ResourceFile] = None,
     interval_idx: Optional[int] = None,
     number_of_intervals: int = 1,
     depends_on: Optional[List[Job]] = None,
-    output_path: Optional[str] = None,
-    overwrite: bool = False,
+    out_gvcf_path: Optional[str] = None,
+    overwrite: bool = True,
     dragen_mode: bool = False,
 ) -> Job:
     """
     Run HaplotypeCaller on an input BAM or CRAM, and output GVCF
     """
-    job_name = f'{project_name}/{sample_name}: HaplotypeCaller'
+    job_name = 'HaplotypeCaller'
     if interval_idx is not None:
         job_name += f', {interval_idx}/{number_of_intervals}'
 
-    j = b.new_job(job_name)
+    if utils.can_reuse(out_gvcf_path, overwrite):
+        return new_job(b, f'{job_name} [reuse]', sample_name, project_name)
+    j = new_job(b, job_name, sample_name, project_name)
+
     j.image(resources.GATK_IMAGE)
     j.cpu(2)
     java_mem = 7
@@ -162,12 +176,12 @@ def hc_job(
     if depends_on:
         j.depends_on(*depends_on)
 
-    cmd = f"""
+    cmd = f"""\
     gatk --java-options "-Xms{java_mem}g -XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10" \\
     HaplotypeCaller \\
     -R {reference.base} \\
     -I {cram_fpath} \\
-    --read-index {crai_fpath} \\
+    --read-index {crai_fpath or (cram_fpath + '.crai')} \\
     {f"-L {interval} " if interval is not None else ""} \\
     --disable-spanning-event-genotyping \\
     {"--dragen-mode " if dragen_mode else ""} \\
@@ -176,9 +190,9 @@ def hc_job(
     -GQB 20 \\
     -ERC GVCF
     """
-    j.command(wrap_command(cmd, output_path, overwrite, monitor_space=True))
-    if output_path:
-        b.write_output(j.output_gvcf, output_path.replace('.g.vcf.gz', ''))
+    j.command(wrap_command(cmd, monitor_space=True))
+    if out_gvcf_path:
+        b.write_output(j.output_gvcf, out_gvcf_path.replace('.g.vcf.gz', ''))
     return j
 
 
@@ -187,15 +201,17 @@ def merge_gvcfs_job(
     sample_name: str,
     project_name: str,
     gvcfs: List[hb.ResourceGroup],
-    output_path: Optional[str],
+    out_gvcf_path: Optional[str],
     overwrite: bool = True,
 ) -> Job:
     """
     Combine by-interval GVCFs into a single sample GVCF file
     """
-
-    job_name = f'{project_name}/{sample_name}: merge {len(gvcfs)} GVCFs'
-    j = b.new_job(job_name)
+    job_name = f'Merge {len(gvcfs)} GVCFs'
+    if utils.can_reuse(out_gvcf_path, overwrite):
+        return new_job(b, f'{job_name} [reuse]', sample_name, project_name)
+    j = new_job(b, job_name, sample_name, project_name)
+    
     j.image(resources.SAMTOOLS_PICARD_IMAGE)
     j.cpu(2)
     java_mem = 7
@@ -213,9 +229,9 @@ def merge_gvcfs_job(
     picard -Xms{java_mem}g \
     MergeVcfs {input_cmd} OUTPUT={j.output_gvcf['g.vcf.gz']}
     """
-    j.command(wrap_command(cmd, output_path, overwrite, monitor_space=True))
-    if output_path:
-        b.write_output(j.output_gvcf, output_path.replace('.g.vcf.gz', ''))
+    j.command(wrap_command(cmd, monitor_space=True))
+    if out_gvcf_path:
+        b.write_output(j.output_gvcf, out_gvcf_path.replace('.g.vcf.gz', ''))
     return j
 
 
@@ -230,6 +246,9 @@ def postproc_gvcf(
     depends_on: Optional[List[Job]] = None,
     external_id: Optional[str] = None,
 ) -> Job:
+    if utils.can_reuse(out_gvcf_path, overwrite):
+        return new_job(b, 'PostprocGVCF [reuse]', sample_name, project_name)
+
     logger.info(
         f'Adding reblock and subset jobs for sample {sample_name}, gvcf {out_gvcf_path}'
     )
@@ -252,7 +271,7 @@ def postproc_gvcf(
         input_gvcf=reblock_j.output_gvcf,
         noalt_regions=b.read_input(resources.NOALT_REGIONS),
         overwrite=overwrite,
-        output_gvcf_path=out_gvcf_path,
+        out_gvcf_path=out_gvcf_path,
         external_sample_id=external_id,
         internal_sample_id=sample_name,
     )
@@ -265,14 +284,17 @@ def reblock_gvcf(
     project_name: str,
     input_gvcf: hb.ResourceGroup,
     reference: hb.ResourceGroup,
-    overwrite: bool,
-    output_gvcf_path: Optional[str] = None,
+    overwrite: bool = True,
+    out_gvcf_path: Optional[str] = None,
 ) -> Job:
     """
     Runs ReblockGVCF to annotate with allele-specific VCF INFO fields
     required for recalibration
     """
-    j = b.new_job(f'{project_name}/{sample_name}: ReblockGVCF')
+    if utils.can_reuse(out_gvcf_path, overwrite):
+        return new_job(b, 'ReblockGVCF [reuse]', sample_name, project_name)
+    
+    j = new_job(b, 'ReblockGVCF', sample_name, project_name)
     j.image(resources.GATK_IMAGE)
     mem_gb = 8
     j.memory(f'{mem_gb}G')
@@ -284,7 +306,7 @@ def reblock_gvcf(
         }
     )
 
-    cmd = f"""
+    cmd = f"""\
     gatk --java-options "-Xms{mem_gb - 1}g" ReblockGVCF \\
     --reference {reference.base} \\
     -V {input_gvcf['g.vcf.gz']} \\
@@ -292,9 +314,9 @@ def reblock_gvcf(
     -O {j.output_gvcf['g.vcf.gz']} \\
     --create-output-variant-index true
     """
-    j.command(wrap_command(cmd, output_gvcf_path, overwrite, monitor_space=True))
-    if output_gvcf_path:
-        b.write_output(j.output_gvcf, output_gvcf_path.replace('.g.vcf.gz', ''))
+    j.command(wrap_command(cmd, monitor_space=True))
+    if out_gvcf_path:
+        b.write_output(j.output_gvcf, out_gvcf_path.replace('.g.vcf.gz', ''))
     return j
 
 
@@ -305,7 +327,7 @@ def subset_noalt(
     input_gvcf: hb.ResourceGroup,
     noalt_regions: str,
     overwrite: bool,
-    output_gvcf_path: Optional[str] = None,
+    out_gvcf_path: Optional[str] = None,
     external_sample_id: Optional[str] = None,
     internal_sample_id: Optional[str] = None,
 ) -> Job:
@@ -315,7 +337,10 @@ def subset_noalt(
        from Hail about mismatched INFO annotations
     3. Renames sample name from external_sample_id to internal_sample_id
     """
-    j = b.new_job(f'{project_name}/{sample_name}: SubsetToNoalt')
+    if utils.can_reuse(out_gvcf_path, overwrite):
+        return new_job(b, 'SubsetToNoalt [reuse]', sample_name, project_name)
+
+    j = new_job(b, 'SubsetToNoalt', sample_name, project_name)
     j.image(resources.BCFTOOLS_IMAGE)
     mem_gb = 8
     j.memory(f'{mem_gb}G')
@@ -341,7 +366,7 @@ def subset_noalt(
 
     bcftools index --tbi {j.output_gvcf['g.vcf.gz']}
     """
-    j.command(wrap_command(cmd, output_gvcf_path, overwrite, monitor_space=True))
-    if output_gvcf_path:
-        b.write_output(j.output_gvcf, output_gvcf_path.replace('.g.vcf.gz', ''))
+    j.command(wrap_command(cmd, monitor_space=True))
+    if out_gvcf_path:
+        b.write_output(j.output_gvcf, out_gvcf_path.replace('.g.vcf.gz', ''))
     return j

@@ -4,6 +4,8 @@ import hailtop.batch as hb
 from os.path import join
 import os
 
+from cpg_production_pipelines.jobs import wrap_command
+from cpg_production_pipelines.jobs.align import align, create_dragmap_index
 
 AR_REPO = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
 DRAGMAP_IMAGE = f'{AR_REPO}/dragmap:1.2.1'
@@ -44,19 +46,10 @@ def _test_dragmap_job(b: hb.Batch):
         }
     )
     sn = 'TEST'
-    j.command(
-        f"""
-set -o pipefail
-set -ex
-
-(while true; do df -h; pwd; du -sh $(dirname {j.sorted_bam}); sleep 600; done) &
-
-dragen-os -r {dragmap_index} -1 {fq1} -2 {fq1} --RGID {sn} --RGSM {sn} |
-samtools sort -T $(dirname {j.sorted_bam})/samtools-sort-tmp -Obam -o {j.sorted_bam}
-
-df -h; pwd; du -sh $(dirname {j.sorted_bam})
-    """
-    )
+    j.command(wrap_command(f"""\
+    dragen-os -r {dragmap_index} -1 {fq1} -2 {fq1} --RGID {sn} --RGSM {sn} |
+    samtools sort -T $(dirname {j.sorted_bam})/samtools-sort-tmp -Obam -o {j.sorted_bam}
+    """))
     return j
 
 
@@ -71,7 +64,7 @@ backend = hb.ServiceBackend(
     token=os.environ.get('HAIL_TOKEN'),
 )
 b = hb.Batch(backend=backend, name='Create DRAGMAP index')
-j1 = _index_dragmap_job(b)
+j1 = create_dragmap_index(b)
 j2 = _test_dragmap_job(b)
 j2.depends_on(j1)
 b.run(wait=False)

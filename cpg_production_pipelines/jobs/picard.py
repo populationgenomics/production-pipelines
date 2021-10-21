@@ -18,7 +18,10 @@ def markdup(
     """
     Make job that runs Picard MarkDuplicates and converts the result to CRAM.
     """
-    j = b.new_job(f'{project_name}/{sample_name}: MarkDuplicates')
+    job_name = f'{sample_name}: MarkDuplicates'
+    if project_name:
+        job_name = f'{project_name}/{job_name}'
+    j = b.new_job(job_name)
     j.image(resources.SAMTOOLS_PICARD_IMAGE)
     j.cpu(2)
     j.memory('highmem')
@@ -40,10 +43,5 @@ def markdup(
     
     samtools index -@2 {j.output_cram.cram} {j.output_cram['cram.crai']}
     """
-    j.command(wrap_command(
-        cmd,
-        out_cram_path,
-        overwrite,
-        monitor_space=True,
-    ))
+    j.command(wrap_command(cmd, monitor_space=True))
     return j

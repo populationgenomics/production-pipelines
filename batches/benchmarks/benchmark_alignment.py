@@ -2,7 +2,8 @@
 import click
 import logging
 from cpg_production_pipelines.pipeline import Pipeline
-from cpg_production_pipelines.jobs.align import AlignmentInput, Aligner, MarkDupTool
+from cpg_production_pipelines.jobs.align import AlignmentInput, Aligner, MarkDupTool, \
+    align
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -19,7 +20,7 @@ TOY_INPUTS_BUCKET = f'{BENCHMARK_BUCKET}/inputs/test'
 def main():
     pipe = Pipeline(
         analysis_project='fewgenomes',
-        name='benchmark_combiner',
+        name='benchmark_alignment',
         output_version='v0',
         namespace=NAMESPACE,
         title='Benchmark alignment',
@@ -56,18 +57,19 @@ def main():
 
     # for sn, inp in giab_inputs.items():
     for sn, inp in tiny_inputs.items():
-        logger.info(f'Submitting DRAGMAP for {inp}')
-    
-        pipe.add_align(
+        align(
+            pipe.b,
             alignment_input=inp,
             sample_name=sn,
             output_path=f'{BENCHMARK_BUCKET}/{sn}/dragmap-picard.bam',
+            project_name='Benchmark',
             aligner=Aligner.DRAGMAP,
             markdup_tool=MarkDupTool.PICARD,
             extra_label='picard',
         )
-    
-        pipe.add_align(
+
+        align(
+            pipe.b,
             alignment_input=inp,
             output_path=f'{BENCHMARK_BUCKET}/{sn}/bwa-picard.bam',
             sample_name=sn,
@@ -77,7 +79,8 @@ def main():
             extra_label='picard',
         )
     
-        pipe.add_align(
+        align(
+            pipe.b,
             alignment_input=inp,
             output_path=f'{BENCHMARK_BUCKET}/{sn}/bwamem2-picard.bam',
             sample_name=sn,
@@ -87,7 +90,8 @@ def main():
             extra_label='picard',
         )
     
-        pipe.add_align(
+        align(
+            pipe.b,
             alignment_input=inp,
             output_path=f'{BENCHMARK_BUCKET}/{sn}/dragmap-biobambam.bam',
             sample_name=sn,
@@ -97,7 +101,8 @@ def main():
             extra_label='biobambam',
         )
     
-        pipe.add_align(
+        align(
+            pipe.b,
             alignment_input=inp,
             output_path=f'{BENCHMARK_BUCKET}/{sn}/bwa-biobambam.bam',
             sample_name=sn,
@@ -107,7 +112,8 @@ def main():
             extra_label='biobambam',
         )
     
-        pipe.add_align(
+        align(
+            pipe.b,
             alignment_input=inp,
             output_path=f'{BENCHMARK_BUCKET}/{sn}/bwamem2-biobambam.bam',
             sample_name=sn,

@@ -11,11 +11,11 @@ import time
 import hashlib
 from dataclasses import dataclass
 from os.path import isdir, isfile, exists, join, basename
-from textwrap import dedent
 from typing import Any, Callable, Dict, Optional, Union, Iterable, List
 import yaml
 import pandas as pd
 import hail as hl
+import hailtop.batch as hb
 import click
 from google.cloud import storage
 from cpg_production_pipelines import _version, get_package_path
@@ -140,6 +140,9 @@ def can_reuse(
 
     If `fpath` is a collection, it requires all files in it to exist.
     """
+    if overwrite:
+        return False
+
     if not fpath:
         return False
 
@@ -149,14 +152,9 @@ def can_reuse(
     if not file_exists(fpath):
         return False
 
-    if overwrite:
-        if not silent:
-            logger.info(f'File {fpath} exists and will be overwritten')
-        return False
-    else:
-        if not silent:
-            logger.info(f'Reusing existing {fpath}. Use --overwrite to overwrite')
-        return True
+    if not silent:
+        logger.info(f'Reusing existing {fpath}. Use --overwrite to overwrite')
+    return True
 
 
 def gs_cache_file(fpath: str, local_tmp_dir: str) -> str:
@@ -405,6 +403,11 @@ class AlignmentInput:
     fqs1: Optional[List[str]] = None
     fqs2: Optional[List[str]] = None
 
-
-def NUMBER_OF_HAPLOTYPE_CALLER_INTERVALS():
-    return None
+    def get_cram_input_group(self, b) -> hb.ResourceGroup:
+        assert self.bam_or_cram_path
+        assert self.index_path
+        assert not self.fqs1 and not self.fqs2
+        return b.read_input_group(
+            base=self.bam_or_cram_path,
+            index=self.index_path
+        )

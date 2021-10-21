@@ -101,23 +101,20 @@ def job(
         )
         ped_file = b.read_input(ped_fpath)
 
-    relate_j.command(
-        wrap_command(
-            f"""
-    cat {ped_file} | grep -v Family.ID > samples.ped 
-    
-    somalier relate \\
-    {' '.join(fp_files)} \\
-    --ped samples.ped \\
-    -o related \\
-    --infer
-
-    ls
-    mv related.html {relate_j.output_html}
-    mv related.pairs.tsv {relate_j.output_pairs}
-    mv related.samples.tsv {relate_j.output_samples}
-    """
-        )
+    relate_j.command(wrap_command(f"""\
+        cat {ped_file} | grep -v Family.ID > samples.ped 
+        
+        somalier relate \\
+        {' '.join(fp_files)} \\
+        --ped samples.ped \\
+        -o related \\
+        --infer
+        
+        ls
+        mv related.html {relate_j.output_html}
+        mv related.pairs.tsv {relate_j.output_pairs}
+        mv related.samples.tsv {relate_j.output_samples}
+        """)
     )
 
     # Copy somalier outputs to buckets
@@ -148,18 +145,15 @@ def job(
 
     with open(script_path) as f:
         script = f.read()
-    check_j.command(
-        wrap_command(
-            f"""
-    cat <<EOT >> {script_name}
-    {script}
-    EOT
-    python {script_name} \
-    --somalier-samples {relate_j.output_samples} \
-    --somalier-pairs {relate_j.output_pairs} \
-    {('--somalier-html ' + somalier_html_url) if somalier_html_url else ''}
-    """
-        )
+    check_j.command(wrap_command(f"""\
+        cat <<EOT >> {script_name}
+        {script}
+        EOT
+        python {script_name} \
+        --somalier-samples {relate_j.output_samples} \
+        --somalier-pairs {relate_j.output_pairs} \
+        {('--somalier-html ' + somalier_html_url) if somalier_html_url else ''}
+        """)
     )
 
     check_j.depends_on(relate_j)
