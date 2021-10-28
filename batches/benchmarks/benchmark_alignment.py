@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import click
 import logging
+
+from cpg_production_pipelines import resources
 from cpg_production_pipelines.pipeline import Pipeline
 from cpg_production_pipelines.jobs.align import AlignmentInput, Aligner, MarkDupTool, \
-    align
+    align, extract_fastq
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -13,7 +15,9 @@ logger.setLevel(logging.INFO)
 INPUT_PROJECT = 'fewgenomes'
 NAMESPACE = 'main'
 BENCHMARK_BUCKET = 'gs://cpg-fewgenomes-test/benchmark'
+INPUTS_BUCKET = f'{BENCHMARK_BUCKET}/inputs'
 TOY_INPUTS_BUCKET = f'{BENCHMARK_BUCKET}/inputs/test'
+RESULTS_BUCKET = f'{BENCHMARK_BUCKET}/fastqc'
 
 
 @click.command()
@@ -27,10 +31,18 @@ def main():
         smdb_check_existence=False,
     )
     # This samples crashes with BWA-MEM2 after 30min
-    # cpg13326 = AlignmentInput(
-    #     fqs1=[f'{BENCHMARK_BUCKET}/inputs/D18-1351_r1.fastq.gz'],
-    #     fqs2=[f'{BENCHMARK_BUCKET}/inputs/D18-1351_r2.fastq.gz'],
-    # )
+    cpg13326 = AlignmentInput(
+        fqs1=[f'{INPUTS_BUCKET}/CPG13326/D18-1351_r1.fastq.gz'],
+        fqs2=[f'{INPUTS_BUCKET}/CPG13326/D18-1351_r2.fastq.gz'],
+    )
+    perthneuro2 = AlignmentInput(
+        fqs1=[f'{INPUTS_BUCKET}/PERTHNEURO2/HNFWKCCXY_3_181017_FD07777491_Homo-sapiens__R_170503_GINRAV_DNA_M002_R1.fastq.gz'],
+        fqs2=[f'{INPUTS_BUCKET}/PERTHNEURO2/HNFWKCCXY_3_181017_FD07777491_Homo-sapiens__R_170503_GINRAV_DNA_M002_R2.fastq.gz'],
+    )
+    na12878fq = AlignmentInput(
+        fqs1=[f'{INPUTS_BUCKET}/NA12878/ERR194147_1.fastq.gz'],
+        fqs2=[f'{INPUTS_BUCKET}/NA12878/ERR194147_2.fastq.gz'],
+    )
     # This set is 50MB each
     tiny_fq = AlignmentInput(
         fqs1=[f'{TOY_INPUTS_BUCKET}/2-699835.L001.R1.n40000.fastq.gz'],
@@ -45,83 +57,124 @@ def main():
         'TINY_FQ': tiny_fq,
         'TINY_CRAM': tiny_cram,
     }
-    
-    giab_path = 'gs://cpg-reference/validation/giab/cram'
-    giab_inputs = {
+    giab_cram_path = 'gs://cpg-reference/validation/giab/cram'
+    giab_cram_inputs = {
         sn: AlignmentInput(
-            bam_or_cram_path=f'{giab_path}/{sn}.cram',
-            index_path=f'{giab_path}/{sn}.cram.crai',
+            bam_or_cram_path=f'{giab_cram_path}/{sn}.cram',
+            index_path=f'{giab_cram_path}/{sn}.cram.crai',
         )
         for sn in ['NA12878', 'NA12891', 'NA12892']
     }
+    fq_inputs = {
+        'NA12878': na12878fq,
+        'CPG13326': cpg13326,
+        'PERTHNEURO2': perthneuro2,
+    }
 
+    project = 'fewgenomes'
+    for sn, inp in fq_inputs.items():
     # for sn, inp in giab_inputs.items():
-    for sn, inp in tiny_inputs.items():
+    # for sn, inp in tiny_inputs.items():
+        deps = []
         align(
             pipe.b,
             alignment_input=inp,
             sample_name=sn,
-            output_path=f'{BENCHMARK_BUCKET}/{sn}/dragmap-picard.bam',
-            project_name='Benchmark',
+            output_path=f'{BENCHMARK_BUCKET}/{sn}/nomarkdup/dragmap.bam',
+            project_name=project,
             aligner=Aligner.DRAGMAP,
-            markdup_tool=MarkDupTool.PICARD,
-            extra_label='picard',
+            markdup_tool=MarkDupTool.NO_MARKDUP,
+            extra_label='nomarkdup_fromfastq',
+            depends_on=deps
+        )
+        align(
+            pipe.b,
+            alignment_input=inp,
+            sample_name=sn,
+            output_path=f'{BENCHMARK_BUCKET}/{sn}/nomarkdup/bwamem.bam',
+            project_name=project,
+            aligner=Aligner.BWA,
+            markdup_tool=MarkDupTool.NO_MARKDUP,
+            extra_label='nomarkdup_fromfastq',
+            depends_on=deps
+        )
+        align(
+            pipe.b,
+            alignment_input=inp,
+            sample_name=sn,
+            output_path=f'{BENCHMARK_BUCKET}/{sn}/nomarkdup/bwamem2.bam',
+            project_name=project,
+            aligner=Aligner.BWAMEM2,
+            markdup_tool=MarkDupTool.NO_MARKDUP,
+            extra_label='nomarkdup_fromfastq',
+            depends_on=deps
         )
 
-        align(
-            pipe.b,
-            alignment_input=inp,
-            output_path=f'{BENCHMARK_BUCKET}/{sn}/bwa-picard.bam',
-            sample_name=sn,
-            project_name='Benchmark',
-            aligner=Aligner.BWA,
-            markdup_tool=MarkDupTool.PICARD,
-            extra_label='picard',
-        )
-    
-        align(
-            pipe.b,
-            alignment_input=inp,
-            output_path=f'{BENCHMARK_BUCKET}/{sn}/bwamem2-picard.bam',
-            sample_name=sn,
-            project_name='Benchmark',
-            aligner=Aligner.BWAMEM2,
-            markdup_tool=MarkDupTool.PICARD,
-            extra_label='picard',
-        )
-    
-        align(
-            pipe.b,
-            alignment_input=inp,
-            output_path=f'{BENCHMARK_BUCKET}/{sn}/dragmap-biobambam.bam',
-            sample_name=sn,
-            project_name='Benchmark',
-            aligner=Aligner.DRAGMAP,
-            markdup_tool=MarkDupTool.BIOBAMBAM,
-            extra_label='biobambam',
-        )
-    
-        align(
-            pipe.b,
-            alignment_input=inp,
-            output_path=f'{BENCHMARK_BUCKET}/{sn}/bwa-biobambam.bam',
-            sample_name=sn,
-            project_name='Benchmark',
-            aligner=Aligner.BWA,
-            markdup_tool=MarkDupTool.BIOBAMBAM,
-            extra_label='biobambam',
-        )
-    
-        align(
-            pipe.b,
-            alignment_input=inp,
-            output_path=f'{BENCHMARK_BUCKET}/{sn}/bwamem2-biobambam.bam',
-            sample_name=sn,
-            project_name='Benchmark',
-            aligner=Aligner.BWAMEM2,
-            markdup_tool=MarkDupTool.BIOBAMBAM,
-            extra_label='biobambam',
-        )
+        # align(
+        #     pipe.b,
+        #     alignment_input=inp,
+        #     sample_name=sn,
+        #     output_path=f'{BENCHMARK_BUCKET}/{sn}/dragmap-picard.bam',
+        #     project_name='Benchmark',
+        #     aligner=Aligner.DRAGMAP,
+        #     markdup_tool=MarkDupTool.PICARD,
+        #     extra_label='picard',
+        # )
+        # 
+        # align(
+        #     pipe.b,
+        #     alignment_input=inp,
+        #     output_path=f'{BENCHMARK_BUCKET}/{sn}/bwa-picard.bam',
+        #     sample_name=sn,
+        #     project_name='Benchmark',
+        #     aligner=Aligner.BWA,
+        #     markdup_tool=MarkDupTool.PICARD,
+        #     extra_label='picard',
+        # )
+        # 
+        # align(
+        #     pipe.b,
+        #     alignment_input=inp,
+        #     output_path=f'{BENCHMARK_BUCKET}/{sn}/bwamem2-picard.bam',
+        #     sample_name=sn,
+        #     project_name='Benchmark',
+        #     aligner=Aligner.BWAMEM2,
+        #     markdup_tool=MarkDupTool.PICARD,
+        #     extra_label='picard',
+        # )
+        # 
+        # align(
+        #     pipe.b,
+        #     alignment_input=inp,
+        #     output_path=f'{BENCHMARK_BUCKET}/{sn}/dragmap-biobambam.bam',
+        #     sample_name=sn,
+        #     project_name='Benchmark',
+        #     aligner=Aligner.DRAGMAP,
+        #     markdup_tool=MarkDupTool.BIOBAMBAM,
+        #     extra_label='biobambam',
+        # )
+        # 
+        # align(
+        #     pipe.b,
+        #     alignment_input=inp,
+        #     output_path=f'{BENCHMARK_BUCKET}/{sn}/bwa-biobambam.bam',
+        #     sample_name=sn,
+        #     project_name='Benchmark',
+        #     aligner=Aligner.BWA,
+        #     markdup_tool=MarkDupTool.BIOBAMBAM,
+        #     extra_label='biobambam',
+        # )
+        # 
+        # align(
+        #     pipe.b,
+        #     alignment_input=inp,
+        #     output_path=f'{BENCHMARK_BUCKET}/{sn}/bwamem2-biobambam.bam',
+        #     sample_name=sn,
+        #     project_name='Benchmark',
+        #     aligner=Aligner.BWAMEM2,
+        #     markdup_tool=MarkDupTool.BIOBAMBAM,
+        #     extra_label='biobambam',
+        # )
 
         # produce_gvcf(
         #     dragen_mode=True,

@@ -10,6 +10,7 @@ from cpg_production_pipelines import utils
 def wrap_command(
     command: str,
     monitor_space: bool = False,
+    setup_gcp: bool = False,
 ):
     """
     Wraps a command for submission
@@ -17,9 +18,17 @@ def wrap_command(
     If output_bucket_path_to_check is defined, checks if this file(s) exists,
     and if it does, skips running the rest of the job.
     """
+    gcp_cmd = ''
+    if setup_gcp:
+        gcp_cmp = """
+    export GOOGLE_APPLICATION_CREDENTIALS=/gsa-key/key.json
+    gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+    """
+    
     return dedent(f"""\
     set -o pipefail
     set -ex
+    {gcp_cmd}
     
     {f'(while true; do {monitor_space_command()}; sleep 600; done) &'
     if monitor_space else ''}

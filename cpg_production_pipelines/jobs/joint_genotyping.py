@@ -1,12 +1,15 @@
+import json
 import logging
-from os.path import join
-from typing import Optional, List, Collection, Dict
+from os.path import join, basename
+from typing import Optional, List, Collection, Dict, Tuple, Set
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_production_pipelines import resources, utils
 from cpg_production_pipelines.jobs import wrap_command
+from cpg_production_pipelines.jobs import split_intervals
+from cpg_production_pipelines.jobs.vqsr import make_vqsr_jobs
 from cpg_production_pipelines.smdb import SMDB
 
 logger = logging.getLogger(__file__)
@@ -14,7 +17,7 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-def _make_joint_genotype_jobs(
+def make_joint_genotyping_jobs(
     b: hb.Batch,
     output_path: str,
     samples: Collection[Dict],
@@ -24,7 +27,7 @@ def _make_joint_genotype_jobs(
     local_tmp_dir: str,
     overwrite: bool,
     depends_on: Optional[List[Job]] = None,
-    analysis_project: str = None,
+    smdb: Optional[SMDB] = None,
     use_gnarly: bool = False,
     use_as_vqsr: bool = True,
 ) -> Job:
@@ -50,10 +53,10 @@ def _make_joint_genotype_jobs(
     # For huge callsets, we allocate more memory for the SNPs Create Model step
 
     genomicsdb_path_per_interval = dict()
-    for idx in range(utils.NUMBER_OF_GENOMICS_DB_INTERVALS):
+    for idx in range(resources.NUMBER_OF_GENOMICS_DB_INTERVALS):
         genomicsdb_path_per_interval[idx] = join(
             genomicsdb_bucket,
-            f'interval_{idx}_outof_{utils.NUMBER_OF_GENOMICS_DB_INTERVALS}',
+            f'interval_{idx}_outof_{resources.NUMBER_OF_GENOMICS_DB_INTERVALS}',
         )
     # Determining which samples to add. Using the first interval, so the assumption
     # is that all DBs have the same set of samples.
@@ -75,34 +78,29 @@ def _make_joint_genotype_jobs(
     assert sample_names_will_be_in_db == sample_ids
     samples_hash = utils.hash_sample_ids(sample_ids)
 
-    intervals_j = _add_split_intervals_job(
+    intervals_j = split_intervals.get_intervals(
         b=b,
-        interval_list=resources.UNPADDED_INTERVALS,
-        scatter_count=utils.NUMBER_OF_GENOMICS_DB_INTERVALS,
-        ref_fasta=resources.REF_FASTA,
+        scatter_count=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
     )
 
-    if SMDB.do_update_analyses:
+    if smdb.do_update_analyses:
         # Interacting with the sample metadata server:
         # 1. Create a "queued" analysis
-        aid = SMDB.create_analysis(
-            project=analysis_project,
+        aid = smdb.create_analysis(
             sample_ids=[s['id'] for s in samples],
             type_='joint-calling',
             output=output_path,
             status='queued',
         )
         # 2. Queue a job that updates the status to "in-progress"
-        sm_in_progress_j = SMDB.make_sm_in_progress_job(
+        sm_in_progress_j = smdb.make_sm_in_progress_job(
             b,
-            project=analysis_project,
             analysis_id=aid,
             analysis_type='joint-calling',
         )
         # 2. Queue a job that updates the status to "completed"
-        sm_completed_j = SMDB.make_sm_completed_job(
+        sm_completed_j = smdb.make_sm_completed_job(
             b,
-            project=analysis_project,
             analysis_id=aid,
             analysis_type='joint-calling',
         )
@@ -118,7 +116,7 @@ def _make_joint_genotype_jobs(
     import_gvcfs_job_per_interval = dict()
     if sample_names_to_add:
         logger.info(f'Queueing genomics-db-import jobs')
-        for idx in range(utils.NUMBER_OF_GENOMICS_DB_INTERVALS):
+        for idx in range(resources.NUMBER_OF_GENOMICS_DB_INTERVALS):
             import_gvcfs_job, _ = _add_import_gvcfs_job(
                 b=b,
                 genomicsdb_gcs_path=genomicsdb_path_per_interval[idx],
@@ -129,7 +127,7 @@ def _make_joint_genotype_jobs(
                 sample_map_bucket_path=sample_map_bucket_path,
                 interval=intervals_j.intervals[f'interval_{idx}'],
                 interval_idx=idx,
-                number_of_intervals=utils.NUMBER_OF_GENOMICS_DB_INTERVALS,
+                number_of_intervals=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
                 depends_on=[intervals_j],
             )
             import_gvcfs_job_per_interval[idx] = import_gvcfs_job
@@ -139,7 +137,7 @@ def _make_joint_genotype_jobs(
     joint_calling_tmp_bucket = f'{tmp_bucket}/joint_calling/{samples_hash}'
     pre_vqsr_vcf_path = f'{joint_calling_tmp_bucket}/gathered.vcf.gz'
     if not utils.can_reuse(pre_vqsr_vcf_path, overwrite):
-        for idx in range(utils.NUMBER_OF_GENOMICS_DB_INTERVALS):
+        for idx in range(resources.NUMBER_OF_GENOMICS_DB_INTERVALS):
             joint_called_vcf_path = (
                 f'{joint_calling_tmp_bucket}/by_interval/interval_{idx}.vcf.gz'
             )
@@ -162,7 +160,7 @@ def _make_joint_genotype_jobs(
                     overwrite=overwrite,
                     number_of_samples=len(sample_names_will_be_in_db),
                     interval_idx=idx,
-                    number_of_intervals=utils.NUMBER_OF_GENOMICS_DB_INTERVALS,
+                    number_of_intervals=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
                     interval=intervals_j.intervals[f'interval_{idx}'],
                 )
                 if import_gvcfs_job_per_interval.get(idx):
@@ -202,17 +200,16 @@ def _make_joint_genotype_jobs(
     logger.info(f'Queueing VQSR job')
     vqsr_job = make_vqsr_jobs(
         b,
-        input_vcf_gathered=pre_vqsr_vcf_path,
-        input_vcfs_scattered=scattered_vcfs,
-        is_small_callset=is_small_callset,
-        is_huge_callset=is_huge_callset,
+        input_vcf_or_mt_path=pre_vqsr_vcf_path,
         work_bucket=tmp_vqsr_bucket,
         web_bucket=tmp_vqsr_bucket,
-        depends_on=[final_gathered_vcf_job],
         intervals=intervals_j.intervals,
-        scatter_count=utils.NUMBER_OF_GENOMICS_DB_INTERVALS,
+        gvcf_count=len(samples),
+        depends_on=[final_gathered_vcf_job],
+        scatter_count=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
         output_vcf_path=output_path,
         use_as_annotations=use_as_vqsr,
+        overwrite=overwrite,
     )
     if sm_completed_j:
         sm_completed_j.depends_on(vqsr_job)
@@ -341,7 +338,7 @@ def _add_import_gvcfs_job(
         job_name += f' {interval_idx}/{number_of_intervals}'
 
     j = b.new_job(job_name)
-    j.image(utils.GATK_IMAGE)
+    j.image(resources.GATK_IMAGE)
     ncpu = 16
     j.cpu(ncpu)
     java_mem = 16
@@ -350,9 +347,7 @@ def _add_import_gvcfs_job(
         j.depends_on(*depends_on)
 
     j.declare_resource_group(output={'tar': '{root}.tar'})
-    j.command(
-        f"""set -e
-
+    j.command(wrap_command(f"""/
     # We've seen some GenomicsDB performance regressions related to intervals, 
     # so we're going to pretend we only have a single interval
     # using the --merge-input-intervals arg. There's no data in between since 
@@ -368,8 +363,6 @@ def _add_import_gvcfs_job(
     # is the optimal value for the amount of memory allocated
     # within the task; please do not change it without consulting
     # the Hellbender (GATK engine) team!
-
-    (while true; do df -h; pwd; free -m; sleep 300; done) &
 
     echo "Adding {len(sample_names_to_add)} samples: {', '.join(sample_names_to_add)}"
     {f'echo "Skipping adding {len(sample_names_to_skip)} samples that are already in the DB: '
@@ -388,9 +381,7 @@ def _add_import_gvcfs_job(
       --merge-input-intervals \\
       --consolidate
 
-    df -h; pwd; free -m
-    """
-    )
+    """, monitor_space=True))
     return j, sample_names_will_be_in_db
 
 
@@ -433,30 +424,18 @@ def _add_genotype_gvcfs_job(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
 
-    j.command(
-        f"""
-set -o pipefail
-set -ex
-
-export GOOGLE_APPLICATION_CREDENTIALS=/gsa-key/key.json
-gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
-
-(while true; do df -h; pwd; free -m; sleep 300; done) &
-
-gatk --java-options -Xms8g \\
-  GenotypeGVCFs \\
-  -R {reference.base} \\
-  -O {j.output_vcf['vcf.gz']} \\
-  -D {resources.DBSNP_VCF} \\
-  -V gendb.{genomicsdb_path} \\
-  {f'-L {interval} ' if interval else ''} \\
-  --only-output-calls-starting-in-intervals \\
-  --merge-input-intervals \\
-  -G AS_StandardAnnotation
-
-df -h; pwd; free -m
-    """
-    )
+    j.command(wrap_command(f"""\
+    gatk --java-options -Xms8g \\
+    GenotypeGVCFs \\
+    -R {reference.base} \\
+    -O {j.output_vcf['vcf.gz']} \\
+    -D {resources.DBSNP_VCF} \\
+    -V gendb.{genomicsdb_path} \\
+    {f'-L {interval} ' if interval else ''} \\
+    --only-output-calls-starting-in-intervals \\
+    --merge-input-intervals \\
+    -G AS_StandardAnnotation
+    """, monitor_space=True, setup_gcp=True))
     if output_vcf_path:
         b.write_output(j.output_vcf, output_vcf_path.replace('.vcf.gz', ''))
 
@@ -512,32 +491,18 @@ def _add_gnarly_genotyper_job(
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
-    j.command(
-        f"""
-set -o pipefail
-set -ex
-
-export GOOGLE_APPLICATION_CREDENTIALS=/gsa-key/key.json
-gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
-
-(while true; do df -h; pwd; free -m; sleep 300; done) &
-
-df -h; pwd; free -m
-
-gatk --java-options -Xms8g \\
-  GnarlyGenotyper \\
-  -R {reference.base} \\
-  -O {j.output_vcf['vcf.gz']} \\
-  -D {resources.DBSNP_VCF} \\
-  --only-output-calls-starting-in-intervals \\
-  --keep-all-sites \\
-  -V gendb.{genomicsdb_path} \\
-  {f'-L {interval} ' if interval else ''} \\
-  --create-output-variant-index
-
-df -h; pwd; free -m
-    """
-    )
+    j.command(wrap_command(f"""\
+    gatk --java-options -Xms8g \\
+    GnarlyGenotyper \\
+    -R {reference.base} \\
+    -O {j.output_vcf['vcf.gz']} \\
+    -D {resources.DBSNP_VCF} \\
+    --only-output-calls-starting-in-intervals \\
+    --keep-all-sites \\
+    -V gendb.{genomicsdb_path} \\
+    {f'-L {interval} ' if interval else ''} \\
+    --create-output-variant-index
+    """, monitor_space=True, setup_gcp=True))
     if output_vcf_path:
         b.write_output(j.output_vcf, output_vcf_path.replace('.vcf.gz', ''))
 
@@ -572,29 +537,27 @@ def _add_exccess_het_filter(
         return b.new_job(job_name + ' [reuse]')
 
     j = b.new_job(job_name)
-    j.image(utils.GATK_IMAGE)
+    j.image(resources.GATK_IMAGE)
     j.memory('8G')
     j.storage(f'32G')
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
 
-    j.command(
-        f"""set -euo pipefail
-
+    j.command(wrap_command(f"""
     # Captring stderr to avoid Batch pod from crashing with OOM from millions of
     # warning messages from VariantFiltration, e.g.:
     # > JexlEngine - ![0,9]: 'ExcessHet > 54.69;' undefined variable ExcessHet
     gatk --java-options -Xms3g \\
-      VariantFiltration \\
-      --filter-expression 'ExcessHet > {excess_het_threshold}' \\
-      --filter-name ExcessHet \\
-      {f'-L {interval} ' if interval else ''} \\
-      -O {j.output_vcf['vcf.gz']} \\
-      -V {input_vcf['vcf.gz']} \\
-      2> {j.stderr}
+    VariantFiltration \\
+    --filter-expression 'ExcessHet > {excess_het_threshold}' \\
+    --filter-name ExcessHet \\
+    {f'-L {interval} ' if interval else ''} \\
+    -O {j.output_vcf['vcf.gz']} \\
+    -V {input_vcf['vcf.gz']} \\
+    2> {j.stderr}
     """
-    )
+    ))
     if output_vcf_path:
         b.write_output(j.output_vcf, output_vcf_path.replace('.vcf.gz', ''))
 
@@ -618,22 +581,19 @@ def _add_make_sites_only_job(
         return b.new_job(job_name + ' [reuse]')
 
     j = b.new_job(job_name)
-    j.image(utils.GATK_IMAGE)
+    j.image(resources.GATK_IMAGE)
     j.memory('8G')
     j.storage(f'32G')
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
 
-    j.command(
-        f"""set -euo pipefail
-
+    j.command(wrap_command(f"""
     gatk --java-options -Xms6g \\
-      MakeSitesOnlyVcf \\
-      -I {input_vcf['vcf.gz']} \\
-      -O {j.output_vcf['vcf.gz']}
-      """
-    )
+    MakeSitesOnlyVcf \\
+    -I {input_vcf['vcf.gz']} \\
+    -O {j.output_vcf['vcf.gz']}
+    """))
     if output_vcf_path:
         b.write_output(j.output_vcf, output_vcf_path.replace('.vcf.gz', ''))
 
@@ -666,27 +626,20 @@ def _add_final_gather_vcf_job(
     )
 
     input_cmdl = ' '.join([f'--input {v["vcf.gz"]}' for v in input_vcfs])
-    j.command(
-        f"""set -euo pipefail
-
-    (while true; do df -h; pwd free -m; sleep 300; done) &
-
+    j.command(wrap_command(f"""
     # --ignore-safety-checks makes a big performance difference so we include it in 
     # our invocation. This argument disables expensive checks that the file headers 
     # contain the same set of genotyped samples and that files are in order 
     # by position of first record.
     gatk --java-options -Xms{java_mem}g \\
-      GatherVcfsCloud \\
-      --ignore-safety-checks \\
-      --gather-type BLOCK \\
-      {input_cmdl} \\
-      --output {j.output_vcf['vcf.gz']}
+    GatherVcfsCloud \\
+    --ignore-safety-checks \\
+    --gather-type BLOCK \\
+    {input_cmdl} \\
+    --output {j.output_vcf['vcf.gz']}
 
     tabix {j.output_vcf['vcf.gz']}
-    
-    df -h; pwd; free -m
-    """
-    )
+    """, monitor_space=True))
     if output_vcf_path:
         b.write_output(j.output_vcf, output_vcf_path.replace('.vcf.gz', ''))
     return j

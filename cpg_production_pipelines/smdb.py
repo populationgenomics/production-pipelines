@@ -4,13 +4,13 @@ Functions to find the pipeline inputs and communicate with the SM server
 
 import logging
 from dataclasses import dataclass
-from textwrap import dedent
 from typing import List, Dict, Optional, Set, Collection
 
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
 from cpg_production_pipelines import utils, resources
+from cpg_production_pipelines.jobs import wrap_command
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -203,14 +203,7 @@ class SMDB:
 
         j = b.new_job(job_name)
         j.image(resources.SM_IMAGE)
-        j.command(
-            dedent(
-                f"""
-        set -o pipefail
-        set -ex
-        
-        export GOOGLE_APPLICATION_CREDENTIALS=/gsa-key/key.json
-        gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+        j.command(wrap_command(f"""\
         export SM_DEV_DB_PROJECT={self.analysis_project}
         export SM_ENVIRONMENT=PRODUCTION
         
@@ -229,9 +222,7 @@ class SMDB:
             traceback.print_exc()
         EOT
         python update.py
-        """
-            )
-        )
+        """, setup_gcp=True))
         return j
 
     def create_analysis(

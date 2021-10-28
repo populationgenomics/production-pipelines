@@ -30,11 +30,6 @@ def main():
         title='Benchmark DRAGMAP - full samples',
         smdb_check_existence=False,
     )
-    # This samples crashes with BWA-MEM2 after 30min
-    # cpg13326 = AlignmentInput(
-    #     fqs1=[f'{BENCHMARK_BUCKET}/inputs/D18-1351_r1.fastq.gz'],
-    #     fqs2=[f'{BENCHMARK_BUCKET}/inputs/D18-1351_r2.fastq.gz'],
-    # )
     # This set is 50MB each
     tiny_fq = AlignmentInput(
         fqs1=[f'{TOY_INPUTS_BUCKET}/2-699835.L001.R1.n40000.fastq.gz'],
@@ -49,7 +44,6 @@ def main():
         'TINY_FQ': tiny_fq,
         'TINY_CRAM': tiny_cram,
     }
-
     giab_path = 'gs://cpg-reference/validation/giab/cram'
     giab_inputs = {
         sn: AlignmentInput(
@@ -59,8 +53,8 @@ def main():
         for sn in ['NA12878', 'NA12891', 'NA12892']
     }
 
-    for sample_name, inp in giab_inputs.items():
-    # for sample_name, inp in tiny_inputs.items():
+    # for sample_name, inp in giab_inputs.items():
+    for sample_name, inp in tiny_inputs.items():
         cram_path = f'{BENCHMARK_BUCKET}/{sample_name}.cram'
         align_j = align(
             pipe.b,
@@ -72,7 +66,6 @@ def main():
             markdup_tool=MarkDupTool.BIOBAMBAM,
             extra_label='biobambam',
         )
-
         produce_gvcf(
             pipe.b,
             output_path=f'{BENCHMARK_BUCKET}/{sample_name}.g.vcf.gz',

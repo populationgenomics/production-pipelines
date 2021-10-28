@@ -307,8 +307,7 @@ def _build_bwa_command(
         use_bazam = False
         # Allow for 300G input FQ, 150G output CRAM, plus some tmp storage
         j.storage('600G')
-        files1 = [b.read_input(f1) for f1 in alignment_input.fqs1]
-        files2 = [b.read_input(f1) for f1 in alignment_input.fqs2]
+        files1, files2 = alignment_input.get_fq_inputs(b)
         if len(files1) > 1:
             r1_param = f'<(cat {" ".join(files1)})'
             r2_param = f'<(cat {" ".join(files2)})'
@@ -336,6 +335,8 @@ def extract_fastq(
     cram: hb.ResourceGroup,
     sample_name: str,
     project_name: Optional[str] = None,
+    output_fq1: Optional[str] = None,
+    output_fq2: Optional[str] = None,
 ) -> Job:
     """
     Job that converts a bam or a cram to a pair of compressed fastq files
@@ -351,12 +352,16 @@ def extract_fastq(
 
     reference = b.read_input_group(**resources.REF_D)
     cmd = f"""\
-    samtools fastq -@{nthreads-1} {cram.base} -T {reference.base} \\
-    -@{nthreads} -1 {j.fq1} -2 {j.fq2} -0 /dev/null -s /dev/null
+    samtools fastq -@{nthreads-1} {cram.base} --reference {reference.base} \\
+    -1 {j.fq1} -2 {j.fq2} -0 /dev/null -s /dev/null
     # After converting to FQ, we don't need input CRAMs anymore:
     rm {cram.base} {cram.index}
     """
     j.command(wrap_command(cmd, monitor_space=True))
+    if output_fq1 or output_fq2:
+        assert output_fq1 and output_fq2, f'Both must be defined: fq1={output_fq1}, fq2={output_fq2}'
+        b.write_output(j.fq1, output_fq1)
+        b.write_output(j.fq2, output_fq2)
     return j
 
 

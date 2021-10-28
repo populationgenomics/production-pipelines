@@ -61,7 +61,7 @@ def produce_gvcf(
     hc_jobs = []
     if number_of_intervals is not None and number_of_intervals > 1:
         if intervals is None:
-            intervals = split_intervals.make_resource_group(
+            intervals = split_intervals.get_intervals(
                 b=b,
                 scatter_count=number_of_intervals,
                 out_bucket=join(tmp_bucket, 'intervals'),

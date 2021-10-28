@@ -12,7 +12,7 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-def make_resource_group(
+def get_intervals(
     b: hb.Batch,
     scatter_count: int,
     out_bucket: Optional[str] = None,
@@ -53,17 +53,7 @@ def make_resource_group(
     -R {resources.REF_FASTA} \\
     -mode INTERVAL_SUBDIVISION
     """
-    output_bucket_path_to_check = None
-    if out_bucket:
-        out_bucket = join(out_bucket, f'{scatter_count}intervals')
-        # Checking the first and the last interval:
-        output_bucket_path_to_check = [
-            join(out_bucket, f'0000-scattered.interval_list'),
-            join(
-                out_bucket, f'{str(scatter_count-1).zfill(4)}-scattered.interval_list'
-            ),
-        ]
     j.command(wrap_command(cmd))
     if out_bucket:
-        b.write_output(j.intervals, out_bucket)
+        b.write_output(j.intervals, join(out_bucket, f'{scatter_count}intervals'))
     return j.intervals

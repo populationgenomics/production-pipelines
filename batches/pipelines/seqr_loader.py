@@ -15,7 +15,6 @@ import pandas as pd
 import click
 import hailtop.batch as hb
 
-from cpg_production_pipelines.vqsr import make_vqsr_jobs
 from cpg_production_pipelines import utils, resources
 from cpg_production_pipelines.jobs import align, split_intervals, haplotype_caller
 from cpg_production_pipelines.pipeline import Namespace, Pipeline
@@ -230,8 +229,10 @@ class SeqrLoaderPipeline(Pipeline):
         self,
         input_projects: List[str],
         skip_samples: List[str],
+        hc_shards_num: int,
         first_stage: Stage = list(Stage.__members__.keys())[0],
         last_stage: Stage = list(Stage.__members__.keys())[-1],
+        overwrite: bool = True,
     ):
         self._prepare_inputs(input_projects, skip_samples)
 
@@ -242,16 +243,21 @@ class SeqrLoaderPipeline(Pipeline):
             return
 
         if first_stage <= Stage.CRAM:
-            self._cram()
+            cram_jobs, cram_paths = self._cram(overwrite)
+
+        if first_stage <= Stage.GVCF:
+            self._gvcf(hc_shards_num, cram_paths, cram_jobs, overwrite)
 
     def _cram(
         self,
+        overwrite: bool,
     ):
         cram_jobs = []
-        for proj, samples in self.samples_by_project.items():
-            logger.info(f'Submitting CRAMs for project {proj}')
-            proj_bucket = f'gs://cpg-{proj}-{self.output_suf}'
-            sample_ids = [s['id'] for s in samples]
+        cram_paths = []
+        for project in self.projects:
+            logger.info(f'Submitting CRAMs for project {project.name}')
+            proj_bucket = f'gs://cpg-{project.name}-{self.output_suf}'
+            sample_ids = [s.id for s in project.samples]
 
             cram_analysis_per_sid = self.db.find_analyses_by_sid(
                 sample_ids=sample_ids,
@@ -259,83 +265,86 @@ class SeqrLoaderPipeline(Pipeline):
             )
             seq_info_by_sid = self.db.find_seq_info_by_sid(sample_ids)
 
-            for s in samples:
-                logger.info(f'Project {proj}. Processing CRAM for {s["id"]}')
-                expected_cram_path = f'{proj_bucket}/cram/{s["id"]}.cram'
-                found_cram_path = self.db.process_existing_analysis(
-                    sample_ids=[s['id']],
-                    completed_analysis=cram_analysis_per_sid.get(s['id']),
+            for s in project.samples:
+                logger.info(f'Project {project.name}. Processing CRAM for {s.id}')
+                cram_path = f'{proj_bucket}/cram/{s.id}.cram'
+                self.db.process_existing_analysis(
+                    sample_ids=[s.id],
+                    completed_analysis=cram_analysis_per_sid.get(s.id),
                     analysis_type='cram',
-                    analysis_sample_ids=[s['id']],
-                    expected_output_fpath=expected_cram_path,
+                    analysis_sample_ids=[s.id],
+                    expected_output_fpath=cram_path,
                 )
-                seq_info = seq_info_by_sid[s['id']]
+                seq_info = seq_info_by_sid[s.id]
                 alignment_input = self.db.parse_reads_from_metadata(seq_info['meta'])
                 if not alignment_input:
-                    logger.critical(f'Could not find read data for sample {s["id"]}')
+                    logger.critical(f'Could not find read data for sample {s.id}')
                     continue
                 cram_job = align.bwa(
                     b=self.b,
                     alignment_input=alignment_input,
-                    output_path=expected_cram_path,
-                    sample_name=s['id'],
-                    project_name=proj,
+                    output_path=cram_path,
+                    sample_name=s.id,
+                    project_name=project.name,
+                    overwrite=overwrite,
                 )
                 cram_jobs.append(cram_job)
-                found_cram_path = expected_cram_path
-        return cram_jobs
+                cram_paths.append(cram_path)
+        return cram_jobs, cram_paths
 
-    def _gvcf(self, hc_shards_num):
+    def _gvcf(
+        self, 
+        hc_shards_num, 
+        cram_paths, 
+        cram_jobs,
+        overwrite: bool
+    ):
         # after dropping samples with incorrect metadata, missing inputs, etc
-        good_samples: List[Dict] = []
         hc_intervals = None
         gvcf_jobs = []
         gvcf_by_sid: Dict[str, str] = dict()
-        for proj, samples in self.samples_by_project.items():
-            logger.info(f'Processing project {proj}')
-            proj_bucket = f'gs://cpg-{proj}-{self.output_suf}'
-            sample_ids = [s['id'] for s in samples]
+        for project in self.projects:
+            logger.info(f'Processing project {project.name}')
+            proj_bucket = f'gs://cpg-{project.name}-{self.output_suf}'
+            sample_ids = [s.id for s in project.samples]
 
             gvcf_analysis_per_sid = self.db.find_analyses_by_sid(
                 sample_ids=sample_ids,
                 analysis_type='gvcf',
             )
 
-            for s in samples:
-                logger.info(f'Project {proj}. Processing GVCF {s["id"]}')
-                expected_gvcf_path = f'{proj_bucket}/gvcf/{s["id"]}.g.vcf.gz'
-                found_gvcf_path = self.db.process_existing_analysis(
-                    sample_ids=[s['id']],
-                    completed_analysis=gvcf_analysis_per_sid.get(s['id']),
+            for cram_job, cram_path, s in zip(cram_paths, cram_paths, project.samples):
+                logger.info(f'Project {project.name}. Processing GVCF {s.id}')
+                gvcf_path = f'{proj_bucket}/gvcf/{s.id}.g.vcf.gz'
+                self.db.process_existing_analysis(
+                    sample_ids=[s.id],
+                    completed_analysis=gvcf_analysis_per_sid.get(s.id),
                     analysis_type='gvcf',
-                    analysis_sample_ids=[s['id']],
-                    expected_output_fpath=expected_gvcf_path,
+                    analysis_sample_ids=[s.id],
+                    expected_output_fpath=gvcf_path,
                 )
                 if hc_intervals is None and hc_shards_num > 1:
-                    hc_intervals = split_intervals.intervals(
+                    hc_intervals = split_intervals.get_intervals(
                         b=self.b,
                         scatter_count=hc_shards_num,
-                        ref_fasta=resources.REF_FASTA,
                     )
                 gvcf_j = haplotype_caller.produce_gvcf(
                     b=self.b,
-                    output_path=expected_gvcf_path,
-                    sample_name=s['id'],
-                    project_name=proj,
-                    cram_path=found_cram_path,
-                    crai_path=found_cram_path + '.crai',
+                    output_path=gvcf_path,
+                    sample_name=s.id,
+                    project_name=project.name,
+                    cram_path=cram_path,
+                    crai_path=cram_path + '.crai',
                     intervals=hc_intervals,
                     number_of_intervals=hc_shards_num,
                     tmp_bucket=self.tmp_bucket,
                     overwrite=overwrite,
                     depends_on=[cram_job] if cram_job else [],
-                    smdb=smdb,
+                    smdb=self.db,
                 )
                 gvcf_jobs.append(gvcf_j)
-                found_gvcf_path = expected_gvcf_path
-                gvcf_by_sid[s['id']] = found_gvcf_path
-                good_samples.append(s)
-        return good_samples
+                gvcf_by_sid[s.id] = gvcf_path
+        return gvcf_by_sid, gvcf_jobs
 
     def _joint_calling(self):
         pass

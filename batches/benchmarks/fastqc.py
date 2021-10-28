@@ -30,15 +30,17 @@ def main():
     )
     # This samples crashes with BWA-MEM2 after 30min
     cpg13326 = AlignmentInput(
-        fqs1=[f'{BENCHMARK_BUCKET}/inputs/D18-1351_r1.fastq.gz'],
-        fqs2=[f'{BENCHMARK_BUCKET}/inputs/D18-1351_r2.fastq.gz'],
+        fqs1=[f'{INPUTS_BUCKET}/CPG13326/D18-1351_r1.fastq.gz'],
+        fqs2=[f'{INPUTS_BUCKET}/CPG13326/D18-1351_r2.fastq.gz'],
     )
-    
-    perth_neuro2 = AlignmentInput(
-        fqs1=[f'{INPUTS_BUCKET}/HNFWKCCXY_3_181017_FD07777491_Homo-sapiens__R_170503_GINRAV_DNA_M002_R1.fastq.gz'],
-        fqs2=[f'{INPUTS_BUCKET}/HNFWKCCXY_3_181017_FD07777491_Homo-sapiens__R_170503_GINRAV_DNA_M002_R2.fastq.gz'],
+    perthneuro2 = AlignmentInput(
+        fqs1=[f'{INPUTS_BUCKET}/PERTHNEURO2/HNFWKCCXY_3_181017_FD07777491_Homo-sapiens__R_170503_GINRAV_DNA_M002_R1.fastq.gz'],
+        fqs2=[f'{INPUTS_BUCKET}/PERTHNEURO2/HNFWKCCXY_3_181017_FD07777491_Homo-sapiens__R_170503_GINRAV_DNA_M002_R2.fastq.gz'],
     )
-    
+    na12878fq = AlignmentInput(
+        fqs1=[f'{INPUTS_BUCKET}/NA12878/ERR194147_1.fastq.gz'],
+        fqs2=[f'{INPUTS_BUCKET}/NA12878/ERR194147_2.fastq.gz'],
+    )
     # This set is 50MB each
     tiny_fq = AlignmentInput(
         fqs1=[f'{TOY_INPUTS_BUCKET}/2-699835.L001.R1.n40000.fastq.gz'],
@@ -53,19 +55,23 @@ def main():
         'TINY_FQ': tiny_fq,
         'TINY_CRAM': tiny_cram,
     }
-    
-    giab_path = 'gs://cpg-reference/validation/giab/cram'
-    giab_inputs = {
+    giab_cram_path = 'gs://cpg-reference/validation/giab/cram'
+    giab_cram_inputs = {
         sn: AlignmentInput(
-            bam_or_cram_path=f'{giab_path}/{sn}.cram',
-            index_path=f'{giab_path}/{sn}.cram.crai',
+            bam_or_cram_path=f'{giab_cram_path}/{sn}.cram',
+            index_path=f'{giab_cram_path}/{sn}.cram.crai',
         )
         for sn in ['NA12878', 'NA12891', 'NA12892']
+    }
+    fq_inputs = {
+        'NA12878': na12878fq,
+        'CPG13326': cpg13326,
+        'PERTHNEURO2': perthneuro2,
     }
 
     # for sample_name, inp in giab_inputs.items():
     # for sample_name, inp in tiny_inputs.items():
-    for sample_name, inp in {'PERTH_NEURO2': perth_neuro2}.items():
+    for sample_name, inp in fq_inputs.items():
         fastqc(
             pipe.b,
             results_bucket=RESULTS_BUCKET,

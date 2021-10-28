@@ -11,7 +11,7 @@ import time
 import hashlib
 from dataclasses import dataclass
 from os.path import isdir, isfile, exists, join, basename
-from typing import Any, Callable, Dict, Optional, Union, Iterable, List
+from typing import Any, Callable, Dict, Optional, Union, Iterable, List, Tuple
 import yaml
 import pandas as pd
 import hail as hl
@@ -398,16 +398,34 @@ class AlignmentInput:
     Sort of a union type for possible alignment inputs
     """
 
-    bam_or_cram_path: Optional[str] = None
+    bam_or_cram_path: Optional[Union[str, hb.ResourceGroup]] = None
     index_path: Optional[str] = None
-    fqs1: Optional[List[str]] = None
-    fqs2: Optional[List[str]] = None
+    fqs1: Optional[List[Union[str, hb.ResourceFile]]] = None
+    fqs2: Optional[List[Union[str, hb.ResourceFile]]] = None
 
     def get_cram_input_group(self, b) -> hb.ResourceGroup:
+        """
+        Makes a ResourceGroup of bam/cram with accompanying index
+        """
         assert self.bam_or_cram_path
-        assert self.index_path
         assert not self.fqs1 and not self.fqs2
-        return b.read_input_group(
-            base=self.bam_or_cram_path,
-            index=self.index_path
-        )
+        if isinstance(self.bam_or_cram_path, str):
+            assert self.index_path
+            return b.read_input_group(
+                base=self.bam_or_cram_path,
+                index=self.index_path
+            )
+        else:
+            return self.bam_or_cram_path
+
+    def get_fq_inputs(self, b) -> Tuple[List[hb.Resource], List[hb.Resource]]:
+        """
+        Makes a pair of lists of ResourceFile objects for fqs1 and fqs2
+        """
+        if isinstance(self.fqs1, hb.Resource):
+            files1 = self.fqs1
+            files2 = self.fqs2
+        else:
+            files1 = [b.read_input(f1) for f1 in self.fqs1]
+            files2 = [b.read_input(f1) for f1 in self.fqs2]
+        return files1, files2
