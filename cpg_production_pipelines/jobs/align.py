@@ -27,6 +27,7 @@ class Aligner(Enum):
 class MarkDupTool(Enum):
     PICARD = 1
     BIOBAMBAM = 2
+    NO_MARKDUP = 3
 
 
 def dragmap(*args, **kwargs):
@@ -99,7 +100,8 @@ def align(
                 aligner=aligner,
                 extra_label=f'{i+1}/{alignment_input.fqs1} {extra_label}',
             )
-            cmd += sort_cmd(nthreads) + f' -o {j.sorted_bam}'
+            cmd = cmd.strip()
+            cmd += ' ' + sort_cmd(nthreads) + f' -o {j.sorted_bam}'
             j.command(wrap_command(cmd, monitor_space=True))
             align_jobs.append(j)
         first_j = align_jobs[0]
@@ -139,9 +141,9 @@ def align(
         sample_name=sample_name,
         project_name=project_name,
         nthreads=nthreads,
+        markdup_tool=markdup_tool,
         output_path=output_path,
         overwrite=overwrite,
-        markdup_tool=markdup_tool,
     )
 
     if depends_on:
@@ -410,9 +412,9 @@ def finalise_alignment(
     sample_name: str,
     project_name: str,
     nthreads: int,
+    markdup_tool: MarkDupTool,
     output_path: Optional[str] = None,
     overwrite: bool = True,
-    markdup_tool: Optional[MarkDupTool] = None,
 ) -> Tuple[str, Job]:
 
     reference = b.read_input_group(**resources.REF_D)
@@ -436,6 +438,7 @@ def finalise_alignment(
         md_j = j
     else:
         if not stdout_is_sorted:
+            align_cmd = align_cmd.strip()
             align_cmd += f' {sort_cmd(nthreads)}'
         align_cmd += f' > {j.sorted_bam}'
 
