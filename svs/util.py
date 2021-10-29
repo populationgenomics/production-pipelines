@@ -64,13 +64,13 @@ class SMDB:
     ):
         # NOTE: this is a proposal, this endpoint does not currently exist like this
         analyses = cls.aapi.get_latest_analysis_for_samples_and_type(
-            analysis_type="variants",
+            analysis_type="sv",
             project=project,
             request_body={
                 "sample_ids": sample_ids,
                 "meta": {
                     # TODO: define some better convention
-                    "sv_type": sv_type
+                    "sv_algorithm": sv_type # manta, melt,
                 },
             },
         )
