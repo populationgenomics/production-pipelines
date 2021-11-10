@@ -1,27 +1,29 @@
+from os.path import splitext, join, dirname
 from typing import Optional
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_production_pipelines.jobs import wrap_command
-from cpg_production_pipelines import resources
+from cpg_production_pipelines.jobs import wrap_command, new_job
+from cpg_production_pipelines import resources, utils
 
 
 def markdup(
     b: hb.Batch,
     sorted_bam: hb.ResourceFile,
     sample_name: str,
-    project_name: str,
-    out_cram_path: Optional[str] = None,
+    project_name: Optional[str] = None,
+    output_path: Optional[str] = None,
     overwrite: bool = True,
 ) -> Job:
     """
     Make job that runs Picard MarkDuplicates and converts the result to CRAM.
     """
-    job_name = f'{sample_name}: MarkDuplicates'
-    if project_name:
-        job_name = f'{project_name}/{job_name}'
-    j = b.new_job(job_name)
+    j = new_job(b, 'MarkDuplicates', sample_name, project_name)
+    if utils.can_reuse(output_path, overwrite):
+        j.name += ' [reuse]'
+        return j
+
     j.image(resources.SAMTOOLS_PICARD_IMAGE)
     j.cpu(2)
     j.memory('highmem')
@@ -44,4 +46,14 @@ def markdup(
     samtools index -@2 {j.output_cram.cram} {j.output_cram['cram.crai']}
     """
     j.command(wrap_command(cmd, monitor_space=True))
+    if output_path:
+        b.write_output(j.output_cram, splitext(output_path)[0])
+        b.write_output(
+            j.duplicate_metrics,
+            join(
+                dirname(output_path),
+                'duplicate-metrics',
+                f'{sample_name}-duplicate-metrics.csv',
+            ),
+        )
     return j

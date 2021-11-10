@@ -7,11 +7,11 @@ import logging
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_production_pipelines import resources
+from cpg_production_pipelines import resources, utils
 from cpg_production_pipelines.jobs import wrap_command, new_job
 from cpg_production_pipelines.jobs import picard
 from cpg_production_pipelines.smdb import SMDB
-from cpg_production_pipelines.utils import AlignmentInput
+from cpg_production_pipelines.hailbatch import AlignmentInput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -68,7 +68,10 @@ def align(
     extra_label: Optional[str] = None,
     depends_on: Optional[List[Job]] = None,
     smdb: Optional[SMDB] = None,
-    overwrite: bool = False,
+    overwrite: bool = True,
+    ncpu: Optional[int] = None,
+    highmem: bool = False,
+    storage_gb: Optional[int] = None,
 ) -> Job:
     """
     - if the input is 1 fastq pair, submits one alignment job
@@ -84,8 +87,16 @@ def align(
       - is biobambam2, stream the alignment or merging within the same job
       - is picard, submit a separate job with deduplication
     """
-    ncpu = 32
-    nthreads = ncpu * 2  # multithreading
+    if utils.can_reuse(output_path, overwrite):
+        job_name = aligner.name
+        if extra_label:
+            job_name += f' {extra_label}'
+        job_name += ' [reuse]'
+        return new_job(b, job_name, sample_name, project_name)
+
+    if ncpu is None:
+        ncpu = 32
+    nthreads = ncpu * 2  # hyperthreading
     if alignment_input.fqs1 and len(alignment_input.fqs1) > 1:
         # running alignment in parallel, then merging
         assert len(alignment_input.fqs1) == len(alignment_input.fqs2), alignment_input
@@ -98,27 +109,40 @@ def align(
                 sample=sample_name,
                 project=project_name,
                 aligner=aligner,
-                extra_label=f'{i+1}/{alignment_input.fqs1} {extra_label}',
+                extra_label=f'{i+1}/{fq1}' + (f' {extra_label}' if extra_label else ''),
             )
+            if highmem:
+                j.memory('highmem')
+            if storage_gb:
+                j.storage(f'{storage_gb}G')
             cmd = cmd.strip()
             cmd += ' ' + sort_cmd(nthreads) + f' -o {j.sorted_bam}'
             j.command(wrap_command(cmd, monitor_space=True))
             align_jobs.append(j)
-        first_j = align_jobs[0]
+        sorted_bams = [j.sorted_bam for j in align_jobs]
+        # sorted_bams = [
+        #     b.read_input('gs://cpg-seqr-main-tmp/seqr_align_CPG12062_19W001482_A0131064_proband/v0/hail/batch/f152ca/1/sorted_bam'),
+        #     b.read_input('gs://cpg-seqr-main-tmp/seqr_align_CPG12062_19W001482_A0131064_proband/v0/hail/batch/f152ca/2/sorted_bam'),
+        #     b.read_input('gs://cpg-seqr-main-tmp/seqr_align_CPG12062_19W001482_A0131064_proband/v0/hail/batch/f152ca/3/sorted_bam'),
+        #     b.read_input('gs://cpg-seqr-main-tmp/seqr_align_CPG12062_19W001482_A0131064_proband/v0/hail/batch/f152ca/4/sorted_bam'),
+        # ]
 
-        merge_j = new_job('merge BAMs', sample_name, project_name)
+        merge_j = new_job(b, 'merge BAMs', sample_name, project_name)
         ncpu = 2
         nthreads = ncpu * 2  # multithreading
         merge_j.cpu(ncpu)
-        merge_j.image(resources.SAMTOOLS_PICARD_IMAGE)
+        merge_j.image(resources.BWA_IMAGE)
         # 300G for input BAMs, 300G for output BAM
         merge_j.storage('600G')
 
         align_cmd = f"""\
-        samtools merge -@{nthreads-1} - {' '.join([j.sorted_bam for j in align_jobs])}
+        samtools merge -@{nthreads-1} - {' '.join(sorted_bams)}
         """
+        output_fmt = 'bam'
         align_j = merge_j
         stdout_is_sorted = True
+        # first_j = align_jobs[0]
+        first_j = merge_j
 
     else:
         align_j, align_cmd = _align_one(
@@ -130,8 +154,14 @@ def align(
             aligner=aligner,
             extra_label=extra_label,
         )
+        if highmem:
+            align_j.memory('highmem')
+        if storage_gb:
+            align_j.storage(f'{storage_gb}G')
+
         first_j = align_j
         stdout_is_sorted = False
+        output_fmt = 'sam'
 
     last_j = finalise_alignment(
         b=b,
@@ -144,6 +174,7 @@ def align(
         markdup_tool=markdup_tool,
         output_path=output_path,
         overwrite=overwrite,
+        align_cmd_out_fmt=output_fmt,
     )
 
     if depends_on:
@@ -153,7 +184,7 @@ def align(
             b=b,
             analysis_type='cram',
             output_path=output_path,
-            sample_name=sample_name,
+            sample_names=[sample_name],
             project_name=project_name,
             first_j=first_j,
             last_j=last_j,
@@ -213,7 +244,7 @@ def _align_one(
         j.image(resources.DRAGMAP_IMAGE)
         # Allow for 400G of extacted FQ, 150G of output CRAMs,
         # plus some tmp storage for sorting
-        j.storage('700G')
+        j.storage(f'700G')
         prep_inp_cmd = ''
         if alignment_input.bam_or_cram_path:
             extract_j = extract_fastq(
@@ -225,15 +256,11 @@ def _align_one(
             input_param = f'-1 {extract_j.fq1} -2 {extract_j.fq2}'
 
         else:
+            files1, files2 = alignment_input.get_fq_inputs(b)
             # Allow for 300G input FQ, 150G output CRAM, plus some tmp storage
             if len(alignment_input.fqs1) == 1:
-                input_param = (
-                    f'-1 {b.read_input(alignment_input.fqs1[0])} '
-                    f'-2 {b.read_input(alignment_input.fqs2[0])}'
-                )
+                input_param = f'-1 {files1[0]} -2 {files2[0]}'
             else:
-                files1 = [b.read_input(f1) for f1 in alignment_input.fqs1]
-                files2 = [b.read_input(f1) for f1 in alignment_input.fqs2]
                 prep_inp_cmd = f"""\
                 cat {" ".join(files1)} >reads.R1.fq.gz
                 cat {" ".join(files2)} >reads.R2.fq.gz
@@ -377,7 +404,7 @@ def create_dragmap_index(b: hb.Batch) -> Job:
         .replace('.fa', '')
         + '.dict',
     )
-    j = b.new_job('Index DRAGMAP')
+    j = new_job(b, name='Index DRAGMAP')
     j.image(resources.DRAGMAP_IMAGE)
     j.memory('standard')
     j.cpu(32)
@@ -420,6 +447,7 @@ def finalise_alignment(
     markdup_tool: MarkDupTool,
     output_path: Optional[str] = None,
     overwrite: bool = True,
+    align_cmd_out_fmt: str = 'sam',
 ) -> Tuple[str, Job]:
 
     reference = b.read_input_group(**resources.REF_D)
@@ -432,14 +460,14 @@ def finalise_alignment(
                 'cram.crai': '{root}.cram.crai',
             }
         )
-        align_cmd = dedent(f"""\
-        {indent(dedent(align_cmd).strip(), ' '*8)} \\
-        | bamsormadup inputformat=sam threads={nthreads} SO=coordinate \\
+        align_cmd = f"""\
+        {align_cmd.strip()} \\
+        | bamsormadup inputformat={align_cmd_out_fmt} threads={nthreads} SO=coordinate \\
         M={j.duplicate_metrics} outputformat=sam \\
         tmpfile=$(dirname {j.output_cram.cram})/bamsormadup-tmp \\
         | samtools view -@{nthreads-1} -T {reference.base} -Ocram -o {j.output_cram.cram}       
         samtools index -@{nthreads-1} {j.output_cram.cram} {j.output_cram["cram.crai"]}
-        """).strip()
+        """.strip()
         md_j = j
     else:
         if not stdout_is_sorted:

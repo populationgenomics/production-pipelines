@@ -11,16 +11,18 @@ from hailtop.batch.job import Job
 
 from cpg_production_pipelines import utils, resources
 from cpg_production_pipelines.jobs import wrap_command
+from cpg_production_pipelines.hailbatch import AlignmentInput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
+
 @dataclass
 class Analysis:
     """
-    Represents the analysis SampleMetadata database entry
+    Represents the Analysis SampleMetadata DB entry
     """
 
     id: str
@@ -28,6 +30,36 @@ class Analysis:
     status: str
     sample_ids: Set[str]
     output: Optional[str]
+
+    def make_analysis_model(self):
+        from sample_metadata import AnalysisModel
+        return AnalysisModel(
+            type=self.type,
+            output=self.output,
+            status=self.status,
+            sample_ids=self.sample_ids,
+        )
+
+
+class Sequence:
+    """
+    Represents the Sequence SampleMetadata DB entry
+    """
+    
+    def __init__(self, id, meta, smdb):
+        self.id = id
+        self.meta = meta
+        self.smdb = smdb
+    
+    @staticmethod
+    def parse(data: Dict, smdb):
+        return Sequence(data['id'], data['meta'], smdb)
+
+    def parse_reads_from_metadata(self):
+        return parse_reads_from_metadata(
+            self.meta,
+            check_existence=self.smdb.do_check_existence
+        )
 
 
 class SMDB:
@@ -59,7 +91,7 @@ class SMDB:
 
     def get_samples_by_project(
         self,
-        projects: List[str],
+        project_names: List[str],
         namespace: str,
         skip_samples: Optional[List[str]] = None,
     ) -> Dict[str, List[Dict]]:
@@ -67,30 +99,31 @@ class SMDB:
         Returns a dictionary of samples per input projects
         """
         samples_by_project: Dict[str, List[Dict]] = dict()
-        for proj in projects:
-            logger.info(f'Finding samples for project {proj}')
-            input_proj = proj
+        for proj_name in project_names:
+            logger.info(f'Finding samples for project {proj_name}')
+            input_proj_name = proj_name
             if namespace != 'main':
-                input_proj += '-test'
+                input_proj_name += '-test'
             samples = self.sapi.get_samples(
                 body_get_samples_by_criteria_api_v1_sample_post={
-                    'project_ids': [input_proj],
+                    'project_ids': [input_proj_name],
                     'active': True,
                 }
             )
-            samples_by_project[proj] = []
+            samples_by_project[proj_name] = []
             for s in samples:
                 if skip_samples and s['id'] in skip_samples:
                     logger.info(f'Skiping sample: {s["id"]}')
                     continue
-                samples_by_project[proj].append(s)
+                samples_by_project[proj_name].append(s)
         return samples_by_project
 
-    def find_seq_info_by_sid(self, sample_ids) -> Dict[List, Dict]:
+    def find_seq_info_by_sid(self, sample_ids) -> Dict[List, Sequence]:
         """
         Return a dict of "Sequence" entries by sample ID
         """
         seq_infos: List[Dict] = self.seqapi.get_sequences_by_sample_ids(sample_ids)
+        seq_infos = [Sequence.parse(d, self) for d in seq_infos]
         seq_info_by_sid = dict(zip(sample_ids, seq_infos))
         return seq_info_by_sid
 
@@ -257,7 +290,6 @@ class SMDB:
         sample_ids: Collection[str],
         completed_analysis: Optional[Analysis],
         analysis_type: str,
-        analysis_sample_ids: Collection[str],
         expected_output_fpath: str,
     ) -> Optional[str]:
         """
@@ -270,14 +302,13 @@ class SMDB:
         :param sample_ids: sample IDs to pull the analysis for
         :param completed_analysis: existing completed analysis of this type for these samples
         :param analysis_type: cram, gvcf, joint_calling
-        :param analysis_sample_ids: sample IDs that analysis refers to
         :param expected_output_fpath: where the pipeline expects the analysis output file
             to sit on the bucket (will invalidate the analysis if it doesn't match)
         :return: path to the output if it can be reused, otherwise None
         """
         label = f'type={analysis_type}'
-        if len(analysis_sample_ids) > 1:
-            label += f' for {", ".join(analysis_sample_ids)}'
+        if len(sample_ids) > 1:
+            label += f' for {", ".join(sample_ids)}'
 
         found_output_fpath = None
         if not completed_analysis:
@@ -332,7 +363,7 @@ class SMDB:
                 type_=analysis_type,
                 output=expected_output_fpath,
                 status='completed',
-                sample_ids=analysis_sample_ids,
+                sample_ids=sample_ids,
             )
             return expected_output_fpath
 
@@ -349,7 +380,7 @@ class SMDB:
         b,
         analysis_type,
         output_path,
-        sample_name,
+        sample_names,
         project_name,
         first_j,
         last_j,
@@ -363,7 +394,7 @@ class SMDB:
             type_=analysis_type,
             output=output_path,
             status='queued',
-            sample_ids=[sample_name],
+            sample_ids=sample_names,
         )
         # 2. Queue a job that updates the status to "in-progress"
         sm_in_progress_j = self.make_sm_in_progress_job(
@@ -371,7 +402,7 @@ class SMDB:
             analysis_id=aid,
             analysis_type=analysis_type,
             project_name=project_name,
-            sample_name=sample_name,
+            sample_name=sample_names[0] if len(sample_names) == 1 else None,
         )
         # 2. Queue a job that updates the status to "completed"
         sm_completed_j = self.make_sm_completed_job(
@@ -379,7 +410,7 @@ class SMDB:
             analysis_id=aid,
             analysis_type=analysis_type,
             project_name=project_name,
-            sample_name=sample_name,
+            sample_name=sample_names[0] if len(sample_names) == 1 else None,
         )
         # Set up dependencies
         first_j.depends_on(sm_in_progress_j)
@@ -389,12 +420,6 @@ class SMDB:
         last_j = sm_completed_j
         return last_j
     
-    def parse_reads_from_metadata(self, metadata):
-        return parse_reads_from_metadata(
-            metadata,
-            check_existence=self.do_check_existence
-        )
-
 
 def _parse_analysis(data: Dict) -> Optional[Analysis]:
     if not data:
@@ -421,7 +446,7 @@ def _parse_analysis(data: Dict) -> Optional[Analysis]:
 def parse_reads_from_metadata(  # pylint: disable=too-many-return-statements
     meta: Dict,
     check_existence: bool = True,
-) -> Optional[utils.AlignmentInput]:
+) -> Optional[AlignmentInput]:
     """
     Verify the meta.reads object in a sequence db entry
     """
@@ -476,7 +501,7 @@ def parse_reads_from_metadata(  # pylint: disable=too-many-return-statements
             logger.error(f'ERROR: index file doesn\'t exist: {index_path}')
             return None
 
-        return utils.AlignmentInput(bam_or_cram_path=bam_path, index_path=index_path)
+        return AlignmentInput(bam_or_cram_path=bam_path, index_path=index_path)
 
     else:
         fqs1 = []
@@ -496,4 +521,4 @@ def parse_reads_from_metadata(  # pylint: disable=too-many-return-statements
 
             fqs1.append(lane_data[0]['location'])
             fqs2.append(lane_data[1]['location'])
-        return utils.AlignmentInput(fqs1=fqs1, fqs2=fqs2)
+        return AlignmentInput(fqs1=fqs1, fqs2=fqs2)

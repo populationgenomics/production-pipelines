@@ -1,10 +1,8 @@
-from textwrap import dedent, indent
-from typing import Optional, Union, List
+from typing import Optional
+import shlex
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
-
-from cpg_production_pipelines import utils
 
 
 def wrap_command(
@@ -20,12 +18,13 @@ def wrap_command(
     """
     gcp_cmd = ''
     if setup_gcp:
-        gcp_cmp = """
-    export GOOGLE_APPLICATION_CREDENTIALS=/gsa-key/key.json
-    gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
-    """
+        gcp_cmd = """\
+        export GOOGLE_APPLICATION_CREDENTIALS=/gsa-key/key.json
+        gcloud -q auth activate-service-account \
+        --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+        """
     
-    return dedent(f"""\
+    cmd = f"""\
     set -o pipefail
     set -ex
     {gcp_cmd}
@@ -33,10 +32,16 @@ def wrap_command(
     {f'(while true; do {monitor_space_command()}; sleep 600; done) &'
     if monitor_space else ''}
     
-    {indent(dedent(command), ' '*4)}
+    {command}
     
     {monitor_space_command() if monitor_space else ''}
-    """)
+    """
+    
+    # remove any leaading space
+    cmd = '\n'.join(line.strip() for line in cmd.split('\n'))
+    # remove sretches of spaces
+    cmd = '\n'.join(' '.join(line.split()) for line in cmd.split('\n'))
+    return cmd
 
 
 # def check_existence_command(

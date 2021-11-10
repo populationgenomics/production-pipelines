@@ -1,26 +1,32 @@
 import subprocess
 from os.path import join
-from typing import Optional, List, Tuple
-import pandas as pd
+from typing import Optional, List, Tuple, Dict
+import logging
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
+import pandas as pd
 
 from cpg_production_pipelines import utils, resources
-from cpg_production_pipelines.jobs import wrap_command
+from cpg_production_pipelines.jobs import wrap_command, new_job
+from cpg_production_pipelines.pipeline import Project
+
+logger = logging.getLogger(__file__)
+logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
+logger.setLevel(logging.INFO)
 
 
 def job(
     b: hb.Batch,
-    samples_df: pd.DataFrame,
+    project: Project,
+    file_by_sid: Dict[str, str],
     overwrite: bool,
     fingerprints_bucket: str,
     web_bucket: str,
-    web_url: str,
     tmp_bucket: str,
-    ped_fpath: Optional[str] = None,
+    web_url: Optional[str] = None,
     depends_on: Optional[List[Job]] = None,
-) -> Tuple[Job, str]:
+) -> Tuple[Job, str, str]:
     """
     Add somalier and peddy based jobs that infer relatedness and sex, compare that
     to the provided PED file, and attempt to recover it. If unable to recover, cancel
@@ -30,31 +36,49 @@ def job(
     with relatedness information for each sample pair
     """
     extract_jobs = []
-    fp_file_by_sample = dict()
-    for sn, gvcf_path in zip(samples_df['s'], samples_df['gvcf']):
-        fp_file_by_sample[sn] = join(fingerprints_bucket, f'{sn}.somalier')
-        if utils.can_reuse(fp_file_by_sample[sn], overwrite):
-            extract_jobs.append(b.new_job(f'Somalier extract, {sn} [reuse]'))
+    somalier_file_by_sample = dict()
+    for sample in project.samples:
+        somalier_file_by_sample[sample.id] = join(fingerprints_bucket, f'{sample.id}.somalier')
+        j = new_job(
+            b, 
+            'Somalier extract', 
+            sample_name=sample.id,
+            project_name=project.name
+        )
+        if utils.can_reuse(somalier_file_by_sample[sample.id], overwrite):
+            j.name += ' [reuse]'
         else:
-            j = b.new_job(f'Somalier extract, {sn}')
             j.image(resources.SOMALIER_IMAGE)
             j.memory('standard')
-            if gvcf_path.endswith('.bam'):
+            fpath = file_by_sid.get(sample.id)
+            if not fpath:
+                logger.error(f'Not found input for somalier check for '
+                             f'sample {sample.id}')
+                continue
+            if fpath.endswith('.bam'):
                 j.cpu(4)
                 j.storage(f'200G')
-            elif gvcf_path.endswith('.cram'):
+                input_file = b.read_input_group(
+                    base=fpath,
+                    index=fpath + '.bai',
+                )
+            elif fpath.endswith('.cram'):
                 j.cpu(4)
                 j.storage(f'50G')
+                input_file = b.read_input_group(
+                    base=fpath,
+                    index=fpath + '.crai',
+                )
             else:
                 j.cpu(2)
                 j.storage(f'10G')
+                input_file = b.read_input_group(
+                    base=fpath,
+                    index=fpath + '.tbi',
+                )
+
             if depends_on:
                 j.depends_on(*depends_on)
-
-            input_file = b.read_input_group(
-                base=gvcf_path,
-                index=gvcf_path + '.tbi',
-            )
 
             sites = b.read_input(resources.SOMALIER_SITES)
             reference = b.read_input_group(
@@ -65,19 +89,16 @@ def job(
                 .replace('.fa', '')
                 + '.dict',
             )
-            j.command(
-                f"""set -ex
-                
-                somalier extract -d extracted/ --sites {sites} -f {reference.base} \\
-                {input_file['base']}
-                
-                mv extracted/*.somalier {j.output_file}
-                """
-            )
-            b.write_output(j.output_file, fp_file_by_sample[sn])
-            extract_jobs.append(j)
+            j.command(wrap_command(f"""\
+            somalier extract -d extracted/ --sites {sites} -f {reference.base} \\
+            {input_file['base']}
+            
+            mv extracted/*.somalier {j.output_file}
+            """))
+            b.write_output(j.output_file, somalier_file_by_sample[sample.id])
+        extract_jobs.append(j)
 
-    relate_j = b.new_job(f'Somalier relate')
+    relate_j = new_job(b, f'Somalier relate', project_name=project.name)
     relate_j.image(resources.SOMALIER_IMAGE)
     relate_j.cpu(1)
     relate_j.memory('standard')  # ~ 4G/core ~ 4G
@@ -85,40 +106,40 @@ def job(
     # samples is >4k
     relate_j.storage(f'{1 + len(extract_jobs) // 4000 * 1}G')
     relate_j.depends_on(*extract_jobs)
-    fp_files = [b.read_input(fp) for sn, fp in fp_file_by_sample.items()]
+    fp_files = [b.read_input(fp) for sn, fp in somalier_file_by_sample.items()]
 
-    if ped_fpath:
-        ped_file = b.read_input(ped_fpath)
-    else:
-        ped_fpath = join(tmp_bucket, 'samples.ped')
-        samples_df['Family.ID'] = samples_df['fam_id']
-        samples_df['Father.ID'] = samples_df['pat_id']
-        samples_df['Mother.ID'] = samples_df['mat_id']
-        samples_df['Sex'] = samples_df['sex']
-        samples_df['Phenotype'] = 0
-        samples_df[['Family.ID', 'Father.ID', 'Mother.ID', 'Sex', 'Phenotype']].to_csv(
-            ped_fpath, sep='\t'
-        )
-        ped_file = b.read_input(ped_fpath)
-
+    ped_fpath = join(tmp_bucket, 'samples.ped')
+    datas = []
+    for sample in project.samples:
+        datas.append({
+            'Individula.ID': sample.id,
+            'Family.ID': sample.pedigree.fam_id,
+            'Father.ID': sample.pedigree.dad.id,
+            'Mother.ID': sample.pedigree.mom.id,
+            'Sex': sample.pedigree.sex,
+            'Phenotype': sample.pedigree.phenotype,
+        })
+    df = pd.DataFrame(datas)
+    df.to_csv(ped_fpath, sep='\t')
+    ped_file = b.read_input(ped_fpath)
+    
     relate_j.command(wrap_command(f"""\
-        cat {ped_file} | grep -v Family.ID > samples.ped 
-        
-        somalier relate \\
-        {' '.join(fp_files)} \\
-        --ped samples.ped \\
-        -o related \\
-        --infer
-        
-        ls
-        mv related.html {relate_j.output_html}
-        mv related.pairs.tsv {relate_j.output_pairs}
-        mv related.samples.tsv {relate_j.output_samples}
-        """)
-    )
+    cat {ped_file} | grep -v Family.ID > samples.ped 
+    
+    somalier relate \\
+    {' '.join(fp_files)} \\
+    --ped samples.ped \\
+    -o related \\
+    --infer
+    
+    ls
+    mv related.html {relate_j.output_html}
+    mv related.pairs.tsv {relate_j.output_pairs}
+    mv related.samples.tsv {relate_j.output_samples}
+    """))
 
     # Copy somalier outputs to buckets
-    sample_hash = utils.hash_sample_ids(samples_df['s'])
+    sample_hash = utils.hash_sample_ids([s.id for s in project.samples])
     prefix = join(fingerprints_bucket, sample_hash, 'somalier')
     somalier_samples_path = f'{prefix}.samples.tsv'
     somalier_pairs_path = f'{prefix}.pairs.tsv'
@@ -130,7 +151,7 @@ def job(
     somalier_html_url = f'{web_url}/{rel_path}'
     b.write_output(relate_j.output_html, somalier_html_path)
 
-    check_j = b.new_job(f'Check relatedness and sex')
+    check_j = new_job(b, 'Check relatedness and sex', project_name=project.name)
     check_j.image(resources.PEDDY_IMAGE)
     check_j.cpu(1)
     check_j.memory('standard')  # ~ 4G/core ~ 4G
@@ -146,15 +167,14 @@ def job(
     with open(script_path) as f:
         script = f.read()
     check_j.command(wrap_command(f"""\
-        cat <<EOT >> {script_name}
-        {script}
-        EOT
-        python {script_name} \
-        --somalier-samples {relate_j.output_samples} \
-        --somalier-pairs {relate_j.output_pairs} \
-        {('--somalier-html ' + somalier_html_url) if somalier_html_url else ''}
-        """)
-    )
+    cat <<EOT >> {script_name}
+    {script}
+    EOT
+    python {script_name} \
+    --somalier-samples {relate_j.output_samples} \
+    --somalier-pairs {relate_j.output_pairs} \
+    {('--somalier-html ' + somalier_html_url) if somalier_html_url else ''}
+    """))
 
     check_j.depends_on(relate_j)
     return relate_j, somalier_samples_path, somalier_pairs_path

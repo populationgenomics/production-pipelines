@@ -39,11 +39,11 @@ def produce_gvcf(
     HaplotypeCaller is run in an interval-based sharded way, with per-interval
     HaplotypeCaller jobs defined in a nested loop.
     """
-    job_name = f'{sample_name}: make GVCF'
-    if project_name:
-        job_name = f'{project_name}/{job_name}'
-    if utils.file_exists(output_path):
-        return b.new_job(f'{job_name} [reuse]')
+    j = new_job(b, 'make GVCF', sample_name, project_name)
+    if utils.can_reuse(output_path, overwrite):
+        j.name += ' [reuse]'
+        return j
+
     logger.info(
         f'Submitting the variant calling jobs to write {output_path} for {sample_name}'
     )
@@ -127,7 +127,7 @@ def produce_gvcf(
             b=b,
             analysis_type='gvcf',
             output_path=output_path,
-            sample_name=sample_name,
+            sample_names=[sample_name],
             project_name=project_name,
             first_j=hc_jobs[0],
             last_j=last_j,
@@ -158,9 +158,10 @@ def hc_job(
     if interval_idx is not None:
         job_name += f', {interval_idx}/{number_of_intervals}'
 
-    if utils.can_reuse(out_gvcf_path, overwrite):
-        return new_job(b, f'{job_name} [reuse]', sample_name, project_name)
     j = new_job(b, job_name, sample_name, project_name)
+    if utils.can_reuse(out_gvcf_path, overwrite):
+        j.name += ' [reuse]'
+        return j
 
     j.image(resources.GATK_IMAGE)
     j.cpu(2)
@@ -208,9 +209,10 @@ def merge_gvcfs_job(
     Combine by-interval GVCFs into a single sample GVCF file
     """
     job_name = f'Merge {len(gvcfs)} GVCFs'
-    if utils.can_reuse(out_gvcf_path, overwrite):
-        return new_job(b, f'{job_name} [reuse]', sample_name, project_name)
     j = new_job(b, job_name, sample_name, project_name)
+    if utils.can_reuse(out_gvcf_path, overwrite):
+        j.name += ' [reuse]'
+        return j
     
     j.image(resources.SAMTOOLS_PICARD_IMAGE)
     j.cpu(2)
@@ -247,7 +249,7 @@ def postproc_gvcf(
     external_id: Optional[str] = None,
 ) -> Job:
     if utils.can_reuse(out_gvcf_path, overwrite):
-        return new_job(b, 'PostprocGVCF [reuse]', sample_name, project_name)
+        return new_job(b, 'Postproc GVCF [reuse]', sample_name, project_name)
 
     logger.info(
         f'Adding reblock and subset jobs for sample {sample_name}, gvcf {out_gvcf_path}'
@@ -291,10 +293,11 @@ def reblock_gvcf(
     Runs ReblockGVCF to annotate with allele-specific VCF INFO fields
     required for recalibration
     """
-    if utils.can_reuse(out_gvcf_path, overwrite):
-        return new_job(b, 'ReblockGVCF [reuse]', sample_name, project_name)
-    
     j = new_job(b, 'ReblockGVCF', sample_name, project_name)
+    if utils.can_reuse(out_gvcf_path, overwrite):
+        j.name += ' [reuse]'
+        return j
+
     j.image(resources.GATK_IMAGE)
     mem_gb = 8
     j.memory(f'{mem_gb}G')
@@ -337,10 +340,11 @@ def subset_noalt(
        from Hail about mismatched INFO annotations
     3. Renames sample name from external_sample_id to internal_sample_id
     """
-    if utils.can_reuse(out_gvcf_path, overwrite):
-        return new_job(b, 'SubsetToNoalt [reuse]', sample_name, project_name)
-
     j = new_job(b, 'SubsetToNoalt', sample_name, project_name)
+    if utils.can_reuse(out_gvcf_path, overwrite):
+        j.name += ' [reuse]'
+        return j
+
     j.image(resources.BCFTOOLS_IMAGE)
     mem_gb = 8
     j.memory(f'{mem_gb}G')
