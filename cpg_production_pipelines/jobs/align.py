@@ -8,7 +8,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_production_pipelines import resources, utils
-from cpg_production_pipelines.jobs import wrap_command, new_job
+from cpg_production_pipelines.jobs import wrap_command
 from cpg_production_pipelines.jobs import picard
 from cpg_production_pipelines.smdb import SMDB
 from cpg_production_pipelines.hailbatch import AlignmentInput
@@ -64,11 +64,12 @@ def align(
     sample_name: str,
     project_name: Optional[str] = None,
     aligner: Aligner = Aligner.BWA,
-    markdup_tool: MarkDupTool = MarkDupTool.BIOBAMBAM,
+    markdup_tool: MarkDupTool = MarkDupTool.PICARD,
     extra_label: Optional[str] = None,
     depends_on: Optional[List[Job]] = None,
     smdb: Optional[SMDB] = None,
     overwrite: bool = True,
+    check_existence: bool = True,
     ncpu: Optional[int] = None,
     highmem: bool = False,
     storage_gb: Optional[int] = None,
@@ -87,12 +88,12 @@ def align(
       - is biobambam2, stream the alignment or merging within the same job
       - is picard, submit a separate job with deduplication
     """
-    if utils.can_reuse(output_path, overwrite):
+    if check_existence and utils.can_reuse(output_path, overwrite):
         job_name = aligner.name
         if extra_label:
             job_name += f' {extra_label}'
         job_name += ' [reuse]'
-        return new_job(b, job_name, sample_name, project_name)
+        return b.new_job(job_name, dict(sample=sample_name, project=project_name))
 
     if ncpu is None:
         ncpu = 32
@@ -127,9 +128,7 @@ def align(
         #     b.read_input('gs://cpg-seqr-main-tmp/seqr_align_CPG12062_19W001482_A0131064_proband/v0/hail/batch/f152ca/4/sorted_bam'),
         # ]
 
-        merge_j = new_job(b, 'merge BAMs', sample_name, project_name)
-        ncpu = 2
-        nthreads = ncpu * 2  # multithreading
+        merge_j = b.new_job('Merge BAMs', dict(sample=sample_name, project=project_name))
         merge_j.cpu(ncpu)
         merge_j.image(resources.BWA_IMAGE)
         # 300G for input BAMs, 300G for output BAM
@@ -137,7 +136,7 @@ def align(
 
         align_cmd = f"""\
         samtools merge -@{nthreads-1} - {' '.join(sorted_bams)}
-        """
+        """.strip()
         output_fmt = 'bam'
         align_j = merge_j
         stdout_is_sorted = True
@@ -163,7 +162,7 @@ def align(
         stdout_is_sorted = False
         output_fmt = 'sam'
 
-    last_j = finalise_alignment(
+    md_j = finalise_alignment(
         b=b,
         align_cmd=align_cmd,
         stdout_is_sorted=stdout_is_sorted,
@@ -176,6 +175,7 @@ def align(
         overwrite=overwrite,
         align_cmd_out_fmt=output_fmt,
     )
+    last_j = md_j if md_j is not None else align_j
 
     if depends_on:
         first_j.depends_on(*depends_on)
@@ -212,7 +212,7 @@ def _align_one(
     if extra_label:
         job_name += f' {extra_label}'
 
-    j = new_job(b, job_name, sample, project)
+    j = b.new_job(job_name, dict(sample=sample, project=project))
     nthreads = ncpu * 2  # multithreading
     j.cpu(ncpu)
     j.memory('standard')
@@ -358,7 +358,7 @@ def _build_bwa_command(
 
 
 def extract_fastq(
-    b: hb.Batch,
+    b,
     cram: hb.ResourceGroup,
     sample_name: str,
     project_name: Optional[str] = None,
@@ -368,7 +368,7 @@ def extract_fastq(
     """
     Job that converts a bam or a cram to a pair of compressed fastq files
     """
-    j = new_job(b, 'extract fastq', sample_name, project_name)
+    j = b.new_job('Extract fastq', dict(sample=sample_name, project=project_name))
     ncpu = 32
     nthreads = ncpu * 2  # multithreading
     j.cpu(ncpu)
@@ -404,7 +404,7 @@ def create_dragmap_index(b: hb.Batch) -> Job:
         .replace('.fa', '')
         + '.dict',
     )
-    j = new_job(b, name='Index DRAGMAP')
+    j = b.new_job('Index DRAGMAP')
     j.image(resources.DRAGMAP_IMAGE)
     j.memory('standard')
     j.cpu(32)
@@ -448,7 +448,7 @@ def finalise_alignment(
     output_path: Optional[str] = None,
     overwrite: bool = True,
     align_cmd_out_fmt: str = 'sam',
-) -> Tuple[str, Job]:
+) -> Optional[Job]:
 
     reference = b.read_input_group(**resources.REF_D)
 
@@ -470,8 +470,8 @@ def finalise_alignment(
         """.strip()
         md_j = j
     else:
+        align_cmd = align_cmd.strip()
         if not stdout_is_sorted:
-            align_cmd = align_cmd.strip()
             align_cmd += f' {sort_cmd(nthreads)}'
         align_cmd += f' > {j.sorted_bam}'
 

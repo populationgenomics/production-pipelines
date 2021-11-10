@@ -3,6 +3,7 @@ import click
 import logging
 
 from cpg_production_pipelines.hailbatch import AlignmentInput
+from cpg_production_pipelines.jobs import picard
 from cpg_production_pipelines.pipeline import Pipeline
 from cpg_production_pipelines.jobs.align import Aligner, MarkDupTool, align
 
@@ -42,16 +43,25 @@ def main():
             f'{dir_path}/191201_A00692_0038_TL1911296_19W001482-FAM000327_MAN-20191129_NEXTERAFLEXWGS_L002_R2.fastq.gz',
         ]
     )
-
-    align(
+    # align(
+    #     pipe.b,
+    #     alignment_input=fq_input,
+    #     sample_name='CPG12062_19W001482_A0131064_proband',
+    #     output_path=f'gs//cpg-seqr-test/test/CPG12062_19W001482_A0131064.bam',
+    #     project_name=PROJECT,
+    #     aligner=Aligner.BWA,
+    #     markdup_tool=MarkDupTool.PICARD,
+    # )
+    
+    merged_bam = 'gs://cpg-seqr-main-tmp/seqr_align_CPG12062_19W001482_A0131064_proband/v0/hail/batch/3b4ddd/1/sorted_bam'
+    picard.markdup(
         pipe.b,
-        alignment_input=fq_input,
+        pipe.b.read_input(merged_bam),
         sample_name='CPG12062_19W001482_A0131064_proband',
-        output_path=f'gs//cpg-seqr-test/test/CPG12062_19W001482_A0131064.bam',
         project_name=PROJECT,
-        aligner=Aligner.BWA,
-        markdup_tool=MarkDupTool.BIOBAMBAM,
+        overwrite=False,
     )
+
     # produce_gvcf(
     #     dragen_mode=True,
     # )

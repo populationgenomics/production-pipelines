@@ -4,19 +4,20 @@ Functions to find the pipeline inputs and communicate with the SM server
 
 import logging
 from dataclasses import dataclass
+from textwrap import dedent
 from typing import List, Dict, Optional, Set, Collection
 
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
 from cpg_production_pipelines import utils, resources
+from cpg_production_pipelines.utils import Namespace
 from cpg_production_pipelines.jobs import wrap_command
 from cpg_production_pipelines.hailbatch import AlignmentInput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
-
 
 
 @dataclass
@@ -92,7 +93,7 @@ class SMDB:
     def get_samples_by_project(
         self,
         project_names: List[str],
-        namespace: str,
+        namespace: Namespace,
         skip_samples: Optional[List[str]] = None,
     ) -> Dict[str, List[Dict]]:
         """
@@ -102,7 +103,7 @@ class SMDB:
         for proj_name in project_names:
             logger.info(f'Finding samples for project {proj_name}')
             input_proj_name = proj_name
-            if namespace != 'main':
+            if namespace != Namespace.MAIN:
                 input_proj_name += '-test'
             samples = self.sapi.get_samples(
                 body_get_samples_by_criteria_api_v1_sample_post={
@@ -177,7 +178,7 @@ class SMDB:
         analysis_per_sid: Dict[str, Analysis] = dict()
         try:
             logger.info(
-                f'Querying analysis entries for project {project}'
+                f'Querying {analysis_type} analysis entries for project {project}'
             )
             datas = self.aapi.get_latest_analysis_for_samples_and_type(
                 project=project,
@@ -236,7 +237,10 @@ class SMDB:
 
         j = b.new_job(job_name)
         j.image(resources.SM_IMAGE)
-        j.command(wrap_command(f"""\
+        cmd = dedent(f"""\
+        export GOOGLE_APPLICATION_CREDENTIALS=/gsa-key/key.json
+        gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+
         export SM_DEV_DB_PROJECT={self.analysis_project}
         export SM_ENVIRONMENT=PRODUCTION
         
@@ -255,7 +259,8 @@ class SMDB:
             traceback.print_exc()
         EOT
         python update.py
-        """, setup_gcp=True))
+        """)
+        j.command(cmd)
         return j
 
     def create_analysis(
@@ -381,11 +386,11 @@ class SMDB:
         analysis_type,
         output_path,
         sample_names,
-        project_name,
         first_j,
         last_j,
         depends_on,
-    ):
+        project_name: Optional[str] = None,
+    ) -> Job:
         if not self.do_update_analyses:
             return last_j
         # Interacting with the sample metadata server:

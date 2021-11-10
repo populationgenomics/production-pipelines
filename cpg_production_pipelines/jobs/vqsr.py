@@ -93,7 +93,6 @@ def make_vqsr_jobs(
     input_vcf_or_mt_path: str,
     work_bucket: str,
     web_bucket: str,
-    intervals: Dict,
     gvcf_count: int,
     scatter_count: int,
     depends_on: Optional[List[Job]] = None,
@@ -116,7 +115,6 @@ def make_vqsr_jobs(
     :param work_bucket: bucket for intermediate files
     :param web_bucket: bucket for plots and evaluation results (exposed via http)
     :param depends_on: job that the created jobs should only run after
-    :param intervals: ResourceGroup object with intervals to scatter
     :param gvcf_count: number of input samples. Can't read from combined_mt_path as it
            might not be yet genereated the point of Batch job submission
     :param scatter_count: number of interavals
@@ -206,6 +204,11 @@ def make_vqsr_jobs(
         huge_disk = 500
     else:
         huge_disk = 2000
+        
+    intervals = split_intervals.get_intervals(
+        b=b,
+        scatter_count=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
+    )
 
     if input_vcf_or_mt_path.endswith('.mt'):
         assert meta_ht_path

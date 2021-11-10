@@ -1,15 +1,9 @@
-from typing import Optional
-import shlex
-
-import hailtop.batch as hb
-from hailtop.batch.job import Job
-
-
 def wrap_command(
     command: str,
     monitor_space: bool = False,
     setup_gcp: bool = False,
-):
+    dedent: bool = True
+) -> str:
     """
     Wraps a command for submission
     If job_resource is defined, monitors output space.
@@ -37,10 +31,11 @@ def wrap_command(
     {monitor_space_command() if monitor_space else ''}
     """
     
-    # remove any leaading space
-    cmd = '\n'.join(line.strip() for line in cmd.split('\n'))
-    # remove sretches of spaces
-    cmd = '\n'.join(' '.join(line.split()) for line in cmd.split('\n'))
+    if dedent:
+        # remove any leading spaces and tabs
+        cmd = '\n'.join(line.strip() for line in cmd.split('\n'))
+        # remove sretches of spaces
+        cmd = '\n'.join(' '.join(line.split()) for line in cmd.split('\n'))
     return cmd
 
 
@@ -71,20 +66,20 @@ def monitor_space_command():
     return f'df -h; du -sh /io; du -sh /io/batch'
 
 
-def new_job(
-    b: hb.Batch, 
-    name: str, 
-    sample_name: Optional[str] = None, 
-    project_name: Optional[str] = None,
-    **kwargs
-) -> Job:
-    """
-    Simplifies calling a new job by wrapping  arguments into a
-    attributes dictionary
-    """
-    assert isinstance(b, hb.Batch)
-    if sample_name:
-        kwargs['sample'] = sample_name
-    if project_name:
-        kwargs['project'] = project_name
-    return b.new_job(name, attributes=kwargs)
+# def new_job(
+#     b: hb.Batch, 
+#     name: str, 
+#     sample_name: Optional[str] = None, 
+#     project_name: Optional[str] = None,
+#     **kwargs
+# ) -> Job:
+#     """
+#     Simplifies calling a new job by wrapping  arguments into a
+#     attributes dictionary
+#     """
+#     assert isinstance(b, hb.Batch)
+#     if sample_name:
+#         kwargs['sample'] = sample_name
+#     if project_name:
+#         kwargs['project'] = project_name
+#     return b.new_job(name, attributes=kwargs)

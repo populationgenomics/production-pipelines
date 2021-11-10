@@ -15,7 +15,7 @@ GATK_IMAGE = f'{AR_REPO}/gatk:{GATK_VERSION}'
 # official GATK docker, that's why we're using a separate image for it:
 GNARLY_IMAGE = f'{AR_REPO}/gnarly_genotyper:hail_ukbb_300K'
 BCFTOOLS_IMAGE = f'{AR_REPO}/bcftools:1.10.2--h4f4756c_2'
-SM_IMAGE = f'{AR_REPO}/sm-api:2.0.3'
+SM_IMAGE = f'{AR_REPO}/sm-api:3.5.0'
 BWA_IMAGE = f'{AR_REPO}/bazam_bwa:v0'
 BWAMEM2_IMAGE = f'{AR_REPO}/bazam_bwamem2:v0'
 DRAGMAP_IMAGE = f'{AR_REPO}/dragmap:1.2.1'

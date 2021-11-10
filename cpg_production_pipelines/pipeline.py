@@ -1,38 +1,24 @@
 import os
 import shutil
+import sys
 import tempfile
-from dataclasses import dataclass
-from enum import Enum
+from dataclasses import dataclass, field
 import logging
-from typing import List, Dict, Optional, Any, Tuple, Callable, Union
+from os.path import join
+from typing import List, Dict, Optional, Any, Union, Tuple
 from abc import ABC, abstractmethod
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_production_pipelines import utils
+from cpg_production_pipelines.utils import Namespace, AnalysisType
 from cpg_production_pipelines.smdb import SMDB, Analysis, Sequence
 from cpg_production_pipelines.hailbatch import AlignmentInput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
-
-
-class Namespace(Enum):
-    TMP = 1
-    TEST = 2
-    MAIN = 3
-
-
-class AnalysisType(Enum):
-    """Types of analysis"""
-
-    QC = 'qc'
-    JOINT_CALLING = 'joint-calling'
-    GVCF = 'gvcf'
-    CRAM = 'cram'
-    CUSTOM = 'custom'
 
 
 class Batch(hb.Batch):
@@ -66,9 +52,9 @@ class Batch(hb.Batch):
         label = attributes.get('label', name)
 
         if sample and project:
-            sample = f'{project}/{sample}'
-        if sample:
-            name = f'{sample}: {name}'
+            name = f'{project}/{sample}: {name}'
+        elif project:
+            name = f'{project}: {name}'
 
         if label and (sample or samples):
             if label not in self.labelled_jobs:
@@ -78,84 +64,221 @@ class Batch(hb.Batch):
         else:
             self.other_job_num += 1
         self.total_job_num += 1
-        j = super().new_job(name, attributes=attributes, **kwargs)
+        j = super().new_job(name, attributes=attributes)
         return j
     
-    
-# @dataclass
-# class StageOutput:
-#     expected_path: str
-#     found_path: str
-
 
 class PipelineStage(ABC):
     def __init__(
         self, 
         pipe: 'Pipeline', 
-        name: str,
         analysis_type: AnalysisType = AnalysisType.CUSTOM,
+        requires_stages: Optional[List] = None
     ):
+        """
+        requires_stages: list of stage names
+        """
         self.pipe = pipe
-        self.name = name
-        self.analysis_type = analysis_type,
-        self.jobs: List[Job] = list()
-        self.inputs: Dict[str, str] = dict()
-        self.outputs: Dict[str, str] = dict()
-        # self._jobs: Dict[Tuple[str, str, str], Job] = dict()
-        # self._expected_outputs: Dict[Tuple[str, str, str], str] = dict()
-        # self._found_outputs: Dict[Tuple[str, str, str], str] = dict()
+        self.analysis_type = analysis_type
+        self.requires_stages = requires_stages or []
 
-    # def get_output(self, name='', sid='', pid='') -> Optional[str]:
-    #     return self._outputs.get((name, sid, pid))
-    # 
-    # def _set_output(self, ouptut_path: str, name='', sid='', pid=''):
-    #     self._outputs[(name, sid, pid)] = ouptut_path
-    # 
-    # def get_job(self, name='', sid='', pid='') -> Optional[Job]:
-    #     return self._jobs.get((name, sid, pid))
-    # 
-    # def _set_job(self, job: Job, name='', sid='', pid=''):
-    #     self._jobs[(name, sid, pid)] = job
-    # 
-    # def get_all_jobs(self) -> List[Job]:
-    #     return list(self._jobs.values())
-
-    @abstractmethod
-    def add_jobs(self, **kwargs):
-        pass
+    @classmethod
+    def get_name(cls):
+        return cls.__name__.replace('Stage', '')
 
     @abstractmethod
     def get_expected_output(self, *args):
         pass
-    
-    def find_stage_output(
-        self, obj: Union['Sample', 'Project', 'Pipeline'],
-    ) -> Optional[str]:
-        found_path = obj.output_by_stage.get(self.name)
-        if not found_path:
-            analysis = obj.analysis_by_type.get(self.analysis_type)
-            if not analysis:
-                return None
 
-            if self.pipe.validate_smdb_analyses:
-                if isinstance(obj, 'Sample'):
-                    sample_ids = [obj.id]
-                elif isinstance(obj, 'Project'):
-                    sample_ids = [s.id for s in obj.samples]
-                else:
-                    sample_ids = obj.get_all_sample_ids()
-                
-                expected_path = self.get_expected_output(obj)
-                found_path = self.pipe.db.process_existing_analysis(
-                    sample_ids=sample_ids,
-                    completed_analysis=analysis,
-                    analysis_type=self.analysis_type,
-                    expected_output_fpath=expected_path,
-                )
+    @abstractmethod
+    def add_jobs(
+        self,
+        target: Union['Sample', 'Project', 'Pipeline'],
+        dep_paths_by_stage: Optional[Dict[str, Union[Dict[str, str], str]]] = None,
+        dep_jobs: Optional[List[str]] = None,
+    ) -> Tuple[Optional[str], Optional[List[Job]]]:
+        """
+        Implements logic of the Stage: adds Batch jobs that do the processing.
+        Assumes that all the household work is done - checking missing inputs,
+        checking the SMDB, checking for possible reuse of existing outputs, etc
+        """
+        pass
+    
+    @abstractmethod
+    def add_to_the_pipeline(self, pipe: 'Pipeline'):
+        """
+        Call add_jobs(target) for each target in the pipeline
+        """
+        pass
+
+    def get_dep_paths(
+        self, 
+        dep,  # class inherited from PipelineStage
+        target: Union['Sample', 'Project', 'Pipeline'],
+    ) -> Union[Dict[str, str], str]:
+        """
+        Sort of a multiple dispatch. Collecting dependencies paths into a dictionary
+        when the dependency stage is on a more fine-grained level than the current stage
+        (e.g. collecting outputs of a sample-level stage for a project-level stage)
+        """
+        if (
+            issubclass(self.__class__, SampleStage) and issubclass(dep, SampleStage) or
+            issubclass(self.__class__, ProjectStage) and issubclass(dep, ProjectStage) or
+            issubclass(self.__class__, CohortStage) and issubclass(dep, CohortStage)
+        ):
+            return target.output_by_stage.get(dep.get_name())
+        
+        if issubclass(self.__class__, ProjectStage) and issubclass(dep, SampleStage):
+            dep_path_by_id = dict()
+            project: Project = target
+            for s in project.samples:
+                dep_path = s.output_by_stage.get(dep.get_name())
+                dep_path_by_id[s.id] = dep_path
+            return dep_path_by_id
+
+        if issubclass(self.__class__, CohortStage) and issubclass(dep, SampleStage):
+            dep_path_by_id = dict()
+            pipe: 'Pipeline' = target
+            for p in pipe.projects:
+                for s in p.samples:
+                    dep_path = s.output_by_stage.get(dep.get_name())
+                    dep_path_by_id[s.id] = dep_path
+            return dep_path_by_id
+
+        if issubclass(self.__class__, CohortStage) and issubclass(dep, ProjectStage):
+            dep_path_by_id = dict()
+            pipe: 'Pipeline' = target
+            for p in pipe.projects:
+                dep_path = p.output_by_stage.get(dep.get_name())
+                dep_path_by_id[p.name] = dep_path
+            return dep_path_by_id
+
+        if issubclass(self.__class__, SampleStage) and issubclass(dep, ProjectStage):
+            sample: Sample = target
+            return sample.project.output_by_stage.get(dep.get_name())
+
+        if issubclass(dep, CohortStage):
+            return self.pipe.output_by_stage.get(dep.get_name())
+
+        logger.critical(f'Unknown stage types: {type(self), dep}')
+        sys.exit(1)
+
+    def _add_jobs(
+        self,
+        target: Union['Sample', 'Project', 'Pipeline'],
+    ):
+        dep_paths_by_stage = dict()
+        dep_jobs = []
+        for dep in self.requires_stages:
+            dep_jobs.extend(target.jobs_by_stage.get(dep.get_name(), []))
+            dep_paths: Union[Dict[str, str], str] = self.get_dep_paths(dep, target)
+            target_name = self.target_name(target)
+            target_name = f"/{target_name}" if target_name else ""
+            if isinstance(dep_paths, dict):
+                not_found_deps = dict()
+                for id, dep_path in dep_paths.items():
+                    if not dep_path:
+                        not_found_deps[id] = dep_path
+                if not_found_deps:
+                    logger.critical(
+                        f'Cannot find {len(not_found_deps)} required outputs '
+                        f'for stage {self.get_name()}{target_name} '
+                        f'from stage {dep.get_name()}/'
+                        f'{"|".join(not_found_deps.keys())}. Exiting'
+                    )
+                    sys.exit(1)
             else:
-                found_path = analysis.output
-            obj.output_by_stage[self.name] = found_path
+                if not dep_paths:
+                    target_name = self.target_name(target)
+                    logger.critical(
+                        f'Cannot find required output '
+                        f'for stage {self.get_name()}/{target_name} '
+                        f'from stage {dep.get_name()}. Exiting'
+                    )
+                    sys.exit(1)
+            dep_paths_by_stage[dep.get_name()] = dep_paths
+
+        res_path, res_jobs = self.add_jobs(
+            target,
+            dep_paths_by_stage=dep_paths_by_stage,
+            dep_jobs=dep_jobs,
+        )
+        if res_path:
+            target.output_by_stage[self.get_name()] = res_path
+        if res_jobs:
+            target.jobs_by_stage[self.get_name()] = res_jobs
+
+    def _reuse_jobs(
+        self,
+        target: Union['Sample', 'Project', 'Pipeline'],
+        found_path: str,
+    ):
+        target.output_by_stage[self.get_name()] = found_path
+        attributes = {}
+        if isinstance(target, Sample):
+            attributes['sample'] = target.id
+            attributes['project'] = target.project.name
+        if isinstance(target, Project):
+            attributes['sample'] = target.name
+        target.jobs_by_stage[self.get_name()] = [
+            self.pipe.b.new_job(f'{self.get_name()} [reuse]', attributes)
+        ]
+        
+    def _add_or_reuse_jobs(
+        self, 
+        target: Union['Sample', 'Project', 'Pipeline'],
+    ):
+        expected_path = self.get_expected_output(target)
+        found_path = self._check_smdb_analysis(target, expected_path)
+        if found_path:
+            self._reuse_jobs(target, found_path)
+        elif expected_path and self.pipe.validate_smdb_analyses and utils.file_exists(expected_path):
+            self._reuse_jobs(target, expected_path)
+        else:
+            self._add_jobs(target)
+
+    def _check_smdb_analysis(
+        self, 
+        target: Union['Sample', 'Project', 'Pipeline'],
+        expected_path: str,
+    ) -> Optional[str]:
+        """
+        Check if SMDB already has analysis, and invalidate it if the
+        output doesn't exist
+        """
+        analysis = target.analysis_by_type.get(self.analysis_type)
+        if not analysis:
+            return None
+
+        if self.pipe.validate_smdb_analyses:
+            if isinstance(target, Sample):
+                sample: Sample = target
+                sample_ids = [sample.id]
+            elif isinstance(target, Project):
+                project: Project = target
+                sample_ids = [s.id for s in project.samples]
+            else:
+                pipe: Pipeline = target
+                sample_ids = pipe.get_all_sample_ids()
+
+            found_path = self.pipe.db.process_existing_analysis(
+                sample_ids=sample_ids,
+                completed_analysis=analysis,
+                analysis_type=self.analysis_type,
+                expected_output_fpath=expected_path,
+            )
+        else:
+            found_path = analysis.output
+
+        target.output_by_stage[self.get_name()] = found_path
         return found_path
+    
+    @abstractmethod
+    def target_name(self, target) -> Optional[str]:
+        """
+        Descriptive name of the stage target
+        """
+        pass
     
     
 class SampleStage(PipelineStage, ABC):
@@ -163,8 +286,40 @@ class SampleStage(PipelineStage, ABC):
     Sample-level stage. run() takes sample and project name as input
     """
     @abstractmethod
-    def add_jobs(self, sample: 'Sample'):
+    def add_jobs(
+        self, 
+        target: 'Sample',
+        dep_paths_by_stage: Optional[Dict[str, Union[Dict[str, str], str]]] = None,
+        dep_jobs: Optional[List[str]] = None,
+    ) -> Tuple[Optional[str], Optional[List[Job]]]:
+        """
+        Implements logic of the Stage: adds Batch jobs that do the processing.
+        Assumes that all the household work is done - checking missing inputs,
+        checking the SMDB, checking for possible reuse of existing outputs, etc
+        """
         pass
+    
+    def _add_or_reuse_jobs(self, sample: 'Sample'):
+        if sample.id in self.pipe.force_samples:
+            self._add_jobs(sample)
+        else:
+            super()._add_or_reuse_jobs(sample)        
+
+    def add_to_the_pipeline(self, pipe: 'Pipeline'):
+        """
+        Call _add_jobs(target) for each target in the pipeline
+        """
+        for project in pipe.projects:
+            logger.info(f'{self.get_name()}: adding jobs for project {project.name}')
+            for sample in project.samples:
+                logger.info(f'{self.get_name()}: adding jobs for {project.name}/{sample.id}')
+                self._add_or_reuse_jobs(sample)     
+    
+    def target_name(self, sample: 'Sample') -> Optional[str]:
+        """
+        Descriptive name of the stage target
+        """
+        return f'{sample.project.name}/{sample.id}'
 
 
 class ProjectStage(PipelineStage, ABC):
@@ -172,17 +327,65 @@ class ProjectStage(PipelineStage, ABC):
     Project-level stage. run() takes project name as input
     """
     @abstractmethod
-    def add_jobs(self, project: 'Project'):
+    def add_jobs(
+        self,
+        target: 'Project',
+        dep_paths_by_stage: Optional[Dict[str, Union[Dict[str, str], str]]] = None,
+        dep_jobs: Optional[List[str]] = None,
+    ) -> Tuple[Optional[str], Optional[List[Job]]]:
+        """
+        Implements logic of the Stage: adds Batch jobs that do the processing.
+        Assumes that all the household work is done - checking missing inputs,
+        checking the SMDB, checking for possible reuse of existing outputs, etc
+        """
         pass
 
+    def add_to_the_pipeline(self, pipe: 'Pipeline'):
+        """
+        Call _add_jobs(target) for each target in the pipeline
+        """
+        for project in pipe.projects:
+            logger.info(f'{self.get_name()}: adding jobs for project {project.name}')
+            self._add_or_reuse_jobs(project)
+
+    def target_name(self, project: 'Project') -> Optional[str]:
+        """
+        Descriptive name of the stage target
+        """
+        return f'{project.name}'
+    
 
 class CohortStage(PipelineStage, ABC):    
     """
     Entire cohort level stage
     """
     @abstractmethod
-    def add_jobs(self):
+    def add_jobs(
+        self, 
+        target: 'Pipeline',
+        dep_paths_by_stage: Optional[Dict[str, Union[Dict[str, str], str]]] = None,
+        dep_jobs: Optional[List[str]] = None,
+    ) -> Tuple[Optional[str], Optional[List[Job]]]:
+
+        """
+        Implements logic of the Stage: adds Batch jobs that do the processing.
+        Assumes that all the household work is done - checking missing inputs,
+        checking the SMDB, checking for possible reuse of existing outputs, etc
+        """
         pass
+
+    def add_to_the_pipeline(self, pipe: 'Pipeline'):
+        """
+        Call _add_jobs(target) for each target in the pipeline
+        """
+        logger.info(f'{self.get_name()}: adding jobs')
+        self._add_or_reuse_jobs(pipe)
+
+    def target_name(self, pipe: 'Pipeline') -> Optional[str]:
+        """
+        Descriptive name of the stage target
+        """
+        return None
 
 
 @dataclass
@@ -191,7 +394,7 @@ class PedigreeInfo:
     dad: Optional['Sample']
     mom: Optional['Sample']
     sex: str
-    phenotype: str
+    phenotype: str     
 
 
 @dataclass
@@ -206,13 +409,45 @@ class Sample:
     good: bool = True
     seq_info: Optional[Sequence] = None
     # From SMDB Analysis entries
-    analysis_by_type: Dict[AnalysisType, Analysis] = None
+    analysis_by_type: Dict[AnalysisType, Analysis] = field(default_factory=lambda: dict())
     # Other outputs, not supported by DB.
     # Project-level outputs are specified in Project class,
     # Cohort-level outputs are specified in Pipeline class
-    output_by_stage: Dict[str, str] = None
-    jobs_by_stage: Dict[str, List[Job]] = None
-    pedigree: Optional[PedigreeInfo] = None 
+    output_by_stage: Dict[str, str] = field(default_factory=lambda: dict())
+    jobs_by_stage: Dict[str, List[Job]] = field(default_factory=lambda: dict())
+
+    pedigree: Optional[PedigreeInfo] = None
+    
+    def get_ped_dict(self, use_ext_id: bool = False) -> Dict:
+        """
+        Returns a dictionary of pedigree fields for this sample
+        """
+        def _get_id(_s: Optional[Sample]):
+            if _s is None:
+                return '0'
+            elif use_ext_id:
+                return _s.external_id
+            else:
+                return _s.id
+            
+        if self.pedigree:
+            return {
+                'Individula.ID': _get_id(self),
+                'Family.ID': self.pedigree.fam_id,
+                'Father.ID': _get_id(self.pedigree.dad),
+                'Mother.ID': _get_id(self.pedigree.mom),
+                'Sex': self.pedigree.sex,
+                'Phenotype': self.pedigree.phenotype,
+            }   
+        else:            
+            return {
+                'Individula.ID': _get_id(self),
+                'Family.ID': _get_id(self),
+                'Father.ID': '0',
+                'Mother.ID': '0',
+                'Sex': '0',
+                'Phenotype': '0',
+            }
 
 
 # TODO: potentially move get_sample_ids, jobs_by_stage, output_bu_stage
@@ -231,28 +466,52 @@ class SampleStageTarget(ABC):
     pass
 
 
-@dataclass
+@dataclass(init=False)
 class Project:
     """
     Represents a CPG dataset/project.
     """
-    name: str
+    stack: str  # in stack terms: can be seqr but not seqr-test
+    name: str   # in smdb terms: can be seqr, seqr-test
     samples: List[Sample]
     pipeline: 'Pipeline'
-    is_test: bool = False
+    is_test: bool
     # From SMDB Analysis entries
-    analysis_by_type: Dict[AnalysisType, Analysis] = None
+    analysis_by_type: Dict[AnalysisType, Analysis]
     # Outputs not supported by DB
     # Sample-level outputs are specified and Sample class,
     # Cohort-level outputs are specified in Pipeline class
-    output_by_stage: Dict[str, str] = None
-    jobs_by_stage: Dict[str, Job] = None
+    output_by_stage: Dict[str, str]
+    jobs_by_stage: Dict[str, Job]
 
     def get_bucket(self):
-        return f'gs://cpg-{self.name}-{self.pipeline.output_suf}'
+        return f'gs://cpg-{self.stack}-{self.pipeline.output_suf}'
 
     def get_tmp_bucket(self):
-        return f'gs://cpg-{self.name}-{self.pipeline.output_suf}-tmp'
+        return f'gs://cpg-{self.stack}-{self.pipeline.output_suf}-tmp'
+    
+    def __init__(
+        self, 
+        name: str, 
+        pipeline: 'Pipeline',
+        namespace: Namespace
+    ):
+        self.samples = []
+        self.pipeline = pipeline
+        self.is_test = namespace != Namespace.MAIN
+        if name.endswith('-test'):
+            self.is_test = True
+            self.stack = name[:-len('-test')]
+        else:
+            self.stack = name
+        
+        self.name = self.stack
+        if self.is_test:
+            self.name = self.stack + '-test'
+            
+        self.analysis_by_type = dict()
+        self.output_by_stage = dict()
+        self.jobs_by_stage = dict()
 
 
 class Pipeline:
@@ -271,26 +530,34 @@ class Pipeline:
         smdb_update_analyses: bool = False,
         smdb_check_existence: bool = False,
         validate_smdb_analyses: bool = False,
+        check_intermediate_existence: bool = False,
         hail_billing_project: Optional[str] = None,
-        overwrite: bool = True,
         first_stage: Optional[str] = None,
         last_stage: Optional[str] = None,
         config: Any = None,
+        input_projects: Optional[List[str]] = None,
+        skip_samples: Optional[List[str]] = None,
+        force_samples: Optional[List[str]] = None,
+        ped_files: Optional[List[str]] = None,
     ):
-        self.analysis_project = analysis_project
+        self.analysis_project = Project(
+            name=analysis_project,
+            pipeline=self,
+            namespace=namespace,
+        )
         self.name = name
         self.output_version = output_version
         self.namespace = namespace
-        self.overwrite = overwrite
+        self.check_intermediate_existence = check_intermediate_existence
         self.first_stage = first_stage
         self.last_stage = last_stage
+        self.force_samples = force_samples or []
         self.db = SMDB(
-            self.analysis_project,
+            self.analysis_project.name,
             do_update_analyses=smdb_update_analyses,
             do_check_existence=smdb_check_existence,
         )
         self.validate_smdb_analyses = validate_smdb_analyses
-        self.projects: List[Project] = []
         self.local_tmp_dir = tempfile.mkdtemp()
         self.keep_scratch = keep_scratch
         self.config = config
@@ -315,7 +582,7 @@ class Pipeline:
             self.proj_output_suf = 'main'
 
         path_ptrn = (
-            f'gs://cpg-{self.analysis_project}-{{suffix}}/'
+            f'gs://cpg-{self.analysis_project.stack}-{{suffix}}/'
             f'{self.name}/'
             f'{self.output_version}'
         )
@@ -332,13 +599,22 @@ class Pipeline:
         )
 
         # Found global SMDB analysis entries by type
-        self.analysis_by_type: Dict[AnalysisType, Analysis] = None
+        self.analysis_by_type: Dict[AnalysisType, Analysis] = dict()
         # Cohort-level outputs, not supported by SMDB.
         # Sample- and project-level outputs are specified in Sample and Project classes
-        self.output_by_stage: Dict[str, str] = None
-        self.jobs_by_stage: Dict[str, Job] = None
+        self.output_by_stage: Dict[str, str] = dict()
+        self.jobs_by_stage: Dict[str, Job] = dict()
 
         self.stages = List[PipelineStage]
+
+        self.projects: List[Project] = []
+        if input_projects:
+            self.populate(
+                input_projects=input_projects,
+                namespace=self.namespace,
+                skip_samples=skip_samples,
+                ped_files=ped_files,
+            )
 
     def get_all_samples(self) -> List[Sample]:
         all_samples = []
@@ -366,10 +642,9 @@ class Pipeline:
     def _populate_projects(
         self,
         input_projects: List[str],
+        namespace: Namespace,
         skip_samples: Optional[List[str]] = None,
-        namespace: Optional[str] = None,
     ):
-        namespace = namespace or self.output_suf
         samples_by_project = self.db.get_samples_by_project(
             project_names=input_projects,
             namespace=namespace,
@@ -378,10 +653,8 @@ class Pipeline:
         for proj_name, sample_datas in samples_by_project.items():
             project = Project(
                 name=proj_name,
-                samples=[],
                 pipeline=self,
-                is_test=namespace != 'main',
-                output_by_stage=dict(),
+                namespace=namespace,
             )
             for s_data in sample_datas:
                 project.samples.append(Sample(
@@ -416,8 +689,8 @@ class Pipeline:
 
             for s in project.samples:
                 s.seq_info = seq_info_by_sid.get(s.id)
-                s.analysis_by_type[AnalysisType.CRAM] = cram_per_sid.get(s.id),
-                s.analysis_by_type[AnalysisType.GVCF] = gvcf_per_sid.get(s.id),
+                s.analysis_by_type[AnalysisType.CRAM] = cram_per_sid.get(s.id)
+                s.analysis_by_type[AnalysisType.GVCF] = gvcf_per_sid.get(s.id)
 
         self.analysis_by_type[AnalysisType.JOINT_CALLING] = jc_analysis
             
@@ -426,8 +699,10 @@ class Pipeline:
         for s in self.get_all_samples():
             sample_by_extid[s.external_id] = s
         
-        for ped_file in ped_files:
-            with open(ped_file) as f:
+        for i, ped_file in enumerate(ped_files):
+            local_ped_file = join(self.local_tmp_dir, f'ped_file_{i}.ped')
+            utils.gsutil_cp(ped_file, local_ped_file)
+            with open(local_ped_file) as f:
                 for line in f:
                     if 'Family.ID' in line:
                         continue
@@ -445,16 +720,16 @@ class Pipeline:
         for project in self.projects:
             samples_with_ped = [s for s in project.samples if s.pedigree]
             logger.info(
-                f'{project}: found pedigree info for {len(samples_with_ped)} '
+                f'{project.name}: found pedigree info for {len(samples_with_ped)} '
                 f'samples out of {len(project.samples)}'
             )
 
-    def populate_samples(
+    def populate(
         self,
         input_projects: List[str],
         skip_samples: Optional[List[str]] = None,
-        namespace: Optional[str] = None,
         ped_files: Optional[List[str]] = None,
+        namespace: Optional[Namespace] = None,
     ) -> None:
         """
         Finds input samples, analyses and sequences from the DB, 
@@ -463,57 +738,57 @@ class Pipeline:
         self._populate_projects(
             input_projects=input_projects,
             skip_samples=skip_samples,
-            namespace=namespace
+            namespace=namespace or self.namespace,
         )
         self._populate_analysis()
         if ped_files:
             self._populate_pedigree(ped_files)
 
-    def add_sample_stage(self, stage: SampleStage):
-        for project in self.projects:
-            logger.info(f'{stage.name}: adding jobs for project {project.name}')
-            for sample in project.samples:
-                logger.info(f'{stage.name}: adding jobs for {project.name}/{sample.id}')
-                stage.add_jobs(sample)
+    def add_stages(self, stages: List[PipelineStage]):
+        stage_names = [s.get_name() for s in stages]
+        lower_stage_names = [s.lower() for s in stage_names]
+        first_stage_num = None
+        if self.first_stage:
+            if self.first_stage.lower() not in lower_stage_names:
+                logger.critical(
+                    f'Value for --first-stage {self.first_stage} '
+                    f'not found in available stages: {", ".join(stage_names)}'
+                )
+            first_stage_num = lower_stage_names.index(self.first_stage.lower())
+        last_stage_num = None
+        if self.last_stage:
+            if self.last_stage.lower() not in lower_stage_names:
+                logger.critical(
+                    f'Value for --last-stage {self.last_stage} '
+                    f'not found in available stages: {", ".join(stage_names)}'
+                )
+            last_stage_num = lower_stage_names.index(self.last_stage.lower())
 
-    def add_project_stage(self, stage: ProjectStage):
-        for project in self.projects:
-            logger.info(f'{stage.name}: adding jobs for project {project.name}')
-            stage.add_jobs(project)
-
-    def add_cohort_stage(self, stage: CohortStage):
-        stage.add_jobs()
-
-    def add_stages(self, stage_by_name: Dict[str, PipelineStage]):
-        for name, stage in stage_by_name.items():
-            if name == self.config.last_stage:
-                logger.info(f'Last stage is {name}, stopping here')
-            elif self.config.first_stage and name != self.config.first_stage:
-                logger.info(f'Skipping stage {name}')
-                self.config.first_stage = None
-            else:
-                logger.info(f'*' * 60)
-                logger.info(f'Stage {name}')
-                if isinstance(stage, SampleStage):
-                    self.add_sample_stage(stage)
-                elif isinstance(stage, ProjectStage):
-                    self.add_project_stage(stage)
-                else:
-                    self.add_cohort_stage(stage)
-                logger.info(f'')
+        for i, stage in enumerate(stages):
+            if first_stage_num is not None and i < first_stage_num:
+                logger.info(f'Skipping stage {stage.get_name()}')
+                continue
+            logger.info(f'*' * 60)
+            logger.info(f'Stage {stage.get_name()}')
+            stage.add_to_the_pipeline(self)
+            logger.info(f'')
+            if i >= last_stage_num:
+                logger.info(f'Last stage is {stage.get_name()}, stopping here')
+                break
     
     def can_reuse(self, fpath: Optional[str]) -> bool:
         """
-        Checks if the fpath exists, but always returns False if self.overwrite=True
+        Checks if the fpath exists, 
+        but always returns False if not check_intermediate_existence
         """
-        return utils.can_reuse(fpath, overwrite=self.overwrite)
+        return utils.can_reuse(fpath, overwrite=not self.check_intermediate_existence)
 
 
 def setup_batch(
-    title, 
-    keep_scratch,
-    tmp_bucket,
-    analysis_project,
+    title: str, 
+    keep_scratch: bool,
+    tmp_bucket: str,
+    analysis_project: Project,
     billing_project: Optional[str] = None,
 ) -> Batch:
     hail_bucket = os.environ.get('HAIL_BUCKET')
@@ -523,7 +798,7 @@ def setup_batch(
     billing_project = (
         billing_project or
         os.getenv('HAIL_BILLING_PROJECT') or
-        analysis_project
+        analysis_project.name
     )
     logger.info(
         f'Starting Hail Batch with the project {billing_project}, '

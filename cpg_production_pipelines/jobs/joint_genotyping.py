@@ -1,6 +1,5 @@
 import json
 import logging
-from dataclasses import dataclass
 from enum import Enum
 from os.path import join, basename
 from typing import Optional, List, Collection, Dict, Tuple, Set
@@ -11,7 +10,6 @@ from hailtop.batch.job import Job
 from cpg_production_pipelines import resources, utils
 from cpg_production_pipelines.jobs import wrap_command
 from cpg_production_pipelines.jobs import split_intervals
-from cpg_production_pipelines.jobs.vqsr import make_vqsr_jobs
 from cpg_production_pipelines.pipeline import Sample
 from cpg_production_pipelines.smdb import SMDB
 
@@ -21,14 +19,13 @@ logger.setLevel(logging.INFO)
 
 
 class JointGenotyperTool(Enum):
-    GenotypeGVCFs: 1
-    GnarlyGenotyper: 2
+    GenotypeGVCFs = 1
+    GnarlyGenotyper = 2
 
 
 def make_joint_genotyping_jobs(
     b: hb.Batch,
     out_jc_vcf_path: str,
-    out_vqsr_site_only_vcf_path: str,
     samples: Collection[Sample],
     genomicsdb_bucket: str,
     tmp_bucket: str,
@@ -45,7 +42,7 @@ def make_joint_genotyping_jobs(
     Outputs a multi-sample VCF under `output_vcf_path`.
     """
     job_name = 'Joint-calling+VQSR'
-    if utils.can_reuse([out_jc_vcf_path, out_vqsr_site_only_vcf_path], overwrite):
+    if utils.can_reuse([out_jc_vcf_path], overwrite):
         return b.new_job(f'{job_name} [reuse]')
 
     logger.info(f'Submitting the joint-calling and VQSR jobs.')
@@ -84,7 +81,7 @@ def make_joint_genotyping_jobs(
     assert sample_names_will_be_in_db == sample_ids
     samples_hash = utils.hash_sample_ids(sample_ids)
 
-    intervals_j = split_intervals.get_intervals(
+    intervals = split_intervals.get_intervals(
         b=b,
         scatter_count=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
     )
@@ -101,10 +98,9 @@ def make_joint_genotyping_jobs(
                 sample_names_will_be_in_db=sample_names_will_be_in_db,
                 updating_existing_db=updating_existing_db,
                 sample_map_bucket_path=sample_map_bucket_path,
-                interval=intervals_j.intervals[f'interval_{idx}'],
+                interval=intervals[f'interval_{idx}'],
                 interval_idx=idx,
                 number_of_intervals=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
-                depends_on=[intervals_j],
             )
             import_gvcfs_job_per_interval[idx] = import_gvcfs_job
 
@@ -134,7 +130,7 @@ def make_joint_genotyping_jobs(
                     number_of_samples=len(sample_names_will_be_in_db),
                     interval_idx=idx,
                     number_of_intervals=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
-                    interval=intervals_j.intervals[f'interval_{idx}'],
+                    interval=intervals[f'interval_{idx}'],
                     tool=tool,
                 )
                 if import_gvcfs_job_per_interval.get(idx):
@@ -146,7 +142,7 @@ def make_joint_genotyping_jobs(
                         b,
                         input_vcf=genotype_vcf_job.output_vcf,
                         overwrite=overwrite,
-                        interval=intervals_j.intervals[f'interval_{idx}'],
+                        interval=intervals[f'interval_{idx}'],
                     )
                     last_job = exccess_filter_job
                 else:
@@ -176,7 +172,7 @@ def make_joint_genotyping_jobs(
             analysis_type='joint-calling',
             output_path=out_jc_vcf_path,
             sample_names=sample_ids,
-            first_j=intervals_j,
+            first_j=list(import_gvcfs_job_per_interval.values())[0],
             last_j=last_j,
             depends_on=depends_on,
         )
@@ -300,7 +296,7 @@ def _add_import_gvcfs_job(
     sample_map = b.read_input(sample_map_bucket_path)
 
     if interval_idx is not None:
-        job_name += f' {interval_idx}/{number_of_intervals}'
+        job_name += f' {interval_idx + 1}/{number_of_intervals}'
 
     j = b.new_job(job_name)
     j.image(resources.GATK_IMAGE)
@@ -379,7 +375,7 @@ def _add_joint_genotyper_job(
     """
     job_name = f'Joint genotyping: {tool.name}'
     if interval_idx is not None:
-        job_name += f' {interval_idx}/{number_of_intervals}'
+        job_name += f' {interval_idx + 1}/{number_of_intervals}'
 
     j = b.new_job(job_name)
     if utils.can_reuse(output_vcf_path, overwrite):

@@ -4,7 +4,7 @@ from typing import Optional
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_production_pipelines.jobs import wrap_command, new_job
+from cpg_production_pipelines.jobs import wrap_command
 from cpg_production_pipelines import resources, utils
 
 
@@ -19,14 +19,14 @@ def markdup(
     """
     Make job that runs Picard MarkDuplicates and converts the result to CRAM.
     """
-    j = new_job(b, 'MarkDuplicates', sample_name, project_name)
+    j = b.new_job('MarkDuplicates', dict(sample=sample_name, project=project_name))
     if utils.can_reuse(output_path, overwrite):
         j.name += ' [reuse]'
         return j
 
     j.image(resources.SAMTOOLS_PICARD_IMAGE)
     j.cpu(2)
-    j.memory('highmem')
+    j.memory('highmem')  # ~6.5G per core, total 13G
     j.storage('400G')  # Allow 200G for input and 200G for output
     j.declare_resource_group(
         output_cram={
@@ -37,7 +37,7 @@ def markdup(
     fasta_reference = b.read_input_group(**resources.REF_D)
 
     cmd = f"""
-    picard MarkDuplicates -Xms7G \\
+    picard MarkDuplicates -Xms12G \\
     I={sorted_bam} O=/dev/stdout M={j.duplicate_metrics} \\
     TMP_DIR=$(dirname {j.output_cram.cram})/picard-tmp \\
     ASSUME_SORT_ORDER=coordinate \\

@@ -6,7 +6,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_production_pipelines import resources, utils
-from cpg_production_pipelines.jobs import wrap_command, new_job
+from cpg_production_pipelines.jobs import wrap_command
 from cpg_production_pipelines.pipeline import Batch
 from cpg_production_pipelines.smdb import SMDB
 from cpg_production_pipelines.jobs import split_intervals
@@ -27,6 +27,7 @@ def produce_gvcf(
     number_of_intervals: Optional[int] = 1,
     intervals: Optional[hb.ResourceGroup] = None,
     overwrite: bool = True,
+    check_existence: bool = True,
     depends_on: Optional[List[Job]] = None,
     smdb: Optional[SMDB] = None,
     external_id: Optional[str] = None,
@@ -39,10 +40,8 @@ def produce_gvcf(
     HaplotypeCaller is run in an interval-based sharded way, with per-interval
     HaplotypeCaller jobs defined in a nested loop.
     """
-    j = new_job(b, 'make GVCF', sample_name, project_name)
-    if utils.can_reuse(output_path, overwrite):
-        j.name += ' [reuse]'
-        return j
+    if check_existence and utils.can_reuse(output_path, overwrite):
+        return b.new_job('Make GVCF [reuse]', dict(sample=sample_name, project=project_name))
 
     logger.info(
         f'Submitting the variant calling jobs to write {output_path} for {sample_name}'
@@ -82,6 +81,7 @@ def produce_gvcf(
                     number_of_intervals=number_of_intervals,
                     depends_on=depends_on,
                     dragen_mode=dragen_mode,
+                    overwrite=overwrite,
                 )
             )
         hc_j = merge_gvcfs_job(
@@ -156,9 +156,9 @@ def hc_job(
     """
     job_name = 'HaplotypeCaller'
     if interval_idx is not None:
-        job_name += f', {interval_idx}/{number_of_intervals}'
+        job_name += f', {interval_idx + 1}/{number_of_intervals}'
 
-    j = new_job(b, job_name, sample_name, project_name)
+    j = b.new_job(job_name, dict(sample=sample_name, project=project_name))
     if utils.can_reuse(out_gvcf_path, overwrite):
         j.name += ' [reuse]'
         return j
@@ -209,7 +209,7 @@ def merge_gvcfs_job(
     Combine by-interval GVCFs into a single sample GVCF file
     """
     job_name = f'Merge {len(gvcfs)} GVCFs'
-    j = new_job(b, job_name, sample_name, project_name)
+    j = b.new_job(job_name, dict(sample=sample_name, project=project_name))
     if utils.can_reuse(out_gvcf_path, overwrite):
         j.name += ' [reuse]'
         return j
@@ -249,7 +249,7 @@ def postproc_gvcf(
     external_id: Optional[str] = None,
 ) -> Job:
     if utils.can_reuse(out_gvcf_path, overwrite):
-        return new_job(b, 'Postproc GVCF [reuse]', sample_name, project_name)
+        return b.new_job('Postproc GVCF [reuse]', dict(sample=sample_name, project=project_name))
 
     logger.info(
         f'Adding reblock and subset jobs for sample {sample_name}, gvcf {out_gvcf_path}'
@@ -293,7 +293,7 @@ def reblock_gvcf(
     Runs ReblockGVCF to annotate with allele-specific VCF INFO fields
     required for recalibration
     """
-    j = new_job(b, 'ReblockGVCF', sample_name, project_name)
+    j = b.new_job('ReblockGVCF', dict(sample=sample_name, project=project_name))
     if utils.can_reuse(out_gvcf_path, overwrite):
         j.name += ' [reuse]'
         return j
@@ -340,7 +340,7 @@ def subset_noalt(
        from Hail about mismatched INFO annotations
     3. Renames sample name from external_sample_id to internal_sample_id
     """
-    j = new_job(b, 'SubsetToNoalt', sample_name, project_name)
+    j = b.new_job('SubsetToNoalt', dict(sample=sample_name, project=project_name))
     if utils.can_reuse(out_gvcf_path, overwrite):
         j.name += ' [reuse]'
         return j

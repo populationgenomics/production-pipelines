@@ -3,21 +3,20 @@ from os.path import join
 from typing import Optional, List, Tuple, Dict
 import logging
 
-import hailtop.batch as hb
 from hailtop.batch.job import Job
 import pandas as pd
 
 from cpg_production_pipelines import utils, resources
-from cpg_production_pipelines.jobs import wrap_command, new_job
-from cpg_production_pipelines.pipeline import Project
+from cpg_production_pipelines.jobs import wrap_command
+from cpg_production_pipelines.pipeline import Project, Batch
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-def job(
-    b: hb.Batch,
+def add_pedigree_jobs(
+    b,
     project: Project,
     file_by_sid: Dict[str, str],
     overwrite: bool,
@@ -26,6 +25,7 @@ def job(
     tmp_bucket: str,
     web_url: Optional[str] = None,
     depends_on: Optional[List[Job]] = None,
+    label: str = None,
 ) -> Tuple[Job, str, str]:
     """
     Add somalier and peddy based jobs that infer relatedness and sex, compare that
@@ -39,11 +39,9 @@ def job(
     somalier_file_by_sample = dict()
     for sample in project.samples:
         somalier_file_by_sample[sample.id] = join(fingerprints_bucket, f'{sample.id}.somalier')
-        j = new_job(
-            b, 
-            'Somalier extract', 
-            sample_name=sample.id,
-            project_name=project.name
+        j = b.new_job(
+            'Somalier extract' + (f' {label}' if label else ''),
+            dict(sample=sample.id, project=project.name),
         )
         if utils.can_reuse(somalier_file_by_sample[sample.id], overwrite):
             j.name += ' [reuse]'
@@ -76,7 +74,7 @@ def job(
                     base=fpath,
                     index=fpath + '.tbi',
                 )
-
+            
             if depends_on:
                 j.depends_on(*depends_on)
 
@@ -98,7 +96,10 @@ def job(
             b.write_output(j.output_file, somalier_file_by_sample[sample.id])
         extract_jobs.append(j)
 
-    relate_j = new_job(b, f'Somalier relate', project_name=project.name)
+    relate_j = b.new_job(
+        'Somalier relate' + (f' {label}' if label else ''), 
+        dict(project=project.name),
+    )
     relate_j.image(resources.SOMALIER_IMAGE)
     relate_j.cpu(1)
     relate_j.memory('standard')  # ~ 4G/core ~ 4G
@@ -111,14 +112,7 @@ def job(
     ped_fpath = join(tmp_bucket, 'samples.ped')
     datas = []
     for sample in project.samples:
-        datas.append({
-            'Individula.ID': sample.id,
-            'Family.ID': sample.pedigree.fam_id,
-            'Father.ID': sample.pedigree.dad.id,
-            'Mother.ID': sample.pedigree.mom.id,
-            'Sex': sample.pedigree.sex,
-            'Phenotype': sample.pedigree.phenotype,
-        })
+        datas.append(sample.get_ped_dict())
     df = pd.DataFrame(datas)
     df.to_csv(ped_fpath, sep='\t')
     ped_file = b.read_input(ped_fpath)
@@ -151,7 +145,10 @@ def job(
     somalier_html_url = f'{web_url}/{rel_path}'
     b.write_output(relate_j.output_html, somalier_html_path)
 
-    check_j = new_job(b, 'Check relatedness and sex', project_name=project.name)
+    check_j = b.new_job(
+        'Check relatedness and sex' + (f' {label}' if label else ''), 
+        dict(project=project.name),
+    )
     check_j.image(resources.PEDDY_IMAGE)
     check_j.cpu(1)
     check_j.memory('standard')  # ~ 4G/core ~ 4G

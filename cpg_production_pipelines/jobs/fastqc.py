@@ -4,7 +4,7 @@ from typing import Optional, List
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_production_pipelines.jobs import align, new_job, wrap_command
+from cpg_production_pipelines.jobs import align, wrap_command
 
 
 def fastqc(
@@ -18,7 +18,7 @@ def fastqc(
     Adds FastQC jobs. If the input is a set of fqs, runs FastQC on each fq file.
     """
     def _fastqc_one(name, inp):
-        j = new_job(b, name, sample_name, project_name)
+        j = b.new_job(name, dict(sample=sample_name, project=project_name))
         j.image('biocontainers/fastqc:v0.11.9_cv8')
         j.cpu(32)
         j.storage('150G')

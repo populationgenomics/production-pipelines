@@ -10,6 +10,7 @@ import sys
 import time
 import hashlib
 from dataclasses import dataclass
+from enum import Enum
 from os.path import isdir, isfile, exists, join, basename
 from typing import Any, Callable, Dict, Optional, Union, Iterable, List, Tuple
 import yaml
@@ -43,6 +44,22 @@ DATAPROC_PACKAGES = [
 
 QUERY_SCRIPTS_DIR = 'query_scripts'
 PACKAGE_DIR = package_name
+
+
+class Namespace(Enum):
+    TMP = 'tmp'
+    TEST = 'test'
+    MAIN = 'main'
+
+
+class AnalysisType(Enum):
+    """Types of analysis"""
+
+    QC = 'qc'
+    JOINT_CALLING = 'joint-calling'
+    GVCF = 'gvcf'
+    CRAM = 'cram'
+    CUSTOM = 'custom'
 
 
 def init_hail(name: str, local_tmp_dir: str = None):
@@ -120,12 +137,17 @@ def file_exists(path: str) -> bool:
     """
     if path.startswith('gs://'):
         bucket = path.replace('gs://', '').split('/')[0]
-        path = path.replace('gs://', '').split('/', maxsplit=1)[1]
-        path = path.rstrip('/')  # ".mt/" -> ".mt"
-        if any(path.endswith(f'.{suf}') for suf in ['mt', 'ht']):
-            path = os.path.join(path, '_SUCCESS')
+        p = path.replace('gs://', '').split('/', maxsplit=1)[1]
+        p = p.rstrip('/')  # ".mt/" -> ".mt"
+        if any(p.endswith(f'.{suf}') for suf in ['mt', 'ht']):
+            p = os.path.join(p, '_SUCCESS')
         gs = storage.Client()
-        return gs.get_bucket(bucket).get_blob(path)
+        exists = gs.get_bucket(bucket).get_blob(p) is not None
+        if exists:
+            logger.info(f'Checking object existence, exists: {path}')
+        else:
+            logger.info(f'Checking object existence, doesn\'t exist: {path}')
+        return exists
     return os.path.exists(path)
 
 
