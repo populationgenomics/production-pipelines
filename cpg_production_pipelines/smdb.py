@@ -3,16 +3,17 @@ Functions to find the pipeline inputs and communicate with the SM server
 """
 
 import logging
+import traceback
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import List, Dict, Optional, Set, Collection
 
+import sample_metadata
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
 from cpg_production_pipelines import utils, resources
 from cpg_production_pipelines.utils import Namespace
-from cpg_production_pipelines.jobs import wrap_command
 from cpg_production_pipelines.hailbatch import AlignmentInput
 
 logger = logging.getLogger(__file__)
@@ -47,14 +48,15 @@ class Sequence:
     Represents the Sequence SampleMetadata DB entry
     """
     
-    def __init__(self, id, meta, smdb):
+    def __init__(self, id, sample_id, meta, smdb):
         self.id = id
+        self.sample_id = sample_id
         self.meta = meta
         self.smdb = smdb
     
     @staticmethod
     def parse(data: Dict, smdb):
-        return Sequence(data['id'], data['meta'], smdb)
+        return Sequence(data['id'], data['sample_id'], data['meta'], smdb)
 
     def parse_reads_from_metadata(self):
         return parse_reads_from_metadata(
@@ -119,14 +121,14 @@ class SMDB:
                 samples_by_project[proj_name].append(s)
         return samples_by_project
 
-    def find_seq_info_by_sid(self, sample_ids) -> Dict[List, Sequence]:
+    def find_seq_by_sid(self, sample_ids) -> Dict[List, Sequence]:
         """
         Return a dict of "Sequence" entries by sample ID
         """
         seq_infos: List[Dict] = self.seqapi.get_sequences_by_sample_ids(sample_ids)
-        seq_infos = [Sequence.parse(d, self) for d in seq_infos]
-        seq_info_by_sid = dict(zip(sample_ids, seq_infos))
-        return seq_info_by_sid
+        seqs = [Sequence.parse(d, self) for d in seq_infos]
+        seqs_by_sid = {seq.sample_id: seq for seq in seqs}
+        return seqs_by_sid
 
     def update_analysis(self, analysis: Analysis, status: str):
         """
@@ -136,9 +138,12 @@ class SMDB:
 
         if not self.do_update_analyses:
             return
-        self.aapi.update_analysis_status(
-            analysis.id, AnalysisUpdateModel(status=status)
-        )
+        try:
+            self.aapi.update_analysis_status(
+                analysis.id, AnalysisUpdateModel(status=status)
+            )
+        except:
+            traceback.print_exc()
         analysis.status = status
 
     def find_joint_calling_analysis(
@@ -284,11 +289,16 @@ class SMDB:
             status=status,
             sample_ids=sample_ids,
         )
-        aid = self.aapi.create_new_analysis(
-            project=self.analysis_project, analysis_model=am
-        )
-        logger.info(f'Queueing joint-calling with analysis ID: {aid}')
-        return aid
+        try:
+            aid = self.aapi.create_new_analysis(
+                project=self.analysis_project, analysis_model=am
+            )
+        except:
+            traceback.print_exc()
+            return None
+        else:
+            logger.info(f'Queueing joint-calling with analysis ID: {aid}')
+            return aid
 
     def process_existing_analysis(
         self,

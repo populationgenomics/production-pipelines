@@ -691,7 +691,7 @@ class Pipeline:
         for project in self.projects:
             sample_ids = [s.id for s in project.samples]
             
-            seq_info_by_sid = self.db.find_seq_info_by_sid(sample_ids)
+            seqs_by_sid = self.db.find_seq_by_sid(sample_ids)
 
             cram_per_sid = self.db.find_analyses_by_sid(
                 sample_ids=sample_ids,
@@ -703,7 +703,7 @@ class Pipeline:
             )
 
             for s in project.samples:
-                s.seq_info = seq_info_by_sid.get(s.id)
+                s.seq_info = seqs_by_sid.get(s.id)
                 s.analysis_by_type[AnalysisType.CRAM] = cram_per_sid.get(s.id)
                 s.analysis_by_type[AnalysisType.GVCF] = gvcf_per_sid.get(s.id)
 
