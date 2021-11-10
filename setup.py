@@ -7,7 +7,7 @@ import setuptools
 
 setuptools.setup(
     name='cpg_production_pipelines',
-    version='0.1.0',
+    version='0.2.0',
     description=(
         'Production pipelines for joint calling, sample and variant QC '
         'for WGS germline data, and loading to seqr'
