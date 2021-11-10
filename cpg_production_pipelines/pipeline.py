@@ -110,12 +110,12 @@ class PipelineStage(ABC):
         Call add_jobs(target) for each target in the pipeline
         """
         pass
-
-    def get_dep_paths(
+    
+    def get_deps(
         self, 
         dep,  # class inherited from PipelineStage
         target: Union['Sample', 'Project', 'Pipeline'],
-    ) -> Union[Dict[str, str], str]:
+    ) -> Tuple[Union[Dict[str, str], str], List[Job]]:
         """
         Sort of a multiple dispatch. Collecting dependencies paths into a dictionary
         when the dependency stage is on a more fine-grained level than the current stage
@@ -126,52 +126,67 @@ class PipelineStage(ABC):
             issubclass(self.__class__, ProjectStage) and issubclass(dep, ProjectStage) or
             issubclass(self.__class__, CohortStage) and issubclass(dep, CohortStage)
         ):
-            return target.output_by_stage.get(dep.get_name())
-        
-        if issubclass(self.__class__, ProjectStage) and issubclass(dep, SampleStage):
+            return(
+                target.output_by_stage.get(dep.get_name()),
+                target.jobs_by_stage.get(dep.get_name(), [])
+            )
+
+        elif issubclass(self.__class__, ProjectStage) and issubclass(dep, SampleStage):
             dep_path_by_id = dict()
+            dep_jobs = []
             project: Project = target
             for s in project.samples:
                 dep_path = s.output_by_stage.get(dep.get_name())
                 dep_path_by_id[s.id] = dep_path
-            return dep_path_by_id
+                dep_jobs.extend(s.jobs_by_stage.get(dep.get_name(), []))
+            return dep_path_by_id, dep_jobs
 
-        if issubclass(self.__class__, CohortStage) and issubclass(dep, SampleStage):
+        elif issubclass(self.__class__, CohortStage) and issubclass(dep, SampleStage):
             dep_path_by_id = dict()
+            dep_jobs = []
             pipe: 'Pipeline' = target
             for p in pipe.projects:
                 for s in p.samples:
                     dep_path = s.output_by_stage.get(dep.get_name())
                     dep_path_by_id[s.id] = dep_path
-            return dep_path_by_id
+                    dep_jobs.extend(s.jobs_by_stage.get(dep.get_name(), []))
+            return dep_path_by_id, dep_jobs
 
-        if issubclass(self.__class__, CohortStage) and issubclass(dep, ProjectStage):
+        elif issubclass(self.__class__, CohortStage) and issubclass(dep, ProjectStage):
             dep_path_by_id = dict()
+            dep_jobs = []
             pipe: 'Pipeline' = target
             for p in pipe.projects:
                 dep_path = p.output_by_stage.get(dep.get_name())
                 dep_path_by_id[p.name] = dep_path
-            return dep_path_by_id
+                dep_jobs.extend(p.jobs_by_stage.get(dep.get_name(), []))
+            return dep_path_by_id, dep_jobs
 
-        if issubclass(self.__class__, SampleStage) and issubclass(dep, ProjectStage):
+        elif issubclass(self.__class__, SampleStage) and issubclass(dep, ProjectStage):
             sample: Sample = target
-            return sample.project.output_by_stage.get(dep.get_name())
+            return (
+                sample.project.output_by_stage.get(dep.get_name()),
+                sample.project.jobs_by_stage.get(dep.get_name(), [])
+            )
 
-        if issubclass(dep, CohortStage):
-            return self.pipe.output_by_stage.get(dep.get_name())
-
-        logger.critical(f'Unknown stage types: {type(self), dep}')
-        sys.exit(1)
+        elif issubclass(dep, CohortStage):
+            return (
+                self.pipe.output_by_stage.get(dep.get_name()),
+                self.pipe.jobs_by_stage.get(dep.get_name(), [])
+            )
+        else:
+            logger.critical(f'Unknown stage types: {type(self), dep}')
+            sys.exit(1)
 
     def _add_jobs(
         self,
         target: Union['Sample', 'Project', 'Pipeline'],
     ):
         dep_paths_by_stage = dict()
-        dep_jobs = []
+        all_dep_jobs = []
         for dep in self.requires_stages:
-            dep_jobs.extend(target.jobs_by_stage.get(dep.get_name(), []))
-            dep_paths: Union[Dict[str, str], str] = self.get_dep_paths(dep, target)
+            dep_paths, dep_jobs = self.get_deps(dep, target)
+            all_dep_jobs.extend(dep_jobs)
             target_name = self.target_name(target)
             target_name = f"/{target_name}" if target_name else ""
             if isinstance(dep_paths, dict):
@@ -201,7 +216,7 @@ class PipelineStage(ABC):
         res_path, res_jobs = self.add_jobs(
             target,
             dep_paths_by_stage=dep_paths_by_stage,
-            dep_jobs=dep_jobs,
+            dep_jobs=all_dep_jobs,
         )
         if res_path:
             target.output_by_stage[self.get_name()] = res_path
