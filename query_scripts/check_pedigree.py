@@ -11,8 +11,9 @@ import logging
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from os.path import join, basename
-from typing import Optional
+from typing import Optional, List
 
 import pandas as pd
 import click
@@ -100,10 +101,10 @@ def main(
     logger.info('* Checking relatedness *')
     ped = Ped(local_somalier_samples_fpath)
     sample_by_id = {s.sample_id: s for s in ped.samples()}
-    pairs_df = pd.read_csv(local_somalier_pairs_fpath, delimiter='\t')
-
+    
     pairs_provided_as_unrelated_but_inferred_related = []
     other_mismatching_pairs = []
+    pairs_df = pd.read_csv(local_somalier_pairs_fpath, delimiter='\t')
     for idx, row in pairs_df.iterrows():
         s1 = row['#sample_a']
         s2 = row['sample_b']
@@ -112,34 +113,39 @@ def main(
         with contextlib.redirect_stderr(None), contextlib.redirect_stdout(None):
             peddy_rel = ped.relation(sample_by_id[s1], sample_by_id[s2])
 
-        def _parse_peddy_label(peddy_rel):
+        def _match_peddy_with_inferred(peddy_rel):
             return {
-                'unrelated': ['unrelated'],
-                'related at unknown level': ['unrelated'],  # e.g. mom-dad
-                'mom-dad': ['unrelated'],
-                'parent-child': ['parent-child'],
-                'grandchild': ['below_first_degree'],
-                'niece/nephew': ['below_first_degree'],
-                'great-grandchild': ['below_first_degree'],
-                'cousins': ['below_first_degree'],
-                'full siblings': ['siblings'],
-                'siblings': ['siblings'],
-                'unknown': ['unknown'],
+                'unrelated': 'unrelated',
+                'related at unknown level': 'unrelated',
+                'mom-dad': 'unrelated',
+                'parent-child': 'parent-child',
+                'grandchild': 'below_first_degree',
+                'niece/nephew': 'below_first_degree',
+                'great-grandchild': 'below_first_degree',
+                'cousins': 'below_first_degree',
+                'full siblings': 'siblings',
+                'siblings': 'siblings',
+                'unknown': 'unknown',
             }.get(peddy_rel)
+        
+
         if (
-            'unknown' in _parse_peddy_label(peddy_rel)
+            _match_peddy_with_inferred(peddy_rel) == 'unknown'
             and inferred_rel != 'unknown'
-            or 'unrelated' in _parse_peddy_label(peddy_rel)
+            or _match_peddy_with_inferred(peddy_rel) == 'unrelated'
             and inferred_rel != 'unrelated'
         ):
             pairs_provided_as_unrelated_but_inferred_related.append(
-                f'"{s1}" and "{s2}", inferred: "{inferred_rel}" '
+                f'"{s1}" and "{s2}", '
+                f'provided: "{peddy_rel}", '
+                f'inferred: "{inferred_rel}" '
                 f'(rel={row["relatedness"]})'
             )
-        elif inferred_rel not in _parse_peddy_label(peddy_rel):
+        elif inferred_rel != _match_peddy_with_inferred(peddy_rel):
             other_mismatching_pairs.append(
                 f'"{s1}" and "{s2}", '
-                f'provided relationship: "{peddy_rel}", inferred: "{inferred_rel}" '
+                f'provided: "{peddy_rel}", '
+                f'inferred: "{inferred_rel}" '
                 f'(rel={row["relatedness"]})'
             )
         pairs_df.loc[idx, 'provided_rel'] = peddy_rel
