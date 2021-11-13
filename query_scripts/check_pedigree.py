@@ -59,13 +59,18 @@ def main(
         local_somalier_pairs_fpath = somalier_pairs_fpath
         local_somalier_samples_fpath = somalier_samples_fpath
 
-    logger.info('* Checking sex *')
     df = pd.read_csv(local_somalier_samples_fpath, delimiter='\t')
     df.sex = df.sex.apply(lambda x: {1: 'male', 2: 'female'}.get(x, 'unknown'))
     df.original_pedigree_sex = df.original_pedigree_sex.apply(
         lambda x: {'-9': 'unknown'}.get(x, x)
     )
     bad_samples = list(df[df.gt_depth_mean == 0.0].sample_id)
+    if bad_samples:
+        logger.info(f'Excluding samples with non enough coverage to make inference: '
+                    f'{", ".join(bad_samples)}')
+    logger.info('-' * 10)
+
+    logger.info('* Checking sex *')
     missing_inferred_sex = df.sex == 'unknown'
     missing_provided_sex = df.original_pedigree_sex == 'unknown'
     mismatching_female = (df.sex == 'female') & (df.original_pedigree_sex == 'male')
@@ -81,9 +86,6 @@ def main(
                 f'mean depth: {row.gt_depth_mean})'
             )
 
-    if bad_samples:
-        logger.info(f'Samples with non enough coverage to make inference '
-                    f'{", ".join(bad_samples)}:')
     if mismatching_sex.any():
         logger.info(f'Found PED samples with mismatching sex:')
         _print_stats(mismatching_sex)
