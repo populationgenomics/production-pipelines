@@ -32,7 +32,7 @@ pipe = Pipeline(
     output_version='v0',
     namespace=NAMESPACE,
     title='Benchmark GVCF combiner',
-    smdb_check_existence=False,
+    smdb_check_seq_existence=False,
 )
 pipe.populate_samples(input_projects=[INPUT_PROJECT], namespace=NAMESPACE)
 samples = pipe.get_all_samples()

@@ -46,7 +46,7 @@ def main():
         output_version='v0',
         namespace=NAMESPACE,
         title='Benchmark alignment',
-        smdb_check_existence=False,
+        smdb_check_seq_existence=False,
         keep_scratch=True,
     )
 

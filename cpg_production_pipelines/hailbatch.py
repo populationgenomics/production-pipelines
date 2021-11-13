@@ -1,6 +1,8 @@
 from dataclasses import dataclass
-from typing import Optional, Union, List, Tuple
+from typing import Optional, Union, List, Tuple, Dict
 import hailtop.batch as hb
+
+from cpg_production_pipelines import utils
 
 
 @dataclass
@@ -49,3 +51,63 @@ class FqAlignmentInput:
 @dataclass
 class AlignmentInput(BamOrCramAlignmentInput, FqAlignmentInput):
     pass
+
+
+@dataclass
+class PrevJob:
+    """
+    Represents a Job from a previous Batch, parsed from the Batch database with:
+    BATCH=6553
+    mysql --ssl-ca=/sql-config/server-ca.pem --ssl-cert=/sql-config/client-cert.pem --ssl-key=/sql-config/client-key.pem --host=10.125.0.3 --user=root --password batch -e "SELECT j.batch_id, j.job_id, ja.key, ja.value FROM jobs as j INNER JOIN job_attributes as ja ON j.job_id = ja.job_id WHERE j.batch_id=$BATCH AND ja.batch_id=j.batch_id AND ja.key='name' AND j.state='Success';" > result.txt    
+    """
+    cpgid: str
+    projname: str
+    batch_number: int
+    job_number: int
+    jtype: str
+    jname: str
+    batchid: int
+    hail_bucket: str
+
+    @staticmethod
+    def parse(
+        fpath: str, 
+        batchid: str, 
+        hail_bucket: str,
+    ) -> Dict:
+        """
+        fpath is the path to result.txt (see above), and batchid is a 6-letter
+        batch ID, e.g. feb0e9 in gs://cpg-seqr-main-tmp/seqr_loader/v0/hail/batch/feb0e9
+        which is not to be confused with a batch number from the URL
+        """
+        if not utils.file_exists(fpath):
+            return dict()
+        prev_batch_jobs = dict()
+        with open(fpath) as f:
+            for line in f:
+                if 'batch_id' in line.split():
+                    continue  # skip header
+                batch_number, job_number, _, jname = \
+                    line.strip().split('\t')
+
+                proj_cpgid = ''
+                if ': ' in jname:
+                    proj_cpgid, jname = jname.split(': ')
+                jtype = jname.split()[0]
+                projname, cpgid = None, None
+                if '/' in proj_cpgid:
+                    projname, cpgid = proj_cpgid.split('/')
+                
+                key = (cpgid, jname)
+                assert key not in prev_batch_jobs, (key, prev_batch_jobs)
+                prev_batch_jobs[key] = PrevJob(
+                    cpgid=cpgid,
+                    projname=projname,
+                    batch_number=batch_number,
+                    job_number=job_number,
+                    jtype=jtype,
+                    jname=jname,
+                    batchid=batchid,
+                    hail_bucket=hail_bucket,
+                )
+        return prev_batch_jobs

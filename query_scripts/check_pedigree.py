@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
 
 """
-This script parses `somalier relate` (https://github.com/brentp/somalier) outputs,
-and returns a non-zero code if either sex or pedigree mismatches the data in a provided PED file.
+This script parses "somalier relate" (https://github.com/brentp/somalier) outputs,
+and returns a non-zero code if either sex or pedigree mismatches the data in a 
+provided PED file.
 """
 
 import contextlib
 import logging
+import subprocess
 import sys
 import tempfile
 from os.path import join, basename
-from typing import Dict, List
+from typing import Optional
 
 import pandas as pd
 import click
 from peddy import Ped
-from cpg_production_pipelines import utils
 
 logger = logging.getLogger('check-pedigree')
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -43,11 +44,12 @@ logger.setLevel(logging.INFO)
 def main(
     somalier_samples_fpath: str,
     somalier_pairs_fpath: str,
-    somalier_html_fpath: str,
+    somalier_html_fpath: Optional[str],
 ):  # pylint: disable=missing-function-docstring
     if somalier_samples_fpath.startswith('gs://'):
         local_tmp_dir = tempfile.mkdtemp()
-        utils.gsutil_cp(somalier_samples_fpath, somalier_pairs_fpath)
+        cmd = f'gsutil cp {somalier_samples_fpath} {somalier_pairs_fpath}'
+        subprocess.run(cmd, check=False, shell=True)
         local_somalier_pairs_fpath = join(local_tmp_dir, basename(somalier_pairs_fpath))
         local_somalier_samples_fpath = join(
             local_tmp_dir, basename(somalier_samples_fpath)
@@ -58,21 +60,36 @@ def main(
 
     logger.info('* Checking sex *')
     df = pd.read_csv(local_somalier_samples_fpath, delimiter='\t')
-    missing_sex = df['original_pedigree_sex'] == 'unknown'
-    mismatching_female = (df['sex'] == 2) & (df['original_pedigree_sex'] == 'male')
-    mismatching_male = (df['sex'] == 1) & (df['original_pedigree_sex'] == 'female')
+    df.sex = df.sex.apply(lambda x: {1: 'male', 2: 'female'}.get(x, 'unknown'))
+    df.original_pedigree_sex = df.original_pedigree_sex.apply(
+        lambda x: {'-9': 'unknown'}.get(x, x)
+    )
+    missing_inferred_sex = df['sex'] == 'unknown'
+    missing_provided_sex = df['original_pedigree_sex'] == 'unknown'
+    mismatching_female = (df['sex'] == 'female') & (df['original_pedigree_sex'] == 'male')
+    mismatching_male = (df['sex'] == 'male') & (df['original_pedigree_sex'] == 'female')
     mismatching_sex = mismatching_female | mismatching_male
 
-    if (mismatching_sex | missing_sex).any():
-        logger.info(f'Found PED samples with mismatching or missing sex:')
-        for _, row in df[mismatching_sex | missing_sex].iterrows():
-            inferred_sex = {1: 'male', 2: 'female'}.get(row.sex, 'unknown')
+    def _print_stats(df_filter):
+        for _, row in df[df_filter].iterrows():
             logger.info(
-                f'\t{row.sample_id} (provided: {row.original_pedigree_sex}, inferred: {inferred_sex})'
+                f'\t{row.sample_id} ('
+                f'provided: {row.original_pedigree_sex}, '
+                f'inferred: {row.sex})'
             )
+    
+    if mismatching_sex.any():
+        logger.info(f'Found PED samples with mismatching sex:')
+        _print_stats(mismatching_sex)
+    if missing_inferred_sex.any():
+        logger.info(f'Samples with missing inferred sex:')
+        _print_stats(missing_inferred_sex)
+    if missing_provided_sex.any():
+        logger.info(f'Samples with missing provided sex:')
+        _print_stats(missing_provided_sex)
 
     if not mismatching_sex.any():
-        if missing_sex.any():
+        if (missing_inferred_sex | missing_provided_sex).any():
             logger.info(
                 f'Inferred sex and pedigree matches or can be inferred for all samples.'
             )
@@ -83,41 +100,61 @@ def main(
     logger.info('* Checking relatedness *')
     ped = Ped(local_somalier_samples_fpath)
     sample_by_id = {s.sample_id: s for s in ped.samples()}
-    mismatching_pairs = []
     pairs_df = pd.read_csv(local_somalier_pairs_fpath, delimiter='\t')
+
+    pairs_provided_as_unrelated_but_inferred_related = []
+    other_mismatching_pairs = []
     for idx, row in pairs_df.iterrows():
         s1 = row['#sample_a']
         s2 = row['sample_b']
         inferred_rel = infer_relationship(row['relatedness'], row['ibs0'], row['ibs2'])
         # Supressing all logging output from peddy as it would clutter the logs
-        with contextlib.redirect_stderr(None):
-            with contextlib.redirect_stdout(None):
-                provided_rel = ped.relation(sample_by_id[s1], sample_by_id[s2])
+        with contextlib.redirect_stderr(None), contextlib.redirect_stdout(None):
+            peddy_rel = ped.relation(sample_by_id[s1], sample_by_id[s2])
 
-        provided_to_inferred: Dict[str, List[str]] = {
-            'unrelated': ['unrelated'],
-            'related at unknown level': ['unrelated'],  # e.g. mom-dad
-            'mom-dad': ['unrelated'],
-            'parent-child': ['parent-child'],
-            'grandchild': ['below_first_degree'],
-            'niece/nephew': ['below_first_degree'],
-            'great-grandchild': ['below_first_degree'],
-            'cousins': ['below_first_degree'],
-            'full siblings': ['siblings'],
-            'siblings': ['siblings'],
-            'unknown': [],
-        }
-        if inferred_rel not in provided_to_inferred[provided_rel]:
-            mismatching_pairs.append(
-                f'"{s1}" and "{s2}", '
-                f'provided relationship: "{provided_rel}", inferred: "{inferred_rel}"'
+        def _parse_peddy_label(peddy_rel):
+            return {
+                'unrelated': ['unrelated'],
+                'related at unknown level': ['unrelated'],  # e.g. mom-dad
+                'mom-dad': ['unrelated'],
+                'parent-child': ['parent-child'],
+                'grandchild': ['below_first_degree'],
+                'niece/nephew': ['below_first_degree'],
+                'great-grandchild': ['below_first_degree'],
+                'cousins': ['below_first_degree'],
+                'full siblings': ['siblings'],
+                'siblings': ['siblings'],
+                'unknown': ['unknown'],
+            }.get(peddy_rel)
+        if (
+            'unknown' in _parse_peddy_label(peddy_rel)
+            and inferred_rel != 'unknown'
+            or 'unrelated' in _parse_peddy_label(peddy_rel)
+            and inferred_rel != 'unrelated'
+        ):
+            pairs_provided_as_unrelated_but_inferred_related.append(
+                f'"{s1}" and "{s2}", inferred: "{inferred_rel}" '
+                f'(rel={row["relatedness"]})'
             )
-        pairs_df.loc[idx, 'provided_rel'] = provided_rel
+        elif inferred_rel not in _parse_peddy_label(peddy_rel):
+            other_mismatching_pairs.append(
+                f'"{s1}" and "{s2}", '
+                f'provided relationship: "{peddy_rel}", inferred: "{inferred_rel}" '
+                f'(rel={row["relatedness"]})'
+            )
+        pairs_df.loc[idx, 'provided_rel'] = peddy_rel
         pairs_df.loc[idx, 'inferred_rel'] = inferred_rel
 
-    if mismatching_pairs:
+    if pairs_provided_as_unrelated_but_inferred_related:
+        logger.info(
+            f'Found sample pairs that are provided as unrelated, but '
+            f'inferred as related:'
+        )
+        for pair in pairs_provided_as_unrelated_but_inferred_related:
+            logger.info(f'\t{pair}')
+    if other_mismatching_pairs:
         logger.info(f'Found sample pairs with mismatched relatedness:')
-        for pair in mismatching_pairs:
+        for pair in other_mismatching_pairs:
             logger.info(f'\t{pair}')
     else:
         logger.info(f'Inferred pedigree matches for all samples.')
@@ -130,7 +167,7 @@ def main(
         somalier_pairs_fpath,
         somalier_html_fpath,
     )
-    if mismatching_sex.any() or mismatching_pairs:
+    if mismatching_sex.any() or other_mismatching_pairs:
         sys.exit(1)
 
 
@@ -139,19 +176,20 @@ def infer_relationship(coeff: float, ibs0: float, ibs2: float) -> str:
     Inferres relashionship labels based on the kin coefficient
     and ibs0 and ibs2 values.
     """
-    result = 'ambiguous'
-    if coeff < 0.1:
+    if coeff < 0.2:
         result = 'unrelated'
-    elif 0.1 <= coeff < 0.38:
+    elif coeff < 0.38:
         result = 'below_first_degree'
-    elif 0.38 <= coeff <= 0.62:
+    elif coeff <= 0.62:
         if ibs0 / ibs2 < 0.005:
             result = 'parent-child'
         elif 0.015 < ibs0 / ibs2 < 0.052:
             result = 'siblings'
         else:
             result = 'first_degree'
-    elif coeff > 0.8:
+    elif coeff < 0.8:
+        result = 'first_degree_or_duplicate_or_twins'
+    else:
         result = 'duplicate_or_twins'
     return result
 
@@ -166,25 +204,27 @@ def print_info(
     """
     Print useful information to manually review pedigree check results
     """
-    samples_str = samples_df.to_string()
-    pairs_str = pairs_df[
-        [
-            '#sample_a',
-            'sample_b',
-            'relatedness',
-            'ibs0',
-            'ibs2',
-            'n',
-            'expected_relatedness',
-        ]
-    ].to_string()
-    logger.info('')
-    logger.info(
-        f'Somalier results, samples (based on {somalier_samples_fpath}):\n{samples_str}\n'
-    )
-    logger.info(
-        f'Somalier results, sample pairs (based on {somalier_pairs_fpath}):\n{pairs_str}\n'
-    )
+    if len(samples_df) < 400:
+        samples_str = samples_df.to_string()
+        logger.info('')
+        logger.info(
+            f'Somalier results, samples (based on {somalier_samples_fpath}):\n{samples_str}\n'
+        )
+    if len(pairs_df) < 400:
+        pairs_str = pairs_df[
+            [
+                '#sample_a',
+                'sample_b',
+                'relatedness',
+                'ibs0',
+                'ibs2',
+                'n',
+                'expected_relatedness',
+            ]
+        ].to_string()
+        logger.info(
+            f'Somalier results, sample pairs (based on {somalier_pairs_fpath}):\n{pairs_str}\n'
+        )
     if somalier_html_fpath:
         logger.info(f'Somalier HTML report: {somalier_html_fpath}\n')
 

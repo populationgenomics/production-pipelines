@@ -2,6 +2,7 @@
 import click
 import logging
 
+from cpg_production_pipelines import resources
 from cpg_production_pipelines.hailbatch import AlignmentInput
 from cpg_production_pipelines.jobs import picard
 from cpg_production_pipelines.pipeline import Pipeline
@@ -23,8 +24,8 @@ def main():
         name='seqr_align_CPG12062_19W001482_A0131064_proband',
         output_version='v0',
         namespace=NAMESPACE,
-        title='Align CPG12062_19W001482_A0131064_proband',
-        smdb_check_existence=False,
+        title='CPG12062_19W001482_A0131064_proband',
+        smdb_check_seq_existence=False,
         keep_scratch=True,
     )
 
@@ -53,14 +54,29 @@ def main():
     #     markdup_tool=MarkDupTool.PICARD,
     # )
     
-    merged_bam = 'gs://cpg-seqr-main-tmp/seqr_align_CPG12062_19W001482_A0131064_proband/v0/hail/batch/3b4ddd/1/sorted_bam'
-    picard.markdup(
-        pipe.b,
-        pipe.b.read_input(merged_bam),
-        sample_name='CPG12062_19W001482_A0131064_proband',
-        project_name=PROJECT,
-        overwrite=False,
+    merged_bam = pipe.b.read_input('gs://cpg-seqr-main-tmp/seqr_align_CPG12062_19W001482_A0131064_proband/v0/hail/batch/3b4ddd/1/sorted_bam')
+    # picard.markdup(
+    #     pipe.b,
+    #     merged_bam),
+    #     sample_name='CPG12062_19W001482_A0131064_proband',
+    #     project_name=PROJECT,
+    #     overwrite=False,
+    # )
+    j = pipe.b.new_job('Index bam')
+    j.declare_resource_group(
+        output={
+            'bam': '{root}.bam',
+            'bam.bai': '{root}.bam.bai',
+        }
     )
+    j.storage('300G')
+    j.cpu(8)
+    j.image(resources.SAMTOOLS_PICARD_IMAGE)
+    j.command(f"""\
+    mv {merged_bam} {j.output.bam}
+    samtools index -@7 {j.output.bam} {j.output['bam.bai']}
+    """)
+    pipe.b.write_output(j.output, 'gs://cpg-seqr-main-tmp/seqr_align_CPG12062_19W001482_A0131064_proband-sorted')
 
     # produce_gvcf(
     #     dragen_mode=True,

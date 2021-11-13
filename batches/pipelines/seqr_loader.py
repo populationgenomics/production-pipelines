@@ -5,6 +5,7 @@ Batch pipeline to laod data info seqr
 """
 
 import logging
+import os
 import sys
 import time
 from dataclasses import dataclass
@@ -39,6 +40,10 @@ class CramStage(SampleStage):
 
     def get_expected_output(self, sample: Sample):
         return f'{sample.project.get_bucket()}/cram/{sample.id}.cram'
+    
+    @staticmethod
+    def get_fingerprint_output(output_path):
+        return output_path.replace('.cram', '.somalier')
 
     def add_jobs(
         self, 
@@ -53,11 +58,17 @@ class CramStage(SampleStage):
         
         alignment_input = sample.seq_info.parse_reads_from_metadata()
         if not alignment_input:
-            logger.critical(f'Could not find read data for sample {sample.id}')
-            sys.exit(1)
+            if not self.pipe.skip_samples_without_seq_input:
+                logger.critical(f'Could not find read data for sample {sample.id}')
+                sys.exit(1)
+            else:
+                logger.error(f'Could not find read data, skipping sample {sample.id}')
+                sample.project.samples = [
+                    s for s in sample.project.samples if s is not sample
+                ]
+                return None, []
 
         expected_path = self.get_expected_output(sample)
-
         cram_job = align.bwa(
             b=self.pipe.b,
             alignment_input=alignment_input,
@@ -67,8 +78,58 @@ class CramStage(SampleStage):
             overwrite=not self.pipe.check_intermediate_existence,
             check_existence=False,
             smdb=self.pipe.db,
+            prev_batch_jobs=self.pipe.prev_batch_jobs,
         )
-        return expected_path, [cram_job]
+        
+        fingerprint_job, fingerprint_path = pedigree.somalier_extact_job(
+            b=self.pipe.b,
+            sample=sample,
+            gvcf_or_cram_or_bam_path=expected_path,
+            overwrite=not self.pipe.check_intermediate_existence,
+            label='(CRAMs)',
+            depends_on=[cram_job],
+        )
+        
+        return expected_path, [cram_job, fingerprint_job]
+
+
+class CramPedCheckStage(ProjectStage):
+    def __init__(self, pipe: 'SeqrLoaderPipeline'):
+        super().__init__(
+            pipe, 
+            requires_stages=[CramStage],
+        )
+        self.pipe = pipe
+
+    def get_expected_output(self, project: Project):
+        pass
+
+    def add_jobs(
+        self,
+        project: Project,
+        dep_paths_by_stage: Dict[str, Dict[str, str]] = None,
+        dep_jobs: Optional[List[str]] = None,
+    ) -> Tuple[Optional[str], Optional[List[Job]]]:
+
+        cram_by_sid = dep_paths_by_stage[CramStage.get_name()]
+        fingerprint_path_by_sid = {
+            sid: CramStage.get_fingerprint_output(cram_path)
+            for sid, cram_path in cram_by_sid
+        }
+
+        j, somalier_samples_path, somalier_pairs_path = pedigree.add_pedigree_jobs(
+            self.pipe.b,
+            project,
+            input_path_by_sid=fingerprint_path_by_sid,
+            overwrite=not self.pipe.check_intermediate_existence,
+            fingerprints_bucket=self.pipe.fingerprints_bucket,
+            web_bucket=self.pipe.web_bucket,
+            web_url=self.pipe.web_url,
+            tmp_bucket=self.pipe.tmp_bucket,
+            depends_on=dep_jobs or [],
+            label='(CRAMs)',
+        )
+        return somalier_samples_path, [j]
 
 
 class GvcfStage(SampleStage):
@@ -79,10 +140,13 @@ class GvcfStage(SampleStage):
             requires_stages=[CramStage],
         )
 
-    def get_expected_output(self, sample: Optional[Sample] = None):
-        assert sample
+    def get_expected_output(self, sample: Optional[Sample]):
         return f'{sample.project.get_bucket()}/gvcf/{sample.id}.g.vcf.gz'
 
+    @staticmethod
+    def get_fingerprint_output(output_path):
+        return output_path.replace('.g.vcf.gz', '.somalier')
+    
     def add_jobs(
         self, 
         sample: Sample,
@@ -113,41 +177,15 @@ class GvcfStage(SampleStage):
             depends_on=dep_jobs,
             smdb=self.pipe.db,
         )
-        return expected_path, [gvcf_job]
-
-
-class CramPedCheckStage(ProjectStage):
-    def __init__(self, pipe: 'SeqrLoaderPipeline'):
-        super().__init__(
-            pipe, 
-            requires_stages=[CramStage],
-        )
-        self.pipe = pipe
-
-    def get_expected_output(self, *args):
-        pass
-
-    def add_jobs(
-        self,
-        project: Project,
-        dep_paths_by_stage: Dict[str, Dict[str, str]] = None,
-        dep_jobs: Optional[List[str]] = None,
-    ) -> Tuple[Optional[str], Optional[List[Job]]]:
-
-        file_by_sid = dep_paths_by_stage[CramStage.get_name()]
-
-        j, somalier_samples_path, somalier_pairs_path = pedigree.add_pedigree_jobs(
-            self.pipe.b,
-            project,
-            file_by_sid=file_by_sid,
+        fingerprint_job, fingerprint_path = pedigree.somalier_extact_job(
+            b=self.pipe.b,
+            sample=sample,
+            gvcf_or_cram_or_bam_path=expected_path,
             overwrite=not self.pipe.check_intermediate_existence,
-            fingerprints_bucket=self.pipe.fingerprints_bucket,
-            web_bucket=self.pipe.web_bucket,
-            tmp_bucket=self.pipe.tmp_bucket,
-            depends_on=dep_jobs or [],
-            label='(CRAMs)'
+            label='(GVCFs)',
+            depends_on=[gvcf_job],
         )
-        return somalier_samples_path, [j]
+        return expected_path, [gvcf_job, fingerprint_job]
 
 
 class GvcfPedCheckStage(ProjectStage):
@@ -168,15 +206,20 @@ class GvcfPedCheckStage(ProjectStage):
         dep_jobs: Optional[List[str]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
-        file_by_sid = dep_paths_by_stage[GvcfStage.get_name()]
+        gvcf_by_sid = dep_paths_by_stage[GvcfStage.get_name()]
+        fingerprint_path_by_sid = {
+            sid: CramStage.get_fingerprint_output(gvcf_path)
+            for sid, gvcf_path in gvcf_by_sid
+        }
 
         j, somalier_samples_path, somalier_pairs_path = pedigree.add_pedigree_jobs(
             self.pipe.b,
             project,
-            file_by_sid=file_by_sid,
+            input_path_by_sid=fingerprint_path_by_sid,
             overwrite=not self.pipe.check_intermediate_existence,
             fingerprints_bucket=self.pipe.fingerprints_bucket,
             web_bucket=self.pipe.web_bucket,
+            web_url=self.pipe.web_url,
             tmp_bucket=self.pipe.tmp_bucket,
             depends_on=dep_jobs or [],
             label='(GVCFs)'
@@ -461,7 +504,12 @@ class LoadToEsStage(ProjectStage):
     default='v0',
     help='Suffix the outputs with this version tag. Useful for testing',
 )
-@click.option('--keep-scratch', 'keep_scratch', is_flag=True)
+@click.option(
+    '--keep-scratch/--remove-scratch', 
+    'keep_scratch', 
+    default=True,
+    is_flag=True,
+)
 @click.option('--dry-run', 'dry_run', is_flag=True)
 @click.option(
     '--ped-file',
@@ -496,31 +544,58 @@ class LoadToEsStage(ProjectStage):
     help='Use allele-specific annotations for VQSR',
 )
 @click.option(
-    '--check-smdb-files-existence/--skip-check-smdb-files-existence',
-    'check_smdb_files_existence',
+    '--check-smdb-seq-existence/--no-check-smdb-seq-existence',
+    'check_smdb_seq_existence',
     default=False,
     is_flag=True,
+    help='Check that files in sequence.meta exist'
 )
 @click.option(
-    '--check-intermediate-existence/--skip-check-intermediate-existence',
+    '--skip-samples-without-seq-input',
+    'skip_samples_without_seq_input',
+    default=False,
+    is_flag=True,
+    help='If sequence.meta files for a sample don\'t exist, remove this sample '
+         'instead of failing'
+)
+@click.option(
+    '--check-intermediate-existence/--no-check-intermediate-existence',
     'check_intermediate_existence',
-    default=False,
-    is_flag=True,
-    help='if an intermediate or a final file exists, skip running the code '
-    'that generates it.',
-)
-@click.option(
-    '--update-smdb/--skip-update-smdb',
-    'update_smdb',
     default=True,
     is_flag=True,
+    help='Before running a job, check for an intermediate output before submitting it, '
+         'and if it exists on a bucket, submit a [reuse] job instead. Works well with '
+         '--previous-batch-tsv/--previous-batch-id options.',
+)
+@click.option(
+    '--update-smdb-analyses/--no-update-smdb-analyses',
+    'update_smdb_analyses',
+    is_flag=True,
+    default=True,
     help='Create analysis entries for queued/running/completed jobs'
 )
 @click.option(
-    '--validate-smdb-analyses',
+    '--validate-smdb-analyses/--no-validate-smdb-analyses',
     'validate_smdb_analyses',
     is_flag=True,
-    help='Validate existing analysis entries. Set to failure if output doesn\'t exist'
+    default=False,
+    help='Validate existing analysis entries by checking if a.output exists on '
+         'the bucket. Set the analysis entry to "failure" if output doesn\'t exist'
+)
+@click.option(
+    '--previous-batch-tsv',
+    'previous_batch_tsv_path',
+    help='A list of previous successful attempts from another batch, dumped from '
+         'from the Batch database (the "jobs" table joined on "job_attributes"). '
+         'If the intermediate output for a job exists in a previous attempt, '
+         'it will be passed forward, and a [reuse] job will be submitted.'
+)
+@click.option(
+    '--previous-batch-id',
+    'previous_batch_id',
+    help='6-letter ID of the previous successful batch (corresponds to the directory '
+         'name in the batch logs. e.g. feb0e9 in '
+         'gs://cpg-seqr-main-tmp/hail/batch/feb0e9'
 )
 def main(
     output_namespace: Namespace,
@@ -539,18 +614,21 @@ def main(
     hc_shards_num: int,
     use_gnarly: bool,
     use_as_vqsr: bool,
-    check_smdb_files_existence: bool,
+    check_smdb_seq_existence: bool,
+    skip_samples_without_seq_input: bool,
     check_intermediate_existence: bool,
-    update_smdb: bool,
+    update_smdb_analyses: bool,
     validate_smdb_analyses: bool,
+    previous_batch_tsv_path: Optional[str],
+    previous_batch_id: Optional[str],
 ):  # pylint: disable=missing-function-docstring
     # Determine bucket paths
 
     assert input_projects
 
-    title = f'Seqr loading: {", ".join(input_projects)}'
+    title = f'Seqr loading: joint call from: {", ".join(input_projects)}'
     if output_projects:
-        title += f' -> {", ".join(output_projects)}'
+        title += f', ES index for: {", ".join(output_projects)}'
     title += f', version {output_version}'
     
     if not output_projects:
@@ -569,15 +647,14 @@ def main(
         namespace=output_namespace,
         keep_scratch=keep_scratch,
         title=title,
-        smdb_update_analyses=update_smdb,
-        smdb_check_existence=check_smdb_files_existence,
+        smdb_update_analyses=update_smdb_analyses,
+        smdb_check_seq_existence=check_smdb_seq_existence,
+        skip_samples_without_seq_input=skip_samples_without_seq_input,
         validate_smdb_analyses=validate_smdb_analyses,
         check_intermediate_existence=check_intermediate_existence,
         first_stage=first_stage,
         last_stage=last_stage,
         config=SeqrLoaderConfig(
-            input_projects=input_projects,
-            skip_samples=skip_samples,
             hc_shards_num=hc_shards_num,
             use_gnarly=use_gnarly,
             use_as_vqsr=use_as_vqsr,
@@ -587,6 +664,8 @@ def main(
         skip_samples=skip_samples,
         force_samples=force_samples,
         ped_files=ped_files,
+        previous_batch_tsv_path=previous_batch_tsv_path,
+        previous_batch_id=previous_batch_id,
     )
 
     pipeline.run(dry_run)
@@ -594,8 +673,6 @@ def main(
 
 @dataclass
 class SeqrLoaderConfig:
-    input_projects: List[str]
-    skip_samples: List[str]
     hc_shards_num: int
     use_gnarly: bool
     use_as_vqsr: bool

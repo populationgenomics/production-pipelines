@@ -4,6 +4,7 @@ import sys
 import tempfile
 from dataclasses import dataclass, field
 import logging
+from enum import Enum
 from os.path import join
 from typing import List, Dict, Optional, Any, Union, Tuple
 from abc import ABC, abstractmethod
@@ -14,7 +15,7 @@ from hailtop.batch.job import Job
 from cpg_production_pipelines import utils
 from cpg_production_pipelines.utils import Namespace, AnalysisType
 from cpg_production_pipelines.smdb import SMDB, Analysis, Sequence
-from cpg_production_pipelines.hailbatch import AlignmentInput
+from cpg_production_pipelines.hailbatch import AlignmentInput, PrevJob
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -403,12 +404,18 @@ class CohortStage(PipelineStage, ABC):
         return None
 
 
+class Sex(Enum):
+    UNKNOWN = 0
+    MALE = 1
+    FEMALE = 2
+
+
 @dataclass
 class PedigreeInfo:
     fam_id: str
     dad: Optional['Sample']
     mom: Optional['Sample']
-    sex: str
+    sex: Sex
     phenotype: str     
 
 
@@ -419,7 +426,7 @@ class Sample:
     """
     id: str
     external_id: str
-    project: 'Project'
+    project: 'Project' = field(repr=lambda p: p.name)
     alignment_input: Optional[AlignmentInput] = None
     good: bool = True
     seq_info: Optional[Sequence] = None
@@ -432,7 +439,7 @@ class Sample:
     jobs_by_stage: Dict[str, List[Job]] = field(default_factory=lambda: dict())
 
     pedigree: Optional[PedigreeInfo] = None
-    
+
     def get_ped_dict(self, use_ext_id: bool = False) -> Dict:
         """
         Returns a dictionary of pedigree fields for this sample
@@ -444,20 +451,22 @@ class Sample:
                 return _s.external_id
             else:
                 return _s.id
-            
+
         if self.pedigree:
             return {
-                'Individula.ID': _get_id(self),
                 'Family.ID': self.pedigree.fam_id,
+                'Individual.ID': _get_id(self),
                 'Father.ID': _get_id(self.pedigree.dad),
                 'Mother.ID': _get_id(self.pedigree.mom),
-                'Sex': self.pedigree.sex,
+                'Sex': {Sex.MALE: '1', Sex.FEMALE: '2'}.get(
+                    self.pedigree.sex, Sex.UNKNOWN
+                ),
                 'Phenotype': self.pedigree.phenotype,
             }   
         else:            
             return {
-                'Individula.ID': _get_id(self),
                 'Family.ID': _get_id(self),
+                'Individual.ID': _get_id(self),
                 'Father.ID': '0',
                 'Mother.ID': '0',
                 'Sex': '0',
@@ -542,10 +551,13 @@ class Pipeline:
         namespace: Namespace,
         title: str,
         keep_scratch: bool = False,
+        previous_batch_tsv_path: Optional[str] = None,
+        previous_batch_id: Optional[str] = None,
         smdb_update_analyses: bool = False,
-        smdb_check_existence: bool = False,
+        smdb_check_seq_existence: bool = False,
+        skip_samples_without_seq_input: bool = False,
         validate_smdb_analyses: bool = False,
-        check_intermediate_existence: bool = False,
+        check_intermediate_existence: bool = True,
         hail_billing_project: Optional[str] = None,
         first_stage: Optional[str] = None,
         last_stage: Optional[str] = None,
@@ -570,12 +582,10 @@ class Pipeline:
         self.db = SMDB(
             self.analysis_project.name,
             do_update_analyses=smdb_update_analyses,
-            do_check_existence=smdb_check_existence,
+            do_check_seq_existence=smdb_check_seq_existence,
         )
+        self.skip_samples_without_seq_input = skip_samples_without_seq_input
         self.validate_smdb_analyses = validate_smdb_analyses
-        self.local_tmp_dir = tempfile.mkdtemp()
-        self.keep_scratch = keep_scratch
-        self.config = config
 
         if namespace == Namespace.TMP:
             tmp_suf = 'test-tmp'
@@ -595,7 +605,7 @@ class Pipeline:
             web_suf = 'main-web'
             self.output_suf = 'main'
             self.proj_output_suf = 'main'
-
+        
         path_ptrn = (
             f'gs://cpg-{self.analysis_project.stack}-{{suffix}}/'
             f'{self.name}/'
@@ -604,6 +614,20 @@ class Pipeline:
         self.tmp_bucket = path_ptrn.format(suffix=tmp_suf)
         self.analysis_bucket = path_ptrn.format(suffix=analysis_suf)
         self.web_bucket = path_ptrn.format(suffix=web_suf)
+        self.web_url = (
+            f'https://{self.namespace}-web.populationgenomics.org.au/'
+            f'{self.analysis_project.stack}/'
+            f'{self.name}/'
+            f'{self.output_version}'
+        )
+        self.local_tmp_dir = tempfile.mkdtemp()
+        self.keep_scratch = keep_scratch
+        self.prev_batch_jobs = PrevJob.parse(
+            previous_batch_tsv_path,
+            previous_batch_id,
+            get_hail_bucket(self.tmp_bucket, keep_scratch),
+        ) if previous_batch_tsv_path else dict()
+        self.config = config
 
         self.b = setup_batch(
             title, 
@@ -713,7 +737,7 @@ class Pipeline:
         sample_by_extid = dict()
         for s in self.get_all_samples():
             sample_by_extid[s.external_id] = s
-        
+
         for i, ped_file in enumerate(ped_files):
             local_ped_file = join(self.local_tmp_dir, f'ped_file_{i}.ped')
             utils.gsutil_cp(ped_file, local_ped_file)
@@ -721,7 +745,7 @@ class Pipeline:
                 for line in f:
                     if 'Family.ID' in line:
                         continue
-                    fields = line.strip().split()[:6]
+                    fields = line.strip().split('\t')[:6]
                     fam_id, sam_id, pat_id, mat_id, sex, phenotype = fields
                     if sam_id in sample_by_extid:
                         s = sample_by_extid[sam_id]
@@ -729,8 +753,8 @@ class Pipeline:
                             fam_id=fam_id,
                             dad=sample_by_extid.get(pat_id),
                             mom=sample_by_extid.get(mat_id),
-                            sex=sex,
-                            phenotype=phenotype,
+                            sex={'1': Sex.MALE, '2': Sex.FEMALE}.get(sex, Sex.UNKNOWN),
+                            phenotype=phenotype or '0',
                         )
         for project in self.projects:
             samples_with_ped = [s for s in project.samples if s.pedigree]
@@ -787,7 +811,7 @@ class Pipeline:
             logger.info(f'Stage {stage.get_name()}')
             stage.add_to_the_pipeline(self)
             logger.info(f'')
-            if i >= last_stage_num:
+            if last_stage_num and i >= last_stage_num:
                 logger.info(f'Last stage is {stage.get_name()}, stopping here')
                 break
     
@@ -799,17 +823,24 @@ class Pipeline:
         return utils.can_reuse(fpath, overwrite=not self.check_intermediate_existence)
 
 
+def get_hail_bucket(tmp_bucket, keep_scratch):
+    hail_bucket = os.environ.get('HAIL_BUCKET')
+    if not hail_bucket or keep_scratch:
+        # Scratch files are large, so we want to use the temporary bucket to put them in
+        hail_bucket = f'{tmp_bucket}/hail'
+    return hail_bucket
+
+
 def setup_batch(
     title: str, 
     keep_scratch: bool,
     tmp_bucket: str,
     analysis_project: Project,
     billing_project: Optional[str] = None,
+    hail_bucket: Optional[str] = None,
 ) -> Batch:
-    hail_bucket = os.environ.get('HAIL_BUCKET')
-    if not hail_bucket or keep_scratch:
-        # Scratch files are large, so we want to use the temporary bucket to put them in
-        hail_bucket = f'{tmp_bucket}/hail'
+    if not hail_bucket:
+        hail_bucket = get_hail_bucket(tmp_bucket, keep_scratch)
     billing_project = (
         billing_project or
         os.getenv('HAIL_BILLING_PROJECT') or

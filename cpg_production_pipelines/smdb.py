@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from textwrap import dedent
 from typing import List, Dict, Optional, Set, Collection
 
-import sample_metadata
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
@@ -58,10 +57,18 @@ class Sequence:
     def parse(data: Dict, smdb):
         return Sequence(data['id'], data['sample_id'], data['meta'], smdb)
 
-    def parse_reads_from_metadata(self):
+    def parse_reads_from_metadata(
+        self, 
+        check_existence: Optional[bool] = None,
+    ) -> Optional[AlignmentInput]:
+        """
+        Parase AlignmentInput from meta. check_existence defaults from self.smdb and can be overwridden
+        """
         return parse_reads_from_metadata(
             self.meta,
-            check_existence=self.smdb.do_check_existence
+            check_existence=check_existence 
+            if (check_existence is not None) 
+            else self.smdb.do_check_seq_existence,
         )
 
 
@@ -74,13 +81,13 @@ class SMDB:
         self, 
         analysis_project: str, 
         do_update_analyses: bool = True,
-        do_check_existence: bool = True,
+        do_check_seq_existence: bool = True,
     ):
         """
         :param analysis_project: project where to create the "analysis" entries.
         :param do_update_analyses: if not set, won't update "analysis" entries' 
             statuses.
-        :param do_check_existence: when querying "sequence" or "analysis" entries
+        :param do_check_seq_existence: when querying "sequence" or "analysis" entries
             with files, check those files existence with gsutil. For "sequence", will
             throw an error. For "analysis", will invalidate by setting status=failure.
         """
@@ -90,7 +97,7 @@ class SMDB:
         self.seqapi = SequenceApi()
         self.analysis_project = analysis_project
         self.do_update_analyses = do_update_analyses
-        self.do_check_existence = do_check_existence
+        self.do_check_seq_existence = do_check_seq_existence
 
     def get_samples_by_project(
         self,

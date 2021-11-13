@@ -1,6 +1,7 @@
+from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent, indent
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict
 from os.path import splitext, basename, dirname, join
 import logging
 
@@ -11,7 +12,7 @@ from cpg_production_pipelines import resources, utils
 from cpg_production_pipelines.jobs import wrap_command
 from cpg_production_pipelines.jobs import picard
 from cpg_production_pipelines.smdb import SMDB
-from cpg_production_pipelines.hailbatch import AlignmentInput
+from cpg_production_pipelines.hailbatch import AlignmentInput, PrevJob
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -73,6 +74,7 @@ def align(
     ncpu: Optional[int] = None,
     highmem: bool = False,
     storage_gb: Optional[int] = None,
+    prev_batch_jobs: Optional[Dict[str, PrevJob]] = None,
 ) -> Job:
     """
     - if the input is 1 fastq pair, submits one alignment job
@@ -101,16 +103,38 @@ def align(
     if alignment_input.fqs1 and len(alignment_input.fqs1) > 1:
         # running alignment in parallel, then merging
         assert len(alignment_input.fqs1) == len(alignment_input.fqs2), alignment_input
+        fastq_pairs = zip(alignment_input.fqs1, alignment_input.fqs2)
+
         align_jobs = []
-        for i, (fq1, fq2) in enumerate(zip(alignment_input.fqs1, alignment_input.fqs2)):
+        sorted_bams = []
+        for i, (fq1, fq2) in enumerate(fastq_pairs):
+            jname = (
+                f'{aligner.name} {i+1}/{fq1}' + 
+                (f' {extra_label}' if extra_label else '')
+            )
+            key = sample_name, jname 
+            if prev_batch_jobs and key in prev_batch_jobs:
+                prevj = prev_batch_jobs[key]
+                logger.info(f'Job was run in the previous batch {prevj.batch_number}: '
+                            f'{key}')
+                existing_sorted_bam_path = (
+                    f'{prevj.hail_bucket}/batch/{prevj.batchid}/{prevj.job_number}/sorted_bam'
+                )
+                if utils.can_reuse(existing_sorted_bam_path, overwrite):
+                    logger.info(f'Reusing previous batch result: {existing_sorted_bam_path}')
+                    jname += ' [reuse from previous batch]'
+                    j = b.new_job(jname, dict(sample=sample_name, project=project_name))
+                    align_jobs.append(j)
+                    sorted_bams.append(b.read_input(existing_sorted_bam_path))
+                    continue
             j, cmd = _align_one(
                 b=b,
                 alignment_input=AlignmentInput(fqs1=[fq1], fqs2=[fq2]),
+                job_name=jname,
                 ncpu=ncpu,
                 sample=sample_name,
                 project=project_name,
                 aligner=aligner,
-                extra_label=f'{i+1}/{fq1}' + (f' {extra_label}' if extra_label else ''),
             )
             if highmem:
                 j.memory('highmem')
@@ -119,14 +143,8 @@ def align(
             cmd = cmd.strip()
             cmd += ' ' + sort_cmd(nthreads) + f' -o {j.sorted_bam}'
             j.command(wrap_command(cmd, monitor_space=True))
+            sorted_bams.append(j.sorted_bam)
             align_jobs.append(j)
-        sorted_bams = [j.sorted_bam for j in align_jobs]
-        # sorted_bams = [
-        #     b.read_input('gs://cpg-seqr-main-tmp/seqr_align_CPG12062_19W001482_A0131064_proband/v0/hail/batch/f152ca/1/sorted_bam'),
-        #     b.read_input('gs://cpg-seqr-main-tmp/seqr_align_CPG12062_19W001482_A0131064_proband/v0/hail/batch/f152ca/2/sorted_bam'),
-        #     b.read_input('gs://cpg-seqr-main-tmp/seqr_align_CPG12062_19W001482_A0131064_proband/v0/hail/batch/f152ca/3/sorted_bam'),
-        #     b.read_input('gs://cpg-seqr-main-tmp/seqr_align_CPG12062_19W001482_A0131064_proband/v0/hail/batch/f152ca/4/sorted_bam'),
-        # ]
 
         merge_j = b.new_job('Merge BAMs', dict(sample=sample_name, project=project_name))
         merge_j.cpu(ncpu)
@@ -144,14 +162,15 @@ def align(
         first_j = merge_j
 
     else:
+        jname = f'{aligner.name} {extra_label}'
         align_j, align_cmd = _align_one(
             b=b,
+            job_name=jname,
             alignment_input=alignment_input,
             ncpu=ncpu,
             sample=sample_name,
             project=project_name,
             aligner=aligner,
-            extra_label=extra_label,
         )
         if highmem:
             align_j.memory('highmem')
@@ -196,11 +215,11 @@ def align(
 def _align_one(
     b,
     alignment_input: AlignmentInput,
+    job_name: str,
     ncpu: int,
     sample: str,
     project: Optional[str] = None,
     aligner: Aligner = Aligner.BWA,
-    extra_label: Optional[str] = None,
 ) -> Tuple[Job, str]:
     """
     Creates a command that (re)aligns reads to hg38.
@@ -208,10 +227,6 @@ def _align_one(
     It leaves sorting and duplicate marking to the user, thus returns a command in
     a raw string in addition to the Job object.
     """
-    job_name = aligner.name
-    if extra_label:
-        job_name += f' {extra_label}'
-
     j = b.new_job(job_name, dict(sample=sample, project=project))
     nthreads = ncpu * 2  # multithreading
     j.cpu(ncpu)

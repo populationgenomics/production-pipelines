@@ -930,7 +930,7 @@ def add_apply_recalibration_step(
     to a VCF with tranche annotated in the FILTER field
     """
     j = b.new_job('VQSR: ApplyRecalibration')
-    j.image(utils.GATK_IMAGE)
+    j.image(resources.GATK_IMAGE)
     j.memory('8G')
     j.storage(f'{disk_size}G')
     j.declare_resource_group(
@@ -942,9 +942,14 @@ def add_apply_recalibration_step(
 
     df -h; pwd; du -sh $(dirname {j.output_vcf['vcf.gz']})
 
+    TMP_DIR=$(dirname {j.output_vcf['vcf.gz']})/tmp
+    mkdir $TMP_DIR
+
+    TMP_INDEL_RECALIBRATED=/io/batch/tmp.indel.recalibrated.vcf.gz
     gatk --java-options -Xms5g \\
       ApplyVQSR \\
-      -O tmp.indel.recalibrated.vcf \\
+      --tmp-dir $TMP_DIR \\
+      -O $TMP_INDEL_RECALIBRATED \\
       -V {input_vcf['vcf.gz']} \\
       --recal-file {indels_recalibration} \\
       --tranches-file {indels_tranches} \\
@@ -957,13 +962,15 @@ def add_apply_recalibration_step(
     df -h; pwd; du -sh $(dirname {j.output_vcf['vcf.gz']})
 
     rm {input_vcf['vcf.gz']} {indels_recalibration} {indels_tranches}
+    rm -rf $TMP_DIR
+    mkdir $TMP_DIR
 
     df -h; pwd; du -sh $(dirname {j.output_vcf['vcf.gz']})
 
     gatk --java-options -Xms5g \\
       ApplyVQSR \\
       -O {j.output_vcf['vcf.gz']} \\
-      -V tmp.indel.recalibrated.vcf \\
+      -V $TMP_INDEL_RECALIBRATED \\
       --recal-file {snps_recalibration} \\
       --tranches-file {snps_tranches} \\
       --truth-sensitivity-filter-level {snp_filter_level} \\

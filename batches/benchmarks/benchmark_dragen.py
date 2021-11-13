@@ -27,7 +27,7 @@ def main():
         output_version='v0',
         namespace=NAMESPACE,
         title='Benchmark DRAGMAP: full samples',
-        smdb_check_existence=False,
+        smdb_check_seq_existence=False,
     )
     tiny_inputs = {
         'TINY_FQ': benchmark.tiny_fq,

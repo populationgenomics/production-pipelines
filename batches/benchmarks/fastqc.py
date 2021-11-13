@@ -23,7 +23,7 @@ def main():
         output_version='v0',
         namespace=NAMESPACE,
         title='Run QC',
-        smdb_check_existence=False,
+        smdb_check_seq_existence=False,
     )
     inputs = {
         'NA12878': benchmark.na12878fq,
