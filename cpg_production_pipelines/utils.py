@@ -9,14 +9,12 @@ import logging
 import sys
 import time
 import hashlib
-from dataclasses import dataclass
 from enum import Enum
 from os.path import isdir, isfile, exists, join, basename
-from typing import Any, Callable, Dict, Optional, Union, Iterable, List, Tuple
+from typing import Any, Callable, Dict, Optional, Union, Iterable
 import yaml
 import pandas as pd
 import hail as hl
-import hailtop.batch as hb
 import click
 from google.cloud import storage
 from cpg_production_pipelines import _version, get_package_path

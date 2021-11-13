@@ -458,12 +458,10 @@ class Sample:
                 'Individual.ID': _get_id(self),
                 'Father.ID': _get_id(self.pedigree.dad),
                 'Mother.ID': _get_id(self.pedigree.mom),
-                'Sex': {Sex.MALE: '1', Sex.FEMALE: '2'}.get(
-                    self.pedigree.sex, Sex.UNKNOWN
-                ),
+                'Sex': str(self.pedigree.sex.value),
                 'Phenotype': self.pedigree.phenotype,
-            }   
-        else:            
+            }
+        else:
             return {
                 'Family.ID': _get_id(self),
                 'Individual.ID': _get_id(self),
@@ -753,7 +751,12 @@ class Pipeline:
                             fam_id=fam_id,
                             dad=sample_by_extid.get(pat_id),
                             mom=sample_by_extid.get(mat_id),
-                            sex={'1': Sex.MALE, '2': Sex.FEMALE}.get(sex, Sex.UNKNOWN),
+                            sex={
+                                '1': Sex.MALE, 
+                                '2': Sex.FEMALE,
+                                'M': Sex.MALE,
+                                'F': Sex.FEMALE,
+                            }.get(sex, Sex.UNKNOWN),
                             phenotype=phenotype or '0',
                         )
         for project in self.projects:

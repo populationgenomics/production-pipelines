@@ -65,10 +65,11 @@ def main(
     df.original_pedigree_sex = df.original_pedigree_sex.apply(
         lambda x: {'-9': 'unknown'}.get(x, x)
     )
-    missing_inferred_sex = df['sex'] == 'unknown'
-    missing_provided_sex = df['original_pedigree_sex'] == 'unknown'
-    mismatching_female = (df['sex'] == 'female') & (df['original_pedigree_sex'] == 'male')
-    mismatching_male = (df['sex'] == 'male') & (df['original_pedigree_sex'] == 'female')
+    bad_samples = list(df[df.gt_depth_mean == 0.0].sample_id)
+    missing_inferred_sex = df.sex == 'unknown'
+    missing_provided_sex = df.original_pedigree_sex == 'unknown'
+    mismatching_female = (df.sex == 'female') & (df.original_pedigree_sex == 'male')
+    mismatching_male = (df.sex == 'male') & (df.original_pedigree_sex == 'female')
     mismatching_sex = mismatching_female | mismatching_male
 
     def _print_stats(df_filter):
@@ -76,9 +77,13 @@ def main(
             logger.info(
                 f'\t{row.sample_id} ('
                 f'provided: {row.original_pedigree_sex}, '
-                f'inferred: {row.sex})'
+                f'inferred: {row.sex}, '
+                f'mean depth: {row.gt_depth_mean})'
             )
-    
+
+    if bad_samples:
+        logger.info(f'Samples with non enough coverage to make inference '
+                    f'{", ".join(bad_samples)}:')
     if mismatching_sex.any():
         logger.info(f'Found PED samples with mismatching sex:')
         _print_stats(mismatching_sex)
@@ -108,6 +113,9 @@ def main(
     for idx, row in pairs_df.iterrows():
         s1 = row['#sample_a']
         s2 = row['sample_b']
+        if s1 in bad_samples or s2 in bad_samples:
+            continue
+
         inferred_rel = infer_relationship(row['relatedness'], row['ibs0'], row['ibs2'])
         # Supressing all logging output from peddy as it would clutter the logs
         with contextlib.redirect_stderr(None), contextlib.redirect_stdout(None):
@@ -195,8 +203,10 @@ def infer_relationship(coeff: float, ibs0: float, ibs2: float) -> str:
             result = 'first_degree'
     elif coeff < 0.8:
         result = 'first_degree_or_duplicate_or_twins'
-    else:
+    elif coeff >= 0.8:
         result = 'duplicate_or_twins'
+    else:
+        result = 'nan'
     return result
 
 

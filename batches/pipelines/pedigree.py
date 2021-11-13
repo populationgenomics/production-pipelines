@@ -64,6 +64,45 @@ class CramPedCheckStage(ProjectStage):
         return somalier_samples_path, [j]
 
 
+
+class GvcfPedCheckStage(ProjectStage):
+    # defining __init__ only to make sure that .pipe instance is of type
+    # PedigreePipeline and not Pipeline, so it has .fingerprints_bucket
+    def __init__(self, pipe: 'PedigreePipeline'):
+        super().__init__(pipe)
+        self.pipe = pipe
+
+    def get_expected_output(self, *args):
+        pass
+
+    def add_jobs(
+        self,
+        project: Project,
+        dep_paths_by_stage: Dict[str, Dict[str, str]] = None,
+        dep_jobs: Optional[List[str]] = None,
+    ) -> Tuple[Optional[str], Optional[List[Job]]]:
+
+        path_by_sid = dict()
+        for s in project.samples:
+            path = f'gs://cpg-{project.name}-main/gvcf/{s.id}.g.vcf.gz'
+            if utils.file_exists(path):
+                path_by_sid[s.id] = path
+
+        j, somalier_samples_path, somalier_pairs_path = pedigree.add_pedigree_jobs(
+            self.pipe.b,
+            project,
+            input_path_by_sid=path_by_sid,
+            overwrite=not self.pipe.check_intermediate_existence,
+            fingerprints_bucket=self.pipe.fingerprints_bucket,
+            web_bucket=self.pipe.web_bucket,
+            tmp_bucket=self.pipe.tmp_bucket,
+            depends_on=dep_jobs or [],
+            label='(GVCFs)',
+            ignore_missing=self.pipe.skip_samples_without_seq_input,
+        )
+        return somalier_samples_path, [j]
+
+
 @click.command()
 @click.option(
     '-n',
@@ -233,6 +272,7 @@ class PedigreePipeline(Pipeline):
 
         self.add_stages([
             CramPedCheckStage(self),
+            GvcfPedCheckStage(self),
         ])
 
 
