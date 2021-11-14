@@ -358,6 +358,10 @@ class AnnotateCohortStage(CohortStage):
             job_name='Make MT and annotate',
             vep='GRCh38',
             depends_on=dep_jobs or [],
+            pyfiles=[
+                'hail-elasticsearch-pipelines/hail_scripts',
+                'hail-elasticsearch-pipelines/luigi_pipeline/lib',
+            ],
         )
         return expected_path, [j]
 
@@ -400,6 +404,10 @@ class AnnotateProjectStage(ProjectStage):
             num_secondary_workers=20,
             job_name=f'{project.name}: annotate project',
             depends_on=dep_jobs or [],
+            pyfiles=[
+                'hail-elasticsearch-pipelines/hail_scripts',
+                'hail-elasticsearch-pipelines/luigi_pipeline/lib',
+            ],
         )
         return expected_path, [j]
 
@@ -437,6 +445,10 @@ class LoadToEsStage(ProjectStage):
             job_name=f'{project.name}: create ES index',
             depends_on=dep_jobs or [],
             scopes=['cloud-platform'],
+            pyfiles=[
+                'hail-elasticsearch-pipelines/hail_scripts',
+                'hail-elasticsearch-pipelines/luigi_pipeline/lib',
+            ],
         )
         
         return None, [j]
