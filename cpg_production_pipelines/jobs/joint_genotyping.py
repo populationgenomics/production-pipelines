@@ -35,6 +35,7 @@ def make_joint_genotyping_jobs(
     depends_on: Optional[List[Job]] = None,
     smdb: Optional[SMDB] = None,
     tool: JointGenotyperTool = JointGenotyperTool.GnarlyGenotyper,
+    do_filter_excesshet: bool = True
 ) -> Job:
     """
     Assumes all samples have a 'file' of 'type'='gvcf' in `samples_df`.
@@ -47,13 +48,8 @@ def make_joint_genotyping_jobs(
 
     logger.info(f'Submitting the joint-calling and VQSR jobs.')
 
-    is_small_callset = len(samples) < 1000
-    # 1. For small callsets, we don't apply the ExcessHet filtering.
-    # 2. For small callsets, we gather the VCF shards and collect QC metrics directly.
-    # For anything larger, we need to keep the VCF sharded and gather metrics
-    # collected from them.
-    is_huge_callset = len(samples) >= 100000
-    # For huge callsets, we allocate more memory for the SNPs Create Model step
+    # For small callsets, we don't apply the ExcessHet filtering anyway
+    do_filter_excesshet = len(samples) >= 1000 and do_filter_excesshet
 
     genomicsdb_path_per_interval = dict()
     for idx in range(resources.NUMBER_OF_GENOMICS_DB_INTERVALS):
@@ -67,6 +63,7 @@ def make_joint_genotyping_jobs(
         sample_names_to_add,
         sample_names_will_be_in_db,
         sample_names_already_added,
+        sample_names_to_remove,
         updating_existing_db,
         sample_map_bucket_path,
     ) = _samples_to_add_to_db(
@@ -87,6 +84,7 @@ def make_joint_genotyping_jobs(
     )
 
     import_gvcfs_job_per_interval = dict()
+    first_j = None
     if sample_names_to_add:
         logger.info(f'Queueing genomics-db-import jobs')
         for idx in range(resources.NUMBER_OF_GENOMICS_DB_INTERVALS):
@@ -95,6 +93,7 @@ def make_joint_genotyping_jobs(
                 genomicsdb_gcs_path=genomicsdb_path_per_interval[idx],
                 sample_names_to_add=sample_names_to_add,
                 sample_names_to_skip=sample_names_already_added,
+                sample_names_to_remove=sample_names_to_remove,
                 sample_names_will_be_in_db=sample_names_will_be_in_db,
                 updating_existing_db=updating_existing_db,
                 sample_map_bucket_path=sample_map_bucket_path,
@@ -103,57 +102,61 @@ def make_joint_genotyping_jobs(
                 number_of_intervals=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
             )
             import_gvcfs_job_per_interval[idx] = import_gvcfs_job
+            if first_j is None:
+                first_j = import_gvcfs_job
 
     scattered_vcf_by_interval: Dict[int, hb.ResourceGroup] = dict()
 
     joint_calling_tmp_bucket = f'{tmp_bucket}/joint_calling/{samples_hash}'
-    pre_vqsr_vcf_path = f'{joint_calling_tmp_bucket}/gathered.vcf.gz'
-    if not utils.can_reuse(pre_vqsr_vcf_path, overwrite):
-        for idx in range(resources.NUMBER_OF_GENOMICS_DB_INTERVALS):
-            joint_called_vcf_path = (
-                f'{joint_calling_tmp_bucket}/by_interval/interval_{idx}.vcf.gz'
+    for idx in range(resources.NUMBER_OF_GENOMICS_DB_INTERVALS):
+        joint_called_vcf_path = (
+            f'{joint_calling_tmp_bucket}/by_interval/interval_{idx}.vcf.gz'
+        )
+        if utils.can_reuse(joint_called_vcf_path, overwrite):
+            j = b.new_job('Joint genotyping [reuse]')
+            scattered_vcf_by_interval[idx] = b.read_input_group(
+                **{
+                    'vcf.gz': joint_called_vcf_path,
+                    'vcf.gz.tbi': joint_called_vcf_path + '.tbi',
+                }
             )
-            if utils.can_reuse(joint_called_vcf_path, overwrite):
-                b.new_job('Joint genotyping [reuse]')
-                scattered_vcf_by_interval[idx] = b.read_input_group(
-                    **{
-                        'vcf.gz': joint_called_vcf_path,
-                        'vcf.gz.tbi': joint_called_vcf_path + '.tbi',
-                    }
-                )
-            else:
-                logger.info(f'Queueing {tool.name} job')
-                genotype_vcf_job = _add_joint_genotyper_job(
-                    b,
-                    genomicsdb_path=genomicsdb_path_per_interval[idx],
-                    overwrite=overwrite,
-                    number_of_samples=len(sample_names_will_be_in_db),
-                    interval_idx=idx,
-                    number_of_intervals=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
-                    interval=intervals[f'interval_{idx}'],
-                    tool=tool,
-                )
-                if import_gvcfs_job_per_interval.get(idx):
-                    genotype_vcf_job.depends_on(import_gvcfs_job_per_interval.get(idx))
+            if first_j is None:
+                first_j = j
+        else:
+            logger.info(f'Queueing {tool.name} job')
+            genotype_vcf_job = _add_joint_genotyper_job(
+                b,
+                genomicsdb_path=genomicsdb_path_per_interval[idx],
+                overwrite=overwrite,
+                number_of_samples=len(sample_names_will_be_in_db),
+                interval_idx=idx,
+                number_of_intervals=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
+                interval=intervals[f'interval_{idx}'],
+                tool=tool,
+            )
+            if first_j is None:
+                first_j = genotype_vcf_job
+            if import_gvcfs_job_per_interval.get(idx):
+                genotype_vcf_job.depends_on(import_gvcfs_job_per_interval.get(idx))
 
-                if not is_small_callset:
-                    logger.info(f'Queueing exccess het filter job')
-                    exccess_filter_job = _add_exccess_het_filter(
-                        b,
-                        input_vcf=genotype_vcf_job.output_vcf,
-                        overwrite=overwrite,
-                        interval=intervals[f'interval_{idx}'],
-                    )
-                    last_job = exccess_filter_job
-                else:
-                    last_job = genotype_vcf_job
-                
-                last_job = _add_make_sites_only_job(
-                    b=b,
-                    input_vcf=last_job.output_vcf,
+            if do_filter_excesshet:
+                logger.info(f'Queueing exccess het filter job')
+                exccess_filter_job = _add_exccess_het_filter(
+                    b,
+                    input_vcf=genotype_vcf_job.output_vcf,
+                    interval=intervals[f'interval_{idx}'],
                     overwrite=overwrite,
                 )
-                scattered_vcf_by_interval[idx] = last_job.output_vcf
+                last_job = exccess_filter_job
+            else:
+                last_job = genotype_vcf_job
+            
+            last_job = _add_make_sites_only_job(
+                b=b,
+                input_vcf=last_job.output_vcf,
+                overwrite=overwrite,
+            )
+            scattered_vcf_by_interval[idx] = last_job.output_vcf
 
     scattered_vcfs = list(scattered_vcf_by_interval.values())
     logger.info(f'Queueing gather-VCF job')
@@ -161,9 +164,11 @@ def make_joint_genotyping_jobs(
         b,
         input_vcfs=scattered_vcfs,
         overwrite=overwrite,
-        output_vcf_path=pre_vqsr_vcf_path,
+        output_vcf_path=out_jc_vcf_path,
         is_allele_specific=True,
     )
+    if first_j is None:
+        first_j = final_gathered_vcf_job
     last_j = final_gathered_vcf_job
 
     if smdb:
@@ -172,7 +177,7 @@ def make_joint_genotyping_jobs(
             analysis_type='joint-calling',
             output_path=out_jc_vcf_path,
             sample_names=sample_ids,
-            first_j=list(import_gvcfs_job_per_interval.values())[0],
+            first_j=first_j,
             last_j=last_j,
             depends_on=depends_on,
         )
@@ -186,7 +191,7 @@ def _samples_to_add_to_db(
     samples,
     tmp_bucket: str,
     gvcf_by_sid: Dict[str, str],
-) -> Tuple[Set[str], Set[str], Set[str], bool, str]:
+) -> Tuple[Set[str], Set[str], Set[str], Set[str], bool, str]:
     if utils.file_exists(join(genomicsdb_gcs_path, 'callset.json')):
         # Checking if samples exists in the DB already
         genomicsdb_metadata = join(local_tmp_dir, f'callset-{interval_idx}.json')
@@ -198,14 +203,14 @@ def _samples_to_add_to_db(
         with open(genomicsdb_metadata) as f:
             db_metadata = json.load(f)
         sample_names_in_db = set(s['sample_name'] for s in db_metadata['callsets'])
-        sample_names_requested = set([s['id'] for s in samples])
+        sample_names_requested = set([s.id for s in samples])
         sample_names_to_add = sample_names_requested - sample_names_in_db
         sample_names_to_remove = sample_names_in_db - sample_names_requested
         if sample_names_to_remove:
             # GenomicsDB doesn't support removing, so creating a new DB
             updating_existing_db = False
             sample_names_already_added = set()
-            sample_names_to_add = {s['id'] for s in samples}
+            sample_names_to_add = {s.id for s in samples}
             sample_names_will_be_in_db = sample_names_to_add
             logger.info(
                 f'GenomicDB {genomicsdb_gcs_path} exists, but '
@@ -243,8 +248,9 @@ def _samples_to_add_to_db(
     else:
         # Initiate new DB
         sample_names_already_added = set()
-        sample_names_to_add = {s['id'] for s in samples}
+        sample_names_to_add = {s.id for s in samples}
         sample_names_will_be_in_db = sample_names_to_add
+        sample_names_to_remove = set()
         updating_existing_db = False
         logger.info(
             f'GenomicDB {genomicsdb_gcs_path} doesn\'t exist, so creating a new one '
@@ -262,6 +268,7 @@ def _samples_to_add_to_db(
         sample_names_to_add,
         sample_names_will_be_in_db,
         sample_names_already_added,
+        sample_names_to_remove,
         updating_existing_db,
         sample_map_bucket_path,
     )
@@ -272,6 +279,7 @@ def _add_import_gvcfs_job(
     genomicsdb_gcs_path: str,
     sample_names_to_add: Set[str],
     sample_names_to_skip: Set[str],
+    sample_names_to_remove: Set[str],
     sample_names_will_be_in_db: Set[str],
     updating_existing_db: bool,
     sample_map_bucket_path: str,
@@ -284,14 +292,29 @@ def _add_import_gvcfs_job(
     Add GVCFs to a genomics database (or create a new instance if it doesn't exist)
     Returns a Job, or None if no new samples to add
     """
+    rm_cmd = ''
+
     if updating_existing_db:
         # Update existing DB
         genomicsdb_param = f'--genomicsdb-update-workspace-path {genomicsdb_gcs_path}'
         job_name = 'Adding to GenomicsDB'
+        msg = f'Adding {len(sample_names_to_add)} samples: {", ".join(sample_names_to_add)}'
+        if sample_names_to_skip:
+            msg += (
+                f'Skipping adding {len(sample_names_to_skip)} samples that are already '
+                f'in the DB: {", ".join(sample_names_to_skip)}"'
+            )
     else:
         # Initiate new DB
         genomicsdb_param = f'--genomicsdb-workspace-path {genomicsdb_gcs_path}'
         job_name = 'Creating GenomicsDB'
+        if sample_names_to_remove:
+            # Need to remove the existing database
+            rm_cmd = f'gsutil -q rm -rf {genomicsdb_gcs_path}'
+        msg = (
+            f'Creating a new DB with {len(sample_names_to_add)} samples: '
+            f'{", ".join(sample_names_to_add)}'
+        )
 
     sample_map = b.read_input(sample_map_bucket_path)
 
@@ -307,8 +330,7 @@ def _add_import_gvcfs_job(
     if depends_on:
         j.depends_on(*depends_on)
 
-    j.declare_resource_group(output={'tar': '{root}.tar'})
-    j.command(wrap_command(f"""/
+    j.command(wrap_command(f"""\
     # We've seen some GenomicsDB performance regressions related to intervals, 
     # so we're going to pretend we only have a single interval
     # using the --merge-input-intervals arg. There's no data in between since 
@@ -325,12 +347,9 @@ def _add_import_gvcfs_job(
     # within the task; please do not change it without consulting
     # the Hellbender (GATK engine) team!
 
-    echo "Adding {len(sample_names_to_add)} samples: {', '.join(sample_names_to_add)}"
-    {f'echo "Skipping adding {len(sample_names_to_skip)} samples that are already in the DB: '
-     f'{", ".join(sample_names_to_skip)}"' if sample_names_to_skip else ''}
+    echo "{msg}"
 
-    export GOOGLE_APPLICATION_CREDENTIALS=/gsa-key/key.json
-    gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+    {rm_cmd}
 
     gatk --java-options -Xms{java_mem}g \\
       GenomicsDBImport \\
@@ -342,7 +361,7 @@ def _add_import_gvcfs_job(
       --merge-input-intervals \\
       --consolidate
 
-    """, monitor_space=True))
+    """, monitor_space=True, setup_gcp=True))
     return j, sample_names_will_be_in_db
 
 
@@ -429,6 +448,7 @@ def _add_exccess_het_filter(
     b: hb.Batch,
     input_vcf: hb.ResourceGroup,
     overwrite: bool,
+    disk_size: int = 32,
     excess_het_threshold: float = 54.69,
     interval: Optional[hb.ResourceGroup] = None,
     output_vcf_path: Optional[str] = None,
@@ -456,7 +476,7 @@ def _add_exccess_het_filter(
 
     j.image(resources.GATK_IMAGE)
     j.memory('8G')
-    j.storage(f'32G')
+    j.storage(f'{disk_size}G')
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
@@ -485,6 +505,7 @@ def _add_make_sites_only_job(
     b: hb.Batch,
     input_vcf: hb.ResourceGroup,
     overwrite: bool,
+    disk_size: int = 32,
     output_vcf_path: Optional[str] = None,
 ) -> Job:
     """
@@ -501,7 +522,7 @@ def _add_make_sites_only_job(
 
     j.image(resources.GATK_IMAGE)
     j.memory('8G')
-    j.storage(f'32G')
+    j.storage(f'{disk_size}G')
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
@@ -535,7 +556,6 @@ def _add_final_gather_vcf_job(
         j.name += ' [reuse]'
         return j
 
-    j = b.new_job(job_name)
     j.image(resources.GATK_IMAGE)
     j.cpu(2)
     java_mem = 7

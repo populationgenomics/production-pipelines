@@ -29,7 +29,9 @@ logger.setLevel(logging.INFO)
 DEFAULT_REF = 'GRCh38'
 
 DATAPROC_PACKAGES = [
+    'seqr-loader',
     'cpg_production_pipelines',
+    'elasticsearch',
     'click',
     'cpg-gnomad',
     'google',

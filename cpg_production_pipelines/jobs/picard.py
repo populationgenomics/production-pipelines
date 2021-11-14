@@ -25,9 +25,10 @@ def markdup(
         return j
 
     j.image(resources.SAMTOOLS_PICARD_IMAGE)
-    j.cpu(2)
-    j.memory('highmem')  # ~6.5G per core, total 13G
-    j.storage('400G')  # Allow 200G for input and 200G for output
+    ncpu = 4
+    nthreads = ncpu * 2
+    j.cpu(ncpu)  # ~3.75G per core, total 15G
+    j.storage('200G')  # Allow 100G for input and 100G for output
     j.declare_resource_group(
         output_cram={
             'cram': '{root}.cram',
@@ -37,13 +38,13 @@ def markdup(
     fasta_reference = b.read_input_group(**resources.REF_D)
 
     cmd = f"""
-    picard MarkDuplicates -Xms12G \\
+    picard MarkDuplicates -Xms13G \\
     I={sorted_bam} O=/dev/stdout M={j.duplicate_metrics} \\
     TMP_DIR=$(dirname {j.output_cram.cram})/picard-tmp \\
     ASSUME_SORT_ORDER=coordinate \\
-    | samtools view -@2 -T {fasta_reference.base} -O cram -o {j.output_cram.cram}
+    | samtools view -@{nthreads - 1} -T {fasta_reference.base} -O cram -o {j.output_cram.cram}
     
-    samtools index -@2 {j.output_cram.cram} {j.output_cram['cram.crai']}
+    samtools index -@{nthreads - 1} {j.output_cram.cram} {j.output_cram['cram.crai']}
     """
     j.command(wrap_command(cmd, monitor_space=True))
     if output_path:

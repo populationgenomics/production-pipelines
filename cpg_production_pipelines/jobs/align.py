@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent, indent
 from typing import Optional, List, Tuple, Dict
@@ -71,10 +70,8 @@ def align(
     smdb: Optional[SMDB] = None,
     overwrite: bool = True,
     check_existence: bool = True,
-    ncpu: Optional[int] = None,
-    highmem: bool = False,
-    storage_gb: Optional[int] = None,
     prev_batch_jobs: Optional[Dict[str, PrevJob]] = None,
+    fraction_of_64thread_instance: Optional[int] = None,
 ) -> Job:
     """
     - if the input is 1 fastq pair, submits one alignment job
@@ -89,6 +86,9 @@ def align(
     - if the markdup tool:
       - is biobambam2, stream the alignment or merging within the same job
       - is picard, submit a separate job with deduplication
+      
+    - fraction_of_64thread_instance can be set for smaller test runs on toy instance,
+      so the job doesn't acquire a whole 32-cpu/64-threaded instance
     """
     if check_existence and utils.can_reuse(output_path, overwrite):
         job_name = aligner.name
@@ -97,8 +97,15 @@ def align(
         job_name += ' [reuse]'
         return b.new_job(job_name, dict(sample=sample_name, project=project_name))
 
-    if ncpu is None:
-        ncpu = 32
+    ncpu = 16
+    storage_gb = 375
+    # When requesting a 16- or 32-cpu job, the job will occupy entire instance
+    # with a fixed 375GB SSD. When we want a n'th fraction of cpus, Batch will squeeze
+    # N jobs like that on an instance, thus the storage will be split N-way accordingly
+    if fraction_of_64thread_instance:
+        ncpu = fraction_of_64thread_instance // ncpu
+        storage_gb = storage_gb // ncpu
+
     nthreads = ncpu * 2  # hyperthreading
     if alignment_input.fqs1 and len(alignment_input.fqs1) > 1:
         # running alignment in parallel, then merging
@@ -136,10 +143,7 @@ def align(
                 project=project_name,
                 aligner=aligner,
             )
-            if highmem:
-                j.memory('highmem')
-            if storage_gb:
-                j.storage(f'{storage_gb}G')
+            j.storage(f'{storage_gb}G')
             cmd = cmd.strip()
             cmd += ' ' + sort_cmd(nthreads) + f' -o {j.sorted_bam}'
             j.command(wrap_command(cmd, monitor_space=True))
@@ -149,11 +153,10 @@ def align(
         merge_j = b.new_job('Merge BAMs', dict(sample=sample_name, project=project_name))
         merge_j.cpu(ncpu)
         merge_j.image(resources.BWA_IMAGE)
-        # 300G for input BAMs, 300G for output BAM
-        merge_j.storage('600G')
+        merge_j.storage(f'{storage_gb}G')
 
         align_cmd = f"""\
-        samtools merge -@{nthreads-1} - {' '.join(sorted_bams)}
+        samtools merge -@{nthreads - 1} - {' '.join(sorted_bams)}
         """.strip()
         output_fmt = 'bam'
         align_j = merge_j
@@ -172,10 +175,7 @@ def align(
             project=project_name,
             aligner=aligner,
         )
-        if highmem:
-            align_j.memory('highmem')
-        if storage_gb:
-            align_j.storage(f'{storage_gb}G')
+        align_j.storage(f'{storage_gb}G')
 
         first_j = align_j
         stdout_is_sorted = False
@@ -259,7 +259,7 @@ def _align_one(
         j.image(resources.DRAGMAP_IMAGE)
         # Allow for 400G of extacted FQ, 150G of output CRAMs,
         # plus some tmp storage for sorting
-        j.storage(f'700G')
+        j.storage(f'300G')
         prep_inp_cmd = ''
         if alignment_input.bam_or_cram_path:
             extract_j = extract_fastq(
@@ -272,7 +272,7 @@ def _align_one(
 
         else:
             files1, files2 = alignment_input.get_fq_inputs(b)
-            # Allow for 300G input FQ, 150G output CRAM, plus some tmp storage
+            # Allow for 100G input FQ, 50G output CRAM, plus some tmp storage
             if len(alignment_input.fqs1) == 1:
                 input_param = f'-1 {files1[0]} -2 {files2[0]}'
             else:
@@ -301,25 +301,19 @@ def _align_one(
 
 def _build_bwa_command(
     b,
-    j,
-    alignment_input,
-    bwa_reference,
-    nthreads,
-    sample_name,
-    tool,
+    j: Job,
+    alignment_input: AlignmentInput,
+    bwa_reference: hb.ResourceGroup,
+    nthreads: int,
+    sample_name: str,
+    tool: Aligner,
 ) -> str:
     pull_inputs_cmd = ''
     if alignment_input.bam_or_cram_path:
         use_bazam = True
         assert alignment_input.index_path
         assert not alignment_input.fqs1 and not alignment_input.fqs2
-
-        if alignment_input.bam_or_cram_path.endswith('.cram'):
-            storage = '400G'  # 150G input CRAM, 150G output CRAM, plus some tmp storage
-        else:
-            storage = '600G'  # input BAM is 1.5-2 times larger
-
-        j.storage(storage)
+        
         if alignment_input.bam_or_cram_path.startswith('gs://'):
             cram = b.read_input_group(
                 base=alignment_input.bam_or_cram_path, index=alignment_input.index_path
@@ -347,8 +341,6 @@ def _build_bwa_command(
         assert alignment_input.fqs1 and alignment_input.fqs2, alignment_input
         assert len(alignment_input.fqs1) == len(alignment_input.fqs1), alignment_input
         use_bazam = False
-        # Allow for 300G input FQ, 150G output CRAM, plus some tmp storage
-        j.storage('600G')
         files1, files2 = alignment_input.get_fq_inputs(b)
         if len(files1) > 1:
             r1_param = f'<(cat {" ".join(files1)})'
@@ -368,8 +360,7 @@ def _build_bwa_command(
     {pull_inputs_cmd}
     {tool} mem -K 100000000 {'-p' if use_bazam else ''} -t{nthreads} -Y \\
     -R '{rg_line}' {bwa_reference.base} {r1_param} {r2_param}
-    """
-    ).strip()
+    """).strip()
 
 
 def extract_fastq(
@@ -447,7 +438,7 @@ def create_dragmap_index(b: hb.Batch) -> Job:
 
 def sort_cmd(nthreads):
     return dedent(f"""\
-    | samtools sort -@{nthreads-1} -T /io/batch/samtools-sort-tmp -Obam
+    | samtools sort -@{nthreads - 1} -T /io/batch/samtools-sort-tmp -Obam
     """).strip()
 
 
@@ -480,8 +471,8 @@ def finalise_alignment(
         | bamsormadup inputformat={align_cmd_out_fmt} threads={nthreads} SO=coordinate \\
         M={j.duplicate_metrics} outputformat=sam \\
         tmpfile=$(dirname {j.output_cram.cram})/bamsormadup-tmp \\
-        | samtools view -@{nthreads-1} -T {reference.base} -Ocram -o {j.output_cram.cram}       
-        samtools index -@{nthreads-1} {j.output_cram.cram} {j.output_cram["cram.crai"]}
+        | samtools view -@{nthreads - 1} -T {reference.base} -Ocram -o {j.output_cram.cram}       
+        samtools index -@{nthreads - 1} {j.output_cram.cram} {j.output_cram["cram.crai"]}
         """.strip()
         md_j = j
     else:

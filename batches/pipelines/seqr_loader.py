@@ -40,7 +40,7 @@ class CramStage(SampleStage):
 
     def get_expected_output(self, sample: Sample):
         return f'{sample.project.get_bucket()}/cram/{sample.id}.cram'
-    
+
     @staticmethod
     def get_fingerprint_output(output_path):
         return output_path.replace('.cram', '.somalier')

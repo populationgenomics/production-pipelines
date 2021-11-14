@@ -4,17 +4,16 @@ Create jobs to create and apply a VQSR model
 
 import os
 from os.path import join
-from typing import List, Optional, Dict, Union
+from typing import List, Optional
 import logging
 import hailtop.batch as hb
-from analysis_runner import dataproc
 from hailtop.batch.job import Job
+from analysis_runner import dataproc
 
 from cpg_production_pipelines import resources, utils
 from cpg_production_pipelines.jobs import wrap_command
 from cpg_production_pipelines.jobs import split_intervals
 from cpg_production_pipelines.resources import BROAD_REF_BUCKET
-from cpg_production_pipelines.smdb import SMDB
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -183,27 +182,10 @@ def make_vqsr_jobs(
     # For huge callsets, we allocate more memory for the SNPs Create Model step
     
     # To fit only a site-only VCF
-    if is_small_callset:
-        small_disk = 50
-    elif not is_huge_callset:
-        small_disk = 100
-    else:
-        small_disk = 200
-
+    small_disk = 50 if is_small_callset else (100 if not is_huge_callset else 200)
     # To fit a joint-called VCF
-    if is_small_callset:
-        medium_disk = 100
-    elif not is_huge_callset:
-        medium_disk = 200
-    else:
-        medium_disk = 500
-
-    if is_small_callset:
-        huge_disk = 200
-    elif not is_huge_callset:
-        huge_disk = 500
-    else:
-        huge_disk = 2000
+    medium_disk = 100 if is_small_callset else (200 if not is_huge_callset else 500)
+    huge_disk = 200 if is_small_callset else (500 if not is_huge_callset else 2000)
         
     intervals = split_intervals.get_intervals(
         b=b,
@@ -213,7 +195,7 @@ def make_vqsr_jobs(
     if input_vcf_or_mt_path.endswith('.mt'):
         assert meta_ht_path
         assert hard_filter_ht_path
-        job_name = 'AS-VQSR: MT to site-only VCF'
+        job_name = 'VQSR: MT to site-only VCF'
         combined_vcf_path = join(work_bucket, 'input.vcf.gz')
         if not utils.can_reuse(combined_vcf_path, overwrite):
             mt_to_vcf_job = dataproc.hail_dataproc_job(
@@ -252,9 +234,9 @@ def make_vqsr_jobs(
             disk=medium_disk,
         )
         first_job = site_only_j
-        if depends_on:
-            first_job.depends_on(*depends_on)
         gathered_vcf = site_only_j.output_vcf
+    if depends_on:
+        first_job.depends_on(*depends_on)
 
     indels_variant_recalibrator_job = add_indels_variant_recalibrator_job(
         b,
@@ -387,7 +369,7 @@ def _add_make_sites_only_job(
 
     Returns: a Job object with a single output j.sites_only_vcf of type ResourceGroup
     """
-    job_name = 'AS-VQSR: MakeSitesOnlyVcf'
+    job_name = 'VQSR: MakeSitesOnlyVcf'
     if utils.can_reuse(output_vcf_path, overwrite):
         return b.new_job(job_name + ' [reuse]')
 
@@ -421,7 +403,7 @@ def add_tabix_step(
     Regzip and tabix the combined VCF (for some reason the one output with mt2vcf
     is not block-gzipped)
     """
-    j = b.new_job('AS-VQSR: Tabix')
+    j = b.new_job('VQSR: Tabix')
     j.image(resources.BCFTOOLS_IMAGE)
     j.memory(f'8G')
     j.storage(f'{disk_size}G')
@@ -449,7 +431,7 @@ def add_split_intervals_step(
     Returns: a Job object with a single output j.intervals of type ResourceGroup
     """
     j = b.new_job('VQSR: SplitIntervals')
-    j.image(utils.GATK_IMAGE)
+    j.image(resources.GATK_IMAGE)
     mem_gb = 8
     j.memory(f'{mem_gb}G')
     j.storage(f'{disk_size}G')
@@ -460,20 +442,17 @@ def add_split_intervals_step(
         }
     )
 
-    j.command(
-        f"""set -e
-
+    j.command(wrap_command(f"""\
     # Modes other than INTERVAL_SUBDIVISION will produce an unpredictable number
     # of intervals. But we have to produce exactly {scatter_count} number of
     # output files because our workflow is not dynamic.
     gatk --java-options -Xms{mem_gb - 1}g SplitIntervals \\
-      -L {interval_list} \\
-      -O {j.intervals} \\
-      -scatter {scatter_count} \\
-      -R {ref_fasta.base} \\
-      -mode INTERVAL_SUBDIVISION
-      """
-    )
+    -L {interval_list} \\
+    -O {j.intervals} \\
+    -scatter {scatter_count} \\
+    -R {ref_fasta.base} \\
+    -mode INTERVAL_SUBDIVISION
+    """))
     return j
 
 
@@ -488,7 +467,7 @@ def add_sites_only_gather_vcf_step(
     Returns: a Job object with a single output j.output_vcf of type ResourceGroup
     """
     j = b.new_job('VQSR: SitesOnlyGatherVcf')
-    j.image(utils.GATK_IMAGE)
+    j.image(resources.GATK_IMAGE)
     j.memory('8G')
     j.storage(f'{disk_size}G')
 
@@ -497,22 +476,19 @@ def add_sites_only_gather_vcf_step(
     )
 
     input_cmdl = ' '.join([f'--input {v["vcf.gz"]}' for v in input_vcfs])
-    j.command(
-        f"""set -euo pipefail
-
+    j.command(wrap_command(f"""\
     # --ignore-safety-checks makes a big performance difference so we include it in
     # our invocation. This argument disables expensive checks that the file headers
     # contain the same set of genotyped samples and that files are in order by position
     # of first record.
-    gatk --java-options -Xms6g \\
-      GatherVcfsCloud \\
-      --ignore-safety-checks \\
-      --gather-type BLOCK \\
-      {input_cmdl} \\
-      --output {j.output_vcf['vcf.gz']}
+    gatk --java-options -Xms6g GatherVcfsCloud \\
+    --ignore-safety-checks \\
+    --gather-type BLOCK \\
+    {input_cmdl} \\
+    --output {j.output_vcf['vcf.gz']}
 
-    tabix {j.output_vcf['vcf.gz']}"""
-    )
+    tabix {j.output_vcf['vcf.gz']}
+    """))
     return j
 
 
@@ -540,7 +516,7 @@ def add_indels_variant_recalibrator_job(
     and j.indel_rscript_file. The latter is usedful to produce the optional tranche plot.
     """
     j = b.new_job('VQSR: IndelsVariantRecalibrator')
-    j.image(utils.GATK_IMAGE)
+    j.image(resources.GATK_IMAGE)
     j.memory('highmem')
     ncpu = 4  # ~ 8G/core ~ 32G
     j.cpu(ncpu)
@@ -629,7 +605,7 @@ def add_snps_variant_recalibrator_create_model_step(
     The latter is useful to produce the optional tranche plot.
     """
     j = b.new_job('VQSR: SNPsVariantRecalibratorCreateModel')
-    j.image(utils.GATK_IMAGE)
+    j.image(resources.GATK_IMAGE)
     j.memory('highmem')
     if is_small_callset:
         ncpu = 8  # ~ 8G/core ~ 64G
@@ -732,7 +708,7 @@ def add_snps_variant_recalibrator_scattered_step(
     """
     j = b.new_job('VQSR: SNPsVariantRecalibratorScattered')
 
-    j.image(utils.GATK_IMAGE)
+    j.image(resources.GATK_IMAGE)
     mem_gb = 64  # ~ twice the sum of all input resources and input VCF sizes
     j.memory(f'{mem_gb}G')
     j.cpu(2)
@@ -795,7 +771,7 @@ def add_snps_variant_recalibrator_step(
     """
     j = b.new_job('VQSR: SNPsVariantRecalibrator')
 
-    j.image(utils.GATK_IMAGE)
+    j.image(resources.GATK_IMAGE)
     j.memory('highmem')
     ncpu = 8  # ~ 8G/core ~ 64G
     j.cpu(ncpu)
@@ -878,7 +854,7 @@ def add_snps_gather_tranches_step(
     Returns: a Job object with one output j.out_tranches
     """
     j = b.new_job('VQSR: SNPGatherTranches')
-    j.image(utils.GATK_IMAGE)
+    j.image(resources.GATK_IMAGE)
     j.memory('8G')
     j.cpu(2)
     j.storage(f'{disk_size}G')
@@ -1011,7 +987,7 @@ def add_collect_metrics_sharded_step(
     j.metrics.detail_metrics and j.metrics.summary_metrics ResourceFiles
     """
     j = b.new_job('VQSR: CollectMetricsSharded')
-    j.image(utils.GATK_IMAGE)
+    j.image(resources.GATK_IMAGE)
     j.memory('8G')
     j.cpu(2)
     j.storage(f'{disk_size}G')
@@ -1048,7 +1024,7 @@ def _add_final_gather_vcf_step(
     Saves the output VCF to a bucket `output_vcf_path`
     """
     j = b.new_job('VQSR: FinalGatherVcf')
-    j.image(utils.GATK_IMAGE)
+    j.image(resources.GATK_IMAGE)
     j.memory(f'8G')
     j.storage(f'{disk_size}G')
     j.declare_resource_group(
@@ -1086,7 +1062,7 @@ def _add_final_filter_job(
     Hard-filters the VQSR'ed VCF
     """
     j = b.new_job('VQSR: final filter')
-    j.image(utils.BCFTOOLS_IMAGE)
+    j.image(resources.BCFTOOLS_IMAGE)
     j.memory(f'8G')
     j.storage(f'100G')
     j.declare_resource_group(
@@ -1121,7 +1097,7 @@ def _add_variant_eval_step(
     Saves the QC to `output_path` bucket
     """
     j = b.new_job('VQSR: VariantEval')
-    j.image(utils.GATK_IMAGE)
+    j.image(resources.GATK_IMAGE)
     j.memory(f'8G')
     j.storage(f'{disk_size}G')
 
@@ -1156,7 +1132,7 @@ def add_gather_variant_calling_metrics_step(
     Saves the QC results to a bucket with the `output_path_prefix` prefix
     """
     j = b.new_job('VQSR: GatherVariantCallingMetrics')
-    j.image(utils.GATK_IMAGE)
+    j.image(resources.GATK_IMAGE)
     j.memory(f'8G')
     j.storage(f'{disk_size}G')
     j.declare_resource_group(

@@ -6,15 +6,14 @@ import setuptools
 
 
 setuptools.setup(
-    name='cpg_production_pipelines',
+    name='cpg-pipes',
     version='0.2.0',
     description=(
-        'Production pipelines for joint calling, sample and variant QC '
-        'for WGS germline data, and loading to seqr'
+        'Hail Batch pipelines for population genomics and rare deseases projects'  
     ),
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    url='https://github.com/populationgenomics/production_pipelines',
+    url='https://github.com/populationgenomics/production-pipelines',
     license='MIT',
     packages=['cpg_production_pipelines'],
     package_data={'cpg_production_pipelines': ['filter_cutoffs.yaml']},

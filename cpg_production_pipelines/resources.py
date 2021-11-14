@@ -9,7 +9,7 @@ from os.path import join
 DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver'
 
 AR_REPO = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
-GATK_VERSION = '4.2.1.0'
+GATK_VERSION = '4.2.2.0-cpgfix00'  # Our fork with a couple of fixes:
 GATK_IMAGE = f'{AR_REPO}/gatk:{GATK_VERSION}'
 # GnarlyGenotyper is in Beta and crashes with NullPointerException when using the
 # official GATK docker, that's why we're using a separate image for it:

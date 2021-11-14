@@ -80,6 +80,10 @@ class PipelineStage(ABC):
         requires_stages: list of stage names
         """
         self.pipe = pipe
+        self.active = False  
+        # self.active=True means taht the stage wasn't skipped and jobs were added
+        # into the pipeline, and we shoule expect target.ouptut_by_stage 
+        # to be populated. Otherwise, self.get_expected_output() should work.
         self.analysis_type = analysis_type
         self.requires_stages = requires_stages or []
 
@@ -114,69 +118,69 @@ class PipelineStage(ABC):
     
     def get_deps(
         self, 
-        dep,  # class inherited from PipelineStage
+        dep: 'PipelineStage',  # class inherited from PipelineStage
         target: Union['Sample', 'Project', 'Pipeline'],
     ) -> Tuple[Union[Dict[str, str], str], List[Job]]:
         """
-        Sort of a multiple dispatch. Collecting dependencies paths into a dictionary
-        when the dependency stage is on a more fine-grained level than the current stage
-        (e.g. collecting outputs of a sample-level stage for a project-level stage)
+        Sort of a multiple dispatch. 
+        
+        Collecting dependencies paths. Will return a path when the dependency is the
+        same or a higher-level stage (e.g. Project-level to a Sample-level), or will
+        return a dictionary when the dependency is of a more fine-grained level:
+        (e.g. outputs of a Sample-level stage for a Project-level stage)
         """
         if (
-            issubclass(self.__class__, SampleStage) and issubclass(dep, SampleStage) or
-            issubclass(self.__class__, ProjectStage) and issubclass(dep, ProjectStage) or
-            issubclass(self.__class__, CohortStage) and issubclass(dep, CohortStage)
+            issubclass(self.__class__, SampleStage) and issubclass(dep.__class__, SampleStage) or
+            issubclass(self.__class__, ProjectStage) and issubclass(dep.__class__, ProjectStage) or
+            issubclass(self.__class__, CohortStage) and issubclass(dep.__class__, CohortStage)
         ):
             return(
-                target.output_by_stage.get(dep.get_name()),
+                dep.find_output(target),
                 target.jobs_by_stage.get(dep.get_name(), [])
             )
 
-        elif issubclass(self.__class__, ProjectStage) and issubclass(dep, SampleStage):
+        elif issubclass(self.__class__, ProjectStage) and issubclass(dep.__class__, SampleStage):
             dep_path_by_id = dict()
             dep_jobs = []
             project: Project = target
             for s in project.samples:
-                dep_path = s.output_by_stage.get(dep.get_name())
-                dep_path_by_id[s.id] = dep_path
+                dep_path_by_id[s.id] = dep.find_output(s)
                 dep_jobs.extend(s.jobs_by_stage.get(dep.get_name(), []))
             return dep_path_by_id, dep_jobs
 
-        elif issubclass(self.__class__, CohortStage) and issubclass(dep, SampleStage):
+        elif issubclass(self.__class__, CohortStage) and issubclass(dep.__class__, SampleStage):
             dep_path_by_id = dict()
             dep_jobs = []
             pipe: 'Pipeline' = target
             for p in pipe.projects:
                 for s in p.samples:
-                    dep_path = s.output_by_stage.get(dep.get_name())
-                    dep_path_by_id[s.id] = dep_path
+                    dep_path_by_id[s.id] = dep.find_output(s)
                     dep_jobs.extend(s.jobs_by_stage.get(dep.get_name(), []))
             return dep_path_by_id, dep_jobs
 
-        elif issubclass(self.__class__, CohortStage) and issubclass(dep, ProjectStage):
+        elif issubclass(self.__class__, CohortStage) and issubclass(dep.__class__, ProjectStage):
             dep_path_by_id = dict()
             dep_jobs = []
             pipe: 'Pipeline' = target
             for p in pipe.projects:
-                dep_path = p.output_by_stage.get(dep.get_name())
-                dep_path_by_id[p.name] = dep_path
+                dep_path_by_id[p.name] = dep.find_output(p)
                 dep_jobs.extend(p.jobs_by_stage.get(dep.get_name(), []))
             return dep_path_by_id, dep_jobs
 
-        elif issubclass(self.__class__, SampleStage) and issubclass(dep, ProjectStage):
+        elif issubclass(self.__class__, SampleStage) and issubclass(dep.__class__, ProjectStage):
             sample: Sample = target
             return (
-                sample.project.output_by_stage.get(dep.get_name()),
+                dep.find_output(sample.project),
                 sample.project.jobs_by_stage.get(dep.get_name(), [])
             )
 
-        elif issubclass(dep, CohortStage):
+        elif issubclass(dep.__class__, CohortStage):
             return (
-                self.pipe.output_by_stage.get(dep.get_name()),
+                dep.find_output(self.pipe),
                 self.pipe.jobs_by_stage.get(dep.get_name(), [])
             )
         else:
-            logger.critical(f'Unknown stage types: {type(self), dep}')
+            logger.critical(f'Unknown stage types: {type(self), type(dep)}')
             sys.exit(1)
 
     def _add_jobs(
@@ -185,7 +189,10 @@ class PipelineStage(ABC):
     ):
         dep_paths_by_stage = dict()
         all_dep_jobs = []
-        for dep in self.requires_stages:
+        for depcls in self.requires_stages:
+            if depcls.get_name() not in self.pipe.stage_by_name:
+                logger.critical(f'Stage {depcls.get_name()} is not found')
+            dep = self.pipe.stage_by_name.get(depcls.get_name())
             dep_paths, dep_jobs = self.get_deps(dep, target)
             all_dep_jobs.extend(dep_jobs)
             target_name = self.target_name(target)
@@ -252,6 +259,55 @@ class PipelineStage(ABC):
             self._reuse_jobs(target, expected_path)
         else:
             self._add_jobs(target)
+    
+    def find_output(
+        self,
+        target: Union['Sample', 'Project', 'Pipeline'],
+    ) -> Optional[str]:
+        """
+        Called by the stage that depends on this one. This stage can be either active 
+        (jobs were added), or skipped (in this case we can only return expected output)
+        """
+        if self.active:
+            return target.output_by_stage.get(self.get_name())
+        else:
+            return self.get_expected_output(target)
+
+    # def find_output(
+    #     self,
+    #     target: Union['Sample', 'Project', 'Pipeline'],
+    #     expected_path: str,
+    #     only_check_smdb: bool = False,
+    #     only_check_bucket: bool = False,
+    #     validate_smdb: bool = False,
+    # ) -> Optional[str]:
+    #     if not only_check_bucket:
+    #         analysis = target.analysis_by_type.get(self.analysis_type)
+    #         if only_check_smdb and analysis is None:
+    #             return None
+    # 
+    #     if self.pipe.validate_smdb_analyses:
+    #         if isinstance(target, Sample):
+    #             sample: Sample = target
+    #             sample_ids = [sample.id]
+    #         elif isinstance(target, Project):
+    #             project: Project = target
+    #             sample_ids = [s.id for s in project.samples]
+    #         else:
+    #             pipe: Pipeline = target
+    #             sample_ids = pipe.get_all_sample_ids()
+    # 
+    #         found_path = self.pipe.db.process_existing_analysis(
+    #             sample_ids=sample_ids,
+    #             completed_analysis=analysis,
+    #             analysis_type=self.analysis_type,
+    #             expected_output_fpath=expected_path,
+    #         )
+    #     else:
+    #         found_path = analysis.output
+    # 
+    #     target.output_by_stage[self.get_name()] = found_path
+    #     return found_path
 
     def _check_smdb_analysis(
         self, 
@@ -642,7 +698,7 @@ class Pipeline:
         self.output_by_stage: Dict[str, str] = dict()
         self.jobs_by_stage: Dict[str, Job] = dict()
 
-        self.stages = List[PipelineStage]
+        self.stage_by_name = Dict
 
         self.projects: List[Project] = []
         if input_projects:
@@ -708,7 +764,7 @@ class Pipeline:
 
         jc_analysis = self.db.find_joint_calling_analysis(
             sample_ids=all_sample_ids,
-        ),
+        )
 
         for project in self.projects:
             sample_ids = [s.id for s in project.samples]
@@ -787,6 +843,10 @@ class Pipeline:
             self._populate_pedigree(ped_files)
 
     def add_stages(self, stages: List[PipelineStage]):
+        self.stage_by_name = {
+            stage.get_name(): stage for stage in stages
+        }
+
         stage_names = [s.get_name() for s in stages]
         lower_stage_names = [s.lower() for s in stage_names]
         first_stage_num = None
@@ -805,13 +865,14 @@ class Pipeline:
                     f'not found in available stages: {", ".join(stage_names)}'
                 )
             last_stage_num = lower_stage_names.index(self.last_stage.lower())
-
+        
         for i, stage in enumerate(stages):
             if first_stage_num is not None and i < first_stage_num:
                 logger.info(f'Skipping stage {stage.get_name()}')
                 continue
             logger.info(f'*' * 60)
             logger.info(f'Stage {stage.get_name()}')
+            stage.active = True
             stage.add_to_the_pipeline(self)
             logger.info(f'')
             if last_stage_num and i >= last_stage_num:
