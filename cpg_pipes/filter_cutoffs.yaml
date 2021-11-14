@@ -1,0 +1,22 @@
+hardfiltering:
+  min_coverage: 18
+  max_n_snps: 8000000
+  min_n_snps: 2400000
+  max_n_singletons: 800000
+  max_r_duplication: 0.3
+  max_r_het_hom: 3.3
+  max_r_contamination: 0.04
+  max_r_chimera: 0.05
+  min_median_insert_size: 250
+pca:
+  # maximum kin threshold to be considered unrelated
+  max_kin: 0.2
+  # minimum Random Forest probability for population assignment
+  min_pop_prob: 0.5
+vqsr:
+  min_excess_het: 54.69
+  # VQSR, when applying model, targets indel_filter_level and snp_filter_level
+  # sensitivities. The tool matches them internally to a VQSLOD score cutoff 
+  # based on the model's estimated sensitivity to a set of true variants.
+  snp_filter_level: 99.7
+  indel_filter_level: 99.0

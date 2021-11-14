@@ -1,4 +1,4 @@
-from cpg_production_pipelines.hailbatch import AlignmentInput
+from cpg_pipes.hailbatch import AlignmentInput
 
 
 BENCHMARK_BUCKET = 'gs://cpg-fewgenomes-test/benchmark'

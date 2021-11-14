@@ -7,9 +7,9 @@ import logging
 from hailtop.batch.job import Job
 import pandas as pd
 
-from cpg_production_pipelines import utils, resources
-from cpg_production_pipelines.jobs import wrap_command
-from cpg_production_pipelines.pipeline import Project, Sample
+from cpg_pipes import utils, resources
+from cpg_pipes.jobs import wrap_command
+from cpg_pipes.pipeline import Project, Sample
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -131,16 +131,10 @@ def add_pedigree_jobs(
     )
     check_j.image(resources.PEDDY_IMAGE)
     check_j.cpu(1)
-    check_j.memory('standard')  # ~ 4G/core ~ 4G
+    check_j.memory('standard')  # ~ 3.75G/core ~ 3.75G
 
     script_name = 'check_pedigree.py'
-    try:
-        script_path = (
-            subprocess.check_output(f'which {script_name}', shell=True).decode().strip()
-        )
-    except subprocess.CalledProcessError:
-        script_path = join(utils.QUERY_SCRIPTS_DIR, script_name)
-
+    script_path = join(utils.SCRIPTS_DIR, script_name)
     with open(script_path) as f:
         script = f.read()
     # We do not wrap the command nicely to avoid breaking python indents of {script}

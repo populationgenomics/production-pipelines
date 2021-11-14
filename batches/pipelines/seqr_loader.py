@@ -17,13 +17,13 @@ import hail as hl
 from analysis_runner import dataproc
 from hailtop.batch.job import Job
 
-from cpg_production_pipelines import utils, resources
-from cpg_production_pipelines.jobs import align, split_intervals, haplotype_caller, \
+from cpg_pipes import utils, resources
+from cpg_pipes.jobs import align, split_intervals, haplotype_caller, \
     pedigree
-from cpg_production_pipelines.jobs.joint_genotyping import make_joint_genotyping_jobs, \
+from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
-from cpg_production_pipelines.jobs.vqsr import make_vqsr_jobs
-from cpg_production_pipelines.pipeline import Namespace, Pipeline, Sample, \
+from cpg_pipes.jobs.vqsr import make_vqsr_jobs
+from cpg_pipes.pipeline import Namespace, Pipeline, Sample, \
     SampleStage, Project, CohortStage, AnalysisType, ProjectStage
 
 logger = logging.getLogger(__file__)
@@ -349,8 +349,8 @@ class AnnotateCohortStage(CohortStage):
             f'--site-only-vqsr-vcf-path {vqsr_vcf_path} '
             f'--dest-mt-path {expected_path} '
             f'--bucket {checkpoints_bucket} '
-            '--disable-validation '
-            '--make-checkpoints '
+            f'--disable-validation '
+            f'--make-checkpoints '
             + ('--overwrite ' if not self.pipe.check_intermediate_existence else ''),
             max_age='16h',
             packages=utils.DATAPROC_PACKAGES,

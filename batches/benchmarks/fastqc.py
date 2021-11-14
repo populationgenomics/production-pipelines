@@ -2,9 +2,9 @@
 import click
 import logging
 
-from cpg_production_pipelines import benchmark
-from cpg_production_pipelines.pipeline import Pipeline
-from cpg_production_pipelines.jobs.fastqc import fastqc
+from cpg_pipes import benchmark
+from cpg_pipes.pipeline import Pipeline
+from cpg_pipes.jobs.fastqc import fastqc
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')

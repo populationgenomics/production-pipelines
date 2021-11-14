@@ -10,8 +10,8 @@ from sample_metadata import (
     SequenceUpdateModel,
 )
 
-from cpg_production_pipelines import utils
-from cpg_production_pipelines.pipeline import Pipeline
+from cpg_pipes import utils
+from cpg_pipes.pipeline import Pipeline
 
 sapi = SampleApi()
 aapi = AnalysisApi()

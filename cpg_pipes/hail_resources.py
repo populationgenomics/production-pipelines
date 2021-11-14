@@ -9,7 +9,7 @@ from os.path import join
 from typing import List, Optional, Union
 import hail as hl
 
-from cpg_production_pipelines import resources
+from cpg_pipes import resources
 
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger = logging.getLogger(__name__)

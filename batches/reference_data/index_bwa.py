@@ -5,8 +5,8 @@ import hailtop.batch as hb
 from os.path import join
 import os
 
-from cpg_production_pipelines import resources
-from cpg_production_pipelines.jobs import wrap_command
+from cpg_pipes import resources
+from cpg_pipes.jobs import wrap_command
 
 AR_REPO = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
 BWAMEM2_IMAGE = f'{AR_REPO}/alignment:v4'

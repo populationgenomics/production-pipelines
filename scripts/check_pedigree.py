@@ -66,8 +66,10 @@ def main(
     )
     bad_samples = list(df[df.gt_depth_mean == 0.0].sample_id)
     if bad_samples:
-        logger.info(f'Excluding samples with non enough coverage to make inference: '
-                    f'{", ".join(bad_samples)}')
+        logger.info(
+            f'Excluding samples with non enough coverage to make inference: '
+            f'{", ".join(bad_samples)}'
+        )
     logger.info('-' * 10)
 
     logger.info('* Checking sex *')

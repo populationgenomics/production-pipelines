@@ -12,10 +12,10 @@ from abc import ABC, abstractmethod
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_production_pipelines import utils
-from cpg_production_pipelines.utils import Namespace, AnalysisType
-from cpg_production_pipelines.smdb import SMDB, Analysis, Sequence
-from cpg_production_pipelines.hailbatch import AlignmentInput, PrevJob
+from cpg_pipes import utils
+from cpg_pipes.utils import Namespace, AnalysisType
+from cpg_pipes.smdb import SMDB, Analysis, Sequence
+from cpg_pipes.hailbatch import AlignmentInput, PrevJob
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')

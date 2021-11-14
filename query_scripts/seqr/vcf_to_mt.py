@@ -4,6 +4,9 @@
 Hail script to submit on a dataproc cluster. 
 
 Converts input multi-sample VCFs into a matrix table, and annotates it.
+
+Requires PYTHONPATH to be set on:
+export PYTHONPATH=hail-elasticsearch-pipelines/luigi_pipeline
 """
 
 import logging
@@ -11,11 +14,11 @@ from typing import Optional
 from os.path import join
 import click
 import hail as hl
-from lib.model.seqr_mt_schema import SeqrVariantSchema
-from lib.model.base_mt_schema import row_annotation
 from gnomad.utils.sparse_mt import split_info_annotation
 from gnomad.utils.filtering import add_filters_expr
-from cpg_production_pipelines import utils
+from cpg_pipes import utils
+from lib.model.seqr_mt_schema import SeqrVariantSchema
+from lib.model.base_mt_schema import row_annotation
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')

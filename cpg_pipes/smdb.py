@@ -11,9 +11,9 @@ from typing import List, Dict, Optional, Set, Collection
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
-from cpg_production_pipelines import utils, resources
-from cpg_production_pipelines.utils import Namespace
-from cpg_production_pipelines.hailbatch import AlignmentInput
+from cpg_pipes import utils, resources
+from cpg_pipes.utils import Namespace
+from cpg_pipes.hailbatch import AlignmentInput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')

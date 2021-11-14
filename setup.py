@@ -15,11 +15,15 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     url='https://github.com/populationgenomics/production-pipelines',
     license='MIT',
-    packages=['cpg_production_pipelines'],
-    package_data={'cpg_production_pipelines': ['filter_cutoffs.yaml']},
+    packages=['cpg_pipes', 'hail_scripts', 'lib', 'lib.model'],
+    package_dir={
+        'lib': 'hail-elasticsearch-pipelines/luigi_pipeline/lib',
+        'lib.model': 'hail-elasticsearch-pipelines/luigi_pipeline/lib/model',
+    },
+    package_data={'cpg_pipes': ['filter_cutoffs.yaml']},
     include_package_data=True,
     zip_safe=False,
-    scripts=[join('batches', fp) for fp in os.listdir('batches') if fp.endswith('.py')],
+    scripts=[join('scripts', fname) for fname in os.listdir('scripts') if fname.endswith('.py')],
     keywords='bioinformatics',
     classifiers=[
         'Environment :: Console',

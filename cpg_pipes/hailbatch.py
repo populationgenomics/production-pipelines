@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, Union, List, Tuple, Dict
 import hailtop.batch as hb
 
-from cpg_production_pipelines import utils
+from cpg_pipes import utils
 
 
 @dataclass

@@ -17,8 +17,8 @@ import pandas as pd
 import hail as hl
 import click
 from google.cloud import storage
-from cpg_production_pipelines import _version, get_package_path
-from cpg_production_pipelines import __name__ as package_name
+from cpg_pipes import _version, get_package_path
+from cpg_pipes import __name__ as package_name
 
 
 logger = logging.getLogger(__file__)
@@ -29,11 +29,10 @@ logger.setLevel(logging.INFO)
 DEFAULT_REF = 'GRCh38'
 
 DATAPROC_PACKAGES = [
-    'seqr-loader',
-    'cpg_production_pipelines',
+    'cpg-pipes',
+    'cpg-gnomad',
     'elasticsearch',
     'click',
-    'cpg-gnomad',
     'google',
     'slackclient',
     'fsspec',
@@ -42,6 +41,7 @@ DATAPROC_PACKAGES = [
     'selenium',
 ]
 
+SCRIPTS_DIR = 'scripts'
 QUERY_SCRIPTS_DIR = 'query_scripts'
 PACKAGE_DIR = package_name
 

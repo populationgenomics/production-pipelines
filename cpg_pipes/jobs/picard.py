@@ -4,8 +4,8 @@ from typing import Optional
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_production_pipelines.jobs import wrap_command
-from cpg_production_pipelines import resources, utils
+from cpg_pipes.jobs import wrap_command
+from cpg_pipes import resources, utils
 
 
 def markdup(

@@ -4,8 +4,8 @@ import hailtop.batch as hb
 from os.path import join
 import os
 
-from cpg_production_pipelines.jobs import wrap_command
-from cpg_production_pipelines.jobs.align import align, create_dragmap_index
+from cpg_pipes.jobs import wrap_command
+from cpg_pipes.jobs.align import align, create_dragmap_index
 
 AR_REPO = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
 DRAGMAP_IMAGE = f'{AR_REPO}/dragmap:1.2.1'

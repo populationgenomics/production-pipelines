@@ -11,9 +11,9 @@ from typing import Optional, List, Collection, Tuple, Dict, Union
 import click
 from hailtop.batch.job import Job
 
-from cpg_production_pipelines import utils, resources
-from cpg_production_pipelines.jobs import pedigree, wrap_command
-from cpg_production_pipelines.pipeline import Namespace, Pipeline, Project, \
+from cpg_pipes import utils, resources
+from cpg_pipes.jobs import pedigree, wrap_command
+from cpg_pipes.pipeline import Namespace, Pipeline, Project, \
     ProjectStage, CohortStage
 
 logger = logging.getLogger(__file__)

@@ -10,10 +10,10 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 from analysis_runner import dataproc
 
-from cpg_production_pipelines import resources, utils
-from cpg_production_pipelines.jobs import wrap_command
-from cpg_production_pipelines.jobs import split_intervals
-from cpg_production_pipelines.resources import BROAD_REF_BUCKET
+from cpg_pipes import resources, utils
+from cpg_pipes.jobs import wrap_command
+from cpg_pipes.jobs import split_intervals
+from cpg_pipes.resources import BROAD_REF_BUCKET
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')

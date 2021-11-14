@@ -16,9 +16,9 @@ import click
 import hail as hl
 from hail.experimental.vcf_combiner import vcf_combiner
 
-from cpg_production_pipelines.utils import get_validation_callback
-from cpg_production_pipelines import utils
-from cpg_production_pipelines import _version
+from cpg_pipes.utils import get_validation_callback
+from cpg_pipes import utils
+from cpg_pipes import _version
 
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger = logging.getLogger(__name__)

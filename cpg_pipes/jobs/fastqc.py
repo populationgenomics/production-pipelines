@@ -4,7 +4,7 @@ from typing import Optional, List
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_production_pipelines.jobs import align, wrap_command
+from cpg_pipes.jobs import align, wrap_command
 
 
 def fastqc(

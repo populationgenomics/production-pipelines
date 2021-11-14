@@ -7,11 +7,11 @@ from typing import Optional, List, Collection, Dict, Tuple, Set
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_production_pipelines import resources, utils
-from cpg_production_pipelines.jobs import wrap_command
-from cpg_production_pipelines.jobs import split_intervals
-from cpg_production_pipelines.pipeline import Sample
-from cpg_production_pipelines.smdb import SMDB
+from cpg_pipes import resources, utils
+from cpg_pipes.jobs import wrap_command
+from cpg_pipes.jobs import split_intervals
+from cpg_pipes.pipeline import Sample
+from cpg_pipes.smdb import SMDB
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
