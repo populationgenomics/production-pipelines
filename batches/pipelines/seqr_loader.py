@@ -383,6 +383,13 @@ class AnnotateProjectStage(ProjectStage):
         dep_jobs: Optional[List[str]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
         
+        if project.name not in self.pipe.config.output_projects:
+            logger.info(
+                f'Skipping annotating project {project.name} because it is not'
+                f'in the --output-projects: {self.pipe.config.output_projects}'
+            )
+            return None, []
+        
         annotated_mt_path = dep_paths_by_stage.get(AnnotateCohortStage.get_name())
 
         # Make a list of project samples to subset from the entire matrix table
@@ -428,6 +435,13 @@ class LoadToEsStage(ProjectStage):
         dep_paths_by_stage: Dict[str, str] = None,
         dep_jobs: Optional[List[str]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
+
+        if project.name not in self.pipe.config.output_projects:
+            logger.info(
+                f'Skipping loading project {project.name} because it is not'
+                f'in the --output-projects: {self.pipe.config.output_projects}'
+            )
+            return None, []
 
         project_mt_path = project.output_by_stage.get(AnnotateProjectStage.get_name())
 
