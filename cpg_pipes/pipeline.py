@@ -566,7 +566,11 @@ class Project:
         return f'gs://cpg-{self.stack}-{self.pipeline.output_suf}'
 
     def get_tmp_bucket(self):
-        return f'gs://cpg-{self.stack}-{self.pipeline.output_suf}-tmp'
+        return (
+            f'gs://cpg-{self.stack}-{self.pipeline.output_suf}-tmp/'
+            f'{self.pipeline.name}/'
+            f'{self.pipeline.output_version}'
+        )
     
     def __init__(
         self, 

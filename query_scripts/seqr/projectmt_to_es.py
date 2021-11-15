@@ -29,11 +29,6 @@ logger.setLevel(logging.INFO)
     required=True,
 )
 @click.option(
-    '--bucket',
-    'work_bucket',
-    required=True,
-)
-@click.option(
     '--es-host',
     'es_host',
     help='Elasticsearch host',

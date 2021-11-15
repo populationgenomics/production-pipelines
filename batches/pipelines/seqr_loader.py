@@ -239,6 +239,10 @@ class JointGenotypingStage(CohortStage):
         samples_hash = utils.hash_sample_ids(self.pipe.get_all_sample_ids())
         expected_jc_vcf_path = f'{self.pipe.tmp_bucket}/joint_calling/{samples_hash}.vcf.gz'
         return expected_jc_vcf_path
+    
+    @staticmethod
+    def make_expected_siteonly_output(output_path):
+        return output_path.replace('.vcf.gz', '-siteonly.vcf.gz')
 
     def add_jobs(
         self,
@@ -263,7 +267,8 @@ class JointGenotypingStage(CohortStage):
         expected_path = self.get_expected_output(pipe)
         jc_job = make_joint_genotyping_jobs(
             b=self.pipe.b,
-            out_jc_vcf_path=expected_path,
+            out_vcf_path=expected_path,
+            out_siteonly_vcf_path=self.make_expected_siteonly_output(expected_path),
             samples=self.pipe.get_all_samples(),
             genomicsdb_bucket=f'{self.pipe.analysis_bucket}/genomicsdbs',
             tmp_bucket=self.pipe.tmp_bucket,
@@ -299,16 +304,17 @@ class VqsrStage(CohortStage):
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
         jc_vcf_path = dep_paths_by_stage.get(JointGenotypingStage.get_name())
-        samples = self.pipe.get_all_samples()
+        siteonly_vcf_path = JointGenotypingStage.make_expected_siteonly_output(jc_vcf_path)
+
         tmp_vqsr_bucket = f'{self.pipe.tmp_bucket}/vqsr'
         logger.info(f'Queueing VQSR job')
         expected_path = self.get_expected_output(pipe)
         vqsr_job = make_vqsr_jobs(
             b=self.pipe.b,
-            input_vcf_or_mt_path=jc_vcf_path,
+            input_vcf_or_mt_path=siteonly_vcf_path,
             work_bucket=tmp_vqsr_bucket,
             web_bucket=tmp_vqsr_bucket,
-            gvcf_count=len(samples),
+            gvcf_count=len(self.pipe.get_all_samples()),
             depends_on=dep_jobs or [],
             scatter_count=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
             output_vcf_path=expected_path,
@@ -355,13 +361,9 @@ class AnnotateCohortStage(CohortStage):
             max_age='16h',
             packages=utils.DATAPROC_PACKAGES,
             num_secondary_workers=50,
-            job_name='Make MT and annotate',
+            job_name='Make MT and annotate cohort',
             vep='GRCh38',
             depends_on=dep_jobs or [],
-            pyfiles=[
-                'hail-elasticsearch-pipelines/hail_scripts',
-                'hail-elasticsearch-pipelines/luigi_pipeline/lib',
-            ],
         )
         return expected_path, [j]
 
@@ -404,17 +406,13 @@ class AnnotateProjectStage(ProjectStage):
             self.pipe.b,
             f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "mt_to_projectmt.py")} '
             f'--mt-path {annotated_mt_path} '
-            f'--out-mt-path {expected_path}'
+            f'--out-mt-path {expected_path} '
             f'--subset-tsv {subset_path}',
             max_age='8h',
             packages=utils.DATAPROC_PACKAGES,
             num_secondary_workers=20,
             job_name=f'{project.name}: annotate project',
             depends_on=dep_jobs or [],
-            pyfiles=[
-                'hail-elasticsearch-pipelines/hail_scripts',
-                'hail-elasticsearch-pipelines/luigi_pipeline/lib',
-            ],
         )
         return expected_path, [j]
 
@@ -423,11 +421,10 @@ class LoadToEsStage(ProjectStage):
     def __init__(self, pipe: 'SeqrLoaderPipeline'):
         super().__init__(
             pipe, 
-            requires_stages=[AnnotateProjectStage],
         )
 
     def get_expected_output(self, project: Project):
-        return f'{project.get_bucket()}/mt/{project.name}.mt'
+        return None
 
     def add_jobs(
         self,
@@ -444,13 +441,14 @@ class LoadToEsStage(ProjectStage):
             return None, []
 
         project_mt_path = project.output_by_stage.get(AnnotateProjectStage.get_name())
+        dep_jobs = project.jobs_by_stage.get(AnnotateProjectStage.get_name())
 
         timestamp = time.strftime("%Y%m%d-%H%M%S")
         j = dataproc.hail_dataproc_job(
             self.pipe.b,
             f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "projectmt_to_es.py")} '
             f'--mt-path {project_mt_path} '
-            f'--es-index {project.name}-{self.pipe.output_version}-{timestamp} '
+            f'--es-index {project.name}-v4-2-{timestamp} '
             f'--es-index-min-num-shards 1 '
             f'{"--prod" if self.pipe.namespace == Namespace.MAIN else ""}',
             max_age='16h',
@@ -459,14 +457,9 @@ class LoadToEsStage(ProjectStage):
             job_name=f'{project.name}: create ES index',
             depends_on=dep_jobs or [],
             scopes=['cloud-platform'],
-            pyfiles=[
-                'hail-elasticsearch-pipelines/hail_scripts',
-                'hail-elasticsearch-pipelines/luigi_pipeline/lib',
-            ],
         )
         
         return None, [j]
-
 
 
 @click.command()
@@ -685,6 +678,7 @@ def main(
             use_gnarly=use_gnarly,
             use_as_vqsr=use_as_vqsr,
             skip_ped_checks=skip_ped_checks,
+            output_projects=output_projects,
         ),
         input_projects=input_projects,
         skip_samples=skip_samples,
@@ -703,6 +697,7 @@ class SeqrLoaderConfig:
     use_gnarly: bool
     use_as_vqsr: bool
     skip_ped_checks: bool
+    output_projects: List[str]
 
 
 class SeqrLoaderPipeline(Pipeline):

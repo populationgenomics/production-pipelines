@@ -31,6 +31,7 @@ DEFAULT_REF = 'GRCh38'
 DATAPROC_PACKAGES = [
     'cpg-pipes',
     'cpg-gnomad',
+    'seqr-loader',
     'elasticsearch',
     'click',
     'google',

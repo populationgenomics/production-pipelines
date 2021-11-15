@@ -20,6 +20,8 @@ from gnomad.utils.filtering import add_filters_expr
 from lib.model.seqr_mt_schema import SeqrVariantSchema
 from lib.model.base_mt_schema import row_annotation
 
+from cpg_pipes import utils
+
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
@@ -90,7 +92,7 @@ def main(
         validate_mt(mt, sample_type='WGS')
 
     out_path = join(work_bucket, 'vqsr_and_37_coords.mt')
-    if False:
+    if utils.can_reuse(out_path, overwrite):
         mt = hl.read_matrix_table(out_path)
     else:
         vqsr_ht = _load_vqsr(
@@ -110,7 +112,7 @@ def main(
             mt = hl.read_matrix_table(out_path)
 
     out_path = join(work_bucket, 'vqsr_and_37_coords.vep.mt')
-    if False:
+    if utils.can_reuse(out_path, overwrite):
         mt = hl.read_matrix_table(out_path)
     else:
         mt = hl.vep(mt, block_size=vep_block_size or 1000)
@@ -158,7 +160,7 @@ def _apply_vqsr_cutoffs(
     Generates variant soft-filters from VQSR scores: adds `mt.filters` row-level
     field of type set with a value "VQSR" when the AS_VQSLOD is below the threshold
     """
-    if False:
+    if utils.can_reuse(output_ht_path, overwrite):
         return hl.read_table(output_ht_path)
 
     ht = vqsr_ht
@@ -195,7 +197,7 @@ def _load_vqsr(
     """
     Loads the VQSR'ed site-only VCF into a site-only hail table
     """
-    if False:
+    if utils.can_reuse(output_ht_path, overwrite):
         return hl.read_table(output_ht_path)
 
     logger.info(f'Importing VQSR annotations...')

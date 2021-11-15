@@ -13,6 +13,7 @@ from analysis_runner import dataproc
 from cpg_pipes import resources, utils
 from cpg_pipes.jobs import wrap_command
 from cpg_pipes.jobs import split_intervals
+from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.resources import BROAD_REF_BUCKET
 
 logger = logging.getLogger(__file__)
@@ -191,6 +192,7 @@ def make_vqsr_jobs(
         b=b,
         scatter_count=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
     )
+    first_job = None
 
     if input_vcf_or_mt_path.endswith('.mt'):
         assert meta_ht_path
@@ -220,27 +222,31 @@ def make_vqsr_jobs(
         first_job = mt_to_vcf_job
         tabix_job = add_tabix_step(b, combined_vcf_path, medium_disk)
         tabix_job.depends_on(mt_to_vcf_job)
-        gathered_vcf = tabix_job.combined_vcf
+        siteonly_vcf = tabix_job.combined_vcf
     else:
-        site_only_j = _add_make_sites_only_job(
-            b=b,
-            input_vcf=b.read_input_group(
-                **{
-                    'vcf.gz': input_vcf_or_mt_path,
-                    'vcf.gz.tbi': input_vcf_or_mt_path + '.tbi',
-                }
-            ),
-            overwrite=overwrite,
-            disk=medium_disk,
+        # site_only_j = _add_make_sites_only_job(
+        #     b=b,
+        #     input_vcf=b.read_input_group(
+        #         **{
+        #             'vcf.gz': input_vcf_or_mt_path,
+        #             'vcf.gz.tbi': input_vcf_or_mt_path + '.tbi',
+        #         }
+        #     ),
+        #     overwrite=overwrite,
+        #     disk=medium_disk,
+        # )
+        # first_job = site_only_j
+        # gathered_vcf = site_only_j.output_vcf
+        siteonly_vcf = b.read_input_group(
+            **{
+                'vcf.gz': input_vcf_or_mt_path,
+                'vcf.gz.tbi': input_vcf_or_mt_path + '.tbi',
+            }
         )
-        first_job = site_only_j
-        gathered_vcf = site_only_j.output_vcf
-    if depends_on:
-        first_job.depends_on(*depends_on)
 
     indels_variant_recalibrator_job = add_indels_variant_recalibrator_job(
         b,
-        sites_only_variant_filtered_vcf=gathered_vcf,
+        sites_only_variant_filtered_vcf=siteonly_vcf,
         mills_resource_vcf=mills_resource_vcf,
         axiom_poly_resource_vcf=axiom_poly_resource_vcf,
         dbsnp_resource_vcf=dbsnp_resource_vcf,
@@ -248,6 +254,9 @@ def make_vqsr_jobs(
         use_as_annotations=use_as_annotations,
         work_bucket=web_bucket,
     )
+    if first_job is None:
+        first_job = indels_variant_recalibrator_job
+
     indels_recalibration = indels_variant_recalibrator_job.recalibration
     indels_tranches = indels_variant_recalibrator_job.tranches
 
@@ -261,7 +270,7 @@ def make_vqsr_jobs(
         # Run SNP recalibrator in a scattered mode
         model_file = add_snps_variant_recalibrator_create_model_step(
             b,
-            sites_only_variant_filtered_vcf=gathered_vcf,
+            sites_only_variant_filtered_vcf=siteonly_vcf,
             hapmap_resource_vcf=hapmap_resource_vcf,
             omni_resource_vcf=omni_resource_vcf,
             one_thousand_genomes_resource_vcf=one_thousand_genomes_resource_vcf,
@@ -278,7 +287,7 @@ def make_vqsr_jobs(
         snps_recalibrator_jobs = [
             add_snps_variant_recalibrator_scattered_step(
                 b,
-                sites_only_vcf=gathered_vcf,
+                sites_only_vcf=siteonly_vcf,
                 interval=intervals[f'interval_{idx}'],
                 model_file=model_file,
                 hapmap_resource_vcf=hapmap_resource_vcf,
@@ -302,7 +311,7 @@ def make_vqsr_jobs(
         scattered_vcfs = [
             add_apply_recalibration_step(
                 b,
-                input_vcf=gathered_vcf,
+                input_vcf=siteonly_vcf,
                 interval=intervals[f'interval_{idx}'],
                 indels_recalibration=indels_recalibration,
                 indels_tranches=indels_tranches,
@@ -315,17 +324,19 @@ def make_vqsr_jobs(
             ).recalibrated_vcf
             for idx in range(scatter_count)
         ]
-        recalibrated_gathered_vcf_job = _add_final_gather_vcf_step(
+        recalibrated_gathered_vcf_j, recalibrated_gathered_vcf = gather_vcfs(
             b,
             input_vcfs=scattered_vcfs,
-            disk_size=huge_disk,
+            overwrite=overwrite,
             output_vcf_path=output_vcf_path,
+            site_only=True,
         )
+        recalibrated_gathered_vcf_j.name = f'VQSR: {recalibrated_gathered_vcf_j.name}'
 
     else:
         snps_recalibrator_job = add_snps_variant_recalibrator_step(
             b,
-            sites_only_variant_filtered_vcf=gathered_vcf,
+            sites_only_variant_filtered_vcf=siteonly_vcf,
             hapmap_resource_vcf=hapmap_resource_vcf,
             omni_resource_vcf=omni_resource_vcf,
             one_thousand_genomes_resource_vcf=one_thousand_genomes_resource_vcf,
@@ -339,9 +350,9 @@ def make_vqsr_jobs(
         snps_recalibration = snps_recalibrator_job.recalibration
         snps_tranches = snps_recalibrator_job.tranches
 
-        recalibrated_gathered_vcf_job = add_apply_recalibration_step(
+        recalibrated_gathered_vcf_j = add_apply_recalibration_step(
             b,
-            input_vcf=gathered_vcf,
+            input_vcf=siteonly_vcf,
             indels_recalibration=indels_recalibration,
             indels_tranches=indels_tranches,
             snps_recalibration=snps_recalibration,
@@ -353,7 +364,9 @@ def make_vqsr_jobs(
             output_vcf_path=output_vcf_path,
         )
 
-    return recalibrated_gathered_vcf_job
+    if depends_on:
+        first_job.depends_on(*depends_on)
+    return recalibrated_gathered_vcf_j
 
 
 def _add_make_sites_only_job(
@@ -1010,46 +1023,6 @@ def add_collect_metrics_sharded_step(
       --THREAD_COUNT 8 \\
       --TARGET_INTERVALS {interval_list}"""
     )
-    return j
-
-
-def _add_final_gather_vcf_step(
-    b: hb.Batch,
-    input_vcfs: List[hb.ResourceGroup],
-    disk_size: int,
-    output_vcf_path: str = None,
-) -> Job:
-    """
-    Combines recalibrated VCFs into a single VCF.
-    Saves the output VCF to a bucket `output_vcf_path`
-    """
-    j = b.new_job('VQSR: FinalGatherVcf')
-    j.image(resources.GATK_IMAGE)
-    j.memory(f'8G')
-    j.storage(f'{disk_size}G')
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
-
-    input_cmdl = ' '.join([f'--input {v["vcf.gz"]}' for v in input_vcfs])
-    j.command(
-        f"""set -euo pipefail
-
-    # --ignore-safety-checks makes a big performance difference so we include it in 
-    # our invocation. This argument disables expensive checks that the file headers 
-    # contain the same set of genotyped samples and that files are in order 
-    # by position of first record.
-    gatk --java-options -Xms6g \\
-      GatherVcfsCloud \\
-      --ignore-safety-checks \\
-      --gather-type BLOCK \\
-      {input_cmdl} \\
-      --output {j.output_vcf['vcf.gz']}
-
-    tabix {j.output_vcf['vcf.gz']}"""
-    )
-    if output_vcf_path:
-        b.write_output(j.output_vcf, output_vcf_path.replace('.vcf.gz', ''))
     return j
 
 

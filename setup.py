@@ -15,19 +15,7 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     url='https://github.com/populationgenomics/production-pipelines',
     license='MIT',
-    # TODO: Can remove hail_scripts, lib, lib.model and package_dir after the oficial 
-    # Hail package is updated to have https://github.com/hail-is/hail/pull/10863
-    packages=[
-        'cpg_pipes', 
-        'hail_scripts', 
-        'lib', 
-        'lib.model'
-    ],
-    package_dir={
-        'hail_scripts': 'hail-elasticsearch-pipelines/hail_scripts',
-        'lib': 'hail-elasticsearch-pipelines/luigi_pipeline/lib',
-        'lib.model': 'hail-elasticsearch-pipelines/luigi_pipeline/lib/model',
-    },
+    packages=['cpg_pipes'],
     package_data={'cpg_pipes': ['filter_cutoffs.yaml']},
     include_package_data=True,
     zip_safe=False,
