@@ -91,13 +91,14 @@ def main(
 
     mt = hl.read_matrix_table(mt_path)
     
-    # AS_MQ can be NaN, need to fix that to avoid failures like 
+    # AS_MQ and InbreedingCoeff can be NaN, need to fix that to avoid failures like 
     # `is.hail.relocated.org.elasticsearch.hadoop.rest.EsHadoopRemoteException: 
     # mapper_parsing_exception: failed to parse field [info_AS_MQ] of type [double]`
     # in: https://batch.hail.populationgenomics.org.au/batches/6621/jobs/6
     mt = mt.annotate_rows(
         info=mt.info.annotate(
-            AS_MQ=hl.if_else(hl.is_nan(mt.info.AS_MQ), 0.0, mt.info.AS_MQ)
+            AS_MQ=hl.if_else(hl.is_nan(mt.info.AS_MQ), 0.0, mt.info.AS_MQ),
+            InbreedingCoeff=hl.if_else(hl.is_nan(mt.info.InbreedingCoeff), 0.0, mt.info.InbreedingCoeff),
         )
     )
     logger.info('Getting rows and exporting to the ES')
