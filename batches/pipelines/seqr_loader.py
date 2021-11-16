@@ -443,7 +443,7 @@ class LoadToEsStage(ProjectStage):
             self.pipe.b,
             f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "projectmt_to_es.py")} '
             f'--mt-path {project_mt_path} '
-            f'--es-index {project.name}-v4-2-{timestamp} '
+            f'--es-index {project.name}-{self.pipe.output_version}-{timestamp} '
             f'--es-index-min-num-shards 1 '
             f'{"--prod" if self.pipe.namespace == Namespace.MAIN else ""}',
             max_age='16h',
@@ -453,7 +453,7 @@ class LoadToEsStage(ProjectStage):
             depends_on=dep_jobs or [],
             scopes=['cloud-platform'],
         )
-        
+
         return None, [j]
 
 
