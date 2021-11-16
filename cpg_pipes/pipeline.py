@@ -73,7 +73,7 @@ class PipelineStage(ABC):
     def __init__(
         self, 
         pipe: 'Pipeline', 
-        analysis_type: AnalysisType = AnalysisType.CUSTOM,
+        analysis_type: Optional[AnalysisType] = None,
         requires_stages: Optional[List] = None
     ):
         """
@@ -99,8 +99,8 @@ class PipelineStage(ABC):
     def add_jobs(
         self,
         target: Union['Sample', 'Project', 'Pipeline'],
-        dep_paths_by_stage: Optional[Dict[str, Union[Dict[str, str], str]]] = None,
-        dep_jobs: Optional[List[str]] = None,
+        dep_paths_by_stage: Optional[Dict[Any, Union[Dict[str, str], str]]] = None,
+        dep_jobs: Optional[List[Job]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
         """
         Implements logic of the Stage: adds Batch jobs that do the processing.
@@ -219,7 +219,7 @@ class PipelineStage(ABC):
                         f'from stage {dep.get_name()}. Exiting'
                     )
                     sys.exit(1)
-            dep_paths_by_stage[dep.get_name()] = dep_paths
+            dep_paths_by_stage[dep.__class__] = dep_paths
 
         res_path, res_jobs = self.add_jobs(
             target,
@@ -259,7 +259,7 @@ class PipelineStage(ABC):
             self._reuse_jobs(target, expected_path)
         else:
             self._add_jobs(target)
-    
+
     def find_output(
         self,
         target: Union['Sample', 'Project', 'Pipeline'],
@@ -361,8 +361,8 @@ class SampleStage(PipelineStage, ABC):
     def add_jobs(
         self, 
         target: 'Sample',
-        dep_paths_by_stage: Optional[Dict[str, Union[Dict[str, str], str]]] = None,
-        dep_jobs: Optional[List[str]] = None,
+        dep_paths_by_stage: Optional[Dict[Any, Union[Dict[str, str], str]]] = None,
+        dep_jobs: Optional[List[Job]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
         """
         Implements logic of the Stage: adds Batch jobs that do the processing.
@@ -402,8 +402,8 @@ class ProjectStage(PipelineStage, ABC):
     def add_jobs(
         self,
         target: 'Project',
-        dep_paths_by_stage: Optional[Dict[str, Union[Dict[str, str], str]]] = None,
-        dep_jobs: Optional[List[str]] = None,
+        dep_paths_by_stage: Optional[Dict[Any, Union[Dict[str, str], str]]] = None,
+        dep_jobs: Optional[List[Job]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
         """
         Implements logic of the Stage: adds Batch jobs that do the processing.
@@ -435,10 +435,9 @@ class CohortStage(PipelineStage, ABC):
     def add_jobs(
         self, 
         target: 'Pipeline',
-        dep_paths_by_stage: Optional[Dict[str, Union[Dict[str, str], str]]] = None,
-        dep_jobs: Optional[List[str]] = None,
+        dep_paths_by_stage: Optional[Dict[Any, Union[Dict[str, str], str]]] = None,
+        dep_jobs: Optional[List[Job]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
-
         """
         Implements logic of the Stage: adds Batch jobs that do the processing.
         Assumes that all the household work is done - checking missing inputs,
@@ -701,8 +700,7 @@ class Pipeline:
         # Sample- and project-level outputs are specified in Sample and Project classes
         self.output_by_stage: Dict[str, str] = dict()
         self.jobs_by_stage: Dict[str, Job] = dict()
-
-        self.stage_by_name = Dict
+        self.stage_by_name: Dict[str, PipelineStage] = dict()
 
         self.projects: List[Project] = []
         if input_projects:
@@ -846,7 +844,7 @@ class Pipeline:
         if ped_files:
             self._populate_pedigree(ped_files)
 
-    def add_stages(self, stages: List[PipelineStage]):
+    def set_stages(self, stages: List[PipelineStage]):
         self.stage_by_name = {
             stage.get_name(): stage for stage in stages
         }

@@ -5,12 +5,11 @@ Batch pipeline to laod data info seqr
 """
 
 import logging
-import os
 import sys
 import time
 from dataclasses import dataclass
 from os.path import join
-from typing import Optional, List, Collection, Tuple, Dict
+from typing import Optional, List, Collection, Tuple, Dict, Any
 
 import click
 import hail as hl
@@ -33,10 +32,7 @@ logger.setLevel(logging.INFO)
 
 class CramStage(SampleStage):
     def __init__(self, pipe: 'SeqrLoaderPipeline'):
-        super().__init__(
-            pipe, 
-            analysis_type=AnalysisType.CRAM,
-        )
+        super().__init__(pipe, analysis_type=AnalysisType.CRAM)
 
     def get_expected_output(self, sample: Sample):
         return f'{sample.project.get_bucket()}/cram/{sample.id}.cram'
@@ -49,7 +45,7 @@ class CramStage(SampleStage):
         self, 
         sample: Sample,
         dep_paths_by_stage=None,
-        dep_jobs: Optional[List[str]] = None,
+        dep_jobs: Optional[List[Job]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
         if not sample.seq_info:
@@ -95,10 +91,10 @@ class CramStage(SampleStage):
 
 class CramPedCheckStage(ProjectStage):
     def __init__(self, pipe: 'SeqrLoaderPipeline'):
-        super().__init__(
-            pipe, 
-            requires_stages=[CramStage],
-        )
+        super().__init__(pipe, requires_stages=[CramStage])
+        # Setting self.pipe again to show linters that pipe is a subclass 
+        # of SeqrLoaderPipeline and self.pipe.fingerprints_bucket should not trigger
+        # a warning:
         self.pipe = pipe
 
     def get_expected_output(self, project: Project):
@@ -108,10 +104,10 @@ class CramPedCheckStage(ProjectStage):
         self,
         project: Project,
         dep_paths_by_stage: Dict[str, Dict[str, str]] = None,
-        dep_jobs: Optional[List[str]] = None,
+        dep_jobs: Optional[List[Job]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
-        cram_by_sid = dep_paths_by_stage[CramStage.get_name()]
+        cram_by_sid = dep_paths_by_stage[CramStage]
         fingerprint_path_by_sid = {
             sid: CramStage.get_fingerprint_output(cram_path)
             for sid, cram_path in cram_by_sid
@@ -134,8 +130,7 @@ class CramPedCheckStage(ProjectStage):
 
 class GvcfStage(SampleStage):
     def __init__(self, pipe: 'SeqrLoaderPipeline'):
-        super().__init__(
-            pipe, 
+        super().__init__(pipe, 
             analysis_type=AnalysisType.GVCF,
             requires_stages=[CramStage],
         )
@@ -150,11 +145,11 @@ class GvcfStage(SampleStage):
     def add_jobs(
         self, 
         sample: Sample,
-        dep_paths_by_stage: Dict[str, str] = None,
-        dep_jobs: Optional[List[str]] = None,
+        dep_paths_by_stage: Dict[Any, str] = None,
+        dep_jobs: Optional[List[Job]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
-        cram_path = dep_paths_by_stage[CramStage.get_name()]
+        cram_path = dep_paths_by_stage[CramStage]
 
         if self.pipe.hc_intervals is None and self.pipe.config.hc_shards_num > 1:
             self.pipe.hc_intervals = split_intervals.get_intervals(
@@ -190,10 +185,10 @@ class GvcfStage(SampleStage):
 
 class GvcfPedCheckStage(ProjectStage):
     def __init__(self, pipe: 'SeqrLoaderPipeline'):
-        super().__init__(
-            pipe, 
-            requires_stages=[GvcfStage],
-        )
+        super().__init__(pipe, requires_stages=[GvcfStage])
+        # Setting self.pipe again to show linters that pipe is a subclass 
+        # of SeqrLoaderPipeline and self.pipe.fingerprints_bucket should not trigger
+        # a warning:
         self.pipe = pipe
 
     def get_expected_output(self, *args):
@@ -203,10 +198,10 @@ class GvcfPedCheckStage(ProjectStage):
         self,
         project: Project,
         dep_paths_by_stage: Dict[str, Dict[str, str]] = None,
-        dep_jobs: Optional[List[str]] = None,
+        dep_jobs: Optional[List[Job]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
-        gvcf_by_sid = dep_paths_by_stage[GvcfStage.get_name()]
+        gvcf_by_sid = dep_paths_by_stage[GvcfStage]
         fingerprint_path_by_sid = {
             sid: CramStage.get_fingerprint_output(gvcf_path)
             for sid, gvcf_path in gvcf_by_sid
@@ -248,10 +243,10 @@ class JointGenotypingStage(CohortStage):
         self,
         pipe: Pipeline,
         dep_paths_by_stage: Dict[str, Dict[str, str]] = None,
-        dep_jobs: Optional[List[str]] = None,
+        dep_jobs: Optional[List[Job]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
         
-        gvcf_path_by_sid = dep_paths_by_stage[GvcfStage.get_name()]
+        gvcf_path_by_sid = dep_paths_by_stage[GvcfStage]
 
         not_found_gvcfs = []
         for sid, gvcf_path in gvcf_path_by_sid.items():
@@ -299,11 +294,11 @@ class VqsrStage(CohortStage):
     def add_jobs(
         self,
         pipe: Pipeline,
-        dep_paths_by_stage: Dict[str, str] = None,
-        dep_jobs: Optional[List[str]] = None,
+        dep_paths_by_stage: Dict[Any, str] = None,
+        dep_jobs: Optional[List[Job]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
-        jc_vcf_path = dep_paths_by_stage.get(JointGenotypingStage.get_name())
+        jc_vcf_path = dep_paths_by_stage[JointGenotypingStage]
         siteonly_vcf_path = JointGenotypingStage.make_expected_siteonly_output(jc_vcf_path)
 
         tmp_vqsr_bucket = f'{self.pipe.tmp_bucket}/vqsr'
@@ -338,14 +333,14 @@ class AnnotateCohortStage(CohortStage):
     def add_jobs(
         self,
         pipe: Pipeline,
-        dep_paths_by_stage: Dict[str, str] = None,
-        dep_jobs: Optional[List[str]] = None,
+        dep_paths_by_stage: Dict[Any, str] = None,
+        dep_jobs: Optional[List[Job]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
         
         checkpoints_bucket = f'{self.anno_tmp_bucket}/checkpoints'
         
-        vcf_path = dep_paths_by_stage.get(JointGenotypingStage.get_name())
-        vqsr_vcf_path = dep_paths_by_stage.get(VqsrStage.get_name())
+        vcf_path = dep_paths_by_stage[JointGenotypingStage]
+        vqsr_vcf_path = dep_paths_by_stage.get(VqsrStage)
 
         expected_path = self.get_expected_output(pipe)
         j = dataproc.hail_dataproc_job(
@@ -381,10 +376,10 @@ class AnnotateProjectStage(ProjectStage):
     def add_jobs(
         self,
         project: Project,
-        dep_paths_by_stage: Dict[str, str] = None,
-        dep_jobs: Optional[List[str]] = None,
+        dep_paths_by_stage: Dict[Any, str] = None,
+        dep_jobs: Optional[List[Job]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
-        
+
         if project.name not in self.pipe.config.output_projects:
             logger.info(
                 f'Skipping annotating project {project.name} because it is not'
@@ -392,7 +387,7 @@ class AnnotateProjectStage(ProjectStage):
             )
             return None, []
         
-        annotated_mt_path = dep_paths_by_stage.get(AnnotateCohortStage.get_name())
+        annotated_mt_path = dep_paths_by_stage[AnnotateCohortStage]
 
         # Make a list of project samples to subset from the entire matrix table
         sample_ids = [s.id for s in project.samples]
@@ -421,6 +416,7 @@ class LoadToEsStage(ProjectStage):
     def __init__(self, pipe: 'SeqrLoaderPipeline'):
         super().__init__(
             pipe, 
+            requires_stages=[AnnotateProjectStage]
         )
 
     def get_expected_output(self, project: Project):
@@ -429,8 +425,8 @@ class LoadToEsStage(ProjectStage):
     def add_jobs(
         self,
         project: Project,
-        dep_paths_by_stage: Dict[str, str] = None,
-        dep_jobs: Optional[List[str]] = None,
+        dep_paths_by_stage: Dict[Any, str] = None,
+        dep_jobs: Optional[List[Job]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
         if project.name not in self.pipe.config.output_projects:
@@ -440,15 +436,14 @@ class LoadToEsStage(ProjectStage):
             )
             return None, []
 
-        project_mt_path = project.output_by_stage.get(AnnotateProjectStage.get_name())
-        dep_jobs = project.jobs_by_stage.get(AnnotateProjectStage.get_name())
+        project_mt_path = dep_paths_by_stage[AnnotateProjectStage]
 
         timestamp = time.strftime("%Y%m%d-%H%M%S")
         j = dataproc.hail_dataproc_job(
             self.pipe.b,
             f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "projectmt_to_es.py")} '
             f'--mt-path {project_mt_path} '
-            f'--es-index {project.name}-{self.pipe.output_version}-{timestamp} '
+            f'--es-index {project.name}-v4-2-{timestamp} '
             f'--es-index-min-num-shards 1 '
             f'{"--prod" if self.pipe.namespace == Namespace.MAIN else ""}',
             max_age='16h',
@@ -704,19 +699,9 @@ class SeqrLoaderPipeline(Pipeline):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fingerprints_bucket = f'{self.analysis_bucket}/fingerprints'
-        
-        self.cram_path_by_sid = dict()
-        self.cram_job_by_sid = dict()
-        self.gvcf_path_by_sid = dict()
-        self.gvcf_job_by_sid = dict()
-        self.joint_called_vcf_path = None
-        self.vqsr_site_only_vcf_path = None
-        self.jc_job = None
-        self.annotated_mt_path = None
-        self.annotate_job = None
         self.hc_intervals = None
 
-        self.add_stages([
+        self.set_stages([
             CramStage(self),
             CramPedCheckStage(self),
             GvcfStage(self),

@@ -35,7 +35,7 @@ class CramPedCheckStage(ProjectStage):
         self,
         project: Project,
         dep_paths_by_stage: Dict[str, Dict[str, str]] = None,
-        dep_jobs: Optional[List[str]] = None,
+        dep_jobs: Optional[List[Job]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
         # path_by_sid = dict()
@@ -79,7 +79,7 @@ class GvcfPedCheckStage(ProjectStage):
         self,
         project: Project,
         dep_paths_by_stage: Dict[str, Dict[str, str]] = None,
-        dep_jobs: Optional[List[str]] = None,
+        dep_jobs: Optional[List[Job]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
         path_by_sid = dict()
@@ -270,7 +270,7 @@ class PedigreePipeline(Pipeline):
         super().__init__(*args, **kwargs)
         self.fingerprints_bucket = f'{self.analysis_bucket}/fingerprints'
 
-        self.add_stages([
+        self.set_stages([
             CramPedCheckStage(self),
             GvcfPedCheckStage(self),
         ])
