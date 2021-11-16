@@ -5,8 +5,7 @@ Batch pipeline check pedigree
 """
 
 import logging
-from os.path import join
-from typing import Optional, List, Collection, Tuple, Dict, Union
+from typing import Optional, List, Collection, Tuple, Dict, Union, Any
 
 import click
 from hailtop.batch.job import Job
@@ -34,7 +33,7 @@ class CramPedCheckStage(ProjectStage):
     def add_jobs(
         self,
         project: Project,
-        dep_paths_by_stage: Dict[str, Dict[str, str]] = None,
+        dep_paths_by_stage: Dict[Any, Dict[str, str]] = None,
         dep_jobs: Optional[List[Job]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
@@ -78,7 +77,7 @@ class GvcfPedCheckStage(ProjectStage):
     def add_jobs(
         self,
         project: Project,
-        dep_paths_by_stage: Dict[str, Dict[str, str]] = None,
+        dep_paths_by_stage: Dict[Any, Dict[str, str]] = None,
         dep_jobs: Optional[List[Job]] = None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 

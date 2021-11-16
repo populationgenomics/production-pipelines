@@ -69,9 +69,7 @@ def main():
                 markdup_tool=MarkDupTool.NO_MARKDUP,
                 extra_label=f'nomarkdup_fromfastq_ncpu{ncpu}',
                 depends_on=deps,
-                ncpu=ncpu,
-                highmem=True if ncpu < 32 else False,
-                storage_gb=200,
+                fraction_of_64thread_instance=32/ncpu,
             )
             align(
                 pipe.b,
@@ -83,9 +81,7 @@ def main():
                 markdup_tool=MarkDupTool.NO_MARKDUP,
                 extra_label=f'nomarkdup_fromfastq_ncpu{ncpu}',
                 depends_on=deps,
-                ncpu=ncpu,
-                highmem=True if ncpu < 32 else False,
-                storage_gb=200,
+                fraction_of_64thread_instance=32/ncpu,
             )
 
         # align(
