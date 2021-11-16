@@ -6,9 +6,10 @@ from dataclasses import dataclass, field
 import logging
 from enum import Enum
 from os.path import join
-from typing import List, Dict, Optional, Any, Union, Tuple
+from typing import List, Dict, Optional, Any, Union, Tuple, Callable
 from abc import ABC, abstractmethod
 
+import click
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
@@ -20,6 +21,140 @@ from cpg_pipes.hailbatch import AlignmentInput, PrevJob
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
+
+
+def pipeline_click_options(function: Callable) -> Callable:
+    """
+    Decorator to use with click, e.g.:
+    @click.command()
+    @pipeline_click_options
+    def main():
+        pass
+    """
+    options = [
+        click.option(
+            '-n',
+            '--namespace',
+            'namespace',
+            type=click.Choice([n.lower() for n in Namespace.__members__]),
+            callback=lambda c, p, v: getattr(Namespace, v.upper()) if v else None,
+            help='The bucket namespace to write the results to',
+        ),
+        click.option(
+            '--analysis-project',
+            'analysis_project',
+            default='seqr',
+            help='SM project name to write the intermediate/joint-calling analysis entries to',
+        ),
+        click.option(
+            '--input-project',
+            'input_projects',
+            multiple=True,
+            required=True,
+            help='Only read samples that belong to the project(s). Can be set multiple times.',
+        ),
+        click.option(
+            '--ped-file',
+            'ped_files',
+            multiple=True,
+        ),
+        click.option(
+            '--first-stage',
+            'first_stage',
+            help='Only pick results from the previous stages if they exist. '
+            'If not, skip such samples',
+        ),
+        click.option(
+            '--last-stage',
+            'last_stage',
+            help='Finish the pipeline after this stage',
+        ),
+        click.option(
+            '--skip-sample',
+            '-S',
+            'skip_samples',
+            multiple=True,
+            help='Don\'t process specified samples. Can be set multiple times.',
+        ),
+        click.option(
+            '--force-sample',
+            'force_samples',
+            multiple=True,
+            help='Force reprocessing these samples. Can be set multiple times.',
+        ),
+        click.option(
+            '--output-version',
+            'output_version',
+            type=str,
+            default='v0',
+            help='Suffix the outputs with this version tag. Useful for testing',
+        ),
+        click.option(
+            '--keep-scratch/--remove-scratch', 
+            'keep_scratch', 
+            default=True,
+            is_flag=True,
+        ),
+        click.option('--dry-run', 'dry_run', is_flag=True),
+        click.option(
+            '--check-smdb-seq-existence/--no-check-smdb-seq-existence',
+            'check_smdb_seq_existence',
+            default=False,
+            is_flag=True,
+            help='Check that files in sequence.meta exist'
+        ),
+        click.option(
+            '--skip-samples-without-seq-input',
+            'skip_samples_without_seq_input',
+            default=False,
+            is_flag=True,
+            help='If sequence.meta files for a sample don\'t exist, remove this sample '
+                 'instead of failing'
+        ),
+        click.option(
+            '--check-intermediate-existence/--no-check-intermediate-existence',
+            'check_intermediate_existence',
+            default=True,
+            is_flag=True,
+            help='Before running a job, check for an intermediate output before submitting it, '
+                 'and if it exists on a bucket, submit a [reuse] job instead. Works well with '
+                 '--previous-batch-tsv/--previous-batch-id options.',
+        ),
+        click.option(
+            '--update-smdb-analyses/--no-update-smdb-analyses',
+            'update_smdb_analyses',
+            is_flag=True,
+            default=True,
+            help='Create analysis entries for queued/running/completed jobs'
+        ),
+        click.option(
+            '--validate-smdb-analyses/--no-validate-smdb-analyses',
+            'validate_smdb_analyses',
+            is_flag=True,
+            default=False,
+            help='Validate existing analysis entries by checking if a.output exists on '
+                 'the bucket. Set the analysis entry to "failure" if output doesn\'t exist'
+        ),
+        click.option(
+            '--previous-batch-tsv',
+            'previous_batch_tsv_path',
+            help='A list of previous successful attempts from another batch, dumped from '
+                 'from the Batch database (the "jobs" table joined on "job_attributes"). '
+                 'If the intermediate output for a job exists in a previous attempt, '
+                 'it will be passed forward, and a [reuse] job will be submitted.'
+        ),
+        click.option(
+            '--previous-batch-id',
+            'previous_batch_id',
+            help='6-letter ID of the previous successful batch (corresponds to the directory '
+                 'name in the batch logs. e.g. feb0e9 in '
+                 'gs://cpg-seqr-main-tmp/hail/batch/feb0e9'
+        )
+    ]
+    for opt in options:
+        function = opt(function)
+    return function
+
 
 
 class Batch(hb.Batch):
@@ -272,42 +407,6 @@ class PipelineStage(ABC):
             return target.output_by_stage.get(self.get_name())
         else:
             return self.get_expected_output(target)
-
-    # def find_output(
-    #     self,
-    #     target: Union['Sample', 'Project', 'Pipeline'],
-    #     expected_path: str,
-    #     only_check_smdb: bool = False,
-    #     only_check_bucket: bool = False,
-    #     validate_smdb: bool = False,
-    # ) -> Optional[str]:
-    #     if not only_check_bucket:
-    #         analysis = target.analysis_by_type.get(self.analysis_type)
-    #         if only_check_smdb and analysis is None:
-    #             return None
-    # 
-    #     if self.pipe.validate_smdb_analyses:
-    #         if isinstance(target, Sample):
-    #             sample: Sample = target
-    #             sample_ids = [sample.id]
-    #         elif isinstance(target, Project):
-    #             project: Project = target
-    #             sample_ids = [s.id for s in project.samples]
-    #         else:
-    #             pipe: Pipeline = target
-    #             sample_ids = pipe.get_all_sample_ids()
-    # 
-    #         found_path = self.pipe.db.process_existing_analysis(
-    #             sample_ids=sample_ids,
-    #             completed_analysis=analysis,
-    #             analysis_type=self.analysis_type,
-    #             expected_output_fpath=expected_path,
-    #         )
-    #     else:
-    #         found_path = analysis.output
-    # 
-    #     target.output_by_stage[self.get_name()] = found_path
-    #     return found_path
 
     def _check_smdb_analysis(
         self, 
@@ -608,10 +707,11 @@ class Pipeline:
         namespace: Namespace,
         title: str,
         keep_scratch: bool = False,
+        dry_run: bool = False,
         previous_batch_tsv_path: Optional[str] = None,
         previous_batch_id: Optional[str] = None,
-        smdb_update_analyses: bool = False,
-        smdb_check_seq_existence: bool = False,
+        update_smdb_analyses: bool = False,
+        check_smdb_seq_existence: bool = False,
         skip_samples_without_seq_input: bool = False,
         validate_smdb_analyses: bool = False,
         check_intermediate_existence: bool = True,
@@ -638,8 +738,8 @@ class Pipeline:
         self.force_samples = force_samples or []
         self.db = SMDB(
             self.analysis_project.name,
-            do_update_analyses=smdb_update_analyses,
-            do_check_seq_existence=smdb_check_seq_existence,
+            do_update_analyses=update_smdb_analyses,
+            do_check_seq_existence=check_smdb_seq_existence,
         )
         self.skip_samples_without_seq_input = skip_samples_without_seq_input
         self.validate_smdb_analyses = validate_smdb_analyses
@@ -679,6 +779,7 @@ class Pipeline:
         )
         self.local_tmp_dir = tempfile.mkdtemp()
         self.keep_scratch = keep_scratch
+        self.dry_run = dry_run
         self.prev_batch_jobs = PrevJob.parse(
             previous_batch_tsv_path,
             previous_batch_id,
@@ -720,7 +821,7 @@ class Pipeline:
     def get_all_sample_ids(self) -> List[str]:
         return [s.id for s in self.get_all_samples()]
 
-    def run(self, dry_run: bool = False) -> None:
+    def run(self) -> None:
         if self.b:
             logger.info(f'Will submit {self.b.total_job_num} jobs:')
             for label, stat in self.b.labelled_jobs.items():
@@ -728,7 +829,7 @@ class Pipeline:
             logger.info(f'  Other jobs: {self.b.other_job_num}')
 
             self.b.run(
-                dry_run=dry_run,
+                dry_run=self.dry_run,
                 delete_scratch_on_exit=not self.keep_scratch,
                 wait=False,
             )

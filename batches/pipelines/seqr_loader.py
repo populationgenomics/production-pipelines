@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Batch pipeline to laod data info seqr
+Batch pipeline to laod data into seqr
 """
 
 import logging
@@ -23,7 +23,8 @@ from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.pipeline import Namespace, Pipeline, Sample, \
-    SampleStage, Project, CohortStage, AnalysisType, ProjectStage
+    SampleStage, Project, CohortStage, AnalysisType, ProjectStage, \
+    pipeline_click_options
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -458,27 +459,7 @@ class LoadToEsStage(ProjectStage):
 
 
 @click.command()
-@click.option(
-    '-n',
-    '--namespace',
-    'output_namespace',
-    type=click.Choice([n.lower() for n in Namespace.__members__]),
-    callback=lambda c, p, v: getattr(Namespace, v.upper()) if v else None,
-    help='The bucket namespace to write the results to',
-)
-@click.option(
-    '--analysis-project',
-    'analysis_project',
-    default='seqr',
-    help='SM project name to write the intermediate/joint-calling analysis entries to',
-)
-@click.option(
-    '--input-project',
-    'input_projects',
-    multiple=True,
-    required=True,
-    help='Only read samples that belong to the project(s). Can be set multiple times.',
-)
+@pipeline_click_options
 @click.option(
     '--output-project',
     'output_projects',
@@ -486,49 +467,6 @@ class LoadToEsStage(ProjectStage):
     help='Only create ES indicies for the project(s). Can be set multiple times. '
     'Defaults to --input-projects. The name of the ES index will be suffixed '
     'with the dataset version (set by --version)',
-)
-@click.option(
-    '--first-stage',
-    'first_stage',
-    help='Only pick results from the previous stages if they exist. '
-    'If not, skip such samples',
-)
-@click.option(
-    '--last-stage',
-    'last_stage',
-    help='Finish the pipeline after this stage',
-)
-@click.option(
-    '--skip-sample',
-    '-S',
-    'skip_samples',
-    multiple=True,
-    help='Don\'t process specified samples. Can be set multiple times.',
-)
-@click.option(
-    '--force-sample',
-    'force_samples',
-    multiple=True,
-    help='Force reprocessing these samples. Can be set multiple times.',
-)
-@click.option(
-    '--output-version',
-    'output_version',
-    type=str,
-    default='v0',
-    help='Suffix the outputs with this version tag. Useful for testing',
-)
-@click.option(
-    '--keep-scratch/--remove-scratch', 
-    'keep_scratch', 
-    default=True,
-    is_flag=True,
-)
-@click.option('--dry-run', 'dry_run', is_flag=True)
-@click.option(
-    '--ped-file',
-    'ped_files',
-    multiple=True,
 )
 @click.option(
     '--skip-ped-checks',
@@ -557,89 +495,17 @@ class LoadToEsStage(ProjectStage):
     is_flag=True,
     help='Use allele-specific annotations for VQSR',
 )
-@click.option(
-    '--check-smdb-seq-existence/--no-check-smdb-seq-existence',
-    'check_smdb_seq_existence',
-    default=False,
-    is_flag=True,
-    help='Check that files in sequence.meta exist'
-)
-@click.option(
-    '--skip-samples-without-seq-input',
-    'skip_samples_without_seq_input',
-    default=False,
-    is_flag=True,
-    help='If sequence.meta files for a sample don\'t exist, remove this sample '
-         'instead of failing'
-)
-@click.option(
-    '--check-intermediate-existence/--no-check-intermediate-existence',
-    'check_intermediate_existence',
-    default=True,
-    is_flag=True,
-    help='Before running a job, check for an intermediate output before submitting it, '
-         'and if it exists on a bucket, submit a [reuse] job instead. Works well with '
-         '--previous-batch-tsv/--previous-batch-id options.',
-)
-@click.option(
-    '--update-smdb-analyses/--no-update-smdb-analyses',
-    'update_smdb_analyses',
-    is_flag=True,
-    default=True,
-    help='Create analysis entries for queued/running/completed jobs'
-)
-@click.option(
-    '--validate-smdb-analyses/--no-validate-smdb-analyses',
-    'validate_smdb_analyses',
-    is_flag=True,
-    default=False,
-    help='Validate existing analysis entries by checking if a.output exists on '
-         'the bucket. Set the analysis entry to "failure" if output doesn\'t exist'
-)
-@click.option(
-    '--previous-batch-tsv',
-    'previous_batch_tsv_path',
-    help='A list of previous successful attempts from another batch, dumped from '
-         'from the Batch database (the "jobs" table joined on "job_attributes"). '
-         'If the intermediate output for a job exists in a previous attempt, '
-         'it will be passed forward, and a [reuse] job will be submitted.'
-)
-@click.option(
-    '--previous-batch-id',
-    'previous_batch_id',
-    help='6-letter ID of the previous successful batch (corresponds to the directory '
-         'name in the batch logs. e.g. feb0e9 in '
-         'gs://cpg-seqr-main-tmp/hail/batch/feb0e9'
-)
 def main(
-    output_namespace: Namespace,
-    analysis_project: str,
     input_projects: Collection[str],
     output_projects: Optional[Collection[str]],
-    first_stage: Optional[str],
-    last_stage: Optional[str],
-    skip_samples: Collection[str],
-    force_samples: Collection[str],
     output_version: str,
-    keep_scratch: bool,
-    dry_run: bool,
-    ped_files: List[str],
     skip_ped_checks: bool,  # pylint: disable=unused-argument
     hc_shards_num: int,
     use_gnarly: bool,
     use_as_vqsr: bool,
-    check_smdb_seq_existence: bool,
-    skip_samples_without_seq_input: bool,
-    check_intermediate_existence: bool,
-    update_smdb_analyses: bool,
-    validate_smdb_analyses: bool,
-    previous_batch_tsv_path: Optional[str],
-    previous_batch_id: Optional[str],
+    **kwargs,
 ):  # pylint: disable=missing-function-docstring
-    # Determine bucket paths
-
     assert input_projects
-
     title = f'Seqr loading: joint call from: {", ".join(input_projects)}'
     if output_projects:
         title += f', ES index for: {", ".join(output_projects)}'
@@ -655,35 +521,20 @@ def main(
         )
 
     pipeline = SeqrLoaderPipeline(
-        analysis_project=analysis_project,
         name='seqr_loader',
-        output_version=output_version,
-        namespace=output_namespace,
-        keep_scratch=keep_scratch,
         title=title,
-        smdb_update_analyses=update_smdb_analyses,
-        smdb_check_seq_existence=check_smdb_seq_existence,
-        skip_samples_without_seq_input=skip_samples_without_seq_input,
-        validate_smdb_analyses=validate_smdb_analyses,
-        check_intermediate_existence=check_intermediate_existence,
-        first_stage=first_stage,
-        last_stage=last_stage,
         config=SeqrLoaderConfig(
+            output_projects=output_projects,
+            skip_ped_checks=skip_ped_checks,
             hc_shards_num=hc_shards_num,
             use_gnarly=use_gnarly,
             use_as_vqsr=use_as_vqsr,
-            skip_ped_checks=skip_ped_checks,
-            output_projects=output_projects,
         ),
         input_projects=input_projects,
-        skip_samples=skip_samples,
-        force_samples=force_samples,
-        ped_files=ped_files,
-        previous_batch_tsv_path=previous_batch_tsv_path,
-        previous_batch_id=previous_batch_id,
+        output_version=output_version,
+        **kwargs,
     )
-
-    pipeline.run(dry_run)
+    pipeline.run()
 
 
 @dataclass
