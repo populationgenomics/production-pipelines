@@ -7,11 +7,12 @@ from analysis_runner import dataproc
 from sample_metadata import (
     AnalysisApi,
     SampleApi,
-    SequenceUpdateModel,
+    SequenceUpdateModel, SampleUpdateModel,
 )
 
 from cpg_pipes import utils
 from cpg_pipes.pipeline import Pipeline
+from cpg_pipes.utils import Namespace
 
 sapi = SampleApi()
 aapi = AnalysisApi()
@@ -22,7 +23,7 @@ logger.setLevel(logging.INFO)
 
 # INPUT_PROJECT = 'fewgenomes'
 INPUT_PROJECT = 'tob-wgs'
-NAMESPACE = 'main'
+NAMESPACE = Namespace.MAIN
 BENCHMARK_BUCKET = f'gs://cpg-{INPUT_PROJECT}-{NAMESPACE}-analysis/benchmark_combiner'
 
 
@@ -33,8 +34,8 @@ pipe = Pipeline(
     namespace=NAMESPACE,
     title='Benchmark GVCF combiner',
     smdb_check_seq_existence=False,
+    input_projects=[INPUT_PROJECT], 
 )
-pipe.populate_samples(input_projects=[INPUT_PROJECT], namespace=NAMESPACE)
 samples = pipe.get_all_samples()
 sample_ids = [s.id for s in samples]
 gvcf_analysis_per_sid = pipe.db.find_analyses_by_sid(
@@ -74,29 +75,7 @@ df = pd.DataFrame(
 )
 logger.info(f'Found {len(df)} samples in {INPUT_PROJECT} with gvcfs')
 
-for n_workers in [10, 20, 40]:
-    for n_samples in [400, 500]:  #[100, 200, 300]:
-        label = f'nsamples-{n_samples}-nworkers-{n_workers}'
-        out_mt_path = join(BENCHMARK_BUCKET, label, 'combined.mt')
-
-        meta_csv_path = join(BENCHMARK_BUCKET, label, 'meta.csv')
-        subset_df = df.sample(n=n_samples)
-        logger.info(f'Subset dataframe to {len(subset_df)} samples')
-        subset_df.to_csv(meta_csv_path, index=False, sep='\t', na_rep='NA')
-
-        combiner_job = dataproc.hail_dataproc_job(
-            pipe.b,
-            f'{utils.QUERY_SCRIPTS_DIR}/combine_gvcfs.py '
-            f'--meta-csv {meta_csv_path} '
-            f'--out-mt {out_mt_path} '
-            f'--bucket {BENCHMARK_BUCKET}/work',
-            max_age='8h',
-            packages=utils.DATAPROC_PACKAGES,
-            num_secondary_workers=n_workers,
-            job_name=f'Combine {n_samples} GVCFs on {n_workers} workers',
-        )
-
-for n_workers in [30, 50]:
+for n_workers in [10, 30, 20, 40, 50]:
     for n_samples in [100, 200, 300, 400, 500]:
         label = f'nsamples-{n_samples}-nworkers-{n_workers}'
         out_mt_path = join(BENCHMARK_BUCKET, label, 'combined.mt')

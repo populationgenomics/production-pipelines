@@ -8,7 +8,6 @@ from cpg_pipes.jobs.haplotype_caller import produce_gvcf
 from cpg_pipes.pipeline import Pipeline
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, \
     align
-from cpg_pipes.hailbatch import AlignmentInput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -33,7 +32,6 @@ def main():
         'TINY_FQ': benchmark.tiny_fq,
         'TINY_CRAM': benchmark.tiny_cram,
     }
-    # for sample_name, inp in giab_inputs.items():
     for sample_name, inp in tiny_inputs.items():
         cram_path = f'{benchmark.BENCHMARK_BUCKET}/outputs/{sample_name}.cram'
         align_j = align(
