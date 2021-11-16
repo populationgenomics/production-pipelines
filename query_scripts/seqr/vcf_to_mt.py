@@ -4,9 +4,6 @@
 Hail script to submit on a dataproc cluster. 
 
 Converts input multi-sample VCFs into a matrix table, and annotates it.
-
-Requires PYTHONPATH to be set on:
-export PYTHONPATH=hail-elasticsearch-pipelines/luigi_pipeline
 """
 
 import logging

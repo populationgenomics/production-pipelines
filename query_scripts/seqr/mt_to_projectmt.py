@@ -4,9 +4,6 @@
 Hail script to submit on a dataproc cluster. 
 
 Subsets matrix table to a list of samples and annotate with SeqrGenotypesSchema.
-
-Requires PYTHONPATH to be set on:
-export PYTHONPATH=hail-elasticsearch-pipelines/luigi_pipeline
 """
 
 import logging

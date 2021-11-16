@@ -4,9 +4,6 @@
 Hail script to submit on a dataproc cluster. 
 
 Loads the matrix table into ES.
-
-Requires PYTHONPATH to be set on:
-export PYTHONPATH=hail-elasticsearch-pipelines
 """
 
 import logging
