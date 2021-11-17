@@ -1,11 +1,11 @@
 # Production pipelines
 
-Hail Batch analysis pipelines used in the Center are located in the `batches` folder.
+Hail Batch analysis pipelines used at CPG are located in the `pipelines` folder.
 
-Example is the seqr loading pipeline, which takes CRAM/FASTQ data for a set of datasets (e.g. `acute-care` and `perth-neuro`), joint-calls variants, annotates, and creates an ElasticSearch index to use with seqr:
+Example is the seqr loading pipeline, which takes CRAM/FASTQ data for a set of datasets (e.g. `acute-care` and `perth-neuro`), calls variants, annotates them, and creates an ElasticSearch index to use with seqr:
 
 ```sh
-python batches/pipelines/seqr_loader.py \
+python pipelines/seqr_loader.py \
 -n main \
 --analysis-project seqr \
 --input-project acute-care \
@@ -23,10 +23,10 @@ python batches/pipelines/seqr_loader.py \
 --keep-scratch
 ```
 
-Another useful pipeline is `batches/pipelines/pedigree.py` to verify inferred samples relationship and sex against a provided PED file:
+Another useful pipeline is `pipelines/pedigree.py` to verify inferred samples relationship and sex against a provided PED file(s):
 
 ```sh
-python batches/pipelines/pedigree.py \
+python pipelines/pedigree.py \
 -n main \
 --analysis-project seqr \
 --input-project acute-care \
@@ -38,4 +38,4 @@ python batches/pipelines/pedigree.py \
 --keep-scratch
 ```
 
-The `cpg_pipes` package defines many handy python functions which can be imported with `import cpg_pipes`. `cpg_pipes/jobs` defines functions that create Hail Batch Jobs for aligment, fastqc, deduplication, variant calling, VQSR, etc. For usage examples, see `batches/benchmarks/benchmark_alignment.py`, as well as other scripts in that folder.
+The `cpg_pipes` package defines many handy python functions that which can be imported with `import cpg_pipes`. `cpg_pipes/jobs` defines functions that create Hail Batch Jobs for aligment, fastqc, deduplication, variant calling, VQSR, etc. For usage examples, see `pipelines/benchmarks/benchmark_alignment.py`, as well as other scripts in that folder.

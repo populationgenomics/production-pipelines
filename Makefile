@@ -22,7 +22,7 @@ sleep:
 
 .PHONY: seqr
 seqr:
-	python batches/pipelines/seqr_loader.py \
+	python pipelines/seqr_loader.py \
 	-n main \
 	--analysis-project seqr \
 	--input-project acute-care \
@@ -40,7 +40,7 @@ seqr:
 
 .PHONY: pedigree
 pedigree:
-	python batches/pipelines/pedigree.py \
+	python pipelines/pedigree.py \
 	-n main \
 	--analysis-project seqr \
 	--input-project acute-care \
