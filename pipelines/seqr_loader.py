@@ -9,7 +9,7 @@ import sys
 import time
 from dataclasses import dataclass
 from os.path import join
-from typing import Optional, List, Collection, Tuple, Dict, Any
+from typing import Optional, List, Collection, Tuple
 
 import click
 import hail as hl
@@ -24,7 +24,7 @@ from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.pipeline import Namespace, Pipeline, Sample, \
     SampleStage, Project, CohortStage, AnalysisType, ProjectStage, \
-    pipeline_click_options
+    pipeline_click_options, StageDeps
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -45,8 +45,7 @@ class CramStage(SampleStage):
     def add_jobs(
         self, 
         sample: Sample,
-        dep_paths_by_stage=None,
-        dep_jobs=None,
+        deps: StageDeps,  # pylint: disable=unused-argument
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
         if not sample.seq_info:
@@ -104,11 +103,13 @@ class CramPedCheckStage(ProjectStage):
     def add_jobs(
         self,
         project: Project,
-        dep_paths_by_stage: Dict[str, Dict[str, str]] = None,
-        dep_jobs: Optional[List[Job]] = None,
+        deps: StageDeps,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
-        cram_by_sid = dep_paths_by_stage[CramStage]
+        cram_by_sid = {
+            s.id: deps.get_file_path(CramStage, s) 
+            for s in project.samples
+        }
         fingerprint_path_by_sid = {
             sid: CramStage.get_fingerprint_output(cram_path)
             for sid, cram_path in cram_by_sid
@@ -123,7 +124,7 @@ class CramPedCheckStage(ProjectStage):
             web_bucket=self.pipe.web_bucket,
             web_url=self.pipe.web_url,
             tmp_bucket=self.pipe.tmp_bucket,
-            depends_on=dep_jobs or [],
+            depends_on=deps.get_jobs(),
             label='(CRAMs)',
         )
         return somalier_samples_path, [j]
@@ -131,7 +132,8 @@ class CramPedCheckStage(ProjectStage):
 
 class GvcfStage(SampleStage):
     def __init__(self, pipe: 'SeqrLoaderPipeline'):
-        super().__init__(pipe, 
+        super().__init__(
+            pipe, 
             analysis_type=AnalysisType.GVCF,
             requires_stages=[CramStage],
         )
@@ -146,11 +148,10 @@ class GvcfStage(SampleStage):
     def add_jobs(
         self, 
         sample: Sample,
-        dep_paths_by_stage: Dict[Any, str] = None,
-        dep_jobs: Optional[List[Job]] = None,
+        deps: StageDeps,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
-        cram_path = dep_paths_by_stage[CramStage]
+        cram_path = deps.get_file_path(CramStage)
 
         if self.pipe.hc_intervals is None and self.pipe.config.hc_shards_num > 1:
             self.pipe.hc_intervals = split_intervals.get_intervals(
@@ -170,7 +171,7 @@ class GvcfStage(SampleStage):
             tmp_bucket=self.pipe.tmp_bucket,
             overwrite=not self.pipe.check_intermediate_existence,
             check_existence=False,
-            depends_on=dep_jobs,
+            depends_on=deps.get_jobs(),
             smdb=self.pipe.db,
         )
         fingerprint_job, fingerprint_path = pedigree.somalier_extact_job(
@@ -198,11 +199,13 @@ class GvcfPedCheckStage(ProjectStage):
     def add_jobs(
         self,
         project: Project,
-        dep_paths_by_stage: Dict[str, Dict[str, str]] = None,
-        dep_jobs: Optional[List[Job]] = None,
+        deps: StageDeps,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
-        gvcf_by_sid = dep_paths_by_stage[GvcfStage]
+        gvcf_by_sid = {
+            s.id: deps.get_file_path(GvcfStage, s)
+            for s in project.samples
+        }
         fingerprint_path_by_sid = {
             sid: CramStage.get_fingerprint_output(gvcf_path)
             for sid, gvcf_path in gvcf_by_sid
@@ -217,7 +220,7 @@ class GvcfPedCheckStage(ProjectStage):
             web_bucket=self.pipe.web_bucket,
             web_url=self.pipe.web_url,
             tmp_bucket=self.pipe.tmp_bucket,
-            depends_on=dep_jobs or [],
+            depends_on=deps.get_jobs(),
             label='(GVCFs)'
         )
         return somalier_samples_path, [j]
@@ -243,14 +246,17 @@ class JointGenotypingStage(CohortStage):
     def add_jobs(
         self,
         pipe: Pipeline,
-        dep_paths_by_stage: Dict[str, Dict[str, str]] = None,
-        dep_jobs: Optional[List[Job]] = None,
+        deps: StageDeps,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
         
-        gvcf_path_by_sid = dep_paths_by_stage[GvcfStage]
+        gvcf_by_sid = {
+            s.id: deps.get_file_path(GvcfStage, s)
+            for p in pipe.projects
+            for s in p.samples
+        }
 
         not_found_gvcfs = []
-        for sid, gvcf_path in gvcf_path_by_sid.items():
+        for sid, gvcf_path in gvcf_by_sid.items():
             if gvcf_path is None:
                 logger.error(f'Joint genotyping: could not find GVCF for {sid}')
                 not_found_gvcfs.append(sid)
@@ -268,10 +274,10 @@ class JointGenotypingStage(CohortStage):
             samples=self.pipe.get_all_samples(),
             genomicsdb_bucket=f'{self.pipe.analysis_bucket}/genomicsdbs',
             tmp_bucket=self.pipe.tmp_bucket,
-            gvcf_by_sid=gvcf_path_by_sid,
+            gvcf_by_sid=gvcf_by_sid,
             local_tmp_dir=self.pipe.local_tmp_dir,
             overwrite=not self.pipe.check_intermediate_existence,
-            depends_on=dep_jobs or [],
+            depends_on=deps.get_jobs(),
             smdb=self.pipe.db,
             tool=JointGenotyperTool.GnarlyGenotyper 
             if self.pipe.config.use_gnarly 
@@ -295,11 +301,10 @@ class VqsrStage(CohortStage):
     def add_jobs(
         self,
         pipe: Pipeline,
-        dep_paths_by_stage: Dict[Any, str] = None,
-        dep_jobs: Optional[List[Job]] = None,
+        deps: StageDeps,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
-        jc_vcf_path = dep_paths_by_stage[JointGenotypingStage]
+        jc_vcf_path = deps.get_file_path(JointGenotypingStage)
         siteonly_vcf_path = JointGenotypingStage.make_expected_siteonly_output(jc_vcf_path)
 
         tmp_vqsr_bucket = f'{self.pipe.tmp_bucket}/vqsr'
@@ -311,7 +316,7 @@ class VqsrStage(CohortStage):
             work_bucket=tmp_vqsr_bucket,
             web_bucket=tmp_vqsr_bucket,
             gvcf_count=len(self.pipe.get_all_samples()),
-            depends_on=dep_jobs or [],
+            depends_on=deps.get_jobs(),
             scatter_count=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
             output_vcf_path=expected_path,
             use_as_annotations=self.pipe.config.use_as_vqsr,
@@ -334,14 +339,13 @@ class AnnotateCohortStage(CohortStage):
     def add_jobs(
         self,
         pipe: Pipeline,
-        dep_paths_by_stage: Dict[Any, str] = None,
-        dep_jobs: Optional[List[Job]] = None,
+        deps: StageDeps,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
         
         checkpoints_bucket = f'{self.anno_tmp_bucket}/checkpoints'
         
-        vcf_path = dep_paths_by_stage[JointGenotypingStage]
-        vqsr_vcf_path = dep_paths_by_stage.get(VqsrStage)
+        vcf_path = deps.get_file_path(JointGenotypingStage)
+        vqsr_vcf_path = deps.get_file_path(VqsrStage)
 
         expected_path = self.get_expected_output(pipe)
         j = dataproc.hail_dataproc_job(
@@ -359,7 +363,7 @@ class AnnotateCohortStage(CohortStage):
             num_secondary_workers=50,
             job_name='Make MT and annotate cohort',
             vep='GRCh38',
-            depends_on=dep_jobs or [],
+            depends_on=deps.get_jobs(),
         )
         return expected_path, [j]
 
@@ -377,8 +381,7 @@ class AnnotateProjectStage(ProjectStage):
     def add_jobs(
         self,
         project: Project,
-        dep_paths_by_stage: Dict[Any, str] = None,
-        dep_jobs: Optional[List[Job]] = None,
+        deps: StageDeps,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
         if project.name not in self.pipe.config.output_projects:
@@ -388,7 +391,7 @@ class AnnotateProjectStage(ProjectStage):
             )
             return None, []
         
-        annotated_mt_path = dep_paths_by_stage[AnnotateCohortStage]
+        annotated_mt_path = deps.get_file_path(AnnotateCohortStage)
 
         # Make a list of project samples to subset from the entire matrix table
         sample_ids = [s.id for s in project.samples]
@@ -408,7 +411,7 @@ class AnnotateProjectStage(ProjectStage):
             packages=utils.DATAPROC_PACKAGES,
             num_secondary_workers=20,
             job_name=f'{project.name}: annotate project',
-            depends_on=dep_jobs or [],
+            depends_on=deps.get_jobs(),
         )
         return expected_path, [j]
 
@@ -426,8 +429,7 @@ class LoadToEsStage(ProjectStage):
     def add_jobs(
         self,
         project: Project,
-        dep_paths_by_stage: Dict[Any, str] = None,
-        dep_jobs: Optional[List[Job]] = None,
+        deps: StageDeps,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
         if project.name not in self.pipe.config.output_projects:
@@ -437,9 +439,9 @@ class LoadToEsStage(ProjectStage):
             )
             return None, []
 
-        project_mt_path = dep_paths_by_stage[AnnotateProjectStage]
+        project_mt_path = deps.get_file_path(AnnotateProjectStage)
 
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        timestamp = time.strftime('%Y%m%d-%H%M%S')
         j = dataproc.hail_dataproc_job(
             self.pipe.b,
             f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "projectmt_to_es.py")} '
@@ -451,7 +453,7 @@ class LoadToEsStage(ProjectStage):
             packages=utils.DATAPROC_PACKAGES,
             num_secondary_workers=2,
             job_name=f'{project.name}: create ES index',
-            depends_on=dep_jobs or [],
+            depends_on=deps.get_jobs(),
             scopes=['cloud-platform'],
         )
 

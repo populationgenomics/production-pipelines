@@ -503,8 +503,7 @@ def _add_exccess_het_filter(
     -O {j.output_vcf['vcf.gz']} \\
     -V {input_vcf['vcf.gz']} \\
     2> {j.stderr}
-    """
-    ))
+    """))
     if output_vcf_path:
         b.write_output(j.output_vcf, output_vcf_path.replace('.vcf.gz', ''))
     return j, j.output_vcf
@@ -525,7 +524,7 @@ def _add_make_sitesonly_job(
     """
     job_name = 'Joint genotyping: MakeSitesOnlyVcf'
     j = b.new_job(job_name)
-    if utils.can_reuse(output_vcf_path, overwrite):
+    if output_vcf_path and utils.can_reuse(output_vcf_path, overwrite):
         j.name += ' [reuse]'
         return j, b.read_input_group(**{
             'vcf.gz': output_vcf_path,

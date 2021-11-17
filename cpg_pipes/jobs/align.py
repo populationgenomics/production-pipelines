@@ -70,7 +70,7 @@ def align(
     smdb: Optional[SMDB] = None,
     overwrite: bool = True,
     check_existence: bool = True,
-    prev_batch_jobs: Optional[Dict[str, PrevJob]] = None,
+    prev_batch_jobs: Optional[Dict[Tuple[Optional[str], str], PrevJob]] = None,
     fraction_of_64thread_instance: Optional[int] = None,
 ) -> Job:
     """
@@ -107,8 +107,9 @@ def align(
         storage_gb = storage_gb // ncpu
 
     nthreads = ncpu * 2  # hyperthreading
-    if alignment_input.fqs1 and len(alignment_input.fqs1) > 1:
+    if alignment_input.fqs1 is not None and len(alignment_input.fqs1) > 1:
         # running alignment in parallel, then merging
+        assert alignment_input.fqs2 is not None
         assert len(alignment_input.fqs1) == len(alignment_input.fqs2), alignment_input
         fastq_pairs = zip(alignment_input.fqs1, alignment_input.fqs2)
 
@@ -234,11 +235,11 @@ def _align_one(
 
     if aligner in [Aligner.BWAMEM2, Aligner.BWA]:
         if aligner == Aligner.BWAMEM2:
-            tool = 'bwa-mem2'
+            tool_name = 'bwa-mem2'
             j.image(resources.BWAMEM2_IMAGE)
             index_exts = resources.BWAMEM2_INDEX_EXTS
         else:
-            tool = 'bwa'
+            tool_name = 'bwa'
             j.image(resources.BWA_IMAGE)
             index_exts = resources.BWA_INDEX_EXTS
 
@@ -253,7 +254,7 @@ def _align_one(
             bwa_reference=bwa_reference,
             nthreads=nthreads,
             sample_name=sample,
-            tool=tool,
+            tool_name=tool_name,
         )
     else:
         j.image(resources.DRAGMAP_IMAGE)
@@ -273,7 +274,7 @@ def _align_one(
         else:
             files1, files2 = alignment_input.get_fq_inputs(b)
             # Allow for 100G input FQ, 50G output CRAM, plus some tmp storage
-            if len(alignment_input.fqs1) == 1:
+            if alignment_input.fqs1 is not None and len(alignment_input.fqs1) == 1:
                 input_param = f'-1 {files1[0]} -2 {files2[0]}'
             else:
                 prep_inp_cmd = f"""\
@@ -306,7 +307,7 @@ def _build_bwa_command(
     bwa_reference: hb.ResourceGroup,
     nthreads: int,
     sample_name: str,
-    tool: Aligner,
+    tool_name: str,
 ) -> str:
     pull_inputs_cmd = ''
     if alignment_input.bam_or_cram_path:
@@ -358,7 +359,7 @@ def _build_bwa_command(
     # -R   read group header line such as '@RG\tID:foo\tSM:bar'
     return dedent(f"""\
     {pull_inputs_cmd}
-    {tool} mem -K 100000000 {'-p' if use_bazam else ''} -t{nthreads} -Y \\
+    {tool_name} mem -K 100000000 {'-p' if use_bazam else ''} -t{nthreads} -Y \\
     -R '{rg_line}' {bwa_reference.base} {r1_param} {r2_param}
     """).strip()
 
@@ -448,7 +449,7 @@ def finalise_alignment(
     stdout_is_sorted: bool,
     j: Job,
     sample_name: str,
-    project_name: str,
+    project_name: Optional[str],
     nthreads: int,
     markdup_tool: MarkDupTool,
     output_path: Optional[str] = None,
