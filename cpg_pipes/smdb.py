@@ -139,10 +139,16 @@ class SMDB:
         """
         Return a dict of "Sequence" entries by sample ID
         """
-        seq_infos: List[Dict] = self.seqapi.get_sequences_by_sample_ids(sample_ids)
-        seqs = [Sequence.parse(d, self) for d in seq_infos]
-        seqs_by_sid = {seq.sample_id: seq for seq in seqs}
-        return seqs_by_sid
+        from sample_metadata.exceptions import ApiException
+        try:
+            seq_infos: List[Dict] = self.seqapi.get_sequences_by_sample_ids(sample_ids)
+        except ApiException:
+            traceback.print_exc()
+            return {}
+        else:
+            seqs = [Sequence.parse(d, self) for d in seq_infos]
+            seqs_by_sid = {seq.sample_id: seq for seq in seqs}
+            return seqs_by_sid
 
     def update_analysis(self, analysis: Analysis, status: str):
         """
