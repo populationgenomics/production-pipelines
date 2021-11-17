@@ -77,6 +77,13 @@ def pipeline_click_options(function: Callable) -> Callable:
             help='Don\'t process specified samples. Can be set multiple times.',
         ),
         click.option(
+            '--only-sample',
+            '-s',
+            'only_samples',
+            multiple=True,
+            help='Only take these samples (can be set multiple times)',
+        ),
+        click.option(
             '--force-sample',
             'force_samples',
             multiple=True,
@@ -324,7 +331,10 @@ class PipelineStage(ABC):
     ):
         dep_paths_by_stage = dict()
         all_dep_jobs = []
-        for depcls in self.requires_stages:
+        req_stages: Any = self.requires_stages
+        if not isinstance(req_stages, list):
+            req_stages = [req_stages]
+        for depcls in req_stages:
             if depcls.get_name() not in self.pipe.stage_by_name:
                 logger.critical(f'Stage {depcls.get_name()} is not found')
             dep = self.pipe.stage_by_name.get(depcls.get_name())
@@ -721,6 +731,7 @@ class Pipeline:
         config: Any = None,
         input_projects: Optional[List[str]] = None,
         skip_samples: Optional[List[str]] = None,
+        only_samples: Optional[List[str]] = None,
         force_samples: Optional[List[str]] = None,
         ped_files: Optional[List[str]] = None,
     ):
@@ -809,6 +820,7 @@ class Pipeline:
                 input_projects=input_projects,
                 namespace=self.namespace,
                 skip_samples=skip_samples,
+                only_samples=only_samples,
                 ped_files=ped_files,
             )
 
@@ -840,11 +852,13 @@ class Pipeline:
         input_projects: List[str],
         namespace: Namespace,
         skip_samples: Optional[List[str]] = None,
+        only_samples: Optional[List[str]] = None,
     ):
         samples_by_project = self.db.get_samples_by_project(
             project_names=input_projects,
             namespace=namespace,
             skip_samples=skip_samples,
+            only_samples=only_samples,
         )
         for proj_name, sample_datas in samples_by_project.items():
             project = Project(
@@ -929,6 +943,7 @@ class Pipeline:
         self,
         input_projects: List[str],
         skip_samples: Optional[List[str]] = None,
+        only_samples: Optional[List[str]] = None,
         ped_files: Optional[List[str]] = None,
         namespace: Optional[Namespace] = None,
     ) -> None:
@@ -939,6 +954,7 @@ class Pipeline:
         self._populate_projects(
             input_projects=input_projects,
             skip_samples=skip_samples,
+            only_samples=only_samples,
             namespace=namespace or self.namespace,
         )
         self._populate_analysis()

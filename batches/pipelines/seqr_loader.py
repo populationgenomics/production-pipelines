@@ -46,7 +46,7 @@ class CramStage(SampleStage):
         self, 
         sample: Sample,
         dep_paths_by_stage=None,
-        dep_jobs: Optional[List[Job]] = None,
+        dep_jobs=None,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
 
         if not sample.seq_info:

@@ -104,6 +104,7 @@ class SMDB:
         project_names: List[str],
         namespace: Namespace,
         skip_samples: Optional[List[str]] = None,
+        only_samples: Optional[List[str]] = None,
     ) -> Dict[str, List[Dict]]:
         """
         Returns a dictionary of samples per input projects
@@ -122,9 +123,15 @@ class SMDB:
             )
             samples_by_project[proj_name] = []
             for s in samples:
-                if skip_samples and s['id'] in skip_samples:
-                    logger.info(f'Skiping sample: {s["id"]}')
-                    continue
+                if only_samples:
+                    if s['id'] in only_samples or s['external_id'] in only_samples:
+                        logger.info(f'Taking sample: {s["id"]}')
+                    else:
+                        continue
+                if skip_samples:
+                    if s['id'] in skip_samples or s['external_id'] in skip_samples:
+                        logger.info(f'Skiping sample: {s["id"]}')
+                        continue
                 samples_by_project[proj_name].append(s)
         return samples_by_project
 
@@ -160,10 +167,14 @@ class SMDB:
         """
         Query the DB to find the last completed joint-calling analysis for the samples
         """
-        data = self.aapi.get_latest_complete_analysis_for_type(
-            project=self.analysis_project,
-            analysis_type='joint-calling',
-        )
+        from sample_metadata.exceptions import ApiException
+        try:
+            data = self.aapi.get_latest_complete_analysis_for_type(
+                project=self.analysis_project,
+                analysis_type='joint-calling',
+            )
+        except ApiException:
+            return None
         a = _parse_analysis(data)
         if not a:
             return None
@@ -178,6 +189,7 @@ class SMDB:
         sample_ids: Collection[str],
         analysis_type: str,
         project: Optional[str] = None,
+        meta: Optional[Dict] = None
     ) -> Dict[str, Analysis]:
         """
         Query the DB to find the last completed analysis for the type and samples,
@@ -188,14 +200,20 @@ class SMDB:
         
         project = project or self.analysis_project
         analysis_per_sid: Dict[str, Analysis] = dict()
+        request_body = sample_ids
+        if meta:
+            request_body = {
+                'sample_ids': sample_ids,
+                'meta': meta
+            }
         try:
             logger.info(
                 f'Querying {analysis_type} analysis entries for project {project}'
             )
             datas = self.aapi.get_latest_analysis_for_samples_and_type(
-                project=project,
                 analysis_type=analysis_type,
-                request_body=sample_ids,
+                project=project,
+                request_body=request_body
             )
         except exceptions.ApiException:
             return dict()
