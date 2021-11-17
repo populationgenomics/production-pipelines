@@ -1,0 +1,12 @@
+{
+  "reference_fasta": "gs://cpg-reference/hg38/v0/Homo_sapiens_assembly38.fasta",
+  "reference_index": "gs://cpg-reference/hg38/v0/Homo_sapiens_assembly38.fasta.fai",
+  "reference_dict": "gs://cpg-reference/hg38/v0/Homo_sapiens_assembly38.dict",
+  "wham_include_list_bed_file": "gs://cpg-reference/hg38/v0/sv-resources/resources/v1/wham_whitelist.bed",
+  "delly_exclude_intervals_file": "gs://cpg-reference/hg38/v0/sv-resources/resources/v1/delly_human.hg38.excl.tsv",
+  "primary_contigs_list": "gs://cpg-reference/hg38/v0/sv-resources/resources/v1/primary_contigs.list",
+  "primary_contigs_fai": "gs://cpg-reference/hg38/v0/sv-resources/resources/v1/contig.fai",
+  "preprocessed_intervals": "gs://cpg-reference/hg38/v0/sv-resources/resources/v1/preprocessed_intervals.interval_list",
+  "manta_region_bed": "gs://cpg-reference/hg38/v0/sv-resources/resources/v1/primary_contigs_plus_mito.bed.gz",
+  "melt_standard_vcf_header": "gs://cpg-reference/hg38/v0/sv-resources/resources/v1/melt_standard_vcf_header.txt"
+}
