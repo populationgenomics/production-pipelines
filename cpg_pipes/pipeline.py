@@ -1,3 +1,52 @@
+"""
+Implements a Pipeline that is capable of plugging multiple "stages" together,
+by resolving dependencies through the sample-metadata database or by checking
+buckets directly. Each stage adds jobs to Hail Batch. Each stage acts on "target",
+which can be a sample, a project, or an entire cohort. Pipeline would resolve 
+dependencies between stages of different levels accordingly.
+
+For usage examples, see the "pipelines" folder in the root of this repository.
+
+Basic example is also provided here:
+
+@stage(analysis_type=AnalysisType.CRAM)
+class CramStage(SampleStage):
+    def queue_jobs(self, sample: Sample, inputs: StageResults) -> StageResults:
+        expected_path = f'{sample.project.get_bucket()}/cram/{sample.id}.cram'
+        job = align.bwa(b=self.pipe.b, ..., output_path=expected_path)
+        return self.make_outputs(sample, paths=expected_path, jobs=[job])
+
+@stage(analysis_type=AnalysisType.GVCF, requires_stages=CramStage)
+class GvcfStage(SampleStage):
+    def queue_jobs(self, sample: Sample, inputs: StageResults) -> StageResults:
+        cram_path = inputs.get_file_path(target=sample, stage=CramStage)
+        expected_path = f'{sample.project.get_bucket()}/gvcf/{sample.id}.g.vcf.gz'
+        job = haplotype_caller.produce_gvcf(b=self.pipe.b, ..., output_path=expected_path)
+        return self.make_outputs(sample, paths=expected_path, jobs=[job])
+
+@stage(analysis_type=AnalysisType.JOINT_CALLING)
+class JointCallingStage(CohortStage):
+    def queue_jobs(self, pipeline: Pipeline, inputs: StageResults) -> StageResults:
+        gvcf_by_sid = {
+            s.id: inputs.get_file_path(stage=GvcfStage, target=s)
+            for p in pipe.projects
+            for s in p.samples
+        }
+        expected_path = ...
+        job = make_joint_genotyping_jobs(b=self.pipe.b, ..., output_path=expected_path)
+        return self.make_outputs(pipe, paths=expected_path, jobs=[job])
+
+@click.command()
+@pipeline_click_options
+def main(**kwargs):
+    run_pipeline(
+        name='my_joint_calling_pipeline',
+        title='My joint calling pipeline',
+        stages_in_order=[CramStage, GvcfStage, JointCallingStage],
+        **kwargs
+    )
+"""
+
 import functools
 import shutil
 import sys
@@ -25,7 +74,7 @@ logger.setLevel(logging.INFO)
 
 def pipeline_click_options(function: Callable) -> Callable:
     """
-    Decorator to use with click, e.g.:
+    Decorator to use with click when writing a pipeline script, e.g.:
     @click.command()
     @pipeline_click_options
     def main():
