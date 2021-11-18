@@ -1,4 +1,4 @@
-import os
+import functools
 import shutil
 import sys
 import tempfile
@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import logging
 from enum import Enum
 from os.path import join
-from typing import List, Dict, Optional, Any, Tuple, Callable, cast, Type
+from typing import List, Dict, Optional, Any, Tuple, Callable, cast, Type, Union
 from abc import ABC, abstractmethod
 
 import click
@@ -16,7 +16,7 @@ from hailtop.batch.job import Job
 from cpg_pipes import utils
 from cpg_pipes.utils import Namespace, AnalysisType
 from cpg_pipes.smdb import SMDB, Analysis, Sequence
-from cpg_pipes.hailbatch import AlignmentInput, PrevJob
+from cpg_pipes.hailbatch import AlignmentInput, PrevJob, get_hail_bucket, setup_batch
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -163,299 +163,560 @@ def pipeline_click_options(function: Callable) -> Callable:
     return function
 
 
-class Batch(hb.Batch):
-    """
-    Inheriting from Hail `Batch` class just so we can register added jobs to
-    print statistics before submitting.
-    """
-    def __init__(self, name, backend, *args, **kwargs):
-        super().__init__(name, backend, *args, **kwargs)
-        # Job stats registry
-        self.labelled_jobs = dict()
-        self.other_job_num = 0
-        self.total_job_num = 0
-
-    def new_job(
-        self,
-        name: Optional[str] = None,
-        attributes: Optional[Dict[str, str]] = None,
-        **kwargs,
-    ) -> Job:
-        """
-        Adds job to the Batch, and also registers it in `self.job_stats` for
-        statistics.
-        """
-        if not name:
-            logger.critical('Error: job name must be defined')
-        
-        attributes = attributes or dict()
-        project = attributes.get('project')
-        sample = attributes.get('sample')
-        samples = attributes.get('samples')
-        label = attributes.get('label', name)
-
-        if sample and project:
-            name = f'{project}/{sample}: {name}'
-        elif project:
-            name = f'{project}: {name}'
-
-        if label and (sample or samples):
-            if label not in self.labelled_jobs:
-                self.labelled_jobs[label] = {'job_n': 0, 'samples': set()}
-            self.labelled_jobs[label]['job_n'] += 1
-            self.labelled_jobs[label]['samples'] |= (samples or {sample})
-        else:
-            self.other_job_num += 1
-        self.total_job_num += 1
-        j = super().new_job(name, attributes=attributes)
-        return j
-    
-
-class StageDeps:
+class StageResults:
     """
     Object of this class is passed to `add_jobs` method of a Stage, and can be used
     to query dependency files and jobs
     """
-    def __init__(self, pipe):
-        self.pipe = pipe
-        self.path_by_target_by_stagecls: Dict[Type, Dict['StageTarget', str]] = dict()
-        self.jobs_by_stagecls: Dict[Type, List[Job]] = dict()
-
-    def get_file_path(self, stagecls: Type, target: Optional['StageTarget'] = None) -> str:
-        if target is None:
-            target = self.pipe
-        return self.path_by_target_by_stagecls[stagecls][target]
-    
-    def get_jobs(self, stagecls: Optional[Type] = None) -> List[Job]:
-        if stagecls is not None:
-            return self.jobs_by_stagecls[stagecls]
-        else:
-            all_jobs = []
-            for jobs in self.jobs_by_stagecls.values():
-                all_jobs.extend(jobs)
-            return all_jobs
-
-    def add_jobs(self, jobs: List[Job], stagecls: Type):
-        self.jobs_by_stagecls[stagecls] = jobs
-
-    def add_file_path(
+    def __init__(
         self, 
-        path: str,
-        stagecls: Type,
+        pipe: 'Pipeline',
+        sourcestage: Optional['Stage'] = None,
+    ):
+        self._pipe = pipe
+        self._sourcestage = sourcestage
+        self._fpath_dict_by_target_by_stagecls: Dict[str, Dict[str, Dict[str, str]]] = dict()
+        self._resource_dict_by_target_by_stagecls: Dict[str, Dict[str, Dict[str, hb.Resource]]] = dict()
+        self._jobs: List[Job] = []
+        
+    def append(self, other: 'StageResults'):
+        """
+        Merge in another StageDeps object
+        """
+        for stage, fpath_dict_by_target in other._fpath_dict_by_target_by_stagecls.items():
+            for target, fpath_dict in fpath_dict_by_target.items():
+                self.add_paths(fpath_dict, stage=stage, target=target)
+
+        for stage, resource_by_target in other._resource_dict_by_target_by_stagecls.items():
+            for target, resource in resource_by_target.items():
+                self.add_resources(resource, stage=stage, target=target)
+
+        self.add_jobs(other.get_jobs())
+
+    def get_file_path_by_target(
+        self, 
+        stage: Optional[Callable] = None,
+        id: Optional[str] = None,
+    ) -> Dict[str, str]:
+        if stage is not None:
+            stage_name = stage.__name__
+        else:
+            assert self._sourcestage is not None
+            stage_name = self._sourcestage.name
+        return {
+            trg: self._fpath_dict_by_target_by_stagecls[stage_name][trg][id]
+            for trg in self._fpath_dict_by_target_by_stagecls[stage_name]
+        }
+
+    def get_file_path_dict_by_target(
+        self, 
+        stage: Optional[Callable] = None,
+    ) -> Dict[str, Dict[str, str]]:
+        return self._get(
+            d=self._fpath_dict_by_target_by_stagecls,
+            stage=stage,
+        )
+
+    def get_file_path_dict(
+        self, 
+        target: 'StageTarget',
+        stage: Optional[Callable] = None,
+    ) -> Dict[str, str]:
+        return self.get_file_path(
+            target=target,
+            stage=stage,
+        )
+
+    def get_file_path(
+        self, 
+        target: 'StageTarget',
+        stage: Optional[Callable] = None,
+        id: Optional[str] = None,
+    ) -> str:
+        return self._get(
+            d=self._fpath_dict_by_target_by_stagecls,
+            target=target,
+            stage=stage,
+            id=id
+        )
+
+    def get_resource_by_target(
+        self, 
+        stage: Optional[Callable] = None,
+        id: Optional[str] = None,
+    ) -> Dict[str, hb.Resource]:
+        if stage is not None:
+            stage_name = stage.__name__
+        else:
+            assert self._sourcestage is not None
+            stage_name = self._sourcestage.name
+        return {
+            trg: self._resource_dict_by_target_by_stagecls[stage_name][trg][id]
+            for trg in self._fpath_dict_by_target_by_stagecls[stage_name]
+        }
+
+    def get_resource_dict_by_target(
+        self, 
+        stage: Optional[Callable] = None,
+    ) -> Dict[str, Dict[str, hb.Resource]]:
+        return self._get(
+            d=self._resource_dict_by_target_by_stagecls,
+            stage=stage,
+        )
+
+    def get_resource_dict(
+        self, 
+        stage: Optional[Callable] = None,
+        target: Optional['StageTarget'] = None
+    ) -> Dict[str, hb.Resource]:
+        return self.get_resource(
+            stage=stage,
+            target=target
+        )
+
+    def get_resource(
+        self, 
+        stage: Optional[Callable] = None,
         target: Optional['StageTarget'] = None,
+        id: Optional[str] = None,
+    ) -> hb.Resource:
+        if target is None:
+            target = self._pipe
+        self._get(
+            d=self._resource_dict_by_target_by_stagecls,
+            stage=stage,
+            target=target,
+            id=id,
+        )
+    
+    def _get(
+        self,
+        d: Dict,
+        target: Optional['StageTarget'] = None,
+        stage: Optional[Callable] = None,
+        id: Optional[str] = None,
+    ):
+        if stage is not None:
+            stage_name = stage.__name__
+        else:
+            assert self._sourcestage is not None
+            stage_name = self._sourcestage.name
+        d = d[stage_name]
+        if target:
+            d = d[target.get_target_name()]
+        return d[id]
+
+    def get_jobs(self) -> List[Job]:
+        return self._jobs
+
+    def add_jobs(self, jobs: Optional[List[Job]]):
+        if jobs:
+            self._jobs.extend(jobs)
+
+    def add_paths(
+        self, 
+        data: Union[str, Dict[str, str]],
+        stage: Optional[str] = None,
+        target: Optional[Union['StageTarget', str]] = None,
     ):
         """
-        Add dependency file path
+        Add dependency file paths
         """
+        self._add_file_data(data, stage=stage, is_resource=False, target=target)
+
+    def add_resources(
+        self, 
+        data: Union[hb.Resource, Dict[str, hb.Resource]],
+        stage: Optional[str] = None,
+        target: Optional[Union['StageTarget', str]] = None,
+    ):
+        """
+        Add dependency Hail Batch resources
+        """
+        self._add_file_data(data, stage=stage, is_resource=True, target=target)
+
+    def _add_file_data(
+        self,
+        data: Union[Union[str, hb.Resource], Dict[str, Union[str, hb.Resource]]],
+        is_resource: bool,
+        stage: Optional[str] = None,
+        target: Optional[Union['StageTarget', str]] = None,
+    ):
+        """
+        Add dependency file paths or Hail Batch output resoruces.
+        Can be one object or a dictionary.
+        """
+        if stage is None:
+            assert self._sourcestage is not None
+            stage = self._sourcestage.name
         if target is None:
-            target = self.pipe
-        if stagecls not in self.path_by_target_by_stagecls:
-            self.path_by_target_by_stagecls[stagecls] = dict()
-        self.path_by_target_by_stagecls[stagecls][target] = path
+            target = self._pipe
+        if not isinstance(data, dict):
+            data = {None: data}
+        if is_resource:
+            d = self._resource_dict_by_target_by_stagecls
+        else:
+            d = self._fpath_dict_by_target_by_stagecls
+        if stage not in d:
+            d[stage] = dict()
+        if not isinstance(target, str):
+            target = cast(StageTarget, target).get_target_name()
+        d[stage][target] = data
+
+
+# class StageLevel(Enum):
+#     SAMPLE = 0
+#     PROJECT = 0
+#     COHORT = 0
+
+
+def stage(
+    _cls=None, 
+    *,
+    analysis_type: Optional[AnalysisType] = None, 
+    requires_stages: Optional[Union[List[Type['Stage']], Type]] = None,
+    # level: StageLevel = StageLevel.COHORT,
+):
+    """
+    Implements a standard class decorator pattern with an optional argument.
+    The goal is to make subclasses of Stage singleton classes, that would allow 
+    only one object per subclass.
+    """
+    def decorator_stage(cls):
+        @functools.wraps(cls)
+        def wrapper_stage(pipe: 'Pipeline' = None):
+            return cls(
+                name=cls.__name__,
+                pipe=pipe,
+                analysis_type=analysis_type,
+                requires_stages=requires_stages,
+                # level=level,
+            )
+        return wrapper_stage
+
+    if _cls is None:
+        return decorator_stage
+    else:
+        return decorator_stage(_cls)
+
+
+# def sample_stage(*args, **kwargs):
+#     return stage(*args, **kwargs, level=StageLevel.SAMPLE)
+# 
+# 
+# def project_stage(*args, **kwargs):
+#     return stage(*args, **kwargs, level=StageLevel.PROJECT)
+# 
+# 
+# def cohort_stage(*args, **kwargs):
+#     return stage(*args, **kwargs, level=StageLevel.COHORT)
+
+
+# def sample_stage(
+#     _fun=None, 
+#     *, 
+#     analysis_type: Optional[AnalysisType] = None, 
+#     requires_stages: Optional[Union[List[Type['Stage']], Type]] = None
+# ):
+#     """
+#     Implements a standard Class decorator pattern with an optional argument.
+#     The goal is to make subclasses of Stage singleton classes, that would allow 
+#     only one object per subclass.
+#     """
+#     stage.instances = dict()  # stores instance per subclass
+# 
+#     def decorator_stage(cls):
+#         @functools.wraps(cls)
+#         def wrapper_stage(*args, **kwargs):
+#             if cls not in stage.instances:
+#                 stage.instances[cls] = cls(
+#                     analysis_type=analysis_type,
+#                     requires_stages=requires_stages
+#                 )
+#             return stage.instances[cls]
+#         return wrapper_stage
+# 
+#     if _cls is None:
+#         return decorator_stage
+#     else:
+#         return decorator_stage(_cls)
 
 
 class Stage(ABC):
+    """
+    Abstract class for a pipeline stage
+    """
     def __init__(
-        self, 
-        pipe: 'Pipeline', 
-        requires_stages: Optional[List] = None,
+        self,
+        pipe: 'Pipeline',
+        name: str,
+        requires_stages: Optional[Union[List[Callable], Type]] = None,
         analysis_type: Optional[AnalysisType] = None,
     ):
-        """
-        requires_stages: list of stage names
-        """
-        self.pipe = pipe
-        self.requires_stages = requires_stages or []
+        self.name = name
+        self.pipe: 'Pipeline' = pipe
+        self.required_stages_classes: List[Callable] = []
+        if requires_stages:
+            if isinstance(requires_stages, list):
+                self.required_stages_classes.extend(requires_stages)
+            elif isinstance(requires_stages, Callable):
+                self.required_stages_classes.append(requires_stages)
+            else:
+                logger.critical(
+                    'requires_stages must be a Type or a list of Type objects that ' +
+                    'are subclasses of Stage (SampleStage, ProjectStage, CohortStage)'
+                )
+                sys.exit(1)
+
+        # Populated in pipeline.run(), after we know all stages
+        self.required_stages: List[Stage] = []
+        
+        # If analysis type is defined, it will be used to find and reuse existing
+        # outputs from the SMDB
         self.analysis_type = analysis_type
 
-        # self.active=True means taht the stage wasn't skipped and jobs were added
+        # Populated when the stage is added by calling `add_to_the_pipeline`
+        self.results: StageResults = StageResults(pipe=self.pipe, sourcestage=self)
+
+        # self.active=True means that the stage wasn't skipped and jobs were added
         # into the pipeline, and we shoule expect target.ouptut_by_stage 
         # to be populated. Otherwise, self.get_expected_output() should work.
-        self.active = False  
+        self.skipped = False  
+        # self.required=True means that is required for another active stage,
+        # even if it was skipped
+        self.required = True
 
-    @classmethod
-    def get_name(cls):
-        return cls.__name__.replace('Stage', '')
+    def get_name(self):
+        return self.name
 
+    @staticmethod
     @abstractmethod
-    def get_expected_output(self, *args):
+    def get_expected_output(target: 'StageTarget') -> Optional[Union[str, Dict[str, str]]]:
+        """
+        Path(s) to files that the stage is epxected to generate for the `target`.
+        Used within the stage to pass the output paths to commands, as well as
+        by the pipeline to get expected paths when the stage is skipped and
+        didn't return a `StageDeps` object from `add_jobs()`.
+        """
         pass
 
     @abstractmethod
-    def add_jobs(
+    def queue_jobs(
         self,
         target: 'StageTarget',
-        deps: StageDeps,
-    ) -> Tuple[Optional[str], Optional[List[Job]]]:
+        inputs: StageResults,
+    ) -> StageResults:
         """
-        Implements logic of the Stage: adds Batch jobs that do the processing.
-        Assumes that all the household work is done - checking missing inputs,
-        checking the SMDB, checking for possible reuse of existing outputs, etc
+        Implements logic of the Stage: creates Batch jobs that do the processing.
+        Assumes that all the household work is done: checking missing inputs
+        from requried stages, checking the SMDB, checking for possible reuse of 
+        existing outputs.
         """
         pass
 
+    @abstractmethod
     def add_to_the_pipeline(self, pipe: 'Pipeline'):
         """
-        Call add_jobs(target) for each target in the pipeline
+        Call `output = add_jobs(target, input)` for each target in the pipeline
         """
-        self.active = True
-
-    def get_deps(
-        self, 
-        dep: 'Stage',  # upstream stage
-        target: 'StageTarget',
-    ) -> Tuple[Dict['StageTarget', Optional[str]], List[Job]]:
-        """
-        Sort of a multiple dispatch. 
         
-        Collecting dependencies paths. Will return a path when the dependency is the
-        same or a higher-level stage (e.g. Project-level to a Sample-level), or will
-        return a dictionary when the dependency is of a more fine-grained level:
-        (e.g. outputs of a Sample-level stage for a Project-level stage)
-        """
-        if (
-            issubclass(self.__class__, SampleStage) and issubclass(dep.__class__, SampleStage) or
-            issubclass(self.__class__, ProjectStage) and issubclass(dep.__class__, ProjectStage) or
-            issubclass(self.__class__, CohortStage) and issubclass(dep.__class__, CohortStage)
-        ):
-            return (
-                {self.pipe: dep.find_output(target)},
-                target.jobs_by_stagecls.get(dep.__class__, [])
-            )
-
-        elif issubclass(self.__class__, ProjectStage) and issubclass(dep.__class__, SampleStage):
-            dep_path_by_id = dict()
-            dep_jobs = []
-            for s in cast(Project, target).samples:
-                dep_path_by_id[cast(StageTarget, s)] = dep.find_output(s)
-                dep_jobs.extend(s.jobs_by_stagecls.get(dep.__class__, []))
-            return dep_path_by_id, dep_jobs
-
-        elif issubclass(self.__class__, CohortStage) and issubclass(dep.__class__, SampleStage):
-            dep_path_by_id = dict()
-            dep_jobs = []
-            for p in cast(Pipeline, target).projects:
-                for s in p.samples:
-                    dep_path_by_id[cast(StageTarget, s)] = dep.find_output(s)
-                    dep_jobs.extend(s.jobs_by_stagecls.get(dep.__class__, []))
-            return dep_path_by_id, dep_jobs
-
-        elif issubclass(self.__class__, CohortStage) and issubclass(dep.__class__, ProjectStage):
-            dep_path_by_id = dict()
-            dep_jobs = []
-            for p in cast(Pipeline, target).projects:
-                dep_path_by_id[cast(StageTarget, p)] = dep.find_output(p)
-                dep_jobs.extend(p.jobs_by_stagecls.get(dep.__class__, []))
-            return dep_path_by_id, dep_jobs
-
-        elif issubclass(self.__class__, SampleStage) and issubclass(dep.__class__, ProjectStage):
-            sample = cast(Sample, target)
-            return (
-                {self.pipe: dep.find_output(sample.project)},
-                sample.project.jobs_by_stagecls.get(dep.__class__, [])
-            )
-
-        elif issubclass(dep.__class__, CohortStage):
-            return (
-                {self.pipe: dep.find_output(self.pipe)},
-                self.pipe.jobs_by_stagecls.get(dep.__class__, [])
-            )
+    def _add_to_the_pipeline_for_target(self, target: 'StageTarget') -> StageResults:
+        if not self.skipped:
+            logger.info(f'{self.get_name()}: adding jobs for {target.get_target_name()}')
+            return self._add_or_reuse_jobs(target)
+        elif self.required:
+            reuse_paths = self._check_if_can_reuse(target)
+            if not reuse_paths:
+                logger.critical(
+                    f'Stage {self.name} is required, but skipped and '
+                    f'cannot reuse outputs for {target.get_target_name()}'
+                )
+                sys.exit(1)
+            return self.make_outputs(target, paths=reuse_paths) 
         else:
-            logger.critical(f'Unknown stage types: {type(self), type(dep)}')
-            sys.exit(1)
+            # Stager is not needed, returning empty outputs
+            return self.make_outputs(target)
 
-    def _add_jobs(self, target: 'StageTarget'):
+    # def append_to_inputs_from_prev_stage(
+    #     self,
+    #     inputs: StageResults,
+    #     prev_stage: 'Stage',
+    #     prev_target: 'StageTarget',
+    # ):
+    #     """
+    #     Populates output genereated by `prev_stage` into `inputs` for each 
+    #     `prev_target`.
+    #     
+    #     Sort of a multiple dispatch. 
+    #     
+    #     Collecting dependencies paths. Will return a path when the dependency is the
+    #     same or a higher-level stage (e.g. Project-level to a Sample-level), or will
+    #     return a dictionary when the dependency is of a more fine-grained level:
+    #     (e.g. outputs of a Sample-level stage for a Project-level stage)
+    #     """
+    #     if (
+    #         issubclass(self.__class__, SampleStage) and issubclass(prev_stage.__class__, SampleStage) or
+    #         issubclass(self.__class__, ProjectStage) and issubclass(prev_stage.__class__, ProjectStage) or
+    #         issubclass(self.__class__, CohortStage) and issubclass(prev_stage.__class__, CohortStage)
+    #     ):
+    #         inputs.add_paths(prev_stage.find_output(prev_target))
+    #         inputs.add_jobs(prev_target.jobs_by_stagecls.get(prev_stage.__class__))
+    # 
+    #     elif issubclass(self.__class__, ProjectStage) and issubclass(prev_stage.__class__, SampleStage):
+    #         dep_path_by_id = dict()
+    #         dep_jobs = []
+    #         for s in cast(Project, prev_target).samples:
+    #             dep_path_by_id[cast(StageTarget, s)] = prev_stage.find_output(s)
+    #             dep_jobs.extend(s.jobs_by_stagecls.get(prev_stage.__class__, []))
+    #         return dep_path_by_id, dep_jobs
+    # 
+    #     elif issubclass(self.__class__, CohortStage) and issubclass(prev_stage.__class__, SampleStage):
+    #         dep_path_by_id = dict()
+    #         dep_jobs = []
+    #         for p in cast(Pipeline, prev_target).projects:
+    #             for s in p.samples:
+    #                 dep_path_by_id[cast(StageTarget, s)] = prev_stage.find_output(s)
+    #                 dep_jobs.extend(s.jobs_by_stagecls.get(prev_stage.__class__, []))
+    #         return dep_path_by_id, dep_jobs
+    # 
+    #     elif issubclass(self.__class__, CohortStage) and issubclass(prev_stage.__class__, ProjectStage):
+    #         dep_path_by_id = dict()
+    #         dep_jobs = []
+    #         for p in cast(Pipeline, prev_target).projects:
+    #             dep_path_by_id[cast(StageTarget, p)] = prev_stage.find_output(p)
+    #             dep_jobs.extend(p.jobs_by_stagecls.get(prev_stage.__class__, []))
+    #         return dep_path_by_id, dep_jobs
+    # 
+    #     elif issubclass(self.__class__, SampleStage) and issubclass(prev_stage.__class__, ProjectStage):
+    #         sample = cast(Sample, prev_target)
+    #         return (
+    #             {self.pipe: prev_stage.find_output(sample.project)},
+    #             sample.project.jobs_by_stagecls.get(prev_stage.__class__, [])
+    #         )
+    # 
+    #     elif issubclass(prev_stage.__class__, CohortStage):
+    #         return (
+    #             {self.pipe: prev_stage.find_output(self.pipe)},
+    #             self.pipe.jobs_by_stagecls.get(prev_stage.__class__, [])
+    #         )
+    #     else:
+    #         logger.critical(f'Unknown stage types: {type(self), type(prev_stage)}')
+    #         sys.exit(1)
+
+    def _add_jobs(self, target: 'StageTarget') -> StageResults:
         """
-        Handles all dirty work of checking job dependencies, then calls 
-        the public add_jobs()
+        Checks the existence of the depenencies, and calls 
+        the public `outputs = self.queue_jobs(target, inputs)`
         """
-        stagedeps = StageDeps(self.pipe)
+        # Building the inputs for the job here
+        inputs = StageResults(pipe=self.pipe)
 
-        # dep_paths_by_stage: Union[str, Dict[str, str]] = dict()
-        # all_dep_jobs = []
-        req_stages: Any = self.requires_stages
-        if not isinstance(req_stages, list):
-            req_stages = [req_stages]
-        for depcls in req_stages:
-            if depcls not in self.pipe.stage_by_stagecls:
-                logger.critical(f'Stage {depcls.get_target_name()} is not found')
-            dep = self.pipe.stage_by_stagecls[depcls]
-            deppath_by_deptarget, dep_jobs = self.get_deps(dep, target)
-
-            target_name = target.get_target_name()
-            target_name = f' (on {target_name})' if target_name else ''
+        for prev_stage in self.required_stages:
+            # d = prev_stage.results.get_file_path_dict_by_target()
+            # for target, file_path_dict in d.items():
+            #     for k, file_path in file_path_dict.items():
+            #         if not self.pipe.check_intermediate_existence:
+            # 
+            #         if not k:
             
-            if isinstance(list(deppath_by_deptarget.keys())[0], Pipeline):
-                # When we deal with stages of the same level 
-                # (Stage-Stage, Project-Project, Cohort-Cohort), they will be indexed
-                # by Pipeline
-                deppath = list(deppath_by_deptarget.values())[0]
-                if deppath is None:
-                    logger.critical(
-                        f'Cannot find required output '
-                        f'for stage {self.get_name()}{target_name} '
-                        f'from stage {dep.get_name()}. Exiting'
-                    )
-                    sys.exit(1)
-                else:
-                    stagedeps.add_file_path(deppath, stagecls=depcls)
-            else:
-                targets_with_not_found_deps: List['StageTarget'] = []
-                for deptarget, deppath in deppath_by_deptarget.items():
-                    if deppath is None:
-                        targets_with_not_found_deps.append(deptarget)
-                    else:
-                        stagedeps.add_file_path(deppath, target=deptarget, stagecls=depcls)
+            inputs.append(prev_stage.results)
 
-                if targets_with_not_found_deps:
-                    logger.critical(
-                        f'Cannot find {len(targets_with_not_found_deps)} required outputs '
-                        f'for stage {self.get_name()}{target_name} '
-                        f'from stage {dep.get_name()} on '
-                        f'{"|".join(str(t.get_target_name()) for t in targets_with_not_found_deps)}. '
-                        f'Exiting'
-                    )
-                    sys.exit(1)
-                    
-            stagedeps.add_jobs(dep_jobs, stagecls=depcls)
+        return self.queue_jobs(target, inputs)
+            
+            # self.append_to_inputs_from_prev_stage(
+            #     inputs=inputs,
+            #     prev_stage=prev_stage, 
+            # )
 
-        res_path, res_jobs = self.add_jobs(target, stagedeps)
-        if res_path:
-            target.output_by_stagecls[self.__class__] = res_path
-        if res_jobs:
-            target.jobs_by_stagecls[self.__class__] = res_jobs
+            # target_name = target.get_target_name()
+            # target_name = f' (on {target_name})' if target_name else ''
+            # 
+            # if isinstance(list(deppath_by_deptarget.keys())[0], Pipeline):
+            #     # When we deal with stages of the same level 
+            #     # (Stage-Stage, Project-Project, Cohort-Cohort), they will be indexed
+            #     # by a Pipeline object
+            #     deppathdata = list(deppath_by_deptarget.values())[0]
+            #     if deppathdata is None:
+            #         logger.critical(
+            #             f'Cannot find required output(s) '
+            #             f'for stage {self.get_name()}{target_name} '
+            #             f'from stage {prev_stage.get_name()}. Exiting'
+            #         )
+            #         sys.exit(1)
+            #     else:
+            #         inputs.add_paths(deppathdata, stagecls=reqcls)
+            # else:
+            #     targets_with_not_found_deps: List['StageTarget'] = []
+            #     for deptarget, deppathdata in deppath_by_deptarget.items():
+            #         if deppathdata is None:
+            #             targets_with_not_found_deps.append(deptarget)
+            #         else:
+            #             inputs.add_paths(deppathdata, target=deptarget, stagecls=reqcls)
+            # 
+            #     if targets_with_not_found_deps:
+            #         logger.critical(
+            #             f'Cannot find {len(targets_with_not_found_deps)} required outputs '
+            #             f'for stage {self.get_name()}{target_name} '
+            #             f'from stage {prev_stage.get_name()} on '
+            #             f'{"|".join(str(t.get_target_name()) for t in targets_with_not_found_deps)}. '
+            #             f'Exiting'
+            #         )
+            #         sys.exit(1)
+            # 
+            # inputs.add_jobs(dep_jobs, stagecls=reqcls)
 
-    def _reuse_jobs(self, target: 'StageTarget', found_path: str):
-        target.output_by_stagecls[self.__class__] = found_path
+        # stage_results: StageResults = self.queue_jobs(target, inputs)
+        # res_file_data = stage_results.get_file_path_dict()
+        # res_resource_data = stage_results.get_resource_dict()
+        # res_jobs = stage_results.get_jobs()
+        # if res_jobs:
+        #     target.jobs_by_stagecls[self.__class__] = res_jobs
+        # return stage_results
+    
+    def _check_if_can_reuse(self, target: 'StageTarget') -> Optional[Union[Dict[str, str], str]]:
+        expected_paths = self.get_expected_output(target)
+
+        if self.analysis_type is not None:
+            if isinstance(expected_paths, dict):
+                logger.error(
+                    f'get_expected_output() returns a dict, won\'t check the SMDB for '
+                    f'{self.name} on {target.get_target_name()}'
+                )
+            expected_path = cast(str, expected_paths)
+            found_path = self._check_smdb_analysis(target, expected_path)
+            if found_path:
+                return found_path
+        if expected_paths and self.pipe.validate_smdb_analyses:
+            if utils.file_exists(expected_paths.values()):
+                return expected_paths
+        return None
+
+    def _reuse_jobs(
+        self, 
+        target: 'StageTarget', 
+        found_paths: Union[str, Dict[str, str]]
+    ) -> StageResults:
+        """
+        Queues a [reuse] Job
+        """
         attributes = {}
         if isinstance(target, Sample):
             attributes['sample'] = target.id
             attributes['project'] = target.project.name
         if isinstance(target, Project):
             attributes['sample'] = target.name
-        target.jobs_by_stagecls[self.__class__] = [
-            self.pipe.b.new_job(f'{self.get_name()} [reuse]', attributes)
-        ]
+        return self.make_outputs(
+            target=target,
+            paths=found_paths,
+            jobs=[self.pipe.b.new_job(f'{self.get_name()} [reuse]', attributes)]
+        )
 
-    def _add_or_reuse_jobs(self, target: 'StageTarget'):
-        expected_path = self.get_expected_output(target)
-        found_path = self._check_smdb_analysis(target, expected_path)
-        if found_path:
-            self._reuse_jobs(target, found_path)
-        elif expected_path and self.pipe.validate_smdb_analyses and utils.file_exists(expected_path):
-            self._reuse_jobs(target, expected_path)
+    def _add_or_reuse_jobs(self, target: 'StageTarget') -> StageResults:
+        reuse_paths = self._check_if_can_reuse(target)
+        if reuse_paths:
+            return self._reuse_jobs(target, reuse_paths)
         else:
-            self._add_jobs(target)
-
-    def find_output(self, target: 'StageTarget') -> Optional[str]:
-        """
-        Called by the stage that depends on this one. This stage can be either active 
-        (jobs were added), or skipped (in this case we can only return expected output)
-        """
-        if self.active:
-            return target.output_by_stagecls.get(self.__class__)
-        else:
-            return self.get_expected_output(target)
+            return self._add_jobs(target)
 
     def _check_smdb_analysis(
         self, 
@@ -491,9 +752,26 @@ class Stage(ABC):
             )
         else:
             found_path = analysis.output
-
-        target.output_by_stagecls[self.__class__] = found_path
         return found_path
+    
+    def make_outputs(
+        self, 
+        target: 'StageTarget',
+        resources: Optional[Union[Dict[str, hb.Resource], hb.Resource]] = None, 
+        paths: Optional[Union[str, Dict[str, str]]] = None,
+        jobs: Optional[List[Job]] = None
+    ) -> StageResults:
+        """
+        Builds a StageDeps object to return from a stage's add_jobs()
+        """
+        deps = StageResults(pipe=self.pipe, sourcestage=self)
+        if jobs:
+            deps.add_jobs(jobs)
+        if resources:
+            deps.add_resources(resources, target=target)
+        if paths:
+            deps.add_paths(paths, target=target) 
+        return deps
         
 
 class SampleStage(Stage, ABC):
@@ -501,10 +779,10 @@ class SampleStage(Stage, ABC):
     Sample-level stage. run() takes sample and project name as input
     """
     @abstractmethod
-    def add_jobs(
+    def queue_jobs(
         self, 
         target: 'Sample',
-        deps: StageDeps,
+        inputs: StageResults,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
         """
         Implements logic of the Stage: adds Batch jobs that do the processing.
@@ -512,34 +790,32 @@ class SampleStage(Stage, ABC):
         checking the SMDB, checking for possible reuse of existing outputs, etc
         """
         pass
-    
-    def _add_or_reuse_jobs(self, sample: 'Sample'):
+
+    def _add_or_reuse_jobs(self, sample: 'Sample') -> StageResults:
         if sample.id in self.pipe.force_samples:
-            self._add_jobs(sample)
+            return self._add_jobs(sample)
         else:
-            super()._add_or_reuse_jobs(sample)        
+            return super()._add_or_reuse_jobs(sample)        
 
     def add_to_the_pipeline(self, pipe: 'Pipeline'):
         """
-        Call _add_jobs(target) for each target in the pipeline
+        Call `output = add_jobs(target, input)` for each target in the pipeline
         """
-        super().add_to_the_pipeline(pipe)
         for project in pipe.projects:
-            logger.info(f'{self.get_name()}: adding jobs for project {project.name}')
             for sample in project.samples:
-                logger.info(f'{self.get_name()}: adding jobs for {project.name}/{sample.id}')
-                self._add_or_reuse_jobs(sample)     
-    
+                sample_res = self._add_to_the_pipeline_for_target(sample)
+                self.results.append(sample_res)
+
 
 class ProjectStage(Stage, ABC):
     """
     Project-level stage. run() takes project name as input
     """
     @abstractmethod
-    def add_jobs(
+    def queue_jobs(
         self,
         target: 'Project',
-        deps: StageDeps,
+        inputs: StageResults,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
         """
         Implements logic of the Stage: adds Batch jobs that do the processing.
@@ -548,13 +824,12 @@ class ProjectStage(Stage, ABC):
         """
         pass
 
-    def add_to_the_pipeline(self, pipe: 'Pipeline'):
+    def add_to_the_pipeline(self, pipe: 'Pipeline') -> StageResults:
         """
-        Call _add_jobs(target) for each target in the pipeline
+        Call `output = add_jobs(target, input)` for each target in the pipeline
         """
         for project in pipe.projects:
-            logger.info(f'{self.get_name()}: adding jobs for project {project.name}')
-            self._add_or_reuse_jobs(project)
+            self.results.append(self._add_to_the_pipeline_for_target(project))
 
 
 class CohortStage(Stage, ABC):    
@@ -562,10 +837,10 @@ class CohortStage(Stage, ABC):
     Entire cohort level stage
     """
     @abstractmethod
-    def add_jobs(
+    def queue_jobs(
         self, 
         target: 'Pipeline',
-        deps: StageDeps,
+        inputs: StageResults,
     ) -> Tuple[Optional[str], Optional[List[Job]]]:
         """
         Implements logic of the Stage: adds Batch jobs that do the processing.
@@ -574,12 +849,24 @@ class CohortStage(Stage, ABC):
         """
         pass
 
-    def add_to_the_pipeline(self, pipe: 'Pipeline'):
+    def add_to_the_pipeline(self, pipe: 'Pipeline') -> StageResults:
         """
-        Call _add_jobs(target) for each target in the pipeline
+        Call `output = add_jobs(target, input)` for each target in the pipeline
         """
-        logger.info(f'{self.get_name()}: adding jobs')
-        self._add_or_reuse_jobs(pipe)
+        self.results = self._add_to_the_pipeline_for_target(pipe)
+
+
+class StageTarget:
+    """
+    Sample, Project, Cohort inherit from this class
+    """
+    def __init__(self):
+        # From SMDB Analysis entries:
+        self.analysis_by_type: Dict[AnalysisType, Analysis] = dict()
+    
+    @abstractmethod
+    def get_target_name(self) -> Optional[str]:
+        pass
 
 
 class Sex(Enum):
@@ -595,26 +882,6 @@ class PedigreeInfo:
     mom: Optional['Sample']
     sex: Sex
     phenotype: str     
-
-
-class StageTarget:
-    """
-    Sample, Project, Cohort inherit from this class
-    """
-    def __init__(self):
-        # Set from upstream dependency jobs. Will be empty if the upstream stage 
-        # is not active (skipped or not added otherwise):
-        self.jobs_by_stagecls: Dict[Type, List[Job]] = dict()
-
-        # From SMDB Analysis entries:
-        self.analysis_by_type: Dict[AnalysisType, Analysis] = dict()
-
-        # Other outputs, not supported by SMDB:
-        self.output_by_stagecls: Dict[Type, Optional[str]] = dict()
-    
-    @abstractmethod
-    def get_target_name(self) -> Optional[str]:
-        pass
 
 
 @dataclass(init=False)
@@ -705,13 +972,13 @@ class Project(StageTarget):
 
     def __init__(
         self, 
-        name: str, 
         pipeline: 'Pipeline',
+        name: str, 
         namespace: Namespace
     ):
         super().__init__()
-        self.samples = []
         self.pipeline = pipeline
+        self.samples = []
         self.is_test = namespace != Namespace.MAIN
         if name.endswith('-test'):
             self.is_test = True
@@ -723,19 +990,31 @@ class Project(StageTarget):
         if self.is_test:
             self.name = self.stack + '-test'
             
-        self.analysis_by_type: Dict[AnalysisType, Analysis] = dict()
-        self.output_by_stagecls: Dict[Type, Optional[str]] = dict()
-        self.jobs_by_stagecls: Dict[Type, List[Job]] = dict()
-
     def get_target_name(self) -> Optional[str]:
         return self.name
 
 
+_pipeline: 'Pipeline' = None
+
+
+def run_pipeline(*args, stages_in_order: List[Callable], **kwargs):
+    """
+    This function should be called to trigger the pipeline logic (i.e. find samples,
+    call Stages' add_jobs(), submit Batch). Sort of implements the singleton logic
+    for the Pipeline class, so there can be no more than one pipeline at runtime
+    """
+    global _pipeline
+    if _pipeline is None:
+        _pipeline = Pipeline(*args, **kwargs)
+    _pipeline.set_stages([cls(_pipeline) for cls in stages_in_order])
+    _pipeline.submit_batch()
+
+
 class Pipeline(StageTarget):
     """
-    Represents a processing pipeline, and incapsulates the Batch object, Batch jobs,
-    samples and projects. Also inherited from StageTarget for global (cohort-level)
-    stage (of type CohortStage)
+    Represents a Pipeline, and incapulates projects, samples and a Hail Batch object.
+
+    Inherited from StageTarget for global (cohort-level) stage (of type CohortStage)
     """
     def __init__(
         self,
@@ -765,8 +1044,8 @@ class Pipeline(StageTarget):
     ):
         super().__init__()
         self.analysis_project = Project(
-            name=analysis_project,
             pipeline=self,
+            name=analysis_project,
             namespace=namespace,
         )
         self.name = name
@@ -831,14 +1110,14 @@ class Pipeline(StageTarget):
             title, 
             self.keep_scratch, 
             self.tmp_bucket, 
-            self.analysis_project, 
+            self.analysis_project.name, 
             hail_billing_project
         )
 
-        self.stage_by_stagecls: Dict[Any, Stage] = dict()
+        self._stages_dict: Dict[str, Stage] = dict()
         self.projects: List[Project] = []
         if input_projects:
-            self.populate(
+            self._populate(
                 input_projects=input_projects,
                 namespace=self.namespace,
                 skip_samples=skip_samples,
@@ -855,7 +1134,7 @@ class Pipeline(StageTarget):
     def get_all_sample_ids(self) -> List[str]:
         return [s.id for s in self.get_all_samples()]
 
-    def run(self) -> None:
+    def submit_batch(self) -> None:
         if self.b:
             logger.info(f'Will submit {self.b.total_job_num} jobs:')
             for label, stat in self.b.labelled_jobs.items():
@@ -884,8 +1163,8 @@ class Pipeline(StageTarget):
         )
         for proj_name, sample_datas in samples_by_project.items():
             project = Project(
-                name=proj_name,
                 pipeline=self,
+                name=proj_name,
                 namespace=namespace,
             )
             for s_data in sample_datas:
@@ -959,7 +1238,7 @@ class Pipeline(StageTarget):
                 f'samples out of {len(project.samples)}'
             )
 
-    def populate(
+    def _populate(
         self,
         input_projects: List[str],
         skip_samples: Optional[List[str]] = None,
@@ -981,13 +1260,9 @@ class Pipeline(StageTarget):
         if ped_files:
             self._populate_pedigree(ped_files)
 
-    def set_stages(self, stages: List[Stage]):
-        self.stage_by_stagecls = {
-            stage.__class__: stage for stage in stages
-        }
-
+    def _validate_first_last_stage(self) -> Tuple[Optional[int], Optional[int]]:
         # Validating the --first-stage and --last-stage parameters
-        stage_names = [s.get_name() for s in stages]
+        stage_names = list(self._stages_dict.keys())
         lower_stage_names = [s.lower() for s in stage_names]
         first_stage_num = None
         if self.first_stage:
@@ -1005,20 +1280,59 @@ class Pipeline(StageTarget):
                     f'not found in available stages: {", ".join(stage_names)}'
                 )
             last_stage_num = lower_stage_names.index(self.last_stage.lower())
+        return first_stage_num, last_stage_num
 
-        # Addings jobs from the stages
-        for i, stage in enumerate(stages):
+    def set_stages(self, stages: List[Stage]):
+        for stage in stages:
+            if stage.get_name() in self._stages_dict:
+                logger.critical(
+                    f'Stage {stage.get_name()} is already defined. Check your '
+                    f'list for duplicates: {", ".join(s.get_name() for s in stages)}'
+                )
+                sys.exit(1)
+            self._stages_dict[stage.get_name()] = stage
+
+        first_stage_num, last_stage_num = self._validate_first_last_stage()
+
+        # First round - checking which stages we require, even if they are skipped
+        for i, (stage_name, stage) in enumerate(self._stages_dict.items()):
             if first_stage_num is not None and i < first_stage_num:
-                logger.info(f'Skipping stage {stage.get_name()}')
-                continue
-            logger.info(f'*' * 60)
-            logger.info(f'Stage {stage.get_name()}')
-            stage.add_to_the_pipeline(self)
+                stage.skipped = True
+                stage.required = False
+                logger.info(f'Skipping stage {stage_name}')
+
+            for reqcls in stage.required_stages_classes:
+                assert reqcls.__name__ in self._stages_dict, (
+                    reqcls.__name__, list(self._stages_dict.keys())
+                )
+                reqstage = self._stages_dict[reqcls.__name__]
+                reqstage.required = True
+                if reqstage.skipped:
+                    logger.info(
+                        f'Stage {reqstage.get_name()} is skipped, '
+                        f'but the output will be required for the stage {stage.get_name()}'
+                    )
+                stage.required_stages.append(reqstage)
+
             logger.info(f'')
-            if last_stage_num and i >= last_stage_num:
-                logger.info(f'Last stage is {stage.get_name()}, stopping here')
-                break
-    
+            if last_stage_num and i > last_stage_num:
+                stage.skipped = True
+
+        # Second round - actually adding jobs from the stages
+        for i, (stagecls, stage) in enumerate(self._stages_dict.items()):
+            if not stage.skipped:
+                logger.info(f'*' * 60)
+                logger.info(f'Stage {stage.get_name()}')
+
+            if stage.required:
+                stage.add_to_the_pipeline(self)
+
+            if not stage.skipped:
+                logger.info(f'')
+                if last_stage_num and i >= last_stage_num:
+                    logger.info(f'Last stage is {stage.get_name()}, stopping here')
+                    break
+
     def can_reuse(self, fpath: Optional[str]) -> bool:
         """
         Checks if the fpath exists, 
@@ -1028,39 +1342,3 @@ class Pipeline(StageTarget):
 
     def get_target_name(self) -> Optional[str]:
         return None
-
-
-def get_hail_bucket(tmp_bucket, keep_scratch):
-    hail_bucket = os.environ.get('HAIL_BUCKET')
-    if not hail_bucket or keep_scratch:
-        # Scratch files are large, so we want to use the temporary bucket to put them in
-        hail_bucket = f'{tmp_bucket}/hail'
-    return hail_bucket
-
-
-def setup_batch(
-    title: str, 
-    keep_scratch: bool,
-    tmp_bucket: str,
-    analysis_project: Project,
-    billing_project: Optional[str] = None,
-    hail_bucket: Optional[str] = None,
-) -> Batch:
-    if not hail_bucket:
-        hail_bucket = get_hail_bucket(tmp_bucket, keep_scratch)
-    billing_project = (
-        billing_project or
-        os.getenv('HAIL_BILLING_PROJECT') or
-        analysis_project.name
-    )
-    logger.info(
-        f'Starting Hail Batch with the project {billing_project}, '
-        f'bucket {hail_bucket}'
-    )
-    backend = hb.ServiceBackend(
-        billing_project=billing_project,
-        bucket=hail_bucket.replace('gs://', ''),
-        token=os.getenv('HAIL_TOKEN'),
-    )
-    b = Batch(name=title, backend=backend)
-    return b

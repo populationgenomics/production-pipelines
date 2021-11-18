@@ -1,8 +1,16 @@
+import logging
+import os
 from dataclasses import dataclass
 from typing import Optional, Union, List, Tuple, Dict
 import hailtop.batch as hb
+from hailtop.batch.job import Job
 
 from cpg_pipes import utils
+
+logger = logging.getLogger(__file__)
+logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
+logger.setLevel(logging.INFO)
+
 
 
 @dataclass
@@ -116,3 +124,87 @@ class PrevJob:
                     hail_bucket=hail_bucket,
                 )
         return prev_batch_jobs
+
+
+class Batch(hb.Batch):
+    """
+    Inheriting from Hail `Batch` class just so we can register added jobs to
+    print statistics before submitting.
+    """
+    def __init__(self, name, backend, *args, **kwargs):
+        super().__init__(name, backend, *args, **kwargs)
+        # Job stats registry
+        self.labelled_jobs = dict()
+        self.other_job_num = 0
+        self.total_job_num = 0
+
+    def new_job(
+        self,
+        name: Optional[str] = None,
+        attributes: Optional[Dict[str, str]] = None,
+        **kwargs,
+    ) -> Job:
+        """
+        Adds job to the Batch, and also registers it in `self.job_stats` for
+        statistics.
+        """
+        if not name:
+            logger.critical('Error: job name must be defined')
+        
+        attributes = attributes or dict()
+        project = attributes.get('project')
+        sample = attributes.get('sample')
+        samples = attributes.get('samples')
+        label = attributes.get('label', name)
+
+        if sample and project:
+            name = f'{project}/{sample}: {name}'
+        elif project:
+            name = f'{project}: {name}'
+
+        if label and (sample or samples):
+            if label not in self.labelled_jobs:
+                self.labelled_jobs[label] = {'job_n': 0, 'samples': set()}
+            self.labelled_jobs[label]['job_n'] += 1
+            self.labelled_jobs[label]['samples'] |= (samples or {sample})
+        else:
+            self.other_job_num += 1
+        self.total_job_num += 1
+        j = super().new_job(name, attributes=attributes)
+        return j
+    
+
+def get_hail_bucket(tmp_bucket, keep_scratch):
+    hail_bucket = os.environ.get('HAIL_BUCKET')
+    if not hail_bucket or keep_scratch:
+        # Scratch files are large, so we want to use the temporary bucket to put them in
+        hail_bucket = f'{tmp_bucket}/hail'
+    return hail_bucket
+
+
+def setup_batch(
+    title: str, 
+    keep_scratch: bool,
+    tmp_bucket: str,
+    analysis_project_name: str,
+    billing_project: Optional[str] = None,
+    hail_bucket: Optional[str] = None,
+) -> Batch:
+    if not hail_bucket:
+        hail_bucket = get_hail_bucket(tmp_bucket, keep_scratch)
+    billing_project = (
+        billing_project or
+        os.getenv('HAIL_BILLING_PROJECT') or
+        analysis_project_name
+    )
+    logger.info(
+        f'Starting Hail Batch with the project {billing_project}, '
+        f'bucket {hail_bucket}'
+    )
+    backend = hb.ServiceBackend(
+        billing_project=billing_project,
+        bucket=hail_bucket.replace('gs://', ''),
+        token=os.environ['HAIL_TOKEN'],
+    )
+    b = Batch(name=title, backend=backend)
+    return b

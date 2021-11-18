@@ -5,38 +5,28 @@ Batch pipeline check pedigree
 """
 
 import logging
-from typing import Optional, List, Collection, Tuple, Dict, Union, Any
+from os.path import join
+from typing import Optional, Collection
 
 import click
-from hailtop.batch.job import Job
 
-from cpg_pipes import utils, resources
-from cpg_pipes.jobs import pedigree, wrap_command
-from cpg_pipes.pipeline import Namespace, Pipeline, Project, \
-    ProjectStage, CohortStage, pipeline_click_options
+from cpg_pipes import utils
+from cpg_pipes.jobs import pedigree
+from cpg_pipes.pipeline import Project, \
+    ProjectStage, pipeline_click_options, stage, StageResults, run_pipeline
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
+@stage
 class CramPedCheckStage(ProjectStage):
-    # defining __init__ only to make sure that .pipe instance is of type
-    # PedigreePipeline and not Pipeline, so it has .fingerprints_bucket
-    def __init__(self, pipe: 'PedigreePipeline'):
-        super().__init__(pipe)
-        self.pipe = pipe
-
-    def get_expected_output(self, *args):
+    @staticmethod
+    def get_expected_output(project: Project):
         pass
 
-    def add_jobs(
-        self,
-        project: Project,
-        dep_paths_by_stage: Dict[Any, Dict[str, str]] = None,
-        dep_jobs: Optional[List[Job]] = None,
-    ) -> Tuple[Optional[str], Optional[List[Job]]]:
-
+    def queue_jobs(self, project: Project, inputs: StageResults) -> StageResults:
         # path_by_sid = dict()
         # for s in project.samples:
         #     path = f'gs://cpg-{project.name}-main/cram/{s.id}.cram'
@@ -53,34 +43,23 @@ class CramPedCheckStage(ProjectStage):
             project,
             input_path_by_sid=path_by_sid,
             overwrite=not self.pipe.check_intermediate_existence,
-            fingerprints_bucket=self.pipe.fingerprints_bucket,
+            fingerprints_bucket=join(self.analysis_bucket, 'fingerprints'),
             web_bucket=self.pipe.web_bucket,
             tmp_bucket=self.pipe.tmp_bucket,
-            depends_on=dep_jobs or [],
+            depends_on=inputs.get_jobs(),
             label='(CRAMs)',
             ignore_missing=self.pipe.skip_samples_without_seq_input,
         )
-        return somalier_samples_path, [j]
+        return self.make_outputs(project, paths=somalier_samples_path, jobs=[j])
 
 
-
+@stage
 class GvcfPedCheckStage(ProjectStage):
-    # defining __init__ only to make sure that .pipe instance is of type
-    # PedigreePipeline and not Pipeline, so it has .fingerprints_bucket
-    def __init__(self, pipe: 'PedigreePipeline'):
-        super().__init__(pipe)
-        self.pipe = pipe
-
-    def get_expected_output(self, *args):
+    @staticmethod
+    def get_expected_output(project: Project):
         pass
 
-    def add_jobs(
-        self,
-        project: Project,
-        dep_paths_by_stage: Dict[Any, Dict[str, str]] = None,
-        dep_jobs: Optional[List[Job]] = None,
-    ) -> Tuple[Optional[str], Optional[List[Job]]]:
-
+    def queue_jobs(self, project: Project, inputs: StageResults) -> StageResults:
         path_by_sid = dict()
         for s in project.samples:
             path = f'gs://cpg-{project.name}-main/gvcf/{s.id}.g.vcf.gz'
@@ -92,14 +71,14 @@ class GvcfPedCheckStage(ProjectStage):
             project,
             input_path_by_sid=path_by_sid,
             overwrite=not self.pipe.check_intermediate_existence,
-            fingerprints_bucket=self.pipe.fingerprints_bucket,
+            fingerprints_bucket=join(self.analysis_bucket, 'fingerprints'),
             web_bucket=self.pipe.web_bucket,
             tmp_bucket=self.pipe.tmp_bucket,
-            depends_on=dep_jobs or [],
+            depends_on=inputs.get_jobs(),
             label='(GVCFs)',
             ignore_missing=self.pipe.skip_samples_without_seq_input,
         )
-        return somalier_samples_path, [j]
+        return self.make_outputs(project, paths=somalier_samples_path, jobs=[j])
 
 
 @click.command()
@@ -123,25 +102,17 @@ def main(
             f'{output_projects}'
         )
 
-    pipeline = PedigreePipeline(
-        name='seqr_loader',
+    run_pipeline(
+        name='pedigree_check',
         title=title,
         input_projects=input_projects,
         output_version=output_version,
+        stages_in_order=[
+            CramPedCheckStage,
+            GvcfPedCheckStage,
+        ],
         **kwargs,
     )
-    pipeline.run()
-
-
-class PedigreePipeline(Pipeline):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fingerprints_bucket = f'{self.analysis_bucket}/fingerprints'
-
-        self.set_stages([
-            CramPedCheckStage(self),
-            GvcfPedCheckStage(self),
-        ])
 
 
 if __name__ == '__main__':
