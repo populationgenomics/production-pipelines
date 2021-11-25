@@ -62,7 +62,8 @@ class Sequence:
         check_existence: Optional[bool] = None,
     ) -> Optional[AlignmentInput]:
         """
-        Parase AlignmentInput from meta. check_existence defaults from self.smdb and can be overwridden
+        Parase AlignmentInput from meta. check_existence defaults from self.smdb 
+        and can be overwridden
         """
         return parse_reads_from_metadata(
             self.meta,
@@ -155,6 +156,7 @@ class SMDB:
         Update "status" of an Analysis entry
         """
         from sample_metadata import AnalysisUpdateModel
+        from sample_metadata.exceptions import ApiException
 
         if not self.do_update_analyses:
             return
@@ -162,7 +164,7 @@ class SMDB:
             self.aapi.update_analysis_status(
                 analysis.id, AnalysisUpdateModel(status=status)
             )
-        except:
+        except ApiException:
             traceback.print_exc()
         analysis.status = status
 
@@ -310,6 +312,7 @@ class SMDB:
         Tries to create an Analysis entry, returns its id if successfuly
         """
         from sample_metadata import AnalysisModel
+        from sample_metadata.exceptions import ApiException
 
         if not self.do_update_analyses:
             return None
@@ -324,7 +327,7 @@ class SMDB:
             aid = self.aapi.create_new_analysis(
                 project=self.analysis_project, analysis_model=am
             )
-        except:
+        except ApiException:
             traceback.print_exc()
             return None
         else:
