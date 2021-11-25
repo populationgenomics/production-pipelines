@@ -560,9 +560,8 @@ class Stage(ABC):
         existing outputs.
         """
 
-    @staticmethod
     @abstractmethod
-    def _get_expected_output(target: 'StageTarget') -> Optional[Union[str, Dict[str, str]]]:
+    def _get_expected_output(self, target: 'StageTarget') -> Optional[Union[str, Dict[str, str]]]:
         """
         Path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
@@ -578,7 +577,6 @@ class Stage(ABC):
         
     def _add_to_the_pipeline_for_target(self, target: 'StageTarget') -> StageResults:
         if not self.skipped:
-            logger.info(f'{self.get_name()}: adding jobs for {target.get_target_name()}')
             return self._add_or_reuse_jobs(target)
         elif self.required:
             reuse_paths = self._check_if_can_reuse(target)
@@ -604,16 +602,24 @@ class Stage(ABC):
 
         return inputs
 
-    def _check_if_can_reuse(self, target: 'StageTarget') -> Optional[Union[Dict[str, str], str]]:
+    def _check_if_can_reuse(
+        self, target: 'StageTarget'
+    ) -> Optional[Union[Dict[str, str], str]]:
         expected_output = self._get_expected_output(target)
 
         if self.analysis_type is not None:
-            if expected_output:
-                if isinstance(expected_output, dict):
-                    raise ValueError(
-                        f'_get_expected_output() returns a dict, won\'t check the SMDB for '
-                        f'{self.name} on {target.get_target_name()}'
-                    )
+            if not expected_output:
+                raise ValueError(
+                    f'_get_expected_output() returned None, but must return str '
+                    f'for a stage with analysis_type: {self.name} '
+                    f'on {target.get_target_name()}, analysis_type={self.analysis_type}'
+                )
+                
+            if isinstance(expected_output, dict):
+                raise ValueError(
+                    f'_get_expected_output() returns a dict, won\'t check the SMDB for '
+                    f'{self.name} on {target.get_target_name()}'
+                )
             found_path = self._check_smdb_analysis(target, cast(str, expected_output))
             if found_path and not self.pipe.validate_smdb_analyses:
                 return found_path
@@ -650,12 +656,18 @@ class Stage(ABC):
     def _add_or_reuse_jobs(self, target: 'StageTarget') -> StageResults:
         if isinstance(target, Sample):
             if target.get_target_name() in self.pipe.force_samples:
+                logger.info(
+                    f'{self.get_name()}: adding jobs for {target.get_target_name()} '
+                    f'because the sample is forced'
+                )
                 return self._queue_jobs(target, self.merged_results_from_prev_stages())
 
         reuse_paths = self._check_if_can_reuse(target)
         if reuse_paths:
+            logger.info(f'{self.get_name()}: reusing results for {target.get_target_name()}')
             return self._reuse_jobs(target, reuse_paths)
         else:
+            logger.info(f'{self.get_name()}: adding jobs for {target.get_target_name()}')
             return self._queue_jobs(target, self.merged_results_from_prev_stages())
 
     def _check_smdb_analysis(
@@ -715,14 +727,12 @@ class SampleStage(Stage, ABC):
     """
     Sample-level stage
     """
-    @staticmethod
-    def _get_expected_output(target: 'StageTarget') -> Optional[Union[str, Dict[str, str]]]:
+    def _get_expected_output(self, target: 'StageTarget') -> Optional[Union[str, Dict[str, str]]]:
         assert isinstance(target, Sample), target
-        return SampleStage.get_expected_output(cast(Sample, target))
+        return self.get_expected_output(cast(Sample, target))
 
-    @staticmethod
     @abstractmethod
-    def get_expected_output(sample: 'Sample') -> Optional[Union[str, Dict[str, str]]]:
+    def get_expected_output(self, sample: 'Sample') -> Optional[Union[str, Dict[str, str]]]:
         """
         Path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
@@ -757,14 +767,12 @@ class ProjectStage(Stage, ABC):
     """
     Project-level stage
     """
-    @staticmethod
-    def _get_expected_output(target: 'StageTarget') -> Optional[Union[str, Dict[str, str]]]:
+    def _get_expected_output(self, target: 'StageTarget') -> Optional[Union[str, Dict[str, str]]]:
         assert isinstance(target, Project), target
-        return ProjectStage.get_expected_output(cast(Project, target))
+        return self.get_expected_output(cast(Project, target))
 
-    @staticmethod
     @abstractmethod
-    def get_expected_output(project: 'Project') -> Optional[Union[str, Dict[str, str]]]:
+    def get_expected_output(self, project: 'Project') -> Optional[Union[str, Dict[str, str]]]:
         """
         Path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
@@ -797,14 +805,12 @@ class CohortStage(Stage, ABC):
     """
     Entire cohort level stage
     """
-    @staticmethod
-    def _get_expected_output(target: 'StageTarget') -> Optional[Union[str, Dict[str, str]]]:
+    def _get_expected_output(self, target: 'StageTarget') -> Optional[Union[str, Dict[str, str]]]:
         assert isinstance(target, Pipeline), target
-        return CohortStage.get_expected_output(cast(Pipeline, target))
+        return self.get_expected_output(cast(Pipeline, target))
 
-    @staticmethod
     @abstractmethod
-    def get_expected_output(pipeline: 'Pipeline') -> Optional[Union[str, Dict[str, str]]]:
+    def get_expected_output(self, pipeline: 'Pipeline') -> Optional[Union[str, Dict[str, str]]]:
         """
         Path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
@@ -1298,7 +1304,6 @@ class Pipeline(StageTarget):
                     )
                 stage.required_stages.append(reqstage)
 
-            logger.info(f'')
             if last_stage_num and i > last_stage_num:
                 stage.skipped = True
 
@@ -1309,6 +1314,7 @@ class Pipeline(StageTarget):
                 logger.info(f'Stage {stage.get_name()}')
 
             if stage.required:
+                logger.info(f'Adding jobs for stage {stage.get_name()}')
                 stage.add_to_the_pipeline(self)
 
             if not stage.skipped:

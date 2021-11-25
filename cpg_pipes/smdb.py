@@ -112,10 +112,10 @@ class SMDB:
         """
         samples_by_project: Dict[str, List[Dict]] = dict()
         for proj_name in project_names:
-            logger.info(f'Finding samples for project {proj_name}')
             input_proj_name = proj_name
             if namespace != Namespace.MAIN:
                 input_proj_name += '-test'
+            logger.info(f'Finding samples for project {input_proj_name}')
             samples = self.sapi.get_samples(
                 body_get_samples_by_criteria_api_v1_sample_post={
                     'project_ids': [input_proj_name],
@@ -321,7 +321,7 @@ class SMDB:
             type=type_,
             output=output,
             status=status,
-            sample_ids=sample_ids,
+            sample_ids=list(sample_ids),
         )
         try:
             aid = self.aapi.create_new_analysis(
@@ -331,7 +331,7 @@ class SMDB:
             traceback.print_exc()
             return None
         else:
-            logger.info(f'Queueing joint-calling with analysis ID: {aid}')
+            logger.info(f'Queueing {type_} analysis with ID: {aid}')
             return aid
 
     def process_existing_analysis(

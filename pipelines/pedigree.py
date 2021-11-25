@@ -22,8 +22,7 @@ logger.setLevel(logging.INFO)
 
 @stage
 class CramPedCheckStage(ProjectStage):
-    @staticmethod
-    def get_expected_output(project: Project):
+    def get_expected_output(self, project: Project):
         pass
 
     def queue_jobs(self, project: Project, inputs: StageResults) -> StageResults:
@@ -55,8 +54,7 @@ class CramPedCheckStage(ProjectStage):
 
 @stage
 class GvcfPedCheckStage(ProjectStage):
-    @staticmethod
-    def get_expected_output(project: Project):
+    def get_expected_output(self, project: Project):
         pass
 
     def queue_jobs(self, project: Project, inputs: StageResults) -> StageResults:

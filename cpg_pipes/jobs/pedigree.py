@@ -1,4 +1,3 @@
-import subprocess
 import sys
 from os.path import join
 from typing import Optional, List, Tuple, Dict
@@ -83,7 +82,9 @@ def add_pedigree_jobs(
     relate_j.memory('standard')  # ~ 4G/core ~ 4G
     # Size of one somalier file is 212K, so we add another G only if the number of
     # samples is >4k
-    relate_j.storage(f'{1 + len(extract_jobs) // 4000 * 1}G')
+    relate_j.storage(f'{1 + len(project.samples) // 4000 * 1}G')
+    if depends_on:
+        extract_jobs.extend(depends_on)
     relate_j.depends_on(*extract_jobs)
     fp_files = [b.read_input(fp) for sn, fp in somalier_file_by_sample.items()]
 

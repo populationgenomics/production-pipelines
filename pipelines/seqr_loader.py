@@ -29,15 +29,18 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
+def get_fingerprint_path(output_path) -> str:
+    if output_path.endswith('.cram'):
+        return output_path.replace('.cram', '.somalier')
+    if output_path.endswith('.g.vcf.gz'):
+        return output_path.replace('.g.vcf.gz', '.somalier')
+    raise ValueError('Only supporting CRAM or GVCF')
+
+
 @stage(analysis_type=AnalysisType.CRAM)
 class CramStage(SampleStage):
-    @staticmethod
-    def get_expected_output(sample: Sample):
+    def get_expected_output(self, sample: Sample):
         return f'{sample.project.get_bucket()}/cram/{sample.id}.cram'
-
-    @staticmethod
-    def get_fingerprint_output(output_path):
-        return output_path.replace('.cram', '.somalier')
 
     def queue_jobs(self, sample: Sample, inputs: StageResults) -> StageResults:
         if not sample.seq_info:
@@ -83,15 +86,14 @@ class CramStage(SampleStage):
 
 @stage(requires_stages=CramStage)
 class CramPedCheckStage(ProjectStage):
-    @staticmethod
-    def get_expected_output(project: Project):
+    def get_expected_output(self, project: Project):
         pass
 
     def queue_jobs(self, project: Project, inputs: StageResults) -> StageResults:
         cram_by_sid = inputs.as_path_by_target(stage=CramStage)
 
         fingerprint_path_by_sid = {
-            sid: CramStage.get_fingerprint_output(cram_path)
+            sid: get_fingerprint_path(cram_path)
             for sid, cram_path in cram_by_sid.items()
         }
         
@@ -114,14 +116,9 @@ class CramPedCheckStage(ProjectStage):
 class GvcfStage(SampleStage):
     hc_intervals = None
 
-    @staticmethod
-    def get_expected_output(sample: Sample):
+    def get_expected_output(self, sample: Sample):
         return f'{sample.project.get_bucket()}/gvcf/{sample.id}.g.vcf.gz'
 
-    @staticmethod
-    def get_fingerprint_output(output_path):
-        return output_path.replace('.g.vcf.gz', '.somalier')
-    
     def queue_jobs(self, sample: Sample, inputs: StageResults) -> StageResults:
         cram_path = inputs.as_path(target=sample, stage=CramStage)
         
@@ -160,14 +157,14 @@ class GvcfStage(SampleStage):
 
 @stage(requires_stages=GvcfStage)
 class GvcfPedCheckStage(ProjectStage):
-    @staticmethod
-    def get_expected_output(project: Project):
+    def get_expected_output(self, project: Project):
         pass
 
     def queue_jobs(self, project: Project, inputs: StageResults) -> StageResults:
         gvcf_by_sid = inputs.as_path_by_target(stage=GvcfStage)
+        
         fingerprint_path_by_sid = {
-            sid: CramStage.get_fingerprint_output(gvcf_path)
+            sid: get_fingerprint_path(gvcf_path)
             for sid, gvcf_path in gvcf_by_sid.items()
         }
 
@@ -186,17 +183,16 @@ class GvcfPedCheckStage(ProjectStage):
         return self.make_outputs(project, data=somalier_samples_path, jobs=[j])
 
 
+def make_expected_siteonly_path(output_path):
+    return output_path.replace('.vcf.gz', '-siteonly.vcf.gz')
+
+
 @stage(requires_stages=GvcfStage, analysis_type=AnalysisType.JOINT_CALLING)
 class JointGenotypingStage(CohortStage):
-    @staticmethod
-    def get_expected_output(pipe: Pipeline):
+    def get_expected_output(self, pipe: Pipeline):
         samples_hash = utils.hash_sample_ids(pipe.get_all_sample_ids())
         expected_jc_vcf_path = f'{pipe.tmp_bucket}/joint_calling/{samples_hash}.vcf.gz'
         return expected_jc_vcf_path
-    
-    @staticmethod
-    def make_expected_siteonly_output(output_path):
-        return output_path.replace('.vcf.gz', '-siteonly.vcf.gz')
 
     def queue_jobs(self, pipe: Pipeline, inputs: StageResults) -> StageResults:
         gvcf_by_sid = inputs.as_path_by_target(stage=GvcfStage)
@@ -216,7 +212,7 @@ class JointGenotypingStage(CohortStage):
         jc_job = make_joint_genotyping_jobs(
             b=self.pipe.b,
             out_vcf_path=expected_path,
-            out_siteonly_vcf_path=self.make_expected_siteonly_output(expected_path),
+            out_siteonly_vcf_path=make_expected_siteonly_path(expected_path),
             samples=self.pipe.get_all_samples(),
             genomicsdb_bucket=f'{self.pipe.analysis_bucket}/genomicsdbs',
             tmp_bucket=self.pipe.tmp_bucket,
@@ -234,15 +230,14 @@ class JointGenotypingStage(CohortStage):
 
 @stage(requires_stages=JointGenotypingStage)
 class VqsrStage(CohortStage):
-    @staticmethod
-    def get_expected_output(pipe: Pipeline):
+    def get_expected_output(self, pipe: Pipeline):
         samples_hash = utils.hash_sample_ids(pipe.get_all_sample_ids())
         expected_jc_vcf_path = f'{pipe.tmp_bucket}/vqsr/{samples_hash}-site-only.vcf.gz'
         return expected_jc_vcf_path
     
     def queue_jobs(self, pipe: Pipeline, inputs: StageResults) -> StageResults:
         jc_vcf_path = inputs.as_path(stage=JointGenotypingStage, target=pipe)
-        siteonly_vcf_path = JointGenotypingStage.make_expected_siteonly_output(jc_vcf_path)
+        siteonly_vcf_path = make_expected_siteonly_path(jc_vcf_path)
 
         tmp_vqsr_bucket = f'{self.pipe.tmp_bucket}/vqsr'
         logger.info(f'Queueing VQSR job')
@@ -262,18 +257,17 @@ class VqsrStage(CohortStage):
         return self.make_outputs(pipe, data=expected_path, jobs=[vqsr_job])
 
 
+def get_anno_tmp_bucket(pipe: Pipeline):
+    return join(pipe.tmp_bucket, 'mt')
+
+
 @stage(requires_stages=[JointGenotypingStage, VqsrStage])
 class AnnotateCohortStage(CohortStage):
-    @staticmethod
-    def get_anno_tmp_bucket(pipe: Pipeline):
-        return f'{pipe.tmp_bucket}/mt'
-
-    @staticmethod
-    def get_expected_output(pipe: Pipeline):
-        return f'{AnnotateCohortStage.get_anno_tmp_bucket(pipe)}/combined.mt'
+    def get_expected_output(self, pipe: Pipeline):
+        return join(get_anno_tmp_bucket(pipe), 'combined.mt')
 
     def queue_jobs(self, pipe: Pipeline, inputs: StageResults) -> StageResults:
-        checkpoints_bucket = f'{self.get_anno_tmp_bucket(pipe)}/checkpoints'
+        checkpoints_bucket = join(get_anno_tmp_bucket(pipe), 'checkpoints')
 
         vcf_path = inputs.as_path(target=pipe, stage=JointGenotypingStage)
         vqsr_vcf_path = inputs.as_path(target=pipe, stage=VqsrStage)
@@ -301,15 +295,14 @@ class AnnotateCohortStage(CohortStage):
 
 @stage(requires_stages=[AnnotateCohortStage])
 class AnnotateProjectStage(ProjectStage):
-    @staticmethod
-    def get_expected_output(project: Project):
+    def get_expected_output(self, project: Project):
         return f'{project.get_bucket()}/mt/{project.name}.mt'
 
     def queue_jobs(self, project: Project, inputs: StageResults) -> StageResults:
         output_projects = self.pipe.config.get('output_projects', self.pipe.projects)
-        if project.name not in output_projects:
+        if project.stack not in output_projects:
             logger.info(
-                f'Skipping annotating project {project.name} because it is not'
+                f'Skipping annotating project {project.stack} because it is not'
                 f'in the --output-projects: {output_projects}'
             )
             return self.make_outputs(project)
@@ -344,15 +337,14 @@ class AnnotateProjectStage(ProjectStage):
 
 @stage(requires_stages=[AnnotateProjectStage])
 class LoadToEsStage(ProjectStage):
-    @staticmethod
-    def get_expected_output(project: Project):
+    def get_expected_output(self, project: Project):
         return None
 
     def queue_jobs(self, project: Project, inputs: StageResults) -> StageResults:
         output_projects = self.pipe.config.get('output_projects', self.pipe.projects)
-        if project.name not in output_projects:
+        if project.stack not in output_projects:
             logger.info(
-                f'Skipping loading project {project.name} because it is not'
+                f'Skipping loading project {project.stack} because it is not'
                 f'in the --output-projects: {output_projects}'
             )
             return self.make_outputs(project)

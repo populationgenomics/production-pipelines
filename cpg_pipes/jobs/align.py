@@ -166,7 +166,9 @@ def align(
         first_j = merge_j
 
     else:
-        jname = f'{aligner.name} {extra_label}'
+        jname = f'{aligner.name}'
+        if extra_label:
+            jname += f' {extra_label}'
         align_j, align_cmd = _align_one(
             b=b,
             job_name=jname,
