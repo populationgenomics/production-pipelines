@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Batch pipeline check pedigree
+Batch pipeline to check pedigree on samples
 """
 
 import logging
@@ -43,14 +43,14 @@ class CramPedCheckStage(ProjectStage):
             project,
             input_path_by_sid=path_by_sid,
             overwrite=not self.pipe.check_intermediate_existence,
-            fingerprints_bucket=join(self.analysis_bucket, 'fingerprints'),
+            fingerprints_bucket=join(self.pipe.analysis_bucket, 'fingerprints'),
             web_bucket=self.pipe.web_bucket,
             tmp_bucket=self.pipe.tmp_bucket,
             depends_on=inputs.get_jobs(),
             label='(CRAMs)',
             ignore_missing=self.pipe.skip_samples_without_seq_input,
         )
-        return self.make_outputs(project, paths=somalier_samples_path, jobs=[j])
+        return self.make_outputs(project, data=somalier_samples_path, jobs=[j])
 
 
 @stage
@@ -71,14 +71,14 @@ class GvcfPedCheckStage(ProjectStage):
             project,
             input_path_by_sid=path_by_sid,
             overwrite=not self.pipe.check_intermediate_existence,
-            fingerprints_bucket=join(self.analysis_bucket, 'fingerprints'),
+            fingerprints_bucket=join(self.pipe.analysis_bucket, 'fingerprints'),
             web_bucket=self.pipe.web_bucket,
             tmp_bucket=self.pipe.tmp_bucket,
             depends_on=inputs.get_jobs(),
             label='(GVCFs)',
             ignore_missing=self.pipe.skip_samples_without_seq_input,
         )
-        return self.make_outputs(project, paths=somalier_samples_path, jobs=[j])
+        return self.make_outputs(project, data=somalier_samples_path, jobs=[j])
 
 
 @click.command()

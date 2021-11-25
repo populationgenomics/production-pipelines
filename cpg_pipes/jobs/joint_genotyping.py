@@ -2,7 +2,7 @@ import json
 import logging
 from enum import Enum
 from os.path import join, basename
-from typing import Optional, List, Collection, Dict, Tuple, Set
+from typing import Optional, List, Collection, Dict, Tuple, Set, cast
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
@@ -401,13 +401,14 @@ def _add_joint_genotyper_job(
         job_name += f' {interval_idx + 1}/{number_of_intervals}'
     j = b.new_job(job_name)
     if utils.can_reuse(output_vcf_path, overwrite):
+        output_vcf_path = cast(str, output_vcf_path)
         j.name += ' [reuse]'
         return j, b.read_input_group(**{
             'vcf.gz': output_vcf_path,
             'vcf.gz.tbi': output_vcf_path + '.tbi',
         })
 
-    logger.info(f'Queueing {tool.name} job {interval_idx + 1}/{number_of_intervals}')
+    logger.info(job_name)
     reference = b.read_input_group(
         base=resources.REF_FASTA,
         fai=resources.REF_FASTA + '.fai',
@@ -479,6 +480,7 @@ def _add_exccess_het_filter(
     j = b.new_job(job_name)
     if utils.can_reuse(output_vcf_path, overwrite):
         j.name += ' [reuse]'
+        output_vcf_path = cast(str, output_vcf_path)
         return j, b.read_input_group(**{
             'vcf.gz': output_vcf_path,
             'vcf.gz.tbi': output_vcf_path + '.tbi',

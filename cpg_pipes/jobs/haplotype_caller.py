@@ -7,7 +7,6 @@ from hailtop.batch.job import Job
 
 from cpg_pipes import resources, utils
 from cpg_pipes.jobs import wrap_command
-from cpg_pipes.pipeline import Batch
 from cpg_pipes.smdb import SMDB
 from cpg_pipes.jobs import split_intervals
 
@@ -137,7 +136,7 @@ def produce_gvcf(
 
 
 def hc_job(
-    b: Batch,
+    b: hb.Batch,
     sample_name: str,
     project_name: str,
     reference: hb.ResourceGroup,
