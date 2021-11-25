@@ -15,7 +15,7 @@ from gnomad.utils.sparse_mt import split_info_annotation
 from gnomad.utils.filtering import add_filters_expr
 # from cpg_pipes import utils
 from lib.model.seqr_mt_schema import SeqrVariantSchema
-from lib.model.base_mt_schema import row_annotation
+from lib.model.base_mt_schema import row_annotation, RowAnnotationOmit
 
 from cpg_pipes import utils
 
@@ -29,6 +29,8 @@ BROAD_REF_BUCKET = f'{REF_BUCKET}/hg38/v1'
 SEQR_REF_BUCKET = 'gs://cpg-seqr-reference-data'
 REF_HT = f'{SEQR_REF_BUCKET}/GRCh38/all_reference_data/v2/combined_reference_data_grch38-2.0.3.ht'
 CLINVAR_HT = f'{SEQR_REF_BUCKET}/GRCh38/clinvar/clinvar.GRCh38.2020-06-15.ht'
+NAGIM_FREQS_HT = 'gs://cpg-nagim-test-analysis/joint-calling/v0-5/variant_qc/frequencies.ht'
+
 
 SNP_SCORE_CUTOFF = 0
 INDEL_SCORE_CUTOFF = 0
@@ -118,8 +120,11 @@ def main(
             mt = hl.read_matrix_table(out_path)
 
     ref_data = hl.read_table(REF_HT)
+    nagim_freqs = hl.read_table(NAGIM_FREQS_HT)
     clinvar = hl.read_table(CLINVAR_HT)
-    mt = compute_variant_annotated_vcf(mt, ref_data=ref_data, clinvar=clinvar)
+    mt = compute_variant_annotated_vcf(
+        mt, ref_data=ref_data, clinvar=clinvar, nagim_freqs=nagim_freqs,
+    )
     mt = mt.annotate_globals(
         sourceFilePath=vcf_path,
         genomeVersion=GENOME_VERSION.replace('GRCh', ''),
@@ -273,26 +278,52 @@ def annotate_old_and_split_multi_hts(mt):
     )
 
 
-class SeqrVariantsASSchema(SeqrVariantSchema):
+class CPGSeqrVariantSchema(SeqrVariantSchema):
     """
-    AC/AF/AN fields in a split matrix table are numbers, not arrays
+    Modified schema to handle Nagim annotaion, and fix the AC annotation.
     """
+    def __init__(self, *args, nagim_freqs=None, **kwargs):
+        """
+        Expects self._nagim_freqs to have the following fields:
+        'freq': array<struct {
+            AC: int32, 
+            AF: float64, 
+            AN: int32, 
+        }> 
+        'popmax': struct {
+            AF: float64, 
+        } 
+        """        
+        super().__init__(*args, **kwargs)
+        ht = nagim_freqs.annotate(
+            AF=nagim_freqs.freq.AF, 
+            AC=nagim_freqs.freq.AC,
+            AN=nagim_freqs.freq.AN,
+            POPMAX_AF=nagim_freqs.popmax.AF,
+        )
+        ht = ht.select(ht.AF, ht.AC, ht.AN, ht.POPMAX_AF)
+        self._nagim_data = ht
 
     @row_annotation(name='AC')
     def ac(self):  # pylint: disable=invalid-name,missing-function-docstring
+        """
+        AC in a split matrix table is a number, not an array.
+        """
         return self.mt.info.AC
 
-    @row_annotation(name='AF')
-    def af(self):  # pylint: disable=invalid-name,missing-function-docstring
-        return self.mt.info.AF[self.mt.a_index - 1]
-
-    @row_annotation(name='AN')
-    def an(self):  # pylint: disable=invalid-name,missing-function-docstring
-        return self.mt.info.AN
+    @row_annotation
+    def nagim(self):
+        """
+        Expects self._nagim_freqs to have: AF, AC, AN, POPMAX_AF
+        """
+        if self._nagim_data is None:
+            raise RowAnnotationOmit
+        
+        return self._nagim_data[self.mt.row_key]
 
 
 def compute_variant_annotated_vcf(
-    mt, ref_data, clinvar, schema_cls=SeqrVariantsASSchema
+    mt, ref_data, clinvar, nagim_freqs, schema_cls=CPGSeqrVariantSchema
 ) -> hl.MatrixTable:
     r"""
     Returns a matrix table with an annotated rows where each row annotation 
@@ -321,15 +352,17 @@ def compute_variant_annotated_vcf(
                     |         |
       SeqrVariantSchema       |
                     |         |
-      SeqrVariantASSchema     |
+      CPGSeqrVariantSchema    |
                     \        /
             SeqrVariantsAndGenotypesSchema
             
     We apply only SeqrVariantSchema here (specifically, a modified 
-    version SeqrVariantASSchema). SeqrGenotypesSchema is applied separately
+    version CPGSeqrVariantSchema). SeqrGenotypesSchema is applied separately
     on the project level.
     """
-    annotation_schema = schema_cls(mt, ref_data=ref_data, clinvar_data=clinvar)
+    annotation_schema = schema_cls(
+        mt, ref_data=ref_data, clinvar_data=clinvar, nagim_freqs=nagim_freqs
+    )
     mt = annotation_schema.annotate_all(overwrite=True).mt
     return mt
 

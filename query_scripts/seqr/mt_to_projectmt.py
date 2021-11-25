@@ -108,11 +108,11 @@ def _compute_genotype_annotated_vcf(
                     |          |
       SeqrVariantSchema     SeqrGenotypesSchema
                     |          |
-      SeqrVariantASSchema     /
+      CPGSeqrVariantSchema    /
                     \        /
             SeqrVariantsAndGenotypesSchema
 
-    SeqrVariantASSchema is applied on the cohort level separately.
+    CPGSeqrVariantSchema is applied on the cohort level separately.
     """
     annotation_schema = schema_cls(mt)
     mt = annotation_schema.annotate_all(overwrite=True).mt
