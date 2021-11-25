@@ -12,7 +12,6 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-
 @dataclass
 class BamOrCramAlignmentInput:
     """
@@ -174,7 +173,7 @@ class Batch(hb.Batch):
         return j
     
 
-def get_hail_bucket(tmp_bucket, keep_scratch):
+def get_hail_bucket(tmp_bucket, keep_scratch) -> str:
     hail_bucket = os.environ.get('HAIL_BUCKET')
     if not hail_bucket or keep_scratch:
         # Scratch files are large, so we want to use the temporary bucket to put them in
@@ -204,7 +203,7 @@ def setup_batch(
     backend = hb.ServiceBackend(
         billing_project=billing_project,
         bucket=hail_bucket.replace('gs://', ''),
-        token=os.environ['HAIL_TOKEN'],
+        token=os.environ.get('HAIL_TOKEN'),
     )
     b = Batch(name=title, backend=backend)
     return b
