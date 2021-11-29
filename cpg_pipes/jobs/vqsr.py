@@ -21,7 +21,6 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-
 SNP_RECALIBRATION_TRANCHE_VALUES = [
     100.0,
     99.95,
@@ -101,6 +100,7 @@ def make_vqsr_jobs(
     output_vcf_path: Optional[str] = None,
     use_as_annotations: bool = True,
     overwrite: bool = True,
+    convert_vcf_to_site_only: bool = False,
 ) -> Job:
     """
     Add jobs that perform the allele-specific VQSR variant QC
@@ -121,6 +121,8 @@ def make_vqsr_jobs(
     :param output_vcf_path: path to write final recalibrated VCF to
     :param use_as_annotations: use allele-specific annotation for VQSR
     :param overwrite: whether to not reuse intermediate files
+    :param convert_vcf_to_site_only: assuming input_vcf_or_mt_path is a VCF,
+           convert it to site-only. Otherwise, assuming it's already site-only 
     :return: a final Job, and a path to the VCF with VQSR annotations
     """
 
@@ -192,7 +194,6 @@ def make_vqsr_jobs(
         b=b,
         scatter_count=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
     )
-    first_job = None
 
     if input_vcf_or_mt_path.endswith('.mt'):
         assert meta_ht_path
@@ -219,30 +220,30 @@ def make_vqsr_jobs(
             )
         else:
             mt_to_vcf_job = b.new_job(f'{job_name} [reuse]')    
-        first_job = mt_to_vcf_job
+        if depends_on:
+            mt_to_vcf_job.depends_on(*depends_on)
         tabix_job = add_tabix_step(b, combined_vcf_path, medium_disk)
         tabix_job.depends_on(mt_to_vcf_job)
         siteonly_vcf = tabix_job.combined_vcf
     else:
-        # site_only_j = _add_make_sites_only_job(
-        #     b=b,
-        #     input_vcf=b.read_input_group(
-        #         **{
-        #             'vcf.gz': input_vcf_or_mt_path,
-        #             'vcf.gz.tbi': input_vcf_or_mt_path + '.tbi',
-        #         }
-        #     ),
-        #     overwrite=overwrite,
-        #     disk=medium_disk,
-        # )
-        # first_job = site_only_j
-        # gathered_vcf = site_only_j.output_vcf
-        siteonly_vcf = b.read_input_group(
+        input_vcf = b.read_input_group(
             **{
                 'vcf.gz': input_vcf_or_mt_path,
                 'vcf.gz.tbi': input_vcf_or_mt_path + '.tbi',
             }
         )
+        if convert_vcf_to_site_only:
+            siteonly_j = _add_make_sites_only_job(
+                b=b,
+                input_vcf=input_vcf,
+                overwrite=overwrite,
+                disk=medium_disk,
+            )
+            if depends_on:
+                siteonly_j.depends_on(*depends_on)
+            siteonly_vcf = siteonly_j.output_vcf
+        else:
+            siteonly_vcf = input_vcf
 
     indels_variant_recalibrator_job = add_indels_variant_recalibrator_job(
         b,
@@ -254,8 +255,8 @@ def make_vqsr_jobs(
         use_as_annotations=use_as_annotations,
         work_bucket=web_bucket,
     )
-    if first_job is None:
-        first_job = indels_variant_recalibrator_job
+    if depends_on:
+        indels_variant_recalibrator_job.depends_on(*depends_on)
 
     indels_recalibration = indels_variant_recalibrator_job.recalibration
     indels_tranches = indels_variant_recalibrator_job.tranches
@@ -268,7 +269,7 @@ def make_vqsr_jobs(
 
     if is_huge_callset:
         # Run SNP recalibrator in a scattered mode
-        model_file = add_snps_variant_recalibrator_create_model_step(
+        model_j = add_snps_variant_recalibrator_create_model_step(
             b,
             sites_only_variant_filtered_vcf=siteonly_vcf,
             hapmap_resource_vcf=hapmap_resource_vcf,
@@ -282,14 +283,16 @@ def make_vqsr_jobs(
             is_small_callset=is_small_callset,
             is_huge_callset=is_huge_callset,
             max_gaussians=snp_max_gaussians,
-        ).model_file
+        )
+        if depends_on:
+            model_j.depends_on(*depends_on)
 
         snps_recalibrator_jobs = [
             add_snps_variant_recalibrator_scattered_step(
                 b,
                 sites_only_vcf=siteonly_vcf,
                 interval=intervals[f'interval_{idx}'],
-                model_file=model_file,
+                model_file=model_j.model_file,
                 hapmap_resource_vcf=hapmap_resource_vcf,
                 omni_resource_vcf=omni_resource_vcf,
                 one_thousand_genomes_resource_vcf=one_thousand_genomes_resource_vcf,
@@ -347,6 +350,9 @@ def make_vqsr_jobs(
             web_bucket=web_bucket,
             work_bucket=work_bucket,
         )
+        if depends_on:
+            snps_recalibrator_job.depends_on(*depends_on)
+
         snps_recalibration = snps_recalibrator_job.recalibration
         snps_tranches = snps_recalibrator_job.tranches
 
@@ -364,8 +370,6 @@ def make_vqsr_jobs(
             output_vcf_path=output_vcf_path,
         )
 
-    if depends_on:
-        first_job.depends_on(*depends_on)
     return recalibrated_gathered_vcf_j
 
 
