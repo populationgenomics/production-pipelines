@@ -680,23 +680,11 @@ class Stage(Generic[TargetT], ABC):
     @abstractmethod
     def queue_jobs(self, target: TargetT, inputs: StageInput) -> StageOutput:
         """
-        In stage subclasses that act on specific targets (SampleStage, ProjectStage),
-        _queue_jobs(target) would call queue_jobs(sample), queue_jobs(project).
-
-        The reason for this separation is so we don't violate Liskov's principle:
-        subclasses would assert that target is of expected subclass, and it
-        would work because subclasses control what is passed to queue_jobs().
+        Implements logic of the Stage: creates Batch jobs that do the processing.
+        Assumes that all the household work is done: checking missing inputs
+        from requried stages, checking the SMDB, checking for possible reuse of 
+        existing outputs.
         """
-
-    def make_inputs(self) -> StageInput:
-        """
-        Collects outputs from all dependencies and create input for this stage
-        """
-        inputs = StageInput()
-        for prev_stage in self.required_stages:
-            for _, stage_output in prev_stage.output_by_target.items():
-                inputs.add_other_stage_output(stage_output)
-        return inputs
 
     @abstractmethod
     def get_expected_output(self, target: TargetT) -> Optional[Union[str, Dict[str, str]]]:
@@ -704,7 +692,7 @@ class Stage(Generic[TargetT], ABC):
         Path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
         by the pipeline to get expected paths when the stage is skipped and
-        didn't return a `StageDeps` object from `add_jobs()`.
+        didn't return a `StageDeps` object from `queue_jobs()`.
         """
     
     @abstractmethod
@@ -724,9 +712,142 @@ class Stage(Generic[TargetT], ABC):
         jobs: Optional[List[Job]] = None
     ) -> StageOutput:
         """
-        Builds a StageDeps object to return from a stage's add_jobs()
+        Builds a StageDeps object to return from a stage's queue_jobs()
         """
         return StageOutput(stage=self, target=target, data=data, jobs=jobs)
+
+    def _make_inputs(self) -> StageInput:
+        """
+        Collects outputs from all dependencies and create input for this stage
+        """
+        inputs = StageInput()
+        for prev_stage in self.required_stages:
+            for _, stage_output in prev_stage.output_by_target.items():
+                inputs.add_other_stage_output(stage_output)
+        return inputs
+    
+    def _queue_jobs_with_checks(self, target: TargetT) -> StageOutput:
+        """
+        Constructs `inputs` and calls the public `output = queue_jobs(target, input)`.
+        Performs checks th like possibility to reuse existing jobs results,
+        or if required dependencies are missing.
+        """
+        if self.skipped and not self.required:
+            # Stage is not needed, returning empty outputs
+            return self.make_outputs(target=target)
+ 
+        reusable_paths = self._try_get_reusable_paths(target)
+        
+        if not self.skipped:
+            inputs = self._make_inputs()
+            if reusable_paths:
+                if target.forced:
+                    logger.info(
+                        f'{self.name}: can reuse, but forcing rerunning the stage '
+                        f'for {target.unique_id}'
+                    )
+                    return self.queue_jobs(target, inputs)
+                else:
+                    logger.info(f'{self.name}: reusing results for {target.unique_id}')
+                    return self._queue_reuse_job(target, reusable_paths)
+            logger.info(f'{self.name}: adding jobs for {target.unique_id}')
+            return self.queue_jobs(target, inputs)
+
+        else:
+            if not reusable_paths:
+                raise ValueError(
+                    f'Stage {self.name} is required, but skipped and '
+                    f'cannot reuse outputs for {target.unique_id}'
+                )
+            return self.make_outputs(target=target, data=reusable_paths) 
+
+    def _try_get_reusable_paths(
+        self, 
+        target: TargetT
+    ) -> Optional[Union[Dict[str, str], str]]:
+        """
+        Returns outputs that can be reused for the stage for the target,
+        or None of none can be reused
+        """
+        expected_output = self.get_expected_output(target)
+
+        if self.analysis_type is not None:
+            if not expected_output:
+                raise ValueError(
+                    f'get_expected_output() returned None, but must return str '
+                    f'for a stage with analysis_type: {self.name} '
+                    f'on {target.unique_id}, analysis_type={self.analysis_type}'
+                )
+                
+            if isinstance(expected_output, dict):
+                raise ValueError(
+                    f'get_expected_output() returns a dict, won\'t check the SMDB for '
+                    f'{self.name} on {target.unique_id}'
+                )
+            found_path = self._try_get_smdb_analysis(target, cast(str, expected_output))
+            if found_path and not self.pipe.validate_smdb_analyses:
+                return found_path
+
+        if expected_output and self.pipe.check_intermediate_existence:
+            if isinstance(expected_output, dict):
+                paths = list(expected_output.values())
+            else:
+                paths = [expected_output]
+            if all(utils.file_exists(path) for path in paths):
+                return expected_output
+        return None
+
+    def _try_get_smdb_analysis(self, target: TargetT, expected_path: str) -> Optional[str]:
+        """
+        Check if SMDB already has analysis, and invalidate it if the
+        output for a stage doesn't exist
+        """
+        if not self.analysis_type:
+            return None
+        analysis = target.analysis_by_type.get(self.analysis_type)
+        if not analysis:
+            return None
+
+        if self.pipe.validate_smdb_analyses:
+            if isinstance(target, Sample):
+                sample = cast(Sample, target)
+                sample_ids = [sample.id]
+            elif isinstance(target, Project):
+                project = cast(Project, target)
+                sample_ids = [s.id for s in project.samples]
+            else:
+                pipe = cast(Pipeline, target)
+                sample_ids = pipe.get_all_sample_ids()
+
+            found_path = self.pipe.db.process_existing_analysis(
+                sample_ids=sample_ids,
+                completed_analysis=analysis,
+                analysis_type=self.analysis_type.value,
+                expected_output_fpath=expected_path,
+            )
+        else:
+            found_path = analysis.output
+        return found_path
+
+    def _queue_reuse_job(
+        self,
+        target: TargetT,
+        found_paths: Union[str, Dict[str, str]]
+    ) -> StageOutput:
+        """
+        Queues a [reuse] Job
+        """
+        attributes = {}
+        if isinstance(target, Sample):
+            attributes['sample'] = target.id
+            attributes['project'] = target.project.name
+        if isinstance(target, Project):
+            attributes['sample'] = target.name
+        return self.make_outputs(
+            target=target,
+            data=found_paths,
+            jobs=[self.pipe.b.new_job(f'{self.name} [reuse]', attributes)]
+        )
     
 
 class SampleStage(Stage[Sample], ABC):
@@ -747,18 +868,13 @@ class SampleStage(Stage[Sample], ABC):
         
     @abstractmethod
     def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput:
-        """
-        Implements logic of the Stage: creates Batch jobs that do the processing.
-        Assumes that all the household work is done: checking missing inputs
-        from requried stages, checking the SMDB, checking for possible reuse of 
-        existing outputs.
-        """
+        pass
 
     def add_to_the_pipeline(self, pipeline: 'Pipeline') -> Dict[str, StageOutput]:
         output_by_target = dict()
         for project in pipeline.projects:
             for sample in project.samples:
-                sample_result = pipeline.add_for_target(self, sample)
+                sample_result = self._queue_jobs_with_checks(sample)
                 output_by_target[sample.unique_id] = sample_result
         return output_by_target
 
@@ -781,12 +897,7 @@ class PairStage(Stage, ABC):
 
     @abstractmethod
     def queue_jobs(self, pair: 'Pair', inputs: StageInput) -> StageOutput:
-        """
-        Implements logic of the Stage: creates Batch jobs that do the processing.
-        Assumes that all the household work is done: checking missing inputs
-        from requried stages, checking the SMDB, checking for possible reuse of 
-        existing outputs.
-        """
+        pass
 
     def add_to_the_pipeline(self, pipeline: 'Pipeline') -> Dict[str, StageOutput]:
         output_by_target = dict()
@@ -796,7 +907,8 @@ class PairStage(Stage, ABC):
                     if s1 == s2:
                         continue
                     pair = Pair(s1, s2)
-                    output_by_target[pair.unique_id] = pipeline.add_for_target(self, pair)
+                    output_by_target[pair.unique_id] = \
+                        self._queue_jobs_with_checks(pair)
         return output_by_target
 
 
@@ -818,17 +930,13 @@ class ProjectStage(Stage, ABC):
 
     @abstractmethod
     def queue_jobs(self, project: 'Project', inputs: StageInput) -> StageOutput:
-        """
-        Implements logic of the Stage: creates Batch jobs that do the processing.
-        Assumes that all the household work is done: checking missing inputs
-        from requried stages, checking the SMDB, checking for possible reuse of 
-        existing outputs.
-        """
+        pass
 
     def add_to_the_pipeline(self, pipeline: 'Pipeline') -> Dict[str, StageOutput]:
         output_by_target = dict()
         for project in pipeline.projects:
-            output_by_target[project.unique_id] = pipeline.add_for_target(self, project)
+            output_by_target[project.unique_id] = \
+                self._queue_jobs_with_checks(project)
         return output_by_target
         
 
@@ -850,15 +958,13 @@ class CohortStage(Stage, ABC):
 
     @abstractmethod
     def queue_jobs(self, pipe: 'Pipeline', inputs: StageInput) -> StageOutput:
-        """
-        Implements logic of the Stage: creates Batch jobs that do the processing.
-        Assumes that all the household work is done: checking missing inputs
-        from requried stages, checking the SMDB, checking for possible reuse of 
-        existing outputs.
-        """
+        pass
 
     def add_to_the_pipeline(self, pipeline: 'Pipeline') -> Dict[str, StageOutput]:
-        return {pipeline.unique_id: pipeline.add_for_target(self, pipeline)}
+        return {
+            pipeline.unique_id: 
+            self._queue_jobs_with_checks(pipeline)
+        }
 
 
 _pipeline = None
@@ -1211,144 +1317,6 @@ class Pipeline(Target):
                 if last_stage_num and i >= last_stage_num:
                     logger.info(f'Last stage is {stage.name}, stopping here')
                     break
-
-    def add_for_target(self, stage: Stage[TargetT], target: TargetT) -> StageOutput:
-        """
-        Calls `output = queue_jobs(target, input)` on a target chosen 
-        by specific Stage subclass.
-        """
-        if not stage.skipped:
-            inputs = stage.make_inputs()
-            return self._add_or_reuse_stage(stage, target, inputs)
-
-        elif stage.required:
-            reuse_paths = self._try_get_reuse_paths(stage, target)
-            if not reuse_paths:
-                raise ValueError(
-                    f'Stage {stage.name} is required, but skipped and '
-                    f'cannot reuse outputs for {target.unique_id}'
-                )
-            return stage.make_outputs(target=target, data=reuse_paths) 
-
-        else:
-            # Stager is not needed, returning empty outputs
-            return stage.make_outputs(target=target)
-
-    def _try_get_reuse_paths(
-        self, 
-        stage: Stage[TargetT],
-        target: TargetT
-    ) -> Optional[Union[Dict[str, str], str]]:
-        """
-        Returns outputs that can be reused for the stage for the target,
-        or None of none can be reused
-        """
-        expected_output = stage.get_expected_output(target)
-
-        if stage.analysis_type is not None:
-            if not expected_output:
-                raise ValueError(
-                    f'get_expected_output() returned None, but must return str '
-                    f'for a stage with analysis_type: {stage.name} '
-                    f'on {target.unique_id}, analysis_type={stage.analysis_type}'
-                )
-                
-            if isinstance(expected_output, dict):
-                raise ValueError(
-                    f'get_expected_output() returns a dict, won\'t check the SMDB for '
-                    f'{stage.name} on {target.unique_id}'
-                )
-            found_path = self._check_smdb_analysis(stage, target, cast(str, expected_output))
-            if found_path and not self.validate_smdb_analyses:
-                return found_path
-
-        if expected_output and self.check_intermediate_existence:
-            if isinstance(expected_output, dict):
-                paths = list(expected_output.values())
-            else:
-                paths = [expected_output]
-            if all(utils.file_exists(path) for path in paths):
-                return expected_output
-        return None
-
-    def _reuse_jobs(
-        self, 
-        stage: Stage[TargetT],
-        target: TargetT,
-        found_paths: Union[str, Dict[str, str]]
-    ) -> StageOutput:
-        """
-        Queues a [reuse] Job
-        """
-        attributes = {}
-        if isinstance(target, Sample):
-            attributes['sample'] = target.id
-            attributes['project'] = target.project.name
-        if isinstance(target, Project):
-            attributes['sample'] = target.name
-        return stage.make_outputs(
-            target=target,
-            data=found_paths,
-            jobs=[self.b.new_job(f'{stage.name} [reuse]', attributes)]
-        )
-
-    def _add_or_reuse_stage(
-        self, 
-        stage: Stage[TargetT], 
-        target: TargetT, 
-        inputs: StageInput
-    ) -> StageOutput:
-        reuse_paths = self._try_get_reuse_paths(stage, target)
-        if reuse_paths:
-            if target.forced:
-                logger.info(
-                    f'{stage.name}: can reuse, but forcing rerunning the stage '
-                    f'for {target.unique_id}'
-                )
-                return stage.queue_jobs(target, inputs)
-            else:
-                logger.info(f'{stage.name}: reusing results for {target.unique_id}')
-                return self._reuse_jobs(stage, target, reuse_paths)
-        else:
-            logger.info(f'{stage.name}: adding jobs for {target.unique_id}')
-            return stage.queue_jobs(target, inputs)
-
-    def _check_smdb_analysis(
-        self,
-        stage: Stage[TargetT],
-        target: TargetT,
-        expected_path: str,
-    ) -> Optional[str]:
-        """
-        Check if SMDB already has analysis, and invalidate it if the
-        output for a stage doesn't exist
-        """
-        if not stage.analysis_type:
-            return None
-        analysis = target.analysis_by_type.get(stage.analysis_type)
-        if not analysis:
-            return None
-
-        if self.validate_smdb_analyses:
-            if isinstance(target, Sample):
-                sample = cast(Sample, target)
-                sample_ids = [sample.id]
-            elif isinstance(target, Project):
-                project = cast(Project, target)
-                sample_ids = [s.id for s in project.samples]
-            else:
-                pipe = cast(Pipeline, target)
-                sample_ids = pipe.get_all_sample_ids()
-
-            found_path = self.db.process_existing_analysis(
-                sample_ids=sample_ids,
-                completed_analysis=analysis,
-                analysis_type=stage.analysis_type.value,
-                expected_output_fpath=expected_path,
-            )
-        else:
-            found_path = analysis.output
-        return found_path
 
     def can_reuse(self, fpath: Optional[str]) -> bool:
         """
