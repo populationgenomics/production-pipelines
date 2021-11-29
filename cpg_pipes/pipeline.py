@@ -12,27 +12,23 @@ Basic example is also provided here:
 @stage(analysis_type=AnalysisType.CRAM)
 class CramStage(SampleStage):
     def queue_jobs(self, sample: Sample, inputs: StageInputs) -> StageOutputs:
-        expected_path = f'{sample.project.get_bucket()}/cram/{sample.id}.cram'
+        expected_path = self.get_expected_output(pipe)
         job = align.bwa(b=self.pipe.b, ..., output_path=expected_path)
         return self.make_outputs(sample, data=expected_path, jobs=[job])
 
 @stage(analysis_type=AnalysisType.GVCF, requires_stages=CramStage)
 class GvcfStage(SampleStage):
     def queue_jobs(self, sample: Sample, inputs: StageInputs) -> StageOutputs:
-        cram_path = inputs.get_file_path(target=sample, stage=CramStage)
-        expected_path = f'{sample.project.get_bucket()}/gvcf/{sample.id}.g.vcf.gz'
+        cram_path = inputs.as_path(target=sample, stage=CramStage)
+        expected_path = self.get_expected_output(pipe)
         job = haplotype_caller.produce_gvcf(b=self.pipe.b, ..., output_path=expected_path)
         return self.make_outputs(sample, data=expected_path, jobs=[job])
 
 @stage(analysis_type=AnalysisType.JOINT_CALLING)
 class JointCallingStage(CohortStage):
     def queue_jobs(self, pipeline: Pipeline, inputs: StageInputs) -> StageOutputs:
-        gvcf_by_sid = {
-            s.id: inputs.get_file_path(stage=GvcfStage, target=s)
-            for p in pipe.projects
-            for s in p.samples
-        }
-        expected_path = ...
+        gvcf_by_sid = inputs.as_path_by_target(stage=GvcfStage)
+        expected_path = self.get_expected_output(pipe)
         job = make_joint_genotyping_jobs(b=self.pipe.b, ..., output_path=expected_path)
         return self.make_outputs(pipe, data=expected_path, jobs=[job])
 
@@ -225,8 +221,8 @@ StageOutputData = Union[str, hb.Resource, Dict[str, str], Dict[str, hb.Resource]
 
 class StageOutput:
     """
-    Represents a result of a specific stage, run on a specific target.
-    Can be a path or a Hail Batch Resource, wrapped in a dict optionally.
+    Represents a result of a specific stage, which was run on a specific target.
+    Can be a file path, or a Hail Batch Resource. Optionally wrapped in a dict.
     """
     def __init__(
         self, 
@@ -256,7 +252,7 @@ class StageOutput:
     def as_path_or_resource(self, id=None) -> Union[str, hb.Resource]:
         """
         Cast the result to Union[str, hb.Resource], error if can't cast.
-        `id` is used to extract the value if the result is a dictionary.
+        `id` is used to extract the value when the result is a dictionary.
         """
         if id is not None:
             if not isinstance(self.data, dict):
@@ -279,7 +275,7 @@ class StageOutput:
     def as_path(self, id=None) -> str:
         """
         Cast the result to str, error if can't cast.
-        `id` is used to extract the value if the result is a dictionary.
+        `id` is used to extract the value when the result is a dictionary.
         """
         res = self.as_path_or_resource(id)
         if not isinstance(res, str):
@@ -289,7 +285,7 @@ class StageOutput:
     def as_resource(self, id=None) -> hb.Resource:
         """
         Cast the result to Hail Batch Resource, error if can't cast.
-        `id` is used to extract the value if the result is a dictionary.
+        `id` is used to extract the value when the result is a dictionary.
         """
         res = self.as_path_or_resource(id)
         if not isinstance(res, hb.Resource):
@@ -319,9 +315,9 @@ class StageOutput:
 
 class StageInput:
     """
-    Represents an input for a stage run. Wraps outputs of all upstream stages
+    Represents an input for a stage run. Wraps outputs of all required upstream stages
     for corresponding targets (e.g. all GVCFs from a HaploytypeCallerStage
-    for a JointCallingStage, along with jobs).
+    for a JointCallingStage, along with Hail Batch jobs).
 
     An object of this class is passed to the public `queue_jobs` method of a Stage, 
     and can be used to query dependency files and jobs.
@@ -432,12 +428,6 @@ class StageInput:
         return jobs
 
 
-class StageLevel(Enum):
-    SAMPLE = 0
-    PROJECT = 0
-    COHORT = 0
-
-
 def stage(
     _cls=None, 
     *,
@@ -446,8 +436,15 @@ def stage(
 ):
     """
     Implements a standard class decorator pattern with an optional argument.
-    The goal is to make subclasses of Stage singleton classes, that would allow 
-    only one object per subclass.
+    The goal is to allow cleaner defining of custom pipeline stages, without
+    requiring to implement constructor. E.g.
+
+    @stage(sm_analysis_type=AnalysisType.GVCF, requires_stages=CramStage)
+    class GvcfStage(SampleStage):
+        def get_expected_output(self, sample: Sample):
+            ...
+        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+            ...
     """
     def decorator_stage(cls):
         @functools.wraps(cls)
@@ -483,17 +480,20 @@ class PedigreeInfo:
 
 class Target:
     """
-    Stage target: e.g. sample, a pair of samples, a dataset/project, cohort/pipeline
+    Stage target: e.g. sample, a dataset/project, cohort/pipeline.
     """
     def __init__(self):
         # From SMDB Analysis entries:
         self.analysis_by_type: Dict[AnalysisType, Analysis] = dict()
-        # Whether to process even if outputs exist
+        # Whether to process even if outputs exist:
         self.forced = False
 
     @abstractmethod
     @property
     def unique_id(self) -> str:
+        """
+        ID should be unique across target of all levels.
+        """
         pass
  
 

@@ -8,7 +8,7 @@ import logging
 import sys
 import time
 from os.path import join
-from typing import Optional, List, Collection, Union, Dict
+from typing import Optional, List, Collection
 
 import click
 import hail as hl
@@ -22,8 +22,7 @@ from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.pipeline import Namespace, Pipeline, Sample, \
     SampleStage, Project, CohortStage, AnalysisType, ProjectStage, \
-    pipeline_click_options, StageInput, stage, run_pipeline, StageOutput, PairStage, \
-    Pair
+    pipeline_click_options, StageInput, stage, run_pipeline, StageOutput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -36,15 +35,6 @@ def get_fingerprint_path(output_path) -> str:
     if output_path.endswith('.g.vcf.gz'):
         return output_path.replace('.g.vcf.gz', '.somalier')
     raise ValueError('Only supporting CRAM or GVCF')
-
-
-@stage
-class MyPairStage(PairStage):
-    def get_expected_output(self, pair: Pair) -> Optional[Union[str, Dict[str, str]]]:
-        pass
-
-    def queue_jobs(self, pair: 'Pair', inputs: StageInput) -> StageOutput:
-        pass
 
 
 @stage(sm_analysis_type=AnalysisType.CRAM)
