@@ -448,7 +448,6 @@ def stage(
     *,
     sm_analysis_type: Optional[AnalysisType] = None, 
     requires_stages: Optional[Union[List[Type['Stage']], Type]] = None,
-    # level: StageLevel = StageLevel.COHORT,
 ):
     """
     Implements a standard class decorator pattern with an optional argument.
@@ -479,6 +478,8 @@ class Target:
     def __init__(self):
         # From SMDB Analysis entries:
         self.analysis_by_type: Dict[AnalysisType, Analysis] = dict()
+        # Whether to process even if outputs exist
+        self.forced = False
 
     @abstractmethod
     @property
@@ -486,9 +487,152 @@ class Target:
         pass
 
 
+class Sex(Enum):
+    UNKNOWN = 0
+    MALE = 1
+    FEMALE = 2
+
+
+@dataclass
+class PedigreeInfo:
+    fam_id: str
+    dad: Optional['Sample']
+    mom: Optional['Sample']
+    sex: Sex
+    phenotype: str     
+
+
+@dataclass(init=False)
+class Sample(Target):
+    """
+    Corresponds to one Sample entry in the SMDB.
+    """
+    id: str
+    external_id: str
+    project: 'Project'
+    alignment_input: Optional[AlignmentInput] = None
+    good: bool = True
+    seq_info: Optional[Sequence] = None
+    pedigree: Optional[PedigreeInfo] = None
+
+    def __init__(
+        self, 
+        id: str, 
+        external_id: str, 
+        project: 'Project',
+    ):
+        super().__init__()
+        self.id = id
+        self.external_id = external_id
+        self.project = project
+
+    def get_ped_dict(self, use_ext_id: bool = False) -> Dict:
+        """
+        Returns a dictionary of pedigree fields for this sample
+        """
+        def _get_id(_s: Optional[Sample]):
+            if _s is None:
+                return '0'
+            elif use_ext_id:
+                return _s.external_id
+            else:
+                return _s.id
+
+        if self.pedigree:
+            return {
+                'Family.ID': self.pedigree.fam_id,
+                'Individual.ID': _get_id(self),
+                'Father.ID': _get_id(self.pedigree.dad),
+                'Mother.ID': _get_id(self.pedigree.mom),
+                'Sex': str(self.pedigree.sex.value),
+                'Phenotype': self.pedigree.phenotype,
+            }
+        else:
+            return {
+                'Family.ID': _get_id(self),
+                'Individual.ID': _get_id(self),
+                'Father.ID': '0',
+                'Mother.ID': '0',
+                'Sex': '0',
+                'Phenotype': '0',
+            }
+
+    @property
+    def unique_id(self) -> str:
+        return self.id
+
+
+class Pair(Target):
+    """
+    Pair of samples
+    """
+    @property
+    def unique_id(self) -> str:
+        return f'{self.s1.unique_id}:{self.s2.unique_id}'
+
+    def __init__(self, s1: 'Sample', s2: 'Sample'):
+        super().__init__()
+        self.s1 = s1
+        self.s2 = s2
+
+
+class Project(Target):
+    """
+    Represents a CPG stack (aka dataset), or a project in the sample metadata database.
+    """
+    def get_bucket(self):
+        """
+        The primary project bucket (-main or -test) 
+        """
+        return f'gs://cpg-{self.stack}-{self.pipeline.output_suf}'
+
+    def get_tmp_bucket(self):
+        """
+        The tmp bucket (-main-tmp or -test-tmp)
+        """
+        return (
+            f'gs://cpg-{self.stack}-{self.pipeline.output_suf}-tmp/'
+            f'{self.pipeline.name}/'
+            f'{self.pipeline.output_version}'
+        )
+    
+    def __repr__(self):
+        return self.name
+
+    def __init__(
+        self, 
+        pipeline: 'Pipeline',
+        name: str, 
+        namespace: Namespace
+    ):
+        """
+        Has "name" and "stack".
+        "name" is in the SMDB terms: e.g. can be "seqr", "seqr-test".
+        "stack" is in the dataset terms, so can be only e.g. "seqr", but not "seqr-test".
+        """
+        super().__init__()
+        self.pipeline = pipeline
+        self.samples: List[Sample] = []
+        self.is_test = namespace != Namespace.MAIN
+
+        if name.endswith('-test'):
+            self.is_test = True
+            self.stack = name[:-len('-test')]
+        else:
+            self.stack = name
+        
+        self.name = self.stack
+        if self.is_test:
+            self.name = self.stack + '-test'
+
+    @property
+    def unique_id(self) -> str:
+        return self.name
+
+
 class Stage(ABC):
     """
-    Abstract class for a pipeline stage
+    Abstract class for a pipeline stage.
     """
     def __init__(
         self,
@@ -523,9 +667,14 @@ class Stage(ABC):
         # self.required=True means that is required for another active stage,
         # even if it was skipped
         self.required = True
+        # Rerun the stage even if can reuse the results
+        self.forced = False
     
     @property
     def name(self):
+        """
+        Stage name (unique and descriptive stage)
+        """
         return self._name
 
     @abstractmethod
@@ -551,9 +700,10 @@ class Stage(ABC):
         """
     
     @abstractmethod
-    def add_to_the_pipeline(self, pipe: 'Pipeline'):
+    def add_to_the_pipeline(self, pipeline: 'Pipeline') -> Dict[str, StageOutput]:
         """
-        Call `output = queue_jobs(target, input)` for each target in the pipeline
+        Calls `output = queue_jobs(target, input)` for each target in the pipeline.
+        Returns a dictionary of StageOutput, indexed by target unique_id.
         """
 
     def _add_jobs_for_target(self, target: Target) -> StageOutput:
@@ -635,13 +785,9 @@ class Stage(ABC):
         )
 
     def _add_or_reuse_jobs(self, target: Target) -> StageOutput:
-        if isinstance(target, Sample):
-            if target.id in self.pipe.force_samples:
-                logger.info(
-                    f'{self.name}: adding jobs for sample {target.id} '
-                    f'because the sample is forced'
-                )
-                return self._queue_jobs(target, self.make_stage_input())
+        if target.forced:
+            logger.info(f'{self.name}: force rerunning stage for {target.unique_id}')
+            return self._queue_jobs(target, self.make_stage_input())
 
         reuse_paths = self._check_if_can_reuse(target)
         if reuse_paths:
@@ -735,25 +881,17 @@ class SampleStage(Stage, ABC):
         existing outputs.
         """
 
-    def add_to_the_pipeline(self, pipeline: 'Pipeline'):
+    def add_to_the_pipeline(self, pipeline: 'Pipeline') -> Dict[str, StageOutput]:
         """
-        Calls `output = queue_jobs(target, input)` for each target in the pipeline
+        Calls `output = queue_jobs(target, input)` for each target in the pipeline.
+        Returns a dictionary of StageOutput, indexed by target unique_id.
         """
+        output_by_target = dict()
         for project in pipeline.projects:
             for sample in project.samples:
                 sample_result = self._add_jobs_for_target(sample)
-                self.output_by_target[sample.unique_id] = sample_result
-
-
-class Pair(Target):
-    @property
-    def unique_id(self) -> str:
-        return f'{self.s1.unique_id}:{self.s2.unique_id}'
-
-    def __init__(self, s1: 'Sample', s2: 'Sample'):
-        super().__init__()
-        self.s1 = s1
-        self.s2 = s2
+                output_by_target[sample.unique_id] = sample_result
+        return output_by_target
 
 
 class PairStage(Stage, ABC):
@@ -791,17 +929,20 @@ class PairStage(Stage, ABC):
         existing outputs.
         """
 
-    def add_to_the_pipeline(self, pipe: 'Pipeline'):
+    def add_to_the_pipeline(self, pipeline: 'Pipeline') -> Dict[str, StageOutput]:
         """
-        Call `output = queue_jobs(target, input)` for each target in the pipeline
+        Calls `output = queue_jobs(target, input)` for each target in the pipeline.
+        Returns a dictionary of StageOutput, indexed by target unique_id.
         """
-        for project in pipe.projects:
+        output_by_target = dict()
+        for project in pipeline.projects:
             for s1 in project.samples:
                 for s2 in project.samples:
-                    if s1 != s2:
-                        pair = Pair(s1, s2)
-                        self.output_by_target[pair.unique_id] = \
-                            self._add_jobs_for_target(pair)
+                    if s1 == s2:
+                        continue
+                    pair = Pair(s1, s2)
+                    output_by_target[pair.unique_id] = self._add_jobs_for_target(pair)
+        return output_by_target
 
 
 class ProjectStage(Stage, ABC):
@@ -840,14 +981,16 @@ class ProjectStage(Stage, ABC):
         existing outputs.
         """
 
-    def add_to_the_pipeline(self, pipe: 'Pipeline'):
+    def add_to_the_pipeline(self, pipeline: 'Pipeline') -> Dict[str, StageOutput]:
         """
-        Call `output = queue_jobs(target, input)` for each target in the pipeline
+        Calls `output = queue_jobs(target, input)` for each target in the pipeline.
+        Returns a dictionary of StageOutput, indexed by target unique_id.
         """
-        for project in pipe.projects:
-            self.output_by_target[project.unique_id] = \
-                self._add_jobs_for_target(project)
-
+        output_by_target = dict()
+        for project in pipeline.projects:
+            output_by_target[project.unique_id] = self._add_jobs_for_target(project)
+        return output_by_target
+        
 
 class CohortStage(Stage, ABC):    
     """
@@ -887,140 +1030,12 @@ class CohortStage(Stage, ABC):
         existing outputs.
         """
 
-    def add_to_the_pipeline(self, pipe: 'Pipeline'):
+    def add_to_the_pipeline(self, pipeline: 'Pipeline') -> Dict[str, StageOutput]:
         """
-        Call `output = queue_jobs(target, input)` for each target in the pipeline
+        Calls `output = queue_jobs(target, input)` for each target in the pipeline.
+        Returns a dictionary of StageOutput, indexed by target unique_id.
         """
-        self.output_by_target[self.pipe.unique_id] = self._add_jobs_for_target(pipe)
-
-
-class Sex(Enum):
-    UNKNOWN = 0
-    MALE = 1
-    FEMALE = 2
-
-
-@dataclass
-class PedigreeInfo:
-    fam_id: str
-    dad: Optional['Sample']
-    mom: Optional['Sample']
-    sex: Sex
-    phenotype: str     
-
-
-@dataclass(init=False)
-class Sample(Target):
-    """
-    Corresponds to one Sample entry in the SMDB
-    """
-    id: str
-    external_id: str
-    project: 'Project'
-    alignment_input: Optional[AlignmentInput] = None
-    good: bool = True
-    seq_info: Optional[Sequence] = None
-    pedigree: Optional[PedigreeInfo] = None
-
-    def __init__(
-        self, 
-        id: str, 
-        external_id: str, 
-        project: 'Project',
-    ):
-        super().__init__()
-        self.id = id
-        self.external_id = external_id
-        self.project = project
-
-    def get_ped_dict(self, use_ext_id: bool = False) -> Dict:
-        """
-        Returns a dictionary of pedigree fields for this sample
-        """
-        def _get_id(_s: Optional[Sample]):
-            if _s is None:
-                return '0'
-            elif use_ext_id:
-                return _s.external_id
-            else:
-                return _s.id
-
-        if self.pedigree:
-            return {
-                'Family.ID': self.pedigree.fam_id,
-                'Individual.ID': _get_id(self),
-                'Father.ID': _get_id(self.pedigree.dad),
-                'Mother.ID': _get_id(self.pedigree.mom),
-                'Sex': str(self.pedigree.sex.value),
-                'Phenotype': self.pedigree.phenotype,
-            }
-        else:
-            return {
-                'Family.ID': _get_id(self),
-                'Individual.ID': _get_id(self),
-                'Father.ID': '0',
-                'Mother.ID': '0',
-                'Sex': '0',
-                'Phenotype': '0',
-            }
-
-    @property
-    def unique_id(self) -> str:
-        return self.id
-
-
-class Project(Target):
-    """
-    Represents a CPG stack (aka dataset) or a project in the sample metadata database
-    """
-    def get_bucket(self):
-        """
-        The primary project bucket (-main or -test) 
-        """
-        return f'gs://cpg-{self.stack}-{self.pipeline.output_suf}'
-
-    def get_tmp_bucket(self):
-        """
-        The tmp bucket (-main-tmp or -test-tmp)
-        """
-        return (
-            f'gs://cpg-{self.stack}-{self.pipeline.output_suf}-tmp/'
-            f'{self.pipeline.name}/'
-            f'{self.pipeline.output_version}'
-        )
-    
-    def __repr__(self):
-        return self.name
-
-    def __init__(
-        self, 
-        pipeline: 'Pipeline',
-        name: str, 
-        namespace: Namespace
-    ):
-        """
-        Has "name" and "stack".
-        "name" is in the SMDB terms: e.g. can be "seqr", "seqr-test".
-        "stack" is in the dataset terms, so can be only e.g. "seqr", but not "seqr-test".
-        """
-        super().__init__()
-        self.pipeline = pipeline
-        self.samples: List[Sample] = []
-        self.is_test = namespace != Namespace.MAIN
-
-        if name.endswith('-test'):
-            self.is_test = True
-            self.stack = name[:-len('-test')]
-        else:
-            self.stack = name
-        
-        self.name = self.stack
-        if self.is_test:
-            self.name = self.stack + '-test'
-
-    @property
-    def unique_id(self) -> str:
-        return self.name
+        return {self.pipe.unique_id: self._add_jobs_for_target(pipeline)}
 
 
 _pipeline = None
@@ -1083,7 +1098,6 @@ class Pipeline(Target):
         self.check_intermediate_existence = check_intermediate_existence
         self.first_stage = first_stage
         self.last_stage = last_stage
-        self.force_samples = force_samples or []
         self.db = SMDB(
             self.analysis_project.name,
             do_update_analyses=update_smdb_analyses,
@@ -1157,6 +1171,7 @@ class Pipeline(Target):
                 skip_samples=skip_samples,
                 only_samples=only_samples,
                 ped_files=ped_files,
+                forced_samples=force_samples,
             )
 
     def get_all_samples(self) -> List[Sample]:
@@ -1189,6 +1204,7 @@ class Pipeline(Target):
         namespace: Namespace,
         skip_samples: Optional[List[str]] = None,
         only_samples: Optional[List[str]] = None,
+        forced_samples: Optional[List[str]] = None,
     ):
         samples_by_project = self.db.get_samples_by_project(
             project_names=input_projects,
@@ -1203,11 +1219,15 @@ class Pipeline(Target):
                 namespace=namespace,
             )
             for s_data in sample_datas:
-                project.samples.append(Sample(
+                s = Sample(
                     id=s_data['id'], 
                     external_id=s_data['external_id'],
                     project=project,
-                ))
+                )
+                if forced_samples and s.id in forced_samples:
+                    logger.info(f'Force rerunning sample {s.id} even if outputs exist')
+                    s.forced = True
+                project.samples.append(s)
             self.projects.append(project)
 
     def _populate_analysis(self):
@@ -1280,6 +1300,7 @@ class Pipeline(Target):
         only_samples: Optional[List[str]] = None,
         ped_files: Optional[List[str]] = None,
         namespace: Optional[Namespace] = None,
+        forced_samples: List[str] = None
     ) -> None:
         """
         Finds input samples, analyses and sequences from the DB, 
@@ -1290,6 +1311,7 @@ class Pipeline(Target):
             skip_samples=skip_samples,
             only_samples=only_samples,
             namespace=namespace or self.namespace,
+            forced_samples=forced_samples,
         )
         self._populate_analysis()
         if ped_files:
@@ -1359,7 +1381,7 @@ class Pipeline(Target):
 
             if stage.required:
                 logger.info(f'Adding jobs for stage {stage.name}')
-                stage.add_to_the_pipeline(self)
+                output_by_target = stage.add_to_the_pipeline(self)
 
             if not stage.skipped:
                 logger.info(f'')
