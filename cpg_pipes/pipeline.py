@@ -495,9 +495,6 @@ class Target:
     @property
     def unique_id(self) -> str:
         pass
-
-
-TargetT = TypeVar('TargetT', bound=Target)
  
 
 @dataclass(init=False)
@@ -628,6 +625,11 @@ class Project(Target):
         return self.name
 
 
+# Type variable to make sure a Stage subclass always matches the
+# correspondinng Target subclass
+TargetT = TypeVar('TargetT', bound=Target)
+
+
 class Stage(Generic[TargetT], ABC):
     """
     Abstract class for a pipeline stage.
@@ -636,12 +638,12 @@ class Stage(Generic[TargetT], ABC):
         self,
         pipe: 'Pipeline',
         name: str,
-        requires_stages: Optional[Union[List[Callable], Callable]] = None,
+        requires_stages: Optional[Union[List[Type['Stage']], Type['Stage']]] = None,
         analysis_type: Optional[AnalysisType] = None,
     ):
         self._name = name
         self.pipe: 'Pipeline' = pipe
-        self.required_stages_classes: List[Callable] = []
+        self.required_stages_classes: List[Type[Stage]] = []
         if requires_stages:
             if isinstance(requires_stages, list):
                 self.required_stages_classes.extend(requires_stages)
