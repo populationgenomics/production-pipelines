@@ -732,34 +732,34 @@ class Stage(Generic[TargetT], ABC):
         Performs checks th like possibility to reuse existing jobs results,
         or if required dependencies are missing.
         """
-        if self.skipped and not self.required:
-            # Stage is not needed, returning empty outputs
-            return self.make_outputs(target=target)
- 
-        reusable_paths = self._try_get_reusable_paths(target)
-        
         if not self.skipped:
-            inputs = self._make_inputs()
+            reusable_paths = self._try_get_reusable_paths(target)
             if reusable_paths:
                 if target.forced:
                     logger.info(
                         f'{self.name}: can reuse, but forcing rerunning the stage '
                         f'for {target.unique_id}'
                     )
-                    return self.queue_jobs(target, inputs)
+                    return self.queue_jobs(target, self._make_inputs())
                 else:
                     logger.info(f'{self.name}: reusing results for {target.unique_id}')
                     return self._queue_reuse_job(target, reusable_paths)
-            logger.info(f'{self.name}: adding jobs for {target.unique_id}')
-            return self.queue_jobs(target, inputs)
+            else:
+                logger.info(f'{self.name}: adding jobs for {target.unique_id}')
+                return self.queue_jobs(target, self._make_inputs())
 
-        else:
+        elif self.required:
+            reusable_paths = self._try_get_reusable_paths(target)
             if not reusable_paths:
                 raise ValueError(
                     f'Stage {self.name} is required, but skipped and '
                     f'cannot reuse outputs for {target.unique_id}'
                 )
             return self.make_outputs(target=target, data=reusable_paths) 
+
+        else:
+            # Stage is not needed, returning empty outputs
+            return self.make_outputs(target=target)
 
     def _try_get_reusable_paths(
         self, 
