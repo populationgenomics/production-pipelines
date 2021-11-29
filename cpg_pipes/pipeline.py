@@ -340,7 +340,7 @@ class StageInput:
     def _each(
         self, 
         fun: Callable,
-        stage: Callable,
+        stage: Type['Stage'],
     ):
         return {
             trg: fun(result)
@@ -350,7 +350,7 @@ class StageInput:
 
     def as_path_by_target(
         self, 
-        stage: Callable,
+        stage: Type['Stage'],
         id: Optional[str] = None,
     ) -> Dict[str, str]:
         """
@@ -360,7 +360,7 @@ class StageInput:
 
     def as_resource_by_target(
         self, 
-        stage: Callable,
+        stage: Type['Stage'],
         id: Optional[str] = None,
     ) -> Dict[str, hb.Resource]:
         """
@@ -368,21 +368,25 @@ class StageInput:
         """
         return self._each(fun=(lambda r: r.as_resource(id=id)), stage=stage)
 
-    def as_dict_by_target(self, stage: Callable) -> Dict[str, Dict[str, str]]:
+    def as_dict_by_target(self, stage: Type['Stage']) -> Dict[str, Dict[str, str]]:
         """
         Get as a dictoinary of files/resources for a specific stage, indexed by target
         """
         return self._each(fun=(lambda r: r.as_dict(id=id)), stage=stage)
 
     def as_resource_dict_by_target(
-        self, stage: Callable
+        self, 
+        stage: Type['Stage'],
     ) -> Dict[str, Dict[str, hb.Resource]]:
         """
         Get a dictoinary of resources for a specific stage, and indexed by target
         """
         return self._each(fun=(lambda r: r.as_resource_dict(id=id)), stage=stage)
 
-    def as_path_dict_by_target(self, stage: Callable) -> Dict[str, Dict[str, str]]:
+    def as_path_dict_by_target(
+        self, 
+        stage: Type['Stage'],
+    ) -> Dict[str, Dict[str, str]]:
         """
         Get a dictoinary of paths for a specific stage, and indexed by target
         """
@@ -391,7 +395,7 @@ class StageInput:
     def as_path(
         self, 
         target: 'Target',
-        stage: Callable,
+        stage: Type['Stage'],
         id: Optional[str] = None,
     ) -> str:
         """
@@ -404,13 +408,13 @@ class StageInput:
     def as_resource(
         self, 
         target: 'Target',
-        stage: Callable,
+        stage: Type['Stage'],
         id: Optional[str] = None,
     ) -> str:
         res = self._results_by_target_by_stage[stage.__name__][target.unique_id]
         return res.as_resource(id)
     
-    def as_dict(self, target: 'Target', stage: Callable) -> Dict[str, str]:
+    def as_dict(self, target: 'Target', stage: Type['Stage']) -> Dict[str, str]:
         """
         Get a dictoinary of files or Resources for a specific target and stage
         """
@@ -428,12 +432,15 @@ class StageInput:
         return jobs
 
 
+StageDecorator = Callable[..., 'Stage']
+
+
 def stage(
-    _cls=None, 
+    _cls: Optional[Type['Stage']] = None, 
     *,
     sm_analysis_type: Optional[AnalysisType] = None, 
-    requires_stages: Optional[Union[List[Type['Stage']], Type]] = None,
-):
+    requires_stages: Optional[Union[List[StageDecorator], StageDecorator]] = None,
+) -> Union[StageDecorator, Callable[..., StageDecorator]]:
     """
     Implements a standard class decorator pattern with an optional argument.
     The goal is to allow cleaner defining of custom pipeline stages, without
@@ -446,14 +453,14 @@ def stage(
         def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
             ...
     """
-    def decorator_stage(cls):
+    def decorator_stage(cls) -> StageDecorator:
         @functools.wraps(cls)
-        def wrapper_stage(pipe: 'Pipeline' = None):
+        def wrapper_stage(pipeline: 'Pipeline') -> Stage:
             return cls(
                 name=cls.__name__,
-                pipe=pipe,
-                sm_analysis_type=sm_analysis_type,
+                pipeline=pipeline,
                 requires_stages=requires_stages,
+                sm_analysis_type=sm_analysis_type,
             )
         return wrapper_stage
 
@@ -636,14 +643,14 @@ class Stage(Generic[TargetT], ABC):
     """
     def __init__(
         self,
-        pipe: 'Pipeline',
+        pipeline: 'Pipeline',
         name: str,
-        requires_stages: Optional[Union[List[Type['Stage']], Type['Stage']]] = None,
-        analysis_type: Optional[AnalysisType] = None,
+        requires_stages: Optional[Union[List[StageDecorator], StageDecorator]] = None,
+        sm_analysis_type: Optional[AnalysisType] = None,
     ):
         self._name = name
-        self.pipe: 'Pipeline' = pipe
-        self.required_stages_classes: List[Type[Stage]] = []
+        self.pipe = pipeline
+        self.required_stages_classes: List[StageDecorator] = []
         if requires_stages:
             if isinstance(requires_stages, list):
                 self.required_stages_classes.extend(requires_stages)
@@ -655,7 +662,7 @@ class Stage(Generic[TargetT], ABC):
         
         # If analysis type is defined, it will be used to find and reuse existing
         # outputs from the SMDB
-        self.analysis_type = analysis_type
+        self.analysis_type = sm_analysis_type
 
         # Populated with the return value of `add_to_the_pipeline()`
         self.output_by_target: Dict[str, StageOutput] = dict()
@@ -972,7 +979,7 @@ class CohortStage(Stage, ABC):
 _pipeline = None
 
 
-def run_pipeline(*args, stages_in_order: List[Callable], **kwargs):
+def run_pipeline(*args, stages_in_order: List[StageDecorator], **kwargs):
     """
     This function should be called to trigger the pipeline logic (i.e. find samples,
     call Stages' add_jobs(), submit Batch). Sort of implements the singleton logic
