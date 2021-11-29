@@ -336,11 +336,12 @@ class StageInput:
         self._jobs: List[Job] = []
 
     def add_stage_output(self, output: StageOutput):
-        if output.stage.get_name() not in self._results_by_target_by_stage:
-            self._results_by_target_by_stage[output.stage.get_name()] = dict()
-        self._results_by_target_by_stage[
-            output.stage.get_name()
-        ][output.target.get_target_name()] = output
+        stage_name = output.stage.get_name()
+        target_name = output.target.get_target_name()
+        
+        if stage_name not in self._results_by_target_by_stage:
+            self._results_by_target_by_stage[stage_name] = dict()
+        self._results_by_target_by_stage[stage_name][target_name] = output
 
     def merge(self, other: 'StageInput'):
         """
@@ -543,7 +544,7 @@ class Stage(ABC):
         self.analysis_type = analysis_type
 
         # Populated when the stage is added by calling `add_to_the_pipeline`
-        self.result_for_all_targets: StageInput = StageInput(pipe=self.pipe, sourcestage=self)
+        self.output_by_target: Dict[str, StageOutput] = dict()
 
         # self.active=True means that the stage wasn't skipped and jobs were added
         # into the pipeline, and we shoule expect target.ouptut_by_stage 
@@ -599,13 +600,13 @@ class Stage(ABC):
 
     def merged_results_from_prev_stages(self) -> StageInput:
         """
-        Checks the existence of the depenencies, and calls 
-        the public `outputs = self.queue_jobs(target, inputs)`
+        Collects inputs from all dependencies
         """
         inputs = StageInput(pipe=self.pipe)
 
         for prev_stage in self.required_stages:
-            inputs.merge(prev_stage.result_for_all_targets)
+            for _, stage_output in prev_stage.output_by_target.items():
+                inputs.add_stage_output(stage_output)
 
         return inputs
 
@@ -768,7 +769,7 @@ class SampleStage(Stage, ABC):
         for project in pipe.projects:
             for sample in project.samples:
                 sample_result = self._add_to_the_pipeline_for_target(sample)
-                self.result_for_all_targets.add_stage_output(sample_result)
+                self.output_by_target[sample.get_target_name()] = sample_result
 
 
 class ProjectStage(Stage, ABC):
@@ -812,10 +813,9 @@ class ProjectStage(Stage, ABC):
         Call `output = queue_jobs(target, input)` for each target in the pipeline
         """
         for project in pipe.projects:
-            self.result_for_all_targets.add_stage_output(
+            self.output_by_target[project.get_target_name()] = \
                 self._add_to_the_pipeline_for_target(project)
-            )
-            
+
 
 class CohortStage(Stage, ABC):    
     """
@@ -859,7 +859,8 @@ class CohortStage(Stage, ABC):
         """
         Call `output = queue_jobs(target, input)` for each target in the pipeline
         """
-        self.results = self._add_to_the_pipeline_for_target(pipe)
+        self.output_by_target[self.pipe.get_target_name()] = \
+            self._add_to_the_pipeline_for_target(pipe)
 
 
 class StageTarget:
