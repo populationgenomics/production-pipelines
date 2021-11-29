@@ -1219,10 +1219,10 @@ class Pipeline(Target):
         """
         if not stage.skipped:
             inputs = stage.make_inputs()
-            return self._add_or_reuse_jobs(stage, target, inputs)
+            return self._add_or_reuse_stage(stage, target, inputs)
 
         elif stage.required:
-            reuse_paths = self._check_if_can_reuse(stage, target)
+            reuse_paths = self._try_get_reuse_paths(stage, target)
             if not reuse_paths:
                 raise ValueError(
                     f'Stage {stage.name} is required, but skipped and '
@@ -1234,24 +1234,15 @@ class Pipeline(Target):
             # Stager is not needed, returning empty outputs
             return stage.make_outputs(target=target)
 
-    # def make_stage_input(self) -> StageInput:
-    #     """
-    #     Collects outputs from all dependencies and create input for this stage
-    #     """
-    #     inputs = StageInput()
-    # 
-    #     for prev_stage in self.required_stages:
-    #         for _, stage_output in prev_stage.output_by_target.items():
-    #             inputs.add_other_stage_output(stage_output)
-    # 
-    #     return inputs
-
-    def _check_if_can_reuse(
+    def _try_get_reuse_paths(
         self, 
-        stage: Stage,
-        target: Target
+        stage: Stage[TargetT],
+        target: TargetT
     ) -> Optional[Union[Dict[str, str], str]]:
-
+        """
+        Returns outputs that can be reused for the stage for the target,
+        or None of none can be reused
+        """
         expected_output = stage.get_expected_output(target)
 
         if stage.analysis_type is not None:
@@ -1282,8 +1273,8 @@ class Pipeline(Target):
 
     def _reuse_jobs(
         self, 
-        stage: Stage,
-        target: Target, 
+        stage: Stage[TargetT],
+        target: TargetT,
         found_paths: Union[str, Dict[str, str]]
     ) -> StageOutput:
         """
@@ -1301,13 +1292,13 @@ class Pipeline(Target):
             jobs=[self.b.new_job(f'{stage.name} [reuse]', attributes)]
         )
 
-    def _add_or_reuse_jobs(
+    def _add_or_reuse_stage(
         self, 
         stage: Stage[TargetT], 
         target: TargetT, 
         inputs: StageInput
     ) -> StageOutput:
-        reuse_paths = self._check_if_can_reuse(stage, target)
+        reuse_paths = self._try_get_reuse_paths(stage, target)
         if reuse_paths:
             if target.forced:
                 logger.info(
@@ -1324,8 +1315,8 @@ class Pipeline(Target):
 
     def _check_smdb_analysis(
         self,
-        stage: Stage,
-        target: Target,
+        stage: Stage[TargetT],
+        target: TargetT,
         expected_path: str,
     ) -> Optional[str]:
         """
