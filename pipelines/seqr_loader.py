@@ -22,7 +22,7 @@ from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.pipeline import Namespace, Pipeline, Sample, \
     SampleStage, Project, CohortStage, AnalysisType, ProjectStage, \
-    pipeline_click_options, StageResults, stage, run_pipeline
+    pipeline_click_options, StageInput, stage, run_pipeline, StageOutput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -42,7 +42,7 @@ class CramStage(SampleStage):
     def get_expected_output(self, sample: Sample):
         return f'{sample.project.get_bucket()}/cram/{sample.id}.cram'
 
-    def queue_jobs(self, sample: Sample, inputs: StageResults) -> StageResults:
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         if not sample.seq_info:
             logger.critical(f'No sequence record for {sample.id}')
             sys.exit(1)
@@ -89,7 +89,7 @@ class CramPedCheckStage(ProjectStage):
     def get_expected_output(self, project: Project):
         pass
 
-    def queue_jobs(self, project: Project, inputs: StageResults) -> StageResults:
+    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
         cram_by_sid = inputs.as_path_by_target(stage=CramStage)
 
         fingerprint_path_by_sid = {
@@ -119,7 +119,7 @@ class GvcfStage(SampleStage):
     def get_expected_output(self, sample: Sample):
         return f'{sample.project.get_bucket()}/gvcf/{sample.id}.g.vcf.gz'
 
-    def queue_jobs(self, sample: Sample, inputs: StageResults) -> StageResults:
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         cram_path = inputs.as_path(target=sample, stage=CramStage)
         
         hc_shards_num = self.pipe.config.get('hc_shards_num', 1)
@@ -160,7 +160,7 @@ class GvcfPedCheckStage(ProjectStage):
     def get_expected_output(self, project: Project):
         pass
 
-    def queue_jobs(self, project: Project, inputs: StageResults) -> StageResults:
+    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
         gvcf_by_sid = inputs.as_path_by_target(stage=GvcfStage)
         
         fingerprint_path_by_sid = {
@@ -194,7 +194,7 @@ class JointGenotypingStage(CohortStage):
         expected_jc_vcf_path = f'{pipe.tmp_bucket}/joint_calling/{samples_hash}.vcf.gz'
         return expected_jc_vcf_path
 
-    def queue_jobs(self, pipe: Pipeline, inputs: StageResults) -> StageResults:
+    def queue_jobs(self, pipe: Pipeline, inputs: StageInput) -> StageOutput:
         gvcf_by_sid = inputs.as_path_by_target(stage=GvcfStage)
 
         not_found_gvcfs: List[str] = []
@@ -235,7 +235,7 @@ class VqsrStage(CohortStage):
         expected_jc_vcf_path = f'{pipe.tmp_bucket}/vqsr/{samples_hash}-site-only.vcf.gz'
         return expected_jc_vcf_path
     
-    def queue_jobs(self, pipe: Pipeline, inputs: StageResults) -> StageResults:
+    def queue_jobs(self, pipe: Pipeline, inputs: StageInput) -> StageOutput:
         jc_vcf_path = inputs.as_path(stage=JointGenotypingStage, target=pipe)
         siteonly_vcf_path = make_expected_siteonly_path(jc_vcf_path)
 
@@ -266,7 +266,7 @@ class AnnotateCohortStage(CohortStage):
     def get_expected_output(self, pipe: Pipeline):
         return join(get_anno_tmp_bucket(pipe), 'combined.mt')
 
-    def queue_jobs(self, pipe: Pipeline, inputs: StageResults) -> StageResults:
+    def queue_jobs(self, pipe: Pipeline, inputs: StageInput) -> StageOutput:
         checkpoints_bucket = join(get_anno_tmp_bucket(pipe), 'checkpoints')
 
         vcf_path = inputs.as_path(target=pipe, stage=JointGenotypingStage)
@@ -298,7 +298,7 @@ class AnnotateProjectStage(ProjectStage):
     def get_expected_output(self, project: Project):
         return f'{project.get_bucket()}/mt/{project.name}.mt'
 
-    def queue_jobs(self, project: Project, inputs: StageResults) -> StageResults:
+    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
         output_projects = self.pipe.config.get('output_projects', self.pipe.projects)
         if project.stack not in output_projects:
             logger.info(
@@ -340,7 +340,7 @@ class LoadToEsStage(ProjectStage):
     def get_expected_output(self, project: Project):
         return None
 
-    def queue_jobs(self, project: Project, inputs: StageResults) -> StageResults:
+    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
         output_projects = self.pipe.config.get('output_projects', self.pipe.projects)
         if project.stack not in output_projects:
             logger.info(

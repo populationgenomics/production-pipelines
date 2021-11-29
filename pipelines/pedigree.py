@@ -13,7 +13,7 @@ import click
 from cpg_pipes import utils
 from cpg_pipes.jobs import pedigree
 from cpg_pipes.pipeline import Project, \
-    ProjectStage, pipeline_click_options, stage, StageResults, run_pipeline
+    ProjectStage, pipeline_click_options, stage, StageInput, run_pipeline, StageOutput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -25,7 +25,7 @@ class CramPedCheckStage(ProjectStage):
     def get_expected_output(self, project: Project):
         pass
 
-    def queue_jobs(self, project: Project, inputs: StageResults) -> StageResults:
+    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
         # path_by_sid = dict()
         # for s in project.samples:
         #     path = f'gs://cpg-{project.name}-main/cram/{s.id}.cram'
@@ -57,7 +57,7 @@ class GvcfPedCheckStage(ProjectStage):
     def get_expected_output(self, project: Project):
         pass
 
-    def queue_jobs(self, project: Project, inputs: StageResults) -> StageResults:
+    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
         path_by_sid = dict()
         for s in project.samples:
             path = f'gs://cpg-{project.name}-main/gvcf/{s.id}.g.vcf.gz'

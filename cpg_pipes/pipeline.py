@@ -73,9 +73,12 @@ logger.setLevel(logging.INFO)
 
 def pipeline_click_options(function: Callable) -> Callable:
     """
-    Decorator to use with click when writing a pipeline script, e.g.:
+    Decorator to use with click when writing a script that implements a pipeline.
+    For example:
+
     @click.command()
     @pipeline_click_options
+    @click.argument('--custom-argument')
     def main():
         pass
     """
@@ -92,14 +95,16 @@ def pipeline_click_options(function: Callable) -> Callable:
             '--analysis-project',
             'analysis_project',
             default='seqr',
-            help='SM project name to write the intermediate/joint-calling analysis entries to',
+            help='SM project name to write the intermediate/joint-calling analysis '
+                 'entries to',
         ),
         click.option(
             '--input-project',
             'input_projects',
             multiple=True,
             required=True,
-            help='Only read samples that belong to the project(s). Can be set multiple times.',
+            help='Only read samples that belong to the project(s). Can be set multiple '
+                 'times.',
         ),
         click.option(
             '--ped-file',
@@ -171,8 +176,9 @@ def pipeline_click_options(function: Callable) -> Callable:
             'check_intermediate_existence',
             default=True,
             is_flag=True,
-            help='Before running a job, check for an intermediate output before submitting it, '
-                 'and if it exists on a bucket, submit a [reuse] job instead. Works well with '
+            help='Before running a job, check for an intermediate output before '
+                 'submitting it, and if it exists on a bucket, submit a [reuse] job '
+                 'instead. Works well with '
                  '--previous-batch-tsv/--previous-batch-id options.',
         ),
         click.option(
@@ -188,21 +194,23 @@ def pipeline_click_options(function: Callable) -> Callable:
             is_flag=True,
             default=False,
             help='Validate existing analysis entries by checking if a.output exists on '
-                 'the bucket. Set the analysis entry to "failure" if output doesn\'t exist'
+                 'the bucket. Set the analysis entry to "failure" if output doesn\'t '
+                 'exist'
         ),
         click.option(
             '--previous-batch-tsv',
             'previous_batch_tsv_path',
-            help='A list of previous successful attempts from another batch, dumped from '
-                 'from the Batch database (the "jobs" table joined on "job_attributes"). '
-                 'If the intermediate output for a job exists in a previous attempt, '
-                 'it will be passed forward, and a [reuse] job will be submitted.'
+            help='A list of previous successful attempts from another batch, dumped '
+                 'from from the Batch database (the "jobs" table joined on '
+                 '"job_attributes"). If the intermediate output for a job exists in '
+                 'a previous attempt, it will be passed forward, and a [reuse] job will '
+                 'be submitted.'
         ),
         click.option(
             '--previous-batch-id',
             'previous_batch_id',
-            help='6-letter ID of the previous successful batch (corresponds to the directory '
-                 'name in the batch logs. e.g. feb0e9 in '
+            help='6-letter ID of the previous successful batch (corresponds to the '
+                 'directory name in the batch logs. e.g. feb0e9 in '
                  'gs://cpg-seqr-main-tmp/hail/batch/feb0e9'
         )
     ]
@@ -211,23 +219,25 @@ def pipeline_click_options(function: Callable) -> Callable:
     return function
 
 
-OneResultData = Union[str, hb.Resource, Dict[str, str], Dict[str, hb.Resource]]
+StageOutputData = Union[str, hb.Resource, Dict[str, str], Dict[str, hb.Resource]]
 
 
-class OneResult:
+class StageOutput:
     """
-    Represents pipeline result for specific stage and specific target.
+    Represents a result of a specific stage, run on a specific target.
     Can be a path or a Hail Batch Resource, wrapped in a dict optionally.
     """
     def __init__(
         self, 
-        data: OneResultData,
-        stage: str, 
-        target: str
+        data: StageOutputData,
+        stage: 'Stage',
+        target: 'StageTarget',
+        jobs: Optional[List[Job]] = None,
     ):
         self.data = data
         self.stage = stage
         self.target = target
+        self.jobs: List[Job] = jobs or []
 
     def exist(self) -> bool:
         """
@@ -306,10 +316,14 @@ class OneResult:
         return {k: self.as_path(id=k) for k in self.as_dict()}
 
 
-class StageResults:
+class StageInput:
     """
-    Object of this class is passed to `add_jobs` method of a Stage, and can be used
-    to query dependency files and jobs
+    Represents an input for a stage run. Wraps outputs of all upstream stages
+    for corresponding targets (e.g. all GVCFs from a HaploytypeCallerStage
+    for a JointCallingStage, along with jobs).
+
+    An object of this class is passed to the public `queue_jobs` method of a Stage, 
+    and can be used to query dependency files and jobs.
     """
     def __init__(
         self, 
@@ -318,38 +332,24 @@ class StageResults:
     ):
         self._pipe = pipe
         self._sourcestage = sourcestage
-        self._results_by_target_by_stage: Dict[str, Dict[str, OneResult]] = {}
+        self._results_by_target_by_stage: Dict[str, Dict[str, StageOutput]] = {}
         self._jobs: List[Job] = []
 
-    def add_data(
-        self,
-        data: OneResultData,
-        stage: Optional[str] = None,
-        target: Optional[Union['StageTarget', str]] = None,
-    ):
-        if stage is None:
-            assert self._sourcestage is not None
-            stage = self._sourcestage.name
-        if target is None:
-            target = self._pipe
-        if not isinstance(target, str):
-            target = cast(StageTarget, target).get_target_name()
+    def add_stage_output(self, output: StageOutput):
+        if output.stage.get_name() not in self._results_by_target_by_stage:
+            self._results_by_target_by_stage[output.stage.get_name()] = dict()
+        self._results_by_target_by_stage[
+            output.stage.get_name()
+        ][output.target.get_target_name()] = output
 
-        result = OneResult(data=data, stage=stage, target=target)
-
-        if stage not in self._results_by_target_by_stage:
-            self._results_by_target_by_stage[stage] = dict()
-        self._results_by_target_by_stage[stage][target] = result
-
-    def merge(self, other: 'StageResults'):
+    def merge(self, other: 'StageInput'):
         """
         Merge with another StageDeps object
         """
-        for stage, results_by_target in other._results_by_target_by_stage.items():
-            for target, one_result in results_by_target.items():
-                self.add_data(one_result.data, stage=stage, target=target)
-        self.add_jobs(other.get_jobs())
-        
+        for _, results_by_target in other._results_by_target_by_stage.items():
+            for _, results in results_by_target.items():
+                self.add_stage_output(results)
+
     def _each(
         self, 
         fun: Callable,
@@ -387,7 +387,9 @@ class StageResults:
         """
         return self._each(fun=(lambda r: r.as_dict(id=id)), stage=stage)
 
-    def as_resource_dict_by_target(self, stage: Callable) -> Dict[str, Dict[str, hb.Resource]]:
+    def as_resource_dict_by_target(
+        self, stage: Callable
+    ) -> Dict[str, Dict[str, hb.Resource]]:
         """
         Get a dictoinary of resources for a specific stage, and indexed by target
         """
@@ -425,11 +427,14 @@ class StageResults:
         return res.as_dict()
 
     def get_jobs(self) -> List[Job]:
-        return self._jobs
-
-    def add_jobs(self, jobs: Optional[List[Job]]):
-        if jobs:
-            self._jobs.extend(jobs)
+        """
+        Build a list of hail batch dependencies from all stages and targets
+        """
+        jobs = []
+        for _, results_by_target in self._results_by_target_by_stage.items():
+            for _, results in results_by_target.items():
+                jobs.extend(results.jobs)
+        return jobs
 
 
 class StageLevel(Enum):
@@ -538,7 +543,7 @@ class Stage(ABC):
         self.analysis_type = analysis_type
 
         # Populated when the stage is added by calling `add_to_the_pipeline`
-        self.results: StageResults = StageResults(pipe=self.pipe, sourcestage=self)
+        self.result_for_all_targets: StageInput = StageInput(pipe=self.pipe, sourcestage=self)
 
         # self.active=True means that the stage wasn't skipped and jobs were added
         # into the pipeline, and we shoule expect target.ouptut_by_stage 
@@ -552,7 +557,7 @@ class Stage(ABC):
         return self.name
 
     @abstractmethod
-    def _queue_jobs(self, target: 'StageTarget', inputs: StageResults) -> StageResults:
+    def _queue_jobs(self, target: 'StageTarget', inputs: StageInput) -> StageOutput:
         """
         Implements logic of the Stage: creates Batch jobs that do the processing.
         Assumes that all the household work is done: checking missing inputs
@@ -561,7 +566,9 @@ class Stage(ABC):
         """
 
     @abstractmethod
-    def _get_expected_output(self, target: 'StageTarget') -> Optional[Union[str, Dict[str, str]]]:
+    def _get_expected_output(
+        self, target: 'StageTarget'
+    ) -> Optional[Union[str, Dict[str, str]]]:
         """
         Path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
@@ -574,8 +581,8 @@ class Stage(ABC):
         """
         Call `output = queue_jobs(target, input)` for each target in the pipeline
         """
-        
-    def _add_to_the_pipeline_for_target(self, target: 'StageTarget') -> StageResults:
+
+    def _add_to_the_pipeline_for_target(self, target: 'StageTarget') -> StageOutput:
         if not self.skipped:
             return self._add_or_reuse_jobs(target)
         elif self.required:
@@ -590,15 +597,15 @@ class Stage(ABC):
             # Stager is not needed, returning empty outputs
             return self.make_outputs(target=target)
 
-    def merged_results_from_prev_stages(self) -> StageResults:
+    def merged_results_from_prev_stages(self) -> StageInput:
         """
         Checks the existence of the depenencies, and calls 
         the public `outputs = self.queue_jobs(target, inputs)`
         """
-        inputs = StageResults(pipe=self.pipe)
+        inputs = StageInput(pipe=self.pipe)
 
         for prev_stage in self.required_stages:
-            inputs.merge(prev_stage.results)
+            inputs.merge(prev_stage.result_for_all_targets)
 
         return inputs
 
@@ -637,7 +644,7 @@ class Stage(ABC):
         self, 
         target: 'StageTarget', 
         found_paths: Union[str, Dict[str, str]]
-    ) -> StageResults:
+    ) -> StageOutput:
         """
         Queues a [reuse] Job
         """
@@ -653,7 +660,7 @@ class Stage(ABC):
             jobs=[self.pipe.b.new_job(f'{self.get_name()} [reuse]', attributes)]
         )
 
-    def _add_or_reuse_jobs(self, target: 'StageTarget') -> StageResults:
+    def _add_or_reuse_jobs(self, target: 'StageTarget') -> StageOutput:
         if isinstance(target, Sample):
             if target.get_target_name() in self.pipe.force_samples:
                 logger.info(
@@ -709,30 +716,31 @@ class Stage(ABC):
     def make_outputs(
         self, 
         target: 'StageTarget',
-        data: Optional[OneResultData] = None,
+        data: Optional[StageOutputData] = None,
         jobs: Optional[List[Job]] = None
-    ) -> StageResults:
+    ) -> StageOutput:
         """
         Builds a StageDeps object to return from a stage's add_jobs()
         """
-        output = StageResults(pipe=self.pipe, sourcestage=self)
-        if jobs:
-            output.add_jobs(jobs)
-        if data is not None:
-            output.add_data(data, target=target)
-        return output
+        return StageOutput(stage=self, target=target, data=data, jobs=jobs)
 
 
 class SampleStage(Stage, ABC):
     """
     Sample-level stage
     """
-    def _get_expected_output(self, target: 'StageTarget') -> Optional[Union[str, Dict[str, str]]]:
+    def _get_expected_output(
+        self, 
+        target: 'StageTarget'
+    ) -> Optional[Union[str, Dict[str, str]]]:
         assert isinstance(target, Sample), target
         return self.get_expected_output(cast(Sample, target))
 
     @abstractmethod
-    def get_expected_output(self, sample: 'Sample') -> Optional[Union[str, Dict[str, str]]]:
+    def get_expected_output(
+        self, 
+        sample: 'Sample'
+    ) -> Optional[Union[str, Dict[str, str]]]:
         """
         Path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
@@ -740,12 +748,12 @@ class SampleStage(Stage, ABC):
         didn't return a `StageDeps` object from `add_jobs()`.
         """
         
-    def _queue_jobs(self, target: 'StageTarget', inputs: StageResults) -> StageResults:
+    def _queue_jobs(self, target: 'StageTarget', inputs: StageInput) -> StageOutput:
         assert isinstance(target, Sample), target
         return self.queue_jobs(cast(Sample, target), inputs)
 
     @abstractmethod
-    def queue_jobs(self, sample: 'Sample', inputs: StageResults) -> StageResults:
+    def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput:
         """
         Implements logic of the Stage: creates Batch jobs that do the processing.
         Assumes that all the household work is done: checking missing inputs
@@ -755,24 +763,30 @@ class SampleStage(Stage, ABC):
 
     def add_to_the_pipeline(self, pipe: 'Pipeline'):
         """
-        Call `output = add_jobs(target, input)` for each target in the pipeline
+        Calls `output = queue_jobs(target, input)` for each target in the pipeline
         """
         for project in pipe.projects:
             for sample in project.samples:
                 sample_result = self._add_to_the_pipeline_for_target(sample)
-                self.results.merge(sample_result)
+                self.result_for_all_targets.add_stage_output(sample_result)
 
 
 class ProjectStage(Stage, ABC):
     """
     Project-level stage
     """
-    def _get_expected_output(self, target: 'StageTarget') -> Optional[Union[str, Dict[str, str]]]:
+    def _get_expected_output(
+        self, 
+        target: 'StageTarget'
+    ) -> Optional[Union[str, Dict[str, str]]]:
         assert isinstance(target, Project), target
         return self.get_expected_output(cast(Project, target))
 
     @abstractmethod
-    def get_expected_output(self, project: 'Project') -> Optional[Union[str, Dict[str, str]]]:
+    def get_expected_output(
+        self, 
+        project: 'Project'
+    ) -> Optional[Union[str, Dict[str, str]]]:
         """
         Path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
@@ -780,12 +794,12 @@ class ProjectStage(Stage, ABC):
         didn't return a `StageDeps` object from `add_jobs()`.
         """
 
-    def _queue_jobs(self, target: 'StageTarget', inputs: StageResults) -> StageResults:
+    def _queue_jobs(self, target: 'StageTarget', inputs: StageInput) -> StageOutput:
         assert isinstance(target, Project), target
         return self.queue_jobs(cast(Project, target), inputs)
 
     @abstractmethod
-    def queue_jobs(self, project: 'Project', inputs: StageResults) -> StageResults:
+    def queue_jobs(self, project: 'Project', inputs: StageInput) -> StageOutput:
         """
         Implements logic of the Stage: creates Batch jobs that do the processing.
         Assumes that all the household work is done: checking missing inputs
@@ -795,22 +809,30 @@ class ProjectStage(Stage, ABC):
 
     def add_to_the_pipeline(self, pipe: 'Pipeline'):
         """
-        Call `output = add_jobs(target, input)` for each target in the pipeline
+        Call `output = queue_jobs(target, input)` for each target in the pipeline
         """
         for project in pipe.projects:
-            self.results.merge(self._add_to_the_pipeline_for_target(project))
+            self.result_for_all_targets.add_stage_output(
+                self._add_to_the_pipeline_for_target(project)
+            )
             
 
 class CohortStage(Stage, ABC):    
     """
     Entire cohort level stage
     """
-    def _get_expected_output(self, target: 'StageTarget') -> Optional[Union[str, Dict[str, str]]]:
+    def _get_expected_output(
+        self, 
+        target: 'StageTarget'
+    ) -> Optional[Union[str, Dict[str, str]]]:
         assert isinstance(target, Pipeline), target
         return self.get_expected_output(cast(Pipeline, target))
 
     @abstractmethod
-    def get_expected_output(self, pipeline: 'Pipeline') -> Optional[Union[str, Dict[str, str]]]:
+    def get_expected_output(
+        self, 
+        pipeline: 'Pipeline'
+    ) -> Optional[Union[str, Dict[str, str]]]:
         """
         Path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
@@ -818,14 +840,14 @@ class CohortStage(Stage, ABC):
         didn't return a `StageDeps` object from `add_jobs()`.
         """
 
-    def _queue_jobs(self, target: 'StageTarget', inputs: StageResults) -> StageResults:
+    def _queue_jobs(self, target: 'StageTarget', inputs: StageInput) -> StageOutput:
         assert isinstance(target, Pipeline), target
         return self.queue_jobs(cast(Pipeline, target), inputs)
 
     @abstractmethod
     def queue_jobs(
-        self, pipe: 'Pipeline', inputs: StageResults
-    ) -> StageResults:  # type: ignore[override]
+        self, pipe: 'Pipeline', inputs: StageInput
+    ) -> StageOutput:  # type: ignore[override]
         """
         Implements logic of the Stage: creates Batch jobs that do the processing.
         Assumes that all the household work is done: checking missing inputs
@@ -835,7 +857,7 @@ class CohortStage(Stage, ABC):
 
     def add_to_the_pipeline(self, pipe: 'Pipeline'):
         """
-        Call `output = add_jobs(target, input)` for each target in the pipeline
+        Call `output = queue_jobs(target, input)` for each target in the pipeline
         """
         self.results = self._add_to_the_pipeline_for_target(pipe)
 
@@ -1121,7 +1143,7 @@ class Pipeline(StageTarget):
         for proj in self.projects:
             all_samples.extend(proj.samples)
         return all_samples
-    
+
     def get_all_sample_ids(self) -> List[str]:
         return [s.id for s in self.get_all_samples()]
 
@@ -1129,7 +1151,8 @@ class Pipeline(StageTarget):
         if self.b:
             logger.info(f'Will submit {self.b.total_job_num} jobs:')
             for label, stat in self.b.labelled_jobs.items():
-                logger.info(f'  {label}: {stat["job_n"]} for {len(stat["samples"])} samples')
+                logger.info(f'  {label}: {stat["job_n"]} for '
+                            f'{len(stat["samples"])} samples')
             logger.info(f'  Other jobs: {self.b.other_job_num}')
 
             self.b.run(
