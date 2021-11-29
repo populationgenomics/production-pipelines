@@ -11,22 +11,22 @@ Basic example is also provided here:
 
 @stage(analysis_type=AnalysisType.CRAM)
 class CramStage(SampleStage):
-    def queue_jobs(self, sample: Sample, inputs: StageResults) -> StageResults:
+    def queue_jobs(self, sample: Sample, inputs: StageInputs) -> StageOutputs:
         expected_path = f'{sample.project.get_bucket()}/cram/{sample.id}.cram'
         job = align.bwa(b=self.pipe.b, ..., output_path=expected_path)
-        return self.make_outputs(sample, paths=expected_path, jobs=[job])
+        return self.make_outputs(sample, data=expected_path, jobs=[job])
 
 @stage(analysis_type=AnalysisType.GVCF, requires_stages=CramStage)
 class GvcfStage(SampleStage):
-    def queue_jobs(self, sample: Sample, inputs: StageResults) -> StageResults:
+    def queue_jobs(self, sample: Sample, inputs: StageInputs) -> StageOutputs:
         cram_path = inputs.get_file_path(target=sample, stage=CramStage)
         expected_path = f'{sample.project.get_bucket()}/gvcf/{sample.id}.g.vcf.gz'
         job = haplotype_caller.produce_gvcf(b=self.pipe.b, ..., output_path=expected_path)
-        return self.make_outputs(sample, paths=expected_path, jobs=[job])
+        return self.make_outputs(sample, data=expected_path, jobs=[job])
 
 @stage(analysis_type=AnalysisType.JOINT_CALLING)
 class JointCallingStage(CohortStage):
-    def queue_jobs(self, pipeline: Pipeline, inputs: StageResults) -> StageResults:
+    def queue_jobs(self, pipeline: Pipeline, inputs: StageInputs) -> StageOutputs:
         gvcf_by_sid = {
             s.id: inputs.get_file_path(stage=GvcfStage, target=s)
             for p in pipe.projects
@@ -34,7 +34,7 @@ class JointCallingStage(CohortStage):
         }
         expected_path = ...
         job = make_joint_genotyping_jobs(b=self.pipe.b, ..., output_path=expected_path)
-        return self.make_outputs(pipe, paths=expected_path, jobs=[job])
+        return self.make_outputs(pipe, data=expected_path, jobs=[job])
 
 @click.command()
 @pipeline_click_options
@@ -967,6 +967,8 @@ class CohortStage(Stage, ABC):
         }
 
 
+# Global _pipeline pointer to make the `@stage` decorator work before 
+# a Pipeline instance is defined (i.e. before `run_pipeline` is called)
 _pipeline = None
 
 
