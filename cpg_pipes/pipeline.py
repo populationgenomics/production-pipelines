@@ -216,6 +216,44 @@ def pipeline_click_options(function: Callable) -> Callable:
     return function
 
 
+StageDecorator = Callable[..., 'Stage']
+
+
+def stage(
+    _cls: Optional[Type['Stage']] = None, 
+    *,
+    sm_analysis_type: Optional[AnalysisType] = None, 
+    requires_stages: Optional[Union[List[StageDecorator], StageDecorator]] = None,
+) -> Union[StageDecorator, Callable[..., StageDecorator]]:
+    """
+    Implements a standard class decorator pattern with an optional argument.
+    The goal is to allow cleaner defining of custom pipeline stages, without
+    requiring to implement constructor. E.g.
+
+    @stage(sm_analysis_type=AnalysisType.GVCF, requires_stages=CramStage)
+    class GvcfStage(SampleStage):
+        def get_expected_output(self, sample: Sample):
+            ...
+        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+            ...
+    """
+    def decorator_stage(cls) -> StageDecorator:
+        @functools.wraps(cls)
+        def wrapper_stage(pipeline: 'Pipeline') -> Stage:
+            return cls(
+                name=cls.__name__,
+                pipeline=pipeline,
+                requires_stages=requires_stages,
+                sm_analysis_type=sm_analysis_type,
+            )
+        return wrapper_stage
+
+    if _cls is None:
+        return decorator_stage
+    else:
+        return decorator_stage(_cls)
+    
+
 StageOutputData = Union[str, hb.Resource, Dict[str, str], Dict[str, hb.Resource]]
 
 
@@ -340,7 +378,7 @@ class StageInput:
     def _each(
         self, 
         fun: Callable,
-        stage: Type['Stage'],
+        stage: StageDecorator,
     ):
         return {
             trg: fun(result)
@@ -350,7 +388,7 @@ class StageInput:
 
     def as_path_by_target(
         self, 
-        stage: Type['Stage'],
+        stage: StageDecorator,
         id: Optional[str] = None,
     ) -> Dict[str, str]:
         """
@@ -360,7 +398,7 @@ class StageInput:
 
     def as_resource_by_target(
         self, 
-        stage: Type['Stage'],
+        stage: StageDecorator,
         id: Optional[str] = None,
     ) -> Dict[str, hb.Resource]:
         """
@@ -368,7 +406,7 @@ class StageInput:
         """
         return self._each(fun=(lambda r: r.as_resource(id=id)), stage=stage)
 
-    def as_dict_by_target(self, stage: Type['Stage']) -> Dict[str, Dict[str, str]]:
+    def as_dict_by_target(self, stage: StageDecorator) -> Dict[str, Dict[str, str]]:
         """
         Get as a dictoinary of files/resources for a specific stage, indexed by target
         """
@@ -376,7 +414,7 @@ class StageInput:
 
     def as_resource_dict_by_target(
         self, 
-        stage: Type['Stage'],
+        stage: StageDecorator,
     ) -> Dict[str, Dict[str, hb.Resource]]:
         """
         Get a dictoinary of resources for a specific stage, and indexed by target
@@ -385,7 +423,7 @@ class StageInput:
 
     def as_path_dict_by_target(
         self, 
-        stage: Type['Stage'],
+        stage: StageDecorator,
     ) -> Dict[str, Dict[str, str]]:
         """
         Get a dictoinary of paths for a specific stage, and indexed by target
@@ -395,7 +433,7 @@ class StageInput:
     def as_path(
         self, 
         target: 'Target',
-        stage: Type['Stage'],
+        stage: StageDecorator,
         id: Optional[str] = None,
     ) -> str:
         """
@@ -408,13 +446,13 @@ class StageInput:
     def as_resource(
         self, 
         target: 'Target',
-        stage: Type['Stage'],
+        stage: StageDecorator,
         id: Optional[str] = None,
     ) -> str:
         res = self._results_by_target_by_stage[stage.__name__][target.unique_id]
         return res.as_resource(id)
     
-    def as_dict(self, target: 'Target', stage: Type['Stage']) -> Dict[str, str]:
+    def as_dict(self, target: 'Target', stage: StageDecorator) -> Dict[str, str]:
         """
         Get a dictoinary of files or Resources for a specific target and stage
         """
@@ -431,44 +469,6 @@ class StageInput:
                 jobs.extend(results.jobs)
         return jobs
 
-
-StageDecorator = Callable[..., 'Stage']
-
-
-def stage(
-    _cls: Optional[Type['Stage']] = None, 
-    *,
-    sm_analysis_type: Optional[AnalysisType] = None, 
-    requires_stages: Optional[Union[List[StageDecorator], StageDecorator]] = None,
-) -> Union[StageDecorator, Callable[..., StageDecorator]]:
-    """
-    Implements a standard class decorator pattern with an optional argument.
-    The goal is to allow cleaner defining of custom pipeline stages, without
-    requiring to implement constructor. E.g.
-
-    @stage(sm_analysis_type=AnalysisType.GVCF, requires_stages=CramStage)
-    class GvcfStage(SampleStage):
-        def get_expected_output(self, sample: Sample):
-            ...
-        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-            ...
-    """
-    def decorator_stage(cls) -> StageDecorator:
-        @functools.wraps(cls)
-        def wrapper_stage(pipeline: 'Pipeline') -> Stage:
-            return cls(
-                name=cls.__name__,
-                pipeline=pipeline,
-                requires_stages=requires_stages,
-                sm_analysis_type=sm_analysis_type,
-            )
-        return wrapper_stage
-
-    if _cls is None:
-        return decorator_stage
-    else:
-        return decorator_stage(_cls)
-    
 
 class Sex(Enum):
     UNKNOWN = 0
