@@ -1212,7 +1212,7 @@ class Pipeline(Target):
                     logger.info(f'Last stage is {stage.name}, stopping here')
                     break
 
-    def add_for_target(self, stage: Stage, target: Target) -> StageOutput:
+    def add_for_target(self, stage: Stage[TargetT], target: TargetT) -> StageOutput:
         """
         Calls `output = queue_jobs(target, input)` on a target chosen 
         by specific Stage subclass.
