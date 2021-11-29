@@ -8,7 +8,7 @@ import logging
 import sys
 import time
 from os.path import join
-from typing import Optional, List, Collection
+from typing import Optional, List, Collection, Union, Dict
 
 import click
 import hail as hl
@@ -22,7 +22,8 @@ from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.pipeline import Namespace, Pipeline, Sample, \
     SampleStage, Project, CohortStage, AnalysisType, ProjectStage, \
-    pipeline_click_options, StageInput, stage, run_pipeline, StageOutput
+    pipeline_click_options, StageInput, stage, run_pipeline, StageOutput, PairStage, \
+    Pair
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -37,7 +38,16 @@ def get_fingerprint_path(output_path) -> str:
     raise ValueError('Only supporting CRAM or GVCF')
 
 
-@stage(analysis_type=AnalysisType.CRAM)
+@stage
+class MyPairStage(PairStage):
+    def get_expected_output(self, pair: Pair) -> Optional[Union[str, Dict[str, str]]]:
+        pass
+
+    def queue_jobs(self, pair: 'Pair', inputs: StageInput) -> StageOutput:
+        pass
+
+
+@stage(sm_analysis_type=AnalysisType.CRAM)
 class CramStage(SampleStage):
     def get_expected_output(self, sample: Sample):
         return f'{sample.project.get_bucket()}/cram/{sample.id}.cram'
@@ -112,7 +122,7 @@ class CramPedCheckStage(ProjectStage):
         return self.make_outputs(project, data=somalier_samples_path, jobs=[j])
 
 
-@stage(requires_stages=CramStage, analysis_type=AnalysisType.GVCF)
+@stage(requires_stages=CramStage, sm_analysis_type=AnalysisType.GVCF)
 class GvcfStage(SampleStage):
     hc_intervals = None
 
@@ -187,7 +197,7 @@ def make_expected_siteonly_path(output_path):
     return output_path.replace('.vcf.gz', '-siteonly.vcf.gz')
 
 
-@stage(requires_stages=GvcfStage, analysis_type=AnalysisType.JOINT_CALLING)
+@stage(requires_stages=GvcfStage, sm_analysis_type=AnalysisType.JOINT_CALLING)
 class JointGenotypingStage(CohortStage):
     def get_expected_output(self, pipe: Pipeline):
         samples_hash = utils.hash_sample_ids(pipe.get_all_sample_ids())
