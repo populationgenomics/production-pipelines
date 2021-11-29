@@ -1278,6 +1278,10 @@ class Pipeline(Target):
         return first_stage_num, last_stage_num
 
     def set_stages(self, stages: List[Stage]):
+        """
+        Iterate over stages and call add_to_the_pipeline() on each.
+        Effectively creates all Hail Batch jobs through Stage.queue_jobs().
+        """
         for stage in stages:
             if stage.name in self._stages_dict:
                 raise ValueError(
