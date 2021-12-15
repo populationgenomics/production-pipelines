@@ -105,10 +105,10 @@ def main(
                 mt.info.InbreedingCoeff
             ),
             # https://batch.hail.populationgenomics.org.au/batches/6973/jobs/12
-            AS_nbreedingCoeff=hl.if_else(
-                hl.is_nan(mt.info.AS_nbreedingCoeff), 
+            AS_InbreedingCoeff=hl.if_else(
+                hl.is_nan(mt.info.AS_InbreedingCoeff), 
                 0.0, 
-                mt.info.AS_nbreedingCoeff
+                mt.info.AS_InbreedingCoeff
             ),
         )
     )
