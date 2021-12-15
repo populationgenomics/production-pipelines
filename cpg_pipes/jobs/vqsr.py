@@ -705,7 +705,6 @@ def add_snps_variant_recalibrator_scattered_step(
     Returns: a Job object with 2 outputs: j.recalibration (ResourceGroup) and j.tranches
     """
     j = b.new_job('VQSR: SNPsVariantRecalibratorScattered')
-
     j.image(resources.GATK_IMAGE)
 
     if is_small_callset:
@@ -772,6 +771,8 @@ def add_snps_variant_recalibrator_step(
     Recalibrate SNPs in one run (alternative to scatter-gather approach)
     """
     j = b.new_job('VQSR: SNPsVariantRecalibrator')
+
+    j.image(resources.GATK_IMAGE)
 
     # we run it for the entire dataset in one job, so can take an entire instance:
     j.cpu(16)
