@@ -94,10 +94,25 @@ def main(
     # in: https://batch.hail.populationgenomics.org.au/batches/6621/jobs/6
     mt = mt.annotate_rows(
         info=mt.info.annotate(
-            AS_MQ=hl.if_else(hl.is_nan(mt.info.AS_MQ), 0.0, mt.info.AS_MQ),
-            InbreedingCoeff=hl.if_else(hl.is_nan(mt.info.InbreedingCoeff), 0.0, mt.info.InbreedingCoeff),
+            AS_MQ=hl.if_else(
+                hl.is_nan(mt.info.AS_MQ), 
+                0.0, 
+                mt.info.AS_MQ
+            ),
+            InbreedingCoeff=hl.if_else(
+                hl.is_nan(mt.info.InbreedingCoeff), 
+                0.0, 
+                mt.info.InbreedingCoeff
+            ),
         )
     )
+    # To avoid this error:
+    # elasticsearch.exceptions.RequestError: RequestError(400, 
+    # 'illegal_argument_exception', 'mapper [samples_gq_40_to_45] cannot be changed 
+    # from type [text] to [keyword]')
+    # in: https://batch.hail.populationgenomics.org.au/batches/6946/jobs/10
+    mt = mt.drop('samples_gq')  
+
     logger.info('Getting rows and exporting to the ES')
     row_table = elasticsearch_row(mt)
     es_shards = _mt_num_shards(mt, es_index_min_num_shards)
