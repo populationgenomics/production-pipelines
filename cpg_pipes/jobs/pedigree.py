@@ -7,8 +7,8 @@ from hailtop.batch.job import Job
 import pandas as pd
 
 from cpg_pipes import utils, resources
-from cpg_pipes.jobs import wrap_command
 from cpg_pipes.pipeline import Project, Sample
+from cpg_pipes.hailbatch import wrap_command
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -176,7 +176,7 @@ def somalier_extact_job(
         out_fpath = gvcf_or_cram_or_bam_path\
             .replace('.cram', '.somalier')\
             .replace('.bam', '.somalier')\
-            .replace('.g.vcf.gz', 'somalier')
+            .replace('.g.vcf.gz', '.somalier')
 
     if utils.can_reuse(out_fpath, overwrite):
         j.name += ' [reuse]'

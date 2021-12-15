@@ -1,3 +1,7 @@
+"""
+Helper Hail Batch jobs useful for both individual and joint variant calling.
+"""
+
 import logging
 from typing import List, Tuple
 
@@ -5,7 +9,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import resources, utils
-from cpg_pipes.jobs import wrap_command
+from cpg_pipes.hailbatch import wrap_command
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')

@@ -8,7 +8,7 @@ import logging
 import sys
 import time
 from os.path import join
-from typing import Optional, List, Collection
+from typing import Optional, List
 
 import click
 import hail as hl
@@ -22,7 +22,7 @@ from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.pipeline import Namespace, Pipeline, Sample, \
     SampleStage, Project, CohortStage, AnalysisType, ProjectStage, \
-    pipeline_click_options, StageInput, stage, run_pipeline, StageOutput
+    pipeline_click_options, StageInput, stage, StageOutput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -39,7 +39,7 @@ def get_fingerprint_path(output_path) -> str:
 
 @stage(sm_analysis_type=AnalysisType.CRAM)
 class CramStage(SampleStage):
-    def get_expected_output(self, sample: Sample):
+    def expected_result(self, sample: Sample):
         return f'{sample.project.get_bucket()}/cram/{sample.id}.cram'
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
@@ -47,7 +47,8 @@ class CramStage(SampleStage):
             logger.critical(f'No sequence record for {sample.id}')
             sys.exit(1)
         
-        alignment_input = sample.seq_info.parse_reads_from_metadata()
+        from cpg_pipes.smdb import parse_reads_from_sequence
+        alignment_input = parse_reads_from_sequence(sample.seq_info)
         if not alignment_input:
             if not self.pipe.skip_samples_without_seq_input:
                 logger.critical(f'Could not find read data for sample {sample.id}')
@@ -59,7 +60,7 @@ class CramStage(SampleStage):
                 ]
                 return self.make_outputs(sample)
 
-        expected_path = self.get_expected_output(sample)
+        expected_path = self.expected_result(sample)
         cram_job = align.bwa(
             b=self.pipe.b,
             alignment_input=alignment_input,
@@ -68,7 +69,7 @@ class CramStage(SampleStage):
             project_name=sample.project.name,
             overwrite=not self.pipe.check_intermediate_existence,
             check_existence=False,
-            smdb=self.pipe.db,
+            smdb=self.pipe.get_db(),
             prev_batch_jobs=self.pipe.prev_batch_jobs,
         )
         
@@ -86,7 +87,7 @@ class CramStage(SampleStage):
 
 @stage(requires_stages=CramStage)
 class CramPedCheckStage(ProjectStage):
-    def get_expected_output(self, project: Project):
+    def expected_result(self, project: Project):
         pass
 
     def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
@@ -116,8 +117,14 @@ class CramPedCheckStage(ProjectStage):
 class GvcfStage(SampleStage):
     hc_intervals = None
 
-    def get_expected_output(self, sample: Sample):
-        return f'{sample.project.get_bucket()}/gvcf/{sample.id}.g.vcf.gz'
+    def expected_result(self, sample: Sample):
+        path = f'{sample.project.get_bucket()}/gvcf'
+        source_tag = sample.meta.get('source_tag')
+        if source_tag:
+            path = join(path, source_tag)
+        path = join(path, f'{sample.id}.g.vcf.gz')
+        return path
+        # return f'{sample.project.get_bucket()}/gvcf/{sample.id}.g.vcf.gz'
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         cram_path = inputs.as_path(target=sample, stage=CramStage)
@@ -128,7 +135,7 @@ class GvcfStage(SampleStage):
                 b=self.pipe.b,
                 scatter_count=hc_shards_num,
             )
-        expected_path = self.get_expected_output(sample)
+        expected_path = self.expected_result(sample)
         gvcf_job = haplotype_caller.produce_gvcf(
             b=self.pipe.b,
             output_path=expected_path,
@@ -142,7 +149,7 @@ class GvcfStage(SampleStage):
             overwrite=not self.pipe.check_intermediate_existence,
             check_existence=False,
             depends_on=inputs.get_jobs(),
-            smdb=self.pipe.db,
+            smdb=self.pipe.get_db(),
         )
         fingerprint_job, fingerprint_path = pedigree.somalier_extact_job(
             b=self.pipe.b,
@@ -157,16 +164,18 @@ class GvcfStage(SampleStage):
 
 @stage(requires_stages=GvcfStage)
 class GvcfPedCheckStage(ProjectStage):
-    def get_expected_output(self, project: Project):
+    def expected_result(self, project: Project):
         pass
 
     def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
         gvcf_by_sid = inputs.as_path_by_target(stage=GvcfStage)
         
-        fingerprint_path_by_sid = {
-            sid: get_fingerprint_path(gvcf_path)
-            for sid, gvcf_path in gvcf_by_sid.items()
-        }
+        fingerprint_path_by_sid = gvcf_by_sid
+        
+        # fingerprint_path_by_sid = {
+        #     sid: get_fingerprint_path(gvcf_path)
+        #     for sid, gvcf_path in gvcf_by_sid.items()
+        # }
 
         j, somalier_samples_path, somalier_pairs_path = pedigree.add_pedigree_jobs(
             self.pipe.b,
@@ -189,7 +198,7 @@ def make_expected_siteonly_path(output_path):
 
 @stage(requires_stages=GvcfStage, sm_analysis_type=AnalysisType.JOINT_CALLING)
 class JointGenotypingStage(CohortStage):
-    def get_expected_output(self, pipe: Pipeline):
+    def expected_result(self, pipe: Pipeline):
         samples_hash = utils.hash_sample_ids(pipe.get_all_sample_ids())
         expected_jc_vcf_path = f'{pipe.tmp_bucket}/joint_calling/{samples_hash}.vcf.gz'
         return expected_jc_vcf_path
@@ -208,7 +217,7 @@ class JointGenotypingStage(CohortStage):
                 f'GVCFs, exiting')
             sys.exit(1)
 
-        expected_path = self.get_expected_output(pipe)
+        expected_path = self.expected_result(pipe)
         jc_job = make_joint_genotyping_jobs(
             b=self.pipe.b,
             out_vcf_path=expected_path,
@@ -220,7 +229,7 @@ class JointGenotypingStage(CohortStage):
             local_tmp_dir=self.pipe.local_tmp_dir,
             overwrite=not self.pipe.check_intermediate_existence,
             depends_on=inputs.get_jobs(),
-            smdb=self.pipe.db,
+            smdb=self.pipe.get_db(),
             tool=JointGenotyperTool.GnarlyGenotyper 
             if self.pipe.config.get('use_gnarly', False) 
             else JointGenotyperTool.GenotypeGVCFs,
@@ -230,7 +239,7 @@ class JointGenotypingStage(CohortStage):
 
 @stage(requires_stages=JointGenotypingStage)
 class VqsrStage(CohortStage):
-    def get_expected_output(self, pipe: Pipeline):
+    def expected_result(self, pipe: Pipeline):
         samples_hash = utils.hash_sample_ids(pipe.get_all_sample_ids())
         expected_jc_vcf_path = f'{pipe.tmp_bucket}/vqsr/{samples_hash}-site-only.vcf.gz'
         return expected_jc_vcf_path
@@ -241,7 +250,7 @@ class VqsrStage(CohortStage):
 
         tmp_vqsr_bucket = f'{self.pipe.tmp_bucket}/vqsr'
         logger.info(f'Queueing VQSR job')
-        expected_path = self.get_expected_output(pipe)
+        expected_path = self.expected_result(pipe)
         vqsr_job = make_vqsr_jobs(
             b=self.pipe.b,
             input_vcf_or_mt_path=siteonly_vcf_path,
@@ -263,7 +272,7 @@ def get_anno_tmp_bucket(pipe: Pipeline):
 
 @stage(requires_stages=[JointGenotypingStage, VqsrStage])
 class AnnotateCohortStage(CohortStage):
-    def get_expected_output(self, pipe: Pipeline):
+    def expected_result(self, pipe: Pipeline):
         return join(get_anno_tmp_bucket(pipe), 'combined.mt')
 
     def queue_jobs(self, pipe: Pipeline, inputs: StageInput) -> StageOutput:
@@ -272,7 +281,7 @@ class AnnotateCohortStage(CohortStage):
         vcf_path = inputs.as_path(target=pipe, stage=JointGenotypingStage)
         vqsr_vcf_path = inputs.as_path(target=pipe, stage=VqsrStage)
 
-        expected_path = self.get_expected_output(pipe)
+        expected_path = self.expected_result(pipe)
         j = dataproc.hail_dataproc_job(
             self.pipe.b,
             f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "vcf_to_mt.py")} '
@@ -295,8 +304,8 @@ class AnnotateCohortStage(CohortStage):
 
 @stage(requires_stages=[AnnotateCohortStage])
 class AnnotateProjectStage(ProjectStage):
-    def get_expected_output(self, project: Project):
-        return f'{project.get_bucket()}/mt/{project.name}.mt'
+    def expected_result(self, project: Project):
+        return f'{self.pipe.analysis_bucket}/mt/{project.name}.mt'
 
     def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
         output_projects = self.pipe.config.get('output_projects', self.pipe.projects)
@@ -319,7 +328,7 @@ class AnnotateProjectStage(ProjectStage):
         with hl.hadoop_open(subset_path, 'w') as f:
             f.write('\n'.join(sample_ids))
 
-        expected_path = self.get_expected_output(project)    
+        expected_path = self.expected_result(project)    
         j = dataproc.hail_dataproc_job(
             self.pipe.b,
             f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "mt_to_projectmt.py")} '
@@ -337,7 +346,7 @@ class AnnotateProjectStage(ProjectStage):
 
 @stage(requires_stages=[AnnotateProjectStage])
 class LoadToEsStage(ProjectStage):
-    def get_expected_output(self, project: Project):
+    def expected_result(self, project: Project):
         return None
 
     def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
@@ -407,8 +416,8 @@ class LoadToEsStage(ProjectStage):
     help='Use allele-specific annotations for VQSR',
 )
 def main(
-    input_projects: Collection[str],
-    output_projects: Optional[Collection[str]],
+    input_projects: List[str],
+    output_projects: Optional[List[str]],
     output_version: str,
     skip_ped_checks: bool,  # pylint: disable=unused-argument
     hc_shards_num: int,
@@ -430,8 +439,8 @@ def main(
             f'projects. Input project: {input_projects}, output projects: '
             f'{output_projects}'
         )
-
-    run_pipeline(
+        
+    pipeline = Pipeline(
         name='seqr_loader',
         title=title,
         config=dict(
@@ -443,19 +452,22 @@ def main(
         ),
         input_projects=input_projects,
         output_version=output_version,
-        stages_in_order=[
-            CramStage,
-            CramPedCheckStage,
-            GvcfStage,
-            GvcfPedCheckStage,
-            JointGenotypingStage,
-            VqsrStage,
-            AnnotateCohortStage,
-            AnnotateProjectStage,
-            LoadToEsStage,
-        ],
         **kwargs,
     )
+
+    pipeline.set_stages([
+        CramStage,
+        CramPedCheckStage,
+        GvcfStage,
+        GvcfPedCheckStage,
+        JointGenotypingStage,
+        VqsrStage,
+        AnnotateCohortStage,
+        AnnotateProjectStage,
+        LoadToEsStage,
+    ])
+    
+    pipeline.submit_batch()
 
 
 if __name__ == '__main__':

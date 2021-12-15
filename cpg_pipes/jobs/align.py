@@ -1,3 +1,7 @@
+"""
+Create Hail Batch jobs for alignment.
+"""
+import math
 from enum import Enum
 from textwrap import dedent, indent
 from typing import Optional, List, Tuple, Dict
@@ -8,10 +12,9 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import resources, utils
-from cpg_pipes.jobs import wrap_command
 from cpg_pipes.jobs import picard
 from cpg_pipes.smdb import SMDB
-from cpg_pipes.hailbatch import AlignmentInput, PrevJob
+from cpg_pipes.hailbatch import AlignmentInput, PrevJob, wrap_command
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -71,7 +74,7 @@ def align(
     overwrite: bool = True,
     check_existence: bool = True,
     prev_batch_jobs: Optional[Dict[Tuple[Optional[str], str], PrevJob]] = None,
-    fraction_of_64thread_instance: Optional[int] = None,
+    nthreads: Optional[int] = None,
 ) -> Job:
     """
     - if the input is 1 fastq pair, submits one alignment job
@@ -97,16 +100,24 @@ def align(
         job_name += ' [reuse]'
         return b.new_job(job_name, dict(sample=sample_name, project=project_name))
 
-    ncpu = 16
+    total_ncpu = 16
     storage_gb = 375
-    # When requesting a 16- or 32-cpu job, the job will occupy entire instance
-    # with a fixed 375GB SSD. When we want a n'th fraction of cpus, Batch will squeeze
-    # N jobs like that on an instance, thus the storage will be split N-way accordingly
-    if fraction_of_64thread_instance:
-        ncpu = fraction_of_64thread_instance // ncpu
-        storage_gb = storage_gb // ncpu
+    if nthreads is not None:
+        if nthreads < 1:
+            raise ValueError('align: nthreads must be >= 1')
+        # round to the nearest power of 2 (15 -> 16, 16 -> 16, 17 -> 32)
+        nthreads = int(pow(2, math.ceil(math.log2(nthreads))))
+        ncpu = nthreads * 2  # multithreading
+        # When requesting a 16- or 32-cpu job, the job will occupy entire instance
+        # with a fixed 375GB SSD. When we want a n'th fraction of cpus, Batch will 
+        # squeeze N jobs like that on an instance, thus the storage will be split 
+        # N-way accordingly.
+        fraction = ncpu / total_ncpu
+        storage_gb = int(math.ceil(storage_gb * fraction))
+    else:
+        ncpu = total_ncpu
+        nthreads = ncpu * 2
 
-    nthreads = ncpu * 2  # hyperthreading
     if alignment_input.fqs1 is not None and len(alignment_input.fqs1) > 1:
         # running alignment in parallel, then merging
         assert alignment_input.fqs2 is not None
@@ -267,14 +278,14 @@ def _align_one(
         if alignment_input.bam_or_cram_path:
             extract_j = extract_fastq(
                 b=b,
-                cram=alignment_input.get_cram_input_group(b),
+                cram=alignment_input.as_cram_input_group(b),
                 sample_name=sample,
                 project_name=project,
             )
             input_param = f'-1 {extract_j.fq1} -2 {extract_j.fq2}'
 
         else:
-            files1, files2 = alignment_input.get_fq_inputs(b)
+            files1, files2 = alignment_input.as_fq_inputs(b)
             # Allow for 100G input FQ, 50G output CRAM, plus some tmp storage
             if alignment_input.fqs1 is not None and len(alignment_input.fqs1) == 1:
                 input_param = f'-1 {files1[0]} -2 {files2[0]}'
@@ -344,7 +355,7 @@ def _build_bwa_command(
         assert alignment_input.fqs1 and alignment_input.fqs2, alignment_input
         assert len(alignment_input.fqs1) == len(alignment_input.fqs1), alignment_input
         use_bazam = False
-        files1, files2 = alignment_input.get_fq_inputs(b)
+        files1, files2 = alignment_input.as_fq_inputs(b)
         if len(files1) > 1:
             r1_param = f'<(cat {" ".join(files1)})'
             r2_param = f'<(cat {" ".join(files2)})'

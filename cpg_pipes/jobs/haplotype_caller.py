@@ -1,3 +1,7 @@
+"""
+Create Hail Batch jobs for variant calling in individual samples.
+"""
+
 import logging
 from os.path import join
 from typing import Optional, List
@@ -6,9 +10,9 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import resources, utils
-from cpg_pipes.jobs import wrap_command
 from cpg_pipes.smdb import SMDB
 from cpg_pipes.jobs import split_intervals
+from cpg_pipes.hailbatch import wrap_command
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')

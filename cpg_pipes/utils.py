@@ -9,9 +9,10 @@ import logging
 import sys
 import time
 import hashlib
+from dataclasses import dataclass
 from enum import Enum
 from os.path import isdir, isfile, exists, join, basename
-from typing import Any, Callable, Dict, Optional, Union, Iterable
+from typing import Any, Callable, Dict, Optional, Union, Iterable, Set
 import yaml
 import pandas as pd
 import hail as hl
@@ -61,6 +62,41 @@ class AnalysisType(Enum):
     GVCF = 'gvcf'
     CRAM = 'cram'
     CUSTOM = 'custom'
+
+
+@dataclass
+class Analysis:
+    """
+    Represents the Analysis SampleMetadata DB entry.
+
+    Defined in utils to allow using the class in type hints 
+    without importing sample-metadata.
+    """
+
+    id: str
+    type: str
+    status: str
+    sample_ids: Set[str]
+    output: Optional[str]
+
+
+class Sequence:
+    """
+    Represents the Sequence SampleMetadata DB entry
+
+    Defined in utils to allow using the class in type hints 
+    without importing sample-metadata.
+    """
+    
+    def __init__(self, id, sample_id, meta, smdb):
+        self.id = id
+        self.sample_id = sample_id
+        self.meta = meta
+        self.smdb = smdb
+    
+    @staticmethod
+    def parse(data: Dict, smdb):
+        return Sequence(data['id'], data['sample_id'], data['meta'], smdb)
 
 
 def init_hail(name: str, local_tmp_dir: str = None):

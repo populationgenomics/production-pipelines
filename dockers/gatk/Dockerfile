@@ -9,7 +9,10 @@ RUN apt-get update && apt-get install -y git wget bash bzip2 zip && \
     wget -qO- https://api.anaconda.org/download/conda-forge/micromamba/0.8.2/linux-64/micromamba-0.8.2-he9b6cbd_0.tar.bz2 | tar -xvj -C /usr/local bin/micromamba && \
     mkdir $MAMBA_ROOT_PREFIX && \
     micromamba install -y --prefix $MAMBA_ROOT_PREFIX -c bioconda -c conda-forge \
-    gatk4 google-cloud-sdk && \
+    gatk4 \
+    google-cloud-sdk \
+    bcftools \
+    && \
     rm -r /root/micromamba/pkgs
 
-COPY gatk-package.jar /root/micromamba/share/gatk4-4.2.2.0-1/gatk-package-4.2.2.0-local.jar
+#COPY gatk-package.jar /root/micromamba/share/gatk4-4.2.2.0-1/gatk-package-4.2.2.0-local.jar

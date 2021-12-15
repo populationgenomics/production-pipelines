@@ -1,3 +1,7 @@
+"""
+Create Hail Batch jobs for joint genotyping.
+"""
+
 import json
 import logging
 from enum import Enum
@@ -8,11 +12,11 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import resources, utils
-from cpg_pipes.jobs import wrap_command
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.pipeline import Sample
 from cpg_pipes.smdb import SMDB
+from cpg_pipes.hailbatch import wrap_command
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -86,7 +90,6 @@ def make_joint_genotyping_jobs(
     )
 
     import_gvcfs_job_per_interval = dict()
-    first_j = None
     if sample_names_to_add:
         logger.info(f'Queueing genomics-db-import jobs')
         for idx in range(resources.NUMBER_OF_GENOMICS_DB_INTERVALS):
@@ -104,8 +107,7 @@ def make_joint_genotyping_jobs(
                 number_of_intervals=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
             )
             import_gvcfs_job_per_interval[idx] = import_gvcfs_job
-            if first_j is None:
-                first_j = import_gvcfs_job
+    first_jobs = list(import_gvcfs_job_per_interval.values())
 
     vcf_by_interval: Dict[int, hb.ResourceGroup] = dict()
     siteonly_vcf_by_interval: Dict[int, hb.ResourceGroup] = dict()
@@ -128,8 +130,8 @@ def make_joint_genotyping_jobs(
             output_vcf_path=jc_vcf_path,
         )
         vcf_by_interval[idx] = jc_vcf
-        if first_j is None:
-            first_j = jc_vcf_j
+        if not first_jobs:
+            first_jobs.append(jc_vcf_j)
         if import_gvcfs_job_per_interval.get(idx):
             jc_vcf_j.depends_on(import_gvcfs_job_per_interval.get(idx))
 
@@ -161,8 +163,8 @@ def make_joint_genotyping_jobs(
         site_only=False,
     )
     j.name = 'Joint genotyping: ' + j.name
-    if first_j is None:
-        first_j = j
+    if not first_jobs:
+        first_jobs.append(j)
     last_j = j
 
     logger.info(f'Queueing gather site-only VCFs job')
@@ -181,7 +183,7 @@ def make_joint_genotyping_jobs(
             analysis_type='joint-calling',
             output_path=out_vcf_path,
             sample_names=sample_ids,
-            first_j=first_j,
+            first_j=first_jobs,
             last_j=last_j,
             depends_on=depends_on,
         )

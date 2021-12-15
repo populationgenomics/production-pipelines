@@ -29,7 +29,7 @@ BROAD_REF_BUCKET = f'{REF_BUCKET}/hg38/v1'
 SEQR_REF_BUCKET = 'gs://cpg-seqr-reference-data'
 REF_HT = f'{SEQR_REF_BUCKET}/GRCh38/all_reference_data/v2/combined_reference_data_grch38-2.0.3.ht'
 CLINVAR_HT = f'{SEQR_REF_BUCKET}/GRCh38/clinvar/clinvar.GRCh38.2020-06-15.ht'
-NAGIM_FREQS_HT = 'gs://cpg-nagim-test-analysis/joint-calling/v0-5/variant_qc/frequencies.ht'
+NAGIM_FREQS_HT = f'{REF_BUCKET}/seqr/v0-1-test/nagim-frequencies.ht'
 
 
 SNP_SCORE_CUTOFF = 0
@@ -119,11 +119,11 @@ def main(
             mt.write(out_path, overwrite=True)
             mt = hl.read_matrix_table(out_path)
 
-    ref_data = hl.read_table(REF_HT)
-    nagim_freqs = hl.read_table(NAGIM_FREQS_HT)
-    clinvar = hl.read_table(CLINVAR_HT)
     mt = compute_variant_annotated_vcf(
-        mt, ref_data=ref_data, clinvar=clinvar, nagim_freqs=nagim_freqs,
+        mt, 
+        ref_data=hl.read_table(REF_HT), 
+        clinvar=hl.read_table(CLINVAR_HT), 
+        nagim_freqs=hl.read_table(NAGIM_FREQS_HT),
     )
     mt = mt.annotate_globals(
         sourceFilePath=vcf_path,
@@ -282,7 +282,7 @@ class CPGSeqrVariantSchema(SeqrVariantSchema):
     """
     Modified schema to handle Nagim annotaion, and fix the AC annotation.
     """
-    def __init__(self, *args, nagim_freqs=None, **kwargs):
+    def __init__(self, *args, nagim_freqs: hl.Table, **kwargs):
         """
         Expects self._nagim_freqs to have the following fields:
         'freq': array<struct {
@@ -292,7 +292,7 @@ class CPGSeqrVariantSchema(SeqrVariantSchema):
         }> 
         'popmax': struct {
             AF: float64, 
-        } 
+        }
         """        
         super().__init__(*args, **kwargs)
         ht = nagim_freqs.annotate(
@@ -318,12 +318,15 @@ class CPGSeqrVariantSchema(SeqrVariantSchema):
         """
         if self._nagim_data is None:
             raise RowAnnotationOmit
-        
+
         return self._nagim_data[self.mt.row_key]
 
 
 def compute_variant_annotated_vcf(
-    mt, ref_data, clinvar, nagim_freqs, schema_cls=CPGSeqrVariantSchema
+    mt: hl.MatrixTable,
+    ref_data: hl.Table,
+    clinvar: hl.Table,
+    nagim_freqs: hl.Table,
 ) -> hl.MatrixTable:
     r"""
     Returns a matrix table with an annotated rows where each row annotation 
@@ -360,8 +363,11 @@ def compute_variant_annotated_vcf(
     version CPGSeqrVariantSchema). SeqrGenotypesSchema is applied separately
     on the project level.
     """
-    annotation_schema = schema_cls(
-        mt, ref_data=ref_data, clinvar_data=clinvar, nagim_freqs=nagim_freqs
+    annotation_schema = CPGSeqrVariantSchema(
+        mt, 
+        ref_data=ref_data, 
+        clinvar_data=clinvar, 
+        nagim_freqs=nagim_freqs
     )
     mt = annotation_schema.annotate_all(overwrite=True).mt
     return mt

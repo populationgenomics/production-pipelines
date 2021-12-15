@@ -1,5 +1,5 @@
 """
-Create jobs to create and apply a VQSR model
+Create Hail Batch jobs to create and apply a VQSR models.
 """
 
 import os
@@ -11,10 +11,10 @@ from hailtop.batch.job import Job
 from analysis_runner import dataproc
 
 from cpg_pipes import resources, utils
-from cpg_pipes.jobs import wrap_command
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.resources import BROAD_REF_BUCKET
+from cpg_pipes.hailbatch import wrap_command
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -529,8 +529,7 @@ def add_indels_variant_recalibrator_job(
     message. In this case, try decrementing the --max-gaussians value. 4 is a
     reasonable default for indels, as their number is smaller than SNPs.
 
-    Returns: a Job object with 3 outputs: j.recalibration (ResourceGroup), j.tranches,
-    and j.indel_rscript_file. The latter is usedful to produce the optional tranche plot.
+    Returns: a Job object with 2 outputs: j.recalibration (ResourceGroup), j.tranches.
     """
     j = b.new_job('VQSR: IndelsVariantRecalibrator')
     j.image(resources.GATK_IMAGE)
@@ -571,17 +570,9 @@ def add_indels_variant_recalibrator_job(
       --max-gaussians {max_gaussians} \\
       -resource:mills,known=false,training=true,truth=true,prior=12 {mills_resource_vcf.base} \\
       -resource:axiomPoly,known=false,training=true,truth=false,prior=10 {axiom_poly_resource_vcf.base} \\
-      -resource:dbsnp,known=true,training=false,truth=false,prior=2 {dbsnp_resource_vcf.base} \\
-      --rscript-file {j.indel_rscript_file}
-      
-      ls $(dirname {j.indel_rscript_file})
+      -resource:dbsnp,known=true,training=false,truth=false,prior=2 {dbsnp_resource_vcf.base}
       """
     )
-    if work_bucket:
-        b.write_output(
-            j.indel_rscript_file,
-            os.path.join(work_bucket, 'recalibration-indels-features.Rscript'),
-        )
     return j
 
 
@@ -618,7 +609,7 @@ def add_snps_variant_recalibrator_create_model_step(
     then the tool will tell you there is insufficient data with a No data found error
     message. In this case, try decrementing the --max-gaussians value.
 
-    Returns: a Job object with 2 outputs: j.model and j.snp_rscript_file.
+    Returns: a Job object with 1 output j.model
     The latter is useful to produce the optional tranche plot.
     """
     j = b.new_job('VQSR: SNPsVariantRecalibratorCreateModel')
@@ -664,29 +655,9 @@ def add_snps_variant_recalibrator_create_model_step(
       -resource:hapmap,known=false,training=true,truth=true,prior=15 {hapmap_resource_vcf.base} \\
       -resource:omni,known=false,training=true,truth=true,prior=12 {omni_resource_vcf.base} \\
       -resource:1000G,known=false,training=true,truth=false,prior=10 {one_thousand_genomes_resource_vcf.base} \\
-      -resource:dbsnp,known=true,training=false,truth=false,prior=7 {dbsnp_resource_vcf.base} \\
-      --rscript-file {j.snp_rscript}
-
-      ls $(dirname {j.snp_rscript})
-
-      ln {j.snp_rscript}.pdf {j.snp_rscript_pdf}
-      ln {j.tranches}.pdf {j.tranches_pdf}
+      -resource:dbsnp,known=true,training=false,truth=false,prior=7 {dbsnp_resource_vcf.base}
       """
     )
-    if work_bucket:
-        b.write_output(
-            j.snp_rscript,
-            os.path.join(work_bucket, 'recalibration-snps-features.RScript'),
-        )
-    if web_bucket:
-        b.write_output(
-            j.snp_rscript_pdf,
-            os.path.join(web_bucket, 'recalibration-snps-features.pdf'),
-        )
-        b.write_output(
-            j.tranches_pdf,
-            os.path.join(web_bucket, 'recalibration-snps-tranches.pdf'),
-        )
     return j
 
 
@@ -825,28 +796,9 @@ def add_snps_variant_recalibrator_step(
       -resource:hapmap,known=false,training=true,truth=true,prior=15 {hapmap_resource_vcf.base} \\
       -resource:omni,known=false,training=true,truth=true,prior=12 {omni_resource_vcf.base} \\
       -resource:1000G,known=false,training=true,truth=false,prior=10 {one_thousand_genomes_resource_vcf.base} \\
-      -resource:dbsnp,known=true,training=false,truth=false,prior=7 {dbsnp_resource_vcf.base} \\
-      --rscript-file {j.snp_rscript}
-
-      ln {j.snp_rscript}.pdf {j.snp_rscript_pdf}
-      ln {j.tranches}.pdf {j.tranches_pdf}
+      -resource:dbsnp,known=true,training=false,truth=false,prior=7 {dbsnp_resource_vcf.base} 
       """
     )
-
-    if work_bucket:
-        b.write_output(
-            j.snp_rscript,
-            os.path.join(work_bucket, 'recalibration-snps-features.RScript'),
-        )
-    if web_bucket:
-        b.write_output(
-            j.snp_rscript_pdf,
-            os.path.join(web_bucket, 'recalibration-snps-features.pdf'),
-        )
-        b.write_output(
-            j.tranches_pdf,
-            os.path.join(web_bucket, 'recalibration-snps-tranches.pdf'),
-        )
     return j
 
 

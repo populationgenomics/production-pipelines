@@ -53,11 +53,11 @@ def main():
             number_of_intervals=50,
             tmp_bucket=join(benchmark.BENCHMARK_BUCKET, 'tmp'),
             depends_on=[align_j],
-            smdb=pipe.db,
+            smdb=pipe.get_db(),
             dragen_mode=True,
         )
     
-    pipe.run()
+    pipe.submit_batch()
 
 
 if __name__ == '__main__':

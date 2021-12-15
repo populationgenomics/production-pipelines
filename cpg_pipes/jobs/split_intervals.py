@@ -1,3 +1,7 @@
+"""
+Create Hail Batch jobs to split genomics intervals for parallel variant calling.
+"""
+
 import logging
 from os.path import join
 from typing import Optional
@@ -5,7 +9,7 @@ from typing import Optional
 import hailtop.batch as hb
 
 from cpg_pipes import resources
-from cpg_pipes.jobs import wrap_command
+from cpg_pipes.hailbatch import wrap_command
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')

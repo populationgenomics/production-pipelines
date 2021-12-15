@@ -12,7 +12,7 @@ Basic example is also provided here:
 @stage(analysis_type=AnalysisType.CRAM)
 class CramStage(SampleStage):
     def queue_jobs(self, sample: Sample, inputs: StageInputs) -> StageOutputs:
-        expected_path = self.get_expected_output(pipe)
+        expected_path = self.expected_result(pipe)
         job = align.bwa(b=self.pipe.b, ..., output_path=expected_path)
         return self.make_outputs(sample, data=expected_path, jobs=[job])
 
@@ -20,7 +20,7 @@ class CramStage(SampleStage):
 class GvcfStage(SampleStage):
     def queue_jobs(self, sample: Sample, inputs: StageInputs) -> StageOutputs:
         cram_path = inputs.as_path(target=sample, stage=CramStage)
-        expected_path = self.get_expected_output(pipe)
+        expected_path = self.expected_result(pipe)
         job = haplotype_caller.produce_gvcf(b=self.pipe.b, ..., output_path=expected_path)
         return self.make_outputs(sample, data=expected_path, jobs=[job])
 
@@ -28,19 +28,19 @@ class GvcfStage(SampleStage):
 class JointCallingStage(CohortStage):
     def queue_jobs(self, pipeline: Pipeline, inputs: StageInputs) -> StageOutputs:
         gvcf_by_sid = inputs.as_path_by_target(stage=GvcfStage)
-        expected_path = self.get_expected_output(pipe)
+        expected_path = self.expected_result(pipe)
         job = make_joint_genotyping_jobs(b=self.pipe.b, ..., output_path=expected_path)
         return self.make_outputs(pipe, data=expected_path, jobs=[job])
 
 @click.command()
 @pipeline_click_options
 def main(**kwargs):
-    run_pipeline(
+    Pipeline(
         name='my_joint_calling_pipeline',
         title='My joint calling pipeline',
         stages_in_order=[CramStage, GvcfStage, JointCallingStage],
         **kwargs
-    )
+    ).submit_batches()
 """
 
 import functools
@@ -50,8 +50,9 @@ from dataclasses import dataclass
 import logging
 from enum import Enum
 from os.path import join
-from typing import List, Dict, Optional, Tuple, Callable, cast, Type, Union, TypeVar, \
-    Generic
+from typing import (
+    List, Dict, Optional, Tuple, Callable, cast, Type, Union, TypeVar, Generic
+)
 from abc import ABC, abstractmethod
 
 import click
@@ -59,9 +60,11 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import utils
-from cpg_pipes.utils import Namespace, AnalysisType
-from cpg_pipes.smdb import SMDB, Analysis, Sequence
-from cpg_pipes.hailbatch import AlignmentInput, PrevJob, get_hail_bucket, setup_batch
+from cpg_pipes.utils import Namespace, AnalysisType, Analysis, Sequence
+from cpg_pipes.hailbatch import AlignmentInput, PrevJob, get_hail_bucket, setup_batch, \
+    Batch
+
+from cpg_pipes.smdb import SMDB
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -102,6 +105,11 @@ def pipeline_click_options(function: Callable) -> Callable:
             required=True,
             help='Only read samples that belong to the project(s). Can be set multiple '
                  'times.',
+        ),
+        click.option(
+            '--source-tag',
+            'source_tag',
+            help='Subset found analysis to "meta={source: <source_tag>}"',
         ),
         click.option(
             '--ped-file',
@@ -232,7 +240,7 @@ def stage(
 
     @stage(sm_analysis_type=AnalysisType.GVCF, requires_stages=CramStage)
     class GvcfStage(SampleStage):
-        def get_expected_output(self, sample: Sample):
+        def expected_result(self, sample: Sample):
             ...
         def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
             ...
@@ -410,7 +418,7 @@ class StageInput:
         """
         Get as a dictoinary of files/resources for a specific stage, indexed by target
         """
-        return self._each(fun=(lambda r: r.as_dict(id=id)), stage=stage)
+        return self._each(fun=(lambda r: r.as_dict()), stage=stage)
 
     def as_resource_dict_by_target(
         self, 
@@ -419,7 +427,7 @@ class StageInput:
         """
         Get a dictoinary of resources for a specific stage, and indexed by target
         """
-        return self._each(fun=(lambda r: r.as_resource_dict(id=id)), stage=stage)
+        return self._each(fun=(lambda r: r.as_resource_dict()), stage=stage)
 
     def as_path_dict_by_target(
         self, 
@@ -428,7 +436,7 @@ class StageInput:
         """
         Get a dictoinary of paths for a specific stage, and indexed by target
         """
-        return self._each(fun=(lambda r: r.as_path_dict(id=id)), stage=stage)
+        return self._each(fun=(lambda r: r.as_path_dict()), stage=stage)
 
     def as_path(
         self, 
@@ -458,7 +466,21 @@ class StageInput:
         """
         res = self._results_by_target_by_stage[stage.__name__][target.unique_id]
         return res.as_dict()
+    
+    def as_path_dict(self, target: 'Target', stage: StageDecorator) -> Dict[str, str]:
+        """
+        Get a dictoinary of files for a specific target and stage
+        """
+        res = self._results_by_target_by_stage[stage.__name__][target.unique_id]
+        return res.as_path_dict()
 
+    def as_resource_dict(self, target: 'Target', stage: StageDecorator) -> Dict[str, str]:
+        """
+        Get a dictoinary of  Resources for a specific target and stage
+        """
+        res = self._results_by_target_by_stage[stage.__name__][target.unique_id]
+        return res.as_resource_dict()
+    
     def get_jobs(self) -> List[Job]:
         """
         Build a list of hail batch dependencies from all stages and targets
@@ -495,14 +517,14 @@ class Target:
         # Whether to process even if outputs exist:
         self.forced = False
 
-    @abstractmethod
     @property
+    @abstractmethod
     def unique_id(self) -> str:
         """
         ID should be unique across target of all levels.
         """
         pass
- 
+
 
 @dataclass(init=False)
 class Sample(Target):
@@ -522,11 +544,13 @@ class Sample(Target):
         id: str, 
         external_id: str, 
         project: 'Project',
+        meta: dict = None,
     ):
         super().__init__()
         self.id = id
         self.external_id = external_id
         self.project = project
+        self.meta = meta or dict()
 
     def get_ped_dict(self, use_ext_id: bool = False) -> Dict:
         """
@@ -605,7 +629,7 @@ class Project(Target):
         self, 
         pipeline: 'Pipeline',
         name: str, 
-        namespace: Namespace
+        namespace: Optional[Namespace] = None
     ):
         """
         Has "name" and "stack".
@@ -615,6 +639,8 @@ class Project(Target):
         super().__init__()
         self.pipeline = pipeline
         self.samples: List[Sample] = []
+        
+        namespace = namespace or pipeline.namespace
         self.is_test = namespace != Namespace.MAIN
 
         if name.endswith('-test'):
@@ -630,6 +656,16 @@ class Project(Target):
     @property
     def unique_id(self) -> str:
         return self.name
+
+    def add_sample(self, id: str, external_id: str, **kwargs) -> Sample:
+        s = Sample(
+            id=id, 
+            external_id=external_id,
+            project=self,
+            meta=kwargs,
+        )
+        self.samples.append(s)
+        return s
 
 
 # Type variable to make sure a Stage subclass always matches the
@@ -669,7 +705,7 @@ class Stage(Generic[TargetT], ABC):
 
         # self.active=True means that the stage wasn't skipped and jobs were added
         # into the pipeline, and we shoule expect target.ouptut_by_stage 
-        # to be populated. Otherwise, self.get_expected_output() should work.
+        # to be populated. Otherwise, self.expected_result() should work.
         self.skipped = False  
         # self.required=True means that is required for another active stage,
         # even if it was skipped
@@ -694,7 +730,7 @@ class Stage(Generic[TargetT], ABC):
         """
 
     @abstractmethod
-    def get_expected_output(self, target: TargetT) -> Optional[Union[str, Dict[str, str]]]:
+    def expected_result(self, target: TargetT) -> Optional[Union[str, Dict[str, str]]]:
         """
         Path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
@@ -776,26 +812,26 @@ class Stage(Generic[TargetT], ABC):
         Returns outputs that can be reused for the stage for the target,
         or None of none can be reused
         """
-        expected_output = self.get_expected_output(target)
+        expected_output = self.expected_result(target)
 
         if self.analysis_type is not None:
             if not expected_output:
                 raise ValueError(
-                    f'get_expected_output() returned None, but must return str '
+                    f'expected_result() returned None, but must return str '
                     f'for a stage with analysis_type: {self.name} '
                     f'on {target.unique_id}, analysis_type={self.analysis_type}'
                 )
                 
             if isinstance(expected_output, dict):
                 raise ValueError(
-                    f'get_expected_output() returns a dict, won\'t check the SMDB for '
+                    f'expected_result() returns a dict, won\'t check the SMDB for '
                     f'{self.name} on {target.unique_id}'
                 )
             found_path = self._try_get_smdb_analysis(target, cast(str, expected_output))
             if found_path and not self.pipe.validate_smdb_analyses:
                 return found_path
 
-        if expected_output and self.pipe.check_intermediate_existence:
+        if self.required and expected_output and self.pipe.check_intermediate_existence:
             if isinstance(expected_output, dict):
                 paths = list(expected_output.values())
             else:
@@ -811,6 +847,7 @@ class Stage(Generic[TargetT], ABC):
         """
         if not self.analysis_type:
             return None
+
         analysis = target.analysis_by_type.get(self.analysis_type)
         if not analysis:
             return None
@@ -826,7 +863,7 @@ class Stage(Generic[TargetT], ABC):
                 pipe = cast(Pipeline, target)
                 sample_ids = pipe.get_all_sample_ids()
 
-            found_path = self.pipe.db.process_existing_analysis(
+            found_path = self.pipe.db_process_existing_analysis(
                 sample_ids=sample_ids,
                 completed_analysis=analysis,
                 analysis_type=self.analysis_type.value,
@@ -862,7 +899,7 @@ class SampleStage(Stage[Sample], ABC):
     Sample-level stage
     """
     @abstractmethod
-    def get_expected_output(
+    def expected_result(
         self, 
         sample: 'Sample'
     ) -> Optional[Union[str, Dict[str, str]]]:
@@ -879,7 +916,11 @@ class SampleStage(Stage[Sample], ABC):
 
     def add_to_the_pipeline(self, pipeline: 'Pipeline') -> Dict[str, StageOutput]:
         output_by_target = dict()
+        if not pipeline.projects:
+            raise ValueError('No projects are found to run')
         for project in pipeline.projects:
+            if not project.samples:
+                raise ValueError(f'No samples are found to run in the project {project.name}')
             for sample in project.samples:
                 sample_result = self._queue_jobs_with_checks(sample)
                 output_by_target[sample.unique_id] = sample_result
@@ -891,7 +932,7 @@ class PairStage(Stage, ABC):
     Stage on a pair os samples
     """
     @abstractmethod
-    def get_expected_output(
+    def expected_result(
         self, 
         pair: Pair
     ) -> Optional[Union[str, Dict[str, str]]]:
@@ -908,7 +949,11 @@ class PairStage(Stage, ABC):
 
     def add_to_the_pipeline(self, pipeline: 'Pipeline') -> Dict[str, StageOutput]:
         output_by_target = dict()
+        if not pipeline.projects:
+            raise ValueError('No projects are found to run')
         for project in pipeline.projects:
+            if not project.samples:
+                raise ValueError(f'No samples are found to run in the project {project.name}')
             for s1 in project.samples:
                 for s2 in project.samples:
                     if s1 == s2:
@@ -924,7 +969,7 @@ class ProjectStage(Stage, ABC):
     Project-level stage
     """
     @abstractmethod
-    def get_expected_output(
+    def expected_result(
         self, 
         project: 'Project'
     ) -> Optional[Union[str, Dict[str, str]]]:
@@ -941,18 +986,20 @@ class ProjectStage(Stage, ABC):
 
     def add_to_the_pipeline(self, pipeline: 'Pipeline') -> Dict[str, StageOutput]:
         output_by_target = dict()
+        if not pipeline.projects:
+            raise ValueError('No projects are found to run')
         for project in pipeline.projects:
             output_by_target[project.unique_id] = \
                 self._queue_jobs_with_checks(project)
         return output_by_target
-        
+
 
 class CohortStage(Stage, ABC):    
     """
     Entire cohort level stage
     """
     @abstractmethod
-    def get_expected_output(
+    def expected_result(
         self, 
         pipeline: 'Pipeline'
     ) -> Optional[Union[str, Dict[str, str]]]:
@@ -974,22 +1021,14 @@ class CohortStage(Stage, ABC):
         }
 
 
-# Global _pipeline pointer to make the `@stage` decorator work before 
-# a Pipeline instance is defined (i.e. before `run_pipeline` is called)
-_pipeline = None
+def run_pipeline(dry_run: bool = False, **kwargs) -> 'Pipeline':
+    pipeline = Pipeline(**kwargs)
+    pipeline.submit_batch(dry_run=dry_run)
+    return pipeline
 
 
-def run_pipeline(*args, stages_in_order: List[StageDecorator], **kwargs):
-    """
-    This function should be called to trigger the pipeline logic (i.e. find samples,
-    call Stages' add_jobs(), submit Batch). Sort of implements the singleton logic
-    for the Pipeline class, so there can be no more than one pipeline at runtime
-    """
-    global _pipeline
-    if _pipeline is None:
-        _pipeline = Pipeline(*args, **kwargs)
-    _pipeline.set_stages([cls(_pipeline) for cls in stages_in_order])
-    _pipeline.submit_batch()
+class PipelineException(Exception):
+    pass
 
 
 class Pipeline(Target):
@@ -1002,9 +1041,10 @@ class Pipeline(Target):
         self,
         analysis_project: str,
         name: str,
+        title: str,
         output_version: str,
         namespace: Namespace,
-        title: str,
+        stages_in_order: Optional[List[StageDecorator]] = None,
         keep_scratch: bool = False,
         dry_run: bool = False,
         previous_batch_tsv_path: Optional[str] = None,
@@ -1019,11 +1059,19 @@ class Pipeline(Target):
         last_stage: Optional[str] = None,
         config: Optional[Dict] = None,
         input_projects: Optional[List[str]] = None,
+        source_tag: Optional[str] = None,
         skip_samples: Optional[List[str]] = None,
         only_samples: Optional[List[str]] = None,
         force_samples: Optional[List[str]] = None,
         ped_files: Optional[List[str]] = None,
     ):
+        if stages_in_order and not input_projects:
+            raise ValueError(
+                'Projects must be populated before adding stages. '
+                'Provide `input_projects`, or omit `stages_in_order` and call '
+                'pipeline.set_stages(stages_in_order) later.'
+            )
+        
         super().__init__()
         self.analysis_project = Project(
             pipeline=self,
@@ -1036,11 +1084,6 @@ class Pipeline(Target):
         self.check_intermediate_existence = check_intermediate_existence
         self.first_stage = first_stage
         self.last_stage = last_stage
-        self.db = SMDB(
-            self.analysis_project.name,
-            do_update_analyses=update_smdb_analyses,
-            do_check_seq_existence=check_smdb_seq_existence,
-        )
         self.skip_samples_without_seq_input = skip_samples_without_seq_input
         self.validate_smdb_analyses = validate_smdb_analyses
 
@@ -1072,7 +1115,7 @@ class Pipeline(Target):
         self.analysis_bucket = path_ptrn.format(suffix=analysis_suf)
         self.web_bucket = path_ptrn.format(suffix=web_suf)
         self.web_url = (
-            f'https://{self.namespace}-web.populationgenomics.org.au/'
+            f'https://{self.namespace.value}-web.populationgenomics.org.au/'
             f'{self.analysis_project.stack}/'
             f'{self.name}/'
             f'{self.output_version}'
@@ -1092,36 +1135,58 @@ class Pipeline(Target):
 
         self.config = config or {}
 
-        self.b = setup_batch(
+        self.b: Batch = setup_batch(
             title, 
             self.keep_scratch, 
             self.tmp_bucket, 
-            self.analysis_project.name, 
+            self.analysis_project.stack, 
             hail_billing_project
         )
 
-        self._stages_dict: Dict[str, Stage] = dict()
         self.projects: List[Project] = []
         if input_projects:
-            self._populate(
+            # Delaying importing smdb until here to allow using Pipeline
+            # without sample-metadata dependency.
+            self._db = SMDB(
+                self.analysis_project.name,
+                do_update_analyses=update_smdb_analyses,
+                do_check_seq_existence=check_smdb_seq_existence,
+            )
+            self.populate(
                 input_projects=input_projects,
+                source_tag=source_tag,
                 namespace=self.namespace,
                 skip_samples=skip_samples,
                 only_samples=only_samples,
                 ped_files=ped_files,
                 forced_samples=force_samples,
             )
+        
+        self._stages_dict: Dict[str, Stage] = dict()
+        if stages_in_order:
+            self.set_stages(stages_in_order)
 
     def get_all_samples(self) -> List[Sample]:
+        """
+        Gets a flat list of all samples from all projects.
+        """
         all_samples = []
         for proj in self.projects:
             all_samples.extend(proj.samples)
         return all_samples
 
     def get_all_sample_ids(self) -> List[str]:
+        """
+        Gets a flat list of CPG IDs for all samples from all projects.
+        """
         return [s.id for s in self.get_all_samples()]
 
-    def submit_batch(self) -> None:
+    def submit_batch(self, dry_run: Optional[bool] = None) -> None:
+        """
+        Submits Hail Batch jobs.
+        """
+        if dry_run is None:
+            dry_run = self.dry_run
         if self.b:
             logger.info(f'Will submit {self.b.total_job_num} jobs:')
             for label, stat in self.b.labelled_jobs.items():
@@ -1130,7 +1195,7 @@ class Pipeline(Target):
             logger.info(f'  Other jobs: {self.b.other_job_num}')
 
             self.b.run(
-                dry_run=self.dry_run,
+                dry_run=dry_run,
                 delete_scratch_on_exit=not self.keep_scratch,
                 wait=False,
             )
@@ -1143,58 +1208,84 @@ class Pipeline(Target):
         skip_samples: Optional[List[str]] = None,
         only_samples: Optional[List[str]] = None,
         forced_samples: Optional[List[str]] = None,
+        source_tag: Optional[str] = None,
     ):
-        samples_by_project = self.db.get_samples_by_project(
+        if self._db is None:
+            raise PipelineException('SMDB is not initialised')
+
+        samples_by_project = self._db.get_samples_by_project(
             project_names=input_projects,
             namespace=namespace,
             skip_samples=skip_samples,
             only_samples=only_samples,
         )
         for proj_name, sample_datas in samples_by_project.items():
-            project = Project(
-                pipeline=self,
+            project = self.add_project(
                 name=proj_name,
                 namespace=namespace,
             )
             for s_data in sample_datas:
-                s = Sample(
-                    id=s_data['id'], 
+                meta = s_data.get('meta', {})
+                if source_tag:
+                    meta['source_tag'] = source_tag
+                s = project.add_sample(
+                    id=s_data['id'],
                     external_id=s_data['external_id'],
-                    project=project,
+                    **s_data.get('meta', dict()),
                 )
                 if forced_samples and s.id in forced_samples:
                     logger.info(f'Force rerunning sample {s.id} even if outputs exist')
                     s.forced = True
-                project.samples.append(s)
-            self.projects.append(project)
+    
+    def add_project(self, name: str, namespace: Optional[Namespace] = None) -> Project:
+        project_by_name = {p.name: p for p in self.projects}
+        if name in project_by_name:
+            logger.warning(f'Project {name} already exists')
+            return project_by_name[name]
+        p = Project(
+            pipeline=self,
+            name=name,
+            namespace=namespace or self.namespace,
+        )
+        self.projects.append(p)
+        return p
 
-    def _populate_analysis(self):
+    def _populate_analysis(self, source_tag: Optional[str] = None):
+        if self._db is None:
+            raise PipelineException('SMDB is not initialised')
+
         all_sample_ids = self.get_all_sample_ids()
 
-        jc_analysis = self.db.find_joint_calling_analysis(
+        jc_analysis = self._db.find_joint_calling_analysis(
             sample_ids=all_sample_ids,
         )
 
         for project in self.projects:
             sample_ids = [s.id for s in project.samples]
             
-            seqs_by_sid = self.db.find_seq_by_sid(sample_ids)
+            seqs_by_sid = self._db.find_seq_by_sid(sample_ids)
 
-            cram_per_sid = self.db.find_analyses_by_sid(
+            cram_per_sid = self._db.find_analyses_by_sid(
                 sample_ids=sample_ids,
-                analysis_type='cram',
+                analysis_type=AnalysisType.CRAM.value,
+                meta={'source': source_tag} if source_tag else None,
             )
-            gvcf_per_sid = self.db.find_analyses_by_sid(
+            gvcf_per_sid = self._db.find_analyses_by_sid(
                 sample_ids=sample_ids,
-                analysis_type='gvcf',
+                analysis_type=AnalysisType.GVCF.value,
+                meta={'source': source_tag} if source_tag else None,
             )
 
             for s in project.samples:
-                s.seq_info = seqs_by_sid.get(s.id)
-                s.analysis_by_type[AnalysisType.CRAM] = cram_per_sid.get(s.id)
-                s.analysis_by_type[AnalysisType.GVCF] = gvcf_per_sid.get(s.id)
+                if s.id in seqs_by_sid:
+                    s.seq_info = seqs_by_sid[s.id]
+                if s.id in cram_per_sid:
+                    s.analysis_by_type[AnalysisType.CRAM] = cram_per_sid[s.id]
+                if s.id in gvcf_per_sid:
+                    s.analysis_by_type[AnalysisType.GVCF] = gvcf_per_sid[s.id]
 
-        self.analysis_by_type[AnalysisType.JOINT_CALLING] = jc_analysis
+        if jc_analysis:
+            self.analysis_by_type[AnalysisType.JOINT_CALLING] = jc_analysis
 
     def _populate_pedigree(self, ped_files: List[str]):
         sample_by_extid = dict()
@@ -1231,9 +1322,10 @@ class Pipeline(Target):
                 f'samples out of {len(project.samples)}'
             )
 
-    def _populate(
+    def populate(
         self,
         input_projects: List[str],
+        source_tag: Optional[str] = None,
         skip_samples: Optional[List[str]] = None,
         only_samples: Optional[List[str]] = None,
         ped_files: Optional[List[str]] = None,
@@ -1250,8 +1342,9 @@ class Pipeline(Target):
             only_samples=only_samples,
             namespace=namespace or self.namespace,
             forced_samples=forced_samples,
+            source_tag=source_tag,
         )
-        self._populate_analysis()
+        self._populate_analysis(source_tag=source_tag)
         if ped_files:
             self._populate_pedigree(ped_files)
 
@@ -1277,11 +1370,13 @@ class Pipeline(Target):
             last_stage_num = lower_stage_names.index(self.last_stage.lower())
         return first_stage_num, last_stage_num
 
-    def set_stages(self, stages: List[Stage]):
+    def set_stages(self, stages_classes: List[StageDecorator]):
         """
         Iterate over stages and call add_to_the_pipeline() on each.
         Effectively creates all Hail Batch jobs through Stage.queue_jobs().
         """
+        # Initializing stage objects
+        stages = [cls(self) for cls in stages_classes]
         for stage in stages:
             if stage.name in self._stages_dict:
                 raise ValueError(
@@ -1298,6 +1393,7 @@ class Pipeline(Target):
                 stage.skipped = True
                 stage.required = False
                 logger.info(f'Skipping stage {stage_name}')
+                continue
 
             for reqcls in stage.required_stages_classes:
                 assert reqcls.__name__ in self._stages_dict, (
@@ -1341,3 +1437,21 @@ class Pipeline(Target):
     @property
     def unique_id(self) -> str:
         return self.name
+
+    def db_process_existing_analysis(self, *args, **kwargs):
+        if self._db is None:
+            raise PipelineException('SMDB is not initialised')
+        
+        return self._db.process_existing_analysis(*args, **kwargs)
+
+    @property
+    def db(self) -> SMDB:
+        if self._db is None:
+            raise PipelineException('SMDB is not initialised')
+        return cast(SMDB, self._db)
+
+    def get_db(self) -> Optional[SMDB]:
+        """
+        Like .db property, but returns None if db is not initiazlied
+        """
+        return self._db

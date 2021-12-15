@@ -9,13 +9,13 @@ from os.path import join
 DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:ca793d8df6dd8fa20f1908d5c76eb98ab2cf53e4-hail-0.2.73.devc6f6f09cec08'
 
 AR_REPO = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
-GATK_VERSION = '4.2.2.0-cpgfix00'  # Our fork with a couple of fixes:
+GATK_VERSION = '4.2.3.0'
 GATK_IMAGE = f'{AR_REPO}/gatk:{GATK_VERSION}'
 # GnarlyGenotyper is in Beta and crashes with NullPointerException when using the
 # official GATK docker, that's why we're using a separate image for it:
 GNARLY_IMAGE = f'{AR_REPO}/gnarly_genotyper:hail_ukbb_300K'
 BCFTOOLS_IMAGE = f'{AR_REPO}/bcftools:1.10.2--h4f4756c_2'
-SM_IMAGE = f'{AR_REPO}/sm-api:3.5.0'
+SM_IMAGE = f'{AR_REPO}/sm-api:4.0.0'
 BWA_IMAGE = f'{AR_REPO}/bazam_bwa:v0'
 BWAMEM2_IMAGE = f'{AR_REPO}/bazam_bwamem2:v0'
 DRAGMAP_IMAGE = f'{AR_REPO}/dragmap:1.2.1'

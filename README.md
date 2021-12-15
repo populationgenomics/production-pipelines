@@ -39,3 +39,7 @@ python pipelines/pedigree.py \
 ```
 
 The `cpg_pipes` package defines many handy python functions that which can be imported with `import cpg_pipes`. `cpg_pipes/jobs` defines functions that create Hail Batch Jobs for aligment, fastqc, deduplication, variant calling, VQSR, etc. For usage examples, see `pipelines/benchmarks/benchmark_alignment.py`, as well as other scripts in that folder.
+
+TODO:
+[] add tests
+[] merge in the joint-calling repo

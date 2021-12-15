@@ -1,3 +1,7 @@
+"""
+Utility functions to interact with Hail Batch Jobs and Resources
+"""
+
 import logging
 import os
 from dataclasses import dataclass
@@ -20,7 +24,7 @@ class BamOrCramAlignmentInput:
     bam_or_cram_path: Optional[Union[str, hb.ResourceGroup]] = None
     index_path: Optional[str] = None
 
-    def get_cram_input_group(self, b) -> hb.ResourceGroup:
+    def as_cram_input_group(self, b) -> hb.ResourceGroup:
         """
         Makes a ResourceGroup of bam/cram with accompanying index
         """
@@ -42,7 +46,7 @@ class FqAlignmentInput:
     fqs1: Optional[List[Union[str, hb.ResourceFile]]] = None
     fqs2: Optional[List[Union[str, hb.ResourceFile]]] = None
 
-    def get_fq_inputs(self, b) -> Tuple[List[hb.Resource], List[hb.Resource]]:
+    def as_fq_inputs(self, b) -> Tuple[List[hb.Resource], List[hb.Resource]]:
         """
         Makes a pair of lists of ResourceFile objects for fqs1 and fqs2
         """
@@ -123,6 +127,14 @@ class PrevJob:
                     hail_bucket=hail_bucket,
                 )
         return prev_batch_jobs
+    
+    
+def job_name(name, sample: str = None, project: str = None):
+    if sample and project:
+        name = f'{project}/{sample}: {name}'
+    elif project:
+        name = f'{project}: {name}'
+    return name
 
 
 class Batch(hb.Batch):
@@ -156,10 +168,7 @@ class Batch(hb.Batch):
         samples = attributes.get('samples')
         label = attributes.get('label', name)
 
-        if sample and project:
-            name = f'{project}/{sample}: {name}'
-        elif project:
-            name = f'{project}: {name}'
+        name = job_name(name, sample, project)
 
         if label and (sample or samples):
             if label not in self.labelled_jobs:
@@ -171,7 +180,7 @@ class Batch(hb.Batch):
         self.total_job_num += 1
         j = super().new_job(name, attributes=attributes)
         return j
-    
+
 
 def get_hail_bucket(tmp_bucket, keep_scratch) -> str:
     hail_bucket = os.environ.get('HAIL_BUCKET')
@@ -189,6 +198,10 @@ def setup_batch(
     billing_project: Optional[str] = None,
     hail_bucket: Optional[str] = None,
 ) -> Batch:
+    """
+    Wrapper around Backend and Batch initialization. 
+    Handles setting the tmp bucket and billing project.
+    """
     if not hail_bucket:
         hail_bucket = get_hail_bucket(tmp_bucket, keep_scratch)
     billing_project = (
@@ -207,3 +220,51 @@ def setup_batch(
     )
     b = Batch(name=title, backend=backend)
     return b
+
+
+def wrap_command(
+    command: str,
+    monitor_space: bool = False,
+    setup_gcp: bool = False,
+    dedent: bool = True
+) -> str:
+    """
+    Wraps a command for submission
+    If job_resource is defined, monitors output space.
+    If output_bucket_path_to_check is defined, checks if this file(s) exists,
+    and if it does, skips running the rest of the job.
+    """
+    gcp_cmd = ''
+    if setup_gcp:
+        gcp_cmd = """\
+        export GOOGLE_APPLICATION_CREDENTIALS=/gsa-key/key.json
+        gcloud -q auth activate-service-account \
+        --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+        """
+    
+    cmd = f"""\
+    set -o pipefail
+    set -ex
+    {gcp_cmd}
+    
+    {f'(while true; do {monitor_space_command()}; sleep 600; done) &'
+    if monitor_space else ''}
+    
+    {command}
+    
+    {monitor_space_command() if monitor_space else ''}
+    """
+    
+    if dedent:
+        # remove any leading spaces and tabs
+        cmd = '\n'.join(line.strip() for line in cmd.split('\n'))
+        # remove sretches of spaces
+        cmd = '\n'.join(' '.join(line.split()) for line in cmd.split('\n'))
+    return cmd
+
+
+def monitor_space_command():
+    """
+    Make command that monitors the instance storage space and memory
+    """
+    return f'df -h; du -sh /io; du -sh /io/batch'

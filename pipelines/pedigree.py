@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 
 """
-Batch pipeline to check pedigree on samples
+Batch pipeline to check pedigree on samples.
 """
 
 import logging
 from os.path import join
-from typing import Optional, Collection
+from typing import Optional, List
 
 import click
 
 from cpg_pipes import utils
 from cpg_pipes.jobs import pedigree
 from cpg_pipes.pipeline import Project, \
-    ProjectStage, pipeline_click_options, stage, StageInput, run_pipeline, StageOutput
+    ProjectStage, pipeline_click_options, stage, StageInput, StageOutput, Pipeline
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -22,7 +22,7 @@ logger.setLevel(logging.INFO)
 
 @stage
 class CramPedCheckStage(ProjectStage):
-    def get_expected_output(self, project: Project):
+    def expected_result(self, project: Project):
         pass
 
     def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
@@ -54,7 +54,7 @@ class CramPedCheckStage(ProjectStage):
 
 @stage
 class GvcfPedCheckStage(ProjectStage):
-    def get_expected_output(self, project: Project):
+    def expected_result(self, project: Project):
         pass
 
     def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
@@ -82,8 +82,8 @@ class GvcfPedCheckStage(ProjectStage):
 @click.command()
 @pipeline_click_options
 def main(
-    input_projects: Collection[str],
-    output_projects: Optional[Collection[str]],
+    input_projects: List[str],
+    output_projects: Optional[List[str]],
     output_version: str,
     **kwargs,
 ):  # pylint: disable=missing-function-docstring
@@ -100,7 +100,7 @@ def main(
             f'{output_projects}'
         )
 
-    run_pipeline(
+    Pipeline(
         name='pedigree_check',
         title=title,
         input_projects=input_projects,
@@ -110,7 +110,7 @@ def main(
             GvcfPedCheckStage,
         ],
         **kwargs,
-    )
+    ).submit_batch()
 
 
 if __name__ == '__main__':

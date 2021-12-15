@@ -4,10 +4,12 @@ import logging
 from os.path import join
 import pandas as pd
 from analysis_runner import dataproc
-from sample_metadata import (
+from sample_metadata.apis import (
     AnalysisApi,
     SampleApi,
-    SequenceUpdateModel, SampleUpdateModel,
+)
+from sample_metadata.models import (
+    SampleUpdateModel,
 )
 
 from cpg_pipes import utils
@@ -36,8 +38,10 @@ pipe = Pipeline(
     check_smdb_seq_existence=False,
     input_projects=[INPUT_PROJECT], 
 )
+
 samples = pipe.get_all_samples()
 sample_ids = [s.id for s in samples]
+
 gvcf_analysis_per_sid = pipe.db.find_analyses_by_sid(
     sample_ids=sample_ids,
     analysis_type='gvcf',
@@ -97,4 +101,4 @@ for n_workers in [10, 30, 20, 40, 50]:
             job_name=f'Combine {n_samples} GVCFs on {n_workers} workers',
         )
 
-pipe.run()
+pipe.submit_batch()

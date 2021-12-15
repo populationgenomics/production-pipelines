@@ -4,73 +4,33 @@ Functions to find the pipeline inputs and communicate with the SM server
 
 import logging
 import traceback
-from dataclasses import dataclass
 from textwrap import dedent
-from typing import List, Dict, Optional, Set, Collection
+from typing import List, Dict, Optional, Collection
 
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
+from sample_metadata.models import (
+    AnalysisModel,
+    AnalysisType,
+    AnalysisStatus,
+    AnalysisUpdateModel,
+    AnalysisQueryModel,
+)
+from sample_metadata.apis import (
+    SampleApi,
+    SequenceApi,
+    AnalysisApi
+)
+from sample_metadata.exceptions import ApiException
+
 from cpg_pipes import utils, resources
-from cpg_pipes.utils import Namespace
+from cpg_pipes.utils import Namespace, Sequence, Analysis
 from cpg_pipes.hailbatch import AlignmentInput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
-
-
-@dataclass
-class Analysis:
-    """
-    Represents the Analysis SampleMetadata DB entry
-    """
-
-    id: str
-    type: str
-    status: str
-    sample_ids: Set[str]
-    output: Optional[str]
-
-    def make_analysis_model(self):
-        from sample_metadata import AnalysisModel
-        return AnalysisModel(
-            type=self.type,
-            output=self.output,
-            status=self.status,
-            sample_ids=self.sample_ids,
-        )
-
-
-class Sequence:
-    """
-    Represents the Sequence SampleMetadata DB entry
-    """
-    
-    def __init__(self, id, sample_id, meta, smdb):
-        self.id = id
-        self.sample_id = sample_id
-        self.meta = meta
-        self.smdb = smdb
-    
-    @staticmethod
-    def parse(data: Dict, smdb):
-        return Sequence(data['id'], data['sample_id'], data['meta'], smdb)
-
-    def parse_reads_from_metadata(
-        self, 
-        check_existence: Optional[bool] = None,
-    ) -> Optional[AlignmentInput]:
-        """
-        Parase AlignmentInput from meta. check_existence defaults from self.smdb 
-        and can be overwridden
-        """
-        return parse_reads_from_metadata(
-            self.meta,
-            check_existence=check_existence 
-            if (check_existence is not None) 
-            else self.smdb.do_check_seq_existence,
-        )
 
 
 class SMDB:
@@ -92,7 +52,6 @@ class SMDB:
             with files, check those files existence with gsutil. For "sequence", will
             throw an error. For "analysis", will invalidate by setting status=failure.
         """
-        from sample_metadata import AnalysisApi, SequenceApi, SampleApi
         self.sapi = SampleApi()
         self.aapi = AnalysisApi()
         self.seqapi = SequenceApi()
@@ -136,11 +95,10 @@ class SMDB:
                 samples_by_project[proj_name].append(s)
         return samples_by_project
 
-    def find_seq_by_sid(self, sample_ids) -> Dict[List, Sequence]:
+    def find_seq_by_sid(self, sample_ids) -> Dict[str, Sequence]:
         """
         Return a dict of "Sequence" entries by sample ID
         """
-        from sample_metadata.exceptions import ApiException
         try:
             seq_infos: List[Dict] = self.seqapi.get_sequences_by_sample_ids(sample_ids)
         except ApiException:
@@ -155,14 +113,11 @@ class SMDB:
         """
         Update "status" of an Analysis entry
         """
-        from sample_metadata import AnalysisUpdateModel
-        from sample_metadata.exceptions import ApiException
-
         if not self.do_update_analyses:
             return
         try:
             self.aapi.update_analysis_status(
-                analysis.id, AnalysisUpdateModel(status=status)
+                analysis.id, AnalysisUpdateModel(status=AnalysisStatus(status))
             )
         except ApiException:
             traceback.print_exc()
@@ -175,11 +130,10 @@ class SMDB:
         """
         Query the DB to find the last completed joint-calling analysis for the samples
         """
-        from sample_metadata.exceptions import ApiException
         try:
             data = self.aapi.get_latest_complete_analysis_for_type(
                 project=self.analysis_project,
-                analysis_type='joint-calling',
+                analysis_type=AnalysisType('joint-calling'),
             )
         except ApiException:
             return None
@@ -204,27 +158,20 @@ class SMDB:
         one Analysis object per sample. Assumes the analysis is defined for a single
         sample (e.g. cram, gvcf)
         """
-        from sample_metadata import exceptions
-        
         project = project or self.analysis_project
         analysis_per_sid: Dict[str, Analysis] = dict()
-        request_body = sample_ids
-        if meta:
-            request_body = {
-                'sample_ids': sample_ids,
-                'meta': meta
-            }
-        try:
-            logger.info(
-                f'Querying {analysis_type} analysis entries for project {project}'
+
+        logger.info(
+            f'Querying {analysis_type} analysis entries for project {project}'
+        )
+        datas = self.aapi.query_analyses(
+            AnalysisQueryModel(
+                projects=[project],
+                sample_ids=sample_ids,
+                analysis_type=AnalysisType(analysis_type),
+                meta=meta or {}
             )
-            datas = self.aapi.get_latest_analysis_for_samples_and_type(
-                analysis_type=analysis_type,
-                project=project,
-                request_body=request_body
-            )
-        except exceptions.ApiException:
-            return dict()
+        )
 
         for data in datas:
             a = _parse_analysis(data)
@@ -283,15 +230,17 @@ class SMDB:
         export SM_ENVIRONMENT=PRODUCTION
         
         cat <<EOT >> update.py
-        from sample_metadata.api import AnalysisApi
-        from sample_metadata import AnalysisUpdateModel
+        from sample_metadata.apis import AnalysisApi
+        from sample_metadata.models import AnalysisUpdateModel, AnalysisStatus
         from sample_metadata import exceptions
         import traceback
         aapi = AnalysisApi()
         try:
             aapi.update_analysis_status(
                 analysis_id='{analysis_id}',
-                analysis_update_model=AnalysisUpdateModel(status='{status}'),
+                analysis_update_model=AnalysisUpdateModel(
+                    status=AnalysisStatus('{status}')
+                ),
             )
         except exceptions.ApiException:
             traceback.print_exc()
@@ -303,24 +252,21 @@ class SMDB:
 
     def create_analysis(
         self,
-        type_: str,
         output: str,
+        type_: str,
         status: str,
         sample_ids: Collection[str],
     ) -> Optional[int]:
         """
         Tries to create an Analysis entry, returns its id if successfuly
         """
-        from sample_metadata import AnalysisModel
-        from sample_metadata.exceptions import ApiException
-
         if not self.do_update_analyses:
             return None
 
         am = AnalysisModel(
-            type=type_,
+            type=AnalysisType(type_),
+            status=AnalysisStatus(status),
             output=output,
-            status=status,
             sample_ids=list(sample_ids),
         )
         try:
@@ -462,7 +408,8 @@ class SMDB:
             sample_name=sample_names[0] if len(sample_names) == 1 else None,
         )
         # Set up dependencies
-        first_j.depends_on(sm_in_progress_j)
+        for fj in (first_j if isinstance(first_j, list) else [first_j]):
+            fj.depends_on(sm_in_progress_j)
         sm_completed_j.depends_on(last_j)
         if depends_on:
             sm_in_progress_j.depends_on(*depends_on)
@@ -492,13 +439,20 @@ def _parse_analysis(data: Dict) -> Optional[Analysis]:
     return a
 
 
-def parse_reads_from_metadata(  # pylint: disable=too-many-return-statements
-    meta: Dict,
-    check_existence: bool = True,
+def parse_reads_from_sequence(  # pylint: disable=too-many-return-statements
+    sequence: Sequence,
+    check_existence: Optional[bool] = None,
 ) -> Optional[AlignmentInput]:
     """
-    Verify the meta.reads object in a sequence db entry
+    Parase AlignmentInput from meta. check_existence defaults from self.smdb 
+    and can be overwridden
     """
+    meta = sequence.meta
+    if check_existence is not None:
+        check_existence = check_existence 
+    else:
+        check_existence = sequence.smdb.do_check_seq_existence
+    
     reads_data = meta.get('reads')
     reads_type = meta.get('reads_type')
     if not reads_data:

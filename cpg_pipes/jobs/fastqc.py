@@ -4,7 +4,8 @@ from typing import Optional, List
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes.jobs import align, wrap_command
+from cpg_pipes.hailbatch import wrap_command
+from cpg_pipes.jobs import align
 
 
 def fastqc(
@@ -36,7 +37,7 @@ def fastqc(
 
     jobs = []
     if alignment_input.bam_or_cram_path and alignment_input.bam_or_cram_path.endswith('.bam'):
-        bam = alignment_input.get_cram_input_group(b)
+        bam = alignment_input.as_cram_input_group(b)
         j = _fastqc_one('FastQC', bam.base)
         jobs.append(j)
         return jobs
@@ -45,7 +46,7 @@ def fastqc(
         assert alignment_input.bam_or_cram_path.endswith('.cram'), alignment_input
         extract_j = align.extract_fastq(
             b=b,
-            cram=alignment_input.get_cram_input_group(b),
+            cram=alignment_input.as_cram_input_group(b),
             sample_name=sample_name,
             project_name=project_name,
         )
@@ -53,6 +54,7 @@ def fastqc(
         fqs2 = [extract_j.fq2]
 
     else:
+        assert alignment_input.fqs1 and alignment_input.fqs2
         fqs1 = [b.read_input(fq) for fq in alignment_input.fqs1]
         fqs2 = [b.read_input(fq) for fq in alignment_input.fqs2]
 

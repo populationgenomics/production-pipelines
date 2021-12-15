@@ -1,11 +1,15 @@
+"""
+Create Hail Batch jobs to run Picard tools (marking duplicates, QC).
+"""
+
 from os.path import splitext, join, dirname
 from typing import Optional
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes.jobs import wrap_command
 from cpg_pipes import resources, utils
+from cpg_pipes.hailbatch import wrap_command
 
 
 def markdup(
