@@ -543,12 +543,14 @@ class Sample(Target):
         self, 
         id: str, 
         external_id: str, 
+        participant_id: Optional[str],
         project: 'Project',
         meta: dict = None,
     ):
         super().__init__()
         self.id = id
         self.external_id = external_id
+        self.participant_id = participant_id or external_id
         self.project = project
         self.meta = meta or dict()
 
@@ -657,10 +659,17 @@ class Project(Target):
     def unique_id(self) -> str:
         return self.name
 
-    def add_sample(self, id: str, external_id: str, **kwargs) -> Sample:
+    def add_sample(
+        self, 
+        id: str, 
+        external_id: str, 
+        participant_id: Optional[str], 
+        **kwargs
+    ) -> Sample:
         s = Sample(
             id=id, 
             external_id=external_id,
+            participant_id=participant_id,
             project=self,
             meta=kwargs,
         )
@@ -1231,6 +1240,7 @@ class Pipeline(Target):
                 s = project.add_sample(
                     id=s_data['id'],
                     external_id=s_data['external_id'],
+                    participant_id=s_data['participant_id'],
                     **s_data.get('meta', dict()),
                 )
                 if forced_samples and s.id in forced_samples:

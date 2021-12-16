@@ -12,6 +12,7 @@ from typing import Optional, List
 
 import click
 import hail as hl
+import pandas as pd
 from analysis_runner import dataproc
 
 from cpg_pipes import utils, resources
@@ -378,6 +379,31 @@ class LoadToEsStage(ProjectStage):
         return self.make_outputs(project, jobs=[j])
 
 
+@stage(requires_stages=[CramStage])
+class IgvPaths(ProjectStage):
+    def expected_result(self, project: Project):
+        return None
+
+    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
+        output_projects = self.pipe.config.get('output_projects', self.pipe.projects)
+        if project.stack not in output_projects:
+            logger.info(
+                f'Skipping loading project {project.stack} because it is not'
+                f'in the --output-projects: {output_projects}'
+            )
+            return self.make_outputs(project)
+
+        tsv_path = f'{self.pipe.analysis_bucket}/igv/{project.name}.tsv'
+        df = pd.DataFrame({
+            'individual_id': s.participant_id,
+            'cram_path': inputs.as_path(target=s, stage=CramStage),
+            'cram_sample_id': s.id,
+        } for s in project.samples if inputs.as_path(target=s, stage=CramStage))
+        df.to_csv(tsv_path, sep='\t', index=False, columns=False)
+        logger.info(f'IGV seqr paths: {tsv_path}')
+        return self.make_outputs(project, data=tsv_path)
+
+
 @click.command()
 @pipeline_click_options
 @click.option(
@@ -465,6 +491,7 @@ def main(
         AnnotateCohortStage,
         AnnotateProjectStage,
         LoadToEsStage,
+        IgvPaths,
     ])
     
     pipeline.submit_batch()

@@ -20,7 +20,8 @@ from sample_metadata.models import (
 from sample_metadata.apis import (
     SampleApi,
     SequenceApi,
-    AnalysisApi
+    AnalysisApi,
+    ParticipantApi,
 )
 from sample_metadata.exceptions import ApiException
 
@@ -55,6 +56,8 @@ class SMDB:
         self.sapi = SampleApi()
         self.aapi = AnalysisApi()
         self.seqapi = SequenceApi()
+        self.seqapi = SequenceApi()
+        self.papi = ParticipantApi()
         self.analysis_project = analysis_project
         self.do_update_analyses = do_update_analyses
         self.do_check_seq_existence = do_check_seq_existence
@@ -81,6 +84,9 @@ class SMDB:
                     'active': True,
                 }
             )
+            
+            participant_id_by_cpgid = self._get_participant_id_by_sid(proj_name)
+            
             samples_by_project[proj_name] = []
             for s in samples:
                 if only_samples:
@@ -93,7 +99,21 @@ class SMDB:
                         logger.info(f'Skiping sample: {s["id"]}')
                         continue
                 samples_by_project[proj_name].append(s)
+                
+                s['participant_id'] = participant_id_by_cpgid.get(s['id'])
+                
         return samples_by_project
+
+    def _get_participant_id_by_sid(self, proj_name: str) -> Dict[str, str]:
+        try:
+            pid_sid = self.papi.get_external_participant_id_to_internal_sample_id(
+                proj_name
+            )
+        except ApiException:
+            participant_id_by_cpgid = {}
+        else:
+            participant_id_by_cpgid = {sid: pid for pid, sid in pid_sid}
+        return participant_id_by_cpgid
 
     def find_seq_by_sid(self, sample_ids) -> Dict[str, Sequence]:
         """
