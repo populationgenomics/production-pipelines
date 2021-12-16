@@ -380,7 +380,7 @@ class LoadToEsStage(ProjectStage):
 
 
 @stage(requires_stages=[CramStage])
-class IgvPaths(ProjectStage):
+class SeqrMaps(ProjectStage):
     def expected_result(self, project: Project):
         return None
 
@@ -393,15 +393,29 @@ class IgvPaths(ProjectStage):
             )
             return self.make_outputs(project)
 
-        tsv_path = f'{self.pipe.analysis_bucket}/igv/{project.name}.tsv'
+        # Sample map
+        sample_map_path = f'{self.pipe.analysis_bucket}/seqr/{project.name}-sample-map.csv'
+        df = pd.DataFrame({
+            'cpg_id': s.id,
+            'individual_id': s.participant_id,
+        } for s in project.samples)
+        df.to_csv(sample_map_path, sep=',', index=False, header=False)
+
+        # IGV
+        igv_paths_path = f'{self.pipe.analysis_bucket}/seqr/{project.name}-igv-paths.tsv'
         df = pd.DataFrame({
             'individual_id': s.participant_id,
             'cram_path': inputs.as_path(target=s, stage=CramStage),
             'cram_sample_id': s.id,
         } for s in project.samples if inputs.as_path(target=s, stage=CramStage))
-        df.to_csv(tsv_path, sep='\t', index=False, columns=False)
-        logger.info(f'IGV seqr paths: {tsv_path}')
-        return self.make_outputs(project, data=tsv_path)
+        df.to_csv(igv_paths_path, sep='\t', index=False, header=False)
+
+        logger.info(f'Seqr sample map: {sample_map_path}')
+        logger.info(f'IGV seqr paths: {igv_paths_path}')
+        return self.make_outputs(project, data={
+            'sample-map': sample_map_path, 
+            'igv-paths': igv_paths_path,
+        })
 
 
 @click.command()
@@ -491,7 +505,7 @@ def main(
         AnnotateCohortStage,
         AnnotateProjectStage,
         LoadToEsStage,
-        IgvPaths,
+        SeqrMaps,
     ])
     
     pipeline.submit_batch()
