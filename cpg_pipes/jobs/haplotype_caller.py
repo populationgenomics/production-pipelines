@@ -360,12 +360,14 @@ def subset_noalt(
     )
     if external_sample_id and internal_sample_id:
         reheader_cmd = f"""
-        | bcftools reheader -s <(echo "{external_sample_id} {internal_sample_id}")
+        | bcftools reheader -s <(echo "$EXISTING_SN {internal_sample_id}")
         """
     else:
         reheader_cmd = ''
 
     cmd = f"""
+    EXISTING_SN=$(bcftools view {input_gvcf['g.vcf.gz']} | awk '/^#CHROM/ {{ print $NF; exit }}')
+    
     bcftools view {input_gvcf['g.vcf.gz']} -T {noalt_regions} \\
     | bcftools annotate -x INFO/DS \\
     {reheader_cmd} \\
