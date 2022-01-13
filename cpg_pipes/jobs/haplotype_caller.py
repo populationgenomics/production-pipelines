@@ -3,7 +3,7 @@ Create Hail Batch jobs for variant calling in individual samples.
 """
 
 import logging
-from os.path import join
+from os.path import join, basename
 from typing import Optional, List
 
 import hailtop.batch as hb
@@ -116,12 +116,10 @@ def produce_gvcf(
         b=b,
         sample_name=sample_name,
         project_name=project_name,
-        input_gvcf_path=hc_gvcf_path,
-        out_gvcf_path=output_path,
-        reference=reference,
+        gvcf_path=hc_gvcf_path,
+        output_path=output_path,
         overwrite=overwrite,
         depends_on=[hc_j],
-        external_id=external_id,
     )
     last_j = postproc_j
 
@@ -242,69 +240,31 @@ def merge_gvcfs_job(
 
 def postproc_gvcf(
     b: hb.Batch,
+    gvcf_path: str,
+    output_path: str,
     sample_name: str,
     project_name: str,
-    input_gvcf_path: str,
-    reference: hb.ResourceGroup,
-    out_gvcf_path: str,
     overwrite: bool,
     depends_on: Optional[List[Job]] = None,
-    external_id: Optional[str] = None,
 ) -> Job:
-    if utils.can_reuse(out_gvcf_path, overwrite):
+    """
+    1. Runs ReblockGVCF to annotate with allele-specific VCF INFO fields
+    required for recalibration, and reduce the number of GVCF blocking bins to 2.
+    2. Subsets GVCF to main, not-alt chromosomes to avoid downstream errors.
+    3. Removes the DS INFO field that is added to some HGDP GVCFs to avoid errors
+       from Hail about mismatched INFO annotations
+    4. Renames the GVCF sample name to use CPG ID.
+    """
+    if utils.can_reuse(output_path, overwrite):
         return b.new_job('Postproc GVCF [reuse]', dict(sample=sample_name, project=project_name))
 
-    logger.info(
-        f'Adding reblock and subset jobs for sample {sample_name}, gvcf {out_gvcf_path}'
-    )
-    reblock_j = reblock_gvcf(
-        b,
-        sample_name=sample_name,
-        project_name=project_name,
-        input_gvcf=b.read_input_group(
-            **{'g.vcf.gz': input_gvcf_path, 'g.vcf.gz.tbi': input_gvcf_path + '.tbi'}
-        ),
-        reference=reference,
-        overwrite=overwrite,
-    )
-    if depends_on:
-        reblock_j.depends_on(*depends_on)
-    subset_to_noalt_j = subset_noalt(
-        b,
-        sample_name=sample_name,
-        project_name=project_name,
-        input_gvcf=reblock_j.output_gvcf,
-        noalt_regions=b.read_input(resources.NOALT_REGIONS),
-        overwrite=overwrite,
-        out_gvcf_path=out_gvcf_path,
-        external_sample_id=external_id,
-        internal_sample_id=sample_name,
-    )
-    return subset_to_noalt_j
+    logger.info(f'Adding GVCF postproc job for sample {sample_name}, gvcf {gvcf_path}')
 
-
-def reblock_gvcf(
-    b: hb.Batch,
-    sample_name: str,
-    project_name: str,
-    input_gvcf: hb.ResourceGroup,
-    reference: hb.ResourceGroup,
-    overwrite: bool = True,
-    out_gvcf_path: Optional[str] = None,
-) -> Job:
-    """
-    Runs ReblockGVCF to annotate with allele-specific VCF INFO fields
-    required for recalibration
-    """
-    j = b.new_job('ReblockGVCF', dict(sample=sample_name, project=project_name))
-    if utils.can_reuse(out_gvcf_path, overwrite):
-        j.name += ' [reuse]'
-        return j
-
+    j = b.new_job(f'ReblockGVCF', dict(sample=sample_name, project=project_name))
     j.image(resources.GATK_IMAGE)
     mem_gb = 8
     j.memory(f'{mem_gb}G')
-    j.storage(f'30G')
+    j.storage(f'50G')
     j.declare_resource_group(
         output_gvcf={
             'g.vcf.gz': '{root}.g.vcf.gz',
@@ -312,70 +272,71 @@ def reblock_gvcf(
         }
     )
 
-    cmd = f"""\
-    gatk --java-options "-Xms{mem_gb - 1}g" ReblockGVCF \\
-    --reference {reference.base} \\
-    -V {input_gvcf['g.vcf.gz']} \\
-    -do-qual-approx \\
-    -O {j.output_gvcf['g.vcf.gz']} \\
-    --create-output-variant-index true
-    """
-    j.command(wrap_command(cmd, monitor_space=True))
-    if out_gvcf_path:
-        b.write_output(j.output_gvcf, out_gvcf_path.replace('.g.vcf.gz', ''))
-    return j
-
-
-def subset_noalt(
-    b: hb.Batch,
-    sample_name: str,
-    project_name: str,
-    input_gvcf: hb.ResourceGroup,
-    noalt_regions: str,
-    overwrite: bool,
-    out_gvcf_path: Optional[str] = None,
-    external_sample_id: Optional[str] = None,
-    internal_sample_id: Optional[str] = None,
-) -> Job:
-    """
-    1. Subset GVCF to main chromosomes to avoid downstream errors
-    2. Removes the DS INFO field that is added to some HGDP GVCFs to avoid errors
-       from Hail about mismatched INFO annotations
-    3. Renames sample name from external_sample_id to internal_sample_id
-    """
-    j = b.new_job('SubsetToNoalt', dict(sample=sample_name, project=project_name))
-    if utils.can_reuse(out_gvcf_path, overwrite):
-        j.name += ' [reuse]'
-        return j
-
-    j.image(resources.BCFTOOLS_IMAGE)
-    mem_gb = 8
-    j.memory(f'{mem_gb}G')
-    j.storage(f'30G')
-    j.declare_resource_group(
-        output_gvcf={
-            'g.vcf.gz': '{root}.g.vcf.gz',
-            'g.vcf.gz.tbi': '{root}.g.vcf.gz.tbi',
-        }
+    ref_fasta = resources.REF_FASTA
+    ref_fai = resources.REF_FASTA + '.fai'
+    ref_dict = (
+        ref_fasta.replace('.fasta', '').replace('.fna', '').replace('.fa', '') + '.dict'
     )
-    if external_sample_id and internal_sample_id:
-        reheader_cmd = f"""
-        | bcftools reheader -s <(echo "$EXISTING_SN {internal_sample_id}")
-        """
-    else:
-        reheader_cmd = ''
 
-    cmd = f"""
-    EXISTING_SN=$(bcftools view {input_gvcf['g.vcf.gz']} | awk '/^#CHROM/ {{ print $NF; exit }}')
+    j.command(f"""
+    export GOOGLE_APPLICATION_CREDENTIALS=/gsa-key/key.json
+    gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+
+    function fail {{
+      echo $1 >&2
+      exit 1
+    }}
+
+    function retry {{
+      local n=1
+      local max=10
+      local delay=30
+      while true; do
+        "$@" && break || {{
+          if [[ $n -lt $max ]]; then
+            ((n++))
+            echo "Command failed. Attempt $n/$max:"
+            sleep $delay;
+          else
+            fail "The command has failed after $n attempts."
+          fi
+        }}
+      done
+    }}
+
+    GVCF=/io/batch/{sample_name}.g.vcf.gz
+    REBLOCKED=/io/batch/{sample_name}-reblocked.g.vcf.gz
+
+    # Retrying copying to avoid google bandwidth limits
+    retry gsutil cp {gvcf_path} $GVCF
+    retry gsutil cp {resources.NOALT_REGIONS} /io/batch/noalt-regions.bed
+
+    # Copying reference data as well to avoid crazy logging costs 
+    # for region requests
+    retry gsutil cp {ref_fasta} /io/batch/{basename(ref_fasta)}
+    retry gsutil cp {ref_fai}   /io/batch/{basename(ref_fai)}
+    retry gsutil cp {ref_dict}  /io/batch/{basename(ref_dict)}
+
+    # Reindexing just to make sure the index is not corrupted
+    bcftools index --tbi /io/batch/{sample_name}.g.vcf.gz
     
-    bcftools view {input_gvcf['g.vcf.gz']} -T {noalt_regions} \\
+    gatk --java-options "-Xms{mem_gb - 1}g" \\
+    ReblockGVCF \\
+    --reference /io/batch/{basename(ref_fasta)} \\
+    -V $GVCF \\
+    -do-qual-approx \\
+    -O $REBLOCKED \\
+    --create-output-variant-index true
+
+    EXISTING_SN=$(bcftools view $REBLOCKED | awk '/^#CHROM/ {{ print $NF; exit }}')    
+    bcftools view $REBLOCKED -T /io/batch/noalt-regions.bed \\
     | bcftools annotate -x INFO/DS \\
-    {reheader_cmd} \\
+    | bcftools reheader -s <(echo "$EXISTING_SN {sample_name}") \\
     | bcftools view -Oz -o {j.output_gvcf['g.vcf.gz']}
 
-    bcftools index --tbi {j.output_gvcf['g.vcf.gz']}
-    """
-    j.command(wrap_command(cmd, monitor_space=True))
-    if out_gvcf_path:
-        b.write_output(j.output_gvcf, out_gvcf_path.replace('.g.vcf.gz', ''))
+    tabix -p vcf {j.output_gvcf['g.vcf.gz']}
+    """)
+    b.write_output(j.output_gvcf, output_path.replace('.g.vcf.gz', ''))
+    if depends_on:
+        j.depends_on(*depends_on)
     return j

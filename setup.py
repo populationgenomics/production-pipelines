@@ -19,7 +19,10 @@ setuptools.setup(
     package_data={'cpg_pipes': ['filter_cutoffs.yaml']},
     include_package_data=True,
     zip_safe=False,
-    scripts=[join('scripts', fname) for fname in os.listdir('scripts') if fname.endswith('.py')],
+    scripts=[
+        join('scripts', fname) 
+        for fname in os.listdir('scripts') if fname.endswith('.py')
+    ],
     keywords='bioinformatics',
     classifiers=[
         'Environment :: Console',
