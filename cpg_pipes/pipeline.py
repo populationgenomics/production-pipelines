@@ -51,7 +51,7 @@ import logging
 from enum import Enum
 from os.path import join
 from typing import (
-    List, Dict, Optional, Tuple, Callable, cast, Type, Union, TypeVar, Generic
+    List, Dict, Optional, Tuple, Callable, cast, Type, Union, TypeVar, Generic, Any
 )
 from abc import ABC, abstractmethod
 
@@ -63,8 +63,7 @@ from cpg_pipes import utils
 from cpg_pipes.utils import Namespace, AnalysisType, Analysis, Sequence
 from cpg_pipes.hailbatch import AlignmentInput, PrevJob, get_hail_bucket, setup_batch, \
     Batch
-
-from cpg_pipes.smdb import SMDB
+from cpg_pipes.smdb import SMDB, parse_reads_from_sequence
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -534,8 +533,8 @@ class Sample(Target):
     id: str
     external_id: str
     project: 'Project'
-    alignment_input: Optional[AlignmentInput] = None
     good: bool = True
+    alignment_input: Optional[AlignmentInput] = None
     seq_info: Optional[Sequence] = None
     pedigree: Optional[PedigreeInfo] = None
 
@@ -543,15 +542,15 @@ class Sample(Target):
         self, 
         id: str, 
         external_id: str, 
-        participant_id: Optional[str],
         project: 'Project',
+        participant_id: Optional[str] = None,
         meta: dict = None,
     ):
         super().__init__()
         self.id = id
         self.external_id = external_id
-        self.participant_id = participant_id or external_id
         self.project = project
+        self.participant_id = participant_id or external_id
         self.meta = meta or dict()
 
     def get_ped_dict(self, use_ext_id: bool = False) -> Dict:
@@ -663,7 +662,7 @@ class Project(Target):
         self, 
         id: str, 
         external_id: str, 
-        participant_id: Optional[str], 
+        participant_id: Optional[str] = None,
         **kwargs
     ) -> Sample:
         s = Sample(
@@ -901,7 +900,7 @@ class Stage(Generic[TargetT], ABC):
             data=found_paths,
             jobs=[self.pipe.b.new_job(f'{self.name} [reuse]', attributes)]
         )
-    
+
 
 class SampleStage(Stage[Sample], ABC):
     """
@@ -1052,7 +1051,7 @@ class Pipeline(Target):
         name: str,
         title: str,
         output_version: str,
-        namespace: Namespace,
+        namespace: Union[Namespace, str],
         stages_in_order: Optional[List[StageDecorator]] = None,
         keep_scratch: bool = False,
         dry_run: bool = False,
@@ -1082,6 +1081,8 @@ class Pipeline(Target):
             )
         
         super().__init__()
+        if isinstance(namespace, str):
+            namespace = Namespace(namespace)
         self.analysis_project = Project(
             pipeline=self,
             name=analysis_project,
@@ -1190,7 +1191,11 @@ class Pipeline(Target):
         """
         return [s.id for s in self.get_all_samples()]
 
-    def submit_batch(self, dry_run: Optional[bool] = None) -> None:
+    def submit_batch(
+        self, 
+        dry_run: Optional[bool] = None,
+        wait: Optional[bool] = False,
+    ) -> Optional[Any]:
         """
         Submits Hail Batch jobs.
         """
@@ -1203,12 +1208,13 @@ class Pipeline(Target):
                             f'{len(stat["samples"])} samples')
             logger.info(f'  Other jobs: {self.b.other_job_num}')
 
-            self.b.run(
+            return self.b.run(
                 dry_run=dry_run,
                 delete_scratch_on_exit=not self.keep_scratch,
-                wait=False,
+                wait=wait,
             )
         shutil.rmtree(self.local_tmp_dir)
+        return None
 
     def _populate_projects(
         self,
@@ -1289,6 +1295,7 @@ class Pipeline(Target):
             for s in project.samples:
                 if s.id in seqs_by_sid:
                     s.seq_info = seqs_by_sid[s.id]
+                    s.alignment_input = parse_reads_from_sequence(s.seq_info)
                 if s.id in cram_per_sid:
                     s.analysis_by_type[AnalysisType.CRAM] = cram_per_sid[s.id]
                 if s.id in gvcf_per_sid:
