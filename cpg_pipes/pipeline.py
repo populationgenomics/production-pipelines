@@ -532,7 +532,7 @@ class Sample(Target):
     """
     id: str
     external_id: str
-    project: 'Project'
+    project: Optional['Project'] = None
     good: bool = True
     alignment_input: Optional[AlignmentInput] = None
     seq_info: Optional[Sequence] = None
@@ -542,7 +542,7 @@ class Sample(Target):
         self, 
         id: str, 
         external_id: str, 
-        project: 'Project',
+        project: Optional['Project'] = None,
         participant_id: Optional[str] = None,
         meta: dict = None,
     ):
@@ -892,7 +892,8 @@ class Stage(Generic[TargetT], ABC):
         attributes = {}
         if isinstance(target, Sample):
             attributes['sample'] = target.id
-            attributes['project'] = target.project.name
+            if target.project:
+                attributes['project'] = target.project.name
         if isinstance(target, Project):
             attributes['sample'] = target.name
         return self.make_outputs(
