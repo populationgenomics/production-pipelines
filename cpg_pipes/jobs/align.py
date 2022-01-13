@@ -63,10 +63,10 @@ def bwamem2(*args, **kwargs):
 def align(
     b,
     alignment_input: AlignmentInput,
-    output_path: str,
     sample_name: str,
+    output_path: Optional[str] = None,
     project_name: Optional[str] = None,
-    aligner: Aligner = Aligner.BWA,
+    aligner: Aligner = Aligner.DRAGMAP,
     markdup_tool: MarkDupTool = MarkDupTool.PICARD,
     extra_label: Optional[str] = None,
     depends_on: Optional[List[Job]] = None,
@@ -93,7 +93,7 @@ def align(
     - fraction_of_64thread_instance can be set for smaller test runs on toy instance,
       so the job doesn't acquire a whole 32-cpu/64-threaded instance
     """
-    if check_existence and utils.can_reuse(output_path, overwrite):
+    if output_path and check_existence and utils.can_reuse(output_path, overwrite):
         job_name = aligner.name
         if extra_label:
             job_name += f' {extra_label}'
@@ -389,13 +389,11 @@ def extract_fastq(
     Job that converts a bam or a cram to a pair of compressed fastq files
     """
     j = b.new_job('Extract fastq', dict(sample=sample_name, project=project_name))
-    ncpu = 32
+    ncpu = 16
     nthreads = ncpu * 2  # multithreading
     j.cpu(ncpu)
     j.image(resources.SAMTOOLS_PICARD_IMAGE)
-
-    # 150G for input CRAM and 400G of extacted FASTQ
-    j.storage('600G')
+    j.storage('375G')
 
     reference = b.read_input_group(**resources.REF_D)
     cmd = f"""\

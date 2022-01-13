@@ -21,19 +21,18 @@ logger.setLevel(logging.INFO)
 
 def produce_gvcf(
     b: hb.Batch,
-    output_path: str,
     sample_name: str,
     project_name: str,
     tmp_bucket: str,
     cram_path: str,
     crai_path: Optional[str] = None,
+    output_path: Optional[str] = None,
     number_of_intervals: Optional[int] = 1,
     intervals: Optional[hb.ResourceGroup] = None,
     overwrite: bool = True,
     check_existence: bool = True,
     depends_on: Optional[List[Job]] = None,
     smdb: Optional[SMDB] = None,
-    external_id: Optional[str] = None,
     dragen_mode: bool = False,
 ) -> Job:
     """
@@ -43,11 +42,13 @@ def produce_gvcf(
     HaplotypeCaller is run in an interval-based sharded way, with per-interval
     HaplotypeCaller jobs defined in a nested loop.
     """
-    if check_existence and utils.can_reuse(output_path, overwrite):
+    if output_path and check_existence and utils.can_reuse(output_path, overwrite):
         return b.new_job('Make GVCF [reuse]', dict(sample=sample_name, project=project_name))
 
     logger.info(
-        f'Submitting the variant calling jobs to write {output_path} for {sample_name}'
+        f'Submitting the variant calling jobs' + 
+        (f' to write {output_path}' if output_path else '') + 
+        ' for {sample_name}'
     )
 
     reference = b.read_input_group(
@@ -241,10 +242,10 @@ def merge_gvcfs_job(
 def postproc_gvcf(
     b: hb.Batch,
     gvcf_path: str,
-    output_path: str,
     sample_name: str,
     project_name: str,
     overwrite: bool,
+    output_path: Optional[str] = None,
     depends_on: Optional[List[Job]] = None,
 ) -> Job:
     """
@@ -255,7 +256,7 @@ def postproc_gvcf(
        from Hail about mismatched INFO annotations
     4. Renames the GVCF sample name to use CPG ID.
     """
-    if utils.can_reuse(output_path, overwrite):
+    if output_path and utils.can_reuse(output_path, overwrite):
         return b.new_job('Postproc GVCF [reuse]', dict(sample=sample_name, project=project_name))
 
     logger.info(f'Adding GVCF postproc job for sample {sample_name}, gvcf {gvcf_path}')
@@ -336,7 +337,8 @@ def postproc_gvcf(
 
     tabix -p vcf {j.output_gvcf['g.vcf.gz']}
     """)
-    b.write_output(j.output_gvcf, output_path.replace('.g.vcf.gz', ''))
+    if output_path:
+        b.write_output(j.output_gvcf, output_path.replace('.g.vcf.gz', ''))
     if depends_on:
         j.depends_on(*depends_on)
     return j
