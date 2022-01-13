@@ -13,5 +13,7 @@ dependencies:
   - pandas
   - google-cloud-sdk
   - google-cloud-storage
+  - google-cloud-secret-manager
+  - google-cloud-pubsub
   - gnomad
   - analysis-runner

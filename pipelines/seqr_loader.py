@@ -44,27 +44,25 @@ class CramStage(SampleStage):
         return f'{sample.project.get_bucket()}/cram/{sample.id}.cram'
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        if not sample.seq_info:
-            logger.critical(f'No sequence record for {sample.id}')
+        if not sample.alignment_input:
+            logger.critical(f'No alignment_input for {sample.id}')
             sys.exit(1)
         
-        from cpg_pipes.smdb import parse_reads_from_sequence
-        alignment_input = parse_reads_from_sequence(sample.seq_info)
-        if not alignment_input:
-            if not self.pipe.skip_samples_without_seq_input:
-                logger.critical(f'Could not find read data for sample {sample.id}')
-                sys.exit(1)
-            else:
-                logger.error(f'Could not find read data, skipping sample {sample.id}')
-                sample.project.samples = [
-                    s for s in sample.project.samples if s is not sample
-                ]
-                return self.make_outputs(sample)
+        # if not sample.alignment_input:
+        #     if not self.pipe.skip_samples_without_seq_input:
+        #         logger.critical(f'Could not find read data for sample {sample.id}')
+        #         sys.exit(1)
+        #     else:
+        #         logger.error(f'Could not find read data, skipping sample {sample.id}')
+        #         sample.project.samples = [
+        #             s for s in sample.project.samples if s is not sample
+        #         ]
+        #         return self.make_outputs(sample)
 
         expected_path = self.expected_result(sample)
-        cram_job = align.bwa(
+        cram_job = align.align(
             b=self.pipe.b,
-            alignment_input=alignment_input,
+            alignment_input=sample.alignment_input,
             output_path=expected_path,
             sample_name=sample.id,
             project_name=sample.project.name,
@@ -256,10 +254,8 @@ class VqsrStage(CohortStage):
             b=self.pipe.b,
             input_vcf_or_mt_path=siteonly_vcf_path,
             work_bucket=tmp_vqsr_bucket,
-            web_bucket=tmp_vqsr_bucket,
             gvcf_count=len(self.pipe.get_all_samples()),
             depends_on=inputs.get_jobs(),
-            scatter_count=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
             output_vcf_path=expected_path,
             use_as_annotations=self.pipe.config.get('use_as_vqsr', True),
             overwrite=not self.pipe.check_intermediate_existence,
