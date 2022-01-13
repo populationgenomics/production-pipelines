@@ -41,13 +41,19 @@ def make_joint_genotyping_jobs(
     depends_on: Optional[List[Job]] = None,
     smdb: Optional[SMDB] = None,
     tool: JointGenotyperTool = JointGenotyperTool.GnarlyGenotyper,
-    do_filter_excesshet: bool = True
+    do_filter_excesshet: bool = True,
+    scatter_count: int = resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
 ) -> Job:
     """
     Assumes all samples have a 'file' of 'type'='gvcf' in `samples_df`.
     Adds samples to the GenomicsDB and runs joint genotyping on them.
     Outputs a multi-sample VCF under `output_vcf_path`.
     """
+    if len(samples) == 0:
+        raise ValueError(
+            'Provided samples collection should contain at least one sample'
+        )
+    
     job_name = 'Joint genotyping'
     if utils.can_reuse([out_vcf_path, out_siteonly_vcf_path], overwrite):
         return b.new_job(f'{job_name} [reuse]')
@@ -58,10 +64,10 @@ def make_joint_genotyping_jobs(
     do_filter_excesshet = len(samples) >= 1000 and do_filter_excesshet
 
     genomicsdb_path_per_interval = dict()
-    for idx in range(resources.NUMBER_OF_GENOMICS_DB_INTERVALS):
+    for idx in range(scatter_count):
         genomicsdb_path_per_interval[idx] = join(
             genomicsdb_bucket,
-            f'interval_{idx}_outof_{resources.NUMBER_OF_GENOMICS_DB_INTERVALS}',
+            f'interval_{idx}_outof_{scatter_count}',
         )
     # Determining which samples to add. Using the first interval, so the assumption
     # is that all DBs have the same set of samples.
@@ -86,13 +92,13 @@ def make_joint_genotyping_jobs(
 
     intervals = split_intervals.get_intervals(
         b=b,
-        scatter_count=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
+        scatter_count=scatter_count,
     )
 
     import_gvcfs_job_per_interval = dict()
     if sample_names_to_add:
         logger.info(f'Queueing genomics-db-import jobs')
-        for idx in range(resources.NUMBER_OF_GENOMICS_DB_INTERVALS):
+        for idx in range(scatter_count):
             import_gvcfs_job, _ = _add_import_gvcfs_job(
                 b=b,
                 genomicsdb_gcs_path=genomicsdb_path_per_interval[idx],
@@ -104,7 +110,7 @@ def make_joint_genotyping_jobs(
                 sample_map_bucket_path=sample_map_bucket_path,
                 interval=intervals[f'interval_{idx}'],
                 interval_idx=idx,
-                number_of_intervals=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
+                number_of_intervals=scatter_count,
             )
             import_gvcfs_job_per_interval[idx] = import_gvcfs_job
     first_jobs = list(import_gvcfs_job_per_interval.values())
@@ -113,7 +119,7 @@ def make_joint_genotyping_jobs(
     siteonly_vcf_by_interval: Dict[int, hb.ResourceGroup] = dict()
 
     jc_tmp_bucket = f'{tmp_bucket}/joint_calling/{samples_hash}'
-    for idx in range(resources.NUMBER_OF_GENOMICS_DB_INTERVALS):
+    for idx in range(scatter_count):
         jc_vcf_path = f'{jc_tmp_bucket}/by_interval/interval_{idx}.vcf.gz'
         filt_jc_vcf_path = f'{jc_tmp_bucket}/by_interval_excess_het_filter/interval_{idx}.vcf.gz'
         siteonly_jc_vcf_path = f'{jc_tmp_bucket}/by_interval_site_only/interval_{idx}.vcf.gz'
@@ -124,7 +130,7 @@ def make_joint_genotyping_jobs(
             overwrite=overwrite,
             number_of_samples=len(sample_names_will_be_in_db),
             interval_idx=idx,
-            number_of_intervals=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
+            number_of_intervals=scatter_count,
             interval=intervals[f'interval_{idx}'],
             tool=tool,
             output_vcf_path=jc_vcf_path,

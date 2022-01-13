@@ -91,9 +91,8 @@ def make_vqsr_jobs(
     b: hb.Batch,
     input_vcf_or_mt_path: str,
     work_bucket: str,
-    web_bucket: str,
     gvcf_count: int,
-    scatter_count: int,
+    scatter_count: int = resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
     depends_on: Optional[List[Job]] = None,
     meta_ht_path: Optional[str] = None,
     hard_filter_ht_path: Optional[str] = None,
@@ -113,7 +112,6 @@ def make_vqsr_jobs(
     :param hard_filter_ht_path: if input_vcf_or_mt_path is a matrix table, this table 
            will be used as a list of samples to hard filter out
     :param work_bucket: bucket for intermediate files
-    :param web_bucket: bucket for plots and evaluation results (exposed via http)
     :param depends_on: job that the created jobs should only run after
     :param gvcf_count: number of input samples. Can't read from combined_mt_path as it
            might not be yet genereated the point of Batch job submission
@@ -192,7 +190,7 @@ def make_vqsr_jobs(
         
     intervals = split_intervals.get_intervals(
         b=b,
-        scatter_count=resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
+        scatter_count=scatter_count,
     )
 
     if input_vcf_or_mt_path.endswith('.mt'):
