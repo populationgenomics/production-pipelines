@@ -1,6 +1,6 @@
 from cpg_pipes import resources
 from cpg_pipes.pipeline import Pipeline, Sample
-from utils import PROJECT, SAMPLES, FULL_GVCF_BY_SID, SUBSET_GVCF_BY_SID, setup_env
+from .utils import PROJECT, SAMPLES, FULL_GVCF_BY_SID, SUBSET_GVCF_BY_SID, setup_env
 
 
 def make_gvcfs():

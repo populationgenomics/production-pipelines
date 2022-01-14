@@ -4,7 +4,9 @@ import time
 import unittest
 from os.path import join, basename
 
-from utils import BASE_BUCKET, PROJECT, SAMPLES, SUBSET_GVCF_BY_SID
+# Make sure utils are imported beforehand, so the environemnt
+# is set before cpg_pipes are imported
+from .utils import BASE_BUCKET, PROJECT, SAMPLES, SUBSET_GVCF_BY_SID
 
 from analysis_runner import dataproc
 

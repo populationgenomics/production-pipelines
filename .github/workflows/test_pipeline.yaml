@@ -25,4 +25,4 @@ jobs:
 
       - name: "Test pipelines"
         run: |
-          python -m unittest -v test/test_pipeline.py
+          python -m unittest tests/test_pipeline.py

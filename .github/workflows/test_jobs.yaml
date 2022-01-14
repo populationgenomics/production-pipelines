@@ -25,4 +25,4 @@ jobs:
 
       - name: "Test jobs"
         run: |
-          python -m unittest -v test/test_jobs.py
+          python -m unittest tests/test_jobs.py

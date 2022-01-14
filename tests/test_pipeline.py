@@ -1,4 +1,5 @@
 import shutil
+import sys
 import tempfile
 import time
 import unittest
@@ -6,7 +7,7 @@ from unittest.mock import patch
 
 # Make sure utils are imported beforehand, so the environemnt
 # is set before cpg_pipes are imported
-from utils import BASE_BUCKET, PROJECT, SAMPLES
+from .utils import BASE_BUCKET, PROJECT, SAMPLES
 
 from cpg_pipes import benchmark
 from cpg_pipes import resources
@@ -77,7 +78,9 @@ class TestPipeline(unittest.TestCase):
     
             # all job commands would be contained in this one print call:
             out = mock_print.call_args_list[0][0][0]
-            lines = out.split('\n')
+
+        sys.stdout.write(out)
+        lines = out.split('\n')
         
         def _cnt(item: str) -> int:
             """Number of lines that start with item"""
