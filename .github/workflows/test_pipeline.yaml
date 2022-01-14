@@ -22,10 +22,6 @@ jobs:
       - name: install gcloud
         uses: google-github-actions/setup-gcloud@master
 
-      - name: gcloud docker auth
-        run: |
-          gcloud auth configure-docker australia-southeast1-docker.pkg.dev
-
       - uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: test-env

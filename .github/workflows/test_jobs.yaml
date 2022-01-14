@@ -3,27 +3,33 @@ on: workflow_dispatch
 jobs:
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
     env:
-      DOCKER_BUILDKIT: 1
-      BUILDKIT_PROGRESS: plain
-      CLOUDSDK_CORE_DISABLE_PROMPTS: 1
-      DOCKER_IMAGE: australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:d9b6278802bd8f2e7c047848f625c6443c43c2a8-hail-0.2.73.devc6f6f09cec08
       GSA_KEY: ${{ secrets.GCP_SA_KEY }}
       HAIL_TOKEN: ${{ secrets.HAIL_TOKEN }}
     steps:
       - name: Check out repository code
         uses: actions/checkout@v2
 
-      - name: gcloud setup
-        uses: google-github-actions/setup-gcloud@master
+      - name: gcloud auth
+        uses: google-github-actions/auth@v0
         with:
-          project_id: "fewgenomes"
-          service_account_key: "${{ secrets.GCP_SA_KEY }}"
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
 
-      - name: gcloud docker auth
-        run: |
-          gcloud auth configure-docker australia-southeast1-docker.pkg.dev
+      # Install gcloud, `setup-gcloud` automatically picks up authentication from `auth`
+      - name: install gcloud
+        uses: google-github-actions/setup-gcloud@master
 
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: test-env
+          environment-file: environment-dev.yml
+          channels: conda-forge,cpg,defaults
+          channel-priority: true
+          python-version: 3.7
+    
       - name: "Test jobs"
         run: |
           python -m unittest tests/test_jobs.py
