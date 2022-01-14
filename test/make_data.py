@@ -1,5 +1,5 @@
 from cpg_pipes import resources
-from cpg_pipes.pipeline import Pipeline
+from cpg_pipes.pipeline import Pipeline, Sample
 from utils import PROJECT, SAMPLES, FULL_GVCF_BY_SID, SUBSET_GVCF_BY_SID, setup_env
 
 
@@ -18,7 +18,10 @@ def make_gvcfs():
     )
             
     jobs = []
-    for s in SAMPLES:
+    samples = [
+        Sample(s, s) for s in SAMPLES
+    ]
+    for s in samples:
         subset_j = pipeline.b.new_job(
             'Subset GVCF', dict(sample_name=s.id)
         )

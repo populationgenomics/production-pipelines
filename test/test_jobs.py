@@ -4,23 +4,18 @@ import time
 import unittest
 from os.path import join, basename
 
-# Make sure setup_env() is called before the imports, because the env vars
-# are required by the dataproc module on import time, and it's also imported 
-# by cpg_pipes
-from utils import setup_env
-setup_env()
+from utils import BASE_BUCKET, PROJECT, SAMPLES, SUBSET_GVCF_BY_SID
 
 from analysis_runner import dataproc
 
 from cpg_pipes import benchmark
 from cpg_pipes.jobs.align import align, Aligner
 from cpg_pipes.jobs.haplotype_caller import produce_gvcf
-from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs
+from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
+    JointGenotyperTool
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
-from cpg_pipes.pipeline import Pipeline
+from cpg_pipes.pipeline import Pipeline, Sample
 from cpg_pipes import utils, resources
-
-from utils import BASE_BUCKET, PROJECT, SAMPLES, SUBSET_GVCF_BY_SID
 
 
 class TestJobs(unittest.TestCase):
@@ -130,18 +125,19 @@ class TestJobs(unittest.TestCase):
         genomicsdb_bucket = f'{self.out_bucket}/genomicsdb'
         out_vcf_path = f'{self.out_bucket}/joint-called.vcf.gz'
         out_siteonly_vcf_path = out_vcf_path.replace('.vcf.gz', '-siteonly.vcf.gz')
-        
+
         j = make_joint_genotyping_jobs(
             b=self.pipeline.b,
             out_vcf_path=out_vcf_path,
             out_siteonly_vcf_path=out_siteonly_vcf_path,
-            samples=SAMPLES,
+            samples=[Sample(s, s) for s in SAMPLES],
             genomicsdb_bucket=genomicsdb_bucket,
             gvcf_by_sid=SUBSET_GVCF_BY_SID,
             tmp_bucket=self.tmp_bucket,
             overwrite=True,
             local_tmp_dir=self.local_tmp_dir,
             scatter_count=10,
+            tool=JointGenotyperTool.GenotypeGVCFs,
         )
         test_result_path = self._job_get_gvcf_header(j.output_vcf['vcf.gz'])
         self.pipeline.submit_batch(wait=True)     
@@ -155,7 +151,10 @@ class TestJobs(unittest.TestCase):
         """
         Test AS-VQSR
         """
-        siteonly_vcf_path = 'gs://cpg-fewgenomes-test/unittest/inputs/chr20/joint-called-siteonly.vcf.gz'
+        siteonly_vcf_path = (
+            'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
+            'joint-called-siteonly.vcf.gz'
+        )
         tmp_vqsr_bucket = f'{self.tmp_bucket}/vqsr'
         out_vcf_path = f'{self.out_bucket}/vqsr/vqsr.vcf.gz'
         j = make_vqsr_jobs(
@@ -173,14 +172,20 @@ class TestJobs(unittest.TestCase):
         self.assertTrue(utils.file_exists(out_vcf_path))
         contents = self._read_object_contents(res_path)
         self.assertEqual(8, len(contents.split()))  # site-only doesn't have any samples
-
+    
     def test_seqr_loader(self):
         """
         Assuming variants are called and VQSR'ed, tests loading
         into a matrix table and annotation for Seqr
         """
-        vcf_path = 'gs://cpg-fewgenomes-test/unittest/inputs/chr20/joint-called.vcf.gz'
-        vqsr_vcf_path = 'gs://cpg-fewgenomes-test/unittest/inputs/chr20/vqsr.vcf.gz'
+        vcf_path = (
+            'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
+            'joint-called.vcf.gz'
+        )
+        vqsr_vcf_path = (
+            'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
+            'vqsr.vcf.gz'
+        )
         
         cohort_mt_path = f'{self.out_bucket}/seqr_loader/cohort.mt'
         project_mt_path = f'{self.out_bucket}/seqr_loader/project.mt'
@@ -221,11 +226,3 @@ class TestJobs(unittest.TestCase):
         projectmt_to_es_j.depends_on(mt_to_projectmt_j)
         self.pipeline.submit_batch(wait=True)     
         self.assertTrue(utils.file_exists(project_mt_path))
-
-    def test_pipeline(self):
-        """
-        Mock:
-         - getting data from sample-metadata
-         - getting responses from hail batch
-         - file existence checks from gsutil
-        """
