@@ -40,7 +40,10 @@ def make_joint_genotyping_jobs(
     overwrite: bool,
     depends_on: Optional[List[Job]] = None,
     smdb: Optional[SMDB] = None,
-    tool: JointGenotyperTool = JointGenotyperTool.GnarlyGenotyper,
+    # Default to GenotypeGVCFs because Gnarly is a bit weird, e.g. it adds <NON_REF>
+    # variants with AC_adj annotations (other variants have AC):
+    # bcftools view gs://cpg-fewgenomes-test/unittest/inputs/chr20/gnarly/joint-called-siteonly.vcf.gz | zgrep 7105364
+    tool: JointGenotyperTool = JointGenotyperTool.GenotypeGVCFs,
     do_filter_excesshet: bool = True,
     scatter_count: int = resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
 ) -> Job:

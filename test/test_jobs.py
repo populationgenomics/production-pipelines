@@ -122,6 +122,7 @@ class TestJobs(unittest.TestCase):
         contents = self._read_object_contents(test_result_path)
         self.assertEqual(self.sample_name, contents.split()[-1])
 
+    @unittest.skip('Skip')
     def test_joint_calling(self):
         """
         Test joint variant calling
@@ -149,6 +150,7 @@ class TestJobs(unittest.TestCase):
         contents = self._read_object_contents(test_result_path)
         self.assertEqual(9 + len(SAMPLES), len(contents.split()))
 
+    @unittest.skip('Skip')
     def test_vqsr(self):
         """
         Test AS-VQSR
@@ -219,3 +221,11 @@ class TestJobs(unittest.TestCase):
         projectmt_to_es_j.depends_on(mt_to_projectmt_j)
         self.pipeline.submit_batch(wait=True)     
         self.assertTrue(utils.file_exists(project_mt_path))
+
+    def test_pipeline(self):
+        """
+        Mock:
+         - getting data from sample-metadata
+         - getting responses from hail batch
+         - file existence checks from gsutil
+        """
