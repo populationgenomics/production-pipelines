@@ -15,4 +15,5 @@ dependencies:
   - google-cloud-storage
   - gnomad
   - analysis-runner
-  - sample_metadata
+  - pip:
+    - sample_metadata
