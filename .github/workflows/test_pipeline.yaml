@@ -13,17 +13,15 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v2
 
-#      - name: gcloud setup
-#        uses: google-github-actions/setup-gcloud@master
-#        with:
-#          project_id: "fewgenomes"
-#          service_account_key: "${{ secrets.GCP_SA_KEY }}"
-  
       - id: gcloud auth
         uses: google-github-actions/auth@v0
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY }}'
-          
+
+      # Install gcloud, `setup-gcloud` automatically picks up authentication from `auth`
+      - name: install gcloud
+        uses: google-github-actions/setup-gcloud@master
+
       - name: gcloud docker auth
         run: |
           gcloud auth configure-docker australia-southeast1-docker.pkg.dev
