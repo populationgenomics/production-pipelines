@@ -1,7 +1,7 @@
-name: Test pipeline
+name: Test Pipeline
 on: [push]
 jobs:
-  test:
+  test_pipeline:
     runs-on: ubuntu-latest
     defaults:
       run:
