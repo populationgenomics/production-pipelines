@@ -3,11 +3,10 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
     env:
-      DOCKER_BUILDKIT: 1
-      BUILDKIT_PROGRESS: plain
-      CLOUDSDK_CORE_DISABLE_PROMPTS: 1
-      DOCKER_IMAGE: australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:d9b6278802bd8f2e7c047848f625c6443c43c2a8-hail-0.2.73.devc6f6f09cec08
       GSA_KEY: ${{ secrets.GCP_SA_KEY }}
       HAIL_TOKEN: ${{ secrets.HAIL_TOKEN }}
     steps:
@@ -23,6 +22,14 @@ jobs:
       - name: gcloud docker auth
         run: |
           gcloud auth configure-docker australia-southeast1-docker.pkg.dev
+
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: test-env
+          environment-file: environment-dev.yml
+          channels: conda-forge,bioconda,defaults
+          channel-priority: true
+          python-version: 3.7
 
       - name: "Test pipelines"
         run: |
