@@ -1148,13 +1148,14 @@ class Pipeline(Target):
 
         self.b: Batch = setup_batch(
             title, 
-            self.keep_scratch, 
-            self.tmp_bucket, 
-            self.analysis_project.stack, 
+            self.keep_scratch,
+            self.tmp_bucket,
+            self.analysis_project.stack,
             hail_billing_project
         )
 
         self.projects: List[Project] = []
+        self._db = None
         if input_projects:
             # Delaying importing smdb until here to allow using Pipeline
             # without sample-metadata dependency.
@@ -1279,7 +1280,7 @@ class Pipeline(Target):
 
         for project in self.projects:
             sample_ids = [s.id for s in project.samples]
-            
+
             seqs_by_sid = self._db.find_seq_by_sid(sample_ids)
 
             cram_per_sid = self._db.find_analyses_by_sid(
@@ -1428,7 +1429,7 @@ class Pipeline(Target):
 
             if last_stage_num and i > last_stage_num:
                 stage.skipped = True
-        
+
         # Second round - actually adding jobs from the stages.
         for i, stage in enumerate(self._stages_dict.values()):
             if not stage.skipped:
