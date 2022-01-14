@@ -27,7 +27,7 @@ jobs:
         with:
           activate-environment: test-env
           environment-file: environment-dev.yml
-          channels: conda-forge,bioconda,defaults
+          channels: conda-forge,cpg,defaults
           channel-priority: true
           python-version: 3.7
 
