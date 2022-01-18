@@ -25,6 +25,12 @@ def setup_env(
     dataset_gcp_project: str = PROJECT,
     access_level: str = 'test',
 ):
+    """
+    Make sure that setup_env() is called before importing cpg_pipes, because 
+    cpg_pipes imports analysis_runner.dataproc, which in turns requires
+    DATASET_GCP_PROJECT to be set on import time. Also, unittest doesn't pick
+    exported environment variables with EnvFile, so have to do it here.
+    """
     assert os.environ.get('HAIL_TOKEN')
     os.environ['DATASET'] = dataset
     os.environ['DATASET_GCP_PROJECT'] = dataset_gcp_project
@@ -34,7 +40,4 @@ def setup_env(
     os.environ['OUTPUT'] = 'unittests'
 
 
-# Make sure setup_env() is called before the imports, because the env vars
-# are required by the dataproc module on import time, and it's also
-# imported by cpg_pipes
 setup_env()

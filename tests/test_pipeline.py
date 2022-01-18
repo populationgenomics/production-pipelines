@@ -5,16 +5,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-# Make sure utils are imported beforehand, so the environemnt
-# is set before cpg_pipes are imported
-from .utils import BASE_BUCKET, PROJECT, SAMPLES
-
-from cpg_pipes import benchmark
-from cpg_pipes import resources
-from cpg_pipes.pipeline import Pipeline
-from pipelines.seqr_loader import CramStage, GvcfStage, JointGenotypingStage, \
-    VqsrStage, \
-    AnnotateCohortStage, AnnotateProjectStage, LoadToEsStage
+from .utils import setup_env, BASE_BUCKET, PROJECT, SAMPLES
 
 
 class TestPipeline(unittest.TestCase):
@@ -45,6 +36,12 @@ class TestPipeline(unittest.TestCase):
         have to initialize hail, which steals a few seconds from this test
         which is supposed to be quick.
         """
+        setup_env()
+        from pipelines import seqr_loader
+        from cpg_pipes import benchmark
+        from cpg_pipes import resources
+        from cpg_pipes.pipeline import Pipeline, find_stages_in_module
+
         pipeline = Pipeline(
             name=self._testMethodName,
             title=self._testMethodName,
@@ -55,21 +52,14 @@ class TestPipeline(unittest.TestCase):
             check_smdb_seq_existence=False,
             config=dict(output_projects=[PROJECT]),
         )
-        p = pipeline.add_project(PROJECT)
+        project = pipeline.add_project(PROJECT)
         for s_id in SAMPLES:
-            s = p.add_sample(s_id, s_id)
+            s = project.add_sample(s_id, s_id)
             s.alignment_input = benchmark.tiny_fq
-        
-        pipeline.set_stages([
-            CramStage,
-            GvcfStage,
-            JointGenotypingStage,
-            VqsrStage,
-            AnnotateCohortStage,
-            AnnotateProjectStage,
-            LoadToEsStage,
-        ])
-        
+
+        # Use seqr loader stages
+        pipeline.set_stages(find_stages_in_module(seqr_loader.__name__))
+
         with patch('builtins.print') as mock_print:
             pipeline.submit_batch(dry_run=True)
         

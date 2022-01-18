@@ -12,8 +12,8 @@ Problems with the currentl publicly shared somalier sites VCF:
 from os.path import join
 import logging
 from cpg_pipes import resources
+from cpg_pipes.hailbatch import wrap_command
 from cpg_pipes.pipeline import Pipeline
-from cpg_pipes.jobs import wrap_command
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -37,8 +37,9 @@ concat_j.image(resources.BCFTOOLS_IMAGE)
 concat_j.storage('1000G')
 concat_j.cpu(4)
 gnomad_vcf_paths = [
-    f'gs://gcp-public-data--gnomad/release/3.1.2/vcf/genomes/gnomad.genomes.v3.1.2.hgdp_tgp.chr{c}.vcf.bgz'
-    for c in [i + 1 for i in range(22)] + ['X', 'Y']
+    f'gs://gcp-public-data--gnomad/release/3.1.2/vcf/genomes/'
+    f'gnomad.genomes.v3.1.2.hgdp_tgp.chr{c}.vcf.bgz'
+    for c in [str(i + 1) for i in range(22)] + ['X', 'Y']
 ]
 gnomad_vcfs = [
     pipe.b.read_input(path) for path in gnomad_vcf_paths

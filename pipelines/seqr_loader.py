@@ -13,6 +13,7 @@ from typing import Optional, List
 import click
 import hail as hl
 import pandas as pd
+
 from analysis_runner import dataproc
 
 from cpg_pipes import utils, resources
@@ -23,41 +24,39 @@ from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.pipeline import Namespace, Pipeline, Sample, \
     SampleStage, Project, CohortStage, AnalysisType, ProjectStage, \
-    pipeline_click_options, StageInput, stage, StageOutput
+    pipeline_click_options, StageInput, stage, StageOutput, \
+    find_stages_in_module
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-def get_fingerprint_path(output_path) -> str:
-    if output_path.endswith('.cram'):
-        return output_path.replace('.cram', '.somalier')
-    if output_path.endswith('.g.vcf.gz'):
-        return output_path.replace('.g.vcf.gz', '.somalier')
-    raise ValueError('Only supporting CRAM or GVCF')
+class NoAlignmentInputError(Exception):
+    pass
 
 
 @stage(sm_analysis_type=AnalysisType.CRAM)
 class CramStage(SampleStage):
     def expected_result(self, sample: Sample):
-        return f'{sample.project.get_bucket()}/cram/{sample.id}.cram'
+        path = f'{sample.project.get_bucket()}/cram'
+        source_tag = sample.meta.get('source_tag')
+        if source_tag:
+            path = join(path, source_tag)
+        path = join(path, f'{sample.id}.cram')
+        return path
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         if not sample.alignment_input:
-            logger.critical(f'No alignment_input for {sample.id}')
-            sys.exit(1)
-        
-        # if not sample.alignment_input:
-        #     if not self.pipe.skip_samples_without_seq_input:
-        #         logger.critical(f'Could not find read data for sample {sample.id}')
-        #         sys.exit(1)
-        #     else:
-        #         logger.error(f'Could not find read data, skipping sample {sample.id}')
-        #         sample.project.samples = [
-        #             s for s in sample.project.samples if s is not sample
-        #         ]
-        #         return self.make_outputs(sample)
+            if self.pipe.skip_samples_without_seq_input:
+                logger.error(f'Could not find read data, skipping sample {sample.id}')
+                sample.active = False
+                return self.make_outputs(sample)  # return empty output
+            else:
+                raise NoAlignmentInputError(
+                    f'No alignment input found for {sample.id}. '
+                    f'Checked: Sequence entry and type=CRAM Analysis entry'
+                )
 
         expected_path = self.expected_result(sample)
         cram_job = align.align(
@@ -71,36 +70,46 @@ class CramStage(SampleStage):
             smdb=self.pipe.get_db(),
             prev_batch_jobs=self.pipe.prev_batch_jobs,
         )
-        
-        fp_job, fingerprint_path = pedigree.somalier_extact_job(
-            b=self.pipe.b,
-            sample=sample,
-            gvcf_or_cram_or_bam_path=expected_path,
-            overwrite=not self.pipe.check_intermediate_existence,
-            label='(CRAMs)',
-            depends_on=[cram_job],
-        )
-        
-        return self.make_outputs(sample, data=expected_path, jobs=[cram_job, fp_job])
+        return self.make_outputs(sample, data=expected_path, jobs=[cram_job])
 
 
 @stage(requires_stages=CramStage)
+class CramSomalierStage(SampleStage):
+    def expected_result(self, sample: Sample):
+        path = f'{sample.project.get_bucket()}/cram'
+        source_tag = sample.meta.get('source_tag')
+        if source_tag:
+            path = join(path, source_tag)
+        path = join(path, f'{sample.id}.somalier')
+        return path
+
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+        cram_path = inputs.as_path(target=sample, stage=CramStage)
+        expected_path = self.expected_result(sample)
+        fingerprint_job, fingerprint_path = pedigree.somalier_extact_job(
+            b=self.pipe.b,
+            sample=sample,
+            gvcf_or_cram_or_bam_path=cram_path,
+            out_fpath=expected_path,
+            overwrite=not self.pipe.check_intermediate_existence,
+            label='(CRAMs)',
+            depends_on=inputs.get_jobs(),
+        )
+        return self.make_outputs(sample, data=expected_path, jobs=[fingerprint_job])
+
+
+@stage(requires_stages=CramSomalierStage)
 class CramPedCheckStage(ProjectStage):
     def expected_result(self, project: Project):
         pass
 
     def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
-        cram_by_sid = inputs.as_path_by_target(stage=CramStage)
+        fp_by_sid = inputs.as_path_by_target(stage=CramSomalierStage)
 
-        fingerprint_path_by_sid = {
-            sid: get_fingerprint_path(cram_path)
-            for sid, cram_path in cram_by_sid.items()
-        }
-        
         j, somalier_samples_path, somalier_pairs_path = pedigree.add_pedigree_jobs(
             self.pipe.b,
             project,
-            input_path_by_sid=fingerprint_path_by_sid,
+            input_path_by_sid=fp_by_sid,
             overwrite=not self.pipe.check_intermediate_existence,
             fingerprints_bucket=join(self.pipe.analysis_bucket, 'fingerprints'),
             web_bucket=self.pipe.web_bucket,
@@ -123,7 +132,6 @@ class GvcfStage(SampleStage):
             path = join(path, source_tag)
         path = join(path, f'{sample.id}.g.vcf.gz')
         return path
-        # return f'{sample.project.get_bucket()}/gvcf/{sample.id}.g.vcf.gz'
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         cram_path = inputs.as_path(target=sample, stage=CramStage)
@@ -150,36 +158,46 @@ class GvcfStage(SampleStage):
             depends_on=inputs.get_jobs(),
             smdb=self.pipe.get_db(),
         )
-        fingerprint_job, fingerprint_path = pedigree.somalier_extact_job(
-            b=self.pipe.b,
-            sample=sample,
-            gvcf_or_cram_or_bam_path=expected_path,
-            overwrite=not self.pipe.check_intermediate_existence,
-            label='(GVCFs)',
-            depends_on=[gvcf_job],
-        )
-        return self.make_outputs(sample, data=expected_path, jobs=[gvcf_job, fingerprint_job])
+        return self.make_outputs(sample, data=expected_path, jobs=[gvcf_job])
 
 
 @stage(requires_stages=GvcfStage)
+class GvcfSomalierStage(SampleStage):
+    def expected_result(self, sample: Sample):
+        path = f'{sample.project.get_bucket()}/gvcf'
+        source_tag = sample.meta.get('source_tag')
+        if source_tag:
+            path = join(path, source_tag)
+        path = join(path, f'{sample.id}.somalier')
+        return path
+
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+        gvcf_path = inputs.as_path(target=sample, stage=GvcfStage)
+        expected_path = self.expected_result(sample)
+        fingerprint_job, fingerprint_path = pedigree.somalier_extact_job(
+            b=self.pipe.b,
+            sample=sample,
+            gvcf_or_cram_or_bam_path=gvcf_path,
+            out_fpath=expected_path,
+            overwrite=not self.pipe.check_intermediate_existence,
+            label='(GVCFs)',
+            depends_on=inputs.get_jobs(),
+        )
+        return self.make_outputs(sample, data=expected_path, jobs=[fingerprint_job])
+
+
+@stage(requires_stages=GvcfSomalierStage)
 class GvcfPedCheckStage(ProjectStage):
     def expected_result(self, project: Project):
         pass
 
     def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
-        gvcf_by_sid = inputs.as_path_by_target(stage=GvcfStage)
-        
-        fingerprint_path_by_sid = gvcf_by_sid
-        
-        # fingerprint_path_by_sid = {
-        #     sid: get_fingerprint_path(gvcf_path)
-        #     for sid, gvcf_path in gvcf_by_sid.items()
-        # }
+        fp_by_sid = inputs.as_path_by_target(stage=GvcfSomalierStage)
 
         j, somalier_samples_path, somalier_pairs_path = pedigree.add_pedigree_jobs(
             self.pipe.b,
             project,
-            input_path_by_sid=fingerprint_path_by_sid,
+            input_path_by_sid=fp_by_sid,
             overwrite=not self.pipe.check_intermediate_existence,
             fingerprints_bucket=join(self.pipe.analysis_bucket, 'fingerprints'),
             web_bucket=self.pipe.web_bucket,
@@ -319,7 +337,7 @@ class AnnotateProjectStage(ProjectStage):
         )
 
         # Make a list of project samples to subset from the entire matrix table
-        sample_ids = [s.id for s in project.samples]
+        sample_ids = [s.id for s in project.get_samples()]
         proj_tmp_bucket = project.get_tmp_bucket()
         subset_path = f'{proj_tmp_bucket}/seqr-samples.txt'
         with hl.hadoop_open(subset_path, 'w') as f:
@@ -375,6 +393,52 @@ class LoadToEsStage(ProjectStage):
         return self.make_outputs(project, jobs=[j])
 
 
+def make_pipeline(
+    input_projects: List[str],
+    output_projects: Optional[List[str]],
+    output_version: str,
+    skip_ped_checks: bool,  # pylint: disable=unused-argument
+    hc_shards_num: int,
+    use_gnarly: bool,
+    use_as_vqsr: bool,
+    **kwargs,
+) -> Pipeline:
+    """
+    Create seqr loader Pipeline
+    """
+    assert input_projects
+    title = f'Seqr loading: joint call from: {", ".join(input_projects)}'
+    if output_projects:
+        title += f', ES index for: {", ".join(output_projects)}'
+    title += f', version {output_version}'
+    
+    if not output_projects:
+        output_projects = input_projects
+    if not all(op in input_projects for op in output_projects):
+        raise click.BadParameter(
+            f'All output projects must be contained within the specified input '
+            f'projects. Input project: {input_projects}, output projects: '
+            f'{output_projects}'
+        )
+
+    pipeline = Pipeline(
+        name='seqr_loader',
+        title=title,
+        config=dict(
+            output_projects=output_projects,
+            skip_ped_checks=skip_ped_checks,
+            hc_shards_num=hc_shards_num,
+            use_gnarly=use_gnarly,
+            use_as_vqsr=use_as_vqsr,
+        ),
+        input_projects=input_projects,
+        output_version=output_version,
+        **kwargs,
+    )
+    pipeline.set_stages(find_stages_in_module(__name__))
+    return pipeline
+
+
 @stage(requires_stages=[CramStage])
 class SeqrMaps(ProjectStage):
     def expected_result(self, project: Project):
@@ -394,7 +458,7 @@ class SeqrMaps(ProjectStage):
         df = pd.DataFrame({
             'cpg_id': s.id,
             'individual_id': s.participant_id,
-        } for s in project.samples)
+        } for s in project.get_samples())
         df.to_csv(sample_map_path, sep=',', index=False, header=False)
 
         # IGV
@@ -403,7 +467,7 @@ class SeqrMaps(ProjectStage):
             'individual_id': s.participant_id,
             'cram_path': inputs.as_path(target=s, stage=CramStage),
             'cram_sample_id': s.id,
-        } for s in project.samples if inputs.as_path(target=s, stage=CramStage))
+        } for s in project.get_samples() if inputs.as_path(target=s, stage=CramStage))
         df.to_csv(igv_paths_path, sep='\t', index=False, header=False)
 
         logger.info(f'Seqr sample map: {sample_map_path}')
@@ -451,59 +515,8 @@ class SeqrMaps(ProjectStage):
     is_flag=True,
     help='Use allele-specific annotations for VQSR',
 )
-def main(
-    input_projects: List[str],
-    output_projects: Optional[List[str]],
-    output_version: str,
-    skip_ped_checks: bool,  # pylint: disable=unused-argument
-    hc_shards_num: int,
-    use_gnarly: bool,
-    use_as_vqsr: bool,
-    **kwargs,
-):  # pylint: disable=missing-function-docstring
-    assert input_projects
-    title = f'Seqr loading: joint call from: {", ".join(input_projects)}'
-    if output_projects:
-        title += f', ES index for: {", ".join(output_projects)}'
-    title += f', version {output_version}'
-    
-    if not output_projects:
-        output_projects = input_projects
-    if not all(op in input_projects for op in output_projects):
-        logger.critical(
-            f'All output projects must be contained within the specified input '
-            f'projects. Input project: {input_projects}, output projects: '
-            f'{output_projects}'
-        )
-        
-    pipeline = Pipeline(
-        name='seqr_loader',
-        title=title,
-        config=dict(
-            output_projects=output_projects,
-            skip_ped_checks=skip_ped_checks,
-            hc_shards_num=hc_shards_num,
-            use_gnarly=use_gnarly,
-            use_as_vqsr=use_as_vqsr,
-        ),
-        input_projects=input_projects,
-        output_version=output_version,
-        **kwargs,
-    )
-
-    pipeline.set_stages([
-        CramStage,
-        CramPedCheckStage,
-        GvcfStage,
-        GvcfPedCheckStage,
-        JointGenotypingStage,
-        VqsrStage,
-        AnnotateCohortStage,
-        AnnotateProjectStage,
-        LoadToEsStage,
-        SeqrMaps,
-    ])
-    
+def main(**kwargs):  # pylint: disable=missing-function-docstring
+    pipeline = make_pipeline(**kwargs)
     pipeline.submit_batch()
 
 

@@ -1,5 +1,5 @@
 import sys
-from os.path import join
+from os.path import join, dirname, pardir
 from typing import Optional, List, Tuple, Dict
 import logging
 
@@ -43,7 +43,7 @@ def add_pedigree_jobs(
     extract_jobs = []
     missing_input = []
     somalier_file_by_sample = dict()
-    for sample in project.samples:
+    for sample in project.get_samples():
         input_path = input_path_by_sid.get(sample.id)
         if input_path is None:
             missing_input.append(sample)
@@ -68,7 +68,7 @@ def add_pedigree_jobs(
     if len(missing_input) > 0:
         (logger.critical if not ignore_missing else logger.warning)(
             f'Could not find input for '
-            f'{len(missing_input)}/{len(project.samples)} samples'
+            f'{len(missing_input)}/{len(project.get_samples())} samples'
         )
         if not ignore_missing:
             sys.exit(1)
@@ -82,7 +82,7 @@ def add_pedigree_jobs(
     relate_j.memory('standard')  # ~ 4G/core ~ 4G
     # Size of one somalier file is 212K, so we add another G only if the number of
     # samples is >4k
-    relate_j.storage(f'{1 + len(project.samples) // 4000 * 1}G')
+    relate_j.storage(f'{1 + len(project.get_samples()) // 4000 * 1}G')
     if depends_on:
         extract_jobs.extend(depends_on)
     relate_j.depends_on(*extract_jobs)
@@ -90,7 +90,7 @@ def add_pedigree_jobs(
 
     ped_fpath = join(tmp_bucket, f'{project.name}.ped')
     datas = []
-    for sample in project.samples:
+    for sample in project.get_samples():
         datas.append(sample.get_ped_dict())
     df = pd.DataFrame(datas)
     df.to_csv(ped_fpath, sep='\t', index=False)
@@ -135,7 +135,7 @@ def add_pedigree_jobs(
     check_j.memory('standard')  # ~ 3.75G/core ~ 3.75G
 
     script_name = 'check_pedigree.py'
-    script_path = join(utils.SCRIPTS_DIR, script_name)
+    script_path = join(dirname(__file__), pardir, pardir, utils.SCRIPTS_DIR, script_name)
     with open(script_path) as f:
         script = f.read()
     # We do not wrap the command nicely to avoid breaking python indents of {script}
@@ -171,7 +171,7 @@ def somalier_extact_job(
         'Somalier extract' + (f' {label}' if label else ''),
         dict(sample=sample.id, project=sample.project.name),
     )
-    
+
     if not out_fpath:
         out_fpath = gvcf_or_cram_or_bam_path\
             .replace('.cram', '.somalier')\

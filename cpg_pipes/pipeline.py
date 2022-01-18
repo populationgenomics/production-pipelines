@@ -44,7 +44,9 @@ def main(**kwargs):
 """
 
 import functools
+import inspect
 import shutil
+import sys
 import tempfile
 from dataclasses import dataclass
 import logging
@@ -259,7 +261,31 @@ def stage(
         return decorator_stage
     else:
         return decorator_stage(_cls)
+
+
+def find_stages_in_module(module_name: str) -> List[StageDecorator]:
+    """
+    Get all declared stages in a module by its name
+    >>> pipeline = Pipeline()
+    >>> pipeline.set_stages(find_stages_in_module(__name__))
+    """
+    stages = []
+    for obj in vars(sys.modules[module_name]).values():
+        # @stage decorators are functions
+        if not inspect.isfunction(obj): 
+            continue
+        # decorators add "return" annotations
+        if 'return' not in obj.__annotations__: 
+            continue
+        try:
+            ret_name = obj.__annotations__['return'].__name__
+        except AttributeError:
+            continue
+        if ret_name == 'Stage':
+            stages.append(obj)
     
+    return stages
+
 
 StageOutputData = Union[str, hb.Resource, Dict[str, str], Dict[str, hb.Resource]]
 
@@ -532,8 +558,8 @@ class Sample(Target):
     """
     id: str
     external_id: str
-    project: Optional['Project'] = None
-    good: bool = True
+    project: 'Project'
+    active: bool = True
     alignment_input: Optional[AlignmentInput] = None
     seq_info: Optional[Sequence] = None
     pedigree: Optional[PedigreeInfo] = None
@@ -542,7 +568,7 @@ class Sample(Target):
         self, 
         id: str, 
         external_id: str, 
-        project: Optional['Project'] = None,
+        project: 'Project',
         participant_id: Optional[str] = None,
         meta: dict = None,
     ):
@@ -639,8 +665,8 @@ class Project(Target):
         """
         super().__init__()
         self.pipeline = pipeline
-        self.samples: List[Sample] = []
-        
+        self._samples: List[Sample] = []
+
         namespace = namespace or pipeline.namespace
         self.is_test = namespace != Namespace.MAIN
 
@@ -672,8 +698,14 @@ class Project(Target):
             project=self,
             meta=kwargs,
         )
-        self.samples.append(s)
+        self._samples.append(s)
         return s
+    
+    def get_samples(self, only_active: bool = True) -> List[Sample]:
+        """
+        Get project's samples. Inlcude only "active" samples, unless only_active
+        """
+        return [s for s in self._samples if (s.active or not only_active)]
 
 
 # Type variable to make sure a Stage subclass always matches the
@@ -866,7 +898,7 @@ class Stage(Generic[TargetT], ABC):
                 sample_ids = [sample.id]
             elif isinstance(target, Project):
                 project = cast(Project, target)
-                sample_ids = [s.id for s in project.samples]
+                sample_ids = [s.id for s in project.get_samples()]
             else:
                 pipe = cast(Pipeline, target)
                 sample_ids = pipe.get_all_sample_ids()
@@ -892,8 +924,7 @@ class Stage(Generic[TargetT], ABC):
         attributes = {}
         if isinstance(target, Sample):
             attributes['sample'] = target.id
-            if target.project:
-                attributes['project'] = target.project.name
+            attributes['project'] = target.project.name
         if isinstance(target, Project):
             attributes['sample'] = target.name
         return self.make_outputs(
@@ -928,9 +959,9 @@ class SampleStage(Stage[Sample], ABC):
         if not pipeline.projects:
             raise ValueError('No projects are found to run')
         for project in pipeline.projects:
-            if not project.samples:
+            if not project.get_samples():
                 raise ValueError(f'No samples are found to run in the project {project.name}')
-            for sample in project.samples:
+            for sample in project.get_samples():
                 sample_result = self._queue_jobs_with_checks(sample)
                 output_by_target[sample.unique_id] = sample_result
         return output_by_target
@@ -961,10 +992,10 @@ class PairStage(Stage, ABC):
         if not pipeline.projects:
             raise ValueError('No projects are found to run')
         for project in pipeline.projects:
-            if not project.samples:
+            if not project.get_samples():
                 raise ValueError(f'No samples are found to run in the project {project.name}')
-            for s1 in project.samples:
-                for s2 in project.samples:
+            for s1 in project.get_samples():
+                for s2 in project.get_samples():
                     if s1 == s2:
                         continue
                     pair = Pair(s1, s2)
@@ -1093,9 +1124,9 @@ class Pipeline(Target):
         self.output_version = output_version
         self.namespace = namespace
         self.check_intermediate_existence = check_intermediate_existence
+        self.skip_samples_without_seq_input = skip_samples_without_seq_input
         self.first_stage = first_stage
         self.last_stage = last_stage
-        self.skip_samples_without_seq_input = skip_samples_without_seq_input
         self.validate_smdb_analyses = validate_smdb_analyses
 
         if namespace == Namespace.TMP:
@@ -1178,13 +1209,14 @@ class Pipeline(Target):
         if stages_in_order:
             self.set_stages(stages_in_order)
 
-    def get_all_samples(self) -> List[Sample]:
+    def get_all_samples(self, only_active: bool = True) -> List[Sample]:
         """
         Gets a flat list of all samples from all projects.
+        Include only "active" samples (unless only_active is False)
         """
         all_samples = []
         for proj in self.projects:
-            all_samples.extend(proj.samples)
+            all_samples.extend(proj.get_samples(only_active))
         return all_samples
 
     def get_all_sample_ids(self) -> List[str]:
@@ -1218,7 +1250,7 @@ class Pipeline(Target):
         shutil.rmtree(self.local_tmp_dir)
         return None
 
-    def _populate_projects(
+    def _populate_samples(
         self,
         input_projects: List[str],
         namespace: Namespace,
@@ -1254,7 +1286,7 @@ class Pipeline(Target):
                 if forced_samples and s.id in forced_samples:
                     logger.info(f'Force rerunning sample {s.id} even if outputs exist')
                     s.forced = True
-    
+                
     def add_project(self, name: str, namespace: Optional[Namespace] = None) -> Project:
         project_by_name = {p.name: p for p in self.projects}
         if name in project_by_name:
@@ -1267,6 +1299,17 @@ class Pipeline(Target):
         )
         self.projects.append(p)
         return p
+    
+    def _populate_seq(self):
+        """
+        Queries Sequence entries for each sample
+        """
+        all_sample_ids = self.get_all_sample_ids()
+        seqs_by_sid = self._db.find_seq_by_sid(all_sample_ids)
+        for s in self.get_all_samples():
+            if s.id in seqs_by_sid:
+                s.seq_info = seqs_by_sid[s.id]
+                s.alignment_input = parse_reads_from_sequence(s.seq_info)
 
     def _populate_analysis(self, source_tag: Optional[str] = None):
         if self._db is None:
@@ -1279,9 +1322,7 @@ class Pipeline(Target):
         )
 
         for project in self.projects:
-            sample_ids = [s.id for s in project.samples]
-
-            seqs_by_sid = self._db.find_seq_by_sid(sample_ids)
+            sample_ids = [s.id for s in project.get_samples()]
 
             cram_per_sid = self._db.find_analyses_by_sid(
                 sample_ids=sample_ids,
@@ -1294,12 +1335,16 @@ class Pipeline(Target):
                 meta={'source': source_tag} if source_tag else None,
             )
 
-            for s in project.samples:
-                if s.id in seqs_by_sid:
-                    s.seq_info = seqs_by_sid[s.id]
-                    s.alignment_input = parse_reads_from_sequence(s.seq_info)
+            for s in project.get_samples():
                 if s.id in cram_per_sid:
                     s.analysis_by_type[AnalysisType.CRAM] = cram_per_sid[s.id]
+                    cram_path = cram_per_sid[s.id].output
+                    if cram_path:
+                        index_path = cram_path + '.crai'
+                        s.alignment_input = AlignmentInput(
+                            bam_or_cram_path=cram_path, 
+                            index_path=index_path
+                        )
                 if s.id in gvcf_per_sid:
                     s.analysis_by_type[AnalysisType.GVCF] = gvcf_per_sid[s.id]
 
@@ -1335,10 +1380,10 @@ class Pipeline(Target):
                             phenotype=phenotype or '0',
                         )
         for project in self.projects:
-            samples_with_ped = [s for s in project.samples if s.pedigree]
+            samples_with_ped = [s for s in project.get_samples() if s.pedigree]
             logger.info(
                 f'{project.name}: found pedigree info for {len(samples_with_ped)} '
-                f'samples out of {len(project.samples)}'
+                f'samples out of {len(project.get_samples())}'
             )
 
     def populate(
@@ -1349,13 +1394,13 @@ class Pipeline(Target):
         only_samples: Optional[List[str]] = None,
         ped_files: Optional[List[str]] = None,
         namespace: Optional[Namespace] = None,
-        forced_samples: List[str] = None
+        forced_samples: List[str] = None,
     ) -> None:
         """
         Finds input samples, analyses and sequences from the DB, 
         populates self.projects, adds pedigree information
         """
-        self._populate_projects(
+        self._populate_samples(
             input_projects=input_projects,
             skip_samples=skip_samples,
             only_samples=only_samples,
@@ -1363,6 +1408,7 @@ class Pipeline(Target):
             forced_samples=forced_samples,
             source_tag=source_tag,
         )
+        self._populate_seq()
         self._populate_analysis(source_tag=source_tag)
         if ped_files:
             self._populate_pedigree(ped_files)
@@ -1396,6 +1442,7 @@ class Pipeline(Target):
         """
         # Initializing stage objects
         stages = [cls(self) for cls in stages_classes]
+        logger.info(f'Setting stages: {", ".join(s.name for s in stages)}')
         for stage in stages:
             if stage.name in self._stages_dict:
                 raise ValueError(

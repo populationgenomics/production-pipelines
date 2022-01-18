@@ -27,8 +27,10 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
+# Default reference build.
 DEFAULT_REF = 'GRCh38'
 
+# Packages to install on a dataproc cluster, to use with the dataproc wrapper.
 DATAPROC_PACKAGES = [
     'cpg-pipes',
     'cpg-gnomad',
@@ -43,20 +45,34 @@ DATAPROC_PACKAGES = [
     'selenium',
 ]
 
+# Location of python scripts to be called directly from command line.
 SCRIPTS_DIR = 'scripts'
+
+# Location of Hail Query scripts, to use with the dataproc wrapper.
 QUERY_SCRIPTS_DIR = 'query_scripts'
+
+# This python package name.
 PACKAGE_DIR = package_name
 
 
 class Namespace(Enum):
-    TMP = 'tmp'
-    TEST = 'test'
-    MAIN = 'main'
+    """
+    CPG storage namespace. See for more details on storage policies:
+    https://github.com/populationgenomics/team-docs/tree/main/storage_policies#main-vs-test
+    """
+    MAIN = 'main'  # production runs: read from main, write to main
+    TEST = 'test'  # runs that make test data: read from test, write to test
+    TMP = 'tmp'    # read from test, write to tmp
 
 
 class AnalysisType(Enum):
-    """Types of analysis"""
+    """
+    Types of sample-metadata analysis. Corresponds to Analysis types:
+    https://github.com/populationgenomics/sample-metadata/blob/dev/models/enums/analysis.py#L4-L11
 
+    Re-defined in utils to allow using the class in type hints without 
+    importing sample-metadata.
+    """
     QC = 'qc'
     JOINT_CALLING = 'joint-calling'
     GVCF = 'gvcf'
@@ -67,12 +83,13 @@ class AnalysisType(Enum):
 @dataclass
 class Analysis:
     """
-    Represents the Analysis SampleMetadata DB entry.
+    Analysis SampleMetadata DB entry. 
 
-    Defined in utils to allow using the class in type hints 
-    without importing sample-metadata.
+    See sample-metadata for more details: https://github.com/populationgenomics/sample-metadata
+
+    Defined in utils to allow using the class in type hints without importing 
+    sample-metadata.
     """
-
     id: str
     type: str
     status: str
@@ -82,12 +99,13 @@ class Analysis:
 
 class Sequence:
     """
-    Represents the Sequence SampleMetadata DB entry
+    Sequence SampleMetadata DB entry.
 
-    Defined in utils to allow using the class in type hints 
-    without importing sample-metadata.
+    See sample-metadata for more details: https://github.com/populationgenomics/sample-metadata
+
+    Defined in utils to allow using the class in type hints without importing 
+    sample-metadata.
     """
-    
     def __init__(self, id, sample_id, meta, smdb):
         self.id = id
         self.sample_id = sample_id
@@ -101,7 +119,7 @@ class Sequence:
 
 def init_hail(name: str, local_tmp_dir: str = None):
     """
-    Initialize Hail and set up the directory for logs
+    Initialise Hail, and set up a local directory for logs.
     :param name: name to prefix the log file
     :param local_tmp_dir: local directory to write Hail logs
     :return:
@@ -131,7 +149,6 @@ def get_validation_callback(
     with a different suffix also exists (e.g. genomes.mt and genomes.metadata.ht)
     :return: a callback suitable for Click parameter initialization
     """
-
     def callback(_: click.Context, param: click.Option, value: Any):
         if value is None:
             return value
