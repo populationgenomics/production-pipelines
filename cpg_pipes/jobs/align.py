@@ -288,7 +288,7 @@ def _align_one(
                 sample_name=sample,
                 project_name=project,
             )
-            input_param = f'-1 {extract_j.output_interleaved_fq} --interleaved=1'
+            input_param = f'-1 {extract_j.fq1} -2 {extract_j.fq2}'
 
         else:
             files1, files2 = alignment_input.as_fq_inputs(b)
@@ -382,7 +382,8 @@ def extract_fastq(
     cram: hb.ResourceGroup,
     sample_name: str,
     project_name: Optional[str] = None,
-    output_interleaved_fq: Optional[str] = None,
+    output_fq1: Optional[str] = None,
+    output_fq2: Optional[str] = None,
 ) -> Job:
     """
     Job that converts a bam or a cram to an interleaved compressed fastq file
@@ -397,11 +398,13 @@ def extract_fastq(
     reference = b.read_input_group(**resources.REF_D)
     cmd = f"""\
     bazam -Xmx16g -Dsamjdk.reference_fasta={reference.base} \
-    -n{nthreads} -bam {cram.base} | gzip -c > {j.output_interleaved_fq}
+    -n{nthreads} -bam {cram.base} -r1 {j.fq1} -r2 {j.fq2}
     """
     j.command(wrap_command(cmd, monitor_space=True))
-    if output_interleaved_fq:
-        b.write_output(j.output_interleaved_fq, output_interleaved_fq)
+    if output_fq1 or output_fq2:
+        assert output_fq1 and output_fq2, (output_fq1, output_fq2)
+        b.write_output(j.fq1, output_fq1)
+        b.write_output(j.fq2, output_fq2)
     return j
 
 
