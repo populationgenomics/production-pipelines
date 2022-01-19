@@ -7,7 +7,7 @@ import setuptools
 
 setuptools.setup(
     name='cpg-pipes',
-    version='0.2.4',
+    version='0.2.5',
     description=(
         'Hail Batch pipelines for population genomics and rare deseases projects'  
     ),
