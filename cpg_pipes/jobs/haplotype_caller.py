@@ -306,6 +306,7 @@ def postproc_gvcf(
     }}
 
     GVCF=/io/batch/{sample_name}.g.vcf.gz
+    GVCF_NODP=/io/batch/{sample_name}-nodp.g.vcf.gz
     REBLOCKED=/io/batch/{sample_name}-reblocked.g.vcf.gz
 
     # Retrying copying to avoid google bandwidth limits
@@ -320,11 +321,24 @@ def postproc_gvcf(
 
     # Reindexing just to make sure the index is not corrupted
     bcftools index --tbi /io/batch/{sample_name}.g.vcf.gz
-    
+
+    # Remove INFO/DP field, which contradicts the FORMAT/DP, in the way that
+    # it has _all_ reads, not just variant-calling-usable reads. If we keep INFO/DP,
+    # ReblockGVCF would prioritize it over FORMAT/DP and change FORMAT/DP to INFO/DP
+    # in the resulting merged blocks. It would pick the highest INFO/DP when merging
+    # multiple blocks, so a variant in a small homopolymer region (surrounded by
+    # long DP=0 areas), that attracted piles of low-MQ reads with INFO/DP=1000
+    # will translate into a long GQ<20 block with the same FORMAT/DP=1000, 
+    # which is wrong, because most of this block has no reads.
+    bcftools view $GVCF \\
+    | bcftools annotate -x INFO/DP \\
+    | bcftools view -Oz -o $GVCF_NODP
+    tabix -p vcf $GVCF_NODP
+
     gatk --java-options "-Xms{mem_gb - 1}g" \\
     ReblockGVCF \\
     --reference /io/batch/{basename(ref_fasta)} \\
-    -V $GVCF \\
+    -V $GVCF_NODP \\
     -do-qual-approx \\
     -O $REBLOCKED \\
     --create-output-variant-index true
