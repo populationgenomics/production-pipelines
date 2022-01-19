@@ -535,10 +535,10 @@ def add_indels_variant_recalibrator_job(
     # however, for smaller datasets we take a standard instance, and for larger
     # ones we take a highmem instance
     if is_small_callset:
-        mem_gb = 60  # ~ 3.75G/core ~ 60G
+        mem_gb = 52  # 
         j.memory('standard')
     else:
-        mem_gb = 128  # ~ 8G/core ~ 128G
+        mem_gb = 104  # hail would allocate 104G
         j.memory('highmem')
     java_mem = mem_gb - 2
     j.storage(f'{disk_size}G')
@@ -622,10 +622,10 @@ def add_snps_variant_recalibrator_create_model_step(
     # however, for smaller datasets we take a standard instance, and for larger
     # ones we take a highmem instance
     if is_small_callset:
-        mem_gb = 60  # ~ 3.75G/core ~ 60G
+        mem_gb = 52  # 
         j.memory('standard')
     else:
-        mem_gb = 128  # ~ 8G/core ~ 128G
+        mem_gb = 104  # hail would allocate 104G
         j.memory('highmem')
     java_mem = mem_gb - 2
     j.storage(f'{disk_size}G')
@@ -777,10 +777,10 @@ def add_snps_variant_recalibrator_step(
     # however, for smaller datasets we take a standard instance, and for larger
     # ones we take a highmem instance
     if is_small_callset:
-        mem_gb = 60  # ~ 3.75G/core ~ 60G
+        mem_gb = 52  # 
         j.memory('standard')
     else:
-        mem_gb = 128  # ~ 8G/core ~ 128G
+        mem_gb = 104  # hail would allocate 104G
         j.memory('highmem')
     java_mem = mem_gb - 2
 
