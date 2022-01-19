@@ -184,6 +184,8 @@ def load_vqsr(
     ht = hl.split_multi_hts(ht)
     ht = ht.annotate(
         info=ht.info.annotate(**split_info_annotation(ht.info, ht.a_index)),
+    )
+    ht = ht.annotate(
         filters=ht.filters.union(hl.set([ht.info.AS_FilterStatus])),
     )
     ht.write(output_ht_path, overwrite=True)
