@@ -893,12 +893,15 @@ class Stage(Generic[TargetT], ABC):
             return None
 
         if self.pipe.validate_smdb_analyses:
+            project_name = None
             if isinstance(target, Sample):
                 sample = cast(Sample, target)
                 sample_ids = [sample.id]
+                project_name = sample.project.name
             elif isinstance(target, Project):
                 project = cast(Project, target)
                 sample_ids = [s.id for s in project.get_samples()]
+                project_name = project.name
             else:
                 pipe = cast(Pipeline, target)
                 sample_ids = pipe.get_all_sample_ids()
@@ -908,6 +911,7 @@ class Stage(Generic[TargetT], ABC):
                 completed_analysis=analysis,
                 analysis_type=self.analysis_type.value,
                 expected_output_fpath=expected_path,
+                project_name=project_name,
             )
         else:
             found_path = analysis.output
@@ -958,12 +962,16 @@ class SampleStage(Stage[Sample], ABC):
         output_by_target = dict()
         if not pipeline.projects:
             raise ValueError('No projects are found to run')
-        for project in pipeline.projects:
+        for project_i, project in enumerate(pipeline.projects):
+            logger.info(f'#{project_i}/{project.name}: queueing {self.name}')
             if not project.get_samples():
                 raise ValueError(f'No samples are found to run in the project {project.name}')
-            for sample in project.get_samples():
+            for sample_i, sample in enumerate(project.get_samples()):
+                logger.info(f'#{sample_i}/{sample.id}/{sample.external_id}: queueing {self.name}')
                 sample_result = self._queue_jobs_with_checks(sample)
                 output_by_target[sample.unique_id] = sample_result
+                logger.info('------')
+            logger.info('-#-#-#-')
         return output_by_target
 
 
@@ -1028,9 +1036,11 @@ class ProjectStage(Stage, ABC):
         output_by_target = dict()
         if not pipeline.projects:
             raise ValueError('No projects are found to run')
-        for project in pipeline.projects:
+        for project_i, project in enumerate(pipeline.projects):
+            logger.info(f'#{project_i}/{project.name}: queueing {self.name}')
             output_by_target[project.unique_id] = \
                 self._queue_jobs_with_checks(project)
+            logger.info('-#-#-#-')
         return output_by_target
 
 
@@ -1238,8 +1248,9 @@ class Pipeline(Target):
         if self.b:
             logger.info(f'Will submit {self.b.total_job_num} jobs:')
             for label, stat in self.b.labelled_jobs.items():
-                logger.info(f'  {label}: {stat["job_n"]} for '
-                            f'{len(stat["samples"])} samples')
+                logger.info(
+                    f'  {label}: {stat["job_n"]} for {len(stat["samples"])} samples'
+                )
             logger.info(f'  Other jobs: {self.b.other_job_num}')
 
             return self.b.run(
@@ -1328,11 +1339,13 @@ class Pipeline(Target):
                 sample_ids=sample_ids,
                 analysis_type=AnalysisType.CRAM.value,
                 meta={'source': source_tag} if source_tag else None,
+                project=project.name,
             )
             gvcf_per_sid = self._db.find_analyses_by_sid(
                 sample_ids=sample_ids,
                 analysis_type=AnalysisType.GVCF.value,
                 meta={'source': source_tag} if source_tag else None,
+                project=project.name,
             )
 
             for s in project.get_samples():
