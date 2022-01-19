@@ -11,14 +11,10 @@ DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/drive
 AR_REPO = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
 GATK_VERSION = '4.2.3.0'
 GATK_IMAGE = f'{AR_REPO}/gatk:{GATK_VERSION}'
-# GnarlyGenotyper is in Beta and crashes with NullPointerException when using the
-# official GATK docker, that's why we're using a separate image for it:
-GNARLY_IMAGE = f'{AR_REPO}/gnarly_genotyper:hail_ukbb_300K'
 BCFTOOLS_IMAGE = f'{AR_REPO}/bcftools:1.10.2--h4f4756c_2'
 SM_IMAGE = f'{AR_REPO}/sm-api:4.0.0'
-BWA_IMAGE = f'{AR_REPO}/bazam_bwa:v0'
+BIOINFO_IMAGE = f'{AR_REPO}/bioinformatics:v1-0'  # include aligners
 BWAMEM2_IMAGE = f'{AR_REPO}/bazam_bwamem2:v0'
-DRAGMAP_IMAGE = f'{AR_REPO}/dragmap:1.2.1'
 SAMTOOLS_PICARD_IMAGE = f'{AR_REPO}/picard_samtools:v0'
 SOMALIER_IMAGE = f'{AR_REPO}/somalier:latest'
 PEDDY_IMAGE = f'{AR_REPO}/peddy:0.4.8--pyh5e36f6f_0'

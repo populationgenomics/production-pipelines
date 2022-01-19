@@ -84,7 +84,8 @@ def align(
 
     - if the input is a cram/bam
       - for bwa or bwa-mem2, stream bazam -> bwa
-      - for dragmap, submit an extra job to extract a pair of fastqs from the cram/bam
+      - for dragmap, submit an extra job to extract a pair of fastqs from the cram/bam,
+        because dragmap can't read streamed files from bazam
 
     - if the markdup tool:
       - is biobambam2, stream the alignment or merging within the same job
@@ -134,8 +135,9 @@ def align(
             key = sample_name, jname 
             if prev_batch_jobs and key in prev_batch_jobs:
                 prevj = prev_batch_jobs[key]
-                logger.info(f'Job was run in the previous batch {prevj.batch_number}: '
-                            f'{key}')
+                logger.info(
+                    f'Job was run in the previous batch {prevj.batch_number}: {key}'
+                )
                 existing_sorted_bam_path = (
                     f'{prevj.hail_bucket}/batch/{prevj.batchid}/{prevj.job_number}/sorted_bam'
                 )
@@ -164,7 +166,7 @@ def align(
 
         merge_j = b.new_job('Merge BAMs', dict(sample=sample_name, project=project_name))
         merge_j.cpu(ncpu)
-        merge_j.image(resources.BWA_IMAGE)
+        merge_j.image(resources.BIOINFO_IMAGE)
         merge_j.storage(f'{storage_gb}G')
 
         align_cmd = f"""\
@@ -241,7 +243,7 @@ def _align_one(
     It leaves sorting and duplicate marking to the user, thus returns a command in
     a raw string in addition to the Job object.
     """
-    j = b.new_job(job_name, dict(sample=sample, project=project))
+    j = b.new_job(job_name, dict(sample=sample, project=project, label=job_name))
     nthreads = ncpu * 2  # multithreading
     j.cpu(ncpu)
     j.memory('standard')
@@ -253,7 +255,7 @@ def _align_one(
             index_exts = resources.BWAMEM2_INDEX_EXTS
         else:
             tool_name = 'bwa'
-            j.image(resources.BWA_IMAGE)
+            j.image(resources.BIOINFO_IMAGE)
             index_exts = resources.BWA_INDEX_EXTS
 
         bwa_reference = b.read_input_group(
@@ -270,10 +272,14 @@ def _align_one(
             tool_name=tool_name,
         )
     else:
-        j.image(resources.DRAGMAP_IMAGE)
-        # Allow for 400G of extacted FQ, 150G of output CRAMs,
-        # plus some tmp storage for sorting
+        j.image(resources.BIOINFO_IMAGE)
         j.storage(f'300G')
+        dragmap_index = b.read_input_group(
+            **{
+                k.replace('.', '_'): join(resources.DRAGMAP_INDEX_BUCKET, k)
+                for k in resources.DRAGMAP_INDEX_FILES
+            }
+        )
         prep_inp_cmd = ''
         if alignment_input.bam_or_cram_path:
             extract_j = extract_fastq(
@@ -282,7 +288,7 @@ def _align_one(
                 sample_name=sample,
                 project_name=project,
             )
-            input_param = f'-1 {extract_j.fq1} -2 {extract_j.fq2}'
+            input_param = f'-1 {extract_j.output_interleaved_fq} --interleaved=1'
 
         else:
             files1, files2 = alignment_input.as_fq_inputs(b)
@@ -298,12 +304,6 @@ def _align_one(
                 """
                 input_param = f'-1 reads.R1.fq.gz -2 reads.R2.fq.gz'
 
-        dragmap_index = b.read_input_group(
-            **{
-                k.replace('.', '_'): join(resources.DRAGMAP_INDEX_BUCKET, k)
-                for k in resources.DRAGMAP_INDEX_FILES
-            }
-        )
         align_cmd = f"""\
         {indent(dedent(prep_inp_cmd), ' '*8)}
         dragen-os -r {dragmap_index} {input_param} \\
@@ -382,31 +382,26 @@ def extract_fastq(
     cram: hb.ResourceGroup,
     sample_name: str,
     project_name: Optional[str] = None,
-    output_fq1: Optional[str] = None,
-    output_fq2: Optional[str] = None,
+    output_interleaved_fq: Optional[str] = None,
 ) -> Job:
     """
-    Job that converts a bam or a cram to a pair of compressed fastq files
+    Job that converts a bam or a cram to an interleaved compressed fastq file
     """
     j = b.new_job('Extract fastq', dict(sample=sample_name, project=project_name))
     ncpu = 16
     nthreads = ncpu * 2  # multithreading
     j.cpu(ncpu)
-    j.image(resources.SAMTOOLS_PICARD_IMAGE)
+    j.image(resources.BIOINFO_IMAGE)
     j.storage('375G')
 
     reference = b.read_input_group(**resources.REF_D)
     cmd = f"""\
-    samtools fastq -@{nthreads-1} {cram.base} --reference {reference.base} \\
-    -1 {j.fq1} -2 {j.fq2} -0 /dev/null -s /dev/null
-    # After converting to FQ, we don't need input CRAMs anymore:
-    rm {cram.base} {cram.index}
+    bazam -Xmx16g -Dsamjdk.reference_fasta={reference.base} \
+    -n{nthreads} -bam {cram.base} | gzip -c > {j.output_interleaved_fq}
     """
     j.command(wrap_command(cmd, monitor_space=True))
-    if output_fq1 or output_fq2:
-        assert output_fq1 and output_fq2, f'Both must be defined: fq1={output_fq1}, fq2={output_fq2}'
-        b.write_output(j.fq1, output_fq1)
-        b.write_output(j.fq2, output_fq2)
+    if output_interleaved_fq:
+        b.write_output(j.output_interleaved_fq, output_interleaved_fq)
     return j
 
 
@@ -423,7 +418,7 @@ def create_dragmap_index(b: hb.Batch) -> Job:
         + '.dict',
     )
     j = b.new_job('Index DRAGMAP')
-    j.image(resources.DRAGMAP_IMAGE)
+    j.image(resources.BIOINFO_IMAGE)
     j.memory('standard')
     j.cpu(32)
     j.storage('40G')
