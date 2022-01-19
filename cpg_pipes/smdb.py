@@ -170,6 +170,7 @@ class SMDB:
         self,
         sample_ids: Collection[str],
         analysis_type: str,
+        analysis_status: str = 'completed',
         project: Optional[str] = None,
         meta: Optional[Dict] = None
     ) -> Dict[str, Analysis]:
@@ -188,8 +189,9 @@ class SMDB:
             AnalysisQueryModel(
                 projects=[project],
                 sample_ids=sample_ids,
-                analysis_type=AnalysisType(analysis_type),
-                meta=meta or {}
+                type=AnalysisType(analysis_type),
+                status=AnalysisStatus(analysis_status),
+                meta=meta or {},
             )
         )
 
@@ -197,10 +199,10 @@ class SMDB:
             a = _parse_analysis(data)
             if not a:
                 continue
-            if a.status == 'completed':
-                assert a.type == analysis_type, data
-                assert len(a.sample_ids) == 1, data
-                analysis_per_sid[list(a.sample_ids)[0]] = a
+            assert a.status == 'completed', data
+            assert a.type == analysis_type, data
+            assert len(a.sample_ids) == 1, data
+            analysis_per_sid[list(a.sample_ids)[0]] = a
         return analysis_per_sid
 
     def make_sm_in_progress_job(self, *args, **kwargs) -> Job:
@@ -222,7 +224,7 @@ class SMDB:
     def make_sm_update_status_job(
         self,
         b: Batch,
-        analysis_id: str,
+        analysis_id: int,
         analysis_type: str,
         status: str,
         sample_name: Optional[str] = None,
@@ -257,7 +259,7 @@ class SMDB:
         aapi = AnalysisApi()
         try:
             aapi.update_analysis_status(
-                analysis_id='{analysis_id}',
+                analysis_id={analysis_id},
                 analysis_update_model=AnalysisUpdateModel(
                     status=AnalysisStatus('{status}')
                 ),
@@ -276,6 +278,7 @@ class SMDB:
         type_: str,
         status: str,
         sample_ids: Collection[str],
+        project_name: Optional[str] = None,
     ) -> Optional[int]:
         """
         Tries to create an Analysis entry, returns its id if successfuly
@@ -291,7 +294,7 @@ class SMDB:
         )
         try:
             aid = self.aapi.create_new_analysis(
-                project=self.analysis_project, analysis_model=am
+                project=project_name or self.analysis_project, analysis_model=am
             )
         except ApiException:
             traceback.print_exc()
@@ -306,6 +309,7 @@ class SMDB:
         completed_analysis: Optional[Analysis],
         analysis_type: str,
         expected_output_fpath: str,
+        project_name: Optional[str] = None,
     ) -> Optional[str]:
         """
         Checks whether existing analysis exists, and output matches the expected output
@@ -319,6 +323,7 @@ class SMDB:
         :param analysis_type: cram, gvcf, joint_calling
         :param expected_output_fpath: where the pipeline expects the analysis output file
             to sit on the bucket (will invalidate the analysis if it doesn't match)
+        :param project_name: project name to create new analysis in
         :return: path to the output if it can be reused, otherwise None
         """
         label = f'type={analysis_type}'
@@ -379,6 +384,7 @@ class SMDB:
                 output=expected_output_fpath,
                 status='completed',
                 sample_ids=sample_ids,
+                project_name=project_name,
             )
             return expected_output_fpath
 
@@ -410,6 +416,7 @@ class SMDB:
             output=output_path,
             status='queued',
             sample_ids=sample_names,
+            project_name=project_name,
         )
         # 2. Queue a job that updates the status to "in-progress"
         sm_in_progress_j = self.make_sm_in_progress_job(
@@ -450,7 +457,7 @@ def _parse_analysis(data: Dict) -> Optional[Analysis]:
         logger.error(f'Analysis data doesn\'t have status: {data}')
         return None
     a = Analysis(
-        id=data['id'],
+        id=int(data['id']),
         type=data['type'],
         status=data['status'],
         sample_ids=set(data.get('sample_ids', [])),

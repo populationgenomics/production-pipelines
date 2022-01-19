@@ -90,7 +90,7 @@ class Analysis:
     Defined in utils to allow using the class in type hints without importing 
     sample-metadata.
     """
-    id: str
+    id: int
     type: str
     status: str
     sample_ids: Set[str]
