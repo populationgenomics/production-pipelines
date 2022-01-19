@@ -12,11 +12,8 @@ from os.path import join
 import click
 import hail as hl
 from gnomad.utils.sparse_mt import split_info_annotation
-from gnomad.utils.filtering import add_filters_expr
-# from cpg_pipes import utils
 from lib.model.seqr_mt_schema import SeqrVariantSchema
 from lib.model.base_mt_schema import row_annotation, RowAnnotationOmit
-
 from cpg_pipes import utils
 
 logger = logging.getLogger(__file__)
@@ -94,14 +91,9 @@ def main(
     if utils.can_reuse(out_path, overwrite):
         mt = hl.read_matrix_table(out_path)
     else:
-        vqsr_ht = _load_vqsr(
+        vqsr_ht = load_vqsr(
             site_only_vqsr_vcf_path,
             output_ht_path=join(work_bucket, 'vqsr.ht'),
-            overwrite=overwrite,
-        )
-        vqsr_ht = _apply_vqsr_cutoffs(
-            vqsr_ht,
-            output_ht_path=join(work_bucket, 'vqsr_with_filters.ht'),
             overwrite=overwrite,
         )
         mt = annotate_vqsr(mt, vqsr_ht)
@@ -141,63 +133,26 @@ def annotate_vqsr(mt, vqsr_ht):
     annotates `mt` rows from `vqsr_ht`
     """
     mt = mt.annotate_rows(**vqsr_ht[mt.row_key])
+    
+    # vqsr_ht has info annotation split by allele; plus new AS-VQSR annotations
+    mt.annotate_rows(info=vqsr_ht[mt.row_key].info).entries().show()
+    
+    # populating filters which is outside of info
     mt = mt.annotate_rows(
-        score=vqsr_ht[mt.row_key].info.AS_VQSLOD,
-        positive_train_site=vqsr_ht[mt.row_key].info.POSITIVE_TRAIN_SITE,
-        negative_train_site=vqsr_ht[mt.row_key].info.NEGATIVE_TRAIN_SITE,
-        AS_culprit=vqsr_ht[mt.row_key].info.AS_culprit,
+        filters=mt.filters.union(vqsr_ht[mt.row_key].filters),
     )
-
-    mt = mt.annotate_rows(filters=mt.filters)
+    
     mt = mt.annotate_globals(**vqsr_ht.index_globals())
     return mt
 
 
-def _apply_vqsr_cutoffs(
-    vqsr_ht,
-    output_ht_path,
-    overwrite: bool = True,
-):
-    """
-    Generates variant soft-filters from VQSR scores: adds `mt.filters` row-level
-    field of type set with a value "VQSR" when the AS_VQSLOD is below the threshold
-    """
-    if utils.can_reuse(output_ht_path, overwrite):
-        return hl.read_table(output_ht_path)
-
-    ht = vqsr_ht
-
-    snp_cutoff_global = hl.struct(min_score=SNP_SCORE_CUTOFF)
-    indel_cutoff_global = hl.struct(min_score=INDEL_SCORE_CUTOFF)
-
-    filters = dict()
-    filters['VQSR'] = (
-        hl.is_missing(ht.info.AS_VQSLOD)
-        | (
-            hl.is_snp(ht.alleles[0], ht.alleles[1])
-            & (ht.info.AS_VQSLOD < snp_cutoff_global.min_score)
-        )
-        | (
-            ~hl.is_snp(ht.alleles[0], ht.alleles[1])
-            & (ht.info.AS_VQSLOD < indel_cutoff_global.min_score)
-        )
-    )
-    ht = ht.transmute(
-        filters=add_filters_expr(filters=filters),
-        info=ht.info,
-    )
-    ht.write(output_ht_path, overwrite=True)
-    ht = hl.read_table(output_ht_path)
-    return ht
-
-
-def _load_vqsr(
+def load_vqsr(
     site_only_vqsr_vcf_path,
     output_ht_path,
     overwrite: bool = False,
 ):
     """
-    Loads the VQSR'ed site-only VCF into a site-only hail table
+    Loads the VQSR'ed site-only VCF into a site-only hail table. Populates ht.filters
     """
     if utils.can_reuse(output_ht_path, overwrite):
         return hl.read_table(output_ht_path)
@@ -211,6 +166,7 @@ def _load_vqsr(
 
     ht = mt.rows()
 
+    # some numeric fields are loaded as strings, so converting them to ints and floats 
     ht = ht.annotate(
         info=ht.info.annotate(
             AS_VQSLOD=ht.info.AS_VQSLOD.map(hl.float),
@@ -221,13 +177,14 @@ def _load_vqsr(
                     x == '', hl.missing(hl.tarray(hl.tint32)), x.split(',').map(hl.int)
                 )
             ),
-        )
+        ),
     )
     unsplit_count = ht.count()
 
     ht = hl.split_multi_hts(ht)
     ht = ht.annotate(
         info=ht.info.annotate(**split_info_annotation(ht.info, ht.a_index)),
+        filters=ht.filters.union(hl.set([ht.info.AS_FilterStatus])),
     )
     ht.write(output_ht_path, overwrite=True)
     ht = hl.read_table(output_ht_path)
