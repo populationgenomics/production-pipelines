@@ -135,8 +135,8 @@ def annotate_vqsr(mt, vqsr_ht):
     mt = mt.annotate_rows(**vqsr_ht[mt.row_key])
     
     # vqsr_ht has info annotation split by allele; plus new AS-VQSR annotations
-    mt.annotate_rows(info=vqsr_ht[mt.row_key].info).entries().show()
-    
+    mt = mt.annotate_rows(info=vqsr_ht[mt.row_key].info)
+
     # populating filters which is outside of info
     mt = mt.annotate_rows(
         filters=mt.filters.union(vqsr_ht[mt.row_key].filters),
