@@ -113,7 +113,7 @@ class DifferentAlignerSetups(SampleStage):
 
         jobs = []
         for aligner in [Aligner.DRAGMAP, Aligner.BWA, Aligner.BWAMEM2]:
-            for markdup in [MarkDupTool.PICARD, MarkDupTool.BIOBAMBAM]:
+            for markdup in [MarkDupTool.PICARD]:
                 jobs.append(align(
                     self.pipe.b,
                     alignment_input=alignment_input,
@@ -122,7 +122,7 @@ class DifferentAlignerSetups(SampleStage):
                     output_path=f'{basepath}/{aligner.name}-{markdup.name}.bam',
                     aligner=aligner,
                     markdup_tool=markdup,
-                    extra_label=f'{aligner.name}-{markdup.name}',
+                    extra_label=f'dedup: {markdup.name}',
                     depends_on=inputs.get_jobs(),
                 ))
         return self.make_outputs(sample, jobs=jobs)
@@ -142,8 +142,8 @@ def main():
 
     p = pipeline.add_project('fewgenomes')
     p.add_sample(
-        id='NA12340',
-        external_id='NA12340',
+        id='NA12878',
+        external_id='NA12878',
         fastq_input=benchmark.na12878fq
     )
 

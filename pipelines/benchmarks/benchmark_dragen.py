@@ -6,8 +6,7 @@ import logging
 from cpg_pipes import benchmark
 from cpg_pipes.jobs.haplotype_caller import produce_gvcf
 from cpg_pipes.pipeline import Pipeline
-from cpg_pipes.jobs.align import Aligner, MarkDupTool, \
-    align
+from cpg_pipes.jobs.align import Aligner, align
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -28,11 +27,10 @@ def main():
         title='Benchmark DRAGMAP: full samples',
         check_smdb_seq_existence=False,
     )
-    tiny_inputs = {
-        'TINY_FQ': benchmark.tiny_fq,
-        'TINY_CRAM': benchmark.tiny_cram,
+    inputs = {
+        'NA12878': benchmark.na12878fq,
     }
-    for sample_name, inp in tiny_inputs.items():
+    for sample_name, inp in inputs.items():
         cram_path = f'{benchmark.BENCHMARK_BUCKET}/outputs/{sample_name}.cram'
         align_j = align(
             pipe.b,
@@ -41,8 +39,6 @@ def main():
             sample_name=sample_name,
             project_name='benchmark',
             aligner=Aligner.DRAGMAP,
-            markdup_tool=MarkDupTool.BIOBAMBAM,
-            extra_label='biobambam',
         )
         produce_gvcf(
             pipe.b,
@@ -50,13 +46,13 @@ def main():
             sample_name=sample_name,
             project_name='benchmark',
             cram_path=cram_path,
-            number_of_intervals=50,
+            number_of_intervals=10,
             tmp_bucket=join(benchmark.BENCHMARK_BUCKET, 'tmp'),
             depends_on=[align_j],
             smdb=pipe.get_db(),
             dragen_mode=True,
         )
-    
+
     pipe.submit_batch()
 
 
