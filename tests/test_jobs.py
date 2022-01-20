@@ -6,7 +6,9 @@ from os.path import join, basename
 
 # Make sure utils are imported beforehand, so the environemnt
 # is set before cpg_pipes are imported
-from .utils import BASE_BUCKET, PROJECT, SAMPLES, SUBSET_GVCF_BY_SID
+from typing import Dict
+
+from utils import BASE_BUCKET, PROJECT, SAMPLES, SUBSET_GVCF_BY_SID
 
 from analysis_runner import dataproc
 
@@ -16,7 +18,7 @@ from cpg_pipes.jobs.haplotype_caller import produce_gvcf
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
-from cpg_pipes.pipeline import Pipeline, Sample
+from cpg_pipes.pipeline import Pipeline
 from cpg_pipes import utils, resources
 
 
@@ -43,27 +45,30 @@ class TestJobs(unittest.TestCase):
     def tearDown(self) -> None:
         shutil.rmtree(self.local_tmp_dir)
 
-    def _read_object_contents(self, path):
+    def _read_file(self, path):
         local_tmp_dir = self.local_tmp_dir
         local_path = join(local_tmp_dir, basename(path))
         utils.gsutil_cp(path, local_path)
         with open(local_path) as f:
             return f.read().strip()
 
-    def _job_get_cram_sample_name(self, cram_path) -> str:
+    def _job_get_cram_details(self, cram_path, out_bucket) -> Dict[str, str]:
         """ 
-        Add job that gets sample name from CRAM file
+        Add job that gets details of a CRAM file
         """
         test_j = self.pipeline.b.new_job('Parse CRAM sample name')
         test_j.image(resources.SAMTOOLS_PICARD_IMAGE)
         sed = r's/.*SM:\([^\t]*\).*/\1/g'
-        test_j.command(
-            f'samtools view -H {cram_path}'
-            f' | grep \'^@RG\' | sed "{sed}" | uniq > {test_j.output}'
-        )
-        out_path = join(self.out_bucket, f'{self.sample_name}.out')
-        self.pipeline.b.write_output(test_j.output, out_path)
-        return out_path
+        fasta_reference = self.pipeline.b.read_input_group(**resources.REF_D)
+        test_j.command(f'samtools view -T {fasta_reference.base} -c {cram_path} > {test_j.reads_num}')
+        test_j.command(f'samtools view -T {fasta_reference.base} -c {cram_path} -f2 > {test_j.reads_num_mapped_in_proper_pair}')
+        test_j.command(f'samtools view -T {fasta_reference.base} -H {cram_path} | grep \'^@RG\' | sed "{sed}" | uniq > {test_j.sample_name}')
+        d = {}
+        for key in ['reads_num', 'reads_num_mapped_in_proper_pair', 'sample_name']:
+            out_path = join(out_bucket, f'{key}.out')
+            self.pipeline.b.write_output(test_j[key], out_path)
+            d[key] = out_path
+        return d
 
     def _job_get_gvcf_header(self, gvcf_path) -> str:
         """ 
@@ -78,26 +83,38 @@ class TestJobs(unittest.TestCase):
         out_path = join(self.out_bucket, f'{self.sample_name}.out')
         self.pipeline.b.write_output(test_j.output, out_path)
         return out_path
-
-    @unittest.skip('Skip')
+    
     def test_alignment(self):
         """
         Test alignment job
-        TODO: use Stage objects. Add mocks to connect stages.
         """
-        for inp in [benchmark.tiny_fq, benchmark.tiny_cram]:
-            with self.subTest(inp=inp):
-                j = align(
-                    self.pipeline.b,
-                    alignment_input=inp,
-                    sample_name=self.sample_name,
-                    project_name=PROJECT,
-                    aligner=Aligner.DRAGMAP,
-                )
-                test_result_path = self._job_get_cram_sample_name(j.output_cram.cram)
-                self.pipeline.submit_batch(wait=True)     
-                contents = self._read_object_contents(test_result_path)
-                self.assertEqual(self.sample_name, contents)
+        inp = benchmark.tiny_cram
+        j = align(
+            self.pipeline.b,
+            alignment_input=inp,
+            sample_name=self.sample_name,
+            project_name=PROJECT,
+            aligner=Aligner.DRAGMAP,
+        )
+        cram_details_paths = self._job_get_cram_details(
+            j.output_cram.cram, out_bucket=join(self.out_bucket, f'align')
+        )
+
+        self.pipeline.submit_batch(wait=True)     
+
+        self.assertEqual(
+            self.sample_name, 
+            self._read_file(cram_details_paths['sample_name'])
+        )
+        self.assertEqual(
+            283306,  # 276599,
+            self._read_file(cram_details_paths['reads_num']),
+        )
+        self.assertAlmostEqual(
+            273658,  # 271728, 
+            self._read_file(cram_details_paths['reads_num_mapped_in_proper_pair']),
+            delta=10
+        )
 
     @unittest.skip('Skip')
     def test_haplotype_calling(self):
@@ -116,7 +133,7 @@ class TestJobs(unittest.TestCase):
         )
         test_result_path = self._job_get_gvcf_header(j.output_gvcf['g.vcf.gz'])
         self.pipeline.submit_batch(wait=True)     
-        contents = self._read_object_contents(test_result_path)
+        contents = self._read_file(test_result_path)
         self.assertEqual(self.sample_name, contents.split()[-1])
 
     @unittest.skip('Skip')
@@ -128,11 +145,15 @@ class TestJobs(unittest.TestCase):
         out_vcf_path = f'{self.out_bucket}/joint-called.vcf.gz'
         out_siteonly_vcf_path = out_vcf_path.replace('.vcf.gz', '-siteonly.vcf.gz')
 
+        proj = self.pipeline.add_project(PROJECT)
+        for sid in SAMPLES:
+            proj.add_sample(sid, sid)
+
         j = make_joint_genotyping_jobs(
             b=self.pipeline.b,
             out_vcf_path=out_vcf_path,
             out_siteonly_vcf_path=out_siteonly_vcf_path,
-            samples=[Sample(s, s) for s in SAMPLES],
+            samples=self.pipeline.get_all_samples(),
             genomicsdb_bucket=genomicsdb_bucket,
             gvcf_by_sid=SUBSET_GVCF_BY_SID,
             tmp_bucket=self.tmp_bucket,
@@ -145,7 +166,7 @@ class TestJobs(unittest.TestCase):
         self.pipeline.submit_batch(wait=True)     
         self.assertTrue(utils.file_exists(out_vcf_path))
         self.assertTrue(utils.file_exists(out_siteonly_vcf_path))
-        contents = self._read_object_contents(test_result_path)
+        contents = self._read_file(test_result_path)
         self.assertEqual(9 + len(SAMPLES), len(contents.split()))
 
     @unittest.skip('Skip')
@@ -172,7 +193,7 @@ class TestJobs(unittest.TestCase):
         res_path = self._job_get_gvcf_header(j.output_vcf['vcf.gz'])
         self.pipeline.submit_batch(wait=True)     
         self.assertTrue(utils.file_exists(out_vcf_path))
-        contents = self._read_object_contents(res_path)
+        contents = self._read_file(res_path)
         self.assertEqual(8, len(contents.split()))  # site-only doesn't have any samples
     
     def test_seqr_loader(self):
