@@ -246,7 +246,7 @@ def _align_one(
     j = b.new_job(job_name, dict(sample=sample, project=project, label=job_name))
     nthreads = ncpu * 2  # multithreading
     j.cpu(ncpu)
-    j.memory('standard')
+    j.memory('highmem')
 
     if aligner in [Aligner.BWAMEM2, Aligner.BWA]:
         if aligner == Aligner.BWAMEM2:
