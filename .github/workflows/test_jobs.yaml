@@ -9,6 +9,7 @@ jobs:
     env:
       GSA_KEY: ${{ secrets.GCP_SA_KEY }}
       HAIL_TOKEN: ${{ secrets.HAIL_TOKEN }}
+      SEQR_ES_PASSWORD: ${{ secrets.SEQR_ES_PASSWORD }}
     steps:
       - name: Check out repository code
         uses: actions/checkout@v2

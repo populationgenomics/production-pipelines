@@ -8,6 +8,7 @@ Loads the matrix table into ES.
 
 import logging
 import math
+import os
 import subprocess
 import click
 import hail as hl
@@ -156,6 +157,9 @@ def _read_es_password(
     """
     Read a GCP secret storing the ES password
     """
+    password = os.environ.get('SEQR_ES_PASSWORD')
+    if password:
+        return password
     cmd = f'gcloud secrets versions access {version_id} --secret {secret_id} --project {project_id}'
     logger.info(cmd)
     return subprocess.check_output(cmd, shell=True).decode()
