@@ -1455,7 +1455,6 @@ class Pipeline(Target):
         """
         # Initializing stage objects
         stages = [cls(self) for cls in stages_classes]
-        logger.info(f'Setting stages: {", ".join(s.name for s in stages)}')
         for stage in stages:
             if stage.name in self._stages_dict:
                 raise ValueError(
@@ -1474,6 +1473,11 @@ class Pipeline(Target):
                 logger.info(f'Skipping stage {stage_name}')
                 continue
 
+            if last_stage_num is not None and i > last_stage_num:
+                stage.skipped = True
+                stage.required = False
+                continue
+
             for reqcls in stage.required_stages_classes:
                 assert reqcls.__name__ in self._stages_dict, (
                     reqcls.__name__, list(self._stages_dict.keys())
@@ -1487,8 +1491,7 @@ class Pipeline(Target):
                     )
                 stage.required_stages.append(reqstage)
 
-            if last_stage_num and i > last_stage_num:
-                stage.skipped = True
+        logger.info(f'Setting stages: {", ".join(s.name for s in stages if not s.skipped)}')
 
         # Second round - actually adding jobs from the stages.
         for i, stage in enumerate(self._stages_dict.values()):
