@@ -66,9 +66,11 @@ class CramStage(SampleStage):
             sample_name=sample.id,
             project_name=sample.project.name,
             overwrite=not self.pipe.check_intermediate_existence,
-            check_existence=False,
             smdb=self.pipe.get_db(),
             prev_batch_jobs=self.pipe.prev_batch_jobs,
+            number_of_shards_for_realignment=(
+                10 if sample.alignment_input.is_bam_or_cram() else None
+            )
         )
         return self.make_outputs(sample, data=expected_path, jobs=[cram_job])
 
@@ -154,7 +156,6 @@ class GvcfStage(SampleStage):
             number_of_intervals=hc_shards_num,
             tmp_bucket=self.pipe.tmp_bucket,
             overwrite=not self.pipe.check_intermediate_existence,
-            check_existence=False,
             depends_on=inputs.get_jobs(),
             smdb=self.pipe.get_db(),
         )
@@ -311,7 +312,10 @@ class AnnotateCohortStage(CohortStage):
             packages=utils.DATAPROC_PACKAGES,
             num_secondary_workers=50,
             job_name='Make MT and annotate cohort',
-            vep='GRCh38',
+            # default VEP initialization script (used with --vep) installs VEP=v95,
+            # but we need v105, so we use a modified vep-GRCh38.sh (with --init) from
+            # this repo: production-pipelines/vep/vep-GRCh38.sh
+            init=['gs://cpg-reference/vep/vep-GRCh38.sh'],  
             depends_on=inputs.get_jobs(),
         )
         return self.make_outputs(pipe, data=expected_path, jobs=[j])
@@ -411,7 +415,7 @@ def make_pipeline(
     if output_projects:
         title += f', ES index for: {", ".join(output_projects)}'
     title += f', version {output_version}'
-    
+
     if not output_projects:
         output_projects = input_projects
     if not all(op in input_projects for op in output_projects):
@@ -435,6 +439,7 @@ def make_pipeline(
         output_version=output_version,
         **kwargs,
     )
+
     pipeline.set_stages(find_stages_in_module(__name__))
     return pipeline
 

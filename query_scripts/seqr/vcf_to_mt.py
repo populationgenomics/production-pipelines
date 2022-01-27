@@ -106,7 +106,15 @@ def main(
     if utils.can_reuse(out_path, overwrite):
         mt = hl.read_matrix_table(out_path)
     else:
-        mt = hl.vep(mt, block_size=vep_block_size or 1000)
+        mt = hl.vep(
+            mt, 
+            block_size=vep_block_size or 1000,
+            # We are not starting the cluster with --vep, instead passing custom
+            # startup script with --init gs://cpg-reference/vep/vep-GRCh38.sh,
+            # so VEP_CONFIG_URI will not be set, thus need to provide config
+            # as a function parameter here:
+            config='file:///vep_data/vep-gcloud.json'
+        )
         if make_checkpoints:
             mt.write(out_path, overwrite=True)
             mt = hl.read_matrix_table(out_path)
@@ -147,8 +155,8 @@ def annotate_vqsr(mt, vqsr_ht):
 
 
 def load_vqsr(
-    site_only_vqsr_vcf_path,
-    output_ht_path,
+    site_only_vqsr_vcf_path: str,
+    output_ht_path: str,
     overwrite: bool = False,
 ):
     """
