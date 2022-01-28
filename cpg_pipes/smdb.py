@@ -77,13 +77,14 @@ class SMDB:
             input_proj_name = proj_name
             if namespace != Namespace.MAIN:
                 input_proj_name += '-test'
-            logger.info(f'Finding samples for project {input_proj_name}')
+            logger.info(f'Finding samples for project {input_proj_name}...')
             samples = self.sapi.get_samples(
                 body_get_samples_by_criteria_api_v1_sample_post={
                     'project_ids': [input_proj_name],
                     'active': True,
                 }
             )
+            logger.info(f'Finding samples for project {input_proj_name}: found {len(samples)}')
             
             participant_id_by_cpgid = self._get_participant_id_by_sid(proj_name)
             
@@ -183,7 +184,7 @@ class SMDB:
         analysis_per_sid: Dict[str, Analysis] = dict()
 
         logger.info(
-            f'Querying {analysis_type} analysis entries for project {project}'
+            f'Querying {analysis_type} analysis entries for project {project}...'
         )
         datas = self.aapi.query_analyses(
             AnalysisQueryModel(
@@ -203,6 +204,9 @@ class SMDB:
             assert a.type == analysis_type, data
             assert len(a.sample_ids) == 1, data
             analysis_per_sid[list(a.sample_ids)[0]] = a
+        logger.info(
+            f'Querying {analysis_type} analysis entries for project {project}: found {len(analysis_per_sid)}'
+        )
         return analysis_per_sid
 
     def make_sm_in_progress_job(self, *args, **kwargs) -> Job:
@@ -300,7 +304,7 @@ class SMDB:
             traceback.print_exc()
             return None
         else:
-            logger.info(f'Queueing {type_} analysis with ID: {aid}')
+            logger.info(f'Created analysis of type={type_}, status={status} with ID: {aid}')
             return aid
 
     def process_existing_analysis(

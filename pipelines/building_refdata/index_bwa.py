@@ -6,7 +6,7 @@ from os.path import join
 import os
 
 from cpg_pipes import resources
-from cpg_pipes.jobs import wrap_command
+from cpg_pipes.hailbatch import wrap_command
 
 AR_REPO = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
 BWAMEM2_IMAGE = f'{AR_REPO}/alignment:v4'
@@ -41,17 +41,8 @@ def _index_bwa_job(b: hb.Batch):
 
 def _test_bwa_job(b: hb.Batch):
     bwa_reference = b.read_input_group(
-        base=REF_FASTA,
-        fai=REF_FASTA + '.fai',
-        dict=REF_FASTA.replace('.fasta', '').replace('.fna', '').replace('.fa', '')
-        + '.dict',
-        sa=REF_FASTA + '.sa',
-        amb=REF_FASTA + '.amb',
-        bwt=REF_FASTA + '.bwt',
-        ann=REF_FASTA + '.ann',
-        pac=REF_FASTA + '.pac',
-        o123=REF_FASTA + '.0123',
-        bwa2bit64=REF_FASTA + '.bwt.2bit.64',
+        **resources.REF_D,
+        **{k: f'{resources.REF_FASTA}.{k}' for k in resources.BWA_INDEX_EXTS},
     )
 
     fq1 = b.read_input('gs://cpg-seqr-test/batches/test/tmp_fq')
@@ -70,7 +61,6 @@ def _test_bwa_job(b: hb.Batch):
     )
     sn = 'TEST'
     rg_line = f'@RG\\tID|:{sn}\\tSM:~{sn}'
-    # bwa index {reference.base}
     use_bazam = True
 
     sorted_bam = f'$(dirname {j.output_cram.cram})/sorted.bam'
