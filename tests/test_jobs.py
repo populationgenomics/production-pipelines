@@ -3,16 +3,13 @@ import tempfile
 import time
 import unittest
 from os.path import join, basename
-
-# Make sure utils are imported beforehand, so the environemnt
-# is set before cpg_pipes are imported
 from typing import Dict
-
-from utils import BASE_BUCKET, PROJECT, SAMPLES, SUBSET_GVCF_BY_SID
 
 from analysis_runner import dataproc
 
+from cpg_pipes.hailbatch import fasta_ref_resource
 from cpg_pipes import benchmark
+from cpg_pipes.jobs import vep
 from cpg_pipes.jobs.align import align, Aligner
 from cpg_pipes.jobs.haplotype_caller import produce_gvcf
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
@@ -20,6 +17,8 @@ from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.pipeline import Pipeline
 from cpg_pipes import utils, resources
+
+from utils import BASE_BUCKET, PROJECT, SAMPLES, SUBSET_GVCF_BY_SID
 
 
 class TestJobs(unittest.TestCase):
@@ -59,7 +58,7 @@ class TestJobs(unittest.TestCase):
         test_j = self.pipeline.b.new_job('Parse CRAM sample name')
         test_j.image(resources.SAMTOOLS_PICARD_IMAGE)
         sed = r's/.*SM:\([^\t]*\).*/\1/g'
-        fasta_reference = self.pipeline.b.read_input_group(**resources.REF_D)
+        fasta_reference = fasta_ref_resource(self.pipeline.b)
         test_j.command(f'samtools view -T {fasta_reference.base} -c {cram_path} > {test_j.reads_num}')
         test_j.command(f'samtools view -T {fasta_reference.base} -c {cram_path} -f2 > {test_j.reads_num_mapped_in_proper_pair}')
         test_j.command(f'samtools view -T {fasta_reference.base} -H {cram_path} | grep \'^@RG\' | sed "{sed}" | uniq > {test_j.sample_name}')
@@ -76,10 +75,8 @@ class TestJobs(unittest.TestCase):
         """
         test_j = self.pipeline.b.new_job('Parse GVCF sample name')
         test_j.image(resources.BCFTOOLS_IMAGE)
-        test_j.command(
-            f'bcftools view {gvcf_path}'
-            f' | awk \'/^#CHROM/ {{ print; exit }}\' > {test_j.output}'
-        )
+        test_j.command(f'bcftools query -l {gvcf_path} > {test_j.output}')
+
         out_path = join(self.out_bucket, f'{self.sample_name}.out')
         self.pipeline.b.write_output(test_j.output, out_path)
         return out_path
@@ -195,6 +192,20 @@ class TestJobs(unittest.TestCase):
         self.assertTrue(utils.file_exists(out_vcf_path))
         contents = self._read_file(res_path)
         self.assertEqual(8, len(contents.split()))  # site-only doesn't have any samples
+        
+    def test_vep(self):
+        site_only_vcf_path = (
+            'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
+            'vqsr.vcf.gz'
+        )
+        vep_vcf_path = f'{self.out_bucket}/vep/vep.vcf.gz'
+        vep.vep(
+            self.pipeline.b, 
+            vcf_path=site_only_vcf_path, 
+            out_vcf_path=vep_vcf_path,
+        )
+        self.pipeline.submit_batch(wait=True)     
+        self.assertTrue(utils.file_exists(vep_vcf_path))
     
     def test_seqr_loader(self):
         """
@@ -212,14 +223,17 @@ class TestJobs(unittest.TestCase):
         
         cohort_mt_path = f'{self.out_bucket}/seqr_loader/cohort.mt'
         project_mt_path = f'{self.out_bucket}/seqr_loader/project.mt'
-        
+
         cluster = dataproc.setup_dataproc(
             self.pipeline.b,
             cluster_name='Test seqr loader',
             max_age='1h',
             packages=utils.DATAPROC_PACKAGES,
             num_secondary_workers=10,
-            vep='GRCh38',            
+            # default VEP initialization script (used with --vep) installs VEP=v95,
+            # but we need v105, so we use a modified vep-GRCh38.sh (with --init) from
+            # this repo: production-pipelines/vep/vep-GRCh38.sh
+            init=['gs://cpg-reference/vep/vep-GRCh38.sh'], 
             scopes=['cloud-platform'],
         )
         vcf_to_mt_j = cluster.add_job(
