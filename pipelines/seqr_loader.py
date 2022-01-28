@@ -18,7 +18,7 @@ from analysis_runner import dataproc
 
 from cpg_pipes import utils, resources
 from cpg_pipes.jobs import align, split_intervals, haplotype_caller, \
-    pedigree
+    pedigree, vep
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
@@ -48,7 +48,7 @@ class CramStage(SampleStage):
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         if not sample.alignment_input:
-            if self.pipe.skip_samples_without_seq_input:
+            if self.pipe.skip_samples_without_first_stage_input:
                 logger.error(f'Could not find read data, skipping sample {sample.id}')
                 sample.active = False
                 return self.make_outputs(sample)  # return empty output
@@ -286,6 +286,25 @@ def get_anno_tmp_bucket(pipe: Pipeline):
     return join(pipe.tmp_bucket, 'mt')
 
 
+@stage(requires_stages=[VqsrStage])
+class VepStage(CohortStage):
+    def expected_result(self, pipe: Pipeline):
+        samples_hash = utils.hash_sample_ids(pipe.get_all_sample_ids())
+        expected_jc_vcf_path = f'{pipe.tmp_bucket}/joint_calling/{samples_hash}-vep.vcf.gz'
+        return expected_jc_vcf_path
+
+    def queue_jobs(self, pipe: Pipeline, inputs: StageInput) -> StageOutput:
+        vqsr_vcf_path = inputs.as_path(target=pipe, stage=VqsrStage)
+        expected_path = self.expected_result(pipe)
+        
+        j = vep.vep(
+            self.pipe.b, 
+            vcf_path=vqsr_vcf_path,
+            out_vcf_path=expected_path,
+        )
+        return self.make_outputs(pipe, data=expected_path, jobs=[j])
+
+
 @stage(requires_stages=[JointGenotypingStage, VqsrStage])
 class AnnotateCohortStage(CohortStage):
     def expected_result(self, pipe: Pipeline):
@@ -327,7 +346,7 @@ class AnnotateProjectStage(ProjectStage):
         return f'{self.pipe.analysis_bucket}/mt/{project.name}.mt'
 
     def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
-        output_projects = self.pipe.config.get('output_projects', self.pipe.projects)
+        output_projects = self.pipe.config.get('output_projects', self.pipe.get_projects())
         if project.stack not in output_projects:
             logger.info(
                 f'Skipping annotating project {project.stack} because it is not'
@@ -369,7 +388,7 @@ class LoadToEsStage(ProjectStage):
         return None
 
     def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
-        output_projects = self.pipe.config.get('output_projects', self.pipe.projects)
+        output_projects = self.pipe.config.get('output_projects', self.pipe.get_projects())
         if project.stack not in output_projects:
             logger.info(
                 f'Skipping loading project {project.stack} because it is not'
@@ -450,7 +469,7 @@ class SeqrMaps(ProjectStage):
         return None
 
     def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
-        output_projects = self.pipe.config.get('output_projects', self.pipe.projects)
+        output_projects = self.pipe.config.get('output_projects', self.pipe.get_projects())
         if project.stack not in output_projects:
             logger.info(
                 f'Skipping loading project {project.stack} because it is not'
