@@ -16,7 +16,7 @@ from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.pipeline import Sample
 from cpg_pipes.smdb import SMDB
-from cpg_pipes.hailbatch import wrap_command
+from cpg_pipes.hailbatch import wrap_command, fasta_ref_resource
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -48,13 +48,13 @@ def make_joint_genotyping_jobs(
     scatter_count: int = resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
 ) -> Job:
     """
-    Assumes all samples have a 'file' of 'type'='gvcf' in `samples_df`.
     Adds samples to the GenomicsDB and runs joint genotyping on them.
     Outputs a multi-sample VCF under `output_vcf_path`.
     """
     if len(samples) == 0:
         raise ValueError(
-            'Provided samples collection should contain at least one sample'
+            'Provided samples collection for joint calling should contain '
+            'at least one active sample'
         )
     
     job_name = 'Joint genotyping'
@@ -88,6 +88,7 @@ def make_joint_genotyping_jobs(
         samples=samples,
         tmp_bucket=tmp_bucket,
         gvcf_by_sid=gvcf_by_sid,
+        overwrite=True,
     )
     sample_ids = set(s.id for s in samples)
     assert sample_names_will_be_in_db == sample_ids
@@ -114,6 +115,7 @@ def make_joint_genotyping_jobs(
                 interval=intervals[f'interval_{idx}'],
                 interval_idx=idx,
                 number_of_intervals=scatter_count,
+                overwrite=overwrite,
             )
             import_gvcfs_job_per_interval[idx] = import_gvcfs_job
     first_jobs = list(import_gvcfs_job_per_interval.values())
@@ -206,8 +208,9 @@ def _samples_to_add_to_db(
     samples,
     tmp_bucket: str,
     gvcf_by_sid: Dict[str, str],
+    overwrite: bool = False,
 ) -> Tuple[Set[str], Set[str], Set[str], Set[str], bool, str]:
-    if utils.file_exists(join(genomicsdb_gcs_path, 'callset.json')):
+    if utils.can_reuse(join(genomicsdb_gcs_path, 'callset.json'), overwrite):
         # Checking if samples exists in the DB already
         genomicsdb_metadata = join(local_tmp_dir, f'callset-{interval_idx}.json')
         utils.gsutil_cp(
@@ -302,6 +305,7 @@ def _add_import_gvcfs_job(
     interval_idx: Optional[int] = None,
     number_of_intervals: int = 1,
     depends_on: Optional[List[Job]] = None,
+    overwrite: bool = False,
 ) -> Tuple[Optional[Job], Set[str]]:
     """
     Add GVCFs to a genomics database (or create a new instance if it doesn't exist)
@@ -321,8 +325,13 @@ def _add_import_gvcfs_job(
             )
     else:
         # Initiate new DB
-        genomicsdb_param = f'--genomicsdb-workspace-path {genomicsdb_gcs_path}'
         job_name = 'Creating GenomicsDB'
+
+        # callset_json = join(genomicsdb_gcs_path, 'callset.json')
+        # if utils.can_reuse(callset_json, overwrite):
+        #     b.new_job(job_name + ' [reuse]')
+
+        genomicsdb_param = f'--genomicsdb-workspace-path {genomicsdb_gcs_path}'
         if sample_names_to_remove:
             # Need to remove the existing database
             rm_cmd = f'gsutil -q rm -rf {genomicsdb_gcs_path}'
@@ -344,7 +353,9 @@ def _add_import_gvcfs_job(
     j.memory('lowmem')  # ~ 1G/core ~ 14.4G
     if depends_on:
         j.depends_on(*depends_on)
-
+        
+    # Not using --consolidate because https://github.com/broadinstitute/gatk/issues/7653
+        
     j.command(wrap_command(f"""\
     # We've seen some GenomicsDB performance regressions related to intervals, 
     # so we're going to pretend we only have a single interval
@@ -367,15 +378,13 @@ def _add_import_gvcfs_job(
     {rm_cmd}
 
     gatk --java-options -Xms{java_mem}g \\
-      GenomicsDBImport \\
-      {genomicsdb_param} \\
-      --batch-size 50 \\
-      -L {interval} \\
-      --sample-name-map {sample_map} \\
-      --reader-threads {ncpu} \\
-      --merge-input-intervals \\
-      --consolidate
-
+    GenomicsDBImport \\
+    {genomicsdb_param} \\
+    --batch-size 50 \\
+    -L {interval} \\
+    --sample-name-map {sample_map} \\
+    --reader-threads {ncpu} \\
+    --merge-input-intervals
     """, monitor_space=True, setup_gcp=True))
     return j, sample_names_will_be_in_db
 
@@ -420,14 +429,6 @@ def _add_joint_genotyper_job(
         })
 
     logger.info(job_name)
-    reference = b.read_input_group(
-        base=resources.REF_FASTA,
-        fai=resources.REF_FASTA + '.fai',
-        dict=resources.REF_FASTA.replace('.fasta', '')
-        .replace('.fna', '')
-        .replace('.fa', '')
-        + '.dict',
-    )
 
     j.image(resources.GATK_IMAGE)
     j.cpu(2)
@@ -437,6 +438,9 @@ def _add_joint_genotyper_job(
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
+
+    reference = fasta_ref_resource(b)
+
     cmd = f"""\
     gatk --java-options -Xms8g \\
     {tool.name} \\
