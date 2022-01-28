@@ -54,6 +54,14 @@ class AlignmentInput:
         assert self.fqs1 and self.fqs2, self
         return False
 
+    def get_fqs1(self) -> List[Union[str, hb.ResourceFile]]:
+        assert self.is_fastq()
+        return cast(List, self.fqs1)
+
+    def get_fqs2(self) -> List[Union[str, hb.ResourceFile]]:
+        assert self.is_fastq()
+        return cast(List, self.fqs2)
+
     def as_fq_inputs(self, b) -> Tuple[List[hb.Resource], List[hb.Resource]]:
         """
         Makes a pair of lists of ResourceFile objects for fqs1 and fqs2
