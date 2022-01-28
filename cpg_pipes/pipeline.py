@@ -170,12 +170,14 @@ def pipeline_click_options(function: Callable) -> Callable:
             help='Check that files in sequence.meta exist'
         ),
         click.option(
-            '--skip-samples-without-seq-input',
-            'skip_samples_without_seq_input',
+            '--skip-samples-without-first-stage-input',
+            'skip_samples_without_first_stage_input',
             default=False,
             is_flag=True,
-            help='If sequence.meta files for a sample don\'t exist, remove this sample '
-                 'instead of failing'
+            help='For the first not-skipped stage, if the input for a target does not'
+                 'exist, just skip this target instead of failing. E.g. if the first'
+                 'stage is CramStage, and sequence.meta files for a sample do not exist,'
+                 'remove this sample instead of failing.'
         ),
         click.option(
             '--check-intermediate-existence/--no-check-intermediate-existence',
@@ -393,7 +395,8 @@ class StageInput:
     An object of this class is passed to the public `queue_jobs` method of a Stage, 
     and can be used to query dependency files and jobs.
     """
-    def __init__(self):
+    def __init__(self, stage: 'Stage'):
+        self.stage = stage
         self._results_by_target_by_stage: Dict[str, Dict[str, StageOutput]] = {}
         self._jobs: List[Job] = []
 
@@ -401,22 +404,32 @@ class StageInput:
         """
         Add output from another stage run
         """
-        stage_name = output.stage.name
-        target_id = output.target.unique_id
-
-        if stage_name not in self._results_by_target_by_stage:
-            self._results_by_target_by_stage[stage_name] = dict()
-        self._results_by_target_by_stage[stage_name][target_id] = output
+        if output.target.active:
+            stage_name = output.stage.name
+            target_id = output.target.unique_id
+    
+            if stage_name not in self._results_by_target_by_stage:
+                self._results_by_target_by_stage[stage_name] = dict()
+            self._results_by_target_by_stage[stage_name][target_id] = output
 
     def _each(
         self, 
         fun: Callable,
         stage: StageDecorator,
     ):
+        if stage.__name__ not in self._results_by_target_by_stage:
+            raise ValueError(
+                f'No inputs from {stage.__name__} for {self.stage.name} found '
+                'after skipping targets with missing inputs. ' +
+                ('Check the logs if all samples were missing inputs from previous '
+                 'stages, and consider changing --first-stage'
+                    if self.stage.pipe.skip_samples_without_first_stage_input else '')
+            )
+
         return {
             trg: fun(result)
             for trg, result 
-            in self._results_by_target_by_stage[stage.__name__].items()
+            in self._results_by_target_by_stage.get(stage.__name__, {}).items()
         }
 
     def as_path_by_target(
@@ -541,6 +554,8 @@ class Target:
         self.analysis_by_type: Dict[AnalysisType, Analysis] = dict()
         # Whether to process even if outputs exist:
         self.forced = False
+        # If not set, exclude from the pipeline:
+        self.active = True
 
     @property
     @abstractmethod
@@ -559,7 +574,6 @@ class Sample(Target):
     id: str
     external_id: str
     project: 'Project'
-    active: bool = True
     alignment_input: Optional[AlignmentInput] = None
     seq_info: Optional[Sequence] = None
     pedigree: Optional[PedigreeInfo] = None
@@ -803,7 +817,7 @@ class Stage(Generic[TargetT], ABC):
         """
         Collects outputs from all dependencies and create input for this stage
         """
-        inputs = StageInput()
+        inputs = StageInput(self)
         for prev_stage in self.required_stages:
             for _, stage_output in prev_stage.output_by_target.items():
                 inputs.add_other_stage_output(stage_output)
@@ -834,11 +848,21 @@ class Stage(Generic[TargetT], ABC):
         elif self.required:
             reusable_paths = self._try_get_reusable_paths(target)
             if not reusable_paths:
-                raise ValueError(
-                    f'Stage {self.name} is required, but skipped and '
-                    f'cannot reuse outputs for {target.unique_id}'
-                )
-            return self.make_outputs(target=target, data=reusable_paths) 
+                if self.pipe.skip_samples_without_first_stage_input:
+                    logger.info(
+                        f'Stage {self.name} is skipped and required, however '
+                        f'--skip-samples-without-first-stage-input is set, so skipping '
+                        f'this target ({target.unique_id}).'
+                    )
+                    target.active = False
+                    return self.make_outputs(target=target) 
+                else:
+                    raise ValueError(
+                        f'Stage {self.name} is required, but skipped and '
+                        f'cannot reuse outputs for {target.unique_id}'
+                    )
+            else:
+                return self.make_outputs(target=target, data=reusable_paths) 
 
         else:
             # Stage is not needed, returning empty outputs
@@ -855,6 +879,7 @@ class Stage(Generic[TargetT], ABC):
         expected_output = self.expected_result(target)
 
         if self.analysis_type is not None:
+            # Checking the SMDB
             if not expected_output:
                 raise ValueError(
                     f'expected_result() returned None, but must return str '
@@ -867,11 +892,23 @@ class Stage(Generic[TargetT], ABC):
                     f'expected_result() returns a dict, won\'t check the SMDB for '
                     f'{self.name} on {target.unique_id}'
                 )
-            found_path = self._try_get_smdb_analysis(target, cast(str, expected_output))
-            if found_path and not self.pipe.validate_smdb_analyses:
-                return found_path
-
-        if self.required and expected_output and self.pipe.check_intermediate_existence:
+            validate = self.pipe.validate_smdb_analyses
+            if self.skipped and self.pipe.skip_samples_without_first_stage_input:
+                validate = False
+            
+            # found_path would be analysis.output from DB if it exists; if it doesn't,
+            # and validate_smdb_analyses=True, expected_output file would be checked:
+            found_path = self._try_get_smdb_analysis(
+                target, cast(str, expected_output), validate=validate
+            )
+            return found_path
+        
+        elif not self.pipe.check_intermediate_existence or not self.required:
+            # Do not need to check file existence:
+            return expected_output
+        
+        elif expected_output:
+            # Checking that expected output exists:
             if isinstance(expected_output, dict):
                 paths = list(expected_output.values())
             else:
@@ -880,7 +917,12 @@ class Stage(Generic[TargetT], ABC):
                 return expected_output
         return None
 
-    def _try_get_smdb_analysis(self, target: TargetT, expected_path: str) -> Optional[str]:
+    def _try_get_smdb_analysis(
+        self, 
+        target: TargetT, 
+        expected_path: str,
+        validate: bool,
+    ) -> Optional[str]:
         """
         Check if SMDB already has analysis, and invalidate it if the
         output for a stage doesn't exist
@@ -889,10 +931,8 @@ class Stage(Generic[TargetT], ABC):
             return None
 
         analysis = target.analysis_by_type.get(self.analysis_type)
-        if not analysis:
-            return None
 
-        if self.pipe.validate_smdb_analyses:
+        if validate:
             project_name = None
             if isinstance(target, Sample):
                 sample = cast(Sample, target)
@@ -913,8 +953,10 @@ class Stage(Generic[TargetT], ABC):
                 expected_output_fpath=expected_path,
                 project_name=project_name,
             )
-        else:
+        elif analysis:
             found_path = analysis.output
+        else:
+            found_path = None
         return found_path
 
     def _queue_reuse_job(
@@ -960,14 +1002,14 @@ class SampleStage(Stage[Sample], ABC):
 
     def add_to_the_pipeline(self, pipeline: 'Pipeline') -> Dict[str, StageOutput]:
         output_by_target = dict()
-        if not pipeline.projects:
-            raise ValueError('No projects are found to run')
-        for project_i, project in enumerate(pipeline.projects):
-            logger.info(f'#{project_i}/{project.name}: queueing {self.name}')
+        if not pipeline.get_projects():
+            raise ValueError('No active projects are found to run')
+        for project_i, project in enumerate(pipeline.get_projects()):
+            logger.info(f'{self.name}: #{project_i}/{project.name} {project}')
             if not project.get_samples():
-                raise ValueError(f'No samples are found to run in the project {project.name}')
+                raise ValueError(f'No active samples are found to run in the project {project.name}')
             for sample_i, sample in enumerate(project.get_samples()):
-                logger.info(f'#{sample_i}/{sample.id}/{sample.external_id}: queueing {self.name}')
+                logger.info(f'{self.name}: #{sample_i}/{sample.id}/{sample.external_id} {sample}')
                 sample_result = self._queue_jobs_with_checks(sample)
                 output_by_target[sample.unique_id] = sample_result
                 logger.info('------')
@@ -997,11 +1039,13 @@ class PairStage(Stage, ABC):
 
     def add_to_the_pipeline(self, pipeline: 'Pipeline') -> Dict[str, StageOutput]:
         output_by_target = dict()
-        if not pipeline.projects:
-            raise ValueError('No projects are found to run')
-        for project in pipeline.projects:
+        if not pipeline.get_projects():
+            raise ValueError('No active projects are found to run')
+        for project in pipeline.get_projects():
             if not project.get_samples():
-                raise ValueError(f'No samples are found to run in the project {project.name}')
+                raise ValueError(
+                    f'No active samples are found to run in the project {project.name}'
+                )
             for s1 in project.get_samples():
                 for s2 in project.get_samples():
                     if s1 == s2:
@@ -1034,10 +1078,10 @@ class ProjectStage(Stage, ABC):
 
     def add_to_the_pipeline(self, pipeline: 'Pipeline') -> Dict[str, StageOutput]:
         output_by_target = dict()
-        if not pipeline.projects:
-            raise ValueError('No projects are found to run')
-        for project_i, project in enumerate(pipeline.projects):
-            logger.info(f'#{project_i}/{project.name}: queueing {self.name}')
+        if not pipeline.get_projects():
+            raise ValueError('No active projects are found to run')
+        for project_i, project in enumerate(pipeline.get_projects()):
+            logger.info(f'{self.name}: #{project_i}/{project.name} {project}')
             output_by_target[project.unique_id] = \
                 self._queue_jobs_with_checks(project)
             logger.info('-#-#-#-')
@@ -1101,7 +1145,7 @@ class Pipeline(Target):
         previous_batch_id: Optional[str] = None,
         update_smdb_analyses: bool = False,
         check_smdb_seq_existence: bool = False,
-        skip_samples_without_seq_input: bool = False,
+        skip_samples_without_first_stage_input: bool = False,
         validate_smdb_analyses: bool = False,
         check_intermediate_existence: bool = True,
         hail_billing_project: Optional[str] = None,
@@ -1121,7 +1165,7 @@ class Pipeline(Target):
                 'Provide `input_projects`, or omit `stages_in_order` and call '
                 'pipeline.set_stages(stages_in_order) later.'
             )
-        
+
         super().__init__()
         if isinstance(namespace, str):
             namespace = Namespace(namespace)
@@ -1134,7 +1178,7 @@ class Pipeline(Target):
         self.output_version = output_version
         self.namespace = namespace
         self.check_intermediate_existence = check_intermediate_existence
-        self.skip_samples_without_seq_input = skip_samples_without_seq_input
+        self.skip_samples_without_first_stage_input = skip_samples_without_first_stage_input
         self.first_stage = first_stage
         self.last_stage = last_stage
         self.validate_smdb_analyses = validate_smdb_analyses
@@ -1188,14 +1232,14 @@ class Pipeline(Target):
         self.config = config or {}
 
         self.b: Batch = setup_batch(
-            title, 
-            self.keep_scratch,
-            self.tmp_bucket,
-            self.analysis_project.stack,
-            hail_billing_project
+            title=title, 
+            analysis_project_name=self.analysis_project.stack,
+            tmp_bucket=self.tmp_bucket,
+            keep_scratch=self.keep_scratch,
+            billing_project=hail_billing_project,
         )
 
-        self.projects: List[Project] = []
+        self._projects: List[Project] = []
         self._db = None
         if input_projects:
             # Delaying importing smdb until here to allow using Pipeline
@@ -1218,6 +1262,13 @@ class Pipeline(Target):
         self._stages_dict: Dict[str, Stage] = dict()
         if stages_in_order:
             self.set_stages(stages_in_order)
+            
+    def get_projects(self, only_active: bool = True) -> List[Project]:
+        """
+        Gets list of all projects. 
+        Include only "active" projects (unless only_active is False)
+        """
+        return [p for p in self._projects if (p.active or not only_active)]
 
     def get_all_samples(self, only_active: bool = True) -> List[Sample]:
         """
@@ -1225,7 +1276,7 @@ class Pipeline(Target):
         Include only "active" samples (unless only_active is False)
         """
         all_samples = []
-        for proj in self.projects:
+        for proj in self.get_projects(only_active=only_active):
             all_samples.extend(proj.get_samples(only_active))
         return all_samples
 
@@ -1299,7 +1350,7 @@ class Pipeline(Target):
                     s.forced = True
                 
     def add_project(self, name: str, namespace: Optional[Namespace] = None) -> Project:
-        project_by_name = {p.name: p for p in self.projects}
+        project_by_name = {p.name: p for p in self._projects}
         if name in project_by_name:
             logger.warning(f'Project {name} already exists')
             return project_by_name[name]
@@ -1308,7 +1359,7 @@ class Pipeline(Target):
             name=name,
             namespace=namespace or self.namespace,
         )
-        self.projects.append(p)
+        self._projects.append(p)
         return p
     
     def _populate_seq(self):
@@ -1332,7 +1383,7 @@ class Pipeline(Target):
             sample_ids=all_sample_ids,
         )
 
-        for project in self.projects:
+        for project in self.get_projects():
             sample_ids = [s.id for s in project.get_samples()]
 
             cram_per_sid = self._db.find_analyses_by_sid(
@@ -1392,7 +1443,7 @@ class Pipeline(Target):
                             }.get(sex, Sex.UNKNOWN),
                             phenotype=phenotype or '0',
                         )
-        for project in self.projects:
+        for project in self.get_projects():
             samples_with_ped = [s for s in project.get_samples() if s.pedigree]
             logger.info(
                 f'{project.name}: found pedigree info for {len(samples_with_ped)} '
