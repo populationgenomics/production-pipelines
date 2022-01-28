@@ -1,5 +1,5 @@
 import sys
-from os.path import join, dirname, pardir
+from os.path import join, dirname, pardir, basename
 from typing import Optional, List, Tuple, Dict
 import logging
 
@@ -77,7 +77,7 @@ def add_pedigree_jobs(
         'Somalier relate' + (f' {label}' if label else ''), 
         dict(project=project.name),
     )
-    relate_j.image(resources.SOMALIER_IMAGE)
+    relate_j.image(resources.BIOINFO_IMAGE)
     relate_j.cpu(1)
     relate_j.memory('standard')  # ~ 4G/core ~ 4G
     # Size of one somalier file is 212K, so we add another G only if the number of
@@ -182,7 +182,7 @@ def somalier_extact_job(
         j.name += ' [reuse]'
         return j, out_fpath
 
-    j.image(resources.SOMALIER_IMAGE)
+    j.image(resources.BIOINFO_IMAGE)
     j.memory('standard')
     if gvcf_or_cram_or_bam_path.endswith('.bam'):
         j.cpu(4)
@@ -209,20 +209,26 @@ def somalier_extact_job(
     if depends_on:
         j.depends_on(*depends_on)
 
-    sites = b.read_input(resources.SOMALIER_SITES)
-    reference = b.read_input_group(
-        base=resources.REF_FASTA,
-        fai=resources.REF_FASTA + '.fai',
-        dict=resources.REF_FASTA.replace('.fasta', '')
-        .replace('.fna', '')
-        .replace('.fa', '')
-        + '.dict',
+    ref_fasta = resources.REF_FASTA
+    ref_fai = resources.REF_FASTA + '.fai'
+    ref_dict = (
+        ref_fasta.replace('.fasta', '').replace('.fna', '').replace('.fa', '') + '.dict'
     )
-    j.command(wrap_command(f"""\
-    somalier extract -d extracted/ --sites {sites} -f {reference.base} \\
+
+    cmd = f"""\
+    # Copying reference data to avoid GCP bandwidth limits
+    retry gsutil cp {ref_fasta} /io/batch/{basename(ref_fasta)}
+    retry gsutil cp {ref_fai}   /io/batch/{basename(ref_fai)}
+    retry gsutil cp {ref_dict}  /io/batch/{basename(ref_dict)}
+    SITES=/io/batch/sites/{basename(resources.SOMALIER_SITES)}
+    retry gsutil cp {resources.SOMALIER_SITES} $SITES
+
+    somalier extract -d extracted/ --sites $SITES \\
+    -f /io/batch/{basename(ref_fasta)} \\
     {input_file['base']}
-    
+
     mv extracted/*.somalier {j.output_file}
-    """))
+    """
+    j.command(wrap_command(cmd, setup_gcp=True, define_retry_function=True))
     b.write_output(j.output_file, out_fpath)
     return j, out_fpath
