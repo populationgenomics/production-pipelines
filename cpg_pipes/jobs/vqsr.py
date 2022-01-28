@@ -21,6 +21,47 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
+# VQSR, when applying model, targets indel_filter_level and snp_filter_level
+# sensitivities. The tool matches them internally to a VQSLOD score cutoff 
+# based on the model's estimated sensitivity to a set of true variants.
+SNP_HARD_FILTER_LEVEL = 99.7
+INDEL_HARD_FILTER_LEVEL = 99.0
+
+SNP_RECALIBRATION_ANNOTATION_VALUES_AS = [
+    'AS_QD',
+    'AS_MQRankSum',
+    'AS_ReadPosRankSum',
+    'AS_FS',
+    'AS_SOR',
+    'AS_MQ',
+    'AS_VarDP',  # TODO: skip for exomes
+]
+INDEL_RECALIBRATION_ANNOTATION_VALUES_AS = [
+    'AS_FS',
+    'AS_ReadPosRankSum',
+    'AS_MQRankSum',
+    'AS_QD',
+    'AS_SOR',
+    'AS_VarDP',  # TODO: skip for exomes
+]
+SNP_RECALIBRATION_ANNOTATION_VALUES = [
+    'QD',
+    'MQRankSum',
+    'ReadPosRankSum',
+    'FS',
+    'MQ',
+    'SOR',
+    'DP',
+]
+INDEL_RECALIBRATION_ANNOTATION_VALUES = [
+    'FS',
+    'ReadPosRankSum',
+    'MQRankSum',
+    'QD',
+    'SOR',
+    'DP',
+]
+
 SNP_RECALIBRATION_TRANCHE_VALUES = [
     100.0,
     99.95,
@@ -34,24 +75,6 @@ SNP_RECALIBRATION_TRANCHE_VALUES = [
     98.0,
     97.0,
     90.0,
-]
-SNP_HARD_FILTER_LEVEL = 99.7
-SNP_RECALIBRATION_ANNOTATION_VALUES = [
-    'QD',
-    'MQRankSum',
-    'ReadPosRankSum',
-    'FS',
-    'MQ',
-    'SOR',
-    'DP',
-]
-SNP_RECALIBRATION_ANNOTATION_VALUES_AS = [
-    'AS_QD',
-    'AS_MQRankSum',
-    'AS_ReadPosRankSum',
-    'AS_FS',
-    'AS_SOR',
-    'AS_MQ',
 ]
 INDEL_RECALIBRATION_TRANCHE_VALUES = [
     100.0,
@@ -68,22 +91,6 @@ INDEL_RECALIBRATION_TRANCHE_VALUES = [
     92.0,
     91.0,
     90.0,
-]
-INDEL_HARD_FILTER_LEVEL = 99.7
-INDEL_RECALIBRATION_ANNOTATION_VALUES = [
-    'FS',
-    'ReadPosRankSum',
-    'MQRankSum',
-    'QD',
-    'SOR',
-    'DP',
-]
-INDEL_RECALIBRATION_ANNOTATION_VALUES_AS = [
-    'AS_FS',
-    'AS_SOR',
-    'AS_ReadPosRankSum',
-    'AS_MQRankSum',
-    'AS_QD',
 ]
 
 

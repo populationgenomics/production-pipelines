@@ -13,10 +13,3 @@ pca:
   max_kin: 0.2
   # minimum Random Forest probability for population assignment
   min_pop_prob: 0.5
-vqsr:
-  min_excess_het: 54.69
-  # VQSR, when applying model, targets indel_filter_level and snp_filter_level
-  # sensitivities. The tool matches them internally to a VQSLOD score cutoff 
-  # based on the model's estimated sensitivity to a set of true variants.
-  snp_filter_level: 99.7
-  indel_filter_level: 99.0

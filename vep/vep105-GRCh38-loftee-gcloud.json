@@ -8,6 +8,7 @@
     "--cache", "--offline",
     "--minimal",
     "--assembly", "GRCh38",
+    "--dir", "/opt/vep/.vep",
     "--fasta", "/opt/vep/.vep/homo_sapiens/105_GRCh38/Homo_sapiens.GRCh38.dna.toplevel.fa.gz",
     "--plugin", "LoF,loftee_path:/usr/local/share/ensembl-vep-105.0-0/,gerp_bigwig:/opt/vep/.vep/gerp_conservation_scores.homo_sapiens.GRCh38.bw,human_ancestor_fa:/opt/vep/.vep/human_ancestor.fa.gz,conservation_file:/opt/vep/.vep/loftee.sql",
     "--dir_plugins", "/usr/local/share/ensembl-vep-105.0-0/",
