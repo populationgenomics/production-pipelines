@@ -11,7 +11,7 @@ from typing import Optional, List, Collection, Dict, Tuple, Set, cast
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes import resources, utils
+from cpg_pipes import resources, utils, hailbatch
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.pipeline import Sample
@@ -88,7 +88,6 @@ def make_joint_genotyping_jobs(
         samples=samples,
         tmp_bucket=tmp_bucket,
         gvcf_by_sid=gvcf_by_sid,
-        overwrite=True,
     )
     sample_ids = set(s.id for s in samples)
     assert sample_names_will_be_in_db == sample_ids
@@ -108,14 +107,12 @@ def make_joint_genotyping_jobs(
                 genomicsdb_gcs_path=genomicsdb_path_per_interval[idx],
                 sample_names_to_add=sample_names_to_add,
                 sample_names_to_skip=sample_names_already_added,
-                sample_names_to_remove=sample_names_to_remove,
                 sample_names_will_be_in_db=sample_names_will_be_in_db,
                 updating_existing_db=updating_existing_db,
                 sample_map_bucket_path=sample_map_bucket_path,
                 interval=intervals[f'interval_{idx}'],
                 interval_idx=idx,
                 number_of_intervals=scatter_count,
-                overwrite=overwrite,
             )
             import_gvcfs_job_per_interval[idx] = import_gvcfs_job
     first_jobs = list(import_gvcfs_job_per_interval.values())
@@ -208,9 +205,8 @@ def _samples_to_add_to_db(
     samples,
     tmp_bucket: str,
     gvcf_by_sid: Dict[str, str],
-    overwrite: bool = False,
 ) -> Tuple[Set[str], Set[str], Set[str], Set[str], bool, str]:
-    if utils.can_reuse(join(genomicsdb_gcs_path, 'callset.json'), overwrite):
+    if utils.file_exists(join(genomicsdb_gcs_path, 'callset.json')):
         # Checking if samples exists in the DB already
         genomicsdb_metadata = join(local_tmp_dir, f'callset-{interval_idx}.json')
         utils.gsutil_cp(
@@ -297,7 +293,6 @@ def _add_import_gvcfs_job(
     genomicsdb_gcs_path: str,
     sample_names_to_add: Set[str],
     sample_names_to_skip: Set[str],
-    sample_names_to_remove: Set[str],
     sample_names_will_be_in_db: Set[str],
     updating_existing_db: bool,
     sample_map_bucket_path: str,
@@ -312,8 +307,8 @@ def _add_import_gvcfs_job(
     Returns a Job, or None if no new samples to add
     """
     rm_cmd = ''
-
-    if updating_existing_db:
+    
+    if updating_existing_db and not overwrite:
         # Update existing DB
         genomicsdb_param = f'--genomicsdb-update-workspace-path {genomicsdb_gcs_path}'
         job_name = 'Adding to GenomicsDB'
@@ -327,14 +322,9 @@ def _add_import_gvcfs_job(
         # Initiate new DB
         job_name = 'Creating GenomicsDB'
 
-        # callset_json = join(genomicsdb_gcs_path, 'callset.json')
-        # if utils.can_reuse(callset_json, overwrite):
-        #     b.new_job(job_name + ' [reuse]')
-
         genomicsdb_param = f'--genomicsdb-workspace-path {genomicsdb_gcs_path}'
-        if sample_names_to_remove:
-            # Need to remove the existing database
-            rm_cmd = f'gsutil -q rm -rf {genomicsdb_gcs_path}'
+        # Need to remove the existing database if exists
+        rm_cmd = f'gsutil ls {genomicsdb_gcs_path} && gsutil -q rm -rf {genomicsdb_gcs_path}'
         msg = (
             f'Creating a new DB with {len(sample_names_to_add)} samples: '
             f'{", ".join(sample_names_to_add)}'
@@ -347,44 +337,52 @@ def _add_import_gvcfs_job(
 
     j = b.new_job(job_name)
     j.image(resources.GATK_IMAGE)
-    ncpu = 16
-    j.cpu(ncpu)
-    java_mem = 16
-    j.memory('lowmem')  # ~ 1G/core ~ 14.4G
+
     if depends_on:
         j.depends_on(*depends_on)
-        
-    # Not using --consolidate because https://github.com/broadinstitute/gatk/issues/7653
-        
-    j.command(wrap_command(f"""\
-    # We've seen some GenomicsDB performance regressions related to intervals, 
-    # so we're going to pretend we only have a single interval
-    # using the --merge-input-intervals arg. There's no data in between since 
-    # we didn't run HaplotypeCaller over those loci so we're not wasting any compute
-
-    # The memory setting here is very important and must be several GiB lower
-    # than the total memory allocated to the VM because this tool uses
-    # a significant amount of non-heap memory for native libraries.
-    # Also, testing has shown that the multithreaded reader initialization
-    # does not scale well beyond 5 threads, so don't increase beyond that.
     
-    # The batch_size value was carefully chosen here as it
-    # is the optimal value for the amount of memory allocated
-    # within the task; please do not change it without consulting
-    # the Hellbender (GATK engine) team!
+    # The Broad: testing has shown that the multithreaded reader initialization
+    # does not scale well beyond 5 threads, so don't increase beyond that.
+    nthreads = 5
+
+    # The Broad: The memory setting here is very important and must be several
+    # GiB lower than the total memory allocated to the VM because this tool uses
+    # a significant amount of non-heap memory for native libraries.
+    xms_gb = 8
+    xmx_gb = 25
+
+    hailbatch.STANDARD.set_resources(j, nthreads=nthreads, mem_gb=xmx_gb + 1)
+    
+    params = [
+        # The Broad: We've seen some GenomicsDB performance regressions related 
+        # to intervals, so we're going to pretend we only have a single interval
+        # using the --merge-input-intervals arg. There's no data in between since we
+        # didn't run HaplotypeCaller over those loci so we're not wasting any compute
+        '--merge-input-intervals',
+        '--consolidate',
+        # The batch_size value was carefully chosen here as it is the optimal value for 
+        # the amount of memory allocated within the task; please do not change it 
+        # without consulting the Hellbender (GATK engine) team!
+        '--batch-size', '50',
+        # Using cloud + --consolidate causes a TileDB error:
+        # https://github.com/broadinstitute/gatk/issues/7653
+        # However disabling --consolidate decreases performance of reading, cause
+        # GenotypeGVCFs to run forever. So instead, using non-cloud GenomicsDB.
+    ]
+
+    j.command(wrap_command(f"""\
 
     echo "{msg}"
 
     {rm_cmd}
 
-    gatk --java-options -Xms{java_mem}g \\
+    gatk --java-options "-Xms{xms_gb}g -Xmx{xmx_gb}g" \
     GenomicsDBImport \\
     {genomicsdb_param} \\
-    --batch-size 50 \\
     -L {interval} \\
     --sample-name-map {sample_map} \\
-    --reader-threads {ncpu} \\
-    --merge-input-intervals
+    --reader-threads {nthreads} \\
+    {" ".join(params)}
     """, monitor_space=True, setup_gcp=True))
     return j, sample_names_will_be_in_db
 
@@ -428,13 +426,18 @@ def _add_joint_genotyper_job(
             'vcf.gz.tbi': output_vcf_path + '.tbi',
         })
 
-    logger.info(job_name)
-
     j.image(resources.GATK_IMAGE)
-    j.cpu(2)
-    j.memory('standard')  # ~ 4G/core ~ 8G
-    # 4G (fasta+fai+dict) + 4G per sample divided by the number of intervals
-    j.storage(f'{4 + number_of_samples * 4 // number_of_intervals}G')
+
+    xms_gb = 8
+    xmx_gb = 25
+
+    hailbatch.STANDARD.set_resources(
+        j, 
+        mem_gb=xmx_gb + 1,
+        # 4G (fasta+fai+dict) + 4G per sample divided by the number of intervals:
+        storage_gb=4 + number_of_samples * 4 // number_of_intervals
+    )
+
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
@@ -442,7 +445,7 @@ def _add_joint_genotyper_job(
     reference = fasta_ref_resource(b)
 
     cmd = f"""\
-    gatk --java-options -Xms8g \\
+    gatk --java-options "-Xms{xms_gb}g -Xmx{xmx_gb}g" \
     {tool.name} \\
     -R {reference.base} \\
     -O {j.output_vcf['vcf.gz']} \\
