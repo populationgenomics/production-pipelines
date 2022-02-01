@@ -331,6 +331,7 @@ class AnnotateCohortStage(CohortStage):
             max_age='16h',
             packages=utils.DATAPROC_PACKAGES,
             num_secondary_workers=50,
+            num_workers=8,
             job_name='Make MT and annotate cohort',
             depends_on=inputs.get_jobs(),
         )
@@ -373,6 +374,7 @@ class AnnotateProjectStage(ProjectStage):
             max_age='8h',
             packages=utils.DATAPROC_PACKAGES,
             num_secondary_workers=20,
+            num_workers=5,
             job_name=f'{project.name}: annotate project',
             depends_on=inputs.get_jobs(),
         )
