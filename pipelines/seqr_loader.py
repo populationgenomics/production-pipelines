@@ -261,7 +261,7 @@ class VqsrStage(CohortStage):
         samples_hash = utils.hash_sample_ids(pipe.get_all_sample_ids())
         expected_jc_vcf_path = f'{pipe.tmp_bucket}/vqsr/{samples_hash}-site-only.vcf.gz'
         return expected_jc_vcf_path
-    
+
     def queue_jobs(self, pipe: Pipeline, inputs: StageInput) -> StageOutput:
         jc_vcf_path = inputs.as_path(stage=JointGenotypingStage, target=pipe)
         siteonly_vcf_path = make_expected_siteonly_path(jc_vcf_path)
@@ -302,10 +302,11 @@ class VepStage(CohortStage):
             vcf_path=vqsr_vcf_path,
             out_vcf_path=expected_path,
         )
+        j.depends_on(*inputs.get_jobs())
         return self.make_outputs(pipe, data=expected_path, jobs=[j])
 
 
-@stage(requires_stages=[JointGenotypingStage, VqsrStage])
+@stage(requires_stages=[JointGenotypingStage, VepStage])
 class AnnotateCohortStage(CohortStage):
     def expected_result(self, pipe: Pipeline):
         return join(get_anno_tmp_bucket(pipe), 'combined.mt')
@@ -314,14 +315,14 @@ class AnnotateCohortStage(CohortStage):
         checkpoints_bucket = join(get_anno_tmp_bucket(pipe), 'checkpoints')
 
         vcf_path = inputs.as_path(target=pipe, stage=JointGenotypingStage)
-        vqsr_vcf_path = inputs.as_path(target=pipe, stage=VqsrStage)
+        annotated_site_only_vcf_path = inputs.as_path(target=pipe, stage=VepStage)
 
         expected_path = self.expected_result(pipe)
         j = dataproc.hail_dataproc_job(
             self.pipe.b,
             f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "vcf_to_mt.py")} '
             f'--vcf-path {vcf_path} '
-            f'--site-only-vqsr-vcf-path {vqsr_vcf_path} '
+            f'--site-only-vqsr-vcf-path {annotated_site_only_vcf_path} '
             f'--dest-mt-path {expected_path} '
             f'--bucket {checkpoints_bucket} '
             f'--disable-validation '
@@ -331,10 +332,6 @@ class AnnotateCohortStage(CohortStage):
             packages=utils.DATAPROC_PACKAGES,
             num_secondary_workers=50,
             job_name='Make MT and annotate cohort',
-            # default VEP initialization script (used with --vep) installs VEP=v95,
-            # but we need v105, so we use a modified vep-GRCh38.sh (with --init) from
-            # this repo: production-pipelines/vep/vep-GRCh38.sh
-            init=['gs://cpg-reference/vep/vep-GRCh38.sh'],  
             depends_on=inputs.get_jobs(),
         )
         return self.make_outputs(pipe, data=expected_path, jobs=[j])
