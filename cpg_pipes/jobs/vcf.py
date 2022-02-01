@@ -8,7 +8,7 @@ from typing import List, Tuple
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes import resources, utils
+from cpg_pipes import resources, utils, hailbatch
 from cpg_pipes.hailbatch import wrap_command
 
 logger = logging.getLogger(__file__)
@@ -37,10 +37,8 @@ def gather_vcfs(
         })
 
     j.image(resources.GATK_IMAGE)
-    j.cpu(2)
-    java_mem = 7
-    j.memory('standard')  # ~ 3.75G/core ~ 7.5G
-    j.storage(f'{1 + len(input_vcfs) * (0.1 if site_only else 2)}G')
+    hailbatch.STANDARD\
+        .set_resources(j, storage_gb=hailbatch.STANDARD.calc_instance_disk_gb())
         
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
@@ -52,7 +50,7 @@ def gather_vcfs(
     # our invocation. This argument disables expensive checks that the file headers 
     # contain the same set of genotyped samples and that files are in order 
     # by position of first record.
-    gatk --java-options -Xms{java_mem}g \\
+    gatk --java-options -Xms25g \\
     GatherVcfsCloud \\
     --ignore-safety-checks \\
     --gather-type BLOCK \\

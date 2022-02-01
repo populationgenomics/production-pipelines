@@ -151,7 +151,7 @@ def align(
             number_of_shards_for_realignment = None
     
     # if number of threads is not requested, using whole instance
-    requested_nthreads = requested_nthreads or STANDARD.ncpu
+    requested_nthreads = requested_nthreads or STANDARD.max_ncpu
 
     sharded_fq = alignment_input.is_fastq() and len(alignment_input.get_fqs1()) > 1
     sharded_bazam = (
@@ -321,7 +321,7 @@ def _align_one(
     if number_of_shards_for_realignment is not None:
         assert number_of_shards_for_realignment > 1, number_of_shards_for_realignment
     
-    if number_of_shards_for_realignment is None and requested_nthreads >= STANDARD.ncpu:
+    if number_of_shards_for_realignment is None and requested_nthreads >= STANDARD.max_ncpu:
         # Running from FASTQ, or from CRAM without sharding, on a full instance.
         # We will need more storage, as default 350G (actual 344G) might not be enough, 
         # see example: https://batch.hail.populationgenomics.org.au/batches/7458/jobs/2

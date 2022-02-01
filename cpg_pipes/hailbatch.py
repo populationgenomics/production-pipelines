@@ -374,7 +374,7 @@ class MachineType:
         price_per_hour: float,
     ):
         self.name = name
-        self.ncpu = ncpu
+        self.max_ncpu = ncpu
         self.mem_gb_per_core = mem_gb_per_core
         self.price_per_hour = price_per_hour
     
@@ -388,7 +388,7 @@ class MachineType:
         disk_size_gb = 375
         reserved_gb = 30
         reserved_gb_per_core = 5
-        return disk_size_gb - reserved_gb - reserved_gb_per_core * self.ncpu
+        return disk_size_gb - reserved_gb - reserved_gb_per_core * self.max_ncpu
 
     def set_resources(
         self, 
@@ -455,13 +455,8 @@ class MachineType:
         can be packed to fit the default instance's available storage 
         (caluclated with self.calc_instance_disk_gb()).
         """
-
-        # Hail Batch actually requests 5% lower number than the 
-        # requested one (e.g. "req_storage: 46.25G, actual_storage: 44.0 GiB"),
-        # so we will ask for a bigger number.        
-        adjusted_storage_gb = storage_gb * 1.05
-        njobs_fit_on_machine = self.calc_instance_disk_gb() / adjusted_storage_gb
-        return self.adjust_ncpu(int(math.ceil(self.ncpu / njobs_fit_on_machine)))
+        njobs_fit_on_machine = self.calc_instance_disk_gb() / storage_gb
+        return self.adjust_ncpu(int(math.ceil(self.max_ncpu / njobs_fit_on_machine)))
 
     def nthreads_to_ncpu(self, nthreads: int) -> int:
         return self.adjust_ncpu(math.ceil(nthreads / 2))
@@ -471,10 +466,10 @@ class MachineType:
         Adjust request number of CPU to a correct requestable number:
         the nearest power of 2, not less than the minimal number of cores allowed.
         """
-        if ncpu > self.ncpu:
+        if ncpu > self.max_ncpu:
             ValueError(
                 f'Requesting more cores than available on {self.name} machine: '
-                f'{ncpu}>{self.ncpu}'
+                f'{ncpu}>{self.max_ncpu}'
             )
 
         if ncpu < MachineType.MIN_NCPU:
@@ -529,10 +524,15 @@ class JobResource:
             a larger disc will be attached by Hail Batch. 
         """
         self.machine_type = machine_type
-
+        
         self.fraction_of_full: float = 1.0
         if ncpu is not None:
-            self.fraction_of_full = ncpu / self.machine_type.ncpu
+            if ncpu > self.machine_type.max_ncpu:
+                raise ValueError(
+                    f'Max number of CPU on machine {self.machine_type.name} '
+                    f'is {self.machine_type.max_ncpu}, requested {ncpu}'
+                )
+            self.fraction_of_full = ncpu / self.machine_type.max_ncpu
 
         self.attach_disk_storage_gb = None
         if attach_disk_storage_gb is not None:
@@ -556,7 +556,7 @@ class JobResource:
         return int(math.floor(self.get_mem_gb() - 1))
 
     def get_ncpu(self) -> int:
-        return int(self.machine_type.ncpu * self.fraction_of_full)
+        return int(self.machine_type.max_ncpu * self.fraction_of_full)
     
     def get_nthreads(self) -> int:
         return self.get_ncpu() * MachineType.THREADS_ON_CPU
@@ -566,9 +566,14 @@ class JobResource:
         Calculate storage in GB
         """
         if self.attach_disk_storage_gb:
-            return self.attach_disk_storage_gb
+            storage_gb = self.attach_disk_storage_gb
         else:
-            return self.machine_type.calc_instance_disk_gb() * self.fraction_of_full
+            storage_gb = self.machine_type.calc_instance_disk_gb() * self.fraction_of_full
+
+        # Hail Batch actually requests 5% lower number than the 
+        # requested one (e.g. "req_storage: 46.25G, actual_storage: 44.0 GiB"),
+        # so we will ask for a bigger number.        
+        return storage_gb * 1.05
 
     def set_to_job(self, j: Job) -> 'JobResource':
         """
