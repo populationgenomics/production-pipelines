@@ -20,7 +20,7 @@ def vep(
     """
     j = b.new_job('VEP')
     j.image(resources.VEP_IMAGE)
-    hailbatch.STANDARD.set_resources(j, storage_gb=25, mem_gb=20)
+    hailbatch.STANDARD.set_resources(j, storage_gb=50, mem_gb=50, ncpu=16)
 
     cmd = f"""\
     LOFTEE_DIR=/io/batch/loftee
@@ -28,20 +28,12 @@ def vep(
     mkdir -p $LOFTEE_DIR
     mkdir -p $CACHE_DIR
     gsutil cat {resources.VEP_LOFTEE} | tar -xf - -C $LOFTEE_DIR/
-    ls $LOFTEE_DIR
-    du -sh $LOFTEE_DIR
 
     gsutil cat {resources.VEP_CACHE} | tar -xf - -C $CACHE_DIR/
-    ls $CACHE_DIR
-    du -sh $CACHE_DIR
     FASTA=$CACHE_DIR/vep/homo_sapiens/105_GRCh38/Homo_sapiens.GRCh38.dna.toplevel.fa.gz
-    ls $(dirname $FASTA)
 
-    gsutil cp {vcf_path} input.vcf.gz
+    retry_gs_cp {vcf_path} input.vcf.gz
     
-    GEPR_PATH=$LOFTEE_DIR/gerp_conservation_scores.homo_sapiens.GRCh38.bw
-    GEPR_PATH=
-
     vep \\
     --vcf \\
     --format vcf \\
