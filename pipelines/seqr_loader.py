@@ -18,7 +18,7 @@ from analysis_runner import dataproc
 
 from cpg_pipes import utils, resources
 from cpg_pipes.jobs import align, split_intervals, haplotype_caller, \
-    pedigree, vep
+    pedigree
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
@@ -286,27 +286,7 @@ def get_anno_tmp_bucket(pipe: Pipeline):
     return join(pipe.tmp_bucket, 'mt')
 
 
-@stage(requires_stages=[VqsrStage])
-class VepStage(CohortStage):
-    def expected_result(self, pipe: Pipeline):
-        samples_hash = utils.hash_sample_ids(pipe.get_all_sample_ids())
-        expected_jc_vcf_path = f'{pipe.tmp_bucket}/joint_calling/{samples_hash}-vep.vcf.gz'
-        return expected_jc_vcf_path
-
-    def queue_jobs(self, pipe: Pipeline, inputs: StageInput) -> StageOutput:
-        vqsr_vcf_path = inputs.as_path(target=pipe, stage=VqsrStage)
-        expected_path = self.expected_result(pipe)
-        
-        j = vep.vep(
-            self.pipe.b, 
-            vcf_path=vqsr_vcf_path,
-            out_vcf_path=expected_path,
-        )
-        j.depends_on(*inputs.get_jobs())
-        return self.make_outputs(pipe, data=expected_path, jobs=[j])
-
-
-@stage(requires_stages=[JointGenotypingStage, VepStage])
+@stage(requires_stages=[JointGenotypingStage, VqsrStage])
 class AnnotateCohortStage(CohortStage):
     def expected_result(self, pipe: Pipeline):
         return join(get_anno_tmp_bucket(pipe), 'combined.mt')
@@ -315,7 +295,7 @@ class AnnotateCohortStage(CohortStage):
         checkpoints_bucket = join(get_anno_tmp_bucket(pipe), 'checkpoints')
 
         vcf_path = inputs.as_path(target=pipe, stage=JointGenotypingStage)
-        annotated_site_only_vcf_path = inputs.as_path(target=pipe, stage=VepStage)
+        annotated_site_only_vcf_path = inputs.as_path(target=pipe, stage=VqsrStage)
 
         expected_path = self.expected_result(pipe)
         j = dataproc.hail_dataproc_job(
@@ -333,6 +313,10 @@ class AnnotateCohortStage(CohortStage):
             num_secondary_workers=50,
             num_workers=8,
             job_name='Make MT and annotate cohort',
+            # Default Hail's VEP initialization script (triggered by --vep) 
+            # installs VEP=v95; if we want v105, we have to use a modified 
+            # vep-GRCh38.sh (with --init) from production-pipelines/vep/vep-GRCh38.sh
+            init=['gs://cpg-reference/vep/vep-GRCh38.sh'],            
             depends_on=inputs.get_jobs(),
         )
         return self.make_outputs(pipe, data=expected_path, jobs=[j])
@@ -411,6 +395,37 @@ class LoadToEsStage(ProjectStage):
             job_name=f'{project.name}: create ES index',
             depends_on=inputs.get_jobs(),
             scopes=['cloud-platform'],
+        )
+        return self.make_outputs(project, jobs=[j])
+
+
+@stage(requires_stages=[AnnotateProjectStage])
+class ToVcfStage(ProjectStage):
+    def expected_result(self, project: Project):
+        return f'{self.pipe.analysis_bucket}/mt/{project.name}.vcf.bgz'
+
+    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
+        output_projects = self.pipe.config.get('output_projects', self.pipe.get_projects())
+        if project.stack not in output_projects:
+            logger.info(
+                f'Skipping loading project {project.stack} because it is not'
+                f'in the --output-projects: {output_projects}'
+            )
+            return self.make_outputs(project)
+
+        project_mt_path = inputs.as_path(target=project, stage=AnnotateProjectStage)
+
+        j = dataproc.hail_dataproc_job(
+            self.pipe.b,
+            f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "projectmt_to_vcf.py")} '
+            f'--mt-path {project_mt_path} '
+            f'--out-vcf-path {self.expected_result(project)}',
+            max_age='8h',
+            packages=utils.DATAPROC_PACKAGES,
+            num_secondary_workers=20,
+            num_workers=5,
+            job_name=f'{project.name}: export to VCF',
+            depends_on=inputs.get_jobs(),
         )
         return self.make_outputs(project, jobs=[j])
 

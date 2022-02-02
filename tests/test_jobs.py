@@ -133,7 +133,6 @@ class TestJobs(unittest.TestCase):
         contents = self._read_file(test_result_path)
         self.assertEqual(self.sample_name, contents.split()[-1])
 
-    @unittest.skip('Skip')
     def test_joint_calling(self):
         """
         Test joint variant calling
@@ -164,7 +163,8 @@ class TestJobs(unittest.TestCase):
         self.assertTrue(utils.file_exists(out_vcf_path))
         self.assertTrue(utils.file_exists(out_siteonly_vcf_path))
         contents = self._read_file(test_result_path)
-        self.assertEqual(9 + len(SAMPLES), len(contents.split()))
+        self.assertEqual(len(SAMPLES), len(contents.split()))
+        self.assertEqual(set(SAMPLES), set(contents.split()))
 
     @unittest.skip('Skip')
     def test_vqsr(self):
@@ -191,22 +191,42 @@ class TestJobs(unittest.TestCase):
         self.pipeline.submit_batch(wait=True)     
         self.assertTrue(utils.file_exists(out_vcf_path))
         contents = self._read_file(res_path)
-        self.assertEqual(8, len(contents.split()))  # site-only doesn't have any samples
+        self.assertEqual(0, len(contents.split()))  # site-only doesn't have any samples
         
     def test_vep(self):
+        """
+        Tests command line VEP with LoF plugin and MANE_SELECT annotation
+        """
         site_only_vcf_path = (
             'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
             'vqsr.vcf.gz'
         )
-        vep_vcf_path = f'{self.out_bucket}/vep/vep.vcf.gz'
-        vep.vep(
+        out_vcf_path = f'{self.out_bucket}/vep/vep.vcf.gz'
+
+        j = vep.vep(
             self.pipeline.b, 
             vcf_path=site_only_vcf_path, 
-            out_vcf_path=vep_vcf_path,
+            out_vcf_path=out_vcf_path,
         )
-        self.pipeline.submit_batch(wait=True)     
-        self.assertTrue(utils.file_exists(vep_vcf_path))
-    
+        self.pipeline.submit_batch(wait=True)
+
+        test_j = self.pipeline.b.new_job('Parse GVCF sample name')
+        test_j.image(resources.BCFTOOLS_IMAGE)
+        test_j.command(f"""
+        bcftools +split-vep {j.out_vcf} \
+        -f '%CHROM:%POS %SYMBOL %BIOTYPE %MANE_SELECT %LoF %LoF_filter\n' \
+        -i'BIOTYPE="protein_coding" & LoF_filter="ANC_ALLELE"' -s worst \
+        > {test_j.output}
+        """)
+        res_path = join(self.out_bucket, f'{self.sample_name}.out')
+        self.pipeline.b.write_output(test_j.output, res_path)
+        self.assertTrue(utils.file_exists(out_vcf_path))
+        contents = self._read_file(res_path)
+        self.assertEqual(
+            'chr20:5111495 TMEM230 protein_coding NM_001009923.2 LC ANC_ALLELE', 
+            contents
+        )
+
     def test_seqr_loader(self):
         """
         Assuming variants are called and VQSR'ed, tests loading
@@ -223,6 +243,7 @@ class TestJobs(unittest.TestCase):
         
         cohort_mt_path = f'{self.out_bucket}/seqr_loader/cohort.mt'
         project_mt_path = f'{self.out_bucket}/seqr_loader/project.mt'
+        project_vcf_path = f'{self.out_bucket}/seqr_loader/project.vcf.bgz'
 
         cluster = dataproc.setup_dataproc(
             self.pipeline.b,
@@ -261,5 +282,12 @@ class TestJobs(unittest.TestCase):
             job_name=f'Create ES index',
         )
         projectmt_to_es_j.depends_on(mt_to_projectmt_j)
+        projectmt_to_vcf_j = cluster.add_job(
+            f'{join("..", utils.QUERY_SCRIPTS_DIR, "seqr", "projectmt_to_vcf.py")} '
+            f'--mt-path {project_mt_path} '
+            f'--out-vcf-path {project_vcf_path}',
+            job_name=f'Convert to VCF',
+        )
+        projectmt_to_vcf_j.depends_on(mt_to_projectmt_j)
         self.pipeline.submit_batch(wait=True)     
-        self.assertTrue(utils.file_exists(project_mt_path))
+        self.assertTrue(utils.file_exists(project_vcf_path))
