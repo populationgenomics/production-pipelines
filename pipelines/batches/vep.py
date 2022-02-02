@@ -24,7 +24,7 @@ def main(vcf_paths: List[str], project: str):
     b = setup_batch('Run VEP', analysis_project_name=project)
 
     for vcf_path in vcf_paths:
-        out_vcf_path = os.path.splitext(vcf_path)[0] + '-vep.vcf.gz'
+        out_vcf_path = os.path.splitext(vcf_path)[0] + '-vep.vcf.bgz'
         vep.vep(
             b, 
             vcf_path=vcf_path, 
