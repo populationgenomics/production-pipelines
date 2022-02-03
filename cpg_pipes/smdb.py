@@ -90,6 +90,9 @@ class SMDB:
             
             samples_by_project[proj_name] = []
             for s in samples:
+                s['id'] = s['id'].strip()
+                s['external_id'] = s['external_id'].strip()
+                
                 if only_samples:
                     if s['id'] in only_samples or s['external_id'] in only_samples:
                         logger.info(f'Taking sample: {s["id"]}')
@@ -113,7 +116,7 @@ class SMDB:
         except ApiException:
             participant_id_by_cpgid = {}
         else:
-            participant_id_by_cpgid = {sid: pid for pid, sid in pid_sid}
+            participant_id_by_cpgid = {sid.strip(): pid.strip() for pid, sid in pid_sid}
         return participant_id_by_cpgid
 
     def find_seq_by_sid(self, sample_ids) -> Dict[str, Sequence]:
