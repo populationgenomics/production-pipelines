@@ -118,6 +118,7 @@ class CramPedCheckStage(ProjectStage):
             web_url=self.pipe.web_url,
             tmp_bucket=self.pipe.tmp_bucket,
             depends_on=inputs.get_jobs(),
+            local_tmp_dir=self.pipe.local_tmp_dir,
             label='(CRAMs)',
         )
         return self.make_outputs(project, data=somalier_samples_path, jobs=[j])
@@ -205,6 +206,7 @@ class GvcfPedCheckStage(ProjectStage):
             web_url=self.pipe.web_url,
             tmp_bucket=self.pipe.tmp_bucket,
             depends_on=inputs.get_jobs(),
+            local_tmp_dir=self.pipe.local_tmp_dir,
             label='(GVCFs)'
         )
         return self.make_outputs(project, data=somalier_samples_path, jobs=[j])
@@ -490,7 +492,7 @@ class SeqrMaps(ProjectStage):
                 f'in the --output-projects: {output_projects}'
             )
             return self.make_outputs(project)
-
+        
         # Sample map
         sample_map_path = f'{self.pipe.analysis_bucket}/seqr/{project.name}-sample-map.csv'
         df = pd.DataFrame({

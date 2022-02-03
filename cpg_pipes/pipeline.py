@@ -593,15 +593,15 @@ class Sample(Target):
         self.participant_id = participant_id or external_id
         self.meta = meta or dict()
 
-    def get_ped_dict(self, use_ext_id: bool = False) -> Dict:
+    def get_ped_dict(self, use_participant_id: bool = False) -> Dict:
         """
         Returns a dictionary of pedigree fields for this sample
         """
         def _get_id(_s: Optional[Sample]):
             if _s is None:
                 return '0'
-            elif use_ext_id:
-                return _s.external_id
+            elif use_participant_id:
+                return _s.participant_id
             else:
                 return _s.id
 
@@ -1342,7 +1342,7 @@ class Pipeline(Target):
                 s = project.add_sample(
                     id=s_data['id'],
                     external_id=s_data['external_id'],
-                    participant_id=s_data['participant_id'],
+                    participant_id=s_data['participant_id'].strip(),
                     **s_data.get('meta', dict()),
                 )
                 if forced_samples and s.id in forced_samples:
@@ -1416,25 +1416,23 @@ class Pipeline(Target):
             self.analysis_by_type[AnalysisType.JOINT_CALLING] = jc_analysis
 
     def _populate_pedigree(self, ped_files: List[str]):
-        sample_by_extid = dict()
+        sample_by_participant_id = dict()
         for s in self.get_all_samples():
-            sample_by_extid[s.external_id] = s
+            sample_by_participant_id[s.participant_id] = s
 
         for i, ped_file in enumerate(ped_files):
             local_ped_file = join(self.local_tmp_dir, f'ped_file_{i}.ped')
             utils.gsutil_cp(ped_file, local_ped_file)
             with open(local_ped_file) as f:
                 for line in f:
-                    if 'Family.ID' in line:
-                        continue
                     fields = line.strip().split('\t')[:6]
                     fam_id, sam_id, pat_id, mat_id, sex, phenotype = fields
-                    if sam_id in sample_by_extid:
-                        s = sample_by_extid[sam_id]
+                    if sam_id in sample_by_participant_id:
+                        s = sample_by_participant_id[sam_id]
                         s.pedigree = PedigreeInfo(
                             fam_id=fam_id,
-                            dad=sample_by_extid.get(pat_id),
-                            mom=sample_by_extid.get(mat_id),
+                            dad=sample_by_participant_id.get(pat_id),
+                            mom=sample_by_participant_id.get(mat_id),
                             sex={
                                 '1': Sex.MALE, 
                                 '2': Sex.FEMALE,

@@ -11,9 +11,8 @@ import logging
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass
 from os.path import join, basename
-from typing import Optional, List
+from typing import Optional, Tuple, Dict
 
 import pandas as pd
 import click
@@ -42,28 +41,28 @@ logger.setLevel(logging.INFO)
     'somalier_html_fpath',
     help='Path to somalier {prefix}.html output file',
 )
+@click.option(
+    '--sample-map',
+    'sample_map_tsv_path',
+    help=(
+        'Path a file with 2 columns (tab-separated): '
+        'current sample ID as in input files, and the new sample ID'
+    ),
+)
 def main(
     somalier_samples_fpath: str,
     somalier_pairs_fpath: str,
     somalier_html_fpath: Optional[str],
+    sample_map_tsv_path: Optional[str],
 ):  # pylint: disable=missing-function-docstring
-    if somalier_samples_fpath.startswith('gs://'):
-        local_tmp_dir = tempfile.mkdtemp()
-        cmd = f'gsutil cp {somalier_samples_fpath} {somalier_pairs_fpath}'
-        subprocess.run(cmd, check=False, shell=True)
-        local_somalier_pairs_fpath = join(local_tmp_dir, basename(somalier_pairs_fpath))
-        local_somalier_samples_fpath = join(
-            local_tmp_dir, basename(somalier_samples_fpath)
-        )
-    else:
-        local_somalier_pairs_fpath = somalier_pairs_fpath
-        local_somalier_samples_fpath = somalier_samples_fpath
-
-    df = pd.read_csv(local_somalier_samples_fpath, delimiter='\t')
-    df.sex = df.sex.apply(lambda x: {1: 'male', 2: 'female'}.get(x, 'unknown'))
-    df.original_pedigree_sex = df.original_pedigree_sex.apply(
-        lambda x: {'-9': 'unknown'}.get(x, x)
+    
+    df, pairs_df, ped = _parse_inputs(
+        somalier_samples_fpath,
+        somalier_pairs_fpath,
+        somalier_html_fpath,
+        sample_map_tsv_path,
     )
+
     bad_samples = list(df[df.gt_depth_mean == 0.0].sample_id)
     if bad_samples:
         logger.info(
@@ -108,12 +107,10 @@ def main(
     logger.info('-' * 10)
 
     logger.info('* Checking relatedness *')
-    ped = Ped(local_somalier_samples_fpath)
     sample_by_id = {s.sample_id: s for s in ped.samples()}
     
     pairs_provided_as_unrelated_but_inferred_related = []
     other_mismatching_pairs = []
-    pairs_df = pd.read_csv(local_somalier_pairs_fpath, delimiter='\t')
     for idx, row in pairs_df.iterrows():
         s1 = row['#sample_a']
         s2 = row['sample_b']
@@ -139,7 +136,6 @@ def main(
                 'siblings': 'siblings',
                 'unknown': 'unknown',
             }.get(peddy_rel)
-        
 
         if (
             _match_peddy_with_inferred(peddy_rel) == 'unknown'
@@ -187,6 +183,68 @@ def main(
     )
     if mismatching_sex.any() or other_mismatching_pairs:
         sys.exit(1)
+
+
+def _parse_inputs(
+    somalier_samples_fpath, 
+    somalier_pairs_fpath, 
+    somalier_html_fpath,
+    sample_map_tsv_path,
+) -> Tuple[pd.DataFrame, pd.DataFrame, Ped]:
+    sample_map = _parse_sample_map(sample_map_tsv_path)
+
+    if somalier_samples_fpath.startswith('gs://'):
+        local_tmp_dir = tempfile.mkdtemp()
+        cmd = f'gsutil cp {somalier_samples_fpath} {somalier_pairs_fpath}'
+        subprocess.run(cmd, check=False, shell=True)
+        local_somalier_samples_fpath = join(
+            local_tmp_dir, basename(somalier_samples_fpath)
+        )
+        local_somalier_pairs_fpath = join(local_tmp_dir, basename(somalier_pairs_fpath))
+    else:
+        local_somalier_samples_fpath = somalier_samples_fpath
+        local_somalier_pairs_fpath = somalier_pairs_fpath
+
+    pairs_df = pd.read_csv(local_somalier_pairs_fpath, delimiter='\t')
+    if sample_map_tsv_path:
+        pairs_df = pairs_df.replace({
+            '#sample_a': sample_map,
+            'sample_b': sample_map,
+        })
+
+    df = pd.read_csv(local_somalier_samples_fpath, delimiter='\t')
+    if sample_map_tsv_path:
+        df = df.replace({
+            'sample_id': sample_map,
+            'paternal_id': sample_map,
+            'maternal_id': sample_map,
+        })
+        
+    # fixed_html_path = 
+    # with open(somalier_html_fpath) as f:
+
+    df.sex = df.sex.apply(lambda x: {1: 'male', 2: 'female'}.get(x, 'unknown'))
+    df.original_pedigree_sex = df.original_pedigree_sex.apply(
+        lambda x: {'-9': 'unknown'}.get(x, x)
+    )
+
+    ped = Ped(local_somalier_samples_fpath)
+
+    return df, pairs_df, ped
+
+
+def _parse_sample_map(sample_map_tsv_path: str) -> Dict[str, str]:
+    """
+    Parse 2-column file into a dict mapping str to str
+    """
+    sample_map = dict()
+    if sample_map_tsv_path:
+        with open(sample_map_tsv_path) as f:
+            for line in f:
+                if line.strip():
+                    ori_sid, new_sid = line.strip().split('\t')
+                    sample_map[ori_sid] = new_sid
+    return sample_map
 
 
 def infer_relationship(coeff: float, ibs0: float, ibs2: float) -> str:

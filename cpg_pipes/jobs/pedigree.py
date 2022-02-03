@@ -22,6 +22,7 @@ def add_pedigree_jobs(
     overwrite: bool,
     fingerprints_bucket: str,
     tmp_bucket: str,
+    local_tmp_dir: str,
     web_bucket: Optional[str] = None,
     web_url: Optional[str] = None,
     depends_on: Optional[List[Job]] = None,
@@ -86,7 +87,6 @@ def add_pedigree_jobs(
     if depends_on:
         extract_jobs.extend(depends_on)
     relate_j.depends_on(*extract_jobs)
-    fp_files = [b.read_input(fp) for sn, fp in somalier_file_by_sample.items()]
 
     ped_fpath = join(tmp_bucket, f'{project.name}.ped')
     datas = []
@@ -96,13 +96,18 @@ def add_pedigree_jobs(
     df.to_csv(ped_fpath, sep='\t', index=False)
     ped_file = b.read_input(ped_fpath)
 
-    files_line = ' \\\n'.join(fp_files)
-    relate_j.command(wrap_command(f"""\
-    cat {ped_file} | grep -v Family.ID > samples.ped 
+    input_files_lines = ''
+    for sample in project.get_samples():
+        if sample.id:
+            somalier_file = b.read_input(somalier_file_by_sample[sample.id])
+            input_files_lines += f'{somalier_file} \\\n'
+
+    cmd = f"""\
+    cat {ped_file} | grep -v Family.ID > /io/samples.ped 
     
     somalier relate \\
-    {files_line} \\
-    --ped samples.ped \\
+    {input_files_lines} \\
+    --ped /io/samples.ped \\
     -o related \\
     --infer
     
@@ -110,7 +115,9 @@ def add_pedigree_jobs(
     mv related.html {relate_j.output_html}
     mv related.pairs.tsv {relate_j.output_pairs}
     mv related.samples.tsv {relate_j.output_samples}
-    """))
+    """
+
+    relate_j.command(wrap_command(cmd))
 
     # Copy somalier outputs to buckets
     prefix = join(fingerprints_bucket, project.name)
@@ -134,6 +141,13 @@ def add_pedigree_jobs(
     check_j.cpu(1)
     check_j.memory('standard')  # ~ 3.75G/core ~ 3.75G
 
+    local_sample_map_fpath = join(local_tmp_dir, f'{project.name}-sample-map.tsv')
+    remote_sample_map_fpath = join(tmp_bucket, f'{project.name}-sample-map.tsv')
+    with open(local_sample_map_fpath, 'w') as f:
+        for sample in project.get_samples():
+            f.write(f'{sample.id}\t{sample.participant_id}\n')
+    utils.gsutil_cp(local_sample_map_fpath, remote_sample_map_fpath)
+
     script_name = 'check_pedigree.py'
     script_path = join(dirname(__file__), pardir, pardir, utils.SCRIPTS_DIR, script_name)
     with open(script_path) as f:
@@ -146,6 +160,7 @@ EOT
 python {script_name} \
 --somalier-samples {relate_j.output_samples} \
 --somalier-pairs {relate_j.output_pairs} \
+--sample-map {b.read_input(remote_sample_map_fpath)} \
 {('--somalier-html ' + somalier_html_url) if somalier_html_url else ''}
 """
     check_j.command(cmd)
