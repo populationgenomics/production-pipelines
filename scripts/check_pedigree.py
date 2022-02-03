@@ -250,7 +250,7 @@ def infer_relationship(coeff: float, ibs0: float, ibs2: float) -> str:
     Inferres relashionship labels based on the kin coefficient
     and ibs0 and ibs2 values.
     """
-    if coeff < 0.2:
+    if coeff < 0.1:
         result = 'unrelated'
     elif coeff < 0.38:
         result = 'below_first_degree'
