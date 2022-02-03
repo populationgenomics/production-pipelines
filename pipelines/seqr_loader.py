@@ -292,14 +292,17 @@ class AnnotateCohortStage(CohortStage):
             + ('--overwrite ' if not self.pipe.check_intermediate_existence else ''),
             max_age='16h',
             packages=utils.DATAPROC_PACKAGES,
-            num_secondary_workers=50,
-            num_workers=8,
             job_name='Make MT and annotate cohort',
+            depends_on=inputs.get_jobs(),
             # Default Hail's VEP initialization script (triggered by --vep) 
             # installs VEP=v95; if we want v105, we have to use a modified 
             # vep-GRCh38.sh (with --init) from production-pipelines/vep/vep-GRCh38.sh
-            init=['gs://cpg-reference/vep/vep-GRCh38.sh'],            
-            depends_on=inputs.get_jobs(),
+            init=['gs://cpg-reference/vep/vep-GRCh38.sh'],
+            worker_machine_type='n1-highmem-8',
+            worker_boot_disk_size=200,
+            secondary_worker_boot_disk_size=200,
+            num_secondary_workers=50,
+            num_workers=8,
         )
         return self.make_outputs(pipe, data=expected_path, jobs=[j])
 
