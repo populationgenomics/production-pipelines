@@ -377,6 +377,12 @@ class MachineType:
         self.max_ncpu = ncpu
         self.mem_gb_per_core = mem_gb_per_core
         self.price_per_hour = price_per_hour
+        
+    def max_threads(self) -> int:
+        """
+        Number of available threads
+        """
+        return self.max_ncpu * self.THREADS_ON_CPU
     
     def calc_instance_disk_gb(self) -> int:
         """

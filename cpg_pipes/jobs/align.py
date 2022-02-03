@@ -151,7 +151,7 @@ def align(
             number_of_shards_for_realignment = None
     
     # if number of threads is not requested, using whole instance
-    requested_nthreads = requested_nthreads or STANDARD.max_ncpu
+    requested_nthreads = requested_nthreads or STANDARD.max_threads()
 
     sharded_fq = alignment_input.is_fastq() and len(alignment_input.get_fqs1()) > 1
     sharded_bazam = (
@@ -307,6 +307,7 @@ def _align_one(
     aligner: Aligner = Aligner.BWA,
     number_of_shards_for_realignment: Optional[int] = None,
     shard_number_1based: Optional[int] = None,
+    extra_storage_gb: Optional[float] = None,
  ) -> Tuple[Job, str]:
     """
     Creates a command that (re)aligns reads to hg38, and a Job object,
@@ -320,14 +321,10 @@ def _align_one(
     
     if number_of_shards_for_realignment is not None:
         assert number_of_shards_for_realignment > 1, number_of_shards_for_realignment
-    
-    if number_of_shards_for_realignment is None and requested_nthreads >= STANDARD.max_ncpu:
-        # Running from FASTQ, or from CRAM without sharding, on a full instance.
-        # We will need more storage, as default 350G (actual 344G) might not be enough, 
-        # see example: https://batch.hail.populationgenomics.org.au/batches/7458/jobs/2
-        job_resource = STANDARD.set_resources(j, attach_disk_storage_gb=550)
-    else:
-        job_resource = STANDARD.set_resources(j, nthreads=requested_nthreads)
+
+    job_resource = STANDARD.set_resources(
+        j, nthreads=requested_nthreads, attach_disk_storage_gb=extra_storage_gb
+    )
 
     if aligner in [Aligner.BWAMEM2, Aligner.BWA]:
         if aligner == Aligner.BWAMEM2:
