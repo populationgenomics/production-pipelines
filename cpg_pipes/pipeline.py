@@ -184,10 +184,17 @@ def pipeline_click_options(function: Callable) -> Callable:
             'check_intermediate_existence',
             default=True,
             is_flag=True,
-            help='Before running a job, check for an intermediate output before '
-                 'submitting it, and if it exists on a bucket, submit a [reuse] job '
-                 'instead. Works well with '
-                 '--previous-batch-tsv/--previous-batch-id options.',
+            help='Within jobs, check all in-job intermediate files for possible reuse. '
+                 'If set to False, will overwrite all intermediates. '
+        ),
+        click.option(
+            '--check-job-expected-outputs-existence/--no-check-job-expected-outputs-existence',
+            'check_job_expected_outputs_existence',
+            default=True,
+            is_flag=True,
+            help='Before running a job, check if its input already exists. '
+                 'If it exists, submit a [reuse] job instead. '
+                 'Works nicely with --previous-batch-tsv/--previous-batch-id options.',
         ),
         click.option(
             '--update-smdb-analyses/--no-update-smdb-analyses',
@@ -220,7 +227,11 @@ def pipeline_click_options(function: Callable) -> Callable:
             help='6-letter ID of the previous successful batch (corresponds to the '
                  'directory name in the batch logs. e.g. feb0e9 in '
                  'gs://cpg-seqr-main-tmp/hail/batch/feb0e9'
-        )
+        ),
+        click.option(
+            '--local-dir',
+            'local_dir',
+        ),
     ]
     for opt in options:
         function = opt(function)
@@ -309,16 +320,6 @@ class StageOutput:
         self.target = target
         self.jobs: List[Job] = jobs or []
 
-    def exist(self) -> bool:
-        """
-        Checks file existence. For Hail Batch Resources, just returns True.
-        """
-        if isinstance(self.data, str):
-            return utils.file_exists(self.data)
-        elif isinstance(self.data, dict):
-            return all(utils.file_exists(v) for v in self.data.values())
-        return True
-    
     def __repr__(self) -> str:
         return f'result {self.data} for target {self.target}, stage {self.stage}'
 
@@ -885,6 +886,9 @@ class Stage(Generic[TargetT], ABC):
         Returns outputs that can be reused for the stage for the target,
         or None of none can be reused
         """
+        if self.pipe.dry_run:
+            return None
+
         expected_output = self.expected_result(target)
 
         if self.analysis_type is not None:
@@ -911,11 +915,11 @@ class Stage(Generic[TargetT], ABC):
                 target, cast(str, expected_output), validate=validate
             )
             return found_path
-        
-        elif not self.pipe.check_intermediate_existence or not self.required:
-            # Do not need to check file existence:
+
+        elif not self.pipe.check_job_expected_outputs_existence or not self.required:
+            # Do not need to check file existence, trust it exists:
             return expected_output
-        
+
         elif expected_output:
             # Checking that expected output exists:
             if isinstance(expected_output, dict):
@@ -1157,6 +1161,7 @@ class Pipeline(Target):
         skip_samples_without_first_stage_input: bool = False,
         validate_smdb_analyses: bool = False,
         check_intermediate_existence: bool = True,
+        check_job_expected_outputs_existence: bool = True,
         hail_billing_project: Optional[str] = None,
         first_stage: Optional[str] = None,
         last_stage: Optional[str] = None,
@@ -1167,6 +1172,7 @@ class Pipeline(Target):
         only_samples: Optional[List[str]] = None,
         force_samples: Optional[List[str]] = None,
         ped_files: Optional[List[str]] = None,
+        local_dir: Optional[str] = None,
     ):
         if stages_in_order and not input_projects:
             raise ValueError(
@@ -1186,7 +1192,8 @@ class Pipeline(Target):
         self.name = name
         self.output_version = output_version
         self.namespace = namespace
-        self.check_intermediate_existence = check_intermediate_existence
+        self.check_intermediate_existence = check_intermediate_existence and not dry_run
+        self.check_job_expected_outputs_existence = check_job_expected_outputs_existence and not dry_run
         self.skip_samples_without_first_stage_input = skip_samples_without_first_stage_input
         self.first_stage = first_stage
         self.last_stage = last_stage
@@ -1225,9 +1232,14 @@ class Pipeline(Target):
             f'{self.name}/'
             f'{self.output_version}'
         )
-        self.local_tmp_dir = tempfile.mkdtemp()
         self.keep_scratch = keep_scratch
-        self.dry_run = dry_run
+        self.dry_run: bool = dry_run
+
+        if local_dir:
+            self.local_dir = local_dir
+            self.local_tmp_dir = tempfile.mkdtemp(dir=local_dir)
+        else:
+            self.local_dir = self.local_tmp_dir = tempfile.mkdtemp()
 
         self.prev_batch_jobs = dict()
         if previous_batch_tsv_path is not None:

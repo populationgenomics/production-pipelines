@@ -43,8 +43,8 @@ class CramPedCheckStage(ProjectStage):
             tmp_bucket=self.pipe.tmp_bucket,
             depends_on=inputs.get_jobs(),
             label='(CRAMs)',
-            local_tmp_dir=self.pipe.local_tmp_dir,
             ignore_missing=self.pipe.skip_samples_without_first_stage_input,
+            dry_run=self.pipe.dry_run,
         )
         return self.make_outputs(project, data=somalier_samples_path, jobs=[j])
 
@@ -71,8 +71,8 @@ class GvcfPedCheckStage(ProjectStage):
             tmp_bucket=self.pipe.tmp_bucket,
             depends_on=inputs.get_jobs(),
             label='(GVCFs)',
-            local_tmp_dir=self.pipe.local_tmp_dir,
             ignore_missing=self.pipe.skip_samples_without_first_stage_input,
+            dry_run=self.pipe.dry_run,
         )
         return self.make_outputs(project, data=somalier_samples_path, jobs=[j])
 

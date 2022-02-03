@@ -6,7 +6,7 @@ import logging
 from hailtop.batch.job import Job
 import pandas as pd
 
-from cpg_pipes import utils, resources
+from cpg_pipes import utils, resources, hailbatch
 from cpg_pipes.pipeline import Project, Sample
 from cpg_pipes.hailbatch import wrap_command
 
@@ -22,12 +22,12 @@ def add_pedigree_jobs(
     overwrite: bool,
     fingerprints_bucket: str,
     tmp_bucket: str,
-    local_tmp_dir: str,
     web_bucket: Optional[str] = None,
     web_url: Optional[str] = None,
     depends_on: Optional[List[Job]] = None,
     label: str = None,
     ignore_missing: bool = False,
+    dry_run: bool = False,
 ) -> Tuple[Job, str, str]:
     """
     Add somalier and peddy based jobs that infer relatedness and sex, compare that
@@ -94,7 +94,8 @@ def add_pedigree_jobs(
         if sample.pedigree:
             datas.append(sample.pedigree.get_ped_dict())
     df = pd.DataFrame(datas)
-    df.to_csv(ped_fpath, sep='\t', index=False)
+    if not dry_run:
+        df.to_csv(ped_fpath, sep='\t', index=False)
     ped_file = b.read_input(ped_fpath)
 
     input_files_lines = ''
@@ -138,16 +139,14 @@ def add_pedigree_jobs(
         'Check relatedness and sex' + (f' {label}' if label else ''), 
         dict(project=project.name),
     )
+    hailbatch.STANDARD.set_resources(check_j, ncpu=2)
     check_j.image(resources.PEDDY_IMAGE)
-    check_j.cpu(1)
-    check_j.memory('standard')  # ~ 3.75G/core ~ 3.75G
 
-    local_sample_map_fpath = join(local_tmp_dir, f'{project.name}-sample-map.tsv')
-    remote_sample_map_fpath = join(tmp_bucket, f'{project.name}-sample-map.tsv')
-    with open(local_sample_map_fpath, 'w') as f:
-        for sample in project.get_samples():
-            f.write(f'{sample.id}\t{sample.participant_id}\n')
-    utils.gsutil_cp(local_sample_map_fpath, remote_sample_map_fpath)
+    # Creating sample map to remap internal IDs to participant IDs
+    sample_map_fpath = f'{tmp_bucket}/pedigree/sample_maps/{project.name}.tsv'
+    if not dry_run:
+        df = pd.DataFrame([{'id': s.id, 'pid': s.participant_id} for s in project.get_samples()])
+        df.to_csv(sample_map_fpath, sep='\t', index=False, header=False)
 
     script_name = 'check_pedigree.py'
     script_path = join(dirname(__file__), pardir, pardir, utils.SCRIPTS_DIR, script_name)
@@ -161,7 +160,7 @@ EOT
 python {script_name} \
 --somalier-samples {relate_j.output_samples} \
 --somalier-pairs {relate_j.output_pairs} \
---sample-map {b.read_input(remote_sample_map_fpath)} \
+--sample-map {b.read_input(sample_map_fpath)} \
 {('--somalier-html ' + somalier_html_url) if somalier_html_url else ''}
 """
     check_j.command(cmd)

@@ -436,7 +436,7 @@ def gsutil_cp(
     disable_check_hashes: bool = False,
     recursive: bool = False,
     quiet: bool = False,
-):
+) -> str:
     """
     Wrapper around `gsutil cp`
 
@@ -454,6 +454,7 @@ def gsutil_cp(
           checks, see the "check_hashes" option in your boto config file.
     :param recursive: to copy a directory
     :param quiet: disable logging of commands and copied files
+    :returns: dst_path
     """
     cmd = (
         'gsutil '
@@ -466,3 +467,4 @@ def gsutil_cp(
     if not quiet:
         logger.info(cmd)
     subprocess.run(cmd, check=False, shell=True)
+    return dst_path

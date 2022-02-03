@@ -9,6 +9,7 @@ from os.path import join, basename, splitext
 from typing import Optional, List, Collection, Dict, Tuple, Set, cast
 
 import hailtop.batch as hb
+import pandas as pd
 from hailtop.batch.job import Job
 
 from cpg_pipes import resources, utils, hailbatch
@@ -36,7 +37,6 @@ def make_joint_genotyping_jobs(
     genomicsdb_bucket: str,
     tmp_bucket: str,
     gvcf_by_sid: Dict[str, str],
-    local_tmp_dir: str,
     overwrite: bool,
     depends_on: Optional[List[Job]] = None,
     smdb: Optional[SMDB] = None,
@@ -46,6 +46,7 @@ def make_joint_genotyping_jobs(
     tool: JointGenotyperTool = JointGenotyperTool.GenotypeGVCFs,
     do_filter_excesshet: bool = True,
     scatter_count: int = resources.NUMBER_OF_GENOMICS_DB_INTERVALS,
+    dry_run: bool = False,
 ) -> Job:
     """
     Adds samples to the GenomicsDB and runs joint genotyping on them.
@@ -83,10 +84,11 @@ def make_joint_genotyping_jobs(
         genomicsdb_bucket=genomicsdb_bucket,
         tmp_bucket=tmp_bucket,
         gvcf_by_sid=gvcf_by_sid,
-        local_tmp_dir=local_tmp_dir,
         intervals=intervals,
         scatter_count=scatter_count,
         depends_on=depends_on,
+        dry_run=dry_run,
+        overwrite=overwrite,
     )
     first_jobs = list(import_gvcfs_job_per_interval.values())
 
@@ -179,21 +181,19 @@ def genomicsdb(
     genomicsdb_bucket: str,
     tmp_bucket: str,
     gvcf_by_sid: Dict[str, str],
-    local_tmp_dir: str,
     intervals: hb.ResourceGroup,
     scatter_count: int = resources.NUMBER_OF_GENOMICS_DB_INTERVALS,    
     depends_on: Optional[List[Job]] = None,
     overwrite: bool = False,
+    dry_run: bool = False,
 ) -> Tuple[Dict[int, Job], Dict[int, str]]:
     """
     Create GenomicDBs for each interval, given new samples.
     """
     sample_map_bucket_path = join(tmp_bucket, 'genomicsdb', 'sample_map.csv')
-    sample_map_local_fpath = join(local_tmp_dir, basename(sample_map_bucket_path))
-    with open(sample_map_local_fpath, 'w') as f:
-        for s in samples:
-            f.write('\t'.join([s.id, gvcf_by_sid[s.id]]) + '\n')
-    utils.gsutil_cp(sample_map_local_fpath, sample_map_bucket_path)
+    df = pd.DataFrame([{'id': s.id, 'path': gvcf_by_sid[s.id]} for s in samples])
+    if not dry_run:
+        df.to_csv(sample_map_bucket_path, index=False, header=False, sep='\t')
 
     path_per_interval = {idx: join(
         genomicsdb_bucket,
@@ -252,7 +252,7 @@ def genomicsdb(
         cmd = f"""\
         WORKSPACE={splitext(basename(out_path))[0]}
         
-        gatk --java-options "-Xms{xms_gb}g -Xmx{xmx_gb}g" \
+        gatk --java-options "-Xms{xms_gb}g -Xmx{xmx_gb}g" \\
         GenomicsDBImport \\
         --genomicsdb-workspace-path $WORKSPACE \\
         -L {intervals[f'interval_{idx}']} \\
@@ -589,7 +589,7 @@ def _add_joint_genotyper_job(
     cmd = f"""\
     {input_cmd}
     
-    gatk --java-options "-Xms{xms_gb}g -Xmx{xmx_gb}g" \
+    gatk --java-options "-Xms{xms_gb}g -Xmx{xmx_gb}g" \\
     {tool.name} \\
     -R {reference.base} \\
     -O {j.output_vcf['vcf.gz']} \\

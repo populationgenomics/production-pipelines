@@ -19,6 +19,7 @@ class TestPipeline(unittest.TestCase):
         self.tmp_bucket = f'{self.out_bucket}/tmp'
         self.local_tmp_dir = tempfile.mkdtemp()
         self.sample_name = f'Test-{self.timestamp}'
+        self.sample_ids = SAMPLES[:3]
 
     def tearDown(self) -> None:
         shutil.rmtree(self.local_tmp_dir)
@@ -48,12 +49,12 @@ class TestPipeline(unittest.TestCase):
             analysis_project=PROJECT,
             output_version='v0',
             namespace='test',
-            check_intermediate_existence=False,
             check_smdb_seq_existence=False,
             config=dict(output_projects=[PROJECT]),
+            dry_run=True,
         )
         project = pipeline.add_project(PROJECT)
-        for s_id in SAMPLES:
+        for s_id in self.sample_ids:
             s = project.add_sample(s_id, s_id)
             s.alignment_input = benchmark.tiny_fq
 
@@ -61,7 +62,7 @@ class TestPipeline(unittest.TestCase):
         pipeline.set_stages(find_stages_in_module(seqr_loader.__name__))
 
         with patch('builtins.print') as mock_print:
-            pipeline.submit_batch(dry_run=True)
+            pipeline.submit_batch()
         
             # print() should be called only once:
             self.assertEqual(1, mock_print.call_count)
@@ -76,9 +77,9 @@ class TestPipeline(unittest.TestCase):
             """Number of lines that start with item"""
             return len([line for line in lines if line.strip().startswith(item)])
 
-        self.assertEqual(_cnt('dragen-os'), len(SAMPLES))
-        self.assertEqual(_cnt('HaplotypeCaller'), len(SAMPLES))
-        self.assertEqual(_cnt('ReblockGVCF'), len(SAMPLES))
+        self.assertEqual(_cnt('bwa mem'), len(self.sample_ids))
+        self.assertEqual(_cnt('HaplotypeCaller'), len(self.sample_ids))
+        self.assertEqual(_cnt('ReblockGVCF'), len(self.sample_ids))
         self.assertEqual(_cnt('GenotypeGVCFs'), resources.NUMBER_OF_GENOMICS_DB_INTERVALS)
         self.assertEqual(_cnt('GenomicsDBImport'), resources.NUMBER_OF_GENOMICS_DB_INTERVALS)
         self.assertEqual(_cnt('MakeSitesOnlyVcf'), resources.NUMBER_OF_GENOMICS_DB_INTERVALS)
@@ -87,5 +88,5 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(_cnt('GatherVcfsCloud'), 2)
         self.assertEqual(
             _cnt('hailctl dataproc submit'), 
-            1 + len(pipeline.config['output_projects']) * 2
+            1 + len(pipeline.config['output_projects']) * 3
         )

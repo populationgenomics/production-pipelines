@@ -7,7 +7,7 @@ Batch pipeline to laod data into seqr
 import logging
 import sys
 import time
-from os.path import join
+from os.path import join, basename
 from typing import Optional, List
 
 import click
@@ -39,12 +39,7 @@ class NoAlignmentInputError(Exception):
 @stage(sm_analysis_type=AnalysisType.CRAM)
 class CramStage(SampleStage):
     def expected_result(self, sample: Sample):
-        path = f'{sample.project.get_bucket()}/cram'
-        source_tag = sample.meta.get('source_tag')
-        if source_tag:
-            path = join(path, source_tag)
-        path = join(path, f'{sample.id}.cram')
-        return path
+        return f'{sample.project.get_bucket()}/cram/{sample.id}.cram'
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         if not sample.alignment_input:
@@ -78,12 +73,7 @@ class CramStage(SampleStage):
 @stage(requires_stages=CramStage)
 class CramSomalierStage(SampleStage):
     def expected_result(self, sample: Sample):
-        path = f'{sample.project.get_bucket()}/cram'
-        source_tag = sample.meta.get('source_tag')
-        if source_tag:
-            path = join(path, source_tag)
-        path = join(path, f'{sample.id}.somalier')
-        return path
+        return f'{sample.project.get_bucket()}/cram/{sample.id}.somalier'
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         cram_path = inputs.as_path(target=sample, stage=CramStage)
@@ -118,8 +108,8 @@ class CramPedCheckStage(ProjectStage):
             web_url=self.pipe.web_url,
             tmp_bucket=self.pipe.tmp_bucket,
             depends_on=inputs.get_jobs(),
-            local_tmp_dir=self.pipe.local_tmp_dir,
             label='(CRAMs)',
+            dry_run=self.pipe.dry_run,
         )
         return self.make_outputs(project, data=somalier_samples_path, jobs=[j])
 
@@ -129,12 +119,7 @@ class GvcfStage(SampleStage):
     hc_intervals = None
 
     def expected_result(self, sample: Sample):
-        path = f'{sample.project.get_bucket()}/gvcf'
-        source_tag = sample.meta.get('source_tag')
-        if source_tag:
-            path = join(path, source_tag)
-        path = join(path, f'{sample.id}.g.vcf.gz')
-        return path
+        return f'{sample.project.get_bucket()}/gvcf/{sample.id}.g.vcf.gz'
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         cram_path = inputs.as_path(target=sample, stage=CramStage)
@@ -166,12 +151,7 @@ class GvcfStage(SampleStage):
 @stage(requires_stages=GvcfStage)
 class GvcfSomalierStage(SampleStage):
     def expected_result(self, sample: Sample):
-        path = f'{sample.project.get_bucket()}/gvcf'
-        source_tag = sample.meta.get('source_tag')
-        if source_tag:
-            path = join(path, source_tag)
-        path = join(path, f'{sample.id}.somalier')
-        return path
+        return f'{sample.project.get_bucket()}/gvcf/{sample.id}.somalier'
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         gvcf_path = inputs.as_path(target=sample, stage=GvcfStage)
@@ -206,8 +186,8 @@ class GvcfPedCheckStage(ProjectStage):
             web_url=self.pipe.web_url,
             tmp_bucket=self.pipe.tmp_bucket,
             depends_on=inputs.get_jobs(),
-            local_tmp_dir=self.pipe.local_tmp_dir,
-            label='(GVCFs)'
+            label='(GVCFs)',
+            dry_run=self.pipe.dry_run,
         )
         return self.make_outputs(project, data=somalier_samples_path, jobs=[j])
 
@@ -246,13 +226,13 @@ class JointGenotypingStage(CohortStage):
             genomicsdb_bucket=f'{self.pipe.analysis_bucket}/genomicsdbs',
             tmp_bucket=self.pipe.tmp_bucket,
             gvcf_by_sid=gvcf_by_sid,
-            local_tmp_dir=self.pipe.local_tmp_dir,
             overwrite=not self.pipe.check_intermediate_existence,
             depends_on=inputs.get_jobs(),
             smdb=self.pipe.get_db(),
             tool=JointGenotyperTool.GnarlyGenotyper 
             if self.pipe.config.get('use_gnarly', False) 
             else JointGenotyperTool.GenotypeGVCFs,
+            dry_run=self.pipe.dry_run,
         )
         return self.make_outputs(pipe, data=expected_path, jobs=[jc_job])
 
@@ -479,43 +459,39 @@ def make_pipeline(
     return pipeline
 
 
-@stage(requires_stages=[CramStage])
-class SeqrMaps(ProjectStage):
-    def expected_result(self, project: Project):
-        return None
+def _make_seqr_metadata_files(
+    local_dir, bucket, project, overwrite: bool = False
+):
+    """
+    Create Seqr metadata files.
+    """
+    sample_map_path = join(local_dir, f'{project.name}-sample-map.csv')
+    igv_paths_path = join(local_dir, f'{project.name}-igv-paths.tsv')
 
-    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
-        output_projects = self.pipe.config.get('output_projects', self.pipe.get_projects())
-        if project.stack not in output_projects:
-            logger.info(
-                f'Skipping loading project {project.stack} because it is not'
-                f'in the --output-projects: {output_projects}'
-            )
-            return self.make_outputs(project)
-        
-        # Sample map
-        sample_map_path = f'{self.pipe.analysis_bucket}/seqr/{project.name}-sample-map.csv'
+    # Sample map
+    if not utils.can_reuse(sample_map_path, overwrite):
         df = pd.DataFrame({
             'cpg_id': s.id,
             'individual_id': s.participant_id,
         } for s in project.get_samples())
         df.to_csv(sample_map_path, sep=',', index=False, header=False)
+        # Sample map has to sit on a bucket
+        sample_map_path = utils.gsutil_cp(
+            sample_map_path, 
+            f'{bucket}/seqr/{basename(sample_map_path)}'
+        )
 
-        # IGV
-        igv_paths_path = f'{self.pipe.analysis_bucket}/seqr/{project.name}-igv-paths.tsv'
+    # IGV
+    if not utils.can_reuse(igv_paths_path, overwrite):
         df = pd.DataFrame({
             'individual_id': s.participant_id,
-            'cram_path': inputs.as_path(target=s, stage=CramStage),
+            'cram_path': s.cram_path,
             'cram_sample_id': s.id,
-        } for s in project.get_samples() if inputs.as_path(target=s, stage=CramStage))
+        } for s in project.get_samples() if s.cram_path)
         df.to_csv(igv_paths_path, sep='\t', index=False, header=False)
 
-        logger.info(f'Seqr sample map: {sample_map_path}')
-        logger.info(f'IGV seqr paths: {igv_paths_path}')
-        return self.make_outputs(project, data={
-            'sample-map': sample_map_path, 
-            'igv-paths': igv_paths_path,
-        })
+    logger.info(f'Seqr sample map: {sample_map_path}')
+    logger.info(f'IGV seqr paths: {igv_paths_path}')
 
 
 @click.command()
@@ -555,10 +531,26 @@ class SeqrMaps(ProjectStage):
     is_flag=True,
     help='Use allele-specific annotations for VQSR',
 )
+@click.option(
+    '--make-seqr-metadata/--no-make-seqr-metadata',
+    'make_seqr_metadata',
+    default=True,
+    is_flag=True,
+    help='Make Seqr metadata',
+)
 def main(**kwargs):  # pylint: disable=missing-function-docstring
     pipeline = make_pipeline(**kwargs)
     pipeline.submit_batch()
 
+    if pipeline.config.get('make_seqr_metadata', False):
+        for project in pipeline.get_projects():
+            if project.stack in pipeline.config.get('output_projects', []):
+                _make_seqr_metadata_files(
+                    local_dir=pipeline.local_dir,
+                    bucket=pipeline.analysis_bucket,
+                    project=project,
+                )
+    
 
 if __name__ == '__main__':
     main()  # pylint: disable=E1120
