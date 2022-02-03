@@ -11,10 +11,9 @@ export PROJECT="$(gcloud config get-value project)"
 export VEP_CONFIG_PATH=/vep_data/vep-gcloud.json
 export VEP_BUCKET=cpg-reference/vep
 export ASSEMBLY=GRCh38
-export VEP_DOCKER_IMAGE=australia-southeast1-docker.pkg.dev/cpg-common/images/vep:105
+export VEP_DOCKER_IMAGE=quay.io/biocontainers/ensembl-vep:105.0--pl5262h4a94de4_0
 
-mkdir -p /vep_data/loftee_data
-mkdir -p /vep_data/homo_sapiens
+mkdir -p /vep_data/loftee/
 
 # Install docker
 apt-get update
@@ -31,14 +30,11 @@ apt-get update
 apt-get install -y --allow-unauthenticated docker-ce
 
 # Get VEP cache and LOFTEE data
-gsutil -u $PROJECT cp gs://${VEP_BUCKET}/vep95-GRCh38-loftee-gcloud.json /vep_data/vep105-GRCh38-gcloud.json
-ln -s /vep_data/vep105-GRCh38-gcloud.json $VEP_CONFIG_PATH
-
-gsutil -u $PROJECT cat gs://${VEP_BUCKET}/loftee-beta.tar | tar -xf - -C /vep_data/ &
-gsutil -u $PROJECT cat gs://${VEP_BUCKET}/homo_sapiens_vep_105_GRCh38.tar.gz | tar -xf - -C /vep_data/homo_sapiens
-ls /vep_data/
-ls /opt/vep/.vep/homo_sapiens
-ls /opt/vep/.vep/homo_sapiens/105_GRCh38
+gsutil -u $PROJECT cp gs://${VEP_BUCKET}/vep105-GRCh38-loftee-gcloud.json $VEP_CONFIG_PATH
+# Will write /vep_data/loftee/gerp_conservation_scores.homo_sapiens.GRCh38.bw
+gsutil -u $PROJECT cat gs://${VEP_BUCKET}/loftee-beta.tar | tar -xf - -C /vep_data/loftee/ &
+# Will write /vep_data/vep/homo_sapiens/105_GRCh38:
+gsutil -u $PROJECT cat gs://${VEP_BUCKET}/homo_sapiens_vep_105_GRCh38.tar | tar -xf - -C /vep_data/
 
 docker pull ${VEP_DOCKER_IMAGE} &
 wait
@@ -59,7 +55,10 @@ chmod u+s /vep
 
 cat >/vep.sh <<EOF
 #!/bin/bash
-docker run -i -v /vep_data/:/opt/vep/.vep/:ro ${VEP_DOCKER_IMAGE} \
-  /usr/local/bin/vep "\$@"
+docker run -i \
+-v /vep_data/loftee/:/opt/vep/.vep/loftee/:ro \
+-v /vep_data/vep/homo_sapiens/:/opt/vep/.vep/homo_sapiens/:ro \
+-v $VEP_CONFIG_PATH:$VEP_CONFIG_PATH:ro \
+${VEP_DOCKER_IMAGE} /usr/local/bin/vep "\$@"
 EOF
 chmod +x /vep.sh
