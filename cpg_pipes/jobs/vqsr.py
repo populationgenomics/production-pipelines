@@ -21,46 +21,37 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-# VQSR, when applying model, targets indel_filter_level and snp_filter_level
+# VQSR - when applying model - targets indel_filter_level and snp_filter_level
 # sensitivities. The tool matches them internally to a VQSLOD score cutoff 
 # based on the model's estimated sensitivity to a set of true variants.
 SNP_HARD_FILTER_LEVEL = 99.7
 INDEL_HARD_FILTER_LEVEL = 99.0
 
-SNP_RECALIBRATION_ANNOTATION_VALUES_AS = [
-    'AS_QD',
-    'AS_MQRankSum',
-    'AS_ReadPosRankSum',
-    'AS_FS',
-    'AS_SOR',
-    'AS_MQ',
-    'AS_VarDP',  # TODO: skip for exomes
-]
-INDEL_RECALIBRATION_ANNOTATION_VALUES_AS = [
-    'AS_FS',
-    'AS_ReadPosRankSum',
-    'AS_MQRankSum',
-    'AS_QD',
-    'AS_SOR',
-    'AS_VarDP',  # TODO: skip for exomes
-]
-SNP_RECALIBRATION_ANNOTATION_VALUES = [
-    'QD',
-    'MQRankSum',
-    'ReadPosRankSum',
-    'FS',
-    'MQ',
-    'SOR',
-    'DP',
-]
-INDEL_RECALIBRATION_ANNOTATION_VALUES = [
-    'FS',
+STANDARD_FEATURES = [
     'ReadPosRankSum',
     'MQRankSum',
     'QD',
+    'FS',
     'SOR',
     'DP',
 ]
+SNP_STANDARD_FEATURES = STANDARD_FEATURES + ['MQ']
+INDEL_STANDARD_FEATURES = STANDARD_FEATURES
+
+ALLELE_SPECIFIC_FEATURES = [
+    'AS_ReadPosRankSum',
+    'AS_MQRankSum',
+    'AS_QD',
+    'AS_FS',
+    'AS_SOR',
+    # Not using depth for the following reaasons:
+    # 1. The Broad pipelines don't use it;
+    # 2. -G AS_StandardAnnotation flag to GenotypeGVCFs doesn't include it;
+    # 3. For exomes, depth is an irrelevant feature and should be skipped.   
+    # 'AS_VarDP',  
+]
+SNP_ALLELE_SPECIFIC_FEATURES = ALLELE_SPECIFIC_FEATURES + ['AS_MQ']
+INDEL_ALLELE_SPECIFIC_FEATURES = ALLELE_SPECIFIC_FEATURES
 
 SNP_RECALIBRATION_TRANCHE_VALUES = [
     100.0,
@@ -559,9 +550,9 @@ def add_indels_variant_recalibrator_job(
         [
             f'-an {v}'
             for v in (
-                INDEL_RECALIBRATION_ANNOTATION_VALUES_AS
+                INDEL_ALLELE_SPECIFIC_FEATURES
                 if use_as_annotations
-                else INDEL_RECALIBRATION_ANNOTATION_VALUES
+                else INDEL_STANDARD_FEATURES
             )
         ]
     )
@@ -644,9 +635,9 @@ def add_snps_variant_recalibrator_create_model_step(
         [
             f'-an {v}'
             for v in (
-                SNP_RECALIBRATION_ANNOTATION_VALUES_AS
+                SNP_ALLELE_SPECIFIC_FEATURES
                 if use_as_annotations
-                else SNP_RECALIBRATION_ANNOTATION_VALUES
+                else SNP_STANDARD_FEATURES
             )
         ]
     )
@@ -728,9 +719,9 @@ def add_snps_variant_recalibrator_scattered_step(
         [
             f'-an {v}'
             for v in (
-                SNP_RECALIBRATION_ANNOTATION_VALUES_AS
+                SNP_ALLELE_SPECIFIC_FEATURES
                 if use_as_annotations
-                else SNP_RECALIBRATION_ANNOTATION_VALUES
+                else SNP_STANDARD_FEATURES
             )
         ]
     )
@@ -800,9 +791,9 @@ def add_snps_variant_recalibrator_step(
         [
             f'-an {v}'
             for v in (
-                SNP_RECALIBRATION_ANNOTATION_VALUES_AS
+                SNP_ALLELE_SPECIFIC_FEATURES
                 if use_as_annotations
-                else SNP_RECALIBRATION_ANNOTATION_VALUES
+                else SNP_STANDARD_FEATURES
             )
         ]
     )
