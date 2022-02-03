@@ -65,13 +65,18 @@ def main(
 
     bad_samples = list(df[df.gt_depth_mean == 0.0].sample_id)
     if bad_samples:
-        logger.info(
+        logger.warning(
             f'Excluding samples with non enough coverage to make inference: '
             f'{", ".join(bad_samples)}'
         )
     logger.info('-' * 10)
 
     logger.info('* Checking sex *')
+    # Rename Ped sex to human-readable tags
+    df.sex = df.sex.apply(lambda x: {1: 'male', 2: 'female'}.get(x, 'unknown'))
+    df.original_pedigree_sex = df.original_pedigree_sex.apply(
+        lambda x: {'-9': 'unknown'}.get(x, x)
+    )
     missing_inferred_sex = df.sex == 'unknown'
     missing_provided_sex = df.original_pedigree_sex == 'unknown'
     mismatching_female = (df.sex == 'female') & (df.original_pedigree_sex == 'male')
@@ -219,15 +224,8 @@ def _parse_inputs(
             'paternal_id': sample_map,
             'maternal_id': sample_map,
         })
-        
-    # fixed_html_path = 
-    # with open(somalier_html_fpath) as f:
-
-    df.sex = df.sex.apply(lambda x: {1: 'male', 2: 'female'}.get(x, 'unknown'))
-    df.original_pedigree_sex = df.original_pedigree_sex.apply(
-        lambda x: {'-9': 'unknown'}.get(x, x)
-    )
-
+        # Writing the file back for parsing with peddy
+        df.to_csv(local_somalier_samples_fpath, sep='\t', index=False)
     ped = Ped(local_somalier_samples_fpath)
 
     return df, pairs_df, ped

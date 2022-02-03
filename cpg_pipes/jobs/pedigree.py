@@ -91,7 +91,8 @@ def add_pedigree_jobs(
     ped_fpath = join(tmp_bucket, f'{project.name}.ped')
     datas = []
     for sample in project.get_samples():
-        datas.append(sample.get_ped_dict())
+        if sample.pedigree:
+            datas.append(sample.pedigree.get_ped_dict())
     df = pd.DataFrame(datas)
     df.to_csv(ped_fpath, sep='\t', index=False)
     ped_file = b.read_input(ped_fpath)
