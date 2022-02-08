@@ -25,9 +25,9 @@ from sample_metadata.apis import (
 )
 from sample_metadata.exceptions import ApiException
 
-from cpg_pipes import utils, resources
+from cpg_pipes import buckets, images
 from cpg_pipes.utils import Namespace, Sequence, Analysis
-from cpg_pipes.hailbatch import AlignmentInput
+from cpg_pipes.hb.inputs import AlignmentInput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -250,7 +250,7 @@ class SMDB:
             return b.new_job(f'{job_name} [skip]')
 
         j = b.new_job(job_name)
-        j.image(resources.SM_IMAGE)
+        j.image(images.SM_IMAGE)
         cmd = dedent(f"""\
         export GOOGLE_APPLICATION_CREDENTIALS=/gsa-key/key.json
         gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
@@ -357,7 +357,7 @@ class SMDB:
                     f'{expected_output_fpath}'
                 )
                 found_output_fpath = None
-            elif not utils.file_exists(found_output_fpath):
+            elif not buckets.file_exists(found_output_fpath):
                 logger.error(
                     f'Found a completed analysis {label}, '
                     f'but the "output" file {found_output_fpath} does not exist'
@@ -381,7 +381,7 @@ class SMDB:
             self.update_analysis(completed_analysis, status='failed')
 
         # can reuse, need to create a completed one?
-        if utils.file_exists(expected_output_fpath):
+        if buckets.file_exists(expected_output_fpath):
             logger.info(
                 f'Output file {expected_output_fpath} already exists, so creating '
                 f'an analysis {label} with status=completed'
@@ -512,7 +512,7 @@ def parse_reads_from_sequence(  # pylint: disable=too-many-return-statements
                 f'got: {bam_path}'
             )
             return None
-        if check_existence and not utils.file_exists(bam_path):
+        if check_existence and not buckets.file_exists(bam_path):
             logger.error(f'ERROR: index file doesn\'t exist: {bam_path}')
             return None
 
@@ -534,7 +534,7 @@ def parse_reads_from_sequence(  # pylint: disable=too-many-return-statements
                 f'ERROR: expected the index file to have an extention '
                 f'.crai or .bai, got: {index_path}'
             )
-        if check_existence and not utils.file_exists(index_path):
+        if check_existence and not buckets.file_exists(index_path):
             logger.error(f'ERROR: index file doesn\'t exist: {index_path}')
             return None
 
@@ -545,12 +545,12 @@ def parse_reads_from_sequence(  # pylint: disable=too-many-return-statements
         fqs2 = []
         for lane_data in reads_data:
             assert len(lane_data) == 2, lane_data
-            if check_existence and not utils.file_exists(lane_data[0]['location']):
+            if check_existence and not buckets.file_exists(lane_data[0]['location']):
                 logger.error(
                     f'ERROR: read 1 file doesn\'t exist: {lane_data[0]["location"]}'
                 )
                 return None
-            if check_existence and not utils.file_exists(lane_data[1]['location']):
+            if check_existence and not buckets.file_exists(lane_data[1]['location']):
                 logger.error(
                     f'ERROR: read 2 file doesn\'t exist: {lane_data[1]["location"]}'
                 )

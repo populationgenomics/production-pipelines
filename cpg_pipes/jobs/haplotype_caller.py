@@ -9,10 +9,11 @@ from typing import Optional, List, Tuple
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes import resources, utils
+from cpg_pipes import images, ref_data, buckets
 from cpg_pipes.smdb import SMDB
 from cpg_pipes.jobs import split_intervals
-from cpg_pipes.hailbatch import wrap_command, STANDARD
+from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.hb.resources import STANDARD
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -41,7 +42,7 @@ def produce_gvcf(
     HaplotypeCaller is run in an interval-based sharded way, with per-interval
     HaplotypeCaller jobs defined in a nested loop.
     """
-    if output_path and utils.can_reuse(output_path, overwrite):
+    if output_path and buckets.can_reuse(output_path, overwrite):
         return b.new_job('Make GVCF [reuse]', dict(sample=sample_name, project=project_name))
 
     depends_on = depends_on or []
@@ -103,7 +104,7 @@ def haplotype_caller(
     Returns the first and the last job object, and path to the output GVCF file.
     """
     hc_gvcf_path = join(tmp_bucket, 'haplotypecaller', f'{sample_name}.g.vcf.gz')
-    if utils.can_reuse(hc_gvcf_path, overwrite):
+    if buckets.can_reuse(hc_gvcf_path, overwrite):
         first_j = last_j = b.new_job('HaplotypeCaller [reuse]', dict(
             sample=sample_name, project=project_name))
         return first_j, last_j, hc_gvcf_path
@@ -185,11 +186,11 @@ def _haplotype_caller_one(
         job_name += f', {interval_idx + 1}/{number_of_intervals}'
 
     j = b.new_job(job_name, dict(sample=sample_name, project=project_name))
-    if utils.can_reuse(out_gvcf_path, overwrite):
+    if buckets.can_reuse(out_gvcf_path, overwrite):
         j.name += ' [reuse]'
         return j
 
-    j.image(resources.GATK_IMAGE)
+    j.image(images.GATK_IMAGE)
 
     # Enough storage to localize CRAMs (can't pass GCS URL to CRAM to gatk directly
     # because we will hit GCP egress bandwidth limit:
@@ -208,8 +209,8 @@ def _haplotype_caller_one(
     if depends_on:
         j.depends_on(*depends_on)
 
-    ref_fasta = resources.REF_FASTA
-    ref_fai = resources.REF_FASTA + '.fai'
+    ref_fasta = ref_data.REF_FASTA
+    ref_fai = ref_data.REF_FASTA + '.fai'
     ref_dict = (
         ref_fasta.replace('.fasta', '').replace('.fna', '').replace('.fa', '') + '.dict'
     )
@@ -265,11 +266,11 @@ def merge_gvcfs_job(
     """
     job_name = f'Merge {len(gvcfs)} GVCFs'
     j = b.new_job(job_name, dict(sample=sample_name, project=project_name))
-    if utils.can_reuse(out_gvcf_path, overwrite):
+    if buckets.can_reuse(out_gvcf_path, overwrite):
         j.name += ' [reuse]'
         return j
     
-    j.image(resources.SAMTOOLS_PICARD_IMAGE)
+    j.image(images.SAMTOOLS_PICARD_IMAGE)
     j.cpu(2)
     java_mem = 7
     j.memory('standard')  # ~ 4G/core ~ 7.5G
@@ -309,13 +310,13 @@ def postproc_gvcf(
        from Hail about mismatched INFO annotations
     4. Renames the GVCF sample name to use CPG ID.
     """
-    if output_path and utils.can_reuse(output_path, overwrite):
+    if output_path and buckets.can_reuse(output_path, overwrite):
         return b.new_job('Postproc GVCF [reuse]', dict(sample=sample_name, project=project_name))
 
     logger.info(f'Adding GVCF postproc job for sample {sample_name}, gvcf {gvcf_path}')
 
     j = b.new_job(f'ReblockGVCF', dict(sample=sample_name, project=project_name))
-    j.image(resources.GATK_IMAGE)
+    j.image(images.GATK_IMAGE)
 
     # Enough to fit a pre-reblocked GVCF, which can be as big as 10G,
     # the reblocked result (1G), and ref data (5G). 
@@ -330,8 +331,8 @@ def postproc_gvcf(
         }
     )
 
-    ref_fasta = resources.REF_FASTA
-    ref_fai = resources.REF_FASTA + '.fai'
+    ref_fasta = ref_data.REF_FASTA
+    ref_fai = ref_data.REF_FASTA + '.fai'
     ref_dict = (
         ref_fasta.replace('.fasta', '').replace('.fna', '').replace('.fa', '') + '.dict'
     )
@@ -343,7 +344,7 @@ def postproc_gvcf(
 
     # Retrying copying to avoid google bandwidth limits
     retry_gs_cp {gvcf_path} $GVCF
-    retry_gs_cp {resources.NOALT_REGIONS} /io/batch/noalt-regions.bed
+    retry_gs_cp {ref_data.NOALT_REGIONS} /io/batch/noalt-regions.bed
 
     # Copying reference data as well to avoid crazy logging costs 
     # for region requests

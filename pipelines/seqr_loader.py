@@ -16,7 +16,7 @@ import pandas as pd
 
 from analysis_runner import dataproc
 
-from cpg_pipes import utils, resources
+from cpg_pipes import buckets, ref_data, utils
 from cpg_pipes.jobs import align, split_intervals, haplotype_caller, \
     pedigree
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
@@ -472,20 +472,20 @@ def _make_seqr_metadata_files(
     igv_paths_path = join(local_dir, f'{project.name}-igv-paths.tsv')
 
     # Sample map
-    if not utils.can_reuse(sample_map_path, overwrite):
+    if not buckets.can_reuse(sample_map_path, overwrite):
         df = pd.DataFrame({
             'cpg_id': s.id,
             'individual_id': s.participant_id,
         } for s in project.get_samples())
         df.to_csv(sample_map_path, sep=',', index=False, header=False)
         # Sample map has to sit on a bucket
-        sample_map_path = utils.gsutil_cp(
+        sample_map_path = buckets.gsutil_cp(
             sample_map_path, 
             f'{bucket}/seqr/{basename(sample_map_path)}'
         )
 
     # IGV
-    if not utils.can_reuse(igv_paths_path, overwrite):
+    if not buckets.can_reuse(igv_paths_path, overwrite):
         df = pd.DataFrame({
             'individual_id': s.participant_id,
             'cram_path': s.cram_path,
@@ -517,7 +517,7 @@ def _make_seqr_metadata_files(
     '--hc-shards-num',
     'hc_shards_num',
     type=click.INT,
-    default=resources.NUMBER_OF_HAPLOTYPE_CALLER_INTERVALS,
+    default=ref_data.NUMBER_OF_HAPLOTYPE_CALLER_INTERVALS,
     help='Number of intervals to devide the genome for gatk HaplotypeCaller',
 )
 @click.option(

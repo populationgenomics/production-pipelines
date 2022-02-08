@@ -6,9 +6,10 @@ import logging
 from hailtop.batch.job import Job
 import pandas as pd
 
-from cpg_pipes import utils, resources, hailbatch
+from cpg_pipes import buckets, images, ref_data, utils
+from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.pipeline import Project, Sample
-from cpg_pipes.hailbatch import wrap_command
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -78,7 +79,7 @@ def add_pedigree_jobs(
         'Somalier relate' + (f' {label}' if label else ''), 
         dict(project=project.name),
     )
-    relate_j.image(resources.BIOINFO_IMAGE)
+    relate_j.image(images.BIOINFO_IMAGE)
     relate_j.cpu(1)
     relate_j.memory('standard')  # ~ 4G/core ~ 4G
     # Size of one somalier file is 212K, so we add another G only if the number of
@@ -139,8 +140,8 @@ def add_pedigree_jobs(
         'Check relatedness and sex' + (f' {label}' if label else ''), 
         dict(project=project.name),
     )
-    hailbatch.STANDARD.set_resources(check_j, ncpu=2)
-    check_j.image(resources.PEDDY_IMAGE)
+    STANDARD.set_resources(check_j, ncpu=2)
+    check_j.image(images.PEDDY_IMAGE)
 
     # Creating sample map to remap internal IDs to participant IDs
     sample_map_fpath = f'{tmp_bucket}/pedigree/sample_maps/{project.name}.tsv'
@@ -193,11 +194,11 @@ def somalier_extact_job(
             .replace('.bam', '.somalier')\
             .replace('.g.vcf.gz', '.somalier')
 
-    if utils.can_reuse(out_fpath, overwrite):
+    if buckets.can_reuse(out_fpath, overwrite):
         j.name += ' [reuse]'
         return j, out_fpath
 
-    j.image(resources.BIOINFO_IMAGE)
+    j.image(images.BIOINFO_IMAGE)
     j.memory('standard')
     if gvcf_or_cram_or_bam_path.endswith('.bam'):
         j.cpu(4)
@@ -224,8 +225,8 @@ def somalier_extact_job(
     if depends_on:
         j.depends_on(*depends_on)
 
-    ref_fasta = resources.REF_FASTA
-    ref_fai = resources.REF_FASTA + '.fai'
+    ref_fasta = ref_data.REF_FASTA
+    ref_fai = ref_data.REF_FASTA + '.fai'
     ref_dict = (
         ref_fasta.replace('.fasta', '').replace('.fna', '').replace('.fa', '') + '.dict'
     )
@@ -235,8 +236,8 @@ def somalier_extact_job(
     retry gsutil cp {ref_fasta} /io/batch/{basename(ref_fasta)}
     retry gsutil cp {ref_fai}   /io/batch/{basename(ref_fai)}
     retry gsutil cp {ref_dict}  /io/batch/{basename(ref_dict)}
-    SITES=/io/batch/sites/{basename(resources.SOMALIER_SITES)}
-    retry gsutil cp {resources.SOMALIER_SITES} $SITES
+    SITES=/io/batch/sites/{basename(ref_data.SOMALIER_SITES)}
+    retry gsutil cp {ref_data.SOMALIER_SITES} $SITES
 
     somalier extract -d extracted/ --sites $SITES \\
     -f /io/batch/{basename(ref_fasta)} \\

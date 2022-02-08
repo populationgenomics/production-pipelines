@@ -2,9 +2,8 @@
 import click
 import logging
 
-from cpg_pipes import resources
-from cpg_pipes.hailbatch import AlignmentInput
-from cpg_pipes.jobs import picard
+from cpg_pipes import images
+from cpg_pipes.hb.inputs import AlignmentInput
 from cpg_pipes.pipeline import Pipeline
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
 
@@ -71,14 +70,14 @@ def main():
     )
     j.storage('300G')
     j.cpu(8)
-    j.image(resources.SAMTOOLS_PICARD_IMAGE)
+    j.image(images.SAMTOOLS_PICARD_IMAGE)
     j.command(f"""\
     mv {merged_bam} {j.output.bam}
     samtools index -@7 {j.output.bam} {j.output['bam.bai']}
     """)
     pipe.b.write_output(j.output, 'gs://cpg-seqr-main-tmp/seqr_align_CPG12062_19W001482_A0131064_proband-sorted')
 
-    pipe.run()
+    pipe.submit_batch()
 
 
 if __name__ == '__main__':

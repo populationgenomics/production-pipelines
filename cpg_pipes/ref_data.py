@@ -1,5 +1,5 @@
 """
-Utility module to encapsulate pointers to the reference files used in the pipeline
+Reference data and indices on used in the pipelines.
 """
 from os.path import join
 import logging
@@ -8,31 +8,20 @@ logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
-# Images
-DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:ca793d8df6dd8fa20f1908d5c76eb98ab2cf53e4-hail-0.2.73.devc6f6f09cec08'
-
-AR_REPO = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
-GATK_VERSION = '4.2.3.0'
-GATK_IMAGE = f'{AR_REPO}/gatk:{GATK_VERSION}'
-BCFTOOLS_IMAGE = f'{AR_REPO}/bcftools:1.10.2--h4f4756c_2'
-SM_IMAGE = f'{AR_REPO}/sm-api:4.0.0'
-BIOINFO_IMAGE = f'{AR_REPO}/bioinformatics:v1-1'  # include aligners
-BWAMEM2_IMAGE = f'{AR_REPO}/bazam_bwamem2:v0'
-SAMTOOLS_PICARD_IMAGE = f'{AR_REPO}/picard_samtools:v0'
-SOMALIER_IMAGE = f'{AR_REPO}/somalier:latest'
-PEDDY_IMAGE = f'{AR_REPO}/peddy:0.4.8--pyh5e36f6f_0'
-VEP_IMAGE = f'{AR_REPO}/vep:105'
-
-# Files
 REF_BUCKET = 'gs://cpg-reference'
+BROAD_REF_BUCKET = f'{REF_BUCKET}/hg38/v1'
+
+# BED files
 NOALT_REGIONS = join(REF_BUCKET, 'noalt.bed')
+
+# Somalier
 SOMALIER_SITES = join(REF_BUCKET, 'somalier/v0/sites.hg38.vcf.gz')
 
+# VEP
 VEP_LOFTEE = join(REF_BUCKET, 'vep/loftee_GRCh38.tar')
 VEP_CACHE = join(REF_BUCKET, 'vep/homo_sapiens_vep_105_GRCh38.tar')
 
-BROAD_REF_BUCKET = f'{REF_BUCKET}/hg38/v1'
-
+# Fasta
 REF_FASTA = join(BROAD_REF_BUCKET, 'Homo_sapiens_assembly38.fasta')
 REF_D = dict(
     base=REF_FASTA,
@@ -41,6 +30,7 @@ REF_D = dict(
     + '.dict',
 )
 
+# DRAGMAP indices
 DRAGMAP_INDEX_BUCKET = f'{REF_BUCKET}/dragmap/v0'
 DRAGMAP_INDEX_FILES = [
     'hash_table.cfg',
@@ -53,16 +43,30 @@ DRAGMAP_INDEX_FILES = [
     'str_table.bin',
 ]
 
+# BWA indices
 BWAMEM2_INDEX_PREFIX = REF_FASTA
 BWAMEM2_INDEX_EXTS = ['0123', 'amb', 'bwt.2bit.64', 'ann', 'pac']
 BWA_INDEX_EXTS = ['sa', 'amb', 'bwt', 'ann', 'pac']
 
-DBSNP_VCF = join(BROAD_REF_BUCKET, 'Homo_sapiens_assembly38.dbsnp138.vcf')
+# GATK intervals
 UNPADDED_INTERVALS = join(BROAD_REF_BUCKET, 'hg38.even.handcurated.20k.intervals')
-
 NUMBER_OF_HAPLOTYPE_CALLER_INTERVALS = 50
 NUMBER_OF_GENOMICS_DB_INTERVALS = 50
 PRECOMPUTED_INTERVALS = {
     50: join(REF_BUCKET, 'intervals', '50intervals'),
     10: join(REF_BUCKET, 'intervals', '10intervals'),
 }
+
+# VQSR
+DBSNP_VCF = join(BROAD_REF_BUCKET, 'Homo_sapiens_assembly38.dbsnp138.vcf')
+DBSNP_VCF_INDEX = join(BROAD_REF_BUCKET, 'Homo_sapiens_assembly38.dbsnp138.vcf.idx')
+HAPMAP_RESOURCE_VCF = join(BROAD_REF_BUCKET, 'hapmap_3.3.hg38.vcf.gz')
+HAPMAP_RESOURCE_VCF_INDEX = join(BROAD_REF_BUCKET, 'hapmap_3.3.hg38.vcf.gz.tbi')
+OMNI_RESOURCE_VCF = join(BROAD_REF_BUCKET, '1000G_omni2.5.hg38.vcf.gz')
+OMNI_RESOURCE_VCF_INDEX = join(BROAD_REF_BUCKET, '1000G_omni2.5.hg38.vcf.gz.tbi')
+ONE_THOUSAND_GENOMES_RESOURCE_VCF = join(BROAD_REF_BUCKET, '1000G_phase1.snps.high_confidence.hg38.vcf.gz')
+ONE_THOUSAND_GENOMES_RESOURCE_VCF_INDEX = join(BROAD_REF_BUCKET, '1000G_phase1.snps.high_confidence.hg38.vcf.gz.tbi')
+MILLS_RESOURCE_VCF = join(BROAD_REF_BUCKET, 'Mills_and_1000G_gold_standard.indels.hg38.vcf.gz')
+MILLS_RESOURCE_VCF_INDEX = join(BROAD_REF_BUCKET, 'Mills_and_1000G_gold_standard.indels.hg38.vcf.gz.tbi')
+AXIOM_POLY_RESOURCE_VCF = join(BROAD_REF_BUCKET, 'Axiom_Exome_Plus.genotypes.all_populations.poly.hg38.vcf.gz')
+AXIOM_POLY_RESOURCE_VCF_INDEX = join(BROAD_REF_BUCKET, 'Axiom_Exome_Plus.genotypes.all_populations.poly.hg38.vcf.gz.tbi')

@@ -2,12 +2,14 @@
 Use Hail Batch to transfer VEP reference data cpg-reference bucket.
 """
 
-from cpg_pipes.hailbatch import setup_batch, wrap_command, resources
+from cpg_pipes import images, ref_data
+from cpg_pipes.hb.batch import setup_batch
+from cpg_pipes.hb.command import wrap_command
 
 
 def _vep_cache(b):
     j = b.new_job('Copy VEP cache with vep_install')
-    j.image(resources.VEP_IMAGE)
+    j.image(images.VEP_IMAGE)
     j.storage(f'30G')
     j.cpu(16)
     
@@ -21,13 +23,13 @@ def _vep_cache(b):
     tar -cvf {j.tar} vep
     """
     j.command(wrap_command(cmd))
-    b.write_output(j.tar, 'gs://cpg-reference/vep/homo_sapiens_vep_105_GRCh38.tar')
+    b.write_output(j.tar, ref_data.VEP_CACHE)
     return j
 
 
 def _loftee(b):
     j = b.new_job('Prepare loftee reference bundle')
-    j.image(resources.VEP_IMAGE)
+    j.image(images.VEP_IMAGE)
     j.storage(f'30G')
     cmd = f"""\
     cd /io/batch
@@ -38,6 +40,7 @@ def _loftee(b):
 
     # conservation file:
     wget https://personal.broadinstitute.org/konradk/loftee_data/GRCh38/loftee.sql.gz
+    gunzip loftee.sql.gz
     
     # human_ancestor.fa file:
     wget https://personal.broadinstitute.org/konradk/loftee_data/GRCh38/human_ancestor.fa.gz
@@ -50,10 +53,10 @@ def _loftee(b):
     tar -cvf {j.tar} .
     """
     j.command(wrap_command(cmd))
-    b.write_output(j.tar, 'gs://cpg-reference/vep/loftee_GRCh38.tar')
+    b.write_output(j.tar, ref_data.VEP_LOFTEE)
 
 
 b = setup_batch('Copy VEP data')
-# _vep_cache(b)
+_vep_cache(b)
 _loftee(b)
 b.run(wait=False)

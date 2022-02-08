@@ -10,7 +10,7 @@ from typing import List
 
 import click
 
-from cpg_pipes import utils
+from cpg_pipes import buckets
 from cpg_pipes.jobs import pedigree
 from cpg_pipes.pipeline import Project, \
     ProjectStage, pipeline_click_options, stage, StageInput, StageOutput, Pipeline
@@ -29,7 +29,7 @@ class CramPedCheckStage(ProjectStage):
         path_by_sid = dict()
         for s in project.get_samples():
             path = f'gs://cpg-{project.name}-main/cram/{s.id}.somalier'
-            if utils.file_exists(path):
+            if buckets.file_exists(path):
                 path_by_sid[s.id] = path
 
         j, somalier_samples_path, somalier_pairs_path = pedigree.add_pedigree_jobs(
@@ -58,7 +58,7 @@ class GvcfPedCheckStage(ProjectStage):
         path_by_sid = dict()
         for s in project.get_samples():
             path = f'gs://cpg-{project.name}-main/gvcf/{s.id}.somalier'
-            if utils.file_exists(path):
+            if buckets.file_exists(path):
                 path_by_sid[s.id] = path
 
         j, somalier_samples_path, somalier_pairs_path = pedigree.add_pedigree_jobs(

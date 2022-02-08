@@ -14,7 +14,6 @@ from sample_metadata.models import (
 
 from cpg_pipes import utils
 from cpg_pipes.pipeline import Pipeline
-from cpg_pipes.utils import Namespace
 
 sapi = SampleApi()
 aapi = AnalysisApi()
@@ -25,7 +24,7 @@ logger.setLevel(logging.INFO)
 
 # INPUT_PROJECT = 'fewgenomes'
 INPUT_PROJECT = 'tob-wgs'
-NAMESPACE = Namespace.MAIN
+NAMESPACE = utils.Namespace.MAIN
 BENCHMARK_BUCKET = f'gs://cpg-{INPUT_PROJECT}-{NAMESPACE}-analysis/benchmark_combiner'
 
 

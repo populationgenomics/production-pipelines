@@ -10,11 +10,14 @@ import logging
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes import resources, utils
+from cpg_pipes import images, ref_data, buckets
+from cpg_pipes.hb import inputs
+from cpg_pipes.hb.inputs import AlignmentInput
+from cpg_pipes.hb.prev_job import PrevJob
 from cpg_pipes.jobs import picard
 from cpg_pipes.smdb import SMDB
-from cpg_pipes.hailbatch import AlignmentInput, PrevJob, wrap_command, \
-    fasta_ref_resource, STANDARD
+from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.hb.resources import STANDARD
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -76,11 +79,11 @@ def samtools_stats(
     j = b.new_job(jname, dict(sample=sample_name, project=project_name))
     if not output_path:
         output_path = cram_path + '.stats'
-    if utils.can_reuse(cram_path, overwrite):
+    if buckets.can_reuse(cram_path, overwrite):
         j.name += ' [reuse]'
         return j
 
-    j.image(resources.SAMTOOLS_PICARD_IMAGE)
+    j.image(images.SAMTOOLS_PICARD_IMAGE)
 
     job_resource = STANDARD.set_resources(j, nthreads=nthreads)
 
@@ -134,7 +137,7 @@ def align(
     - nthreads can be set for smaller test runs on toy instance, so the job 
       doesn't take entire 32-cpu/64-threaded instance.
     """
-    if output_path and utils.can_reuse(output_path, overwrite):
+    if output_path and buckets.can_reuse(output_path, overwrite):
         job_name = aligner.name
         if extra_label:
             job_name += f' {extra_label}'
@@ -200,7 +203,7 @@ def align(
                     existing_sorted_bam_path = (
                         f'{prevj.hail_bucket}/batch/{prevj.batchid}/{prevj.job_number}/sorted_bam'
                     )
-                    if utils.can_reuse(existing_sorted_bam_path, overwrite):
+                    if buckets.can_reuse(existing_sorted_bam_path, overwrite):
                         logger.info(f'Reusing previous batch result: {existing_sorted_bam_path}')
                         jname += ' [reuse from previous batch]'
                         j = b.new_job(jname, dict(sample=sample_name, project=project_name))
@@ -255,7 +258,7 @@ def align(
                 align_jobs.append(j)
 
         merge_j = b.new_job('Merge BAMs', dict(sample=sample_name, project=project_name))
-        merge_j.image(resources.BIOINFO_IMAGE)
+        merge_j.image(images.BIOINFO_IMAGE)
         nthreads = STANDARD.set_resources(merge_j, nthreads=requested_nthreads).get_nthreads()
 
         align_cmd = f"""\
@@ -329,16 +332,16 @@ def _align_one(
     if aligner in [Aligner.BWAMEM2, Aligner.BWA]:
         if aligner == Aligner.BWAMEM2:
             tool_name = 'bwa-mem2'
-            j.image(resources.BWAMEM2_IMAGE)
-            index_exts = resources.BWAMEM2_INDEX_EXTS
+            j.image(images.BWAMEM2_IMAGE)
+            index_exts = ref_data.BWAMEM2_INDEX_EXTS
         else:
             tool_name = 'bwa'
-            j.image(resources.BIOINFO_IMAGE)
-            index_exts = resources.BWA_INDEX_EXTS
+            j.image(images.BIOINFO_IMAGE)
+            index_exts = ref_data.BWA_INDEX_EXTS
 
         bwa_reference = b.read_input_group(
-            **resources.REF_D,
-            **{k: f'{resources.REF_FASTA}.{k}' for k in index_exts},
+            **ref_data.REF_D,
+            **{k: f'{ref_data.REF_FASTA}.{k}' for k in index_exts},
         )
         align_cmd = _build_bwa_command(
             b=b,
@@ -352,11 +355,11 @@ def _align_one(
             shard_number_1based=shard_number_1based,
         )
     else:
-        j.image(resources.BIOINFO_IMAGE)
+        j.image(images.BIOINFO_IMAGE)
         dragmap_index = b.read_input_group(
             **{
-                k.replace('.', '_'): join(resources.DRAGMAP_INDEX_BUCKET, k)
-                for k in resources.DRAGMAP_INDEX_FILES
+                k.replace('.', '_'): join(ref_data.DRAGMAP_INDEX_BUCKET, k)
+                for k in ref_data.DRAGMAP_INDEX_FILES
             }
         )
         prep_inp_cmd = ''
@@ -478,10 +481,10 @@ def extract_fastq(
     ncpu = 16
     nthreads = ncpu * 2  # multithreading
     j.cpu(ncpu)
-    j.image(resources.BIOINFO_IMAGE)
+    j.image(images.BIOINFO_IMAGE)
     j.storage('700G')
 
-    reference = fasta_ref_resource(b)
+    reference = inputs.fasta(b)
     cmd = f"""\
     bazam -Xmx16g -Dsamjdk.reference_fasta={reference.base} \
     -n{nthreads} -bam {cram.base} -r1 {j.fq1} -r2 {j.fq2}
@@ -498,10 +501,10 @@ def create_dragmap_index(b: hb.Batch) -> Job:
     """
     Creates the index for DRAGMAP
     """
-    reference = fasta_ref_resource(b)
+    reference = inputs.fasta(b)
 
     j = b.new_job('Index DRAGMAP')
-    j.image(resources.BIOINFO_IMAGE)
+    j.image(images.BIOINFO_IMAGE)
     j.memory('standard')
     j.cpu(32)
     j.storage('40G')
@@ -515,13 +518,13 @@ def create_dragmap_index(b: hb.Batch) -> Job:
     --output-directory $DIR
     """
     j.command(wrap_command(cmd))
-    for f in resources.DRAGMAP_INDEX_FILES:
+    for f in ref_data.DRAGMAP_INDEX_FILES:
         cmd += f'ln $DIR/{f} {getattr(j, f.replace(".", "_"))}\n'
     cmd += 'df -h; pwd; ls | grep -v proc | xargs du -sh'
     j.command(cmd)
-    for f in resources.DRAGMAP_INDEX_FILES:
+    for f in ref_data.DRAGMAP_INDEX_FILES:
         b.write_output(
-            getattr(j, f.replace('.', '_')), join(resources.DRAGMAP_INDEX_BUCKET, f)
+            getattr(j, f.replace('.', '_')), join(ref_data.DRAGMAP_INDEX_BUCKET, f)
         )
     return j
 
@@ -551,7 +554,7 @@ def finalise_alignment(
     For MarkDupTool.PICARD, creates a new job, as Picard can't read from stdin.
     """
 
-    reference = b.read_input_group(**resources.REF_D)
+    reference = b.read_input_group(**ref_data.REF_D)
     
     nthreads = STANDARD.request_resources(nthreads=requested_nthreads).get_nthreads()
 

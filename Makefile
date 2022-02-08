@@ -15,7 +15,3 @@ package:
 	rm -rf dist/*
 	python setup.py sdist bdist_wheel
 	twine upload dist/*
-
-.PHONY: sleep
-sleep:
-	sleep 60

@@ -8,8 +8,9 @@ from typing import List, Tuple
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes import resources, utils, hailbatch
-from cpg_pipes.hailbatch import wrap_command
+from cpg_pipes import images, buckets
+from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.hb.resources import STANDARD
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -29,17 +30,16 @@ def gather_vcfs(
     """
     job_name = f'Gather {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
     j = b.new_job(job_name)
-    if output_vcf_path and utils.can_reuse(output_vcf_path, overwrite):
+    if output_vcf_path and buckets.can_reuse(output_vcf_path, overwrite):
         j.name += ' [reuse]'
         return j, b.read_input_group(**{
             'vcf.gz': output_vcf_path,
             'vcf.gz.tbi': output_vcf_path + '.tbi',
         })
 
-    j.image(resources.GATK_IMAGE)
-    hailbatch.STANDARD\
-        .set_resources(j, storage_gb=hailbatch.STANDARD.calc_instance_disk_gb())
-        
+    j.image(images.GATK_IMAGE)
+    STANDARD.set_resources(j, fraction=1)
+
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )

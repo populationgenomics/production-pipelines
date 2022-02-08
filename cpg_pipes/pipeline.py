@@ -1,13 +1,13 @@
 """
-Implements a Pipeline that is capable of plugging multiple "stages" together,
-by resolving dependencies through the sample-metadata database or by checking
-buckets directly. Each stage adds jobs to Hail Batch. Each stage acts on "target",
-which can be a sample, a project, or an entire cohort. Pipeline would resolve 
-dependencies between stages of different levels accordingly.
+Provides "Pipeline" class that allows plugging multiple "stages" together
+by resolving dependencies through the sample-metadata database, or by checking
+objects on buckets directly. 
 
-For usage examples, see the "pipelines" folder in the root of this repository.
+Each stage adds jobs to Hail Batch. Each stage acts on "target", which can be a 
+sample, a project, or an entire cohort. Pipeline would resolve dependencies between
+stages of different levels accordingly.
 
-Basic example is also provided here:
+Basic example:
 
 @stage(analysis_type=AnalysisType.CRAM)
 class CramStage(SampleStage):
@@ -35,12 +35,15 @@ class JointCallingStage(CohortStage):
 @click.command()
 @pipeline_click_options
 def main(**kwargs):
-    Pipeline(
+    p = Pipeline(
         name='my_joint_calling_pipeline',
         title='My joint calling pipeline',
         stages_in_order=[CramStage, GvcfStage, JointCallingStage],
         **kwargs
-    ).submit_batches()
+    )
+    p.submit_batches()
+
+For more usage examples, see the "pipelines" folder in the root of this repository.
 """
 
 import functools
@@ -61,10 +64,11 @@ import click
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes import utils
+from cpg_pipes import buckets
 from cpg_pipes.utils import Namespace, AnalysisType, Analysis, Sequence
-from cpg_pipes.hailbatch import AlignmentInput, PrevJob, get_hail_bucket, setup_batch, \
-    Batch
+from cpg_pipes.hb.inputs import AlignmentInput
+from cpg_pipes.hb.prev_job import PrevJob
+from cpg_pipes.hb.batch import setup_batch, Batch
 from cpg_pipes.smdb import SMDB, parse_reads_from_sequence
 
 logger = logging.getLogger(__file__)
@@ -926,7 +930,7 @@ class Stage(Generic[TargetT], ABC):
                 paths = list(expected_output.values())
             else:
                 paths = [expected_output]
-            if all(utils.file_exists(path) for path in paths):
+            if all(buckets.file_exists(path) for path in paths):
                 return expected_output
         return None
 
@@ -1152,7 +1156,7 @@ class Pipeline(Target):
         output_version: str,
         namespace: Union[Namespace, str],
         stages_in_order: Optional[List[StageDecorator]] = None,
-        keep_scratch: bool = False,
+        keep_scratch: bool = True,
         dry_run: bool = False,
         previous_batch_tsv_path: Optional[str] = None,
         previous_batch_id: Optional[str] = None,
@@ -1162,7 +1166,6 @@ class Pipeline(Target):
         validate_smdb_analyses: bool = False,
         check_intermediate_existence: bool = True,
         check_job_expected_outputs_existence: bool = True,
-        hail_billing_project: Optional[str] = None,
         first_stage: Optional[str] = None,
         last_stage: Optional[str] = None,
         config: Optional[Dict] = None,
@@ -1247,17 +1250,17 @@ class Pipeline(Target):
             self.prev_batch_jobs = PrevJob.parse(
                 previous_batch_tsv_path,
                 previous_batch_id,
-                get_hail_bucket(self.tmp_bucket, keep_scratch),
+                tmp_bucket=self.tmp_bucket,
+                keep_scratch=keep_scratch,
             )
 
         self.config = config or {}
 
         self.b: Batch = setup_batch(
             title=title, 
-            analysis_project_name=self.analysis_project.stack,
             tmp_bucket=self.tmp_bucket,
             keep_scratch=self.keep_scratch,
-            billing_project=hail_billing_project,
+            billing_project=self.analysis_project.stack,
         )
 
         self._projects: List[Project] = []
@@ -1443,7 +1446,7 @@ class Pipeline(Target):
 
         for i, ped_file in enumerate(ped_files):
             local_ped_file = join(self.local_tmp_dir, f'ped_file_{i}.ped')
-            utils.gsutil_cp(ped_file, local_ped_file)
+            buckets.gsutil_cp(ped_file, local_ped_file)
             with open(local_ped_file) as f:
                 for line in f:
                     fields = line.strip().split('\t')[:6]
@@ -1585,7 +1588,7 @@ class Pipeline(Target):
         Checks if the fpath exists, 
         but always returns False if not check_intermediate_existence
         """
-        return utils.can_reuse(fpath, overwrite=not self.check_intermediate_existence)
+        return buckets.can_reuse(fpath, overwrite=not self.check_intermediate_existence)
     
     @property
     def unique_id(self) -> str:

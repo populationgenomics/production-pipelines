@@ -6,19 +6,16 @@ Combine a set of GVCFs into a MatrixTable
 
 import os
 from os.path import join, basename
-import subprocess
-from typing import List
 import logging
 import shutil
 
 import pandas as pd
 import click
 import hail as hl
-from hail.experimental.vcf_combiner import vcf_combiner
 
+from cpg_pipes.hailquery_utils import init_hail
 from cpg_pipes.utils import get_validation_callback
-from cpg_pipes import utils
-from cpg_pipes import _version
+from cpg_pipes import buckets, utils, _version
 
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger = logging.getLogger(__name__)
@@ -65,11 +62,11 @@ def main(
     local_tmp_dir: str,
     hail_billing: str,  # pylint: disable=unused-argument
 ):  # pylint: disable=missing-function-docstring
-    local_tmp_dir = utils.init_hail('combine_gvcfs', local_tmp_dir)
+    local_tmp_dir = init_hail('combine_gvcfs', local_tmp_dir)
 
     # Copy the metadata file locally    
     local_meta_csv_path = join(local_tmp_dir, basename(meta_csv_path))
-    utils.gsutil_cp(meta_csv_path, local_meta_csv_path)
+    buckets.gsutil_cp(meta_csv_path, local_meta_csv_path)
     samples_df = pd.read_table(local_meta_csv_path)
 
     logger.info(f'Combining {len(samples_df.gvcf)} GVCFs')

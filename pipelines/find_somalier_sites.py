@@ -11,7 +11,7 @@ Problems with the currentl publicly shared somalier sites VCF:
 
 from os.path import join
 import logging
-from cpg_pipes import resources
+from cpg_pipes import ref_data, images
 from cpg_pipes.hailbatch import wrap_command
 from cpg_pipes.pipeline import Pipeline
 
@@ -19,7 +19,7 @@ logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
-RESULT_VCF = join(resources.REF_BUCKET, 'somalier/v0/sites.hg38.vcf.gz')
+RESULT_VCF = join(ref_data.REF_BUCKET, 'somalier/v0/sites.hg38.vcf.gz')
 
 
 pipe = Pipeline(
@@ -33,7 +33,7 @@ pipe = Pipeline(
 )
 
 concat_j = pipe.b.new_job('Make somalier sites')
-concat_j.image(resources.BCFTOOLS_IMAGE)
+concat_j.image(images.BCFTOOLS_IMAGE)
 concat_j.storage('1000G')
 concat_j.cpu(4)
 gnomad_vcf_paths = [
@@ -49,7 +49,7 @@ bcftools concat {" ".join(gnomad_vcfs)} -Oz -o {concat_j.gnomad_vcf}
 """, monitor_space=True))
 
 make_sites_j = pipe.b.new_job('Make somalier sites')
-make_sites_j.image(resources.SOMALIER_IMAGE)
+make_sites_j.image(images.SOMALIER_IMAGE)
 make_sites_j.storage('6T')
 make_sites_j.cpu(4)
 make_sites_j.command(wrap_command(f"""

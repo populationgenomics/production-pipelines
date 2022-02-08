@@ -1,22 +1,26 @@
 """
-Reference Hail tables and matrix tables used in the pipeline
+Hail tables and matrix tables used as reference data.
 """
 
 import functools
 import logging
 import operator
+import os
+import tempfile
+import time
 from os.path import join
 from typing import List, Optional, Union
 import hail as hl
 
-from cpg_pipes import resources
+from cpg_pipes import ref_data
+from cpg_pipes.utils import safe_mkdir, DEFAULT_REF
+
 
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-
-GNOMAD_REF_BUCKET = f'{resources.REF_BUCKET}/gnomad/v0'
+GNOMAD_REF_BUCKET = f'{ref_data.REF_BUCKET}/gnomad/v0'
 TEL_AND_CENT_HT = join(
     GNOMAD_REF_BUCKET,
     'telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht',
@@ -35,7 +39,7 @@ GNOMAD_HT = (
     'gs://gcp-public-data--gnomad/release/3.1/ht/genomes/gnomad.genomes.v3.1.sites.ht'
 )
 
-ANCESTRY_BUCKET = f'{resources.REF_BUCKET}/ancestry/v3-90k'
+ANCESTRY_BUCKET = f'{ref_data.REF_BUCKET}/ancestry/v3-90k'
 ANCESTRY_HGDP_SUBSET_MTS = {
     'all': f'{ANCESTRY_BUCKET}/gnomad_subset.mt',
     'nfe': f'{ANCESTRY_BUCKET}/gnomad_subset_nfe.mt',
@@ -43,6 +47,24 @@ ANCESTRY_HGDP_SUBSET_MTS = {
     'test_nfe': f'{ANCESTRY_BUCKET}/gnomad_subset_test_nfe.mt',
 }
 ANCESTRY_SITES = f'{ANCESTRY_BUCKET}/pca_sites.ht'
+
+
+def init_hail(name: str, local_tmp_dir: str = None):
+    """
+    Initialise Hail, and set up a local directory for logs.
+    :param name: name to prefix the log file
+    :param local_tmp_dir: local directory to write Hail logs
+    :return:
+    """
+    if not local_tmp_dir:
+        local_tmp_dir = tempfile.mkdtemp()
+
+    timestamp = time.strftime('%Y%m%d-%H%M')
+    hl_log = os.path.join(
+        safe_mkdir(os.path.join(local_tmp_dir, 'log')), f'{name}-{timestamp}.log'
+    )
+    hl.init(default_reference=DEFAULT_REF, log=hl_log)
+    return local_tmp_dir
 
 
 def filter_low_conf_regions(

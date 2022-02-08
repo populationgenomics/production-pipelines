@@ -1,4 +1,4 @@
-from cpg_pipes import resources
+from cpg_pipes import images
 from cpg_pipes.pipeline import Pipeline, Sample
 from .utils import PROJECT, SAMPLES, FULL_GVCF_BY_SID, SUBSET_GVCF_BY_SID, setup_env
 
@@ -25,7 +25,7 @@ def make_gvcfs():
         subset_j = pipeline.b.new_job(
             'Subset GVCF', dict(sample_name=s.id)
         )
-        subset_j.image(resources.BCFTOOLS_IMAGE)
+        subset_j.image(images.BCFTOOLS_IMAGE)
         inp_gvcf = pipeline.b.read_input_group(**{
             'g.vcf.gz': FULL_GVCF_BY_SID[s.id],
             'g.vcf.gz.tbi': FULL_GVCF_BY_SID[s.id] + '.tbi',

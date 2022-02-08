@@ -4,7 +4,8 @@ from typing import Optional, List
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes.hailbatch import wrap_command
+from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.hb.inputs import AlignmentInput
 from cpg_pipes.jobs import align
 
 
@@ -13,7 +14,7 @@ def fastqc(
     results_bucket: str,
     sample_name: str, 
     project_name: Optional[str], 
-    alignment_input: align.AlignmentInput,
+    alignment_input: AlignmentInput,
 ) -> List[Job]:
     """
     Adds FastQC jobs. If the input is a set of fqs, runs FastQC on each fq file.

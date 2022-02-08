@@ -1,31 +1,27 @@
 #!/usr/bin/env python3
+"""
+Create index for BWA and BWA-MEM2.
+"""
+
 from textwrap import dedent
 
 import hailtop.batch as hb
-from os.path import join
 import os
 
-from cpg_pipes import resources
-from cpg_pipes.hailbatch import wrap_command
-
-AR_REPO = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
-BWAMEM2_IMAGE = f'{AR_REPO}/alignment:v4'
-PICARD_IMAGE = f'{AR_REPO}/picard_samtools:v0'
-
-REF_BUCKET = 'gs://cpg-reference/hg38/v1'
-REF_FASTA = join(REF_BUCKET, 'Homo_sapiens_assembly38.fasta')
+from cpg_pipes import ref_data, images
+from cpg_pipes.hb.command import wrap_command
 
 
 def _index_bwa_job(b: hb.Batch):
-    reference = b.read_input_group(**resources.REF_D)
+    reference = b.read_input_group(**ref_data.REF_D)
 
     j = b.new_job('Index BWA')
-    j.image(BWAMEM2_IMAGE)
+    j.image(images.BWAMEM2_IMAGE)
     total_cpu = 32
     j.cpu(total_cpu)
     j.storage('40G')
     j.declare_resource_group(
-        bwa_index={e: '{root}.' + e for e in resources.BWAMEM2_INDEX_EXTS}
+        bwa_index={e: '{root}.' + e for e in ref_data.BWAMEM2_INDEX_EXTS}
     )
     j.command(wrap_command(f"""\
     set -o pipefail
@@ -35,19 +31,19 @@ def _index_bwa_job(b: hb.Batch):
     
     df -h; pwd; ls | grep -v proc | xargs du -sh
     """))
-    b.write_output(j.bwa_index, resources.BWAMEM2_INDEX_PREFIX)
+    b.write_output(j.bwa_index, ref_data.BWAMEM2_INDEX_PREFIX)
     return j
 
 
 def _test_bwa_job(b: hb.Batch):
     bwa_reference = b.read_input_group(
-        **resources.REF_D,
-        **{k: f'{resources.REF_FASTA}.{k}' for k in resources.BWA_INDEX_EXTS},
+        **ref_data.REF_D,
+        **{k: f'{ref_data.REF_FASTA}.{k}' for k in ref_data.BWA_INDEX_EXTS},
     )
 
     fq1 = b.read_input('gs://cpg-seqr-test/batches/test/tmp_fq')
     j = b.new_job('Test BWA')
-    j.image(BWAMEM2_IMAGE)
+    j.image(images.BWAMEM2_IMAGE)
     total_cpu = 16
     bwa_cpu = 1
     j.memory('highmem')

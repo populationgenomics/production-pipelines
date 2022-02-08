@@ -14,7 +14,7 @@ import hail as hl
 from gnomad.utils.sparse_mt import split_info_annotation
 from lib.model.seqr_mt_schema import SeqrVariantSchema
 from lib.model.base_mt_schema import row_annotation, RowAnnotationOmit
-from cpg_pipes import utils
+from cpg_pipes import buckets
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -88,7 +88,7 @@ def main(
         validate_mt(mt, sample_type='WGS')
 
     out_path = join(work_bucket, 'vqsr_and_37_coords.mt')
-    if utils.can_reuse(out_path, overwrite):
+    if buckets.can_reuse(out_path, overwrite):
         mt = hl.read_matrix_table(out_path)
     else:
         vqsr_ht = load_vqsr(
@@ -103,7 +103,7 @@ def main(
             mt = hl.read_matrix_table(out_path)
 
     out_path = join(work_bucket, 'vqsr_and_37_coords.vep.mt')
-    if utils.can_reuse(out_path, overwrite):
+    if buckets.can_reuse(out_path, overwrite):
         mt = hl.read_matrix_table(out_path)
     else:
         mt = hl.vep(
@@ -162,7 +162,7 @@ def load_vqsr(
     """
     Loads the VQSR'ed site-only VCF into a site-only hail table. Populates ht.filters
     """
-    if utils.can_reuse(output_ht_path, overwrite):
+    if buckets.can_reuse(output_ht_path, overwrite):
         return hl.read_table(output_ht_path)
 
     logger.info(f'Importing VQSR annotations...')

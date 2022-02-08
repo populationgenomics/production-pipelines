@@ -8,8 +8,10 @@ from typing import Optional
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes import resources, utils
-from cpg_pipes.hailbatch import wrap_command, fasta_ref_resource, STANDARD
+from cpg_pipes import images, buckets
+from cpg_pipes.hb import inputs
+from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.hb.resources import STANDARD
 
 
 def markdup(
@@ -24,11 +26,11 @@ def markdup(
     Make job that runs Picard MarkDuplicates and converts the result to CRAM.
     """
     j = b.new_job('MarkDuplicates', dict(sample=sample_name, project=project_name))
-    if utils.can_reuse(output_path, overwrite):
+    if buckets.can_reuse(output_path, overwrite):
         j.name += ' [reuse]'
         return j
 
-    j.image(resources.SAMTOOLS_PICARD_IMAGE)
+    j.image(images.SAMTOOLS_PICARD_IMAGE)
     resource = STANDARD.set_resources(j, storage_gb=175)  # enough for input BAM and output CRAM
     j.declare_resource_group(
         output_cram={
@@ -36,7 +38,7 @@ def markdup(
             'cram.crai': '{root}.cram.crai',
         }
     )
-    fasta_reference = fasta_ref_resource(b)
+    fasta_reference = inputs.fasta(b)
 
     cmd = f"""
     picard MarkDuplicates -Xms13G \\
