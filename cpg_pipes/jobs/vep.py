@@ -9,7 +9,6 @@ from typing import Optional
 from hailtop.batch.job import Job
 
 from cpg_pipes import images, ref_data, buckets
-from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.hb.command import wrap_command
 
 
@@ -26,9 +25,10 @@ def vep(
     if out_vcf_path and buckets.can_reuse(out_vcf_path, overwrite):
         j.name += ' [reuse]'
         return j
-    
+
     j.image(images.VEP_IMAGE)
-    STANDARD.set_resources(j, storage_gb=50, mem_gb=50, ncpu=16)
+    j.storage('50G')
+    j.memory('50G')
 
     loftee_conf = {
         'loftee_path': '$LOFTEE_PLUGIN_PATH',
@@ -36,7 +36,7 @@ def vep(
         'human_ancestor_fa': '$LOFTEE_DIR/human_ancestor.fa.gz',
         'conservation_file': '$LOFTEE_DIR/loftee.sql',
     }
-
+    
     cmd = f"""\
     CACHE_DIR=/io/batch/cache
     LOFTEE_DIR=/io/batch/loftee
@@ -49,12 +49,10 @@ def vep(
     gsutil cat {ref_data.VEP_LOFTEE} | tar -xf - -C $LOFTEE_DIR/
     ls $LOFTEE_DIR
 
-    retry_gs_cp {vcf_path} input.vcf.gz
-    
     vep \\
     --vcf \\
     --format vcf \\
-    -i input.vcf.gz \\
+    -i {b.read_input(vcf_path)} \\
     --everything \\
     --allele_number \\
     --no_stats \\
@@ -71,7 +69,6 @@ def vep(
         cmd, 
         setup_gcp=True, 
         monitor_space=True, 
-        define_retry_function=True
     ))
     if out_vcf_path:
         b.write_output(j.out_vcf, out_vcf_path)

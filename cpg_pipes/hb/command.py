@@ -16,44 +16,6 @@ gcloud -q auth activate-service-account \
 --key-file=$GOOGLE_APPLICATION_CREDENTIALS
 """
 
-# commands that declare functions that pull files on an instance, 
-# handling transitive errors
-RETRY_CMD = """\
-function fail {
-  echo $1 >&2
-  exit 1
-}
-
-function retry {
-  local n_attempts=10
-  local delay=30
-  local n=1
-  while true; do
-    "$@" && break || {
-      if [[ $n -lt $n_attempts ]]; then
-        ((n++))
-        echo "Command failed. Attempt $n/$n_attempts:"
-        sleep $delay;
-      else
-        fail "The command has failed after $n attempts."
-      fi
-    }
-  done
-}
-
-function retry_gs_cp {
-  src=$1
-
-  if [ -n "$2" ]; then
-    dst=$2
-  else
-    dst=/io/batch/${basename $src}
-  fi
-  
-  retry gsutil -o GSUtil:check_hashes=never cp $src $dst
-}
-"""
-
 # command that monitors the instance storage space
 MONITOR_SPACE_CMD = f'df -h; du -sh /io; du -sh /io/batch'
 
@@ -62,7 +24,6 @@ def wrap_command(
     command: str,
     monitor_space: bool = False,
     setup_gcp: bool = False,
-    define_retry_function: bool = False,
     dedent: bool = True,
 ) -> str:
     """
@@ -75,17 +36,13 @@ def wrap_command(
     :param monitor_space: add a background process that checks the instance disk 
         space every 5 minutes and prints it to the screen
     :param setup_gcp: login to GCP
-    :param define_retry_function: when set, adds bash functions `retry` that attempts 
-        to redo a command with a pause of default 30 seconds (useful to pull inputs 
-        and get around GoogleEgressBandwidth Quota or other google quotas)
     :param dedent: remove all common leading intendation from the command
     """
     cmd = f"""\
     set -o pipefail
     set -ex
     {GCLOUD_CMD if setup_gcp else ''}
-    {RETRY_CMD if define_retry_function else ''}
-    
+
     {f'(while true; do {MONITOR_SPACE_CMD}; sleep 600; done) &'
     if monitor_space else ''}
     
