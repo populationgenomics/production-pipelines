@@ -11,14 +11,12 @@ import time
 import hashlib
 from dataclasses import dataclass
 from enum import Enum
-from os.path import isdir, isfile, exists, join, basename
+from os.path import isdir, isfile, exists
 from typing import Any, Callable, Dict, Optional, Union, Iterable, Set
-import yaml
-import pandas as pd
 import hail as hl
 import click
 from google.cloud import storage
-from cpg_pipes import _version, get_package_path
+from cpg_pipes import _version
 from cpg_pipes import __name__ as package_name
 
 
@@ -233,32 +231,6 @@ def can_reuse(
     return True
 
 
-def gs_cache_file(fpath: str, local_tmp_dir: str) -> str:
-    """
-    :param fpath: local or a `gs://` path. If the latter, the file
-        will be downloaded and cached if local_tmp_dir is provided,
-        the local path will be returned
-    :param local_tmp_dir: a local directory to cache files downloaded
-        from Google Storage
-    :return: file path
-    """
-    if fpath.startswith('gs://'):
-        fname = (
-            os.path.basename(fpath) + '_' + hashlib.md5(fpath.encode()).hexdigest()[:6]
-        )
-        local_fpath = os.path.join(local_tmp_dir, fname)
-        if not exists(local_fpath):
-            bucket = fpath.replace('gs://', '').split('/')[0]
-            path = fpath.replace('gs://', '').split('/', maxsplit=1)[1]
-            gs = storage.Client()
-            blob = gs.get_bucket(bucket).get_blob(path)
-            if blob:
-                blob.download_to_filename(local_fpath)
-    else:
-        local_fpath = fpath
-    return local_fpath
-
-
 def safe_mkdir(dirpath: str, descriptive_name: str = '') -> str:
     """
     Multiprocessing-safely and recursively creates a directory
@@ -352,71 +324,6 @@ def get_mt(
         mt = hl.experimental.sparse_split_multi(mt, filter_changed_loci=True)
 
     return mt
-
-
-def get_vqsr_filters_path(
-    work_bucket: str,
-    model_id: str,
-    split: bool = True,
-    finalized: bool = False,
-) -> str:
-    """
-    Gets the specified VQSR filtering annotation resource.
-    :param work_bucket: bucket
-    :param model_id: VQSR filtering model id
-    :param split: Split or multi-allelic version of the filtering file
-    :param finalized: Whether to return the raw VQSR table or the finalized VQSR table representing determined cutoffs
-    :return: VQSR filtering annotation file path
-    """
-    return join(
-        work_bucket,
-        f'filtering/{model_id}'
-        f'{".finalized" if finalized else ""}'
-        f'{".split" if split else ""}'
-        f'.ht',
-    )
-
-
-def get_filter_cutoffs(
-    provided_filter_cutoffs_path: Optional[str] = None,
-) -> Dict:
-    """
-    :provided_filter_cutoffs_path: optional, a path to a YAML file with cutoffs.
-    Can sit on a bucket. If not provided, a default one from the package will be used.
-    gets the a default one within the package
-    :return: a Dict with cutoffs
-    """
-    if provided_filter_cutoffs_path:
-        assert file_exists(provided_filter_cutoffs_path), provided_filter_cutoffs_path
-        path = provided_filter_cutoffs_path
-    else:
-        path = join(get_package_path(), 'filter_cutoffs.yaml')
-
-    if path.startswith('gs://'):
-        contents = subprocess.check_output(['gsutil', 'cat', path])
-        filter_cutoffs_d = yaml.safe_load(contents)
-    else:
-        with open(path) as f:
-            filter_cutoffs_d = yaml.safe_load(f)
-
-    return filter_cutoffs_d
-
-
-def parse_input_metadata(
-    meta_csv_path: str,
-    local_tmp_dir: str,
-    out_ht_path: Optional[str] = None,
-) -> hl.Table:
-    """
-    Parse KCCG metadata (continental_pop and picard metrics)
-    """
-    local_csv_path = join(local_tmp_dir, basename(meta_csv_path))
-    gsutil_cp(meta_csv_path, local_csv_path)
-    df = pd.read_table(local_csv_path)
-    ht = hl.Table.from_pandas(df).key_by('s')
-    if out_ht_path:
-        ht = ht.checkpoint(out_ht_path, overwrite=True)
-    return ht
 
 
 def hash_sample_ids(sample_names: Iterable[str]) -> str:
