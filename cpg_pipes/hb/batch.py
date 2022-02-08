@@ -4,59 +4,13 @@ Extending the Hail's `Batch` class.
 
 import logging
 import os
-from typing import Optional, Dict
+from typing import Optional
 
 import hailtop.batch as hb
-from hailtop.batch.job import Job
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
-
-
-class Batch(hb.Batch):
-    """
-    Thin subclass of the Hail `Batch` class. The aim is to be able to register
-    the create jobs to be able to print statistics before submitting.
-    """
-    def __init__(self, name, backend, *args, **kwargs):
-        super().__init__(name, backend, *args, **kwargs)
-        # Job stats registry:
-        self.labelled_jobs = dict()
-        self.other_job_num = 0
-        self.total_job_num = 0
-
-    def new_job(
-        self,
-        name: Optional[str] = None,
-        attributes: Optional[Dict[str, str]] = None,
-        **kwargs,
-    ) -> Job:
-        """
-        Adds job to the Batch, and also registers it in `self.job_stats` for
-        statistics.
-        """
-        if not name:
-            logger.critical('Error: job name must be defined')
-        
-        attributes = attributes or dict()
-        project = attributes.get('project')
-        sample = attributes.get('sample')
-        samples = attributes.get('samples')
-        label = attributes.get('label', name)
-
-        name = _job_name(name, sample, project)
-
-        if label and (sample or samples):
-            if label not in self.labelled_jobs:
-                self.labelled_jobs[label] = {'job_n': 0, 'samples': set()}
-            self.labelled_jobs[label]['job_n'] += 1
-            self.labelled_jobs[label]['samples'] |= (samples or {sample})
-        else:
-            self.other_job_num += 1
-        self.total_job_num += 1
-        j = super().new_job(name, attributes=attributes)
-        return j
 
 
 def setup_batch(
@@ -65,7 +19,7 @@ def setup_batch(
     tmp_bucket: Optional[str] = None,
     billing_project: Optional[str] = None,
     hail_bucket: Optional[str] = None,
-) -> Batch:
+) -> hb.Batch:
     """
     Wrapper around the initialization of a Hail Batch object.
     Handles setting the temporary bucket and the billing project.
@@ -95,7 +49,7 @@ def setup_batch(
         bucket=hail_bucket.replace('gs://', ''),
         token=os.environ.get('HAIL_TOKEN'),
     )
-    return Batch(name=title, backend=backend)
+    return hb.Batch(name=title, backend=backend)
 
 
 def get_hail_bucket(tmp_bucket: Optional[str], keep_scratch: bool = False) -> str:
