@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+.idea
+playground/
+.DS_Store
+# has patient data:
+tests/data/check_pedigree
