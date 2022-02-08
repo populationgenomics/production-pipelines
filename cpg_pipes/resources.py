@@ -28,7 +28,7 @@ REF_BUCKET = 'gs://cpg-reference'
 NOALT_REGIONS = join(REF_BUCKET, 'noalt.bed')
 SOMALIER_SITES = join(REF_BUCKET, 'somalier/v0/sites.hg38.vcf.gz')
 
-VEP_LOFTEE = join(REF_BUCKET, 'vep/loftee-beta.tar')
+VEP_LOFTEE = join(REF_BUCKET, 'vep/loftee_GRCh38.tar')
 VEP_CACHE = join(REF_BUCKET, 'vep/homo_sapiens_vep_105_GRCh38.tar')
 
 BROAD_REF_BUCKET = f'{REF_BUCKET}/hg38/v1'

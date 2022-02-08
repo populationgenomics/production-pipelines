@@ -2,7 +2,7 @@
 
 ##############
 ## Modified copy of https://github.com/hail-is/hail/blob/main/hail/python/hailtop/hailctl/dataproc/resources/vep-GRCh38.sh:
-# * using a more recent VEP (105 vs 95)
+# * using a more recent VEP (105 vs. 95)
 # * using cpg artifact registry VEP image, based on biocontainers image
 # * changed hardcoded hail bucket to cpg-reference/vep
 ##############

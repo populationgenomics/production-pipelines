@@ -15,6 +15,18 @@ python copy_cache.py
 For Loftee data, we can reuse Hail-provided bundle, which is already on a GCP bucket, so we can just copy it directly:
 
 ```bash
+mkdir loftee
+cd loftee
+# conservation file
+wget https://personal.broadinstitute.org/konradk/loftee_data/GRCh38/loftee.sql.gz
+# human_ancestor.fa file
+wget https://personal.broadinstitute.org/konradk/loftee_data/GRCh38/human_ancestor.fa.gz
+wget https://personal.broadinstitute.org/konradk/loftee_data/GRCh38/human_ancestor.fa.gz.fai
+wget https://personal.broadinstitute.org/konradk/loftee_data/GRCh38/human_ancestor.fa.gz.gzi
+# loftee bigwig file (specific for grch38 loftee branch https://github.com/konradjk/loftee/tree/grch38)
+wget https://personal.broadinstitute.org/konradk/loftee_data/GRCh38/gerp_conservation_scores.homo_sapiens.GRCh38.bw
+
+
 gsutil -u vlad-dev cp gs://hail-aus-sydney-vep/loftee-beta/GRCh38.tar \\
 gs://cpg-reference/vep/loftee-beta.tar
 ```
