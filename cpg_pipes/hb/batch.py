@@ -15,7 +15,7 @@ logger.setLevel(logging.INFO)
 
 def setup_batch(
     title: str, 
-    keep_scratch: bool = True,
+    keep_scratch: bool = False,
     tmp_bucket: Optional[str] = None,
     billing_project: Optional[str] = None,
     hail_bucket: Optional[str] = None,
@@ -52,21 +52,33 @@ def setup_batch(
     return hb.Batch(name=title, backend=backend)
 
 
-def get_hail_bucket(tmp_bucket: Optional[str], keep_scratch: bool = False) -> str:
+def get_hail_bucket(
+    tmp_bucket: Optional[str] = None, 
+    keep_scratch: bool = False,
+) -> str:
     """
     Get bucket where Hail Batch will keep scratch files
     """
     hail_bucket = os.environ.get('HAIL_BUCKET')
-    if not hail_bucket or keep_scratch:
-        if not tmp_bucket:
-            raise ValueError(
-                'Either the tmp_bucket parameter, or the HAIL_BUCKET'
-                'environment variable must be set'
-            )
-        # Scratch files can be large, so we want to use the tmp bucket 
-        # to put them in, which is expected to set up to get cleaned 
-        # automatically on schedule.
-        hail_bucket = f'{tmp_bucket}/hail'
+    
+    if not hail_bucket and not tmp_bucket:
+        raise ValueError(
+            'Either the tmp_bucket parameter, or the HAIL_BUCKET '
+            'environment variable must be set.'
+        )
+
+    if keep_scratch and not tmp_bucket:
+        raise ValueError(
+            'When keep_scratch=True, the tmp_bucket parameter must be set. '
+            'Scratch files can be large, so we want to use the tmp bucket '
+            'to store them, which is expected to set up to get cleaned '
+            'automatically on schedule.'
+        )
+        
+    if keep_scratch or not hail_bucket:
+        assert tmp_bucket
+        hail_bucket = os.path.join(tmp_bucket, 'hail')
+
     return hail_bucket
 
 
