@@ -36,7 +36,7 @@ def wrap_command(
     :param monitor_space: add a background process that checks the instance disk 
         space every 5 minutes and prints it to the screen
     :param setup_gcp: login to GCP
-    :param dedent: remove all common leading intendation from the command
+    :param dedent: remove all common leading indentation from the command
     """
     cmd = f"""\
     set -o pipefail
