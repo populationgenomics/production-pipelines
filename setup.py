@@ -9,7 +9,7 @@ setuptools.setup(
     name='cpg-pipes',
     version='0.2.9',
     description=(
-        'Hail Batch pipelines for large cohort and rare deseases projects'  
+        'Hail Batch pipelines for large cohort and rare disease projects'  
     ),
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
