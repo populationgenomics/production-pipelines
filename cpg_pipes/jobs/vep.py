@@ -8,7 +8,7 @@ from typing import Optional
 
 from hailtop.batch.job import Job
 
-from cpg_pipes import images, ref_data, buckets
+from cpg_pipes import images, ref_data, files
 from cpg_pipes.hb.command import wrap_command
 
 
@@ -22,7 +22,7 @@ def vep(
     Runs VEP on provided VCF.
     """
     j = b.new_job('VEP')
-    if out_vcf_path and buckets.can_reuse(out_vcf_path, overwrite):
+    if out_vcf_path and files.can_reuse(out_vcf_path, overwrite):
         j.name += ' [reuse]'
         return j
 
