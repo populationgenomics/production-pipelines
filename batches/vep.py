@@ -17,13 +17,8 @@ import click
     multiple=True,
     help='Paths to VCFs (can be multiple)',
 )
-@click.option(
-    '--project',
-    'project',
-    help='Billing project for Batch'
-)
-def main(vcf_paths: List[str], project: str):
-    b = setup_batch('Run VEP', billing_project=project)
+def main(vcf_paths: List[str]):
+    b = setup_batch('Run VEP')
 
     for vcf_path in vcf_paths:
         out_vcf_path = os.path.splitext(vcf_path)[0] + '-vep.vcf.bgz'

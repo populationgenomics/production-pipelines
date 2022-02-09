@@ -17,7 +17,6 @@ def setup_batch(
     title: str, 
     keep_scratch: bool = False,
     tmp_bucket: Optional[str] = None,
-    billing_project: Optional[str] = None,
     hail_bucket: Optional[str] = None,
 ) -> hb.Batch:
     """
@@ -25,7 +24,6 @@ def setup_batch(
     Handles setting the temporary bucket and the billing project.
 
     :param title: descriptive name of the Batch (will be displayed in the GUI)
-    :param billing_project: billing project name
     :param tmp_bucket: path to temporary bucket. Will be used if neither 
         the hail_bucket parameter nor HAIL_BUCKET env var are set.
     :param keep_scratch: whether scratch will be kept after the batch is finished
@@ -34,11 +32,10 @@ def setup_batch(
     if not hail_bucket:
         hail_bucket = get_hail_bucket(tmp_bucket, keep_scratch)
 
-    billing_project = billing_project or os.getenv('HAIL_BILLING_PROJECT')
+    billing_project = os.getenv('HAIL_BILLING_PROJECT')
     if not billing_project:
         raise ValueError(
-            'Either the billing_project parameter, or the HAIL_BILLING_PROJECT'
-            'environment variable must be set'
+            'HAIL_BILLING_PROJECT environment variable must be set'
         )
     logger.info(
         f'Starting Hail Batch with the project {billing_project}, '
