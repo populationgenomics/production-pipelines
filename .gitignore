@@ -133,3 +133,6 @@ playground/
 .DS_Store
 # has patient data:
 tests/data/check_pedigree
+
+dockers/cpg_pipes/
+scripts/copy_nagim_release.py
