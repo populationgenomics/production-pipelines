@@ -1,0 +1,19 @@
+{
+  "cnmops_docker" : "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/cnmops:lint-24b9cda",
+  "condense_counts_docker" :"australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:condensecounts-7396ae99aaab07e29c92b509a6515508fbe68158",
+  "gatk_docker" : "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.1.8.1",
+  "gatk_docker_pesr_override" : "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.1.8.1",
+  "genomes_in_the_cloud_docker" : "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/genomes-in-the-cloud:2.3.2-1510681135",
+  "linux_docker" : "australia-southeast1-docker.pkg.dev/cpg-common/images/ubuntu1804",
+  "manta_docker" : "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/manta:8645aa",
+  "melt_docker": "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/melt:2.2.2",
+  "samtools_cloud_docker" : "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/samtools-cloud:mw-gnomad-02-6a66c96",
+  "sv_base_docker" : "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-base:lint-24b9cda",
+  "sv_base_mini_docker" : "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-base-mini:lint-24b9cda",
+  "sv_pipeline_base_docker" : "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-pipeline-base:lint-24b9cda",
+  "sv_pipeline_docker" : "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-pipeline:mw-missing-baf-f14df3b",
+  "sv_pipeline_qc_docker" : "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-pipeline-qc:lint-24b9cda",
+  "sv_pipeline_rdtest_docker" : "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-pipeline-rdtest:lint-24b9cda",
+  "wham_docker" : "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/wham:8645aa",
+  "cloud_sdk_docker" : "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/cloud-sdk"
+}
