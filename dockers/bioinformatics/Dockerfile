@@ -3,7 +3,6 @@ FROM debian:buster-slim
 ENV HAIL_VERSION 0.2.73.devc6f6f09cec08
 ENV MAMBA_ROOT_PREFIX /root/micromamba
 ENV PATH $MAMBA_ROOT_PREFIX/bin:$PATH
-ENV HAIL_QUERY_BACKEND local
 
 RUN apt-get update && apt-get install -y git wget bash bzip2 zip tmux && \
     wget -O jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x ./jq && cp jq /usr/bin && \

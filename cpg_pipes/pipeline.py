@@ -250,6 +250,10 @@ def stage(
     *,
     sm_analysis_type: Optional[AnalysisType] = None, 
     requires_stages: Optional[Union[List[StageDecorator], StageDecorator]] = None,
+    skipped: bool = False,
+    required: bool = True,
+    assume_results_exist: bool = False,
+    forced: bool = False,
 ) -> Union[StageDecorator, Callable[..., StageDecorator]]:
     """
     Implements a standard class decorator pattern with an optional argument.
@@ -271,6 +275,10 @@ def stage(
                 pipeline=pipeline,
                 requires_stages=requires_stages,
                 sm_analysis_type=sm_analysis_type,
+                skipped=skipped,
+                required=required,
+                assume_results_exist=assume_results_exist, 
+                forced=forced,
             )
         return wrapper_stage
 
@@ -278,6 +286,40 @@ def stage(
         return decorator_stage
     else:
         return decorator_stage(_cls)
+
+
+def skipped(
+    _fun: Optional[StageDecorator] = None, 
+    *,
+    assume_results_exist: bool = False,
+) -> Union[StageDecorator, Callable[..., StageDecorator]]:
+    """
+    Decorator on top of `@stage` that sets the self.skipped field to True
+
+    @skipped
+    @stage
+    class MyStage1(SampleStage):
+        ...
+
+    @skipped
+    @stage(assume_results_exist=True)
+    class MyStage2(SampleStage):
+        ...
+    """
+    def decorator_stage(fun) -> StageDecorator:
+        @functools.wraps(fun)
+        def wrapper_stage(*args, **kwargs) -> Stage:
+            stage = fun(*args, **kwargs)
+            stage.skipped = True
+            stage.assume_results_exist = assume_results_exist
+            return stage
+
+        return wrapper_stage
+
+    if _fun is None:
+        return decorator_stage
+    else:
+        return decorator_stage(_fun)
 
 
 def find_stages_in_module(module_name: str) -> List[StageDecorator]:
@@ -751,7 +793,27 @@ class Stage(Generic[TargetT], ABC):
         name: str,
         requires_stages: Optional[Union[List[StageDecorator], StageDecorator]] = None,
         sm_analysis_type: Optional[AnalysisType] = None,
+        skipped: bool = False,
+        required: bool = True,
+        assume_results_exist: bool = False,
+        forced: bool = False,
     ):
+        """
+        :param requires_stages: list of stage classes that this stage requires
+        :param sm_analysis_type: if defined, will query the SMDB Analysis entries 
+            of this type
+        :param skipped: means that the stage is skipped and self.queue_jobs()
+            won't run. The other stages if depend on it can aassume that that 
+            self.expected_result() returns existing files and target.ouptut_by_stage 
+            will be populated.
+        :param required: means that the self.expected_output() results are 
+            required for another active stage, even if the stage was skipped.
+        :param assume_results_exist: for skipped but required stages, 
+            the self.expected_result() output will still be checked for existence. 
+            This option makes the downstream stages assume that the output exist.
+        :param forced: run self.queue_jobs() even if can reuse the 
+            self.expected_output().
+        """
         self._name = name
         self.pipe = pipeline
         self.required_stages_classes: List[StageDecorator] = []
@@ -771,15 +833,10 @@ class Stage(Generic[TargetT], ABC):
         # Populated with the return value of `add_to_the_pipeline()`
         self.output_by_target: Dict[str, StageOutput] = dict()
 
-        # self.active=True means that the stage wasn't skipped and jobs were added
-        # into the pipeline, and we shoule expect target.ouptut_by_stage 
-        # to be populated. Otherwise, self.expected_result() should work.
-        self.skipped = False  
-        # self.required=True means that is required for another active stage,
-        # even if it was skipped
-        self.required = True
-        # Rerun the stage even if can reuse the results
-        self.forced = False
+        self.skipped = skipped  
+        self.required = required
+        self.forced = forced
+        self.assume_results_exist = assume_results_exist
     
     @property
     def name(self):
@@ -910,29 +967,38 @@ class Stage(Generic[TargetT], ABC):
                     f'{self.name} on {target.unique_id}'
                 )
             validate = self.pipe.validate_smdb_analyses
-            if self.skipped and self.pipe.skip_samples_without_first_stage_input:
+            if self.skipped and (
+                self.assume_results_exist or self.pipe.skip_samples_without_first_stage_input
+            ):
                 validate = False
-            
+
             # found_path would be analysis.output from DB if it exists; if it doesn't,
             # and validate_smdb_analyses=True, expected_output file would be checked:
             found_path = self._try_get_smdb_analysis(
                 target, cast(str, expected_output), validate=validate
             )
             return found_path
+        
+        elif not expected_output:
+            return None
 
-        elif not self.pipe.check_job_expected_outputs_existence or not self.required:
+        elif (
+            not self.pipe.check_job_expected_outputs_existence or 
+            not self.required or
+            self.assume_results_exist
+        ):
             # Do not need to check file existence, trust it exists:
             return expected_output
-
-        elif expected_output:
+        
+        else:
             # Checking that expected output exists:
             if isinstance(expected_output, dict):
                 paths = list(expected_output.values())
             else:
                 paths = [expected_output]
-            if all(buckets.file_exists(path) for path in paths):
-                return expected_output
-        return None
+            if not all(buckets.file_exists(path) for path in paths):
+                return None
+            return expected_output
 
     def _try_get_smdb_analysis(
         self, 
@@ -1363,10 +1429,12 @@ class Pipeline(Target):
                 meta = s_data.get('meta', {})
                 if source_tag:
                     meta['source_tag'] = source_tag
+                external_id = s_data['external_id']
+                participant_id = s_data.get('participant_id')
                 s = project.add_sample(
                     id=s_data['id'],
-                    external_id=s_data['external_id'],
-                    participant_id=s_data['participant_id'].strip(),
+                    external_id=external_id.strip(),
+                    participant_id=participant_id.strip() if participant_id else None,
                     **s_data.get('meta', dict()),
                 )
                 if forced_samples and s.id in forced_samples:
@@ -1539,7 +1607,10 @@ class Pipeline(Target):
 
         first_stage_num, last_stage_num = self._validate_first_last_stage()
 
-        # First round - checking which stages we require, even if they are skipped
+        # First round - checking which stages we require, even if they are skipped.
+        # If there are required stages that are not defined, we defined them
+        # into `additional_stages` as `skipped`.
+        additional_stages_dict: Dict[str, Stage] = dict()
         for i, (stage_name, stage) in enumerate(self._stages_dict.items()):
             if first_stage_num is not None and i < first_stage_num:
                 stage.skipped = True
@@ -1553,10 +1624,15 @@ class Pipeline(Target):
                 continue
 
             for reqcls in stage.required_stages_classes:
-                assert reqcls.__name__ in self._stages_dict, (
-                    reqcls.__name__, list(self._stages_dict.keys())
-                )
-                reqstage = self._stages_dict[reqcls.__name__]
+                if reqcls.__name__ in self._stages_dict:
+                    reqstage = self._stages_dict[reqcls.__name__]
+                elif reqcls.__name__ in additional_stages_dict:
+                    reqstage = additional_stages_dict[reqcls.__name__]
+                else:
+                    # stage is not initialized, so we defining it as skipped
+                    reqstage = reqcls(self)
+                    reqstage.skipped = True
+                    additional_stages_dict[reqcls.__name__] = reqstage
                 reqstage.required = True
                 if reqstage.skipped:
                     logger.info(
@@ -1564,6 +1640,15 @@ class Pipeline(Target):
                         f'but the output will be required for the stage {stage.name}'
                     )
                 stage.required_stages.append(reqstage)
+        
+        if additional_stages_dict:
+            logger.info(
+                f'Additional required stages added as "skipped": '
+                f'{additional_stages_dict.keys()}'
+            )
+            for name, stage in self._stages_dict.items():
+                additional_stages_dict[name] = stage    
+            self._stages_dict = additional_stages_dict
 
         logger.info(f'Setting stages: {", ".join(s.name for s in stages if not s.skipped)}')
 

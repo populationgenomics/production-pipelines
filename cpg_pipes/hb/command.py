@@ -3,6 +3,7 @@ Helpers to setup Job's command.
 """
 
 import logging
+from typing import List, Union
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -59,7 +60,7 @@ MONITOR_SPACE_CMD = f'df -h; du -sh /io; du -sh /io/batch'
 
 
 def wrap_command(
-    command: str,
+    command: Union[str, List[str]],
     monitor_space: bool = False,
     setup_gcp: bool = False,
     define_retry_function: bool = False,
@@ -70,8 +71,8 @@ def wrap_command(
     If job_resource is defined, monitors output space.
     If output_bucket_path_to_check is defined, checks if this file(s) exists,
     and if it does, skips running the rest of the job.
-    
-    :param command: command to wrap
+
+    :param command: command to wrap (can be a list of commands)
     :param monitor_space: add a background process that checks the instance disk 
         space every 5 minutes and prints it to the screen
     :param setup_gcp: login to GCP
@@ -80,6 +81,9 @@ def wrap_command(
         and get around GoogleEgressBandwidth Quota or other google quotas)
     :param dedent: remove all common leading intendation from the command
     """
+    if isinstance(command, list):
+        command = '\n'.join(command)
+    
     cmd = f"""\
     set -o pipefail
     set -ex

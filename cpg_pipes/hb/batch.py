@@ -45,7 +45,7 @@ class Batch(hb.Batch):
         samples = attributes.get('samples')
         label = attributes.get('label', name)
 
-        name = _job_name(name, sample, project)
+        name = job_name(name, sample, project)
 
         if label and (sample or samples):
             if label not in self.labelled_jobs:
@@ -128,7 +128,7 @@ def get_hail_bucket(
     return hail_bucket
 
 
-def _job_name(name, sample: str = None, project: str = None) -> str:
+def job_name(name, sample: str = None, project: str = None) -> str:
     """
     Extend the descriptive job name to reflect the project and the sample names
     """

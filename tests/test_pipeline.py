@@ -40,7 +40,7 @@ class TestPipeline(unittest.TestCase):
         setup_env()
         from pipelines import seqr_loader
         from cpg_pipes import benchmark
-        from cpg_pipes import resources
+        from cpg_pipes import ref_data
         from cpg_pipes.pipeline import Pipeline, find_stages_in_module
 
         pipeline = Pipeline(
@@ -80,9 +80,9 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(_cnt('bwa mem'), len(self.sample_ids))
         self.assertEqual(_cnt('HaplotypeCaller'), len(self.sample_ids))
         self.assertEqual(_cnt('ReblockGVCF'), len(self.sample_ids))
-        self.assertEqual(_cnt('GenotypeGVCFs'), resources.NUMBER_OF_GENOMICS_DB_INTERVALS)
-        self.assertEqual(_cnt('GenomicsDBImport'), resources.NUMBER_OF_GENOMICS_DB_INTERVALS)
-        self.assertEqual(_cnt('MakeSitesOnlyVcf'), resources.NUMBER_OF_GENOMICS_DB_INTERVALS)
+        self.assertEqual(_cnt('GenotypeGVCFs'), ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS)
+        self.assertEqual(_cnt('GenomicsDBImport'), ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS)
+        self.assertEqual(_cnt('MakeSitesOnlyVcf'), ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS)
         self.assertEqual(_cnt('VariantRecalibrator'), 2)
         self.assertEqual(_cnt('ApplyVQSR'), 2)
         self.assertEqual(_cnt('GatherVcfsCloud'), 2)

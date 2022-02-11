@@ -77,7 +77,7 @@ def make_joint_genotyping_jobs(
     # There are some problems with using GenomcsDB in cloud (`genomicsdb_cloud()`):
     # Using cloud + --consolidate on larger datasets causes a TileDB error:
     # https://github.com/broadinstitute/gatk/issues/7653
-    # Alsp, disabling --consolidate decreases performance of reading, causing
+    # Also, disabling --consolidate decreases performance of reading, causing
     # GenotypeGVCFs to run for too long. So for now it's safer to disable cloud,
     # and use the version of function that passes a tarball around (`genomicsdb()`):
     import_gvcfs_job_per_interval, genomicsdb_path_per_interval = genomicsdb(
