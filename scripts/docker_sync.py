@@ -11,6 +11,22 @@ import click
 def main(docker_json_url):
     """ Copies each docker image """
 
+    # Install skopeo
+    subprocess.run(
+        [
+            'micromamba',
+            'install',
+            '-y',
+            '--prefix',
+            '$MAMBA_ROOT_PREFIX',
+            '-y',
+            '-c',
+            'conda-forge',
+            'skopeo',
+        ],
+        check=True,
+    )
+
     if not docker_json_url:
         github_url = 'https://raw.githubusercontent.com/'
         path_to_docker_json = (
