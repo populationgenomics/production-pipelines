@@ -44,13 +44,13 @@ def main(docker_json_url):
     docker_json.pop('name')
 
     for key in docker_json:
-        initial_path = 'docker://' + docker_json[key]
+        initial_path = 'docker://' + docker_json[key]  # pylint: disable=W0612
         docker_image = docker_json[key].split('/')[-1]
         destination_path = (
             'docker://australia-southeast1-docker.pkg.dev/cpg-common/images/sv/'
             + docker_image
-        )
-        subprocess.run(['skopeo', 'copy', initial_path, destination_path], check='True')
+        )  # pylint: disable=W0612
+        print(initial_path, destination_path)
 
 
 if __name__ == '__main__':
