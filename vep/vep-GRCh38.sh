@@ -56,8 +56,7 @@ chmod u+s /vep
 cat >/vep.sh <<EOF
 #!/bin/bash
 docker run -i \
--v /vep_data/loftee/:/opt/vep/.vep/loftee/:ro \
--v /vep_data/vep/homo_sapiens/:/opt/vep/.vep/homo_sapiens/:ro \
+-v /vep_data:/vep_data:ro \
 -v $VEP_CONFIG_PATH:$VEP_CONFIG_PATH:ro \
 ${VEP_DOCKER_IMAGE} /usr/local/bin/vep "\$@"
 EOF
