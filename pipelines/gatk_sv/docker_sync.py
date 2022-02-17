@@ -38,8 +38,7 @@ def main(docker_json_url):
         cpg_docker_dict[key] = cpg_ar_path
         # subprocess.run(['skopeo', 'copy', initial_path, destination_path], check='True')
 
-    with open('pipelines/gatk_sv/dockers.json', 'w') as output_json:
-        json.dump(cpg_docker_dict, output_json, indent=4)
+    print(json.dumps(cpg_docker_dict, indent=4))
 
 
 if __name__ == '__main__':
