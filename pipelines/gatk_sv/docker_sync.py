@@ -29,14 +29,14 @@ def main(docker_json_url):
 
     cpg_docker_dict = {}
     for key in docker_json:
-        initial_path = 'docker://' + docker_json[key]  # noqa: F841
+        initial_path = 'docker://' + docker_json[key]
         docker_image = docker_json[key].split('/')[-1]
         cpg_ar_path = (
             'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/' + docker_image
         )
-        destination_path = 'docker://' + cpg_ar_path  # noqa: F841
+        destination_path = 'docker://' + cpg_ar_path
         cpg_docker_dict[key] = cpg_ar_path
-        # subprocess.run(['skopeo', 'copy', initial_path, destination_path], check='True')
+        subprocess.run(['skopeo', 'copy', initial_path, destination_path], check='True')
 
     print(json.dumps(cpg_docker_dict, indent=4))
 
