@@ -10,13 +10,7 @@ from typing import List, Dict, Optional, Collection
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
-from sample_metadata.models import (
-    AnalysisModel,
-    AnalysisType,
-    AnalysisStatus,
-    AnalysisUpdateModel,
-    AnalysisQueryModel,
-)
+from sample_metadata import models
 from sample_metadata.apis import (
     SampleApi,
     SequenceApi,
@@ -26,8 +20,9 @@ from sample_metadata.apis import (
 from sample_metadata.exceptions import ApiException
 
 from cpg_pipes import buckets, images
-from cpg_pipes.utils import Namespace, Sequence, Analysis
+from cpg_pipes.namespace import Namespace
 from cpg_pipes.hb.inputs import AlignmentInput
+from cpg_pipes.smdb.types import Analysis, SmSequence
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -119,7 +114,7 @@ class SMDB:
             participant_id_by_cpgid = {sid.strip(): pid.strip() for pid, sid in pid_sid}
         return participant_id_by_cpgid
 
-    def find_seq_by_sid(self, sample_ids) -> Dict[str, Sequence]:
+    def find_seq_by_sid(self, sample_ids) -> Dict[str, SmSequence]:
         """
         Return a dict of "Sequence" entries by sample ID
         """
@@ -129,11 +124,11 @@ class SMDB:
             traceback.print_exc()
             return {}
         else:
-            seqs = [Sequence.parse(d, self) for d in seq_infos]
+            seqs = [_parse_sequence(d, self) for d in seq_infos]
             seqs_by_sid = {seq.sample_id: seq for seq in seqs}
             return seqs_by_sid
 
-    def update_analysis(self, analysis: Analysis, status: str):
+    def update_analysis(self, analysis: 'Analysis', status: str):
         """
         Update "status" of an Analysis entry
         """
@@ -141,7 +136,9 @@ class SMDB:
             return
         try:
             self.aapi.update_analysis_status(
-                analysis.id, AnalysisUpdateModel(status=AnalysisStatus(status))
+                analysis.id, models.AnalysisUpdateModel(
+                    status=models.AnalysisStatus(status)
+                )
             )
         except ApiException:
             traceback.print_exc()
@@ -150,14 +147,14 @@ class SMDB:
     def find_joint_calling_analysis(
         self,
         sample_ids: Collection[str],
-    ) -> Optional[Analysis]:
+    ) -> Optional['Analysis']:
         """
         Query the DB to find the last completed joint-calling analysis for the samples
         """
         try:
             data = self.aapi.get_latest_complete_analysis_for_type(
                 project=self.analysis_project,
-                analysis_type=AnalysisType('joint-calling'),
+                analysis_type=models.AnalysisType('joint-calling'),
             )
         except ApiException:
             return None
@@ -190,11 +187,11 @@ class SMDB:
             f'Querying {analysis_type} analysis entries for project {project}...'
         )
         datas = self.aapi.query_analyses(
-            AnalysisQueryModel(
+            models.AnalysisQueryModel(
                 projects=[project],
                 sample_ids=sample_ids,
-                type=AnalysisType(analysis_type),
-                status=AnalysisStatus(analysis_status),
+                type=models.AnalysisType(analysis_type),
+                status=models.AnalysisStatus(analysis_status),
                 meta=meta or {},
             )
         )
@@ -293,9 +290,9 @@ class SMDB:
         if not self.do_update_analyses:
             return None
 
-        am = AnalysisModel(
-            type=AnalysisType(type_),
-            status=AnalysisStatus(status),
+        am = models.AnalysisModel(
+            type=models.AnalysisType(type_),
+            status=models.AnalysisStatus(status),
             output=output,
             sample_ids=list(sample_ids),
         )
@@ -313,7 +310,7 @@ class SMDB:
     def process_existing_analysis(
         self,
         sample_ids: Collection[str],
-        completed_analysis: Optional[Analysis],
+        completed_analysis: Optional['Analysis'],
         analysis_type: str,
         expected_output_fpath: str,
         project_name: Optional[str] = None,
@@ -449,20 +446,16 @@ class SMDB:
             sm_in_progress_j.depends_on(*depends_on)
         last_j = sm_completed_j
         return last_j
-    
 
-def _parse_analysis(data: Dict) -> Optional[Analysis]:
-    if not data:
-        return None
-    if 'id' not in data:
-        logger.error(f'Analysis data doesn\'t have id: {data}')
-        return None
-    if 'type' not in data:
-        logger.error(f'Analysis data doesn\'t have type: {data}')
-        return None
-    if 'status' not in data:
-        logger.error(f'Analysis data doesn\'t have status: {data}')
-        return None
+
+def _parse_analysis(data: Dict) -> Analysis:
+    req_keys = ['id', 'type', 'status']
+    if any(k not in data for k in req_keys):
+        for key in req_keys:
+            if key not in data:
+                logger.error(f'"Analysis" data does not have {key}: {data}')
+        raise ValueError(f'Cannot parse SMDB Sequence {data}')
+    
     a = Analysis(
         id=int(data['id']),
         type=data['type'],
@@ -473,8 +466,24 @@ def _parse_analysis(data: Dict) -> Optional[Analysis]:
     return a
 
 
+def _parse_sequence(data: Dict, smdb: SMDB) -> SmSequence:
+    req_keys = ['id', 'sample_id', 'meta']
+    if any(k not in data for k in req_keys):
+        for key in req_keys:
+            if key not in data:
+                logger.error(f'"Sequence" data does not have {key}: {data}')
+        raise ValueError(f'Cannot parse SMDB Sequence {data}')
+    
+    return SmSequence(
+        id=data['id'], 
+        sample_id=data['sample_id'], 
+        meta=data['meta'], 
+        smdb=smdb,
+    )
+
+
 def parse_reads_from_sequence(  # pylint: disable=too-many-return-statements
-    sequence: Sequence,
+    sequence: SmSequence,
     check_existence: Optional[bool] = None,
 ) -> Optional[AlignmentInput]:
     """

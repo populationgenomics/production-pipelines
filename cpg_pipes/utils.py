@@ -6,17 +6,15 @@ import hashlib
 import os
 import sys
 import time
-from dataclasses import dataclass
-from enum import Enum
 from os.path import isdir, isfile, exists
-from typing import Any, Callable, Dict, Optional, Iterable, Set
+from typing import Any, Callable, Iterable
 
 import click
 
 from cpg_pipes import __name__ as package_name
+from cpg_pipes.buckets import file_exists
 
 # Default reference genome build.
-from cpg_pipes.buckets import file_exists
 DEFAULT_REF = 'GRCh38'
 
 # Packages to install on a dataproc cluster, to use with the dataproc wrapper.
@@ -41,68 +39,6 @@ QUERY_SCRIPTS_DIR = 'query_scripts'
 
 # This python package name.
 PACKAGE_DIR = package_name
-
-
-class Namespace(Enum):
-    """
-    CPG storage namespace. See for more details on storage policies:
-    https://github.com/populationgenomics/team-docs/tree/main/storage_policies#main-vs-test
-    """
-    MAIN = 'main'  # production runs: read from main, write to main
-    TEST = 'test'  # runs that make test data: read from test, write to test
-    TMP = 'tmp'    # read from test, write to tmp
-
-
-class AnalysisType(Enum):
-    """
-    Types of sample-metadata analysis. Corresponds to Analysis types:
-    https://github.com/populationgenomics/sample-metadata/blob/dev/models/enums/analysis.py#L4-L11
-
-    Re-defined in utils to allow using the class in type hints without 
-    importing sample-metadata.
-    """
-    QC = 'qc'
-    JOINT_CALLING = 'joint-calling'
-    GVCF = 'gvcf'
-    CRAM = 'cram'
-    CUSTOM = 'custom'
-
-
-@dataclass
-class Analysis:
-    """
-    Analysis SampleMetadata DB entry. 
-
-    See sample-metadata for more details: https://github.com/populationgenomics/sample-metadata
-
-    Defined in utils to allow using the class in type hints without importing 
-    sample-metadata.
-    """
-    id: int
-    type: str
-    status: str
-    sample_ids: Set[str]
-    output: Optional[str]
-
-
-class Sequence:
-    """
-    Sequence SampleMetadata DB entry.
-
-    See sample-metadata for more details: https://github.com/populationgenomics/sample-metadata
-
-    Defined in utils to allow using the class in type hints without importing 
-    sample-metadata.
-    """
-    def __init__(self, id, sample_id, meta, smdb):
-        self.id = id
-        self.sample_id = sample_id
-        self.meta = meta
-        self.smdb = smdb
-    
-    @staticmethod
-    def parse(data: Dict, smdb):
-        return Sequence(data['id'], data['sample_id'], data['meta'], smdb)
 
 
 def get_validation_callback(

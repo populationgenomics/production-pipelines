@@ -38,8 +38,49 @@ python pipelines/pedigree.py \
 --keep-scratch
 ```
 
-The `cpg_pipes` package defines many handy python functions that which can be imported with `import cpg_pipes`. `cpg_pipes/jobs` defines functions that create Hail Batch Jobs for aligment, fastqc, deduplication, variant calling, VQSR, etc. For usage examples, see `pipelines/benchmarks/benchmark_alignment.py`, as well as other scripts in that folder.
+## cpg-pipes package
 
-TODO:
-[] add tests
-[] merge in the joint-calling repo
+The `cpg_pipes` package provides Python functions that help to design a Hail Batch powered workflow in the context of the CPG infrastructe (e.g. Google Cloud, CPG storage policies, the `analysis-runner` and the `sample-metadata` database). Specifically, the following assumptions:
+
+* The inputs are organised in a form of projects and samples on the `sample-metadata` database. To address that, `cpg_pipes`
+
+* `cpg_pipes.jobs` defines functions that create Hail Batch Jobs for differrent bioinformatics purposes: alignment, fastqc, deduplication, variant calling, VQSR, etc. For usage examples, see `pipelines/benchmarks/benchmark_alignment.py`, as well as other scripts in that folder.
+
+* `cpg_pipes.hb.batch` provides a helper function `setup_batch` to set up Hail Batch in the CPG context. `Batch`
+
+
+
+```python
+import click
+from cpg_pipes.pipeline import \
+    Pipeline, pipeline_click_options, find_stages_in_module, \
+    Sample, SampleStage, StageInput, StageOutput, stage
+
+from cpg_pipes.jobs import align
+
+@click.command()
+@pipeline_click_options
+def main(**kwargs):
+    # Initialize pipeline. Will automatically pass CLI options
+    pipeline = Pipeline(name='my_pipeline', title='My pipeline', **kwargs)
+    pipeline.set_stages(find_stages_in_module(__name__))
+    pipeline.submit_batch()
+
+@stage
+class CramStage(SampleStage):
+    def expected_result(self, sample: Sample):
+        return f'{sample.project.get_bucket()}/cram/{sample.id}.cram'
+
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+        expected_path = self.expected_result(self.pipe)
+        job = align.bwa(b=self.pipe.b, output_path=expected_path)
+        return self.make_outputs(sample, data=expected_path, jobs=[job])
+```
+
+* from cpg_pipes.hb.batch import setup_batch
+* from cpg_pipes.hb.command import wrap_command
+* from cpg_pipes import images with CPG AR images,
+* from cpg_pipes import ref_data with file pointers on the CPG reference bucket,
+* from cpg_pipes import buckets with file_exists and can_reuse helper functions that check the object existence on a bucket.
+
+`@stage` decorator allows to define a pipeline in a declarative manner. 

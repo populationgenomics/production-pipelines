@@ -22,10 +22,13 @@ from cpg_pipes.jobs import align, split_intervals, haplotype_caller, \
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
-from cpg_pipes.pipeline import Namespace, Pipeline, Sample, \
-    SampleStage, Project, CohortStage, AnalysisType, ProjectStage, \
+from cpg_pipes.namespace import Namespace
+from cpg_pipes.analysis_type import AnalysisType
+from cpg_pipes.pipeline import Pipeline, Sample, \
+    SampleStage, Project, CohortStage, ProjectStage, \
     pipeline_click_options, StageInput, stage, StageOutput, \
     find_stages_in_module
+from cpg_pipes.pipeline.cohort import Cohort
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -198,12 +201,12 @@ def make_expected_siteonly_path(output_path):
 
 @stage(requires_stages=GvcfStage, sm_analysis_type=AnalysisType.JOINT_CALLING)
 class JointGenotypingStage(CohortStage):
-    def expected_result(self, pipe: Pipeline):
-        samples_hash = utils.hash_sample_ids(pipe.get_all_sample_ids())
-        expected_jc_vcf_path = f'{pipe.tmp_bucket}/joint_calling/{samples_hash}.vcf.gz'
+    def expected_result(self, cohort: Cohort):
+        samples_hash = utils.hash_sample_ids(cohort.get_all_sample_ids())
+        expected_jc_vcf_path = f'{self.pipe.tmp_bucket}/joint_calling/{samples_hash}.vcf.gz'
         return expected_jc_vcf_path
 
-    def queue_jobs(self, pipe: Pipeline, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         gvcf_by_sid = inputs.as_path_by_target(stage=GvcfStage)
 
         not_found_gvcfs: List[str] = []
@@ -217,7 +220,7 @@ class JointGenotypingStage(CohortStage):
                 f'GVCFs, exiting')
             sys.exit(1)
 
-        expected_path = self.expected_result(pipe)
+        expected_path = self.expected_result(cohort)
         jc_job = make_joint_genotyping_jobs(
             b=self.pipe.b,
             out_vcf_path=expected_path,
@@ -234,23 +237,23 @@ class JointGenotypingStage(CohortStage):
             else JointGenotyperTool.GenotypeGVCFs,
             dry_run=self.pipe.dry_run,
         )
-        return self.make_outputs(pipe, data=expected_path, jobs=[jc_job])
+        return self.make_outputs(cohort, data=expected_path, jobs=[jc_job])
 
 
 @stage(requires_stages=JointGenotypingStage)
 class VqsrStage(CohortStage):
-    def expected_result(self, pipe: Pipeline):
-        samples_hash = utils.hash_sample_ids(pipe.get_all_sample_ids())
-        expected_jc_vcf_path = f'{pipe.tmp_bucket}/vqsr/{samples_hash}-site-only.vcf.gz'
+    def expected_result(self, cohort: Cohort):
+        samples_hash = utils.hash_sample_ids(cohort.get_all_sample_ids())
+        expected_jc_vcf_path = f'{self.pipe.tmp_bucket}/vqsr/{samples_hash}-site-only.vcf.gz'
         return expected_jc_vcf_path
 
-    def queue_jobs(self, pipe: Pipeline, inputs: StageInput) -> StageOutput:
-        jc_vcf_path = inputs.as_path(stage=JointGenotypingStage, target=pipe)
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        jc_vcf_path = inputs.as_path(stage=JointGenotypingStage, target=cohort)
         siteonly_vcf_path = make_expected_siteonly_path(jc_vcf_path)
 
         tmp_vqsr_bucket = f'{self.pipe.tmp_bucket}/vqsr'
         logger.info(f'Queueing VQSR job')
-        expected_path = self.expected_result(pipe)
+        expected_path = self.expected_result(cohort)
         vqsr_job = make_vqsr_jobs(
             b=self.pipe.b,
             input_vcf_or_mt_path=siteonly_vcf_path,
@@ -261,7 +264,7 @@ class VqsrStage(CohortStage):
             use_as_annotations=self.pipe.config.get('use_as_vqsr', True),
             overwrite=not self.pipe.check_intermediate_existence,
         )
-        return self.make_outputs(pipe, data=expected_path, jobs=[vqsr_job])
+        return self.make_outputs(cohort, data=expected_path, jobs=[vqsr_job])
 
 
 def get_anno_tmp_bucket(pipe: Pipeline):
@@ -270,16 +273,16 @@ def get_anno_tmp_bucket(pipe: Pipeline):
 
 @stage(requires_stages=[JointGenotypingStage, VqsrStage])
 class AnnotateCohortStage(CohortStage):
-    def expected_result(self, pipe: Pipeline):
-        return join(get_anno_tmp_bucket(pipe), 'combined.mt')
+    def expected_result(self, cohort: Cohort):
+        return join(get_anno_tmp_bucket(self.pipe), 'combined.mt')
 
-    def queue_jobs(self, pipe: Pipeline, inputs: StageInput) -> StageOutput:
-        checkpoints_bucket = join(get_anno_tmp_bucket(pipe), 'checkpoints')
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        checkpoints_bucket = join(get_anno_tmp_bucket(self.pipe), 'checkpoints')
 
-        vcf_path = inputs.as_path(target=pipe, stage=JointGenotypingStage)
-        annotated_site_only_vcf_path = inputs.as_path(target=pipe, stage=VqsrStage)
+        vcf_path = inputs.as_path(target=cohort, stage=JointGenotypingStage)
+        annotated_site_only_vcf_path = inputs.as_path(target=cohort, stage=VqsrStage)
 
-        expected_path = self.expected_result(pipe)
+        expected_path = self.expected_result(cohort)
         j = dataproc.hail_dataproc_job(
             self.pipe.b,
             f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "vcf_to_mt.py")} '
@@ -304,7 +307,7 @@ class AnnotateCohortStage(CohortStage):
             num_secondary_workers=50,
             num_workers=8,
         )
-        return self.make_outputs(pipe, data=expected_path, jobs=[j])
+        return self.make_outputs(cohort, data=expected_path, jobs=[j])
 
 
 @stage(requires_stages=[AnnotateCohortStage])
@@ -546,7 +549,7 @@ def main(**kwargs):  # pylint: disable=missing-function-docstring
     pipeline.submit_batch()
 
     if pipeline.config.get('make_seqr_metadata', False):
-        for project in pipeline.get_projects():
+        for project in pipeline.cohort.get_projects():
             if project.stack in pipeline.config.get('output_projects', []):
                 _make_seqr_metadata_files(
                     local_dir=pipeline.local_dir,
