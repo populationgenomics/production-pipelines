@@ -87,7 +87,7 @@ class Cohort(Target):
         Finds input samples, analyses and sequences from the DB, 
         populates self.projects, adds pedigree information
         """
-        self._populate_samples(
+        self._populate_projects(
             smdb=smdb,
             input_projects=input_projects,
             skip_samples=skip_samples,
@@ -100,7 +100,7 @@ class Cohort(Target):
         if ped_files:
             self._populate_pedigree(ped_files, local_tmp_dir)
 
-    def _populate_samples(
+    def _populate_projects(
         self,
         smdb: SMDB,
         input_projects: List[str],
