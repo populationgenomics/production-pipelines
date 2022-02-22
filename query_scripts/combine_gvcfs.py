@@ -13,7 +13,7 @@ import pandas as pd
 import click
 import hail as hl
 
-from cpg_pipes.hailquery_utils import init_hail
+from cpg_pipes.hailquery import init_hail
 from cpg_pipes.utils import get_validation_callback
 from cpg_pipes import buckets, utils, _version
 
