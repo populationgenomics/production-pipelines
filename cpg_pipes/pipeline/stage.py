@@ -574,7 +574,7 @@ class SampleStage(Stage[Sample], ABC):
             if not project.get_samples():
                 raise ValueError(f'No active samples are found to run in the project {project.name}')
             for sample_i, sample in enumerate(project.get_samples()):
-                logger.info(f'{self.name}: #{sample_i}/{sample.id}/{sample.external_id} {sample}')
+                logger.info(f'{self.name}: #{sample_i}/{sample}')
                 sample_result = self._queue_jobs_with_checks(sample)
                 output_by_target[sample.unique_id] = sample_result
                 logger.info('------')

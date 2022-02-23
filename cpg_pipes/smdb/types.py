@@ -74,7 +74,7 @@ class SmSequence:
         self.smdb = smdb
 
     @staticmethod
-    def parse(data: Dict, smdb: 'SMDB') -> 'SmSequence':
+    def parse(data: Dict, smdb) -> 'SmSequence':
         req_keys = ['id', 'sample_id', 'meta']
         if any(k not in data for k in req_keys):
             for key in req_keys:

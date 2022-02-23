@@ -52,18 +52,18 @@ Example:
 
 ```python
 import click
-from cpg_pipes.pipeline import \
-    Pipeline, pipeline_click_options, find_stages_in_module, \
-    Sample, SampleStage, StageInput, StageOutput, stage
+from cpg_pipes.pipeline.pipeline import Pipeline, stage
+from cpg_pipes.pipeline.cli_opts import pipeline_click_options
+from cpg_pipes.pipeline.stage import SampleStage, StageInput, StageOutput
+from cpg_pipes.pipeline.sample import Sample
 
 from cpg_pipes.jobs import align
 
 @click.command()
 @pipeline_click_options
 def main(**kwargs):
-    # Initialize pipeline. Will automatically pass CLI options
+    # Initialise the pipeline. Will automatically pass CLI options as kwargs.
     pipeline = Pipeline(name='my_pipeline', title='My pipeline', **kwargs)
-    pipeline.set_stages(find_stages_in_module(__name__))
     pipeline.submit_batch()
 
 @stage
@@ -76,4 +76,3 @@ class CramStage(SampleStage):
         job = align.bwa(b=self.pipe.b, output_path=expected_path)
         return self.make_outputs(sample, data=expected_path, jobs=[job])
 ```
-

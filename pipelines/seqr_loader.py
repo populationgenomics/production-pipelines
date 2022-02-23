@@ -25,7 +25,7 @@ from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.namespace import Namespace
 from cpg_pipes.smdb.types import AnalysisType
 from cpg_pipes.pipeline.cli_opts import pipeline_click_options
-from cpg_pipes.pipeline.pipeline import stage, Pipeline, find_stages_in_module
+from cpg_pipes.pipeline.pipeline import stage, Pipeline
 from cpg_pipes.pipeline.stage import SampleStage, CohortStage, ProjectStage, \
     StageInput, StageOutput
 from cpg_pipes.pipeline.sample import Sample
@@ -462,8 +462,6 @@ def make_pipeline(
         output_version=output_version,
         **kwargs,
     )
-
-    pipeline.set_stages(find_stages_in_module(__name__))
     return pipeline
 
 

@@ -19,6 +19,7 @@ from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.pipeline.sample import Sample
+from cpg_pipes.smdb.smdb import SMDB
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -40,7 +41,7 @@ def make_joint_genotyping_jobs(
     gvcf_by_sid: Dict[str, str],
     overwrite: bool,
     depends_on: Optional[List[Job]] = None,
-    smdb: Optional['SMDB'] = None,
+    smdb: Optional[SMDB] = None,
     # Default to GenotypeGVCFs because Gnarly is a bit weird, e.g. it adds <NON_REF>
     # variants with AC_adj annotations (other variants have AC):
     # bcftools view gs://cpg-fewgenomes-test/unittest/inputs/chr20/gnarly/joint-called-siteonly.vcf.gz | zgrep 7105364

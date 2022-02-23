@@ -17,6 +17,7 @@ from cpg_pipes.hb.prev_job import PrevJob
 from cpg_pipes.jobs import picard
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.smdb.smdb import SMDB
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -109,7 +110,7 @@ def align(
     markdup_tool: MarkDupTool = MarkDupTool.BIOBAMBAM,
     extra_label: Optional[str] = None,
     depends_on: Optional[List[Job]] = None,
-    smdb: Optional['SMDB'] = None,
+    smdb: Optional[SMDB] = None,
     overwrite: bool = True,
     requested_nthreads: Optional[int] = None,
     number_of_shards_for_realignment: Optional[int] = None,

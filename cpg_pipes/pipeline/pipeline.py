@@ -46,10 +46,8 @@ def main(**kwargs):
 For more usage examples, see the "pipelines" folder in the root of this repository.
 """
 import functools
-import inspect
 import logging
 import shutil
-import sys
 import tempfile
 from typing import List, Dict, Optional, Tuple, cast, Union, Any, Callable, Type
 
@@ -61,6 +59,7 @@ from cpg_pipes.pipeline.cohort import Cohort
 from cpg_pipes.pipeline.project import Project
 from cpg_pipes.pipeline.stage import Stage
 from cpg_pipes.smdb.types import AnalysisType
+from cpg_pipes.smdb.smdb import SMDB
 
 
 logger = logging.getLogger(__file__)
@@ -69,6 +68,11 @@ logger.setLevel(logging.INFO)
 
 
 StageDecorator = Callable[..., 'Stage']
+
+
+# We record each initialised Stage subclass, so we know the default stage
+# list for the case when the user doesn't pass them explicitly with set_stages()
+_defined_stages = []
 
 
 def stage(
@@ -106,6 +110,10 @@ def stage(
                 assume_results_exist=assume_results_exist, 
                 forced=forced,
             )
+        # We record each initialised Stage subclass, so we know the default stage
+        # list for the case when the user doesn't pass them explicitly with set_stages()
+        global _defined_stages
+        _defined_stages.append(wrapper_stage)
         return wrapper_stage
 
     if _cls is None:
@@ -284,9 +292,6 @@ class Pipeline:
         self.cohort = Cohort(self.name, pipeline=self)
         self._db = None
         if input_projects:
-            # Delaying importing smdb until here to allow using Pipeline
-            # without sample-metadata dependency.
-            from cpg_pipes.smdb.smdb import SMDB
             self._db = SMDB(
                 self.analysis_project.name,
                 do_update_analyses=update_smdb_analyses,
@@ -306,6 +311,8 @@ class Pipeline:
         self._stages_dict: Dict[str, Stage] = dict()
         if stages_in_order:
             self.set_stages(stages_in_order)
+        else:
+            self.set_stages(_defined_stages)
 
     def submit_batch(
         self, 
@@ -451,37 +458,13 @@ class Pipeline:
         return self._db.process_existing_analysis(*args, **kwargs)
 
     @property
-    def db(self) -> 'SMDB':
+    def db(self) -> SMDB:
         if self._db is None:
             raise PipelineException('SMDB is not initialised')
         return cast('SMDB', self._db)
 
-    def get_db(self) -> Optional['SMDB']:
+    def get_db(self) -> Optional[SMDB]:
         """
         Like .db property, but returns None if db is not initiazlied
         """
         return self._db
-
-
-def find_stages_in_module(module_name: str) -> List[StageDecorator]:
-    """
-    Get all declared stages in a module by its name
-    >>> pipeline = Pipeline()
-    >>> pipeline.set_stages(find_stages_in_module(__name__))
-    """
-    stages = []
-    for obj in vars(sys.modules[module_name]).values():
-        # @stage decorators are functions
-        if not inspect.isfunction(obj): 
-            continue
-        # decorators add "return" annotations
-        if 'return' not in obj.__annotations__: 
-            continue
-        try:
-            ret_name = obj.__annotations__['return'].__name__
-        except AttributeError:
-            continue
-        if ret_name == 'Stage':
-            stages.append(obj)
-    
-    return stages
