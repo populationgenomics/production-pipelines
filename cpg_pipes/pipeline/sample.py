@@ -6,7 +6,6 @@ from typing import Dict, Optional
 from cpg_pipes.hb.inputs import AlignmentInput
 from cpg_pipes.pipeline.target import Target
 from cpg_pipes.smdb.types import SmSequence
-from cpg_pipes.pipeline.project import Project
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -20,7 +19,7 @@ class Sample(Target):
     """
     id: str
     external_id: str
-    project: Project
+    project: 'Project'  # type: ignore  # noqa: F821
     participant_id: InitVar[Optional[str]] = None
     meta: dict = field(default_factory=dict)
     alignment_input: Optional[AlignmentInput] = None
