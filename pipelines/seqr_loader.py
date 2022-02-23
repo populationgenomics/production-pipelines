@@ -227,7 +227,7 @@ class JointGenotypingStage(CohortStage):
             b=self.pipe.b,
             out_vcf_path=expected_path,
             out_siteonly_vcf_path=make_expected_siteonly_path(expected_path),
-            samples=self.pipe.get_all_samples(),
+            samples=cohort.get_all_samples(),
             genomicsdb_bucket=f'{self.pipe.analysis_bucket}/genomicsdbs',
             tmp_bucket=self.pipe.tmp_bucket,
             gvcf_by_sid=gvcf_by_sid,
@@ -260,7 +260,7 @@ class VqsrStage(CohortStage):
             b=self.pipe.b,
             input_vcf_or_mt_path=siteonly_vcf_path,
             work_bucket=tmp_vqsr_bucket,
-            gvcf_count=len(self.pipe.get_all_samples()),
+            gvcf_count=len(cohort.get_all_samples()),
             depends_on=inputs.get_jobs(),
             output_vcf_path=expected_path,
             use_as_annotations=self.pipe.config.get('use_as_vqsr', True),
@@ -327,7 +327,7 @@ class AnnotateProjectStage(ProjectStage):
             return self.make_outputs(project)
         
         annotated_mt_path = inputs.as_path(
-            target=project.pipeline, 
+            target=self.pipe.cohort, 
             stage=AnnotateCohortStage
         )
 

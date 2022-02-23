@@ -30,6 +30,8 @@ setuptools.setup(
         'cpg-gnomad',   # github.com/populationgenomics/gnomad_methods
         'gcloud',
         'fsspec',
+        'sample-metadata',
+        'analysis-runner',
     ],
     keywords='bioinformatics',
     classifiers=[

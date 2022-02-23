@@ -72,7 +72,7 @@ StageDecorator = Callable[..., 'Stage']
 
 # We record each initialised Stage subclass, so we know the default stage
 # list for the case when the user doesn't pass them explicitly with set_stages()
-_defined_stages = []
+_all_defined_stages = []
 
 
 def stage(
@@ -112,8 +112,8 @@ def stage(
             )
         # We record each initialised Stage subclass, so we know the default stage
         # list for the case when the user doesn't pass them explicitly with set_stages()
-        global _defined_stages
-        _defined_stages.append(wrapper_stage)
+        global _all_defined_stages
+        _all_defined_stages.append(wrapper_stage)
         return wrapper_stage
 
     if _cls is None:
@@ -309,10 +309,7 @@ class Pipeline:
             )
 
         self._stages_dict: Dict[str, Stage] = dict()
-        if stages_in_order:
-            self.set_stages(stages_in_order)
-        else:
-            self.set_stages(_defined_stages)
+        self._stages_in_order: List[StageDecorator] = stages_in_order or _all_defined_stages
 
     def submit_batch(
         self, 
@@ -324,6 +321,9 @@ class Pipeline:
         """
         if dry_run is None:
             dry_run = self.dry_run
+        
+        self.set_stages(self._stages_in_order)
+            
         if self.b:
             logger.info(f'Will submit {self.b.total_job_num} jobs:')
             for label, stat in self.b.labelled_jobs.items():
@@ -468,3 +468,10 @@ class Pipeline:
         Like .db property, but returns None if db is not initiazlied
         """
         return self._db
+
+    def get_projects(self, only_active: bool = True) -> List[Project]:
+        """
+        Gets list of all projects of the cohort.
+        Include only "active" projects (unless only_active is False)
+        """
+        return self.cohort.get_projects(only_active=only_active)

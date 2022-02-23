@@ -5,7 +5,10 @@ import time
 import unittest
 from unittest.mock import patch
 
-from .utils import setup_env, BASE_BUCKET, PROJECT, SAMPLES
+try:
+    from .utils import setup_env, BASE_BUCKET, PROJECT, SAMPLES
+except ImportError:
+    from utils import setup_env, BASE_BUCKET, PROJECT, SAMPLES
 
 
 class TestPipeline(unittest.TestCase):
