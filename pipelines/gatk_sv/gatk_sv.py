@@ -28,10 +28,16 @@ from analysis_runner.cromwell import (
 from cpg_pipes import images
 from cpg_pipes.hb.batch import job_name
 from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.pipeline import Sample, \
-    SampleStage, pipeline_click_options, StageInput, \
-    stage, skipped, Project, ProjectStage, Pipeline, CohortStage, \
-    find_stages_in_module, StageOutput
+from cpg_pipes.pipeline import (
+    Sample,
+    SampleStage,
+    pipeline_click_options,
+    StageInput,
+    stage,
+    Pipeline,
+    find_stages_in_module,
+    StageOutput,
+)
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -59,7 +65,7 @@ def get_references(keys: List[str]) -> Dict[str, object]:
 def add_gatksv_job(
     pipeline,
     wfl_name: str,
-    input_dict: Dict[str, object], 
+    input_dict: Dict[str, object],
     expected_out_dict: Dict[str, str],
     project_name: Optional[str] = None,
     sample_id: Optional[str] = None,
@@ -67,18 +73,18 @@ def add_gatksv_job(
     """
     Generic function to add a job that would run one GATK-SV workflow.
     """
-    # Where Cromwell writes the output. 
+    # Where Cromwell writes the output.
     # Will be different from paths in expected_out_dict:
     output_suffix = f'gatk_sv/output/{wfl_name}'
-    if project_name: 
+    if project_name:
         output_suffix = join(output_suffix, project_name)
-    if sample_id: 
+    if sample_id:
         output_suffix = join(output_suffix, sample_id)
 
     outputs_to_collect = dict()
     for key in expected_out_dict.keys():
         outputs_to_collect[key] = CromwellOutputType.single_path(f'{wfl_name}.{key}')
-    
+
     job_prefix = job_name(wfl_name, sample=sample_id, project=project_name)
     output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
         b=pipeline.b,
@@ -107,17 +113,15 @@ def add_gatksv_job(
     return output_dict, copy_j
 
 
-@skipped(assume_results_exist=True)
 @stage
 class GatherSampleEvidence(SampleStage):
     """
-    https://github.com/broadinstitute/gatk-sv#gathersampleevidence    
+    https://github.com/broadinstitute/gatk-sv#gathersampleevidence
     """
+
     def expected_result(self, sample: Sample) -> Dict[str, str]:
         d = dict()
-        fname_by_key = {
-            'coverage_counts': 'coverage_counts.tsv.gz'
-        }
+        fname_by_key = {'coverage_counts': 'coverage_counts.tsv.gz'}
         for caller in SV_CALLERS:
             fname_by_key[f'{caller}_vcf'] = f'{caller}.vcf.gz'
             fname_by_key[f'{caller}_index'] = f'{caller}.vcf.gz.tbi'
@@ -144,32 +148,40 @@ class GatherSampleEvidence(SampleStage):
             # 'revise_base_cram_to_bam': True,
         }
 
-        input_dict.update(get_dockers([
-            'sv_pipeline_docker',
-            'sv_base_mini_docker',
-            'samtools_cloud_docker',
-            'gatk_docker',
-            'genomes_in_the_cloud_docker',
-            'cloud_sdk_docker',
-            'wham_docker',
-            # 'melt_docker',
-            'manta_docker',
-            'sv_pipeline_base_docker',
-            'gatk_docker_pesr_override',
-        ]))
+        input_dict.update(
+            get_dockers(
+                [
+                    'sv_pipeline_docker',
+                    'sv_base_mini_docker',
+                    'samtools_cloud_docker',
+                    'gatk_docker',
+                    'genomes_in_the_cloud_docker',
+                    'cloud_sdk_docker',
+                    'wham_docker',
+                    # 'melt_docker',
+                    'manta_docker',
+                    'sv_pipeline_base_docker',
+                    'gatk_docker_pesr_override',
+                ]
+            )
+        )
 
-        input_dict.update(get_references([
-            'primary_contigs_fai',
-            'primary_contigs_list',
-            'reference_fasta',
-            'reference_index',
-            'reference_dict',
-            'reference_version',
-            'preprocessed_intervals',
-            'manta_region_bed',
-            'wham_include_list_bed_file',
-            # 'melt_standard_vcf_header',
-        ]))
+        input_dict.update(
+            get_references(
+                [
+                    'primary_contigs_fai',
+                    'primary_contigs_list',
+                    'reference_fasta',
+                    'reference_index',
+                    'reference_dict',
+                    'reference_version',
+                    'preprocessed_intervals',
+                    'manta_region_bed',
+                    'wham_include_list_bed_file',
+                    # 'melt_standard_vcf_header',
+                ]
+            )
+        )
 
         expected_d = self.expected_result(sample)
 
@@ -183,129 +195,6 @@ class GatherSampleEvidence(SampleStage):
         )
 
         return self.make_outputs(sample, data=output_dict, jobs=[j])
-
-
-@skipped(assume_results_exist=True)
-@stage(requires_stages=GatherSampleEvidence)
-class EvidenceQC(ProjectStage):
-    """
-    # https://github.com/broadinstitute/gatk-sv#evidenceqc
-    """
-    def expected_result(self, project: Project) -> Dict[str, str]:
-        d = dict()
-        fname_by_key = {
-            'ploidy_matrix':       'ploidy_matrix.bed.gz',
-            'ploidy_plots':        'ploidy_plots.tar.gz',
-            'WGD_dist':            'WGD_score_distributions.pdf',
-            'WGD_matrix':          'WGD_scoring_matrix_output.bed.gz',
-            'WGD_scores':          'WGD_scores.txt.gz',
-            'bincov_median':       'RD.txt.gz',
-            'bincov_matrix':       'RD.txt.gz',
-            'bincov_matrix_index': 'RD.txt.gz.tbi',
-        }
-        for caller in SV_CALLERS:
-            for k in ['low', 'high']:
-                fname_by_key[f'{caller}_qc_{k}'] = f'{caller}_QC.outlier.{k}'
-
-        for key, fname in fname_by_key.items():
-            d[key] = join(project.get_bucket(), 'gatk_sv', self.name.lower(), fname)
-        return d
-
-    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
-
-        d = inputs.as_dict_by_target(GatherSampleEvidence)
-
-        sids = [s.id for s in project.get_samples()]
-
-        input_dict = {
-            'batch': project.name,
-            'samples': sids,
-            'run_vcf_qc': True,  # generates <caller>_qc_low/<caller>_qc_high
-            'counts': [d[sid]['coverage_counts'] for sid in sids],
-        }
-        for caller in SV_CALLERS:
-            input_dict[f'{caller}_vcfs'] = [d[sid][f'{caller}_vcf'] for sid in sids]
-
-        input_dict.update(get_dockers([
-            'sv_base_mini_docker',
-            'sv_base_docker',
-            'sv_pipeline_docker',
-            'sv_pipeline_qc_docker',
-        ]))
-        
-        input_dict.update(get_references([
-            'genome_file',
-            'wgd_scoring_mask',
-        ]))
-
-        expected_d = self.expected_result(project)
-
-        output_dict, j = add_gatksv_job(
-            self.pipe,
-            wfl_name=self.name,
-            input_dict=input_dict,
-            expected_out_dict=expected_d,
-            project_name=project.name,
-        )
-
-        return self.make_outputs(project, data=output_dict, jobs=[j])
-
-
-@stage(requires_stages=[GatherSampleEvidence])
-class TrainGCNV(CohortStage):
-    """
-    # https://github.com/populationgenomics/gatk-sv/blob/main/wdl/TrainGCNV.wdl
-    """
-    def expected_result(self, pipeline: Pipeline) -> Dict[str, str]:
-        d = dict()
-        fname_by_key = {
-            'cohort_contig_ploidy_model_tar': 'cohort_contig_ploidy_model.tar',
-            'cohort_contig_ploidy_calls_tar': 'cohort_contig_ploidy_calls.tar',
-        }
-        for key, fname in fname_by_key.items():
-            d[key] = join(pipeline.analysis_bucket, 'gatk_sv', self.name.lower(), fname)
-        return d
-
-    def queue_jobs(self, pipeline: Pipeline, inputs: StageInput) -> StageOutput:
-
-        d = inputs.as_dict_by_target(GatherSampleEvidence)
-        
-        sids = pipeline.get_all_sample_ids()
-        input_dict = {
-            'cohort': pipeline.unique_id,
-            'samples': sids,
-            'count_files': [d[sid]['coverage_counts'] for sid in sids],
-            'ref_copy_number_autosomal_contigs': 2,
-            'num_intervals_per_scatter': 5000,
-        }
-        for caller in SV_CALLERS:
-            input_dict[f'{caller}_vcfs'] = [d[sid][f'{caller}_vcf'] for sid in sids]
-
-        input_dict.update(get_dockers([
-            'sv_base_mini_docker',
-            'condense_counts_docker',
-            'gatk_docker',
-            'linux_docker',
-        ]))
-        
-        input_dict.update(get_references([
-            'reference_fasta',
-            'reference_index',
-            'reference_dict',
-            'allosomal_contigs',
-            'contig_ploidy_priors',
-        ]))
-
-        expected_d = self.expected_result(pipeline)
-
-        output_dict, j = add_gatksv_job(
-            self.pipe,
-            wfl_name=self.name,
-            input_dict=input_dict,
-            expected_out_dict=expected_d,
-        )
-
-        return self.make_outputs(pipeline, data=output_dict, jobs=[j])
 
 
 @click.command()
@@ -325,7 +214,7 @@ def main(
         title=title,
         input_projects=input_projects,
         output_version=output_version,
-        **kwargs
+        **kwargs,
     )
     pipeline.set_stages(find_stages_in_module(__name__))
     pipeline.submit_batch()

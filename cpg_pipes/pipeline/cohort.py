@@ -23,6 +23,7 @@ class Cohort(Target):
     """
     Represents a "cohort" target - all samples from all projects in the pipeline
     """
+
     def __init__(self, name: str, pipeline):
         super().__init__()
         self.name = name
@@ -42,7 +43,7 @@ class Cohort(Target):
 
     def get_projects(self, only_active: bool = True) -> List[Project]:
         """
-        Gets list of all projects. 
+        Gets list of all projects.
         Include only "active" projects (unless only_active is False)
         """
         return [p for p in self._projects if (p.active or not only_active)]
@@ -84,7 +85,7 @@ class Cohort(Target):
         forced_samples: List[str] = None,
     ) -> None:
         """
-        Finds input samples, analyses and sequences from the DB, 
+        Finds input samples, analyses and sequences from the DB,
         populates self.projects, adds pedigree information
         """
         self._populate_projects(
@@ -153,7 +154,7 @@ class Cohort(Target):
                             dad=sample_by_participant_id.get(pat_id),
                             mom=sample_by_participant_id.get(mat_id),
                             sex={
-                                '1': Sex.MALE, 
+                                '1': Sex.MALE,
                                 '2': Sex.FEMALE,
                                 'M': Sex.MALE,
                                 'F': Sex.FEMALE,
@@ -208,8 +209,7 @@ class Cohort(Target):
                     if cram_path:
                         index_path = cram_path + '.crai'
                         s.alignment_input = AlignmentInput(
-                            bam_or_cram_path=cram_path, 
-                            index_path=index_path
+                            bam_or_cram_path=cram_path, index_path=index_path
                         )
                 if s.id in gvcf_per_sid:
                     s.analysis_by_type[AnalysisType.GVCF] = gvcf_per_sid[s.id]

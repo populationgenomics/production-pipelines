@@ -84,6 +84,7 @@ class Pipeline:
     Represents a Pipeline, and incapulates a Hail Batch object,
     stages, and a cohort of projects with samples.
     """
+
     def __init__(
         self,
         analysis_project: str,
@@ -132,8 +133,12 @@ class Pipeline:
         self.output_version = output_version
         self.namespace = namespace
         self.check_intermediate_existence = check_intermediate_existence and not dry_run
-        self.check_job_expected_outputs_existence = check_job_expected_outputs_existence and not dry_run
-        self.skip_samples_without_first_stage_input = skip_samples_without_first_stage_input
+        self.check_job_expected_outputs_existence = (
+            check_job_expected_outputs_existence and not dry_run
+        )
+        self.skip_samples_without_first_stage_input = (
+            skip_samples_without_first_stage_input
+        )
         self.first_stage = first_stage
         self.last_stage = last_stage
         self.validate_smdb_analyses = validate_smdb_analyses
@@ -156,7 +161,7 @@ class Pipeline:
             web_suf = 'main-web'
             self.output_suf = 'main'
             self.proj_output_suf = 'main'
-        
+
         path_ptrn = (
             f'gs://cpg-{self.analysis_project.stack}-{{suffix}}/'
             f'{self.name}/'
@@ -193,7 +198,7 @@ class Pipeline:
         self.config = config or {}
 
         self.b: Batch = setup_batch(
-            title=title, 
+            title=title,
             tmp_bucket=self.tmp_bucket,
             keep_scratch=self.keep_scratch,
             billing_project=self.analysis_project.stack,
@@ -225,7 +230,7 @@ class Pipeline:
             self.set_stages(stages_in_order)
 
     def submit_batch(
-        self, 
+        self,
         dry_run: Optional[bool] = None,
         wait: Optional[bool] = False,
     ) -> Optional[Any]:
@@ -326,17 +331,19 @@ class Pipeline:
                         f'but the output will be required for the stage {stage.name}'
                     )
                 stage.required_stages.append(reqstage)
-        
+
         if additional_stages_dict:
             logger.info(
                 f'Additional required stages added as "skipped": '
                 f'{additional_stages_dict.keys()}'
             )
             for name, stage in self._stages_dict.items():
-                additional_stages_dict[name] = stage    
+                additional_stages_dict[name] = stage
             self._stages_dict = additional_stages_dict
 
-        logger.info(f'Setting stages: {", ".join(s.name for s in stages if not s.skipped)}')
+        logger.info(
+            f'Setting stages: {", ".join(s.name for s in stages if not s.skipped)}'
+        )
 
         # Second round - actually adding jobs from the stages.
         for i, stage in enumerate(self._stages_dict.values()):
@@ -356,7 +363,7 @@ class Pipeline:
 
     def can_reuse(self, fpath: Optional[str]) -> bool:
         """
-        Checks if the fpath exists, 
+        Checks if the fpath exists,
         but always returns False if not check_intermediate_existence
         """
         return buckets.can_reuse(fpath, overwrite=not self.check_intermediate_existence)
@@ -364,7 +371,7 @@ class Pipeline:
     def db_process_existing_analysis(self, *args, **kwargs):
         if self._db is None:
             raise PipelineException('SMDB is not initialised')
-        
+
         return self._db.process_existing_analysis(*args, **kwargs)
 
     @property
