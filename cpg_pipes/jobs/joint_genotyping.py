@@ -18,8 +18,8 @@ from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
-from cpg_pipes.pipeline import Sample
-from cpg_pipes.smdb import SMDB
+from cpg_pipes.pipeline.sample import Sample
+from cpg_pipes.smdb.smdb import SMDB
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')

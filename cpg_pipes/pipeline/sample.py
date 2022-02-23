@@ -1,5 +1,5 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field, InitVar
 from enum import Enum
 from typing import Dict, Optional
 
@@ -12,34 +12,29 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-@dataclass(init=False)
+@dataclass
 class Sample(Target):
     """
     Corresponds to one Sample entry in the SMDB
     """
-    def __init__(
-        self, 
-        id: str, 
-        external_id: str, 
-        project,
-        participant_id: Optional[str] = None,
-        meta: dict = None,
-    ):
-        super().__init__()
-        self.id = id
-        self.external_id = external_id
-        self.project = project
-        self.participant_id = participant_id or external_id
-        self.meta = meta or dict()
-        self.alignment_input: Optional[AlignmentInput] = None
-        self.seq_info: Optional[SmSequence] = None
-        self.pedigree: Optional[PedigreeInfo] = None
+
+    id: str
+    external_id: str
+    project: 'Project'  # type: ignore  # noqa: F821
+    meta: dict = field(default_factory=dict)
+    participant_id: InitVar[Optional[str]] = None
+    alignment_input: Optional[AlignmentInput] = None
+    seq: Optional[SmSequence] = field(repr=False, default=None)
+    pedigree: Optional['PedigreeInfo'] = None
+
+    def __post_init__(self, participant_id: Optional[str]):
+        self.participant_id: str = participant_id or self.external_id
 
     @property
     def unique_id(self) -> str:
         return self.id
 
-    def get_ped_dict(self, use_participant_id: bool = False) -> Dict:
+    def get_ped_dict(self, use_participant_id: bool = False) -> Dict[str, str]:
         """
         Returns a dictionary of pedigree fields for this sample, corresponging
         a PED file entry.
@@ -77,6 +72,7 @@ class PedigreeInfo:
         Returns a dictionary of pedigree fields for this sample, corresponging
         a PED file entry.
         """
+
         def _get_id(_s: Optional[Sample]):
             if _s is None:
                 return '0'

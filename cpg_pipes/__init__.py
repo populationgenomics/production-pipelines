@@ -1,7 +1,3 @@
-"""
-Just defines `package_path` which returns the local install path of the package
-"""
-
 from os.path import dirname, abspath
 
 

@@ -10,10 +10,10 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import images, ref_data, buckets
-from cpg_pipes.smdb import SMDB
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.smdb.smdb import SMDB
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')

@@ -38,10 +38,12 @@ class TestPipeline(unittest.TestCase):
         which is supposed to be quick.
         """
         setup_env()
-        from pipelines import seqr_loader
         from cpg_pipes import benchmark
         from cpg_pipes import ref_data
-        from cpg_pipes.pipeline import Pipeline, find_stages_in_module
+        from cpg_pipes.pipeline.pipeline import Pipeline
+        # Use the seqr_loader stages. Importing it will make sure all its stages
+        # are used by default:
+        from pipelines import seqr_loader  # noqa: F401
 
         pipeline = Pipeline(
             name=self._testMethodName,
@@ -53,13 +55,10 @@ class TestPipeline(unittest.TestCase):
             config=dict(output_projects=[PROJECT]),
             dry_run=True,
         )
-        project = pipeline.add_project(PROJECT)
+        project = pipeline.cohort.add_project(PROJECT)
         for s_id in self.sample_ids:
             s = project.add_sample(s_id, s_id)
             s.alignment_input = benchmark.tiny_fq
-
-        # Use seqr loader stages
-        pipeline.set_stages(find_stages_in_module(seqr_loader.__name__))
 
         with patch('builtins.print') as mock_print:
             pipeline.submit_batch()

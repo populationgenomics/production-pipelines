@@ -9,7 +9,8 @@ import pandas as pd
 from cpg_pipes import buckets, images, ref_data, utils
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.pipeline import Project, Sample
+from cpg_pipes.pipeline.project import Project
+from cpg_pipes.pipeline.sample import Sample
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')

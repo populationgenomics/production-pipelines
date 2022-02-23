@@ -45,25 +45,115 @@ def main(**kwargs):
 
 For more usage examples, see the "pipelines" folder in the root of this repository.
 """
-
+import functools
 import logging
 import shutil
 import tempfile
-from typing import List, Dict, Optional, Tuple, cast, Union, Any
+from typing import List, Dict, Optional, Tuple, cast, Union, Any, Callable, Type
 
 from cpg_pipes import buckets
 from cpg_pipes.hb.batch import setup_batch, Batch
 from cpg_pipes.hb.prev_job import PrevJob
+from cpg_pipes.namespace import Namespace
 from cpg_pipes.pipeline.cohort import Cohort
-from cpg_pipes.pipeline.decorators import StageDecorator
 from cpg_pipes.pipeline.project import Project
 from cpg_pipes.pipeline.stage import Stage
-from cpg_pipes.smdb import SMDB
-from cpg_pipes.namespace import Namespace
+from cpg_pipes.smdb.types import AnalysisType
+from cpg_pipes.smdb.smdb import SMDB
+
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
+
+
+StageDecorator = Callable[..., 'Stage']
+
+
+# We record each initialised Stage subclass, so we know the default stage
+# list for the case when the user doesn't pass them explicitly with set_stages()
+_defined_stages = []
+
+
+def stage(
+    _cls: Optional[Type[Stage]] = None, 
+    *,
+    sm_analysis_type: Optional[AnalysisType] = None, 
+    requires_stages: Optional[Union[List[StageDecorator], StageDecorator]] = None,
+    skipped: bool = False,
+    required: bool = True,
+    assume_results_exist: bool = False,
+    forced: bool = False,
+) -> Union[StageDecorator, Callable[..., StageDecorator]]:
+    """
+    Implements a standard class decorator pattern with an optional argument.
+    The goal is to allow cleaner defining of custom pipeline stages, without
+    requiring to implement constructor. E.g.
+
+    @stage(sm_analysis_type=AnalysisType.GVCF, requires_stages=CramStage)
+    class GvcfStage(SampleStage):
+        def expected_result(self, sample: Sample):
+            ...
+        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+            ...
+    """
+    def decorator_stage(cls) -> StageDecorator:
+        @functools.wraps(cls)
+        def wrapper_stage(pipeline: 'Pipeline') -> Stage:
+            return cls(
+                name=cls.__name__,
+                pipeline=pipeline,
+                requires_stages=requires_stages,
+                sm_analysis_type=sm_analysis_type,
+                skipped=skipped,
+                required=required,
+                assume_results_exist=assume_results_exist, 
+                forced=forced,
+            )
+        # We record each initialised Stage subclass, so we know the default stage
+        # list for the case when the user doesn't pass them explicitly with set_stages()
+        global _defined_stages
+        _defined_stages.append(wrapper_stage)
+        return wrapper_stage
+
+    if _cls is None:
+        return decorator_stage
+    else:
+        return decorator_stage(_cls)
+
+
+def skipped(
+    _fun: Optional[StageDecorator] = None, 
+    *,
+    assume_results_exist: bool = False,
+) -> Union[StageDecorator, Callable[..., StageDecorator]]:
+    """
+    Decorator on top of `@stage` that sets the self.skipped field to True
+
+    @skipped
+    @stage
+    class MyStage1(SampleStage):
+        ...
+
+    @skipped
+    @stage(assume_results_exist=True)
+    class MyStage2(SampleStage):
+        ...
+    """
+    def decorator_stage(fun) -> StageDecorator:
+        @functools.wraps(fun)
+        def wrapper_stage(*args, **kwargs) -> Stage:
+            stage = fun(*args, **kwargs)
+            stage.skipped = True
+            stage.assume_results_exist = assume_results_exist
+            return stage
+
+        return wrapper_stage
+
+    if _fun is None:
+        return decorator_stage
+    else:
+        return decorator_stage(_fun)
 
 
 def run_pipeline(dry_run: bool = False, **kwargs) -> 'Pipeline':
@@ -207,8 +297,6 @@ class Pipeline:
         self.cohort = Cohort(self.name, pipeline=self)
         self._db = None
         if input_projects:
-            # Delaying importing smdb until here to allow using Pipeline
-            # without sample-metadata dependency.
             self._db = SMDB(
                 self.analysis_project.name,
                 do_update_analyses=update_smdb_analyses,
@@ -228,6 +316,8 @@ class Pipeline:
         self._stages_dict: Dict[str, Stage] = dict()
         if stages_in_order:
             self.set_stages(stages_in_order)
+        else:
+            self.set_stages(_defined_stages)
 
     def submit_batch(
         self,
@@ -378,7 +468,7 @@ class Pipeline:
     def db(self) -> SMDB:
         if self._db is None:
             raise PipelineException('SMDB is not initialised')
-        return cast(SMDB, self._db)
+        return cast('SMDB', self._db)
 
     def get_db(self) -> Optional[SMDB]:
         """

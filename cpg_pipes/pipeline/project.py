@@ -5,8 +5,8 @@ from typing import List, Optional
 import logging
 
 from cpg_pipes.namespace import Namespace
-from cpg_pipes.pipeline.sample import Sample
 from cpg_pipes.pipeline.target import Target
+from cpg_pipes.pipeline.sample import Sample
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -17,10 +17,11 @@ class Project(Target):
     """
     Represents a CPG stack (aka dataset), or a project from sample-metadata database.
     """
+
     def __init__(
-        self, 
+        self,
         name: str,
-        pipeline,
+        pipeline: 'Pipeline',  # type: ignore  # noqa: F821
         namespace: Optional[Namespace] = None,
     ):
         """
@@ -31,10 +32,11 @@ class Project(Target):
         super().__init__()
         if name.endswith('-test'):
             self.is_test = True
-            self.stack = name[:-len('-test')]
+            self.stack = name[: -len('-test')]
         else:
+            self.is_test = False
             self.stack = name
-            
+
         self.name = self.stack
         if self.is_test:
             self.name = self.stack + '-test'
@@ -45,7 +47,7 @@ class Project(Target):
 
     def get_bucket(self):
         """
-        The primary project bucket (-main or -test) 
+        The primary project bucket (-main or -test)
         """
         return f'gs://cpg-{self.stack}-{self.pipeline.output_suf}'
 
@@ -67,14 +69,10 @@ class Project(Target):
         return self.name
 
     def add_sample(
-        self, 
-        id: str, 
-        external_id: str, 
-        participant_id: Optional[str] = None,
-        **kwargs
+        self, id: str, external_id: str, participant_id: Optional[str] = None, **kwargs
     ) -> Sample:
         s = Sample(
-            id=id, 
+            id=id,
             external_id=external_id,
             participant_id=participant_id,
             project=self,
@@ -82,7 +80,7 @@ class Project(Target):
         )
         self._samples.append(s)
         return s
-    
+
     def get_samples(self, only_active: bool = True) -> List[Sample]:
         """
         Get project's samples. Inlcude only "active" samples, unless only_active

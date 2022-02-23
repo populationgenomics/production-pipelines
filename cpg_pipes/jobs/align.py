@@ -15,9 +15,9 @@ from cpg_pipes.hb import inputs
 from cpg_pipes.hb.inputs import AlignmentInput
 from cpg_pipes.hb.prev_job import PrevJob
 from cpg_pipes.jobs import picard
-from cpg_pipes.smdb import SMDB
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.smdb.smdb import SMDB
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
