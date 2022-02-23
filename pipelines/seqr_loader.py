@@ -23,11 +23,13 @@ from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.namespace import Namespace
-from cpg_pipes.analysis_type import AnalysisType
-from cpg_pipes.pipeline import Pipeline, Sample, \
-    SampleStage, Project, CohortStage, ProjectStage, \
-    pipeline_click_options, StageInput, stage, StageOutput, \
-    find_stages_in_module
+from cpg_pipes.smdb.types import AnalysisType
+from cpg_pipes.pipeline.cli_opts import pipeline_click_options
+from cpg_pipes.pipeline.pipeline import stage, Pipeline, find_stages_in_module
+from cpg_pipes.pipeline.stage import SampleStage, CohortStage, ProjectStage, \
+    StageInput, StageOutput
+from cpg_pipes.pipeline.sample import Sample
+from cpg_pipes.pipeline.project import Project
 from cpg_pipes.pipeline.cohort import Cohort
 
 logger = logging.getLogger(__file__)
@@ -545,10 +547,12 @@ def _make_seqr_metadata_files(
     help='Make Seqr metadata',
 )
 def main(**kwargs):  # pylint: disable=missing-function-docstring
+    make_seqr_metadata = kwargs.pop('make_seqr_metadata')
+    
     pipeline = make_pipeline(**kwargs)
     pipeline.submit_batch()
 
-    if pipeline.config.get('make_seqr_metadata', False):
+    if make_seqr_metadata:
         for project in pipeline.cohort.get_projects():
             if project.stack in pipeline.config.get('output_projects', []):
                 _make_seqr_metadata_files(
