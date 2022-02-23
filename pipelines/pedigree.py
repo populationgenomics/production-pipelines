@@ -12,8 +12,10 @@ import click
 
 from cpg_pipes import buckets
 from cpg_pipes.jobs import pedigree
-from cpg_pipes.pipeline import Project, \
-    ProjectStage, pipeline_click_options, stage, StageInput, StageOutput, Pipeline
+from cpg_pipes.pipeline.project import Project
+from cpg_pipes.pipeline.stage import ProjectStage, StageInput, StageOutput
+from cpg_pipes.pipeline.pipeline import stage, Pipeline
+from cpg_pipes.pipeline.cli_opts import pipeline_click_options
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')

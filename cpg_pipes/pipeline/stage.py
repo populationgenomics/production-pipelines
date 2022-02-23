@@ -9,16 +9,16 @@ from typing import (
 )
 
 import hailtop.batch as hb
+
+from cpg_pipes.pipeline.project import Project
 from hailtop.batch.job import Job
 
 from cpg_pipes import buckets
-from cpg_pipes.pipeline.cohort import Cohort
-from cpg_pipes.pipeline.decorators import StageDecorator
-from cpg_pipes.pipeline.pair import Pair
-from cpg_pipes.pipeline.project import Project
-from cpg_pipes.pipeline.sample import Sample
-from cpg_pipes.pipeline.target import Target
 from cpg_pipes.smdb.types import AnalysisType
+from cpg_pipes.pipeline.cohort import Cohort
+from cpg_pipes.pipeline.target import Target
+from cpg_pipes.pipeline.sample import Sample
+from cpg_pipes.pipeline.pair import Pair
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -110,6 +110,9 @@ class StageOutput:
         Cast the result to a dictionary of strings, error if can't cast.
         """
         return {k: self.as_path(id=k) for k in self.as_dict()}
+
+
+StageDecorator = Callable[..., 'Stage']
 
 
 class StageInput:

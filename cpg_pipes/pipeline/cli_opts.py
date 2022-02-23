@@ -3,7 +3,6 @@ Common pipeline command line options for "click".
 """
 
 from collections import Callable
-
 import click
 
 from cpg_pipes.namespace import Namespace

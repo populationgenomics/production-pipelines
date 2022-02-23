@@ -5,8 +5,8 @@ from typing import List, Optional
 import logging
 
 from cpg_pipes.namespace import Namespace
-from cpg_pipes.pipeline.sample import Sample
 from cpg_pipes.pipeline.target import Target
+from cpg_pipes.pipeline.sample import Sample
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -33,6 +33,7 @@ class Project(Target):
             self.is_test = True
             self.stack = name[:-len('-test')]
         else:
+            self.is_test = False
             self.stack = name
             
         self.name = self.stack

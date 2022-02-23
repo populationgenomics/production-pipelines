@@ -32,7 +32,7 @@ class Sample(Target):
         self.participant_id = participant_id or external_id
         self.meta = meta or dict()
         self.alignment_input: Optional[AlignmentInput] = None
-        self.seq_info: Optional[SmSequence] = None
+        self.seq: Optional[SmSequence] = None
         self.pedigree: Optional[PedigreeInfo] = None
 
     @property

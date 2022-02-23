@@ -11,7 +11,6 @@ from cpg_pipes.hb.inputs import AlignmentInput
 from cpg_pipes.pipeline.sample import Sample, PedigreeInfo, Sex
 from cpg_pipes.pipeline.project import Project
 from cpg_pipes.pipeline.target import Target
-from cpg_pipes.smdb.smdb import SMDB, parse_reads_from_sequence
 from cpg_pipes.smdb.types import AnalysisType
 
 logger = logging.getLogger(__file__)
@@ -74,7 +73,7 @@ class Cohort(Target):
 
     def populate(
         self,
-        smdb: SMDB,
+        smdb: 'SMDB',
         input_projects: List[str],
         local_tmp_dir: str,
         source_tag: Optional[str] = None,
@@ -102,7 +101,7 @@ class Cohort(Target):
 
     def _populate_projects(
         self,
-        smdb: SMDB,
+        smdb: 'SMDB',
         input_projects: List[str],
         skip_samples: Optional[List[str]] = None,
         only_samples: Optional[List[str]] = None,
@@ -167,7 +166,7 @@ class Cohort(Target):
                 f'samples out of {len(project.get_samples())}'
             )
 
-    def _populate_seq(self, smdb: SMDB):
+    def _populate_seq(self, smdb: 'SMDB'):
         """
         Queries Sequence entries for each sample
         """
@@ -175,10 +174,11 @@ class Cohort(Target):
         seqs_by_sid = smdb.find_seq_by_sid(all_sample_ids)
         for s in self.get_all_samples():
             if s.id in seqs_by_sid:
-                s.seq_info = seqs_by_sid[s.id]
-                s.alignment_input = parse_reads_from_sequence(s.seq_info)
+                s.seq = seqs_by_sid[s.id]
+                assert s.seq is not None
+                s.alignment_input = s.seq.parse_reads()
 
-    def _populate_analysis(self, smdb: SMDB, source_tag: Optional[str] = None):
+    def _populate_analysis(self, smdb: 'SMDB', source_tag: Optional[str] = None):
         all_sample_ids = self.get_all_sample_ids()
 
         jc_analysis = smdb.find_joint_calling_analysis(

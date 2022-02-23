@@ -1,8 +1,8 @@
 """
 Pair of samples as a stage's Target
 """
-from cpg_pipes.pipeline import Sample
 from cpg_pipes.pipeline.target import Target
+from cpg_pipes.pipeline.sample import Sample
 
 
 class Pair(Target):
