@@ -678,5 +678,5 @@ class CohortStage(Stage, ABC):
     def add_to_the_pipeline(self, pipeline) -> Dict[str, StageOutput]:
         return {
             pipeline.cohort.unique_id: 
-            self._queue_jobs_with_checks(pipeline)
+            self._queue_jobs_with_checks(pipeline.cohort)
         }
