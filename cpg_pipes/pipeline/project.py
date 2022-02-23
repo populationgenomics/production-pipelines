@@ -20,7 +20,7 @@ class Project(Target):
     def __init__(
         self, 
         name: str,
-        pipeline,
+        pipeline: 'Pipeline',  # type: ignore  # noqa: F821
         namespace: Optional[Namespace] = None,
     ):
         """
