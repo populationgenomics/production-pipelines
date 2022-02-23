@@ -28,10 +28,13 @@ from analysis_runner.cromwell import (
 from cpg_pipes import images
 from cpg_pipes.hb.batch import job_name
 from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.pipeline import Sample, \
-    SampleStage, pipeline_click_options, StageInput, \
-    stage, skipped, Project, ProjectStage, Pipeline, CohortStage, \
-    find_stages_in_module, StageOutput
+from cpg_pipes.pipeline.cli_opts import pipeline_click_options
+from cpg_pipes.pipeline.cohort import Cohort
+from cpg_pipes.pipeline.pipeline import Pipeline, skipped, stage
+from cpg_pipes.pipeline.project import Project
+from cpg_pipes.pipeline.sample import Sample
+from cpg_pipes.pipeline.stage import StageInput, StageOutput, CohortStage, SampleStage, \
+    ProjectStage
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -256,23 +259,23 @@ class TrainGCNV(CohortStage):
     """
     # https://github.com/populationgenomics/gatk-sv/blob/main/wdl/TrainGCNV.wdl
     """
-    def expected_result(self, pipeline: Pipeline) -> Dict[str, str]:
+    def expected_result(self, cohort: Cohort) -> Dict[str, str]:
         d = dict()
         fname_by_key = {
             'cohort_contig_ploidy_model_tar': 'cohort_contig_ploidy_model.tar',
             'cohort_contig_ploidy_calls_tar': 'cohort_contig_ploidy_calls.tar',
         }
         for key, fname in fname_by_key.items():
-            d[key] = join(pipeline.analysis_bucket, 'gatk_sv', self.name.lower(), fname)
+            d[key] = join(self.pipe.analysis_bucket, 'gatk_sv', self.name.lower(), fname)
         return d
 
-    def queue_jobs(self, pipeline: Pipeline, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
 
         d = inputs.as_dict_by_target(GatherSampleEvidence)
         
-        sids = pipeline.get_all_sample_ids()
+        sids = cohort.get_all_sample_ids()
         input_dict = {
-            'cohort': pipeline.unique_id,
+            'cohort': cohort.unique_id,
             'samples': sids,
             'count_files': [d[sid]['coverage_counts'] for sid in sids],
             'ref_copy_number_autosomal_contigs': 2,
@@ -296,7 +299,7 @@ class TrainGCNV(CohortStage):
             'contig_ploidy_priors',
         ]))
 
-        expected_d = self.expected_result(pipeline)
+        expected_d = self.expected_result(cohort)
 
         output_dict, j = add_gatksv_job(
             self.pipe,
@@ -305,7 +308,7 @@ class TrainGCNV(CohortStage):
             expected_out_dict=expected_d,
         )
 
-        return self.make_outputs(pipeline, data=output_dict, jobs=[j])
+        return self.make_outputs(cohort, data=output_dict, jobs=[j])
 
 
 @click.command()
@@ -327,7 +330,6 @@ def main(
         output_version=output_version,
         **kwargs
     )
-    pipeline.set_stages(find_stages_in_module(__name__))
     pipeline.submit_batch()
 
 
