@@ -274,6 +274,7 @@ class EvidenceQC(ProjectStage):
         return self.make_outputs(project, data=output_dict, jobs=[j])
 
 
+@skipped(assume_results_exist=True)
 @stage(requires_stages=[GatherSampleEvidence])
 class TrainGCNV(CohortStage):
     """
