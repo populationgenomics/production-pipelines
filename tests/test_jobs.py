@@ -15,7 +15,7 @@ from cpg_pipes.jobs.haplotype_caller import produce_gvcf
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
-from cpg_pipes.pipeline import Pipeline
+from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes import buckets, images
 
 from utils import BASE_BUCKET, PROJECT, SAMPLES, SUBSET_GVCF_BY_SID
@@ -105,15 +105,15 @@ class TestJobs(unittest.TestCase):
         )
         self.assertEqual(
             283306,  # 276599,
-            self._read_file(cram_details_paths['reads_num']),
+            int(self._read_file(cram_details_paths['reads_num'])),
         )
         self.assertAlmostEqual(
             273658,  # 271728, 
-            self._read_file(cram_details_paths['reads_num_mapped_in_proper_pair']),
+            int(self._read_file(cram_details_paths['reads_num_mapped_in_proper_pair'])),
             delta=10
         )
 
-    @unittest.skip('Skip')
+    # @unittest.skip('Skip')
     def test_haplotype_calling(self):
         """
         Test individual sample haplotype calling
@@ -141,7 +141,7 @@ class TestJobs(unittest.TestCase):
         out_vcf_path = f'{self.out_bucket}/joint-called.vcf.gz'
         out_siteonly_vcf_path = out_vcf_path.replace('.vcf.gz', '-siteonly.vcf.gz')
 
-        proj = self.pipeline.add_project(PROJECT)
+        proj = self.pipeline.cohort.add_project(PROJECT)
         for sid in SAMPLES:
             proj.add_sample(sid, sid)
 
@@ -165,7 +165,7 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(len(SAMPLES), len(contents.split()))
         self.assertEqual(set(SAMPLES), set(contents.split()))
 
-    @unittest.skip('Skip')
+    # @unittest.skip('Skip')
     def test_vqsr(self):
         """
         Test AS-VQSR

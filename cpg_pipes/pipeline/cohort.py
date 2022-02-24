@@ -57,13 +57,16 @@ class Cohort(Target):
             all_samples.extend(proj.get_samples(only_active))
         return all_samples
 
-    def get_all_sample_ids(self) -> List[str]:
+    def get_all_sample_ids(self, only_active: bool = True) -> List[str]:
         """
         Gets a flat list of CPG IDs for all samples from all projects.
         """
-        return [s.id for s in self.get_all_samples()]
+        return [s.id for s in self.get_all_samples(only_active=only_active)]
 
     def add_project(self, name: str) -> Project:
+        """
+        Create a project and add to the cohort.
+        """
         project_by_name = {p.name: p for p in self._projects}
         if name in project_by_name:
             logger.warning(f'Project {name} already exists')

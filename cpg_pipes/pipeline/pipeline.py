@@ -24,13 +24,13 @@ class GvcfStage(SampleStage):
         job = haplotype_caller.produce_gvcf(b=self.pipe.b, ..., output_path=expected_path)
         return self.make_outputs(sample, data=expected_path, jobs=[job])
 
-@stage(analysis_type=AnalysisType.JOINT_CALLING)
+@stage(analysis_type=AnalysisType.JOINT_CALLING, requires_stages=GvcfStage)
 class JointCallingStage(CohortStage):
-    def queue_jobs(self, pipeline: Pipeline, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         gvcf_by_sid = inputs.as_path_by_target(stage=GvcfStage)
-        expected_path = self.expected_result(pipe)
+        expected_path = self.expected_result(cohort)
         job = make_joint_genotyping_jobs(b=self.pipe.b, ..., output_path=expected_path)
-        return self.make_outputs(pipe, data=expected_path, jobs=[job])
+        return self.make_outputs(cohort, data=expected_path, jobs=[job])
 
 @click.command()
 @pipeline_click_options
@@ -38,7 +38,6 @@ def main(**kwargs):
     p = Pipeline(
         name='my_joint_calling_pipeline',
         title='My joint calling pipeline',
-        stages_in_order=[CramStage, GvcfStage, JointCallingStage],
         **kwargs
     )
     p.submit_batches()
@@ -57,6 +56,7 @@ from cpg_pipes.hb.prev_job import PrevJob
 from cpg_pipes.namespace import Namespace
 from cpg_pipes.pipeline.cohort import Cohort
 from cpg_pipes.pipeline.project import Project
+from cpg_pipes.pipeline.sample import Sample
 from cpg_pipes.pipeline.stage import Stage
 from cpg_pipes.smdb.types import AnalysisType
 from cpg_pipes.smdb.smdb import SMDB
@@ -452,6 +452,9 @@ class Pipeline:
         return buckets.can_reuse(fpath, overwrite=not self.check_intermediate_existence)
 
     def db_process_existing_analysis(self, *args, **kwargs):
+        """
+        Thin wrapper around SMDB.process_existing_analysis
+        """
         if self._db is None:
             raise PipelineException('SMDB is not initialised')
         
@@ -459,19 +462,39 @@ class Pipeline:
 
     @property
     def db(self) -> SMDB:
+        """
+        Get read-only sample-metadata DB object.
+        """
         if self._db is None:
             raise PipelineException('SMDB is not initialised')
         return cast('SMDB', self._db)
 
     def get_db(self) -> Optional[SMDB]:
         """
-        Like .db property, but returns None if db is not initiazlied
+        Like .db property, but returns None if db is not initialised.
         """
         return self._db
 
     def get_projects(self, only_active: bool = True) -> List[Project]:
         """
-        Gets list of all projects of the cohort.
-        Include only "active" projects (unless only_active is False)
+        Thin wrapper around corresponding Cohort method.
         """
         return self.cohort.get_projects(only_active=only_active)
+
+    def add_project(self, name: str) -> Project:
+        """
+        Thin wrapper around corresponding Cohort method.
+        """
+        return self.cohort.add_project(name)
+
+    def get_all_samples(self, only_active: bool = True) -> List[Sample]:
+        """
+        Thin wrapper around corresponding Cohort method.
+        """
+        return self.cohort.get_all_samples(only_active=only_active)
+
+    def get_all_sample_ids(self, only_active: bool = True) -> List[str]:
+        """
+        Thin wrapper around corresponding Cohort method.
+        """
+        return self.cohort.get_all_sample_ids(only_active=only_active)
