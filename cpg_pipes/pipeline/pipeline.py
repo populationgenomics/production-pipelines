@@ -57,6 +57,7 @@ from cpg_pipes.hb.prev_job import PrevJob
 from cpg_pipes.namespace import Namespace
 from cpg_pipes.pipeline.cohort import Cohort
 from cpg_pipes.pipeline.project import Project
+from cpg_pipes.pipeline.sample import Sample
 from cpg_pipes.pipeline.stage import Stage
 from cpg_pipes.smdb.types import AnalysisType
 from cpg_pipes.smdb.smdb import SMDB
@@ -452,6 +453,9 @@ class Pipeline:
         return buckets.can_reuse(fpath, overwrite=not self.check_intermediate_existence)
 
     def db_process_existing_analysis(self, *args, **kwargs):
+        """
+        Thin wrapper around SMDB.process_existing_analysis
+        """
         if self._db is None:
             raise PipelineException('SMDB is not initialised')
         
@@ -459,19 +463,39 @@ class Pipeline:
 
     @property
     def db(self) -> SMDB:
+        """
+        Get read-only sample-metadata DB object.
+        """
         if self._db is None:
             raise PipelineException('SMDB is not initialised')
         return cast('SMDB', self._db)
 
     def get_db(self) -> Optional[SMDB]:
         """
-        Like .db property, but returns None if db is not initiazlied
+        Like .db property, but returns None if db is not initialised.
         """
         return self._db
 
     def get_projects(self, only_active: bool = True) -> List[Project]:
         """
-        Gets list of all projects of the cohort.
-        Include only "active" projects (unless only_active is False)
+        Thin wrapper around corresponding Cohort method.
         """
         return self.cohort.get_projects(only_active=only_active)
+
+    def add_project(self, name: str) -> Project:
+        """
+        Thin wrapper around corresponding Cohort method.
+        """
+        return self.cohort.add_project(name)
+
+    def get_all_samples(self, only_active: bool = True) -> List[Sample]:
+        """
+        Thin wrapper around corresponding Cohort method.
+        """
+        return self.cohort.get_all_samples(only_active=only_active)
+
+    def get_all_sample_ids(self, only_active: bool = True) -> List[str]:
+        """
+        Thin wrapper around corresponding Cohort method.
+        """
+        return self.cohort.get_all_sample_ids(only_active=only_active)
