@@ -16,14 +16,15 @@ python pipelines/seqr_loader.py \
 --ped-file gs://cpg-perth-neuro-main-upload/perth-neuro-sm.ped \
 --validate-smdb-analyses \
 --check-smdb-seq-existence \
---check-intermediate-existence
+--check-intermediate-existence \
 --skip-sample CPG11783 \
 --skip-sample CPG13326 \
 --output-version v4-1 \
 --keep-scratch
 ```
 
-Another useful pipeline is `pipelines/pedigree.py` to verify inferred samples relationship and sex against a provided PED file(s):
+Another useful pipeline is `pipelines/pedigree.py` to verify inferred samples 
+relationship and sex against a provided PED file(s):
 
 ```sh
 python pipelines/pedigree.py \
