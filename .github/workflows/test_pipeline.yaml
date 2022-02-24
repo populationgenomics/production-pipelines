@@ -1,5 +1,5 @@
 name: Test Pipeline
-on: [push]
+on: [push, workflow_dispatch]
 jobs:
   test_pipeline:
     runs-on: ubuntu-latest
