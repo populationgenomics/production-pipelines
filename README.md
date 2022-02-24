@@ -20,7 +20,7 @@ pip install cpg_pipes
 
 A common use case of a bioinformatics pipeline at the CPG is a set of stages, with intermediate outputs stored on buckets according to the storage policies, and optionally tracked by the sample-metadata database.
 
-The package implements a concept of /stage/, that can act on a /target/: e.g. a /sample/, a /project/, or a /cohort/. For example, a stage that runs whole genome alignment to produce a CRAM file, would act on a sample, and a stage that performs joint-calling would act on an entire cohort. 
+The package implements a concept of _stage_, that can act on a _target_: e.g. a _sample_, a _project_, or a _cohort_. For example, a stage that runs whole genome alignment to produce a CRAM file, would act on a sample, and a stage that performs joint-calling would act on an entire cohort. 
 
 Each stage declares paths to the outputs it would produce by overriding abstract `expected_result()` method; and defines how jobs are added into Hail Batch using `queue_jobs()` method. 
 
@@ -98,7 +98,7 @@ class JointCalling(CohortStage):
         return self.make_outputs(cohort, data=self.expected_result(cohort), jobs=[job])
 ```
 
-To submit the constructed pipeline to Hail Batch, initialise the `Pipeline` object, and call `submit_batch()`. You need to pass name, title, version, namespace, and the `analysis_project` name that would be used to communicate with the sample-metadata DB.
+To submit the constructed pipeline to Hail Batch, initialise the `Pipeline` object, and call `submit_batch()`. You need to pass a name, a title, a version of a run, the namespace according to the storage policies (test/main/tmp), and the `analysis_project` name that would be used to communicate with the sample-metadata DB.
 
 ```python
 from cpg_pipes.pipeline.pipeline import Pipeline
@@ -116,7 +116,7 @@ pipeline.submit_batch()
 
 ### Sample-metadata database
 
-Stage targets are organised in a form of projects and samples, folowing the model used in the sample-metadata database. Additional target "cohort" is used to define all samples from all projects. The Pipeline class can populate correspondning targets if you provide input project names with `input_projects`:
+Stage targets are organised in a form of projects and samples, folowing the model used in the sample-metadata database. Additional target _cohort_ is used to define all samples from all projects. The Pipeline class can populate correspondning targets if you provide input project names with `input_projects`:
 
 ```python
 pipeline = Pipeline(
@@ -140,7 +140,7 @@ Sample(id='CPG68197', external_id='HGDP00001', project=hgdp, meta={'project': 'h
 
 If `Participant` entry is available, `sample.participant_id` will be populated. If corresponding `Sequence` is available, `sample.seq` will be populated, and `reads` metadata will be parsed and populated as `sample.alignment_input`. If corresponding `Analysis` entries exist, they wil be populated as `sample.sanalysis_by_type`. If `Family` data is available, it will be parsed and populated as `sample.pedigre`.
 
-Communication with the sample-metadata DB is organised through the `cpg_pipes.smdb` module - a wrapper around the sample-metadata database API. E.g., to get a dictionary of Sample entries indexed by project name, run:
+Communication with the sample-metadata DB is organised through the `cpg_pipes.smdb` module, a wrapper around the sample-metadata database API. E.g., to get a dictionary of Sample entries indexed by project name, run:
 
 ```python
 from cpg_pipes.smdb import SMDB
