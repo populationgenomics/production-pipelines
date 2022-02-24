@@ -32,7 +32,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             'analysis_project',
             default='seqr',
             help='SM project name to write the intermediate/joint-calling analysis '
-                 'entries to',
+                 'entries',
         ),
         click.option(
             '--input-project',
@@ -51,12 +51,13 @@ def pipeline_click_options(function: Callable) -> Callable:
             '--ped-file',
             'ped_files',
             multiple=True,
+            help='PED file (will override sample-meatadata family data if available)'
         ),
         click.option(
             '--first-stage',
             'first_stage',
-            help='Only pick results from the previous stages if they exist. '
-            'If not, skip such samples',
+            help='Skip previous stages and pick their expected results if further '
+                 'stages depend on thems',
         ),
         click.option(
             '--last-stage',
@@ -168,6 +169,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             'local_dir',
         ),
     ]
-    for opt in options:
+    # click shows options in a reverse order, so inverting the list back:
+    for opt in options[::-1]:
         function = opt(function)
     return function

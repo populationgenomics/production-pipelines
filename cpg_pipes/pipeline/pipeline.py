@@ -24,13 +24,13 @@ class GvcfStage(SampleStage):
         job = haplotype_caller.produce_gvcf(b=self.pipe.b, ..., output_path=expected_path)
         return self.make_outputs(sample, data=expected_path, jobs=[job])
 
-@stage(analysis_type=AnalysisType.JOINT_CALLING)
+@stage(analysis_type=AnalysisType.JOINT_CALLING, requires_stages=GvcfStage)
 class JointCallingStage(CohortStage):
-    def queue_jobs(self, pipeline: Pipeline, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         gvcf_by_sid = inputs.as_path_by_target(stage=GvcfStage)
-        expected_path = self.expected_result(pipe)
+        expected_path = self.expected_result(cohort)
         job = make_joint_genotyping_jobs(b=self.pipe.b, ..., output_path=expected_path)
-        return self.make_outputs(pipe, data=expected_path, jobs=[job])
+        return self.make_outputs(cohort, data=expected_path, jobs=[job])
 
 @click.command()
 @pipeline_click_options
@@ -38,7 +38,6 @@ def main(**kwargs):
     p = Pipeline(
         name='my_joint_calling_pipeline',
         title='My joint calling pipeline',
-        stages_in_order=[CramStage, GvcfStage, JointCallingStage],
         **kwargs
     )
     p.submit_batches()
