@@ -28,7 +28,7 @@ setuptools.setup(
         'pandas',
         'cpg-hail',
         'cpg-gnomad',   # github.com/populationgenomics/gnomad_methods
-        'gcloud',
+        'google-cloud-storage',
         'fsspec',
         'sample-metadata',
         'analysis-runner',
