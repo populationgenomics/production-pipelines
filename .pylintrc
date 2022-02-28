@@ -12,13 +12,17 @@
 # 5. fixme (left 'TODO' lines)
 # 6. logging-fstring-interpolation (forbids f-strings in logging functions)
 # 7. missing-function-docstring (Missing function or method docstring)
-# 8. The following require installing the python modules imported in the source code.
+# 8. trailing-whitespace
+# 9. use-dict-literal
+# 10. too-many-instance-attributes
+#
+# The following require installing the python modules imported in the source code.
 #    Add these if you don't want to include all dependencies into the dev environment:
 #    import-error ("Unable to import")
 #    no-member
 #    c-extension-no-member
 
-disable=f-string-without-interpolation,inherit-non-class,too-few-public-methods,C0330,C0326,fixme,logging-fstring-interpolation
+disable=f-string-without-interpolation,inherit-non-class,too-few-public-methods,C0330,C0326,fixme,logging-fstring-interpolation,trailing-whitespace,use-dict-literal,too-many-instance-attributes
 
 # Overriding variable name patterns to allow short 1- or 2-letter variables
 attr-rgx=[a-z_][a-z0-9_]{0,30}$

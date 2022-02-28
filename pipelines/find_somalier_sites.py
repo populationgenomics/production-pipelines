@@ -12,8 +12,8 @@ Problems with the currentl publicly shared somalier sites VCF:
 from os.path import join
 import logging
 from cpg_pipes import ref_data, images
-from cpg_pipes.hailbatch import wrap_command
-from cpg_pipes.pipeline import Pipeline
+from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.pipeline.pipeline import Pipeline
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')

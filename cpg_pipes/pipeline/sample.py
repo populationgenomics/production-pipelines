@@ -1,5 +1,9 @@
+"""
+Corresponds to one Sample entry in the SMDB
+"""
+
 import logging
-from dataclasses import dataclass, field, InitVar
+from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, Optional
 
@@ -12,22 +16,50 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-@dataclass
 class Sample(Target):
     """
-    Corresponds to one Sample entry in the SMDB
+    Represents a Sample
     """
-    id: str
-    external_id: str
-    project: 'Project'  # type: ignore  # noqa: F821
-    participant_id: InitVar[Optional[str]] = None
-    meta: dict = field(default_factory=dict)
-    alignment_input: Optional[AlignmentInput] = None
-    seq: Optional[SmSequence] = field(repr=False, default=None)
-    pedigree: Optional['PedigreeInfo'] = None
-    
-    def __post_init__(self, participant_id: Optional[str]):
-        self.participant_id: str = participant_id or self.external_id
+    def __init__(
+        self, 
+        id: str,  # pylint: disable=redefined-builtin
+        external_id: str,
+        project: 'Project',  # type: ignore  # noqa: F821
+        participant_id: str | None = None,
+        meta: dict | None = None
+    ):
+        super().__init__()
+        self.id = id
+        self.external_id = external_id
+        self.project = project
+        self._participant_id = participant_id
+        self.meta: dict = meta or dict()
+        self.alignment_input: Optional[AlignmentInput] = None
+        self.seq: Optional[SmSequence] = None
+        self.pedigree: Optional['PedigreeInfo'] = None
+
+    def __repr__(self):
+        return (
+            f'Sample({self.id}|{self.external_id}' +
+            (f'participant_id={self._participant_id}, ' 
+             if self._participant_id else '') +
+            f', project={self.project.id}'
+            f', forced={self.forced}'
+            f', active={self.active}'
+            f', alignment_input={self.alignment_input}'
+            f', meta={self.meta}'
+            f', seq={self.seq}'
+            f', pedigree={self.pedigree}'
+            f')'
+        )
+
+    @property
+    def participant_id(self) -> str:
+        """
+        Get participant's ID. 
+        Uses external_id whenever participant_id is not available in the DB
+        """
+        return self._participant_id or self.external_id
 
     @property
     def unique_id(self) -> str:
@@ -40,18 +72,20 @@ class Sample(Target):
         """
         if self.pedigree:
             return self.pedigree.get_ped_dict(use_participant_id)
-        else:
-            return {
-                'Family.ID': self.participant_id if use_participant_id else self.id,
-                'Individual.ID': self.participant_id if use_participant_id else self.id,
-                'Father.ID': '0',
-                'Mother.ID': '0',
-                'Sex': '0',
-                'Phenotype': '0',
-            }
+        return {
+            'Family.ID': self.participant_id if use_participant_id else self.id,
+            'Individual.ID': self.participant_id if use_participant_id else self.id,
+            'Father.ID': '0',
+            'Mother.ID': '0',
+            'Sex': '0',
+            'Phenotype': '0',
+        }
 
 
 class Sex(Enum):
+    """
+    Sex as in PED format
+    """
     UNKNOWN = 0
     MALE = 1
     FEMALE = 2
@@ -59,6 +93,9 @@ class Sex(Enum):
 
 @dataclass
 class PedigreeInfo:
+    """
+    Pedigree relationsips with other samples in the cohort, and other PED data
+    """
     sample: Sample
     fam_id: str
     dad: Optional[Sample]
@@ -74,10 +111,9 @@ class PedigreeInfo:
         def _get_id(_s: Optional[Sample]):
             if _s is None:
                 return '0'
-            elif use_participant_id:
+            if use_participant_id:
                 return _s.participant_id
-            else:
-                return _s.id
+            return _s.id
 
         return {
             'Family.ID': self.fam_id,

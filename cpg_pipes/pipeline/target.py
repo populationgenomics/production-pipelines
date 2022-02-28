@@ -1,25 +1,23 @@
 """
 Defines a target that stage can act upon. Classes like Sample, Project, Pipeline
-expend this class.
+extend this class.
 """
-from dataclasses import dataclass, field, KW_ONLY
+
 from typing import Dict
 from cpg_pipes.smdb.types import AnalysisType, Analysis
 
 
-@dataclass
 class Target:
     """
-    Stage target: e.g. a sample, a dataset/project, entire cohort/pipeline.
+    Stage for a target
     """
-    _: KW_ONLY
-    # From SMDB Analysis entries:
-    analysis_by_type: Dict[AnalysisType, Analysis] = \
-        field(default_factory=dict, repr=False)
-    # Whether to process even if outputs exist:
-    forced = False
-    # If not set, exclude from the pipeline:
-    active = True
+    def __init__(self):
+        # From SMDB Analysis entries:
+        self.analysis_by_type: Dict[AnalysisType, Analysis] = dict()
+        # Whether to process even if outputs exist:
+        self.forced: bool = False
+        # If not set, exclude from the pipeline:
+        self.active: bool = True
 
     @property
     def unique_id(self) -> str:

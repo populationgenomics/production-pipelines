@@ -26,7 +26,11 @@ class Project(Target):
         """
         Can have a "name" and "stack":
         * "name" is in the SMDB terms: e.g. can be "seqr", "seqr-test".
-        * "stack" is in the CPG storage policy terms, so can be only e.g. "seqr", but not "seqr-test"
+        * "stack" is in the CPG storage policy terms, so can be only e.g. "seqr", 
+          but not "seqr-test"
+        
+        Note that we pipeline, not cohort. Project can exist outside of a cohort,
+        if it's an analysis project without samples.
         """
         super().__init__()
         if name.endswith('-test'):
@@ -44,6 +48,13 @@ class Project(Target):
         self.is_test = namespace != Namespace.MAIN
         self._samples: List[Sample] = []
 
+    def __repr__(self):
+        return f'Project("{self.name}", {len(self.get_samples())} samples)'
+
+    @property
+    def unique_id(self) -> str:
+        return self.name
+
     def get_bucket(self):
         """
         The primary project bucket (-main or -test) 
@@ -60,20 +71,16 @@ class Project(Target):
             f'{self.pipeline.output_version}'
         )
 
-    def __repr__(self):
-        return self.name
-
-    @property
-    def unique_id(self) -> str:
-        return self.name
-
     def add_sample(
         self, 
-        id: str, 
+        id: str,  # pylint: disable=redefined-builtin
         external_id: str, 
         participant_id: Optional[str] = None,
         **kwargs
     ) -> Sample:
+        """
+        Create a new sample and add it to the project
+        """
         s = Sample(
             id=id, 
             external_id=external_id,

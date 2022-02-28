@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
-import click
+
+"""
+Batch pipeline to run fastqc
+"""
+
 import logging
+import click
 
 from cpg_pipes import benchmark
-from cpg_pipes.pipeline import Pipeline
+from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes.jobs.fastqc import fastqc
 
 logger = logging.getLogger(__file__)
@@ -16,7 +21,7 @@ NAMESPACE = 'main'
 
 
 @click.command()
-def main():
+def main():  # pylint: disable=missing-function-docstring
     pipe = Pipeline(
         analysis_project='fewgenomes',
         name='run_qc',
@@ -38,7 +43,7 @@ def main():
             project_name='FastQC',
         )
     
-    pipe.run()
+    pipe.submit_batch()
 
 
 if __name__ == '__main__':
