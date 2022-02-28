@@ -22,8 +22,7 @@ jobs:
 
     - name: Install pre-commit
       run: |
-        # adding pylint section into pre-commit
-        cat .github/workflows/pre-commit-config-pylint.yaml > .pre-commit-config-pylint.yaml
+        # Installing hooks
         pre-commit install --install-hooks
 
     - name: pre-commit

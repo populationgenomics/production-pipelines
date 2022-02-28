@@ -72,7 +72,7 @@ def main(
     logger.info(f'Combining {len(samples_df.gvcf)} GVCFs')
     hl.experimental.run_combiner(
         list(samples_df.gvcf),
-        sample_names=list(samples_df.s),
+        sample_names=list(samples_df.s),  # pylint: disable=no-member
         out_file=out_mt_path,
         reference_genome=utils.DEFAULT_REF,
         use_genome_default_intervals=True,

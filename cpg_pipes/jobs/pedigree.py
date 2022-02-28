@@ -1,3 +1,7 @@
+"""
+Adding jobs for fingerprinting and pedigree checks. Mostly using Somalier.
+"""
+
 import sys
 from os.path import join, dirname, pardir, basename
 from typing import Optional, List, Tuple, Dict
@@ -76,53 +80,24 @@ def add_pedigree_jobs(
         if not ignore_missing:
             sys.exit(1)
 
-    relate_j = b.new_job(
-        'Somalier relate' + (f' {label}' if label else ''), 
-        dict(project=project.name),
+    relate_j = _relate_job(
+        b, depends_on, dry_run, extract_jobs, label, project,
+        somalier_file_by_sample, tmp_bucket
     )
-    relate_j.image(images.BIOINFO_IMAGE)
-    relate_j.cpu(1)
-    relate_j.memory('standard')  # ~ 4G/core ~ 4G
-    # Size of one somalier file is 212K, so we add another G only if the number of
-    # samples is >4k
-    relate_j.storage(f'{1 + len(project.get_samples()) // 4000 * 1}G')
-    if depends_on:
-        extract_jobs.extend(depends_on)
-    relate_j.depends_on(*extract_jobs)
 
-    ped_fpath = join(tmp_bucket, f'{project.name}.ped')
-    datas = []
-    for sample in project.get_samples():
-        if sample.pedigree:
-            datas.append(sample.pedigree.get_ped_dict())
-    df = pd.DataFrame(datas)
-    if not dry_run:
-        df.to_csv(ped_fpath, sep='\t', index=False)
-    ped_file = b.read_input(ped_fpath)
+    html_url, pairs_path, samples_path = _copy_somalier_output(
+        b, fingerprints_bucket, project, relate_j, web_bucket, web_url
+    )
 
-    input_files_lines = ''
-    for sample in project.get_samples():
-        if sample.id:
-            somalier_file = b.read_input(somalier_file_by_sample[sample.id])
-            input_files_lines += f'{somalier_file} \\\n'
+    _check_pedigree_job(
+        b, dry_run, label, project, relate_j, html_url, tmp_bucket
+    )
 
-    cmd = f"""\
-    cat {ped_file} | grep -v Family.ID > /io/samples.ped 
-    
-    somalier relate \\
-    {input_files_lines} \\
-    --ped /io/samples.ped \\
-    -o related \\
-    --infer
-    
-    ls
-    mv related.html {relate_j.output_html}
-    mv related.pairs.tsv {relate_j.output_pairs}
-    mv related.samples.tsv {relate_j.output_samples}
-    """
+    return relate_j, samples_path, pairs_path
 
-    relate_j.command(wrap_command(cmd))
 
+def _copy_somalier_output(b, fingerprints_bucket, project, relate_j, web_bucket,
+                          web_url):
     # Copy somalier outputs to buckets
     prefix = join(fingerprints_bucket, project.name)
     somalier_samples_path = f'{prefix}.samples.tsv'
@@ -136,22 +111,25 @@ def add_pedigree_jobs(
         somalier_html_path = f'{web_bucket}/{rel_path}'
         somalier_html_url = f'{web_url}/{rel_path}'
         b.write_output(relate_j.output_html, somalier_html_path)
+    return somalier_html_url, somalier_pairs_path, somalier_samples_path
 
+
+def _check_pedigree_job(b, dry_run, label, project, relate_j, somalier_html_url, tmp_bucket):
     check_j = b.new_job(
-        'Check relatedness and sex' + (f' {label}' if label else ''), 
+        'Check relatedness and sex' + (f' {label}' if label else ''),
         dict(project=project.name),
     )
     STANDARD.set_resources(check_j, ncpu=2)
     check_j.image(images.PEDDY_IMAGE)
-
     # Creating sample map to remap internal IDs to participant IDs
     sample_map_fpath = f'{tmp_bucket}/pedigree/sample_maps/{project.name}.tsv'
     if not dry_run:
-        df = pd.DataFrame([{'id': s.id, 'pid': s.participant_id} for s in project.get_samples()])
+        df = pd.DataFrame(
+            [{'id': s.id, 'pid': s.participant_id} for s in project.get_samples()])
         df.to_csv(sample_map_fpath, sep='\t', index=False, header=False)
-
     script_name = 'check_pedigree.py'
-    script_path = join(dirname(__file__), pardir, pardir, utils.SCRIPTS_DIR, script_name)
+    script_path = join(dirname(__file__), pardir, pardir, utils.SCRIPTS_DIR,
+                       script_name)
     with open(script_path) as f:
         script = f.read()
     # We do not wrap the command nicely to avoid breaking python indents of {script}
@@ -166,9 +144,56 @@ python {script_name} \
 {('--somalier-html ' + somalier_html_url) if somalier_html_url else ''}
 """
     check_j.command(cmd)
-
     check_j.depends_on(relate_j)
-    return relate_j, somalier_samples_path, somalier_pairs_path
+
+
+def _relate_job(
+    b, depends_on, dry_run, extract_jobs, label, project,
+    somalier_file_by_sample, tmp_bucket
+) -> Job:
+    relate_j = b.new_job(
+        'Somalier relate' + (f' {label}' if label else ''),
+        dict(project=project.name),
+    )
+    relate_j.image(images.BIOINFO_IMAGE)
+    relate_j.cpu(1)
+    relate_j.memory('standard')  # ~ 4G/core ~ 4G
+    # Size of one somalier file is 212K, so we add another G only if the number of
+    # samples is >4k
+    relate_j.storage(f'{1 + len(project.get_samples()) // 4000 * 1}G')
+    if depends_on:
+        extract_jobs.extend(depends_on)
+    relate_j.depends_on(*extract_jobs)
+    ped_fpath = join(tmp_bucket, f'{project.name}.ped')
+    datas = []
+    for sample in project.get_samples():
+        if sample.pedigree:
+            datas.append(sample.pedigree.get_ped_dict())
+    df = pd.DataFrame(datas)
+    if not dry_run:
+        df.to_csv(ped_fpath, sep='\t', index=False)
+    ped_file = b.read_input(ped_fpath)
+    input_files_lines = ''
+    for sample in project.get_samples():
+        if sample.id:
+            somalier_file = b.read_input(somalier_file_by_sample[sample.id])
+            input_files_lines += f'{somalier_file} \\\n'
+    cmd = f"""\
+    cat {ped_file} | grep -v Family.ID > /io/samples.ped 
+    
+    somalier relate \\
+    {input_files_lines} \\
+    --ped /io/samples.ped \\
+    -o related \\
+    --infer
+    
+    ls
+    mv related.html {relate_j.output_html}
+    mv related.pairs.tsv {relate_j.output_pairs}
+    mv related.samples.tsv {relate_j.output_samples}
+    """
+    relate_j.command(wrap_command(cmd))
+    return relate_j
 
 
 def somalier_extact_job(

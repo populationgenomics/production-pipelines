@@ -38,14 +38,14 @@ class CramPedCheckStage(ProjectStage):
             self.pipe.b,
             project,
             input_path_by_sid=path_by_sid,
-            overwrite=not self.pipe.check_intermediate_existence,
+            overwrite=not self.pipe.check_intermediates,
             fingerprints_bucket=join(self.pipe.analysis_bucket, 'fingerprints'),
             web_bucket=self.pipe.web_bucket,
             web_url=self.pipe.web_url,
             tmp_bucket=self.pipe.tmp_bucket,
             depends_on=inputs.get_jobs(),
             label='(CRAMs)',
-            ignore_missing=self.pipe.skip_samples_without_first_stage_input,
+            ignore_missing=self.pipe.skip_missing_input,
             dry_run=self.pipe.dry_run,
         )
         return self.make_outputs(project, data=somalier_samples_path, jobs=[j])
@@ -67,13 +67,13 @@ class GvcfPedCheckStage(ProjectStage):
             self.pipe.b,
             project,
             input_path_by_sid=path_by_sid,
-            overwrite=not self.pipe.check_intermediate_existence,
+            overwrite=not self.pipe.check_intermediates,
             fingerprints_bucket=join(self.pipe.analysis_bucket, 'fingerprints'),
             web_bucket=self.pipe.web_bucket,
             tmp_bucket=self.pipe.tmp_bucket,
             depends_on=inputs.get_jobs(),
             label='(GVCFs)',
-            ignore_missing=self.pipe.skip_samples_without_first_stage_input,
+            ignore_missing=self.pipe.skip_missing_input,
             dry_run=self.pipe.dry_run,
         )
         return self.make_outputs(project, data=somalier_samples_path, jobs=[j])

@@ -406,7 +406,7 @@ You can add more custom options like this:
 ```python
 import click
 from cpg_pipes.pipeline.cli_opts import pipeline_click_options
-from cpg_pipes.pipeline.pipeline import stage, Pipeline
+from cpg_pipes.pipeline.pipeline import Pipeline
 
 @click.command()
 @pipeline_click_options
@@ -482,10 +482,13 @@ By default, if expected result exist, empty jobs will be submitted suffixed with
 
 You can also start from a specific stage with `--first-stage`, or finish on specific one with `--last-stage`.
 
-You can use `@skipped` decorator to force skipping a stage:
+You can use `@skip` decorator to force skipping a stage:
 
 ```python
-@skipped
+from cpg_pipes.pipeline.pipeline import stage, skip
+from cpg_pipes.pipeline.stage import SampleStage
+
+@skip
 @stage
 class MyStage1(SampleStage):
     ...
@@ -494,7 +497,10 @@ class MyStage1(SampleStage):
 `assume_results_exist=True` would also tell the code that the expected results of that stage exist, and there is no need to check bucket objects for existence:
 
 ```python
-@skipped
+from cpg_pipes.pipeline.pipeline import stage, skip
+from cpg_pipes.pipeline.stage import SampleStage
+
+@skip
 @stage(assume_results_exist=True)
 class MyStage2(SampleStage):
     ...

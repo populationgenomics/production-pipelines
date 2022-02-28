@@ -15,14 +15,18 @@
 # 8. trailing-whitespace
 # 9. use-dict-literal
 # 10. too-many-instance-attributes
+# 11. line-too-long
+# 12. no-else-return
+# 13. redefined-builtin
+# 14. arguments-renamed
 #
 # The following require installing the python modules imported in the source code.
 #    Add these if you don't want to include all dependencies into the dev environment:
 #    import-error ("Unable to import")
 #    no-member
 #    c-extension-no-member
-
-disable=f-string-without-interpolation,inherit-non-class,too-few-public-methods,C0330,C0326,fixme,logging-fstring-interpolation,trailing-whitespace,use-dict-literal,too-many-instance-attributes
+# 
+disable=f-string-without-interpolation,inherit-non-class,too-few-public-methods,C0330,C0326,fixme,logging-fstring-interpolation,trailing-whitespace,use-dict-literal,too-many-instance-attributes,line-too-long,no-else-return,redefined-builtin,arguments-renamed
 
 # Overriding variable name patterns to allow short 1- or 2-letter variables
 attr-rgx=[a-z_][a-z0-9_]{0,30}$

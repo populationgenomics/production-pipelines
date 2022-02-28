@@ -100,14 +100,14 @@ def pipeline_click_options(function: Callable) -> Callable:
         click.option('--dry-run', 'dry_run', is_flag=True),
         click.option(
             '--check-smdb-seq-existence/--no-check-smdb-seq-existence',
-            'check_smdb_seq_existence',
+            'check_smdb_seq',
             default=False,
             is_flag=True,
             help='Check that files in sequence.meta exist'
         ),
         click.option(
             '--skip-samples-without-first-stage-input',
-            'skip_samples_without_first_stage_input',
+            'skip_missing_input',
             default=False,
             is_flag=True,
             help='For the first not-skipped stage, if the input for a target does not'
@@ -117,7 +117,7 @@ def pipeline_click_options(function: Callable) -> Callable:
         ),
         click.option(
             '--check-intermediate-existence/--no-check-intermediate-existence',
-            'check_intermediate_existence',
+            'check_intermediates',
             default=True,
             is_flag=True,
             help='Within jobs, check all in-job intermediate files for possible reuse. '
@@ -125,7 +125,7 @@ def pipeline_click_options(function: Callable) -> Callable:
         ),
         click.option(
             '--check-job-expected-outputs-existence/--no-check-job-expected-outputs-existence',
-            'check_job_expected_outputs_existence',
+            'check_expected_outputs',
             default=True,
             is_flag=True,
             help='Before running a job, check if its input already exists. '

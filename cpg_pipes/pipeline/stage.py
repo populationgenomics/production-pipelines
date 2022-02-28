@@ -9,10 +9,9 @@ from typing import (
 )
 
 import hailtop.batch as hb
-
-from cpg_pipes.pipeline.project import Project
 from hailtop.batch.job import Job
 
+from cpg_pipes.pipeline.project import Project
 from cpg_pipes import buckets
 from cpg_pipes.smdb.types import AnalysisType
 from cpg_pipes.pipeline.cohort import Cohort
@@ -152,7 +151,7 @@ class StageInput:
                 'after skipping targets with missing inputs. ' +
                 ('Check the logs if all samples were missing inputs from previous '
                  'stages, and consider changing --first-stage'
-                    if self.stage.pipe.skip_samples_without_first_stage_input else '')
+                    if self.stage.pipe.skip_missing_input else '')
             )
 
         return {
@@ -224,6 +223,9 @@ class StageInput:
         stage: StageDecorator,
         id: Optional[str] = None,
     ) -> str:
+        """
+        Get Hail Batch Resource for a specific target and stage
+        """
         res = self._results_by_target_by_stage[stage.__name__][target.unique_id]
         return res.as_resource(id)
     
@@ -400,7 +402,7 @@ class Stage(Generic[TargetT], ABC):
         elif self.required:
             reusable_paths = self._try_get_reusable_paths(target)
             if not reusable_paths:
-                if self.pipe.skip_samples_without_first_stage_input:
+                if self.pipe.skip_missing_input:
                     logger.info(
                         f'Stage {self.name} is skipped and required, however '
                         f'--skip-samples-without-first-stage-input is set, so skipping '
@@ -449,7 +451,7 @@ class Stage(Generic[TargetT], ABC):
                 )
             validate = self.pipe.validate_smdb_analyses
             if self.skipped and (
-                self.assume_results_exist or self.pipe.skip_samples_without_first_stage_input
+                self.assume_results_exist or self.pipe.skip_missing_input
             ):
                 validate = False
 
@@ -464,7 +466,7 @@ class Stage(Generic[TargetT], ABC):
             return None
 
         elif (
-            not self.pipe.check_job_expected_outputs_existence or 
+            not self.pipe.check_expected_outputs or
             not self.required or
             self.assume_results_exist
         ):

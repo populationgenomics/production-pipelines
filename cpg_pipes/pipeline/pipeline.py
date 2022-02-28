@@ -72,7 +72,13 @@ StageDecorator = Callable[..., 'Stage']
 
 # We record each initialised Stage subclass, so we know the default stage
 # list for the case when the user doesn't pass them explicitly with set_stages()
-_all_defined_stages = []
+_ALL_DEFINED_STAGES = []
+
+
+class PipelineError(Exception):
+    """
+    Error raised by pipeline stages implementation
+    """
 
 
 def stage(
@@ -112,8 +118,7 @@ def stage(
             )
         # We record each initialised Stage subclass, so we know the default stage
         # list for the case when the user doesn't pass them explicitly with set_stages()
-        global _all_defined_stages
-        _all_defined_stages.append(wrapper_stage)
+        _ALL_DEFINED_STAGES.append(wrapper_stage)
         return wrapper_stage
 
     if _cls is None:
@@ -122,7 +127,7 @@ def stage(
         return decorator_stage(_cls)
 
 
-def skipped(
+def skip(
     _fun: Optional[StageDecorator] = None, 
     *,
     assume_results_exist: bool = False,
@@ -130,12 +135,12 @@ def skipped(
     """
     Decorator on top of `@stage` that sets the self.skipped field to True
 
-    @skipped
+    @skip
     @stage
     class MyStage1(SampleStage):
         ...
 
-    @skipped
+    @skip
     @stage(assume_results_exist=True)
     class MyStage2(SampleStage):
         ...
@@ -143,10 +148,10 @@ def skipped(
     def decorator_stage(fun) -> StageDecorator:
         @functools.wraps(fun)
         def wrapper_stage(*args, **kwargs) -> Stage:
-            stage = fun(*args, **kwargs)
-            stage.skipped = True
-            stage.assume_results_exist = assume_results_exist
-            return stage
+            s = fun(*args, **kwargs)
+            s.skipped = True
+            s.assume_results_exist = assume_results_exist
+            return s
 
         return wrapper_stage
 
@@ -163,10 +168,6 @@ def run_pipeline(dry_run: bool = False, **kwargs) -> 'Pipeline':
     pipeline = Pipeline(**kwargs)
     pipeline.submit_batch(dry_run=dry_run)
     return pipeline
-
-
-class PipelineException(Exception):
-    pass
 
 
 class Pipeline:
@@ -187,11 +188,11 @@ class Pipeline:
         previous_batch_tsv_path: Optional[str] = None,
         previous_batch_id: Optional[str] = None,
         update_smdb_analyses: bool = False,
-        check_smdb_seq_existence: bool = False,
-        skip_samples_without_first_stage_input: bool = False,
+        check_smdb_seq: bool = False,
+        skip_missing_input: bool = False,
         validate_smdb_analyses: bool = False,
-        check_intermediate_existence: bool = True,
-        check_job_expected_outputs_existence: bool = True,
+        check_intermediates: bool = True,
+        check_expected_outputs: bool = True,
         first_stage: Optional[str] = None,
         last_stage: Optional[str] = None,
         config: Optional[Dict] = None,
@@ -221,9 +222,9 @@ class Pipeline:
         self.name = name
         self.output_version = output_version
         self.namespace = namespace
-        self.check_intermediate_existence = check_intermediate_existence and not dry_run
-        self.check_job_expected_outputs_existence = check_job_expected_outputs_existence and not dry_run
-        self.skip_samples_without_first_stage_input = skip_samples_without_first_stage_input
+        self.check_intermediates = check_intermediates and not dry_run
+        self.check_expected_outputs = check_expected_outputs and not dry_run
+        self.skip_missing_input = skip_missing_input
         self.first_stage = first_stage
         self.last_stage = last_stage
         self.validate_smdb_analyses = validate_smdb_analyses
@@ -295,7 +296,7 @@ class Pipeline:
             self._db = SMDB(
                 self.analysis_project.name,
                 do_update_analyses=update_smdb_analyses,
-                do_check_seq_existence=check_smdb_seq_existence,
+                do_check_seq_existence=check_smdb_seq,
             )
             self.cohort.populate(
                 smdb=self._db,
@@ -309,7 +310,7 @@ class Pipeline:
             )
 
         self._stages_dict: Dict[str, Stage] = dict()
-        self._stages_in_order: List[StageDecorator] = stages_in_order or _all_defined_stages
+        self._stages_in_order: List[StageDecorator] = stages_in_order or _ALL_DEFINED_STAGES
 
     def submit_batch(
         self, 
@@ -369,13 +370,13 @@ class Pipeline:
         """
         # Initializing stage objects
         stages = [cls(self) for cls in stages_classes]
-        for stage in stages:
-            if stage.name in self._stages_dict:
+        for stage_ in stages:
+            if stage_.name in self._stages_dict:
                 raise ValueError(
-                    f'Stage {stage.name} is already defined. Check your '
+                    f'Stage {stage_.name} is already defined. Check your '
                     f'list for duplicates: {", ".join(s.name for s in stages)}'
                 )
-            self._stages_dict[stage.name] = stage
+            self._stages_dict[stage_.name] = stage_
 
         first_stage_num, last_stage_num = self._validate_first_last_stage()
 
@@ -387,19 +388,19 @@ class Pipeline:
         # for stage in graphlib.TopologicalSorter(stages).static_order():
         # https://github.com/populationgenomics/analysis-runner/pull/328/files
         additional_stages_dict: Dict[str, Stage] = dict()
-        for i, (stage_name, stage) in enumerate(self._stages_dict.items()):
+        for i, (stage_name, stage_) in enumerate(self._stages_dict.items()):
             if first_stage_num is not None and i < first_stage_num:
-                stage.skipped = True
-                stage.required = False
+                stage_.skipped = True
+                stage_.required = False
                 logger.info(f'Skipping stage {stage_name}')
                 continue
 
             if last_stage_num is not None and i > last_stage_num:
-                stage.skipped = True
-                stage.required = False
+                stage_.skipped = True
+                stage_.required = False
                 continue
 
-            for reqcls in stage.required_stages_classes:
+            for reqcls in stage_.required_stages_classes:
                 if reqcls.__name__ in self._stages_dict:
                     reqstage = self._stages_dict[reqcls.__name__]
                 elif reqcls.__name__ in additional_stages_dict:
@@ -413,35 +414,35 @@ class Pipeline:
                 if reqstage.skipped:
                     logger.info(
                         f'Stage {reqstage.name} is skipped, '
-                        f'but the output will be required for the stage {stage.name}'
+                        f'but the output will be required for the stage {stage_.name}'
                     )
-                stage.required_stages.append(reqstage)
+                stage_.required_stages.append(reqstage)
         
         if additional_stages_dict:
             logger.info(
                 f'Additional required stages added as "skipped": '
                 f'{additional_stages_dict.keys()}'
             )
-            for name, stage in self._stages_dict.items():
-                additional_stages_dict[name] = stage    
+            for name, stage_ in self._stages_dict.items():
+                additional_stages_dict[name] = stage_    
             self._stages_dict = additional_stages_dict
 
         logger.info(f'Setting stages: {", ".join(s.name for s in stages if not s.skipped)}')
 
         # Second round - actually adding jobs from the stages.
-        for i, stage in enumerate(self._stages_dict.values()):
-            if not stage.skipped:
+        for i, stage_ in enumerate(self._stages_dict.values()):
+            if not stage_.skipped:
                 logger.info(f'*' * 60)
-                logger.info(f'Stage {stage.name}')
+                logger.info(f'Stage {stage_.name}')
 
-            if stage.required:
-                logger.info(f'Adding jobs for stage {stage.name}')
-                stage.output_by_target = stage.add_to_the_pipeline(self)
+            if stage_.required:
+                logger.info(f'Adding jobs for stage {stage_.name}')
+                stage_.output_by_target = stage_.add_to_the_pipeline(self)
 
-            if not stage.skipped:
+            if not stage_.skipped:
                 logger.info(f'')
                 if last_stage_num and i >= last_stage_num:
-                    logger.info(f'Last stage is {stage.name}, stopping here')
+                    logger.info(f'Last stage is {stage_.name}, stopping here')
                     break
 
     def can_reuse(self, fpath: Optional[str]) -> bool:
@@ -449,14 +450,14 @@ class Pipeline:
         Checks if the fpath exists, 
         but always returns False if not check_intermediate_existence
         """
-        return buckets.can_reuse(fpath, overwrite=not self.check_intermediate_existence)
+        return buckets.can_reuse(fpath, overwrite=not self.check_intermediates)
 
     def db_process_existing_analysis(self, *args, **kwargs):
         """
         Thin wrapper around SMDB.process_existing_analysis
         """
         if self._db is None:
-            raise PipelineException('SMDB is not initialised')
+            raise PipelineError('SMDB is not initialised')
         
         return self._db.process_existing_analysis(*args, **kwargs)
 
@@ -466,7 +467,7 @@ class Pipeline:
         Get read-only sample-metadata DB object.
         """
         if self._db is None:
-            raise PipelineException('SMDB is not initialised')
+            raise PipelineError('SMDB is not initialised')
         return cast('SMDB', self._db)
 
     def get_db(self) -> Optional[SMDB]:
