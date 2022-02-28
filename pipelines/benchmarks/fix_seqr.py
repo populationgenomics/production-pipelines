@@ -4,7 +4,7 @@ import logging
 
 from cpg_pipes import images
 from cpg_pipes.hb.inputs import AlignmentInput
-from cpg_pipes.pipeline import Pipeline
+from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
 
 logger = logging.getLogger(__file__)

@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
+
 from enum import Enum
 
 import click
 import logging
 
-from cpg_pipes import benchmark, resources
-from cpg_pipes.hailbatch import AlignmentInput, fasta_ref_resource
-from cpg_pipes.pipeline import Pipeline, stage, SampleStage, StageInput, \
-    StageOutput, Sample
+from cpg_pipes import benchmark, images
+from cpg_pipes.hb.inputs import AlignmentInput, fasta_group
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
+from cpg_pipes.pipeline.pipeline import stage, Pipeline
+from cpg_pipes.pipeline.sample import Sample
+from cpg_pipes.pipeline.stage import SampleStage, StageInput, StageOutput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -28,9 +30,9 @@ class InputsType(Enum):
 INPUTS_TYPE = InputsType.FULL
 
 
-@stage()
+@stage
 class SubsetAlignmentInput(SampleStage):
-    def expected_result(self, sample: 'Sample'):
+    def expected_result(self, sample: Sample):
         basepath = f'{benchmark.BENCHMARK_BUCKET}/outputs/{sample.id}/subset'
         return {
             'r1': f'{basepath}/R1.fastq.gz',
@@ -67,10 +69,10 @@ class SubsetAlignmentInput(SampleStage):
     
     def _subset_cram(self, alignment_input: AlignmentInput, sample: Sample):
         j = self.pipe.b.new_job('Subset CRAM')
-        j.image(resources.BIOINFO_IMAGE)
+        j.image(images.BIOINFO_IMAGE)
         j.storage('100G')
-        reference = fasta_ref_resource(self.b)
-        cram = alignment_input.as_cram_input_group(self.b)
+        reference = fasta_group(self.pipe.b)
+        cram = alignment_input.as_cram_input_group(self.pipe.b)
 
         j.declare_resource_group(
             output_cram={

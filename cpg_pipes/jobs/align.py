@@ -484,7 +484,7 @@ def extract_fastq(
     j.image(images.BIOINFO_IMAGE)
     j.storage('700G')
 
-    reference = inputs.fasta(b)
+    reference = inputs.fasta_group(b)
     cmd = f"""\
     bazam -Xmx16g -Dsamjdk.reference_fasta={reference.base} \
     -n{nthreads} -bam {cram.base} -r1 {j.fq1} -r2 {j.fq2}
@@ -501,7 +501,7 @@ def create_dragmap_index(b: hb.Batch) -> Job:
     """
     Creates the index for DRAGMAP
     """
-    reference = inputs.fasta(b)
+    reference = inputs.fasta_group(b)
 
     j = b.new_job('Index DRAGMAP')
     j.image(images.BIOINFO_IMAGE)

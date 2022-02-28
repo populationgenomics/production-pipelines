@@ -38,7 +38,7 @@ def markdup(
             'cram.crai': '{root}.cram.crai',
         }
     )
-    fasta_reference = inputs.fasta(b)
+    fasta_reference = inputs.fasta_group(b)
 
     cmd = f"""
     picard MarkDuplicates -Xms13G \\

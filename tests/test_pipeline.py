@@ -8,7 +8,7 @@ from unittest.mock import patch
 try:
     from .utils import setup_env, BASE_BUCKET, PROJECT, SAMPLES
 except ImportError:
-    from utils import setup_env, BASE_BUCKET, PROJECT, SAMPLES
+    from utils import setup_env, BASE_BUCKET, PROJECT, SAMPLES  # type: ignore
 
 
 class TestPipeline(unittest.TestCase):

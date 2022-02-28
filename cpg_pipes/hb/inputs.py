@@ -11,7 +11,7 @@ from hailtop.batch import ResourceGroup
 from cpg_pipes import ref_data
 
 
-def fasta(b) -> ResourceGroup:
+def fasta_group(b: hb.Batch) -> ResourceGroup:
     """
     Returns fasta reference resource group
     """

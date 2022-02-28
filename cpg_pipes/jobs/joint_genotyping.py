@@ -574,7 +574,7 @@ def _add_joint_genotyper_job(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
 
-    reference = inputs.fasta(b)
+    reference = inputs.fasta_group(b)
     
     if genomicsdb_path.endswith('.tar'):
         # can't use directly from cloud, need to copy and uncompress:

@@ -5,7 +5,7 @@ import logging
 
 from cpg_pipes import benchmark
 from cpg_pipes.jobs.haplotype_caller import produce_gvcf
-from cpg_pipes.pipeline import Pipeline
+from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes.jobs.align import Aligner, align
 
 logger = logging.getLogger(__file__)
