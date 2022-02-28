@@ -66,6 +66,8 @@ Stages can also communicate with the sample-metadata database to read or write o
 
 ```python
 from cpg_pipes.smdb.types import AnalysisType
+from cpg_pipes.pipeline.pipeline import stage
+from cpg_pipes.pipeline.stage import SampleStage
 
 @stage(sm_analysis_type=AnalysisType.GVCF)
 class HaplotypeCaller(SampleStage):
