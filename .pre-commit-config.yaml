@@ -24,11 +24,8 @@ repos:
   hooks:
   - id: mypy
 
-# Using system installation of pylint to support checking python module imports
-- repo: local
+# Static type analysis (as much as it's possible in python using type hints)
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: v0.931
   hooks:
-  - id: pylint
-    name: pylint
-    entry: pylint
-    language: system
-    types: [python]
+  - id: mypy
