@@ -18,7 +18,10 @@ from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes import buckets, images
 
-from utils import BASE_BUCKET, PROJECT, SAMPLES, SUBSET_GVCF_BY_SID
+try:
+    from .utils import BASE_BUCKET, PROJECT, SAMPLES, SUBSET_GVCF_BY_SID
+except ImportError:
+    from utils import BASE_BUCKET, PROJECT, SAMPLES, SUBSET_GVCF_BY_SID  # type: ignore
 
 
 class TestJobs(unittest.TestCase):
