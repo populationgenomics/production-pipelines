@@ -25,7 +25,7 @@ def main():
         output_version='v0',
         namespace=NAMESPACE,
         title='Benchmark DRAGMAP: full samples',
-        check_smdb_seq_existence=False,
+        check_smdb_seq=False,
     )
     inputs = {
         'NA12878': benchmark.na12878fq,
