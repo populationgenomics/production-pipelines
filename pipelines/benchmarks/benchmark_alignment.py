@@ -180,7 +180,7 @@ def main():
         analysis_project=PROJECT,
         output_version='v0',
         namespace=NAMESPACE,
-        check_smdb_seq_existence=False,
+        check_smdb_seq=False,
         keep_scratch=True,
     )
 
