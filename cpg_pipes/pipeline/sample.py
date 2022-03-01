@@ -43,7 +43,7 @@ class Sample(Target):
             f'Sample({self.id}|{self.external_id}' +
             (f'participant_id={self._participant_id}, ' 
              if self._participant_id else '') +
-            f', project={self.project.id}'
+            f', project={self.project.name}'
             f', forced={self.forced}'
             f', active={self.active}'
             f', alignment_input={self.alignment_input}'
