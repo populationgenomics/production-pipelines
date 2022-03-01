@@ -54,7 +54,7 @@ class TestPipeline(unittest.TestCase):
             analysis_project=PROJECT,
             output_version='v0',
             namespace='test',
-            check_smdb_seq_existence=False,
+            check_smdb_seq=False,
             config=dict(output_projects=[PROJECT]),
             dry_run=True,
         )

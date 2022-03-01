@@ -28,7 +28,7 @@ def main():  # pylint: disable=missing-function-docstring
         output_version='v0',
         namespace=NAMESPACE,
         title='Run QC',
-        check_smdb_seq_existence=False,
+        check_smdb_seq=False,
     )
     inputs = {
         'NA12878': benchmark.na12878fq,

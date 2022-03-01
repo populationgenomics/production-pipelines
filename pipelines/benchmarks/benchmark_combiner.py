@@ -40,7 +40,7 @@ pipe = Pipeline(
     output_version='v0',
     namespace=NAMESPACE,
     title='Benchmark GVCF combiner',
-    check_smdb_seq_existence=False,
+    check_smdb_seq=False,
     input_projects=[INPUT_PROJECT], 
 )
 

@@ -24,7 +24,7 @@ def main():
         output_version='v0',
         namespace=NAMESPACE,
         title='CPG12062_19W001482_A0131064_proband',
-        check_smdb_seq_existence=False,
+        check_smdb_seq=False,
         keep_scratch=True,
     )
 
