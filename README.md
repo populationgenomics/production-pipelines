@@ -135,7 +135,7 @@ pipeline = Pipeline(
 )
 ```
 
-Under the hood, this will create a `cohort` field of type `Cohort`, which incapsulates a list of projects of type `Project`, each of which contains a list of samples of type `Sample`:
+Under the hood, this will create a `cohort` field of type `Cohort`, which encapsulates a list of projects of type `Project`, each of which contains a list of samples of type `Sample`:
 
 ```
 >>> pipeline.cohort.get_projects()
