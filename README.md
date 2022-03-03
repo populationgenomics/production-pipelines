@@ -63,7 +63,7 @@ from cpg_pipes.pipeline.pipeline import stage
 from cpg_pipes.pipeline.stage import SampleStage, StageInput, StageOutput
 from cpg_pipes.pipeline.sample import Sample
 
-@stage(requires_stages=[WriteSampleName])
+@stage(required_stages=[WriteSampleName])
 class ReadSampleName(SampleStage):
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         sample_name_path = inputs.as_path(sample, stage=WriteSampleName)
@@ -97,7 +97,7 @@ class HaplotypeCaller(SampleStage):
         job = add_haplotype_calling_job()
         return self.make_outputs(sample, data=self.expected_result(sample), jobs=[job])
 
-@stage(sm_analysis_type=AnalysisType.JOINT_CALLING, requires_stages=HaplotypeCaller)
+@stage(sm_analysis_type=AnalysisType.JOINT_CALLING, required_stages=HaplotypeCaller)
 class JointCalling(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         # Get outputs from previous stage. Because the HaplotypeCaller stage
@@ -135,7 +135,7 @@ pipeline = Pipeline(
 )
 ```
 
-Under the hood, this will create a `cohort` field of type `Cohort`, which incapsulates a list of projects of type `Project`, each of which contains a list of samples of type `Sample`:
+Under the hood, this will create a `cohort` field of type `Cohort`, which encapsulates a list of projects of type `Project`, each of which contains a list of samples of type `Sample`:
 
 ```
 >>> pipeline.cohort.get_projects()
@@ -223,7 +223,7 @@ class HaplotypeCaller(SampleStage):
         )
         return self.make_outputs(sample, data=expected_path, jobs=[job])
 
-@stage(sm_analysis_type=AnalysisType.JOINT_CALLING, requires_stages=HaplotypeCaller)
+@stage(sm_analysis_type=AnalysisType.JOINT_CALLING, required_stages=HaplotypeCaller)
 class JointCalling(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         gvcf_by_sid = inputs.as_path_by_target(stage=HaplotypeCaller)
@@ -322,7 +322,7 @@ from cpg_pipes.pipeline.pipeline import stage, Pipeline
 def main(**kwargs):
     pipeline = Pipeline(
         name='my_pipeline',
-        title='My pipeline',
+        description='My pipeline',
         **kwargs,
     )
 ```
@@ -423,7 +423,7 @@ def main(**kwargs):
     custom_option = kwargs.pop('custom_option')
     pipeline = Pipeline(
         name='my_pipeline',
-        title='My pipeline',
+        description='My pipeline',
         **kwargs,
     )
 ```
