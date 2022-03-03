@@ -322,7 +322,7 @@ from cpg_pipes.pipeline.pipeline import stage, Pipeline
 def main(**kwargs):
     pipeline = Pipeline(
         name='my_pipeline',
-        title='My pipeline',
+        description='My pipeline',
         **kwargs,
     )
 ```
@@ -423,7 +423,7 @@ def main(**kwargs):
     custom_option = kwargs.pop('custom_option')
     pipeline = Pipeline(
         name='my_pipeline',
-        title='My pipeline',
+        description='My pipeline',
         **kwargs,
     )
 ```
