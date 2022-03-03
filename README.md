@@ -6,7 +6,7 @@ The `cpg_pipes` package provides Python functions that help to design a pipeline
 - Google Cloud,
 - [CPG storage policies](https://github.com/populationgenomics/team-docs/tree/main/storage_policies),
 - The [analysis-runner](https://github.com/populationgenomics/analysis-runner) as a proxy for submissions,
-- The [sample-metadata](https://github.com/populationgenomics/sample-metadata) database as a source of input data.
+- The [sample-metadata](https://github.com/populationgenomics/sample-metadata) database as a source of input data and metadata.
 
 ### Installation
 
@@ -16,15 +16,23 @@ Requires Python 3.10
 pip install cpg_pipes
 ```
 
+### Motivation
+
+A pipeline can be represented as a set of stages with dependency interrelashionships (i.e. a directed acyclic graph of stages). Hail Batch has a concept of jobs that can depend on each other; however, a Hail Batch job corresponds to only one bash script that is run on a cloud VM, which doesn't always solve a higher-level task in the application domain. For example, a pipeline stage called "genotype" can include multiple jobs that generate intervals, partition input, run a genotyping tool on each partition in parallel, gather outputs, and perform some post-processing. However, a user might want to treat it as one "stage" that sits between an "alignment" stage and a "joint calling" stage.
+
+At the CPG, we also want to permanently record outputs of some stages (e.g. individual CRAM and GVCF files, fingerprints, a joint-called matrix table): store them on buckets according to the storage policy, and add entries into the sample-metadata database.
+
+The `cpg_pipes` package implements a concept of `Stage` that can act on a `Target`: e.g. a `Sample`, a `Project`, or a `Cohort`. For example, a stage that performs read alignment to produce a CRAM file would act on a sample, and a stage that performs joint-calling would act on an entire cohort. 
+
+Each stage declares paths to the outputs it would produce by implementing abstract `expected_result()` method; and it also defines how jobs are added into Hail Batch using `queue_jobs()` method. 
+
+Overall classes and objects relashionships look like as follows on a diagram:
+
+![uml](docs/classes.png)
+
 ### Building pipelines
 
-A common use case of a bioinformatics pipeline at the CPG is a set of stages, with intermediate outputs stored on buckets according to the storage policies, and optionally tracked by the sample-metadata database.
-
-The package implements a concept of _stage_, that can act on a _target_: e.g. a _sample_, a _project_, or a _cohort_. For example, a stage that runs whole genome alignment to produce a CRAM file, would act on a sample, and a stage that performs joint-calling would act on an entire cohort. 
-
-Each stage declares paths to the outputs it would produce by overriding abstract `expected_result()` method; and defines how jobs are added into Hail Batch using `queue_jobs()` method. 
-
-To declare a stage, inherit a class from SampleStage, ProjectStage, or CohortStage, implement the abstract methods, and wrap the class with a `@stage` decorator.
+To declare a stage, inherit a class from `SampleStage`, `ProjectStage`, or `CohortStage`, implement the abstract methods, and wrap the class with a `@stage` decorator:
 
 ```python
 from cpg_pipes.pipeline.pipeline import stage
@@ -47,10 +55,6 @@ class WriteSampleName(SampleStage):
 ```
 
 The `queue_jobs` method is expected to retuns output of type `StageOutput`: you can call `self.make_outputs()` to construct that object.
-
-The classes and objects relashionships looks like as follows:
-
-![uml](docs/classes.png)
 
 Stages can depend on each other. Use the `requires_stages` parameter to `@stage` to set dependencies, and use the `inputs` parameter in `queue_jobs` to get the output of the previous stage:
 
