@@ -92,7 +92,7 @@ def main(
 
     Pipeline(
         name='pedigree_check',
-        title=title,
+        description=title,
         input_projects=input_projects,
         output_version=output_version,
         stages_in_order=[

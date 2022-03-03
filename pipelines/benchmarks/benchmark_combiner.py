@@ -39,7 +39,7 @@ pipe = Pipeline(
     name='benchmark_combiner',
     output_version='v0',
     namespace=NAMESPACE,
-    title='Benchmark GVCF combiner',
+    description='Benchmark GVCF combiner',
     check_smdb_seq=False,
     input_projects=[INPUT_PROJECT], 
 )

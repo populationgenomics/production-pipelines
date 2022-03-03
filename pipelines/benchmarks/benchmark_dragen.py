@@ -24,7 +24,7 @@ def main():
         name='benchmark_dragen',
         output_version='v0',
         namespace=NAMESPACE,
-        title='Benchmark DRAGMAP: full samples',
+        description='Benchmark DRAGMAP: full samples',
         check_smdb_seq=False,
     )
     inputs = {

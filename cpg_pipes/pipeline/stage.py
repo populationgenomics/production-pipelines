@@ -274,7 +274,7 @@ class Stage(Generic[TargetT], ABC):
         self,
         pipeline,
         name: str,
-        requires_stages: Optional[Union[List[StageDecorator], StageDecorator]] = None,
+        required_stages: Optional[Union[List[StageDecorator], StageDecorator]] = None,
         sm_analysis_type: Optional[AnalysisType] = None,
         skipped: bool = False,
         required: bool = True,
@@ -282,7 +282,7 @@ class Stage(Generic[TargetT], ABC):
         forced: bool = False,
     ):
         """
-        :param requires_stages: list of stage classes that this stage requires
+        :param required_stages: list of stage classes that this stage requires
         :param sm_analysis_type: if defined, will query the SMDB Analysis entries 
             of this type
         :param skipped: means that the stage is skipped and self.queue_jobs()
@@ -300,11 +300,11 @@ class Stage(Generic[TargetT], ABC):
         self._name = name
         self.pipe = pipeline
         self.required_stages_classes: List[StageDecorator] = []
-        if requires_stages:
-            if isinstance(requires_stages, list):
-                self.required_stages_classes.extend(requires_stages)
+        if required_stages:
+            if isinstance(required_stages, list):
+                self.required_stages_classes.extend(required_stages)
             else:
-                self.required_stages_classes.append(requires_stages)
+                self.required_stages_classes.append(required_stages)
 
         # Populated in pipeline.run(), after we know all stages
         self.required_stages: List[Stage] = []

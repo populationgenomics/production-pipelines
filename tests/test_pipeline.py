@@ -50,7 +50,7 @@ class TestPipeline(unittest.TestCase):
 
         pipeline = Pipeline(
             name=self._testMethodName,
-            title=self._testMethodName,
+            description=self._testMethodName,
             analysis_project=PROJECT,
             output_version='v0',
             namespace='test',

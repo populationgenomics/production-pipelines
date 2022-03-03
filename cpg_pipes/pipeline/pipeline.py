@@ -16,7 +16,7 @@ class CramStage(SampleStage):
         job = align.bwa(b=self.pipe.b, ..., output_path=expected_path)
         return self.make_outputs(sample, data=expected_path, jobs=[job])
 
-@stage(analysis_type=AnalysisType.GVCF, requires_stages=CramStage)
+@stage(analysis_type=AnalysisType.GVCF, required_stages=CramStage)
 class GvcfStage(SampleStage):
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         cram_path = inputs.as_path(target=sample, stage=CramStage)
@@ -24,7 +24,7 @@ class GvcfStage(SampleStage):
         job = haplotype_caller.produce_gvcf(b=self.pipe.b, ..., output_path=expected_path)
         return self.make_outputs(sample, data=expected_path, jobs=[job])
 
-@stage(analysis_type=AnalysisType.JOINT_CALLING, requires_stages=GvcfStage)
+@stage(analysis_type=AnalysisType.JOINT_CALLING, required_stages=GvcfStage)
 class JointCallingStage(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         gvcf_by_sid = inputs.as_path_by_target(stage=GvcfStage)
@@ -85,7 +85,7 @@ def stage(
     _cls: Optional[Type[Stage]] = None, 
     *,
     sm_analysis_type: Optional[AnalysisType] = None, 
-    requires_stages: Optional[Union[List[StageDecorator], StageDecorator]] = None,
+    required_stages: Optional[Union[List[StageDecorator], StageDecorator]] = None,
     skipped: bool = False,
     required: bool = True,
     assume_results_exist: bool = False,
@@ -96,7 +96,7 @@ def stage(
     The goal is to allow cleaner defining of custom pipeline stages, without
     requiring to implement constructor. E.g.
 
-    @stage(sm_analysis_type=AnalysisType.GVCF, requires_stages=CramStage)
+    @stage(sm_analysis_type=AnalysisType.GVCF, required_stages=CramStage)
     class GvcfStage(SampleStage):
         def expected_result(self, sample: Sample):
             ...
@@ -109,7 +109,7 @@ def stage(
             return cls(
                 name=cls.__name__,
                 pipeline=pipeline,
-                requires_stages=requires_stages,
+                required_stages=required_stages,
                 sm_analysis_type=sm_analysis_type,
                 skipped=skipped,
                 required=required,
@@ -179,7 +179,7 @@ class Pipeline:
         self,
         analysis_project: str,
         name: str,
-        title: str,
+        description: str,
         output_version: str,
         namespace: Union[Namespace, str],
         stages_in_order: Optional[List[StageDecorator]] = None,
@@ -284,7 +284,7 @@ class Pipeline:
         self.config = config or {}
 
         self.b: Batch = setup_batch(
-            title=title, 
+            title=description, 
             tmp_bucket=self.tmp_bucket,
             keep_scratch=self.keep_scratch,
             billing_project=self.analysis_project.stack,

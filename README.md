@@ -56,18 +56,19 @@ class WriteSampleName(SampleStage):
 
 The `queue_jobs` method is expected to retuns output of type `StageOutput`: you can call `self.make_outputs()` to construct that object.
 
-Stages can depend on each other. Use the `requires_stages` parameter to `@stage` to set dependencies, and use the `inputs` parameter in `queue_jobs` to get the output of the previous stage:
+Stages can depend on each other. Use the `required_stages` parameter to `@stage` to set dependencies, and use the `inputs` parameter in `queue_jobs` to get the output of the previous stage:
 
 ```python
 from cpg_pipes.pipeline.pipeline import stage
 from cpg_pipes.pipeline.stage import SampleStage, StageInput, StageOutput
 from cpg_pipes.pipeline.sample import Sample
 
-@stage(requires_stages=[WriteSampleName])
+
+@stage(required_stages=[WriteSampleName])
 class ReadSampleName(SampleStage):
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         sample_name_path = inputs.as_path(sample, stage=WriteSampleName)
-        <...>
+        < ... >
 ```
 
 Stages can also communicate with the sample-metadata database to read or write outputs. E.g. a stage that calls a HaplotypeCaller could write results as Analysis entries of type "gvcf":
@@ -91,13 +92,15 @@ from cpg_pipes.pipeline.stage import SampleStage, CohortStage, StageInput, Stage
 from cpg_pipes.pipeline.sample import Sample
 from cpg_pipes.pipeline.cohort import Cohort
 
+
 @stage(sm_analysis_type=AnalysisType.GVCF)
 class HaplotypeCaller(SampleStage):
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         job = add_haplotype_calling_job()
         return self.make_outputs(sample, data=self.expected_result(sample), jobs=[job])
 
-@stage(sm_analysis_type=AnalysisType.JOINT_CALLING, requires_stages=HaplotypeCaller)
+
+@stage(sm_analysis_type=AnalysisType.JOINT_CALLING, required_stages=HaplotypeCaller)
 class JointCalling(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         # Get outputs from previous stage. Because the HaplotypeCaller stage
@@ -208,9 +211,10 @@ from cpg_pipes.pipeline.sample import Sample
 from cpg_pipes.pipeline.cohort import Cohort
 from cpg_pipes.jobs import haplotype_caller, joint_genotyping
 
+
 @stage(sm_analysis_type=AnalysisType.GVCF)
 class HaplotypeCaller(SampleStage):
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput: 
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         cram_path = inputs.as_path(target=sample, stage=Align)
         expected_path = self.expected_result(sample)
         job = haplotype_caller.produce_gvcf(
@@ -223,7 +227,8 @@ class HaplotypeCaller(SampleStage):
         )
         return self.make_outputs(sample, data=expected_path, jobs=[job])
 
-@stage(sm_analysis_type=AnalysisType.JOINT_CALLING, requires_stages=HaplotypeCaller)
+
+@stage(sm_analysis_type=AnalysisType.JOINT_CALLING, required_stages=HaplotypeCaller)
 class JointCalling(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         gvcf_by_sid = inputs.as_path_by_target(stage=HaplotypeCaller)

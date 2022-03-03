@@ -27,7 +27,7 @@ pipe = Pipeline(
     name='find-somalier-sites',
     output_version='v0',
     namespace='main',
-    title='find 65k somalier sites',
+    description='find 65k somalier sites',
     check_smdb_seq=False,
     keep_scratch=True,
 )

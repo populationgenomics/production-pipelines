@@ -85,7 +85,7 @@ class CramStage(SampleStage):
         )
 
 
-@stage(requires_stages=CramStage)
+@stage(required_stages=CramStage)
 class CramSomalierStage(SampleStage):
     """
     Genereate fingerprints from CRAMs for pedigree checks
@@ -114,7 +114,7 @@ class CramSomalierStage(SampleStage):
         return self.make_outputs(sample, data=expected_path, jobs=[fingerprint_job])
 
 
-@stage(requires_stages=CramSomalierStage)
+@stage(required_stages=CramSomalierStage)
 class CramPedCheckStage(ProjectStage):
     """
     Checks pedigree from CRAM fingerprints
@@ -146,7 +146,7 @@ class CramPedCheckStage(ProjectStage):
         return self.make_outputs(project, data=somalier_samples_path, jobs=[j])
 
 
-@stage(requires_stages=CramStage, sm_analysis_type=AnalysisType.GVCF)
+@stage(required_stages=CramStage, sm_analysis_type=AnalysisType.GVCF)
 class GvcfStage(SampleStage):
     """
     Use HaplotypeCaller to genotype individual samples
@@ -193,7 +193,7 @@ class GvcfStage(SampleStage):
         )
 
 
-@stage(requires_stages=GvcfStage)
+@stage(required_stages=GvcfStage)
 class GvcfSomalierStage(SampleStage):
     """
     Genereate fingerprints from GVCFs for pedigree checks
@@ -222,7 +222,7 @@ class GvcfSomalierStage(SampleStage):
         return self.make_outputs(sample, data=expected_path, jobs=[fingerprint_job])
 
 
-@stage(requires_stages=GvcfSomalierStage)
+@stage(required_stages=GvcfSomalierStage)
 class GvcfPedCheckStage(ProjectStage):
     """
     Check pedigree from GVCFs
@@ -254,7 +254,7 @@ class GvcfPedCheckStage(ProjectStage):
         return self.make_outputs(project, data=somalier_samples_path, jobs=[j])
 
 
-@stage(requires_stages=GvcfStage, sm_analysis_type=AnalysisType.JOINT_CALLING)
+@stage(required_stages=GvcfStage, sm_analysis_type=AnalysisType.JOINT_CALLING)
 class JointGenotypingStage(CohortStage):
     """
     Joint-calling of GVCFs together
@@ -312,7 +312,7 @@ class JointGenotypingStage(CohortStage):
         )
 
 
-@stage(requires_stages=JointGenotypingStage)
+@stage(required_stages=JointGenotypingStage)
 class VqsrStage(CohortStage):
     """
     Variant filtering of joint-called VCF
@@ -358,7 +358,7 @@ def get_anno_tmp_bucket(pipe: Pipeline):
     return join(pipe.tmp_bucket, 'mt')
 
 
-@stage(requires_stages=[JointGenotypingStage, VqsrStage])
+@stage(required_stages=[JointGenotypingStage, VqsrStage])
 class AnnotateCohortStage(CohortStage):
     """
     Re-annotate the entire cohort, including projects that are not going to be loaded 
@@ -406,7 +406,7 @@ class AnnotateCohortStage(CohortStage):
         return self.make_outputs(cohort, data=expected_path, jobs=[j])
 
 
-@stage(requires_stages=[AnnotateCohortStage])
+@stage(required_stages=[AnnotateCohortStage])
 class AnnotateProjectStage(ProjectStage):
     """
     Split mt by project and annotate project-specific fields (only for those projects
@@ -459,7 +459,7 @@ class AnnotateProjectStage(ProjectStage):
         return self.make_outputs(project, data=expected_path, jobs=[j])
 
 
-@stage(requires_stages=[AnnotateProjectStage])
+@stage(required_stages=[AnnotateProjectStage])
 class LoadToEsStage(ProjectStage):
     """
     Create a Seqr index for requested "output_projects"
@@ -502,7 +502,7 @@ class LoadToEsStage(ProjectStage):
         return self.make_outputs(project, jobs=[j])
 
 
-@stage(requires_stages=[AnnotateProjectStage])
+@stage(required_stages=[AnnotateProjectStage])
 class ToVcfStage(ProjectStage):
     """
     Convers the annotated matrix table to a pVCF
@@ -575,7 +575,7 @@ def make_pipeline(
 
     pipeline = Pipeline(
         name='seqr_loader',
-        title=title,
+        description=title,
         config=dict(
             output_projects=output_projects,
             skip_ped_checks=skip_ped_checks,

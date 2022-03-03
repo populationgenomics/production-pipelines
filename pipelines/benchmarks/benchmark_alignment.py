@@ -101,7 +101,7 @@ class SubsetAlignmentInput(SampleStage):
             return self.make_outputs(sample, None)
 
 
-@stage(requires_stages=SubsetAlignmentInput if (INPUTS_TYPE == InputsType.FULL_SUBSET) else None)
+@stage(required_stages=SubsetAlignmentInput if (INPUTS_TYPE == InputsType.FULL_SUBSET) else None)
 class DifferentResources(SampleStage):
     def expected_result(self, sample: 'Sample'):
         return None
@@ -133,7 +133,7 @@ class DifferentResources(SampleStage):
         return self.make_outputs(sample, jobs=jobs)
 
 
-@stage(requires_stages=SubsetAlignmentInput if (INPUTS_TYPE == InputsType.FULL_SUBSET) else None)
+@stage(required_stages=SubsetAlignmentInput if (INPUTS_TYPE == InputsType.FULL_SUBSET) else None)
 class DifferentAlignerSetups(SampleStage):
     def expected_result(self, sample: 'Sample'):
         return None
@@ -176,7 +176,7 @@ class DifferentAlignerSetups(SampleStage):
 def main():
     pipeline = Pipeline(
         name='benchmark_alignment',
-        title='Benchmark alignment',
+        description='Benchmark alignment',
         analysis_project=PROJECT,
         output_version='v0',
         namespace=NAMESPACE,

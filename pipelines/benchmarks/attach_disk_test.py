@@ -10,7 +10,7 @@ def main():  # pylint: disable=missing-function-docstring
     pipeline = Pipeline(
         analysis_project='fewgenomes',
         name='test_attach_disk',
-        title='test_attach_disk',
+        description='test_attach_disk',
         output_version='v0',
         namespace='test'
     )

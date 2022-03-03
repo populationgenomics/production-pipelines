@@ -27,7 +27,7 @@ def main():  # pylint: disable=missing-function-docstring
         name='run_qc',
         output_version='v0',
         namespace=NAMESPACE,
-        title='Run QC',
+        description='Run QC',
         check_smdb_seq=False,
     )
     inputs = {

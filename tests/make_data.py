@@ -17,7 +17,7 @@ def make_gvcfs():
     
     pipeline = Pipeline(
         name='make_test_data',
-        title='Make test data',
+        description='Make test data',
         analysis_project=PROJECT,
         output_version='v0',
         namespace='test',
