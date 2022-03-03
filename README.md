@@ -1,16 +1,16 @@
 # Production pipelines
 
-## cpg_pipes
+## cpg_pipes python package
 
 The `cpg_pipes` package provides Python functions that help to design a pipeline powered by [Hail Batch](https://hail.is/docs/batch/service.html), in the context of the CPG infrastructe:
 - Google Cloud,
 - [CPG storage policies](https://github.com/populationgenomics/team-docs/tree/main/storage_policies),
-- The [analysis-runner](https://github.com/populationgenomics/analysis-runner) as a proxy for submissions
+- The [analysis-runner](https://github.com/populationgenomics/analysis-runner) as a proxy for submissions,
 - The [sample-metadata](https://github.com/populationgenomics/sample-metadata) database as a source of input data.
 
 ### Installation
 
-Requires Python 3.10.
+Requires Python 3.10
 
 ```bash
 pip install cpg_pipes
@@ -24,7 +24,7 @@ The package implements a concept of _stage_, that can act on a _target_: e.g. a 
 
 Each stage declares paths to the outputs it would produce by overriding abstract `expected_result()` method; and defines how jobs are added into Hail Batch using `queue_jobs()` method. 
 
-To declare a stage, inherit a class from SampleStage, ProjectStage, or CohortStage, implement the abstract methods, and wrap the class with a `@stage` decorator:
+To declare a stage, inherit a class from SampleStage, ProjectStage, or CohortStage, implement the abstract methods, and wrap the class with a `@stage` decorator.
 
 ```python
 from cpg_pipes.pipeline.pipeline import stage
@@ -47,6 +47,10 @@ class WriteSampleName(SampleStage):
 ```
 
 The `queue_jobs` method is expected to retuns output of type `StageOutput`: you can call `self.make_outputs()` to construct that object.
+
+The classes and objects relashionships looks like as follows:
+
+![uml](docs/classes.png)
 
 Stages can depend on each other. Use the `requires_stages` parameter to `@stage` to set dependencies, and use the `inputs` parameter in `queue_jobs` to get the output of the previous stage:
 
