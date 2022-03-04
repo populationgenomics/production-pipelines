@@ -1,5 +1,5 @@
 """
-Defines a target that stage can act upon. Classes like Sample, Project, Pipeline
+Defines a target that stage can act upon. Classes like Sample, Dataset, Pipeline
 extend this class.
 """
 

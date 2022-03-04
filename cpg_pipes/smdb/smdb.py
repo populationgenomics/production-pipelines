@@ -35,12 +35,12 @@ class SMDB:
 
     def __init__(
         self, 
-        analysis_project: str, 
+        analysis_dataset: str, 
         do_update_analyses: bool = True,
         do_check_seq_existence: bool = True,
     ):
         """
-        :param analysis_project: project where to create the "analysis" entries.
+        :param analysis_dataset: dataset where to create the "analysis" entries.
         :param do_update_analyses: if not set, won't update "analysis" entries' 
             statuses.
         :param do_check_seq_existence: when querying "sequence" or "analysis" entries
@@ -52,37 +52,37 @@ class SMDB:
         self.seqapi = SequenceApi()
         self.seqapi = SequenceApi()
         self.papi = ParticipantApi()
-        self.analysis_project = analysis_project
+        self.analysis_dataset = analysis_dataset
         self.do_update_analyses = do_update_analyses
         self.do_check_seq_existence = do_check_seq_existence
 
-    def get_samples_by_project(
+    def get_samples_by_dataset(
         self,
-        project_names: List[str],
+        dataset_names: List[str],
         namespace: Namespace,
         skip_samples: Optional[List[str]] = None,
         only_samples: Optional[List[str]] = None,
     ) -> Dict[str, List[Dict]]:
         """
-        Returns a dictionary of samples per input projects
+        Returns a dictionary of samples per input datasets
         """
-        samples_by_project: Dict[str, List[Dict]] = dict()
-        for proj_name in project_names:
-            input_proj_name = proj_name
+        samples_by_dataset: Dict[str, List[Dict]] = dict()
+        for ds_name in dataset_names:
+            input_ds_name = ds_name
             if namespace != Namespace.MAIN:
-                input_proj_name += '-test'
-            logger.info(f'Finding samples for project {input_proj_name}...')
+                input_ds_name += '-test'
+            logger.info(f'Finding samples for dataset {input_ds_name}...')
             samples = self.sapi.get_samples(
                 body_get_samples_by_criteria_api_v1_sample_post={
-                    'project_ids': [input_proj_name],
+                    'project_ids': [input_ds_name],
                     'active': True,
                 }
             )
-            logger.info(f'Finding samples for project {input_proj_name}: found {len(samples)}')
+            logger.info(f'Finding samples for dataset {input_ds_name}: found {len(samples)}')
             
-            participant_id_by_cpgid = self._get_participant_id_by_sid(proj_name)
+            participant_id_by_cpgid = self._get_participant_id_by_sid(ds_name)
             
-            samples_by_project[proj_name] = []
+            samples_by_dataset[ds_name] = []
             for s in samples:
                 s['id'] = s['id'].strip()
                 s['external_id'] = s['external_id'].strip()
@@ -96,11 +96,11 @@ class SMDB:
                     if s['id'] in skip_samples or s['external_id'] in skip_samples:
                         logger.info(f'Skiping sample: {s["id"]}')
                         continue
-                samples_by_project[proj_name].append(s)
+                samples_by_dataset[ds_name].append(s)
                 
                 s['participant_id'] = participant_id_by_cpgid.get(s['id'])
                 
-        return samples_by_project
+        return samples_by_dataset
 
     def _get_participant_id_by_sid(self, proj_name: str) -> Dict[str, str]:
         try:
@@ -152,7 +152,7 @@ class SMDB:
         """
         try:
             data = self.aapi.get_latest_complete_analysis_for_type(
-                project=self.analysis_project,
+                project=self.analysis_dataset,
                 analysis_type=models.AnalysisType('joint-calling'),
             )
         except ApiException:
@@ -171,7 +171,7 @@ class SMDB:
         sample_ids: Collection[str],
         analysis_type: str,
         analysis_status: str = 'completed',
-        project: Optional[str] = None,
+        dataset: Optional[str] = None,
         meta: Optional[Dict] = None
     ) -> Dict[str, Analysis]:
         """
@@ -179,15 +179,15 @@ class SMDB:
         one Analysis object per sample. Assumes the analysis is defined for a single
         sample (e.g. cram, gvcf)
         """
-        project = project or self.analysis_project
+        dataset = dataset or self.analysis_dataset
         analysis_per_sid: Dict[str, Analysis] = dict()
 
         logger.info(
-            f'Querying {analysis_type} analysis entries for project {project}...'
+            f'Querying {analysis_type} analysis entries for dataset {dataset}...'
         )
         datas = self.aapi.query_analyses(
             models.AnalysisQueryModel(
-                projects=[project],
+                projects=[dataset],
                 sample_ids=sample_ids,
                 type=models.AnalysisType(analysis_type),
                 status=models.AnalysisStatus(analysis_status),
@@ -204,7 +204,7 @@ class SMDB:
             assert len(a.sample_ids) == 1, data
             analysis_per_sid[list(a.sample_ids)[0]] = a
         logger.info(
-            f'Querying {analysis_type} analysis entries for project {project}: found {len(analysis_per_sid)}'
+            f'Querying {analysis_type} analysis entries for dataset {dataset}: found {len(analysis_per_sid)}'
         )
         return analysis_per_sid
 
@@ -231,15 +231,15 @@ class SMDB:
         analysis_type: str,
         status: str,
         sample_name: Optional[str] = None,
-        project_name: Optional[str] = None,
+        dataset_name: Optional[str] = None,
     ) -> Job:
         """
         Creates a job that updates the sample metadata server entry analysis status.
         """
         assert status in ['in-progress', 'failed', 'completed', 'queued']
         job_name = ''
-        if project_name and sample_name:
-            job_name += f'{project_name}/{sample_name}: '
+        if dataset_name and sample_name:
+            job_name += f'{dataset_name}/{sample_name}: '
         job_name += f'Update SM: {analysis_type} to {status}'
 
         if not self.do_update_analyses:
@@ -251,7 +251,7 @@ class SMDB:
         export GOOGLE_APPLICATION_CREDENTIALS=/gsa-key/key.json
         gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
 
-        export SM_DEV_DB_PROJECT={self.analysis_project}
+        export SM_DEV_DB_PROJECT={self.analysis_dataset}
         export SM_ENVIRONMENT=PRODUCTION
         
         cat <<EOT >> update.py
@@ -281,7 +281,7 @@ class SMDB:
         type_: str,
         status: str,
         sample_ids: Collection[str],
-        project_name: Optional[str] = None,
+        dataset_name: Optional[str] = None,
     ) -> Optional[int]:
         """
         Tries to create an Analysis entry, returns its id if successfuly
@@ -297,7 +297,7 @@ class SMDB:
         )
         try:
             aid = self.aapi.create_new_analysis(
-                project=project_name or self.analysis_project, analysis_model=am
+                project=dataset_name or self.analysis_dataset, analysis_model=am
             )
         except ApiException:
             traceback.print_exc()
@@ -312,7 +312,7 @@ class SMDB:
         completed_analysis: Optional['Analysis'],
         analysis_type: str,
         expected_output_fpath: str,
-        project_name: Optional[str] = None,
+        dataset_name: Optional[str] = None,
     ) -> Optional[str]:
         """
         Checks whether existing analysis exists, and output matches the expected output
@@ -322,11 +322,12 @@ class SMDB:
         Returns the path to the output if it can be reused, otherwise None.
 
         :param sample_ids: sample IDs to pull the analysis for
-        :param completed_analysis: existing completed analysis of this type for these samples
+        :param completed_analysis: existing completed analysis of this type for these 
+        samples
         :param analysis_type: cram, gvcf, joint_calling
-        :param expected_output_fpath: where the pipeline expects the analysis output file
-            to sit on the bucket (will invalidate the analysis if it doesn't match)
-        :param project_name: project name to create new analysis in
+        :param expected_output_fpath: where the pipeline expects the analysis output 
+        file to sit on the bucket (will invalidate the analysis if it doesn't match)
+        :param dataset_name: the name of the dataset where to create a new analysis
         :return: path to the output if it can be reused, otherwise None
         """
         label = f'type={analysis_type}'
@@ -387,7 +388,7 @@ class SMDB:
                 output=expected_output_fpath,
                 status='completed',
                 sample_ids=sample_ids,
-                project_name=project_name,
+                dataset_name=dataset_name,
             )
             return expected_output_fpath
 
@@ -408,7 +409,7 @@ class SMDB:
         first_j,
         last_j,
         depends_on,
-        project_name: Optional[str] = None,
+        dataset_name: Optional[str] = None,
     ) -> Job:
         if not self.do_update_analyses:
             return last_j
@@ -419,14 +420,14 @@ class SMDB:
             output=output_path,
             status='queued',
             sample_ids=sample_names,
-            project_name=project_name,
+            dataset_name=dataset_name,
         )
         # 2. Queue a job that updates the status to "in-progress"
         sm_in_progress_j = self.make_sm_in_progress_job(
             b,
             analysis_id=aid,
             analysis_type=analysis_type,
-            project_name=project_name,
+            dataset_name=dataset_name,
             sample_name=sample_names[0] if len(sample_names) == 1 else None,
         )
         # 2. Queue a job that updates the status to "completed"
@@ -434,7 +435,7 @@ class SMDB:
             b,
             analysis_id=aid,
             analysis_type=analysis_type,
-            project_name=project_name,
+            dataset_name=dataset_name,
             sample_name=sample_names[0] if len(sample_names) == 1 else None,
         )
         # Set up dependencies

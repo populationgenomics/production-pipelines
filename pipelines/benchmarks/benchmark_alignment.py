@@ -6,7 +6,7 @@ import click
 import logging
 
 from cpg_pipes import benchmark, images
-from cpg_pipes.hb.inputs import AlignmentInput, fasta_group
+from cpg_pipes.filetypes import AlignmentInput, fasta_group
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
 from cpg_pipes.pipeline.pipeline import stage, Pipeline
 from cpg_pipes.pipeline.sample import Sample
@@ -17,7 +17,7 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-PROJECT = 'fewgenomes'
+DATASET = 'fewgenomes'
 NAMESPACE = 'main'
 
 
@@ -123,7 +123,7 @@ class DifferentResources(SampleStage):
                     alignment_input=alignment_input,
                     sample_name=sample.id,
                     output_path=f'{basepath}/nomarkdup/{aligner.name}_nthreads{nthreads}.bam',
-                    project_name=PROJECT,
+                    dataset_name=DATASET,
                     aligner=aligner,
                     markdup_tool=MarkDupTool.NO_MARKDUP,
                     extra_label=f'nomarkdup_fromfastq_{aligner.name}nthreads{nthreads}',
@@ -161,7 +161,7 @@ class DifferentAlignerSetups(SampleStage):
                     self.pipe.b,
                     alignment_input=alignment_input,
                     sample_name=sample.id,
-                    project_name=PROJECT,
+                    dataset_name=DATASET,
                     output_path=f'{basepath}/{aligner.name}-{markdup.name}.bam',
                     aligner=aligner,
                     markdup_tool=markdup,
@@ -177,14 +177,14 @@ def main():
     pipeline = Pipeline(
         name='benchmark_alignment',
         description='Benchmark alignment',
-        analysis_project=PROJECT,
+        analysis_dataset=DATASET,
         output_version='v0',
         namespace=NAMESPACE,
         check_smdb_seq=False,
         keep_scratch=True,
     )
 
-    p = pipeline.add_project('fewgenomes')
+    p = pipeline.add_dataset('fewgenomes')
     # p.add_sample(
     #     id='NA12878',
     #     external_id='NA12878',

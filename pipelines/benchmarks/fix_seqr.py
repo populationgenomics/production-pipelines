@@ -3,7 +3,7 @@ import click
 import logging
 
 from cpg_pipes import images
-from cpg_pipes.hb.inputs import AlignmentInput
+from cpg_pipes.filetypes import AlignmentInput
 from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
 
@@ -12,14 +12,14 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-PROJECT = 'seqr'
+DATASET = 'seqr'
 NAMESPACE = 'main'
 
 
 @click.command()
 def main():
     pipe = Pipeline(
-        analysis_project='seqr',
+        analysis_dataset='seqr',
         name='seqr_align_CPG12062_19W001482_A0131064_proband',
         output_version='v0',
         namespace=NAMESPACE,
@@ -48,7 +48,7 @@ def main():
         alignment_input=fq_input,
         sample_name='CPG12062_19W001482_A0131064_proband',
         output_path=f'gs//cpg-seqr-test/test/CPG12062_19W001482_A0131064.bam',
-        project_name=PROJECT,
+        dataset_name=DATASET,
         aligner=Aligner.BWA,
         markdup_tool=MarkDupTool.PICARD,
     )
@@ -58,7 +58,7 @@ def main():
     #     pipe.b,
     #     merged_bam),
     #     sample_name='CPG12062_19W001482_A0131064_proband',
-    #     project_name=PROJECT,
+    #     dataset_name=PROJECT,
     #     overwrite=False,
     # )
     j = pipe.b.new_job('Index bam')

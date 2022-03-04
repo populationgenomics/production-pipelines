@@ -6,9 +6,9 @@ import unittest
 from unittest.mock import patch
 
 try:
-    from .utils import setup_env, BASE_BUCKET, PROJECT, SAMPLES
+    from .utils import setup_env, BASE_BUCKET, DATASET, SAMPLES
 except ImportError:
-    from utils import setup_env, BASE_BUCKET, PROJECT, SAMPLES  # type: ignore
+    from utils import setup_env, BASE_BUCKET, DATASET, SAMPLES  # type: ignore
 
 
 class TestPipeline(unittest.TestCase):
@@ -51,16 +51,16 @@ class TestPipeline(unittest.TestCase):
         pipeline = Pipeline(
             name=self._testMethodName,
             description=self._testMethodName,
-            analysis_project=PROJECT,
+            analysis_dataset=DATASET,
             output_version='v0',
             namespace='test',
             check_smdb_seq=False,
-            config=dict(output_projects=[PROJECT]),
+            config=dict(output_datasets=[DATASET]),
             dry_run=True,
         )
-        project = pipeline.cohort.add_project(PROJECT)
+        ds = pipeline.cohort.add_dataset(DATASET)
         for s_id in self.sample_ids:
-            s = project.add_sample(s_id, s_id)
+            s = ds.add_sample(s_id, s_id)
             s.alignment_input = benchmark.tiny_fq
 
         with patch('builtins.print') as mock_print:
@@ -90,5 +90,5 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(_cnt('GatherVcfsCloud'), 2)
         self.assertEqual(
             _cnt('hailctl dataproc submit'), 
-            1 + len(pipeline.config['output_projects']) * 3
+            1 + len(pipeline.config['output_datasets']) * 3
         )

@@ -8,6 +8,7 @@ from typing import Optional, List, Tuple, Dict
 import logging
 
 from hailtop.batch.job import Job
+from hailtop.batch import Batch
 import pandas as pd
 
 from cpg_pipes import buckets, images, ref_data, utils
@@ -23,7 +24,7 @@ logger.setLevel(logging.INFO)
 
 def add_pedigree_jobs(
     b,
-    project: Dataset,
+    dataset: Dataset,
     input_path_by_sid: Dict[str, str],
     overwrite: bool,
     fingerprints_bucket: str,
@@ -31,7 +32,7 @@ def add_pedigree_jobs(
     web_bucket: Optional[str] = None,
     web_url: Optional[str] = None,
     depends_on: Optional[List[Job]] = None,
-    label: str = None,
+    label: str|None = None,
     ignore_missing: bool = False,
     dry_run: bool = False,
 ) -> Tuple[Job, str, str]:
@@ -50,7 +51,7 @@ def add_pedigree_jobs(
     extract_jobs = []
     missing_input = []
     somalier_file_by_sample = dict()
-    for sample in project.get_samples():
+    for sample in dataset.get_samples():
         input_path = input_path_by_sid.get(sample.id)
         if input_path is None:
             missing_input.append(sample)
@@ -75,31 +76,54 @@ def add_pedigree_jobs(
     if len(missing_input) > 0:
         (logger.critical if not ignore_missing else logger.warning)(
             f'Could not find input for '
-            f'{len(missing_input)}/{len(project.get_samples())} samples'
+            f'{len(missing_input)}/{len(dataset.get_samples())} samples'
         )
         if not ignore_missing:
             sys.exit(1)
 
     relate_j = _relate_job(
-        b, depends_on, dry_run, extract_jobs, label, project,
-        somalier_file_by_sample, tmp_bucket
+        b=b,
+        somalier_file_by_sample=somalier_file_by_sample,
+        dataset=dataset,
+        tmp_bucket=tmp_bucket,
+        label=label,
+        extract_jobs=extract_jobs,
+        depends_on=depends_on,
+        dry_run=dry_run,
     )
 
-    html_url, pairs_path, samples_path = _copy_somalier_output(
-        b, fingerprints_bucket, project, relate_j, web_bucket, web_url
+    pairs_path, samples_path, html_url = _copy_somalier_output(
+        b=b, 
+        dataset=dataset, 
+        fingerprints_bucket=fingerprints_bucket, 
+        relate_j=relate_j, 
+        web_bucket=web_bucket, 
+        web_url=web_url,
     )
 
     _check_pedigree_job(
-        b, dry_run, label, project, relate_j, html_url, tmp_bucket
+        b=b,
+        dataset=dataset,
+        relate_j=relate_j,
+        tmp_bucket=tmp_bucket,
+        label=label,
+        dry_run=dry_run,
+        somalier_html_url=html_url,
     )
 
     return relate_j, samples_path, pairs_path
 
 
-def _copy_somalier_output(b, fingerprints_bucket, project, relate_j, web_bucket,
-                          web_url):
+def _copy_somalier_output(
+    b: Batch,
+    dataset: Dataset, 
+    fingerprints_bucket: str, 
+    relate_j: Job,
+    web_bucket: str|None = None,
+    web_url: str|None = None,
+) -> tuple[str, str, str|None]:
     # Copy somalier outputs to buckets
-    prefix = join(fingerprints_bucket, project.name)
+    prefix = join(fingerprints_bucket, dataset.name)
     somalier_samples_path = f'{prefix}.samples.tsv'
     somalier_pairs_path = f'{prefix}.pairs.tsv'
     b.write_output(relate_j.output_samples, somalier_samples_path)
@@ -107,25 +131,33 @@ def _copy_somalier_output(b, fingerprints_bucket, project, relate_j, web_bucket,
     # Copy somalier HTML to the web bucket
     somalier_html_url = None
     if web_bucket and web_url:
-        rel_path = f'pedigree/{project.name}.html'
+        rel_path = f'pedigree/{dataset.name}.html'
         somalier_html_path = f'{web_bucket}/{rel_path}'
         somalier_html_url = f'{web_url}/{rel_path}'
         b.write_output(relate_j.output_html, somalier_html_path)
-    return somalier_html_url, somalier_pairs_path, somalier_samples_path
+    return somalier_pairs_path, somalier_samples_path, somalier_html_url
 
 
-def _check_pedigree_job(b, dry_run, label, project, relate_j, somalier_html_url, tmp_bucket):
+def _check_pedigree_job(
+    b: Batch, 
+    dataset: Dataset, 
+    relate_j: Job, 
+    tmp_bucket: str,
+    label: str|None,
+    dry_run: bool = False,
+    somalier_html_url: str|None = None,
+):
     check_j = b.new_job(
         'Check relatedness and sex' + (f' {label}' if label else ''),
-        dict(project=project.name),
+        dict(dataset=dataset.name),
     )
     STANDARD.set_resources(check_j, ncpu=2)
     check_j.image(images.PEDDY_IMAGE)
     # Creating sample map to remap internal IDs to participant IDs
-    sample_map_fpath = f'{tmp_bucket}/pedigree/sample_maps/{project.name}.tsv'
+    sample_map_fpath = f'{tmp_bucket}/pedigree/sample_maps/{dataset.name}.tsv'
     if not dry_run:
         df = pd.DataFrame(
-            [{'id': s.id, 'pid': s.participant_id} for s in project.get_samples()])
+            [{'id': s.id, 'pid': s.participant_id} for s in dataset.get_samples()])
         df.to_csv(sample_map_fpath, sep='\t', index=False, header=False)
     script_name = 'check_pedigree.py'
     script_path = join(dirname(__file__), pardir, pardir, utils.SCRIPTS_DIR,
@@ -148,25 +180,31 @@ python {script_name} \
 
 
 def _relate_job(
-    b, depends_on, dry_run, extract_jobs, label, project,
-    somalier_file_by_sample, tmp_bucket
+    b: Batch, 
+    somalier_file_by_sample: dict[str, str],
+    dataset: Dataset,
+    tmp_bucket: str,
+    label: str|None,
+    extract_jobs: list[Job],
+    depends_on: list[Job]|None = None,
+    dry_run: bool = False,
 ) -> Job:
     relate_j = b.new_job(
         'Somalier relate' + (f' {label}' if label else ''),
-        dict(project=project.name),
+        dict(dataset=dataset.name),
     )
     relate_j.image(images.BIOINFO_IMAGE)
     relate_j.cpu(1)
     relate_j.memory('standard')  # ~ 4G/core ~ 4G
     # Size of one somalier file is 212K, so we add another G only if the number of
     # samples is >4k
-    relate_j.storage(f'{1 + len(project.get_samples()) // 4000 * 1}G')
+    relate_j.storage(f'{1 + len(dataset.get_samples()) // 4000 * 1}G')
     if depends_on:
         extract_jobs.extend(depends_on)
     relate_j.depends_on(*extract_jobs)
-    ped_fpath = join(tmp_bucket, f'{project.name}.ped')
+    ped_fpath = join(tmp_bucket, f'{dataset.name}.ped')
     datas = []
-    for sample in project.get_samples():
+    for sample in dataset.get_samples():
         if sample.pedigree:
             datas.append(sample.pedigree.get_ped_dict())
     df = pd.DataFrame(datas)
@@ -174,7 +212,7 @@ def _relate_job(
         df.to_csv(ped_fpath, sep='\t', index=False)
     ped_file = b.read_input(ped_fpath)
     input_files_lines = ''
-    for sample in project.get_samples():
+    for sample in dataset.get_samples():
         if sample.id:
             somalier_file = b.read_input(somalier_file_by_sample[sample.id])
             input_files_lines += f'{somalier_file} \\\n'
@@ -201,17 +239,17 @@ def somalier_extact_job(
     sample: Sample,
     gvcf_or_cram_or_bam_path: str,
     overwrite: bool,
-    label: Optional[str] = None,
-    depends_on: Optional[List[Job]] = None,
-    out_fpath: Optional[str] = None,
-) -> Tuple[Job, str]:
+    label: str|None = None,
+    depends_on: List[Job]|None = None,
+    out_fpath: str|None = None,
+) -> tuple[Job, str]:
     """
     Run "somalier extract" to generate a fingerprint for a `sample`
     from `fpath` (which can be a gvcf, a cram or a bam)
     """
     j = b.new_job(
         'Somalier extract' + (f' {label}' if label else ''),
-        dict(sample=sample.id, project=sample.project.name),
+        dict(sample=sample.id, dataset=sample.dataset.name),
     )
 
     if not out_fpath:

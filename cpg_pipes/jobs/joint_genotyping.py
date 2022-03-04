@@ -13,7 +13,7 @@ import pandas as pd
 from hailtop.batch.job import Job
 
 from cpg_pipes import ref_data, images, buckets, utils
-from cpg_pipes.hb import inputs
+from cpg_pipes.filetypes import fasta_group
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs import split_intervals
@@ -574,7 +574,7 @@ def _add_joint_genotyper_job(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
 
-    reference = inputs.fasta_group(b)
+    reference = fasta_group(b)
     
     if genomicsdb_path.endswith('.tar'):
         # can't use directly from cloud, need to copy and uncompress:

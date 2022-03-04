@@ -16,14 +16,14 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-INPUT_PROJECT = 'fewgenomes'
+INPUT_DATASET = 'fewgenomes'
 NAMESPACE = 'main'
 
 
 @click.command()
 def main():  # pylint: disable=missing-function-docstring
     pipe = Pipeline(
-        analysis_project='fewgenomes',
+        analysis_dataset='fewgenomes',
         name='run_qc',
         output_version='v0',
         namespace=NAMESPACE,
@@ -40,7 +40,7 @@ def main():  # pylint: disable=missing-function-docstring
             results_bucket=f'{benchmark.BENCHMARK_BUCKET}/outputs/fastqc/{sample_name}',
             alignment_input=inp,
             sample_name=sample_name,
-            project_name='FastQC',
+            dataset_name='FastQC',
         )
     
     pipe.submit_batch()

@@ -8,7 +8,7 @@ from typing import Dict
 from analysis_runner import dataproc
 
 from cpg_pipes import benchmark, utils
-from cpg_pipes.hb.inputs import fasta_group
+from cpg_pipes.filetypes import fasta_group
 from cpg_pipes.jobs import vep
 from cpg_pipes.jobs.align import align, Aligner
 from cpg_pipes.jobs.haplotype_caller import produce_gvcf
@@ -19,9 +19,9 @@ from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes import buckets, images
 
 try:
-    from .utils import BASE_BUCKET, PROJECT, SAMPLES, SUBSET_GVCF_BY_SID
+    from .utils import BASE_BUCKET, DATASET, SAMPLES, SUBSET_GVCF_BY_SID
 except ImportError:
-    from utils import BASE_BUCKET, PROJECT, SAMPLES, SUBSET_GVCF_BY_SID  # type: ignore
+    from utils import BASE_BUCKET, DATASET, SAMPLES, SUBSET_GVCF_BY_SID  # type: ignore
 
 
 class TestJobs(unittest.TestCase):
@@ -38,7 +38,7 @@ class TestJobs(unittest.TestCase):
         self.pipeline = Pipeline(
             name=self._testMethodName,
             description=self._testMethodName,
-            analysis_project=PROJECT,
+            analysis_dataset=DATASET,
             output_version='v0',
             namespace='test',
         )
@@ -93,7 +93,7 @@ class TestJobs(unittest.TestCase):
             self.pipeline.b,
             alignment_input=inp,
             sample_name=self.sample_name,
-            project_name=PROJECT,
+            dataset_name=DATASET,
             aligner=Aligner.DRAGMAP,
         )
         cram_details_paths = self._job_get_cram_details(
@@ -125,7 +125,7 @@ class TestJobs(unittest.TestCase):
         j = produce_gvcf(
             self.pipeline.b,
             sample_name=self.sample_name,
-            project_name=PROJECT,
+            dataset_name=DATASET,
             cram_path=cram_path,
             number_of_intervals=10,
             tmp_bucket=self.tmp_bucket,
@@ -144,7 +144,7 @@ class TestJobs(unittest.TestCase):
         out_vcf_path = f'{self.out_bucket}/joint-called.vcf.gz'
         out_siteonly_vcf_path = out_vcf_path.replace('.vcf.gz', '-siteonly.vcf.gz')
 
-        proj = self.pipeline.cohort.add_project(PROJECT)
+        proj = self.pipeline.cohort.add_dataset(DATASET)
         for sid in SAMPLES:
             proj.add_sample(sid, sid)
 
@@ -244,8 +244,8 @@ class TestJobs(unittest.TestCase):
         )
         
         cohort_mt_path = f'{self.out_bucket}/seqr_loader/cohort.mt'
-        project_mt_path = f'{self.out_bucket}/seqr_loader/project.mt'
-        project_vcf_path = f'{self.out_bucket}/seqr_loader/project.vcf.bgz'
+        dataset_mt_path = f'{self.out_bucket}/seqr_loader/dataset.mt'
+        dataset_vcf_path = f'{self.out_bucket}/seqr_loader/dataset.vcf.bgz'
 
         cluster = dataproc.setup_dataproc(
             self.pipeline.b,
@@ -269,27 +269,27 @@ class TestJobs(unittest.TestCase):
             f'--make-checkpoints',
             job_name='Make MT and annotate cohort',
         )
-        mt_to_projectmt_j = cluster.add_job(
-            f'{join("..", utils.QUERY_SCRIPTS_DIR, "seqr", "mt_to_projectmt.py")} '
+        mt_to_datasetmt_j = cluster.add_job(
+            f'{join("..", utils.QUERY_SCRIPTS_DIR, "seqr", "subset_mt.py")} '
             f'--mt-path {cohort_mt_path} '
-            f'--out-mt-path {project_mt_path}',
-            job_name=f'Annotate project',
+            f'--out-mt-path {dataset_mt_path}',
+            job_name=f'Annotate dataset',
         )
-        mt_to_projectmt_j.depends_on(vcf_to_mt_j)
-        projectmt_to_es_j = cluster.add_job(
-            f'{join("..", utils.QUERY_SCRIPTS_DIR, "seqr", "projectmt_to_es.py")} '
-            f'--mt-path {project_mt_path} '
+        mt_to_datasetmt_j.depends_on(vcf_to_mt_j)
+        datasetmt_to_es_j = cluster.add_job(
+            f'{join("..", utils.QUERY_SCRIPTS_DIR, "seqr", "mt_to_es.py")} '
+            f'--mt-path {dataset_mt_path} '
             f'--es-index test-{self.timestamp} '
             f'--es-index-min-num-shards 1',
             job_name=f'Create ES index',
         )
-        projectmt_to_es_j.depends_on(mt_to_projectmt_j)
-        projectmt_to_vcf_j = cluster.add_job(
-            f'{join("..", utils.QUERY_SCRIPTS_DIR, "seqr", "projectmt_to_vcf.py")} '
-            f'--mt-path {project_mt_path} '
-            f'--out-vcf-path {project_vcf_path}',
+        datasetmt_to_es_j.depends_on(mt_to_datasetmt_j)
+        datasetmt_to_vcf_j = cluster.add_job(
+            f'{join("..", utils.QUERY_SCRIPTS_DIR, "seqr", "mt_to_vcf.py")} '
+            f'--mt-path {dataset_mt_path} '
+            f'--out-vcf-path {dataset_vcf_path}',
             job_name=f'Convert to VCF',
         )
-        projectmt_to_vcf_j.depends_on(mt_to_projectmt_j)
+        datasetmt_to_vcf_j.depends_on(mt_to_datasetmt_j)
         self.pipeline.submit_batch(wait=True)     
-        self.assertTrue(buckets.file_exists(project_vcf_path))
+        self.assertTrue(buckets.file_exists(dataset_vcf_path))

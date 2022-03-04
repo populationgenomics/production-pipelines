@@ -1,5 +1,5 @@
 """
-Represents a "cohort" target - all samples from all projects in the pipeline
+Represents a "cohort" target - all samples from all datasets in the pipeline
 """
 
 from os.path import join
@@ -7,7 +7,7 @@ from typing import List, Optional
 import logging
 
 from cpg_pipes import buckets
-from cpg_pipes.hb.inputs import AlignmentInput
+from cpg_pipes.filetypes import AlignmentInput
 from cpg_pipes.pipeline.sample import Sample, PedigreeInfo, Sex
 from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes.pipeline.target import Target
@@ -21,13 +21,13 @@ logger.setLevel(logging.INFO)
 
 class Cohort(Target):
     """
-    Represents a "cohort" target - all samples from all projects in the pipeline
+    Represents a "cohort" target - all samples from all datasets in the pipeline
     """
     def __init__(self, name: str, pipeline):
         super().__init__()
         self.name = name
         self.pipeline = pipeline
-        self._projects: List[Dataset] = []
+        self._datasets: List[Dataset] = []
 
     def __repr__(self):
         return self.name
@@ -40,45 +40,45 @@ class Cohort(Target):
         """
         return self.name
 
-    def get_projects(self, only_active: bool = True) -> List[Dataset]:
+    def get_datasets(self, only_active: bool = True) -> List[Dataset]:
         """
-        Gets list of all projects. 
-        Include only "active" projects (unless only_active is False)
+        Gets list of all datasets. 
+        Include only "active" datasets (unless only_active is False)
         """
-        return [p for p in self._projects if (p.active or not only_active)]
+        return [ds for ds in self._datasets if (ds.active or not only_active)]
 
     def get_all_samples(self, only_active: bool = True) -> List[Sample]:
         """
-        Gets a flat list of all samples from all projects.
+        Gets a flat list of all samples from all datasets.
         Include only "active" samples (unless only_active is False)
         """
         all_samples = []
-        for proj in self.get_projects(only_active=only_active):
+        for proj in self.get_datasets(only_active=only_active):
             all_samples.extend(proj.get_samples(only_active))
         return all_samples
 
     def get_all_sample_ids(self, only_active: bool = True) -> List[str]:
         """
-        Gets a flat list of CPG IDs for all samples from all projects.
+        Gets a flat list of CPG IDs for all samples from all datasets.
         """
         return [s.id for s in self.get_all_samples(only_active=only_active)]
 
-    def add_project(self, name: str) -> Dataset:
+    def add_dataset(self, name: str) -> Dataset:
         """
-        Create a project and add to the cohort.
+        Create a dataset and add to the cohort.
         """
-        project_by_name = {p.name: p for p in self._projects}
-        if name in project_by_name:
-            logger.warning(f'Project {name} already exists')
-            return project_by_name[name]
+        ds_by_name = {ds.name: ds for ds in self._datasets}
+        if name in ds_by_name:
+            logger.warning(f'Dataset {name} already exists in the cohort')
+            return ds_by_name[name]
         p = Dataset(pipeline=self.pipeline, name=name)
-        self._projects.append(p)
+        self._datasets.append(p)
         return p
 
     def populate(
         self,
         smdb: SMDB,
-        input_projects: List[str],
+        input_datasets: List[str],
         local_tmp_dir: str,
         source_tag: Optional[str] = None,
         skip_samples: Optional[List[str]] = None,
@@ -87,12 +87,12 @@ class Cohort(Target):
         forced_samples: List[str] = None,
     ) -> None:
         """
-        Finds input samples, analyses and sequences from the DB, 
-        populates self.projects, adds pedigree information
+        Finds input samples, as well as analysis and sequence entries from the DB.
+        Populates self._dataset, adds pedigree information.
         """
-        self._populate_projects(
+        self._populate_datasets(
             smdb=smdb,
-            input_projects=input_projects,
+            input_datasets=input_datasets,
             skip_samples=skip_samples,
             only_samples=only_samples,
             forced_samples=forced_samples,
@@ -103,30 +103,30 @@ class Cohort(Target):
         if ped_files:
             self._populate_pedigree(ped_files, local_tmp_dir)
 
-    def _populate_projects(
+    def _populate_datasets(
         self,
         smdb: SMDB,
-        input_projects: List[str],
+        input_datasets: List[str],
         skip_samples: Optional[List[str]] = None,
         only_samples: Optional[List[str]] = None,
         forced_samples: Optional[List[str]] = None,
         source_tag: Optional[str] = None,
     ):
-        samples_by_project = smdb.get_samples_by_project(
-            project_names=input_projects,
+        samples_by_dataset = smdb.get_samples_by_dataset(
+            dataset_names=input_datasets,
             namespace=self.pipeline.namespace,
             skip_samples=skip_samples,
             only_samples=only_samples,
         )
-        for proj_name, sample_datas in samples_by_project.items():
-            project = self.add_project(name=proj_name)
+        for ds_name, sample_datas in samples_by_dataset.items():
+            dataset = self.add_dataset(name=ds_name)
             for s_data in sample_datas:
                 meta = s_data.get('meta', {})
                 if source_tag:
                     meta['source_tag'] = source_tag
                 external_id = s_data['external_id']
                 participant_id = s_data.get('participant_id')
-                s = project.add_sample(
+                s = dataset.add_sample(
                     id=s_data['id'],
                     external_id=external_id.strip(),
                     participant_id=participant_id.strip() if participant_id else None,
@@ -163,11 +163,11 @@ class Cohort(Target):
                             }.get(sex, Sex.UNKNOWN),
                             phenotype=phenotype or '0',
                         )
-        for project in self.get_projects():
-            samples_with_ped = [s for s in project.get_samples() if s.pedigree]
+        for dataset in self.get_datasets():
+            samples_with_ped = [s for s in dataset.get_samples() if s.pedigree]
             logger.info(
-                f'{project.name}: found pedigree info for {len(samples_with_ped)} '
-                f'samples out of {len(project.get_samples())}'
+                f'{dataset.name}: found pedigree info for {len(samples_with_ped)} '
+                f'samples out of {len(dataset.get_samples())}'
             )
 
     def _populate_seq(self, smdb: SMDB):
@@ -189,23 +189,23 @@ class Cohort(Target):
             sample_ids=all_sample_ids,
         )
 
-        for project in self.get_projects():
-            sample_ids = [s.id for s in project.get_samples()]
+        for dataset in self.get_datasets():
+            sample_ids = [s.id for s in dataset.get_samples()]
 
             cram_per_sid = smdb.find_analyses_by_sid(
                 sample_ids=sample_ids,
                 analysis_type=AnalysisType.CRAM.value,
                 meta={'source': source_tag} if source_tag else None,
-                project=project.name,
+                dataset=dataset.name,
             )
             gvcf_per_sid = smdb.find_analyses_by_sid(
                 sample_ids=sample_ids,
                 analysis_type=AnalysisType.GVCF.value,
                 meta={'source': source_tag} if source_tag else None,
-                project=project.name,
+                dataset=dataset.name,
             )
 
-            for s in project.get_samples():
+            for s in dataset.get_samples():
                 if s.id in cram_per_sid:
                     s.analysis_by_type[AnalysisType.CRAM] = cram_per_sid[s.id]
                     cram_path = cram_per_sid[s.id].output

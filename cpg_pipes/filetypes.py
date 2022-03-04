@@ -3,6 +3,7 @@ Converts paths into Hail Batch inputs: ResourceFile and ResourceGroup objects.
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional, Union, List, Tuple, cast
 
 import hailtop.batch as hb
@@ -16,6 +17,69 @@ def fasta_group(b: hb.Batch) -> ResourceGroup:
     Returns fasta reference resource group
     """
     return b.read_input_group(**ref_data.REF_D)
+
+
+class Cram:
+    """
+    Represents a CRAM or a BAM file with a correponding index,
+    and a corresponding fingerprint path.
+    """
+    def __init__(self, path: Path|str, index_path: Path|None = None):
+        self.path = Path(path)
+        self.is_bam = self.path.suffix == '.bam'
+        self.ext = 'cram' if not self.is_bam else 'bam'
+        self.index_ext = 'crai' if not self.is_bam else 'bai'
+        self._index_path = index_path
+        self.somalier_path = Path(self.path.stem + '.somalier')
+
+    @property
+    def index_path(self) -> Path:
+        """
+        Path to the corresponding index
+        """
+        return self._index_path or Path(f'{self.path}.{self.index_ext}')
+
+    def __repr__(self) -> str:
+        name = 'CRAM' if not self.is_bam else 'BAM'
+        return f'{name}({self.path})'
+    
+    def resource_group(self, b: hb.Batch) -> ResourceGroup:
+        """
+        Create a Hail Batch resource group
+        """
+        return b.read_input_group(**{
+            self.ext: self.path,
+            f'{self.ext}.{self.index_ext}': self.index_path,
+        })
+
+
+class Gvcf:
+    """
+    Represents a GVCF file with a corresponding index, and a corresponding 
+    fingerprint path.
+    """
+    def __init__(self, path: Path|str):
+        self.path = Path(path)
+        self.somalier_path = Path(self.path.stem + '.somalier')
+
+    @property
+    def tbi_path(self) -> Path:
+        """
+        Path to the corresponding index
+        """
+        return Path(f'{self.path}.tbi')
+
+    def __repr__(self) -> str:
+        return f'GVCF({self.path})'
+    
+    def resource_group(self, b: hb.Batch) -> ResourceGroup:
+        """
+        Create a Hail Batch resource group
+        """
+        return b.read_input_group(**{
+            'g.vcf.gz': self.path,
+            'g.vcf.gz.tbi': self.tbi_path,
+        })
 
 
 @dataclass

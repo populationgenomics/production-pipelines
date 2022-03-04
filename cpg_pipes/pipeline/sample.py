@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, Optional
 
-from cpg_pipes.hb.inputs import AlignmentInput
+from cpg_pipes.filetypes import Cram, Gvcf, AlignmentInput
 from cpg_pipes.pipeline.target import Target
 from cpg_pipes.smdb.types import SmSequence
 
@@ -24,17 +24,17 @@ class Sample(Target):
         self, 
         id: str,  # pylint: disable=redefined-builtin
         external_id: str,
-        project: 'Project',  # type: ignore  # noqa: F821
-        participant_id: str | None = None,
-        meta: dict | None = None
+        dataset: 'Dataset',  # type: ignore  # noqa: F821
+        participant_id: str|None = None,
+        meta: dict|None = None
     ):
         super().__init__()
         self.id = id
         self.external_id = external_id
-        self.project = project
+        self.dataset = dataset
         self._participant_id = participant_id
         self.meta: dict = meta or dict()
-        self.alignment_input: Optional[AlignmentInput] = None
+        self.alignment_input: AlignmentInput|None = None
         self.seq: Optional[SmSequence] = None
         self.pedigree: Optional['PedigreeInfo'] = None
 
@@ -43,13 +43,15 @@ class Sample(Target):
             f'Sample({self.id}|{self.external_id}' +
             (f'participant_id={self._participant_id}, ' 
              if self._participant_id else '') +
-            f', project={self.project.name}'
-            f', forced={self.forced}'
-            f', active={self.active}'
-            f', alignment_input={self.alignment_input}'
-            f', meta={self.meta}'
-            f', seq={self.seq}'
-            f', pedigree={self.pedigree}'
+            f', dataset={self.dataset.name}' +
+            f', forced={self.forced}' +
+            f', active={self.active}' +
+            (f', cram={self.cram}' if self.cram else '') +
+            (f', gvcf={self.gvcf}' if self.gvcf else '') +
+            f', alignment_input={self.alignment_input}' +
+            f', meta={self.meta}' +
+            f', seq={self.seq}' +
+            f', pedigree={self.pedigree}' +
             f')'
         )
 
@@ -80,6 +82,20 @@ class Sample(Target):
             'Sex': '0',
             'Phenotype': '0',
         }
+
+    @property
+    def cram(self) -> Cram:
+        """
+        Path to corresponding CRAM file. Not checking its existence here.
+        """
+        return Cram(f'{self.dataset.get_bucket()}/cram/{self.id}.cram')
+
+    @property
+    def gvcf(self) -> Gvcf:
+        """
+        Path to corresponding GVCF file. Not checking its existence here.
+        """
+        return Gvcf(f'{self.dataset.get_bucket()}/gvcf/{self.id}.g.vcf.gz')
 
 
 class Sex(Enum):

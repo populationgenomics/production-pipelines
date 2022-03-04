@@ -1,7 +1,7 @@
 import os
 
 
-PROJECT = 'fewgenomes'
+DATASET = 'fewgenomes'
 BASE_BUCKET = 'gs://cpg-fewgenomes-test/unittest'
 
 # Samples for joint calling
@@ -21,8 +21,8 @@ SUBSET_GVCF_BY_SID = {
 
 
 def setup_env(
-    dataset: str = PROJECT,
-    dataset_gcp_project: str = PROJECT,
+    dataset: str = DATASET,
+    dataset_gcp_project: str = DATASET,
     access_level: str = 'test',
 ):
     """

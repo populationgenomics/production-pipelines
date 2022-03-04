@@ -4,8 +4,8 @@ by resolving dependencies through the sample-metadata database, or by checking
 objects on buckets directly. 
 
 Each stage adds jobs to Hail Batch. Each stage acts on "target", which can be a 
-sample, a project, or an entire cohort. Pipeline would resolve dependencies between
-stages of different levels accordingly.
+sample, a dataset, or an entire cohort (= all input datasets combined). Pipeline 
+would resolve dependencies between stages of different levels accordingly.
 
 Basic example:
 
@@ -172,12 +172,12 @@ def run_pipeline(dry_run: bool = False, **kwargs) -> 'Pipeline':
 
 class Pipeline:
     """
-    Represents a Pipeline, and incapulates a Hail Batch object,
-    stages, and a cohort of projects with samples.
+    Represents a Pipeline, and incapulates a Hail Batch object, stages, 
+    and a cohort of datasets of samples.
     """
     def __init__(
         self,
-        analysis_project: str,
+        analysis_dataset: str,
         name: str,
         description: str,
         output_version: str,
@@ -196,7 +196,7 @@ class Pipeline:
         first_stage: Optional[str] = None,
         last_stage: Optional[str] = None,
         config: Optional[Dict] = None,
-        input_projects: Optional[List[str]] = None,
+        input_datasets: Optional[List[str]] = None,
         source_tag: Optional[str] = None,
         skip_samples: Optional[List[str]] = None,
         only_samples: Optional[List[str]] = None,
@@ -204,18 +204,18 @@ class Pipeline:
         ped_files: Optional[List[str]] = None,
         local_dir: Optional[str] = None,
     ):
-        if stages_in_order and not input_projects:
+        if stages_in_order and not input_datasets:
             raise ValueError(
-                'Projects must be populated before adding stages. '
-                'Provide `input_projects`, or omit `stages_in_order` and call '
+                'Datasets must be populated before adding stages. '
+                'Provide `input_datasets`, or omit `stages_in_order` and call '
                 'pipeline.set_stages(stages_in_order) later.'
             )
 
         super().__init__()
         if isinstance(namespace, str):
             namespace = Namespace(namespace)
-        self.analysis_project = Dataset(
-            name=analysis_project,
+        self.analysis_dataset = Dataset(
+            name=analysis_dataset,
             namespace=namespace,
             pipeline=self,
         )
@@ -249,7 +249,7 @@ class Pipeline:
             self.proj_output_suf = 'main'
         
         path_ptrn = (
-            f'gs://cpg-{self.analysis_project.stack}-{{suffix}}/'
+            f'gs://cpg-{self.analysis_dataset.stack}-{{suffix}}/'
             f'{self.name}/'
             f'{self.output_version}'
         )
@@ -258,7 +258,7 @@ class Pipeline:
         self.web_bucket = path_ptrn.format(suffix=web_suf)
         self.web_url = (
             f'https://{self.namespace.value}-web.populationgenomics.org.au/'
-            f'{self.analysis_project.stack}/'
+            f'{self.analysis_dataset.stack}/'
             f'{self.name}/'
             f'{self.output_version}'
         )
@@ -287,20 +287,20 @@ class Pipeline:
             title=description, 
             tmp_bucket=self.tmp_bucket,
             keep_scratch=self.keep_scratch,
-            billing_project=self.analysis_project.stack,
+            billing_project=self.analysis_dataset.stack,
         )
 
         self.cohort = Cohort(self.name, pipeline=self)
         self._db = None
-        if input_projects:
+        if input_datasets:
             self._db = SMDB(
-                self.analysis_project.name,
+                self.analysis_dataset.name,
                 do_update_analyses=update_smdb_analyses,
                 do_check_seq_existence=check_smdb_seq,
             )
             self.cohort.populate(
                 smdb=self._db,
-                input_projects=input_projects,
+                input_datasets=input_datasets,
                 local_tmp_dir=self.local_dir,
                 source_tag=source_tag,
                 skip_samples=skip_samples,
@@ -476,17 +476,17 @@ class Pipeline:
         """
         return self._db
 
-    def get_projects(self, only_active: bool = True) -> List[Dataset]:
+    def get_datasets(self, only_active: bool = True) -> List[Dataset]:
         """
         Thin wrapper around corresponding Cohort method.
         """
-        return self.cohort.get_projects(only_active=only_active)
+        return self.cohort.get_datasets(only_active=only_active)
 
-    def add_project(self, name: str) -> Dataset:
+    def add_dataset(self, name: str) -> Dataset:
         """
         Thin wrapper around corresponding Cohort method.
         """
-        return self.cohort.add_project(name)
+        return self.cohort.add_dataset(name)
 
     def get_all_samples(self, only_active: bool = True) -> List[Sample]:
         """

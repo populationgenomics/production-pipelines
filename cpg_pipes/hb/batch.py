@@ -40,12 +40,12 @@ class Batch(hb.Batch):
             logger.critical('Error: job name must be defined')
         
         attributes = attributes or dict()
-        project = attributes.get('project')
+        dataset = attributes.get('dataset')
         sample = attributes.get('sample')
         samples = attributes.get('samples')
         label = attributes.get('label', name)
 
-        name = job_name(name, sample, project)
+        name = job_name(name, sample, dataset)
 
         if label and (sample or samples):
             if label not in self.labelled_jobs:
@@ -71,7 +71,7 @@ def setup_batch(
     Handles setting the temporary bucket and the billing project.
 
     :param title: descriptive name of the Batch (will be displayed in the GUI)
-    :param billing_project: billing project name
+    :param billing_project: Hail billing project name
     :param tmp_bucket: path to temporary bucket. Will be used if neither 
         the hail_bucket parameter nor HAIL_BUCKET env var are set.
     :param keep_scratch: whether scratch will be kept after the batch is finished
@@ -128,12 +128,12 @@ def get_hail_bucket(
     return hail_bucket
 
 
-def job_name(name, sample: str = None, project: str = None) -> str:
+def job_name(name, sample: str = None, dataset: str = None) -> str:
     """
-    Extend the descriptive job name to reflect the project and the sample names
+    Extend the descriptive job name to reflect the dataset and the sample names
     """
-    if sample and project:
-        name = f'{project}/{sample}: {name}'
-    elif project:
-        name = f'{project}: {name}'
+    if sample and dataset:
+        name = f'{dataset}/{sample}: {name}'
+    elif dataset:
+        name = f'{dataset}: {name}'
     return name

@@ -328,7 +328,7 @@ def compute_variant_annotated_vcf(
             
     We apply only SeqrVariantSchema here (specifically, a modified 
     version CPGSeqrVariantSchema). SeqrGenotypesSchema is applied separately
-    on the project level.
+    on the dataset level.
     """
     annotation_schema = CPGSeqrVariantSchema(
         mt, 

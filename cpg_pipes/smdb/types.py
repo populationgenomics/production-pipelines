@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Optional, Set, Dict
 
 from cpg_pipes import buckets
-from cpg_pipes.hb.inputs import AlignmentInput
+from cpg_pipes.filetypes import AlignmentInput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')

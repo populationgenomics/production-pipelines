@@ -13,7 +13,7 @@ import click
 from cpg_pipes import buckets
 from cpg_pipes.jobs import pedigree
 from cpg_pipes.pipeline.dataset import Dataset
-from cpg_pipes.pipeline.stage import ProjectStage, StageInput, StageOutput
+from cpg_pipes.pipeline.stage import DatasetStage, StageInput, StageOutput
 from cpg_pipes.pipeline.pipeline import stage, Pipeline
 from cpg_pipes.pipeline.cli_opts import pipeline_click_options
 
@@ -23,20 +23,20 @@ logger.setLevel(logging.INFO)
 
 
 @stage
-class CramPedCheckStage(ProjectStage):
-    def expected_result(self, project: Dataset):
+class CramPedCheckStage(DatasetStage):
+    def expected_result(self, dataset: Dataset):
         pass
 
-    def queue_jobs(self, project: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         path_by_sid = dict()
-        for s in project.get_samples():
-            path = f'gs://cpg-{project.name}-main/cram/{s.id}.somalier'
+        for s in dataset.get_samples():
+            path = f'gs://cpg-{dataset.name}-main/cram/{s.id}.somalier'
             if buckets.file_exists(path):
                 path_by_sid[s.id] = path
 
         j, somalier_samples_path, somalier_pairs_path = pedigree.add_pedigree_jobs(
             self.pipe.b,
-            project,
+            dataset,
             input_path_by_sid=path_by_sid,
             overwrite=not self.pipe.check_intermediates,
             fingerprints_bucket=join(self.pipe.analysis_bucket, 'fingerprints'),
@@ -48,24 +48,24 @@ class CramPedCheckStage(ProjectStage):
             ignore_missing=self.pipe.skip_missing_input,
             dry_run=self.pipe.dry_run,
         )
-        return self.make_outputs(project, data=somalier_samples_path, jobs=[j])
+        return self.make_outputs(dataset, data=somalier_samples_path, jobs=[j])
 
 
 @stage
-class GvcfPedCheckStage(ProjectStage):
-    def expected_result(self, project: Dataset):
+class GvcfPedCheckStage(DatasetStage):
+    def expected_result(self, dataset: Dataset):
         pass
 
-    def queue_jobs(self, project: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         path_by_sid = dict()
-        for s in project.get_samples():
-            path = f'gs://cpg-{project.name}-main/gvcf/{s.id}.somalier'
+        for s in dataset.get_samples():
+            path = f'gs://cpg-{dataset.name}-main/gvcf/{s.id}.somalier'
             if buckets.file_exists(path):
                 path_by_sid[s.id] = path
 
         j, somalier_samples_path, somalier_pairs_path = pedigree.add_pedigree_jobs(
             self.pipe.b,
-            project,
+            dataset,
             input_path_by_sid=path_by_sid,
             overwrite=not self.pipe.check_intermediates,
             fingerprints_bucket=join(self.pipe.analysis_bucket, 'fingerprints'),
@@ -76,24 +76,24 @@ class GvcfPedCheckStage(ProjectStage):
             ignore_missing=self.pipe.skip_missing_input,
             dry_run=self.pipe.dry_run,
         )
-        return self.make_outputs(project, data=somalier_samples_path, jobs=[j])
+        return self.make_outputs(dataset, data=somalier_samples_path, jobs=[j])
 
 
 @click.command()
 @pipeline_click_options
 def main(
-    input_projects: List[str],
+    input_datasets: List[str],
     output_version: str,
     **kwargs,
 ):  # pylint: disable=missing-function-docstring
-    assert input_projects
+    assert input_datasets
 
-    title = f'Pedigree checks for {", ".join(input_projects)}'
+    title = f'Pedigree checks for {", ".join(input_datasets)}'
 
     Pipeline(
         name='pedigree_check',
         description=title,
-        input_projects=input_projects,
+        input_datasets=input_datasets,
         output_version=output_version,
         stages_in_order=[
             CramPedCheckStage,

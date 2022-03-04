@@ -161,8 +161,8 @@ from cpg_pipes.namespace import Namespace
 
 smdb = SMDB(analysis_project='seqr')
 
-samples_by_project = smdb.get_samples_by_project(
-    project_names=['acute-care', 'perth-neuro'],
+samples_by_project = smdb.get_samples_by_dataset(
+    dataset_names=['acute-care', 'perth-neuro'],
     namespace=Namespace.TEST,
 )
 ```
@@ -179,7 +179,7 @@ analysis_id = smdb.create_analysis(
     output='gs://cpg-acute-care-test/cram/CPG12345.cram',
     status='completed',
     sample_ids=['CPG12345'],
-    project_name='acute-care',
+    dataset_name='acute-care',
 )
 ```
 

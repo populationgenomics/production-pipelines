@@ -499,15 +499,15 @@ class Stage(Generic[TargetT], ABC):
         analysis = target.analysis_by_type.get(self.analysis_type)
 
         if validate:
-            project_name = None
+            ds_name = None
             if isinstance(target, Sample):
                 sample = cast(Sample, target)
                 sample_ids = [sample.id]
-                project_name = sample.project.name
+                ds_name = sample.dataset.name
             elif isinstance(target, Dataset):
-                project = cast(Dataset, target)
-                sample_ids = [s.id for s in project.get_samples()]
-                project_name = project.name
+                ds = cast(Dataset, target)
+                sample_ids = [s.id for s in ds.get_samples()]
+                ds_name = ds.name
             else:
                 cohort = cast(Cohort, target)
                 sample_ids = cohort.get_all_sample_ids()
@@ -517,7 +517,7 @@ class Stage(Generic[TargetT], ABC):
                 completed_analysis=analysis,
                 analysis_type=self.analysis_type.value,
                 expected_output_fpath=expected_path,
-                project_name=project_name,
+                dataset_name=ds_name,
             )
         elif analysis:
             found_path = analysis.output
@@ -536,7 +536,7 @@ class Stage(Generic[TargetT], ABC):
         attributes = {}
         if isinstance(target, Sample):
             attributes['sample'] = target.id
-            attributes['project'] = target.project.name
+            attributes['dataset'] = target.dataset.name
         if isinstance(target, Dataset):
             attributes['sample'] = target.name
         return self.make_outputs(
@@ -568,14 +568,14 @@ class SampleStage(Stage[Sample], ABC):
 
     def add_to_the_pipeline(self, pipeline) -> Dict[str, StageOutput]:
         output_by_target = dict()
-        projects = pipeline.cohort.get_projects()
-        if not projects:
-            raise ValueError('No active projects are found to run')
-        for project_i, project in enumerate(projects):
-            logger.info(f'{self.name}: #{project_i}/{project.name} {project}')
-            if not project.get_samples():
-                raise ValueError(f'No active samples are found to run in the project {project.name}')
-            for sample_i, sample in enumerate(project.get_samples()):
+        datasets = pipeline.cohort.get_datasets()
+        if not datasets:
+            raise ValueError('No active datasets are found to run')
+        for ds_i, ds in enumerate(datasets):
+            logger.info(f'{self.name}: #{ds_i}/{ds.name} {ds}')
+            if not ds.get_samples():
+                raise ValueError(f'No active samples are found to run in the dataset {ds.name}')
+            for sample_i, sample in enumerate(ds.get_samples()):
                 logger.info(f'{self.name}: #{sample_i}/{sample}')
                 sample_result = self._queue_jobs_with_checks(sample)
                 output_by_target[sample.unique_id] = sample_result
@@ -606,16 +606,16 @@ class PairStage(Stage, ABC):
 
     def add_to_the_pipeline(self, pipeline) -> Dict[str, StageOutput]:
         output_by_target = dict()
-        projects = pipeline.cohort.get_projects()
-        if projects:
-            raise ValueError('No active projects are found to run')
-        for project in projects:
-            if not project.get_samples():
+        datasets = pipeline.cohort.get_datasets()
+        if datasets:
+            raise ValueError('No active datasets are found to run')
+        for ds in datasets:
+            if not ds.get_samples():
                 raise ValueError(
-                    f'No active samples are found to run in the project {project.name}'
+                    f'No active samples are found to run in the dataset {ds.name}'
                 )
-            for s1 in project.get_samples():
-                for s2 in project.get_samples():
+            for s1 in ds.get_samples():
+                for s2 in ds.get_samples():
                     if s1 == s2:
                         continue
                     pair = Pair(s1, s2)
@@ -624,14 +624,14 @@ class PairStage(Stage, ABC):
         return output_by_target
 
 
-class ProjectStage(Stage, ABC):
+class DatasetStage(Stage, ABC):
     """
-    Project-level stage
+    Dataset-level stage
     """
     @abstractmethod
     def expected_result(
         self, 
-        project: 'Dataset'
+        dataset: 'Dataset'
     ) -> Optional[Union[str, Dict[str, str]]]:
         """
         Path(s) to files that the stage is epxected to generate for the `target`.
@@ -641,18 +641,18 @@ class ProjectStage(Stage, ABC):
         """
 
     @abstractmethod
-    def queue_jobs(self, project: 'Dataset', inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: 'Dataset', inputs: StageInput) -> StageOutput:
         pass
 
     def add_to_the_pipeline(self, pipeline) -> Dict[str, StageOutput]:
         output_by_target = dict()
-        projects = pipeline.cohort.get_projects()
-        if not projects:
-            raise ValueError('No active projects are found to run')
-        for project_i, project in enumerate(projects):
-            logger.info(f'{self.name}: #{project_i}/{project.name} {project}')
-            output_by_target[project.unique_id] = \
-                self._queue_jobs_with_checks(project)
+        datasets = pipeline.cohort.get_datasets()
+        if not datasets:
+            raise ValueError('No active datasets are found to run')
+        for ds_i, ds in enumerate(datasets):
+            logger.info(f'{self.name}: #{ds_i}/{ds.name} {ds}')
+            output_by_target[ds.unique_id] = \
+                self._queue_jobs_with_checks(ds)
             logger.info('-#-#-#-')
         return output_by_target
 

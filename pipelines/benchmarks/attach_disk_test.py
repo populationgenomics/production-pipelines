@@ -8,7 +8,7 @@ from cpg_pipes.pipeline.pipeline import Pipeline
 
 def main():  # pylint: disable=missing-function-docstring
     pipeline = Pipeline(
-        analysis_project='fewgenomes',
+        analysis_dataset='fewgenomes',
         name='test_attach_disk',
         description='test_attach_disk',
         output_version='v0',

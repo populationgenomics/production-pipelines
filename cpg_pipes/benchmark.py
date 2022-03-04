@@ -1,4 +1,4 @@
-from cpg_pipes.hb.inputs import AlignmentInput
+from cpg_pipes.filetypes import AlignmentInput
 
 
 BENCHMARK_BUCKET = 'gs://cpg-fewgenomes-test/benchmark'

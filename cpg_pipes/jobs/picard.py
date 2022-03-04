@@ -9,7 +9,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import images, buckets
-from cpg_pipes.hb import inputs
+from cpg_pipes.filetypes import fasta_group
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 
@@ -18,14 +18,14 @@ def markdup(
     b: hb.Batch,
     sorted_bam: hb.ResourceFile,
     sample_name: str,
-    project_name: Optional[str] = None,
+    dataset_name: Optional[str] = None,
     output_path: Optional[str] = None,
     overwrite: bool = True,
 ) -> Job:
     """
     Make job that runs Picard MarkDuplicates and converts the result to CRAM.
     """
-    j = b.new_job('MarkDuplicates', dict(sample=sample_name, project=project_name))
+    j = b.new_job('MarkDuplicates', dict(sample=sample_name, dataset=dataset_name))
     if buckets.can_reuse(output_path, overwrite):
         j.name += ' [reuse]'
         return j
@@ -38,7 +38,7 @@ def markdup(
             'cram.crai': '{root}.cram.crai',
         }
     )
-    fasta_reference = inputs.fasta_group(b)
+    fasta_reference = fasta_group(b)
 
     cmd = f"""
     picard MarkDuplicates -Xms13G \\

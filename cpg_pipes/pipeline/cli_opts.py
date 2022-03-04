@@ -28,19 +28,19 @@ def pipeline_click_options(function: Callable) -> Callable:
             help='The bucket namespace to write the results to',
         ),
         click.option(
-            '--analysis-project',
-            'analysis_project',
+            '--analysis-dataset',
+            'analysis_dataset',
             default='seqr',
-            help='SM project name to write the intermediate/joint-calling analysis '
-                 'entries',
+            help='Dataset name to write the intermediate/joint-calling analysis '
+                 'entries in the sample metadata database',
         ),
         click.option(
-            '--input-project',
-            'input_projects',
+            '--input-dataset',
+            'datasets',
             multiple=True,
             required=True,
-            help='Only read samples that belong to the project(s). Can be set multiple '
-                 'times.',
+            help='Only read samples that belong to the dataset(s). '
+                 'Can be set multiple times.',
         ),
         click.option(
             '--source-tag',

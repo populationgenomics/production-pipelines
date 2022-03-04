@@ -23,7 +23,7 @@ RESULT_VCF = join(ref_data.REF_BUCKET, 'somalier/v0/sites.hg38.vcf.gz')
 
 
 pipe = Pipeline(
-    analysis_project='fewgenomes',
+    analysis_dataset='fewgenomes',
     name='find-somalier-sites',
     output_version='v0',
     namespace='main',

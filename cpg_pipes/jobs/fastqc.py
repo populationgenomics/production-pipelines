@@ -5,7 +5,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.hb.inputs import AlignmentInput
+from cpg_pipes.filetypes import AlignmentInput
 from cpg_pipes.jobs import align
 
 
@@ -13,14 +13,14 @@ def fastqc(
     b: hb.Batch, 
     results_bucket: str,
     sample_name: str, 
-    project_name: Optional[str], 
+    dataset_name: Optional[str], 
     alignment_input: AlignmentInput,
 ) -> List[Job]:
     """
     Adds FastQC jobs. If the input is a set of fqs, runs FastQC on each fq file.
     """
     def _fastqc_one(name, inp):
-        j = b.new_job(name, dict(sample=sample_name, project=project_name))
+        j = b.new_job(name, dict(sample=sample_name, dataset=dataset_name))
         j.image('biocontainers/fastqc:v0.11.9_cv8')
         j.cpu(32)
         j.storage('150G')
@@ -49,7 +49,7 @@ def fastqc(
             b=b,
             cram=alignment_input.as_cram_input_group(b),
             sample_name=sample_name,
-            project_name=project_name,
+            dataset_name=dataset_name,
         )
         fqs1 = [extract_j.fq1]
         fqs2 = [extract_j.fq2]

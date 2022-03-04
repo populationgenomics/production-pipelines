@@ -13,14 +13,14 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-PROJECT = 'fewgenomes'
+DATASET = 'fewgenomes'
 NAMESPACE = 'main'
 
 
 @click.command()
 def main():
     pipe = Pipeline(
-        analysis_project='fewgenomes',
+        analysis_dataset='fewgenomes',
         name='benchmark_dragen',
         output_version='v0',
         namespace=NAMESPACE,
@@ -37,14 +37,14 @@ def main():
             alignment_input=inp,
             output_path=cram_path,
             sample_name=sample_name,
-            project_name='benchmark',
+            dataset_name='benchmark',
             aligner=Aligner.DRAGMAP,
         )
         produce_gvcf(
             pipe.b,
             output_path=f'{benchmark.BENCHMARK_BUCKET}/outputs/{sample_name}.g.vcf.gz',
             sample_name=sample_name,
-            project_name='benchmark',
+            dataset_name='benchmark',
             cram_path=cram_path,
             number_of_intervals=10,
             tmp_bucket=join(benchmark.BENCHMARK_BUCKET, 'tmp'),
