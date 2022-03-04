@@ -9,7 +9,7 @@ import logging
 from cpg_pipes import buckets
 from cpg_pipes.hb.inputs import AlignmentInput
 from cpg_pipes.pipeline.sample import Sample, PedigreeInfo, Sex
-from cpg_pipes.pipeline.project import Project
+from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes.pipeline.target import Target
 from cpg_pipes.smdb.smdb import SMDB
 from cpg_pipes.smdb.types import AnalysisType
@@ -27,7 +27,7 @@ class Cohort(Target):
         super().__init__()
         self.name = name
         self.pipeline = pipeline
-        self._projects: List[Project] = []
+        self._projects: List[Dataset] = []
 
     def __repr__(self):
         return self.name
@@ -40,7 +40,7 @@ class Cohort(Target):
         """
         return self.name
 
-    def get_projects(self, only_active: bool = True) -> List[Project]:
+    def get_projects(self, only_active: bool = True) -> List[Dataset]:
         """
         Gets list of all projects. 
         Include only "active" projects (unless only_active is False)
@@ -63,7 +63,7 @@ class Cohort(Target):
         """
         return [s.id for s in self.get_all_samples(only_active=only_active)]
 
-    def add_project(self, name: str) -> Project:
+    def add_project(self, name: str) -> Dataset:
         """
         Create a project and add to the cohort.
         """
@@ -71,7 +71,7 @@ class Cohort(Target):
         if name in project_by_name:
             logger.warning(f'Project {name} already exists')
             return project_by_name[name]
-        p = Project(pipeline=self.pipeline, name=name)
+        p = Dataset(pipeline=self.pipeline, name=name)
         self._projects.append(p)
         return p
 

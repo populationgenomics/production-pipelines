@@ -55,7 +55,7 @@ from cpg_pipes.hb.batch import setup_batch, Batch
 from cpg_pipes.hb.prev_job import PrevJob
 from cpg_pipes.namespace import Namespace
 from cpg_pipes.pipeline.cohort import Cohort
-from cpg_pipes.pipeline.project import Project
+from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes.pipeline.sample import Sample
 from cpg_pipes.pipeline.stage import Stage
 from cpg_pipes.smdb.types import AnalysisType
@@ -214,7 +214,7 @@ class Pipeline:
         super().__init__()
         if isinstance(namespace, str):
             namespace = Namespace(namespace)
-        self.analysis_project = Project(
+        self.analysis_project = Dataset(
             name=analysis_project,
             namespace=namespace,
             pipeline=self,
@@ -476,13 +476,13 @@ class Pipeline:
         """
         return self._db
 
-    def get_projects(self, only_active: bool = True) -> List[Project]:
+    def get_projects(self, only_active: bool = True) -> List[Dataset]:
         """
         Thin wrapper around corresponding Cohort method.
         """
         return self.cohort.get_projects(only_active=only_active)
 
-    def add_project(self, name: str) -> Project:
+    def add_project(self, name: str) -> Dataset:
         """
         Thin wrapper around corresponding Cohort method.
         """

@@ -28,7 +28,7 @@ from cpg_pipes.pipeline.pipeline import stage, Pipeline, PipelineError
 from cpg_pipes.pipeline.stage import SampleStage, CohortStage, ProjectStage, \
     StageInput, StageOutput
 from cpg_pipes.pipeline.sample import Sample
-from cpg_pipes.pipeline.project import Project
+from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes.pipeline.cohort import Cohort
 
 logger = logging.getLogger(__file__)
@@ -119,12 +119,12 @@ class CramPedCheckStage(ProjectStage):
     """
     Checks pedigree from CRAM fingerprints
     """
-    def expected_result(self, project: Project):
+    def expected_result(self, project: Dataset):
         """
         We don't expect any output - just rerun it every time
         """
 
-    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, project: Dataset, inputs: StageInput) -> StageOutput:
         """
         Checks calls job from the pedigree module
         """
@@ -227,12 +227,12 @@ class GvcfPedCheckStage(ProjectStage):
     """
     Check pedigree from GVCFs
     """
-    def expected_result(self, project: Project):
+    def expected_result(self, project: Dataset):
         """
         We don't expect any output - just rerun it every time
         """
 
-    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, project: Dataset, inputs: StageInput) -> StageOutput:
         """
         Use function from pedigree module
         """
@@ -412,13 +412,13 @@ class AnnotateProjectStage(ProjectStage):
     Split mt by project and annotate project-specific fields (only for those projects
     that will be loaded into Seqr)
     """
-    def expected_result(self, project: Project):
+    def expected_result(self, project: Dataset):
         """
         Expected to generate a matrix table
         """
         return f'{self.pipe.analysis_bucket}/mt/{project.name}.mt'
 
-    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, project: Dataset, inputs: StageInput) -> StageOutput:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
@@ -464,13 +464,13 @@ class LoadToEsStage(ProjectStage):
     """
     Create a Seqr index for requested "output_projects"
     """
-    def expected_result(self, project: Project):
+    def expected_result(self, project: Dataset):
         """
         Expected to generate a Seqr index, which is not a file
         """
         return None
 
-    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, project: Dataset, inputs: StageInput) -> StageOutput:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
@@ -507,7 +507,7 @@ class ToVcfStage(ProjectStage):
     """
     Convers the annotated matrix table to a pVCF
     """
-    def expected_result(self, project: Project):
+    def expected_result(self, project: Dataset):
         """
         Generates an indexed VCF
         """
@@ -516,7 +516,7 @@ class ToVcfStage(ProjectStage):
             'tbi': f'{self.pipe.analysis_bucket}/mt/{project.name}.vcf.bgz.tbi',
         }
 
-    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, project: Dataset, inputs: StageInput) -> StageOutput:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """

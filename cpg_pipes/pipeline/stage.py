@@ -11,7 +11,7 @@ from typing import (
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes.pipeline.project import Project
+from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes import buckets
 from cpg_pipes.smdb.types import AnalysisType
 from cpg_pipes.pipeline.cohort import Cohort
@@ -504,8 +504,8 @@ class Stage(Generic[TargetT], ABC):
                 sample = cast(Sample, target)
                 sample_ids = [sample.id]
                 project_name = sample.project.name
-            elif isinstance(target, Project):
-                project = cast(Project, target)
+            elif isinstance(target, Dataset):
+                project = cast(Dataset, target)
                 sample_ids = [s.id for s in project.get_samples()]
                 project_name = project.name
             else:
@@ -537,7 +537,7 @@ class Stage(Generic[TargetT], ABC):
         if isinstance(target, Sample):
             attributes['sample'] = target.id
             attributes['project'] = target.project.name
-        if isinstance(target, Project):
+        if isinstance(target, Dataset):
             attributes['sample'] = target.name
         return self.make_outputs(
             target=target,
@@ -631,7 +631,7 @@ class ProjectStage(Stage, ABC):
     @abstractmethod
     def expected_result(
         self, 
-        project: 'Project'
+        project: 'Dataset'
     ) -> Optional[Union[str, Dict[str, str]]]:
         """
         Path(s) to files that the stage is epxected to generate for the `target`.
@@ -641,7 +641,7 @@ class ProjectStage(Stage, ABC):
         """
 
     @abstractmethod
-    def queue_jobs(self, project: 'Project', inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, project: 'Dataset', inputs: StageInput) -> StageOutput:
         pass
 
     def add_to_the_pipeline(self, pipeline) -> Dict[str, StageOutput]:

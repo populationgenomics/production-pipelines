@@ -13,7 +13,7 @@ import pandas as pd
 from cpg_pipes import buckets, images, ref_data, utils
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.pipeline.project import Project
+from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes.pipeline.sample import Sample
 
 logger = logging.getLogger(__file__)
@@ -23,7 +23,7 @@ logger.setLevel(logging.INFO)
 
 def add_pedigree_jobs(
     b,
-    project: Project,
+    project: Dataset,
     input_path_by_sid: Dict[str, str],
     overwrite: bool,
     fingerprints_bucket: str,

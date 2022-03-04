@@ -12,7 +12,7 @@ import click
 
 from cpg_pipes import buckets
 from cpg_pipes.jobs import pedigree
-from cpg_pipes.pipeline.project import Project
+from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes.pipeline.stage import ProjectStage, StageInput, StageOutput
 from cpg_pipes.pipeline.pipeline import stage, Pipeline
 from cpg_pipes.pipeline.cli_opts import pipeline_click_options
@@ -24,10 +24,10 @@ logger.setLevel(logging.INFO)
 
 @stage
 class CramPedCheckStage(ProjectStage):
-    def expected_result(self, project: Project):
+    def expected_result(self, project: Dataset):
         pass
 
-    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, project: Dataset, inputs: StageInput) -> StageOutput:
         path_by_sid = dict()
         for s in project.get_samples():
             path = f'gs://cpg-{project.name}-main/cram/{s.id}.somalier'
@@ -53,10 +53,10 @@ class CramPedCheckStage(ProjectStage):
 
 @stage
 class GvcfPedCheckStage(ProjectStage):
-    def expected_result(self, project: Project):
+    def expected_result(self, project: Dataset):
         pass
 
-    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, project: Dataset, inputs: StageInput) -> StageOutput:
         path_by_sid = dict()
         for s in project.get_samples():
             path = f'gs://cpg-{project.name}-main/gvcf/{s.id}.somalier'

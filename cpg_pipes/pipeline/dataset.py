@@ -13,7 +13,7 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-class Project(Target):
+class Dataset(Target):
     """
     Represents a CPG stack (aka dataset), or a project from sample-metadata database.
     """
