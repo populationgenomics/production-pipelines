@@ -6,8 +6,9 @@ from typing import List, Optional
 import logging
 
 from cpg_pipes.namespace import Namespace
+from cpg_pipes.pipeline.sequence import SmSequence
 from cpg_pipes.pipeline.target import Target
-from cpg_pipes.pipeline.sample import Sample
+from cpg_pipes.pipeline.sample import Sample, PedigreeInfo
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -94,7 +95,9 @@ class Dataset(Target):
         self, 
         id: str,  # pylint: disable=redefined-builtin
         external_id: str, 
-        participant_id: Optional[str] = None,
+        participant_id: str|None = None,
+        seq: SmSequence|None = None,
+        pedigree: PedigreeInfo|None = None,
         **kwargs
     ) -> Sample:
         """
@@ -104,14 +107,23 @@ class Dataset(Target):
             id=id, 
             external_id=external_id,
             participant_id=participant_id,
+            seq=seq,
+            pedigree=pedigree,
             dataset=self,
             meta=kwargs,
         )
         self._samples.append(s)
         return s
     
-    def get_samples(self, only_active: bool = True) -> List[Sample]:
+    def get_samples(self, only_active: bool = True) -> list[Sample]:
         """
-        Get dataset's samples. Inlcude only "active" samples, unless only_active
+        Get dataset's samples. Inlcude only "active" samples, unless only_active=False
         """
         return [s for s in self._samples if (s.active or not only_active)]
+
+    def get_sample_ids(self, only_active: bool = True) -> list[str]:
+        """
+        Get dataset's sample IDs. Inlcude only "active" samples, 
+        unless only_active=False.
+        """
+        return [s.id for s in self.get_samples(only_active=only_active)]

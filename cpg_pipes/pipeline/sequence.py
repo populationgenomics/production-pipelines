@@ -1,108 +1,65 @@
 """
-Sample-metadata DB types. 
-
-Re-defined in a separate module to decouple from the main smdb module, so 
-decorators can use `@stage(analysis_type=AnalysisType.QC)`
+Sample-metadata DB Sequence entry.
 """
+
 import logging
-from dataclasses import dataclass
-from enum import Enum
-from typing import Optional, Set, Dict
 
 from cpg_pipes import buckets
-from cpg_pipes.filetypes import AlignmentInput
+from cpg_pipes.alignment_input import AlignmentInput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-class AnalysisType(Enum):
-    """
-    Corresponds to SMDB Analysis types:
-https://github.com/populationgenomics/sample-metadata/blob/dev/models/enums/analysis.py#L4-L11
-    """
-    QC = 'qc'
-    JOINT_CALLING = 'joint-calling'
-    GVCF = 'gvcf'
-    CRAM = 'cram'
-    CUSTOM = 'custom'
-
-
-@dataclass
-class Analysis:
-    """
-    Sample-metadata DB "Analysis" entry.
-
-    See sample-metadata for more details: https://github.com/populationgenomics/sample-metadata
-    """
-    id: int
-    type: str
-    status: str
-    sample_ids: Set[str]
-    output: Optional[str]
-
-    @staticmethod
-    def parse(data: Dict) -> 'Analysis':
-        req_keys = ['id', 'type', 'status']
-        if any(k not in data for k in req_keys):
-            for key in req_keys:
-                if key not in data:
-                    logger.error(f'"Analysis" data does not have {key}: {data}')
-            raise ValueError(f'Cannot parse SMDB Sequence {data}')
-        
-        a = Analysis(
-            id=int(data['id']),
-            type=data['type'],
-            status=data['status'],
-            sample_ids=set(data.get('sample_ids', [])),
-            output=data.get('output', None),
-        )
-        return a
-    
-    
 class SmSequence:
     """
     Sample-metadata DB "Sequence" entry.
 
     See sample-metadata for more details: https://github.com/populationgenomics/sample-metadata
     """
-    def __init__(self, id, sample_id, meta, smdb):
+    def __init__(
+        self, 
+        id: str,
+        sample_id: str, 
+        meta: dict,
+        alignment_input: AlignmentInput|None
+    ):
         self.id = id
         self.sample_id = sample_id
         self.meta = meta
-        self.smdb = smdb
+        self.alignment_input = alignment_input
 
     @staticmethod
-    def parse(data: Dict, smdb) -> 'SmSequence':
+    def parse(data: dict, check_existence: bool) -> 'SmSequence':
         req_keys = ['id', 'sample_id', 'meta']
         if any(k not in data for k in req_keys):
             for key in req_keys:
                 if key not in data:
                     logger.error(f'"Sequence" data does not have {key}: {data}')
             raise ValueError(f'Cannot parse SMDB Sequence {data}')
-        
+
         return SmSequence(
             id=data['id'], 
             sample_id=data['sample_id'], 
             meta=data['meta'], 
-            smdb=smdb,
+            alignment_input=SmSequence._parse_reads(
+                meta=data['meta'], 
+                check_existence=check_existence
+            ),
         )
-    
-    def parse_reads(  # pylint: disable=too-many-return-statements
-        self,
-        check_existence: Optional[bool] = None,
-    ) -> Optional[AlignmentInput]:
+
+    @staticmethod
+    def _parse_reads(  # pylint: disable=too-many-return-statements
+        meta: dict,
+        check_existence: bool,
+    ) -> AlignmentInput|None:
         """
-        Parase AlignmentInput from meta. check_existence defaults from self.smdb 
-        and can be overwridden
+        Parse a AlignmentInput object from the meta dictionary.
+
+        :param check_existence: check if fastq/crams exist on buckets. 
+        Default value is pulled from self.smdb and can be overwridden.
         """
-        meta = self.meta
-        if check_existence is not None:
-            check_existence = check_existence 
-        else:
-            check_existence = self.smdb.do_check_seq_existence
-        
         reads_data = meta.get('reads')
         reads_type = meta.get('reads_type')
         if not reads_data:
@@ -154,8 +111,8 @@ class SmSequence:
                 logger.error(f'ERROR: index file doesn\'t exist: {index_path}')
                 return None
     
-            return AlignmentInput(bam_or_cram_path=bam_path, index_path=index_path)
-    
+            return AlignmentInput(cram_path=bam_path, index_path=index_path)
+
         else:
             fqs1 = []
             fqs2 = []

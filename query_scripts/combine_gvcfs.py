@@ -69,9 +69,9 @@ def main(
     buckets.gsutil_cp(meta_csv_path, local_meta_csv_path)
     samples_df = pd.read_table(local_meta_csv_path)
 
-    logger.info(f'Combining {len(samples_df.gvcf)} GVCFs')
+    logger.info(f'Combining {len(samples_df.gvcf_path)} GVCFs')
     hl.experimental.run_combiner(
-        list(samples_df.gvcf),
+        list(samples_df.gvcf_path),
         sample_names=list(samples_df.s),  # pylint: disable=no-member
         out_file=out_mt_path,
         reference_genome=utils.DEFAULT_REF,

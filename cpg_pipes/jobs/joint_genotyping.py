@@ -6,6 +6,7 @@ import json
 import logging
 from enum import Enum
 from os.path import join, basename, splitext
+from pathlib import Path
 from typing import Optional, List, Collection, Dict, Tuple, Set, cast
 
 import hailtop.batch as hb
@@ -13,11 +14,12 @@ import pandas as pd
 from hailtop.batch.job import Job
 
 from cpg_pipes import ref_data, images, buckets, utils
-from cpg_pipes.filetypes import fasta_group
+from cpg_pipes.alignment_input import fasta_group
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
+from cpg_pipes.pipeline.analysis import GvcfPath
 from cpg_pipes.pipeline.sample import Sample
 from cpg_pipes.smdb.smdb import SMDB
 
@@ -33,15 +35,15 @@ class JointGenotyperTool(Enum):
     
 def make_joint_genotyping_jobs(
     b: hb.Batch,
-    out_vcf_path: str,
-    out_siteonly_vcf_path: str,
+    out_vcf_path: Path,
+    out_siteonly_vcf_path: Path,
     samples: Collection[Sample],
     genomicsdb_bucket: str,
     tmp_bucket: str,
-    gvcf_by_sid: Dict[str, str],
+    gvcf_by_sid: dict[str, GvcfPath],
     overwrite: bool,
-    depends_on: Optional[List[Job]] = None,
-    smdb: Optional[SMDB] = None,
+    depends_on: list[Job]|None = None,
+    smdb: SMDB|None = None,
     # Default to GenotypeGVCFs because Gnarly is a bit weird, e.g. it adds <NON_REF>
     # variants with AC_adj annotations (other variants have AC):
     # bcftools view gs://cpg-fewgenomes-test/unittest/inputs/chr20/gnarly/joint-called-siteonly.vcf.gz | zgrep 7105364
@@ -182,10 +184,10 @@ def genomicsdb(
     samples: Collection[Sample],
     genomicsdb_bucket: str,
     tmp_bucket: str,
-    gvcf_by_sid: Dict[str, str],
+    gvcf_by_sid: dict[str, GvcfPath],
     intervals: hb.ResourceGroup,
     scatter_count: int = ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS,    
-    depends_on: Optional[List[Job]] = None,
+    depends_on: list[Job]|None = None,
     overwrite: bool = False,
     dry_run: bool = False,
 ) -> Tuple[Dict[int, Job], Dict[int, str]]:
@@ -193,7 +195,7 @@ def genomicsdb(
     Create GenomicDBs for each interval, given new samples.
     """
     sample_map_bucket_path = join(tmp_bucket, 'genomicsdb', 'sample_map.csv')
-    df = pd.DataFrame([{'id': s.id, 'path': gvcf_by_sid[s.id]} for s in samples])
+    df = pd.DataFrame([{'id': s.id, 'path': gvcf_by_sid[s.id].path} for s in samples])
     if not dry_run:
         df.to_csv(sample_map_bucket_path, index=False, header=False, sep='\t')
 

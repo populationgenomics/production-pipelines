@@ -3,7 +3,8 @@ Helper Hail Batch jobs useful for both individual and joint variant calling.
 """
 
 import logging
-from typing import List, Tuple
+from pathlib import Path
+from typing import Tuple
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
@@ -19,9 +20,9 @@ logger.setLevel(logging.INFO)
 
 def gather_vcfs(
     b: hb.Batch,
-    input_vcfs: List[hb.ResourceGroup],
+    input_vcfs: list[hb.ResourceGroup],
     overwrite: bool,
-    output_vcf_path: str = None,
+    output_vcf_path: Path|None = None,
     site_only: bool = False,
 ) -> Tuple[Job, hb.ResourceGroup]:
     """
@@ -34,7 +35,7 @@ def gather_vcfs(
         j.name += ' [reuse]'
         return j, b.read_input_group(**{
             'vcf.gz': output_vcf_path,
-            'vcf.gz.tbi': output_vcf_path + '.tbi',
+            'vcf.gz.tbi': f'{output_vcf_path}.tbi',
         })
 
     j.image(images.GATK_IMAGE)
@@ -60,5 +61,5 @@ def gather_vcfs(
     tabix {j.output_vcf['vcf.gz']}
     """, monitor_space=True))
     if output_vcf_path:
-        b.write_output(j.output_vcf, output_vcf_path.replace('.vcf.gz', ''))
+        b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
     return j, j.output_vcf

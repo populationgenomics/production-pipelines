@@ -5,11 +5,12 @@ Corresponds to one Sample entry in the SMDB
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Optional
+from typing import cast
 
-from cpg_pipes.filetypes import Cram, Gvcf, AlignmentInput
+from cpg_pipes.alignment_input import AlignmentInput
+from cpg_pipes.pipeline.analysis import CramPath, GvcfPath, AnalysisType
 from cpg_pipes.pipeline.target import Target
-from cpg_pipes.smdb.types import SmSequence
+from cpg_pipes.pipeline.sequence import SmSequence
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -26,7 +27,9 @@ class Sample(Target):
         external_id: str,
         dataset: 'Dataset',  # type: ignore  # noqa: F821
         participant_id: str|None = None,
-        meta: dict|None = None
+        meta: dict|None = None,
+        seq: SmSequence|None = None,
+        pedigree: 'PedigreeInfo'|None = None,
     ):
         super().__init__()
         self.id = id
@@ -34,9 +37,8 @@ class Sample(Target):
         self.dataset = dataset
         self._participant_id = participant_id
         self.meta: dict = meta or dict()
-        self.alignment_input: AlignmentInput|None = None
-        self.seq: Optional[SmSequence] = None
-        self.pedigree: Optional['PedigreeInfo'] = None
+        self.seq = seq
+        self.pedigree = pedigree
 
     def __repr__(self):
         return (
@@ -46,14 +48,21 @@ class Sample(Target):
             f', dataset={self.dataset.name}' +
             f', forced={self.forced}' +
             f', active={self.active}' +
-            (f', cram={self.cram}' if self.cram else '') +
-            (f', gvcf={self.gvcf}' if self.gvcf else '') +
-            f', alignment_input={self.alignment_input}' +
+            (f', cram={self.cram_path}' if self.cram_path else '') +
+            (f', gvcf={self.gvcf_path}' if self.gvcf_path else '') +
             f', meta={self.meta}' +
             f', seq={self.seq}' +
             f', pedigree={self.pedigree}' +
             f')'
         )
+
+    @property
+    def alignment_input(self) -> AlignmentInput|None:
+        if cram_path := self.analysis_by_type.get(AnalysisType.CRAM):
+            return cast(CramPath, cram_path).alignment_input()
+        elif self.seq:
+            return self.seq.alignment_input
+        return None
 
     @property
     def participant_id(self) -> str:
@@ -67,7 +76,7 @@ class Sample(Target):
     def unique_id(self) -> str:
         return self.id
 
-    def get_ped_dict(self, use_participant_id: bool = False) -> Dict[str, str]:
+    def get_ped_dict(self, use_participant_id: bool = False) -> dict[str, str]:
         """
         Returns a dictionary of pedigree fields for this sample, corresponging
         a PED file entry.
@@ -84,18 +93,18 @@ class Sample(Target):
         }
 
     @property
-    def cram(self) -> Cram:
+    def cram_path(self) -> CramPath:
         """
-        Path to corresponding CRAM file. Not checking its existence here.
+        Path to a CRAM file. Not checking its existence here.
         """
-        return Cram(f'{self.dataset.get_bucket()}/cram/{self.id}.cram')
+        return CramPath(f'{self.dataset.get_bucket()}/cram/{self.id}.cram')
 
     @property
-    def gvcf(self) -> Gvcf:
+    def gvcf_path(self) -> GvcfPath:
         """
-        Path to corresponding GVCF file. Not checking its existence here.
+        Path to a GVCF file. Not checking its existence here.
         """
-        return Gvcf(f'{self.dataset.get_bucket()}/gvcf/{self.id}.g.vcf.gz')
+        return GvcfPath(f'{self.dataset.get_bucket()}/gvcf/{self.id}.g.vcf.gz')
 
 
 class Sex(Enum):
@@ -114,17 +123,17 @@ class PedigreeInfo:
     """
     sample: Sample
     fam_id: str
-    dad: Optional[Sample]
-    mom: Optional[Sample]
+    dad: Sample|None
+    mom: Sample|None
     sex: Sex
     phenotype: str
 
-    def get_ped_dict(self, use_participant_id: bool = False) -> Dict:
+    def get_ped_dict(self, use_participant_id: bool = False) -> dict:
         """
         Returns a dictionary of pedigree fields for this sample, corresponging
         a PED file entry.
         """
-        def _get_id(_s: Optional[Sample]):
+        def _get_id(_s: Sample|None):
             if _s is None:
                 return '0'
             if use_participant_id:

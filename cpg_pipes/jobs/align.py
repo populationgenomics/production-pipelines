@@ -3,20 +3,19 @@ Create Hail Batch jobs for alignment.
 """
 from enum import Enum
 from textwrap import dedent, indent
-from typing import Optional, List, Tuple, Dict
-from os.path import splitext, basename, dirname, join
+from typing import Optional, Tuple
+from os.path import splitext, dirname, join
 import logging
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import images, ref_data, buckets
-from cpg_pipes.filetypes import AlignmentInput, fasta_group
+from cpg_pipes.alignment_input import AlignmentInput, fasta_group
 from cpg_pipes.hb.prev_job import PrevJob
 from cpg_pipes.jobs import picard
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.smdb.smdb import SMDB
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -92,7 +91,7 @@ def samtools_stats(
     })
 
     j.command(wrap_command(f"""\
-    samtools stats -@{job_resource.get_nthreads() - 1} {cram.cram} > {j.output_stats}
+    samtools stats -@{job_resource.get_nthreads() - 1} {cram.cram_path} > {j.output_stats}
     """))
     b.write_output(j.output_stats, output_path)
     
@@ -103,17 +102,17 @@ def align(
     b,
     alignment_input: AlignmentInput,
     sample_name: str,
-    output_path: Optional[str] = None,
-    dataset_name: Optional[str] = None,
+    output_path: str|None = None,
+    dataset_name: str|None = None,
     aligner: Aligner = Aligner.BWA,
     markdup_tool: MarkDupTool = MarkDupTool.BIOBAMBAM,
-    extra_label: Optional[str] = None,
-    depends_on: Optional[List[Job]] = None,
-    smdb: Optional[SMDB] = None,
+    extra_label: str|None = None,
+    depends_on: list[Job]|None = None,
+    smdb=None,
     overwrite: bool = True,
-    requested_nthreads: Optional[int] = None,
-    number_of_shards_for_realignment: Optional[int] = None,
-    prev_batch_jobs: Optional[Dict[Tuple[Optional[str], str], PrevJob]] = None,
+    requested_nthreads: int|None = None,
+    number_of_shards_for_realignment: int|None = None,
+    prev_batch_jobs: dict[tuple[str|None, str], PrevJob]|None = None,
 ) -> Job:
     """
     - if the input is 1 fastq pair, submits one alignment job.
@@ -362,7 +361,7 @@ def _align_one(
             }
         )
         prep_inp_cmd = ''
-        if alignment_input.bam_or_cram_path:
+        if alignment_input.cram_path:
             extract_j = extract_fastq(
                 b=b,
                 cram=alignment_input.as_cram_input_group(b),
@@ -407,24 +406,24 @@ def _build_bwa_command(
     shard_number_1based: Optional[int] = None,
 ) -> str:
     pull_inputs_cmd = ''
-    if alignment_input.bam_or_cram_path:
+    if alignment_input.cram_path:
         use_bazam = True
         assert not alignment_input.is_fastq()
-        
-        if alignment_input.bam_or_cram_path.startswith('gs://'):
+
+        if dirname(alignment_input.cram_path.path).startswith('gs://'):
             cram = alignment_input.as_cram_input_group(b)
             cram_localized_path = cram.base
         else:
             # Can't use on Batch localization mechanism with `b.read_input_group`,
             # but have to manually localize with `wget`
-            cram_name = basename(alignment_input.bam_or_cram_path)
-            work_dir = dirname(j.output_cram.cram)
-            cram_localized_path = join(work_dir, cram_name)
-            index_ext = '.crai' if cram_name.endswith('.cram') else '.bai'
-            crai_localized_path = join(work_dir, cram_name + index_ext)
+            local_work_dir = dirname(j.output_cram.cram)
+            cram_name = alignment_input.cram_path.path.name
+            crai_name = alignment_input.cram_path.index_path.name
+            cram_localized_path = join(local_work_dir, cram_name)
+            crai_localized_path = join(local_work_dir, crai_name)
             pull_inputs_cmd = (
-                f'wget {alignment_input.bam_or_cram_path} -O {cram_localized_path}\n'
-                f'wget {alignment_input.index_path} -O {crai_localized_path}'
+                f'wget {alignment_input.cram_path.path} -O {cram_localized_path}\n'
+                f'wget {alignment_input.cram_path.index_path} -O {crai_localized_path}'
             )
         if number_of_shards and number_of_shards > 1:
             assert shard_number_1based is not None and shard_number_1based > 0, \
@@ -569,9 +568,9 @@ def finalise_alignment(
         {align_cmd.strip()} \\
         | bamsormadup inputformat={align_cmd_out_fmt} threads={min(nthreads, 6)} SO=coordinate \\
         M={j.duplicate_metrics} outputformat=sam \\
-        tmpfile=$(dirname {j.output_cram.cram})/bamsormadup-tmp \\
-        | samtools view -@{min(nthreads, 6) - 1} -T {reference.base} -Ocram -o {j.output_cram.cram}       
-        samtools index -@{nthreads - 1} {j.output_cram.cram} {j.output_cram["cram.crai"]}
+        tmpfile=$(dirname {j.output_cram.cram_path})/bamsormadup-tmp \\
+        | samtools view -@{min(nthreads, 6) - 1} -T {reference.base} -Ocram -o {j.output_cram.cram_path}       
+        samtools index -@{nthreads - 1} {j.output_cram.cram_path} {j.output_cram["cram.crai"]}
         """.strip()
         md_j = j
     else:

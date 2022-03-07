@@ -10,7 +10,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import images, ref_data, buckets
-from cpg_pipes.filetypes import Cram
+from cpg_pipes.alignment_input import CramPath
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
@@ -26,7 +26,7 @@ def produce_gvcf(
     sample_name: str,
     dataset_name: str,
     tmp_bucket: str,
-    cram: Cram,
+    cram: CramPath,
     output_path: Optional[str] = None,
     number_of_intervals: int = 1,
     intervals: Optional[hb.ResourceGroup] = None,
@@ -90,7 +90,7 @@ def haplotype_caller(
     sample_name: str,
     dataset_name: str,
     tmp_bucket: str,
-    cram: Cram,
+    cram: CramPath,
     number_of_intervals: int = 1,
     intervals: Optional[hb.ResourceGroup] = None,
     overwrite: bool = True,
@@ -164,7 +164,7 @@ def _haplotype_caller_one(
     b: hb.Batch,
     sample_name: str,
     dataset_name: str,
-    cram: Cram,
+    cram: CramPath,
     interval: Optional[hb.ResourceFile] = None,
     interval_idx: Optional[int] = None,
     number_of_intervals: int = 1,

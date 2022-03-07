@@ -4,7 +4,8 @@ Adding jobs for fingerprinting and pedigree checks. Mostly using Somalier.
 
 import sys
 from os.path import join, dirname, pardir, basename
-from typing import Optional, List, Tuple, Dict
+from pathlib import Path
+from typing import Tuple
 import logging
 
 from hailtop.batch.job import Job
@@ -14,6 +15,7 @@ import pandas as pd
 from cpg_pipes import buckets, images, ref_data, utils
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.pipeline.analysis import CramPath, GvcfPath
 from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes.pipeline.sample import Sample
 
@@ -25,13 +27,13 @@ logger.setLevel(logging.INFO)
 def add_pedigree_jobs(
     b,
     dataset: Dataset,
-    input_path_by_sid: Dict[str, str],
+    input_path_by_sid: dict[str, Path],
     overwrite: bool,
     fingerprints_bucket: str,
     tmp_bucket: str,
-    web_bucket: Optional[str] = None,
-    web_url: Optional[str] = None,
-    depends_on: Optional[List[Job]] = None,
+    web_bucket: str|None = None,
+    web_url: str|None = None,
+    depends_on: list[Job]|None = None,
     label: str|None = None,
     ignore_missing: bool = False,
     dry_run: bool = False,
@@ -57,15 +59,20 @@ def add_pedigree_jobs(
             missing_input.append(sample)
             logger.error(f'Not found somalier input for {sample.id}')
             continue
-        
-        if input_path.endswith('.somalier'):
+
+        if input_path.name.endswith('.somalier'):
             somalier_file_by_sample[sample.id] = input_path
             continue
 
+        gvcf_or_cram_or_bam_path: CramPath|GvcfPath
+        if input_path.name.endswith('.cram') or input_path.name.endswith('.bam'):
+            gvcf_or_cram_or_bam_path = CramPath(input_path)
+        else:
+            gvcf_or_cram_or_bam_path = GvcfPath(input_path)
         j, out_fpath = somalier_extact_job(
             b=b,
             sample=sample,
-            gvcf_or_cram_or_bam_path=input_path,
+            gvcf_or_cram_or_bam_path=gvcf_or_cram_or_bam_path,
             overwrite=overwrite,
             label=label,
             depends_on=depends_on,
@@ -181,7 +188,7 @@ python {script_name} \
 
 def _relate_job(
     b: Batch, 
-    somalier_file_by_sample: dict[str, str],
+    somalier_file_by_sample: dict[str, Path],
     dataset: Dataset,
     tmp_bucket: str,
     label: str|None,
@@ -237,12 +244,12 @@ def _relate_job(
 def somalier_extact_job(
     b,
     sample: Sample,
-    gvcf_or_cram_or_bam_path: str,
+    gvcf_or_cram_or_bam_path: CramPath|GvcfPath,
     overwrite: bool,
     label: str|None = None,
-    depends_on: List[Job]|None = None,
-    out_fpath: str|None = None,
-) -> tuple[Job, str]:
+    depends_on: list[Job]|None = None,
+    out_fpath: Path|None = None,
+) -> tuple[Job, Path]:
     """
     Run "somalier extract" to generate a fingerprint for a `sample`
     from `fpath` (which can be a gvcf, a cram or a bam)
@@ -253,10 +260,7 @@ def somalier_extact_job(
     )
 
     if not out_fpath:
-        out_fpath = gvcf_or_cram_or_bam_path\
-            .replace('.cram', '.somalier')\
-            .replace('.bam', '.somalier')\
-            .replace('.g.vcf.gz', '.somalier')
+        out_fpath = gvcf_or_cram_or_bam_path.somalier_path
 
     if buckets.can_reuse(out_fpath, overwrite):
         j.name += ' [reuse]'
@@ -264,26 +268,22 @@ def somalier_extact_job(
 
     j.image(images.BIOINFO_IMAGE)
     j.memory('standard')
-    if gvcf_or_cram_or_bam_path.endswith('.bam'):
+    if isinstance(gvcf_or_cram_or_bam_path, CramPath):
         j.cpu(4)
-        j.storage(f'200G')
         input_file = b.read_input_group(
             base=gvcf_or_cram_or_bam_path,
-            index=gvcf_or_cram_or_bam_path + '.bai',
+            index=gvcf_or_cram_or_bam_path.index_path
         )
-    elif gvcf_or_cram_or_bam_path.endswith('.cram'):
-        j.cpu(4)
-        j.storage(f'50G')
-        input_file = b.read_input_group(
-            base=gvcf_or_cram_or_bam_path,
-            index=gvcf_or_cram_or_bam_path + '.crai',
-        )
+        if gvcf_or_cram_or_bam_path.is_bam:
+            j.storage(f'200G')
+        else:
+            j.storage(f'50G')
     else:
         j.cpu(2)
         j.storage(f'10G')
         input_file = b.read_input_group(
             base=gvcf_or_cram_or_bam_path,
-            index=gvcf_or_cram_or_bam_path + '.tbi',
+            index=gvcf_or_cram_or_bam_path.tbi_path
         )
     
     if depends_on:

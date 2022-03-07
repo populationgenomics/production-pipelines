@@ -50,16 +50,16 @@ import shutil
 import tempfile
 from typing import List, Dict, Optional, Tuple, cast, Union, Any, Callable, Type
 
-from cpg_pipes import buckets
-from cpg_pipes.hb.batch import setup_batch, Batch
-from cpg_pipes.hb.prev_job import PrevJob
-from cpg_pipes.namespace import Namespace
-from cpg_pipes.pipeline.cohort import Cohort
-from cpg_pipes.pipeline.dataset import Dataset
-from cpg_pipes.pipeline.sample import Sample
-from cpg_pipes.pipeline.stage import Stage
-from cpg_pipes.smdb.types import AnalysisType
-from cpg_pipes.smdb.smdb import SMDB
+from .analysis import AnalysisType
+from .. import buckets
+from ..hb.batch import setup_batch, Batch
+from ..hb.prev_job import PrevJob
+from ..namespace import Namespace
+from .cohort import Cohort
+from .dataset import Dataset
+from .sample import Sample
+from .stage import Stage
+from .smdb import SMDB
 
 
 logger = logging.getLogger(__file__)
@@ -84,8 +84,8 @@ class PipelineError(Exception):
 def stage(
     _cls: Optional[Type[Stage]] = None, 
     *,
-    sm_analysis_type: Optional[AnalysisType] = None, 
-    required_stages: Optional[Union[List[StageDecorator], StageDecorator]] = None,
+    sm_analysis_type: AnalysisType|None = None, 
+    required_stages: list[StageDecorator] | StageDecorator | None = None,
     skipped: bool = False,
     required: bool = True,
     assume_results_exist: bool = False,
@@ -197,10 +197,9 @@ class Pipeline:
         last_stage: Optional[str] = None,
         config: Optional[Dict] = None,
         input_datasets: Optional[List[str]] = None,
-        source_tag: Optional[str] = None,
         skip_samples: Optional[List[str]] = None,
         only_samples: Optional[List[str]] = None,
-        force_samples: Optional[List[str]] = None,
+        forced_samples: Optional[List[str]] = None,
         ped_files: Optional[List[str]] = None,
         local_dir: Optional[str] = None,
     ):
@@ -298,16 +297,22 @@ class Pipeline:
                 do_update_analyses=update_smdb_analyses,
                 do_check_seq_existence=check_smdb_seq,
             )
-            self.cohort.populate(
-                smdb=self._db,
+            self._db.populate_cohort(
+                cohort=self.cohort,
                 input_datasets=input_datasets,
                 local_tmp_dir=self.local_dir,
-                source_tag=source_tag,
                 skip_samples=skip_samples,
                 only_samples=only_samples,
                 ped_files=ped_files,
-                forced_samples=force_samples,
             )
+
+        if forced_samples:
+            for s in self.cohort.get_all_samples():
+                if s.id in forced_samples:
+                    logger.info(
+                        f'Force rerunning sample {s.id} even if its outputs exist'
+                    )
+                    s.forced = True
 
         self._stages_dict: Dict[str, Stage] = dict()
         self._stages_in_order: List[StageDecorator] = stages_in_order or _ALL_DEFINED_STAGES

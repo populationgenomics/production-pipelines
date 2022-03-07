@@ -1,11 +1,10 @@
 from os.path import join
-from typing import Optional, List
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.filetypes import AlignmentInput
+from cpg_pipes.alignment_input import AlignmentInput
 from cpg_pipes.jobs import align
 
 
@@ -13,9 +12,9 @@ def fastqc(
     b: hb.Batch, 
     results_bucket: str,
     sample_name: str, 
-    dataset_name: Optional[str], 
+    dataset_name: str|None, 
     alignment_input: AlignmentInput,
-) -> List[Job]:
+) -> list[Job]:
     """
     Adds FastQC jobs. If the input is a set of fqs, runs FastQC on each fq file.
     """
@@ -37,14 +36,14 @@ def fastqc(
         return j
 
     jobs = []
-    if alignment_input.bam_or_cram_path and alignment_input.bam_or_cram_path.endswith('.bam'):
+    if alignment_input.cram_path and alignment_input.cram_path.is_bam:
         bam = alignment_input.as_cram_input_group(b)
         j = _fastqc_one('FastQC', bam.base)
         jobs.append(j)
         return jobs
 
-    if alignment_input.bam_or_cram_path:
-        assert alignment_input.bam_or_cram_path.endswith('.cram'), alignment_input
+    if alignment_input.cram_path:
+        assert not alignment_input.cram_path.is_bam, alignment_input
         extract_j = align.extract_fastq(
             b=b,
             cram=alignment_input.as_cram_input_group(b),

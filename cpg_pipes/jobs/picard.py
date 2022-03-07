@@ -9,7 +9,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import images, buckets
-from cpg_pipes.filetypes import fasta_group
+from cpg_pipes.alignment_input import fasta_group
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 
@@ -43,11 +43,11 @@ def markdup(
     cmd = f"""
     picard MarkDuplicates -Xms13G \\
     I={sorted_bam} O=/dev/stdout M={j.duplicate_metrics} \\
-    TMP_DIR=$(dirname {j.output_cram.cram})/picard-tmp \\
+    TMP_DIR=$(dirname {j.output_cram.cram_path})/picard-tmp \\
     ASSUME_SORT_ORDER=coordinate \\
-    | samtools view -@{resource.get_nthreads() - 1} -T {fasta_reference.base} -O cram -o {j.output_cram.cram}
+    | samtools view -@{resource.get_nthreads() - 1} -T {fasta_reference.base} -O cram -o {j.output_cram.cram_path}
     
-    samtools index -@{resource.get_nthreads() - 1} {j.output_cram.cram} {j.output_cram['cram.crai']}
+    samtools index -@{resource.get_nthreads() - 1} {j.output_cram.cram_path} {j.output_cram['cram.crai']}
     """
     j.command(wrap_command(cmd, monitor_space=True))
     if output_path:

@@ -1,4 +1,4 @@
-from cpg_pipes.filetypes import AlignmentInput
+from cpg_pipes.alignment_input import AlignmentInput
 
 
 BENCHMARK_BUCKET = 'gs://cpg-fewgenomes-test/benchmark'
@@ -15,13 +15,13 @@ tiny_fq = AlignmentInput(
 
 # ~300k reads:
 tiny_cram = AlignmentInput(
-    bam_or_cram_path=f'{BENCHMARK_BUCKET}/inputs/toy/NA12878-chr21-tiny.cram',
+    cram_path=f'{BENCHMARK_BUCKET}/inputs/toy/NA12878-chr21-tiny.cram',
 )
 
 # WGS:
 giab_crams = {
     sn: AlignmentInput(
-        bam_or_cram_path=f'gs://cpg-reference/validation/giab/cram/{sn}.cram'
+        cram_path=f'gs://cpg-reference/validation/giab/cram/{sn}.cram'
     )
     for sn in ['NA12878', 'NA12891', 'NA12892']
 }
@@ -34,5 +34,5 @@ perth_neuro_fq = AlignmentInput(
     fqs2=[f'{BENCHMARK_BUCKET}/inputs/PERTHNEURO_FQ/HNFWKCCXY_3_181017_FD07777491_Homo-sapiens__R_170503_GINRAV_DNA_M002_R2.fastq.gz'],
 )
 perth_neuro_cram = AlignmentInput(
-    bam_or_cram_path=f'{BENCHMARK_BUCKET}/inputs/PERTHNEURO_CRAM/CPG13045.cram',
+    cram_path=f'{BENCHMARK_BUCKET}/inputs/PERTHNEURO_CRAM/CPG13045.cram',
 )

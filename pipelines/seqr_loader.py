@@ -22,7 +22,7 @@ from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.namespace import Namespace
-from cpg_pipes.smdb.types import AnalysisType
+from cpg_pipes.pipeline.analysis import AnalysisType, GvcfPath, CramPath
 from cpg_pipes.pipeline.cli_opts import pipeline_click_options
 from cpg_pipes.pipeline.pipeline import stage, Pipeline, PipelineError
 from cpg_pipes.pipeline.stage import SampleStage, CohortStage, DatasetStage, \
@@ -45,7 +45,7 @@ class CramStage(SampleStage):
         """
         Stage is expected to generate a CRAM file and a corresponding index.
         """
-        return sample.cram.path
+        return sample.cram_path.path
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """
@@ -91,7 +91,7 @@ class CramSomalierStage(SampleStage):
         """
         Expected to generate the fingerprints file
         """
-        return sample.cram.somalier_path
+        return sample.cram_path.somalier_path
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """
@@ -102,7 +102,7 @@ class CramSomalierStage(SampleStage):
         j, _ = pedigree.somalier_extact_job(
             b=self.pipe.b,
             sample=sample,
-            gvcf_or_cram_or_bam_path=cram_path,
+            gvcf_or_cram_or_bam_path=CramPath(cram_path),
             out_fpath=expected_path,
             overwrite=not self.pipe.check_intermediates,
             label='(CRAMs)',
@@ -154,7 +154,7 @@ class GvcfStage(SampleStage):
         """
         Generate a GVCF and corresponding TBI index
         """
-        return sample.gvcf.path
+        return sample.gvcf_path.path
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """
@@ -171,7 +171,7 @@ class GvcfStage(SampleStage):
             output_path=self.expected_result(sample),
             sample_name=sample.id,
             dataset_name=sample.dataset.name,
-            cram=sample.cram,
+            cram=sample.cram_path,
             intervals=GvcfStage.hc_intervals,
             number_of_intervals=hc_shards_num,
             tmp_bucket=self.pipe.tmp_bucket,
@@ -195,7 +195,7 @@ class GvcfSomalierStage(SampleStage):
         """
         Expected to generate the fingerprints file
         """
-        return sample.gvcf.somalier_path
+        return sample.gvcf_path.somalier_path
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """
@@ -206,7 +206,7 @@ class GvcfSomalierStage(SampleStage):
         j, _ = pedigree.somalier_extact_job(
             b=self.pipe.b,
             sample=sample,
-            gvcf_or_cram_or_bam_path=gvcf_path,
+            gvcf_or_cram_or_bam_path=GvcfPath(gvcf_path),
             out_fpath=expected_path,
             overwrite=not self.pipe.check_intermediates,
             label='(GVCFs)',
@@ -269,7 +269,10 @@ class JointGenotypingStage(CohortStage):
         """
         Use function defined in jobs module
         """
-        gvcf_by_sid = inputs.as_path_by_target(stage=GvcfStage)
+        gvcf_by_sid = {
+            k: GvcfPath(v) for k, v 
+            in inputs.as_path_by_target(stage=GvcfStage).items()
+        }
 
         not_found_gvcfs: List[str] = []
         for sid, gvcf_path in gvcf_by_sid.items():
@@ -612,9 +615,9 @@ def _make_seqr_metadata_files(
     if not buckets.can_reuse(igv_paths_path, overwrite):
         df = pd.DataFrame({
             'individual_id': s.participant_id,
-            'cram_path': s.cram.path,
+            'cram_path': s.cram_path,
             'cram_sample_id': s.id,
-        } for s in dataset.get_samples() if s.cram.path)
+        } for s in dataset.get_samples() if s.cram_path)
         df.to_csv(igv_paths_path, sep='\t', index=False, header=False)
 
     logger.info(f'Seqr sample map: {sample_map_path}')

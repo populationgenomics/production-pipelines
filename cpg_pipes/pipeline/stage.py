@@ -4,6 +4,7 @@ Stage classes
 
 import logging
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import (
     List, Dict, Optional, Callable, cast, Union, TypeVar, Generic
 )
@@ -11,9 +12,9 @@ from typing import (
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
+from cpg_pipes.pipeline.analysis import AnalysisType
 from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes import buckets
-from cpg_pipes.smdb.types import AnalysisType
 from cpg_pipes.pipeline.cohort import Cohort
 from cpg_pipes.pipeline.target import Target
 from cpg_pipes.pipeline.sample import Sample
@@ -24,7 +25,7 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-StageOutputData = Union[str, hb.Resource, Dict[str, str], Dict[str, hb.Resource]]
+StageOutputData = Union[str, hb.Resource, dict[str, Path], dict[str, hb.Resource]]
 
 
 class StageOutput:
@@ -37,17 +38,17 @@ class StageOutput:
         data: StageOutputData,
         stage: 'Stage',
         target: 'Target',
-        jobs: Optional[List[Job]] = None,
+        jobs: list[Job]|None = None,
     ):
         self.data = data
         self.stage = stage
         self.target = target
-        self.jobs: List[Job] = jobs or []
+        self.jobs: list[Job] = jobs or []
 
     def __repr__(self) -> str:
         return f'result {self.data} for target {self.target}, stage {self.stage}'
 
-    def as_path_or_resource(self, id=None) -> Union[str, hb.Resource]:
+    def as_path_or_resource(self, id=None) -> Path | hb.Resource:
         """
         Cast the result to Union[str, hb.Resource], error if can't cast.
         `id` is used to extract the value when the result is a dictionary.
@@ -70,15 +71,15 @@ class StageOutput:
 
         return self.data        
 
-    def as_path(self, id=None) -> str:
+    def as_path(self, id=None) -> Path:
         """
-        Cast the result to str, error if can't cast.
+        Cast the result to str. Though exception if failed to cast.
         `id` is used to extract the value when the result is a dictionary.
         """
         res = self.as_path_or_resource(id)
         if not isinstance(res, str):
             raise ValueError(f'{self} is not a path.')
-        return cast(str, res)
+        return cast(Path, res)
 
     def as_resource(self, id=None) -> hb.Resource:
         """
@@ -90,21 +91,21 @@ class StageOutput:
             raise ValueError(f'{self} is not a Hail Batch Resource.')
         return cast(hb.Resource, res)
 
-    def as_dict(self) -> Dict[str, Union[str, hb.Resource]]:
+    def as_dict(self) -> dict[str, Path|hb.Resource]:
         """
         Cast the result to a dictionary, error if can't cast.
         """
         if not isinstance(self.data, dict):
             raise ValueError(f'{self} is not a dictionary.')
         return self.data
-    
-    def as_resource_dict(self) -> Dict[str, hb.Resource]:
+
+    def as_resource_dict(self) -> dict[str, hb.Resource]:
         """
         Cast the result to a dictionary of Hail Batch Resources, error if can't cast.
         """
         return {k: self.as_resource(id=k) for k in self.as_dict()}
 
-    def as_path_dict(self) -> Dict[str, hb.Resource]:
+    def as_path_dict(self) -> dict[str, hb.Resource]:
         """
         Cast the result to a dictionary of strings, error if can't cast.
         """
@@ -163,8 +164,8 @@ class StageInput:
     def as_path_by_target(
         self, 
         stage: StageDecorator,
-        id: Optional[str] = None,
-    ) -> Dict[str, str]:
+        id: str|None = None,
+    ) -> dict[str, Path]:
         """
         Get a single file path result, indexed by target for a specific stage
         """
@@ -173,14 +174,14 @@ class StageInput:
     def as_resource_by_target(
         self, 
         stage: StageDecorator,
-        id: Optional[str] = None,
-    ) -> Dict[str, hb.Resource]:
+        id: str|None = None,
+    ) -> dict[str, hb.Resource]:
         """
         Get a single file path result, indexed by target for a specific stage
         """
         return self._each(fun=(lambda r: r.as_resource(id=id)), stage=stage)
 
-    def as_dict_by_target(self, stage: StageDecorator) -> Dict[str, Dict[str, str]]:
+    def as_dict_by_target(self, stage: StageDecorator) -> dict[str, dict[str, Path]]:
         """
         Get as a dictoinary of files/resources for a specific stage, indexed by target
         """
@@ -189,7 +190,7 @@ class StageInput:
     def as_resource_dict_by_target(
         self, 
         stage: StageDecorator,
-    ) -> Dict[str, Dict[str, hb.Resource]]:
+    ) -> dict[str, dict[str, hb.Resource]]:
         """
         Get a dictoinary of resources for a specific stage, and indexed by target
         """
@@ -198,7 +199,7 @@ class StageInput:
     def as_path_dict_by_target(
         self, 
         stage: StageDecorator,
-    ) -> Dict[str, Dict[str, str]]:
+    ) -> dict[str, dict[str, Path]]:
         """
         Get a dictoinary of paths for a specific stage, and indexed by target
         """
@@ -208,8 +209,8 @@ class StageInput:
         self, 
         target: 'Target',
         stage: StageDecorator,
-        id: Optional[str] = None,
-    ) -> str:
+        id: str|None = None,
+    ) -> Path:
         """
         Represent as a path to a file, otherwise fail.
         `stage` can be callable, or a subclass of Stage
@@ -221,36 +222,38 @@ class StageInput:
         self, 
         target: 'Target',
         stage: StageDecorator,
-        id: Optional[str] = None,
+        id: str|None = None,
     ) -> str:
         """
         Get Hail Batch Resource for a specific target and stage
         """
         res = self._results_by_target_by_stage[stage.__name__][target.unique_id]
         return res.as_resource(id)
-    
-    def as_dict(self, target: 'Target', stage: StageDecorator) -> Dict[str, str]:
+
+    def as_dict(self, target: 'Target', stage: StageDecorator) -> dict[str, Path]:
         """
         Get a dictoinary of files or Resources for a specific target and stage
         """
         res = self._results_by_target_by_stage[stage.__name__][target.unique_id]
         return res.as_dict()
     
-    def as_path_dict(self, target: 'Target', stage: StageDecorator) -> Dict[str, str]:
+    def as_path_dict(self, target: 'Target', stage: StageDecorator) -> dict[str, Path]:
         """
         Get a dictoinary of files for a specific target and stage
         """
         res = self._results_by_target_by_stage[stage.__name__][target.unique_id]
         return res.as_path_dict()
 
-    def as_resource_dict(self, target: 'Target', stage: StageDecorator) -> Dict[str, str]:
+    def as_resource_dict(
+        self, target: 'Target', stage: StageDecorator
+    ) -> dict[str, Path]:
         """
         Get a dictoinary of  Resources for a specific target and stage
         """
         res = self._results_by_target_by_stage[stage.__name__][target.unique_id]
         return res.as_resource_dict()
-    
-    def get_jobs(self) -> List[Job]:
+
+    def get_jobs(self) -> list[Job]:
         """
         Build a list of hail batch dependencies from all stages and targets
         """
@@ -274,8 +277,8 @@ class Stage(Generic[TargetT], ABC):
         self,
         pipeline,
         name: str,
-        required_stages: Optional[Union[List[StageDecorator], StageDecorator]] = None,
-        sm_analysis_type: Optional[AnalysisType] = None,
+        required_stages: list[StageDecorator] | StageDecorator | None = None,
+        sm_analysis_type: AnalysisType|None = None,
         skipped: bool = False,
         required: bool = True,
         assume_results_exist: bool = False,
@@ -359,8 +362,8 @@ class Stage(Generic[TargetT], ABC):
     def make_outputs(
         self, 
         target: TargetT,
-        data: Optional[StageOutputData] = None,
-        jobs: Optional[List[Job]] = None
+        data: StageOutputData|None = None,
+        jobs: list[Job]|None = None
     ) -> StageOutput:
         """
         Builds a StageDeps object to return from a stage's queue_jobs()
@@ -380,7 +383,7 @@ class Stage(Generic[TargetT], ABC):
     def _queue_jobs_with_checks(self, target: TargetT) -> StageOutput:
         """
         Constructs `inputs` and calls the public `output = queue_jobs(target, input)`.
-        Performs checks th like possibility to reuse existing jobs results,
+        Performs checks like possibility to reuse existing jobs results,
         or if required dependencies are missing.
         """
         if not self.skipped:

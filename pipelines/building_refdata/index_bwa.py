@@ -59,26 +59,26 @@ def _test_bwa_job(b: hb.Batch):
     rg_line = f'@RG\\tID|:{sn}\\tSM:~{sn}'
     use_bazam = True
 
-    sorted_bam = f'$(dirname {j.output_cram.cram})/sorted.bam'
+    sorted_bam = f'$(dirname {j.output_cram.cram_path})/sorted.bam'
     j.command(
         dedent(
             f"""
     set -o pipefail
     set -ex
     
-    (while true; do df -h; pwd; du -sh $(dirname {j.output_cram.cram}); sleep 600; done) &
+    (while true; do df -h; pwd; du -sh $(dirname {j.output_cram.cram_path}); sleep 600; done) &
     
     bwa-mem2 mem -K 100000000 {'-p' if use_bazam else ''} -t{bwa_cpu} -Y \\
         -R '{rg_line}' {bwa_reference.base} {fq1} - | \\
-    samtools sort -T $(dirname {j.output_cram.cram})/samtools-sort-tmp -Obam -o {sorted_bam}
+    samtools sort -T $(dirname {j.output_cram.cram_path})/samtools-sort-tmp -Obam -o {sorted_bam}
     
     picard MarkDuplicates I={sorted_bam} O=/dev/stdout M={j.duplicate_metrics} \\
         ASSUME_SORT_ORDER=coordinate | \\
-    samtools view -@30 -T {bwa_reference.base} -O cram -o {j.output_cram.cram}
+    samtools view -@30 -T {bwa_reference.base} -O cram -o {j.output_cram.cram_path}
     
-    samtools index -@{total_cpu} {j.output_cram.cram} {j.output_cram.crai}
+    samtools index -@{total_cpu} {j.output_cram.cram_path} {j.output_cram.crai}
     
-    df -h; pwd; du -sh $(dirname {j.output_cram.cram})
+    df -h; pwd; du -sh $(dirname {j.output_cram.cram_path})
     """
         )
     )

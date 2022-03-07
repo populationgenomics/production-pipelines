@@ -3,6 +3,7 @@ Create Hail Batch jobs to create and apply a VQSR models.
 """
 
 from os.path import join
+from pathlib import Path
 from typing import List, Optional
 import logging
 import hailtop.batch as hb
@@ -85,14 +86,14 @@ INDEL_RECALIBRATION_TRANCHE_VALUES = [
 
 def make_vqsr_jobs(
     b: hb.Batch,
-    input_vcf_or_mt_path: str,
+    input_vcf_or_mt_path: Path,
     work_bucket: str,
     gvcf_count: int,
     scatter_count: int = ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS,
-    depends_on: Optional[List[Job]] = None,
-    meta_ht_path: Optional[str] = None,
-    hard_filter_ht_path: Optional[str] = None,
-    output_vcf_path: Optional[str] = None,
+    depends_on: list[Job]|None = None,
+    meta_ht_path: Path|None = None,
+    hard_filter_ht_path: Path|None = None,
+    output_vcf_path: Path|None = None,
     use_as_annotations: bool = True,
     overwrite: bool = True,
     convert_vcf_to_site_only: bool = False,
@@ -103,8 +104,8 @@ def make_vqsr_jobs(
     :param b: Batch object to add jobs to
     :param input_vcf_or_mt_path: path to a multi-sample VCF or matrix table
     :param meta_ht_path: if input_vcf_or_mt_path is a matrix table, this table will 
-           be used as a source of annotations for that matrix table, i.e. to filter out
-           samples flagged as meta.related
+           be used as a source of annotations for that matrix table, i.e. 
+           to filter out samples flagged as meta.related
     :param hard_filter_ht_path: if input_vcf_or_mt_path is a matrix table, this table 
            will be used as a list of samples to hard filter out
     :param work_bucket: bucket for intermediate files
@@ -164,7 +165,7 @@ def make_vqsr_jobs(
         scatter_count=scatter_count,
     )
 
-    if input_vcf_or_mt_path.endswith('.mt'):
+    if input_vcf_or_mt_path.name.endswith('.mt'):
         assert meta_ht_path
         assert hard_filter_ht_path
         job_name = 'VQSR: MT to site-only VCF'
@@ -198,7 +199,7 @@ def make_vqsr_jobs(
         input_vcf = b.read_input_group(
             **{
                 'vcf.gz': input_vcf_or_mt_path,
-                'vcf.gz.tbi': input_vcf_or_mt_path + '.tbi',
+                'vcf.gz.tbi': f'{input_vcf_or_mt_path}.tbi',
             }
         )
         if convert_vcf_to_site_only:
@@ -843,8 +844,8 @@ def add_apply_recalibration_step(
     use_as_annotations: bool,
     indel_filter_level: float,
     snp_filter_level: float,
-    interval: Optional[hb.ResourceGroup] = None,
-    output_vcf_path: Optional[str] = None,
+    interval: hb.ResourceGroup|None = None,
+    output_vcf_path: Path|None = None,
 ) -> Job:
     """
     Apply a score cutoff to filter variants based on a recalibration table.
@@ -924,7 +925,7 @@ def add_apply_recalibration_step(
     )
 
     if output_vcf_path:
-        b.write_output(j.output_vcf, output_vcf_path.replace('.vcf.gz', ''))
+        b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
     return j
 
 

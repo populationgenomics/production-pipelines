@@ -4,8 +4,8 @@ Functions to find the pipeline inputs and communicate with the SM server
 
 import logging
 import traceback
+from os.path import join
 from textwrap import dedent
-from typing import List, Dict, Optional, Collection
 
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
@@ -19,9 +19,12 @@ from sample_metadata.apis import (
 )
 from sample_metadata.exceptions import ApiException
 
-from cpg_pipes import buckets, images
-from cpg_pipes.namespace import Namespace
-from cpg_pipes.smdb.types import Analysis, SmSequence
+from .. import buckets, images
+from .cohort import Cohort
+from .sample import PedigreeInfo, Sex
+from .dataset import Dataset
+from .analysis import Analysis, AnalysisType, AnalysisStatus
+from .sequence import SmSequence
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -30,7 +33,7 @@ logger.setLevel(logging.INFO)
 
 class SMDB:
     """
-    Abstracting the communication with the SampleMetadata database.
+    Communication with the SampleMetadata database.
     """
 
     def __init__(
@@ -56,53 +59,160 @@ class SMDB:
         self.do_update_analyses = do_update_analyses
         self.do_check_seq_existence = do_check_seq_existence
 
-    def get_samples_by_dataset(
+    def populate_cohort(
         self,
-        dataset_names: List[str],
-        namespace: Namespace,
-        skip_samples: Optional[List[str]] = None,
-        only_samples: Optional[List[str]] = None,
-    ) -> Dict[str, List[Dict]]:
+        cohort: Cohort,
+        input_datasets: list[str],
+        local_tmp_dir: str,
+        skip_samples: list[str]|None = None,
+        only_samples: list[str]|None = None,
+        ped_files: list[str]|None = None,
+    ) -> Cohort:
         """
-        Returns a dictionary of samples per input datasets
+        Populate database entries for all datasets.
         """
-        samples_by_dataset: Dict[str, List[Dict]] = dict()
-        for ds_name in dataset_names:
-            input_ds_name = ds_name
-            if namespace != Namespace.MAIN:
-                input_ds_name += '-test'
-            logger.info(f'Finding samples for dataset {input_ds_name}...')
-            samples = self.sapi.get_samples(
-                body_get_samples_by_criteria_api_v1_sample_post={
-                    'project_ids': [input_ds_name],
-                    'active': True,
-                }
+        for name in input_datasets:
+            self.populate_dataset(
+                cohort.add_dataset(name),
+                only_samples=only_samples,
+                skip_samples=skip_samples,
             )
-            logger.info(f'Finding samples for dataset {input_ds_name}: found {len(samples)}')
-            
-            participant_id_by_cpgid = self._get_participant_id_by_sid(ds_name)
-            
-            samples_by_dataset[ds_name] = []
-            for s in samples:
-                s['id'] = s['id'].strip()
-                s['external_id'] = s['external_id'].strip()
-                
-                if only_samples:
-                    if s['id'] in only_samples or s['external_id'] in only_samples:
-                        logger.info(f'Taking sample: {s["id"]}')
-                    else:
-                        continue
-                if skip_samples:
-                    if s['id'] in skip_samples or s['external_id'] in skip_samples:
-                        logger.info(f'Skiping sample: {s["id"]}')
-                        continue
-                samples_by_dataset[ds_name].append(s)
-                
-                s['participant_id'] = participant_id_by_cpgid.get(s['id'])
-                
-        return samples_by_dataset
+        self._populate_analysis(cohort)
+        if ped_files:
+            self._populate_pedigree(cohort, ped_files, local_tmp_dir)
+        return cohort
+    
+    def _populate_pedigree(
+        self, 
+        cohort: Cohort, 
+        ped_files: list[str], 
+        local_tmp_dir: str
+    ):
+        sample_by_participant_id = dict()
+        for s in cohort.get_all_samples():
+            sample_by_participant_id[s.participant_id] = s
 
-    def _get_participant_id_by_sid(self, proj_name: str) -> Dict[str, str]:
+        for i, ped_file in enumerate(ped_files):
+            local_ped_file = join(local_tmp_dir, f'ped_file_{i}.ped')
+            buckets.gsutil_cp(ped_file, local_ped_file)
+            with open(local_ped_file) as f:
+                for line in f:
+                    fields = line.strip().split('\t')[:6]
+                    fam_id, sam_id, pat_id, mat_id, sex, phenotype = fields
+                    if sam_id in sample_by_participant_id:
+                        s = sample_by_participant_id[sam_id]
+                        s.pedigree = PedigreeInfo(
+                            sample=s,
+                            fam_id=fam_id,
+                            dad=sample_by_participant_id.get(pat_id),
+                            mom=sample_by_participant_id.get(mat_id),
+                            sex={
+                                '1': Sex.MALE, 
+                                '2': Sex.FEMALE,
+                                'M': Sex.MALE,
+                                'F': Sex.FEMALE,
+                            }.get(sex, Sex.UNKNOWN),
+                            phenotype=phenotype or '0',
+                        )
+        for dataset in cohort.get_datasets():
+            samples_with_ped = [s for s in dataset.get_samples() if s.pedigree]
+            logger.info(
+                f'{dataset.name}: found pedigree info for {len(samples_with_ped)} '
+                f'samples out of {len(dataset.get_samples())}'
+            )
+
+    def _populate_analysis(self, cohort: Cohort, source_tag: str|None = None):
+        all_sample_ids = cohort.get_all_sample_ids()
+
+        jc_analysis = self.find_joint_calling_analysis(
+            sample_ids=all_sample_ids,
+        )
+        if jc_analysis:
+            cohort.analysis_by_type[AnalysisType.JOINT_CALLING] = jc_analysis
+
+        for dataset in cohort.get_datasets():
+            sample_ids = [s.id for s in dataset.get_samples()]
+
+            for atype in AnalysisType:
+                analysis_per_sid = self.find_analyses_by_sid(
+                    sample_ids=sample_ids,
+                    analysis_type=atype,
+                    meta={'source': source_tag} if source_tag else None,
+                    dataset=dataset.name,
+                )
+                for s in dataset.get_samples():
+                    if s.id in analysis_per_sid:
+                        s.analysis_by_type[atype] = analysis_per_sid[s.id]
+
+    def populate_dataset(
+        self,
+        dataset: Dataset,
+        skip_samples: list[str]|None = None,
+        only_samples: list[str]|None = None,
+    ) -> Dataset:
+        """
+        Populate database entries for one dataset.
+        """
+        sample_datas = self.__get_sample_entries(
+            dataset_name=dataset.name,
+            skip_samples=skip_samples,
+            only_samples=only_samples,
+        )
+
+        participant_id_by_cpgid = self.__get_participant_id_by_sid(dataset.name)
+        sequence_by_sid = self.get_sequence_by_sid([d['id'] for d in sample_datas])
+
+        for sample_d in sample_datas:
+            cpgid = sample_d['id']
+            dataset.add_sample(
+                id=cpgid, 
+                external_id=sample_d['external_id'],
+                participant_id=participant_id_by_cpgid.get(cpgid),
+                seq=sequence_by_sid.get(cpgid),
+                **sample_d.get('meta', {}),
+            )
+        return dataset
+
+    def __get_sample_entries(
+        self,
+        dataset_name: str,
+        skip_samples: list[str]|None = None,
+        only_samples: list[str]|None = None,
+    ) -> list[dict]:
+        """
+        Get Sample entries and apply `skip_samples` and `only_samples` filters.
+        This is a helper method; use public `populate_dataset` to parse samples. 
+        """
+        logger.info(f'Finding samples for dataset {dataset_name}...')
+        sample_entries = self.sapi.get_samples(
+            body_get_samples_by_criteria_api_v1_sample_post={
+                'project_ids': [dataset_name],
+                'active': True,
+            }
+        )
+        logger.info(
+            f'Finding samples for dataset {dataset_name}:'
+            f'found {len(sample_entries)}'
+        )
+        
+        filtered_entries = []
+        for sample_dict in sample_entries:
+            cpgid = sample_dict['id'].strip()
+            extid = sample_dict['external_id'].strip()
+
+            if only_samples:
+                if cpgid in only_samples or extid in only_samples:
+                    logger.info(f'Picking sample: {cpgid}|{extid}')
+                else:
+                    continue
+            if skip_samples:
+                if cpgid in skip_samples or extid in skip_samples:
+                    logger.info(f'Skiping sample: {cpgid}|{extid}')
+                    continue 
+            filtered_entries.append(sample_dict)
+        return filtered_entries
+
+    def __get_participant_id_by_sid(self, proj_name: str) -> dict[str, str]:
         try:
             pid_sid = self.papi.get_external_participant_id_to_internal_sample_id(
                 proj_name
@@ -113,21 +223,24 @@ class SMDB:
             participant_id_by_cpgid = {sid.strip(): pid.strip() for pid, sid in pid_sid}
         return participant_id_by_cpgid
 
-    def find_seq_by_sid(self, sample_ids) -> Dict[str, SmSequence]:
+    def get_sequence_by_sid(self, sample_ids: list[str]) -> dict[str, SmSequence]:
         """
-        Return a dict of "Sequence" entries by sample ID
+        Return a dict of "Sequence" entries indexed by sample ID.
         """
         try:
-            seq_infos: List[Dict] = self.seqapi.get_sequences_by_sample_ids(sample_ids)
+            seq_infos: list[dict] = self.seqapi.get_sequences_by_sample_ids(sample_ids)
         except ApiException:
             traceback.print_exc()
             return {}
         else:
-            seqs = [SmSequence.parse(d, self) for d in seq_infos]
+            seqs = [
+                SmSequence.parse(d, self.do_check_seq_existence) 
+                for d in seq_infos
+            ]
             seqs_by_sid = {seq.sample_id: seq for seq in seqs}
             return seqs_by_sid
 
-    def update_analysis(self, analysis: 'Analysis', status: str):
+    def update_analysis(self, analysis: 'Analysis', status: AnalysisStatus):
         """
         Update "status" of an Analysis entry
         """
@@ -136,7 +249,7 @@ class SMDB:
         try:
             self.aapi.update_analysis_status(
                 analysis.id, models.AnalysisUpdateModel(
-                    status=models.AnalysisStatus(status)
+                    status=models.AnalysisStatus(status.value)
                 )
             )
         except ApiException:
@@ -145,8 +258,8 @@ class SMDB:
 
     def find_joint_calling_analysis(
         self,
-        sample_ids: Collection[str],
-    ) -> Optional['Analysis']:
+        sample_ids: list[str],
+    ) -> 'Analysis'|None:
         """
         Query the DB to find the last completed joint-calling analysis for the samples
         """
@@ -160,27 +273,27 @@ class SMDB:
         a = Analysis.parse(data)
         if not a:
             return None
-        assert a.type == 'joint-calling', data
-        assert a.status == 'completed', data
+        assert a.type == AnalysisType.JOINT_CALLING, data
+        assert a.status == AnalysisStatus.COMPLETED, data
         if a.sample_ids != set(sample_ids):
             return None
         return a
 
     def find_analyses_by_sid(
         self,
-        sample_ids: Collection[str],
-        analysis_type: str,
-        analysis_status: str = 'completed',
-        dataset: Optional[str] = None,
-        meta: Optional[Dict] = None
-    ) -> Dict[str, Analysis]:
+        sample_ids: list[str],
+        analysis_type: AnalysisType,
+        analysis_status: AnalysisStatus = AnalysisStatus.COMPLETED,
+        dataset: str|None = None,
+        meta: dict|None = None
+    ) -> dict[str, Analysis]:
         """
         Query the DB to find the last completed analysis for the type and samples,
         one Analysis object per sample. Assumes the analysis is defined for a single
         sample (e.g. cram, gvcf)
         """
         dataset = dataset or self.analysis_dataset
-        analysis_per_sid: Dict[str, Analysis] = dict()
+        analysis_per_sid: dict[str, Analysis] = dict()
 
         logger.info(
             f'Querying {analysis_type} analysis entries for dataset {dataset}...'
@@ -189,8 +302,8 @@ class SMDB:
             models.AnalysisQueryModel(
                 projects=[dataset],
                 sample_ids=sample_ids,
-                type=models.AnalysisType(analysis_type),
-                status=models.AnalysisStatus(analysis_status),
+                type=models.AnalysisType(analysis_type.value),
+                status=models.AnalysisStatus(analysis_status.value),
                 meta=meta or {},
             )
         )
@@ -199,7 +312,7 @@ class SMDB:
             a = Analysis.parse(data)
             if not a:
                 continue
-            assert a.status == 'completed', data
+            assert a.status == AnalysisStatus.COMPLETED, data
             assert a.type == analysis_type, data
             assert len(a.sample_ids) == 1, data
             analysis_per_sid[list(a.sample_ids)[0]] = a
@@ -213,7 +326,7 @@ class SMDB:
         Creates a job that updates the sample metadata server entry analysis status
         to "in-progress"
         """
-        kwargs['status'] = 'in-progress'
+        kwargs['status'] = AnalysisStatus.IN_PROGRESS.value
         return self.make_sm_update_status_job(*args, **kwargs)
 
     def make_sm_completed_job(self, *args, **kwargs) -> Job:
@@ -221,7 +334,7 @@ class SMDB:
         Creates a job that updates the sample metadata server entry analysis status
         to "completed"
         """
-        kwargs['status'] = 'completed'
+        kwargs['status'] = AnalysisStatus.COMPLETED.value
         return self.make_sm_update_status_job(*args, **kwargs)
 
     def make_sm_update_status_job(
@@ -230,8 +343,8 @@ class SMDB:
         analysis_id: int,
         analysis_type: str,
         status: str,
-        sample_name: Optional[str] = None,
-        dataset_name: Optional[str] = None,
+        sample_name: str|None = None,
+        dataset_name: str|None = None,
     ) -> Job:
         """
         Creates a job that updates the sample metadata server entry analysis status.
@@ -280,9 +393,9 @@ class SMDB:
         output: str,
         type_: str,
         status: str,
-        sample_ids: Collection[str],
-        dataset_name: Optional[str] = None,
-    ) -> Optional[int]:
+        sample_ids: list[str],
+        dataset_name: str|None = None,
+    ) -> int|None:
         """
         Tries to create an Analysis entry, returns its id if successfuly
         """
@@ -308,12 +421,12 @@ class SMDB:
 
     def process_existing_analysis(
         self,
-        sample_ids: Collection[str],
-        completed_analysis: Optional['Analysis'],
+        sample_ids: list[str],
+        completed_analysis: 'Analysis'|None,
         analysis_type: str,
         expected_output_fpath: str,
-        dataset_name: Optional[str] = None,
-    ) -> Optional[str]:
+        dataset_name: str|None = None,
+    ) -> str|None:
         """
         Checks whether existing analysis exists, and output matches the expected output
         file. Invalidates bad analysis by setting status=failure, and submits a
@@ -375,7 +488,7 @@ class SMDB:
                 f'Invalidating the analysis {label} by setting the status to "failure", '
                 f'and resubmitting the analysis.'
             )
-            self.update_analysis(completed_analysis, status='failed')
+            self.update_analysis(completed_analysis, status=AnalysisStatus.FAILED)
 
         # can reuse, need to create a completed one?
         if buckets.file_exists(expected_output_fpath):
@@ -409,8 +522,13 @@ class SMDB:
         first_j,
         last_j,
         depends_on,
-        dataset_name: Optional[str] = None,
+        dataset_name: str|None = None,
     ) -> Job:
+        """
+        Given a first job and a last job object, insert corresponding "queued", 
+        "in_progress", and "completed" jobs. Useful to call in the end of a stage
+        definition.
+        """
         if not self.do_update_analyses:
             return last_j
         # Interacting with the sample metadata server:

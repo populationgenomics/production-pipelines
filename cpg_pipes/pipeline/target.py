@@ -34,6 +34,5 @@ class Target:
         ```
         Only concrete class can be given where "Type[Target]" is expected
         ```
-        
         """
         raise NotImplementedError

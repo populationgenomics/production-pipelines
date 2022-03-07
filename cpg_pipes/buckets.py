@@ -5,7 +5,8 @@ Utility functions to interact with objects on buckets.
 import logging
 import os
 import subprocess
-from typing import Optional, Union, Iterable
+from pathlib import Path
+from typing import Iterable, cast
 
 from google.cloud import storage
 
@@ -14,7 +15,7 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-def file_exists(path: str) -> bool:
+def file_exists(path: str|Path) -> bool:
     """
     Check if the object exists, where the object can be:
         * local file
@@ -26,6 +27,9 @@ def file_exists(path: str) -> bool:
     :param path: path to the file/directory/object/mt/ht
     :return: True if the object exists
     """
+    if isinstance(path, Path):
+        path = cast(str, path.absolute())
+
     if path.startswith('gs://'):
         bucket = path.replace('gs://', '').split('/')[0]
         p = path.replace('gs://', '').split('/', maxsplit=1)[1]
@@ -43,7 +47,7 @@ def file_exists(path: str) -> bool:
 
 
 def can_reuse(
-    fpath: Optional[Union[Iterable[str], str]],
+    fpath: Iterable[str|Path]|str|Path|None,
     overwrite: bool,
     silent=False,
 ) -> bool:
@@ -59,10 +63,13 @@ def can_reuse(
     if not fpath:
         return False
 
-    if not isinstance(fpath, str):
+    if isinstance(fpath, Iterable):
         return all(can_reuse(fp, overwrite) for fp in fpath)
 
-    if not file_exists(fpath):
+    if isinstance(fpath, Path) and not fpath.exists():
+        return False
+    
+    if isinstance(fpath, str) and not file_exists(fpath):
         return False
 
     if not silent:

@@ -6,7 +6,7 @@ import click
 import logging
 
 from cpg_pipes import benchmark, images
-from cpg_pipes.filetypes import AlignmentInput, fasta_group
+from cpg_pipes.alignment_input import AlignmentInput, fasta_group
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
 from cpg_pipes.pipeline.pipeline import stage, Pipeline
 from cpg_pipes.pipeline.sample import Sample
@@ -82,8 +82,8 @@ class SubsetAlignmentInput(SampleStage):
         )
         j.command(
             f'samtools view {cram.base} -@31 --subsample {1/self.SUBSET_FRACTION} '
-            f'-T {reference.base} -Ocram -o {j.output_cram.cram}\n'
-            f'samtools index -@31 {j.output_cram.cram} {j.output_cram["cram.crai"]}'
+            f'-T {reference.base} -Ocram -o {j.output_cram.cram_path}\n'
+            f'samtools index -@31 {j.output_cram.cram_path} {j.output_cram["cram.crai"]}'
         )
         self.pipe.b.write_output(j.output_cram, self.expected_result(sample).replace('.cram', ''))
         
