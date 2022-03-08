@@ -6,6 +6,7 @@ Batch pipeline to check pedigree on samples.
 
 import logging
 from os.path import join
+from pathlib import Path
 from typing import List
 
 import click
@@ -30,7 +31,7 @@ class CramPedCheckStage(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         path_by_sid = dict()
         for s in dataset.get_samples():
-            path = f'gs://cpg-{dataset.name}-main/cram/{s.id}.somalier'
+            path = Path(f'gs://cpg-{dataset.name}-main/cram/{s.id}.somalier')
             if buckets.file_exists(path):
                 path_by_sid[s.id] = path
 
@@ -59,7 +60,7 @@ class GvcfPedCheckStage(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         path_by_sid = dict()
         for s in dataset.get_samples():
-            path = f'gs://cpg-{dataset.name}-main/gvcf/{s.id}.somalier'
+            path = Path(f'gs://cpg-{dataset.name}-main/gvcf/{s.id}.somalier')
             if buckets.file_exists(path):
                 path_by_sid[s.id] = path
 

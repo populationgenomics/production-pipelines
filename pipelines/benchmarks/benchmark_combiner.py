@@ -19,6 +19,7 @@ from sample_metadata.models import (
 
 from cpg_pipes import utils
 from cpg_pipes.namespace import Namespace
+from cpg_pipes.pipeline.analysis import AnalysisType
 from cpg_pipes.pipeline.pipeline import Pipeline
 
 sapi = SampleApi()
@@ -49,7 +50,7 @@ sample_ids = [s.id for s in samples]
 
 gvcf_analysis_per_sid = pipe.db.find_analyses_by_sid(
     sample_ids=sample_ids,
-    analysis_type='gvcf',
+    analysis_type=AnalysisType('gvcf'),
     dataset=INPUT_DATASET,
 )
 gvcf_by_sid = dict()
