@@ -198,8 +198,8 @@ def make_vqsr_jobs(
     else:
         input_vcf = b.read_input_group(
             **{
-                'vcf.gz': input_vcf_or_mt_path,
-                'vcf.gz.tbi': f'{input_vcf_or_mt_path}.tbi',
+                'vcf.gz': str(input_vcf_or_mt_path),
+                'vcf.gz.tbi': str(input_vcf_or_mt_path) + '.tbi',
             }
         )
         if convert_vcf_to_site_only:

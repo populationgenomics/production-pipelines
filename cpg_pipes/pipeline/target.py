@@ -4,7 +4,8 @@ extend this class.
 """
 
 from typing import Dict
-from cpg_pipes.smdb.types import AnalysisType, Analysis
+
+from cpg_pipes.pipeline.analysis import AnalysisType, Analysis
 
 
 class Target:

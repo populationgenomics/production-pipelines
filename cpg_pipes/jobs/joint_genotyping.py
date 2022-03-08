@@ -14,14 +14,14 @@ import pandas as pd
 from hailtop.batch.job import Job
 
 from cpg_pipes import ref_data, images, buckets, utils
-from cpg_pipes.alignment_input import fasta_group
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.pipeline.analysis import GvcfPath
 from cpg_pipes.pipeline.sample import Sample
-from cpg_pipes.smdb.smdb import SMDB
+from cpg_pipes.pipeline.smdb import SMDB
+from cpg_pipes.ref_data import REF_D
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -42,8 +42,8 @@ def make_joint_genotyping_jobs(
     tmp_bucket: str,
     gvcf_by_sid: dict[str, GvcfPath],
     overwrite: bool,
-    depends_on: list[Job]|None = None,
-    smdb: SMDB|None = None,
+    depends_on: list[Job] | None = None,
+    smdb: SMDB | None = None,
     # Default to GenotypeGVCFs because Gnarly is a bit weird, e.g. it adds <NON_REF>
     # variants with AC_adj annotations (other variants have AC):
     # bcftools view gs://cpg-fewgenomes-test/unittest/inputs/chr20/gnarly/joint-called-siteonly.vcf.gz | zgrep 7105364
@@ -576,7 +576,7 @@ def _add_joint_genotyper_job(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
 
-    reference = fasta_group(b)
+    reference = b.read_input_group(**REF_D)
     
     if genomicsdb_path.endswith('.tar'):
         # can't use directly from cloud, need to copy and uncompress:

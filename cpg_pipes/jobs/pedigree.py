@@ -221,7 +221,7 @@ def _relate_job(
     input_files_lines = ''
     for sample in dataset.get_samples():
         if sample.id:
-            somalier_file = b.read_input(somalier_file_by_sample[sample.id])
+            somalier_file = b.read_input(str(somalier_file_by_sample[sample.id]))
             input_files_lines += f'{somalier_file} \\\n'
     cmd = f"""\
     cat {ped_file} | grep -v Family.ID > /io/samples.ped 
@@ -271,8 +271,8 @@ def somalier_extact_job(
     if isinstance(gvcf_or_cram_or_bam_path, CramPath):
         j.cpu(4)
         input_file = b.read_input_group(
-            base=gvcf_or_cram_or_bam_path,
-            index=gvcf_or_cram_or_bam_path.index_path
+            base=str(gvcf_or_cram_or_bam_path),
+            index=str(gvcf_or_cram_or_bam_path.index_path)
         )
         if gvcf_or_cram_or_bam_path.is_bam:
             j.storage(f'200G')
@@ -282,8 +282,8 @@ def somalier_extact_job(
         j.cpu(2)
         j.storage(f'10G')
         input_file = b.read_input_group(
-            base=gvcf_or_cram_or_bam_path,
-            index=gvcf_or_cram_or_bam_path.tbi_path
+            base=str(gvcf_or_cram_or_bam_path),
+            index=str(gvcf_or_cram_or_bam_path.tbi_path)
         )
     
     if depends_on:

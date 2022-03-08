@@ -30,6 +30,7 @@ REF_D = dict(
     + '.dict',
 )
 
+
 # DRAGMAP indices
 DRAGMAP_INDEX_BUCKET = f'{REF_BUCKET}/dragmap/v0'
 DRAGMAP_INDEX_FILES = [

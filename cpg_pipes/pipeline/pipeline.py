@@ -48,6 +48,7 @@ import functools
 import logging
 import shutil
 import tempfile
+from pathlib import Path
 from typing import List, Dict, Optional, Tuple, cast, Union, Any, Callable, Type
 
 from .analysis import AnalysisType
@@ -457,7 +458,7 @@ class Pipeline:
         """
         return buckets.can_reuse(fpath, overwrite=not self.check_intermediates)
 
-    def db_process_existing_analysis(self, *args, **kwargs):
+    def db_process_existing_analysis(self, *args, **kwargs) -> Path | None:
         """
         Thin wrapper around SMDB.process_existing_analysis
         """

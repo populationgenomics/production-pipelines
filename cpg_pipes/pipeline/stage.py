@@ -5,9 +5,7 @@ Stage classes
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import (
-    List, Dict, Optional, Callable, cast, Union, TypeVar, Generic
-)
+from typing import Callable, cast, Union, TypeVar, Generic
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
@@ -25,7 +23,7 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-StageOutputData = Union[str, hb.Resource, dict[str, Path], dict[str, hb.Resource]]
+StageOutputData = Union[str, Path, hb.Resource, dict[str, str], dict[str, Path], dict[str, hb.Resource]]
 
 
 class StageOutput:
@@ -38,8 +36,12 @@ class StageOutput:
         data: StageOutputData,
         stage: 'Stage',
         target: 'Target',
-        jobs: list[Job]|None = None,
+        jobs: list[Job] | None = None,
     ):
+        if isinstance(data, str):
+            data = Path(data)
+        if isinstance(data, dict):
+            data = {k: (Path(v) if isinstance(v, str) else v) for k, v in data.items()}
         self.data = data
         self.stage = stage
         self.target = target
@@ -56,7 +58,7 @@ class StageOutput:
         if id is not None:
             if not isinstance(self.data, dict):
                 raise ValueError(
-                    f'{self} is not a dictionary, can\'t get "{id}".'
+                    f'{self.data} is not a dictionary, can\'t get "{id}".'
                 )
             return cast(dict, self.data)[id]
         
@@ -64,7 +66,7 @@ class StageOutput:
             res = cast(dict, self.data)
             if len(res.values()) > 1:
                 raise ValueError(
-                    f'{self} is a dictionary with more than 1 element, '
+                    f'{res} is a dictionary with more than 1 element, '
                     f'please set the `id` parameter'
                 )
             return list(res.values())[0]
@@ -77,8 +79,8 @@ class StageOutput:
         `id` is used to extract the value when the result is a dictionary.
         """
         res = self.as_path_or_resource(id)
-        if not isinstance(res, str):
-            raise ValueError(f'{self} is not a path.')
+        if not isinstance(res, Path):
+            raise ValueError(f'{res} is not a path.')
         return cast(Path, res)
 
     def as_resource(self, id=None) -> hb.Resource:
@@ -88,7 +90,7 @@ class StageOutput:
         """
         res = self.as_path_or_resource(id)
         if not isinstance(res, hb.Resource):
-            raise ValueError(f'{self} is not a Hail Batch Resource.')
+            raise ValueError(f'{res} is not a Hail Batch Resource.')
         return cast(hb.Resource, res)
 
     def as_dict(self) -> dict[str, Path|hb.Resource]:
@@ -96,7 +98,7 @@ class StageOutput:
         Cast the result to a dictionary, error if can't cast.
         """
         if not isinstance(self.data, dict):
-            raise ValueError(f'{self} is not a dictionary.')
+            raise ValueError(f'{self.data} is not a dictionary.')
         return self.data
 
     def as_resource_dict(self) -> dict[str, hb.Resource]:
@@ -126,8 +128,8 @@ class StageInput:
     """
     def __init__(self, stage: 'Stage'):
         self.stage = stage
-        self._results_by_target_by_stage: Dict[str, Dict[str, StageOutput]] = {}
-        self._jobs: List[Job] = []
+        self._results_by_target_by_stage: dict[str, dict[str, StageOutput]] = {}
+        self._jobs: list[Job] = []
 
     def add_other_stage_output(self, output: StageOutput):
         """
@@ -268,6 +270,8 @@ class StageInput:
 # correspondinng Target subclass
 TargetT = TypeVar('TargetT', bound=Target)
 
+ExpectedResultT = Union[str, Path, dict[str, str], dict[str, Path], None]
+
 
 class Stage(Generic[TargetT], ABC):
     """
@@ -302,7 +306,7 @@ class Stage(Generic[TargetT], ABC):
         """
         self._name = name
         self.pipe = pipeline
-        self.required_stages_classes: List[StageDecorator] = []
+        self.required_stages_classes: list[StageDecorator] = []
         if required_stages:
             if isinstance(required_stages, list):
                 self.required_stages_classes.extend(required_stages)
@@ -310,14 +314,14 @@ class Stage(Generic[TargetT], ABC):
                 self.required_stages_classes.append(required_stages)
 
         # Populated in pipeline.run(), after we know all stages
-        self.required_stages: List[Stage] = []
+        self.required_stages: list[Stage] = []
         
         # If analysis type is defined, it will be used to find and reuse existing
         # outputs from the SMDB
         self.analysis_type = sm_analysis_type
 
         # Populated with the return value of `add_to_the_pipeline()`
-        self.output_by_target: Dict[str, StageOutput] = dict()
+        self.output_by_target: dict[str, StageOutput] = dict()
 
         self.skipped = skipped  
         self.required = required
@@ -341,16 +345,18 @@ class Stage(Generic[TargetT], ABC):
         """
 
     @abstractmethod
-    def expected_result(self, target: TargetT) -> Optional[Union[str, Dict[str, str]]]:
+    def expected_result(self, target: TargetT) -> ExpectedResultT:
         """
         Path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
         by the pipeline to get expected paths when the stage is skipped and
         didn't return a `StageDeps` object from `queue_jobs()`.
+        
+        Can be a str or a Path object, or a dictionary of str/Path objects.
         """
     
     @abstractmethod
-    def add_to_the_pipeline(self, pipeline) -> Dict[str, StageOutput]:
+    def add_to_the_pipeline(self, pipeline) -> dict[str, StageOutput]:
         """
         Calls `output = pipeline.add_for_target(target)` on each target, 
         which itself calls `output = queue_jobs(target, input)`, making sure to
@@ -362,8 +368,8 @@ class Stage(Generic[TargetT], ABC):
     def make_outputs(
         self, 
         target: TargetT,
-        data: StageOutputData|None = None,
-        jobs: list[Job]|None = None
+        data: StageOutputData | None = None,
+        jobs: list[Job] | None = None
     ) -> StageOutput:
         """
         Builds a StageDeps object to return from a stage's queue_jobs()
@@ -428,7 +434,7 @@ class Stage(Generic[TargetT], ABC):
     def _try_get_reusable_paths(
         self, 
         target: TargetT
-    ) -> Optional[Union[Dict[str, str], str]]:
+    ) -> dict[str, Path] | Path | None:
         """
         Returns outputs that can be reused for the stage for the target,
         or None of none can be reused
@@ -437,6 +443,15 @@ class Stage(Generic[TargetT], ABC):
             return None
 
         expected_output = self.expected_result(target)
+        
+        # Converting all str into Path
+        expected_paths: dict[str, Path] | Path | None
+        if isinstance(expected_output, dict):
+            expected_paths = {k: Path(v) for k, v in expected_output.items()}
+        elif isinstance(expected_output, str):
+            expected_paths = Path(expected_output)
+        else:
+            expected_paths = expected_output
 
         if self.analysis_type is not None:
             # Checking the SMDB
@@ -447,7 +462,7 @@ class Stage(Generic[TargetT], ABC):
                     f'on {target.unique_id}, analysis_type={self.analysis_type}'
                 )
                 
-            if isinstance(expected_output, dict):
+            if isinstance(expected_paths, dict):
                 raise ValueError(
                     f'expected_result() returns a dict, won\'t check the SMDB for '
                     f'{self.name} on {target.unique_id}'
@@ -459,13 +474,13 @@ class Stage(Generic[TargetT], ABC):
                 validate = False
 
             # found_path would be analysis.output from DB if it exists; if it doesn't,
-            # and validate_smdb_analyses=True, expected_output file would be checked:
+            # and validate_smdb_analyses=True, expected_paths file would be checked:
             found_path = self._try_get_smdb_analysis(
-                target, cast(str, expected_output), validate=validate
+                target, cast(Path, expected_paths), validate=validate
             )
             return found_path
         
-        elif not expected_output:
+        elif not expected_paths:
             return None
 
         elif (
@@ -474,24 +489,25 @@ class Stage(Generic[TargetT], ABC):
             self.assume_results_exist
         ):
             # Do not need to check file existence, trust it exists:
-            return expected_output
+            return expected_paths
         
         else:
             # Checking that expected output exists:
-            if isinstance(expected_output, dict):
-                paths = list(expected_output.values())
+            paths: list[Path]
+            if isinstance(expected_paths, dict):
+                paths = list(expected_paths.values())
             else:
-                paths = [expected_output]
+                paths = [expected_paths]
             if not all(buckets.file_exists(path) for path in paths):
                 return None
-            return expected_output
+            return expected_paths
 
     def _try_get_smdb_analysis(
         self, 
         target: TargetT, 
-        expected_path: str,
+        expected_path: Path,
         validate: bool,
-    ) -> Optional[str]:
+    ) -> Path | None:
         """
         Check if SMDB already has analysis, and invalidate it if the
         output for a stage doesn't exist
@@ -531,7 +547,7 @@ class Stage(Generic[TargetT], ABC):
     def _queue_reuse_job(
         self,
         target: TargetT,
-        found_paths: Union[str, Dict[str, str]]
+        found_paths: Path | dict[str, Path]
     ) -> StageOutput:
         """
         Queues a [reuse] Job
@@ -554,10 +570,7 @@ class SampleStage(Stage[Sample], ABC):
     Sample-level stage
     """
     @abstractmethod
-    def expected_result(
-        self, 
-        sample: 'Sample'
-    ) -> Optional[Union[str, Dict[str, str]]]:
+    def expected_result(self, sample: 'Sample') -> ExpectedResultT:
         """
         Path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
@@ -569,7 +582,7 @@ class SampleStage(Stage[Sample], ABC):
     def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput:
         pass
 
-    def add_to_the_pipeline(self, pipeline) -> Dict[str, StageOutput]:
+    def add_to_the_pipeline(self, pipeline) -> dict[str, StageOutput]:
         output_by_target = dict()
         datasets = pipeline.cohort.get_datasets()
         if not datasets:
@@ -592,10 +605,7 @@ class PairStage(Stage, ABC):
     Stage on a pair os samples
     """
     @abstractmethod
-    def expected_result(
-        self, 
-        pair: Pair
-    ) -> Optional[Union[str, Dict[str, str]]]:
+    def expected_result(self, pair: Pair) -> ExpectedResultT:
         """
         Path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
@@ -607,7 +617,7 @@ class PairStage(Stage, ABC):
     def queue_jobs(self, pair: 'Pair', inputs: StageInput) -> StageOutput:
         pass
 
-    def add_to_the_pipeline(self, pipeline) -> Dict[str, StageOutput]:
+    def add_to_the_pipeline(self, pipeline) -> dict[str, StageOutput]:
         output_by_target = dict()
         datasets = pipeline.cohort.get_datasets()
         if datasets:
@@ -632,10 +642,7 @@ class DatasetStage(Stage, ABC):
     Dataset-level stage
     """
     @abstractmethod
-    def expected_result(
-        self, 
-        dataset: 'Dataset'
-    ) -> Optional[Union[str, Dict[str, str]]]:
+    def expected_result(self, dataset: 'Dataset') -> ExpectedResultT:
         """
         Path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
@@ -647,7 +654,7 @@ class DatasetStage(Stage, ABC):
     def queue_jobs(self, dataset: 'Dataset', inputs: StageInput) -> StageOutput:
         pass
 
-    def add_to_the_pipeline(self, pipeline) -> Dict[str, StageOutput]:
+    def add_to_the_pipeline(self, pipeline) -> dict[str, StageOutput]:
         output_by_target = dict()
         datasets = pipeline.cohort.get_datasets()
         if not datasets:
@@ -665,10 +672,7 @@ class CohortStage(Stage, ABC):
     Entire cohort level stage
     """
     @abstractmethod
-    def expected_result(
-        self, 
-        cohort: 'Cohort'
-    ) -> Optional[Union[str, Dict[str, str]]]:
+    def expected_result(self, cohort: 'Cohort') -> ExpectedResultT:
         """
         Path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
@@ -680,7 +684,7 @@ class CohortStage(Stage, ABC):
     def queue_jobs(self, cohort: 'Cohort', inputs: StageInput) -> StageOutput:
         pass
 
-    def add_to_the_pipeline(self, pipeline) -> Dict[str, StageOutput]:
+    def add_to_the_pipeline(self, pipeline) -> dict[str, StageOutput]:
         return {
             pipeline.cohort.unique_id: 
             self._queue_jobs_with_checks(pipeline.cohort)

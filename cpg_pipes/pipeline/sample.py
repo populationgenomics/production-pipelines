@@ -5,10 +5,9 @@ Corresponds to one Sample entry in the SMDB
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import cast
+from typing import cast, Optional
 
-from cpg_pipes.alignment_input import AlignmentInput
-from cpg_pipes.pipeline.analysis import CramPath, GvcfPath, AnalysisType
+from cpg_pipes.pipeline.analysis import CramPath, GvcfPath, AnalysisType, AlignmentInput
 from cpg_pipes.pipeline.target import Target
 from cpg_pipes.pipeline.sequence import SmSequence
 
@@ -29,7 +28,8 @@ class Sample(Target):
         participant_id: str|None = None,
         meta: dict|None = None,
         seq: SmSequence|None = None,
-        pedigree: 'PedigreeInfo'|None = None,
+        pedigree: Optional['PedigreeInfo'] = None,
+        alignment_input: AlignmentInput | None = None
     ):
         super().__init__()
         self.id = id
@@ -39,6 +39,7 @@ class Sample(Target):
         self.meta: dict = meta or dict()
         self.seq = seq
         self.pedigree = pedigree
+        self._alignment_input = alignment_input
 
     def __repr__(self):
         return (
@@ -51,18 +52,32 @@ class Sample(Target):
             (f', cram={self.cram_path}' if self.cram_path else '') +
             (f', gvcf={self.gvcf_path}' if self.gvcf_path else '') +
             f', meta={self.meta}' +
-            f', seq={self.seq}' +
-            f', pedigree={self.pedigree}' +
+            (f', seq={self.seq}' if self.seq else '') +
+            (f', alignment_input={self._alignment_input}' 
+             if self._alignment_input else '') +
+            (f', pedigree={self.pedigree}' if self.pedigree else '') +
             f')'
         )
 
     @property
-    def alignment_input(self) -> AlignmentInput|None:
+    def alignment_input(self) -> AlignmentInput | None:
+        """
+        @return: returns input for (re-)alignment
+        """
+        if self._alignment_input:
+            return self._alignment_input
         if cram_path := self.analysis_by_type.get(AnalysisType.CRAM):
             return cast(CramPath, cram_path).alignment_input()
-        elif self.seq:
+        if self.seq:
             return self.seq.alignment_input
         return None
+
+    @alignment_input.setter
+    def alignment_input(self, value: AlignmentInput):
+        """
+        Set alignment_input
+        """
+        self._alignment_input = value
 
     @property
     def participant_id(self) -> str:

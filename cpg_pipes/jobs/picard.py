@@ -9,9 +9,9 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import images, buckets
-from cpg_pipes.alignment_input import fasta_group
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.ref_data import REF_D
 
 
 def markdup(
@@ -38,7 +38,7 @@ def markdup(
             'cram.crai': '{root}.cram.crai',
         }
     )
-    fasta_reference = fasta_group(b)
+    fasta_reference = b.read_input_group(**REF_D)
 
     cmd = f"""
     picard MarkDuplicates -Xms13G \\

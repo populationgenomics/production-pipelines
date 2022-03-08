@@ -5,7 +5,7 @@ Sample-metadata DB Sequence entry.
 import logging
 
 from cpg_pipes import buckets
-from cpg_pipes.alignment_input import AlignmentInput
+from cpg_pipes.pipeline.analysis import AlignmentInput
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')

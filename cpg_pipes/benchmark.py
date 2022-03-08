@@ -1,4 +1,8 @@
-from cpg_pipes.alignment_input import AlignmentInput
+"""
+Utilities and resources for running benchmarking
+"""
+
+from cpg_pipes.pipeline.analysis import AlignmentInput
 
 
 BENCHMARK_BUCKET = 'gs://cpg-fewgenomes-test/benchmark'

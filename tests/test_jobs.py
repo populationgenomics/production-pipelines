@@ -8,7 +8,6 @@ from typing import Dict
 from analysis_runner import dataproc
 
 from cpg_pipes import benchmark, utils
-from cpg_pipes.alignment_input import fasta_group
 from cpg_pipes.jobs import vep
 from cpg_pipes.jobs.align import align, Aligner
 from cpg_pipes.jobs.haplotype_caller import produce_gvcf
@@ -17,6 +16,7 @@ from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes import buckets, images
+from cpg_pipes.ref_data import REF_D
 
 try:
     from .utils import BASE_BUCKET, DATASET, SAMPLES, SUBSET_GVCF_BY_SID
@@ -61,7 +61,7 @@ class TestJobs(unittest.TestCase):
         test_j = self.pipeline.b.new_job('Parse CRAM sample name')
         test_j.image(images.SAMTOOLS_PICARD_IMAGE)
         sed = r's/.*SM:\([^\t]*\).*/\1/g'
-        fasta_reference = fasta_group(self.pipeline.b)
+        fasta_reference = self.pipeline.b.read_input_group(**REF_D)
         test_j.command(f'samtools view -T {fasta_reference.base} -c {cram_path} > {test_j.reads_num}')
         test_j.command(f'samtools view -T {fasta_reference.base} -c {cram_path} -f2 > {test_j.reads_num_mapped_in_proper_pair}')
         test_j.command(f'samtools view -T {fasta_reference.base} -H {cram_path} | grep \'^@RG\' | sed "{sed}" | uniq > {test_j.sample_name}')

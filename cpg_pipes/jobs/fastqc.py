@@ -1,11 +1,15 @@
+"""
+Jobs to run fastqc
+"""
+
 from os.path import join
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.alignment_input import AlignmentInput
 from cpg_pipes.jobs import align
+from cpg_pipes.pipeline.analysis import AlignmentInput
 
 
 def fastqc(

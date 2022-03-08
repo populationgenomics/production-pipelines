@@ -92,3 +92,7 @@ class TestPipeline(unittest.TestCase):
             _cnt('hailctl dataproc submit'), 
             1 + len(pipeline.config['output_datasets']) * 3
         )
+
+
+if __name__ == '__main__':
+    unittest.main()

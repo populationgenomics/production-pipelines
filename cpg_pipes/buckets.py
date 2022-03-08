@@ -15,7 +15,7 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-def file_exists(path: str|Path) -> bool:
+def file_exists(path: str | Path) -> bool:
     """
     Check if the object exists, where the object can be:
         * local file

@@ -5,6 +5,7 @@ Functions to find the pipeline inputs and communicate with the SM server
 import logging
 import traceback
 from os.path import join
+from pathlib import Path
 from textwrap import dedent
 
 from hailtop.batch import Batch
@@ -259,7 +260,7 @@ class SMDB:
     def find_joint_calling_analysis(
         self,
         sample_ids: list[str],
-    ) -> 'Analysis'|None:
+    ) -> Analysis|None:
         """
         Query the DB to find the last completed joint-calling analysis for the samples
         """
@@ -390,7 +391,7 @@ class SMDB:
 
     def create_analysis(
         self,
-        output: str,
+        output: Path,
         type_: str,
         status: str,
         sample_ids: list[str],
@@ -405,7 +406,7 @@ class SMDB:
         am = models.AnalysisModel(
             type=models.AnalysisType(type_),
             status=models.AnalysisStatus(status),
-            output=output,
+            output=str(output),
             sample_ids=list(sample_ids),
         )
         try:
@@ -422,11 +423,11 @@ class SMDB:
     def process_existing_analysis(
         self,
         sample_ids: list[str],
-        completed_analysis: 'Analysis'|None,
+        completed_analysis: Analysis | None,
         analysis_type: str,
-        expected_output_fpath: str,
-        dataset_name: str|None = None,
-    ) -> str|None:
+        expected_output_fpath: Path,
+        dataset_name: str | None = None,
+    ) -> Path | None:
         """
         Checks whether existing analysis exists, and output matches the expected output
         file. Invalidates bad analysis by setting status=failure, and submits a
@@ -447,7 +448,7 @@ class SMDB:
         if len(sample_ids) > 1:
             label += f' for {", ".join(sample_ids)}'
 
-        found_output_fpath = None
+        found_output_fpath: Path | None = None
         if not completed_analysis:
             logger.warning(
                 f'Not found completed analysis {label} for '
@@ -459,7 +460,7 @@ class SMDB:
                 f'but the "output" field does not exist or empty'
             )
         else:
-            found_output_fpath = str(completed_analysis.output)
+            found_output_fpath = completed_analysis.output
             if found_output_fpath != expected_output_fpath:
                 logger.error(
                     f'Found a completed analysis {label}, but the "output" path '

@@ -7,6 +7,7 @@ Batch pipeline to laod data into seqr
 import logging
 import time
 from os.path import join, basename
+from pathlib import Path
 from typing import Optional, List
 
 import click
@@ -257,12 +258,14 @@ class JointGenotypingStage(CohortStage):
         Generate a pVCF and a site-only VCF
         """
         samples_hash = utils.hash_sample_ids(cohort.get_all_sample_ids())
-        expected_jc_vcf_path = (
+        expected_jc_vcf_path = Path(
             f'{self.pipe.tmp_bucket}/joint_calling/{samples_hash}.vcf.gz'
         )
         return {
             'vcf': expected_jc_vcf_path,
-            'siteonly': expected_jc_vcf_path.replace('.vcf.gz', '-siteonly.vcf.gz'),
+            'siteonly': Path(str(expected_jc_vcf_path).replace(
+                '.vcf.gz', '-siteonly.vcf.gz'
+            )),
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:

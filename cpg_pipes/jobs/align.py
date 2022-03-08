@@ -11,11 +11,12 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import images, ref_data, buckets
-from cpg_pipes.alignment_input import AlignmentInput, fasta_group
 from cpg_pipes.hb.prev_job import PrevJob
 from cpg_pipes.jobs import picard
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.pipeline.analysis import AlignmentInput
+from cpg_pipes.ref_data import REF_D
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -482,7 +483,7 @@ def extract_fastq(
     j.image(images.BIOINFO_IMAGE)
     j.storage('700G')
 
-    reference = fasta_group(b)
+    reference = b.read_input_group(**REF_D)
     cmd = f"""\
     bazam -Xmx16g -Dsamjdk.reference_fasta={reference.base} \
     -n{nthreads} -bam {cram.base} -r1 {j.fq1} -r2 {j.fq2}
@@ -499,7 +500,7 @@ def create_dragmap_index(b: hb.Batch) -> Job:
     """
     Creates the index for DRAGMAP
     """
-    reference = fasta_group(b)
+    reference = b.read_input_group(**REF_D)
 
     j = b.new_job('Index DRAGMAP')
     j.image(images.BIOINFO_IMAGE)
@@ -568,9 +569,9 @@ def finalise_alignment(
         {align_cmd.strip()} \\
         | bamsormadup inputformat={align_cmd_out_fmt} threads={min(nthreads, 6)} SO=coordinate \\
         M={j.duplicate_metrics} outputformat=sam \\
-        tmpfile=$(dirname {j.output_cram.cram_path})/bamsormadup-tmp \\
-        | samtools view -@{min(nthreads, 6) - 1} -T {reference.base} -Ocram -o {j.output_cram.cram_path}       
-        samtools index -@{nthreads - 1} {j.output_cram.cram_path} {j.output_cram["cram.crai"]}
+        tmpfile=$(dirname {j.output_cram.cram})/bamsormadup-tmp \\
+        | samtools view -@{min(nthreads, 6) - 1} -T {reference.base} -Ocram -o {j.output_cram.cram}       
+        samtools index -@{nthreads - 1} {j.output_cram.cram} {j.output_cram["cram.crai"]}
         """.strip()
         md_j = j
     else:

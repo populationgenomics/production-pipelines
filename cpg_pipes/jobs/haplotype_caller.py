@@ -10,11 +10,11 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import images, ref_data, buckets
-from cpg_pipes.alignment_input import CramPath
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.smdb.smdb import SMDB
+from cpg_pipes.pipeline.analysis import CramPath
+from cpg_pipes.pipeline.smdb import SMDB
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -384,7 +384,7 @@ def postproc_gvcf(
         cmd, setup_gcp=True, monitor_space=True, define_retry_function=True
     ))
     if output_path:
-        b.write_output(j.output_gvcf, output_path.replace('.g.vcf.gz', ''))
+        b.write_output(j.output_gvcf, str(output_path).replace('.g.vcf.gz', ''))
     if depends_on:
         j.depends_on(*depends_on)
     return j
