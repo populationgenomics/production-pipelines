@@ -27,7 +27,7 @@ def produce_gvcf(
     dataset_name: str,
     tmp_bucket: CloudPath,
     cram_path: CramPath,
-    output_path: str | GvcfPath | None = None,
+    output_path: CloudPath | None = None,
     number_of_intervals: int = 1,
     intervals: hb.ResourceGroup | None = None,
     overwrite: bool = True,
@@ -42,7 +42,7 @@ def produce_gvcf(
     HaplotypeCaller is run in an interval-based sharded way, with per-interval
     HaplotypeCaller jobs defined in a nested loop.
     """
-    if output_path and buckets.can_reuse(output_path, overwrite):
+    if buckets.can_reuse(output_path, overwrite):
         return b.new_job('Make GVCF [reuse]', dict(
             sample=sample_name, dataset=dataset_name
         ))
@@ -103,11 +103,11 @@ def haplotype_caller(
     Run haplotype caller in parallel sharded by intervals. 
     Returns the first and the last job object, and path to the output GVCF file.
     """
-    hc_gvcf_path = GvcfPath(tmp_bucket / 'haplotypecaller' / f'{sample_name}.g.vcf.gz')
+    hc_gvcf_path = CloudPath(tmp_bucket / 'haplotypecaller' / f'{sample_name}.g.vcf.gz')
     if buckets.can_reuse(hc_gvcf_path, overwrite):
         first_j = last_j = b.new_job('HaplotypeCaller [reuse]', dict(
             sample=sample_name, dataset=dataset_name))
-        return first_j, last_j, hc_gvcf_path
+        return first_j, last_j, GvcfPath(hc_gvcf_path)
 
     hc_jobs = []
     if number_of_intervals > 1:
@@ -159,7 +159,7 @@ def haplotype_caller(
     if depends_on:
         first_j.depends_on(*depends_on)
     
-    return first_j, last_j, hc_gvcf_path
+    return first_j, last_j, GvcfPath(hc_gvcf_path)
 
 
 def _haplotype_caller_one(
@@ -171,7 +171,7 @@ def _haplotype_caller_one(
     interval_idx: int | None = None,
     number_of_intervals: int = 1,
     depends_on: list[Job] | None = None,
-    out_gvcf_path: GvcfPath | None = None,
+    out_gvcf_path: CloudPath | None = None,
     overwrite: bool = True,
     dragen_mode: bool = False,
 ) -> Job:
@@ -257,7 +257,7 @@ def merge_gvcfs_job(
     sample_name: str,
     dataset_name: str,
     gvcfs: list[hb.ResourceGroup],
-    out_gvcf_path: GvcfPath | None,
+    out_gvcf_path: CloudPath | None,
     overwrite: bool = True,
 ) -> Job:
     """
@@ -298,7 +298,7 @@ def postproc_gvcf(
     sample_name: str,
     dataset_name: str,
     overwrite: bool,
-    output_path: str | GvcfPath | None = None,
+    output_path: CloudPath | None = None,
     depends_on: list[Job] | None = None,
 ) -> Job:
     """
@@ -309,7 +309,7 @@ def postproc_gvcf(
        from Hail about mismatched INFO annotations
     4. Renames the GVCF sample name to use CPG ID.
     """
-    if output_path and buckets.can_reuse(output_path, overwrite):
+    if buckets.can_reuse(output_path, overwrite):
         return b.new_job('Postproc GVCF [reuse]', dict(sample=sample_name, dataset=dataset_name))
 
     logger.info(f'Adding GVCF postproc job for sample {sample_name}, gvcf {gvcf_path}')

@@ -217,7 +217,7 @@ class GvcfStage(SampleStage):
             smdb=self.pipe.get_db(),
         )
         return self.make_outputs(
-            sample, 
+            sample,
             data=self.expected_result(sample), 
             jobs=[gvcf_job]
         )

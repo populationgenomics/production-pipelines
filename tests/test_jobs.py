@@ -126,14 +126,15 @@ class TestJobs(unittest.TestCase):
             self.sample_name, 
             self._read_file(cram_details_paths['sample_name'])
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             20296, 
             int(self._read_file(cram_details_paths['reads_num'])),
+            delta=10,
         )
         self.assertAlmostEqual(
             18797,
             int(self._read_file(cram_details_paths['reads_num_mapped_in_proper_pair'])),
-            delta=10
+            delta=10,
         )
 
     def test_alignment_cram(self):
@@ -155,12 +156,13 @@ class TestJobs(unittest.TestCase):
             self.sample_name, 
             self._read_file(cram_details_paths['sample_name'])
         )
-        self.assertEqual(
-            285438,  # 276599,
+        self.assertAlmostEqual(
+            285438,
             int(self._read_file(cram_details_paths['reads_num'])),
+            delta=50
         )
         self.assertAlmostEqual(
-            273658,  # 271728, 
+            273658,
             int(self._read_file(cram_details_paths['reads_num_mapped_in_proper_pair'])),
             delta=10
         )

@@ -3,7 +3,7 @@ Sample-metadata DB Sequence entry.
 """
 
 import logging
-
+from dataclasses import dataclass
 from cloudpathlib import CloudPath
 
 from cpg_pipes import buckets
@@ -14,23 +14,17 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
+@dataclass
 class SmSequence:
     """
     Sample-metadata DB "Sequence" entry.
 
     See sample-metadata for more details: https://github.com/populationgenomics/sample-metadata
     """
-    def __init__(
-        self, 
-        id: str,
-        sample_id: str, 
-        meta: dict,
-        alignment_input: AlignmentInput | None = None
-    ):
-        self.id = id
-        self.sample_id = sample_id
-        self.meta = meta
-        self.alignment_input = alignment_input
+    id: str
+    sample_id: str
+    meta: dict
+    alignment_input: AlignmentInput | None = None
 
     @staticmethod
     def parse(data: dict, check_existence: bool) -> 'SmSequence':

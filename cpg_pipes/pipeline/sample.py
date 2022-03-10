@@ -5,7 +5,7 @@ Corresponds to one Sample entry in the SMDB
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import cast, Optional
+from typing import Optional
 
 from cpg_pipes.pipeline.analysis import CramPath, GvcfPath, AnalysisType, AlignmentInput
 from cpg_pipes.pipeline.target import Target
@@ -60,13 +60,11 @@ class Sample(Target):
     @property
     def alignment_input(self) -> AlignmentInput | None:
         """
-        @return: returns input for (re-)alignment
+        Returns input for (re-)alignment.
+        :param use_cram_analysis: check CRAM analysis entry.
         """
         if self._alignment_input:
             return self._alignment_input
-        
-        if cram_path := self.analysis_by_type.get(AnalysisType.CRAM):
-            return cast(CramPath, cram_path)
 
         if self.seq:
             return self.seq.alignment_input
@@ -118,6 +116,14 @@ class Sample(Target):
         Path to a GVCF file. Not checking its existence here.
         """
         return GvcfPath(f'{self.dataset.get_bucket(pipeline)}/gvcf/{self.id}.g.vcf.gz')
+
+    def analysis_cram_path(self) -> CramPath | None:
+        """
+        Get CramPath from analysis SMDB entry.
+        """
+        if analysis := self.analysis_by_type.get(AnalysisType.CRAM):
+            return CramPath(analysis.output)
+        return None
 
 
 class Sex(Enum):

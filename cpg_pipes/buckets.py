@@ -7,12 +7,27 @@ import subprocess
 from pathlib import Path
 from cloudpathlib import CloudPath
 
+from cpg_pipes.storage import StorageProvider
+
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-def exists(path: Path | CloudPath, verbose: bool = True) -> bool:
+def str_to_path(path: str | Path | CloudPath) -> Path | CloudPath:
+    """
+    Helper method to create a Path (local file) or CloudPath (cloud storage object) 
+    instance.
+    """
+    if isinstance(path, str):
+        if any(path.startswith(f'{pref.value}://') for pref in StorageProvider):
+            return CloudPath(path)
+        else:
+            return Path(path)
+    return path
+
+
+def exists(path: str | Path | CloudPath, verbose: bool = True) -> bool:
     """
     Check if the object exists, where the object can be:
         * local file
@@ -25,6 +40,7 @@ def exists(path: Path | CloudPath, verbose: bool = True) -> bool:
     :param verbose: for cloud objects, log every existence check
     :return: True if the object exists
     """
+    path = str_to_path(path)
     
     # rstrip to ".mt/" -> ".mt"
     if any(str(path).rstrip('/').endswith(f'.{suf}') for suf in ['mt', 'ht']):

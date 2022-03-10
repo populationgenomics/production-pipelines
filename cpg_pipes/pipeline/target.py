@@ -3,8 +3,6 @@ Defines a target that stage can act upon. Classes like Sample, Dataset, Pipeline
 extend this class.
 """
 
-from typing import Dict
-
 from cpg_pipes.pipeline.analysis import AnalysisType, Analysis
 
 
@@ -14,7 +12,7 @@ class Target:
     """
     def __init__(self):
         # From SMDB Analysis entries:
-        self.analysis_by_type: Dict[AnalysisType, Analysis] = dict()
+        self.analysis_by_type: dict[AnalysisType, Analysis] = dict()
         # Whether to process even if outputs exist:
         self.forced: bool = False
         # If not set, exclude from the pipeline:

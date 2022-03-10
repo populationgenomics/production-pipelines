@@ -4,20 +4,19 @@ Stage classes
 
 import logging
 from abc import ABC, abstractmethod
-from pathlib import Path
 from typing import Callable, cast, Union, TypeVar, Generic
 
 import hailtop.batch as hb
 from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 
+from cpg_pipes.buckets import str_to_path
 from cpg_pipes.pipeline.analysis import AnalysisType
 from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes.pipeline.cohort import Cohort
 from cpg_pipes.pipeline.target import Target
 from cpg_pipes.pipeline.sample import Sample
 from cpg_pipes.pipeline.pair import Pair
-from cpg_pipes.storage import StorageProvider
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -372,18 +371,11 @@ class Stage(Generic[TargetT], ABC):
         Builds a StageDeps object to return from a stage's queue_jobs()
         """
         # Converting str into Path objects.
-        def _convert_path(path):
-            if isinstance(path, str):
-                if any(path.startswith(f'{pref.value}://') for pref in StorageProvider):
-                    return CloudPath(path)
-                else:
-                    return Path(path)
-            return path
         if isinstance(data, str):
-            data = _convert_path(data)
+            data = str_to_path(data)
         if isinstance(data, dict):
             data = {
-                k: _convert_path(v) if isinstance(v, str) else v 
+                k: str_to_path(v) if isinstance(v, str) else v 
                 for k, v in data.items()
             }
         return StageOutput(stage=self, target=target, data=data, jobs=jobs)
@@ -459,9 +451,9 @@ class Stage(Generic[TargetT], ABC):
         # Converting all str into CloudPath
         expected_paths: dict[str, CloudPath] | CloudPath | None
         if isinstance(expected_output, dict):
-            expected_paths = {k: CloudPath(v) for k, v in expected_output.items()}
+            expected_paths = {k: str_to_path(v) for k, v in expected_output.items()}
         elif isinstance(expected_output, str):
-            expected_paths = CloudPath(expected_output)
+            expected_paths = str_to_path(expected_output)
         else:
             expected_paths = expected_output
 
