@@ -10,7 +10,7 @@ The `cpg_pipes` package provides Python functions that help to design a pipeline
 
 ### Installation
 
-Requires Python 3.10.
+Requires Python 3.10
 
 ```bash
 pip install cpg_pipes
@@ -108,7 +108,7 @@ class JointCalling(CohortStage):
         return self.make_outputs(cohort, data=self.expected_result(cohort), jobs=[job])
 ```
 
-To submit the constructed pipeline to Hail Batch, initialise the `Pipeline` object, and call `submit_batch()`. You need to pass a name, a description, a version of a run, the namespace according to the storage policies (`test` / `main` / `tmp`), and the `analysis_project` name that would be used to communicate with the sample metadata DB.
+To submit the constructed pipeline to Hail Batch, initialise the `Pipeline` object, and call `submit_batch()`. You need to pass a name, a description, a version of a run, the namespace according to the storage policies (`test` / `main` / `tmp`), and the `analysis_dataset` name that would be used to communicate with the sample metadata DB.
 
 ```python
 from cpg_pipes.pipeline.pipeline import Pipeline
@@ -119,47 +119,47 @@ pipeline = Pipeline(
     description='My Pipeline',
     output_version='v0-1',
     namespace=Namespace.TEST,
-    analysis_project='fewgenomes',
+    analysis_dataset='fewgenomes',
 )
 pipeline.submit_batch()
 ```
 
 ### Sample metadata database
 
-Stage targets are organised in a form of projects and samples, folowing the model used in the sample metadata database. The additional target _cohort_ is used to define all samples from all projects. The Pipeline class can populate corresponding targets if you provide input project names with `input_projects`:
+Stage targets are organised in a form of dataset and samples, folowing the model used in the sample metadata database. The additional target _cohort_ is used to define all samples from all datasets. The Pipeline class can populate corresponding targets if you provide input dataset names with `input_datasets`:
 
 ```python
 pipeline = Pipeline(
     <...>,
-    input_projects=['hgdp', 'thousand-genomes'],
+    input_datasets=['hgdp', 'thousand-genomes'],
 )
 ```
 
-Under the hood, this will create a `cohort` field of type `Cohort`, which encapsulates a list of projects of type `Project`, each of which contains a list of samples of type `Sample`:
+Under the hood, this will create a `cohort` field of type `Cohort`, which encapsulates a list of datasets of type `Dataset`, each of which contains a list of samples of type `Sample`:
 
 ```
->>> pipeline.cohort.get_projects()
+>>> pipeline.cohort.get_datasets()
 ['perth-neuro', 'acute-care']
 
->>> for project in pipeline.cohort.get_projects():
->>>     samples = project.get_samples()
+>>> for dataset in pipeline.cohort.get_datasets():
+>>>     samples = dataset.get_samples()
 >>>     print(samples[0])
-Sample(id='CPG68197', external_id='HGDP00001', project=hgdp, meta={'project': 'hgdp'}, alignment_input=AlignmentInput(fqs1=None, fqs2=None, bam_or_cram_path='gs://cpg-nagim-test/cram/HGDP00001.cram', index_path='gs://cpg-nagim-test/cram/HGDP00001.cram.crai'), pedigree=None),
+Sample(id='CPG68197', external_id='HGDP00001', dataset=hgdp, meta={}, alignment_input=AlignmentInput(fqs1=None, fqs2=None, bam_or_cram_path='gs://cpg-nagim-test/cram/HGDP00001.cram', index_path='gs://cpg-nagim-test/cram/HGDP00001.cram.crai'), pedigree=None),
 ...
 ```
 
 If a `Participant` entry is available, `sample.participant_id` will be populated. If a corresponding `Sequence` is available, `sample.seq` will be populated, and `reads` metadata will be parsed and populated as `sample.alignment_input`. If corresponding `Analysis` entries exist, they will be populated as `sample.sanalysis_by_type`. If `Family` data is available, it will be parsed and populated as `sample.pedigree`.
 
-Communication with the sample metadata DB is organised through the `cpg_pipes.smdb` module, a wrapper around the sample metadata database API. E.g., to get a dictionary of Sample entries indexed by project name, run:
+Communication with the sample metadata DB is organised through the `cpg_pipes.smdb` module, a wrapper around the sample metadata database API. E.g., to get a dictionary of Sample entries indexed by dataset name, run:
 
 ```python
 from cpg_pipes.smdb import SMDB
 from cpg_pipes.namespace import Namespace
 
-smdb = SMDB(analysis_project='seqr')
+smdb = SMDB(analysis_dataset='seqr')
 
-samples_by_project = smdb.get_samples_by_project(
-    project_names=['acute-care', 'perth-neuro'],
+samples_by_dataset = smdb.get_samples_by_dataset(
+    dataset_names=['acute-care', 'perth-neuro'],
     namespace=Namespace.TEST,
 )
 ```
@@ -169,14 +169,14 @@ To add an Analysis entry, run:
 ```python
 from cpg_pipes.smdb import SMDB
 
-smdb = SMDB(analysis_project='seqr')
+smdb = SMDB(analysis_dataset='seqr')
 
 analysis_id = smdb.create_analysis(
     type_='cram',
     output='gs://cpg-acute-care-test/cram/CPG12345.cram',
     status='completed',
     sample_ids=['CPG12345'],
-    project_name='acute-care',
+    dataset_name='acute-care',
 )
 ```
 
@@ -185,13 +185,13 @@ To add a Batch job that updates an Analysis entry, run:
 ```python
 from cpg_pipes.smdb import SMDB
 
-smdb = SMDB(analysis_project='seqr')
+smdb = SMDB(analysis_dataset='seqr')
 
 j = smdb.make_sm_completed_job(
     batch,
     analysis_id=analysis_id,
     analysis_type='cram',
-    project_name='seqr',
+    dataset_name='seqr',
     sample_name=['CPG12345'],
 )
 ```
@@ -271,13 +271,13 @@ fingerprint_job, fingerprint_path = pedigree.somalier_extact_job(
 )
 ```
 
-Check the pedigree of a project:
+Infer pedigree relashionships and sex of samples in a dataset, and check with a probided PED file:
 
 ```python
 from cpg_pipes.jobs import pedigree
 j, somalier_samples_path, somalier_pairs_path = pedigree.add_pedigree_jobs(
     b,
-    project,
+    dataset,
     input_path_by_sid=fingerprint_by_sid,
     web_bucket=self.pipe.web_bucket,
     web_url=self.pipe.web_url,
@@ -331,10 +331,10 @@ When calling such a pipelne script from the command-line, the options defined in
 
 ```
   -n, --namespace [main|test|tmp] The bucket namespace to write the results to
-  --analysis-project TEXT         SM project name to write the
+  --analysis-dataset TEXT         SM dataset name to write the
                                   intermediate/joint-calling analysis entries
-  --input-project TEXT            Only read samples that belong to the
-                                  project(s). Can be set multiple times.
+  --input-dataset TEXT            Only read samples that belong to the
+                                  dataset(s). Can be set multiple times.
                                   [required]
   --first-stage TEXT              Skip previous stages and pick their expected 
                                   results if further stages depend on them
@@ -392,9 +392,9 @@ When calling such a pipelne script from the command-line, the options defined in
   --ped-file TEXT                 PED file (will override sample-meatadata family 
                                   data if available)
   --local-dir TEXT
-  --output-project TEXT           Only create ES indicies for the project(s).
+  --output-dataset TEXT           Only create ES indicies for the dataset(s).
                                   Can be set multiple times. Defaults to
-                                  --input-projects. The name of the ES index
+                                  --input-datasets. The name of the ES index
                                   will be suffixed with the dataset version
                                   (set by --version)
   --skip-ped-checks               Skip checking provided sex and pedigree
@@ -449,10 +449,10 @@ Will submit 186 jobs:
   Other jobs: 171
 ```
 
-The Batch instance also constructs the job name if the names of a sample and a project are provided as attributes, e.g.:
+The Batch instance also constructs the job name if the names of a sample and a dataset are provided as attributes, e.g.:
 
 ```bash
->>> j = b.new_job('My job', dict(sample='CPG196535', project='fewgenomes'))
+>>> j = b.new_job('My job', dict(sample='CPG196535', dataset='fewgenomes'))
 >>> print(j.name)
 fewgenomes/CPG196535: My job
 ```
@@ -518,15 +518,15 @@ You can also force the pipeline to skip certain samples with `--skip-samples/-S`
 
 ### Running pipelines
 
-To start the `seqr_loader` pipeline on 2 projects `acute-care` and `perth-neuro` in the test namespace, using `seqr` as analysis project, and write the Elasticsearch index for `perth-neuro`:
+To start the `seqr_loader` pipeline on 2 datasets `acute-care` and `perth-neuro` in the test namespace, using `seqr` as analysis dataset, and write the Elasticsearch index for `perth-neuro`:
 
 ```sh
 python pipelines/seqr_loader.py \
 -n main \
---analysis-project seqr \
---input-project acute-care \
---input-project perth-neuro \
---output-project perth-neuro \
+--analysis-dataset seqr \
+--input-dataset acute-care \
+--input-dataset perth-neuro \
+--output-dataset perth-neuro \
 --validate-smdb-analyses \
 --check-smdb-seq-existence \
 --check-intermediate-existence \
@@ -542,9 +542,9 @@ relatedness and sex against a provided PED file(s):
 ```sh
 python pipelines/pedigree.py \
 -n main \
---analysis-project seqr \
---input-project acute-care \
---input-project perth-neuro \
+--analysis-dataset seqr \
+--input-dataset acute-care \
+--input-dataset perth-neuro \
 --ped-file gs://cpg-acute-care-main-upload/acute-care-sm.ped \
 --ped-file gs://cpg-perth-neuro-main-upload/perth-neuro-sm.ped \
 --skip-sample CPG11783 \
