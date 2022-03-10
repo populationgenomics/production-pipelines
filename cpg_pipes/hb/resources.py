@@ -5,7 +5,6 @@ Functions to set up Hail Batch resources (cores, memory, storage).
 import logging
 import math
 from dataclasses import dataclass
-from typing import Optional
 
 from hailtop.batch.job import Job
 
@@ -55,12 +54,11 @@ class MachineType:
     def set_resources(
         self, 
         j: Job,
-        fraction: Optional[float] = None,
-        ncpu: Optional[int] = None, 
-        nthreads: Optional[int] = None, 
-        mem_gb: Optional[float] = None,
-        storage_gb: Optional[float] = None, 
-        attach_disk_storage_gb: Optional[float] = None,
+        fraction: float | None = None,
+        ncpu: int | None = None, 
+        nthreads: int | None = None, 
+        mem_gb: float | None = None,
+        storage_gb: float | None = None, 
     ) -> 'JobResource':
         """
         Set resources to a Job object. If any optional parameters are set,
@@ -72,17 +70,15 @@ class MachineType:
             nthreads=nthreads,
             mem_gb=mem_gb,
             storage_gb=storage_gb,
-            attach_disk_storage_gb=attach_disk_storage_gb,
         ).set_to_job(j)
 
     def request_resources(
         self,
-        fraction: Optional[float] = None,
-        ncpu: Optional[int] = None, 
-        nthreads: Optional[int] = None, 
-        mem_gb: Optional[float] = None,
-        storage_gb: Optional[float] = None, 
-        attach_disk_storage_gb: Optional[float] = None,
+        fraction: float | None = None,
+        ncpu: int | None = None, 
+        nthreads: int | None = None, 
+        mem_gb: float | None = None,
+        storage_gb: float | None = None, 
     ) -> 'JobResource':
         """
         Request resources from the machine, satisfying all provided requirements.
@@ -100,7 +96,11 @@ class MachineType:
         return JobResource(
             machine_type=self, 
             ncpu=min_ncpu, 
-            attach_disk_storage_gb=attach_disk_storage_gb
+            attach_disk_storage_gb=(
+                storage_gb 
+                if storage_gb and storage_gb > self.calc_instance_disk_gb()
+                else None
+            )
         )
     
     def fraction_to_ncpu(self, fraction: float) -> int:
@@ -130,6 +130,7 @@ class MachineType:
         (caluclated with self.calc_instance_disk_gb()).
         """
         fraction = storage_gb / self.calc_instance_disk_gb()
+        fraction = min(fraction, 1.0)
         return self.fraction_to_ncpu(fraction)
 
     def nthreads_to_ncpu(self, nthreads: int) -> int:
@@ -151,7 +152,7 @@ class MachineType:
 
         if ncpu < MachineType.min_cpu:
             logger.warning(
-                f'align: ncpu is adjusted: {ncpu} -> {MachineType.min_cpu}, '
+                f'ncpu is adjusted: {ncpu} -> {MachineType.min_cpu}, '
                 f'to the minimal amount to request from an instance.'
             )
             ncpu = MachineType.min_cpu
@@ -190,8 +191,8 @@ class JobResource:
     def __init__(
         self,
         machine_type: MachineType,
-        ncpu: Optional[int] = None,
-        attach_disk_storage_gb: Optional[float] = None,
+        ncpu: int | None = None,
+        attach_disk_storage_gb: float | None = None,
     ):
         """
         :param machine_type: Hail Batch machine pool type

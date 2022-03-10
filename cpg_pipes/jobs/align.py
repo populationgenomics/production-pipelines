@@ -3,7 +3,7 @@ Create Hail Batch jobs for alignment.
 """
 from enum import Enum
 from textwrap import dedent, indent
-from typing import Optional, Tuple, cast, List
+from typing import cast
 from os.path import join
 import logging
 
@@ -68,10 +68,10 @@ def samtools_stats(
     b,
     cram_path: str,
     sample_name: str,
-    output_path: Optional[str] = None,
-    dataset_name: Optional[str] = None,
+    output_path: str | None = None,
+    dataset_name: str | None = None,
     overwrite: bool = True,
-    nthreads: Optional[int] = None,
+    nthreads: int | None = None,
 ) -> Job:
     """
     Run `samtools stats` for mapping QC
@@ -147,7 +147,7 @@ def align(
         return b.new_job(job_name, dict(sample=sample_name, dataset=dataset_name))
 
     if number_of_shards_for_realignment and number_of_shards_for_realignment > 1:
-        if isinstance(alignment_input, List):
+        if not isinstance(alignment_input, CramPath):
             logger.warning(
                 f'Cannot use number_of_shards_for_realignment for fastq inputs. '
                 f'Sharding only works for CRAM/BAM inputs. '
@@ -159,10 +159,10 @@ def align(
     requested_nthreads = requested_nthreads or STANDARD.max_threads()
 
     sharded_fq = (
-        isinstance(alignment_input, List) and len(alignment_input) > 1
+        not isinstance(alignment_input, CramPath) and len(alignment_input) > 1
     )
     sharded_bazam = (
-        not isinstance(alignment_input, List) and 
+        isinstance(alignment_input, CramPath) and 
         number_of_shards_for_realignment and number_of_shards_for_realignment > 1
     )
     sharded = sharded_fq or sharded_bazam
@@ -180,6 +180,7 @@ def align(
             sample=sample_name,
             dataset=dataset_name,
             aligner=aligner,
+            storage_gb=500,
         )
         first_j = align_j
         stdout_is_sorted = False
@@ -310,12 +311,12 @@ def _align_one(
     alignment_input: AlignmentInput,
     requested_nthreads: int,
     sample: str,
-    dataset: Optional[str] = None,
+    dataset: str | None = None,
     aligner: Aligner = Aligner.BWA,
-    number_of_shards_for_realignment: Optional[int] = None,
-    shard_number_1based: Optional[int] = None,
-    extra_storage_gb: Optional[float] = None,
- ) -> Tuple[Job, str]:
+    number_of_shards_for_realignment: int | None = None,
+    shard_number_1based: int | None = None,
+    storage_gb: float | None = None,
+ ) -> tuple[Job, str]:
     """
     Creates a command that (re)aligns reads to hg38, and a Job object,
     but doesn't add the command to the Job object yet, so sorting and/or
@@ -330,7 +331,7 @@ def _align_one(
         assert number_of_shards_for_realignment > 1, number_of_shards_for_realignment
 
     job_resource = STANDARD.set_resources(
-        j, nthreads=requested_nthreads, attach_disk_storage_gb=extra_storage_gb
+        j, nthreads=requested_nthreads, storage_gb=storage_gb
     )
 
     if aligner in [Aligner.BWAMEM2, Aligner.BWA]:
@@ -408,8 +409,8 @@ def _build_bwa_command(
     nthreads: int,
     sample_name: str,
     tool_name: str,
-    number_of_shards: Optional[int] = None,
-    shard_number_1based: Optional[int] = None,
+    number_of_shards: int | None = None,
+    shard_number_1based: int | None = None,
 ) -> str:
     pull_inputs_cmd = ''
     if isinstance(alignment_input, CramPath):
@@ -460,9 +461,9 @@ def extract_fastq(
     b,
     cram: hb.ResourceGroup,
     sample_name: str,
-    dataset_name: Optional[str] = None,
-    output_fq1: Optional[str] = None,
-    output_fq2: Optional[str] = None,
+    dataset_name: str | None = None,
+    output_fq1: str | None = None,
+    output_fq2: str | None = None,
 ) -> Job:
     """
     Job that converts a bam or a cram to an interleaved compressed fastq file
@@ -539,7 +540,7 @@ def finalise_alignment(
     qc_bucket: CloudPath | str | None = None,
     overwrite: bool = True,
     align_cmd_out_fmt: str = 'sam',
-) -> Optional[Job]:
+) -> Job | None:
     """
     For MarkDupTool.BIOBAMBAM, adds bamsormadup command piped to the existing job.
     For MarkDupTool.PICARD, creates a new job, as Picard can't read from stdin.

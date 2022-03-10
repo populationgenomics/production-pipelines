@@ -241,8 +241,9 @@ def genomicsdb(
         xmx_gb = 25
     
         STANDARD.set_resources(
-            j, 
-            nthreads=nthreads, mem_gb=xmx_gb + 1,
+            j,
+            nthreads=nthreads, 
+            mem_gb=xmx_gb + 1,
             storage_gb=20,
         )
 
