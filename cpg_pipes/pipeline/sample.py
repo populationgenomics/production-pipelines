@@ -49,8 +49,6 @@ class Sample(Target):
             f', dataset={self.dataset.name}' +
             f', forced={self.forced}' +
             f', active={self.active}' +
-            (f', cram={self.cram_path}' if self.cram_path else '') +
-            (f', gvcf={self.gvcf_path}' if self.gvcf_path else '') +
             f', meta={self.meta}' +
             (f', seq={self.seq}' if self.seq else '') +
             (f', alignment_input={self._alignment_input}' 
@@ -138,8 +136,8 @@ class PedigreeInfo:
     """
     sample: Sample
     fam_id: str
-    dad: Sample|None
-    mom: Sample|None
+    dad: Sample | None
+    mom: Sample | None
     sex: Sex
     phenotype: str
 
