@@ -109,19 +109,17 @@ class Sample(Target):
             'Phenotype': '0',
         }
 
-    @property
-    def cram_path(self) -> CramPath:
+    def get_cram_path(self, pipeline) -> CramPath:
         """
         Path to a CRAM file. Not checking its existence here.
         """
-        return CramPath(f'{self.dataset.get_bucket()}/cram/{self.id}.cram')
+        return CramPath(f'{self.dataset.get_bucket(pipeline)}/cram/{self.id}.cram')
 
-    @property
-    def gvcf_path(self) -> GvcfPath:
+    def get_gvcf_path(self, pipeline) -> GvcfPath:
         """
         Path to a GVCF file. Not checking its existence here.
         """
-        return GvcfPath(f'{self.dataset.get_bucket()}/gvcf/{self.id}.g.vcf.gz')
+        return GvcfPath(f'{self.dataset.get_bucket(pipeline)}/gvcf/{self.id}.g.vcf.gz')
 
 
 class Sex(Enum):

@@ -39,8 +39,9 @@ class Dataset(Target):
     def __init__(
         self, 
         name: str,
-        pipeline: 'Pipeline',  # type: ignore  # noqa: F821
         namespace: Namespace | None = None,
+        bucket: CloudPath | None = None,
+        tmp_bucket: CloudPath | None = None,
     ):
         """
         Input `name` can be either e.g. "seqr" or "seqr-test". The latter will be 
@@ -53,7 +54,9 @@ class Dataset(Target):
         """
         super().__init__()
 
-        self.pipeline = pipeline
+        self.bucket = bucket        
+        self.tmp_bucket = tmp_bucket        
+
         self._samples: List[Sample] = []
 
         if name.endswith('-test'):
@@ -80,24 +83,30 @@ class Dataset(Target):
     def __str__(self):
         return f'{self.name} ({len(self.get_samples())} samples)'
 
-    def get_bucket(self) -> CloudPath:
+    def get_bucket(self, pipeline=None) -> CloudPath:
         """
         The primary dataset bucket (-main or -test) 
         """
-        prefix = self.pipeline.storage_provider.value
+        if self.bucket:
+            return self.bucket
+        assert pipeline
+        prefix = pipeline.storage_provider.value
         return (
-            CloudPath(f'{prefix}://cpg-{self.stack}-{self.pipeline.output_suf}')
+            CloudPath(f'{prefix}://cpg-{self.stack}-{pipeline.output_suf}')
         )
 
-    def get_tmp_bucket(self) -> CloudPath:
+    def get_tmp_bucket(self, pipeline=None) -> CloudPath:
         """
         The tmp bucket (-main-tmp or -test-tmp)
         """
-        prefix = self.pipeline.storage_provider.value
+        if self.tmp_bucket:
+            return self.tmp_bucket
+        assert pipeline
+        prefix = pipeline.storage_provider.value
         return (
-            CloudPath(f'{prefix}://cpg-{self.stack}-{self.pipeline.output_suf}-tmp')
-            / self.pipeline.name 
-            / self.pipeline.output_version
+            CloudPath(f'{prefix}://cpg-{self.stack}-{pipeline.output_suf}-tmp')
+            / pipeline.name 
+            / pipeline.output_version
         )
 
     def add_sample(

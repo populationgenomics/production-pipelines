@@ -42,7 +42,7 @@ class FastqcStage(SampleStage):
         """
         Stage is expected to generate a fastqc report
         """
-        return f'{sample.dataset.get_bucket()}/qc/fastqc/{sample.id}.html'
+        return f'{sample.dataset.get_bucket(self.pipe)}/qc/fastqc/{sample.id}.html'
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """
@@ -82,7 +82,7 @@ class CramStage(SampleStage):
         """
         Stage is expected to generate a CRAM file and a corresponding index.
         """
-        return sample.cram_path.path
+        return sample.get_cram_path(self.pipe).path
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """
@@ -128,7 +128,7 @@ class CramSomalierStage(SampleStage):
         """
         Expected to generate the fingerprints file
         """
-        return sample.cram_path.somalier_path
+        return sample.get_cram_path(self.pipe).somalier_path
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """
@@ -191,7 +191,7 @@ class GvcfStage(SampleStage):
         """
         Generate a GVCF and corresponding TBI index
         """
-        return sample.gvcf_path.path
+        return sample.get_gvcf_path(self.pipe).path
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """
@@ -208,7 +208,7 @@ class GvcfStage(SampleStage):
             output_path=self.expected_result(sample),
             sample_name=sample.id,
             dataset_name=sample.dataset.name,
-            cram_path=sample.cram_path,
+            cram_path=sample.get_cram_path(self.pipe),
             intervals=GvcfStage.hc_intervals,
             number_of_intervals=hc_shards_num,
             tmp_bucket=self.pipe.tmp_bucket,
@@ -232,7 +232,7 @@ class GvcfSomalierStage(SampleStage):
         """
         Expected to generate the fingerprints file
         """
-        return sample.gvcf_path.somalier_path
+        return sample.get_gvcf_path(self.pipe).somalier_path
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """
@@ -469,7 +469,7 @@ class AnnotateDatasetStage(DatasetStage):
 
         # Make a list of dataset samples to subset from the entire matrix table
         sample_ids = [s.id for s in dataset.get_samples()]
-        proj_tmp_bucket = dataset.get_tmp_bucket()
+        proj_tmp_bucket = dataset.get_tmp_bucket(self.pipe)
         subset_path = proj_tmp_bucket / 'seqr-samples.txt'
         with subset_path.open('w') as f:
             f.write('\n'.join(sample_ids))
@@ -626,8 +626,9 @@ def make_pipeline(
 
 
 def _make_seqr_metadata_files(
+    pipeline: Pipeline,
     dataset: Dataset, 
-    bucket: CloudPath, 
+    bucket: CloudPath,
     local_dir: Path, 
     overwrite: bool = False
 ):
@@ -649,9 +650,9 @@ def _make_seqr_metadata_files(
     if not buckets.can_reuse(igv_paths_path, overwrite):
         df = pd.DataFrame({
             'individual_id': s.participant_id,
-            'cram_path': s.cram_path,
+            'cram_path': s.get_cram_path(pipeline),
             'cram_sample_id': s.id,
-        } for s in dataset.get_samples() if s.cram_path)
+        } for s in dataset.get_samples() if s.get_cram_path(pipeline))
         df.to_csv(str(igv_paths_path), sep='\t', index=False, header=False)
 
     logger.info(f'Seqr sample map: {samplemap_bucket_path}')
@@ -712,6 +713,7 @@ def main(**kwargs):  # pylint: disable=missing-function-docstring
         for dataset in pipeline.cohort.get_datasets():
             if dataset.stack in pipeline.config.get('output_datasets', []):
                 _make_seqr_metadata_files(
+                    pipeline=pipeline,
                     dataset=dataset,
                     bucket=pipeline.analysis_bucket,
                     local_dir=pipeline.local_dir,

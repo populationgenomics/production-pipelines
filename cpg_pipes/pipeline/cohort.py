@@ -18,10 +18,9 @@ class Cohort(Target):
     """
     Represents a "cohort" target - all samples from all datasets in the pipeline
     """
-    def __init__(self, name: str, pipeline):
+    def __init__(self, name: str):
         super().__init__()
         self.name = name
-        self.pipeline = pipeline
         self._datasets: list[Dataset] = []
 
     def __repr__(self):
@@ -67,7 +66,6 @@ class Cohort(Target):
             logger.warning(f'Dataset {name} already exists in the cohort')
             return ds_by_name[name]
         p = Dataset(
-            pipeline=self.pipeline, 
             name=name, 
             namespace=namespace,
         )

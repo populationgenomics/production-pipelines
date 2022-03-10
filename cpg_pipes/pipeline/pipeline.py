@@ -217,7 +217,6 @@ class Pipeline:
         self.analysis_dataset = Dataset(
             name=analysis_dataset,
             namespace=namespace,
-            pipeline=self,
         )
         self.name = name
         self.output_version = output_version
@@ -292,7 +291,7 @@ class Pipeline:
             billing_project=self.analysis_dataset.stack,
         )
 
-        self.cohort = Cohort(self.name, pipeline=self)
+        self.cohort = Cohort(self.name)
         self._db = None
         if input_datasets:
             for name in input_datasets:
