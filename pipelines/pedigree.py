@@ -6,10 +6,10 @@ Batch pipeline to check pedigree on samples.
 
 import logging
 from os.path import join
-from pathlib import Path
 from typing import List
 
 import click
+from cloudpathlib import CloudPath
 
 from cpg_pipes import buckets
 from cpg_pipes.jobs import pedigree
@@ -31,7 +31,7 @@ class CramPedCheckStage(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         path_by_sid = dict()
         for s in dataset.get_samples():
-            path = Path(f'gs://cpg-{dataset.name}-main/cram/{s.id}.somalier')
+            path = CloudPath(f'gs://cpg-{dataset.name}-main/cram/{s.id}.somalier')
             if buckets.file_exists(path):
                 path_by_sid[s.id] = path
 
@@ -46,7 +46,7 @@ class CramPedCheckStage(DatasetStage):
             tmp_bucket=self.pipe.tmp_bucket,
             depends_on=inputs.get_jobs(),
             label='(CRAMs)',
-            ignore_missing=self.pipe.skip_missing_input,
+            ignore_missing=self.pipe.skip_samples_with_missing_input,
             dry_run=self.pipe.dry_run,
         )
         return self.make_outputs(dataset, data=somalier_samples_path, jobs=[j])
@@ -60,7 +60,7 @@ class GvcfPedCheckStage(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         path_by_sid = dict()
         for s in dataset.get_samples():
-            path = Path(f'gs://cpg-{dataset.name}-main/gvcf/{s.id}.somalier')
+            path = CloudPath(f'gs://cpg-{dataset.name}-main/gvcf/{s.id}.somalier')
             if buckets.file_exists(path):
                 path_by_sid[s.id] = path
 
@@ -74,7 +74,7 @@ class GvcfPedCheckStage(DatasetStage):
             tmp_bucket=self.pipe.tmp_bucket,
             depends_on=inputs.get_jobs(),
             label='(GVCFs)',
-            ignore_missing=self.pipe.skip_missing_input,
+            ignore_missing=self.pipe.skip_samples_with_missing_input,
             dry_run=self.pipe.dry_run,
         )
         return self.make_outputs(dataset, data=somalier_samples_path, jobs=[j])

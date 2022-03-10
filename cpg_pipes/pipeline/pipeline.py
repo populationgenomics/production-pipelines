@@ -48,8 +48,9 @@ import functools
 import logging
 import shutil
 import tempfile
-from pathlib import Path
 from typing import List, Dict, Optional, Tuple, cast, Union, Any, Callable, Type
+
+from cloudpathlib import CloudPath
 
 from .analysis import AnalysisType
 from .. import buckets
@@ -88,7 +89,7 @@ def stage(
     sm_analysis_type: AnalysisType|None = None, 
     required_stages: list[StageDecorator] | StageDecorator | None = None,
     skipped: bool = False,
-    required: bool = True,
+    required: bool | None = None,
     assume_results_exist: bool = False,
     forced: bool = False,
 ) -> Union[StageDecorator, Callable[..., StageDecorator]]:
@@ -182,27 +183,27 @@ class Pipeline:
         name: str,
         description: str,
         output_version: str,
-        namespace: Union[Namespace, str],
-        stages_in_order: Optional[List[StageDecorator]] = None,
+        namespace: Namespace | str,
+        stages_in_order: list[StageDecorator] | None = None,
         keep_scratch: bool = True,
         dry_run: bool = False,
-        previous_batch_tsv_path: Optional[str] = None,
-        previous_batch_id: Optional[str] = None,
+        previous_batch_tsv_path: str | None = None,
+        previous_batch_id: str | None = None,
         update_smdb_analyses: bool = False,
         check_smdb_seq: bool = False,
-        skip_missing_input: bool = False,
+        skip_samples_with_missing_input: bool = False,
         validate_smdb_analyses: bool = False,
         check_intermediates: bool = True,
         check_expected_outputs: bool = True,
-        first_stage: Optional[str] = None,
-        last_stage: Optional[str] = None,
-        config: Optional[Dict] = None,
-        input_datasets: Optional[List[str]] = None,
-        skip_samples: Optional[List[str]] = None,
-        only_samples: Optional[List[str]] = None,
-        forced_samples: Optional[List[str]] = None,
-        ped_files: Optional[List[str]] = None,
-        local_dir: Optional[str] = None,
+        first_stage: str | None = None,
+        last_stage: str | None = None,
+        config: dict | None = None,
+        input_datasets: list[str] | None = None,
+        skip_samples: list[str] | None = None,
+        only_samples: list[str] | None = None,
+        force_samples: list[str] | None = None,
+        ped_files: list[str] | None = None,
+        local_dir: str | None = None,
     ):
         if stages_in_order and not input_datasets:
             raise ValueError(
@@ -211,7 +212,6 @@ class Pipeline:
                 'pipeline.set_stages(stages_in_order) later.'
             )
 
-        super().__init__()
         if isinstance(namespace, str):
             namespace = Namespace(namespace)
         self.analysis_dataset = Dataset(
@@ -224,7 +224,7 @@ class Pipeline:
         self.namespace = namespace
         self.check_intermediates = check_intermediates and not dry_run
         self.check_expected_outputs = check_expected_outputs and not dry_run
-        self.skip_missing_input = skip_missing_input
+        self.skip_samples_with_missing_input = skip_samples_with_missing_input
         self.first_stage = first_stage
         self.last_stage = last_stage
         self.validate_smdb_analyses = validate_smdb_analyses
@@ -293,6 +293,8 @@ class Pipeline:
         self.cohort = Cohort(self.name, pipeline=self)
         self._db = None
         if input_datasets:
+            for name in input_datasets:
+                self.cohort.add_dataset(name, namespace=namespace)
             self._db = SMDB(
                 self.analysis_dataset.name,
                 do_update_analyses=update_smdb_analyses,
@@ -300,16 +302,15 @@ class Pipeline:
             )
             self._db.populate_cohort(
                 cohort=self.cohort,
-                input_datasets=input_datasets,
                 local_tmp_dir=self.local_dir,
                 skip_samples=skip_samples,
                 only_samples=only_samples,
                 ped_files=ped_files,
             )
 
-        if forced_samples:
+        if force_samples:
             for s in self.cohort.get_all_samples():
-                if s.id in forced_samples:
+                if s.id in force_samples:
                     logger.info(
                         f'Force rerunning sample {s.id} even if its outputs exist'
                     )
@@ -458,7 +459,7 @@ class Pipeline:
         """
         return buckets.can_reuse(fpath, overwrite=not self.check_intermediates)
 
-    def db_process_existing_analysis(self, *args, **kwargs) -> Path | None:
+    def db_process_existing_analysis(self, *args, **kwargs) -> CloudPath | None:
         """
         Thin wrapper around SMDB.process_existing_analysis
         """

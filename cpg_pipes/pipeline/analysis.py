@@ -5,9 +5,8 @@ Sample metadata DB Analysis entry.
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
-from typing import cast
-
+from typing import List, Union
+from cloudpathlib import CloudPath
 from hailtop.batch import ResourceGroup, ResourceFile, Batch
 
 logger = logging.getLogger(__file__)
@@ -63,7 +62,7 @@ class Analysis:
     type: AnalysisType
     status: AnalysisStatus
     sample_ids: set[str]
-    output: Path|None
+    output: CloudPath | None
 
     @staticmethod
     def parse(data: dict) -> 'Analysis':
@@ -74,16 +73,14 @@ class Analysis:
                     logger.error(f'"Analysis" data does not have {key}: {data}')
             raise ValueError(f'Cannot parse SMDB Sequence {data}')
         
-        type_ = AnalysisType.parse(data['type'])
-        
         output = data.get('output')
         if output:
-            output = Path(output)
+            output = CloudPath(output)
 
         a = Analysis(
             id=int(data['id']),
-            type=type_,
-            status=data['status'],
+            type=AnalysisType.parse(data['type']),
+            status=AnalysisStatus.parse(data['status']),
             sample_ids=set(data.get('sample_ids', [])),
             output=output,
         )
@@ -92,26 +89,37 @@ class Analysis:
 
 class CramPath:
     """
-    Represents a path to CRAM or a BAM file along with a correponding index,
+    Represents alignment data on a bucket within the pipeline. 
+    Includes a path to a CRAM or a BAM file along with a correponding index,
     and a corresponding fingerprint path.
     """
-    def __init__(self, path: str|Path, index_path: Path|str|None = None):
-        self.path: Path = Path(path)
+    def __init__(
+        self, 
+        path: str | CloudPath, 
+        index_path: CloudPath | str | None = None
+    ):
+        self.path = CloudPath(path)
         self.is_bam = self.path.suffix == '.bam'
         self.ext = 'cram' if not self.is_bam else 'bam'
         self.index_ext = 'crai' if not self.is_bam else 'bai'
         self._index_path = index_path
-        self.somalier_path = Path(self.path.stem + '.somalier')
+        self.somalier_path = CloudPath(f'{self.path}.somalier')
+
+    def __str__(self) -> str:
+        return str(self.path)
+
+    def __repr__(self) -> str:
+        return f'CRAM({self.path})'
 
     @property
-    def index_path(self) -> Path:
+    def index_path(self) -> CloudPath:
         """
         Path to the corresponding index
         """
         return (
-            Path(self._index_path) 
+            CloudPath(self._index_path) 
             if self._index_path 
-            else Path(f'{self.path}.{self.index_ext}')
+            else CloudPath(f'{self.path}.{self.index_ext}')
         )
 
     def resource_group(self, b: Batch) -> ResourceGroup:
@@ -119,123 +127,67 @@ class CramPath:
         Create a Hail Batch resource group
         """
         return b.read_input_group(**{
-            self.ext: self.path,
-            f'{self.ext}.{self.index_ext}': self.index_path,
+            self.ext: str(self.path),
+            f'{self.ext}.{self.index_ext}': str(self.index_path),
         })
     
-    def alignment_input(self) -> 'AlignmentInput':
-        return AlignmentInput(cram_path=self)
-
 
 class GvcfPath:
     """
-    Represents a GVCF file path alon g with a corresponding index, 
+    Represents GVCF data on a bucket within the pipeline. 
+    Includes a path to a GVCF file along with a correponding TBI index,
     and a corresponding fingerprint path.
     """
-    def __init__(self, path: Path|str):
-        self.path = Path(path)
-        self.somalier_path = Path(self.path.stem + '.somalier')
+    def __init__(self, path: CloudPath | str):
+        self.path = CloudPath(path)
+        self.somalier_path = CloudPath(f'{self.path}.somalier')
+        
+    def __str__(self) -> str:
+        return str(self.path)
 
+    def __repr__(self) -> str:
+        return f'GVCF({self.path})'
+    
     @property
-    def tbi_path(self) -> Path:
+    def tbi_path(self) -> CloudPath:
         """
         Path to the corresponding index
         """
-        return Path(f'{self.path}.tbi')
+        return CloudPath(f'{self.path}.tbi')
     
     def resource_group(self, b: Batch) -> ResourceGroup:
         """
         Create a Hail Batch resource group
         """
         return b.read_input_group(**{
-            'g.vcf.gz': self.path,
-            'g.vcf.gz.tbi': self.tbi_path,
+            'g.vcf.gz': str(self.path),
+            'g.vcf.gz.tbi': str(self.tbi_path),
         })
 
 
-class AlignmentInput:
-    """
-    Represents inputs for an alignment job, which can be a set of fastq files,
-    or a CRAM or a BAM file with an index.
-    """
-    def __init__(
-        self, 
-        fqs1: list[str|ResourceFile]|None = None,
-        fqs2: list[str|ResourceFile]|None = None,
-        cram_path: CramPath|Path|str|ResourceGroup|None = None,
-        index_path: Path|str|None = None,
-    ):
-        self.fqs1 = fqs1
-        self.fqs2 = fqs2
-        self.cram_path: CramPath|ResourceGroup|None = None
-        if isinstance(cram_path, str|Path):
-            self.cram_path = CramPath(cram_path, index_path=index_path)
-        else:
-            self.cram_path = cram_path
+FastqPath = Union[str, CloudPath, ResourceFile]
 
-    def __repr__(self):
-        return (
-            f'AlignmentInput(' +
-            (self.cram_path if self.is_bam_or_cram() else str((self.fqs1, self.fqs2))) +
-            f')'
-        )
 
-    def is_fastq(self) -> bool:
+@dataclass
+class FastqPair:
+    r1: FastqPath
+    r2: FastqPath
+    
+    def __getitem__(self, i):
+        assert i == 0 or i == 1, i
+        return [self.r1, self.r2][i]
+
+    def as_resources(self, b) -> 'FastqPair':
         """
-        Checks that it's a fastq pair, and both in pair are of the same type and length
+        Makes a pair of ResourceFile objects for r1 and r2.
         """
-        if self.fqs1 or self.fqs2:
-            assert self.fqs1 and self.fqs2, self
-            if any(isinstance(fq, str) for fq in [self.fqs1, self.fqs2]):
-                assert all(isinstance(fq, str) for fq in [self.fqs1, self.fqs2]), self
-            elif any(isinstance(fq, ResourceFile) for fq in [self.fqs1, self.fqs2]):
-                assert all(isinstance(fq, ResourceFile) for fq in [self.fqs1, self.fqs2]), self
-            else:
-                assert len(self.fqs1) == len(self.fqs2), self
-            return True
-        assert self.cram_path, self
-        return False
+        r1 = self.r1 if isinstance(self.r1, ResourceFile) else b.read_input(str(self.r1))
+        r2 = self.r2 if isinstance(self.r2, ResourceFile) else b.read_input(str(self.r2))
+        return FastqPair(r1, r2)
 
-    def is_bam_or_cram(self) -> bool:
-        """
-        Checks that it's a BAM or a CRAM file
-        """
-        if self.cram_path:
-            return True
-        assert self.fqs1 and self.fqs2, self
-        return False
 
-    def get_fqs1(self) -> list[str|ResourceFile]:
-        assert self.is_fastq()
-        return cast(list, self.fqs1)
+FastqPairs = List[FastqPair]
 
-    def get_fqs2(self) -> list[str|ResourceFile]:
-        assert self.is_fastq()
-        return cast(list, self.fqs2)
 
-    def as_fq_inputs(self, b) -> tuple[list[ResourceFile], list[ResourceFile]]:
-        """
-        Makes a pair of lists of ResourceFile objects for fqs1 and fqs2
-        """
-        assert self.is_fastq()
-        self.fqs1 = cast(list, self.fqs1)
-        self.fqs2 = cast(list, self.fqs2)
-        if isinstance(self.fqs1[0], ResourceFile):
-            files1 = self.fqs1
-            files2 = self.fqs2
-        else:
-            files1 = [b.read_input(f1) for f1 in self.fqs1]
-            files2 = [b.read_input(f1) for f1 in self.fqs2]
-        return files1, files2
-
-    def as_cram_input_group(self, b) -> ResourceGroup:
-        """
-        Makes a ResourceGroup of bam/cram with accompanying index
-        """
-        assert self.is_bam_or_cram()
-
-        if isinstance(self.cram_path, ResourceGroup):
-            return cast(ResourceGroup, self.cram_path)
-
-        self.cram_path = cast(CramPath, self.cram_path)
-        return self.cram_path.resource_group(b)
+# Alignment input can be a CRAM file on a bucket, or a list of Fastq pairs on a bucket.
+AlignmentInput = Union[FastqPairs, CramPath]

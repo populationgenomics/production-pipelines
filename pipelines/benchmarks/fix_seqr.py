@@ -3,7 +3,7 @@ import click
 import logging
 
 from cpg_pipes import images
-from cpg_pipes.pipeline.analysis import AlignmentInput
+from cpg_pipes.pipeline.analysis import FastqPair
 from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
 
@@ -29,20 +29,24 @@ def main():
     )
 
     dir_path = 'gs://cpg-acute-care-main-upload/cpg_acute_positives_20211003_213917'
-    fq_input = AlignmentInput(
-        fqs1=[
+    fq_input = [
+        FastqPair(
             f'{dir_path}/191129_A00692_0037_TL1911296_19W001482-FAM000327_MAN-20191129_NEXTERAFLEXWGS_L001_R1.fastq.gz',
-            f'{dir_path}/191201_A00692_0038_TL1911296_19W001482-FAM000327_MAN-20191129_NEXTERAFLEXWGS_L001_R1.fastq.gz',
-            f'{dir_path}/191129_A00692_0037_TL1911296_19W001482-FAM000327_MAN-20191129_NEXTERAFLEXWGS_L002_R1.fastq.gz',
-            f'{dir_path}/191201_A00692_0038_TL1911296_19W001482-FAM000327_MAN-20191129_NEXTERAFLEXWGS_L002_R1.fastq.gz',
-        ],
-        fqs2=[
             f'{dir_path}/191129_A00692_0037_TL1911296_19W001482-FAM000327_MAN-20191129_NEXTERAFLEXWGS_L001_R2.fastq.gz',
+        ),
+        FastqPair(
+            f'{dir_path}/191201_A00692_0038_TL1911296_19W001482-FAM000327_MAN-20191129_NEXTERAFLEXWGS_L001_R1.fastq.gz',
             f'{dir_path}/191201_A00692_0038_TL1911296_19W001482-FAM000327_MAN-20191129_NEXTERAFLEXWGS_L001_R2.fastq.gz',
+        ),
+        FastqPair(
+            f'{dir_path}/191129_A00692_0037_TL1911296_19W001482-FAM000327_MAN-20191129_NEXTERAFLEXWGS_L002_R1.fastq.gz',
             f'{dir_path}/191129_A00692_0037_TL1911296_19W001482-FAM000327_MAN-20191129_NEXTERAFLEXWGS_L002_R2.fastq.gz',
+        ),
+        FastqPair(
+            f'{dir_path}/191201_A00692_0038_TL1911296_19W001482-FAM000327_MAN-20191129_NEXTERAFLEXWGS_L002_R1.fastq.gz',
             f'{dir_path}/191201_A00692_0038_TL1911296_19W001482-FAM000327_MAN-20191129_NEXTERAFLEXWGS_L002_R2.fastq.gz',
-        ]
-    )
+        )
+    ]
     align(
         pipe.b,
         alignment_input=fq_input,

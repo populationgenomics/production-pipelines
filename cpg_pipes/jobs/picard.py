@@ -2,10 +2,8 @@
 Create Hail Batch jobs to run Picard tools (marking duplicates, QC).
 """
 
-from os.path import splitext, join, dirname
-from typing import Optional
-
 import hailtop.batch as hb
+from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 
 from cpg_pipes import images, buckets
@@ -18,8 +16,9 @@ def markdup(
     b: hb.Batch,
     sorted_bam: hb.ResourceFile,
     sample_name: str,
-    dataset_name: Optional[str] = None,
-    output_path: Optional[str] = None,
+    dataset_name: str | None = None,
+    output_path: CloudPath | str | None = None,
+    qc_bucket: CloudPath | str | None = None,
     overwrite: bool = True,
 ) -> Job:
     """
@@ -50,14 +49,22 @@ def markdup(
     samtools index -@{resource.get_nthreads() - 1} {j.output_cram.cram_path} {j.output_cram['cram.crai']}
     """
     j.command(wrap_command(cmd, monitor_space=True))
+    
     if output_path:
-        b.write_output(j.output_cram, splitext(output_path)[0])
+        output_path = CloudPath(output_path)
+
+        if qc_bucket:
+            qc_bucket = CloudPath(qc_bucket)
+        else:
+            qc_bucket = output_path.parent
+    
+        b.write_output(j.output_cram, str(output_path.with_suffix('')))
         b.write_output(
-            j.duplicate_metrics,
-            join(
-                dirname(output_path),
-                'duplicate-metrics',
-                f'{sample_name}-duplicate-metrics.csv',
-            ),
+            j.duplicate_metrics, str(
+                qc_bucket /
+                'duplicate-metrics' /
+                f'{sample_name}-duplicate-metrics.csv'
+            )
         )
+
     return j

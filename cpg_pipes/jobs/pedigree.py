@@ -4,10 +4,10 @@ Adding jobs for fingerprinting and pedigree checks. Mostly using Somalier.
 
 import sys
 from os.path import join, dirname, pardir, basename
-from pathlib import Path
 from typing import Tuple
 import logging
 
+from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 import pandas as pd
@@ -27,7 +27,7 @@ logger.setLevel(logging.INFO)
 def add_pedigree_jobs(
     b,
     dataset: Dataset,
-    input_path_by_sid: dict[str, Path],
+    input_path_by_sid: dict[str, CloudPath | str],
     overwrite: bool,
     fingerprints_bucket: str,
     tmp_bucket: str,
@@ -59,12 +59,14 @@ def add_pedigree_jobs(
             missing_input.append(sample)
             logger.error(f'Not found somalier input for {sample.id}')
             continue
+            
+        input_path = CloudPath(input_path)
 
         if input_path.name.endswith('.somalier'):
             somalier_file_by_sample[sample.id] = input_path
             continue
 
-        gvcf_or_cram_or_bam_path: CramPath|GvcfPath
+        gvcf_or_cram_or_bam_path: CramPath | GvcfPath
         if input_path.name.endswith('.cram') or input_path.name.endswith('.bam'):
             gvcf_or_cram_or_bam_path = CramPath(input_path)
         else:
@@ -150,9 +152,9 @@ def _check_pedigree_job(
     dataset: Dataset, 
     relate_j: Job, 
     tmp_bucket: str,
-    label: str|None,
+    label: str | None,
     dry_run: bool = False,
-    somalier_html_url: str|None = None,
+    somalier_html_url: str | None = None,
 ):
     check_j = b.new_job(
         'Check relatedness and sex' + (f' {label}' if label else ''),
@@ -163,12 +165,14 @@ def _check_pedigree_job(
     # Creating sample map to remap internal IDs to participant IDs
     sample_map_fpath = f'{tmp_bucket}/pedigree/sample_maps/{dataset.name}.tsv'
     if not dry_run:
-        df = pd.DataFrame(
-            [{'id': s.id, 'pid': s.participant_id} for s in dataset.get_samples()])
+        df = pd.DataFrame([
+            {'id': s.id, 'pid': s.participant_id} for s in dataset.get_samples()
+        ])
         df.to_csv(sample_map_fpath, sep='\t', index=False, header=False)
     script_name = 'check_pedigree.py'
-    script_path = join(dirname(__file__), pardir, pardir, utils.SCRIPTS_DIR,
-                       script_name)
+    script_path = join(
+        dirname(__file__), pardir, pardir, utils.SCRIPTS_DIR, script_name
+    )
     with open(script_path) as f:
         script = f.read()
     # We do not wrap the command nicely to avoid breaking python indents of {script}
@@ -188,7 +192,7 @@ python {script_name} \
 
 def _relate_job(
     b: Batch, 
-    somalier_file_by_sample: dict[str, Path],
+    somalier_file_by_sample: dict[str, CloudPath],
     dataset: Dataset,
     tmp_bucket: str,
     label: str|None,
@@ -244,15 +248,15 @@ def _relate_job(
 def somalier_extact_job(
     b,
     sample: Sample,
-    gvcf_or_cram_or_bam_path: CramPath|GvcfPath,
+    gvcf_or_cram_or_bam_path: CramPath | GvcfPath,
     overwrite: bool,
-    label: str|None = None,
-    depends_on: list[Job]|None = None,
-    out_fpath: Path|None = None,
-) -> tuple[Job, Path]:
+    label: str | None = None,
+    depends_on: list[Job] | None = None,
+    out_fpath: CloudPath | None = None,
+) -> tuple[Job, CloudPath]:
     """
     Run "somalier extract" to generate a fingerprint for a `sample`
-    from `fpath` (which can be a gvcf, a cram or a bam)
+    from `fpath` (which can be a GVCF, a CRAM or a BAM)
     """
     j = b.new_job(
         'Somalier extract' + (f' {label}' if label else ''),
@@ -310,5 +314,5 @@ def somalier_extact_job(
     mv extracted/*.somalier {j.output_file}
     """
     j.command(wrap_command(cmd, setup_gcp=True, define_retry_function=True))
-    b.write_output(j.output_file, out_fpath)
+    b.write_output(j.output_file, str(out_fpath))
     return j, out_fpath

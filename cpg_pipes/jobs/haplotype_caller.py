@@ -4,7 +4,7 @@ Create Hail Batch jobs for variant calling in individual samples.
 
 import logging
 from os.path import join, basename
-from typing import Optional, List, Tuple
+from typing import Tuple
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
@@ -13,7 +13,7 @@ from cpg_pipes import images, ref_data, buckets
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.pipeline.analysis import CramPath
+from cpg_pipes.pipeline.analysis import CramPath, AnalysisType, GvcfPath
 from cpg_pipes.pipeline.smdb import SMDB
 
 logger = logging.getLogger(__file__)
@@ -26,13 +26,13 @@ def produce_gvcf(
     sample_name: str,
     dataset_name: str,
     tmp_bucket: str,
-    cram: CramPath,
-    output_path: Optional[str] = None,
+    cram_path: CramPath,
+    output_path: str | GvcfPath | None = None,
     number_of_intervals: int = 1,
-    intervals: Optional[hb.ResourceGroup] = None,
+    intervals: hb.ResourceGroup | None = None,
     overwrite: bool = True,
-    depends_on: Optional[List[Job]] = None,
-    smdb: Optional[SMDB] = None,
+    depends_on: list[Job] | None = None,
+    smdb: SMDB | None = None,
     dragen_mode: bool = False,
 ) -> Job:
     """
@@ -43,7 +43,9 @@ def produce_gvcf(
     HaplotypeCaller jobs defined in a nested loop.
     """
     if output_path and buckets.can_reuse(output_path, overwrite):
-        return b.new_job('Make GVCF [reuse]', dict(sample=sample_name, dataset=dataset_name))
+        return b.new_job('Make GVCF [reuse]', dict(
+            sample=sample_name, dataset=dataset_name
+        ))
 
     depends_on = depends_on or []
 
@@ -52,7 +54,7 @@ def produce_gvcf(
         sample_name=sample_name,
         dataset_name=dataset_name,
         tmp_bucket=tmp_bucket,
-        cram=cram,
+        cram_path=cram_path,
         number_of_intervals=number_of_intervals, 
         intervals=intervals,
         overwrite=overwrite, 
@@ -74,7 +76,7 @@ def produce_gvcf(
     if smdb:
         last_j = smdb.add_running_and_completed_update_jobs(
             b=b,
-            analysis_type='gvcf',
+            analysis_type=AnalysisType.GVCF,
             output_path=output_path,
             sample_names=[sample_name],
             dataset_name=dataset_name,
@@ -90,18 +92,22 @@ def haplotype_caller(
     sample_name: str,
     dataset_name: str,
     tmp_bucket: str,
-    cram: CramPath,
+    cram_path: CramPath,
     number_of_intervals: int = 1,
-    intervals: Optional[hb.ResourceGroup] = None,
+    intervals: hb.ResourceGroup | None = None,
     overwrite: bool = True,
-    depends_on: Optional[List[Job]] = None,
+    depends_on: list[Job] | None = None,
     dragen_mode: bool = False,
-) -> Tuple[Job, Job, str]:
+) -> Tuple[Job, Job, GvcfPath]:
     """
     Run haplotype caller in parallel sharded by intervals. 
     Returns the first and the last job object, and path to the output GVCF file.
     """
-    hc_gvcf_path = join(tmp_bucket, 'haplotypecaller', f'{sample_name}.g.vcf.gz')
+    hc_gvcf_path = GvcfPath(join(
+        tmp_bucket,
+        'haplotypecaller', 
+        f'{sample_name}.g.vcf.gz')
+    )
     if buckets.can_reuse(hc_gvcf_path, overwrite):
         first_j = last_j = b.new_job('HaplotypeCaller [reuse]', dict(
             sample=sample_name, dataset=dataset_name))
@@ -123,7 +129,7 @@ def haplotype_caller(
                     b,
                     sample_name=sample_name,
                     dataset_name=dataset_name,
-                    cram=cram,
+                    cram_path=cram_path,
                     interval=intervals[f'interval_{idx}'],
                     interval_idx=idx,
                     number_of_intervals=number_of_intervals,
@@ -145,7 +151,7 @@ def haplotype_caller(
             b,
             sample_name=sample_name,
             dataset_name=dataset_name,
-            cram=cram,
+            cram_path=cram_path,
             depends_on=depends_on,
             out_gvcf_path=hc_gvcf_path,
             overwrite=overwrite,
@@ -164,12 +170,12 @@ def _haplotype_caller_one(
     b: hb.Batch,
     sample_name: str,
     dataset_name: str,
-    cram: CramPath,
-    interval: Optional[hb.ResourceFile] = None,
-    interval_idx: Optional[int] = None,
+    cram_path: CramPath,
+    interval: hb.ResourceFile | None = None,
+    interval_idx: int | None = None,
     number_of_intervals: int = 1,
-    depends_on: Optional[List[Job]] = None,
-    out_gvcf_path: Optional[str] = None,
+    depends_on: list[Job] | None = None,
+    out_gvcf_path: GvcfPath | None = None,
     overwrite: bool = True,
     dragen_mode: bool = False,
 ) -> Job:
@@ -220,8 +226,8 @@ def _haplotype_caller_one(
     CRAI=/io/batch/{sample_name}.cram.crai
 
     # Retrying copying to avoid google bandwidth limits
-    retry_gs_cp {cram.path} $CRAM
-    retry_gs_cp {cram.index_path} $CRAI
+    retry_gs_cp {str(cram_path.path)} $CRAM
+    retry_gs_cp {str(cram_path.index_path)} $CRAI
 
     # Copying reference data as well to avoid crazy logging costs 
     # for region requests
@@ -242,9 +248,11 @@ def _haplotype_caller_one(
     -GQB 20 \\
     -ERC GVCF
     """
-    j.command(wrap_command(cmd, monitor_space=True, setup_gcp=True, define_retry_function=True))
+    j.command(wrap_command(
+        cmd, monitor_space=True, setup_gcp=True, define_retry_function=True
+    ))
     if out_gvcf_path:
-        b.write_output(j.output_gvcf, out_gvcf_path.replace('.g.vcf.gz', ''))
+        b.write_output(j.output_gvcf, str(out_gvcf_path).replace('.g.vcf.gz', ''))
     return j
 
 
@@ -252,8 +260,8 @@ def merge_gvcfs_job(
     b: hb.Batch,
     sample_name: str,
     dataset_name: str,
-    gvcfs: List[hb.ResourceGroup],
-    out_gvcf_path: Optional[str],
+    gvcfs: list[hb.ResourceGroup],
+    out_gvcf_path: GvcfPath | None,
     overwrite: bool = True,
 ) -> Job:
     """
@@ -284,18 +292,18 @@ def merge_gvcfs_job(
     """
     j.command(wrap_command(cmd, monitor_space=True))
     if out_gvcf_path:
-        b.write_output(j.output_gvcf, out_gvcf_path.replace('.g.vcf.gz', ''))
+        b.write_output(j.output_gvcf, str(out_gvcf_path).replace('.g.vcf.gz', ''))
     return j
 
 
 def postproc_gvcf(
     b: hb.Batch,
-    gvcf_path: str,
+    gvcf_path: GvcfPath,
     sample_name: str,
     dataset_name: str,
     overwrite: bool,
-    output_path: Optional[str] = None,
-    depends_on: Optional[List[Job]] = None,
+    output_path: str | GvcfPath | None = None,
+    depends_on: list[Job] | None = None,
 ) -> Job:
     """
     1. Runs ReblockGVCF to annotate with allele-specific VCF INFO fields
@@ -338,7 +346,7 @@ def postproc_gvcf(
     REBLOCKED=/io/batch/{sample_name}-reblocked.g.vcf.gz
 
     # Retrying copying to avoid google bandwidth limits
-    retry_gs_cp {gvcf_path} $GVCF
+    retry_gs_cp {str(gvcf_path.path)} $GVCF
     retry_gs_cp {ref_data.NOALT_REGIONS} /io/batch/noalt-regions.bed
 
     # Copying reference data as well to avoid crazy logging costs 

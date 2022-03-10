@@ -92,7 +92,7 @@ def setup_batch(
     )
     backend = hb.ServiceBackend(
         billing_project=billing_project,
-        bucket=hail_bucket.replace('gs://', ''),
+        remote_tmpdir=hail_bucket,
         token=os.environ.get('HAIL_TOKEN'),
     )
     return Batch(name=title, backend=backend)

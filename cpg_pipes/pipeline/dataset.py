@@ -2,7 +2,7 @@
 Represents a CPG dataset in a particular namespace: main and test.
 """
 
-from typing import List, Optional
+from typing import List
 import logging
 
 from cpg_pipes.namespace import Namespace
@@ -38,7 +38,7 @@ class Dataset(Target):
         self, 
         name: str,
         pipeline: 'Pipeline',  # type: ignore  # noqa: F821
-        namespace: Optional[Namespace] = None,
+        namespace: Namespace | None = None,
     ):
         """
         Input `name` can be either e.g. "seqr" or "seqr-test". The latter will be 
@@ -75,6 +75,9 @@ class Dataset(Target):
     def __repr__(self):
         return f'Dataset("{self.name}", {len(self.get_samples())} samples)'
 
+    def __str__(self):
+        return f'{self.name} ({len(self.get_samples())} samples)'
+
     def get_bucket(self):
         """
         The primary dataset bucket (-main or -test) 
@@ -95,9 +98,9 @@ class Dataset(Target):
         self, 
         id: str,  # pylint: disable=redefined-builtin
         external_id: str, 
-        participant_id: str|None = None,
-        seq: SmSequence|None = None,
-        pedigree: PedigreeInfo|None = None,
+        participant_id: str | None = None,
+        seq: SmSequence | None = None,
+        pedigree: PedigreeInfo | None = None,
         **kwargs
     ) -> Sample:
         """

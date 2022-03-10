@@ -4,6 +4,7 @@ Represents a "cohort" target - all samples from all datasets in the pipeline
 
 import logging
 
+from cpg_pipes.namespace import Namespace
 from cpg_pipes.pipeline.sample import Sample
 from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes.pipeline.target import Target
@@ -57,7 +58,7 @@ class Cohort(Target):
         """
         return [s.id for s in self.get_all_samples(only_active=only_active)]
 
-    def add_dataset(self, name: str) -> Dataset:
+    def add_dataset(self, name: str, namespace: Namespace | None = None) -> Dataset:
         """
         Create a dataset and add to the cohort.
         """
@@ -65,7 +66,11 @@ class Cohort(Target):
         if name in ds_by_name:
             logger.warning(f'Dataset {name} already exists in the cohort')
             return ds_by_name[name]
-        p = Dataset(pipeline=self.pipeline, name=name)
+        p = Dataset(
+            pipeline=self.pipeline, 
+            name=name, 
+            namespace=namespace,
+        )
         self._datasets.append(p)
         return p
 

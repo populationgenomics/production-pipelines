@@ -2,18 +2,20 @@ import shutil
 import tempfile
 import time
 import unittest
-from os.path import join, basename
+from os.path import join
 from typing import Dict
 
 from analysis_runner import dataproc
+from cloudpathlib import CloudPath
 
 from cpg_pipes import benchmark, utils
 from cpg_pipes.jobs import vep
-from cpg_pipes.jobs.align import align, Aligner
+from cpg_pipes.jobs.align import align
 from cpg_pipes.jobs.haplotype_caller import produce_gvcf
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
+from cpg_pipes.pipeline.analysis import CramPath
 from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes import buckets, images
 from cpg_pipes.ref_data import REF_D
@@ -31,8 +33,8 @@ class TestJobs(unittest.TestCase):
     def setUp(self):
         self.name = self._testMethodName
         self.timestamp = time.strftime('%Y%m%d-%H%M')
-        self.out_bucket = f'{BASE_BUCKET}/{self.name}/{self.timestamp}'
-        self.tmp_bucket = f'{self.out_bucket}/tmp'
+        self.out_bucket = CloudPath(BASE_BUCKET) / self.name / self.timestamp
+        self.tmp_bucket = self.out_bucket / 'tmp'
         self.local_tmp_dir = tempfile.mkdtemp()
 
         self.pipeline = Pipeline(
@@ -47,14 +49,15 @@ class TestJobs(unittest.TestCase):
     def tearDown(self) -> None:
         shutil.rmtree(self.local_tmp_dir)
 
-    def _read_file(self, path):
-        local_tmp_dir = self.local_tmp_dir
-        local_path = join(local_tmp_dir, basename(path))
-        buckets.gsutil_cp(path, local_path)
-        with open(local_path) as f:
+    def _read_file(self, path: CloudPath) -> str:
+        with path.open() as f:
             return f.read().strip()
 
-    def _job_get_cram_details(self, cram_path, out_bucket) -> Dict[str, str]:
+    def _job_get_cram_details(
+        self, 
+        cram_path: CloudPath, 
+        out_bucket: CloudPath,
+    ) -> Dict[str, CloudPath]:
         """ 
         Add job that gets details of a CRAM file
         """
@@ -62,13 +65,22 @@ class TestJobs(unittest.TestCase):
         test_j.image(images.SAMTOOLS_PICARD_IMAGE)
         sed = r's/.*SM:\([^\t]*\).*/\1/g'
         fasta_reference = self.pipeline.b.read_input_group(**REF_D)
-        test_j.command(f'samtools view -T {fasta_reference.base} -c {cram_path} > {test_j.reads_num}')
-        test_j.command(f'samtools view -T {fasta_reference.base} -c {cram_path} -f2 > {test_j.reads_num_mapped_in_proper_pair}')
-        test_j.command(f'samtools view -T {fasta_reference.base} -H {cram_path} | grep \'^@RG\' | sed "{sed}" | uniq > {test_j.sample_name}')
+        test_j.command(
+            f'samtools view -T {fasta_reference.base} {cram_path} '
+            f'-c > {test_j.reads_num}'
+        )
+        test_j.command(
+            f'samtools view -T {fasta_reference.base} {cram_path} '
+            f'-c -f2 > {test_j.reads_num_mapped_in_proper_pair}'
+        )
+        test_j.command(
+            f'samtools view -T {fasta_reference.base} {cram_path} '
+            f'-H | grep \'^@RG\' | sed "{sed}" | uniq > {test_j.sample_name}'
+        )
         d = {}
         for key in ['reads_num', 'reads_num_mapped_in_proper_pair', 'sample_name']:
-            out_path = join(out_bucket, f'{key}.out')
-            self.pipeline.b.write_output(test_j[key], out_path)
+            out_path = out_bucket / f'{key}.out'
+            self.pipeline.b.write_output(test_j[key], str(out_path))
             d[key] = out_path
         return d
 
@@ -80,34 +92,71 @@ class TestJobs(unittest.TestCase):
         test_j.image(images.BCFTOOLS_IMAGE)
         test_j.command(f'bcftools query -l {gvcf_path} > {test_j.output}')
 
-        out_path = join(self.out_bucket, f'{self.sample_name}.out')
+        out_path = self.out_bucket / f'{self.sample_name}.out'
         self.pipeline.b.write_output(test_j.output, out_path)
         return out_path
-    
-    def test_alignment(self):
+
+    def test_alignment_fastq(self):
         """
-        Test alignment job
+        Test alignment job on a set of two FASTQ pairs 
+        (tests processing in parallel merging and merging)
         """
-        inp = benchmark.tiny_cram
+        qc_bucket = self.out_bucket / 'align_fastq' / 'qc'
+
         j = align(
-            self.pipeline.b,
-            alignment_input=inp,
+            b=self.pipeline.b,
+            alignment_input=benchmark.tiny_fq,
+            output_path=self.out_bucket / 'align_fastq' / 'result.cram',
+            qc_bucket=qc_bucket,
             sample_name=self.sample_name,
             dataset_name=DATASET,
-            aligner=Aligner.DRAGMAP,
         )
         cram_details_paths = self._job_get_cram_details(
-            j.output_cram.cram_path, out_bucket=join(self.out_bucket, f'align')
+            j.output_cram.cram, out_bucket=self.out_bucket / 'align_fastq'
         )
-
         self.pipeline.submit_batch(wait=True)     
+        
+        self.assertTrue((
+            qc_bucket / 
+            'duplicate-metrics' / 
+            f'{self.sample_name}-duplicate-metrics.csv'
+        ).exists())
 
         self.assertEqual(
             self.sample_name, 
             self._read_file(cram_details_paths['sample_name'])
         )
         self.assertEqual(
-            283306,  # 276599,
+            20296, 
+            int(self._read_file(cram_details_paths['reads_num'])),
+        )
+        self.assertAlmostEqual(
+            18797,
+            int(self._read_file(cram_details_paths['reads_num_mapped_in_proper_pair'])),
+            delta=10
+        )
+
+    def test_alignment_cram(self):
+        """
+        Test alignment job on a CRAM input (tests realignment with bazam)
+        """
+        j = align(
+            self.pipeline.b,
+            alignment_input=benchmark.tiny_cram,
+            sample_name=self.sample_name,
+            dataset_name=DATASET,
+        )
+        cram_details_paths = self._job_get_cram_details(
+            j.output_cram.cram, out_bucket=self.out_bucket / 'align'
+        )
+        self.pipeline.submit_batch(wait=True)
+
+        self.assertEqual(
+            self.sample_name, 
+            self._read_file(cram_details_paths['sample_name'])
+        )
+        self.assertEqual(
+            285438,  # 276599,
             int(self._read_file(cram_details_paths['reads_num'])),
         )
         self.assertAlmostEqual(
@@ -121,7 +170,9 @@ class TestJobs(unittest.TestCase):
         """
         Test individual sample haplotype calling
         """
-        cram_path = f'{benchmark.BENCHMARK_BUCKET}/outputs/TINY_CRAM/dragmap-picard.cram'
+        cram_path = CramPath(
+            f'{benchmark.BENCHMARK_BUCKET}/outputs/TINY_CRAM/dragmap-picard.cram'
+        )
         j = produce_gvcf(
             self.pipeline.b,
             sample_name=self.sample_name,
@@ -199,16 +250,16 @@ class TestJobs(unittest.TestCase):
         """
         Tests command line VEP with LoF plugin and MANE_SELECT annotation
         """
-        site_only_vcf_path = (
+        site_only_vcf_path = CloudPath(
             'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
             'vqsr.vcf.gz'
         )
-        out_vcf_path = f'{self.out_bucket}/vep/vep.vcf.gz'
+        out_vcf_path = self.out_bucket / 'vep' / 'vep.vcf.gz'
 
         j = vep.vep(
             self.pipeline.b, 
-            vcf_path=site_only_vcf_path, 
-            out_vcf_path=out_vcf_path,
+            vcf_path=str(site_only_vcf_path), 
+            out_vcf_path=str(out_vcf_path),
         )
         self.pipeline.submit_batch(wait=True)
 
@@ -220,9 +271,9 @@ class TestJobs(unittest.TestCase):
         -i'BIOTYPE="protein_coding" & LoF_filter="ANC_ALLELE"' -s worst \
         > {test_j.output}
         """)
-        res_path = join(self.out_bucket, f'{self.sample_name}.out')
-        self.pipeline.b.write_output(test_j.output, res_path)
-        self.assertTrue(buckets.file_exists(out_vcf_path))
+        res_path = self.out_bucket / f'{self.sample_name}.out'
+        self.pipeline.b.write_output(test_j.output, str(res_path))
+        self.assertTrue(out_vcf_path.exists())
         contents = self._read_file(res_path)
         self.assertEqual(
             'chr20:5111495 TMEM230 protein_coding NM_001009923.2 LC ANC_ALLELE', 

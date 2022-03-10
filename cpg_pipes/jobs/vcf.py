@@ -3,10 +3,10 @@ Helper Hail Batch jobs useful for both individual and joint variant calling.
 """
 
 import logging
-from pathlib import Path
 from typing import Tuple
 
 import hailtop.batch as hb
+from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 
 from cpg_pipes import images, buckets
@@ -22,7 +22,7 @@ def gather_vcfs(
     b: hb.Batch,
     input_vcfs: list[hb.ResourceGroup],
     overwrite: bool,
-    output_vcf_path: Path|None = None,
+    output_vcf_path: CloudPath | None = None,
     site_only: bool = False,
 ) -> Tuple[Job, hb.ResourceGroup]:
     """

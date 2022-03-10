@@ -30,6 +30,7 @@ setuptools.setup(
         'fsspec',
         'sample-metadata',
         'analysis-runner',
+        'cloudpathlib[gs]'
     ],
     keywords='bioinformatics',
     classifiers=[

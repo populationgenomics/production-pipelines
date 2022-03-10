@@ -7,7 +7,6 @@ Batch pipeline to laod data into seqr
 import logging
 import time
 from os.path import join, basename
-from pathlib import Path
 from typing import Optional, List
 
 import click
@@ -18,7 +17,7 @@ from analysis_runner import dataproc
 
 from cpg_pipes import buckets, ref_data, utils
 from cpg_pipes.jobs import align, split_intervals, haplotype_caller, \
-    pedigree
+    pedigree, fastqc
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
@@ -37,6 +36,46 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
+@stage(skipped=True)
+class FastqcStage(SampleStage):
+    """
+    Run FastQC on alignment inputs
+    """
+    def expected_result(self, sample: Sample):
+        """
+        Stage is expected to generate a fastqc report
+        """
+        return f'{sample.dataset.get_bucket()}/qc/fastqc/{sample.id}.html'
+
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+        """
+        Using the "fastqc" function implemented in the jobs module
+        """
+        if not sample.alignment_input:
+            if self.pipe.skip_samples_with_missing_input:
+                logger.error(f'Could not find read data, skipping sample {sample.id}')
+                sample.active = False
+                return self.make_outputs(sample)  # return empty output
+            else:
+                raise PipelineError(
+                    f'No alignment input found for {sample.id}. '
+                    f'Checked: Sequence entry and type=CRAM Analysis entry'
+                )
+
+        job = fastqc.fastqc(
+            b=self.pipe.b,
+            output_fpath=self.expected_result(sample),
+            alignment_input=sample.alignment_input,
+            sample_name=sample.id,
+            dataset_name=sample.dataset.name,
+        )
+        return self.make_outputs(
+            sample, 
+            data=self.expected_result(sample), 
+            jobs=[job]
+        )
+    
+
 @stage(sm_analysis_type=AnalysisType.CRAM)
 class CramStage(SampleStage):
     """
@@ -53,7 +92,7 @@ class CramStage(SampleStage):
         Using the "align" function implemented in the jobs module
         """
         if not sample.alignment_input:
-            if self.pipe.skip_missing_input:
+            if self.pipe.skip_samples_with_missing_input:
                 logger.error(f'Could not find read data, skipping sample {sample.id}')
                 sample.active = False
                 return self.make_outputs(sample)  # return empty output
@@ -73,7 +112,7 @@ class CramStage(SampleStage):
             smdb=self.pipe.get_db(),
             prev_batch_jobs=self.pipe.prev_batch_jobs,
             number_of_shards_for_realignment=(
-                10 if sample.alignment_input.is_bam_or_cram() else None
+                10 if isinstance(sample.alignment_input, CramPath) else None
             )
         )
         return self.make_outputs(
@@ -172,7 +211,7 @@ class GvcfStage(SampleStage):
             output_path=self.expected_result(sample),
             sample_name=sample.id,
             dataset_name=sample.dataset.name,
-            cram=sample.cram_path,
+            cram_path=sample.cram_path,
             intervals=GvcfStage.hc_intervals,
             number_of_intervals=hc_shards_num,
             tmp_bucket=self.pipe.tmp_bucket,
@@ -258,14 +297,12 @@ class JointGenotypingStage(CohortStage):
         Generate a pVCF and a site-only VCF
         """
         samples_hash = utils.hash_sample_ids(cohort.get_all_sample_ids())
-        expected_jc_vcf_path = Path(
+        expected_jc_vcf_path = (
             f'{self.pipe.tmp_bucket}/joint_calling/{samples_hash}.vcf.gz'
         )
         return {
             'vcf': expected_jc_vcf_path,
-            'siteonly': Path(str(expected_jc_vcf_path).replace(
-                '.vcf.gz', '-siteonly.vcf.gz'
-            )),
+            'siteonly': expected_jc_vcf_path.replace('.vcf.gz', '-siteonly.vcf.gz'),
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
@@ -685,7 +722,7 @@ def main(**kwargs):  # pylint: disable=missing-function-docstring
                     bucket=pipeline.analysis_bucket,
                     local_dir=pipeline.local_dir,
                 )
-    
+
 
 if __name__ == '__main__':
     main()  # pylint: disable=E1120

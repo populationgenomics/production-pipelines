@@ -5,9 +5,9 @@ Functions to find the pipeline inputs and communicate with the SM server
 import logging
 import traceback
 from os.path import join
-from pathlib import Path
 from textwrap import dedent
 
+from cloudpathlib import CloudPath
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
@@ -22,7 +22,7 @@ from sample_metadata.exceptions import ApiException
 
 from .. import buckets, images
 from .cohort import Cohort
-from .sample import PedigreeInfo, Sex
+from .sample import PedigreeInfo, Sex, Sample
 from .dataset import Dataset
 from .analysis import Analysis, AnalysisType, AnalysisStatus
 from .sequence import SmSequence
@@ -63,7 +63,6 @@ class SMDB:
     def populate_cohort(
         self,
         cohort: Cohort,
-        input_datasets: list[str],
         local_tmp_dir: str,
         skip_samples: list[str]|None = None,
         only_samples: list[str]|None = None,
@@ -72,9 +71,9 @@ class SMDB:
         """
         Populate database entries for all datasets.
         """
-        for name in input_datasets:
+        for dataset in cohort.get_datasets():
             self.populate_dataset(
-                cohort.add_dataset(name),
+                dataset,
                 only_samples=only_samples,
                 skip_samples=skip_samples,
             )
@@ -161,19 +160,39 @@ class SMDB:
         )
 
         participant_id_by_cpgid = self.__get_participant_id_by_sid(dataset.name)
-        sequence_by_sid = self.get_sequence_by_sid([d['id'] for d in sample_datas])
 
-        for sample_d in sample_datas:
-            cpgid = sample_d['id']
+        samples = [
             dataset.add_sample(
-                id=cpgid, 
+                id=sample_d['id'], 
                 external_id=sample_d['external_id'],
-                participant_id=participant_id_by_cpgid.get(cpgid),
-                seq=sequence_by_sid.get(cpgid),
+                participant_id=participant_id_by_cpgid.get(sample_d['id']),
                 **sample_d.get('meta', {}),
             )
+            for sample_d in sample_datas
+        ]
+
+        self.populate_sequence(samples)
+
         return dataset
 
+    def populate_sequence(self, samples: list[Sample]) -> list[Sample]:
+        """
+        Get and parse "Sequence" entries for each sample.
+        """
+        try:
+            seq_infos: list[dict] = self.seqapi.get_sequences_by_sample_ids(
+                [s.id for s in samples]
+            )
+        except ApiException:
+            traceback.print_exc()
+            return []
+        
+        seq_info_by_sid = {seq['sample_id']: seq for seq in seq_infos}
+        for sample in samples:
+            seq_info = seq_info_by_sid[sample.id]
+            sample.seq = SmSequence.parse(seq_info, self.do_check_seq_existence) 
+        return samples
+    
     def __get_sample_entries(
         self,
         dataset_name: str,
@@ -223,23 +242,6 @@ class SMDB:
         else:
             participant_id_by_cpgid = {sid.strip(): pid.strip() for pid, sid in pid_sid}
         return participant_id_by_cpgid
-
-    def get_sequence_by_sid(self, sample_ids: list[str]) -> dict[str, SmSequence]:
-        """
-        Return a dict of "Sequence" entries indexed by sample ID.
-        """
-        try:
-            seq_infos: list[dict] = self.seqapi.get_sequences_by_sample_ids(sample_ids)
-        except ApiException:
-            traceback.print_exc()
-            return {}
-        else:
-            seqs = [
-                SmSequence.parse(d, self.do_check_seq_existence) 
-                for d in seq_infos
-            ]
-            seqs_by_sid = {seq.sample_id: seq for seq in seqs}
-            return seqs_by_sid
 
     def update_analysis(self, analysis: 'Analysis', status: AnalysisStatus):
         """
@@ -391,9 +393,9 @@ class SMDB:
 
     def create_analysis(
         self,
-        output: Path,
-        type_: str,
-        status: str,
+        output: CloudPath | str,
+        type_: str | AnalysisType,
+        status: str | AnalysisStatus,
         sample_ids: list[str],
         dataset_name: str|None = None,
     ) -> int|None:
@@ -402,6 +404,11 @@ class SMDB:
         """
         if not self.do_update_analyses:
             return None
+
+        if isinstance(type_, AnalysisType):
+            type_ = type_.value
+        if isinstance(status, AnalysisStatus):
+            status = status.value
 
         am = models.AnalysisModel(
             type=models.AnalysisType(type_),
@@ -425,9 +432,9 @@ class SMDB:
         sample_ids: list[str],
         completed_analysis: Analysis | None,
         analysis_type: str,
-        expected_output_fpath: Path,
+        expected_output_fpath: CloudPath,
         dataset_name: str | None = None,
-    ) -> Path | None:
+    ) -> CloudPath | None:
         """
         Checks whether existing analysis exists, and output matches the expected output
         file. Invalidates bad analysis by setting status=failure, and submits a
@@ -448,7 +455,7 @@ class SMDB:
         if len(sample_ids) > 1:
             label += f' for {", ".join(sample_ids)}'
 
-        found_output_fpath: Path | None = None
+        found_output_fpath: CloudPath | None = None
         if not completed_analysis:
             logger.warning(
                 f'Not found completed analysis {label} for '
@@ -516,14 +523,14 @@ class SMDB:
 
     def add_running_and_completed_update_jobs(
         self,
-        b,
-        analysis_type,
-        output_path,
-        sample_names,
-        first_j,
-        last_j,
-        depends_on,
-        dataset_name: str|None = None,
+        b: Batch,
+        analysis_type: AnalysisType,
+        output_path: CloudPath | str,
+        sample_names: list[str],
+        first_j: Job,
+        last_j: Job,
+        depends_on: list[Job] | None,
+        dataset_name: str | None = None,
     ) -> Job:
         """
         Given a first job and a last job object, insert corresponding "queued", 

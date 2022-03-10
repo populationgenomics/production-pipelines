@@ -3,10 +3,10 @@ Create Hail Batch jobs to create and apply a VQSR models.
 """
 
 from os.path import join
-from pathlib import Path
 from typing import List, Optional
 import logging
 import hailtop.batch as hb
+from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 from analysis_runner import dataproc
 
@@ -86,14 +86,14 @@ INDEL_RECALIBRATION_TRANCHE_VALUES = [
 
 def make_vqsr_jobs(
     b: hb.Batch,
-    input_vcf_or_mt_path: Path,
+    input_vcf_or_mt_path: CloudPath,
     work_bucket: str,
     gvcf_count: int,
     scatter_count: int = ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS,
-    depends_on: list[Job]|None = None,
-    meta_ht_path: Path|None = None,
-    hard_filter_ht_path: Path|None = None,
-    output_vcf_path: Path|None = None,
+    depends_on: list[Job] | None = None,
+    meta_ht_path: CloudPath | None = None,
+    hard_filter_ht_path: CloudPath | None = None,
+    output_vcf_path: CloudPath | None = None,
     use_as_annotations: bool = True,
     overwrite: bool = True,
     convert_vcf_to_site_only: bool = False,
@@ -844,8 +844,8 @@ def add_apply_recalibration_step(
     use_as_annotations: bool,
     indel_filter_level: float,
     snp_filter_level: float,
-    interval: hb.ResourceGroup|None = None,
-    output_vcf_path: Path|None = None,
+    interval: hb.ResourceGroup | None = None,
+    output_vcf_path: CloudPath | None = None,
 ) -> Job:
     """
     Apply a score cutoff to filter variants based on a recalibration table.

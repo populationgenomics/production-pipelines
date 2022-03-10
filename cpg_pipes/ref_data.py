@@ -45,9 +45,9 @@ DRAGMAP_INDEX_FILES = [
 ]
 
 # BWA indices
+BWA_INDEX_EXTS = ['sa', 'amb', 'bwt', 'ann', 'pac', 'alt']
+BWAMEM2_INDEX_EXTS = ['0123', 'amb', 'bwt.2bit.64', 'ann', 'pac', 'alt']
 BWAMEM2_INDEX_PREFIX = REF_FASTA
-BWAMEM2_INDEX_EXTS = ['0123', 'amb', 'bwt.2bit.64', 'ann', 'pac']
-BWA_INDEX_EXTS = ['sa', 'amb', 'bwt', 'ann', 'pac']
 
 # GATK intervals
 UNPADDED_INTERVALS = join(BROAD_REF_BUCKET, 'hg38.even.handcurated.20k.intervals')

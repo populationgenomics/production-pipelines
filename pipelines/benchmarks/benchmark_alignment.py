@@ -6,7 +6,7 @@ import logging
 
 from cpg_pipes import benchmark, images
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
-from cpg_pipes.pipeline.analysis import AlignmentInput
+from cpg_pipes.pipeline.analysis import FastqPair, CramPath
 from cpg_pipes.pipeline.pipeline import stage, Pipeline
 from cpg_pipes.pipeline.sample import Sample
 from cpg_pipes.pipeline.stage import SampleStage, StageInput, StageOutput
@@ -67,12 +67,12 @@ class SubsetAlignmentInput(SampleStage):
             jobs=[j1, j2],
         )
     
-    def _subset_cram(self, alignment_input: AlignmentInput, sample: Sample):
+    def _subset_cram(self, cram: CramPath, sample: Sample):
         j = self.pipe.b.new_job('Subset CRAM')
         j.image(images.BIOINFO_IMAGE)
         j.storage('100G')
         reference = self.pipe.b.read_input_group(**REF_D)
-        cram = alignment_input.as_cram_input_group(self.pipe.b)
+        cram_group = cram.resource_group(self.pipe.b)
 
         j.declare_resource_group(
             output_cram={
@@ -81,11 +81,14 @@ class SubsetAlignmentInput(SampleStage):
             }
         )
         j.command(
-            f'samtools view {cram.base} -@31 --subsample {1/self.SUBSET_FRACTION} '
+            f'samtools view {cram_group.cram} -@31 --subsample {1/self.SUBSET_FRACTION} '
             f'-T {reference.base} -Ocram -o {j.output_cram.cram_path}\n'
             f'samtools index -@31 {j.output_cram.cram_path} {j.output_cram["cram.crai"]}'
         )
-        self.pipe.b.write_output(j.output_cram, self.expected_result(sample).replace('.cram', ''))
+        self.pipe.b.write_output(
+            j.output_cram, 
+            self.expected_result(sample).replace('.cram', '')
+        )
         
         return self.make_outputs(
             sample, 
@@ -111,7 +114,7 @@ class DifferentResources(SampleStage):
 
         if INPUTS_TYPE == InputsType.FULL_SUBSET:
             d = inputs.as_dict(sample, stage=SubsetAlignmentInput)
-            alignment_input = AlignmentInput(fqs1=[d['r1']], fqs2=[d['r2']])
+            alignment_input = [FastqPair(d['r1'], d['r2'])]
         else:
             alignment_input = sample.meta['fastq_input']
 
@@ -143,7 +146,7 @@ class DifferentAlignerSetups(SampleStage):
 
         if INPUTS_TYPE == InputsType.FULL_SUBSET:
             d = inputs.as_dict(sample, stage=SubsetAlignmentInput)
-            alignment_input = AlignmentInput(fqs1=[d['r1']], fqs2=[d['r2']])
+            alignment_input = [FastqPair(d['r1'], ['r2'])]
         else:
             if 'fastq_input' in sample.meta:
                 alignment_input = sample.meta['fastq_input']
@@ -167,7 +170,8 @@ class DifferentAlignerSetups(SampleStage):
                     markdup_tool=markdup,
                     extra_label=f', dedup with {markdup.name}',
                     depends_on=inputs.get_jobs(),
-                    number_of_shards_for_realignment=10 if alignment_input.is_bam_or_cram() else 0,
+                    number_of_shards_for_realignment=10 if 
+                    isinstance(alignment_input, CramPath) else 0,
                 ))
         return self.make_outputs(sample, jobs=jobs)
 

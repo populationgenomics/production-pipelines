@@ -5,9 +5,8 @@ Utility functions to interact with objects on buckets.
 import logging
 import os
 import subprocess
-from pathlib import Path
-from typing import Iterable, cast
 
+from cloudpathlib import CloudPath
 from google.cloud import storage
 
 logger = logging.getLogger(__file__)
@@ -15,7 +14,7 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-def file_exists(path: str | Path) -> bool:
+def file_exists(path: str | CloudPath) -> bool:
     """
     Check if the object exists, where the object can be:
         * local file
@@ -27,8 +26,8 @@ def file_exists(path: str | Path) -> bool:
     :param path: path to the file/directory/object/mt/ht
     :return: True if the object exists
     """
-    if isinstance(path, Path):
-        path = cast(str, path.absolute())
+    if isinstance(path, CloudPath):
+        path = str(path)
 
     if path.startswith('gs://'):
         bucket = path.replace('gs://', '').split('/')[0]
@@ -47,9 +46,9 @@ def file_exists(path: str | Path) -> bool:
 
 
 def can_reuse(
-    fpath: Iterable[str|Path]|str|Path|None,
+    fpath: list[str | CloudPath] | str | CloudPath | None,
     overwrite: bool,
-    silent=False,
+    silent: bool = False,
 ) -> bool:
     """
     Checks if `fpath` is good to reuse in the analysis: it exists
@@ -63,10 +62,10 @@ def can_reuse(
     if not fpath:
         return False
 
-    if isinstance(fpath, Iterable):
+    if isinstance(fpath, list):
         return all(can_reuse(fp, overwrite) for fp in fpath)
 
-    if isinstance(fpath, Path) and not fpath.exists():
+    if isinstance(fpath, CloudPath) and not fpath.exists():
         return False
     
     if isinstance(fpath, str) and not file_exists(fpath):

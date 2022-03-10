@@ -6,11 +6,10 @@ import json
 import logging
 from enum import Enum
 from os.path import join, basename, splitext
-from pathlib import Path
 from typing import Optional, List, Collection, Dict, Tuple, Set, cast
-
-import hailtop.batch as hb
 import pandas as pd
+import hailtop.batch as hb
+from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 
 from cpg_pipes import ref_data, images, buckets, utils
@@ -18,7 +17,7 @@ from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
-from cpg_pipes.pipeline.analysis import GvcfPath
+from cpg_pipes.pipeline.analysis import GvcfPath, AnalysisType
 from cpg_pipes.pipeline.sample import Sample
 from cpg_pipes.pipeline.smdb import SMDB
 from cpg_pipes.ref_data import REF_D
@@ -35,8 +34,8 @@ class JointGenotyperTool(Enum):
     
 def make_joint_genotyping_jobs(
     b: hb.Batch,
-    out_vcf_path: Path,
-    out_siteonly_vcf_path: Path,
+    out_vcf_path: CloudPath,
+    out_siteonly_vcf_path: CloudPath,
     samples: Collection[Sample],
     genomicsdb_bucket: str,
     tmp_bucket: str,
@@ -169,9 +168,9 @@ def make_joint_genotyping_jobs(
     if smdb:
         last_j = smdb.add_running_and_completed_update_jobs(
             b=b,
-            analysis_type='joint-calling',
+            analysis_type=AnalysisType.JOINT_CALLING,
             output_path=out_vcf_path,
-            sample_names=sample_ids,
+            sample_names=list(sample_ids),
             first_j=first_jobs,
             last_j=last_j,
             depends_on=depends_on,
@@ -195,7 +194,10 @@ def genomicsdb(
     Create GenomicDBs for each interval, given new samples.
     """
     sample_map_bucket_path = join(tmp_bucket, 'genomicsdb', 'sample_map.csv')
-    df = pd.DataFrame([{'id': s.id, 'path': gvcf_by_sid[s.id].path} for s in samples])
+    df = pd.DataFrame([{
+        'id': s.id, 
+        'path': str(gvcf_by_sid[s.id].path)
+    } for s in samples])
     if not dry_run:
         df.to_csv(sample_map_bucket_path, index=False, header=False, sep='\t')
 

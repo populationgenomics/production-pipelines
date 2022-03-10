@@ -36,16 +36,11 @@ def pipeline_click_options(function: Callable) -> Callable:
         ),
         click.option(
             '--input-dataset',
-            'datasets',
+            'input_datasets',
             multiple=True,
             required=True,
             help='Only read samples that belong to the dataset(s). '
                  'Can be set multiple times.',
-        ),
-        click.option(
-            '--source-tag',
-            'source_tag',
-            help='Subset found analysis to "meta={source: <source_tag>}"',
         ),
         click.option(
             '--ped-file',
@@ -106,11 +101,11 @@ def pipeline_click_options(function: Callable) -> Callable:
             help='Check that files in sequence.meta exist'
         ),
         click.option(
-            '--skip-samples-without-first-stage-input',
-            'skip_missing_input',
+            '--skip-samples-with-missing-input',
+            'skip_samples_with_missing_input',
             default=False,
             is_flag=True,
-            help='For the first not-skipped stage, if the input for a target does not'
+            help='For the first (not-skipped) stage, if the input for a target does not'
                  'exist, just skip this target instead of failing. E.g. if the first'
                  'stage is CramStage, and sequence.meta files for a sample do not exist,'
                  'remove this sample instead of failing.'

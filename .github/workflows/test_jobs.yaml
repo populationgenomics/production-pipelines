@@ -3,6 +3,9 @@ on: [workflow_dispatch]
 jobs:
   test_jobs:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test_name: ['alignment_fastq', 'alignment_cram', 'haplotype_calling', 'joint_calling', 'vqsr', 'seqr_loader']
     defaults:
       run:
         shell: bash -l {0}
@@ -33,5 +36,7 @@ jobs:
       - name: Install
         run: pip install dist/*
    
-      - name: "Test jobs"
-        run: python -m unittest tests/test_jobs.py
+      - name: Test ${{ matrix.test_name }}
+        run: |
+          cd tests
+          python -m unittest test_jobs.TestJobs.test_${{ matrix.test_name }}

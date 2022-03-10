@@ -25,9 +25,9 @@ class Sample(Target):
         id: str,  # pylint: disable=redefined-builtin
         external_id: str,
         dataset: 'Dataset',  # type: ignore  # noqa: F821
-        participant_id: str|None = None,
-        meta: dict|None = None,
-        seq: SmSequence|None = None,
+        participant_id: str | None = None,
+        meta: dict | None = None,
+        seq: SmSequence | None = None,
         pedigree: Optional['PedigreeInfo'] = None,
         alignment_input: AlignmentInput | None = None
     ):
@@ -44,7 +44,7 @@ class Sample(Target):
     def __repr__(self):
         return (
             f'Sample({self.id}|{self.external_id}' +
-            (f'participant_id={self._participant_id}, ' 
+            (f', participant_id={self._participant_id}' 
              if self._participant_id else '') +
             f', dataset={self.dataset.name}' +
             f', forced={self.forced}' +
@@ -66,8 +66,10 @@ class Sample(Target):
         """
         if self._alignment_input:
             return self._alignment_input
+        
         if cram_path := self.analysis_by_type.get(AnalysisType.CRAM):
-            return cast(CramPath, cram_path).alignment_input()
+            return cast(CramPath, cram_path)
+
         if self.seq:
             return self.seq.alignment_input
         return None
