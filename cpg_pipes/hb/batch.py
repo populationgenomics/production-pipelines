@@ -7,6 +7,7 @@ import os
 from typing import Optional, Dict
 
 import hailtop.batch as hb
+from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 
 logger = logging.getLogger(__file__)
@@ -62,9 +63,9 @@ class Batch(hb.Batch):
 def setup_batch(
     title: str, 
     keep_scratch: bool = False,
-    tmp_bucket: Optional[str] = None,
-    billing_project: Optional[str] = None,
-    hail_bucket: Optional[str] = None,
+    tmp_bucket: CloudPath | None = None,
+    billing_project: str | None = None,
+    hail_bucket: CloudPath | None = None,
 ) -> Batch:
     """
     Wrapper around the initialization of a Hail Batch object.
@@ -92,16 +93,16 @@ def setup_batch(
     )
     backend = hb.ServiceBackend(
         billing_project=billing_project,
-        remote_tmpdir=hail_bucket,
+        remote_tmpdir=str(hail_bucket),
         token=os.environ.get('HAIL_TOKEN'),
     )
     return Batch(name=title, backend=backend)
 
 
 def get_hail_bucket(
-    tmp_bucket: Optional[str] = None, 
+    tmp_bucket: CloudPath | None = None, 
     keep_scratch: bool = False,
-) -> str:
+) -> CloudPath:
     """
     Get bucket where Hail Batch will keep scratch files
     """
@@ -123,9 +124,9 @@ def get_hail_bucket(
         
     if keep_scratch or not hail_bucket:
         assert tmp_bucket
-        hail_bucket = os.path.join(tmp_bucket, 'hail')
+        hail_bucket = tmp_bucket / 'hail'
 
-    return hail_bucket
+    return CloudPath(hail_bucket)
 
 
 def job_name(name, sample: str = None, dataset: str = None) -> str:

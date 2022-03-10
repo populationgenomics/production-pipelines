@@ -5,10 +5,10 @@ Create Hail Batch jobs for joint genotyping.
 import json
 import logging
 from enum import Enum
-from os.path import join, basename, splitext
-from typing import Optional, List, Collection, Dict, Tuple, Set, cast
-import pandas as pd
+from typing import Optional, List, Tuple
+
 import hailtop.batch as hb
+import pandas as pd
 from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 
@@ -31,14 +31,14 @@ class JointGenotyperTool(Enum):
     GenotypeGVCFs = 1
     GnarlyGenotyper = 2
     
-    
+
 def make_joint_genotyping_jobs(
     b: hb.Batch,
     out_vcf_path: CloudPath,
     out_siteonly_vcf_path: CloudPath,
-    samples: Collection[Sample],
-    genomicsdb_bucket: str,
-    tmp_bucket: str,
+    samples: list[Sample],
+    genomicsdb_bucket: CloudPath,
+    tmp_bucket: CloudPath,
     gvcf_by_sid: dict[str, GvcfPath],
     overwrite: bool,
     depends_on: list[Job] | None = None,
@@ -95,16 +95,20 @@ def make_joint_genotyping_jobs(
     )
     first_jobs = list(import_gvcfs_job_per_interval.values())
 
-    vcf_by_interval: Dict[int, hb.ResourceGroup] = dict()
-    siteonly_vcf_by_interval: Dict[int, hb.ResourceGroup] = dict()
+    vcf_by_interval: dict[int, hb.ResourceGroup] = dict()
+    siteonly_vcf_by_interval: dict[int, hb.ResourceGroup] = dict()
 
     sample_ids = set(s.id for s in samples)
     samples_hash = utils.hash_sample_ids(sample_ids)
-    jc_tmp_bucket = f'{tmp_bucket}/joint_calling/{samples_hash}'
+    jc_tmp_bucket = tmp_bucket / 'joint_calling' / samples_hash
     for idx in range(scatter_count):
-        jc_vcf_path = f'{jc_tmp_bucket}/by_interval/interval_{idx}.vcf.gz'
-        filt_jc_vcf_path = f'{jc_tmp_bucket}/by_interval_excess_het_filter/interval_{idx}.vcf.gz'
-        siteonly_jc_vcf_path = f'{jc_tmp_bucket}/by_interval_site_only/interval_{idx}.vcf.gz'
+        jc_vcf_path = jc_tmp_bucket / 'by_interval' / f'interval_{idx}.vcf.gz'
+        filt_jc_vcf_path = (
+            jc_tmp_bucket / 'by_interval_excess_het_filter' / f'interval_{idx}.vcf.gz'
+        )
+        siteonly_jc_vcf_path = (
+           jc_tmp_bucket / 'by_interval_site_only' / f'interval_{idx}.vcf.gz'
+        )
 
         jc_vcf_j, jc_vcf = _add_joint_genotyper_job(
             b,
@@ -141,7 +145,7 @@ def make_joint_genotyping_jobs(
             output_vcf_path=siteonly_jc_vcf_path,
         )
         siteonly_vcf_by_interval[idx] = siteonly_vcf
-    
+
     logger.info(f'Queueing gather VCFs job')
     j, _ = gather_vcfs(
         b,
@@ -180,31 +184,31 @@ def make_joint_genotyping_jobs(
 
 def genomicsdb(
     b: hb.Batch,
-    samples: Collection[Sample],
-    genomicsdb_bucket: str,
-    tmp_bucket: str,
+    samples: list[Sample],
+    genomicsdb_bucket: CloudPath,
+    tmp_bucket: CloudPath,
     gvcf_by_sid: dict[str, GvcfPath],
     intervals: hb.ResourceGroup,
     scatter_count: int = ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS,    
-    depends_on: list[Job]|None = None,
+    depends_on: list[Job] | None = None,
     overwrite: bool = False,
     dry_run: bool = False,
-) -> Tuple[Dict[int, Job], Dict[int, str]]:
+) -> tuple[dict[int, Job], dict[int, GvcfPath]]:
     """
     Create GenomicDBs for each interval, given new samples.
     """
-    sample_map_bucket_path = join(tmp_bucket, 'genomicsdb', 'sample_map.csv')
+    sample_map_bucket_path = tmp_bucket / 'genomicsdb' / 'sample_map.csv'
     df = pd.DataFrame([{
         'id': s.id, 
         'path': str(gvcf_by_sid[s.id].path)
     } for s in samples])
     if not dry_run:
-        df.to_csv(sample_map_bucket_path, index=False, header=False, sep='\t')
+        df.to_csv(str(sample_map_bucket_path), index=False, header=False, sep='\t')
 
-    path_per_interval = {idx: join(
-        genomicsdb_bucket,
-        f'interval_{idx}_outof_{scatter_count}.tar',
-    ) for idx in range(scatter_count)}
+    path_per_interval = {
+        idx: genomicsdb_bucket / f'interval_{idx}_outof_{scatter_count}.tar' 
+        for idx in range(scatter_count)
+    }
 
     job_per_interval = dict()
     for idx in range(scatter_count):
@@ -224,7 +228,7 @@ def genomicsdb(
         if depends_on:
             j.depends_on(*depends_on)
         
-        sample_map = b.read_input(sample_map_bucket_path)
+        sample_map = b.read_input(str(sample_map_bucket_path))
         
         # The Broad: testing has shown that the multithreaded reader initialization
         # does not scale well beyond 5 threads, so don't increase beyond that.
@@ -256,7 +260,7 @@ def genomicsdb(
         ]
 
         cmd = f"""\
-        WORKSPACE={splitext(basename(out_path))[0]}
+        WORKSPACE={out_path.with_suffix('').name}
         
         gatk --java-options "-Xms{xms_gb}g -Xmx{xmx_gb}g" \\
         GenomicsDBImport \\
@@ -269,29 +273,27 @@ def genomicsdb(
         tar -cf {j.db_tar} $WORKSPACE
         """
         j.command(wrap_command(cmd, monitor_space=True, setup_gcp=True))
-        b.write_output(j.db_tar, out_path)
+        b.write_output(j.db_tar, str(out_path))
     return job_per_interval, path_per_interval
 
 
 def genomicsdb_cloud(
     b: hb.Batch,
-    samples: Collection[Sample],
-    genomicsdb_bucket: str,
-    tmp_bucket: str,
-    gvcf_by_sid: Dict[str, str],
-    local_tmp_dir: str,
+    samples: list[Sample],
+    genomicsdb_bucket: CloudPath,
+    tmp_bucket: CloudPath,
+    gvcf_by_sid: dict[str, GvcfPath],
     intervals: hb.ResourceGroup,
     scatter_count: int = ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS,    
     depends_on: Optional[List[Job]] = None,
-) -> Tuple[Dict[int, Job], Dict[int, str]]:
+) -> tuple[dict[int, Job], dict[int, CloudPath]]:
     """
     Update or create GenomicDBs for each interval, given new samples.
     """
     genomicsdb_path_per_interval = dict()
     for idx in range(scatter_count):
-        genomicsdb_path_per_interval[idx] = join(
-            genomicsdb_bucket,
-            f'interval_{idx}_outof_{scatter_count}',
+        genomicsdb_path_per_interval[idx] = (
+            genomicsdb_bucket / f'interval_{idx}_outof_{scatter_count}'
         )
         
     # Determining which samples to add. Using the first interval, so the assumption
@@ -304,8 +306,6 @@ def genomicsdb_cloud(
         sample_map_bucket_path,
     ) = _samples_to_add_to_db(
         genomicsdb_gcs_path=genomicsdb_path_per_interval[0],
-        interval_idx=0,
-        local_tmp_dir=local_tmp_dir,
         samples=samples,
         tmp_bucket=tmp_bucket,
         gvcf_by_sid=gvcf_by_sid,
@@ -334,22 +334,14 @@ def genomicsdb_cloud(
 
 
 def _samples_to_add_to_db(
-    genomicsdb_gcs_path,
-    interval_idx,
-    local_tmp_dir,
-    samples,
-    tmp_bucket: str,
-    gvcf_by_sid: Dict[str, str],
-) -> Tuple[Set[str], Set[str], Set[str], bool, str]:
-    if buckets.file_exists(join(genomicsdb_gcs_path, 'callset.json')):
+    genomicsdb_gcs_path: CloudPath,
+    samples: list[Sample],
+    tmp_bucket: CloudPath,
+    gvcf_by_sid: dict[str, CloudPath],
+) -> tuple[set[str], set[str], set[str], bool, CloudPath]:
+    if buckets.exists(genomicsdb_gcs_path / 'callset.json'):
         # Checking if samples exists in the DB already
-        genomicsdb_metadata = join(local_tmp_dir, f'callset-{interval_idx}.json')
-        buckets.gsutil_cp(
-            src_path=join(genomicsdb_gcs_path, 'callset.json'),
-            dst_path=genomicsdb_metadata,
-            disable_check_hashes=True,
-        )
-        with open(genomicsdb_metadata) as f:
+        with (genomicsdb_gcs_path / 'callset.json').open() as f:
             db_metadata = json.load(f)
         sample_names_in_db = set(s['sample_name'] for s in db_metadata['callsets'])
         sample_names_requested = set([s.id for s in samples])
@@ -407,12 +399,10 @@ def _samples_to_add_to_db(
             f'with {len(sample_names_to_add)} samples: {", ".join(sample_names_to_add)}'
         )
 
-    sample_map_bucket_path = join(tmp_bucket, 'genomicsdb', 'sample_map.csv')
-    sample_map_local_fpath = join(local_tmp_dir, basename(sample_map_bucket_path))
-    with open(sample_map_local_fpath, 'w') as f:
+    sample_map_bucket_path = tmp_bucket / 'genomicsdb' / 'sample_map.csv'
+    with sample_map_bucket_path.open('w') as f:
         for sid in sample_names_to_add:
-            f.write('\t'.join([sid, gvcf_by_sid[sid]]) + '\n')
-    buckets.gsutil_cp(sample_map_local_fpath, sample_map_bucket_path)
+            f.write('\t'.join([sid, str(gvcf_by_sid[sid])]) + '\n')
 
     assert sample_names_will_be_in_db == {s.id for s in samples}
     return (
@@ -426,18 +416,18 @@ def _samples_to_add_to_db(
 
 def _genomicsdb_import_cloud(
     b: hb.Batch,
-    genomicsdb_gcs_path: str,
-    sample_names_to_add: Set[str],
-    sample_names_to_skip: Set[str],
-    sample_names_will_be_in_db: Set[str],
+    genomicsdb_gcs_path: CloudPath,
+    sample_names_to_add: set[str],
+    sample_names_to_skip: set[str],
+    sample_names_will_be_in_db: set[str],
     updating_existing_db: bool,
-    sample_map_bucket_path: str,
+    sample_map_bucket_path: CloudPath,
     interval: hb.ResourceFile,
-    interval_idx: Optional[int] = None,
+    interval_idx: int | None = None,
     number_of_intervals: int = 1,
-    depends_on: Optional[List[Job]] = None,
+    depends_on: list[Job] | None = None,
     overwrite: bool = False,
-) -> Tuple[Job, Set[str]]:
+) -> tuple[Job, set[str]]:
     """
     Add GVCFs to a genomics database (or create a new instance if it doesn't exist)
     Returns a Job, or None if no new samples to add
@@ -466,7 +456,7 @@ def _genomicsdb_import_cloud(
             f'{", ".join(sample_names_to_add)}'
         )
 
-    sample_map = b.read_input(sample_map_bucket_path)
+    sample_map = b.read_input(str(sample_map_bucket_path))
 
     if interval_idx is not None:
         job_name += f' {interval_idx + 1}/{number_of_intervals}'
@@ -525,15 +515,15 @@ def _genomicsdb_import_cloud(
 
 def _add_joint_genotyper_job(
     b: hb.Batch,
-    genomicsdb_path: str,
+    genomicsdb_path: CloudPath,
     overwrite: bool,
     number_of_samples: int,
-    interval_idx: Optional[int] = None,
+    interval_idx: int | None = None,
     number_of_intervals: int = 1,
-    interval: Optional[hb.ResourceGroup] = None,
-    output_vcf_path: Optional[str] = None,
+    interval: hb.ResourceGroup | None = None,
+    output_vcf_path: CloudPath | None = None,
     tool: JointGenotyperTool = JointGenotyperTool.GnarlyGenotyper,
-) -> Tuple[Job, hb.ResourceGroup]:
+) -> tuple[Job, hb.ResourceGroup]:
     """
     Runs GATK GnarlyGenotyper or GenotypeGVCFs on a combined_gvcf VCF bgzipped file,
     pre-called with HaplotypeCaller.
@@ -555,11 +545,10 @@ def _add_joint_genotyper_job(
         job_name += f' {interval_idx + 1}/{number_of_intervals}'
     j = b.new_job(job_name)
     if buckets.can_reuse(output_vcf_path, overwrite):
-        output_vcf_path = cast(str, output_vcf_path)
         j.name += ' [reuse]'
         return j, b.read_input_group(**{
-            'vcf.gz': output_vcf_path,
-            'vcf.gz.tbi': output_vcf_path + '.tbi',
+            'vcf.gz': str(output_vcf_path),
+            'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
         })
 
     j.image(images.GATK_IMAGE)
@@ -580,12 +569,12 @@ def _add_joint_genotyper_job(
 
     reference = b.read_input_group(**REF_D)
     
-    if genomicsdb_path.endswith('.tar'):
+    if str(genomicsdb_path).endswith('.tar'):
         # can't use directly from cloud, need to copy and uncompress:
         input_cmd = f"""\
-        retry_gs_cp {genomicsdb_path} {basename(genomicsdb_path)}
-        tar -xf {basename(genomicsdb_path)}
-        WORKSPACE=gendb://{splitext(basename(genomicsdb_path))[0]}
+        retry_gs_cp {genomicsdb_path} {genomicsdb_path.name}
+        tar -xf {genomicsdb_path.name}
+        WORKSPACE=gendb://{genomicsdb_path.with_suffix('').name}
         """
     else:
         input_cmd = f"""\
@@ -619,7 +608,7 @@ def _add_joint_genotyper_job(
         define_retry_function=True
     ))
     if output_vcf_path:
-        b.write_output(j.output_vcf, output_vcf_path.replace('.vcf.gz', ''))
+        b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
     return j, j.output_vcf
 
 
@@ -629,9 +618,9 @@ def _add_exccess_het_filter(
     overwrite: bool,
     disk_size: int = 32,
     excess_het_threshold: float = 54.69,
-    interval: Optional[hb.ResourceGroup] = None,
-    output_vcf_path: Optional[str] = None,
-) -> Tuple[Job, hb.ResourceGroup]:
+    interval: hb.ResourceGroup | None = None,
+    output_vcf_path: CloudPath | None = None,
+) -> tuple[Job, hb.ResourceGroup]:
     """
     Filter a large cohort callset on Excess Heterozygosity.
 
@@ -651,10 +640,9 @@ def _add_exccess_het_filter(
     j = b.new_job(job_name)
     if buckets.can_reuse(output_vcf_path, overwrite):
         j.name += ' [reuse]'
-        output_vcf_path = cast(str, output_vcf_path)
         return j, b.read_input_group(**{
-            'vcf.gz': output_vcf_path,
-            'vcf.gz.tbi': output_vcf_path + '.tbi',
+            'vcf.gz': str(output_vcf_path),
+            'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
         })
 
     j.image(images.GATK_IMAGE)
@@ -678,7 +666,7 @@ def _add_exccess_het_filter(
     2> {j.stderr}
     """))
     if output_vcf_path:
-        b.write_output(j.output_vcf, output_vcf_path.replace('.vcf.gz', ''))
+        b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
     return j, j.output_vcf
 
 
@@ -687,7 +675,7 @@ def _add_make_sitesonly_job(
     input_vcf: hb.ResourceGroup,
     overwrite: bool,
     disk_size: int = 32,
-    output_vcf_path: Optional[str] = None,
+    output_vcf_path: CloudPath | None = None,
 ) -> Tuple[Job, hb.ResourceGroup]:
     """
     Create sites-only VCF with only site-level annotations.
@@ -700,8 +688,8 @@ def _add_make_sitesonly_job(
     if output_vcf_path and buckets.can_reuse(output_vcf_path, overwrite):
         j.name += ' [reuse]'
         return j, b.read_input_group(**{
-            'vcf.gz': output_vcf_path,
-            'vcf.gz.tbi': output_vcf_path + '.tbi',
+            'vcf.gz': str(output_vcf_path),
+            'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
         })
 
     j.image(images.GATK_IMAGE)
@@ -718,5 +706,5 @@ def _add_make_sitesonly_job(
     -O {j.output_vcf['vcf.gz']}
     """))
     if output_vcf_path:
-        b.write_output(j.output_vcf, output_vcf_path.replace('.vcf.gz', ''))
+        b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
     return j, j.output_vcf

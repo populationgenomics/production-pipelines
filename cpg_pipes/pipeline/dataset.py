@@ -5,7 +5,9 @@ Represents a CPG dataset in a particular namespace: main and test.
 from typing import List
 import logging
 
-from cpg_pipes.namespace import Namespace
+from cloudpathlib import CloudPath
+
+from cpg_pipes.storage import Namespace
 from cpg_pipes.pipeline.sequence import SmSequence
 from cpg_pipes.pipeline.target import Target
 from cpg_pipes.pipeline.sample import Sample, PedigreeInfo
@@ -78,20 +80,24 @@ class Dataset(Target):
     def __str__(self):
         return f'{self.name} ({len(self.get_samples())} samples)'
 
-    def get_bucket(self):
+    def get_bucket(self) -> CloudPath:
         """
         The primary dataset bucket (-main or -test) 
         """
-        return f'gs://cpg-{self.stack}-{self.pipeline.output_suf}'
+        prefix = self.pipeline.storage_provider.value
+        return (
+            CloudPath(f'{prefix}://cpg-{self.stack}-{self.pipeline.output_suf}')
+        )
 
-    def get_tmp_bucket(self):
+    def get_tmp_bucket(self) -> CloudPath:
         """
         The tmp bucket (-main-tmp or -test-tmp)
         """
+        prefix = self.pipeline.storage_provider.value
         return (
-            f'gs://cpg-{self.stack}-{self.pipeline.output_suf}-tmp/'
-            f'{self.pipeline.name}/'
-            f'{self.pipeline.output_version}'
+            CloudPath(f'{prefix}://cpg-{self.stack}-{self.pipeline.output_suf}-tmp')
+            / self.pipeline.name 
+            / self.pipeline.output_version
         )
 
     def add_sample(

@@ -33,7 +33,7 @@ class TestJobs(unittest.TestCase):
     def setUp(self):
         self.name = self._testMethodName
         self.timestamp = time.strftime('%Y%m%d-%H%M')
-        self.out_bucket = CloudPath(BASE_BUCKET) / self.name / self.timestamp
+        self.out_bucket = BASE_BUCKET / self.name / self.timestamp
         self.tmp_bucket = self.out_bucket / 'tmp'
         self.local_tmp_dir = tempfile.mkdtemp()
 
@@ -93,7 +93,7 @@ class TestJobs(unittest.TestCase):
         test_j.command(f'bcftools query -l {gvcf_path} > {test_j.output}')
 
         out_path = self.out_bucket / f'{self.sample_name}.out'
-        self.pipeline.b.write_output(test_j.output, out_path)
+        self.pipeline.b.write_output(test_j.output, str(out_path))
         return out_path
 
     def test_alignment_fastq(self):
@@ -191,9 +191,11 @@ class TestJobs(unittest.TestCase):
         """
         Test joint variant calling
         """
-        genomicsdb_bucket = f'{self.out_bucket}/genomicsdb'
-        out_vcf_path = f'{self.out_bucket}/joint-called.vcf.gz'
-        out_siteonly_vcf_path = out_vcf_path.replace('.vcf.gz', '-siteonly.vcf.gz')
+        genomicsdb_bucket = self.out_bucket / 'genomicsdb'
+        out_vcf_path = self.out_bucket / 'joint-called.vcf.gz'
+        out_siteonly_vcf_path = CloudPath(
+            str(out_vcf_path).replace('.vcf.gz', '-siteonly.vcf.gz')
+        )
 
         proj = self.pipeline.cohort.add_dataset(DATASET)
         for sid in SAMPLES:
@@ -213,8 +215,8 @@ class TestJobs(unittest.TestCase):
         )
         test_result_path = self._job_get_gvcf_header(j.output_vcf['vcf.gz'])
         self.pipeline.submit_batch(wait=True)     
-        self.assertTrue(buckets.file_exists(out_vcf_path))
-        self.assertTrue(buckets.file_exists(out_siteonly_vcf_path))
+        self.assertTrue(buckets.exists(out_vcf_path))
+        self.assertTrue(buckets.exists(out_siteonly_vcf_path))
         contents = self._read_file(test_result_path)
         self.assertEqual(len(SAMPLES), len(contents.split()))
         self.assertEqual(set(SAMPLES), set(contents.split()))
@@ -242,7 +244,7 @@ class TestJobs(unittest.TestCase):
         )
         res_path = self._job_get_gvcf_header(j.output_vcf['vcf.gz'])
         self.pipeline.submit_batch(wait=True)     
-        self.assertTrue(buckets.file_exists(out_vcf_path))
+        self.assertTrue(buckets.exists(out_vcf_path))
         contents = self._read_file(res_path)
         self.assertEqual(0, len(contents.split()))  # site-only doesn't have any samples
         
@@ -343,4 +345,4 @@ class TestJobs(unittest.TestCase):
         )
         datasetmt_to_vcf_j.depends_on(mt_to_datasetmt_j)
         self.pipeline.submit_batch(wait=True)     
-        self.assertTrue(buckets.file_exists(dataset_vcf_path))
+        self.assertTrue(buckets.exists(dataset_vcf_path))

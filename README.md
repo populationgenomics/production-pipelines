@@ -115,7 +115,7 @@ To submit the constructed pipeline to Hail Batch, initialise the `Pipeline` obje
 
 ```python
 from cpg_pipes.pipeline.pipeline import Pipeline
-from cpg_pipes.namespace import Namespace
+from cpg_pipes.storage import Namespace
 
 pipeline = Pipeline(
     name='my_pipeline',
@@ -157,7 +157,7 @@ Communication with the sample-metadata DB is organised through the `cpg_pipes.sm
 
 ```python
 from cpg_pipes.smdb import SMDB
-from cpg_pipes.namespace import Namespace
+from cpg_pipes.storage import Namespace
 
 smdb = SMDB(analysis_project='seqr')
 

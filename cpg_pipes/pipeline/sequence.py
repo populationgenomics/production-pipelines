@@ -96,7 +96,7 @@ class SmSequence:
                     f'.cram or .bam, got: {bam_path}'
                 )
                 return None
-            if check_existence and not buckets.file_exists(bam_path):
+            if check_existence and not buckets.exists(bam_path):
                 logger.error(
                     f'{sample_id}: ERROR: index file doesn\'t exist: {bam_path}'
                 )
@@ -120,7 +120,7 @@ class SmSequence:
                     f'{sample_id}: ERROR: expected the index file to have an extention '
                     f'.crai or .bai, got: {index_path}'
                 )
-            if check_existence and not buckets.file_exists(index_path):
+            if check_existence and not buckets.exists(index_path):
                 logger.error(
                     f'{sample_id}: ERROR: index file doesn\'t exist: {index_path}'
                 )
@@ -132,13 +132,13 @@ class SmSequence:
             fastq_pairs = []
             for lane_data in reads_data:
                 assert len(lane_data) == 2, lane_data
-                if check_existence and not buckets.file_exists(lane_data[0]['location']):
+                if check_existence and not buckets.exists(lane_data[0]['location']):
                     logger.error(
                         f'{sample_id}: ERROR: read 1 file doesn\'t exist: '
                         f'{lane_data[0]["location"]}'
                     )
                     return None
-                if check_existence and not buckets.file_exists(lane_data[1]['location']):
+                if check_existence and not buckets.exists(lane_data[1]['location']):
                     logger.error(
                         f'{sample_id}: ERROR: read 2 file doesn\'t exist: '
                         f'{lane_data[1]["location"]}'

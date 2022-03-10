@@ -3,18 +3,16 @@ Utility functions to interact with objects on buckets.
 """
 
 import logging
-import os
 import subprocess
-
+from pathlib import Path
 from cloudpathlib import CloudPath
-from google.cloud import storage
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-def file_exists(path: str | CloudPath) -> bool:
+def exists(path: Path | CloudPath, verbose: bool = True) -> bool:
     """
     Check if the object exists, where the object can be:
         * local file
@@ -24,29 +22,25 @@ def file_exists(path: str | CloudPath) -> bool:
           in which case it will check for the existence of a
           *.mt/_SUCCESS or *.ht/_SUCCESS file.
     :param path: path to the file/directory/object/mt/ht
+    :param verbose: for cloud objects, log every existence check
     :return: True if the object exists
     """
-    if isinstance(path, CloudPath):
-        path = str(path)
+    
+    # rstrip to ".mt/" -> ".mt"
+    if any(str(path).rstrip('/').endswith(f'.{suf}') for suf in ['mt', 'ht']):
+        path = path / '_SUCCESS'
 
-    if path.startswith('gs://'):
-        bucket = path.replace('gs://', '').split('/')[0]
-        p = path.replace('gs://', '').split('/', maxsplit=1)[1]
-        p = p.rstrip('/')  # ".mt/" -> ".mt"
-        if any(p.endswith(f'.{suf}') for suf in ['mt', 'ht']):
-            p = os.path.join(p, '_SUCCESS')
-        gs = storage.Client()
-        exists = gs.get_bucket(bucket).get_blob(p) is not None
+    exists = path.exists()
+    if verbose and isinstance(path, CloudPath):
         if exists:
             logger.info(f'Checking object existence, exists: {path}')
         else:
             logger.info(f'Checking object existence, doesn\'t exist: {path}')
-        return exists
-    return os.path.exists(path)
+    return exists
 
 
 def can_reuse(
-    fpath: list[str | CloudPath] | str | CloudPath | None,
+    path: list[Path | CloudPath] | Path | CloudPath | None,
     overwrite: bool,
     silent: bool = False,
 ) -> bool:
@@ -59,20 +53,17 @@ def can_reuse(
     if overwrite:
         return False
 
-    if not fpath:
+    if not path:
         return False
 
-    if isinstance(fpath, list):
-        return all(can_reuse(fp, overwrite) for fp in fpath)
+    if isinstance(path, list):
+        return all(can_reuse(fp, overwrite) for fp in path)
 
-    if isinstance(fpath, CloudPath) and not fpath.exists():
+    if not exists(path):
         return False
     
-    if isinstance(fpath, str) and not file_exists(fpath):
-        return False
-
     if not silent:
-        logger.info(f'Reusing existing {fpath}. Use --overwrite to overwrite')
+        logger.info(f'Reusing existing {path}. Use --overwrite to overwrite')
     return True
 
 

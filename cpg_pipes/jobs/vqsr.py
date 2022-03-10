@@ -2,7 +2,6 @@
 Create Hail Batch jobs to create and apply a VQSR models.
 """
 
-from os.path import join
 from typing import List, Optional
 import logging
 import hailtop.batch as hb
@@ -87,7 +86,7 @@ INDEL_RECALIBRATION_TRANCHE_VALUES = [
 def make_vqsr_jobs(
     b: hb.Batch,
     input_vcf_or_mt_path: CloudPath,
-    work_bucket: str,
+    work_bucket: CloudPath,
     gvcf_count: int,
     scatter_count: int = ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS,
     depends_on: list[Job] | None = None,
@@ -169,7 +168,7 @@ def make_vqsr_jobs(
         assert meta_ht_path
         assert hard_filter_ht_path
         job_name = 'VQSR: MT to site-only VCF'
-        combined_vcf_path = join(work_bucket, 'input.vcf.gz')
+        combined_vcf_path = work_bucket / 'input.vcf.gz'
         if not buckets.can_reuse(combined_vcf_path, overwrite):
             mt_to_vcf_job = dataproc.hail_dataproc_job(
                 b,

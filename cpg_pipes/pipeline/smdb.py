@@ -4,7 +4,6 @@ Functions to find the pipeline inputs and communicate with the SM server
 
 import logging
 import traceback
-from os.path import join
 from textwrap import dedent
 
 from cloudpathlib import CloudPath
@@ -63,10 +62,9 @@ class SMDB:
     def populate_cohort(
         self,
         cohort: Cohort,
-        local_tmp_dir: str,
-        skip_samples: list[str]|None = None,
-        only_samples: list[str]|None = None,
-        ped_files: list[str]|None = None,
+        skip_samples: list[str] | None = None,
+        only_samples: list[str] | None = None,
+        ped_files: list[CloudPath] | None = None,
     ) -> Cohort:
         """
         Populate database entries for all datasets.
@@ -79,23 +77,16 @@ class SMDB:
             )
         self._populate_analysis(cohort)
         if ped_files:
-            self._populate_pedigree(cohort, ped_files, local_tmp_dir)
+            self._populate_pedigree(cohort, ped_files)
         return cohort
-    
-    def _populate_pedigree(
-        self, 
-        cohort: Cohort, 
-        ped_files: list[str], 
-        local_tmp_dir: str
-    ):
+
+    def _populate_pedigree(self, cohort: Cohort, ped_files: list[CloudPath]):
         sample_by_participant_id = dict()
         for s in cohort.get_all_samples():
             sample_by_participant_id[s.participant_id] = s
 
-        for i, ped_file in enumerate(ped_files):
-            local_ped_file = join(local_tmp_dir, f'ped_file_{i}.ped')
-            buckets.gsutil_cp(ped_file, local_ped_file)
-            with open(local_ped_file) as f:
+        for _, ped_file in enumerate(ped_files):
+            with ped_file.open() as f:
                 for line in f:
                     fields = line.strip().split('\t')[:6]
                     fam_id, sam_id, pat_id, mat_id, sex, phenotype = fields
@@ -475,7 +466,7 @@ class SMDB:
                     f'{expected_output_fpath}'
                 )
                 found_output_fpath = None
-            elif not buckets.file_exists(found_output_fpath):
+            elif not buckets.exists(found_output_fpath):
                 logger.error(
                     f'Found a completed analysis {label}, '
                     f'but the "output" file {found_output_fpath} does not exist'
@@ -499,7 +490,7 @@ class SMDB:
             self.update_analysis(completed_analysis, status=AnalysisStatus.FAILED)
 
         # can reuse, need to create a completed one?
-        if buckets.file_exists(expected_output_fpath):
+        if buckets.exists(expected_output_fpath):
             logger.info(
                 f'Output file {expected_output_fpath} already exists, so creating '
                 f'an analysis {label} with status=completed'

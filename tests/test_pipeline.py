@@ -3,6 +3,7 @@ import sys
 import tempfile
 import time
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 try:
@@ -18,9 +19,9 @@ class TestPipeline(unittest.TestCase):
     def setUp(self):
         self.name = self._testMethodName
         self.timestamp = time.strftime('%Y%m%d-%H%M')
-        self.out_bucket = f'{BASE_BUCKET}/{self.name}/{self.timestamp}'
-        self.tmp_bucket = f'{self.out_bucket}/tmp'
-        self.local_tmp_dir = tempfile.mkdtemp()
+        self.out_bucket = BASE_BUCKET / self.name / self.timestamp
+        self.tmp_bucket = self.out_bucket / 'tmp'
+        self.local_tmp_dir = Path(tempfile.mkdtemp())
         self.sample_name = f'Test-{self.timestamp}'
         self.sample_ids = SAMPLES[:3]
 
@@ -33,7 +34,7 @@ class TestPipeline(unittest.TestCase):
         Constucting a pipeline and submitting it to Hail Batch with dry_run.
 
         With dry_run, Hail Batch prints all code with a single print() call.
-        Thus we capture builtins.print, and verify that it has the expected
+        Thus, we capture builtins.print, and verify that it has the expected
         job commands passed to it.
         
         Mocking all hail methods (hail.hadoop_open in this case) so we don't 
@@ -79,7 +80,7 @@ class TestPipeline(unittest.TestCase):
             """Number of lines that start with item"""
             return len([line for line in lines if line.strip().startswith(item)])
 
-        self.assertEqual(_cnt('bwa mem'), len(self.sample_ids))
+        self.assertEqual(_cnt('bwa mem'), len(self.sample_ids) * 2)
         self.assertEqual(_cnt('HaplotypeCaller'), len(self.sample_ids))
         self.assertEqual(_cnt('ReblockGVCF'), len(self.sample_ids))
         self.assertEqual(_cnt('GenotypeGVCFs'), ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS)

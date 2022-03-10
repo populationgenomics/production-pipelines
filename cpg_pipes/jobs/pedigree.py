@@ -1,16 +1,14 @@
 """
 Adding jobs for fingerprinting and pedigree checks. Mostly using Somalier.
 """
-
+import os
 import sys
-from os.path import join, dirname, pardir, basename
-from typing import Tuple
 import logging
-
+from pathlib import Path
 from cloudpathlib import CloudPath
+import pandas as pd
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
-import pandas as pd
 
 from cpg_pipes import buckets, images, ref_data, utils
 from cpg_pipes.hb.command import wrap_command
@@ -29,15 +27,15 @@ def add_pedigree_jobs(
     dataset: Dataset,
     input_path_by_sid: dict[str, CloudPath | str],
     overwrite: bool,
-    fingerprints_bucket: str,
-    tmp_bucket: str,
-    web_bucket: str|None = None,
-    web_url: str|None = None,
-    depends_on: list[Job]|None = None,
-    label: str|None = None,
+    fingerprints_bucket: CloudPath,
+    tmp_bucket: CloudPath,
+    web_bucket: CloudPath | None = None,
+    web_url: str | None = None,
+    depends_on: list[Job] | None = None,
+    label: str | None = None,
     ignore_missing: bool = False,
     dry_run: bool = False,
-) -> Tuple[Job, str, str]:
+) -> tuple[Job, CloudPath, CloudPath]:
     """
     Add somalier and peddy based jobs that infer relatedness and sex, compare that
     to the provided PED file, and attempt to recover it. If unable to recover, cancel
@@ -126,24 +124,24 @@ def add_pedigree_jobs(
 def _copy_somalier_output(
     b: Batch,
     dataset: Dataset, 
-    fingerprints_bucket: str, 
+    fingerprints_bucket: CloudPath, 
     relate_j: Job,
-    web_bucket: str|None = None,
-    web_url: str|None = None,
-) -> tuple[str, str, str|None]:
+    web_bucket: CloudPath | None = None,
+    web_url: str | None = None,
+) -> tuple[CloudPath, CloudPath, str | None]:
     # Copy somalier outputs to buckets
-    prefix = join(fingerprints_bucket, dataset.name)
-    somalier_samples_path = f'{prefix}.samples.tsv'
-    somalier_pairs_path = f'{prefix}.pairs.tsv'
-    b.write_output(relate_j.output_samples, somalier_samples_path)
-    b.write_output(relate_j.output_pairs, somalier_pairs_path)
+    prefix = fingerprints_bucket / dataset.name
+    somalier_samples_path = CloudPath(f'{prefix}.samples.tsv')
+    somalier_pairs_path = CloudPath(f'{prefix}.pairs.tsv')
+    b.write_output(relate_j.output_samples, str(somalier_samples_path))
+    b.write_output(relate_j.output_pairs, str(somalier_pairs_path))
     # Copy somalier HTML to the web bucket
     somalier_html_url = None
     if web_bucket and web_url:
         rel_path = f'pedigree/{dataset.name}.html'
-        somalier_html_path = f'{web_bucket}/{rel_path}'
+        somalier_html_path = web_bucket / rel_path
         somalier_html_url = f'{web_url}/{rel_path}'
-        b.write_output(relate_j.output_html, somalier_html_path)
+        b.write_output(relate_j.output_html, str(somalier_html_path))
     return somalier_pairs_path, somalier_samples_path, somalier_html_url
 
 
@@ -151,7 +149,7 @@ def _check_pedigree_job(
     b: Batch, 
     dataset: Dataset, 
     relate_j: Job, 
-    tmp_bucket: str,
+    tmp_bucket: CloudPath,
     label: str | None,
     dry_run: bool = False,
     somalier_html_url: str | None = None,
@@ -163,16 +161,14 @@ def _check_pedigree_job(
     STANDARD.set_resources(check_j, ncpu=2)
     check_j.image(images.PEDDY_IMAGE)
     # Creating sample map to remap internal IDs to participant IDs
-    sample_map_fpath = f'{tmp_bucket}/pedigree/sample_maps/{dataset.name}.tsv'
+    sample_map_fpath = tmp_bucket / 'pedigree' 'sample_maps' f'{dataset.name}.tsv'
     if not dry_run:
         df = pd.DataFrame([
             {'id': s.id, 'pid': s.participant_id} for s in dataset.get_samples()
         ])
-        df.to_csv(sample_map_fpath, sep='\t', index=False, header=False)
+        df.to_csv(str(sample_map_fpath), sep='\t', index=False, header=False)
     script_name = 'check_pedigree.py'
-    script_path = join(
-        dirname(__file__), pardir, pardir, utils.SCRIPTS_DIR, script_name
-    )
+    script_path = Path(__file__).parent.parent.parent / utils.SCRIPTS_DIR / script_name
     with open(script_path) as f:
         script = f.read()
     # We do not wrap the command nicely to avoid breaking python indents of {script}
@@ -183,7 +179,7 @@ EOT
 python {script_name} \
 --somalier-samples {relate_j.output_samples} \
 --somalier-pairs {relate_j.output_pairs} \
---sample-map {b.read_input(sample_map_fpath)} \
+--sample-map {b.read_input(str(sample_map_fpath))} \
 {('--somalier-html ' + somalier_html_url) if somalier_html_url else ''}
 """
     check_j.command(cmd)
@@ -194,10 +190,10 @@ def _relate_job(
     b: Batch, 
     somalier_file_by_sample: dict[str, CloudPath],
     dataset: Dataset,
-    tmp_bucket: str,
-    label: str|None,
+    tmp_bucket: CloudPath,
+    label: str | None,
     extract_jobs: list[Job],
-    depends_on: list[Job]|None = None,
+    depends_on: list[Job] | None = None,
     dry_run: bool = False,
 ) -> Job:
     relate_j = b.new_job(
@@ -213,15 +209,15 @@ def _relate_job(
     if depends_on:
         extract_jobs.extend(depends_on)
     relate_j.depends_on(*extract_jobs)
-    ped_fpath = join(tmp_bucket, f'{dataset.name}.ped')
+    ped_fpath = tmp_bucket / f'{dataset.name}.ped'
     datas = []
     for sample in dataset.get_samples():
         if sample.pedigree:
             datas.append(sample.pedigree.get_ped_dict())
     df = pd.DataFrame(datas)
     if not dry_run:
-        df.to_csv(ped_fpath, sep='\t', index=False)
-    ped_file = b.read_input(ped_fpath)
+        df.to_csv(str(ped_fpath), sep='\t', index=False)
+    ped_file = b.read_input(str(ped_fpath))
     input_files_lines = ''
     for sample in dataset.get_samples():
         if sample.id:
@@ -301,14 +297,14 @@ def somalier_extact_job(
 
     cmd = f"""\
     # Copying reference data to avoid GCP bandwidth limits
-    retry gsutil cp {ref_fasta} /io/batch/{basename(ref_fasta)}
-    retry gsutil cp {ref_fai}   /io/batch/{basename(ref_fai)}
-    retry gsutil cp {ref_dict}  /io/batch/{basename(ref_dict)}
-    SITES=/io/batch/sites/{basename(ref_data.SOMALIER_SITES)}
+    retry gsutil cp {ref_fasta} /io/batch/{os.path.basename(ref_fasta)}
+    retry gsutil cp {ref_fai}   /io/batch/{os.path.basename(ref_fai)}
+    retry gsutil cp {ref_dict}  /io/batch/{os.path.basename(ref_dict)}
+    SITES=/io/batch/sites/{os.path.basename(ref_data.SOMALIER_SITES)}
     retry gsutil cp {ref_data.SOMALIER_SITES} $SITES
 
     somalier extract -d extracted/ --sites $SITES \\
-    -f /io/batch/{basename(ref_fasta)} \\
+    -f /io/batch/{os.path.basename(ref_fasta)} \\
     {input_file['base']}
 
     mv extracted/*.somalier {j.output_file}

@@ -4,7 +4,7 @@ Common pipeline command line options for "click".
 from typing import Callable
 import click
 
-from cpg_pipes.namespace import Namespace
+from cpg_pipes.storage import Namespace
 
 
 def pipeline_click_options(function: Callable) -> Callable:

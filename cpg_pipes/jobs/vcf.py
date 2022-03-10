@@ -34,7 +34,7 @@ def gather_vcfs(
     if output_vcf_path and buckets.can_reuse(output_vcf_path, overwrite):
         j.name += ' [reuse]'
         return j, b.read_input_group(**{
-            'vcf.gz': output_vcf_path,
+            'vcf.gz': str(output_vcf_path),
             'vcf.gz.tbi': f'{output_vcf_path}.tbi',
         })
 

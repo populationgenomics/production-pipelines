@@ -1,8 +1,11 @@
 import os
 
+from cloudpathlib import CloudPath
+
+from cpg_pipes.pipeline.analysis import GvcfPath
 
 DATASET = 'fewgenomes'
-BASE_BUCKET = 'gs://cpg-fewgenomes-test/unittest'
+BASE_BUCKET = CloudPath('gs://cpg-fewgenomes-test/unittest')
 
 # Samples for joint calling
 SAMPLES = [
@@ -10,12 +13,12 @@ SAMPLES = [
     'CPG196568', 'CPG196576', 'CPG196584', 'CPG196592', 'CPG196600'
 ]
 FULL_GVCF_BY_SID = {
-    s: f'gs://cpg-fewgenomes-test/unittest/inputs/gvcf/{s}.g.vcf.gz'
+    s: GvcfPath(f'gs://cpg-fewgenomes-test/unittest/inputs/gvcf/{s}.g.vcf.gz')
     for s in SAMPLES
 }  # from gs://cpg-thousand-genomes-test/gvcf/nagim/
 
 SUBSET_GVCF_BY_SID = {
-    s: f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/gvcf/{s}.g.vcf.gz'
+    s: GvcfPath(f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/gvcf/{s}.g.vcf.gz')
     for s in SAMPLES
 }
 

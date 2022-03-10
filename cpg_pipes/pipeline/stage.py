@@ -4,6 +4,7 @@ Stage classes
 
 import logging
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Callable, cast, Union, TypeVar, Generic
 
 import hailtop.batch as hb
@@ -12,18 +13,18 @@ from hailtop.batch.job import Job
 
 from cpg_pipes.pipeline.analysis import AnalysisType
 from cpg_pipes.pipeline.dataset import Dataset
-from cpg_pipes import buckets
 from cpg_pipes.pipeline.cohort import Cohort
 from cpg_pipes.pipeline.target import Target
 from cpg_pipes.pipeline.sample import Sample
 from cpg_pipes.pipeline.pair import Pair
+from cpg_pipes.storage import StorageProvider
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-StageOutputData = Union[str, CloudPath, hb.Resource, dict[str, str], dict[str, CloudPath], dict[str, hb.Resource]]
+StageOutputData = Union[CloudPath, hb.Resource, dict[str, CloudPath], dict[str, hb.Resource]]
 
 
 class StageOutput:
@@ -38,10 +39,6 @@ class StageOutput:
         target: 'Target',
         jobs: list[Job] | None = None,
     ):
-        if isinstance(data, str):
-            data = CloudPath(data)
-        if isinstance(data, dict):
-            data = {k: (CloudPath(v) if isinstance(v, str) else v) for k, v in data.items()}
         self.data = data
         self.stage = stage
         self.target = target
@@ -75,7 +72,7 @@ class StageOutput:
 
     def as_path(self, id=None) -> CloudPath:
         """
-        Cast the result to str. Though exception if failed to cast.
+        Cast the result to path. Though exception if failed to cast.
         `id` is used to extract the value when the result is a dictionary.
         """
         res = self.as_path_or_resource(id)
@@ -368,12 +365,27 @@ class Stage(Generic[TargetT], ABC):
     def make_outputs(
         self, 
         target: TargetT,
-        data: StageOutputData | None = None,
+        data: StageOutputData | str | dict[str, str] | None = None,
         jobs: list[Job] | None = None
     ) -> StageOutput:
         """
         Builds a StageDeps object to return from a stage's queue_jobs()
         """
+        # Converting str into Path objects.
+        def _convert_path(path):
+            if isinstance(path, str):
+                if any(path.startswith(f'{pref.value}://') for pref in StorageProvider):
+                    return CloudPath(path)
+                else:
+                    return Path(path)
+            return path
+        if isinstance(data, str):
+            data = _convert_path(data)
+        if isinstance(data, dict):
+            data = {
+                k: _convert_path(v) if isinstance(v, str) else v 
+                for k, v in data.items()
+            }
         return StageOutput(stage=self, target=target, data=data, jobs=jobs)
 
     def _make_inputs(self) -> StageInput:
@@ -498,7 +510,7 @@ class Stage(Generic[TargetT], ABC):
                 paths = list(expected_paths.values())
             else:
                 paths = [expected_paths]
-            if not all(buckets.file_exists(path) for path in paths):
+            if not all(path.exists() for path in paths):
                 return None
             return expected_paths
 

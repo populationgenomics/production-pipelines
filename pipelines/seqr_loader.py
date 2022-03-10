@@ -6,13 +6,10 @@ Batch pipeline to laod data into seqr
 
 import logging
 import time
-from os.path import join, basename
-from typing import Optional, List
-
+from pathlib import Path
 import click
-import hail as hl
 import pandas as pd
-
+from cloudpathlib import CloudPath
 from analysis_runner import dataproc
 
 from cpg_pipes import buckets, ref_data, utils
@@ -21,7 +18,7 @@ from cpg_pipes.jobs import align, split_intervals, haplotype_caller, \
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
-from cpg_pipes.namespace import Namespace
+from cpg_pipes.storage import Namespace
 from cpg_pipes.pipeline.analysis import AnalysisType, GvcfPath, CramPath
 from cpg_pipes.pipeline.cli_opts import pipeline_click_options
 from cpg_pipes.pipeline.pipeline import stage, Pipeline, PipelineError
@@ -172,7 +169,7 @@ class CramPedCheckStage(DatasetStage):
             dataset,
             input_path_by_sid=fp_by_sid,
             overwrite=not self.pipe.check_intermediates,
-            fingerprints_bucket=join(self.pipe.analysis_bucket, 'fingerprints'),
+            fingerprints_bucket=self.pipe.analysis_bucket / 'fingerprints',
             web_bucket=self.pipe.web_bucket,
             web_url=self.pipe.web_url,
             tmp_bucket=self.pipe.tmp_bucket,
@@ -276,7 +273,7 @@ class GvcfPedCheckStage(DatasetStage):
             dataset,
             input_path_by_sid=fp_by_sid,
             overwrite=not self.pipe.check_intermediates,
-            fingerprints_bucket=join(self.pipe.analysis_bucket, 'fingerprints'),
+            fingerprints_bucket=self.pipe.analysis_bucket / 'fingerprints',
             web_bucket=self.pipe.web_bucket,
             web_url=self.pipe.web_url,
             tmp_bucket=self.pipe.tmp_bucket,
@@ -298,11 +295,13 @@ class JointGenotypingStage(CohortStage):
         """
         samples_hash = utils.hash_sample_ids(cohort.get_all_sample_ids())
         expected_jc_vcf_path = (
-            f'{self.pipe.tmp_bucket}/joint_calling/{samples_hash}.vcf.gz'
+            self.pipe.tmp_bucket / 'joint_calling' / f'{samples_hash}.vcf.gz'
         )
         return {
             'vcf': expected_jc_vcf_path,
-            'siteonly': expected_jc_vcf_path.replace('.vcf.gz', '-siteonly.vcf.gz'),
+            'siteonly': CloudPath(
+                str(expected_jc_vcf_path).replace('.vcf.gz', '-siteonly.vcf.gz')
+            ),
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
@@ -314,7 +313,7 @@ class JointGenotypingStage(CohortStage):
             in inputs.as_path_by_target(stage=GvcfStage).items()
         }
 
-        not_found_gvcfs: List[str] = []
+        not_found_gvcfs: list[str] = []
         for sid, gvcf_path in gvcf_by_sid.items():
             if gvcf_path is None:
                 logger.error(f'Joint genotyping: could not find GVCF for {sid}')
@@ -330,7 +329,7 @@ class JointGenotypingStage(CohortStage):
             out_vcf_path=self.expected_result(cohort)['vcf'],
             out_siteonly_vcf_path=self.expected_result(cohort)['siteonly'],
             samples=cohort.get_all_samples(),
-            genomicsdb_bucket=f'{self.pipe.analysis_bucket}/genomicsdbs',
+            genomicsdb_bucket=self.pipe.analysis_bucket / 'genomicsdbs',
             tmp_bucket=self.pipe.tmp_bucket,
             gvcf_by_sid=gvcf_by_sid,
             overwrite=not self.pipe.check_intermediates,
@@ -358,10 +357,7 @@ class VqsrStage(CohortStage):
         Expects to generate one site-only VCF
         """
         samples_hash = utils.hash_sample_ids(cohort.get_all_sample_ids())
-        expected_jc_vcf_path = (
-            f'{self.pipe.tmp_bucket}/vqsr/{samples_hash}-siteonly.vcf.gz'
-        )
-        return expected_jc_vcf_path
+        return self.pipe.tmp_bucket / 'vqsr' / f'{samples_hash}-siteonly.vcf.gz'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
@@ -371,7 +367,7 @@ class VqsrStage(CohortStage):
             stage=JointGenotypingStage, target=cohort, id='siteonly'
         )
 
-        tmp_vqsr_bucket = f'{self.pipe.tmp_bucket}/vqsr'
+        tmp_vqsr_bucket = self.pipe.tmp_bucket / 'vqsr'
         logger.info(f'Queueing VQSR job')
         expected_path = self.expected_result(cohort)
         vqsr_job = make_vqsr_jobs(
@@ -387,11 +383,11 @@ class VqsrStage(CohortStage):
         return self.make_outputs(cohort, data=expected_path, jobs=[vqsr_job])
 
 
-def get_anno_tmp_bucket(pipe: Pipeline):
+def get_anno_tmp_bucket(pipe: Pipeline) -> CloudPath:
     """
     Path to write Hail Query intermediate files
     """
-    return join(pipe.tmp_bucket, 'mt')
+    return pipe.tmp_bucket / 'mt'
 
 
 @stage(required_stages=[JointGenotypingStage, VqsrStage])
@@ -403,13 +399,13 @@ class AnnotateCohortStage(CohortStage):
         """
         Expected to write a matrix table
         """
-        return join(get_anno_tmp_bucket(self.pipe), 'combined.mt')
+        return get_anno_tmp_bucket(self.pipe) / 'combined.mt'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        checkpoints_bucket = join(get_anno_tmp_bucket(self.pipe), 'checkpoints')
+        checkpoints_bucket = get_anno_tmp_bucket(self.pipe) / 'checkpoints'
 
         vcf_path = inputs.as_path(target=cohort, stage=JointGenotypingStage, id='vcf')
         annotated_siteonly_vcf_path = inputs.as_path(target=cohort, stage=VqsrStage)
@@ -417,7 +413,7 @@ class AnnotateCohortStage(CohortStage):
         expected_path = self.expected_result(cohort)
         j = dataproc.hail_dataproc_job(
             self.pipe.b,
-            f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "vcf_to_mt.py")} '
+            f'{utils.QUERY_SCRIPTS_DIR}/seqr/vcf_to_mt.py '
             f'--vcf-path {vcf_path} '
             f'--site-only-vqsr-vcf-path {annotated_siteonly_vcf_path} '
             f'--dest-mt-path {expected_path} '
@@ -452,7 +448,7 @@ class AnnotateDatasetStage(DatasetStage):
         """
         Expected to generate a matrix table
         """
-        return f'{self.pipe.analysis_bucket}/mt/{dataset.name}.mt'
+        return self.pipe.analysis_bucket / 'mt' / f'{dataset.name}.mt'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
@@ -474,14 +470,14 @@ class AnnotateDatasetStage(DatasetStage):
         # Make a list of dataset samples to subset from the entire matrix table
         sample_ids = [s.id for s in dataset.get_samples()]
         proj_tmp_bucket = dataset.get_tmp_bucket()
-        subset_path = f'{proj_tmp_bucket}/seqr-samples.txt'
-        with hl.hadoop_open(subset_path, 'w') as f:
+        subset_path = proj_tmp_bucket / 'seqr-samples.txt'
+        with subset_path.open('w') as f:
             f.write('\n'.join(sample_ids))
 
         expected_path = self.expected_result(dataset)    
         j = dataproc.hail_dataproc_job(
             self.pipe.b,
-            f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "subset_mt.py")} '
+            f'{utils.QUERY_SCRIPTS_DIR}/seqr/subset_mt.py '
             f'--mt-path {annotated_mt_path} '
             f'--out-mt-path {expected_path} '
             f'--subset-tsv {subset_path}',
@@ -526,7 +522,7 @@ class LoadToEsStage(DatasetStage):
         timestamp = time.strftime('%Y%m%d-%H%M%S')
         j = dataproc.hail_dataproc_job(
             self.pipe.b,
-            f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "mt_to_es.py")} '
+            f'{utils.QUERY_SCRIPTS_DIR}/seqr/mt_to_es.py '
             f'--mt-path {dataset_mt_path} '
             f'--es-index {dataset.name}-{self.pipe.output_version}-{timestamp} '
             f'--es-index-min-num-shards 1 '
@@ -550,13 +546,16 @@ class ToVcfStage(DatasetStage):
         """
         Generates an indexed VCF
         """
-        return f'{self.pipe.analysis_bucket}/mt/{dataset.name}.vcf.bgz'
+        return self.pipe.analysis_bucket / 'mt' / f'{dataset.name}.vcf.bgz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        output_datasets = self.pipe.config.get('output_datasets', self.pipe.get_datasets())
+        output_datasets = self.pipe.config.get(
+            'output_datasets', 
+            self.pipe.get_datasets()
+        )
         if dataset.stack not in output_datasets:
             logger.info(
                 f'Skipping loading dataset {dataset.stack} because it is not'
@@ -568,7 +567,7 @@ class ToVcfStage(DatasetStage):
 
         j = dataproc.hail_dataproc_job(
             self.pipe.b,
-            f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "mt_to_vcf.py")} '
+            f'{utils.QUERY_SCRIPTS_DIR}/seqr/mt_to_vcf.py '
             f'--mt-path {dataset_mt_path} '
             f'--out-vcf-path {self.expected_result(dataset)}',
             max_age='8h',
@@ -582,8 +581,8 @@ class ToVcfStage(DatasetStage):
 
 
 def make_pipeline(
-    input_datasets: List[str],
-    output_datasets: Optional[List[str]],
+    input_datasets: list[str],
+    output_datasets: list[str] | None,
     output_version: str,
     skip_ped_checks: bool,  # pylint: disable=unused-argument
     hc_shards_num: int,
@@ -628,28 +627,23 @@ def make_pipeline(
 
 def _make_seqr_metadata_files(
     dataset: Dataset, 
-    bucket: str, 
-    local_dir: str, 
+    bucket: CloudPath, 
+    local_dir: Path, 
     overwrite: bool = False
 ):
     """
     Create Seqr metadata files
     """
-    sample_map_path = join(local_dir, f'{dataset.name}-sample-map.csv')
-    igv_paths_path = join(local_dir, f'{dataset.name}-igv-paths.tsv')
+    samplemap_bucket_path = bucket / 'seqr' / f'{dataset.name}-sample-map.csv'
+    igv_paths_path = local_dir / f'{dataset.name}-igv-paths.tsv'
 
     # Sample map
-    if not buckets.can_reuse(sample_map_path, overwrite):
+    if not buckets.can_reuse(samplemap_bucket_path, overwrite):
         df = pd.DataFrame({
             'cpg_id': s.id,
             'individual_id': s.participant_id,
         } for s in dataset.get_samples())
-        df.to_csv(sample_map_path, sep=',', index=False, header=False)
-        # Sample map has to sit on a bucket
-        sample_map_path = buckets.gsutil_cp(
-            sample_map_path, 
-            f'{bucket}/seqr/{basename(sample_map_path)}'
-        )
+        df.to_csv(str(samplemap_bucket_path), sep=',', index=False, header=False)
 
     # IGV
     if not buckets.can_reuse(igv_paths_path, overwrite):
@@ -658,9 +652,9 @@ def _make_seqr_metadata_files(
             'cram_path': s.cram_path,
             'cram_sample_id': s.id,
         } for s in dataset.get_samples() if s.cram_path)
-        df.to_csv(igv_paths_path, sep='\t', index=False, header=False)
+        df.to_csv(str(igv_paths_path), sep='\t', index=False, header=False)
 
-    logger.info(f'Seqr sample map: {sample_map_path}')
+    logger.info(f'Seqr sample map: {samplemap_bucket_path}')
     logger.info(f'IGV seqr paths: {igv_paths_path}')
 
 

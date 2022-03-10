@@ -6,6 +6,8 @@ import logging
 from dataclasses import dataclass
 from typing import Optional, Tuple, Dict
 
+from cloudpathlib import CloudPath
+
 from cpg_pipes import buckets
 from cpg_pipes.hb.batch import get_hail_bucket
 
@@ -34,7 +36,7 @@ class PrevJob:
     def parse(
         fpath: str, 
         batchid: str, 
-        tmp_bucket: str,
+        tmp_bucket: CloudPath,
         keep_scratch: bool,
     ) -> Dict[Tuple[Optional[str], str], 'PrevJob']:
         """
@@ -48,7 +50,7 @@ class PrevJob:
         """
         hail_bucket = get_hail_bucket(tmp_bucket, keep_scratch)
         
-        if not buckets.file_exists(fpath):
+        if not buckets.exists(fpath):
             return dict()
         prev_batch_jobs: Dict[Tuple[Optional[str], str], PrevJob] = dict()
         with open(fpath) as f:

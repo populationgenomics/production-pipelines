@@ -18,7 +18,7 @@ from sample_metadata.models import (
 )
 
 from cpg_pipes import utils
-from cpg_pipes.namespace import Namespace
+from cpg_pipes.storage import Namespace
 from cpg_pipes.pipeline.analysis import AnalysisType
 from cpg_pipes.pipeline.pipeline import Pipeline
 

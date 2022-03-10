@@ -32,7 +32,7 @@ class CramPedCheckStage(DatasetStage):
         path_by_sid = dict()
         for s in dataset.get_samples():
             path = CloudPath(f'gs://cpg-{dataset.name}-main/cram/{s.id}.somalier')
-            if buckets.file_exists(path):
+            if buckets.exists(path):
                 path_by_sid[s.id] = path
 
         j, somalier_samples_path, somalier_pairs_path = pedigree.add_pedigree_jobs(
@@ -61,7 +61,7 @@ class GvcfPedCheckStage(DatasetStage):
         path_by_sid = dict()
         for s in dataset.get_samples():
             path = CloudPath(f'gs://cpg-{dataset.name}-main/gvcf/{s.id}.somalier')
-            if buckets.file_exists(path):
+            if buckets.exists(path):
                 path_by_sid[s.id] = path
 
         j, somalier_samples_path, somalier_pairs_path = pedigree.add_pedigree_jobs(

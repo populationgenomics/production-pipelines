@@ -3,10 +3,9 @@ Create Hail Batch jobs to split genomics intervals for parallel variant calling.
 """
 
 import logging
-from os.path import join
-from typing import Optional
 
 import hailtop.batch as hb
+from cloudpathlib import CloudPath
 
 from cpg_pipes import ref_data, images
 from cpg_pipes.hb.command import wrap_command
@@ -19,7 +18,7 @@ logger.setLevel(logging.INFO)
 def get_intervals(
     b: hb.Batch,
     scatter_count: int,
-    out_bucket: Optional[str] = None,
+    out_bucket: CloudPath | None = None,
 ) -> hb.ResourceGroup:
     """
     Add a job that split genome into intervals to parallelise GnarlyGenotyper
@@ -59,5 +58,5 @@ def get_intervals(
     """
     j.command(wrap_command(cmd))
     if out_bucket:
-        b.write_output(j.intervals, join(out_bucket, f'{scatter_count}intervals'))
+        b.write_output(j.intervals, str(out_bucket / f'{scatter_count}intervals'))
     return j.intervals

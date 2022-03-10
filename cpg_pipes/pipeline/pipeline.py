@@ -48,21 +48,20 @@ import functools
 import logging
 import shutil
 import tempfile
-from typing import List, Dict, Optional, Tuple, cast, Union, Any, Callable, Type
+from pathlib import Path
+from typing import Optional, cast, Union, Any, Callable, Type
 
 from cloudpathlib import CloudPath
 
 from .analysis import AnalysisType
-from .. import buckets
-from ..hb.batch import setup_batch, Batch
-from ..hb.prev_job import PrevJob
-from ..namespace import Namespace
 from .cohort import Cohort
 from .dataset import Dataset
 from .sample import Sample
-from .stage import Stage
 from .smdb import SMDB
-
+from .stage import Stage
+from ..hb.batch import setup_batch, Batch
+from ..hb.prev_job import PrevJob
+from ..storage import Namespace, StorageProvider
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -184,6 +183,7 @@ class Pipeline:
         description: str,
         output_version: str,
         namespace: Namespace | str,
+        storage_provider: StorageProvider = StorageProvider.GS,
         stages_in_order: list[StageDecorator] | None = None,
         keep_scratch: bool = True,
         dry_run: bool = False,
@@ -202,8 +202,8 @@ class Pipeline:
         skip_samples: list[str] | None = None,
         only_samples: list[str] | None = None,
         force_samples: list[str] | None = None,
-        ped_files: list[str] | None = None,
-        local_dir: str | None = None,
+        ped_files: list[CloudPath] | None = None,
+        local_dir: Path | None = None,
     ):
         if stages_in_order and not input_datasets:
             raise ValueError(
@@ -222,6 +222,7 @@ class Pipeline:
         self.name = name
         self.output_version = output_version
         self.namespace = namespace
+        self.storage_provider = storage_provider
         self.check_intermediates = check_intermediates and not dry_run
         self.check_expected_outputs = check_expected_outputs and not dry_run
         self.skip_samples_with_missing_input = skip_samples_with_missing_input
@@ -247,15 +248,16 @@ class Pipeline:
             web_suf = 'main-web'
             self.output_suf = 'main'
             self.proj_output_suf = 'main'
-        
+
         path_ptrn = (
-            f'gs://cpg-{self.analysis_dataset.stack}-{{suffix}}/'
+            f'{storage_provider.value}://'
+            f'cpg-{self.analysis_dataset.stack}-{{suffix}}/'
             f'{self.name}/'
             f'{self.output_version}'
         )
-        self.tmp_bucket = path_ptrn.format(suffix=tmp_suf)
-        self.analysis_bucket = path_ptrn.format(suffix=analysis_suf)
-        self.web_bucket = path_ptrn.format(suffix=web_suf)
+        self.tmp_bucket = CloudPath(path_ptrn.format(suffix=tmp_suf))
+        self.analysis_bucket = CloudPath(path_ptrn.format(suffix=analysis_suf))
+        self.web_bucket = CloudPath(path_ptrn.format(suffix=web_suf))
         self.web_url = (
             f'https://{self.namespace.value}-web.populationgenomics.org.au/'
             f'{self.analysis_dataset.stack}/'
@@ -266,10 +268,10 @@ class Pipeline:
         self.dry_run: bool = dry_run
 
         if local_dir:
-            self.local_dir = local_dir
-            self.local_tmp_dir = tempfile.mkdtemp(dir=local_dir)
+            self.local_dir = Path(local_dir)
+            self.local_tmp_dir = Path(tempfile.mkdtemp(dir=local_dir))
         else:
-            self.local_dir = self.local_tmp_dir = tempfile.mkdtemp()
+            self.local_dir = self.local_tmp_dir = Path(tempfile.mkdtemp())
 
         self.prev_batch_jobs = dict()
         if previous_batch_tsv_path is not None:
@@ -302,7 +304,6 @@ class Pipeline:
             )
             self._db.populate_cohort(
                 cohort=self.cohort,
-                local_tmp_dir=self.local_dir,
                 skip_samples=skip_samples,
                 only_samples=only_samples,
                 ped_files=ped_files,
@@ -316,14 +317,14 @@ class Pipeline:
                     )
                     s.forced = True
 
-        self._stages_dict: Dict[str, Stage] = dict()
-        self._stages_in_order: List[StageDecorator] = stages_in_order or _ALL_DEFINED_STAGES
+        self._stages_dict: dict[str, Stage] = dict()
+        self._stages_in_order: list[StageDecorator] = stages_in_order or _ALL_DEFINED_STAGES
 
     def submit_batch(
         self, 
-        dry_run: Optional[bool] = None,
-        wait: Optional[bool] = False,
-    ) -> Optional[Any]:
+        dry_run: bool | None = None,
+        wait: bool | None = False,
+    ) -> Any | None:
         """
         Submits Hail Batch jobs.
         """
@@ -331,7 +332,7 @@ class Pipeline:
             dry_run = self.dry_run
         
         self.set_stages(self._stages_in_order)
-            
+
         if self.b:
             logger.info(f'Will submit {self.b.total_job_num} jobs:')
             for label, stat in self.b.labelled_jobs.items():
@@ -348,7 +349,7 @@ class Pipeline:
         shutil.rmtree(self.local_tmp_dir)
         return None
 
-    def _validate_first_last_stage(self) -> Tuple[Optional[int], Optional[int]]:
+    def _validate_first_last_stage(self) -> tuple[int | None, int | None]:
         # Validating the --first-stage and --last-stage parameters
         stage_names = list(self._stages_dict.keys())
         lower_stage_names = [s.lower() for s in stage_names]
@@ -370,7 +371,7 @@ class Pipeline:
             last_stage_num = lower_stage_names.index(self.last_stage.lower())
         return first_stage_num, last_stage_num
 
-    def set_stages(self, stages_classes: List[StageDecorator]):
+    def set_stages(self, stages_classes: list[StageDecorator]):
         """
         Iterate over stages and call add_to_the_pipeline() on each.
         Effectively creates all Hail Batch jobs through Stage.queue_jobs().
@@ -394,7 +395,7 @@ class Pipeline:
         # import graphlib
         # for stage in graphlib.TopologicalSorter(stages).static_order():
         # https://github.com/populationgenomics/analysis-runner/pull/328/files
-        additional_stages_dict: Dict[str, Stage] = dict()
+        additional_stages_dict: dict[str, Stage] = dict()
         for i, (stage_name, stage_) in enumerate(self._stages_dict.items()):
             if first_stage_num is not None and i < first_stage_num:
                 stage_.skipped = True
@@ -452,13 +453,6 @@ class Pipeline:
                     logger.info(f'Last stage is {stage_.name}, stopping here')
                     break
 
-    def can_reuse(self, fpath: Optional[str]) -> bool:
-        """
-        Checks if the fpath exists, 
-        but always returns False if not check_intermediate_existence
-        """
-        return buckets.can_reuse(fpath, overwrite=not self.check_intermediates)
-
     def db_process_existing_analysis(self, *args, **kwargs) -> CloudPath | None:
         """
         Thin wrapper around SMDB.process_existing_analysis
@@ -477,13 +471,13 @@ class Pipeline:
             raise PipelineError('SMDB is not initialised')
         return cast('SMDB', self._db)
 
-    def get_db(self) -> Optional[SMDB]:
+    def get_db(self) -> SMDB | None:
         """
         Like .db property, but returns None if db is not initialised.
         """
         return self._db
 
-    def get_datasets(self, only_active: bool = True) -> List[Dataset]:
+    def get_datasets(self, only_active: bool = True) -> list[Dataset]:
         """
         Thin wrapper around corresponding Cohort method.
         """
@@ -495,13 +489,13 @@ class Pipeline:
         """
         return self.cohort.add_dataset(name)
 
-    def get_all_samples(self, only_active: bool = True) -> List[Sample]:
+    def get_all_samples(self, only_active: bool = True) -> list[Sample]:
         """
         Thin wrapper around corresponding Cohort method.
         """
         return self.cohort.get_all_samples(only_active=only_active)
 
-    def get_all_sample_ids(self, only_active: bool = True) -> List[str]:
+    def get_all_sample_ids(self, only_active: bool = True) -> list[str]:
         """
         Thin wrapper around corresponding Cohort method.
         """

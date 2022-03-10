@@ -6,13 +6,13 @@ import hashlib
 import os
 import sys
 import time
-from os.path import isdir, isfile, exists
+from pathlib import Path
 from typing import Any, Callable, Iterable
 
 import click
 
 from cpg_pipes import __name__ as package_name
-from cpg_pipes.buckets import file_exists
+from cpg_pipes.buckets import exists
 
 # Default reference genome build.
 DEFAULT_REF = 'GRCh38'
@@ -66,13 +66,13 @@ def get_validation_callback(
                     f'an extension .{ext}, got: {value}'
                 )
         if must_exist:
-            if not file_exists(value):
+            if not exists(value):
                 raise click.BadParameter(f"{value} doesn't exist or incomplete")
             if accompanying_metadata_suffix:
                 accompanying_metadata_fpath = (
                     os.path.splitext(value)[0] + accompanying_metadata_suffix
                 )
-                if not file_exists(accompanying_metadata_fpath):
+                if not exists(accompanying_metadata_fpath):
                     raise click.BadParameter(
                         f"An accompanying file {accompanying_metadata_fpath} doesn't "
                         f'exist'
@@ -82,7 +82,7 @@ def get_validation_callback(
     return callback
 
 
-def safe_mkdir(dirpath: str, descriptive_name: str = '') -> str:
+def safe_mkdir(dirpath: Path, descriptive_name: str = '') -> Path:
     """
     Multiprocessing-safely and recursively creates a directory
     """
@@ -91,20 +91,20 @@ def safe_mkdir(dirpath: str, descriptive_name: str = '') -> str:
             f'Path is empty: {descriptive_name if descriptive_name else ""}\n'
         )
 
-    if isdir(dirpath):
+    if dirpath.is_dir():
         return dirpath
 
-    if isfile(dirpath):
-        sys.stderr.write(descriptive_name + ' ' + dirpath + ' is a file.\n')
+    if dirpath.is_file():
+        sys.stderr.write(f'{descriptive_name} {dirpath} is a file.\n')
 
     num_tries = 0
     max_tries = 10
 
-    while not exists(dirpath):
+    while not dirpath.exists():
         # we could get an error here if multiple processes are creating
         # the directory at the same time. Grr, concurrency.
         try:
-            os.makedirs(dirpath)
+            os.makedirs(str(dirpath))
         except OSError:
             if num_tries > max_tries:
                 raise

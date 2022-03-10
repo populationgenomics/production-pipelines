@@ -4,7 +4,7 @@ Represents a "cohort" target - all samples from all datasets in the pipeline
 
 import logging
 
-from cpg_pipes.namespace import Namespace
+from cpg_pipes.storage import Namespace
 from cpg_pipes.pipeline.sample import Sample
 from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes.pipeline.target import Target
@@ -73,29 +73,3 @@ class Cohort(Target):
         )
         self._datasets.append(p)
         return p
-
-    # def populate(
-    #     self,
-    #     smdb: SMDB,
-    #     input_datasets: list[str],
-    #     local_tmp_dir: str,
-    #     skip_samples: list[str]|None = None,
-    #     only_samples: list[str]|None = None,
-    #     ped_files: list[str]|None = None,
-    #     forced_samples: list[str] = None,
-    # ) -> None:
-    #     """
-    #     Finds input samples, as well as analysis and sequence entries from the DB.
-    #     Populates self._dataset, adds pedigree information.
-    #     """
-    #     self._populate_datasets(
-    #         smdb=smdb,
-    #         input_datasets=input_datasets,
-    #         skip_samples=skip_samples,
-    #         only_samples=only_samples,
-    #         forced_samples=forced_samples,
-    #     )
-    #     self._populate_seq(smdb)
-    #     self._populate_analysis(smdb)
-    #     if ped_files:
-    #         self._populate_pedigree(ped_files, local_tmp_dir)

@@ -9,6 +9,7 @@ import os
 import tempfile
 import time
 from os.path import join
+from pathlib import Path
 from typing import List, Optional, Union
 import hail as hl
 
@@ -49,7 +50,7 @@ ANCESTRY_HGDP_SUBSET_MTS = {
 ANCESTRY_SITES = f'{ANCESTRY_BUCKET}/pca_sites.ht'
 
 
-def init_hail(name: str, local_tmp_dir: str = None):
+def init_hail(name: str, local_tmp_dir: Path = None):
     """
     Initialise Hail, and set up a local directory for logs.
     :param name: name to prefix the log file
@@ -57,11 +58,11 @@ def init_hail(name: str, local_tmp_dir: str = None):
     :return:
     """
     if not local_tmp_dir:
-        local_tmp_dir = tempfile.mkdtemp()
+        local_tmp_dir = Path(tempfile.mkdtemp())
 
     timestamp = time.strftime('%Y%m%d-%H%M')
     hl_log = os.path.join(
-        safe_mkdir(os.path.join(local_tmp_dir, 'log')), f'{name}-{timestamp}.log'
+        safe_mkdir(local_tmp_dir / 'log'), f'{name}-{timestamp}.log'
     )
     hl.init(default_reference=DEFAULT_REF, log=hl_log)
     return local_tmp_dir
