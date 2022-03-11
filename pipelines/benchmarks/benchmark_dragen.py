@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+
+"""
+Benchmarking DRAGMAP alignment and GATK-DRAGEN variant calling.
+"""
+
 from os.path import join
 import click
 import logging

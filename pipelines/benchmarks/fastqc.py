@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Batch pipeline to run fastqc
+Batch pipeline to run FastQC.
 """
 
 import logging

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+"""
+Benchmarking different aligment setups.
+"""
+
 from enum import Enum
 import click
 import logging
@@ -189,34 +193,13 @@ def main():
     )
 
     p = pipeline.add_dataset('fewgenomes')
-    # p.add_sample(
-    #     id='NA12878',
-    #     external_id='NA12878',
-    #     fastq_input=benchmark.na12878fq,
-    # )
-    # p.add_sample(
-    #     id='PERTHNEURO_FQ',
-    #     external_id='PERTHNEURO_FQ',
-    #     fastq_input=benchmark.perth_neuro_fq,
-    # )
     p.add_sample(
         id='PERTHNEURO_CRAM',
         external_id='PERTHNEURO_CRAM',
         cram_input=benchmark.perth_neuro_cram,
     )
-    # p.add_sample(
-    #     id='TOY_FQ',
-    #     external_id='TOY_FQ',
-    #     fastq_input=benchmark.tiny_fq
-    # )
-    # p.add_sample(
-    #     id='TOY_CRAM',
-    #     external_id='TOY_CRAM',
-    #     fastq_input=benchmark.tiny_cram
-    # )
 
     pipeline.set_stages([
-        # SubsetAlignmentInput,
         DifferentAlignerSetups,
     ])
 
