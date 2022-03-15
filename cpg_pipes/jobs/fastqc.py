@@ -14,7 +14,8 @@ from cpg_pipes.pipeline.analysis import AlignmentInput, CramPath, FastqPair
 
 def fastqc(
     b: hb.Batch, 
-    output_fpath: CloudPath,
+    output_html_path: CloudPath,
+    output_zip_path: CloudPath,
     sample_name: str, 
     dataset_name: str | None, 
     alignment_input: AlignmentInput,
@@ -32,10 +33,12 @@ def fastqc(
         fastqc -t{res.get_nthreads()} {inp} --outdir /io/batch/outdir
         ls /io/batch/outdir
         ln /io/batch/outdir/*_fastqc.html {j.out_html}
+        ln /io/batch/outdir/*_fastqc.zip {j.out_zip}
         """
         j.command(wrap_command(cmd, monitor_space=True))
     
-        b.write_output(j.out_html, output_fpath)
+        b.write_output(j.out_html, str(output_html_path))
+        b.write_output(j.out_zip, str(output_zip_path))
         return j
     
     jobs = []

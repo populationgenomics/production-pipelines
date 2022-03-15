@@ -6,6 +6,7 @@ Batch pipeline to run FastQC.
 
 import logging
 import click
+from cloudpathlib import CloudPath
 
 from cpg_pipes import benchmark
 from cpg_pipes.pipeline.pipeline import Pipeline
@@ -37,7 +38,12 @@ def main():  # pylint: disable=missing-function-docstring
     for sample_name, inp in inputs.items():
         fastqc(
             pipe.b,
-            results_bucket=f'{benchmark.BENCHMARK_BUCKET}/outputs/fastqc/{sample_name}',
+            output_fpath=(
+                CloudPath(benchmark.BENCHMARK_BUCKET) / 
+                'outputs' /
+                'fastqc' /
+                f'{sample_name}.html'
+            ),
             alignment_input=inp,
             sample_name=sample_name,
             dataset_name='FastQC',

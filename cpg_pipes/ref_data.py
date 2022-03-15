@@ -71,3 +71,7 @@ MILLS_RESOURCE_VCF = join(BROAD_REF_BUCKET, 'Mills_and_1000G_gold_standard.indel
 MILLS_RESOURCE_VCF_INDEX = join(BROAD_REF_BUCKET, 'Mills_and_1000G_gold_standard.indels.hg38.vcf.gz.tbi')
 AXIOM_POLY_RESOURCE_VCF = join(BROAD_REF_BUCKET, 'Axiom_Exome_Plus.genotypes.all_populations.poly.hg38.vcf.gz')
 AXIOM_POLY_RESOURCE_VCF_INDEX = join(BROAD_REF_BUCKET, 'Axiom_Exome_Plus.genotypes.all_populations.poly.hg38.vcf.gz.tbi')
+
+# Contamination check
+CONTAM_BUCKET = f'{BROAD_REF_BUCKET}/contamination-resources/1000g'
+WGS_COVERAGE_INTERVAL_LIST = f'{BROAD_REF_BUCKET}/wgs_coverage_regions.hg38.interval_list'
