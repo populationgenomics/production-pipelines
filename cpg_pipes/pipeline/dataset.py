@@ -59,16 +59,18 @@ class Dataset(Target):
 
         self._samples: List[Sample] = []
 
+        self.namespace = namespace or Namespace.MAIN
         if name.endswith('-test'):
-            self.is_test = True
             self.stack = name[:-len('-test')]
+            if self.namespace == Namespace.MAIN:
+                self.namespace = Namespace.TEST
         else:
-            self.is_test = False
             self.stack = name
-            
-        if namespace is not None:
-            self.is_test = namespace != Namespace.MAIN
 
+    @property
+    def is_test(self) -> bool:
+        return self.namespace != Namespace.MAIN
+    
     @property
     def name(self) -> str:
         return self.stack + ('-test' if self.is_test else '')
@@ -103,12 +105,41 @@ class Dataset(Target):
             return self.tmp_bucket
         assert pipeline
         prefix = pipeline.storage_provider.value
+        ns = 'test' if self.is_test else 'main'
         return (
-            CloudPath(f'{prefix}://cpg-{self.stack}-{pipeline.output_suf}-tmp')
-            / pipeline.name 
+            CloudPath(f'{prefix}://cpg-{self.stack}-{ns}-tmp')
+            / pipeline.name
             / pipeline.output_version
         )
+    
+    def get_analysis_bucket(self, pipeline=None) -> CloudPath:
+        """
+        Get analysis bucket (-main-analysis or -test-analysis)
+        """
+        assert pipeline
+        prefix = pipeline.storage_provider.value
+        ns = 'test' if self.is_test else 'main'
+        return CloudPath(f'{prefix}://cpg-{self.stack}-{ns}-analysis')
 
+    def get_web_bucket(self, pipeline=None) -> CloudPath:
+        """
+        Get web bucket (-main-web or -test-web)
+        """
+        assert pipeline
+        prefix = pipeline.storage_provider.value
+        ns = 'test' if self.is_test else 'main'
+        return CloudPath(f'{prefix}://cpg-{self.stack}-{ns}-web')
+
+    def get_web_url(self, pipeline=None) -> CloudPath:
+        """
+        Get web base URL
+        """
+        assert pipeline
+        return (
+            f'https://{self.namespace.value}-web.populationgenomics.org.au/'
+            f'{self.stack}/'
+        )
+    
     def add_sample(
         self, 
         id: str,  # pylint: disable=redefined-builtin

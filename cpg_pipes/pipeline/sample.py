@@ -38,7 +38,17 @@ class Sample(Target):
         self._participant_id = participant_id
         self.meta: dict = meta or dict()
         self.seq = seq
-        self.pedigree = pedigree
+        self.pedigree: PedigreeInfo | None
+        if pedigree:
+            self.pedigree = pedigree
+        elif 'sex' in self.meta:
+            self.pedigree = PedigreeInfo(
+                sample=self,
+                fam_id=self.participant_id,
+                sex=Sex.parse(self.meta['sex'])
+            )
+        else:
+            self.pedigree = None
         self._alignment_input = alignment_input
 
     def __repr__(self):
@@ -133,6 +143,14 @@ class Sex(Enum):
     UNKNOWN = 0
     MALE = 1
     FEMALE = 2
+    
+    @staticmethod
+    def parse(sex: str) -> 'Sex':
+        if sex.lower() in ('m', 'male', '1'):
+            return Sex.MALE
+        if sex.lower() in ('f', 'female', '2'):
+            return Sex.FEMALE
+        return Sex.UNKNOWN
 
 
 @dataclass
@@ -141,11 +159,11 @@ class PedigreeInfo:
     Pedigree relationsips with other samples in the cohort, and other PED data
     """
     sample: Sample
-    fam_id: str
-    dad: Sample | None
-    mom: Sample | None
     sex: Sex
-    phenotype: str
+    fam_id: str | None = None
+    phenotype: str | None = None
+    dad: Sample | None = None
+    mom: Sample | None = None
 
     def get_ped_dict(self, use_participant_id: bool = False) -> dict:
         """
@@ -160,7 +178,7 @@ class PedigreeInfo:
             return _s.id
 
         return {
-            'Family.ID': self.fam_id,
+            'Family.ID': self.fam_id or self.sample.participant_id,
             'Individual.ID': _get_id(self.sample),
             'Father.ID': _get_id(self.dad),
             'Mother.ID': _get_id(self.mom),

@@ -206,17 +206,10 @@ def _haplotype_caller_one(
     if depends_on:
         j.depends_on(*depends_on)
 
-    ref_fasta = ref_data.REF_FASTA
-    ref_fai = ref_data.REF_FASTA + '.fai'
-    ref_dict = (
-        ref_fasta.replace('.fasta', '').replace('.fna', '').replace('.fa', '') + '.dict'
-    )
+    ref_fasta = ref_data.REF_D['base']
+    ref_fai = ref_data.REF_D['fai']
+    ref_dict = ref_data.REF_D['dict']
     
-    # cram = b.read_input_group(**{
-    #     'cram': cram_fpath,
-    #     'cram.crai': crai_fpath or (cram_fpath + '.crai'),
-    # })
-
     cmd = f"""\
     CRAM=/io/batch/{sample_name}.cram
     CRAI=/io/batch/{sample_name}.cram.crai
@@ -231,7 +224,11 @@ def _haplotype_caller_one(
     retry_gs_cp {ref_fai}   /io/batch/{os.path.basename(ref_fai)}
     retry_gs_cp {ref_dict}  /io/batch/{os.path.basename(ref_dict)}
 
-    gatk --java-options "-Xms{job_res.get_java_mem_mb()}g -XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10" \\
+    gatk --java-options \
+    "-Xms{job_res.get_java_mem_mb()}m \
+    -Xmx{job_res.get_java_mem_mb()}m \
+    -XX:GCTimeLimit=50 \
+    -XX:GCHeapFreeLimit=10" \\
     HaplotypeCaller \\
     -R /io/batch/{os.path.basename(ref_fasta)} \\
     -I $CRAM \\
@@ -330,11 +327,9 @@ def postproc_gvcf(
         }
     )
 
-    ref_fasta = ref_data.REF_FASTA
-    ref_fai = ref_data.REF_FASTA + '.fai'
-    ref_dict = (
-        ref_fasta.replace('.fasta', '').replace('.fna', '').replace('.fa', '') + '.dict'
-    )
+    ref_fasta = ref_data.REF_D['base']
+    ref_fai = ref_data.REF_D['fai']
+    ref_dict = ref_data.REF_D['dict']
 
     cmd = f"""\
     GVCF=/io/batch/{sample_name}.g.vcf.gz

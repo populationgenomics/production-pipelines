@@ -162,7 +162,7 @@ class StageInput:
     def as_path_by_target(
         self, 
         stage: StageDecorator,
-        id: str|None = None,
+        id: str | None = None,
     ) -> dict[str, CloudPath]:
         """
         Get a single file path result, indexed by target for a specific stage
@@ -172,7 +172,7 @@ class StageInput:
     def as_resource_by_target(
         self, 
         stage: StageDecorator,
-        id: str|None = None,
+        id: str | None = None,
     ) -> dict[str, hb.Resource]:
         """
         Get a single file path result, indexed by target for a specific stage
@@ -207,7 +207,7 @@ class StageInput:
         self, 
         target: 'Target',
         stage: StageDecorator,
-        id: str|None = None,
+        id: str | None = None,
     ) -> CloudPath:
         """
         Represent as a path to a file, otherwise fail.
@@ -220,7 +220,7 @@ class StageInput:
         self, 
         target: 'Target',
         stage: StageDecorator,
-        id: str|None = None,
+        id: str | None = None,
     ) -> str:
         """
         Get Hail Batch Resource for a specific target and stage
@@ -393,7 +393,7 @@ class Stage(Generic[TargetT], ABC):
     def _queue_jobs_with_checks(self, target: TargetT) -> StageOutput:
         """
         Constructs `inputs` and calls the public `output = queue_jobs(target, input)`.
-        Performs checks like possibility to reuse existing jobs results,
+        Performs the checks like possibility to reuse existing jobs results,
         or if required dependencies are missing.
         """
         if not self.skipped:
@@ -401,8 +401,14 @@ class Stage(Generic[TargetT], ABC):
             if reusable_paths:
                 if target.forced:
                     logger.info(
-                        f'{self.name}: can reuse, but forcing rerunning the stage '
-                        f'for {target.unique_id}'
+                        f'{self.name}: can reuse, but forcing the target '
+                        f'{target.unique_id} to rerun this stage'
+                    )
+                    return self.queue_jobs(target, self._make_inputs())
+                elif self.forced:
+                    logger.info(
+                        f'{self.name}: can reuse, but forcing the stage '
+                        f'to rerun, target={target.unique_id}'
                     )
                     return self.queue_jobs(target, self._make_inputs())
                 else:

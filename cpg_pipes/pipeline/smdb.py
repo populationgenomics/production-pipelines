@@ -97,12 +97,7 @@ class SMDB:
                             fam_id=fam_id,
                             dad=sample_by_participant_id.get(pat_id),
                             mom=sample_by_participant_id.get(mat_id),
-                            sex={
-                                '1': Sex.MALE, 
-                                '2': Sex.FEMALE,
-                                'M': Sex.MALE,
-                                'F': Sex.FEMALE,
-                            }.get(sex, Sex.UNKNOWN),
+                            sex=Sex.parse(sex),
                             phenotype=phenotype or '0',
                         )
         for dataset in cohort.get_datasets():

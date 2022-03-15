@@ -64,43 +64,6 @@ def bwamem2(*args, **kwargs):
     return align(*args, **kwargs)
 
 
-def samtools_stats(
-    b,
-    cram_path: str,
-    sample_name: str,
-    output_path: str | None = None,
-    dataset_name: str | None = None,
-    overwrite: bool = True,
-    nthreads: int | None = None,
-) -> Job:
-    """
-    Run `samtools stats` for mapping QC
-    """
-    jname = 'samtools stats'
-    j = b.new_job(jname, dict(sample=sample_name, dataset=dataset_name))
-    if not output_path:
-        output_path = cram_path + '.stats'
-    if buckets.can_reuse(cram_path, overwrite):
-        j.name += ' [reuse]'
-        return j
-
-    j.image(images.SAMTOOLS_PICARD_IMAGE)
-
-    job_resource = STANDARD.set_resources(j, nthreads=nthreads)
-
-    cram = b.read_input_group(**{
-        'cram': cram_path,
-        'cram.crai': cram_path + '.crai',
-    })
-
-    j.command(wrap_command(f"""\
-    samtools stats -@{job_resource.get_nthreads() - 1} {cram.cram_path} > {j.output_stats}
-    """))
-    b.write_output(j.output_stats, output_path)
-    
-    return j
-
-
 def align(
     b,
     alignment_input: AlignmentInput,

@@ -27,8 +27,12 @@ def add_pedigree_jobs(
     dataset: Dataset,
     input_path_by_sid: dict[str, CloudPath | str],
     overwrite: bool,
-    fingerprints_bucket: CloudPath,
     tmp_bucket: CloudPath,
+    out_samples_path: CloudPath | None = None,
+    out_pairs_path: CloudPath | None = None,
+    out_ancestry_path: CloudPath | None = None,
+    out_html_path: CloudPath | None = None,
+    fingerprints_bucket: CloudPath | None = None,
     web_bucket: CloudPath | None = None,
     web_url: str | None = None,
     depends_on: list[Job] | None = None,
@@ -101,9 +105,13 @@ def add_pedigree_jobs(
 
     pairs_path, samples_path, html_url = _copy_somalier_output(
         b=b, 
-        dataset=dataset, 
-        fingerprints_bucket=fingerprints_bucket, 
+        dataset=dataset,
         relate_j=relate_j, 
+        out_samples_path=out_samples_path,
+        out_pairs_path=out_pairs_path,
+        out_html_path=out_html_path,
+        out_ancestry_path=out_ancestry_path,
+        fingerprints_bucket=fingerprints_bucket, 
         web_bucket=web_bucket, 
         web_url=web_url,
     )
@@ -124,25 +132,46 @@ def add_pedigree_jobs(
 def _copy_somalier_output(
     b: Batch,
     dataset: Dataset, 
-    fingerprints_bucket: CloudPath, 
     relate_j: Job,
+    out_samples_path: CloudPath | None = None,
+    out_pairs_path: CloudPath | None = None,
+    out_html_path: CloudPath | None = None,
+    out_ancestry_path: CloudPath | None = None,
+    fingerprints_bucket: CloudPath | None = None,
     web_bucket: CloudPath | None = None,
     web_url: str | None = None,
 ) -> tuple[CloudPath, CloudPath, str | None]:
-    # Copy somalier outputs to buckets
-    prefix = fingerprints_bucket / dataset.name
-    somalier_samples_path = CloudPath(f'{prefix}.samples.tsv')
-    somalier_pairs_path = CloudPath(f'{prefix}.pairs.tsv')
-    b.write_output(relate_j.output_samples, str(somalier_samples_path))
-    b.write_output(relate_j.output_pairs, str(somalier_pairs_path))
+    """
+    Copy somalier outputs to buckets
+    """
+    if not (out_samples_path and out_pairs_path):
+        if not fingerprints_bucket:
+            raise ValueError(
+                'Somalier Either both out_samples_path/out_pairs_path, or '
+                'fingerprints_bucket should be specified'
+            )
+        prefix = fingerprints_bucket / dataset.name
+        out_samples_path = CloudPath(f'{prefix}.samples.tsv')
+        out_pairs_path = CloudPath(f'{prefix}.pairs.tsv')
+    b.write_output(relate_j.output_samples, str(out_samples_path))
+    b.write_output(relate_j.output_pairs, str(out_pairs_path))
+    if out_ancestry_path:
+        b.write_output(relate_j.output_ancesry, str(out_ancestry_path))
+
     # Copy somalier HTML to the web bucket
-    somalier_html_url = None
-    if web_bucket and web_url:
-        rel_path = f'pedigree/{dataset.name}.html'
-        somalier_html_path = web_bucket / rel_path
-        somalier_html_url = f'{web_url}/{rel_path}'
-        b.write_output(relate_j.output_html, str(somalier_html_path))
-    return somalier_pairs_path, somalier_samples_path, somalier_html_url
+    out_html_url = None
+    if not out_html_path:
+        if web_bucket:
+            out_html_path = web_bucket / 'pedigree' / f'{dataset.name}.html'
+        if web_url:
+            out_html_url = f'{web_url}/pedigree/{dataset.name}.html'
+    else:
+        out_html_url = f'{web_url}/{out_html_path.name}'
+    
+    if out_html_path:
+        b.write_output(relate_j.output_html, str(out_html_path))
+        
+    return out_pairs_path, out_samples_path, out_html_url
 
 
 def _check_pedigree_job(
@@ -161,7 +190,7 @@ def _check_pedigree_job(
     STANDARD.set_resources(check_j, ncpu=2)
     check_j.image(images.PEDDY_IMAGE)
     # Creating sample map to remap internal IDs to participant IDs
-    sample_map_fpath = tmp_bucket / 'pedigree' 'sample_maps' f'{dataset.name}.tsv'
+    sample_map_fpath = tmp_bucket / 'pedigree' / 'sample_maps' / f'{dataset.name}.tsv'
     if not dry_run:
         df = pd.DataFrame([
             {'id': s.id, 'pid': s.participant_id} for s in dataset.get_samples()

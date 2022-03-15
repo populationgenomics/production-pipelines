@@ -1,77 +1,39 @@
 #!/usr/bin/env python3
 
 """
-Batch pipeline to laod data into seqr
+Batch pipeline to load data into seqr
 """
 
 import logging
 import time
 from pathlib import Path
+
 import click
+import click_config_file
 import pandas as pd
-from cloudpathlib import CloudPath
 from analysis_runner import dataproc
+from cloudpathlib import CloudPath
 
 from cpg_pipes import buckets, ref_data, utils
 from cpg_pipes.jobs import align, split_intervals, haplotype_caller, \
-    pedigree, fastqc
+    pedigree
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
-from cpg_pipes.storage import Namespace
 from cpg_pipes.pipeline.analysis import AnalysisType, GvcfPath, CramPath
 from cpg_pipes.pipeline.cli_opts import pipeline_click_options
+from cpg_pipes.pipeline.cohort import Cohort
+from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes.pipeline.pipeline import stage, Pipeline, PipelineError
+from cpg_pipes.pipeline.sample import Sample
 from cpg_pipes.pipeline.stage import SampleStage, CohortStage, DatasetStage, \
     StageInput, StageOutput
-from cpg_pipes.pipeline.sample import Sample
-from cpg_pipes.pipeline.dataset import Dataset
-from cpg_pipes.pipeline.cohort import Cohort
+from cpg_pipes.storage import Namespace
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
-
-@stage(skipped=True)
-class FastqcStage(SampleStage):
-    """
-    Run FastQC on alignment inputs
-    """
-    def expected_result(self, sample: Sample):
-        """
-        Stage is expected to generate a fastqc report
-        """
-        return f'{sample.dataset.get_bucket(self.pipe)}/qc/fastqc/{sample.id}.html'
-
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        """
-        Using the "fastqc" function implemented in the jobs module
-        """
-        if not sample.alignment_input:
-            if self.pipe.skip_samples_with_missing_input:
-                logger.error(f'Could not find read data, skipping sample {sample.id}')
-                sample.active = False
-                return self.make_outputs(sample)  # return empty output
-            else:
-                raise PipelineError(
-                    f'No alignment input found for {sample.id}. '
-                    f'Checked: Sequence entry and type=CRAM Analysis entry'
-                )
-
-        job = fastqc.fastqc(
-            b=self.pipe.b,
-            output_fpath=self.expected_result(sample),
-            alignment_input=sample.alignment_input,
-            sample_name=sample.id,
-            dataset_name=sample.dataset.name,
-        )
-        return self.make_outputs(
-            sample, 
-            data=self.expected_result(sample), 
-            jobs=[job]
-        )
-    
 
 @stage(sm_analysis_type=AnalysisType.CRAM)
 class CramStage(SampleStage):
@@ -122,7 +84,7 @@ class CramStage(SampleStage):
 @stage(required_stages=CramStage)
 class CramSomalierStage(SampleStage):
     """
-    Genereate fingerprints from CRAMs for pedigree checks
+    Genereate fingerprints from CRAMs for pedigree checks.
     """
     def expected_result(self, sample: Sample):
         """
@@ -132,20 +94,23 @@ class CramSomalierStage(SampleStage):
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """
-        Using a function from the jobs module
+        Using a function from the jobs module.
         """
-        cram_path = inputs.as_path(target=sample, stage=CramStage)
-        expected_path = self.expected_result(sample)
-        j, _ = pedigree.somalier_extact_job(
-            b=self.pipe.b,
-            sample=sample,
-            gvcf_or_cram_or_bam_path=CramPath(cram_path),
-            out_fpath=expected_path,
-            overwrite=not self.pipe.check_intermediates,
-            label='(CRAMs)',
-            depends_on=inputs.get_jobs(),
-        )
-        return self.make_outputs(sample, data=expected_path, jobs=[j])
+        if self.pipe.config.get('ped_checks'):
+            cram_path = inputs.as_path(target=sample, stage=CramStage)
+            expected_path = self.expected_result(sample)
+            j, _ = pedigree.somalier_extact_job(
+                b=self.pipe.b,
+                sample=sample,
+                gvcf_or_cram_or_bam_path=CramPath(cram_path),
+                out_fpath=expected_path,
+                overwrite=not self.pipe.check_intermediates,
+                label='(CRAMs)',
+                depends_on=inputs.get_jobs(),
+            )
+            return self.make_outputs(sample, data=expected_path, jobs=[j])
+        else:
+            return self.make_outputs(sample)  # return empty output
 
 
 @stage(required_stages=CramSomalierStage)
@@ -162,22 +127,25 @@ class CramPedCheckStage(DatasetStage):
         """
         Checks calls job from the pedigree module
         """
-        fp_by_sid = inputs.as_path_by_target(stage=CramSomalierStage)
-
-        j, somalier_samples_path, _ = pedigree.add_pedigree_jobs(
-            self.pipe.b,
-            dataset,
-            input_path_by_sid=fp_by_sid,
-            overwrite=not self.pipe.check_intermediates,
-            fingerprints_bucket=self.pipe.analysis_bucket / 'fingerprints',
-            web_bucket=self.pipe.web_bucket,
-            web_url=self.pipe.web_url,
-            tmp_bucket=self.pipe.tmp_bucket,
-            depends_on=inputs.get_jobs(),
-            label='(CRAMs)',
-            dry_run=self.pipe.dry_run,
-        )
-        return self.make_outputs(dataset, data=somalier_samples_path, jobs=[j])
+        if self.pipe.config.get('ped_checks'):
+            fp_by_sid = inputs.as_path_by_target(stage=CramSomalierStage)
+    
+            j, somalier_samples_path, _ = pedigree.add_pedigree_jobs(
+                self.pipe.b,
+                dataset,
+                input_path_by_sid=fp_by_sid,
+                overwrite=not self.pipe.check_intermediates,
+                fingerprints_bucket=self.pipe.analysis_bucket / 'fingerprints',
+                web_bucket=self.pipe.web_bucket,
+                web_url=self.pipe.web_url,
+                tmp_bucket=self.pipe.tmp_bucket,
+                depends_on=inputs.get_jobs(),
+                label='(CRAMs)',
+                dry_run=self.pipe.dry_run,
+            )
+            return self.make_outputs(dataset, data=somalier_samples_path, jobs=[j])
+        else:
+            return self.make_outputs(dataset)  # return empty output
 
 
 @stage(required_stages=CramStage, sm_analysis_type=AnalysisType.GVCF)
@@ -238,18 +206,21 @@ class GvcfSomalierStage(SampleStage):
         """
         Use function from pedigree module
         """
-        gvcf_path = inputs.as_path(target=sample, stage=GvcfStage)
-        expected_path = self.expected_result(sample)
-        j, _ = pedigree.somalier_extact_job(
-            b=self.pipe.b,
-            sample=sample,
-            gvcf_or_cram_or_bam_path=GvcfPath(gvcf_path),
-            out_fpath=expected_path,
-            overwrite=not self.pipe.check_intermediates,
-            label='(GVCFs)',
-            depends_on=inputs.get_jobs(),
-        )
-        return self.make_outputs(sample, data=expected_path, jobs=[j])
+        if self.pipe.config.get('ped_checks'):
+            gvcf_path = inputs.as_path(target=sample, stage=GvcfStage)
+            expected_path = self.expected_result(sample)
+            j, _ = pedigree.somalier_extact_job(
+                b=self.pipe.b,
+                sample=sample,
+                gvcf_or_cram_or_bam_path=GvcfPath(gvcf_path),
+                out_fpath=expected_path,
+                overwrite=not self.pipe.check_intermediates,
+                label='(GVCFs)',
+                depends_on=inputs.get_jobs(),
+            )
+            return self.make_outputs(sample, data=expected_path, jobs=[j])
+        else:
+            return self.make_outputs(sample)  # return empty output
 
 
 @stage(required_stages=GvcfSomalierStage)
@@ -266,32 +237,36 @@ class GvcfPedCheckStage(DatasetStage):
         """
         Use function from pedigree module
         """
-        fp_by_sid = inputs.as_path_by_target(stage=GvcfSomalierStage)
+        if self.pipe.config.get('ped_checks'):
+            fp_by_sid = inputs.as_path_by_target(stage=GvcfSomalierStage)
+    
+            j, somalier_samples_path, _ = pedigree.add_pedigree_jobs(
+                self.pipe.b,
+                dataset,
+                input_path_by_sid=fp_by_sid,
+                overwrite=not self.pipe.check_intermediates,
+                fingerprints_bucket=self.pipe.analysis_bucket / 'fingerprints',
+                web_bucket=self.pipe.web_bucket,
+                web_url=self.pipe.web_url,
+                tmp_bucket=self.pipe.tmp_bucket,
+                depends_on=inputs.get_jobs(),
+                label='(GVCFs)',
+                dry_run=self.pipe.dry_run,
+            )
+            return self.make_outputs(dataset, data=somalier_samples_path, jobs=[j])
+        else:
+            return self.make_outputs(dataset)  # return empty output
 
-        j, somalier_samples_path, _ = pedigree.add_pedigree_jobs(
-            self.pipe.b,
-            dataset,
-            input_path_by_sid=fp_by_sid,
-            overwrite=not self.pipe.check_intermediates,
-            fingerprints_bucket=self.pipe.analysis_bucket / 'fingerprints',
-            web_bucket=self.pipe.web_bucket,
-            web_url=self.pipe.web_url,
-            tmp_bucket=self.pipe.tmp_bucket,
-            depends_on=inputs.get_jobs(),
-            label='(GVCFs)',
-            dry_run=self.pipe.dry_run,
-        )
-        return self.make_outputs(dataset, data=somalier_samples_path, jobs=[j])
 
-
-@stage(required_stages=GvcfStage, sm_analysis_type=AnalysisType.JOINT_CALLING)
+@stage(required_stages=GvcfStage)
 class JointGenotypingStage(CohortStage):
     """
-    Joint-calling of GVCFs together
+    Joint-calling of GVCFs together.
     """
     def expected_result(self, cohort: Cohort):
         """
-        Generate a pVCF and a site-only VCF
+        Generate a pVCF and a site-only VCF. Returns 2 outputs, thus not checking
+        the SMDB, because the Analysis entry supports only single output.
         """
         samples_hash = utils.hash_sample_ids(cohort.get_all_sample_ids())
         expected_jc_vcf_path = (
@@ -584,10 +559,10 @@ def make_pipeline(
     input_datasets: list[str],
     output_datasets: list[str] | None,
     output_version: str,
-    skip_ped_checks: bool,  # pylint: disable=unused-argument
     hc_shards_num: int,
     use_gnarly: bool,
     use_as_vqsr: bool,
+    ped_checks: bool,
     **kwargs,
 ) -> Pipeline:
     """
@@ -613,7 +588,7 @@ def make_pipeline(
         description=title,
         config=dict(
             output_datasets=output_datasets,
-            skip_ped_checks=skip_ped_checks,
+            ped_checks=ped_checks,
             hc_shards_num=hc_shards_num,
             use_gnarly=use_gnarly,
             use_as_vqsr=use_as_vqsr,
@@ -670,12 +645,6 @@ def _make_seqr_metadata_files(
     'with the dataset version (set by --version)',
 )
 @click.option(
-    '--skip-ped-checks',
-    'skip_ped_checks',
-    is_flag=True,
-    help='Skip checking provided sex and pedigree against the inferred one',
-)
-@click.option(
     '--hc-shards-num',
     'hc_shards_num',
     type=click.INT,
@@ -703,6 +672,14 @@ def _make_seqr_metadata_files(
     is_flag=True,
     help='Make Seqr metadata',
 )
+@click.option(
+    '--ped-checks/--no-ped-checks',
+    'ped_checks',
+    default=True,
+    is_flag=True,
+    help='Perform fingerprinting and PED checks',
+)
+@click_config_file.configuration_option()
 def main(**kwargs):  # pylint: disable=missing-function-docstring
     make_seqr_metadata = kwargs.pop('make_seqr_metadata')
     

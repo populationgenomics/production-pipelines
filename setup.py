@@ -24,7 +24,7 @@ setuptools.setup(
     install_requires=[
         'click',
         'pandas',
-        'cpg-hail',
+        'hail>=0.2.90',
         'cpg-gnomad',   # github.com/populationgenomics/gnomad_methods
         'google-cloud-storage',
         'fsspec',

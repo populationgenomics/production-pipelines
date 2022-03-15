@@ -30,7 +30,6 @@ def pipeline_click_options(function: Callable) -> Callable:
         click.option(
             '--analysis-dataset',
             'analysis_dataset',
-            default='seqr',
             help='Dataset name to write the intermediate/joint-calling analysis '
                  'entries in the sample metadata database',
         ),
@@ -89,7 +88,7 @@ def pipeline_click_options(function: Callable) -> Callable:
         click.option(
             '--keep-scratch/--remove-scratch', 
             'keep_scratch', 
-            default=True,
+            default=False,
             is_flag=True,
         ),
         click.option('--dry-run', 'dry_run', is_flag=True),
