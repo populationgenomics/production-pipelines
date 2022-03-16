@@ -7,7 +7,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Callable
 
 import click
 
@@ -113,7 +113,7 @@ def safe_mkdir(dirpath: Path, descriptive_name: str = '') -> Path:
     return dirpath
 
 
-def hash_sample_ids(sample_names: Iterable[str]) -> str:
+def hash_sample_ids(sample_names: list[str]) -> str:
     """
     Return a unique hash string from a set of strings
     :param sample_names: set of strings
@@ -121,4 +121,5 @@ def hash_sample_ids(sample_names: Iterable[str]) -> str:
     """
     for sn in sample_names:
         assert ' ' not in sn, sn
-    return hashlib.sha256(' '.join(sorted(sample_names)).encode()).hexdigest()[:32]
+    h = hashlib.sha256(' '.join(sorted(sample_names)).encode()).hexdigest()[:38]
+    return f'{h}_{len(sample_names)}'

@@ -63,7 +63,7 @@ def main(
     local_tmp_dir: str,
     hail_billing: str,  # pylint: disable=unused-argument
 ):  # pylint: disable=missing-function-docstring
-    local_tmp_dir = init_hail('combine_gvcfs', Path(local_tmp_dir))
+    init_hail('combine_gvcfs', Path(local_tmp_dir))
 
     # Copy the metadata file locally    
     local_meta_csv_path = join(local_tmp_dir, basename(meta_csv_path))

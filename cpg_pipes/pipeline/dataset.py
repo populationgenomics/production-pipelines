@@ -2,12 +2,10 @@
 Represents a CPG dataset in a particular namespace: main and test.
 """
 
-from typing import List
 import logging
-
 from cloudpathlib import CloudPath
 
-from cpg_pipes.storage import Namespace
+from cpg_pipes.storage import Namespace, StorageProvider
 from cpg_pipes.pipeline.sequence import SmSequence
 from cpg_pipes.pipeline.target import Target
 from cpg_pipes.pipeline.sample import Sample, PedigreeInfo
@@ -40,8 +38,7 @@ class Dataset(Target):
         self, 
         name: str,
         namespace: Namespace | None = None,
-        bucket: CloudPath | None = None,
-        tmp_bucket: CloudPath | None = None,
+        storage_provider: StorageProvider | None = None,
     ):
         """
         Input `name` can be either e.g. "seqr" or "seqr-test". The latter will be 
@@ -53,11 +50,10 @@ class Dataset(Target):
         joint analysis of multiple datasets, but itself doesn't contain any samples.
         """
         super().__init__()
+        
+        self._storage_provider = storage_provider
 
-        self.bucket = bucket        
-        self.tmp_bucket = tmp_bucket        
-
-        self._samples: List[Sample] = []
+        self._samples: list[Sample] = []
 
         self.namespace = namespace or Namespace.MAIN
         if name.endswith('-test'):
@@ -76,68 +72,61 @@ class Dataset(Target):
         return self.stack + ('-test' if self.is_test else '')
 
     @property
-    def unique_id(self) -> str:
-        return self.name
-
+    def target_id(self) -> str:
+        return f'Dataset({self.name})'
+    
     def __repr__(self):
         return f'Dataset("{self.name}", {len(self.get_samples())} samples)'
 
     def __str__(self):
         return f'{self.name} ({len(self.get_samples())} samples)'
 
-    def get_bucket(self, pipeline=None) -> CloudPath:
+    @property
+    def storage_provider(self) -> StorageProvider:
+        if not self._storage_provider:
+            raise ValueError(
+                'storage_provider must be set before calling Dataset.get_bucket()'
+            )
+        return self._storage_provider
+
+    def get_bucket(self, **kwargs) -> CloudPath:
         """
-        The primary dataset bucket (-main or -test) 
+        The primary dataset bucket (-main or -test).
         """
-        if self.bucket:
-            return self.bucket
-        assert pipeline
-        prefix = pipeline.storage_provider.value
-        return (
-            CloudPath(f'{prefix}://cpg-{self.stack}-{pipeline.output_suf}')
+        return self.storage_provider.get_bucket(
+            dataset=self.stack, namespace=self.namespace, **kwargs,
         )
 
-    def get_tmp_bucket(self, pipeline=None) -> CloudPath:
+    def get_tmp_bucket(self, **kwargs) -> CloudPath:
         """
         The tmp bucket (-main-tmp or -test-tmp)
         """
-        if self.tmp_bucket:
-            return self.tmp_bucket
-        assert pipeline
-        prefix = pipeline.storage_provider.value
-        ns = 'test' if self.is_test else 'main'
-        return (
-            CloudPath(f'{prefix}://cpg-{self.stack}-{ns}-tmp')
-            / pipeline.name
-            / pipeline.output_version
+        return self.storage_provider.get_tmp_bucket(
+            dataset=self.stack, namespace=self.namespace, **kwargs
         )
     
-    def get_analysis_bucket(self, pipeline=None) -> CloudPath:
+    def get_analysis_bucket(self, **kwargs) -> CloudPath:
         """
         Get analysis bucket (-main-analysis or -test-analysis)
         """
-        assert pipeline
-        prefix = pipeline.storage_provider.value
-        ns = 'test' if self.is_test else 'main'
-        return CloudPath(f'{prefix}://cpg-{self.stack}-{ns}-analysis')
-
-    def get_web_bucket(self, pipeline=None) -> CloudPath:
+        return self.storage_provider.get_analysis_bucket(
+            dataset=self.stack, namespace=self.namespace, **kwargs
+        )
+    
+    def get_web_bucket(self, **kwargs) -> CloudPath:
         """
         Get web bucket (-main-web or -test-web)
         """
-        assert pipeline
-        prefix = pipeline.storage_provider.value
-        ns = 'test' if self.is_test else 'main'
-        return CloudPath(f'{prefix}://cpg-{self.stack}-{ns}-web')
+        return self.storage_provider.get_web_bucket(
+            dataset=self.stack, namespace=self.namespace, **kwargs
+        )
 
-    def get_web_url(self, pipeline=None) -> CloudPath:
+    def get_web_url(self, **kwargs) -> CloudPath:
         """
         Get web base URL
         """
-        assert pipeline
-        return (
-            f'https://{self.namespace.value}-web.populationgenomics.org.au/'
-            f'{self.stack}/'
+        return self.storage_provider.get_web_url(
+            dataset=self.stack, namespace=self.namespace, **kwargs
         )
     
     def add_sample(

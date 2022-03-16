@@ -256,8 +256,8 @@ j = split_intervals.get_intervals(b=b, scatter_count=20)
 Generate somalier pedigree fingerprints:
 
 ```python
-from cpg_pipes.jobs import pedigree
-fingerprint_job, fingerprint_path = pedigree.somalier_extact_job(
+from cpg_pipes.jobs import somalier
+fingerprint_job, fingerprint_path = pedigree.extact_job(
     b,
     sample,
     gvcf_or_cram_or_bam_path=gvcf_path,
@@ -268,13 +268,13 @@ fingerprint_job, fingerprint_path = pedigree.somalier_extact_job(
 Infer pedigree relashionships and sex of samples in a dataset, and check with a probided PED file:
 
 ```python
-from cpg_pipes.jobs import pedigree
-j, somalier_samples_path, somalier_pairs_path = pedigree.add_pedigree_jobs(
+from cpg_pipes.jobs import somalier
+j, somalier_samples_path, somalier_pairs_path = pedigree.ancestry(
     b,
     dataset,
     input_path_by_sid=fingerprint_by_sid,
     web_bucket=self.pipe.web_bucket,
-    web_url=self.pipe.web_url,
+    web_url=self.pipe.analysis_dataset.get_web_url(),
 )
 ```
 

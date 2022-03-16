@@ -2,7 +2,6 @@
 Adding jobs for fingerprinting and pedigree checks. Mostly using Somalier.
 """
 import os
-import sys
 import logging
 from pathlib import Path
 from cloudpathlib import CloudPath
@@ -22,24 +21,20 @@ logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
-def add_pedigree_jobs(
+def pedigree(
     b,
     dataset: Dataset,
     input_path_by_sid: dict[str, CloudPath | str],
     overwrite: bool,
-    tmp_bucket: CloudPath,
     out_samples_path: CloudPath | None = None,
     out_pairs_path: CloudPath | None = None,
-    out_ancestry_path: CloudPath | None = None,
     out_html_path: CloudPath | None = None,
-    fingerprints_bucket: CloudPath | None = None,
-    web_bucket: CloudPath | None = None,
-    web_url: str | None = None,
+    out_html_url: str | None = None,
     depends_on: list[Job] | None = None,
     label: str | None = None,
     ignore_missing: bool = False,
     dry_run: bool = False,
-) -> tuple[Job, CloudPath, CloudPath]:
+) -> Job:
     """
     Add somalier and peddy based jobs that infer relatedness and sex, compare that
     to the provided PED file, and attempt to recover it. If unable to recover, cancel
@@ -52,6 +47,93 @@ def add_pedigree_jobs(
     fingerprints, which will be determined based on extention. Unless a .somalier
     print is provided, `somalier extract` will be run to extract one.
     """
+    extract_jobs, somalier_file_by_sample = _prep_somalier_files(
+        b=b,
+        dataset=dataset,
+        input_path_by_sid=input_path_by_sid,
+        overwrite=overwrite,
+        depends_on=depends_on,
+        label=label,
+        ignore_missing=ignore_missing,
+    )
+    
+    relate_j = _relate(
+        b=b,
+        somalier_file_by_sample=somalier_file_by_sample,
+        dataset=dataset,
+        label=label,
+        extract_jobs=extract_jobs,
+        out_samples_path=out_samples_path,
+        out_pairs_path=out_pairs_path,
+        out_html_path=out_html_path,
+        out_html_url=out_html_url,
+        depends_on=depends_on,
+        dry_run=dry_run,
+    )
+    
+    _check_pedigree(
+        b=b,
+        dataset=dataset,
+        relate_j=relate_j,
+        label=label,
+        somalier_html_url=out_html_url,
+        dry_run=dry_run,
+    )
+
+    return relate_j
+
+
+def ancestry(
+    b,
+    dataset: Dataset,
+    input_path_by_sid: dict[str, CloudPath | str],
+    overwrite: bool,
+    out_tsv_path: CloudPath,
+    out_html_path: CloudPath,
+    out_html_url: str | None = None,
+    depends_on: list[Job] | None = None,
+    label: str | None = None,
+    ignore_missing: bool = False,
+) -> Job:
+    """
+    Run somalier ancestry https://github.com/brentp/somalier/wiki/ancestry
+    """
+    extract_jobs, somalier_file_by_sample = _prep_somalier_files(
+        b=b,
+        dataset=dataset,
+        input_path_by_sid=input_path_by_sid,
+        overwrite=overwrite,
+        depends_on=depends_on,
+        label=label,
+        ignore_missing=ignore_missing,
+    )
+
+    j = _ancestry(
+        b=b,
+        somalier_file_by_sample=somalier_file_by_sample,
+        dataset=dataset,
+        label=label,
+        extract_jobs=extract_jobs,
+        out_tsv_path=out_tsv_path,
+        out_html_path=out_html_path,
+        out_html_url=out_html_url,
+        depends_on=depends_on,
+    )
+    return j
+
+
+def _prep_somalier_files(
+    b,
+    dataset: Dataset,
+    input_path_by_sid: dict[str, CloudPath | str],
+    overwrite: bool,
+    depends_on: list[Job] | None = None,
+    label: str | None = None,
+    ignore_missing: bool = False,
+) -> tuple[list[Job], dict[str, CloudPath]]:
+    """
+    Generate .somalier file for each input
+    """
     extract_jobs = []
     missing_input = []
     somalier_file_by_sample = dict()
@@ -61,7 +143,7 @@ def add_pedigree_jobs(
             missing_input.append(sample)
             logger.error(f'Not found somalier input for {sample.id}')
             continue
-            
+
         input_path = CloudPath(input_path)
 
         if input_path.name.endswith('.somalier'):
@@ -73,115 +155,37 @@ def add_pedigree_jobs(
             gvcf_or_cram_or_bam_path = CramPath(input_path)
         else:
             gvcf_or_cram_or_bam_path = GvcfPath(input_path)
-        j, out_fpath = somalier_extact_job(
+        j = extact_job(
             b=b,
             sample=sample,
             gvcf_or_cram_or_bam_path=gvcf_or_cram_or_bam_path,
             overwrite=overwrite,
             label=label,
             depends_on=depends_on,
+            out_fpath=gvcf_or_cram_or_bam_path.somalier_path,
         )
-        somalier_file_by_sample[sample.id] = out_fpath
+        somalier_file_by_sample[sample.id] = gvcf_or_cram_or_bam_path.somalier_path
         extract_jobs.append(j)
 
     if len(missing_input) > 0:
-        (logger.critical if not ignore_missing else logger.warning)(
+        msg = (
             f'Could not find input for '
             f'{len(missing_input)}/{len(dataset.get_samples())} samples'
         )
-        if not ignore_missing:
-            sys.exit(1)
-
-    relate_j = _relate_job(
-        b=b,
-        somalier_file_by_sample=somalier_file_by_sample,
-        dataset=dataset,
-        tmp_bucket=tmp_bucket,
-        label=label,
-        extract_jobs=extract_jobs,
-        depends_on=depends_on,
-        dry_run=dry_run,
-    )
-
-    pairs_path, samples_path, html_url = _copy_somalier_output(
-        b=b, 
-        dataset=dataset,
-        relate_j=relate_j, 
-        out_samples_path=out_samples_path,
-        out_pairs_path=out_pairs_path,
-        out_html_path=out_html_path,
-        out_ancestry_path=out_ancestry_path,
-        fingerprints_bucket=fingerprints_bucket, 
-        web_bucket=web_bucket, 
-        web_url=web_url,
-    )
-
-    _check_pedigree_job(
-        b=b,
-        dataset=dataset,
-        relate_j=relate_j,
-        tmp_bucket=tmp_bucket,
-        label=label,
-        dry_run=dry_run,
-        somalier_html_url=html_url,
-    )
-
-    return relate_j, samples_path, pairs_path
+        if ignore_missing:
+            logger.warning(msg)
+        else:
+            raise ValueError(msg)
+    return extract_jobs, somalier_file_by_sample
 
 
-def _copy_somalier_output(
-    b: Batch,
-    dataset: Dataset, 
-    relate_j: Job,
-    out_samples_path: CloudPath | None = None,
-    out_pairs_path: CloudPath | None = None,
-    out_html_path: CloudPath | None = None,
-    out_ancestry_path: CloudPath | None = None,
-    fingerprints_bucket: CloudPath | None = None,
-    web_bucket: CloudPath | None = None,
-    web_url: str | None = None,
-) -> tuple[CloudPath, CloudPath, str | None]:
-    """
-    Copy somalier outputs to buckets
-    """
-    if not (out_samples_path and out_pairs_path):
-        if not fingerprints_bucket:
-            raise ValueError(
-                'Somalier Either both out_samples_path/out_pairs_path, or '
-                'fingerprints_bucket should be specified'
-            )
-        prefix = fingerprints_bucket / dataset.name
-        out_samples_path = CloudPath(f'{prefix}.samples.tsv')
-        out_pairs_path = CloudPath(f'{prefix}.pairs.tsv')
-    b.write_output(relate_j.output_samples, str(out_samples_path))
-    b.write_output(relate_j.output_pairs, str(out_pairs_path))
-    if out_ancestry_path:
-        b.write_output(relate_j.output_ancesry, str(out_ancestry_path))
-
-    # Copy somalier HTML to the web bucket
-    out_html_url = None
-    if not out_html_path:
-        if web_bucket:
-            out_html_path = web_bucket / 'pedigree' / f'{dataset.name}.html'
-        if web_url:
-            out_html_url = f'{web_url}/pedigree/{dataset.name}.html'
-    else:
-        out_html_url = f'{web_url}/{out_html_path.name}'
-    
-    if out_html_path:
-        b.write_output(relate_j.output_html, str(out_html_path))
-        
-    return out_pairs_path, out_samples_path, out_html_url
-
-
-def _check_pedigree_job(
+def _check_pedigree(
     b: Batch, 
     dataset: Dataset, 
     relate_j: Job, 
-    tmp_bucket: CloudPath,
     label: str | None,
-    dry_run: bool = False,
     somalier_html_url: str | None = None,
+    dry_run: bool = False,
 ):
     check_j = b.new_job(
         'Check relatedness and sex' + (f' {label}' if label else ''),
@@ -190,7 +194,7 @@ def _check_pedigree_job(
     STANDARD.set_resources(check_j, ncpu=2)
     check_j.image(images.PEDDY_IMAGE)
     # Creating sample map to remap internal IDs to participant IDs
-    sample_map_fpath = tmp_bucket / 'pedigree' / 'sample_maps' / f'{dataset.name}.tsv'
+    sample_map_fpath = dataset.get_tmp_bucket() / 'pedigree' / 'sample_maps' / f'{dataset.name}.tsv'
     if not dry_run:
         df = pd.DataFrame([
             {'id': s.id, 'pid': s.participant_id} for s in dataset.get_samples()
@@ -202,43 +206,104 @@ def _check_pedigree_job(
         script = f.read()
     # We do not wrap the command nicely to avoid breaking python indents of {script}
     cmd = f"""\
-cat <<EOT >> {script_name}
-{script}
-EOT
-python {script_name} \
---somalier-samples {relate_j.output_samples} \
---somalier-pairs {relate_j.output_pairs} \
---sample-map {b.read_input(str(sample_map_fpath))} \
-{('--somalier-html ' + somalier_html_url) if somalier_html_url else ''}
-"""
+    cat <<EOT >> {script_name}
+    {script}
+    EOT
+    python {script_name} \
+    --somalier-samples {relate_j.output_samples} \
+    --somalier-pairs {relate_j.output_pairs} \
+    --sample-map {b.read_input(str(sample_map_fpath))} \
+    {('--somalier-html ' + somalier_html_url) if somalier_html_url else ''}
+    """
     check_j.command(cmd)
     check_j.depends_on(relate_j)
 
 
-def _relate_job(
+def _ancestry(
     b: Batch, 
     somalier_file_by_sample: dict[str, CloudPath],
     dataset: Dataset,
-    tmp_bucket: CloudPath,
     label: str | None,
     extract_jobs: list[Job],
+    out_tsv_path: CloudPath,
+    out_html_path: CloudPath,
+    out_html_url: str | None = None,
+    depends_on: list[Job] | None = None,
+) -> Job:
+    j = b.new_job(
+        'Somalier ancestry' + (f' {label}' if label else ''),
+        dict(dataset=dataset.name),
+    )
+    j.image(images.BIOINFO_IMAGE)
+    # Size of one somalier file is 212K, so we add another G only if the number of
+    # samples is >4k
+    STANDARD.set_resources(
+        j, 
+        storage_gb=1 + len(dataset.get_samples()) // 4000 * 1,
+    )
+    if depends_on:
+        extract_jobs.extend(depends_on)
+    j.depends_on(*extract_jobs)
+
+    cmd = f"""\
+    mkdir /io/batch/1kg
+    mv {b.read_input(ref_data.SOMALIER_1KG_TARGZ)} /io/batch/1kg
+    (cd /io/batch/1kg && tar -xzf *.tar.gz)
+
+    mkdir /io/batch/somaliers
+    """
+
+    for sample in dataset.get_samples():
+        if sample.id:
+            somalier_file = b.read_input(str(somalier_file_by_sample[sample.id]))
+            cmd += f'    cp {somalier_file} /io/batch/somaliers/\n'
+
+    cmd += f"""\
+    somalier ancestry \\
+    --labels {b.read_input(ref_data.SOMALIER_1KG_LABELS_TSV)} \\
+    /io/batch/1kg/1kg-somalier/*.somalier ++ \\
+    /io/batch/somaliers/*.somalier \\
+    -o ancestry
+
+    mv ancestry.somalier-ancestry.tsv {j.output_tsv}
+    mv ancestry.somalier-ancestry.html {j.output_html}
+    """
+    if out_html_url:
+        cmd += '\n' + f'echo "HTML URL: {out_html_url}"'
+    j.command(wrap_command(cmd))
+    b.write_output(j.output_tsv, str(out_tsv_path))
+    b.write_output(j.output_html, str(out_html_path))
+    return j
+
+
+def _relate(
+    b: Batch, 
+    somalier_file_by_sample: dict[str, CloudPath],
+    dataset: Dataset,
+    label: str | None,
+    extract_jobs: list[Job],
+    out_samples_path: CloudPath | None = None,
+    out_pairs_path: CloudPath | None = None,
+    out_html_path: CloudPath | None = None,
+    out_html_url: str | None = None,
     depends_on: list[Job] | None = None,
     dry_run: bool = False,
 ) -> Job:
-    relate_j = b.new_job(
+    j = b.new_job(
         'Somalier relate' + (f' {label}' if label else ''),
         dict(dataset=dataset.name),
     )
-    relate_j.image(images.BIOINFO_IMAGE)
-    relate_j.cpu(1)
-    relate_j.memory('standard')  # ~ 4G/core ~ 4G
+    j.image(images.BIOINFO_IMAGE)
     # Size of one somalier file is 212K, so we add another G only if the number of
     # samples is >4k
-    relate_j.storage(f'{1 + len(dataset.get_samples()) // 4000 * 1}G')
+    STANDARD.set_resources(
+        j, 
+        storage_gb=1 + len(dataset.get_samples()) // 4000 * 1,
+    )
     if depends_on:
         extract_jobs.extend(depends_on)
-    relate_j.depends_on(*extract_jobs)
-    ped_fpath = tmp_bucket / f'{dataset.name}.ped'
+    j.depends_on(*extract_jobs)
+    ped_fpath = dataset.get_tmp_bucket() / f'{dataset.name}.ped'
     datas = []
     for sample in dataset.get_samples():
         if sample.pedigree:
@@ -262,15 +327,22 @@ def _relate_job(
     --infer
     
     ls
-    mv related.html {relate_j.output_html}
-    mv related.pairs.tsv {relate_j.output_pairs}
-    mv related.samples.tsv {relate_j.output_samples}
+    mv related.html {j.output_html}
+    mv related.pairs.tsv {j.output_pairs}
+    mv related.samples.tsv {j.output_samples}
     """
-    relate_j.command(wrap_command(cmd))
-    return relate_j
+    if out_html_url:
+        cmd += '\n' + f'echo "HTML URL: {out_html_url}"'
+    j.command(wrap_command(cmd))
+    # Copy somalier outputs to buckets
+    b.write_output(j.output_samples, str(out_samples_path))
+    b.write_output(j.output_pairs, str(out_pairs_path))
+    if out_html_path:
+        b.write_output(j.output_html, str(out_html_path))
+    return j
 
 
-def somalier_extact_job(
+def extact_job(
     b,
     sample: Sample,
     gvcf_or_cram_or_bam_path: CramPath | GvcfPath,
@@ -278,7 +350,7 @@ def somalier_extact_job(
     label: str | None = None,
     depends_on: list[Job] | None = None,
     out_fpath: CloudPath | None = None,
-) -> tuple[Job, CloudPath]:
+) -> Job:
     """
     Run "somalier extract" to generate a fingerprint for a `sample`
     from `fpath` (which can be a GVCF, a CRAM or a BAM)
@@ -293,7 +365,7 @@ def somalier_extact_job(
 
     if buckets.can_reuse(out_fpath, overwrite):
         j.name += ' [reuse]'
-        return j, out_fpath
+        return j
 
     j.image(images.BIOINFO_IMAGE)
     j.memory('standard')
@@ -340,4 +412,4 @@ def somalier_extact_job(
     """
     j.command(wrap_command(cmd, setup_gcp=True, define_retry_function=True))
     b.write_output(j.output_file, str(out_fpath))
-    return j, out_fpath
+    return j

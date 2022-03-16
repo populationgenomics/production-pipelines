@@ -16,6 +16,8 @@ NOALT_REGIONS = join(REF_BUCKET, 'noalt.bed')
 
 # Somalier
 SOMALIER_SITES = join(REF_BUCKET, 'somalier/v0/sites.hg38.vcf.gz')
+SOMALIER_1KG_TARGZ = join(REF_BUCKET, 'somalier/v0/1kg.somalier.tar.gz')
+SOMALIER_1KG_LABELS_TSV = join(REF_BUCKET, 'somalier/v0/ancestry-labels-1kg.tsv')
 
 # VEP
 VEP_LOFTEE = join(REF_BUCKET, 'vep/loftee_GRCh38.tar')

@@ -10,7 +10,7 @@ import hailtop.batch as hb
 from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 
-from cpg_pipes.buckets import str_to_path
+from cpg_pipes.buckets import str_to_path, exists
 from cpg_pipes.pipeline.analysis import AnalysisType
 from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes.pipeline.cohort import Cohort
@@ -133,7 +133,7 @@ class StageInput:
         """
         if output.target.active:
             stage_name = output.stage.name
-            target_id = output.target.unique_id
+            target_id = output.target.target_id
     
             if stage_name not in self._results_by_target_by_stage:
                 self._results_by_target_by_stage[stage_name] = dict()
@@ -213,7 +213,7 @@ class StageInput:
         Represent as a path to a file, otherwise fail.
         `stage` can be callable, or a subclass of Stage
         """
-        res = self._results_by_target_by_stage[stage.__name__][target.unique_id]
+        res = self._results_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_path(id)
     
     def as_resource(
@@ -225,21 +225,21 @@ class StageInput:
         """
         Get Hail Batch Resource for a specific target and stage
         """
-        res = self._results_by_target_by_stage[stage.__name__][target.unique_id]
+        res = self._results_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_resource(id)
 
     def as_dict(self, target: 'Target', stage: StageDecorator) -> dict[str, CloudPath]:
         """
         Get a dictoinary of files or Resources for a specific target and stage
         """
-        res = self._results_by_target_by_stage[stage.__name__][target.unique_id]
+        res = self._results_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_dict()
     
     def as_path_dict(self, target: 'Target', stage: StageDecorator) -> dict[str, CloudPath]:
         """
         Get a dictoinary of files for a specific target and stage
         """
-        res = self._results_by_target_by_stage[stage.__name__][target.unique_id]
+        res = self._results_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_path_dict()
 
     def as_resource_dict(
@@ -248,7 +248,7 @@ class StageInput:
         """
         Get a dictoinary of  Resources for a specific target and stage
         """
-        res = self._results_by_target_by_stage[stage.__name__][target.unique_id]
+        res = self._results_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_resource_dict()
 
     def get_jobs(self) -> list[Job]:
@@ -402,37 +402,38 @@ class Stage(Generic[TargetT], ABC):
                 if target.forced:
                     logger.info(
                         f'{self.name}: can reuse, but forcing the target '
-                        f'{target.unique_id} to rerun this stage'
+                        f'{target.target_id} to rerun this stage'
                     )
                     return self.queue_jobs(target, self._make_inputs())
                 elif self.forced:
                     logger.info(
                         f'{self.name}: can reuse, but forcing the stage '
-                        f'to rerun, target={target.unique_id}'
+                        f'to rerun, target={target.target_id}'
                     )
                     return self.queue_jobs(target, self._make_inputs())
                 else:
-                    logger.info(f'{self.name}: reusing results for {target.unique_id}')
+                    logger.info(f'{self.name}: reusing results for {target.target_id}')
                     return self._queue_reuse_job(target, reusable_paths)
             else:
-                logger.info(f'{self.name}: adding jobs for {target.unique_id}')
+                logger.info(f'{self.name}: adding jobs for {target.target_id}')
                 return self.queue_jobs(target, self._make_inputs())
 
         elif self.required:
             reusable_paths = self._try_get_reusable_paths(target)
             if not reusable_paths:
-                if self.pipe.skip_samples_with_missing_input:
+                if isinstance(target, Sample) and self.pipe.skip_samples_with_missing_input:
                     logger.info(
                         f'Stage {self.name} is skipped and required, however '
                         f'--skip-samples-without-first-stage-input is set, so skipping '
-                        f'this target ({target.unique_id}).'
+                        f'this target ({target.target_id}).'
                     )
                     target.active = False
-                    return self.make_outputs(target=target) 
+                    return self.make_outputs(target=target)  # type: ignore 
                 else:
                     raise ValueError(
                         f'Stage {self.name} is required, but skipped and '
-                        f'cannot reuse outputs for {target.unique_id}'
+                        f'cannot reuse outputs for '
+                        f'target {target.__class__.__name__}("{target.target_id}")'
                     )
             else:
                 return self.make_outputs(target=target, data=reusable_paths) 
@@ -469,13 +470,13 @@ class Stage(Generic[TargetT], ABC):
                 raise ValueError(
                     f'expected_result() returned None, but must return str '
                     f'for a stage with analysis_type: {self.name} '
-                    f'on {target.unique_id}, analysis_type={self.analysis_type}'
+                    f'on {target.target_id}, analysis_type={self.analysis_type}'
                 )
                 
             if isinstance(expected_paths, dict):
                 raise ValueError(
                     f'expected_result() returns a dict, won\'t check the SMDB for '
-                    f'{self.name} on {target.unique_id}'
+                    f'{self.name} on {target.target_id}'
                 )
             validate = self.pipe.validate_smdb_analyses
             if self.skipped and (
@@ -508,7 +509,7 @@ class Stage(Generic[TargetT], ABC):
                 paths = list(expected_paths.values())
             else:
                 paths = [expected_paths]
-            if not all(path.exists() for path in paths):
+            if not all(exists(path) for path in paths):
                 return None
             return expected_paths
 
@@ -604,7 +605,7 @@ class SampleStage(Stage[Sample], ABC):
             for sample_i, sample in enumerate(ds.get_samples()):
                 logger.info(f'{self.name}: #{sample_i}/{sample}')
                 sample_result = self._queue_jobs_with_checks(sample)
-                output_by_target[sample.unique_id] = sample_result
+                output_by_target[sample.target_id] = sample_result
                 logger.info('------')
             logger.info('-#-#-#-')
         return output_by_target
@@ -642,7 +643,7 @@ class PairStage(Stage, ABC):
                     if s1 == s2:
                         continue
                     pair = Pair(s1, s2)
-                    output_by_target[pair.unique_id] = \
+                    output_by_target[pair.target_id] = \
                         self._queue_jobs_with_checks(pair)
         return output_by_target
 
@@ -671,7 +672,7 @@ class DatasetStage(Stage, ABC):
             raise ValueError('No active datasets are found to run')
         for ds_i, ds in enumerate(datasets):
             logger.info(f'{self.name}: #{ds_i}/{ds.name} {ds}')
-            output_by_target[ds.unique_id] = \
+            output_by_target[ds.target_id] = \
                 self._queue_jobs_with_checks(ds)
             logger.info('-#-#-#-')
         return output_by_target
@@ -696,6 +697,6 @@ class CohortStage(Stage, ABC):
 
     def add_to_the_pipeline(self, pipeline) -> dict[str, StageOutput]:
         return {
-            pipeline.cohort.unique_id: 
+            pipeline.cohort.target_id: 
             self._queue_jobs_with_checks(pipeline.cohort)
         }

@@ -48,6 +48,7 @@ import functools
 import logging
 import shutil
 import tempfile
+import time
 from pathlib import Path
 from typing import Optional, cast, Union, Any, Callable, Type
 
@@ -181,9 +182,9 @@ class Pipeline:
         analysis_dataset: str,
         name: str,
         description: str,
-        output_version: str,
+        version: str | None,
         namespace: Namespace | str,
-        storage_provider: StorageProvider = StorageProvider.GS,
+        storage_provider: StorageProvider,
         stages_in_order: list[StageDecorator] | None = None,
         keep_scratch: bool = True,
         dry_run: bool = False,
@@ -217,9 +218,10 @@ class Pipeline:
         self.analysis_dataset = Dataset(
             name=analysis_dataset,
             namespace=namespace,
+            storage_provider=storage_provider,
         )
         self.name = name
-        self.output_version = output_version
+        self.version = version or time.strftime('%Y%m%d-%H%M%S')
         self.namespace = namespace
         self.storage_provider = storage_provider
         self.check_intermediates = check_intermediates and not dry_run
@@ -229,39 +231,10 @@ class Pipeline:
         self.last_stage = last_stage
         self.validate_smdb_analyses = validate_smdb_analyses
 
-        if namespace == Namespace.TMP:
-            tmp_suf = 'test-tmp'
-            analysis_suf = 'test-tmp/analysis'
-            web_suf = 'test-tmp/web'
-            self.output_suf = 'test-tmp'
-            self.proj_output_suf = 'test'
-        elif namespace == Namespace.TEST:
-            tmp_suf = 'test-tmp'
-            analysis_suf = 'test-analysis'
-            web_suf = 'test-web'
-            self.output_suf = 'test'
-            self.proj_output_suf = 'test'
-        else:
-            tmp_suf = 'main-tmp'
-            analysis_suf = 'main-analysis'
-            web_suf = 'main-web'
-            self.output_suf = 'main'
-            self.proj_output_suf = 'main'
-
-        path_ptrn = (
-            f'{storage_provider.value}://'
-            f'cpg-{self.analysis_dataset.stack}-{{suffix}}/'
-            f'{self.name}/'
-            f'{self.output_version}'
-        )
-        self.tmp_bucket = CloudPath(path_ptrn.format(suffix=tmp_suf))
-        self.analysis_bucket = CloudPath(path_ptrn.format(suffix=analysis_suf))
-        self.web_bucket = CloudPath(path_ptrn.format(suffix=web_suf))
-        self.web_url = (
-            f'https://{self.namespace.value}-web.populationgenomics.org.au/'
-            f'{self.analysis_dataset.stack}/'
-            f'{self.name}/'
-            f'{self.output_version}'
+        self.tmp_bucket = CloudPath(
+            self.analysis_dataset.get_tmp_bucket(
+                version=f'{self.name}/{self.version}'
+            )
         )
         self.keep_scratch = keep_scratch
         self.dry_run: bool = dry_run
@@ -284,8 +257,12 @@ class Pipeline:
 
         self.config = config or {}
 
+        if version:
+            description += f' {version}'
+        if input_datasets:
+            description += ': ' + ', '.join(input_datasets)
         self.b: Batch = setup_batch(
-            title=description, 
+            description=description, 
             tmp_bucket=self.tmp_bucket,
             keep_scratch=self.keep_scratch,
             billing_project=self.analysis_dataset.stack,
@@ -295,7 +272,11 @@ class Pipeline:
         self._db = None
         if input_datasets:
             for name in input_datasets:
-                self.cohort.add_dataset(name, namespace=namespace)
+                self.cohort.add_dataset(
+                    name, 
+                    namespace=namespace, 
+                    storage_provider=storage_provider,
+                )
             self._db = SMDB(
                 self.analysis_dataset.name,
                 do_update_analyses=update_smdb_analyses,
@@ -408,6 +389,7 @@ class Pipeline:
                 continue
 
             for reqcls in stage_.required_stages_classes:
+                # breakpoint()
                 if reqcls.__name__ in self._stages_dict:
                     reqstage = self._stages_dict[reqcls.__name__]
                 elif reqcls.__name__ in additional_stages_dict:
@@ -435,6 +417,12 @@ class Pipeline:
             self._stages_dict = additional_stages_dict
 
         logger.info(f'Setting stages: {", ".join(s.name for s in stages if not s.skipped)}')
+        required_skipped_stages = [s for s in stages if s.skipped and s.required]
+        if required_skipped_stages:
+            logger.info(
+                f'Skipped stages that are used to get inputs: '
+                f'{", ".join(s.name for s in required_skipped_stages)}'
+            )
 
         # Second round - actually adding jobs from the stages.
         for i, stage_ in enumerate(self._stages_dict.values()):

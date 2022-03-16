@@ -96,8 +96,8 @@ class Sample(Target):
         return self._participant_id or self.external_id
 
     @property
-    def unique_id(self) -> str:
-        return self.id
+    def target_id(self) -> str:
+        return f'Sample({self.id})'
 
     def get_ped_dict(self, use_participant_id: bool = False) -> dict[str, str]:
         """
@@ -115,17 +115,17 @@ class Sample(Target):
             'Phenotype': '0',
         }
 
-    def get_cram_path(self, pipeline) -> CramPath:
+    def get_cram_path(self) -> CramPath:
         """
         Path to a CRAM file. Not checking its existence here.
         """
-        return CramPath(f'{self.dataset.get_bucket(pipeline)}/cram/{self.id}.cram')
+        return CramPath(self.dataset.get_bucket() / 'cram' / f'{self.id}.cram')
 
-    def get_gvcf_path(self, pipeline) -> GvcfPath:
+    def get_gvcf_path(self) -> GvcfPath:
         """
         Path to a GVCF file. Not checking its existence here.
         """
-        return GvcfPath(f'{self.dataset.get_bucket(pipeline)}/gvcf/{self.id}.g.vcf.gz')
+        return GvcfPath(self.dataset.get_bucket() / 'gvcf' / f'{self.id}.g.vcf.gz')
 
     def analysis_cram_path(self) -> CramPath | None:
         """

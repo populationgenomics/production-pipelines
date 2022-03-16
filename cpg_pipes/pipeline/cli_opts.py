@@ -79,11 +79,10 @@ def pipeline_click_options(function: Callable) -> Callable:
             help='Force reprocessing these samples. Can be set multiple times.',
         ),
         click.option(
-            '--output-version',
-            'output_version',
+            '--version', '--output-version'
+            'version',
             type=str,
-            default='v0',
-            help='Suffix the outputs with this version tag. Useful for testing',
+            help='Pipeline version. Default is a timestamp',
         ),
         click.option(
             '--keep-scratch/--remove-scratch', 

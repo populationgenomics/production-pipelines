@@ -7,7 +7,7 @@ logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
-DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:ca793d8df6dd8fa20f1908d5c76eb98ab2cf53e4-hail-0.2.73.devc6f6f09cec08'
+DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:c27f80a5d68f5925614c95ef51b09dd0ecf15074-hail-0.2.85.post2-a6471564e3026200c8ccb6539210bca99ef80260'
 
 AR_REPO = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
 GATK_VERSION = '4.2.3.0'

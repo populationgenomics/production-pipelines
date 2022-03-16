@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 from cloudpathlib import CloudPath
 
-from cpg_pipes.storage import StorageProvider
+from cpg_pipes.storage import Cloud
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -20,7 +20,7 @@ def str_to_path(path: str | Path | CloudPath) -> Path | CloudPath:
     instance.
     """
     if isinstance(path, str):
-        if any(path.startswith(f'{pref.value}://') for pref in StorageProvider):
+        if any(path.startswith(f'{protocol.value}://') for protocol in Cloud):
             return CloudPath(path)
         else:
             return Path(path)

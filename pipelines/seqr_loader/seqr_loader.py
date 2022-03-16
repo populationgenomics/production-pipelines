@@ -5,7 +5,6 @@ Batch pipeline to load data into seqr
 """
 
 import logging
-import time
 from pathlib import Path
 
 import click
@@ -15,8 +14,7 @@ from analysis_runner import dataproc
 from cloudpathlib import CloudPath
 
 from cpg_pipes import buckets, ref_data, utils
-from cpg_pipes.jobs import align, split_intervals, haplotype_caller, \
-    pedigree
+from cpg_pipes.jobs import align, split_intervals, haplotype_caller
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
@@ -44,7 +42,7 @@ class CramStage(SampleStage):
         """
         Stage is expected to generate a CRAM file and a corresponding index.
         """
-        return sample.get_cram_path(self.pipe).path
+        return sample.get_cram_path().path
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """
@@ -81,73 +79,6 @@ class CramStage(SampleStage):
         )
 
 
-@stage(required_stages=CramStage)
-class CramSomalierStage(SampleStage):
-    """
-    Genereate fingerprints from CRAMs for pedigree checks.
-    """
-    def expected_result(self, sample: Sample):
-        """
-        Expected to generate the fingerprints file
-        """
-        return sample.get_cram_path(self.pipe).somalier_path
-
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        """
-        Using a function from the jobs module.
-        """
-        if self.pipe.config.get('ped_checks'):
-            cram_path = inputs.as_path(target=sample, stage=CramStage)
-            expected_path = self.expected_result(sample)
-            j, _ = pedigree.somalier_extact_job(
-                b=self.pipe.b,
-                sample=sample,
-                gvcf_or_cram_or_bam_path=CramPath(cram_path),
-                out_fpath=expected_path,
-                overwrite=not self.pipe.check_intermediates,
-                label='(CRAMs)',
-                depends_on=inputs.get_jobs(),
-            )
-            return self.make_outputs(sample, data=expected_path, jobs=[j])
-        else:
-            return self.make_outputs(sample)  # return empty output
-
-
-@stage(required_stages=CramSomalierStage)
-class CramPedCheckStage(DatasetStage):
-    """
-    Checks pedigree from CRAM fingerprints
-    """
-    def expected_result(self, dataset: Dataset):
-        """
-        We don't expect any output - just rerun it every time
-        """
-
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        """
-        Checks calls job from the pedigree module
-        """
-        if self.pipe.config.get('ped_checks'):
-            fp_by_sid = inputs.as_path_by_target(stage=CramSomalierStage)
-    
-            j, somalier_samples_path, _ = pedigree.add_pedigree_jobs(
-                self.pipe.b,
-                dataset,
-                input_path_by_sid=fp_by_sid,
-                overwrite=not self.pipe.check_intermediates,
-                fingerprints_bucket=self.pipe.analysis_bucket / 'fingerprints',
-                web_bucket=self.pipe.web_bucket,
-                web_url=self.pipe.web_url,
-                tmp_bucket=self.pipe.tmp_bucket,
-                depends_on=inputs.get_jobs(),
-                label='(CRAMs)',
-                dry_run=self.pipe.dry_run,
-            )
-            return self.make_outputs(dataset, data=somalier_samples_path, jobs=[j])
-        else:
-            return self.make_outputs(dataset)  # return empty output
-
-
 @stage(required_stages=CramStage, sm_analysis_type=AnalysisType.GVCF)
 class GvcfStage(SampleStage):
     """
@@ -159,7 +90,7 @@ class GvcfStage(SampleStage):
         """
         Generate a GVCF and corresponding TBI index
         """
-        return sample.get_gvcf_path(self.pipe).path
+        return sample.get_gvcf_path().path
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """
@@ -176,7 +107,7 @@ class GvcfStage(SampleStage):
             output_path=self.expected_result(sample),
             sample_name=sample.id,
             dataset_name=sample.dataset.name,
-            cram_path=sample.get_cram_path(self.pipe),
+            cram_path=sample.get_cram_path(),
             intervals=GvcfStage.hc_intervals,
             number_of_intervals=hc_shards_num,
             tmp_bucket=self.pipe.tmp_bucket,
@@ -189,73 +120,6 @@ class GvcfStage(SampleStage):
             data=self.expected_result(sample), 
             jobs=[gvcf_job]
         )
-
-
-@stage(required_stages=GvcfStage)
-class GvcfSomalierStage(SampleStage):
-    """
-    Genereate fingerprints from GVCFs for pedigree checks
-    """
-    def expected_result(self, sample: Sample):
-        """
-        Expected to generate the fingerprints file
-        """
-        return sample.get_gvcf_path(self.pipe).somalier_path
-
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        """
-        Use function from pedigree module
-        """
-        if self.pipe.config.get('ped_checks'):
-            gvcf_path = inputs.as_path(target=sample, stage=GvcfStage)
-            expected_path = self.expected_result(sample)
-            j, _ = pedigree.somalier_extact_job(
-                b=self.pipe.b,
-                sample=sample,
-                gvcf_or_cram_or_bam_path=GvcfPath(gvcf_path),
-                out_fpath=expected_path,
-                overwrite=not self.pipe.check_intermediates,
-                label='(GVCFs)',
-                depends_on=inputs.get_jobs(),
-            )
-            return self.make_outputs(sample, data=expected_path, jobs=[j])
-        else:
-            return self.make_outputs(sample)  # return empty output
-
-
-@stage(required_stages=GvcfSomalierStage)
-class GvcfPedCheckStage(DatasetStage):
-    """
-    Check pedigree from GVCFs
-    """
-    def expected_result(self, dataset: Dataset):
-        """
-        We don't expect any output - just rerun it every time
-        """
-
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        """
-        Use function from pedigree module
-        """
-        if self.pipe.config.get('ped_checks'):
-            fp_by_sid = inputs.as_path_by_target(stage=GvcfSomalierStage)
-    
-            j, somalier_samples_path, _ = pedigree.add_pedigree_jobs(
-                self.pipe.b,
-                dataset,
-                input_path_by_sid=fp_by_sid,
-                overwrite=not self.pipe.check_intermediates,
-                fingerprints_bucket=self.pipe.analysis_bucket / 'fingerprints',
-                web_bucket=self.pipe.web_bucket,
-                web_url=self.pipe.web_url,
-                tmp_bucket=self.pipe.tmp_bucket,
-                depends_on=inputs.get_jobs(),
-                label='(GVCFs)',
-                dry_run=self.pipe.dry_run,
-            )
-            return self.make_outputs(dataset, data=somalier_samples_path, jobs=[j])
-        else:
-            return self.make_outputs(dataset)  # return empty output
 
 
 @stage(required_stages=GvcfStage)
@@ -423,20 +287,12 @@ class AnnotateDatasetStage(DatasetStage):
         """
         Expected to generate a matrix table
         """
-        return self.pipe.analysis_bucket / 'mt' / f'{dataset.name}.mt'
+        return self.pipe.analysis_dataset.get_analysis_bucket() / 'mt' / f'{dataset.name}.mt'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        output_datasets = self.pipe.config.get('output_datasets', self.pipe.get_datasets())
-        if dataset.stack not in output_datasets:
-            logger.info(
-                f'Skipping annotating dataset {dataset.stack} because it is not'
-                f'in the --output-datasets: {output_datasets}'
-            )
-            return self.make_outputs(dataset)
-        
         annotated_mt_path = inputs.as_path(
             target=self.pipe.cohort, 
             stage=AnnotateCohortStage
@@ -444,7 +300,7 @@ class AnnotateDatasetStage(DatasetStage):
 
         # Make a list of dataset samples to subset from the entire matrix table
         sample_ids = [s.id for s in dataset.get_samples()]
-        proj_tmp_bucket = dataset.get_tmp_bucket(self.pipe)
+        proj_tmp_bucket = dataset.get_tmp_bucket()
         subset_path = proj_tmp_bucket / 'seqr-samples.txt'
         with subset_path.open('w') as f:
             f.write('\n'.join(sample_ids))
@@ -469,7 +325,7 @@ class AnnotateDatasetStage(DatasetStage):
 @stage(required_stages=[AnnotateDatasetStage])
 class LoadToEsStage(DatasetStage):
     """
-    Create a Seqr index for requested "output_datasets"
+    Create a Seqr index.
     """
     def expected_result(self, dataset: Dataset):
         """
@@ -481,25 +337,13 @@ class LoadToEsStage(DatasetStage):
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        output_datasets = self.pipe.config.get(
-            'output_datasets', 
-            self.pipe.get_datasets()
-        )
-        if dataset.stack not in output_datasets:
-            logger.info(
-                f'Skipping loading a dataset {dataset.stack} because it is not'
-                f'in the --output-datasets: {output_datasets}'
-            )
-            return self.make_outputs(dataset)
-
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetStage)
 
-        timestamp = time.strftime('%Y%m%d-%H%M%S')
         j = dataproc.hail_dataproc_job(
             self.pipe.b,
             f'{utils.QUERY_SCRIPTS_DIR}/seqr/mt_to_es.py '
             f'--mt-path {dataset_mt_path} '
-            f'--es-index {dataset.name}-{self.pipe.output_version}-{timestamp} '
+            f'--es-index {dataset.name}-{self.pipe.version} '
             f'--es-index-min-num-shards 1 '
             f'{"--prod" if self.pipe.namespace == Namespace.MAIN else ""}',
             max_age='16h',
@@ -521,23 +365,12 @@ class ToVcfStage(DatasetStage):
         """
         Generates an indexed VCF
         """
-        return self.pipe.analysis_bucket / 'mt' / f'{dataset.name}.vcf.bgz'
+        return self.pipe.analysis_dataset.get_analysis_bucket() / 'vcf' / f'{dataset.name}.vcf.bgz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        output_datasets = self.pipe.config.get(
-            'output_datasets', 
-            self.pipe.get_datasets()
-        )
-        if dataset.stack not in output_datasets:
-            logger.info(
-                f'Skipping loading dataset {dataset.stack} because it is not'
-                f'in the --output-datasets: {output_datasets}'
-            )
-            return self.make_outputs(dataset)
-
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetStage)
 
         j = dataproc.hail_dataproc_job(
@@ -555,53 +388,7 @@ class ToVcfStage(DatasetStage):
         return self.make_outputs(dataset, self.expected_result(dataset), jobs=[j])
 
 
-def make_pipeline(
-    input_datasets: list[str],
-    output_datasets: list[str] | None,
-    output_version: str,
-    hc_shards_num: int,
-    use_gnarly: bool,
-    use_as_vqsr: bool,
-    ped_checks: bool,
-    **kwargs,
-) -> Pipeline:
-    """
-    Create the seqr-loader Pipeline
-    """
-    assert input_datasets
-    title = f'Seqr loading: joint call from: {", ".join(input_datasets)}'
-    if output_datasets:
-        title += f', ES index for: {", ".join(output_datasets)}'
-    title += f', version {output_version}'
-
-    if not output_datasets:
-        output_datasets = input_datasets
-    if not all(op in input_datasets for op in output_datasets):
-        raise click.BadParameter(
-            f'All output datasets must be contained within the specified input '
-            f'datasets. Input dataset: {input_datasets}, output datasets: '
-            f'{output_datasets}'
-        )
-
-    pipeline = Pipeline(
-        name='seqr_loader',
-        description=title,
-        config=dict(
-            output_datasets=output_datasets,
-            ped_checks=ped_checks,
-            hc_shards_num=hc_shards_num,
-            use_gnarly=use_gnarly,
-            use_as_vqsr=use_as_vqsr,
-        ),
-        input_datasets=input_datasets,
-        output_version=output_version,
-        **kwargs,
-    )
-    return pipeline
-
-
 def _make_seqr_metadata_files(
-    pipeline: Pipeline,
     dataset: Dataset, 
     bucket: CloudPath,
     local_dir: Path, 
@@ -625,9 +412,9 @@ def _make_seqr_metadata_files(
     if not buckets.can_reuse(igv_paths_path, overwrite):
         df = pd.DataFrame({
             'individual_id': s.participant_id,
-            'cram_path': s.get_cram_path(pipeline),
+            'cram_path': s.get_cram_path(),
             'cram_sample_id': s.id,
-        } for s in dataset.get_samples() if s.get_cram_path(pipeline))
+        } for s in dataset.get_samples() if s.get_cram_path())
         df.to_csv(str(igv_paths_path), sep='\t', index=False, header=False)
 
     logger.info(f'Seqr sample map: {samplemap_bucket_path}')
@@ -636,14 +423,6 @@ def _make_seqr_metadata_files(
 
 @click.command()
 @pipeline_click_options
-@click.option(
-    '--output-dataset',
-    'output_datasets',
-    multiple=True,
-    help='Only create ES indicies for the dataset(s). Can be set multiple times. '
-    'Defaults to --input-datasets. The name of the ES index will be suffixed '
-    'with the dataset version (set by --version)',
-)
 @click.option(
     '--hc-shards-num',
     'hc_shards_num',
@@ -680,21 +459,38 @@ def _make_seqr_metadata_files(
     help='Perform fingerprinting and PED checks',
 )
 @click_config_file.configuration_option()
-def main(**kwargs):  # pylint: disable=missing-function-docstring
+def main(
+    hc_shards_num: int,
+    use_gnarly: bool,
+    use_as_vqsr: bool,
+    ped_checks: bool,
+    **kwargs,
+):  # pylint: disable=missing-function-docstring
     make_seqr_metadata = kwargs.pop('make_seqr_metadata')
     
-    pipeline = make_pipeline(**kwargs)
+    pipeline = Pipeline(
+        name='seqr_loader',
+        description='Seqr loader',
+        config=dict(
+            ped_checks=ped_checks,
+            hc_shards_num=hc_shards_num,
+            use_gnarly=use_gnarly,
+            use_as_vqsr=use_as_vqsr,
+        ),
+        **kwargs,
+    )
+
     pipeline.submit_batch()
 
     if make_seqr_metadata:
         for dataset in pipeline.cohort.get_datasets():
-            if dataset.stack in pipeline.config.get('output_datasets', []):
-                _make_seqr_metadata_files(
-                    pipeline=pipeline,
-                    dataset=dataset,
-                    bucket=pipeline.analysis_bucket,
-                    local_dir=pipeline.local_dir,
-                )
+            _make_seqr_metadata_files(
+                dataset=dataset,
+                bucket=pipeline.analysis_dataset.get_analysis_bucket(
+                    version=pipeline.version,
+                ),
+                local_dir=pipeline.local_dir,
+            )
 
 
 if __name__ == '__main__':

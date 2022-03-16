@@ -4,7 +4,7 @@ Represents a "cohort" target - all samples from all datasets in the pipeline
 
 import logging
 
-from cpg_pipes.storage import Namespace
+from cpg_pipes.storage import Namespace, StorageProvider
 from cpg_pipes.pipeline.sample import Sample
 from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes.pipeline.target import Target
@@ -27,12 +27,8 @@ class Cohort(Target):
         return self.name
 
     @property
-    def unique_id(self) -> str:
-        """
-        Unique ID of cohort as a stage "Target" - can be anything, because
-        the cohort is expected to be only one
-        """
-        return self.name
+    def target_id(self) -> str:
+        return f'Cohort({self.name}, {len(self.get_datasets())} datasets)'
 
     def get_datasets(self, only_active: bool = True) -> list[Dataset]:
         """
@@ -57,7 +53,12 @@ class Cohort(Target):
         """
         return [s.id for s in self.get_all_samples(only_active=only_active)]
 
-    def add_dataset(self, name: str, namespace: Namespace | None = None) -> Dataset:
+    def add_dataset(
+        self, 
+        name: str, 
+        namespace: Namespace | None = None,
+        storage_provider: StorageProvider | None = None,
+    ) -> Dataset:
         """
         Create a dataset and add to the cohort.
         """
@@ -68,6 +69,7 @@ class Cohort(Target):
         p = Dataset(
             name=name, 
             namespace=namespace,
+            storage_provider=storage_provider,
         )
         self._datasets.append(p)
         return p

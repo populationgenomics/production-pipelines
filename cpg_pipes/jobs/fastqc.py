@@ -30,10 +30,12 @@ def fastqc(
         
         cmd = f"""\
         mkdir -p /io/batch/outdir
-        fastqc -t{res.get_nthreads()} {inp} --outdir /io/batch/outdir
+        fastqc -t{res.get_nthreads()} {inp} \\
+        --outdir /io/batch/outdir
         ls /io/batch/outdir
         ln /io/batch/outdir/*_fastqc.html {j.out_html}
         ln /io/batch/outdir/*_fastqc.zip {j.out_zip}
+        unzip /io/batch/outdir/*_fastqc.zip
         """
         j.command(wrap_command(cmd, monitor_space=True))
     

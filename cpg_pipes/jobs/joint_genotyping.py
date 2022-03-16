@@ -99,7 +99,7 @@ def make_joint_genotyping_jobs(
     siteonly_vcf_by_interval: dict[int, hb.ResourceGroup] = dict()
 
     sample_ids = set(s.id for s in samples)
-    samples_hash = utils.hash_sample_ids(sample_ids)
+    samples_hash = utils.hash_sample_ids(list(sample_ids))
     jc_tmp_bucket = tmp_bucket / 'joint_calling' / samples_hash
     for idx in range(scatter_count):
         jc_vcf_path = jc_tmp_bucket / 'by_interval' / f'interval_{idx}.vcf.gz'

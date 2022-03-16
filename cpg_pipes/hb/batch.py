@@ -61,7 +61,7 @@ class Batch(hb.Batch):
 
 
 def setup_batch(
-    title: str, 
+    description: str, 
     keep_scratch: bool = False,
     tmp_bucket: CloudPath | None = None,
     billing_project: str | None = None,
@@ -96,7 +96,7 @@ def setup_batch(
         remote_tmpdir=str(hail_bucket),
         token=os.environ.get('HAIL_TOKEN'),
     )
-    return Batch(name=title, backend=backend)
+    return Batch(name=description, backend=backend)
 
 
 def get_hail_bucket(

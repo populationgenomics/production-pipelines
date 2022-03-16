@@ -19,12 +19,14 @@ class Target:
         self.active: bool = True
 
     @property
-    def unique_id(self) -> str:
+    def target_id(self) -> str:
         """
-        ID should be unique across target of all levels. We are raising
-        NotImplementedError instead of making it abstractclass because
-        mypy is not happy about binding TypeVar to abstract classes:
+        ID should be unique across target of all levels. 
+        
+        We are raising NotImplementedError instead of making it abstractclass because
+        mypy is not happy about binding TypeVar to abstract classes, see:
         https://stackoverflow.com/questions/48349054/how-do-you-annotate-the-type-of-an-abstract-class-with-mypy
+
         Specifically,
         ```
         TypeVar('TargetT', bound=Target)

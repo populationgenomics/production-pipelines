@@ -10,8 +10,8 @@ class Pair(Target):
     Pair of samples
     """
     @property
-    def unique_id(self) -> str:
-        return f'{self.s1.unique_id}:{self.s2.unique_id}'
+    def target_id(self) -> str:
+        return f'{self.s1.target_id}:{self.s2.target_id}'
 
     def __init__(self, s1: Sample, s2: Sample):
         super().__init__()
