@@ -10,8 +10,6 @@ from cloudpathlib import CloudPath
 from hailtop.batch import ResourceGroup, ResourceFile, Batch
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 class AnalysisType(Enum):
@@ -110,6 +108,9 @@ class CramPath:
 
     def __repr__(self) -> str:
         return f'CRAM({self.path})'
+    
+    def exists(self) -> bool:
+        return self.path.exists()
 
     @property
     def index_path(self) -> CloudPath:
@@ -147,7 +148,10 @@ class GvcfPath:
 
     def __repr__(self) -> str:
         return f'GVCF({self.path})'
-    
+
+    def exists(self) -> bool:
+        return self.path.exists()
+
     @property
     def tbi_path(self) -> CloudPath:
         """
@@ -184,7 +188,7 @@ class FastqPair:
         r1 = self.r1 if isinstance(self.r1, ResourceFile) else b.read_input(str(self.r1))
         r2 = self.r2 if isinstance(self.r2, ResourceFile) else b.read_input(str(self.r2))
         return FastqPair(r1, r2)
-
+    
 
 FastqPairs = List[FastqPair]
 

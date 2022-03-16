@@ -5,9 +5,8 @@ Helpers to setup Job's command.
 import logging
 from typing import List, Union
 
+
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 # commands that activate gsutil

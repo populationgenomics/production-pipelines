@@ -10,8 +10,6 @@ from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes.pipeline.target import Target
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 class Cohort(Target):

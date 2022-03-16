@@ -1,0 +1,50 @@
+"""
+Stage that performs AS-VQSR.
+"""
+
+import logging
+
+from cpg_pipes import utils
+from cpg_pipes.jobs.vqsr import make_vqsr_jobs
+from cpg_pipes.pipeline.cohort import Cohort
+from cpg_pipes.pipeline.pipeline import stage
+from cpg_pipes.pipeline.stage import CohortStage, StageInput, StageOutput
+from cpg_pipes.stages.joint_genotyping import JointGenotypingStage
+
+logger = logging.getLogger(__file__)
+
+
+@stage(required_stages=JointGenotypingStage)
+class VqsrStage(CohortStage):
+    """
+    Variant filtering of joint-called VCF
+    """
+    def expected_result(self, cohort: Cohort):
+        """
+        Expects to generate one site-only VCF
+        """
+        samples_hash = utils.hash_sample_ids(cohort.get_all_sample_ids())
+        return self.pipe.tmp_bucket / 'vqsr' / f'{samples_hash}-siteonly.vcf.gz'
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        """
+        Use function defined in jobs module
+        """
+        siteonly_vcf_path = inputs.as_path(
+            stage=JointGenotypingStage, target=cohort, id='siteonly'
+        )
+
+        tmp_vqsr_bucket = self.pipe.tmp_bucket / 'vqsr'
+        logger.info(f'Queueing VQSR job')
+        expected_path = self.expected_result(cohort)
+        vqsr_job = make_vqsr_jobs(
+            b=self.pipe.b,
+            input_vcf_or_mt_path=siteonly_vcf_path,
+            work_bucket=tmp_vqsr_bucket,
+            gvcf_count=len(cohort.get_all_samples()),
+            depends_on=inputs.get_jobs(),
+            output_vcf_path=expected_path,
+            use_as_annotations=self.pipe.config.get('use_as_vqsr', True),
+            overwrite=not self.pipe.check_intermediates,
+        )
+        return self.make_outputs(cohort, data=expected_path, jobs=[vqsr_job])

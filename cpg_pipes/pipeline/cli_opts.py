@@ -3,6 +3,8 @@ Common pipeline command line options for "click".
 """
 from typing import Callable
 import click
+import click_config_file
+import yaml  # type: ignore
 
 from cpg_pipes.storage import Namespace
 
@@ -37,7 +39,6 @@ def pipeline_click_options(function: Callable) -> Callable:
             '--input-dataset',
             'input_datasets',
             multiple=True,
-            required=True,
             help='Only read samples that belong to the dataset(s). '
                  'Can be set multiple times.',
         ),
@@ -165,4 +166,15 @@ def pipeline_click_options(function: Callable) -> Callable:
     # click shows options in a reverse order, so inverting the list back:
     for opt in options[::-1]:
         function = opt(function)
+    
+    # add ability to load options from a yaml file
+    # using https://pypi.org/project/click-config-file/
+    def yaml_provider(fp, _):
+        """Load options from YAML"""
+        with open(fp) as f:
+            return yaml.load(f, Loader=yaml.SafeLoader)
+    function = click_config_file.configuration_option(
+        provider=yaml_provider
+    )(function)
+ 
     return function

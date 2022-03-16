@@ -1,0 +1,6 @@
+namespace: test
+analysis_dataset: prophecy
+input_datasets: [prophecy]
+keep_scratch: true
+validate_smdb_analyses: false
+skip_samples_with_missing_input: true

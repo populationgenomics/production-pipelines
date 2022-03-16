@@ -1,0 +1,12 @@
+namespace=main
+analysis_dataset=seqr
+input_datasets=acute-care,perth-neuro,heartkids,ravenscroft-rdstudy,circa
+skip_samples=CPG11783,CPG11783,CPG13326,CPG200576
+output_version=v1
+keep_scratch=True
+skip_samples_with_missing_input=True
+validate_smdb_analyses=True
+make_seqr_metadata=False
+last_stage=GvcfPedCheckStage
+local_dir=/Users/vlad/CPG/seqr-loader
+ped_checks=False

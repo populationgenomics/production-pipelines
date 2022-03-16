@@ -4,8 +4,6 @@ Docker images used in the pipelines.
 import logging
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:c27f80a5d68f5925614c95ef51b09dd0ecf15074-hail-0.2.85.post2-a6471564e3026200c8ccb6539210bca99ef80260'
 

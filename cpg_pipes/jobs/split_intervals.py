@@ -11,8 +11,6 @@ from cpg_pipes import ref_data, images
 from cpg_pipes.hb.command import wrap_command
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 def get_intervals(

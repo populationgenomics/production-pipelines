@@ -12,8 +12,6 @@ import hail as hl
 from lib.model.seqr_mt_schema import SeqrGenotypesSchema
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 @click.command()

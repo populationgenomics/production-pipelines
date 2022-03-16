@@ -14,8 +14,6 @@ from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes.jobs.align import Aligner, align
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 DATASET = 'fewgenomes'

@@ -16,8 +16,6 @@ from lib.model.seqr_mt_schema import SeqrVariantSchema
 from lib.model.base_mt_schema import row_annotation, RowAnnotationOmit
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 GENOME_VERSION = 'GRCh38'
 REF_BUCKET = 'gs://cpg-reference'

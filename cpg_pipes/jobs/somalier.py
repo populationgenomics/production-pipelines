@@ -17,8 +17,6 @@ from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes.pipeline.sample import Sample
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 def pedigree(

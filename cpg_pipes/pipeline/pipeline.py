@@ -57,6 +57,7 @@ from cloudpathlib import CloudPath
 from .analysis import AnalysisType
 from .cohort import Cohort
 from .dataset import Dataset
+from .exceptions import PipelineError
 from .sample import Sample
 from .smdb import SMDB
 from .stage import Stage
@@ -65,8 +66,6 @@ from ..hb.prev_job import PrevJob
 from ..storage import Namespace, StorageProvider, CPGStorageProvider
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 StageDecorator = Callable[..., 'Stage']
@@ -75,12 +74,6 @@ StageDecorator = Callable[..., 'Stage']
 # We record each initialised Stage subclass, so we know the default stage
 # list for the case when the user doesn't pass them explicitly with set_stages()
 _ALL_DEFINED_STAGES = []
-
-
-class PipelineError(Exception):
-    """
-    Error raised by pipeline stages implementation
-    """
 
 
 def stage(
@@ -182,8 +175,8 @@ class Pipeline:
         analysis_dataset: str,
         name: str,
         description: str,
-        version: str | None,
         namespace: Namespace | str,
+        version: str | None = None,
         storage_provider: StorageProvider | None = None,
         stages_in_order: list[StageDecorator] | None = None,
         keep_scratch: bool = True,

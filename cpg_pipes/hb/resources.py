@@ -9,8 +9,6 @@ from dataclasses import dataclass
 from hailtop.batch.job import Job
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 @dataclass(init=False)

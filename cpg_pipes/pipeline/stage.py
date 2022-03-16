@@ -1,5 +1,5 @@
 """
-Stage classes
+Stage classes.
 """
 
 import logging
@@ -14,12 +14,12 @@ from cpg_pipes.buckets import str_to_path, exists
 from cpg_pipes.pipeline.analysis import AnalysisType
 from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes.pipeline.cohort import Cohort
+from cpg_pipes.pipeline.exceptions import PipelineError
 from cpg_pipes.pipeline.target import Target
 from cpg_pipes.pipeline.sample import Sample
 from cpg_pipes.pipeline.pair import Pair
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
 
@@ -144,8 +144,16 @@ class StageInput:
         fun: Callable,
         stage: StageDecorator,
     ):
+        if stage.__name__ not in [s.name for s in self.stage.required_stages]:
+            raise PipelineError(
+                f'{self.stage.name}: getting inputs from stage {stage.__name__}, '
+                f'but {stage.__name__} is not listed in required_stages. '
+                f'Consider adding it into the decorator: '
+                f'@stage(required_stages=[{stage.__name__}])'
+            )
+        
         if stage.__name__ not in self._results_by_target_by_stage:
-            raise ValueError(
+            raise PipelineError(
                 f'No inputs from {stage.__name__} for {self.stage.name} found '
                 'after skipping targets with missing inputs. ' +
                 ('Check the logs if all samples were missing inputs from previous '
@@ -421,20 +429,20 @@ class Stage(Generic[TargetT], ABC):
         elif self.required:
             reusable_paths = self._try_get_reusable_paths(target)
             if not reusable_paths:
-                if isinstance(target, Sample) and self.pipe.skip_samples_with_missing_input:
-                    logger.info(
-                        f'Stage {self.name} is skipped and required, however '
-                        f'--skip-samples-without-first-stage-input is set, so skipping '
-                        f'this target ({target.target_id}).'
-                    )
-                    target.active = False
-                    return self.make_outputs(target=target)  # type: ignore 
-                else:
-                    raise ValueError(
-                        f'Stage {self.name} is required, but skipped and '
-                        f'cannot reuse outputs for '
-                        f'target {target.__class__.__name__}("{target.target_id}")'
-                    )
+                # if isinstance(target, Sample) and self.pipe.skip_samples_with_missing_input:
+                #     logger.info(
+                #         f'Stage {self.name} is skipped and required, however '
+                #         f'--skip-samples-without-first-stage-input is set, so skipping '
+                #         f'this target ({target.target_id}).'
+                #     )
+                #     target.active = False
+                #     return self.make_outputs(target=target)  # type: ignore 
+                # else:
+                raise ValueError(
+                    f'Stage {self.name} is required, but skipped and '
+                    f'cannot reuse outputs for '
+                    f'target {target.__class__.__name__}("{target.target_id}")'
+                )
             else:
                 return self.make_outputs(target=target, data=reusable_paths) 
 

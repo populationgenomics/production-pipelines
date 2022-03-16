@@ -11,8 +11,6 @@ from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.pipeline.analysis import CramPath
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 def samtools_stats(

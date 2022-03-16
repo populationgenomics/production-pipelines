@@ -12,8 +12,6 @@ import hail as hl
 from gnomad.utils.vep import vep_struct_to_csq
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 @click.command()

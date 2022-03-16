@@ -14,8 +14,6 @@ from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 def gather_vcfs(

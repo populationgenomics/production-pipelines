@@ -13,8 +13,6 @@ from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes.jobs.fastqc import fastqc
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 INPUT_DATASET = 'fewgenomes'

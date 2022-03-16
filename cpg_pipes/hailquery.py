@@ -17,9 +17,7 @@ from cpg_pipes import ref_data
 from cpg_pipes.utils import safe_mkdir, DEFAULT_REF
 
 
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger = logging.getLogger(__file__)
 
 GNOMAD_REF_BUCKET = f'{ref_data.REF_BUCKET}/gnomad/v0'
 TEL_AND_CENT_HT = join(

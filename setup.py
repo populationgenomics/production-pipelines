@@ -30,7 +30,9 @@ setuptools.setup(
         'fsspec',
         'sample-metadata',
         'analysis-runner',
-        'cloudpathlib[gs]'
+        'cloudpathlib[gs]',
+        'coloredlogs',
+        'types-PyYAML',  # https://mypy.readthedocs.io/en/stable/getting_started.html#library-stubs-and-typeshed
     ],
     keywords='bioinformatics',
     classifiers=[

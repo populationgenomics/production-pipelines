@@ -15,8 +15,6 @@ from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.hb.command import wrap_command
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 # VQSR - when applying model - targets indel_filter_level and snp_filter_level

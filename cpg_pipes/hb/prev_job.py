@@ -12,8 +12,6 @@ from cpg_pipes import buckets
 from cpg_pipes.hb.batch import get_hail_bucket
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 @dataclass

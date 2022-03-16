@@ -19,8 +19,6 @@ import click
 from peddy import Ped
 
 logger = logging.getLogger('check-pedigree')
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 @click.command()

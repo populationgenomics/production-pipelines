@@ -1,7 +1,8 @@
 """
-Functions to find the pipeline inputs and communicate with the SM server
+Abstract provider if input data, and the CPG sample-metadata DB implementation.
 """
 
+from abc import ABC, abstractmethod
 import logging
 import traceback
 from textwrap import dedent
@@ -27,6 +28,45 @@ from .analysis import Analysis, AnalysisType, AnalysisStatus
 from .sequence import SmSequence
 
 logger = logging.getLogger(__file__)
+
+
+class MetadataProvider(ABC):
+    """
+    Abstract class for implementing metadata source.
+    """
+    def __init__(self):
+        pass
+
+    @abstractmethod
+    def populate_cohort(
+        self,
+        cohort: Cohort,
+        skip_samples: list[str] | None = None,
+        only_samples: list[str] | None = None,
+        ped_files: list[CloudPath] | None = None,
+    ) -> Cohort:
+        pass
+
+    @abstractmethod
+    def populate_pedigree(self, cohort: Cohort, ped_files: list[CloudPath] | None):
+        pass
+
+    @abstractmethod
+    def populate_analysis(self, cohort: Cohort, source_tag: str | None = None):
+        pass
+
+    @abstractmethod
+    def populate_dataset(
+        self,
+        dataset: Dataset,
+        skip_samples: list[str] | None = None,
+        only_samples: list[str] | None = None,
+    ) -> Dataset:
+        pass
+
+    @abstractmethod
+    def populate_sequencing_run(self, samples: list[Sample]) -> list[Sample]:
+        pass
 
 
 class SMDB:

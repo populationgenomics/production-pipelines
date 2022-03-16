@@ -5,8 +5,6 @@ from os.path import join
 import logging
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 REF_BUCKET = 'gs://cpg-reference'
 BROAD_REF_BUCKET = f'{REF_BUCKET}/hg38/v1'

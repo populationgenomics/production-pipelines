@@ -16,8 +16,6 @@ from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.pipeline.pipeline import Pipeline
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 RESULT_VCF = join(ref_data.REF_BUCKET, 'somalier/v0/sites.hg38.vcf.gz')
 
@@ -25,9 +23,8 @@ RESULT_VCF = join(ref_data.REF_BUCKET, 'somalier/v0/sites.hg38.vcf.gz')
 pipe = Pipeline(
     analysis_dataset='fewgenomes',
     name='find-somalier-sites',
-    output_version='v0',
-    namespace='main',
     description='find 65k somalier sites',
+    namespace='main',
     check_smdb_seq=False,
     keep_scratch=True,
 )

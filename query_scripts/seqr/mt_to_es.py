@@ -16,8 +16,6 @@ import hail as hl
 from hail_scripts.v02.utils.elasticsearch_client import ElasticsearchClient
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 @click.command()

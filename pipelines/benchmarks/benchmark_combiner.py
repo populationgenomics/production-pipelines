@@ -26,8 +26,6 @@ sapi = SampleApi()
 aapi = AnalysisApi()
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 # INPUT_DATASET = 'fewgenomes'
 INPUT_DATASET = 'tob-wgs'
@@ -38,7 +36,6 @@ BENCHMARK_BUCKET = f'gs://cpg-{INPUT_DATASET}-{NAMESPACE}-analysis/benchmark_com
 pipe = Pipeline(
     analysis_dataset=INPUT_DATASET,
     name='benchmark_combiner',
-    output_version='v0',
     namespace=NAMESPACE,
     description='Benchmark GVCF combiner',
     check_smdb_seq=False,

@@ -1,225 +1,29 @@
 #!/usr/bin/env python3
 
 """
-Batch pipeline to load data into seqr
+Batch pipeline to load data into seqr.
 """
 
 import logging
 from pathlib import Path
 
 import click
-import click_config_file
 import pandas as pd
 from analysis_runner import dataproc
 from cloudpathlib import CloudPath
 
 from cpg_pipes import buckets, ref_data, utils
-from cpg_pipes.jobs import align, split_intervals, haplotype_caller
-from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
-    JointGenotyperTool
-from cpg_pipes.jobs.vqsr import make_vqsr_jobs
-from cpg_pipes.pipeline.analysis import AnalysisType, GvcfPath, CramPath
 from cpg_pipes.pipeline.cli_opts import pipeline_click_options
 from cpg_pipes.pipeline.cohort import Cohort
 from cpg_pipes.pipeline.dataset import Dataset
-from cpg_pipes.pipeline.pipeline import stage, Pipeline, PipelineError
-from cpg_pipes.pipeline.sample import Sample
-from cpg_pipes.pipeline.stage import SampleStage, CohortStage, DatasetStage, \
+from cpg_pipes.pipeline.pipeline import stage, Pipeline
+from cpg_pipes.pipeline.stage import CohortStage, DatasetStage, \
     StageInput, StageOutput
+from cpg_pipes.stages.joint_genotyping import JointGenotypingStage
+from cpg_pipes.stages.vqsr import VqsrStage
 from cpg_pipes.storage import Namespace
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
-
-
-@stage(sm_analysis_type=AnalysisType.CRAM)
-class CramStage(SampleStage):
-    """
-    Align or re-align input data to produce a CRAM file
-    """
-    def expected_result(self, sample: Sample):
-        """
-        Stage is expected to generate a CRAM file and a corresponding index.
-        """
-        return sample.get_cram_path().path
-
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        """
-        Using the "align" function implemented in the jobs module
-        """
-        if not sample.alignment_input:
-            if self.pipe.skip_samples_with_missing_input:
-                logger.error(f'Could not find read data, skipping sample {sample.id}')
-                sample.active = False
-                return self.make_outputs(sample)  # return empty output
-            else:
-                raise PipelineError(
-                    f'No alignment input found for {sample.id}. '
-                    f'Checked: Sequence entry and type=CRAM Analysis entry'
-                )
-
-        cram_job = align.align(
-            b=self.pipe.b,
-            alignment_input=sample.alignment_input,
-            output_path=self.expected_result(sample),
-            sample_name=sample.id,
-            dataset_name=sample.dataset.name,
-            overwrite=not self.pipe.check_intermediates,
-            smdb=self.pipe.get_db(),
-            prev_batch_jobs=self.pipe.prev_batch_jobs,
-            number_of_shards_for_realignment=(
-                10 if isinstance(sample.alignment_input, CramPath) else None
-            )
-        )
-        return self.make_outputs(
-            sample, 
-            data=self.expected_result(sample), 
-            jobs=[cram_job]
-        )
-
-
-@stage(required_stages=CramStage, sm_analysis_type=AnalysisType.GVCF)
-class GvcfStage(SampleStage):
-    """
-    Use HaplotypeCaller to genotype individual samples
-    """
-    hc_intervals = None
-
-    def expected_result(self, sample: Sample):
-        """
-        Generate a GVCF and corresponding TBI index
-        """
-        return sample.get_gvcf_path().path
-
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        """
-        Use function from the jobs module
-        """
-        hc_shards_num = self.pipe.config.get('hc_shards_num', 1)
-        if GvcfStage.hc_intervals is None and hc_shards_num > 1:
-            GvcfStage.hc_intervals = split_intervals.get_intervals(
-                b=self.pipe.b,
-                scatter_count=hc_shards_num,
-            )
-        gvcf_job = haplotype_caller.produce_gvcf(
-            b=self.pipe.b,
-            output_path=self.expected_result(sample),
-            sample_name=sample.id,
-            dataset_name=sample.dataset.name,
-            cram_path=sample.get_cram_path(),
-            intervals=GvcfStage.hc_intervals,
-            number_of_intervals=hc_shards_num,
-            tmp_bucket=self.pipe.tmp_bucket,
-            overwrite=not self.pipe.check_intermediates,
-            depends_on=inputs.get_jobs(),
-            smdb=self.pipe.get_db(),
-        )
-        return self.make_outputs(
-            sample,
-            data=self.expected_result(sample), 
-            jobs=[gvcf_job]
-        )
-
-
-@stage(required_stages=GvcfStage)
-class JointGenotypingStage(CohortStage):
-    """
-    Joint-calling of GVCFs together.
-    """
-    def expected_result(self, cohort: Cohort):
-        """
-        Generate a pVCF and a site-only VCF. Returns 2 outputs, thus not checking
-        the SMDB, because the Analysis entry supports only single output.
-        """
-        samples_hash = utils.hash_sample_ids(cohort.get_all_sample_ids())
-        expected_jc_vcf_path = (
-            self.pipe.tmp_bucket / 'joint_calling' / f'{samples_hash}.vcf.gz'
-        )
-        return {
-            'vcf': expected_jc_vcf_path,
-            'siteonly': CloudPath(
-                str(expected_jc_vcf_path).replace('.vcf.gz', '-siteonly.vcf.gz')
-            ),
-        }
-
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        """
-        Use function defined in jobs module
-        """
-        gvcf_by_sid = {
-            k: GvcfPath(v) for k, v 
-            in inputs.as_path_by_target(stage=GvcfStage).items()
-        }
-
-        not_found_gvcfs: list[str] = []
-        for sid, gvcf_path in gvcf_by_sid.items():
-            if gvcf_path is None:
-                logger.error(f'Joint genotyping: could not find GVCF for {sid}')
-                not_found_gvcfs.append(sid)
-        if not_found_gvcfs:
-            raise PipelineError(
-                f'Joint genotyping: could not find {len(not_found_gvcfs)} '
-                f'GVCFs, exiting'
-            )
-
-        jc_job = make_joint_genotyping_jobs(
-            b=self.pipe.b,
-            out_vcf_path=self.expected_result(cohort)['vcf'],
-            out_siteonly_vcf_path=self.expected_result(cohort)['siteonly'],
-            samples=cohort.get_all_samples(),
-            genomicsdb_bucket=self.pipe.analysis_bucket / 'genomicsdbs',
-            tmp_bucket=self.pipe.tmp_bucket,
-            gvcf_by_sid=gvcf_by_sid,
-            overwrite=not self.pipe.check_intermediates,
-            depends_on=inputs.get_jobs(),
-            smdb=self.pipe.get_db(),
-            tool=JointGenotyperTool.GnarlyGenotyper 
-            if self.pipe.config.get('use_gnarly', False) 
-            else JointGenotyperTool.GenotypeGVCFs,
-            dry_run=self.pipe.dry_run,
-        )
-        return self.make_outputs(
-            cohort, 
-            data=self.expected_result(cohort), 
-            jobs=[jc_job]
-        )
-
-
-@stage(required_stages=JointGenotypingStage)
-class VqsrStage(CohortStage):
-    """
-    Variant filtering of joint-called VCF
-    """
-    def expected_result(self, cohort: Cohort):
-        """
-        Expects to generate one site-only VCF
-        """
-        samples_hash = utils.hash_sample_ids(cohort.get_all_sample_ids())
-        return self.pipe.tmp_bucket / 'vqsr' / f'{samples_hash}-siteonly.vcf.gz'
-
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        """
-        Use function defined in jobs module
-        """
-        siteonly_vcf_path = inputs.as_path(
-            stage=JointGenotypingStage, target=cohort, id='siteonly'
-        )
-
-        tmp_vqsr_bucket = self.pipe.tmp_bucket / 'vqsr'
-        logger.info(f'Queueing VQSR job')
-        expected_path = self.expected_result(cohort)
-        vqsr_job = make_vqsr_jobs(
-            b=self.pipe.b,
-            input_vcf_or_mt_path=siteonly_vcf_path,
-            work_bucket=tmp_vqsr_bucket,
-            gvcf_count=len(cohort.get_all_samples()),
-            depends_on=inputs.get_jobs(),
-            output_vcf_path=expected_path,
-            use_as_annotations=self.pipe.config.get('use_as_vqsr', True),
-            overwrite=not self.pipe.check_intermediates,
-        )
-        return self.make_outputs(cohort, data=expected_path, jobs=[vqsr_job])
 
 
 def get_anno_tmp_bucket(pipe: Pipeline) -> CloudPath:
@@ -422,7 +226,6 @@ def _make_seqr_metadata_files(
 
 
 @click.command()
-@pipeline_click_options
 @click.option(
     '--hc-shards-num',
     'hc_shards_num',
@@ -458,7 +261,7 @@ def _make_seqr_metadata_files(
     is_flag=True,
     help='Perform fingerprinting and PED checks',
 )
-@click_config_file.configuration_option()
+@pipeline_click_options
 def main(
     hc_shards_num: int,
     use_gnarly: bool,
@@ -479,7 +282,6 @@ def main(
         ),
         **kwargs,
     )
-
     pipeline.submit_batch()
 
     if make_seqr_metadata:

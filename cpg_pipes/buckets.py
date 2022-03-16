@@ -10,8 +10,6 @@ from cloudpathlib import CloudPath
 from cpg_pipes.storage import Cloud
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 def str_to_path(path: str | Path | CloudPath) -> Path | CloudPath:
@@ -49,9 +47,9 @@ def exists(path: str | Path | CloudPath, verbose: bool = True) -> bool:
     exists = path.exists()
     if verbose and isinstance(path, CloudPath):
         if exists:
-            logger.info(f'Checking object existence, exists: {path}')
+            logger.debug(f'Checking object existence, exists: {path}')
         else:
-            logger.info(f'Checking object existence, doesn\'t exist: {path}')
+            logger.debug(f'Checking object existence, doesn\'t exist: {path}')
     return exists
 
 

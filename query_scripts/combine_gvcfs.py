@@ -18,9 +18,7 @@ from cpg_pipes.hailquery import init_hail
 from cpg_pipes.utils import get_validation_callback
 from cpg_pipes import buckets, utils, _version
 
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 @click.command()

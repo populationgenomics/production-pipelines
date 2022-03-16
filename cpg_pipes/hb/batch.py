@@ -11,8 +11,6 @@ from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 class Batch(hb.Batch):

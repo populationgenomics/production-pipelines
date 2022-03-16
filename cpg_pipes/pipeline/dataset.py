@@ -11,8 +11,6 @@ from cpg_pipes.pipeline.target import Target
 from cpg_pipes.pipeline.sample import Sample, PedigreeInfo
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 class Dataset(Target):

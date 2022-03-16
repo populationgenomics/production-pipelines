@@ -7,13 +7,11 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from cpg_pipes.pipeline.analysis import CramPath, GvcfPath, AnalysisType, AlignmentInput
+from cpg_pipes.pipeline.analysis import CramPath, GvcfPath, AlignmentInput
 from cpg_pipes.pipeline.target import Target
 from cpg_pipes.pipeline.sequence import SmSequence
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 class Sample(Target):
@@ -53,10 +51,9 @@ class Sample(Target):
 
     def __repr__(self):
         return (
-            f'Sample({self.id}|{self.external_id}' +
-            (f', participant_id={self._participant_id}' 
+            f'Sample({self.dataset.name}/{self.id}|{self.external_id}' +
+            (f', participant={self._participant_id}' 
              if self._participant_id else '') +
-            f', dataset={self.dataset.name}' +
             f', forced={self.forced}' +
             f', active={self.active}' +
             f', meta={self.meta}' +
@@ -67,11 +64,23 @@ class Sample(Target):
             f')'
         )
 
+    def __str__(self):
+        ai_tag = ''
+        if self._alignment_input:
+            if isinstance(self._alignment_input, CramPath):
+                if self._alignment_input.is_bam:
+                    ai_tag = f'|SEQ=CRAM'
+                else:
+                    ai_tag = f'|SEQ=BAM'
+            else:
+                ai_tag = f'|SEQ={len(self._alignment_input)}FQS'
+
+        return f'Sample({self.dataset.name}/{self.id}|{self.external_id}{ai_tag})'
+
     @property
     def alignment_input(self) -> AlignmentInput | None:
         """
         Returns input for (re-)alignment.
-        :param use_cram_analysis: check CRAM analysis entry.
         """
         if self._alignment_input:
             return self._alignment_input
@@ -126,14 +135,6 @@ class Sample(Target):
         Path to a GVCF file. Not checking its existence here.
         """
         return GvcfPath(self.dataset.get_bucket() / 'gvcf' / f'{self.id}.g.vcf.gz')
-
-    def analysis_cram_path(self) -> CramPath | None:
-        """
-        Get CramPath from analysis SMDB entry.
-        """
-        if analysis := self.analysis_by_type.get(AnalysisType.CRAM):
-            return CramPath(analysis.output)
-        return None
 
 
 class Sex(Enum):

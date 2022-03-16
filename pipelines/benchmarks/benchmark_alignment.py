@@ -17,8 +17,6 @@ from cpg_pipes.pipeline.stage import SampleStage, StageInput, StageOutput
 from cpg_pipes.ref_data import REF_D
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 DATASET = 'fewgenomes'

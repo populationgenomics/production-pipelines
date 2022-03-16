@@ -17,8 +17,6 @@ from cpg_pipes.pipeline.analysis import CramPath, AnalysisType, GvcfPath
 from cpg_pipes.pipeline.smdb import SMDB
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 def produce_gvcf(
