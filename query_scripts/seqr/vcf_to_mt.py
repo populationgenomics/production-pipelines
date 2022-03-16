@@ -10,8 +10,6 @@ from typing import Optional
 from os.path import join
 import click
 import logging
-from pathlib import Path
-from cloudpathlib import CloudPath
 import hail as hl
 from gnomad.utils.sparse_mt import split_info_annotation
 from lib.model.seqr_mt_schema import SeqrVariantSchema
@@ -470,73 +468,12 @@ class Cloud(Enum):
     AZ = 'az'
     
 
-def str_to_path(path: str | Path | CloudPath) -> Path | CloudPath:
-    """
-    Helper method to create a Path (local file) or CloudPath (cloud storage object) 
-    instance.
-    """
-    if isinstance(path, str):
-        if any(path.startswith(f'{protocol.value}://') for protocol in Cloud):
-            return CloudPath(path)
-        else:
-            return Path(path)
-    return path
-
-
-def exists(path: str | Path | CloudPath, verbose: bool = True) -> bool:
-    """
-    Check if the object exists, where the object can be:
-        * local file
-        * local directory
-        * Google Storage object
-        * Google Storage URL representing a *.mt or *.ht Hail data,
-          in which case it will check for the existence of a
-          *.mt/_SUCCESS or *.ht/_SUCCESS file.
-    :param path: path to the file/directory/object/mt/ht
-    :param verbose: for cloud objects, log every existence check
-    :return: True if the object exists
-    """
-    path = str_to_path(path)
-
-    # rstrip to ".mt/" -> ".mt"
-    if any(str(path).rstrip('/').endswith(f'.{suf}') for suf in ['mt', 'ht']):
-        path = path / '_SUCCESS'
-
-    exists = path.exists()
-    if verbose and isinstance(path, CloudPath):
-        if exists:
-            logger.info(f'Checking object existence, exists: {path}')
-        else:
-            logger.info(f'Checking object existence, doesn\'t exist: {path}')
-    return exists
-
-
 def can_reuse(
-    path: list[Path | CloudPath] | Path | CloudPath | None,
+    path,
     overwrite: bool,
     silent: bool = False,
 ) -> bool:
-    """
-    Checks if `fpath` is good to reuse in the analysis: it exists
-    and `overwrite` is False.
-
-    If `fpath` is a collection, it requires all files in it to exist.
-    """
-    if overwrite:
-        return False
-
-    if not path:
-        return False
-
-    if isinstance(path, list):
-        return all(can_reuse(fp, overwrite) for fp in path)
-
-    if not exists(path):
-        return False
-
-    if not silent:
-        logger.info(f'Reusing existing {path}. Use --overwrite to overwrite')
-    return True
+    return False
 
 
 if __name__ == '__main__':

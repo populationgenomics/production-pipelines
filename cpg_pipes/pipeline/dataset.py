@@ -86,7 +86,8 @@ class Dataset(Target):
     def storage_provider(self) -> StorageProvider:
         if not self._storage_provider:
             raise ValueError(
-                'storage_provider must be set before calling Dataset.get_bucket()'
+                '_storage_provider is not set. storage_provider must be passed to the '
+                'Dataset() constructor before calling Dataset.get_bucket()'
             )
         return self._storage_provider
 

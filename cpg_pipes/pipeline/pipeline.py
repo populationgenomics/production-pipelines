@@ -276,7 +276,7 @@ class Pipeline:
                 self.cohort.add_dataset(
                     name, 
                     namespace=namespace, 
-                    storage_provider=storage_provider,
+                    storage_provider=self.storage_provider,
                 )
             self._db = SMDB(
                 self.analysis_dataset.name,
