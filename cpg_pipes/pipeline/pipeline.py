@@ -62,7 +62,7 @@ from .smdb import SMDB
 from .stage import Stage
 from ..hb.batch import setup_batch, Batch
 from ..hb.prev_job import PrevJob
-from ..storage import Namespace, StorageProvider
+from ..storage import Namespace, StorageProvider, CPGStorageProvider
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -184,7 +184,7 @@ class Pipeline:
         description: str,
         version: str | None,
         namespace: Namespace | str,
-        storage_provider: StorageProvider,
+        storage_provider: StorageProvider | None = None,
         stages_in_order: list[StageDecorator] | None = None,
         keep_scratch: bool = True,
         dry_run: bool = False,
@@ -213,17 +213,18 @@ class Pipeline:
                 'pipeline.set_stages(stages_in_order) later.'
             )
 
+        self.storage_provider = storage_provider or CPGStorageProvider()
         if isinstance(namespace, str):
             namespace = Namespace(namespace)
         self.analysis_dataset = Dataset(
             name=analysis_dataset,
             namespace=namespace,
-            storage_provider=storage_provider,
+            storage_provider=self.storage_provider,
         )
         self.name = name
         self.version = version or time.strftime('%Y%m%d-%H%M%S')
         self.namespace = namespace
-        self.storage_provider = storage_provider
+
         self.check_intermediates = check_intermediates and not dry_run
         self.check_expected_outputs = check_expected_outputs and not dry_run
         self.skip_samples_with_missing_input = skip_samples_with_missing_input

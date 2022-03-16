@@ -13,7 +13,7 @@ from cloudpathlib import CloudPath
 
 class Namespace(Enum):
     """
-    CPG storage namespace. See for more details on storage policies:
+    Storage namespace.
     https://github.com/populationgenomics/team-docs/tree/main/storage_policies#main-vs-test
     """
     MAIN = 'main'
@@ -22,7 +22,7 @@ class Namespace(Enum):
 
 class Cloud(Enum):
     """
-    Cloud storage protocol.
+    Cloud storage provider and correponding protocol prefix.
     """
     GS = 'gs'
     AZ = 'az'
@@ -34,8 +34,8 @@ class StorageProvider(ABC):
     Onty get_bucket() method is required, however other methods
     are available to override as well.
     """
-    def __init__(self, protocol: Cloud):
-        self.protocol = protocol
+    def __init__(self, cloud: Cloud):
+        self.cloud = cloud
 
     @abstractmethod
     def get_bucket(
@@ -127,32 +127,32 @@ class CPGStorageProvider(StorageProvider):
     """
     CPG storage policy implementation of the StorageProvider
     """
-    def __init__(self, prefix: Cloud):
-        super().__init__(prefix)
+    def __init__(self, cloud: Cloud = Cloud.GS):
+        super().__init__(cloud)
         self.prefix = 'cpg'
-        
+
     def get_bucket(
         self, 
         dataset: str,
         namespace: Namespace,
         suffix: str = None,
         version: str | None = None,
-        sample_name: str = None,
+        sample: str = None,
     ) -> CloudPath:
         """
         Bucket name is constructed according to the storage policy:
         https://github.com/populationgenomics/team-docs/tree/main/storage_policies
         """
         path = CloudPath(
-            f'{self.protocol.value}://'
+            f'{self.cloud.value}://'
             f'{self.prefix}-{dataset}-{namespace.value}'
         )
         if suffix:
             path = CloudPath(f'{path}-{suffix}')
         if version:
             path = path / version
-        if sample_name:
-            path = path / sample_name
+        if sample:
+            path = path / sample
         return path
 
     # noinspection PyMethodMayBeStatic
@@ -161,7 +161,7 @@ class CPGStorageProvider(StorageProvider):
         dataset: str,
         namespace: Namespace,
         version: str | None = None,
-        sample_name: str = None,
+        sample: str = None,
     ) -> str | None:
         """
         URL corrsponding to the WEB bucket.
@@ -172,6 +172,6 @@ class CPGStorageProvider(StorageProvider):
         )
         if version:
             url += f'/{version}'
-        if sample_name:
-            url += f'/{sample_name}'
+        if sample:
+            url += f'/{sample}'
         return url

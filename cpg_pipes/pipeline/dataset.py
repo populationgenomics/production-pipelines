@@ -45,9 +45,10 @@ class Dataset(Target):
         resolved to stack="seqr" and is_test=True, unless `namespace` is provided 
         explicitly.
 
-        Also note that a Pipeline is passed as a parameter. A Dataset can exist outside
-        of a Cohort, e.g. if it's an analysis dataset that exists only to track
-        joint analysis of multiple datasets, but itself doesn't contain any samples.
+        Also note that a Pipeline is passed as a parameter. A Dataset can exist 
+        outside of a cohort, e.g. if it's an analysis dataset that exists only 
+        to track joint analysis of multiple datasets, but itself doesn't contain 
+        any samples.
         """
         super().__init__()
         
