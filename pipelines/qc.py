@@ -9,6 +9,7 @@ import click
 from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 
+from cpg_pipes.hb.batch import Batch
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.images import DRIVER_IMAGE
@@ -37,7 +38,7 @@ class FastQC(SampleStage):
         Stage is expected to generate a FastQC HTML report, and a zip file for 
         parsing with MuiltiQC.
         """
-        folder = sample.dataset.get_bucket() / 'qc' / 'fastqc'
+        folder = sample.dataset.get_bucket() / 'qc'
         return {
             'html': folder / (sample.id + '_fastqc.html'),
             'zip': folder / (sample.id + '_fastqc.zip'),
@@ -91,9 +92,12 @@ class CramQC(SampleStage):
         """
         folder = sample.dataset.get_bucket() / 'qc'
         return {
-            'samtools_stats': folder / 'samtools_stats' / (sample.id + '.stats'),
-            'picard_wgs_metrics': folder / 'picard_wgs_metrics' / (sample.id + '.csv'),
-            'verify_bamid': folder / 'verify_bamid' / (sample.id + '.selfSM'),
+            'samtools_stats': 
+                folder / (sample.id + '_samtools_stats.txt'),
+            'picard_wgs_metrics': 
+                folder / (sample.id + '_picard_wgs_metrics.csv'),
+            'verify_bamid': 
+                folder / (sample.id + '_verify_bamid.selfSM'),
         }
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
@@ -167,23 +171,28 @@ class MultiQC(DatasetStage):
             str(html_path.parent), dataset.get_web_url()
         )
 
-        qc_paths = [somalier_samples, somalier_pairs, somalier_ancestry]
-        qc_endings = set()  # endings to trim to get sample names
+        paths = [somalier_samples, somalier_pairs, somalier_ancestry]
+        ending_to_trim = set()  # endings to trim to get sample names
         for sid in dataset.get_sample_ids():
-            qc_paths.append(fastqc_zip_d[sid])
-            qc_paths.append(samtools_stats_d[sid])
-            qc_paths.append(picard_wgs_metrics_d[sid])
-            qc_paths.append(verify_bamid_d[sid])
-            qc_endings.add(fastqc_zip_d[sid].name.replace(sid, ''))
-            qc_endings.add(samtools_stats_d[sid].name.replace(sid, ''))
-            qc_endings.add(picard_wgs_metrics_d[sid].name.replace(sid, ''))
-            qc_endings.add(verify_bamid_d[sid].name.replace(sid, ''))
+            paths.append(fastqc_zip_d[sid])
+            paths.append(samtools_stats_d[sid])
+            paths.append(picard_wgs_metrics_d[sid])
+            paths.append(verify_bamid_d[sid])
+            ending_to_trim.add(fastqc_zip_d[sid].name.replace(sid, ''))
+            ending_to_trim.add(samtools_stats_d[sid].name.replace(sid, ''))
+            ending_to_trim.add(picard_wgs_metrics_d[sid].name.replace(sid, ''))
+            ending_to_trim.add(verify_bamid_d[sid].name.replace(sid, ''))
+        modules_to_trim_endings = {
+            'fastqc', 'samtools', 'picard/wgs_metrics', 'verifybamid/selfsm'
+        }
 
         j = multiqc(
             self.pipe.b,
-            dataset=dataset,
-            qc_paths=qc_paths,
-            qc_endings=qc_endings,
+            dataset_name=dataset.name,
+            tmp_bucket=dataset.get_tmp_bucket(),
+            paths=paths,
+            ending_to_trim=ending_to_trim,
+            modules_to_trim_endings=modules_to_trim_endings,
             out_json_path=json_path,
             out_html_path=html_path,
             out_html_url=html_url,
@@ -193,33 +202,52 @@ class MultiQC(DatasetStage):
 
 
 def multiqc(
-    b,
-    dataset: Dataset,
-    qc_paths: list[CloudPath],
-    qc_endings: set[str],
+    b: Batch,
+    dataset_name: str,
+    tmp_bucket: CloudPath,
+    paths: list[CloudPath],
     out_html_path: CloudPath,
     out_json_path: CloudPath,
-    out_html_url: str | None,
+    out_html_url: str | None = None,
+    ending_to_trim: set[str] | None = None,
+    modules_to_trim_endings: set[str] | None = None,
 ) -> Job:
-    j = b.new_job('Run MultiQC', {'dataset': dataset.name})
+    """
+    Run MultiQC for the files in `qc_paths`
+    @param b: batch object
+    @param dataset_name: dataset name
+    @param tmp_bucket: bucket for tmp files
+    @param paths: file bucket paths to pass into MultiQC 
+    @param out_json_path: where to write MultiQC-generated JSON file
+    @param out_html_path: where to write the HTML report
+    @param out_html_url: URL corresponding to the HTML report
+    @param ending_to_trim: trim these endings from input files to get sample names
+    @param modules_to_trim_endings: list of modules for which trim the endings
+    @return: 
+    """
+    j = b.new_job('Run MultiQC', {'dataset': dataset_name})
     j.image(DRIVER_IMAGE)
 
-    file_list_path = dataset.get_tmp_bucket() / 'multiqc-file-list.txt'
+    file_list_path = tmp_bucket / 'multiqc-file-list.txt'
     with file_list_path.open('w') as f:
-        f.writelines([f'{p}\n' for p in qc_paths])
+        f.writelines([f'{p}\n' for p in paths])
     file_list = b.read_input(str(file_list_path))
 
     j.env('GOOGLE_APPLICATION_CREDENTIALS', '/gsa-key/key.json')
     j.command(f'pip install multiqc')
     STANDARD.set_resources(j, ncpu=16)
-
-    ending_list = ', '.join(f'{ending}' for ending in qc_endings)
-    mqc_conf = f'extra_fn_clean_exts: [{ending_list}]'
+    
+    endings_conf = ', '.join(list(ending_to_trim)) if ending_to_trim else ''
+    modules_conf = ', '.join(list(modules_to_trim_endings)) if modules_to_trim_endings else ''
 
     cmd = f"""\
     mkdir inputs
     cat {file_list} | gsutil -m cp -I inputs/
-    multiqc inputs -o output -f --fn_as_s_name --cl_config "{mqc_conf}"
+
+    multiqc inputs -o output -f \\
+    --cl_config "extra_fn_clean_exts: [{endings_conf}]" \\
+    --cl_config "use_filename_as_sample_name: [{modules_conf}]"
+    
     cp output/multiqc_report.html {j.html}
     cp output/multiqc_data/multiqc_data.json {j.json}
     """

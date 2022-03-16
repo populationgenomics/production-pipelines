@@ -159,9 +159,9 @@ class DifferentAlignerSetups(SampleStage):
 
         jobs = []
         for aligner in [
-            # Aligner.DRAGMAP, 
-            Aligner.BWA, 
-            Aligner.BWAMEM2
+            Aligner.DRAGMAP, 
+            Aligner.BWA,
+            # Aligner.BWAMEM2
         ]:
             for markdup in [MarkDupTool.PICARD]:
                 jobs.append(align(

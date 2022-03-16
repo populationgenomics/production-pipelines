@@ -19,11 +19,12 @@ DEFAULT_REF = 'GRCh38'
 
 # Packages to install on a dataproc cluster, to use with the dataproc wrapper.
 DATAPROC_PACKAGES = [
-    'cpg-pipes',
+    'cpg-pipes>=0.3.0',
     'cpg-gnomad',   # github.com/populationgenomics/gnomad_methods
     'seqr-loader',  # github.com/populationgenomics/hail-elasticsearch-pipelines
     'elasticsearch',
     'click',
+    'cloudpathlib[gs]',
     'google',
     'fsspec',
     'sklearn',
