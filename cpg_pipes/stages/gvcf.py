@@ -4,11 +4,13 @@ Stage that generates a GVCF file.
 
 import logging
 
+from cloudpathlib import CloudPath
+
 from cpg_pipes.jobs import split_intervals, haplotype_caller
 from cpg_pipes.pipeline.analysis import AnalysisType
-from cpg_pipes.pipeline.pipeline import stage
-from cpg_pipes.pipeline.sample import Sample
-from cpg_pipes.pipeline.stage import SampleStage, StageInput, StageOutput
+from cpg_pipes.pipeline.dataset import Sample
+from cpg_pipes.pipeline.pipeline import stage, SampleStage
+from cpg_pipes.pipeline.stage import StageInput, StageOutput
 from cpg_pipes.stages.cram import CramStage
 
 logger = logging.getLogger(__file__)
@@ -21,7 +23,7 @@ class GvcfStage(SampleStage):
     """
     hc_intervals = None
 
-    def expected_result(self, sample: Sample):
+    def expected_result(self, sample: Sample) -> CloudPath:
         """
         Generate a GVCF and corresponding TBI index
         """
@@ -31,24 +33,24 @@ class GvcfStage(SampleStage):
         """
         Use function from the jobs module
         """
-        hc_shards_num = self.pipe.config.get('hc_shards_num', 1)
+        hc_shards_num = self.pipeline_config.get('hc_shards_num', 1)
         if GvcfStage.hc_intervals is None and hc_shards_num > 1:
             GvcfStage.hc_intervals = split_intervals.get_intervals(
-                b=self.pipe.b,
+                b=self.b,
                 scatter_count=hc_shards_num,
             )
         gvcf_job = haplotype_caller.produce_gvcf(
-            b=self.pipe.b,
+            b=self.b,
             output_path=self.expected_result(sample),
             sample_name=sample.id,
             dataset_name=sample.dataset.name,
             cram_path=sample.get_cram_path(),
             intervals=GvcfStage.hc_intervals,
             number_of_intervals=hc_shards_num,
-            tmp_bucket=self.pipe.tmp_bucket,
-            overwrite=not self.pipe.check_intermediates,
+            tmp_bucket=sample.dataset.get_tmp_bucket(),
+            overwrite=not self.check_intermediates,
             depends_on=inputs.get_jobs(),
-            smdb=self.pipe.get_db(),
+            smdb=self.smdb,
         )
         return self.make_outputs(
             sample,

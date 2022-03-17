@@ -193,10 +193,10 @@ class JobResource:
         attach_disk_storage_gb: float | None = None,
     ):
         """
-        :param machine_type: Hail Batch machine pool type
-        :param ncpu: number of CPU request. Will be used to calculate the fraction of
+        @param machine_type: Hail Batch machine pool type
+        @param ncpu: number of CPU request. Will be used to calculate the fraction of
             the machine to take. If not set, all machine's CPUs will be used.
-        :param attach_disk_storage_gb: if set to > MachineType.max_default_storage_gb, 
+        @param attach_disk_storage_gb: if set to > MachineType.max_default_storage_gb, 
             a larger disc will be attached by Hail Batch. 
         """
         self.machine_type = machine_type

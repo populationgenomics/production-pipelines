@@ -4,10 +4,13 @@ Stage that runs FastQC on alignment inputs.
 
 import logging
 
+from cloudpathlib import CloudPath
+
 from cpg_pipes.jobs import fastqc
-from cpg_pipes.pipeline.pipeline import stage, PipelineError
-from cpg_pipes.pipeline.sample import Sample
-from cpg_pipes.pipeline.stage import SampleStage, StageInput, StageOutput
+from cpg_pipes.pipeline.dataset import Sample
+from cpg_pipes.pipeline.pipeline import stage, SampleStage
+from cpg_pipes.pipeline.exceptions import PipelineError
+from cpg_pipes.pipeline.stage import StageInput, StageOutput
 
 logger = logging.getLogger(__file__)
 
@@ -17,7 +20,7 @@ class FastQC(SampleStage):
     """
     Run FastQC on alignment inputs.
     """
-    def expected_result(self, sample: Sample):
+    def expected_result(self, sample: Sample) -> dict[str, CloudPath]:
         """
         Stage is expected to generate a FastQC HTML report, and a zip file for 
         parsing with MuiltiQC.
@@ -33,7 +36,7 @@ class FastQC(SampleStage):
         Using the "fastqc" function implemented in the jobs module
         """
         if not sample.alignment_input:
-            if self.pipe.skip_samples_with_missing_input:
+            if self.skip_samples_with_missing_input:
                 logger.error(f'Could not find read data, skipping sample {sample.id}')
                 sample.active = False
                 return self.make_outputs(sample)  # return empty output
@@ -43,8 +46,8 @@ class FastQC(SampleStage):
                     f'Checked: Sequence entry and type=CRAM Analysis entry'
                 )
 
-        job = fastqc.fastqc(
-            b=self.pipe.b,
+        jobs = fastqc.fastqc(
+            b=self.b,
             output_html_path=self.expected_result(sample)['html'],
             output_zip_path=self.expected_result(sample)['zip'],
             alignment_input=sample.alignment_input,
@@ -54,5 +57,5 @@ class FastQC(SampleStage):
         return self.make_outputs(
             sample, 
             data=self.expected_result(sample), 
-            jobs=[job]
+            jobs=jobs
         )

@@ -69,12 +69,12 @@ def setup_batch(
     Wrapper around the initialization of a Hail Batch object.
     Handles setting the temporary bucket and the billing project.
 
-    :param title: descriptive name of the Batch (will be displayed in the GUI)
-    :param billing_project: Hail billing project name
-    :param tmp_bucket: path to temporary bucket. Will be used if neither 
+    @param title: descriptive name of the Batch (will be displayed in the GUI)
+    @param billing_project: Hail billing project name
+    @param tmp_bucket: path to temporary bucket. Will be used if neither 
         the hail_bucket parameter nor HAIL_BUCKET env var are set.
-    :param keep_scratch: whether scratch will be kept after the batch is finished
-    :param hail_bucket: bucket for Hail Batch intermediate files.
+    @param keep_scratch: whether scratch will be kept after the batch is finished
+    @param hail_bucket: bucket for Hail Batch intermediate files.
     """
     if not hail_bucket:
         hail_bucket = get_hail_bucket(tmp_bucket, keep_scratch)

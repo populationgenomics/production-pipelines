@@ -5,9 +5,9 @@ Stages that perform alignment QC on CRAM files.
 import logging
 
 from cpg_pipes.jobs.cram_qc import samtools_stats, verify_bamid, picard_wgs_metrics
-from cpg_pipes.pipeline.pipeline import stage
-from cpg_pipes.pipeline.sample import Sample
-from cpg_pipes.pipeline.stage import SampleStage, StageInput, StageOutput
+from cpg_pipes.pipeline.dataset import Sample
+from cpg_pipes.pipeline.pipeline import stage, SampleStage
+from cpg_pipes.pipeline.stage import StageInput, StageOutput
 
 logger = logging.getLogger(__file__)
 
@@ -26,10 +26,13 @@ class SamtoolsStats(SampleStage):
         return sample.dataset.get_bucket() / 'qc' / (sample.id + '_samtools_stats.txt')
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+        """
+        Call a function from the `jobs` module.
+        """
         cram_path = sample.get_cram_path()
-
+        
         j = samtools_stats(
-            b=self.pipe.b,
+            b=self.b,
             cram_path=cram_path,
             output_path=self.expected_result(sample),
             sample_name=sample.id,
@@ -54,10 +57,13 @@ class PicardWgsMetrics(SampleStage):
         )
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+        """
+        Call a function from the `jobs` module.
+        """
         cram_path = sample.get_cram_path()
 
         j = picard_wgs_metrics(
-            b=self.pipe.b,
+            b=self.b,
             cram_path=cram_path,
             output_path=self.expected_result(sample),
             sample_name=sample.id,
@@ -82,10 +88,13 @@ class VerifyBamId(SampleStage):
         )
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+        """
+        Call a function from the `jobs` module.
+        """
         cram_path = sample.get_cram_path()
 
         j = verify_bamid(
-            b=self.pipe.b,
+            b=self.b,
             cram_path=cram_path,
             output_path=self.expected_result(sample),
             sample_name=sample.id,

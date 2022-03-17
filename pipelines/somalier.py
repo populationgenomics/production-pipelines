@@ -19,10 +19,12 @@ logger = logging.getLogger(__file__)
 
 @click.command()
 @pipeline_click_options
-@click_config_file.configuration_option()
 def main(
     **kwargs,
-):  # pylint: disable=missing-function-docstring
+):
+    """
+    Entry point, decorated by pipeline click options.
+    """
     pipeline = Pipeline(
         name='pedigree_check',
         description='Pedigree checks',

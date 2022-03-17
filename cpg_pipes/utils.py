@@ -49,9 +49,9 @@ def get_validation_callback(
 ) -> Callable:
     """
     Get callback for Click parameters validation
-    :param ext: check that the path has the expected extension
-    :param must_exist: check that the input file/object/directory exists
-    :param accompanying_metadata_suffix: checks that a file at the same location but
+    @param ext: check that the path has the expected extension
+    @param must_exist: check that the input file/object/directory exists
+    @param accompanying_metadata_suffix: checks that a file at the same location but
     with a different suffix also exists (e.g. genomes.mt and genomes.metadata.ht)
     :return: a callback suitable for Click parameter initialization
     """
@@ -117,7 +117,7 @@ def safe_mkdir(dirpath: Path, descriptive_name: str = '') -> Path:
 def hash_sample_ids(sample_names: list[str]) -> str:
     """
     Return a unique hash string from a set of strings
-    :param sample_names: set of strings
+    @param sample_names: set of strings
     :return: a string hash
     """
     for sn in sample_names:

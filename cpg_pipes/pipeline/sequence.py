@@ -60,7 +60,7 @@ class SmSequence:
         """
         Parse a AlignmentInput object from the meta dictionary.
 
-        :param check_existence: check if fastq/crams exist on buckets. 
+        @param check_existence: check if fastq/crams exist on buckets. 
         Default value is pulled from self.smdb and can be overwridden.
         """
         reads_data = meta.get('reads')

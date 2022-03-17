@@ -7,13 +7,14 @@ Batch pipeline to run WGS QC.
 import logging
 
 import click
+from cloudpathlib import CloudPath
 
 from cpg_pipes.buckets import exists
 from cpg_pipes.jobs.multiqc import multiqc
 from cpg_pipes.pipeline.cli_opts import pipeline_click_options
 from cpg_pipes.pipeline.dataset import Dataset
-from cpg_pipes.pipeline.pipeline import stage, Pipeline
-from cpg_pipes.pipeline.stage import StageInput, StageOutput, DatasetStage
+from cpg_pipes.pipeline.pipeline import stage, Pipeline, DatasetStage
+from cpg_pipes.pipeline.stage import StageInput, StageOutput
 from cpg_pipes.stages.cramqc import SamtoolsStats, PicardWgsMetrics, VerifyBamId
 from cpg_pipes.stages.fastqc import FastQC
 from pipelines.somalier import CramSomalierPedigree, CramSomalierAncestry
@@ -36,22 +37,30 @@ class MultiQC(DatasetStage):
     """
     Run MultiQC to summarise all QC.
     """
-    def expected_result(self, dataset: Dataset):
+    def expected_result(self, dataset: Dataset) -> dict[str, CloudPath]:
+        """
+        Expected to produce an HTML and a correponding JSON file.
+        """
         return {
             'html': dataset.get_web_bucket() / 'qc' / 'multiqc.html',
             'json': dataset.get_analysis_bucket() / 'qc' / 'multiqc_data.json'
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        """
+        Call a function from the `jobs` module using inputs from `cramqc` 
+        and `somalier` stages.
+        """
         somalier_samples = inputs.as_path(dataset, CramSomalierPedigree, id='samples')
         somalier_pairs = inputs.as_path(dataset, CramSomalierPedigree, id='pairs')
         somalier_ancestry = inputs.as_path(dataset, CramSomalierAncestry, id='tsv')
 
         json_path = self.expected_result(dataset)['json']
         html_path = self.expected_result(dataset)['html']
-        html_url = str(html_path).replace(
-            str(dataset.get_web_bucket()), dataset.get_web_url()
-        )
+        if base_url := dataset.get_web_url():
+            html_url = str(html_path).replace(str(dataset.get_web_bucket()), base_url)
+        else:
+            html_url = None
 
         paths = [somalier_samples, somalier_pairs, somalier_ancestry]
         ending_to_trim = set()  # endings to trim to get sample names
@@ -70,7 +79,7 @@ class MultiQC(DatasetStage):
         }
 
         j = multiqc(
-            self.pipe.b,
+            self.b,
             dataset_name=dataset.name,
             tmp_bucket=dataset.get_tmp_bucket(),
             paths=paths,
@@ -88,8 +97,10 @@ class MultiQC(DatasetStage):
 @pipeline_click_options
 def main(
     **kwargs,
-):  # pylint: disable=missing-function-docstring
-
+):
+    """
+    Entry point, decorated by pipeline click options.
+    """
     pipeline = Pipeline(
         name='cram_qc',
         description='CRAM QC',

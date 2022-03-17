@@ -71,14 +71,14 @@ def wrap_command(
     If output_bucket_path_to_check is defined, checks if this file(s) exists,
     and if it does, skips running the rest of the job.
 
-    :param command: command to wrap (can be a list of commands)
-    :param monitor_space: add a background process that checks the instance disk 
+    @param command: command to wrap (can be a list of commands)
+    @param monitor_space: add a background process that checks the instance disk 
         space every 5 minutes and prints it to the screen
-    :param setup_gcp: login to GCP
-    :param define_retry_function: when set, adds bash functions `retry` that attempts 
+    @param setup_gcp: login to GCP
+    @param define_retry_function: when set, adds bash functions `retry` that attempts 
         to redo a command with a pause of default 30 seconds (useful to pull inputs 
         and get around GoogleEgressBandwidth Quota or other google quotas)
-    :param dedent: remove all common leading intendation from the command
+    @param dedent: remove all common leading intendation from the command
     """
     if isinstance(command, list):
         command = '\n'.join(command)

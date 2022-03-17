@@ -18,7 +18,7 @@ from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.pipeline.analysis import GvcfPath, AnalysisType
-from cpg_pipes.pipeline.sample import Sample
+from cpg_pipes.pipeline.dataset import Sample
 from cpg_pipes.pipeline.smdb import SMDB
 from cpg_pipes.ref_data import REF_D
 

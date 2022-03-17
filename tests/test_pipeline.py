@@ -53,13 +53,12 @@ class TestPipeline(unittest.TestCase):
             name=self._testMethodName,
             description=self._testMethodName,
             analysis_dataset=DATASET,
-            output_version='v0',
             namespace='test',
             check_smdb_seq=False,
             config=dict(output_datasets=[DATASET]),
             dry_run=True,
         )
-        ds = pipeline.cohort.add_dataset(DATASET)
+        ds = pipeline.add_dataset(DATASET)
         for s_id in self.sample_ids:
             s = ds.add_sample(s_id, s_id)
             s.alignment_input = benchmark.tiny_fq

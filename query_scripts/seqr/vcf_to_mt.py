@@ -368,8 +368,8 @@ def get_sample_type_stats(mt, threshold=0.3):
     Calculate stats for sample type by checking against a list of common coding and non-coding variants.
     If the match for each respective type is over the threshold, we return a match.
 
-    :param mt: Matrix Table to check
-    :param threshold: if the matched percentage is over this threshold, we classify as match
+    @param mt: Matrix Table to check
+    @param threshold: if the matched percentage is over this threshold, we classify as match
     :return: a dict of coding/non-coding to dict with 'matched_count', 'total_count' and 'match' boolean.
     """
     stats = {}
@@ -402,8 +402,8 @@ def validate_mt(mt, sample_type):
     Validate the mt by checking against a list of common coding and non-coding variants given its
     genome version. This validates genome_version, variants, and the reported sample type.
 
-    :param mt: mt to validate
-    :param sample_type: WGS or WES
+    @param mt: mt to validate
+    @param sample_type: WGS or WES
     :return: True or Exception
     """
     sample_type_stats = get_sample_type_stats(mt)
@@ -448,7 +448,7 @@ def validate_mt(mt, sample_type):
 
 def add_37_coordinates(mt):
     """Annotates the GRCh38 MT with 37 coordinates using hail's built-in liftover
-    :param mt: MatrixTable from VCF
+    @param mt: MatrixTable from VCF
     :return: MatrixTable annotated with GRCh37 coordinates
     """
     rg37 = hl.get_reference('GRCh37')

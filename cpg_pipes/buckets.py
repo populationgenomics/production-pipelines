@@ -34,8 +34,8 @@ def exists(path: str | Path | CloudPath, verbose: bool = True) -> bool:
         * Google Storage URL representing a *.mt or *.ht Hail data,
           in which case it will check for the existence of a
           *.mt/_SUCCESS or *.ht/_SUCCESS file.
-    :param path: path to the file/directory/object/mt/ht
-    :param verbose: for cloud objects, log every existence check
+    @param path: path to the file/directory/object/mt/ht
+    @param verbose: for cloud objects, log every existence check
     :return: True if the object exists
     """
     path = str_to_path(path)
@@ -91,9 +91,9 @@ def gsutil_cp(
     """
     Wrapper around `gsutil cp`
 
-    :param src_path: path to a file to copy from
-    :param dst_path: path to copy to
-    :param disable_check_hashes:
+    @param src_path: path to a file to copy from
+    @param dst_path: path to copy to
+    @param disable_check_hashes:
         Uses the gsutil option `-o GSUtil:check_hashes=never` which is required to
         get around the gsutil integrity checking error, as conda gsutil doesn't use
         CRC32c:
@@ -103,8 +103,8 @@ def gsutil_cp(
 
           To download regardless of crcmod performance or to skip slow integrity
           checks, see the "check_hashes" option in your boto config file.
-    :param recursive: to copy a directory
-    :param quiet: disable logging of commands and copied files
+    @param recursive: to copy a directory
+    @param quiet: disable logging of commands and copied files
     :returns: dst_path
     """
     cmd = (

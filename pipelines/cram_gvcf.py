@@ -20,8 +20,10 @@ logger = logging.getLogger(__file__)
 @pipeline_click_options
 def main(
     **kwargs,
-):  # pylint: disable=missing-function-docstring
-
+):
+    """
+    Entry point, decorated by pipeline click options.
+    """
     pipeline = Pipeline(
         name='cram_gvcf',
         description='CRAM+GVCF',

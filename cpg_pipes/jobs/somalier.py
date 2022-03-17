@@ -13,8 +13,7 @@ from cpg_pipes import buckets, images, ref_data, utils
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.pipeline.analysis import CramPath, GvcfPath
-from cpg_pipes.pipeline.dataset import Dataset
-from cpg_pipes.pipeline.sample import Sample
+from cpg_pipes.pipeline.dataset import Dataset, Sample
 
 logger = logging.getLogger(__file__)
 

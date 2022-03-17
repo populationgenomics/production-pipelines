@@ -49,18 +49,17 @@ import logging
 import shutil
 import tempfile
 import time
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional, cast, Union, Any, Callable, Type
 
 from cloudpathlib import CloudPath
 
 from .analysis import AnalysisType
-from .cohort import Cohort
-from .dataset import Dataset
+from .dataset import Dataset, Cohort, Sample, Pair
 from .exceptions import PipelineError
-from .sample import Sample
 from .smdb import SMDB
-from .stage import Stage
+from .stage import Stage, ExpectedResultT, StageInput, StageOutput
 from ..hb.batch import setup_batch, Batch
 from ..hb.prev_job import PrevJob
 from ..storage import Namespace, StorageProvider, CPGStorageProvider
@@ -103,13 +102,20 @@ def stage(
         def wrapper_stage(pipeline: 'Pipeline') -> Stage:
             return cls(
                 name=cls.__name__,
-                pipeline=pipeline,
+                batch=pipeline.b,
+                dry_run=pipeline.dry_run,
                 required_stages=required_stages,
                 sm_analysis_type=sm_analysis_type,
                 skipped=skipped,
                 required=required,
                 assume_results_exist=assume_results_exist, 
                 forced=forced,
+                validate_smdb_analyses=pipeline.validate_smdb_analyses,
+                skip_samples_with_missing_input=pipeline.skip_samples_with_missing_input,
+                check_expected_outputs=pipeline.check_expected_outputs,
+                check_intermediates=pipeline.check_intermediates,
+                smdb=pipeline.get_db(),
+                pipeline_config=pipeline.config,
             )
         # We record each initialised Stage subclass, so we know the default stage
         # list for the case when the user doesn't pass them explicitly with set_stages()
@@ -206,17 +212,20 @@ class Pipeline:
                 'pipeline.set_stages(stages_in_order) later.'
             )
 
-        self.storage_provider = storage_provider or CPGStorageProvider()
-        if isinstance(namespace, str):
-            namespace = Namespace(namespace)
-        self.analysis_dataset = Dataset(
-            name=analysis_dataset,
-            namespace=namespace,
-            storage_provider=self.storage_provider,
-        )
         self.name = name
         self.version = version or time.strftime('%Y%m%d-%H%M%S')
+        if isinstance(namespace, str):
+            namespace = Namespace(namespace)
         self.namespace = namespace
+        storage_provider = storage_provider or CPGStorageProvider()
+        self.storage_provider = storage_provider
+
+        self.cohort = Cohort(
+            self.name,
+            analysis_dataset_name=analysis_dataset,
+            namespace=namespace,
+            storage_provider=storage_provider
+        )
 
         self.check_intermediates = check_intermediates and not dry_run
         self.check_expected_outputs = check_expected_outputs and not dry_run
@@ -226,7 +235,7 @@ class Pipeline:
         self.validate_smdb_analyses = validate_smdb_analyses
 
         self.tmp_bucket = CloudPath(
-            self.analysis_dataset.get_tmp_bucket(
+            self.cohort.analysis_dataset.get_tmp_bucket(
                 version=f'{self.name}/{self.version}'
             )
         )
@@ -259,20 +268,18 @@ class Pipeline:
             description=description, 
             tmp_bucket=self.tmp_bucket,
             keep_scratch=self.keep_scratch,
-            billing_project=self.analysis_dataset.stack,
+            billing_project=self.cohort.analysis_dataset.stack,
         )
 
-        self.cohort = Cohort(self.name)
         self._db = None
         if input_datasets:
             for name in input_datasets:
                 self.cohort.add_dataset(
                     name, 
                     namespace=namespace, 
-                    storage_provider=self.storage_provider,
                 )
             self._db = SMDB(
-                self.analysis_dataset.name,
+                self.cohort.analysis_dataset.name,
                 do_update_analyses=update_smdb_analyses,
                 do_check_seq_existence=check_smdb_seq,
             )
@@ -434,15 +441,6 @@ class Pipeline:
                     logger.info(f'Last stage is {stage_.name}, stopping here')
                     break
 
-    def db_process_existing_analysis(self, *args, **kwargs) -> CloudPath | None:
-        """
-        Thin wrapper around SMDB.process_existing_analysis
-        """
-        if self._db is None:
-            raise PipelineError('SMDB is not initialised')
-        
-        return self._db.process_existing_analysis(*args, **kwargs)
-
     @property
     def db(self) -> SMDB:
         """
@@ -481,3 +479,134 @@ class Pipeline:
         Thin wrapper around corresponding Cohort method.
         """
         return self.cohort.get_all_sample_ids(only_active=only_active)
+
+
+class SampleStage(Stage[Sample], ABC):
+    """
+    Sample-level stage.
+    """
+
+    @abstractmethod
+    def expected_result(self, sample: Sample) -> ExpectedResultT:
+        """
+        CloudPath(s) to files that the stage is epxected to generate for the `target`.
+        Used within the stage to pass the output paths to commands, as well as
+        by the pipeline to get expected paths when the stage is skipped and
+        didn't return a `StageDeps` object from `add_jobs()`.
+        """
+
+    @abstractmethod
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+        pass
+
+    def add_to_the_pipeline(self, pipeline: Pipeline) -> dict[str, StageOutput]:
+        output_by_target = dict()
+        datasets = pipeline.cohort.get_datasets()
+        if not datasets:
+            raise ValueError('No active datasets are found to run')
+        for ds_i, ds in enumerate(datasets):
+            logger.info(f'{self.name}: #{ds_i} {ds}')
+            if not ds.get_samples():
+                raise ValueError(
+                    f'No active samples are found to run in the dataset {ds.name}')
+            for sample_i, sample in enumerate(ds.get_samples()):
+                logger.info(f'{self.name}: #{sample_i}/{sample}')
+                sample_result = self._queue_jobs_with_checks(sample)
+                output_by_target[sample.target_id] = sample_result
+                logger.info('------')
+            logger.info('-#-#-#-')
+        return output_by_target
+
+
+class PairStage(Stage, ABC):
+    """
+    Stage on a pair os samples
+    """
+
+    @abstractmethod
+    def expected_result(self, pair: Pair) -> ExpectedResultT:
+        """
+        CloudPath(s) to files that the stage is epxected to generate for the `target`.
+        Used within the stage to pass the output paths to commands, as well as
+        by the pipeline to get expected paths when the stage is skipped and
+        didn't return a `StageDeps` object from `add_jobs()`.
+        """
+
+    @abstractmethod
+    def queue_jobs(self, pair: Pair, inputs: StageInput) -> StageOutput:
+        pass
+
+    def add_to_the_pipeline(self, pipeline: Pipeline) -> dict[str, StageOutput]:
+        output_by_target = dict()
+        datasets = pipeline.cohort.get_datasets()
+        if datasets:
+            raise ValueError('No active datasets are found to run')
+        for ds in datasets:
+            if not ds.get_samples():
+                raise ValueError(
+                    f'No active samples are found to run in the dataset {ds.name}'
+                )
+            for s1 in ds.get_samples():
+                for s2 in ds.get_samples():
+                    if s1 == s2:
+                        continue
+                    pair = Pair(s1, s2)
+                    output_by_target[pair.target_id] = \
+                        self._queue_jobs_with_checks(pair)
+        return output_by_target
+
+
+class DatasetStage(Stage, ABC):
+    """
+    Dataset-level stage
+    """
+
+    @abstractmethod
+    def expected_result(self, dataset: Dataset) -> ExpectedResultT:
+        """
+        CloudPath(s) to files that the stage is epxected to generate for the `target`.
+        Used within the stage to pass the output paths to commands, as well as
+        by the pipeline to get expected paths when the stage is skipped and
+        didn't return a `StageDeps` object from `add_jobs()`.
+        """
+
+    @abstractmethod
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        pass
+
+    def add_to_the_pipeline(self, pipeline: Pipeline) -> dict[str, StageOutput]:
+        output_by_target = dict()
+        datasets = pipeline.cohort.get_datasets()
+        if not datasets:
+            raise ValueError('No active datasets are found to run')
+        for ds_i, ds in enumerate(datasets):
+            logger.info(f'{self.name}: #{ds_i}/{ds.name} {ds}')
+            output_by_target[ds.target_id] = \
+                self._queue_jobs_with_checks(ds)
+            logger.info('-#-#-#-')
+        return output_by_target
+
+
+class CohortStage(Stage, ABC):
+    """
+    Entire cohort level stage
+    """
+
+    @abstractmethod
+    def expected_result(self, cohort: Cohort) -> ExpectedResultT:
+        """
+        CloudPath(s) to files that the stage is epxected to generate for the `target`.
+        Used within the stage to pass the output paths to commands, as well as
+        by the pipeline to get expected paths when the stage is skipped and
+        didn't return a `StageDeps` object from `add_jobs()`.
+        """
+
+    @abstractmethod
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        pass
+
+    def add_to_the_pipeline(self, pipeline: Pipeline) -> dict[str, StageOutput]:
+        return {
+            pipeline.cohort.target_id:
+                self._queue_jobs_with_checks(pipeline.cohort)
+        }

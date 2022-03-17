@@ -5,6 +5,7 @@ Batch pipeline to load data into seqr.
 """
 
 import logging
+import time
 from pathlib import Path
 
 import click
@@ -14,11 +15,10 @@ from cloudpathlib import CloudPath
 
 from cpg_pipes import buckets, ref_data, utils
 from cpg_pipes.pipeline.cli_opts import pipeline_click_options
-from cpg_pipes.pipeline.cohort import Cohort
+from cpg_pipes.pipeline.dataset import Cohort
 from cpg_pipes.pipeline.dataset import Dataset
-from cpg_pipes.pipeline.pipeline import stage, Pipeline
-from cpg_pipes.pipeline.stage import CohortStage, DatasetStage, \
-    StageInput, StageOutput
+from cpg_pipes.pipeline.pipeline import stage, Pipeline, CohortStage, DatasetStage
+from cpg_pipes.pipeline.stage import StageInput, StageOutput
 from cpg_pipes.stages.joint_genotyping import JointGenotypingStage
 from cpg_pipes.stages.vqsr import VqsrStage
 from cpg_pipes.storage import Namespace
@@ -26,11 +26,11 @@ from cpg_pipes.storage import Namespace
 logger = logging.getLogger(__file__)
 
 
-def get_anno_tmp_bucket(pipe: Pipeline) -> CloudPath:
+def get_anno_tmp_bucket(cohort: Cohort) -> CloudPath:
     """
     Path to write Hail Query intermediate files
     """
-    return pipe.tmp_bucket / 'mt'
+    return cohort.analysis_dataset.get_tmp_bucket() / 'mt'
 
 
 @stage(required_stages=[JointGenotypingStage, VqsrStage])
@@ -38,24 +38,24 @@ class AnnotateCohortStage(CohortStage):
     """
     Re-annotate the entire cohort, including datasets that are not going to be loaded 
     """
-    def expected_result(self, cohort: Cohort):
+    def expected_result(self, cohort: Cohort) -> CloudPath:
         """
-        Expected to write a matrix table
+        Expected to write a matrix table.
         """
-        return get_anno_tmp_bucket(self.pipe) / 'combined.mt'
+        return get_anno_tmp_bucket(cohort) / 'combined.mt'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        checkpoints_bucket = get_anno_tmp_bucket(self.pipe) / 'checkpoints'
+        checkpoints_bucket = get_anno_tmp_bucket(cohort) / 'checkpoints'
 
         vcf_path = inputs.as_path(target=cohort, stage=JointGenotypingStage, id='vcf')
         annotated_siteonly_vcf_path = inputs.as_path(target=cohort, stage=VqsrStage)
 
         expected_path = self.expected_result(cohort)
         j = dataproc.hail_dataproc_job(
-            self.pipe.b,
+            self.b,
             f'{utils.QUERY_SCRIPTS_DIR}/seqr/vcf_to_mt.py '
             f'--vcf-path {vcf_path} '
             f'--site-only-vqsr-vcf-path {annotated_siteonly_vcf_path} '
@@ -63,7 +63,7 @@ class AnnotateCohortStage(CohortStage):
             f'--bucket {checkpoints_bucket} '
             f'--disable-validation '
             f'--make-checkpoints '
-            + ('--overwrite ' if not self.pipe.check_intermediates else ''),
+            + ('--overwrite ' if not self.check_intermediates else ''),
             max_age='16h',
             packages=utils.DATAPROC_PACKAGES,
             job_name='Make MT and annotate cohort',
@@ -87,18 +87,18 @@ class AnnotateDatasetStage(DatasetStage):
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
     that will be loaded into Seqr)
     """
-    def expected_result(self, dataset: Dataset):
+    def expected_result(self, dataset: Dataset) -> CloudPath:
         """
         Expected to generate a matrix table
         """
-        return self.pipe.analysis_dataset.get_analysis_bucket() / 'mt' / f'{dataset.name}.mt'
+        return dataset.get_analysis_bucket() / 'mt' / f'{dataset.name}.mt'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
         annotated_mt_path = inputs.as_path(
-            target=self.pipe.cohort, 
+            target=dataset.cohort, 
             stage=AnnotateCohortStage
         )
 
@@ -111,7 +111,7 @@ class AnnotateDatasetStage(DatasetStage):
 
         expected_path = self.expected_result(dataset)    
         j = dataproc.hail_dataproc_job(
-            self.pipe.b,
+            self.b,
             f'{utils.QUERY_SCRIPTS_DIR}/seqr/subset_mt.py '
             f'--mt-path {annotated_mt_path} '
             f'--out-mt-path {expected_path} '
@@ -131,7 +131,7 @@ class LoadToEsStage(DatasetStage):
     """
     Create a Seqr index.
     """
-    def expected_result(self, dataset: Dataset):
+    def expected_result(self, dataset: Dataset) -> None:
         """
         Expected to generate a Seqr index, which is not a file
         """
@@ -142,14 +142,15 @@ class LoadToEsStage(DatasetStage):
         Uses analysis-runner's dataproc helper to run a hail query script
         """
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetStage)
+        version = time.strftime('%Y%m%d-%H%M%S')
 
         j = dataproc.hail_dataproc_job(
-            self.pipe.b,
+            self.b,
             f'{utils.QUERY_SCRIPTS_DIR}/seqr/mt_to_es.py '
             f'--mt-path {dataset_mt_path} '
-            f'--es-index {dataset.name}-{self.pipe.version} '
+            f'--es-index {dataset.name}-{version} '
             f'--es-index-min-num-shards 1 '
-            f'{"--prod" if self.pipe.namespace == Namespace.MAIN else ""}',
+            f'{"--prod" if dataset.namespace == Namespace.MAIN else ""}',
             max_age='16h',
             packages=utils.DATAPROC_PACKAGES,
             num_secondary_workers=2,
@@ -165,11 +166,11 @@ class ToVcfStage(DatasetStage):
     """
     Convers the annotated matrix table to a pVCF
     """
-    def expected_result(self, dataset: Dataset):
+    def expected_result(self, dataset: Dataset) -> CloudPath:
         """
         Generates an indexed VCF
         """
-        return self.pipe.analysis_dataset.get_analysis_bucket() / 'vcf' / f'{dataset.name}.vcf.bgz'
+        return dataset.get_analysis_bucket() / 'vcf' / f'{dataset.name}.vcf.bgz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
@@ -178,7 +179,7 @@ class ToVcfStage(DatasetStage):
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetStage)
 
         j = dataproc.hail_dataproc_job(
-            self.pipe.b,
+            self.b,
             f'{utils.QUERY_SCRIPTS_DIR}/seqr/mt_to_vcf.py '
             f'--mt-path {dataset_mt_path} '
             f'--out-vcf-path {self.expected_result(dataset)}',
@@ -268,9 +269,12 @@ def main(
     use_as_vqsr: bool,
     ped_checks: bool,
     **kwargs,
-):  # pylint: disable=missing-function-docstring
+):
+    """
+    Entry point, decorated by pipeline click options.
+    """
     make_seqr_metadata = kwargs.pop('make_seqr_metadata')
-    
+
     pipeline = Pipeline(
         name='seqr_loader',
         description='Seqr loader',
@@ -288,7 +292,7 @@ def main(
         for dataset in pipeline.cohort.get_datasets():
             _make_seqr_metadata_files(
                 dataset=dataset,
-                bucket=pipeline.analysis_dataset.get_analysis_bucket(
+                bucket=pipeline.cohort.analysis_dataset.get_analysis_bucket(
                     version=pipeline.version,
                 ),
                 local_dir=pipeline.local_dir,

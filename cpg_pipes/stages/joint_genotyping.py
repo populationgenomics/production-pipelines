@@ -10,9 +10,9 @@ from cpg_pipes import utils
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.pipeline.analysis import GvcfPath
-from cpg_pipes.pipeline.cohort import Cohort
-from cpg_pipes.pipeline.pipeline import stage, PipelineError
-from cpg_pipes.pipeline.stage import CohortStage, StageInput, StageOutput
+from cpg_pipes.pipeline.dataset import Cohort
+from cpg_pipes.pipeline.pipeline import PipelineError, stage, CohortStage
+from cpg_pipes.pipeline.stage import StageInput, StageOutput
 from cpg_pipes.stages.gvcf import GvcfStage
 
 logger = logging.getLogger(__file__)
@@ -23,14 +23,16 @@ class JointGenotypingStage(CohortStage):
     """
     Joint-calling of GVCFs together.
     """
-    def expected_result(self, cohort: Cohort):
+    def expected_result(self, cohort: Cohort) -> dict[str, CloudPath]:
         """
         Generate a pVCF and a site-only VCF. Returns 2 outputs, thus not checking
         the SMDB, because the Analysis entry supports only single output.
         """
         samples_hash = utils.hash_sample_ids(cohort.get_all_sample_ids())
         expected_jc_vcf_path = (
-            self.pipe.tmp_bucket / 'joint_calling' / f'{samples_hash}.vcf.gz'
+            cohort.analysis_dataset.get_tmp_bucket() / 
+            'joint_calling' / 
+            f'{samples_hash}.vcf.gz'
         )
         return {
             'vcf': expected_jc_vcf_path,
@@ -61,20 +63,20 @@ class JointGenotypingStage(CohortStage):
             )
 
         jc_job = make_joint_genotyping_jobs(
-            b=self.pipe.b,
+            b=self.b,
             out_vcf_path=self.expected_result(cohort)['vcf'],
             out_siteonly_vcf_path=self.expected_result(cohort)['siteonly'],
             samples=cohort.get_all_samples(),
-            genomicsdb_bucket=self.pipe.analysis_bucket / 'genomicsdbs',
-            tmp_bucket=self.pipe.tmp_bucket,
+            genomicsdb_bucket=cohort.analysis_dataset.get_bucket() / 'genomicsdbs',
+            tmp_bucket=cohort.analysis_dataset.get_tmp_bucket(),
             gvcf_by_sid=gvcf_by_sid,
-            overwrite=not self.pipe.check_intermediates,
+            overwrite=not self.check_intermediates,
             depends_on=inputs.get_jobs(),
-            smdb=self.pipe.get_db(),
+            smdb=self.smdb,
             tool=JointGenotyperTool.GnarlyGenotyper 
-            if self.pipe.config.get('use_gnarly', False) 
+            if self.pipeline_config.get('use_gnarly', False) 
             else JointGenotyperTool.GenotypeGVCFs,
-            dry_run=self.pipe.dry_run,
+            dry_run=self.dry_run,
         )
         return self.make_outputs(
             cohort, 

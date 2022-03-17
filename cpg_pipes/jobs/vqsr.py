@@ -98,22 +98,22 @@ def make_vqsr_jobs(
     """
     Add jobs that perform the allele-specific VQSR variant QC
 
-    :param b: Batch object to add jobs to
-    :param input_vcf_or_mt_path: path to a multi-sample VCF or matrix table
-    :param meta_ht_path: if input_vcf_or_mt_path is a matrix table, this table will 
+    @param b: Batch object to add jobs to
+    @param input_vcf_or_mt_path: path to a multi-sample VCF or matrix table
+    @param meta_ht_path: if input_vcf_or_mt_path is a matrix table, this table will 
            be used as a source of annotations for that matrix table, i.e. 
            to filter out samples flagged as meta.related
-    :param hard_filter_ht_path: if input_vcf_or_mt_path is a matrix table, this table 
+    @param hard_filter_ht_path: if input_vcf_or_mt_path is a matrix table, this table 
            will be used as a list of samples to hard filter out
-    :param work_bucket: bucket for intermediate files
-    :param depends_on: job that the created jobs should only run after
-    :param gvcf_count: number of input samples. Can't read from combined_mt_path as it
+    @param work_bucket: bucket for intermediate files
+    @param depends_on: job that the created jobs should only run after
+    @param gvcf_count: number of input samples. Can't read from combined_mt_path as it
            might not be yet genereated the point of Batch job submission
-    :param scatter_count: number of interavals
-    :param output_vcf_path: path to write final recalibrated VCF to
-    :param use_as_annotations: use allele-specific annotation for VQSR
-    :param overwrite: whether to not reuse intermediate files
-    :param convert_vcf_to_site_only: assuming input_vcf_or_mt_path is a VCF,
+    @param scatter_count: number of interavals
+    @param output_vcf_path: path to write final recalibrated VCF to
+    @param use_as_annotations: use allele-specific annotation for VQSR
+    @param overwrite: whether to not reuse intermediate files
+    @param convert_vcf_to_site_only: assuming input_vcf_or_mt_path is a VCF,
            convert it to site-only. Otherwise, assuming it's already site-only 
     :return: a final Job, and a path to the VCF with VQSR annotations
     """

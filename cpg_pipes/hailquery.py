@@ -51,8 +51,8 @@ ANCESTRY_SITES = f'{ANCESTRY_BUCKET}/pca_sites.ht'
 def init_hail(name: str, local_tmp_dir: Path = None):
     """
     Initialise Hail, and set up a local directory for logs.
-    :param name: name to prefix the log file
-    :param local_tmp_dir: local directory to write Hail logs
+    @param name: name to prefix the log file
+    @param local_tmp_dir: local directory to write Hail logs
     :return:
     """
     if not local_tmp_dir:
@@ -76,11 +76,11 @@ def filter_low_conf_regions(
     """
     Filter low-confidence regions.
 
-    :param mt: MatrixTable or Table to filter
-    :param filter_lcr: Whether to filter LCR regions
-    :param filter_segdup: Whether to filter Segdup regions
-    :param filter_telomeres_and_centromeres: Whether to filter telomeres and centromeres
-    :param high_conf_regions: Paths to set of high confidence regions to restrict to (union of regions)
+    @param mt: MatrixTable or Table to filter
+    @param filter_lcr: Whether to filter LCR regions
+    @param filter_segdup: Whether to filter Segdup regions
+    @param filter_telomeres_and_centromeres: Whether to filter telomeres and centromeres
+    @param high_conf_regions: Paths to set of high confidence regions to restrict to (union of regions)
     :return: MatrixTable or Table with low confidence regions removed
     """
     criteria = []

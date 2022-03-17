@@ -15,9 +15,9 @@ def pipeline_click_options(function: Callable) -> Callable:
     For example:
 
     @click.command()
-    @pipeline_click_options
     @click.argument('--custom-argument')
-    def main():
+    @pipeline_click_options
+    def main(custom_argument: str):
         pass
     """
     options = [
@@ -163,11 +163,11 @@ def pipeline_click_options(function: Callable) -> Callable:
             'local_dir',
         ),
     ]
-    # click shows options in a reverse order, so inverting the list back:
+    # Click shows options in a reverse order, so inverting the list back:
     for opt in options[::-1]:
         function = opt(function)
     
-    # add ability to load options from a yaml file
+    # Add ability to load options from a yaml file
     # using https://pypi.org/project/click-config-file/
     def yaml_provider(fp, _):
         """Load options from YAML"""

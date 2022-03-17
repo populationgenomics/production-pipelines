@@ -6,12 +6,13 @@ Stages to run somalier tools.
 
 import logging
 
+from cloudpathlib import CloudPath
+
 from cpg_pipes.jobs import somalier
-from cpg_pipes.pipeline.analysis import CramPath
 from cpg_pipes.pipeline.dataset import Dataset
-from cpg_pipes.pipeline.pipeline import stage
-from cpg_pipes.pipeline.sample import Sample
-from cpg_pipes.pipeline.stage import DatasetStage, StageInput, StageOutput, SampleStage
+from cpg_pipes.pipeline.pipeline import stage, SampleStage, DatasetStage
+from cpg_pipes.pipeline.stage import StageInput, StageOutput
+from cpg_pipes.pipeline.dataset import Sample
 
 logger = logging.getLogger(__file__)
 
@@ -22,7 +23,7 @@ class CramSomalierStage(SampleStage):
     Genereate fingerprints from CRAMs for pedigree checks.
     """
 
-    def expected_result(self, sample: Sample):
+    def expected_result(self, sample: Sample) -> CloudPath:
         """
         Expected to generate the fingerprints file
         """
@@ -30,17 +31,17 @@ class CramSomalierStage(SampleStage):
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """
-        Using a function from the jobs module.
+        Using a function from the `jobs` module.
         """
         cram_path = sample.get_cram_path()
 
         expected_path = self.expected_result(sample)
         j = somalier.extact_job(
-            b=self.pipe.b,
+            b=self.b,
             sample=sample,
-            gvcf_or_cram_or_bam_path=CramPath(cram_path),
+            gvcf_or_cram_or_bam_path=cram_path,
             out_fpath=expected_path,
-            overwrite=not self.pipe.check_intermediates,
+            overwrite=not self.check_intermediates,
             depends_on=inputs.get_jobs(),
         )
         return self.make_outputs(sample, data=expected_path, jobs=[j])
@@ -52,7 +53,7 @@ class CramSomalierPedigree(DatasetStage):
     Checks pedigree from CRAM fingerprints.
     """
 
-    def expected_result(self, dataset: Dataset):
+    def expected_result(self, dataset: Dataset) -> dict[str, CloudPath]:
         """
         Return the report for MultiQC, plus putting an HTML into the web bucket.
         MultiQC expects the following patterns:
@@ -62,11 +63,11 @@ class CramSomalierPedigree(DatasetStage):
         .yaml#L472-L481
         """
 
-        prefix = dataset.get_analysis_bucket() / 'qc' / 'somalier'
+        prefix = dataset.get_analysis_bucket() / 'somalier'
         return {
             'samples': prefix / f'{dataset.name}.samples.tsv',
             'pairs': prefix / f'{dataset.name}.pairs.tsv',
-            'html': dataset.get_web_bucket() / 'pedigree' / 'somalier.html',
+            'html': dataset.get_web_bucket() / 'somalier-pedigree.html',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -79,21 +80,22 @@ class CramSomalierPedigree(DatasetStage):
         }
 
         html_path = self.expected_result(dataset)['html']
-        html_url = str(html_path).replace(
-            str(dataset.get_web_bucket()), dataset.get_web_url()
-        )
+        if base_url := dataset.get_web_url():
+            html_url = str(html_path).replace(str(dataset.get_web_bucket()), base_url)
+        else:
+            html_url = None
 
         j = somalier.pedigree(
-            self.pipe.b,
+            self.b,
             dataset,
             input_path_by_sid=fp_by_sid,
-            overwrite=not self.pipe.check_intermediates,
+            overwrite=not self.check_intermediates,
             out_samples_path=self.expected_result(dataset)['samples'],
             out_pairs_path=self.expected_result(dataset)['pairs'],
             out_html_path=html_path,
             out_html_url=html_url,
             depends_on=inputs.get_jobs(),
-            dry_run=self.pipe.dry_run,
+            dry_run=self.dry_run,
         )
         return self.make_outputs(dataset, data=self.expected_result(dataset), jobs=[j])
 
@@ -104,7 +106,7 @@ class CramSomalierAncestry(DatasetStage):
     Checks pedigree from CRAM fingerprints
     """
 
-    def expected_result(self, dataset: Dataset):
+    def expected_result(self, dataset: Dataset) -> dict[str, CloudPath]:
         """
         Return the report for MultiQC, plus putting an HTML into the web bucket.
         MultiQC expects the following patterns:
@@ -129,15 +131,16 @@ class CramSomalierAncestry(DatasetStage):
         }
 
         html_path = self.expected_result(dataset)['html']
-        html_url = str(html_path).replace(
-            str(dataset.get_web_bucket()), dataset.get_web_url()
-        )
+        if base_url := dataset.get_web_url():
+            html_url = str(html_path).replace(str(dataset.get_web_bucket()), base_url)
+        else:
+            html_url = None
 
         j = somalier.ancestry(
-            self.pipe.b,
+            self.b,
             dataset,
             input_path_by_sid=fp_by_sid,
-            overwrite=not self.pipe.check_intermediates,
+            overwrite=not self.check_intermediates,
             out_tsv_path=self.expected_result(dataset)['tsv'],
             out_html_path=html_path,
             out_html_url=html_url,

@@ -20,9 +20,7 @@ from sample_metadata.apis import (
 from sample_metadata.exceptions import ApiException
 
 from .. import buckets, images
-from .cohort import Cohort
-from .sample import PedigreeInfo, Sex, Sample
-from .dataset import Dataset
+from .dataset import Dataset, Cohort, PedigreeInfo, Sex, Sample
 from .analysis import Analysis, AnalysisType, AnalysisStatus
 from .sequence import SmSequence
 
@@ -41,10 +39,10 @@ class SMDB:
         do_check_seq_existence: bool = True,
     ):
         """
-        :param analysis_dataset: dataset where to create the "analysis" entries.
-        :param do_update_analyses: if not set, won't update "analysis" entries' 
+        @param analysis_dataset: dataset where to create the "analysis" entries.
+        @param do_update_analyses: if not set, won't update "analysis" entries' 
             statuses.
-        :param do_check_seq_existence: when querying "sequence" or "analysis" entries
+        @param do_check_seq_existence: when querying "sequence" or "analysis" entries
             with files, check those files existence with gsutil. For "sequence", will
             throw an error. For "analysis", will invalidate by setting status=failure.
         """
@@ -426,13 +424,13 @@ class SMDB:
 
         Returns the path to the output if it can be reused, otherwise None.
 
-        :param sample_ids: sample IDs to pull the analysis for
-        :param completed_analysis: existing completed analysis of this type for these 
+        @param sample_ids: sample IDs to pull the analysis for
+        @param completed_analysis: existing completed analysis of this type for these 
         samples
-        :param analysis_type: cram, gvcf, joint_calling
-        :param expected_output_fpath: where the pipeline expects the analysis output 
+        @param analysis_type: cram, gvcf, joint_calling
+        @param expected_output_fpath: where the pipeline expects the analysis output 
         file to sit on the bucket (will invalidate the analysis if it doesn't match)
-        :param dataset_name: the name of the dataset where to create a new analysis
+        @param dataset_name: the name of the dataset where to create a new analysis
         :return: path to the output if it can be reused, otherwise None
         """
         label = f'type={analysis_type}'
