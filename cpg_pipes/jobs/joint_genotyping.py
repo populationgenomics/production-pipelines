@@ -19,13 +19,17 @@ from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.pipeline.analysis import GvcfPath, AnalysisType
 from cpg_pipes.pipeline.dataset import Sample
-from cpg_pipes.pipeline.smdb import SMDB
+from cpg_pipes.cpg.smdb import SMDB
 from cpg_pipes.ref_data import REF_D
 
 logger = logging.getLogger(__file__)
 
 
 class JointGenotyperTool(Enum):
+    """
+    Tool used for joint genotyping. GenotypeGVCFs is more stable, 
+    GnarlyGenotyper is fater but more experimental.
+    """
     GenotypeGVCFs = 1
     GnarlyGenotyper = 2
     

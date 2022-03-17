@@ -61,6 +61,16 @@ class Cohort(Target):
             ds for k, ds in self._datasets_by_name.items() 
             if (ds.active or not only_active)
         ]
+    
+    def get_dataset_by_name(
+        self, name: str, only_active: bool = True
+    ) -> Optional['Dataset']:
+        """
+        Get dataset by name.
+        Include only "active" datasets (unless only_active is False)
+        """
+        ds_by_name = {d.name: d for d in self.get_datasets(only_active)}
+        return ds_by_name.get(name)
 
     def get_all_samples(self, only_active: bool = True) -> list['Sample']:
         """
@@ -79,7 +89,7 @@ class Cohort(Target):
         return [s.id for s in self.get_all_samples(only_active=only_active)]
 
     def add_dataset(
-        self, 
+        self,
         name: str, 
         namespace: Namespace | None = None,
         storage_provider: StorageProvider | None = None,
@@ -87,20 +97,55 @@ class Cohort(Target):
         """
         Create a dataset and add it into the cohort.
         """
+        namespace = namespace or self.analysis_dataset.namespace
+        # Normalising the dataset's name:
+        name = build_dataset_name(*parse_stack(name, namespace))
         if name in self._datasets_by_name:
-            logger.warning(f'Dataset {name} already exists in the cohort')
+            logger.debug(f'Dataset {name} already exists in the cohort')
             return self._datasets_by_name[name]
+
         if name == self.analysis_dataset.name:
             ds = self.analysis_dataset
         else:
             ds = Dataset(
-                name=name, 
+                name=name,
                 cohort=self,
                 namespace=namespace,
                 storage_provider=storage_provider or self.storage_provider,
             )
+
         self._datasets_by_name[ds.name] = ds
         return ds
+
+
+def parse_stack(
+    name: str, 
+    namespace: Namespace | None = None
+) -> tuple[str, Namespace]:
+    """
+    Input `name` can be either e.g. "seqr" or "seqr-test". The latter will be 
+    resolved to stack="seqr" and is_test=True, unless `namespace` is provided 
+    explicitly.
+
+    Returns the stack id and a corrected namespace.
+    """
+    namespace = namespace or Namespace.MAIN
+    if name.endswith('-test'):
+        stack = name[:-len('-test')]
+        if namespace == Namespace.MAIN:
+            namespace = Namespace.TEST
+    else:
+        stack = name
+    return stack, namespace
+
+
+def build_dataset_name(stack: str, namespace: Namespace) -> str:
+    """
+    Dataset name is suffixed with "-test" for a test dataset (matching the
+    corresponding sample-metadata project).
+    """
+    is_test = namespace != Namespace.MAIN
+    return stack + ('-test' if is_test else '')
 
 
 class Dataset(Target):
@@ -129,30 +174,14 @@ class Dataset(Target):
         namespace: Namespace | None = None,
         storage_provider: StorageProvider | None = None,
     ):
-        """
-        Input `name` can be either e.g. "seqr" or "seqr-test". The latter will be 
-        resolved to stack="seqr" and is_test=True, unless `namespace` is provided 
-        explicitly.
-
-        Also note that a Pipeline is passed as a parameter. A Dataset can exist 
-        outside `Cohort`, e.g. if it's an analysis dataset that exists only 
-        to track joint analysis of multiple datasets, but itself doesn't contain 
-        any samples.
-        """
         super().__init__()
         self.cohort = cohort
         
         self._storage_provider = storage_provider
 
-        self._samples: list[Sample] = []
-
-        self.namespace = namespace or Namespace.MAIN
-        if name.endswith('-test'):
-            self.stack = name[:-len('-test')]
-            if self.namespace == Namespace.MAIN:
-                self.namespace = Namespace.TEST
-        else:
-            self.stack = name
+        self._sample_by_id: dict[str, Sample] = {}
+        
+        self.stack, self.namespace = parse_stack(name, namespace)
 
     @property
     def is_test(self) -> bool:
@@ -164,10 +193,10 @@ class Dataset(Target):
     @property
     def name(self) -> str:
         """
-        Name is suffixed with "-test" for test dataset 
-        (matching the sample-metadata project).
+        Name is suffixed with "-test" for a test dataset (matching the
+        corresponding sample-metadata project).
         """
-        return self.stack + ('-test' if self.is_test else '')
+        return build_dataset_name(self.stack, self.namespace)
 
     @property
     def target_id(self) -> str:
@@ -238,29 +267,38 @@ class Dataset(Target):
         external_id: str, 
         participant_id: str | None = None,
         seq: SmSequence | None = None,
+        sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
         **kwargs
     ) -> 'Sample':
         """
         Create a new sample and add it into the dataset.
         """
+        if id in self._sample_by_id:
+            logger.debug(f'Sample {id} already exists in the dataset {self.name}')
+            return self._sample_by_id[id]
+
         s = Sample(
             id=id, 
             external_id=external_id,
             participant_id=participant_id,
             seq=seq,
+            sex=sex,
             pedigree=pedigree,
             dataset=self,
             meta=kwargs,
         )
-        self._samples.append(s)
+        self._sample_by_id[id] = s
         return s
     
     def get_samples(self, only_active: bool = True) -> list['Sample']:
         """
         Get dataset's samples. Inlcude only "active" samples, unless only_active=False
         """
-        return [s for s in self._samples if (s.active or not only_active)]
+        return [
+            s for sid, s in self._sample_by_id.items() 
+            if (s.active or not only_active)
+        ]
 
     def get_sample_ids(self, only_active: bool = True) -> list[str]:
         """
@@ -282,6 +320,7 @@ class Sample(Target):
         dataset: 'Dataset',  # type: ignore  # noqa: F821
         participant_id: str | None = None,
         meta: dict | None = None,
+        sex: Optional['Sex'] = None,
         seq: SmSequence | None = None,
         pedigree: Optional['PedigreeInfo'] = None,
         alignment_input: AlignmentInput | None = None
@@ -293,17 +332,13 @@ class Sample(Target):
         self._participant_id = participant_id
         self.meta: dict = meta or dict()
         self.seq = seq
-        self.pedigree: PedigreeInfo | None
-        if pedigree:
-            self.pedigree = pedigree
-        elif 'sex' in self.meta:
+        self.pedigree: PedigreeInfo | None = pedigree
+        if sex:
             self.pedigree = PedigreeInfo(
                 sample=self,
                 fam_id=self.participant_id,
-                sex=Sex.parse(self.meta['sex'])
+                sex=sex,
             )
-        else:
-            self.pedigree = None
         self._alignment_input = alignment_input
 
     def __repr__(self):
@@ -404,14 +439,15 @@ class Sex(Enum):
     FEMALE = 2
 
     @staticmethod
-    def parse(sex: str) -> 'Sex':
+    def parse(sex: str | None) -> 'Sex':
         """
         Parse a string into a Sex object.
         """
-        if sex.lower() in ('m', 'male', '1'):
-            return Sex.MALE
-        if sex.lower() in ('f', 'female', '2'):
-            return Sex.FEMALE
+        if sex:
+            if sex.lower() in ('m', 'male', '1'):
+                return Sex.MALE
+            if sex.lower() in ('f', 'female', '2'):
+                return Sex.FEMALE
         return Sex.UNKNOWN
 
 

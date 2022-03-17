@@ -26,6 +26,9 @@ class SmSequence:
 
     @staticmethod
     def parse(data: dict, check_existence: bool) -> 'SmSequence':
+        """
+        Parse dictionary to create a SmSequence object.
+        """
         req_keys = ['id', 'sample_id', 'meta']
         if any(k not in data for k in req_keys):
             for key in req_keys:

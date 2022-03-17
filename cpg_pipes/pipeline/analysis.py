@@ -174,6 +174,9 @@ FastqPath = Union[str, CloudPath, ResourceFile]
 
 @dataclass
 class FastqPair:
+    """
+    Pair of FASTQ files
+    """
     r1: FastqPath
     r2: FastqPath
     

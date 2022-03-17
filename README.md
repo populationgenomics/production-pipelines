@@ -36,9 +36,9 @@ Overall classes and object relationships look as follows:
 To declare a stage, derive a class from `SampleStage`, `ProjectStage`, or `CohortStage`, implement the abstract methods, and wrap the class with a `@stage` decorator:
 
 ```python
-from cpg_pipes.pipeline.pipeline import stage
-from cpg_pipes.pipeline.stage import SampleStage, StageInput, StageOutput
-from cpg_pipes.pipeline.sample import Sample
+from cpg_pipes.pipeline.pipeline import stage, SampleStage
+from cpg_pipes.pipeline.stage import StageInput, StageOutput
+from cpg_pipes.pipeline.dataset import Sample
 
 @stage
 class WriteSampleName(SampleStage):
@@ -146,8 +146,8 @@ If a `Participant` entry is available, `sample.participant_id` will be populated
 Communication with the sample metadata DB is organised through the `cpg_pipes.smdb` module, a wrapper around the sample metadata database API. E.g., to get a dictionary of Sample entries indexed by dataset name, run:
 
 ```python
-from cpg_pipes.pipeline.smdb import SMDB
-from cpg_pipes.pipeline.cohort import Cohort
+from cpg_pipes.cpg.smdb import SMDB
+from cpg_pipes.pipeline.dataset import Cohort
 from cpg_pipes.storage import Namespace
 
 cohort = Cohort('seqr')
@@ -159,7 +159,7 @@ smdb.populate_cohort(cohort)
 To add an Analysis entry, run:
 
 ```python
-from cpg_pipes.pipeline.smdb import SMDB
+from cpg_pipes.cpg.smdb import SMDB
 from cpg_pipes.pipeline.analysis import AnalysisStatus, AnalysisType
 
 smdb = SMDB(analysis_dataset='seqr')
@@ -176,7 +176,7 @@ analysis_id = smdb.create_analysis(
 To add a Batch job that updates an Analysis entry, run:
 
 ```python
-from cpg_pipes.pipeline.smdb import SMDB
+from cpg_pipes.cpg.smdb import SMDB
 from cpg_pipes.pipeline.analysis import AnalysisType
 
 smdb = SMDB(analysis_dataset='seqr')
@@ -195,11 +195,10 @@ j = smdb.make_sm_completed_job(
 The `cpg_pipes.jobs` module defines functions that create Hail Batch Jobs for different bioinformatics purposes: alignment, fastqc, deduplication, variant calling, VQSR, etc. E.g. to implement the joint calling stage above, you can use:
 
 ```python
-from cpg_pipes.pipeline.smdb.types import AnalysisType
+from cpg_pipes.pipeline.analysis import AnalysisType
 from cpg_pipes.pipeline.pipeline import stage
-from cpg_pipes.pipeline.stage import SampleStage, CohortStage, StageInput, StageOutput
-from cpg_pipes.pipeline.sample import Sample
-from cpg_pipes.pipeline.cohort import Cohort
+from cpg_pipes.pipeline.pipeline import SampleStage, CohortStage, StageInput, StageOutput
+from cpg_pipes.pipeline.dataset import Sample, Cohort
 from cpg_pipes.jobs import haplotype_caller, joint_genotyping
 
 @stage(sm_analysis_type=AnalysisType.GVCF)

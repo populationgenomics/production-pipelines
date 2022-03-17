@@ -15,7 +15,7 @@ from cpg_pipes.hb.batch import Batch
 from cpg_pipes.pipeline.analysis import AnalysisType
 from cpg_pipes.pipeline.dataset import Dataset
 from cpg_pipes.pipeline.exceptions import PipelineError
-from cpg_pipes.pipeline.smdb import SMDB
+from cpg_pipes.cpg.smdb import SMDB
 from cpg_pipes.pipeline.target import Target
 from cpg_pipes.pipeline.dataset import Sample, Cohort
 
@@ -109,7 +109,7 @@ class StageOutput:
         """
         return {k: self.as_resource(id=k) for k in self.as_dict()}
 
-    def as_path_dict(self) -> dict[str, hb.Resource]:
+    def as_path_dict(self) -> dict[str, CloudPath]:
         """
         Cast the result to a dictionary of strings, error if can't cast.
         """
@@ -238,7 +238,7 @@ class StageInput:
         target: 'Target',
         stage: StageDecorator,
         id: str | None = None,
-    ) -> str:
+    ) -> hb.Resource:
         """
         Get Hail Batch Resource for a specific target and stage
         """
@@ -263,7 +263,7 @@ class StageInput:
 
     def as_resource_dict(
         self, target: 'Target', stage: StageDecorator
-    ) -> dict[str, CloudPath]:
+    ) -> dict[str, hb.Resource]:
         """
         Get a dictoinary of  Resources for a specific target and stage
         """

@@ -14,7 +14,7 @@ from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.pipeline.analysis import CramPath, AnalysisType, GvcfPath
-from cpg_pipes.pipeline.smdb import SMDB
+from cpg_pipes.cpg.smdb import SMDB
 
 logger = logging.getLogger(__file__)
 

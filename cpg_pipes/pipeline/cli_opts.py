@@ -86,6 +86,18 @@ def pipeline_click_options(function: Callable) -> Callable:
             help='Pipeline version. Default is a timestamp',
         ),
         click.option(
+            '--metadata-source', 
+            'metadata_source',
+            default='smdb',
+            type=click.Choice(['smdb', 'csv']),
+            help='Source of input metadata',
+        ),
+        click.option(
+            '--metadata-csv', 
+            'metadata_csv',
+            help='CSV file with metdata, if --metadata-source=csv is set',
+        ),
+        click.option(
             '--keep-scratch/--remove-scratch', 
             'keep_scratch', 
             default=False,

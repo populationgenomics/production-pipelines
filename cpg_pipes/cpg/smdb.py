@@ -20,63 +20,127 @@ from sample_metadata.apis import (
 from sample_metadata.exceptions import ApiException
 
 from .. import buckets, images
-from .dataset import Dataset, Cohort, PedigreeInfo, Sex, Sample
-from .analysis import Analysis, AnalysisType, AnalysisStatus
-from .sequence import SmSequence
+from ..pipeline.dataset import Dataset, Cohort, PedigreeInfo, Sex
+from ..pipeline.analysis import Analysis, AnalysisType, AnalysisStatus
+from ..pipeline.metadata_provider import MetadataProvider, MetadataError
+from ..pipeline.sequence import SmSequence
 
 logger = logging.getLogger(__file__)
 
 
-class SMDB:
+class SmdbMetadataProvider(MetadataProvider):
     """
-    Communication with the SampleMetadata database.
+    Metadata provider that pulls data from the sample-metadata DB.
     """
+    def __init__(self, db: 'SMDB'):
+        super().__init__()
+        self.db = db
 
-    def __init__(
-        self, 
-        analysis_dataset: str, 
-        do_update_analyses: bool = True,
-        do_check_seq_existence: bool = True,
-    ):
+    def get_entries(self, dataset: Dataset | None = None) -> list[dict]:
         """
-        @param analysis_dataset: dataset where to create the "analysis" entries.
-        @param do_update_analyses: if not set, won't update "analysis" entries' 
-            statuses.
-        @param do_check_seq_existence: when querying "sequence" or "analysis" entries
-            with files, check those files existence with gsutil. For "sequence", will
-            throw an error. For "analysis", will invalidate by setting status=failure.
+        Return list of data entries.
         """
-        self.sapi = SampleApi()
-        self.aapi = AnalysisApi()
-        self.seqapi = SequenceApi()
-        self.seqapi = SequenceApi()
-        self.papi = ParticipantApi()
-        self.analysis_dataset = analysis_dataset
-        self.do_update_analyses = do_update_analyses
-        self.do_check_seq_existence = do_check_seq_existence
-
-    def populate_cohort(
-        self,
-        cohort: Cohort,
-        skip_samples: list[str] | None = None,
-        only_samples: list[str] | None = None,
-        ped_files: list[CloudPath] | None = None,
-    ) -> Cohort:
-        """
-        Populate database entries for all datasets.
-        """
-        for dataset in cohort.get_datasets():
-            self.populate_dataset(
-                dataset,
-                only_samples=only_samples,
-                skip_samples=skip_samples,
+        if dataset is None:
+            raise MetadataError(
+                'SmdbMetadataProvider: dataset must be provided for get_entries()'
             )
-        self._populate_analysis(cohort)
-        if ped_files:
-            self._populate_pedigree(cohort, ped_files)
-        return cohort
+        return self.db.get_sample_entries(dataset_name=dataset.name)
+   
+    def get_dataset_name(self, cohort: Cohort, entry: dict[str, str]) -> str:
+        """
+        Get name of the dataset. Not relevant for SMDB because we pull 
+        specific datasets by their names.
+        """
+        raise NotImplementedError
 
-    def _populate_pedigree(self, cohort: Cohort, ped_files: list[CloudPath]):
+    def get_sample_id(self, entry: dict) -> str:
+        """
+        Get sample ID from a sample dict.
+        """
+        return entry['id'].strip()
+
+    def get_external_id(self, entry: dict) -> str | None:
+        """
+        Get external sample ID from a sample dict.
+        """
+        return entry['external_id'].strip()
+
+    def get_participant_id(self, entry: dict) -> str | None:
+        """
+        Get participant ID from a sample dict.
+        """
+        res = entry.get('participant_id')
+        return res.strip() if res else None
+
+    def get_participant_sex(self, entry: dict) -> Sex | None:
+        """
+        Get participant ID from a sample dict.
+        """
+        return Sex.parse(entry['sex']) if 'sex' in entry else None
+    
+    def get_sample_meta(self, entry: dict) -> dict:
+        """
+        Get sample metadata..
+        """
+        return entry.get('meta', {})
+
+    def populate_alignment_inputs(
+        self, 
+        cohort: Cohort, 
+        do_check_seq_existence: bool = True,
+    ) -> None:
+        """
+        Populate sequencing inputs for samples.
+        """
+        try:
+            seq_infos: list[dict] = self.db.seqapi.get_sequences_by_sample_ids(
+                [s.id for s in cohort.get_all_samples()]
+            )
+        except ApiException:
+            traceback.print_exc()
+            return
+
+        seq_info_by_sid = {seq['sample_id']: seq for seq in seq_infos}
+        for sample in cohort.get_all_samples():
+            seq_info = seq_info_by_sid[sample.id]
+            sample.seq = SmSequence.parse(seq_info, do_check_seq_existence)
+
+    def populate_analysis(self, cohort: Cohort) -> None:
+        """
+        Populate Analysis entries for samples and for the cohort.
+        """
+        all_sample_ids = cohort.get_all_sample_ids()
+
+        jc_analysis = self.db.find_joint_calling_analysis(
+            sample_ids=all_sample_ids,
+        )
+        if jc_analysis:
+            cohort.analysis_by_type[AnalysisType.JOINT_CALLING] = jc_analysis
+
+        for dataset in cohort.get_datasets():
+            sample_ids = [s.id for s in dataset.get_samples()]
+
+            for atype in AnalysisType:
+                analysis_per_sid = self.db.find_analyses_by_sid(
+                    sample_ids=sample_ids,
+                    analysis_type=atype,
+                    dataset=dataset.name,
+                )
+                for s in dataset.get_samples():
+                    if s.id in analysis_per_sid:
+                        s.analysis_by_type[atype] = analysis_per_sid[s.id]
+
+    def populate_pedigree(
+        self, 
+        cohort: Cohort,
+        ped_files: list[CloudPath] | None = None,
+    ) -> None:
+        """
+        Populate pedigree data for samples.
+        """
+        if not ped_files:
+            return None
+            
         sample_by_participant_id = dict()
         for s in cohort.get_all_samples():
             sample_by_participant_id[s.participant_id] = s
@@ -103,83 +167,39 @@ class SMDB:
                 f'samples out of {len(dataset.get_samples())}'
             )
 
-    def _populate_analysis(self, cohort: Cohort, source_tag: str|None = None):
-        all_sample_ids = cohort.get_all_sample_ids()
 
-        jc_analysis = self.find_joint_calling_analysis(
-            sample_ids=all_sample_ids,
-        )
-        if jc_analysis:
-            cohort.analysis_by_type[AnalysisType.JOINT_CALLING] = jc_analysis
+class SMDB:
+    """
+    Communication with the SampleMetadata database.
+    """
 
-        for dataset in cohort.get_datasets():
-            sample_ids = [s.id for s in dataset.get_samples()]
-
-            for atype in AnalysisType:
-                analysis_per_sid = self.find_analyses_by_sid(
-                    sample_ids=sample_ids,
-                    analysis_type=atype,
-                    meta={'source': source_tag} if source_tag else None,
-                    dataset=dataset.name,
-                )
-                for s in dataset.get_samples():
-                    if s.id in analysis_per_sid:
-                        s.analysis_by_type[atype] = analysis_per_sid[s.id]
-
-    def populate_dataset(
-        self,
-        dataset: Dataset,
-        skip_samples: list[str]|None = None,
-        only_samples: list[str]|None = None,
-    ) -> Dataset:
+    def __init__(
+        self, 
+        analysis_dataset: str, 
+        do_update_analyses: bool = True,
+        do_check_seq_existence: bool = True,
+    ):
         """
-        Populate database entries for one dataset.
+        @param analysis_dataset: dataset where to create the "analysis" entries.
+        @param do_update_analyses: if not set, won't update "analysis" entries' 
+            statuses.
+        @param do_check_seq_existence: when querying "sequence" or "analysis" entries
+            with files, check if the exist. 
+            For "sequence", will throw an error. 
+            For "analysis", will invalidate by setting status=failure.
         """
-        sample_datas = self.__get_sample_entries(
-            dataset_name=dataset.name,
-            skip_samples=skip_samples,
-            only_samples=only_samples,
-        )
-
-        participant_id_by_cpgid = self.__get_participant_id_by_sid(dataset.name)
-
-        samples = [
-            dataset.add_sample(
-                id=sample_d['id'], 
-                external_id=sample_d['external_id'],
-                participant_id=participant_id_by_cpgid.get(sample_d['id']),
-                **sample_d.get('meta', {}),
-            )
-            for sample_d in sample_datas
-        ]
-
-        self.populate_sequence(samples)
-
-        return dataset
-
-    def populate_sequence(self, samples: list[Sample]) -> list[Sample]:
-        """
-        Get and parse "Sequence" entries for each sample.
-        """
-        try:
-            seq_infos: list[dict] = self.seqapi.get_sequences_by_sample_ids(
-                [s.id for s in samples]
-            )
-        except ApiException:
-            traceback.print_exc()
-            return []
-        
-        seq_info_by_sid = {seq['sample_id']: seq for seq in seq_infos}
-        for sample in samples:
-            seq_info = seq_info_by_sid[sample.id]
-            sample.seq = SmSequence.parse(seq_info, self.do_check_seq_existence) 
-        return samples
+        self.sapi = SampleApi()
+        self.aapi = AnalysisApi()
+        self.seqapi = SequenceApi()
+        self.seqapi = SequenceApi()
+        self.papi = ParticipantApi()
+        self.analysis_dataset = analysis_dataset
+        self.do_update_analyses = do_update_analyses
+        self.do_check_seq_existence = do_check_seq_existence
     
-    def __get_sample_entries(
+    def get_sample_entries(
         self,
         dataset_name: str,
-        skip_samples: list[str]|None = None,
-        only_samples: list[str]|None = None,
     ) -> list[dict]:
         """
         Get Sample entries and apply `skip_samples` and `only_samples` filters.
@@ -196,28 +216,15 @@ class SMDB:
             f'Finding samples for dataset {dataset_name}:'
             f'found {len(sample_entries)}'
         )
-        
-        filtered_entries = []
-        for sample_dict in sample_entries:
-            cpgid = sample_dict['id'].strip()
-            extid = sample_dict['external_id'].strip()
+        return sample_entries
 
-            if only_samples:
-                if cpgid in only_samples or extid in only_samples:
-                    logger.info(f'Picking sample: {cpgid}|{extid}')
-                else:
-                    continue
-            if skip_samples:
-                if cpgid in skip_samples or extid in skip_samples:
-                    logger.info(f'Skiping sample: {cpgid}|{extid}')
-                    continue 
-            filtered_entries.append(sample_dict)
-        return filtered_entries
-
-    def __get_participant_id_by_sid(self, proj_name: str) -> dict[str, str]:
+    def get_participant_id_by_sid(self, dataset: str) -> dict[str, str]:
+        """
+        Get dictionary of participant IDs indexed by sample IDs.
+        """
         try:
             pid_sid = self.papi.get_external_participant_id_to_internal_sample_id(
-                proj_name
+                dataset
             )
         except ApiException:
             participant_id_by_cpgid = {}
@@ -244,7 +251,7 @@ class SMDB:
     def find_joint_calling_analysis(
         self,
         sample_ids: list[str],
-    ) -> Analysis|None:
+    ) -> Analysis | None:
         """
         Query the DB to find the last completed joint-calling analysis for the samples
         """
@@ -269,8 +276,8 @@ class SMDB:
         sample_ids: list[str],
         analysis_type: AnalysisType,
         analysis_status: AnalysisStatus = AnalysisStatus.COMPLETED,
-        dataset: str|None = None,
-        meta: dict|None = None
+        dataset: str | None = None,
+        meta: dict | None = None
     ) -> dict[str, Analysis]:
         """
         Query the DB to find the last completed analysis for the type and samples,
@@ -328,8 +335,8 @@ class SMDB:
         analysis_id: int,
         analysis_type: str,
         status: str,
-        sample_name: str|None = None,
-        dataset_name: str|None = None,
+        sample_name: str | None = None,
+        dataset_name: str | None = None,
     ) -> Job:
         """
         Creates a job that updates the sample metadata server entry analysis status.
@@ -379,7 +386,7 @@ class SMDB:
         type_: str | AnalysisType,
         status: str | AnalysisStatus,
         sample_ids: list[str],
-        dataset_name: str|None = None,
+        dataset_name: str | None = None,
     ) -> int|None:
         """
         Tries to create an Analysis entry, returns its id if successfuly

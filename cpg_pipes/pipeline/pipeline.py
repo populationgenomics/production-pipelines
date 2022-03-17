@@ -58,11 +58,14 @@ from cloudpathlib import CloudPath
 from .analysis import AnalysisType
 from .dataset import Dataset, Cohort, Sample, Pair
 from .exceptions import PipelineError
-from .smdb import SMDB
+from .metadata_provider import CsvMetadataProvider, MetadataProvider
 from .stage import Stage, ExpectedResultT, StageInput, StageOutput
+from .. import buckets
+from ..cpg.smdb import SMDB, SmdbMetadataProvider
+from ..cpg.storage import CPGStorageProvider
 from ..hb.batch import setup_batch, Batch
 from ..hb.prev_job import PrevJob
-from ..storage import Namespace, StorageProvider, CPGStorageProvider
+from ..storage import Namespace, StorageProvider
 
 logger = logging.getLogger(__file__)
 
@@ -98,8 +101,10 @@ def stage(
             ...
     """
     def decorator_stage(cls) -> StageDecorator:
+        """Implements decorator."""
         @functools.wraps(cls)
         def wrapper_stage(pipeline: 'Pipeline') -> Stage:
+            """Decorator helper function."""
             return cls(
                 name=cls.__name__,
                 batch=pipeline.b,
@@ -147,8 +152,10 @@ def skip(
         ...
     """
     def decorator_stage(fun) -> StageDecorator:
+        """Implements decorator."""
         @functools.wraps(fun)
         def wrapper_stage(*args, **kwargs) -> Stage:
+            """Decorator helper function."""
             s = fun(*args, **kwargs)
             s.skipped = True
             s.assume_results_exist = assume_results_exist
@@ -184,6 +191,8 @@ class Pipeline:
         namespace: Namespace | str,
         version: str | None = None,
         storage_provider: StorageProvider | None = None,
+        metadata_source: str = 'smdb',
+        metadata_csv: str | None = None,
         stages_in_order: list[StageDecorator] | None = None,
         keep_scratch: bool = True,
         dry_run: bool = False,
@@ -273,21 +282,30 @@ class Pipeline:
 
         self._db = None
         if input_datasets:
-            for name in input_datasets:
-                self.cohort.add_dataset(
-                    name, 
-                    namespace=namespace, 
+            metadata_provider: MetadataProvider
+            if metadata_source == 'smdb':
+                self._db = SMDB(
+                    self.cohort.analysis_dataset.name,
+                    do_update_analyses=update_smdb_analyses,
                 )
-            self._db = SMDB(
-                self.cohort.analysis_dataset.name,
-                do_update_analyses=update_smdb_analyses,
-                do_check_seq_existence=check_smdb_seq,
-            )
-            self._db.populate_cohort(
+                metadata_provider = SmdbMetadataProvider(self._db)
+            else:
+                assert metadata_csv == 'csv'
+                if not metadata_csv:
+                    raise PipelineError(
+                        '--metadata-source is "csv", --metadata-csv path must be '
+                        'provided'
+                    )
+                with buckets.str_to_path(metadata_csv).open() as fp:
+                    metadata_provider = CsvMetadataProvider(fp=fp)
+
+            metadata_provider.populate_cohort(
                 cohort=self.cohort,
+                dataset_names=input_datasets,
                 skip_samples=skip_samples,
                 only_samples=only_samples,
                 ped_files=ped_files,
+                do_check_seq_existence=check_smdb_seq,
             )
 
         if force_samples:
@@ -497,9 +515,15 @@ class SampleStage(Stage[Sample], ABC):
 
     @abstractmethod
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+        """
+        Override to add Hail Batch jobs.
+        """
         pass
 
     def add_to_the_pipeline(self, pipeline: Pipeline) -> dict[str, StageOutput]:
+        """
+        Pplug in stage into the pipeline.
+        """
         output_by_target = dict()
         datasets = pipeline.cohort.get_datasets()
         if not datasets:
@@ -534,9 +558,15 @@ class PairStage(Stage, ABC):
 
     @abstractmethod
     def queue_jobs(self, pair: Pair, inputs: StageInput) -> StageOutput:
+        """
+        Override to add Hail Batch jobs.
+        """
         pass
 
     def add_to_the_pipeline(self, pipeline: Pipeline) -> dict[str, StageOutput]:
+        """
+        Pplug in stage into the pipeline.
+        """
         output_by_target = dict()
         datasets = pipeline.cohort.get_datasets()
         if datasets:
@@ -572,9 +602,15 @@ class DatasetStage(Stage, ABC):
 
     @abstractmethod
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        """
+        Override to add Hail Batch jobs.
+        """
         pass
 
     def add_to_the_pipeline(self, pipeline: Pipeline) -> dict[str, StageOutput]:
+        """
+        Pplug in stage into the pipeline.
+        """
         output_by_target = dict()
         datasets = pipeline.cohort.get_datasets()
         if not datasets:
@@ -603,9 +639,15 @@ class CohortStage(Stage, ABC):
 
     @abstractmethod
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        """
+        Override to add Hail Batch jobs.
+        """
         pass
 
     def add_to_the_pipeline(self, pipeline: Pipeline) -> dict[str, StageOutput]:
+        """
+        Override to plug in stage into the pipeline.
+        """
         return {
             pipeline.cohort.target_id:
                 self._queue_jobs_with_checks(pipeline.cohort)

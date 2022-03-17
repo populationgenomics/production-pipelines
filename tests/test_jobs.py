@@ -41,7 +41,6 @@ class TestJobs(unittest.TestCase):
             name=self._testMethodName,
             description=self._testMethodName,
             analysis_dataset=DATASET,
-            output_version='v0',
             namespace='test',
         )
         self.sample_name = f'Test-{self.timestamp}'
@@ -84,7 +83,7 @@ class TestJobs(unittest.TestCase):
             d[key] = out_path
         return d
 
-    def _job_get_gvcf_header(self, gvcf_path) -> str:
+    def _job_get_gvcf_header(self, gvcf_path) -> CloudPath:
         """ 
         Parses header of GVCF file
         """
@@ -228,12 +227,12 @@ class TestJobs(unittest.TestCase):
         """
         Test AS-VQSR
         """
-        siteonly_vcf_path = (
+        siteonly_vcf_path = CloudPath(
             'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
             'joint-called-siteonly.vcf.gz'
         )
-        tmp_vqsr_bucket = f'{self.tmp_bucket}/vqsr'
-        out_vcf_path = f'{self.out_bucket}/vqsr/vqsr.vcf.gz'
+        tmp_vqsr_bucket = self.tmp_bucket / 'vqsr'
+        out_vcf_path = self.out_bucket / 'vqsr' / 'vqsr.vcf.gz'
         j = make_vqsr_jobs(
             b=self.pipeline.b,
             input_vcf_or_mt_path=siteonly_vcf_path,
