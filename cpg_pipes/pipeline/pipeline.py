@@ -129,15 +129,6 @@ def skip(
         return decorator_stage(_fun)
 
 
-def run_pipeline(dry_run: bool = False, **kwargs) -> 'Pipeline':
-    """
-    Create and submit a pipeline to Hail Batch.
-    """
-    pipeline = Pipeline(**kwargs)
-    pipeline.submit_batch(dry_run=dry_run)
-    return pipeline
-
-
 class Pipeline:
     """
     Represents a Pipeline, and incapulates a Hail Batch object, stages, 
