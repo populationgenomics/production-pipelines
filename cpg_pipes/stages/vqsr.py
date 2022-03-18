@@ -43,7 +43,7 @@ class VqsrStage(CohortStage):
         tmp_vqsr_bucket = cohort.analysis_dataset.get_tmp_bucket() / 'vqsr'
         logger.info(f'Queueing VQSR job')
         expected_path = self.expected_result(cohort)
-        vqsr_job = make_vqsr_jobs(
+        jobs = make_vqsr_jobs(
             b=self.b,
             input_vcf_or_mt_path=siteonly_vcf_path,
             work_bucket=tmp_vqsr_bucket,
@@ -53,4 +53,4 @@ class VqsrStage(CohortStage):
             use_as_annotations=self.pipeline_config.get('use_as_vqsr', True),
             overwrite=not self.check_intermediates,
         )
-        return self.make_outputs(cohort, data=expected_path, jobs=[vqsr_job])
+        return self.make_outputs(cohort, data=expected_path, jobs=jobs)
