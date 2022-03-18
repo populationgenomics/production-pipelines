@@ -4,7 +4,7 @@ Stage that performs joint genotyping of GVCFs using GATK.
 
 import logging
 
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path, to_path
 
 from cpg_pipes import utils
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
@@ -23,7 +23,7 @@ class JointGenotypingStage(CohortStage):
     """
     Joint-calling of GVCFs together.
     """
-    def expected_result(self, cohort: Cohort) -> dict[str, CloudPath]:
+    def expected_result(self, cohort: Cohort) -> dict[str, Path]:
         """
         Generate a pVCF and a site-only VCF. Returns 2 outputs, thus not checking
         the SMDB, because the Analysis entry supports only single output.
@@ -36,7 +36,7 @@ class JointGenotypingStage(CohortStage):
         )
         return {
             'vcf': expected_jc_vcf_path,
-            'siteonly': CloudPath(
+            'siteonly': to_path(
                 str(expected_jc_vcf_path).replace('.vcf.gz', '-siteonly.vcf.gz')
             ),
         }
@@ -62,7 +62,7 @@ class JointGenotypingStage(CohortStage):
                 f'GVCFs, exiting'
             )
 
-        jc_job = make_joint_genotyping_jobs(
+        jobs = make_joint_genotyping_jobs(
             b=self.b,
             out_vcf_path=self.expected_result(cohort)['vcf'],
             out_siteonly_vcf_path=self.expected_result(cohort)['siteonly'],
@@ -81,5 +81,5 @@ class JointGenotypingStage(CohortStage):
         return self.make_outputs(
             cohort, 
             data=self.expected_result(cohort), 
-            jobs=[jc_job]
+            jobs=jobs
         )

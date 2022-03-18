@@ -6,12 +6,11 @@ Batch pipeline to load data into seqr.
 
 import logging
 import time
-from pathlib import Path
 
 import click
 import pandas as pd
 from analysis_runner import dataproc
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path
 
 from cpg_pipes import buckets, ref_data, utils
 from cpg_pipes.pipeline.cli_opts import pipeline_click_options
@@ -26,7 +25,7 @@ from cpg_pipes.storage import Namespace
 logger = logging.getLogger(__file__)
 
 
-def get_anno_tmp_bucket(cohort: Cohort) -> CloudPath:
+def get_anno_tmp_bucket(cohort: Cohort) -> Path:
     """
     Path to write Hail Query intermediate files
     """
@@ -38,7 +37,7 @@ class AnnotateCohortStage(CohortStage):
     """
     Re-annotate the entire cohort, including datasets that are not going to be loaded 
     """
-    def expected_result(self, cohort: Cohort) -> CloudPath:
+    def expected_result(self, cohort: Cohort) -> Path:
         """
         Expected to write a matrix table.
         """
@@ -87,7 +86,7 @@ class AnnotateDatasetStage(DatasetStage):
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
     that will be loaded into Seqr)
     """
-    def expected_result(self, dataset: Dataset) -> CloudPath:
+    def expected_result(self, dataset: Dataset) -> Path:
         """
         Expected to generate a matrix table
         """
@@ -166,7 +165,7 @@ class ToVcfStage(DatasetStage):
     """
     Convers the annotated matrix table to a pVCF
     """
-    def expected_result(self, dataset: Dataset) -> CloudPath:
+    def expected_result(self, dataset: Dataset) -> Path:
         """
         Generates an indexed VCF
         """
@@ -195,7 +194,7 @@ class ToVcfStage(DatasetStage):
 
 def _make_seqr_metadata_files(
     dataset: Dataset, 
-    bucket: CloudPath,
+    bucket: Path,
     local_dir: Path, 
     overwrite: bool = False
 ):

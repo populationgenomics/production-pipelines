@@ -4,7 +4,7 @@ Stage that runs FastQC on alignment inputs.
 
 import logging
 
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path
 
 from cpg_pipes.jobs import fastqc
 from cpg_pipes.pipeline.dataset import Sample
@@ -20,7 +20,7 @@ class FastQC(SampleStage):
     """
     Run FastQC on alignment inputs.
     """
-    def expected_result(self, sample: Sample) -> dict[str, CloudPath]:
+    def expected_result(self, sample: Sample) -> dict[str, Path]:
         """
         Stage is expected to generate a FastQC HTML report, and a zip file for 
         parsing with MuiltiQC.

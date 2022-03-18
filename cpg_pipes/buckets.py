@@ -4,59 +4,44 @@ Utility functions to interact with objects on buckets.
 
 import logging
 import subprocess
-from pathlib import Path
+from typing import cast
+
 from cloudpathlib import CloudPath
 
-from cpg_pipes.storage import Cloud
+from cpg_pipes.storage import Path, to_path
 
 logger = logging.getLogger(__file__)
 
 
-def str_to_path(path: str | Path | CloudPath) -> Path | CloudPath:
-    """
-    Helper method to create a Path (local file) or CloudPath (cloud storage object) 
-    instance.
-    """
-    if isinstance(path, str):
-        if any(path.startswith(f'{protocol.value}://') for protocol in Cloud):
-            return CloudPath(path)
-        else:
-            return Path(path)
-    return path
-
-
-def exists(path: str | Path | CloudPath, verbose: bool = True) -> bool:
+def exists(path: Path | str) -> bool:
     """
     Check if the object exists, where the object can be:
         * local file
         * local directory
-        * Google Storage object
-        * Google Storage URL representing a *.mt or *.ht Hail data,
+        * cloud object
+        * cloud URL representing a *.mt or *.ht Hail data,
           in which case it will check for the existence of a
           *.mt/_SUCCESS or *.ht/_SUCCESS file.
     @param path: path to the file/directory/object/mt/ht
-    @param verbose: for cloud objects, log every existence check
-    :return: True if the object exists
+    @return: True if the object exists
     """
-    path = str_to_path(path)
+    path = cast(Path, to_path(path))
     
     # rstrip to ".mt/" -> ".mt"
     if any(str(path).rstrip('/').endswith(f'.{suf}') for suf in ['mt', 'ht']):
         path = path / '_SUCCESS'
 
-    exists = path.exists()
-    if verbose and isinstance(path, CloudPath):
-        if exists:
-            logger.debug(f'Checking object existence, exists: {path}')
-        else:
-            logger.debug(f'Checking object existence, doesn\'t exist: {path}')
-    return exists
+    res = path.exists()
+    if res and isinstance(path, CloudPath):
+        logger.debug(f'Checking object existence, exists: {path}')
+    else:
+        logger.debug(f'Checking object existence, doesn\'t exist: {path}')
+    return res
 
 
 def can_reuse(
-    path: list[Path | CloudPath] | Path | CloudPath | None,
+    path: list[Path] | Path | str | None,
     overwrite: bool,
-    silent: bool = False,
 ) -> bool:
     """
     Checks if `fpath` is good to reuse in the analysis: it exists
@@ -76,8 +61,7 @@ def can_reuse(
     if not exists(path):
         return False
     
-    if not silent:
-        logger.info(f'Reusing existing {path}. Use --overwrite to overwrite')
+    logger.debug(f'Reusing existing {path}. Use --overwrite to overwrite')
     return True
 
 
@@ -105,7 +89,7 @@ def gsutil_cp(
           checks, see the "check_hashes" option in your boto config file.
     @param recursive: to copy a directory
     @param quiet: disable logging of commands and copied files
-    :returns: dst_path
+    @returns: dst_path
     """
     cmd = (
         'gsutil '

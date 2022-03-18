@@ -53,7 +53,7 @@ def get_validation_callback(
     @param must_exist: check that the input file/object/directory exists
     @param accompanying_metadata_suffix: checks that a file at the same location but
     with a different suffix also exists (e.g. genomes.mt and genomes.metadata.ht)
-    :return: a callback suitable for Click parameter initialization
+    @return: a callback suitable for Click parameter initialization
     """
     def callback(_: click.Context, param: click.Option, value: Any):
         if value is None:
@@ -118,7 +118,7 @@ def hash_sample_ids(sample_names: list[str]) -> str:
     """
     Return a unique hash string from a set of strings
     @param sample_names: set of strings
-    :return: a string hash
+    @return: a string hash
     """
     for sn in sample_names:
         assert ' ' not in sn, sn

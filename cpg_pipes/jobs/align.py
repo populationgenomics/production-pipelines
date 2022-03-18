@@ -8,7 +8,7 @@ from os.path import join
 import logging
 
 import hailtop.batch as hb
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path
 from hailtop.batch.job import Job
 
 from cpg_pipes import images, ref_data, buckets
@@ -66,8 +66,8 @@ def align(
     b,
     alignment_input: AlignmentInput,
     sample_name: str,
-    output_path: str | CloudPath | None = None,
-    qc_bucket: str | CloudPath | None = None,
+    output_path: Path | None = None,
+    qc_bucket: Path | None = None,
     dataset_name: str | None = None,
     aligner: Aligner = Aligner.BWA,
     markdup_tool: MarkDupTool = MarkDupTool.BIOBAMBAM,
@@ -78,7 +78,7 @@ def align(
     requested_nthreads: int | None = None,
     number_of_shards_for_realignment: int | None = None,
     prev_batch_jobs: dict[tuple[str | None, str], PrevJob] | None = None,
-) -> Job:
+) -> list[Job]:
     """
     - if the input is 1 fastq pair, submits one alignment job.
 
@@ -105,7 +105,7 @@ def align(
         if extra_label:
             job_name += f' {extra_label}'
         job_name += ' [reuse]'
-        return b.new_job(job_name, dict(sample=sample_name, dataset=dataset_name))
+        return [b.new_job(job_name, dict(sample=sample_name, dataset=dataset_name))]
 
     if number_of_shards_for_realignment and number_of_shards_for_realignment > 1:
         if not isinstance(alignment_input, CramPath):
@@ -248,22 +248,22 @@ def align(
         overwrite=overwrite,
         align_cmd_out_fmt=output_fmt,
     )
-    last_j = md_j if md_j is not None else align_j
+    last_jobs = [md_j if md_j is not None else align_j]
 
     if depends_on:
         first_j.depends_on(*depends_on)
     if smdb:
-        last_j = smdb.add_running_and_completed_update_jobs(
+        last_jobs = smdb.add_running_and_completed_update_jobs(
             b=b,
             analysis_type=AnalysisType.CRAM,
             output_path=output_path,
             sample_names=[sample_name],
             dataset_name=dataset_name,
             first_j=first_j,
-            last_j=last_j,
+            last_j=last_jobs,
             depends_on=depends_on,
         )
-    return last_j
+    return last_jobs
 
 
 def _align_one(
@@ -497,14 +497,14 @@ def finalise_alignment(
     sample_name: str,
     dataset_name: str | None,
     markdup_tool: MarkDupTool,
-    output_path: CloudPath | str | None = None,
-    qc_bucket: CloudPath | str | None = None,
+    output_path: Path | None = None,
+    qc_bucket: Path | None = None,
     overwrite: bool = True,
     align_cmd_out_fmt: str = 'sam',
 ) -> Job | None:
     """
-    For MarkDupTool.BIOBAMBAM, adds bamsormadup command piped to the existing job.
-    For MarkDupTool.PICARD, creates a new job, as Picard can't read from stdin.
+    For `MarkDupTool.BIOBAMBAM`, adds bamsormadup command piped to the existing job.
+    For `MarkDupTool.PICARD`, creates a new job, as Picard can't read from stdin.
     """
 
     reference = b.read_input_group(**ref_data.REF_D)
@@ -549,11 +549,7 @@ def finalise_alignment(
         )
 
     if output_path:
-        output_path = CloudPath(output_path)
-
-        if qc_bucket:
-            qc_bucket = CloudPath(qc_bucket)
-        else:
+        if not qc_bucket:
             qc_bucket = output_path.parent
     
         if md_j is not None:

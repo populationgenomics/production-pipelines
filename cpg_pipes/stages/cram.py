@@ -4,7 +4,7 @@ Stage that generates a CRAM file.
 
 import logging
 
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path
 
 from cpg_pipes.jobs import align
 from cpg_pipes.pipeline.analysis import AnalysisType, CramPath
@@ -20,7 +20,7 @@ class CramStage(SampleStage):
     """
     Align or re-align input data to produce a CRAM file
     """
-    def expected_result(self, sample: Sample) -> CloudPath:
+    def expected_result(self, sample: Sample) -> Path:
         """
         Stage is expected to generate a CRAM file and a corresponding index.
         """
@@ -41,7 +41,7 @@ class CramStage(SampleStage):
                     f'Checked: Sequence entry and type=CRAM Analysis entry'
                 )
 
-        cram_job = align.align(
+        jobs = align.align(
             b=self.b,
             alignment_input=sample.alignment_input,
             output_path=self.expected_result(sample),
@@ -56,5 +56,5 @@ class CramStage(SampleStage):
         return self.make_outputs(
             sample, 
             data=self.expected_result(sample), 
-            jobs=[cram_job]
+            jobs=jobs
         )

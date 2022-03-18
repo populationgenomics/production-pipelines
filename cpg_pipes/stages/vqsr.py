@@ -4,7 +4,7 @@ Stage that performs AS-VQSR.
 
 import logging
 
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path
 
 from cpg_pipes import utils
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
@@ -21,7 +21,7 @@ class VqsrStage(CohortStage):
     """
     Variant filtering of joint-called VCF
     """
-    def expected_result(self, cohort: Cohort) -> CloudPath:
+    def expected_result(self, cohort: Cohort) -> Path:
         """
         Expects to generate one site-only VCF
         """

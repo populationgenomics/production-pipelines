@@ -2,7 +2,7 @@
 Jobs to run FastQC
 """
 import hailtop.batch as hb
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path
 from hailtop.batch import ResourceFile
 from hailtop.batch.job import Job
 
@@ -14,8 +14,8 @@ from cpg_pipes.pipeline.analysis import AlignmentInput, CramPath, FastqPair
 
 def fastqc(
     b: hb.Batch, 
-    output_html_path: CloudPath,
-    output_zip_path: CloudPath,
+    output_html_path: Path,
+    output_zip_path: Path,
     sample_name: str, 
     dataset_name: str | None, 
     alignment_input: AlignmentInput,
@@ -23,8 +23,8 @@ def fastqc(
     """
     Adds FastQC jobs. If the input is a set of fqs, runs FastQC on each fq file.
     """
-    def _fastqc_one(name, inp: ResourceFile):
-        j = b.new_job(name, dict(sample=sample_name, dataset=dataset_name))
+    def _fastqc_one(jname_, inp: ResourceFile):
+        j = b.new_job(jname_, dict(sample=sample_name, dataset=dataset_name))
         j.image('biocontainers/fastqc:v0.11.9_cv8')
         res = STANDARD.set_resources(j, ncpu=16)
         
@@ -62,9 +62,9 @@ def fastqc(
         fastq_resouces = [pair.as_resources(b) for pair in alignment_input]
 
     for lane_i, pair in enumerate(fastq_resouces):
-        name = f'FastQC R1'
+        jname = f'FastQC R1'
         if len(fastq_resouces) > 1:
-            name += f' lane={lane_i}'
-        j = _fastqc_one(name, pair.r1)
+            jname += f' lane={lane_i}'
+        j = _fastqc_one(jname, pair.r1)
         jobs.append(j)
     return jobs

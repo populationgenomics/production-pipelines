@@ -6,7 +6,7 @@ import logging
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path
 
 from .analysis import AlignmentInput, CramPath, FastqPair
 from .dataset import Cohort, Sex, Dataset
@@ -33,7 +33,7 @@ class MetadataProvider(ABC):
         dataset_names: list[str] | None = None,
         skip_samples: list[str] | None = None,
         only_samples: list[str] | None = None,
-        ped_files: list[CloudPath] | None = None,
+        ped_files: list[Path] | None = None,
         do_check_seq_existence: bool = True,
     ) -> Cohort:
         """
@@ -130,7 +130,7 @@ class MetadataProvider(ABC):
     def populate_pedigree(
         self, 
         cohort: Cohort,
-        ped_files: list[CloudPath] | None = None,
+        ped_files: list[Path] | None = None,
     ) -> None:
         """
         Populate pedigree data
@@ -292,7 +292,7 @@ class CsvMetadataProvider(MetadataProvider):
     def populate_pedigree(
         self, 
         cohort: Cohort,
-        ped_files: list[CloudPath] | None = None,
+        ped_files: list[Path] | None = None,
     ) -> None:
         """
         Populate pedigree data

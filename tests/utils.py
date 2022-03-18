@@ -1,11 +1,10 @@
 import os
 
-from cloudpathlib import CloudPath
-
 from cpg_pipes.pipeline.analysis import GvcfPath
+from cpg_pipes.storage import to_path
 
 DATASET = 'fewgenomes'
-BASE_BUCKET = CloudPath('gs://cpg-fewgenomes-test/unittest')
+BASE_BUCKET = to_path('gs://cpg-fewgenomes-test/unittest')
 
 # Samples for joint calling
 SAMPLES = [

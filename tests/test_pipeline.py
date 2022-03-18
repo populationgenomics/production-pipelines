@@ -3,8 +3,9 @@ import sys
 import tempfile
 import time
 import unittest
-from pathlib import Path
 from unittest.mock import patch
+
+from cpg_pipes.storage import to_path
 
 try:
     from .utils import setup_env, BASE_BUCKET, DATASET, SAMPLES
@@ -21,7 +22,7 @@ class TestPipeline(unittest.TestCase):
         self.timestamp = time.strftime('%Y%m%d-%H%M')
         self.out_bucket = BASE_BUCKET / self.name / self.timestamp
         self.tmp_bucket = self.out_bucket / 'tmp'
-        self.local_tmp_dir = Path(tempfile.mkdtemp())
+        self.local_tmp_dir = to_path(tempfile.mkdtemp())
         self.sample_name = f'Test-{self.timestamp}'
         self.sample_ids = SAMPLES[:3]
 

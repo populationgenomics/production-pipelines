@@ -6,7 +6,8 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from typing import List, Union
-from cloudpathlib import CloudPath
+
+from cpg_pipes.storage import Path, to_path
 from hailtop.batch import ResourceGroup, ResourceFile, Batch
 
 logger = logging.getLogger(__file__)
@@ -29,6 +30,9 @@ class AnalysisType(Enum):
     
     @staticmethod
     def parse(name: str) -> 'AnalysisType':
+        """
+        Parse str and create a AnalysisStatus object
+        """
         return {v.value: v for v in AnalysisType}[name.lower()]
 
 
@@ -45,6 +49,9 @@ class AnalysisStatus(Enum):
     
     @staticmethod
     def parse(name: str) -> 'AnalysisStatus':
+        """
+        Parse str and create a AnalysisStatus object
+        """
         return {v.value: v for v in AnalysisStatus}[name.lower()]
 
 
@@ -60,10 +67,13 @@ class Analysis:
     type: AnalysisType
     status: AnalysisStatus
     sample_ids: set[str]
-    output: CloudPath | None
+    output: Path | None
 
     @staticmethod
     def parse(data: dict) -> 'Analysis':
+        """
+        Parse data to create an Analysis object
+        """
         req_keys = ['id', 'type', 'status']
         if any(k not in data for k in req_keys):
             for key in req_keys:
@@ -73,7 +83,7 @@ class Analysis:
         
         output = data.get('output')
         if output:
-            output = CloudPath(output)
+            output = to_path(output)
 
         a = Analysis(
             id=int(data['id']),
@@ -93,15 +103,15 @@ class CramPath:
     """
     def __init__(
         self, 
-        path: str | CloudPath, 
-        index_path: CloudPath | str | None = None
+        path: str | Path, 
+        index_path: Path | str | None = None
     ):
-        self.path = CloudPath(path)
+        self.path = to_path(path)
         self.is_bam = self.path.suffix == '.bam'
         self.ext = 'cram' if not self.is_bam else 'bam'
         self.index_ext = 'crai' if not self.is_bam else 'bai'
         self._index_path = index_path
-        self.somalier_path = CloudPath(f'{self.path}.somalier')
+        self.somalier_path = to_path(f'{self.path}.somalier')
 
     def __str__(self) -> str:
         return str(self.path)
@@ -113,14 +123,14 @@ class CramPath:
         return self.path.exists()
 
     @property
-    def index_path(self) -> CloudPath:
+    def index_path(self) -> Path:
         """
         Path to the corresponding index
         """
         return (
-            CloudPath(self._index_path) 
+            to_path(self._index_path) 
             if self._index_path 
-            else CloudPath(f'{self.path}.{self.index_ext}')
+            else to_path(f'{self.path}.{self.index_ext}')
         )
 
     def resource_group(self, b: Batch) -> ResourceGroup:
@@ -139,9 +149,9 @@ class GvcfPath:
     Includes a path to a GVCF file along with a correponding TBI index,
     and a corresponding fingerprint path.
     """
-    def __init__(self, path: CloudPath | str):
-        self.path = CloudPath(path)
-        self.somalier_path = CloudPath(f'{self.path}.somalier')
+    def __init__(self, path: Path | str):
+        self.path = to_path(path)
+        self.somalier_path = to_path(f'{self.path}.somalier')
         
     def __str__(self) -> str:
         return str(self.path)
@@ -153,11 +163,11 @@ class GvcfPath:
         return self.path.exists()
 
     @property
-    def tbi_path(self) -> CloudPath:
+    def tbi_path(self) -> Path:
         """
         Path to the corresponding index
         """
-        return CloudPath(f'{self.path}.tbi')
+        return to_path(f'{self.path}.tbi')
     
     def resource_group(self, b: Batch) -> ResourceGroup:
         """
@@ -169,7 +179,7 @@ class GvcfPath:
         })
 
 
-FastqPath = Union[str, CloudPath, ResourceFile]
+FastqPath = Union[str, Path, ResourceFile]
 
 
 @dataclass

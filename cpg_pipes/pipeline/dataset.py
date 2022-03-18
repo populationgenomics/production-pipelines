@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path
 
 from cpg_pipes.pipeline.analysis import AlignmentInput, CramPath, GvcfPath
 from cpg_pipes.storage import Namespace, StorageProvider
@@ -221,7 +221,7 @@ class Dataset(Target):
             )
         return self._storage_provider
 
-    def get_bucket(self, **kwargs) -> CloudPath:
+    def get_bucket(self, **kwargs) -> Path:
         """
         The primary dataset bucket (-main or -test).
         """
@@ -229,7 +229,7 @@ class Dataset(Target):
             dataset=self.stack, namespace=self.namespace, **kwargs,
         )
 
-    def get_tmp_bucket(self, **kwargs) -> CloudPath:
+    def get_tmp_bucket(self, **kwargs) -> Path:
         """
         The tmp bucket (-main-tmp or -test-tmp)
         """
@@ -237,7 +237,7 @@ class Dataset(Target):
             dataset=self.stack, namespace=self.namespace, **kwargs
         )
     
-    def get_analysis_bucket(self, **kwargs) -> CloudPath:
+    def get_analysis_bucket(self, **kwargs) -> Path:
         """
         Get analysis bucket (-main-analysis or -test-analysis)
         """
@@ -245,7 +245,7 @@ class Dataset(Target):
             dataset=self.stack, namespace=self.namespace, **kwargs
         )
     
-    def get_web_bucket(self, **kwargs) -> CloudPath:
+    def get_web_bucket(self, **kwargs) -> Path:
         """
         Get web bucket (-main-web or -test-web)
         """

@@ -3,7 +3,7 @@ Create Hail Batch jobs to run Picard tools (marking duplicates, QC).
 """
 
 import hailtop.batch as hb
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path
 from hailtop.batch.job import Job
 
 from cpg_pipes import images, buckets
@@ -17,8 +17,8 @@ def markdup(
     sorted_bam: hb.ResourceFile,
     sample_name: str,
     dataset_name: str | None = None,
-    output_path: CloudPath | str | None = None,
-    qc_bucket: CloudPath | str | None = None,
+    output_path: Path | None = None,
+    qc_bucket: Path | None = None,
     overwrite: bool = True,
 ) -> Job:
     """
@@ -51,11 +51,7 @@ def markdup(
     j.command(wrap_command(cmd, monitor_space=True))
     
     if output_path:
-        output_path = CloudPath(output_path)
-
-        if qc_bucket:
-            qc_bucket = CloudPath(qc_bucket)
-        else:
+        if not qc_bucket:
             qc_bucket = output_path.parent
     
         b.write_output(j.output_cram, str(output_path.with_suffix('')))

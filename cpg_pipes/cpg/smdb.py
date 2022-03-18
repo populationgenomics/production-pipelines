@@ -6,7 +6,7 @@ import logging
 import traceback
 from textwrap import dedent
 
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
@@ -133,7 +133,7 @@ class SmdbMetadataProvider(MetadataProvider):
     def populate_pedigree(
         self, 
         cohort: Cohort,
-        ped_files: list[CloudPath] | None = None,
+        ped_files: list[Path] | None = None,
     ) -> None:
         """
         Populate pedigree data for samples.
@@ -382,7 +382,7 @@ class SMDB:
 
     def create_analysis(
         self,
-        output: CloudPath | str,
+        output: Path | str,
         type_: str | AnalysisType,
         status: str | AnalysisStatus,
         sample_ids: list[str],
@@ -421,9 +421,9 @@ class SMDB:
         sample_ids: list[str],
         completed_analysis: Analysis | None,
         analysis_type: str,
-        expected_output_fpath: CloudPath,
+        expected_output_fpath: Path,
         dataset_name: str | None = None,
-    ) -> CloudPath | None:
+    ) -> Path | None:
         """
         Checks whether existing analysis exists, and output matches the expected output
         file. Invalidates bad analysis by setting status=failure, and submits a
@@ -438,13 +438,13 @@ class SMDB:
         @param expected_output_fpath: where the pipeline expects the analysis output 
         file to sit on the bucket (will invalidate the analysis if it doesn't match)
         @param dataset_name: the name of the dataset where to create a new analysis
-        :return: path to the output if it can be reused, otherwise None
+        @return: path to the output if it can be reused, otherwise None
         """
         label = f'type={analysis_type}'
         if len(sample_ids) > 1:
             label += f' for {", ".join(sample_ids)}'
 
-        found_output_fpath: CloudPath | None = None
+        found_output_fpath: Path | None = None
         if not completed_analysis:
             logger.warning(
                 f'Not found completed analysis {label} for '
@@ -514,20 +514,25 @@ class SMDB:
         self,
         b: Batch,
         analysis_type: AnalysisType,
-        output_path: CloudPath | str,
+        output_path: Path | str,
         sample_names: list[str],
-        first_j: Job,
-        last_j: Job,
+        first_j: Job | list[Job],
+        last_j: Job | list[Job],
         depends_on: list[Job] | None,
         dataset_name: str | None = None,
-    ) -> Job:
+    ) -> list[Job]:
         """
         Given a first job and a last job object, insert corresponding "queued", 
         "in_progress", and "completed" jobs. Useful to call in the end of a stage
         definition.
         """
+        # Set up dependencies
+        first_jobs = first_j if isinstance(first_j, list) else [first_j]
+        last_jobs = last_j if isinstance(first_j, list) else [first_j]
+
         if not self.do_update_analyses:
-            return last_j
+            return last_jobs
+
         # Interacting with the sample metadata server:
         # 1. Create a "queued" analysis
         aid = self.create_analysis(
@@ -553,11 +558,11 @@ class SMDB:
             dataset_name=dataset_name,
             sample_name=sample_names[0] if len(sample_names) == 1 else None,
         )
-        # Set up dependencies
-        for fj in (first_j if isinstance(first_j, list) else [first_j]):
+
+        for fj in first_jobs:
             fj.depends_on(sm_in_progress_j)
-        sm_completed_j.depends_on(last_j)
+        sm_completed_j.depends_on(*last_jobs)
+
         if depends_on:
             sm_in_progress_j.depends_on(*depends_on)
-        last_j = sm_completed_j
-        return last_j
+        return [sm_completed_j]

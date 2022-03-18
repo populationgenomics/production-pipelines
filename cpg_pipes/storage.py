@@ -1,11 +1,21 @@
 """
 Types specific to Cloud storage. 
 """
+import pathlib
 from enum import Enum
 from abc import ABC, abstractmethod
+from typing import Union
 
 from cloudpathlib import CloudPath
+from cloudpathlib.anypath import to_anypath
 
+
+# Path can be both a cloud URL and local path
+Path = Union[CloudPath, pathlib.Path]
+
+# Using convenience method from cloudpathlib to parse a path string
+to_path = to_anypath
+    
 
 class Namespace(Enum):
     """
@@ -41,7 +51,7 @@ class StorageProvider(ABC):
         suffix: str | None = None,
         version: str | None = None,
         sample: str = None,
-    ) -> CloudPath:
+    ) -> Path:
         """
         Bucket to write results:
         @param dataset: dataset/stack name
@@ -57,7 +67,7 @@ class StorageProvider(ABC):
         namespace: Namespace,
         version: str | None = None,
         sample: str = None,
-    ) -> CloudPath:
+    ) -> Path:
         """
         Bucket for analysis results.
         """
@@ -75,7 +85,7 @@ class StorageProvider(ABC):
         namespace: Namespace,
         version: str | None = None,
         sample: str = None,
-    ) -> CloudPath:
+    ) -> Path:
         """
         Bucket for temporary files.
         """
@@ -93,7 +103,7 @@ class StorageProvider(ABC):
         namespace: Namespace,
         version: str | None = None,
         sample: str = None,
-    ) -> CloudPath:
+    ) -> Path:
         """
         Bucket shared with an HTTP server.
         """

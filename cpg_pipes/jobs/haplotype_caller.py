@@ -4,7 +4,7 @@ Create Hail Batch jobs for variant calling in individual samples.
 
 import logging
 import os
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
@@ -23,16 +23,16 @@ def produce_gvcf(
     b: hb.Batch,
     sample_name: str,
     dataset_name: str,
-    tmp_bucket: CloudPath,
+    tmp_bucket: Path,
     cram_path: CramPath,
-    output_path: CloudPath | None = None,
+    output_path: Path | None = None,
     number_of_intervals: int = 1,
     intervals: hb.ResourceGroup | None = None,
     overwrite: bool = True,
     depends_on: list[Job] | None = None,
     smdb: SMDB | None = None,
     dragen_mode: bool = False,
-) -> Job:
+) -> list[Job]:
     """
     Takes all samples with a 'file' of 'type'='bam' in `samples_df`,
     and runs HaplotypeCaller on them, and sets a new 'file' of 'type'='gvcf'
@@ -41,9 +41,9 @@ def produce_gvcf(
     HaplotypeCaller jobs defined in a nested loop.
     """
     if buckets.can_reuse(output_path, overwrite):
-        return b.new_job('Make GVCF [reuse]', dict(
+        return [b.new_job('Make GVCF [reuse]', dict(
             sample=sample_name, dataset=dataset_name
-        ))
+        ))]
 
     depends_on = depends_on or []
 
@@ -69,27 +69,27 @@ def produce_gvcf(
         overwrite=overwrite,
         depends_on=depends_on + [last_j],
     )
-    last_j = postproc_j
+    last_jobs = [postproc_j]
 
     if smdb:
-        last_j = smdb.add_running_and_completed_update_jobs(
+        last_jobs = smdb.add_running_and_completed_update_jobs(
             b=b,
             analysis_type=AnalysisType.GVCF,
             output_path=output_path,
             sample_names=[sample_name],
             dataset_name=dataset_name,
             first_j=first_j,
-            last_j=last_j,
+            last_j=last_jobs,
             depends_on=depends_on,
         )
-    return last_j
+    return last_jobs
 
 
 def haplotype_caller(
     b: hb.Batch,
     sample_name: str,
     dataset_name: str,
-    tmp_bucket: CloudPath,
+    tmp_bucket: Path,
     cram_path: CramPath,
     number_of_intervals: int = 1,
     intervals: hb.ResourceGroup | None = None,
@@ -101,7 +101,7 @@ def haplotype_caller(
     Run haplotype caller in parallel sharded by intervals. 
     Returns the first and the last job object, and path to the output GVCF file.
     """
-    hc_gvcf_path = CloudPath(tmp_bucket / 'haplotypecaller' / f'{sample_name}.g.vcf.gz')
+    hc_gvcf_path = tmp_bucket / 'haplotypecaller' / f'{sample_name}.g.vcf.gz'
     if buckets.can_reuse(hc_gvcf_path, overwrite):
         first_j = last_j = b.new_job('HaplotypeCaller [reuse]', dict(
             sample=sample_name, dataset=dataset_name))
@@ -169,7 +169,7 @@ def _haplotype_caller_one(
     interval_idx: int | None = None,
     number_of_intervals: int = 1,
     depends_on: list[Job] | None = None,
-    out_gvcf_path: CloudPath | None = None,
+    out_gvcf_path: Path | None = None,
     overwrite: bool = True,
     dragen_mode: bool = False,
 ) -> Job:
@@ -252,7 +252,7 @@ def merge_gvcfs_job(
     sample_name: str,
     dataset_name: str,
     gvcfs: list[hb.ResourceGroup],
-    out_gvcf_path: CloudPath | None,
+    out_gvcf_path: Path | None,
     overwrite: bool = True,
 ) -> Job:
     """
@@ -293,7 +293,7 @@ def postproc_gvcf(
     sample_name: str,
     dataset_name: str,
     overwrite: bool,
-    output_path: CloudPath | None = None,
+    output_path: Path | None = None,
     depends_on: list[Job] | None = None,
 ) -> Job:
     """

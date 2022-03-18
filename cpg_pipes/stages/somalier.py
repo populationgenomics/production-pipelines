@@ -6,7 +6,7 @@ Stages to run somalier tools.
 
 import logging
 
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path
 
 from cpg_pipes.jobs import somalier
 from cpg_pipes.pipeline.dataset import Dataset
@@ -23,7 +23,7 @@ class CramSomalierStage(SampleStage):
     Genereate fingerprints from CRAMs for pedigree checks.
     """
 
-    def expected_result(self, sample: Sample) -> CloudPath:
+    def expected_result(self, sample: Sample) -> Path:
         """
         Expected to generate the fingerprints file
         """
@@ -53,7 +53,7 @@ class CramSomalierPedigree(DatasetStage):
     Checks pedigree from CRAM fingerprints.
     """
 
-    def expected_result(self, dataset: Dataset) -> dict[str, CloudPath]:
+    def expected_result(self, dataset: Dataset) -> dict[str, Path]:
         """
         Return the report for MultiQC, plus putting an HTML into the web bucket.
         MultiQC expects the following patterns:
@@ -106,7 +106,7 @@ class CramSomalierAncestry(DatasetStage):
     Checks pedigree from CRAM fingerprints
     """
 
-    def expected_result(self, dataset: Dataset) -> dict[str, CloudPath]:
+    def expected_result(self, dataset: Dataset) -> dict[str, Path]:
         """
         Return the report for MultiQC, plus putting an HTML into the web bucket.
         MultiQC expects the following patterns:

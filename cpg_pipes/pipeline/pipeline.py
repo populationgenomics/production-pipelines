@@ -50,22 +50,18 @@ import shutil
 import tempfile
 import time
 from abc import ABC, abstractmethod
-from pathlib import Path
 from typing import Optional, cast, Union, Any, Callable, Type
-
-from cloudpathlib import CloudPath
 
 from .analysis import AnalysisType
 from .dataset import Dataset, Cohort, Sample, Pair
 from .exceptions import PipelineError
 from .metadata_provider import CsvMetadataProvider, MetadataProvider
 from .stage import Stage, ExpectedResultT, StageInput, StageOutput
-from .. import buckets
 from ..cpg.smdb import SMDB, SmdbMetadataProvider
 from ..cpg.storage import CPGStorageProvider
 from ..hb.batch import setup_batch, Batch
 from ..hb.prev_job import PrevJob
-from ..storage import Namespace, StorageProvider
+from ..storage import Namespace, StorageProvider, Path, to_path
 
 logger = logging.getLogger(__file__)
 
@@ -81,7 +77,7 @@ _ALL_DEFINED_STAGES = []
 def stage(
     _cls: Optional[Type[Stage]] = None, 
     *,
-    sm_analysis_type: AnalysisType|None = None, 
+    sm_analysis_type: AnalysisType | None = None, 
     required_stages: list[StageDecorator] | StageDecorator | None = None,
     skipped: bool = False,
     required: bool | None = None,
@@ -139,7 +135,7 @@ def skip(
     assume_results_exist: bool = False,
 ) -> Union[StageDecorator, Callable[..., StageDecorator]]:
     """
-    Decorator on top of `@stage` that sets the self.skipped field to True
+    Decorator on top of `@stage` that sets the `self.skipped` field to True
 
     @skip
     @stage
@@ -192,7 +188,7 @@ class Pipeline:
         version: str | None = None,
         storage_provider: StorageProvider | None = None,
         metadata_source: str = 'smdb',
-        metadata_csv: str | None = None,
+        metadata_csv_path: str | None = None,
         stages_in_order: list[StageDecorator] | None = None,
         keep_scratch: bool = True,
         dry_run: bool = False,
@@ -211,7 +207,7 @@ class Pipeline:
         skip_samples: list[str] | None = None,
         only_samples: list[str] | None = None,
         force_samples: list[str] | None = None,
-        ped_files: list[CloudPath] | None = None,
+        ped_files: list[Path] | None = None,
         local_dir: Path | None = None,
     ):
         if stages_in_order and not input_datasets:
@@ -243,7 +239,7 @@ class Pipeline:
         self.last_stage = last_stage
         self.validate_smdb_analyses = validate_smdb_analyses
 
-        self.tmp_bucket = CloudPath(
+        self.tmp_bucket = to_path(
             self.cohort.analysis_dataset.get_tmp_bucket(
                 version=f'{self.name}/{self.version}'
             )
@@ -252,10 +248,10 @@ class Pipeline:
         self.dry_run: bool = dry_run
 
         if local_dir:
-            self.local_dir = Path(local_dir)
-            self.local_tmp_dir = Path(tempfile.mkdtemp(dir=local_dir))
+            self.local_dir = to_path(local_dir)
+            self.local_tmp_dir = to_path(tempfile.mkdtemp(dir=local_dir))
         else:
-            self.local_dir = self.local_tmp_dir = Path(tempfile.mkdtemp())
+            self.local_dir = self.local_tmp_dir = to_path(tempfile.mkdtemp())
 
         self.prev_batch_jobs = dict()
         if previous_batch_tsv_path is not None:
@@ -290,13 +286,13 @@ class Pipeline:
                 )
                 metadata_provider = SmdbMetadataProvider(self._db)
             else:
-                assert metadata_csv == 'csv'
-                if not metadata_csv:
+                assert metadata_source == 'csv'
+                if not metadata_csv_path:
                     raise PipelineError(
                         '--metadata-source is "csv", --metadata-csv path must be '
                         'provided'
                     )
-                with buckets.str_to_path(metadata_csv).open() as fp:
+                with to_path(metadata_csv_path).open() as fp:
                     metadata_provider = CsvMetadataProvider(fp=fp)
 
             metadata_provider.populate_cohort(
@@ -444,7 +440,7 @@ class Pipeline:
             )
 
         # Second round - actually adding jobs from the stages.
-        for i, stage_ in enumerate(self._stages_dict.values()):
+        for i, (_, stage_) in enumerate(self._stages_dict.items()):
             if not stage_.skipped:
                 logger.info(f'*' * 60)
                 logger.info(f'Stage {stage_.name}')
@@ -507,7 +503,7 @@ class SampleStage(Stage[Sample], ABC):
     @abstractmethod
     def expected_result(self, sample: Sample) -> ExpectedResultT:
         """
-        CloudPath(s) to files that the stage is epxected to generate for the `target`.
+        to_path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
         by the pipeline to get expected paths when the stage is skipped and
         didn't return a `StageDeps` object from `add_jobs()`.
@@ -550,7 +546,7 @@ class PairStage(Stage, ABC):
     @abstractmethod
     def expected_result(self, pair: Pair) -> ExpectedResultT:
         """
-        CloudPath(s) to files that the stage is epxected to generate for the `target`.
+        to_path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
         by the pipeline to get expected paths when the stage is skipped and
         didn't return a `StageDeps` object from `add_jobs()`.
@@ -594,7 +590,7 @@ class DatasetStage(Stage, ABC):
     @abstractmethod
     def expected_result(self, dataset: Dataset) -> ExpectedResultT:
         """
-        CloudPath(s) to files that the stage is epxected to generate for the `target`.
+        to_path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
         by the pipeline to get expected paths when the stage is skipped and
         didn't return a `StageDeps` object from `add_jobs()`.
@@ -631,7 +627,7 @@ class CohortStage(Stage, ABC):
     @abstractmethod
     def expected_result(self, cohort: Cohort) -> ExpectedResultT:
         """
-        CloudPath(s) to files that the stage is epxected to generate for the `target`.
+        to_path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
         by the pipeline to get expected paths when the stage is skipped and
         didn't return a `StageDeps` object from `add_jobs()`.

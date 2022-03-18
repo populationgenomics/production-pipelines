@@ -66,7 +66,7 @@ def _subset_samples_and_variants(mt, subset_tsv_path: str) -> hl.MatrixTable:
     in those samples
     @param mt: MatrixTable from VCF
     @param subset_tsv_path: path to a TSV file with a single column 's', with no header
-    :return: MatrixTable subsetted to list of samples
+    @return: MatrixTable subsetted to list of samples
     """
     count_before = mt.count_cols()
 

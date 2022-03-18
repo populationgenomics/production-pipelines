@@ -6,12 +6,12 @@ import logging
 from typing import Tuple
 
 import hailtop.batch as hb
-from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 
 from cpg_pipes import images, buckets
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.storage import Path
 
 logger = logging.getLogger(__file__)
 
@@ -20,7 +20,7 @@ def gather_vcfs(
     b: hb.Batch,
     input_vcfs: list[hb.ResourceGroup],
     overwrite: bool,
-    output_vcf_path: CloudPath | None = None,
+    output_vcf_path: Path | None = None,
     site_only: bool = False,
 ) -> Tuple[Job, hb.ResourceGroup]:
     """

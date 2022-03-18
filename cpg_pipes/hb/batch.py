@@ -7,7 +7,8 @@ import os
 from typing import Optional, Dict
 
 import hailtop.batch as hb
-from cloudpathlib import CloudPath
+
+from cpg_pipes.storage import Path, to_path
 from hailtop.batch.job import Job
 
 logger = logging.getLogger(__file__)
@@ -16,7 +17,7 @@ logger = logging.getLogger(__file__)
 class Batch(hb.Batch):
     """
     Thin subclass of the Hail `Batch` class. The aim is to be able to register
-    the create jobs to be able to print statistics before submitting.
+    created jobs, in order to print statistics before submitting the Batch.
     """
     def __init__(self, name, backend, *args, **kwargs):
         super().__init__(name, backend, *args, **kwargs)
@@ -61,15 +62,15 @@ class Batch(hb.Batch):
 def setup_batch(
     description: str, 
     keep_scratch: bool = False,
-    tmp_bucket: CloudPath | None = None,
+    tmp_bucket: Path | None = None,
     billing_project: str | None = None,
-    hail_bucket: CloudPath | None = None,
+    hail_bucket: Path | None = None,
 ) -> Batch:
     """
     Wrapper around the initialization of a Hail Batch object.
     Handles setting the temporary bucket and the billing project.
 
-    @param title: descriptive name of the Batch (will be displayed in the GUI)
+    @param description: descriptive name of the Batch (will be displayed in the GUI)
     @param billing_project: Hail billing project name
     @param tmp_bucket: path to temporary bucket. Will be used if neither 
         the hail_bucket parameter nor HAIL_BUCKET env var are set.
@@ -98,15 +99,15 @@ def setup_batch(
 
 
 def get_hail_bucket(
-    tmp_bucket: CloudPath | None = None, 
+    tmp_bucket: Path | None = None, 
     keep_scratch: bool = False,
-) -> CloudPath:
+) -> Path:
     """
     Get bucket where Hail Batch will keep scratch files
     """
-    hail_bucket = os.environ.get('HAIL_BUCKET')
+    hail_bucket_str = os.environ.get('HAIL_BUCKET')
     
-    if not hail_bucket and not tmp_bucket:
+    if not hail_bucket_str and not tmp_bucket:
         raise ValueError(
             'Either the tmp_bucket parameter, or the HAIL_BUCKET '
             'environment variable must be set.'
@@ -120,11 +121,13 @@ def get_hail_bucket(
             'automatically on schedule.'
         )
         
-    if keep_scratch or not hail_bucket:
+    if keep_scratch or not hail_bucket_str:
         assert tmp_bucket
         hail_bucket = tmp_bucket / 'hail'
+    else:
+        hail_bucket = to_path(hail_bucket_str)
 
-    return CloudPath(hail_bucket)
+    return hail_bucket
 
 
 def job_name(name, sample: str = None, dataset: str = None) -> str:

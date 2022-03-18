@@ -5,7 +5,7 @@ Batch pipeline to run WGS QC.
 """
 
 import logging
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path
 from hailtop.batch.job import Job
 
 from cpg_pipes.hb.batch import Batch
@@ -19,10 +19,10 @@ logger = logging.getLogger(__file__)
 def multiqc(
     b: Batch,
     dataset_name: str,
-    tmp_bucket: CloudPath,
-    paths: list[CloudPath],
-    out_html_path: CloudPath,
-    out_json_path: CloudPath,
+    tmp_bucket: Path,
+    paths: list[Path],
+    out_html_path: Path,
+    out_json_path: Path,
     out_html_url: str | None = None,
     ending_to_trim: set[str] | None = None,
     modules_to_trim_endings: set[str] | None = None,

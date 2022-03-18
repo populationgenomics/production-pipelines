@@ -7,7 +7,7 @@ Batch pipeline to run WGS QC.
 import logging
 
 import click
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path
 
 from cpg_pipes.buckets import exists
 from cpg_pipes.jobs.multiqc import multiqc
@@ -37,7 +37,7 @@ class MultiQC(DatasetStage):
     """
     Run MultiQC to summarise all QC.
     """
-    def expected_result(self, dataset: Dataset) -> dict[str, CloudPath]:
+    def expected_result(self, dataset: Dataset) -> dict[str, Path]:
         """
         Expected to produce an HTML and a correponding JSON file.
         """

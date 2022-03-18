@@ -4,7 +4,7 @@ Stage that generates a GVCF file.
 
 import logging
 
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path
 
 from cpg_pipes.jobs import split_intervals, haplotype_caller
 from cpg_pipes.pipeline.analysis import AnalysisType
@@ -23,7 +23,7 @@ class GvcfStage(SampleStage):
     """
     hc_intervals = None
 
-    def expected_result(self, sample: Sample) -> CloudPath:
+    def expected_result(self, sample: Sample) -> Path:
         """
         Generate a GVCF and corresponding TBI index
         """
@@ -39,7 +39,7 @@ class GvcfStage(SampleStage):
                 b=self.b,
                 scatter_count=hc_shards_num,
             )
-        gvcf_job = haplotype_caller.produce_gvcf(
+        jobs = haplotype_caller.produce_gvcf(
             b=self.b,
             output_path=self.expected_result(sample),
             sample_name=sample.id,
@@ -55,5 +55,5 @@ class GvcfStage(SampleStage):
         return self.make_outputs(
             sample,
             data=self.expected_result(sample), 
-            jobs=[gvcf_job]
+            jobs=jobs
         )

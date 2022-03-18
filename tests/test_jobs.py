@@ -4,10 +4,12 @@ import time
 import unittest
 from os.path import join
 from typing import Dict
+import hailtop.batch as hb
+from hailtop.batch.job import Job
 
 from analysis_runner import dataproc
-from cloudpathlib import CloudPath
 
+from cpg_pipes.storage import Path, to_path
 from cpg_pipes import benchmark, utils
 from cpg_pipes.jobs import vep
 from cpg_pipes.jobs.align import align
@@ -15,7 +17,7 @@ from cpg_pipes.jobs.haplotype_caller import produce_gvcf
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
-from cpg_pipes.pipeline.analysis import CramPath
+from cpg_pipes.pipeline.analysis import CramPath, GvcfPath
 from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes import buckets, images
 from cpg_pipes.ref_data import REF_D
@@ -48,15 +50,15 @@ class TestJobs(unittest.TestCase):
     def tearDown(self) -> None:
         shutil.rmtree(self.local_tmp_dir)
 
-    def _read_file(self, path: CloudPath) -> str:
+    def _read_file(self, path: Path) -> str:
         with path.open() as f:
             return f.read().strip()
 
     def _job_get_cram_details(
         self, 
-        cram_path: CloudPath, 
-        out_bucket: CloudPath,
-    ) -> Dict[str, CloudPath]:
+        cram_path: Path, 
+        out_bucket: Path,
+    ) -> Dict[str, Path]:
         """ 
         Add job that gets details of a CRAM file
         """
@@ -83,13 +85,19 @@ class TestJobs(unittest.TestCase):
             d[key] = out_path
         return d
 
-    def _job_get_gvcf_header(self, gvcf_path) -> CloudPath:
+    def _job_get_gvcf_header(
+        self, 
+        vcf_path: Path, 
+        jobs: list[Job],
+    ) -> Path:
         """ 
         Parses header of GVCF file
         """
+        vcf_input = self.pipeline.b.read_input(str(vcf_path))
         test_j = self.pipeline.b.new_job('Parse GVCF sample name')
         test_j.image(images.BCFTOOLS_IMAGE)
-        test_j.command(f'bcftools query -l {gvcf_path} > {test_j.output}')
+        test_j.command(f'bcftools query -l {vcf_input} > {test_j.output}')
+        test_j.depends_on(*jobs)
 
         out_path = self.out_bucket / f'{self.sample_name}.out'
         self.pipeline.b.write_output(test_j.output, str(out_path))
@@ -172,9 +180,11 @@ class TestJobs(unittest.TestCase):
         Test individual sample haplotype calling
         """
         cram_path = CramPath(
-            f'{benchmark.BENCHMARK_BUCKET}/outputs/TINY_CRAM/dragmap-picard.cram'
+            to_path(benchmark.BENCHMARK_BUCKET) /
+            'outputs' / 'TINY_CRAM' / 'dragmap-picard.cram'
         )
-        j = produce_gvcf(
+        out_gvcf_path = self.out_bucket / 'test_haplotype_calling.g.vcf.gz'
+        jobs = produce_gvcf(
             self.pipeline.b,
             sample_name=self.sample_name,
             dataset_name=DATASET,
@@ -182,8 +192,9 @@ class TestJobs(unittest.TestCase):
             number_of_intervals=10,
             tmp_bucket=self.tmp_bucket,
             dragen_mode=True,
+            output_path=out_gvcf_path,
         )
-        test_result_path = self._job_get_gvcf_header(j.output_gvcf['g.vcf.gz'])
+        test_result_path = self._job_get_gvcf_header(out_gvcf_path, jobs)
         self.pipeline.submit_batch(wait=True)     
         contents = self._read_file(test_result_path)
         self.assertEqual(self.sample_name, contents.split()[-1])
@@ -194,7 +205,7 @@ class TestJobs(unittest.TestCase):
         """
         genomicsdb_bucket = self.out_bucket / 'genomicsdb'
         out_vcf_path = self.out_bucket / 'joint-called.vcf.gz'
-        out_siteonly_vcf_path = CloudPath(
+        out_siteonly_vcf_path = to_path(
             str(out_vcf_path).replace('.vcf.gz', '-siteonly.vcf.gz')
         )
 
@@ -202,7 +213,7 @@ class TestJobs(unittest.TestCase):
         for sid in SAMPLES:
             proj.add_sample(sid, sid)
 
-        j = make_joint_genotyping_jobs(
+        jobs = make_joint_genotyping_jobs(
             b=self.pipeline.b,
             out_vcf_path=out_vcf_path,
             out_siteonly_vcf_path=out_siteonly_vcf_path,
@@ -214,7 +225,7 @@ class TestJobs(unittest.TestCase):
             scatter_count=10,
             tool=JointGenotyperTool.GenotypeGVCFs,
         )
-        test_result_path = self._job_get_gvcf_header(j.output_vcf['vcf.gz'])
+        test_result_path = self._job_get_gvcf_header(out_vcf_path, jobs)
         self.pipeline.submit_batch(wait=True)     
         self.assertTrue(buckets.exists(out_vcf_path))
         self.assertTrue(buckets.exists(out_siteonly_vcf_path))
@@ -227,13 +238,13 @@ class TestJobs(unittest.TestCase):
         """
         Test AS-VQSR
         """
-        siteonly_vcf_path = CloudPath(
+        siteonly_vcf_path = to_path(
             'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
             'joint-called-siteonly.vcf.gz'
         )
         tmp_vqsr_bucket = self.tmp_bucket / 'vqsr'
         out_vcf_path = self.out_bucket / 'vqsr' / 'vqsr.vcf.gz'
-        j = make_vqsr_jobs(
+        jobs = make_vqsr_jobs(
             b=self.pipeline.b,
             input_vcf_or_mt_path=siteonly_vcf_path,
             work_bucket=tmp_vqsr_bucket,
@@ -243,7 +254,7 @@ class TestJobs(unittest.TestCase):
             use_as_annotations=True,
             overwrite=True,
         )
-        res_path = self._job_get_gvcf_header(j.output_vcf['vcf.gz'])
+        res_path = self._job_get_gvcf_header(out_vcf_path, jobs)
         self.pipeline.submit_batch(wait=True)     
         self.assertTrue(buckets.exists(out_vcf_path))
         contents = self._read_file(res_path)
@@ -253,7 +264,7 @@ class TestJobs(unittest.TestCase):
         """
         Tests command line VEP with LoF plugin and MANE_SELECT annotation
         """
-        site_only_vcf_path = CloudPath(
+        site_only_vcf_path = to_path(
             'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
             'vqsr.vcf.gz'
         )

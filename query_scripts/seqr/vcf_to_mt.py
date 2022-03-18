@@ -210,7 +210,7 @@ def import_vcf(source_paths, genome_version):
     takes advantage of all CPUs.
     :source_paths: list of paths to multi-sample VCFs
     :genome_version: GRCh37 or GRCh38
-    :return a MatrixTable
+    @return a MatrixTable
     """
     recode = {}
     if genome_version == 'GRCh38':
@@ -234,7 +234,7 @@ def annotate_old_and_split_multi_hts(mt):
 
     Saves the old allele and locus because while split_multi does this, split_multi_hts drops this. Will see if
     we can add this to split_multi_hts and then this will be deprecated.
-    :return: mt that has pre-annotations
+    @return: mt that has pre-annotations
     """
     # Named `locus_old` instead of `old_locus` because split_multi_hts drops `old_locus`.
     return hl.split_multi_hts(
@@ -349,7 +349,7 @@ def elasticsearch_row(ds):
     TODO:
     - Call validate
     - when all annotations are here, whitelist fields to send instead of blacklisting.
-    :return:
+    @return:
     """
     # Converts a mt to the row equivalent.
     if isinstance(ds, hl.MatrixTable):
@@ -370,7 +370,7 @@ def get_sample_type_stats(mt, threshold=0.3):
 
     @param mt: Matrix Table to check
     @param threshold: if the matched percentage is over this threshold, we classify as match
-    :return: a dict of coding/non-coding to dict with 'matched_count', 'total_count' and 'match' boolean.
+    @return: a dict of coding/non-coding to dict with 'matched_count', 'total_count' and 'match' boolean.
     """
     stats = {}
     types_to_ht_path = {
@@ -404,7 +404,7 @@ def validate_mt(mt, sample_type):
 
     @param mt: mt to validate
     @param sample_type: WGS or WES
-    :return: True or Exception
+    @return: True or Exception
     """
     sample_type_stats = get_sample_type_stats(mt)
 
@@ -449,7 +449,7 @@ def validate_mt(mt, sample_type):
 def add_37_coordinates(mt):
     """Annotates the GRCh38 MT with 37 coordinates using hail's built-in liftover
     @param mt: MatrixTable from VCF
-    :return: MatrixTable annotated with GRCh37 coordinates
+    @return: MatrixTable annotated with GRCh37 coordinates
     """
     rg37 = hl.get_reference('GRCh37')
     rg38 = hl.get_reference('GRCh38')

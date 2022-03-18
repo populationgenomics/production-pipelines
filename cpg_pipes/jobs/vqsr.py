@@ -5,7 +5,7 @@ Create Hail Batch jobs to create and apply a VQSR models.
 from typing import List, Optional
 import logging
 import hailtop.batch as hb
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path
 from hailtop.batch.job import Job
 from analysis_runner import dataproc
 
@@ -83,18 +83,18 @@ INDEL_RECALIBRATION_TRANCHE_VALUES = [
 
 def make_vqsr_jobs(
     b: hb.Batch,
-    input_vcf_or_mt_path: CloudPath,
-    work_bucket: CloudPath,
+    input_vcf_or_mt_path: Path,
+    work_bucket: Path,
     gvcf_count: int,
     scatter_count: int = ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS,
     depends_on: list[Job] | None = None,
-    meta_ht_path: CloudPath | None = None,
-    hard_filter_ht_path: CloudPath | None = None,
-    output_vcf_path: CloudPath | None = None,
+    meta_ht_path: Path | None = None,
+    hard_filter_ht_path: Path | None = None,
+    output_vcf_path: Path | None = None,
     use_as_annotations: bool = True,
     overwrite: bool = True,
     convert_vcf_to_site_only: bool = False,
-) -> Job:
+) -> list[Job]:
     """
     Add jobs that perform the allele-specific VQSR variant QC
 
@@ -102,7 +102,7 @@ def make_vqsr_jobs(
     @param input_vcf_or_mt_path: path to a multi-sample VCF or matrix table
     @param meta_ht_path: if input_vcf_or_mt_path is a matrix table, this table will 
            be used as a source of annotations for that matrix table, i.e. 
-           to filter out samples flagged as meta.related
+           to filter out samples flagged as `meta.related`
     @param hard_filter_ht_path: if input_vcf_or_mt_path is a matrix table, this table 
            will be used as a list of samples to hard filter out
     @param work_bucket: bucket for intermediate files
@@ -115,7 +115,7 @@ def make_vqsr_jobs(
     @param overwrite: whether to not reuse intermediate files
     @param convert_vcf_to_site_only: assuming input_vcf_or_mt_path is a VCF,
            convert it to site-only. Otherwise, assuming it's already site-only 
-    :return: a final Job, and a path to the VCF with VQSR annotations
+    @return: a final Job, and a path to the VCF with VQSR annotations
     """
 
     dbsnp_vcf = b.read_input_group(
@@ -335,7 +335,7 @@ def make_vqsr_jobs(
             output_vcf_path=output_vcf_path,
         )
 
-    return recalibrated_gathered_vcf_j
+    return [recalibrated_gathered_vcf_j]
 
 
 def _add_make_sites_only_job(
@@ -378,12 +378,12 @@ def _add_make_sites_only_job(
 
 def add_tabix_step(
     b: hb.Batch,
-    vcf_path: str,
+    vcf_path: Path,
     disk_size: int,
 ) -> Job:
     """
-    Regzip and tabix the combined VCF (for some reason the one output with mt2vcf
-    is not block-gzipped)
+    Regzip and tabix the combined VCF (for some reason the one produced by `mt2vcf`
+    is not block-gzipped).
     """
     j = b.new_job('VQSR: Tabix')
     j.image(images.BCFTOOLS_IMAGE)
@@ -392,7 +392,7 @@ def add_tabix_step(
     j.declare_resource_group(
         combined_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
-    vcf_inp = b.read_input(vcf_path)
+    vcf_inp = b.read_input(str(vcf_path))
     j.command(wrap_command(f"""\
     gunzip {vcf_inp} -c | bgzip -c > {j.combined_vcf['vcf.gz']}
     tabix -p vcf {j.combined_vcf['vcf.gz']}
@@ -440,7 +440,7 @@ def add_split_intervals_step(
 
 def add_sites_only_gather_vcf_step(
     b: hb.Batch,
-    input_vcfs: List[hb.ResourceFile],
+    input_vcfs: list[hb.ResourceGroup],
     disk_size: int,
 ) -> Job:
     """
@@ -647,7 +647,7 @@ def add_snps_variant_recalibrator_scattered_step(
     dbsnp_resource_vcf: hb.ResourceGroup,
     disk_size: int,
     use_as_annotations: bool,
-    interval: Optional[hb.ResourceGroup] = None,
+    interval: hb.Resource | None = None,
     max_gaussians: int = 4,
     is_small_callset: bool = False,
 ) -> Job:
@@ -832,7 +832,7 @@ def add_snps_gather_tranches_step(
 
 def add_apply_recalibration_step(
     b: hb.Batch,
-    input_vcf: hb.ResourceFile,
+    input_vcf: hb.ResourceGroup,
     indels_recalibration: hb.ResourceGroup,
     indels_tranches: hb.ResourceFile,
     snps_recalibration: hb.ResourceGroup,
@@ -841,8 +841,8 @@ def add_apply_recalibration_step(
     use_as_annotations: bool,
     indel_filter_level: float,
     snp_filter_level: float,
-    interval: hb.ResourceGroup | None = None,
-    output_vcf_path: CloudPath | None = None,
+    interval: hb.Resource | None = None,
+    output_vcf_path: Path | None = None,
 ) -> Job:
     """
     Apply a score cutoff to filter variants based on a recalibration table.
@@ -937,7 +937,7 @@ def add_collect_metrics_sharded_step(
     """
     Run CollectVariantCallingMetrics for site-level evaluation.
 
-    This produces detailed and summary metrics report files. The summary metrics
+    This method produces detailed and summary metrics report files. The summary metrics
     provide cohort-level variant metrics and the detailed metrics segment variant
     metrics for each sample in the callset. The detail metrics give the same metrics
     as the summary metrics for the samples plus several additional metrics.
@@ -945,7 +945,7 @@ def add_collect_metrics_sharded_step(
     These are explained in detail at
     https://broadinstitute.github.io/picard/picard-metric-definitions.html.
 
-    Returns: Job object with a single ResourceGroup output j.metrics, with
+    Returns: a `Job` object with a single ResourceGroup output j.metrics, with
     j.metrics.detail_metrics and j.metrics.summary_metrics ResourceFiles
     """
     j = b.new_job('VQSR: CollectMetricsSharded')
@@ -1048,7 +1048,7 @@ def add_gather_variant_calling_metrics_step(
     """
     Combines metrics from multiple CollectVariantCallingMetrics runs.
 
-    Returns: Job object with a single ResourceGroup output j.metrics, with
+    Returns: a `Job` object with a single ResourceGroup output j.metrics, with
     j.metrics.detail_metrics and j.metrics.summary_metrics ResourceFiles
 
     Saves the QC results to a bucket with the `output_path_prefix` prefix
@@ -1064,7 +1064,7 @@ def add_gather_variant_calling_metrics_step(
         }
     )
 
-    input_cmdl = ' '.join('--INPUT {f} ' for f in input_details + input_summaries)
+    input_cmdl = ' '.join(f'--INPUT {f} ' for f in input_details + input_summaries)
     j.command(
         f"""set -euo pipefail
 

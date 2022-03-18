@@ -3,8 +3,7 @@ Adding jobs for fingerprinting and pedigree checks. Mostly using Somalier.
 """
 import os
 import logging
-from pathlib import Path
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path, to_path
 import pandas as pd
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
@@ -21,11 +20,11 @@ logger = logging.getLogger(__file__)
 def pedigree(
     b,
     dataset: Dataset,
-    input_path_by_sid: dict[str, CloudPath | str],
+    input_path_by_sid: dict[str, Path | str],
     overwrite: bool,
-    out_samples_path: CloudPath | None = None,
-    out_pairs_path: CloudPath | None = None,
-    out_html_path: CloudPath | None = None,
+    out_samples_path: Path | None = None,
+    out_pairs_path: Path | None = None,
+    out_html_path: Path | None = None,
     out_html_url: str | None = None,
     depends_on: list[Job] | None = None,
     label: str | None = None,
@@ -83,10 +82,10 @@ def pedigree(
 def ancestry(
     b,
     dataset: Dataset,
-    input_path_by_sid: dict[str, CloudPath | str],
+    input_path_by_sid: dict[str, Path | str],
     overwrite: bool,
-    out_tsv_path: CloudPath,
-    out_html_path: CloudPath,
+    out_tsv_path: Path,
+    out_html_path: Path,
     out_html_url: str | None = None,
     depends_on: list[Job] | None = None,
     label: str | None = None,
@@ -122,12 +121,12 @@ def ancestry(
 def _prep_somalier_files(
     b,
     dataset: Dataset,
-    input_path_by_sid: dict[str, CloudPath | str],
+    input_path_by_sid: dict[str, Path | str],
     overwrite: bool,
     depends_on: list[Job] | None = None,
     label: str | None = None,
     ignore_missing: bool = False,
-) -> tuple[list[Job], dict[str, CloudPath]]:
+) -> tuple[list[Job], dict[str, Path]]:
     """
     Generate .somalier file for each input
     """
@@ -141,7 +140,7 @@ def _prep_somalier_files(
             logger.error(f'Not found somalier input for {sample.id}')
             continue
 
-        input_path = CloudPath(input_path)
+        input_path = to_path(input_path)
 
         if input_path.name.endswith('.somalier'):
             somalier_file_by_sample[sample.id] = input_path
@@ -198,7 +197,7 @@ def _check_pedigree(
         ])
         df.to_csv(str(sample_map_fpath), sep='\t', index=False, header=False)
     script_name = 'check_pedigree.py'
-    script_path = Path(__file__).parent.parent.parent / utils.SCRIPTS_DIR / script_name
+    script_path = to_path(__file__).parent.parent.parent / utils.SCRIPTS_DIR / script_name
     with open(script_path) as f:
         script = f.read()
     # We do not wrap the command nicely to avoid breaking python indents of {script}
@@ -218,12 +217,12 @@ def _check_pedigree(
 
 def _ancestry(
     b: Batch, 
-    somalier_file_by_sample: dict[str, CloudPath],
+    somalier_file_by_sample: dict[str, Path],
     dataset: Dataset,
     label: str | None,
     extract_jobs: list[Job],
-    out_tsv_path: CloudPath,
-    out_html_path: CloudPath,
+    out_tsv_path: Path,
+    out_html_path: Path,
     out_html_url: str | None = None,
     depends_on: list[Job] | None = None,
 ) -> Job:
@@ -275,13 +274,13 @@ def _ancestry(
 
 def _relate(
     b: Batch, 
-    somalier_file_by_sample: dict[str, CloudPath],
+    somalier_file_by_sample: dict[str, Path],
     dataset: Dataset,
     label: str | None,
     extract_jobs: list[Job],
-    out_samples_path: CloudPath | None = None,
-    out_pairs_path: CloudPath | None = None,
-    out_html_path: CloudPath | None = None,
+    out_samples_path: Path | None = None,
+    out_pairs_path: Path | None = None,
+    out_html_path: Path | None = None,
     out_html_url: str | None = None,
     depends_on: list[Job] | None = None,
     dry_run: bool = False,
@@ -346,7 +345,7 @@ def extact_job(
     overwrite: bool,
     label: str | None = None,
     depends_on: list[Job] | None = None,
-    out_fpath: CloudPath | None = None,
+    out_fpath: Path | None = None,
 ) -> Job:
     """
     Run "somalier extract" to generate a fingerprint for a `sample`

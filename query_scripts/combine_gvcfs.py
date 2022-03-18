@@ -16,13 +16,13 @@ import hail as hl
 
 from cpg_pipes.hailquery import init_hail
 from cpg_pipes.utils import get_validation_callback
-from cpg_pipes import buckets, utils, _version
+from cpg_pipes import buckets, utils, version
 
 logger = logging.getLogger(__name__)
 
 
 @click.command()
-@click.version_option(_version.__version__)
+@click.version_option(version.__version__)
 @click.option(
     '--meta-csv',
     'meta_csv_path',
@@ -61,6 +61,9 @@ def main(
     local_tmp_dir: str,
     hail_billing: str,  # pylint: disable=unused-argument
 ):  # pylint: disable=missing-function-docstring
+    """
+    Entry point
+    """
     init_hail('combine_gvcfs', Path(local_tmp_dir))
 
     # Copy the metadata file locally    

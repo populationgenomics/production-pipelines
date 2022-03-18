@@ -53,7 +53,7 @@ def init_hail(name: str, local_tmp_dir: Path = None):
     Initialise Hail, and set up a local directory for logs.
     @param name: name to prefix the log file
     @param local_tmp_dir: local directory to write Hail logs
-    :return:
+    @return:
     """
     if not local_tmp_dir:
         local_tmp_dir = Path(tempfile.mkdtemp())
@@ -81,7 +81,7 @@ def filter_low_conf_regions(
     @param filter_segdup: Whether to filter Segdup regions
     @param filter_telomeres_and_centromeres: Whether to filter telomeres and centromeres
     @param high_conf_regions: Paths to set of high confidence regions to restrict to (union of regions)
-    :return: MatrixTable or Table with low confidence regions removed
+    @return: MatrixTable or Table with low confidence regions removed
     """
     criteria = []
     if filter_lcr:
@@ -121,7 +121,7 @@ def get_truth_ht() -> hl.Table:
         - kgp_phase_1_hc (high confidence sites in 1000 genonmes)
         - mills (Mills & Devine indels)
 
-    :return: A table with the latest version of popular truth data annotations
+    @return: A table with the latest version of popular truth data annotations
     """
     return (
         hl.read_table(HAPMAP_HT)

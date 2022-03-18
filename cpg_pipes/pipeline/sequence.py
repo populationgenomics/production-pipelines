@@ -4,10 +4,10 @@ Sample-metadata DB Sequence entry.
 
 import logging
 from dataclasses import dataclass
-from cloudpathlib import CloudPath
 
 from cpg_pipes import buckets
 from cpg_pipes.pipeline.analysis import AlignmentInput, CramPath, FastqPair
+from cpg_pipes.storage import to_path
 
 logger = logging.getLogger(__file__)
 
@@ -141,8 +141,8 @@ class SmSequence:
                     return None
 
                 fastq_pairs.append(FastqPair(
-                    CloudPath(lane_data[0]['location']),
-                    CloudPath(lane_data[1]['location'])
+                    to_path(lane_data[0]['location']),
+                    to_path(lane_data[1]['location'])
                 ))
 
             return fastq_pairs

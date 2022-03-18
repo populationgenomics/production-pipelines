@@ -2,7 +2,7 @@
 Create Hail Batch jobs for alignment QC.
 """
 import logging
-from cloudpathlib import CloudPath
+from cpg_pipes.storage import Path, to_path
 from hailtop.batch.job import Job
 
 from cpg_pipes import images, buckets, ref_data
@@ -17,7 +17,7 @@ def samtools_stats(
     b,
     cram_path: CramPath,
     sample_name: str,
-    output_path: CloudPath | None = None,
+    output_path: Path | None = None,
     dataset_name: str | None = None,
     overwrite: bool = True,
 ) -> Job:
@@ -28,7 +28,7 @@ def samtools_stats(
     j = b.new_job(jname, dict(sample=sample_name, dataset=dataset_name))
     if not output_path:
         output_path = cram_path.path.with_suffix('.stats')
-    if buckets.can_reuse(cram_path, overwrite):
+    if buckets.can_reuse(cram_path.path, overwrite):
         j.name += ' [reuse]'
         return j
 
@@ -53,7 +53,7 @@ def verify_bamid(
     b,
     cram_path: CramPath,
     sample_name: str,
-    output_path: CloudPath | None = None,
+    output_path: Path | None = None,
     dataset_name: str | None = None,
     overwrite: bool = True,
 ) -> Job:
@@ -65,7 +65,7 @@ def verify_bamid(
     j = b.new_job(jname, dict(sample=sample_name, dataset=dataset_name))
     if not output_path:
         output_path = cram_path.path.with_suffix('.selfSM')
-    if buckets.can_reuse(cram_path, overwrite):
+    if buckets.can_reuse(cram_path.path, overwrite):
         j.name += ' [reuse]'
         return j
 
@@ -74,9 +74,9 @@ def verify_bamid(
     cram = cram_path.resource_group(b)
     reference = b.read_input_group(**ref_data.REF_D)
     cont_ref_d = dict(
-        ud=CloudPath(ref_data.CONTAM_BUCKET) / '1000g.phase3.100k.b38.vcf.gz.dat.UD',
-        bed=CloudPath(ref_data.CONTAM_BUCKET) / '1000g.phase3.100k.b38.vcf.gz.dat.bed',
-        mu=CloudPath(ref_data.CONTAM_BUCKET) / '1000g.phase3.100k.b38.vcf.gz.dat.mu',
+        ud=to_path(ref_data.CONTAM_BUCKET) / '1000g.phase3.100k.b38.vcf.gz.dat.UD',
+        bed=to_path(ref_data.CONTAM_BUCKET) / '1000g.phase3.100k.b38.vcf.gz.dat.bed',
+        mu=to_path(ref_data.CONTAM_BUCKET) / '1000g.phase3.100k.b38.vcf.gz.dat.mu',
     )
     res_group = b.read_input_group(**{k: str(v) for k, v in cont_ref_d.items()})
     
@@ -107,7 +107,7 @@ def picard_wgs_metrics(
     b,
     cram_path: CramPath,
     sample_name: str,
-    output_path: CloudPath | None = None,
+    output_path: Path | None = None,
     dataset_name: str | None = None,
     overwrite: bool = True,
     read_length: int = 250,
@@ -120,7 +120,7 @@ def picard_wgs_metrics(
     j = b.new_job(jname, dict(sample=sample_name, dataset=dataset_name))
     if not output_path:
         output_path = cram_path.path.with_suffix('.csv')
-    if buckets.can_reuse(cram_path, overwrite):
+    if buckets.can_reuse(cram_path.path, overwrite):
         j.name += ' [reuse]'
         return j
 

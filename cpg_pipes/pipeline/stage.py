@@ -3,14 +3,17 @@ Stage classes.
 """
 
 import logging
+import pathlib
 from abc import ABC, abstractmethod
 from typing import Callable, cast, Union, TypeVar, Generic, Any
 
 import hailtop.batch as hb
 from cloudpathlib import CloudPath
+
+from cpg_pipes.storage import Path, to_path
 from hailtop.batch.job import Job
 
-from cpg_pipes.buckets import str_to_path, exists
+from cpg_pipes.buckets import exists
 from cpg_pipes.hb.batch import Batch
 from cpg_pipes.pipeline.analysis import AnalysisType
 from cpg_pipes.pipeline.dataset import Dataset
@@ -26,10 +29,11 @@ logger = logging.getLogger(__file__)
 # correspondinng Target subclass
 TargetT = TypeVar('TargetT', bound=Target)
 
-ExpectedResultT = Union[CloudPath, dict[str, CloudPath], None]
+ExpectedResultT = Union[Path, dict[str, Path], None]
 
 StageOutputData = Union[
-    CloudPath, hb.Resource, dict[str, CloudPath], dict[str, hb.Resource]]
+    Path, hb.Resource, dict[str, Path], dict[str, hb.Resource]
+]
 
 
 class StageOutput:
@@ -52,7 +56,7 @@ class StageOutput:
     def __repr__(self) -> str:
         return f'result {self.data} for target {self.target}, stage {self.stage}'
 
-    def as_path_or_resource(self, id=None) -> CloudPath | hb.Resource:
+    def as_path_or_resource(self, id=None) -> Path | hb.Resource:
         """
         Cast the result to Union[str, hb.Resource], error if can't cast.
         `id` is used to extract the value when the result is a dictionary.
@@ -75,19 +79,19 @@ class StageOutput:
 
         return self.data
 
-    def as_path(self, id=None) -> CloudPath:
+    def as_path(self, id=None) -> Path:
         """
         Cast the result to path. Though exception if failed to cast.
         `id` is used to extract the value when the result is a dictionary.
         """
         res = self.as_path_or_resource(id)
-        if not isinstance(res, CloudPath):
+        if not isinstance(res, CloudPath | pathlib.Path):
             raise ValueError(f'{res} is not a path.')
-        return cast(CloudPath, res)
+        return cast(Path, res)
 
     def as_resource(self, id=None) -> hb.Resource:
         """
-        Cast the result to Hail Batch Resource, error if can't cast.
+        Cast the result to Hail Batch Resource, or throw an error if the cast failed.
         `id` is used to extract the value when the result is a dictionary.
         """
         res = self.as_path_or_resource(id)
@@ -95,9 +99,9 @@ class StageOutput:
             raise ValueError(f'{res} is not a Hail Batch Resource.')
         return cast(hb.Resource, res)
 
-    def as_dict(self) -> dict[str, CloudPath | hb.Resource]:
+    def as_dict(self) -> dict[str, Path | hb.Resource]:
         """
-        Cast the result to a dictionary, error if can't cast.
+        Cast the result to a dictionary, or throw an error if the cast failed.
         """
         if not isinstance(self.data, dict):
             raise ValueError(f'{self.data} is not a dictionary.')
@@ -105,13 +109,15 @@ class StageOutput:
 
     def as_resource_dict(self) -> dict[str, hb.Resource]:
         """
-        Cast the result to a dictionary of Hail Batch Resources, error if can't cast.
+        Cast the result to a dictionary of Hail Batch Resources, 
+        or throw an error if the cast failed
         """
         return {k: self.as_resource(id=k) for k in self.as_dict()}
 
-    def as_path_dict(self) -> dict[str, CloudPath]:
+    def as_path_dict(self) -> dict[str, Path]:
         """
-        Cast the result to a dictionary of strings, error if can't cast.
+        Cast the result to a dictionary of strings, 
+        or throw an error if the cast failed.
         """
         return {k: self.as_path(id=k) for k in self.as_dict()}
 
@@ -121,7 +127,7 @@ StageDecorator = Callable[..., 'Stage']
 
 class StageInput:
     """
-    Represents an input for a stage run. Wraps outputs of all required upstream stages
+    Represents an input for a stage run. It wraps the outputs of all required upstream stages
     for corresponding targets (e.g. all GVCFs from a HaploytypeCallerStage
     for a JointCallingStage, along with Hail Batch jobs).
 
@@ -178,7 +184,7 @@ class StageInput:
         self,
         stage: StageDecorator,
         id: str | None = None,
-    ) -> dict[str, CloudPath]:
+    ) -> dict[str, Path]:
         """
         Get a single file path result, indexed by target for a specific stage
         """
@@ -196,7 +202,7 @@ class StageInput:
 
     def as_dict_by_target(
         self, stage: StageDecorator
-    ) -> dict[str, dict[str, CloudPath]]:
+    ) -> dict[str, dict[str, Path]]:
         """
         Get as a dictoinary of files/resources for a specific stage, indexed by target
         """
@@ -214,7 +220,7 @@ class StageInput:
     def as_path_dict_by_target(
         self,
         stage: StageDecorator,
-    ) -> dict[str, dict[str, CloudPath]]:
+    ) -> dict[str, dict[str, Path]]:
         """
         Get a dictoinary of paths for a specific stage, and indexed by target
         """
@@ -225,7 +231,7 @@ class StageInput:
         target: 'Target',
         stage: StageDecorator,
         id: str | None = None,
-    ) -> CloudPath:
+    ) -> Path:
         """
         Represent as a path to a file, otherwise fail.
         `stage` can be callable, or a subclass of Stage
@@ -245,7 +251,7 @@ class StageInput:
         res = self._results_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_resource(id)
 
-    def as_dict(self, target: 'Target', stage: StageDecorator) -> dict[str, CloudPath]:
+    def as_dict(self, target: 'Target', stage: StageDecorator) -> dict[str, Path]:
         """
         Get a dictoinary of files or Resources for a specific target and stage
         """
@@ -254,7 +260,7 @@ class StageInput:
 
     def as_path_dict(
         self, target: 'Target', stage: StageDecorator
-    ) -> dict[str, CloudPath]:
+    ) -> dict[str, Path]:
         """
         Get a dictoinary of files for a specific target and stage
         """
@@ -274,11 +280,11 @@ class StageInput:
         """
         Build a list of hail batch dependencies from all stages and targets
         """
-        jobs = []
+        all_jobs = []
         for _, results_by_target in self._results_by_target_by_stage.items():
             for _, results in results_by_target.items():
-                jobs.extend(results.jobs)
-        return jobs
+                all_jobs.extend(results.jobs)
+        return all_jobs
 
 
 class Stage(Generic[TargetT], ABC):
@@ -373,12 +379,12 @@ class Stage(Generic[TargetT], ABC):
     @abstractmethod
     def expected_result(self, target: TargetT) -> ExpectedResultT:
         """
-        CloudPath(s) to files that the stage is epxected to generate for the `target`.
+        to_path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
         by the pipeline to get expected paths when the stage is skipped and
         didn't return a `StageDeps` object from `queue_jobs()`.
 
-        Can be a str or a CloudPath object, or a dictionary of str/CloudPath objects.
+        Can be a str or a AnyPath object, or a dictionary of str/AnyPath objects.
         """
 
     @abstractmethod
@@ -395,19 +401,17 @@ class Stage(Generic[TargetT], ABC):
         self,
         target: TargetT,
         data: StageOutputData | str | dict[str, str] | None = None,
-        jobs: list[Job] | None = None
+        jobs: list[Job] | Job | None = None
     ) -> StageOutput:
         """
         Builds a StageDeps object to return from a stage's queue_jobs()
         """
-        # Converting str into Path objects.
-        if isinstance(data, str):
-            data = str_to_path(data)
+        # Converting str into AnyPath objects.
         if isinstance(data, dict):
-            data = {
-                k: str_to_path(v) if isinstance(v, str) else v
-                for k, v in data.items()
-            }
+            data = {k: to_path(v) for k, v in data.items()}
+        elif data is not None:
+            data = to_path(data)
+        jobs = [jobs] if isinstance(jobs, Job) else jobs
         return StageOutput(stage=self, target=target, data=data, jobs=jobs)
 
     def _make_inputs(self) -> StageInput:
@@ -474,7 +478,7 @@ class Stage(Generic[TargetT], ABC):
             # Stage is not needed, returning empty outputs
             return self.make_outputs(target=target)
 
-    def _try_get_reusable_paths(self, target: TargetT) -> dict[str, CloudPath] | CloudPath | None:
+    def _try_get_reusable_paths(self, target: TargetT) -> dict[str, Path] | Path | None:
         """
         Returns outputs that can be reused for the stage for the target,
         or None of none can be reused
@@ -484,14 +488,12 @@ class Stage(Generic[TargetT], ABC):
 
         expected_output = self.expected_result(target)
 
-        # Converting all str into CloudPath
-        expected_paths: dict[str, CloudPath] | CloudPath | None
+        # Converting all str into AnyPath
+        expected_paths: dict[str, Path] | Path | None = None
         if isinstance(expected_output, dict):
-            expected_paths = {k: str_to_path(v) for k, v in expected_output.items()}
-        elif isinstance(expected_output, str):
-            expected_paths = str_to_path(expected_output)
-        else:
-            expected_paths = expected_output
+            expected_paths = {k: to_path(v) for k, v in expected_output.items()}
+        elif expected_output is not None:
+            expected_paths = to_path(expected_output)  # type: ignore
 
         if self.analysis_type is not None:
             # Checking the SMDB
@@ -518,7 +520,7 @@ class Stage(Generic[TargetT], ABC):
             found_path = None
             if self.smdb is not None:
                 found_path = self._try_get_smdb_analysis(
-                    self.smdb, target, cast(CloudPath, expected_paths), validate=validate
+                    self.smdb, target, cast(Path, expected_paths), validate=validate
                 )
             return found_path
 
@@ -535,7 +537,7 @@ class Stage(Generic[TargetT], ABC):
 
         else:
             # Checking that expected output exists:
-            paths: list[CloudPath]
+            paths: list[Path]
             if isinstance(expected_paths, dict):
                 paths = list(expected_paths.values())
             else:
@@ -548,9 +550,9 @@ class Stage(Generic[TargetT], ABC):
         self,
         smdb: SMDB,
         target: TargetT,
-        expected_path: CloudPath,
+        expected_path: Path,
         validate: bool,
-    ) -> CloudPath | None:
+    ) -> Path | None:
         """
         Check if SMDB already has analysis, and invalidate it if the
         output for a stage doesn't exist
@@ -590,7 +592,7 @@ class Stage(Generic[TargetT], ABC):
     def _queue_reuse_job(
         self,
         target: TargetT,
-        found_paths: CloudPath | dict[str, CloudPath]
+        found_paths: Path | dict[str, Path]
     ) -> StageOutput:
         """
         Queues a [reuse] Job
