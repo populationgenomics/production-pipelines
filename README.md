@@ -1,5 +1,4 @@
-class AnalysisStatus:
-pass# Production pipelines
+# Production pipelines
 
 ## cpg_pipes python package
 

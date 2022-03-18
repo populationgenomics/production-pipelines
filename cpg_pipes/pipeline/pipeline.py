@@ -1,48 +1,12 @@
 """
-Provides "Pipeline" class that allows plugging multiple "stages" together
-by resolving dependencies through the sample-metadata database, or by checking
-objects on buckets directly. 
+Provides `Pipeline` class and a `@stage` decorator that allows to define pipeline
+stages and plug them together.
 
-Each stage adds jobs to Hail Batch. Each stage acts on "target", which can be a 
-sample, a dataset, or an entire cohort (= all input datasets combined). Pipeline 
-would resolve dependencies between stages of different levels accordingly.
+Workflow of a stage is to add jobs to Hail Batch. Each stage acts on a `Target`, 
+which can be a `Sample`, a `Dataset`, or a `Cohort` (= all input datasets combined). 
+Pipeline would resolve dependencies between stages of different levels accordingly.
 
-Basic example:
-
-@stage(analysis_type=AnalysisType.CRAM)
-class CramStage(SampleStage):
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        expected_path = self.expected_result(pipe)
-        job = align.bwa(b=self.pipe.b, ..., output_path=expected_path)
-        return self.make_outputs(sample, data=expected_path, jobs=[job])
-
-@stage(analysis_type=AnalysisType.GVCF, required_stages=CramStage)
-class GvcfStage(SampleStage):
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        cram_path = inputs.as_path(target=sample, stage=CramStage)
-        expected_path = self.expected_result(pipe)
-        job = haplotype_caller.produce_gvcf(b=self.pipe.b, ..., output_path=expected_path)
-        return self.make_outputs(sample, data=expected_path, jobs=[job])
-
-@stage(analysis_type=AnalysisType.JOINT_CALLING, required_stages=GvcfStage)
-class JointCallingStage(CohortStage):
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        gvcf_by_sid = inputs.as_path_by_target(stage=GvcfStage)
-        expected_path = self.expected_result(cohort)
-        job = make_joint_genotyping_jobs(b=self.pipe.b, ..., output_path=expected_path)
-        return self.make_outputs(cohort, data=expected_path, jobs=[job])
-
-@click.command()
-@pipeline_click_options
-def main(**kwargs):
-    p = Pipeline(
-        name='my_joint_calling_pipeline',
-        title='My joint calling pipeline',
-        **kwargs
-    )
-    p.submit_batches()
-
-For more usage examples, see the "pipelines" folder in the root of this repository.
+For examples of pipelines, see the `pipelines/` folder in the repository root.
 """
 import functools
 import logging
