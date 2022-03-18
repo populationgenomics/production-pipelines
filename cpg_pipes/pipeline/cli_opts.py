@@ -90,11 +90,12 @@ def pipeline_click_options(function: Callable) -> Callable:
             'metadata_source',
             default='smdb',
             type=click.Choice(['smdb', 'csv']),
-            help='Source of input metadata',
+            help='Source of input metadata. For "csv", use --metadata-csv to specify '
+                 'the CSV file location',
         ),
         click.option(
             '--metadata-csv', 
-            'metadata_csv',
+            'metadata_csv_path',
             help='CSV file with metdata, if --metadata-source=csv is set',
         ),
         click.option(

@@ -189,7 +189,7 @@ class TestJobs(unittest.TestCase):
             sample_name=self.sample_name,
             dataset_name=DATASET,
             cram_path=cram_path,
-            number_of_intervals=10,
+            number_of_intervals=2,
             tmp_bucket=self.tmp_bucket,
             dragen_mode=True,
             output_path=out_gvcf_path,

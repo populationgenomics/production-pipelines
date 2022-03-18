@@ -455,21 +455,9 @@ class Stage(Generic[TargetT], ABC):
         elif self.required:
             reusable_paths = self._try_get_reusable_paths(target)
             if not reusable_paths:
-                # if isinstance(target, Sample) and 
-                # self.pipe.skip_samples_with_missing_input:
-                #     logger.info(
-                #         f'Stage {self.name} is skipped and required, however '
-                #         f'--skip-samples-without-first-stage-input is set, 
-                #         so skipping '
-                #         f'this target ({target.target_id}).'
-                #     )
-                #     target.active = False
-                #     return self.make_outputs(target=target)  # type: ignore 
-                # else:
                 raise ValueError(
-                    f'Stage {self.name} is required, but skipped and '
-                    f'cannot reuse outputs for '
-                    f'target {target.__class__.__name__}("{target.target_id}")'
+                    f'Stage {self.name} is required, but is skipped, and '
+                    f'expected outputs for target {target.target_id} do not exist.)'
                 )
             else:
                 return self.make_outputs(target=target, data=reusable_paths)

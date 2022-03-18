@@ -50,7 +50,7 @@ class Cohort(Target):
     @property
     def target_id(self) -> str:
         """Unique target ID"""
-        return f'Cohort({self.name}, {len(self.get_datasets())} datasets)'
+        return f'Cohort("{self.name}", {len(self.get_datasets())} datasets)'
 
     def get_datasets(self, only_active: bool = True) -> list['Dataset']:
         """
@@ -201,7 +201,7 @@ class Dataset(Target):
     @property
     def target_id(self) -> str:
         """Unique target ID"""
-        return f'Dataset({self.name})'
+        return f'Dataset("{self.name}")'
     
     def __repr__(self):
         return f'Dataset("{self.name}", {len(self.get_samples())} samples)'
@@ -399,7 +399,7 @@ class Sample(Target):
     @property
     def target_id(self) -> str:
         """Unique target ID"""
-        return f'Sample({self.id})'
+        return f'Sample("{self.id})"'
 
     def get_ped_dict(self, use_participant_id: bool = False) -> dict[str, str]:
         """

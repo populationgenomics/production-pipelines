@@ -237,7 +237,8 @@ def _haplotype_caller_one(
     -O {j.output_gvcf['g.vcf.gz']} \\
     -G AS_StandardAnnotation \\
     -GQB 20 \\
-    -ERC GVCF
+    -ERC GVCF \\
+    --create-output-variant-index
     """
     j.command(wrap_command(
         cmd, monitor_space=True, setup_gcp=True, define_retry_function=True
