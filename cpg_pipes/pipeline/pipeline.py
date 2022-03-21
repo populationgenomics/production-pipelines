@@ -146,7 +146,7 @@ def skip(
 
 class Pipeline:
     """
-    Represents a Pipeline, and incapulates a Hail Batch object, stages, 
+    Represents a Pipeline, and encapulates a Hail Batch object, stages, 
     and a cohort of datasets of samples.
     """
     def __init__(
