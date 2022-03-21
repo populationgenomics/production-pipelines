@@ -56,7 +56,7 @@ _ALL_DEFINED_STAGES = []
 
 
 def stage(
-    _cls: Optional[Type['Stage']] = None, 
+    cls: Optional[Type['Stage']] = None, 
     *,
     analysis_type: str | None = None, 
     required_stages: list[StageDecorator] | StageDecorator | None = None,
@@ -77,13 +77,13 @@ def stage(
         def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
             ...
     """
-    def decorator_stage(cls) -> StageDecorator:
+    def decorator_stage(_cls) -> StageDecorator:
         """Implements decorator."""
-        @functools.wraps(cls)
+        @functools.wraps(_cls)
         def wrapper_stage(pipeline: 'Pipeline') -> Stage:
             """Decorator helper function."""
-            return cls(
-                name=cls.__name__,
+            return _cls(
+                name=_cls.__name__,
                 batch=pipeline.b,
                 required_stages=required_stages,
                 analysis_type=analysis_type,
@@ -102,10 +102,10 @@ def stage(
         _ALL_DEFINED_STAGES.append(wrapper_stage)
         return wrapper_stage
 
-    if _cls is None:
+    if cls is None:
         return decorator_stage
     else:
-        return decorator_stage(_cls)
+        return decorator_stage(cls)
 
 
 def skip(
@@ -619,7 +619,7 @@ class StageInput:
         self, stage: StageDecorator
     ) -> dict[str, dict[str, Path]]:
         """
-        Get as a dictoinary of files/resources for a specific stage, indexed by target
+        Get as a dict of files/resources for a specific stage, indexed by target
         """
         return self._each(fun=(lambda r: r.as_dict()), stage=stage)
 
@@ -628,7 +628,7 @@ class StageInput:
         stage: StageDecorator,
     ) -> dict[str, dict[str, hb.Resource]]:
         """
-        Get a dictoinary of resources for a specific stage, and indexed by target
+        Get a dict of resources for a specific stage, and indexed by target
         """
         return self._each(fun=(lambda r: r.as_resource_dict()), stage=stage)
 
@@ -637,7 +637,7 @@ class StageInput:
         stage: StageDecorator,
     ) -> dict[str, dict[str, Path]]:
         """
-        Get a dictoinary of paths for a specific stage, and indexed by target
+        Get a dict of paths for a specific stage, and indexed by target
         """
         return self._each(fun=(lambda r: r.as_path_dict()), stage=stage)
 
@@ -668,7 +668,7 @@ class StageInput:
 
     def as_dict(self, target: 'Target', stage: StageDecorator) -> dict[str, Path]:
         """
-        Get a dictoinary of files or Resources for a specific target and stage
+        Get a dict of files or Resources for a specific target and stage
         """
         res = self._results_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_dict()
@@ -677,7 +677,7 @@ class StageInput:
         self, target: 'Target', stage: StageDecorator
     ) -> dict[str, Path]:
         """
-        Get a dictoinary of files for a specific target and stage
+        Get a dict of files for a specific target and stage
         """
         res = self._results_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_path_dict()
@@ -686,7 +686,7 @@ class StageInput:
         self, target: 'Target', stage: StageDecorator
     ) -> dict[str, hb.Resource]:
         """
-        Get a dictoinary of  Resources for a specific target and stage
+        Get a dict of  Resources for a specific target and stage
         """
         res = self._results_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_resource_dict()

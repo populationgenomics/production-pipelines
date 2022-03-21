@@ -55,8 +55,8 @@ def get_intervals(
     }[sequencing_type]
 
     cmd = f"""
-    mkdir out
-
+    mkdir /io/batch/out
+    
     picard -Xms1000m -Xmx1500m \
     IntervalListTools \
     SCATTER_COUNT={scatter_count} \
@@ -65,12 +65,14 @@ def get_intervals(
     SORT=true \
     BREAK_BANDS_AT_MULTIPLES_OF={break_bands_at_multiples_of} \
     INPUT={b.read_input(str(intervals))} \
-    OUTPUT=out
+    OUTPUT=/io/batch/out
+    ls /io/batch/out
+    ls /io/batch/out/*
     """
     for idx in range(scatter_count):
         name = f'temp_{str(idx + 1).zfill(4)}_of_{scatter_count}'
         cmd += f"""
-    ln -s out/{name}/scattered.interval_list {j[f"intervals{idx}"]}
+    ln /io/batch/out/{name}/scattered.interval_list {j[f"intervals{idx}"]}
     """
     
     j.command(wrap_command(cmd))
