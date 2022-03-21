@@ -56,7 +56,7 @@ _ALL_DEFINED_STAGES = []
 
 
 def stage(
-    _cls: Optional[Type['Stage']] = None, 
+    cls: Optional[Type['Stage']] = None, 
     *,
     analysis_type: str | None = None, 
     required_stages: list[StageDecorator] | StageDecorator | None = None,
@@ -77,13 +77,13 @@ def stage(
         def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
             ...
     """
-    def decorator_stage(cls) -> StageDecorator:
+    def decorator_stage(_cls) -> StageDecorator:
         """Implements decorator."""
-        @functools.wraps(cls)
+        @functools.wraps(_cls)
         def wrapper_stage(pipeline: 'Pipeline') -> Stage:
             """Decorator helper function."""
-            return cls(
-                name=cls.__name__,
+            return _cls(
+                name=_cls.__name__,
                 batch=pipeline.b,
                 required_stages=required_stages,
                 analysis_type=analysis_type,
@@ -102,10 +102,10 @@ def stage(
         _ALL_DEFINED_STAGES.append(wrapper_stage)
         return wrapper_stage
 
-    if _cls is None:
+    if cls is None:
         return decorator_stage
     else:
-        return decorator_stage(_cls)
+        return decorator_stage(cls)
 
 
 def skip(
