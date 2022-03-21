@@ -4,10 +4,10 @@ Testing TSV metadata provider. TSV file must contain one required column "sample
 import unittest
 from io import StringIO
 
-from cpg_pipes.pipeline.dataset import Cohort, Sex
-from cpg_pipes.pipeline.metadata_provider import CsvMetadataProvider
-from cpg_pipes.storage import Namespace
-from cpg_pipes.cpg.storage import CPGStorageProvider
+from cpg_pipes import Namespace
+from cpg_pipes.pipeline.targets import Cohort, Sex
+from cpg_pipes.providers.inputs import CsvInputsProvider
+from cpg_pipes.providers.cpg import CpgStorageProvider
 
 
 DATASET = 'fewgenomes'
@@ -35,13 +35,13 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex
         """.strip()
 
         with StringIO(tsv_contents) as fp:
-            provider = CsvMetadataProvider(fp)
+            provider = CsvInputsProvider(fp)
             
         cohort = Cohort(
             name='test',
             analysis_dataset_name=DATASET,
             namespace=Namespace.TEST,
-            storage_provider=CPGStorageProvider(),
+            storage_provider=CpgStorageProvider(),
         )
         provider.populate_cohort(
             cohort, 

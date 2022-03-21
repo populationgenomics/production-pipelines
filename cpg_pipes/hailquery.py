@@ -8,44 +8,15 @@ import operator
 import os
 import tempfile
 import time
-from os.path import join
 from pathlib import Path
 from typing import List, Optional, Union
 import hail as hl
 
-from cpg_pipes import ref_data
-from cpg_pipes.utils import safe_mkdir, DEFAULT_REF
+from .refdata import RefData
+from .utils import safe_mkdir, DEFAULT_REF
 
 
 logger = logging.getLogger(__file__)
-
-GNOMAD_REF_BUCKET = f'{ref_data.REF_BUCKET}/gnomad/v0'
-TEL_AND_CENT_HT = join(
-    GNOMAD_REF_BUCKET,
-    'telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht',
-)
-LCR_INTERVALS_HT = join(GNOMAD_REF_BUCKET, 'lcr_intervals/LCRFromHengHg38.ht')
-SEG_DUP_INTERVALS_HT = join(GNOMAD_REF_BUCKET, 'seg_dup_intervals/GRCh38_segdups.ht')
-CLINVAR_HT = join(GNOMAD_REF_BUCKET, 'clinvar/clinvar_20190923.ht')
-HAPMAP_HT = join(GNOMAD_REF_BUCKET, 'hapmap/hapmap_3.3.hg38.ht')
-KGP_OMNI_HT = join(GNOMAD_REF_BUCKET, 'kgp/1000G_omni2.5.hg38.ht')
-KGP_HC_HT = join(GNOMAD_REF_BUCKET, 'kgp/1000G_phase1.snps.high_confidence.hg38.ht')
-MILLS_HT = join(
-    GNOMAD_REF_BUCKET, 'mills/Mills_and_1000G_gold_standard.indels.hg38.ht/'
-)
-
-GNOMAD_HT = (
-    'gs://gcp-public-data--gnomad/release/3.1/ht/genomes/gnomad.genomes.v3.1.sites.ht'
-)
-
-ANCESTRY_BUCKET = f'{ref_data.REF_BUCKET}/ancestry/v3-90k'
-ANCESTRY_HGDP_SUBSET_MTS = {
-    'all': f'{ANCESTRY_BUCKET}/gnomad_subset.mt',
-    'nfe': f'{ANCESTRY_BUCKET}/gnomad_subset_nfe.mt',
-    'test': f'{ANCESTRY_BUCKET}/gnomad_subset_test.mt',
-    'test_nfe': f'{ANCESTRY_BUCKET}/gnomad_subset_test_nfe.mt',
-}
-ANCESTRY_SITES = f'{ANCESTRY_BUCKET}/pca_sites.ht'
 
 
 def init_hail(name: str, local_tmp_dir: Path = None):
@@ -68,6 +39,7 @@ def init_hail(name: str, local_tmp_dir: Path = None):
 
 def filter_low_conf_regions(
     mt: Union[hl.MatrixTable, hl.Table],
+    refs: RefData,
     filter_lcr: bool = True,
     filter_segdup: bool = True,
     filter_telomeres_and_centromeres: bool = False,
@@ -85,15 +57,15 @@ def filter_low_conf_regions(
     """
     criteria = []
     if filter_lcr:
-        lcr = hl.read_table(LCR_INTERVALS_HT)
+        lcr = hl.read_table(refs.lcr_intervals_ht)
         criteria.append(hl.is_missing(lcr[mt.locus]))
 
     if filter_segdup:
-        segdup = hl.read_table(SEG_DUP_INTERVALS_HT)
+        segdup = hl.read_table(refs.seg_dup_intervals_ht)
         criteria.append(hl.is_missing(segdup[mt.locus]))
 
     if filter_telomeres_and_centromeres:
-        telomeres_and_centromeres = hl.read_table(TEL_AND_CENT_HT)
+        telomeres_and_centromeres = hl.read_table(refs.tel_and_cent_ht)
         criteria.append(hl.is_missing(telomeres_and_centromeres[mt.locus]))
 
     if high_conf_regions is not None:
@@ -111,7 +83,7 @@ def filter_low_conf_regions(
     return mt
 
 
-def get_truth_ht() -> hl.Table:
+def get_truth_ht(refs: RefData) -> hl.Table:
     """
     Return a table with annotations from the latest version of the corresponding truth data.
 
@@ -124,11 +96,11 @@ def get_truth_ht() -> hl.Table:
     @return: A table with the latest version of popular truth data annotations
     """
     return (
-        hl.read_table(HAPMAP_HT)
+        hl.read_table(refs.hapmap_ht)
         .select(hapmap=True)
-        .join(hl.read_table(KGP_OMNI_HT).select(omni=True), how='outer')
-        .join(hl.read_table(KGP_HC_HT).select(kgp_phase1_hc=True), how='outer')
-        .join(hl.read_table(MILLS_HT).select(mills=True), how='outer')
+        .join(hl.read_table(refs.kgp_omni_ht).select(omni=True), how='outer')
+        .join(hl.read_table(refs.kgp_hc_ht).select(kgp_phase1_hc=True), how='outer')
+        .join(hl.read_table(refs.mills_ht).select(mills=True), how='outer')
         .repartition(200, shuffle=False)
         .persist()
     )

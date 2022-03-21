@@ -1,98 +1,15 @@
 """
-Sample metadata DB Analysis entry.
+Basic bioinformatics status types.
 """
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
 from typing import List, Union
 
-from cpg_pipes.storage import Path, to_path
+from cpg_pipes import Path, to_path
 from hailtop.batch import ResourceGroup, ResourceFile, Batch
 
 logger = logging.getLogger(__file__)
-
-
-class AnalysisType(Enum):
-    """
-    Corresponds to SMDB Analysis types:
-    https://github.com/populationgenomics/sample-metadata/blob/dev/models/enums/analysis.py#L4-L11
-
-    Re-defined in a separate module to decouple from the main sample-metadata module,
-    so decorators can use `@stage(analysis_type=AnalysisType.QC)` without importing
-    the sample-metadata package.
-    """
-    QC = 'qc'
-    JOINT_CALLING = 'joint-calling'
-    GVCF = 'gvcf'
-    CRAM = 'cram'
-    CUSTOM = 'custom'
-    
-    @staticmethod
-    def parse(name: str) -> 'AnalysisType':
-        """
-        Parse str and create a AnalysisStatus object
-        """
-        return {v.value: v for v in AnalysisType}[name.lower()]
-
-
-class AnalysisStatus(Enum):
-    """
-    Corresponds to SMDB Analysis statuses:
-    https://github.com/populationgenomics/sample-metadata/blob/dev/models/enums/analysis.py#L14-L21
-    """
-    QUEUED = 'queued'
-    IN_PROGRESS = 'in-progress'
-    FAILED = 'failed'
-    COMPLETED = 'completed'
-    UNKNOWN = 'unknown'
-    
-    @staticmethod
-    def parse(name: str) -> 'AnalysisStatus':
-        """
-        Parse str and create a AnalysisStatus object
-        """
-        return {v.value: v for v in AnalysisStatus}[name.lower()]
-
-
-@dataclass
-class Analysis:
-    """
-    Sample metadata DB Analysis entry.
-
-    See the sample-metadata package for more details: 
-    https://github.com/populationgenomics/sample-metadata
-    """
-    id: int
-    type: AnalysisType
-    status: AnalysisStatus
-    sample_ids: set[str]
-    output: Path | None
-
-    @staticmethod
-    def parse(data: dict) -> 'Analysis':
-        """
-        Parse data to create an Analysis object
-        """
-        req_keys = ['id', 'type', 'status']
-        if any(k not in data for k in req_keys):
-            for key in req_keys:
-                if key not in data:
-                    logger.error(f'"Analysis" data does not have {key}: {data}')
-            raise ValueError(f'Cannot parse SMDB Sequence {data}')
-        
-        output = data.get('output')
-        if output:
-            output = to_path(output)
-
-        a = Analysis(
-            id=int(data['id']),
-            type=AnalysisType.parse(data['type']),
-            status=AnalysisStatus.parse(data['status']),
-            sample_ids=set(data.get('sample_ids', [])),
-            output=output,
-        )
-        return a
 
 
 class CramPath:
@@ -120,6 +37,9 @@ class CramPath:
         return f'CRAM({self.path})'
     
     def exists(self) -> bool:
+        """
+        CRAM file exists.
+        """
         return self.path.exists()
 
     @property
@@ -160,6 +80,9 @@ class GvcfPath:
         return f'GVCF({self.path})'
 
     def exists(self) -> bool:
+        """
+        GVCF file exists.
+        """
         return self.path.exists()
 
     @property

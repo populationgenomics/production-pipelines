@@ -4,19 +4,16 @@ Stage that generates a GVCF file.
 
 import logging
 
-from cpg_pipes.storage import Path
-
-from cpg_pipes.jobs import split_intervals, haplotype_caller
-from cpg_pipes.pipeline.analysis import AnalysisType
-from cpg_pipes.pipeline.dataset import Sample
-from cpg_pipes.pipeline.pipeline import stage, SampleStage
-from cpg_pipes.pipeline.stage import StageInput, StageOutput
-from cpg_pipes.stages.cram import CramStage
+from .. import Path
+from ..jobs import split_intervals, haplotype_caller
+from ..pipeline.targets import Sample
+from ..pipeline import stage, SampleStage, StageInput, StageOutput
+from .cram import CramStage
 
 logger = logging.getLogger(__file__)
 
 
-@stage(required_stages=CramStage, sm_analysis_type=AnalysisType.GVCF)
+@stage(required_stages=CramStage, analysis_type='gvcf')
 class GvcfStage(SampleStage):
     """
     Use HaplotypeCaller to genotype individual samples
@@ -37,20 +34,20 @@ class GvcfStage(SampleStage):
         if GvcfStage.hc_intervals is None and hc_shards_num > 1:
             GvcfStage.hc_intervals = split_intervals.get_intervals(
                 b=self.b,
+                refs=self.refs,
                 scatter_count=hc_shards_num,
             )
         jobs = haplotype_caller.produce_gvcf(
             b=self.b,
             output_path=self.expected_result(sample),
             sample_name=sample.id,
-            dataset_name=sample.dataset.name,
+            job_attrs=sample.get_job_attrs(),
             cram_path=sample.get_cram_path(),
             intervals=GvcfStage.hc_intervals,
             number_of_intervals=hc_shards_num,
+            refs=self.refs,
             tmp_bucket=sample.dataset.get_tmp_bucket(),
             overwrite=not self.check_intermediates,
-            depends_on=inputs.get_jobs(),
-            smdb=self.smdb,
         )
         return self.make_outputs(
             sample,

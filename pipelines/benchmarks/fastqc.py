@@ -6,16 +6,17 @@ Batch pipeline to run FastQC.
 
 import logging
 import click
-from cpg_pipes.storage import to_path
+
+from cpg_pipes import to_path, Namespace
 from cpg_pipes import benchmark
-from cpg_pipes.pipeline.pipeline import Pipeline
+from cpg_pipes.pipeline import Pipeline
 from cpg_pipes.jobs.fastqc import fastqc
 
 logger = logging.getLogger(__file__)
 
 
 INPUT_DATASET = 'fewgenomes'
-NAMESPACE = 'main'
+NAMESPACE = Namespace.MAIN
 
 
 @click.command()
@@ -28,7 +29,6 @@ def main():  # pylint: disable=missing-function-docstring
         name='run_qc',
         namespace=NAMESPACE,
         description='Run QC',
-        check_smdb_seq=False,
     )
     inputs = {
         'NA12878': benchmark.na12878fq,
@@ -45,8 +45,6 @@ def main():  # pylint: disable=missing-function-docstring
             output_html_path=prefix / f'{sample_name}.html',
             output_zip_path=prefix / f'{sample_name}.zip',
             alignment_input=inp,
-            sample_name=sample_name,
-            dataset_name='FastQC',
         )
     
     pipe.submit_batch()

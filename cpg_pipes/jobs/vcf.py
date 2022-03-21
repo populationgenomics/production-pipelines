@@ -8,10 +8,10 @@ from typing import Tuple
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes import images, buckets
+from cpg_pipes import Path
+from cpg_pipes import images, utils
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.storage import Path
 
 logger = logging.getLogger(__file__)
 
@@ -29,7 +29,7 @@ def gather_vcfs(
     """
     job_name = f'Gather {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
     j = b.new_job(job_name)
-    if output_vcf_path and buckets.can_reuse(output_vcf_path, overwrite):
+    if output_vcf_path and utils.can_reuse(output_vcf_path, overwrite):
         j.name += ' [reuse]'
         return j, b.read_input_group(**{
             'vcf.gz': str(output_vcf_path),

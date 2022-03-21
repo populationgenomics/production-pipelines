@@ -1,5 +1,12 @@
 import coloredlogs
-from os.path import dirname, abspath
+import importlib.metadata
+
+from .providers.storage import (
+    Path,
+    to_path,
+    Namespace,
+)
+
 
 coloredlogs.install(
     level='DEBUG', 
@@ -7,8 +14,22 @@ coloredlogs.install(
 )
 
 
-def get_package_path():
+def get_package_name() -> str:
     """
-    @return: local install path of the package
+    Get name of the package.
     """
-    return dirname(abspath(__file__))
+    return __name__.split('.', 1)[0]
+
+
+def get_package_path() -> str:
+    """
+    Get local install path of the package.
+    """
+    return to_path(__file__).parent.absolute
+
+
+def get_version() -> str:
+    """
+    Get package version.
+    """
+    return importlib.metadata.version(get_package_name())

@@ -5,7 +5,9 @@ import time
 import unittest
 from unittest.mock import patch
 
-from cpg_pipes.storage import to_path
+from cpg_pipes import to_path
+from cpg_pipes.providers.storage import Namespace
+from cpg_pipes.refdata import RefData
 
 try:
     from .utils import setup_env, BASE_BUCKET, DATASET, SAMPLES
@@ -44,7 +46,6 @@ class TestPipeline(unittest.TestCase):
         """
         setup_env()
         from cpg_pipes import benchmark
-        from cpg_pipes import ref_data
         from cpg_pipes.pipeline.pipeline import Pipeline
         # Use the seqr_loader stages. Importing it will make sure all its stages
         # are used by default:
@@ -54,8 +55,7 @@ class TestPipeline(unittest.TestCase):
             name=self._testMethodName,
             description=self._testMethodName,
             analysis_dataset=DATASET,
-            namespace='test',
-            check_smdb_seq=False,
+            namespace=Namespace.TEST,
             config=dict(output_datasets=[DATASET]),
             dry_run=True,
         )
@@ -83,9 +83,9 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(_cnt('bwa mem'), len(self.sample_ids) * 2)
         self.assertEqual(_cnt('HaplotypeCaller'), len(self.sample_ids))
         self.assertEqual(_cnt('ReblockGVCF'), len(self.sample_ids))
-        self.assertEqual(_cnt('GenotypeGVCFs'), ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS)
-        self.assertEqual(_cnt('GenomicsDBImport'), ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS)
-        self.assertEqual(_cnt('MakeSitesOnlyVcf'), ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS)
+        self.assertEqual(_cnt('GenotypeGVCFs'), RefData.number_of_genomics_db_intervals)
+        self.assertEqual(_cnt('GenomicsDBImport'), RefData.number_of_genomics_db_intervals)
+        self.assertEqual(_cnt('MakeSitesOnlyVcf'), RefData.number_of_genomics_db_intervals)
         self.assertEqual(_cnt('VariantRecalibrator'), 2)
         self.assertEqual(_cnt('ApplyVQSR'), 2)
         self.assertEqual(_cnt('GatherVcfsCloud'), 2)

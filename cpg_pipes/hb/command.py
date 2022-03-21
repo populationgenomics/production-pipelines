@@ -1,5 +1,5 @@
 """
-Helpers to setup Job's command.
+Helpers to set up Job's command.
 """
 
 import logging

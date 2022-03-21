@@ -6,10 +6,9 @@ import logging
 from dataclasses import dataclass
 from typing import Optional, Tuple, Dict
 
-from cpg_pipes.storage import Path
-
-from cpg_pipes import buckets
-from cpg_pipes.hb.batch import get_hail_bucket
+from .. import Path
+from .. import utils
+from .batch import get_hail_bucket
 
 logger = logging.getLogger(__file__)
 
@@ -48,7 +47,7 @@ class PrevJob:
         """
         hail_bucket = get_hail_bucket(tmp_bucket, keep_scratch)
         
-        if not buckets.exists(fpath):
+        if not utils.exists(fpath):
             return dict()
         prev_batch_jobs: Dict[Tuple[Optional[str], str], PrevJob] = dict()
         with fpath.open() as f:

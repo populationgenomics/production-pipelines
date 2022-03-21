@@ -1,12 +1,41 @@
 """
 Common pipeline command line options for "click".
 """
-from typing import Callable
+from enum import Enum
+from typing import Callable, Type, TypeVar
 import click
 import click_config_file
 import yaml  # type: ignore
 
-from cpg_pipes.storage import Namespace
+from ..providers import (
+    Namespace, 
+    Cloud,
+    StoragePolicy, 
+    StatusReporterType, 
+    InputProviderType,
+)
+
+
+def choice_from_enum(cls: Type[Enum]) -> click.Choice:
+    """
+    List of an Enum items to use with click.Choice
+    """
+    return click.Choice([n.lower() for n in cls.__members__])
+
+
+T = TypeVar('T', bound=Enum)
+
+
+def val_to_enum(cls: Type[T]) -> Callable:
+    """
+    Callback to parse value into an Enum value
+    """
+    def _callback(c, p, val: str) -> T:
+        d = {
+            name.lower(): item for name, item in cls.__members__.items()
+        }
+        return d[val]
+    return _callback
 
 
 def pipeline_click_options(function: Callable) -> Callable:
@@ -25,15 +54,14 @@ def pipeline_click_options(function: Callable) -> Callable:
             '-n',
             '--namespace',
             'namespace',
-            type=click.Choice([n.lower() for n in Namespace.__members__]),
-            callback=lambda c, p, v: getattr(Namespace, v.upper()) if v else None,
+            type=choice_from_enum(Namespace),
+            callback=val_to_enum(Namespace),
             help='The bucket namespace to write the results to',
         ),
         click.option(
             '--analysis-dataset',
             'analysis_dataset',
-            help='Dataset name to write the intermediate/joint-calling analysis '
-                 'entries in the sample metadata database',
+            help='Dataset name to write cohort and pipeline level intermediate files',
         ),
         click.option(
             '--input-dataset',
@@ -86,17 +114,39 @@ def pipeline_click_options(function: Callable) -> Callable:
             help='Pipeline version. Default is a timestamp',
         ),
         click.option(
-            '--metadata-source', 
-            'metadata_source',
-            default='smdb',
-            type=click.Choice(['smdb', 'csv']),
-            help='Source of input metadata. For "csv", use --metadata-csv to specify '
-                 'the CSV file location',
+            '--storage-policy', 
+            'storage_policy',
+            type=choice_from_enum(StoragePolicy),
+            callback=val_to_enum(StoragePolicy),
+            default=StoragePolicy.CPG.value,
+            help='Storage policy is used to determine bucket names for intermediate '
+                 'and output files',
         ),
         click.option(
-            '--metadata-csv', 
-            'metadata_csv_path',
-            help='CSV file with metdata, if --metadata-source=csv is set',
+            '--cloud', 
+            'cloud',
+            type=choice_from_enum(Cloud),
+            callback=val_to_enum(Cloud),
+            default=Cloud.GS.value,
+            help='Cloud storage provider',
+        ),
+        click.option(
+            '--status-reporter', 
+            'status_reporter_type',
+            type=choice_from_enum(StatusReporterType),
+            callback=val_to_enum(StatusReporterType),
+            default=None,
+            help='Use a status reporter implementation to report jobs statuses',
+        ),
+        click.option(
+            '--input-provider', 
+            'input_provider_type',
+            type=choice_from_enum(InputProviderType),
+            callback=val_to_enum(InputProviderType),
+            default=InputProviderType.SMDB.value,
+            help=f'Source of inputs. '
+                 f'For "--input-source={InputProviderType.CSV.value}", '
+                 f'use --input-csv to specify a CSV file location',
         ),
         click.option(
             '--keep-scratch/--remove-scratch', 
@@ -105,13 +155,6 @@ def pipeline_click_options(function: Callable) -> Callable:
             is_flag=True,
         ),
         click.option('--dry-run', 'dry_run', is_flag=True),
-        click.option(
-            '--check-smdb-seq-existence/--no-check-smdb-seq-existence',
-            'check_smdb_seq',
-            default=False,
-            is_flag=True,
-            help='Check that files in sequence.meta exist'
-        ),
         click.option(
             '--skip-samples-with-missing-input',
             'skip_samples_with_missing_input',
@@ -140,22 +183,6 @@ def pipeline_click_options(function: Callable) -> Callable:
                  'Works nicely with --previous-batch-tsv/--previous-batch-id options.',
         ),
         click.option(
-            '--update-smdb-analyses/--no-update-smdb-analyses',
-            'update_smdb_analyses',
-            is_flag=True,
-            default=True,
-            help='Create analysis entries for queued/running/completed jobs'
-        ),
-        click.option(
-            '--validate-smdb-analyses/--no-validate-smdb-analyses',
-            'validate_smdb_analyses',
-            is_flag=True,
-            default=False,
-            help='Validate existing analysis entries by checking if a.output exists on '
-                 'the bucket. Set the analysis entry to "failure" if output doesn\'t '
-                 'exist'
-        ),
-        click.option(
             '--previous-batch-tsv',
             'previous_batch_tsv_path',
             help='A list of previous successful attempts from another batch, dumped '
@@ -174,12 +201,17 @@ def pipeline_click_options(function: Callable) -> Callable:
         click.option(
             '--local-dir',
             'local_dir',
+            help='Local directory for temporary files. Usually takes a few KB. '
+                 'If not provided, a temp folder will be created'
         ),
     ]
     # Click shows options in a reverse order, so inverting the list back:
-    for opt in options[::-1]:
+    options = options[::-1]
+
+    # Applying decorators:
+    for opt in options:
         function = opt(function)
-    
+
     # Add ability to load options from a yaml file
     # using https://pypi.org/project/click-config-file/
     def yaml_provider(fp, _):

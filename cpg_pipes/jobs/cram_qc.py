@@ -2,13 +2,15 @@
 Create Hail Batch jobs for alignment QC.
 """
 import logging
-from cpg_pipes.storage import Path, to_path
 from hailtop.batch.job import Job
 
-from cpg_pipes import images, buckets, ref_data
+from cpg_pipes import Path, to_path
+from cpg_pipes import images, utils
+from cpg_pipes.filetypes import CramPath
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.pipeline.analysis import CramPath
+
+from cpg_pipes.refdata import RefData
 
 logger = logging.getLogger(__file__)
 
@@ -16,26 +18,26 @@ logger = logging.getLogger(__file__)
 def samtools_stats(
     b,
     cram_path: CramPath,
-    sample_name: str,
+    refs: RefData,
+    job_attrs: dict | None = None,
     output_path: Path | None = None,
-    dataset_name: str | None = None,
     overwrite: bool = True,
 ) -> Job:
     """
     Run `samtools stats` for alignment QC.
     """
     jname = 'samtools stats'
-    j = b.new_job(jname, dict(sample=sample_name, dataset=dataset_name))
+    j = b.new_job(jname, job_attrs)
     if not output_path:
         output_path = cram_path.path.with_suffix('.stats')
-    if buckets.can_reuse(cram_path.path, overwrite):
+    if utils.can_reuse(cram_path.path, overwrite):
         j.name += ' [reuse]'
         return j
 
     j.image(images.SAMTOOLS_PICARD_IMAGE)
     job_resource = STANDARD.set_resources(j, storage_gb=60)
     cram = cram_path.resource_group(b)
-    reference = b.read_input_group(**ref_data.REF_D)
+    reference = refs.fasta_res_group(b)
 
     cmd = f"""\
     samtools stats \\
@@ -52,9 +54,9 @@ def samtools_stats(
 def verify_bamid(
     b,
     cram_path: CramPath,
-    sample_name: str,
+    refs: RefData,
+    job_attrs: dict | None = None,
     output_path: Path | None = None,
-    dataset_name: str | None = None,
     overwrite: bool = True,
 ) -> Job:
     """
@@ -62,32 +64,31 @@ def verify_bamid(
     Based on https://github.com/broadinstitute/warp/blob/57edec5591182d120b7d288b4b409e92a6539871/tasks/broad/BamProcessing.wdl#L395
     """
     jname = 'VerifyBamID'
-    j = b.new_job(jname, dict(sample=sample_name, dataset=dataset_name))
+    j = b.new_job(jname, job_attrs)
     if not output_path:
         output_path = cram_path.path.with_suffix('.selfSM')
-    if buckets.can_reuse(cram_path.path, overwrite):
+    if utils.can_reuse(cram_path.path, overwrite):
         j.name += ' [reuse]'
         return j
 
     j.image(images.VERIFY_BAMID)
     STANDARD.set_resources(j, storage_gb=60)
     cram = cram_path.resource_group(b)
-    reference = b.read_input_group(**ref_data.REF_D)
+    reference = refs.fasta_res_group(b)
     cont_ref_d = dict(
-        ud=to_path(ref_data.CONTAM_BUCKET) / '1000g.phase3.100k.b38.vcf.gz.dat.UD',
-        bed=to_path(ref_data.CONTAM_BUCKET) / '1000g.phase3.100k.b38.vcf.gz.dat.bed',
-        mu=to_path(ref_data.CONTAM_BUCKET) / '1000g.phase3.100k.b38.vcf.gz.dat.mu',
+        ud=to_path(refs.contam_bucket) / '1000g.phase3.100k.b38.vcf.gz.dat.UD',
+        bed=to_path(refs.contam_bucket) / '1000g.phase3.100k.b38.vcf.gz.dat.bed',
+        mu=to_path(refs.contam_bucket) / '1000g.phase3.100k.b38.vcf.gz.dat.mu',
     )
     res_group = b.read_input_group(**{k: str(v) for k, v in cont_ref_d.items()})
     
-    output_prefix = sample_name
     cmd = f"""\
     # creates a *.selfSM file, a TSV file with 2 rows, 19 columns.
     # First row are the keys (e.g., SEQ_SM, RG, FREEMIX), second row are the associated values
     /usr/gitc/VerifyBamID \
     --Verbose \
     --NumPC 4 \
-    --Output {output_prefix} \
+    --Output OUTPUT \
     --BamFile {cram.cram} \
     --Reference {reference.base} \
     --UDPath {res_group.ud} \
@@ -95,7 +96,7 @@ def verify_bamid(
     --BedPath {res_group.bed} \
     1>/dev/null
     
-    cp {output_prefix}.selfSM {j.out_selfsm}
+    cp OUTPUT.selfSM {j.out_selfsm}
     """
 
     j.command(wrap_command(cmd))
@@ -106,9 +107,9 @@ def verify_bamid(
 def picard_wgs_metrics(
     b,
     cram_path: CramPath,
-    sample_name: str,
+    refs: RefData,
+    job_attrs: dict | None = None,
     output_path: Path | None = None,
-    dataset_name: str | None = None,
     overwrite: bool = True,
     read_length: int = 250,
 ) -> Job:
@@ -117,18 +118,18 @@ def picard_wgs_metrics(
     Based on https://github.com/broadinstitute/warp/blob/e1ac6718efd7475ca373b7988f81e54efab608b4/tasks/broad/Qc.wdl#L444
     """
     jname = 'Picard CollectWgsMetrics'
-    j = b.new_job(jname, dict(sample=sample_name, dataset=dataset_name))
+    j = b.new_job(jname, job_attrs)
     if not output_path:
         output_path = cram_path.path.with_suffix('.csv')
-    if buckets.can_reuse(cram_path.path, overwrite):
+    if utils.can_reuse(cram_path.path, overwrite):
         j.name += ' [reuse]'
         return j
 
     j.image(images.SAMTOOLS_PICARD_IMAGE)
     res = STANDARD.set_resources(j, storage_gb=60)
     cram = cram_path.resource_group(b)
-    reference = b.read_input_group(**ref_data.REF_D)
-    interval_file = b.read_input(ref_data.WGS_COVERAGE_INTERVAL_LIST)
+    reference = refs.fasta_res_group(b)
+    interval_file = b.read_input(refs.wgs_coverage_interval_list)
 
     cmd = f"""\
     picard -Xms2000m -Xmx{res.get_java_mem_mb()}g \

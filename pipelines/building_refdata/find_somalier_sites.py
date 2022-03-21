@@ -9,23 +9,22 @@ Problems with the currentl publicly shared somalier sites VCF:
  * and contains only 15k sites.
 """
 
-from os.path import join
 import logging
-from cpg_pipes import ref_data, images
+from cpg_pipes import images, Namespace
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.pipeline.pipeline import Pipeline
+from cpg_pipes.providers.cpg import CpgStorageProvider
 
 logger = logging.getLogger(__file__)
 
-RESULT_VCF = join(ref_data.REF_BUCKET, 'somalier/v0/sites.hg38.vcf.gz')
+RESULT_VCF = CpgStorageProvider().get_ref_bucket() / 'somalier/v0/sites.hg38.vcf.gz'
 
 
 pipe = Pipeline(
     analysis_dataset='fewgenomes',
     name='find-somalier-sites',
     description='find 65k somalier sites',
-    namespace='main',
-    check_smdb_seq=False,
+    namespace=Namespace.MAIN,
     keep_scratch=True,
 )
 

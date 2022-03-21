@@ -2,29 +2,30 @@
 Jobs to run FastQC
 """
 import hailtop.batch as hb
-from cpg_pipes.storage import Path
 from hailtop.batch import ResourceFile
 from hailtop.batch.job import Job
 
+from cpg_pipes import Path
+from cpg_pipes.filetypes import AlignmentInput, CramPath, FastqPair
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs import align
-from cpg_pipes.pipeline.analysis import AlignmentInput, CramPath, FastqPair
+from cpg_pipes.refdata import RefData
 
 
 def fastqc(
     b: hb.Batch, 
     output_html_path: Path,
     output_zip_path: Path,
-    sample_name: str, 
-    dataset_name: str | None, 
     alignment_input: AlignmentInput,
+    refs: RefData,
+    job_attrs: dict | None = None,
 ) -> list[Job]:
     """
     Adds FastQC jobs. If the input is a set of fqs, runs FastQC on each fq file.
     """
     def _fastqc_one(jname_, inp: ResourceFile):
-        j = b.new_job(jname_, dict(sample=sample_name, dataset=dataset_name))
+        j = b.new_job(jname_, job_attrs)
         j.image('biocontainers/fastqc:v0.11.9_cv8')
         res = STANDARD.set_resources(j, ncpu=16)
         
@@ -54,8 +55,8 @@ def fastqc(
         extract_j = align.extract_fastq(
             b=b,
             cram=alignment_input.resource_group(b),
-            sample_name=sample_name,
-            dataset_name=dataset_name,
+            refs=refs,
+            job_attrs=job_attrs,
         )
         fastq_resouces = [FastqPair(extract_j.fq1, extract_j.fq2)]
     else:

@@ -8,12 +8,14 @@ from textwrap import dedent
 import hailtop.batch as hb
 import os
 
-from cpg_pipes import ref_data, images
+from cpg_pipes import images
 from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.providers.cpg import CpgStorageProvider
+from cpg_pipes.refdata import RefData
 
 
-def _index_bwa_job(b: hb.Batch):
-    reference = b.read_input_group(**ref_data.REF_D)
+def _index_bwa_job(b: hb.Batch, refs: RefData):
+    reference = refs.fasta_res_group(b)
 
     j = b.new_job('Index BWA')
     j.image(images.BWAMEM2_IMAGE)
@@ -21,7 +23,7 @@ def _index_bwa_job(b: hb.Batch):
     j.cpu(total_cpu)
     j.storage('40G')
     j.declare_resource_group(
-        bwa_index={e: '{root}.' + e for e in ref_data.BWAMEM2_INDEX_EXTS}
+        bwa_index={e: '{root}.' + e for e in refs.bwamem2_index_exts}
     )
     j.command(wrap_command(f"""\
     set -o pipefail
@@ -31,15 +33,12 @@ def _index_bwa_job(b: hb.Batch):
     
     df -h; pwd; ls | grep -v proc | xargs du -sh
     """))
-    b.write_output(j.bwa_index, ref_data.BWAMEM2_INDEX_PREFIX)
+    b.write_output(j.bwa_index, refs.bwamem2_index_prefix)
     return j
 
 
-def _test_bwa_job(b: hb.Batch):
-    bwa_reference = b.read_input_group(
-        **ref_data.REF_D,
-        **{k: f'{ref_data.REF_FASTA}.{k}' for k in ref_data.BWA_INDEX_EXTS},
-    )
+def _test_bwa_job(b: hb.Batch, refs: RefData):
+    bwa_reference = refs.fasta_res_group(b, refs.bwa_index_exts)
 
     fq1 = b.read_input('gs://cpg-seqr-test/batches/test/tmp_fq')
     j = b.new_job('Test BWA')
@@ -95,7 +94,8 @@ backend = hb.ServiceBackend(
     bucket=hail_bucket.replace('gs://', ''),
 )
 b = hb.Batch(backend=backend, name='Create BWA index')
-j1 = _index_bwa_job(b)
-j2 = _test_bwa_job(b)
+refs = RefData(CpgStorageProvider().get_ref_bucket())
+j1 = _index_bwa_job(b, refs)
+j2 = _test_bwa_job(b, refs)
 j2.depends_on(j1)
 b.run(wait=False)

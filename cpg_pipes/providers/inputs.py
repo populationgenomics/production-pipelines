@@ -1,31 +1,30 @@
 """
-Abstract provider if input data, and the CPG sample-metadata DB implementation.
+Abstract provider if input data source.
 """
 import csv
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from cpg_pipes.storage import Path
-
-from .analysis import AlignmentInput, CramPath, FastqPair
-from .dataset import Cohort, Sex, Dataset
-from ..buckets import exists
+from cpg_pipes.utils import exists
+from cpg_pipes.filetypes import FastqPair, CramPath, AlignmentInput
+from cpg_pipes.pipeline.targets import Cohort, Dataset, Sex
+from cpg_pipes import Path
 
 logger = logging.getLogger(__file__)
 
 
-class MetadataError(Exception):
+class InputProviderError(Exception):
     """
     Exception thrown when there is something wrong happened parsing
-    metadata.
+    inputs.
     """
     pass
 
 
-class MetadataProvider(ABC):
+class InputsProvider(ABC):
     """
-    Abstract class for implementing metadata source.
+    Abstract class for implementing inputs source.
     """
     def populate_cohort(
         self,
@@ -46,7 +45,7 @@ class MetadataProvider(ABC):
                 dataset = cohort.add_dataset(ds_name)
                 entries = self._get_entries(
                     dataset=dataset,
-                    skip_samples=skip_samples, 
+                    skip_samples=skip_samples,
                     only_samples=only_samples,
                 )
                 for entry in entries:
@@ -120,11 +119,11 @@ class MetadataProvider(ABC):
         Populate sequencing inputs for samples
         """
 
-    @abstractmethod
     def populate_analysis(self, cohort: Cohort) -> None:
         """
         Populate Analysis entries
         """
+        pass
 
     @abstractmethod
     def populate_pedigree(
@@ -206,9 +205,9 @@ class FieldMap(Enum):
     sex = 'sex'
 
 
-class CsvMetadataProvider(MetadataProvider):
+class CsvInputsProvider(InputsProvider):
     """
-    Metadata provider that parses data from a CSV file.
+    Input provider that parses data from a CSV file.
     """
 
     def __init__(self, fp):
@@ -216,9 +215,9 @@ class CsvMetadataProvider(MetadataProvider):
 
         self.d = list(csv.DictReader(fp))
         if len(self.d) == 0:
-            raise MetadataError('Empty metadata TSV')
+            raise InputProviderError('Empty metadata TSV')
         if 'sample' not in self.d[0]:
-            raise MetadataError(
+            raise InputProviderError(
                 f'Metadata TSV must have a header and a column "sample", '
                 f'got: {self.d[0]}'
             )
@@ -248,7 +247,7 @@ class CsvMetadataProvider(MetadataProvider):
         Get sample ID from a sample dict.
         """
         if 'sample' not in entry:
-            raise MetadataError(
+            raise InputProviderError(
                 f'Metadata TSV must have a header and a column '
                 f'"{FieldMap.sample.value}", got: {entry}'
             )
@@ -310,21 +309,25 @@ class CsvMetadataProvider(MetadataProvider):
         d_by_sid: dict[str, AlignmentInput] = {}
         for entry in self.get_entries():
             sid = self.get_sample_id(entry)
-            fqs1 = [f.strip() for f in entry.get(FieldMap.fqs_r1.value, '').split('|')
-                    if f.strip()]
-            fqs2 = [f.strip() for f in entry.get(FieldMap.fqs_r2.value, '').split('|')
-                    if f.strip()]
+            fqs1 = [
+                f.strip() for f in entry.get(FieldMap.fqs_r1.value, '').split('|')
+                if f.strip()
+            ]
+            fqs2 = [
+                f.strip() for f in entry.get(FieldMap.fqs_r2.value, '').split('|')
+                if f.strip()
+            ]
             cram = entry.get(FieldMap.cram.value, None)
             if fqs1:
                 if len(fqs1) != len(fqs1):
-                    raise MetadataError(
+                    raise InputProviderError(
                         'Numbers of fqs_r1 and fqs_r2 values (pipe-separated) '
                         'must match.'
                     )
                 if do_check_seq_existence:
                     for fq in (fqs1 + fqs2):
                         if not exists(fq):
-                            raise MetadataError(f'FQ {fq} does not exist')
+                            raise InputProviderError(f'FQ {fq} does not exist')
                 d_by_sid[sid] = [
                     FastqPair(fq1, fq2) for fq1, fq2
                     in zip(fqs1, fqs2)
@@ -332,8 +335,8 @@ class CsvMetadataProvider(MetadataProvider):
             elif cram:
                 if do_check_seq_existence:
                     if not exists(cram):
-                        raise MetadataError(f'CRAM {cram} does not exist')
+                        raise InputProviderError(f'CRAM {cram} does not exist')
                 d_by_sid[sid] = CramPath(cram)
 
-        for sample in cohort.get_all_samples():
+        for sample in cohort.get_samples():
             sample.alignment_input = d_by_sid.get(sample.id)

@@ -1,5 +1,5 @@
 """
-Pipeline stage targets: cohort, dataset, sample.
+Pipeline stage target and subclasses: Cohort, Dataset, Sample.
 """
 
 import logging
@@ -7,19 +7,67 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from cpg_pipes.storage import Path
-
-from cpg_pipes.pipeline.analysis import AlignmentInput, CramPath, GvcfPath
-from cpg_pipes.storage import Namespace, StorageProvider
-from cpg_pipes.pipeline.sequence import SmSequence
-from cpg_pipes.pipeline.target import Target
+from .. import Path
+from ..filetypes import AlignmentInput, CramPath, GvcfPath
+from ..providers.storage import StorageProvider, Namespace
 
 logger = logging.getLogger(__file__)
 
 
+class Target:
+    """
+    Defines a target that stage can act upon. Classes like Sample, Dataset, Pipeline
+    extend this class.
+    """
+    def __init__(self):
+        # Whether to process even if outputs exist:
+        self.forced: bool = False
+        # If not set, exclude from the pipeline:
+        self.active: bool = True
+
+    def get_samples(self, only_active: bool = True) -> list['Sample']:
+        """
+        Get all samples corresponding to this target
+        """
+        raise NotImplementedError
+
+    @property
+    def target_id(self) -> str:
+        """
+        ID should be unique across target of all levels. 
+
+        We are raising NotImplementedError instead of making it abstractclass because
+        mypy is not happy about binding TypeVar to abstract classes, see:
+        https://stackoverflow.com/questions/48349054/how-do-you-annotate-the-type-of
+        -an-abstract-class-with-mypy
+
+        Specifically,
+        ```
+        TypeVar('TargetT', bound=Target)
+        ```
+        Will raise:
+        ```
+        Only concrete class can be given where "Type[Target]" is expected
+        ```
+        """
+        raise NotImplementedError
+    
+    def get_job_attrs(self) -> dict[str, str]:
+        """
+        Attributes for Hail Batch job.
+        """
+        raise NotImplementedError
+
+    def get_job_prefix(self) -> str:
+        """
+        Prefix job names.
+        """
+        raise NotImplementedError
+
+
 class Cohort(Target):
     """
-    Represents a "cohort" target - all samples from all datasets in the pipeline
+    Represents a "cohort" target - all samples from all datasets in the pipeline.
     """
     def __init__(
         self, 
@@ -72,7 +120,7 @@ class Cohort(Target):
         ds_by_name = {d.name: d for d in self.get_datasets(only_active)}
         return ds_by_name.get(name)
 
-    def get_all_samples(self, only_active: bool = True) -> list['Sample']:
+    def get_samples(self, only_active: bool = True) -> list['Sample']:
         """
         Gets a flat list of all samples from all datasets.
         Include only "active" samples (unless only_active is False)
@@ -82,11 +130,11 @@ class Cohort(Target):
             all_samples.extend(proj.get_samples(only_active))
         return all_samples
 
-    def get_all_sample_ids(self, only_active: bool = True) -> list[str]:
+    def get_sample_ids(self, only_active: bool = True) -> list[str]:
         """
         Gets a flat list of CPG IDs for all samples from all datasets.
         """
-        return [s.id for s in self.get_all_samples(only_active=only_active)]
+        return [s.id for s in self.get_samples(only_active=only_active)]
 
     def add_dataset(
         self,
@@ -116,6 +164,18 @@ class Cohort(Target):
 
         self._datasets_by_name[ds.name] = ds
         return ds
+
+    def get_job_attrs(self) -> dict[str, str]:
+        """
+        Attributes for Hail Batch job.
+        """
+        return {}
+
+    def get_job_prefix(self) -> str:
+        """
+        Prefix job names.
+        """
+        return ''
 
 
 def parse_stack(
@@ -266,7 +326,6 @@ class Dataset(Target):
         id: str,  # pylint: disable=redefined-builtin
         external_id: str, 
         participant_id: str | None = None,
-        seq: SmSequence | None = None,
         sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
         **kwargs
@@ -282,7 +341,6 @@ class Dataset(Target):
             id=id, 
             external_id=external_id,
             participant_id=participant_id,
-            seq=seq,
             sex=sex,
             pedigree=pedigree,
             dataset=self,
@@ -307,12 +365,23 @@ class Dataset(Target):
         """
         return [s.id for s in self.get_samples(only_active=only_active)]
 
+    def get_job_attrs(self) -> dict[str, str]:
+        """
+        Attributes for Hail Batch job.
+        """
+        return {'dataset': self.name}
+
+    def get_job_prefix(self) -> str:
+        """
+        Prefix job names.
+        """
+        return f'{self.name}: '
+    
 
 class Sample(Target):
     """
     Represents a Sample.
     """
-
     def __init__(
         self,
         id: str,  # pylint: disable=redefined-builtin
@@ -321,7 +390,6 @@ class Sample(Target):
         participant_id: str | None = None,
         meta: dict | None = None,
         sex: Optional['Sex'] = None,
-        seq: SmSequence | None = None,
         pedigree: Optional['PedigreeInfo'] = None,
         alignment_input: AlignmentInput | None = None
     ):
@@ -331,7 +399,6 @@ class Sample(Target):
         self.dataset = dataset
         self._participant_id = participant_id
         self.meta: dict = meta or dict()
-        self.seq = seq
         self.pedigree: PedigreeInfo | None = pedigree
         if sex:
             self.pedigree = PedigreeInfo(
@@ -339,7 +406,7 @@ class Sample(Target):
                 fam_id=self.participant_id,
                 sex=sex,
             )
-        self._alignment_input = alignment_input
+        self.alignment_input = alignment_input
 
     def __repr__(self):
         return (
@@ -349,44 +416,23 @@ class Sample(Target):
             f', forced={self.forced}' +
             f', active={self.active}' +
             f', meta={self.meta}' +
-            (f', seq={self.seq}' if self.seq else '') +
-            (f', alignment_input={self._alignment_input}'
-             if self._alignment_input else '') +
+            (f', alignment_input={self.alignment_input}' if self.alignment_input else '') +
             (f', pedigree={self.pedigree}' if self.pedigree else '') +
             f')'
         )
 
     def __str__(self):
         ai_tag = ''
-        if self._alignment_input:
-            if isinstance(self._alignment_input, CramPath):
-                if self._alignment_input.is_bam:
+        if self.alignment_input:
+            if isinstance(self.alignment_input, CramPath):
+                if self.alignment_input.is_bam:
                     ai_tag = f'|SEQ=CRAM'
                 else:
                     ai_tag = f'|SEQ=BAM'
             else:
-                ai_tag = f'|SEQ={len(self._alignment_input)}FQS'
+                ai_tag = f'|SEQ={len(self.alignment_input)}FQS'
 
         return f'Sample({self.dataset.name}/{self.id}|{self.external_id}{ai_tag})'
-
-    @property
-    def alignment_input(self) -> AlignmentInput | None:
-        """
-        Returns input for (re-)alignment.
-        """
-        if self._alignment_input:
-            return self._alignment_input
-
-        if self.seq:
-            return self.seq.alignment_input
-        return None
-
-    @alignment_input.setter
-    def alignment_input(self, value: AlignmentInput):
-        """
-        Set alignment_input
-        """
-        self._alignment_input = value
 
     @property
     def participant_id(self) -> str:
@@ -395,11 +441,6 @@ class Sample(Target):
         Uses external_id whenever participant_id is not available in the DB
         """
         return self._participant_id or self.external_id
-
-    @property
-    def target_id(self) -> str:
-        """Unique target ID"""
-        return f'Sample("{self.id})"'
 
     def get_ped_dict(self, use_participant_id: bool = False) -> dict[str, str]:
         """
@@ -428,6 +469,31 @@ class Sample(Target):
         Path to a GVCF file. Not checking its existence here.
         """
         return GvcfPath(self.dataset.get_bucket() / 'gvcf' / f'{self.id}.g.vcf.gz')
+
+    @property
+    def target_id(self) -> str:
+        """Unique target ID"""
+        return f'Sample("{self.id})"'
+
+    def get_samples(self, only_active: bool = True) -> list['Sample']:
+        """
+        Implementing the abstract method.
+        """
+        if only_active and not self.active:
+            return []
+        return [self]
+    
+    def get_job_attrs(self) -> dict[str, str]:
+        """
+        Attributes for Hail Batch job.
+        """
+        return {'dataset': self.dataset.name, 'sample': self.id}
+
+    def get_job_prefix(self) -> str:
+        """
+        Prefix job names.
+        """
+        return f'{self.dataset.name}/{self.id}: '
 
 
 class Sex(Enum):
@@ -484,18 +550,3 @@ class PedigreeInfo:
             'Sex': str(self.sex.value),
             'Phenotype': self.phenotype,
         }
-
-
-class Pair(Target):
-    """
-    Pair of samples
-    """
-    @property
-    def target_id(self) -> str:
-        """Unique target ID"""
-        return f'{self.s1.target_id}:{self.s2.target_id}'
-
-    def __init__(self, s1: Sample, s2: Sample):
-        super().__init__()
-        self.s1 = s1
-        self.s2 = s2

@@ -10,17 +10,23 @@ import time
 import click
 import pandas as pd
 from analysis_runner import dataproc
-from cpg_pipes.storage import Path
 
-from cpg_pipes import buckets, ref_data, utils
-from cpg_pipes.pipeline.cli_opts import pipeline_click_options
-from cpg_pipes.pipeline.dataset import Cohort
-from cpg_pipes.pipeline.dataset import Dataset
-from cpg_pipes.pipeline.pipeline import stage, Pipeline, CohortStage, DatasetStage
-from cpg_pipes.pipeline.stage import StageInput, StageOutput
+from cpg_pipes import Path, Namespace
+from cpg_pipes import utils
+from cpg_pipes.pipeline import (
+    pipeline_click_options,
+    Cohort, 
+    Dataset, 
+    stage, 
+    Pipeline, 
+    StageInput, 
+    StageOutput,
+    CohortStage, 
+    DatasetStage
+)
+from cpg_pipes.refdata import RefData
 from cpg_pipes.stages.joint_genotyping import JointGenotypingStage
 from cpg_pipes.stages.vqsr import VqsrStage
-from cpg_pipes.storage import Namespace
 
 logger = logging.getLogger(__file__)
 
@@ -70,7 +76,8 @@ class AnnotateCohortStage(CohortStage):
             # Default Hail's VEP initialization script (triggered by --vep) 
             # installs VEP=v95; if we want v105, we have to use a modified 
             # vep-GRCh38.sh (with --init) from production-pipelines/vep/vep-GRCh38.sh
-            init=['gs://cpg-reference/vep/vep-GRCh38.sh'],
+            # init=['gs://cpg-reference/vep/vep-GRCh38.sh'],
+            vep='GRCh38',
             worker_machine_type='n1-highmem-8',
             worker_boot_disk_size=200,
             secondary_worker_boot_disk_size=200,
@@ -205,7 +212,7 @@ def _make_seqr_metadata_files(
     igv_paths_path = local_dir / f'{dataset.name}-igv-paths.tsv'
 
     # Sample map
-    if not buckets.can_reuse(samplemap_bucket_path, overwrite):
+    if not utils.can_reuse(samplemap_bucket_path, overwrite):
         df = pd.DataFrame({
             'cpg_id': s.id,
             'individual_id': s.participant_id,
@@ -213,7 +220,7 @@ def _make_seqr_metadata_files(
         df.to_csv(str(samplemap_bucket_path), sep=',', index=False, header=False)
 
     # IGV
-    if not buckets.can_reuse(igv_paths_path, overwrite):
+    if not utils.can_reuse(igv_paths_path, overwrite):
         df = pd.DataFrame({
             'individual_id': s.participant_id,
             'cram_path': s.get_cram_path(),
@@ -230,7 +237,7 @@ def _make_seqr_metadata_files(
     '--hc-shards-num',
     'hc_shards_num',
     type=click.INT,
-    default=ref_data.NUMBER_OF_HAPLOTYPE_CALLER_INTERVALS,
+    default=RefData.number_of_haplotype_caller_intervals,
     help='Number of intervals to devide the genome for gatk HaplotypeCaller',
 )
 @click.option(
@@ -285,7 +292,6 @@ def main(
         ),
         **kwargs,
     )
-    pipeline.submit_batch()
 
     if make_seqr_metadata:
         for dataset in pipeline.cohort.get_datasets():
@@ -296,6 +302,8 @@ def main(
                 ),
                 local_dir=pipeline.local_dir,
             )
+
+    pipeline.submit_batch()
 
 
 if __name__ == '__main__':

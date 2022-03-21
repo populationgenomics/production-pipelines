@@ -5,14 +5,15 @@ Create Hail Batch jobs to create and apply a VQSR models.
 from typing import List, Optional
 import logging
 import hailtop.batch as hb
-from cpg_pipes.storage import Path
 from hailtop.batch.job import Job
 from analysis_runner import dataproc
 
-from cpg_pipes import ref_data, images, buckets, utils
+from cpg_pipes import Path
+from cpg_pipes import images, utils
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.refdata import RefData
 
 logger = logging.getLogger(__file__)
 
@@ -84,10 +85,10 @@ INDEL_RECALIBRATION_TRANCHE_VALUES = [
 def make_vqsr_jobs(
     b: hb.Batch,
     input_vcf_or_mt_path: Path,
+    refs: RefData,
     work_bucket: Path,
     gvcf_count: int,
-    scatter_count: int = ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS,
-    depends_on: list[Job] | None = None,
+    scatter_count: int = RefData.number_of_genomics_db_intervals,
     meta_ht_path: Path | None = None,
     hard_filter_ht_path: Path | None = None,
     output_vcf_path: Path | None = None,
@@ -100,13 +101,13 @@ def make_vqsr_jobs(
 
     @param b: Batch object to add jobs to
     @param input_vcf_or_mt_path: path to a multi-sample VCF or matrix table
+    @param refs: reference data
     @param meta_ht_path: if input_vcf_or_mt_path is a matrix table, this table will 
            be used as a source of annotations for that matrix table, i.e. 
            to filter out samples flagged as `meta.related`
     @param hard_filter_ht_path: if input_vcf_or_mt_path is a matrix table, this table 
            will be used as a list of samples to hard filter out
     @param work_bucket: bucket for intermediate files
-    @param depends_on: job that the created jobs should only run after
     @param gvcf_count: number of input samples. Can't read from combined_mt_path as it
            might not be yet genereated the point of Batch job submission
     @param scatter_count: number of interavals
@@ -119,28 +120,28 @@ def make_vqsr_jobs(
     """
 
     dbsnp_vcf = b.read_input_group(
-        base=ref_data.DBSNP_VCF, 
-        index=ref_data.DBSNP_VCF_INDEX,
+        base=str(refs.dbsnp_vcf),
+        index=str(refs.dbsnp_vcf_index),
     )
     hapmap_resource_vcf = b.read_input_group(
-        base=ref_data.HAPMAP_RESOURCE_VCF, 
-        index=ref_data.HAPMAP_RESOURCE_VCF_INDEX,
+        base=str(refs.hapmap_resource_vcf),
+        index=str(refs.hapmap_resource_vcf_index),
     )
     omni_resource_vcf = b.read_input_group(
-        base=ref_data.OMNI_RESOURCE_VCF, 
-        index=ref_data.OMNI_RESOURCE_VCF_INDEX,
+        base=str(refs.omni_resource_vcf),
+        index=str(refs.omni_resource_vcf_index),
     )
     one_thousand_genomes_resource_vcf = b.read_input_group(
-        base=ref_data.ONE_THOUSAND_GENOMES_RESOURCE_VCF,
-        index=ref_data.ONE_THOUSAND_GENOMES_RESOURCE_VCF_INDEX,
+        base=str(refs.one_thousand_genomes_resource_vcf),
+        index=str(refs.one_thousand_genomes_resource_vcf_index),
     )
     mills_resource_vcf = b.read_input_group(
-        base=ref_data.MILLS_RESOURCE_VCF, 
-        index=ref_data.MILLS_RESOURCE_VCF_INDEX,
+        base=str(refs.mills_resource_vcf),
+        index=str(refs.mills_resource_vcf_index),
     )
     axiom_poly_resource_vcf = b.read_input_group(
-        base=ref_data.AXIOM_POLY_RESOURCE_VCF, 
-        index=ref_data.AXIOM_POLY_RESOURCE_VCF_INDEX,
+        base=str(refs.axiom_poly_resource_vcf),
+        index=str(refs.axiom_poly_resource_vcf_index),
     )
     dbsnp_resource_vcf = dbsnp_vcf
 
@@ -159,15 +160,18 @@ def make_vqsr_jobs(
 
     intervals = split_intervals.get_intervals(
         b=b,
+        refs=refs,
         scatter_count=scatter_count,
     )
+
+    jobs = []
 
     if input_vcf_or_mt_path.name.endswith('.mt'):
         assert meta_ht_path
         assert hard_filter_ht_path
         job_name = 'VQSR: MT to site-only VCF'
         combined_vcf_path = work_bucket / 'input.vcf.gz'
-        if not buckets.can_reuse(combined_vcf_path, overwrite):
+        if not utils.can_reuse(combined_vcf_path, overwrite):
             mt_to_vcf_job = dataproc.hail_dataproc_job(
                 b,
                 f'{utils.QUERY_SCRIPTS_DIR}/mt_to_vcf.py --overwrite '
@@ -178,7 +182,6 @@ def make_vqsr_jobs(
                 max_age='8h',
                 packages=utils.DATAPROC_PACKAGES,
                 num_secondary_workers=scatter_count,
-                depends_on=depends_on,
                 # hl.export_vcf() uses non-preemptible workers' disk to merge VCF files.
                 # 10 samples take 2.3G, 400 samples take 60G, which roughly matches
                 # `huge_disk` (also used in the AS-VQSR VCF-gather job)
@@ -187,8 +190,7 @@ def make_vqsr_jobs(
             )
         else:
             mt_to_vcf_job = b.new_job(f'{job_name} [reuse]')    
-        if depends_on:
-            mt_to_vcf_job.depends_on(*depends_on)
+        jobs.append(mt_to_vcf_job)
         tabix_job = add_tabix_step(b, combined_vcf_path, medium_disk)
         tabix_job.depends_on(mt_to_vcf_job)
         siteonly_vcf = tabix_job.combined_vcf
@@ -206,8 +208,7 @@ def make_vqsr_jobs(
                 overwrite=overwrite,
                 disk=medium_disk,
             )
-            if depends_on:
-                siteonly_j.depends_on(*depends_on)
+            jobs.append(siteonly_j)
             siteonly_vcf = siteonly_j.output_vcf
         else:
             siteonly_vcf = input_vcf
@@ -222,8 +223,7 @@ def make_vqsr_jobs(
         use_as_annotations=use_as_annotations,
         is_small_callset=is_small_callset,
     )
-    if depends_on:
-        indels_variant_recalibrator_job.depends_on(*depends_on)
+    jobs.append(indels_variant_recalibrator_job)
 
     indels_recalibration = indels_variant_recalibrator_job.recalibration
     indels_tranches = indels_variant_recalibrator_job.tranches
@@ -249,8 +249,7 @@ def make_vqsr_jobs(
             is_huge_callset=is_huge_callset,
             max_gaussians=snp_max_gaussians,
         )
-        if depends_on:
-            model_j.depends_on(*depends_on)
+        jobs.append(model_j)
 
         snps_recalibrator_jobs = [
             add_snps_variant_recalibrator_scattered_step(
@@ -301,6 +300,7 @@ def make_vqsr_jobs(
             site_only=True,
         )
         recalibrated_gathered_vcf_j.name = f'VQSR: {recalibrated_gathered_vcf_j.name}'
+        jobs.append(recalibrated_gathered_vcf_j)
 
     else:
         snps_recalibrator_job = add_snps_variant_recalibrator_step(
@@ -315,8 +315,7 @@ def make_vqsr_jobs(
             max_gaussians=snp_max_gaussians,
             is_small_callset=is_small_callset,
         )
-        if depends_on:
-            snps_recalibrator_job.depends_on(*depends_on)
+        jobs.append(snps_recalibrator_job)
 
         snps_recalibration = snps_recalibrator_job.recalibration
         snps_tranches = snps_recalibrator_job.tranches
@@ -334,8 +333,9 @@ def make_vqsr_jobs(
             snp_filter_level=INDEL_HARD_FILTER_LEVEL,
             output_vcf_path=output_vcf_path,
         )
+        jobs.append(recalibrated_gathered_vcf_j)
 
-    return [recalibrated_gathered_vcf_j]
+    return jobs
 
 
 def _add_make_sites_only_job(
@@ -352,7 +352,7 @@ def _add_make_sites_only_job(
     Returns: a Job object with a single output j.sites_only_vcf of type ResourceGroup
     """
     job_name = 'VQSR: MakeSitesOnlyVcf'
-    if buckets.can_reuse(output_vcf_path, overwrite):
+    if utils.can_reuse(output_vcf_path, overwrite):
         return b.new_job(job_name + ' [reuse]')
 
     j = b.new_job(job_name)

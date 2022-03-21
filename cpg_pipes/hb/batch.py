@@ -4,12 +4,11 @@ Extending the Hail's `Batch` class.
 
 import logging
 import os
-from typing import Optional, Dict
 
 import hailtop.batch as hb
-
-from cpg_pipes.storage import Path, to_path
 from hailtop.batch.job import Job
+
+from .. import Path, to_path
 
 logger = logging.getLogger(__file__)
 
@@ -28,8 +27,8 @@ class Batch(hb.Batch):
 
     def new_job(
         self,
-        name: Optional[str] = None,
-        attributes: Optional[Dict[str, str]] = None,
+        name: str | None = None,
+        attributes: dict[str, str] | None = None,
         **kwargs,
     ) -> Job:
         """
@@ -57,7 +56,7 @@ class Batch(hb.Batch):
         self.total_job_num += 1
         j = super().new_job(name, attributes=attributes)
         return j
-
+    
 
 def setup_batch(
     description: str, 

@@ -1,5 +1,5 @@
 """
-Types specific to Cloud storage. 
+Abstract storage provider.
 """
 import pathlib
 from enum import Enum
@@ -15,7 +15,7 @@ Path = Union[CloudPath, pathlib.Path]
 
 # Using convenience method from cloudpathlib to parse a path string
 to_path = to_anypath
-    
+
 
 class Namespace(Enum):
     """
@@ -115,7 +115,7 @@ class StorageProvider(ABC):
             suffix='web'
         )
 
-    # noinspection PyMethodMayBeStatic
+    @abstractmethod
     def get_web_url(
         self, 
         dataset: str,
@@ -126,4 +126,9 @@ class StorageProvider(ABC):
         """
         URL corrsponding to the WEB bucket.
         """
-        return None
+
+    @abstractmethod
+    def get_ref_bucket(self) -> Path:
+        """
+        Prefix for reference data
+        """

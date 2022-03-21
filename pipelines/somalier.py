@@ -7,11 +7,9 @@ Batch pipeline to check pedigree on samples.
 import logging
 
 import click
-import click_config_file
 
-from cpg_pipes.buckets import exists
-from cpg_pipes.pipeline.cli_opts import pipeline_click_options
-from cpg_pipes.pipeline.pipeline import Pipeline
+from cpg_pipes.utils import exists
+from cpg_pipes.pipeline import Pipeline, pipeline_click_options
 from cpg_pipes.stages.somalier import CramSomalierAncestry, CramSomalierPedigree
 
 logger = logging.getLogger(__file__)

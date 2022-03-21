@@ -1,30 +1,31 @@
 """
-Various utility functions and constants.
+Utility functions and constants.
 """
 
 import hashlib
+import logging
 import os
 import sys
 import time
-from pathlib import Path
-from typing import Any, Callable
-
 import click
+from typing import Any, Callable, cast
+from cloudpathlib import CloudPath
 
-from cpg_pipes import __name__ as package_name
-from cpg_pipes.buckets import exists
+from . import __name__ as package_name
+from . import Path, to_path
+
+logger = logging.getLogger(__file__)
 
 # Default reference genome build.
 DEFAULT_REF = 'GRCh38'
 
 # Packages to install on a dataproc cluster, to use with the dataproc wrapper.
 DATAPROC_PACKAGES = [
-    'cpg-pipes>=0.3.0',
-    'cpg-gnomad',   # github.com/populationgenomics/gnomad_methods
-    'seqr-loader',  # github.com/populationgenomics/hail-elasticsearch-pipelines
+    'cpg_pipes==0.3.0',
+    'cpg_gnomad',   # github.com/populationgenomics/gnomad_methods
+    'seqr_loader',  # github.com/populationgenomics/hail-elasticsearch-pipelines
     'elasticsearch',
     'click',
-    'cloudpathlib[gs]',
     'google',
     'fsspec',
     'sklearn',
@@ -124,3 +125,55 @@ def hash_sample_ids(sample_names: list[str]) -> str:
         assert ' ' not in sn, sn
     h = hashlib.sha256(' '.join(sorted(sample_names)).encode()).hexdigest()[:38]
     return f'{h}_{len(sample_names)}'
+
+
+def exists(path: Path | str) -> bool:
+    """
+    Check if the object exists, where the object can be:
+        * local file
+        * local directory
+        * cloud object
+        * cloud URL representing a *.mt or *.ht Hail data,
+          in which case it will check for the existence of a
+          *.mt/_SUCCESS or *.ht/_SUCCESS file.
+    @param path: path to the file/directory/object/mt/ht
+    @return: True if the object exists
+    """
+    path = cast(Path, to_path(path))
+
+    # rstrip to ".mt/" -> ".mt"
+    if any(str(path).rstrip('/').endswith(f'.{suf}') for suf in ['mt', 'ht']):
+        path = path / '_SUCCESS'
+
+    res = path.exists()
+    if res and isinstance(path, CloudPath):
+        logger.debug(f'Checking object existence, exists: {path}')
+    else:
+        logger.debug(f'Checking object existence, doesn\'t exist: {path}')
+    return res
+
+
+def can_reuse(
+    path: list[Path] | Path | str | None,
+    overwrite: bool,
+) -> bool:
+    """
+    Checks if `fpath` is good to reuse in the analysis: it exists
+    and `overwrite` is False.
+
+    If `fpath` is a collection, it requires all files in it to exist.
+    """
+    if overwrite:
+        return False
+
+    if not path:
+        return False
+
+    if isinstance(path, list):
+        return all(can_reuse(fp, overwrite) for fp in path)
+
+    if not exists(path):
+        return False
+
+    logger.debug(f'Reusing existing {path}. Use --overwrite to overwrite')
+    return True

@@ -5,16 +5,20 @@ Batch pipeline to run WGS QC.
 """
 
 import logging
-
 import click
-from cpg_pipes.storage import Path
 
-from cpg_pipes.buckets import exists
+from cpg_pipes import Path
+from cpg_pipes.utils import exists
+from cpg_pipes.pipeline import (
+    pipeline_click_options, 
+    stage, 
+    Pipeline, 
+    Dataset,
+    StageInput, 
+    StageOutput, 
+    DatasetStage
+)
 from cpg_pipes.jobs.multiqc import multiqc
-from cpg_pipes.pipeline.cli_opts import pipeline_click_options
-from cpg_pipes.pipeline.dataset import Dataset
-from cpg_pipes.pipeline.pipeline import stage, Pipeline, DatasetStage
-from cpg_pipes.pipeline.stage import StageInput, StageOutput
 from cpg_pipes.stages.cramqc import SamtoolsStats, PicardWgsMetrics, VerifyBamId
 from cpg_pipes.stages.fastqc import FastQC
 from pipelines.somalier import CramSomalierPedigree, CramSomalierAncestry
@@ -80,7 +84,6 @@ class MultiQC(DatasetStage):
 
         j = multiqc(
             self.b,
-            dataset_name=dataset.name,
             tmp_bucket=dataset.get_tmp_bucket(),
             paths=paths,
             ending_to_trim=ending_to_trim,
@@ -88,8 +91,8 @@ class MultiQC(DatasetStage):
             out_json_path=json_path,
             out_html_path=html_path,
             out_html_url=html_url,
+            job_attrs=dataset.get_job_attrs(),
         )
-        
         return self.make_outputs(dataset, data=self.expected_result(dataset), jobs=[j])
 
 

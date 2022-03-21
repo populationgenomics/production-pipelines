@@ -5,12 +5,10 @@ across Google Cloud Storage and Azure Blob Storage.
 """
 from cloudpathlib import CloudPath
 
-from cpg_pipes.storage import Path
-
-from cpg_pipes.storage import StorageProvider, Cloud, Namespace
+from ..storage import StorageProvider, Cloud, Namespace, Path, to_path
 
 
-class CPGStorageProvider(StorageProvider):
+class CpgStorageProvider(StorageProvider):
     """
     CPG storage policy implementation of the StorageProvider
     """
@@ -62,3 +60,9 @@ class CPGStorageProvider(StorageProvider):
         if sample:
             url += f'/{sample}'
         return url
+
+    def get_ref_bucket(self) -> Path:
+        """
+        Prefix for reference data
+        """
+        return to_path(f'{self.cloud.value}://cpg-reference')
