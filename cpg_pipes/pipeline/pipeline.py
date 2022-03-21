@@ -619,7 +619,7 @@ class StageInput:
         self, stage: StageDecorator
     ) -> dict[str, dict[str, Path]]:
         """
-        Get as a dictoinary of files/resources for a specific stage, indexed by target
+        Get as a dict of files/resources for a specific stage, indexed by target
         """
         return self._each(fun=(lambda r: r.as_dict()), stage=stage)
 
@@ -628,7 +628,7 @@ class StageInput:
         stage: StageDecorator,
     ) -> dict[str, dict[str, hb.Resource]]:
         """
-        Get a dictoinary of resources for a specific stage, and indexed by target
+        Get a dict of resources for a specific stage, and indexed by target
         """
         return self._each(fun=(lambda r: r.as_resource_dict()), stage=stage)
 
@@ -637,7 +637,7 @@ class StageInput:
         stage: StageDecorator,
     ) -> dict[str, dict[str, Path]]:
         """
-        Get a dictoinary of paths for a specific stage, and indexed by target
+        Get a dict of paths for a specific stage, and indexed by target
         """
         return self._each(fun=(lambda r: r.as_path_dict()), stage=stage)
 
@@ -668,7 +668,7 @@ class StageInput:
 
     def as_dict(self, target: 'Target', stage: StageDecorator) -> dict[str, Path]:
         """
-        Get a dictoinary of files or Resources for a specific target and stage
+        Get a dict of files or Resources for a specific target and stage
         """
         res = self._results_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_dict()
@@ -677,7 +677,7 @@ class StageInput:
         self, target: 'Target', stage: StageDecorator
     ) -> dict[str, Path]:
         """
-        Get a dictoinary of files for a specific target and stage
+        Get a dict of files for a specific target and stage
         """
         res = self._results_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_path_dict()
@@ -686,7 +686,7 @@ class StageInput:
         self, target: 'Target', stage: StageDecorator
     ) -> dict[str, hb.Resource]:
         """
-        Get a dictoinary of  Resources for a specific target and stage
+        Get a dict of  Resources for a specific target and stage
         """
         res = self._results_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_resource_dict()
