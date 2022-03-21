@@ -63,6 +63,12 @@ INDEL_SCORE_CUTOFF = 0
     is_flag=True,
     help='Reuse intermediate files',
 )
+@click.option(
+    '--run-vep',
+    'run_vep',
+    is_flag=True,
+    help='Run VEP',
+)
 def main(
     vcf_path: str,
     site_only_vqsr_vcf_path: str,
@@ -71,6 +77,7 @@ def main(
     disable_validation: bool,
     make_checkpoints: bool,
     overwrite: bool,
+    run_vep: bool,
 ):  # pylint: disable=missing-function-docstring
     """
     Entry point
@@ -98,6 +105,24 @@ def main(
         if make_checkpoints:
             mt.write(out_path, overwrite=True)
             mt = hl.read_matrix_table(out_path)
+
+    if run_vep:
+        out_path = join(work_bucket, 'vqsr_and_37_coords.vep.mt')
+        if can_reuse(out_path, overwrite):
+            mt = hl.read_matrix_table(out_path)
+        else:
+            mt = hl.vep(
+                mt, 
+                block_size=1000,
+                # We are not starting the cluster with --vep, instead passing custom
+                # startup script with --init gs://cpg-reference/vep/vep-GRCh38.sh,
+                # so VEP_CONFIG_URI will not be set, thus need to provide config
+                # as a function parameter here:
+                config='file:///vep_data/vep-gcloud.json'
+            )
+            if make_checkpoints:
+                mt.write(out_path, overwrite=True)
+                mt = hl.read_matrix_table(out_path)
 
     mt = compute_variant_annotated_vcf(
         mt, 

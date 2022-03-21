@@ -66,6 +66,8 @@ def produce_gvcf(
         output_path=output_path,
         overwrite=overwrite,
     )
+    postproc_j.depends_on(*jobs)
+    
     return jobs + [postproc_j]
 
 

@@ -13,7 +13,6 @@ from analysis_runner import dataproc
 
 from cpg_pipes import Path, Namespace
 from cpg_pipes import utils
-from cpg_pipes.jobs import vep
 from cpg_pipes.pipeline import (
     pipeline_click_options,
     Cohort, 
@@ -39,31 +38,7 @@ def get_anno_tmp_bucket(cohort: Cohort) -> Path:
     return cohort.analysis_dataset.get_tmp_bucket() / 'mt'
 
 
-@stage(required_stages=[JointGenotypingStage])
-class VepStage(CohortStage):
-    """
-    Run VEP on a VCF
-    """
-    def expected_result(self, cohort: Cohort) -> Path:
-        """
-        Expected to write a matrix table.
-        """
-        return cohort.analysis_dataset.get_tmp_bucket() / 'vep' / 'cohort-vep.vcf.gz'
-    
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        """
-        Uses jobs vep() function.
-        """
-        j = vep.vep(
-            self.b,
-            vcf_path=inputs.as_path(cohort, stage=JointGenotypingStage, id='vcf'),
-            refs=self.refs,
-            out_vcf_path=self.expected_result(cohort),
-        )
-        return self.make_outputs(cohort, self.expected_result(cohort), [j])
-    
-
-@stage(required_stages=[VepStage, VqsrStage])
+@stage(required_stages=[JointGenotypingStage, VqsrStage])
 class AnnotateCohortStage(CohortStage):
     """
     Re-annotate the entire cohort. 
@@ -80,7 +55,7 @@ class AnnotateCohortStage(CohortStage):
         """
         checkpoints_bucket = get_anno_tmp_bucket(cohort) / 'checkpoints'
 
-        vcf_path = inputs.as_path(target=cohort, stage=VepStage)
+        vcf_path = inputs.as_path(target=cohort, stage=JointGenotypingStage, id='vcf')
         annotated_siteonly_vcf_path = inputs.as_path(target=cohort, stage=VqsrStage)
 
         expected_path = self.expected_result(cohort)
@@ -93,11 +68,19 @@ class AnnotateCohortStage(CohortStage):
             f'--bucket {checkpoints_bucket} '
             f'--disable-validation '
             f'--make-checkpoints '
+            f'--run-vep '
             + ('--overwrite ' if not self.check_intermediates else ''),
             max_age='16h',
             packages=utils.DATAPROC_PACKAGES,
             job_name='Make MT and annotate cohort',
             depends_on=inputs.get_jobs(),
+            # Default Hail's VEP initialization script (triggered by --vep)
+            # installs VEP=v95; if we want v105, we have to use a modified
+            # vep-GRCh38.sh (with --init) from production-pipelines/vep/vep-GRCh38.sh
+            init=['gs://cpg-reference/vep/vep-GRCh38.sh'],
+            worker_machine_type='n1-highmem-8',
+            worker_boot_disk_size=200,
+            secondary_worker_boot_disk_size=200,
             num_secondary_workers=50,
             num_workers=8,
         )

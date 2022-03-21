@@ -34,12 +34,11 @@ def setup_env(
     exported environment variables with EnvFile, so have to do it here.
     """
     assert os.environ.get('HAIL_TOKEN')
-    os.environ['DATASET'] = dataset
-    os.environ['DATASET_GCP_PROJECT'] = dataset_gcp_project
-    os.environ['ACCESS_LEVEL'] = access_level
-    os.environ['HAIL_BUCKET'] = f'cpg-{dataset}-test-tmp/hail'
+    os.environ['CPG_DATASET'] = dataset
+    os.environ['CPG_OUTPUT_PREFIX'] = 'unittests'
+    os.environ['CPG_ACCESS_LEVEL'] = access_level
+    os.environ['CPG_DATASET_GCP_PROJECT'] = dataset_gcp_project
     os.environ['HAIL_BILLING_PROJECT'] = dataset
-    os.environ['OUTPUT'] = 'unittests'
 
 
 setup_env()

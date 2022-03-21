@@ -1,3 +1,7 @@
+"""
+Test building and running pipeline. Optionally, dry-run.
+"""
+
 import shutil
 import sys
 import tempfile
@@ -17,9 +21,12 @@ except ImportError:
 
 class TestPipeline(unittest.TestCase):
     """
-    Test Pipeline class
+    Test building and running pipeline. Optionally, dry-run.
     """
     def setUp(self):
+        """
+        Setting parameters, creating local tmp dir.
+        """
         self.name = self._testMethodName
         self.timestamp = time.strftime('%Y%m%d-%H%M')
         self.out_bucket = BASE_BUCKET / self.name / self.timestamp
@@ -29,21 +36,12 @@ class TestPipeline(unittest.TestCase):
         self.sample_ids = SAMPLES[:3]
 
     def tearDown(self) -> None:
+        """
+        Removing local tmp dir
+        """
         shutil.rmtree(self.local_tmp_dir)
-
-    @patch('hail.hadoop_open', lambda a, b: tempfile.TemporaryFile('w'))
-    def test_pipeline(self):
-        """
-        Constucting a pipeline and submitting it to Hail Batch with dry_run.
-
-        With dry_run, Hail Batch prints all code with a single print() call.
-        Thus, we capture builtins.print, and verify that it has the expected
-        job commands passed to it.
         
-        Mocking all hail methods (hail.hadoop_open in this case) so we don't 
-        have to initialize hail, which steals a few seconds from this test
-        which is supposed to be quick.
-        """
+    def _setup_pipeline(self, dry_run=False):
         setup_env()
         from cpg_pipes import benchmark
         from cpg_pipes.pipeline.pipeline import Pipeline
@@ -57,13 +55,36 @@ class TestPipeline(unittest.TestCase):
             analysis_dataset=DATASET,
             namespace=Namespace.TEST,
             config=dict(output_datasets=[DATASET]),
-            dry_run=True,
+            dry_run=dry_run,
         )
         ds = pipeline.add_dataset(DATASET)
         for s_id in self.sample_ids:
             s = ds.add_sample(s_id, s_id)
             s.alignment_input = benchmark.tiny_fq
+        return pipeline
 
+    def test_pipeline(self):
+        """
+        Constucting a pipeline and submitting it to Hail Batch.
+        """
+        pipeline = self._setup_pipeline(dry_run=False)
+        pipeline.submit_batch()
+
+    @patch('hail.hadoop_open', lambda a, b: tempfile.TemporaryFile('w'))
+    def test_pipeline_dry(self):
+        """
+        Constucting a pipeline and submitting it to Hail Batch with dry_run.
+
+        With dry_run, Hail Batch prints all code with a single print() call.
+        Thus, we capture `builtins.print`, and verify that it has the expected
+        job commands passed to it.
+        
+        Mocking all hail methods (hail.hadoop_open in this case) so we don't 
+        have to initialize hail, which steals a few seconds from this test
+        which is supposed to be quick.
+        """
+        pipeline = self._setup_pipeline(dry_run=True)
+        
         with patch('builtins.print') as mock_print:
             pipeline.submit_batch()
         

@@ -145,12 +145,7 @@ def exists(path: Path | str) -> bool:
     if any(str(path).rstrip('/').endswith(f'.{suf}') for suf in ['mt', 'ht']):
         path = path / '_SUCCESS'
 
-    res = path.exists()
-    if res and isinstance(path, CloudPath):
-        logger.debug(f'Checking object existence, exists: {path}')
-    else:
-        logger.debug(f'Checking object existence, doesn\'t exist: {path}')
-    return res
+    return path.exists()
 
 
 def can_reuse(
