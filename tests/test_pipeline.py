@@ -48,7 +48,7 @@ class TestPipeline(unittest.TestCase):
         # Use the seqr_loader stages. Importing it will make sure all its stages
         # are used by default:
         from pipelines import seqr_loader  # noqa: F401
-
+        
         pipeline = Pipeline(
             name=self._testMethodName,
             description=self._testMethodName,
@@ -61,11 +61,12 @@ class TestPipeline(unittest.TestCase):
                 jc_intervals_num=self.jc_intervals_num,
             ),
         )
-        ds = pipeline.add_dataset(DATASET)
-        for s_id in self.sample_ids:
-            s = ds.add_sample(s_id, s_id)
-            s.alignment_input = benchmark.tiny_fq
-            s.sequencing_type = seq_type
+        self.datasets = [pipeline.add_dataset(DATASET)]
+        for ds in self.datasets:
+            for s_id in self.sample_ids:
+                s = ds.add_sample(s_id, s_id)
+                s.alignment_input = benchmark.tiny_fq
+                s.sequencing_type = seq_type
         return pipeline
 
     def test_wgs(self):
@@ -94,7 +95,7 @@ class TestPipeline(unittest.TestCase):
         have to initialize hail, which steals a few seconds from this test
         which is supposed to be quick.
         """
-        with patch.object(Path, 'exists') as mock_exists:
+        with patch('cpg_pipes.utils.exists') as mock_exists:
             mock_exists.return_value = True
             pipeline = self._setup_pipeline()
 
@@ -125,7 +126,7 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(_cnt('GatherVcfsCloud'), 2)
         self.assertEqual(
             _cnt('hailctl dataproc submit'), 
-            1 + len(pipeline.config['output_datasets']) * 3
+            1 + len(self.datasets) * 3
         )
 
 
