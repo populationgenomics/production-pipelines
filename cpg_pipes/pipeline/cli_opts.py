@@ -135,7 +135,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             'status_reporter_type',
             type=choice_from_enum(StatusReporterType),
             callback=val_to_enum(StatusReporterType),
-            default=None,
+            default=StatusReporterType.NONE.value,
             help='Use a status reporter implementation to report jobs statuses',
         ),
         click.option(

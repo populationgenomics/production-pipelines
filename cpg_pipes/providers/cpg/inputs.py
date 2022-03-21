@@ -75,7 +75,7 @@ class SmdbInputsProvider(InputsProvider):
     def populate_alignment_inputs(
         self,
         cohort: Cohort,
-        do_check_seq_existence: bool = True,
+        do_check_seq_existence: bool = False,
     ) -> None:
         """
         Populate sequencing inputs for samples.

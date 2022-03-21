@@ -33,7 +33,7 @@ class InputsProvider(ABC):
         skip_samples: list[str] | None = None,
         only_samples: list[str] | None = None,
         ped_files: list[Path] | None = None,
-        do_check_seq_existence: bool = True,
+        do_check_seq_existence: bool = False,
     ) -> Cohort:
         """
         Add datasets in the cohort. There exists only one cohort for 
@@ -113,7 +113,7 @@ class InputsProvider(ABC):
     def populate_alignment_inputs(
         self, 
         cohort: Cohort,
-        do_check_seq_existence: bool = True,
+        do_check_seq_existence: bool = False,
     ):
         """
         Populate sequencing inputs for samples
@@ -301,7 +301,7 @@ class CsvInputsProvider(InputsProvider):
     def populate_alignment_inputs(
         self, 
         cohort: Cohort,
-        do_check_seq_existence: bool = True,
+        do_check_seq_existence: bool = False,
     ) -> None:
         """
         Populate sequencing inputs for samples.

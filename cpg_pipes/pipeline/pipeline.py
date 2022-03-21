@@ -1,12 +1,13 @@
 """
-Provides `Pipeline` class and a `@stage` decorator that allows to define pipeline
+Provides `Pipeline` class and a `@stage` decorator that allow to define pipeline
 stages and plug them together.
 
-Workflow of a stage is to add jobs to Hail Batch. Each stage acts on a `Target`, 
-which can be a `Sample`, a `Dataset`, or a `Cohort` (= all input datasets combined). 
-Pipeline would resolve dependencies between stages of different levels accordingly.
+A Stage describes the job that are added to Hail Batch, and outputs that are expected
+to be produced. Each stage acts on a `Target`, which can be of a different level:
+a `Sample`, a `Dataset`, a `Cohort` (= all input datasets combined). Pipeline plugs
+stages together by resolving dependencies between different levels accordingly.
 
-For examples of pipelines, see the `pipelines/` folder in the repository root.
+Examples of pipelines can be found in the `pipelines/` folder in the repository root.
 """
 import functools
 import logging

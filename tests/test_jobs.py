@@ -283,9 +283,9 @@ class TestJobs(unittest.TestCase):
 
         j = vep.vep(
             self.pipeline.b, 
-            vcf_path=str(site_only_vcf_path),
+            vcf_path=site_only_vcf_path,
             refs=self.refs,
-            out_vcf_path=str(out_vcf_path),
+            out_vcf_path=out_vcf_path,
         )
         self.pipeline.submit_batch(wait=True)
 

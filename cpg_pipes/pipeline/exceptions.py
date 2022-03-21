@@ -1,9 +1,9 @@
 """
-Pipeline errors
+Pipeline errors.
 """
 
 
 class PipelineError(Exception):
     """
-    Error raised by pipeline stages implementation
+    Error raised by pipeline stages implementation.
     """

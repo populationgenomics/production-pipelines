@@ -6,7 +6,7 @@ Creates a Hail Batch job to run the command line VEP tool.
 
 from hailtop.batch.job import Job
 
-from cpg_pipes import images, utils
+from cpg_pipes import images, utils, Path
 from cpg_pipes.hb.batch import Batch
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.hb.command import wrap_command
@@ -15,9 +15,9 @@ from cpg_pipes.refdata import RefData
 
 def vep(
     b: Batch,
-    vcf_path: str,
+    vcf_path: Path,
     refs: RefData,
-    out_vcf_path: str | None = None,
+    out_vcf_path: Path | None = None,
     overwrite: bool = True
 ) -> Job:
     """
@@ -50,12 +50,10 @@ def vep(
     gsutil cat {refs.vep_loftee} | tar -xf - -C $LOFTEE_DIR/
     ls $LOFTEE_DIR
 
-    retry_gs_cp {vcf_path} input.vcf.gz
-    
     vep \\
     --vcf \\
     --format vcf \\
-    -i input.vcf.gz \\
+    -i {b.read_input(str(vcf_path))} \\
     --everything \\
     --allele_number \\
     --no_stats \\
@@ -75,5 +73,5 @@ def vep(
         define_retry_function=True
     ))
     if out_vcf_path:
-        b.write_output(j.out_vcf, out_vcf_path)
+        b.write_output(j.out_vcf, str(out_vcf_path))
     return j

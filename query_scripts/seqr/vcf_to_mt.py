@@ -6,7 +6,6 @@ Hail script to submit on a dataproc cluster.
 Converts input multi-sample VCFs into a matrix table, and annotates it.
 """
 from enum import Enum
-from typing import Optional
 from os.path import join
 import click
 import logging
@@ -64,7 +63,6 @@ INDEL_SCORE_CUTOFF = 0
     is_flag=True,
     help='Reuse intermediate files',
 )
-@click.option('--vep-block-size', 'vep_block_size')
 def main(
     vcf_path: str,
     site_only_vqsr_vcf_path: str,
@@ -73,8 +71,10 @@ def main(
     disable_validation: bool,
     make_checkpoints: bool,
     overwrite: bool,
-    vep_block_size: Optional[int],
 ):  # pylint: disable=missing-function-docstring
+    """
+    Entry point
+    """
     logger.info('Starting the seqr_load pipeline')
 
     hl.init(default_reference=GENOME_VERSION)
@@ -95,23 +95,6 @@ def main(
         )
         mt = annotate_vqsr(mt, vqsr_ht)
         mt = add_37_coordinates(mt)
-        if make_checkpoints:
-            mt.write(out_path, overwrite=True)
-            mt = hl.read_matrix_table(out_path)
-
-    out_path = join(work_bucket, 'vqsr_and_37_coords.vep.mt')
-    if can_reuse(out_path, overwrite):
-        mt = hl.read_matrix_table(out_path)
-    else:
-        mt = hl.vep(
-            mt, 
-            block_size=vep_block_size or 1000,
-            # We are not starting the cluster with --vep, instead passing custom
-            # startup script with --init gs://cpg-reference/vep/vep-GRCh38.sh,
-            # so VEP_CONFIG_URI will not be set, thus need to provide config
-            # as a function parameter here:
-            # config='file:///vep_data/vep-gcloud.json'
-        )
         if make_checkpoints:
             mt.write(out_path, overwrite=True)
             mt = hl.read_matrix_table(out_path)
