@@ -8,7 +8,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
-from cpg_pipes.filetypes import CramPath, GvcfPath
+from cpg_pipes.types import CramPath, GvcfPath, SequencingType
 from cpg_pipes import images, utils
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
@@ -21,6 +21,7 @@ logger = logging.getLogger(__file__)
 def produce_gvcf(
     b: hb.Batch,
     sample_name: str,
+    sequencing_type: SequencingType,
     tmp_bucket: Path,
     cram_path: CramPath,
     refs: RefData,
@@ -46,14 +47,15 @@ def produce_gvcf(
     jobs = haplotype_caller(
         b=b,
         sample_name=sample_name,
+        sequencing_type=sequencing_type,
         refs=refs,
         job_attrs=job_attrs,
         output_path=hc_gvcf_path,
         tmp_bucket=tmp_bucket,
         cram_path=cram_path,
-        number_of_intervals=number_of_intervals, 
+        number_of_intervals=number_of_intervals,
         intervals=intervals,
-        overwrite=overwrite, 
+        overwrite=overwrite,
         dragen_mode=dragen_mode,
     )
 
@@ -74,6 +76,7 @@ def produce_gvcf(
 def haplotype_caller(
     b: hb.Batch,
     sample_name: str,
+    sequencing_type: SequencingType,
     tmp_bucket: Path,
     cram_path: CramPath,
     refs: RefData,
@@ -97,6 +100,7 @@ def haplotype_caller(
             intervals = split_intervals.get_intervals(
                 b=b,
                 refs=refs,
+                sequencing_type=sequencing_type,
                 scatter_count=number_of_intervals,
                 out_bucket=tmp_bucket / 'intervals',
             )
@@ -323,7 +327,7 @@ def postproc_gvcf(
     | bcftools view -Oz -o $GVCF_NODP
     tabix -p vcf $GVCF_NODP
 
-    gatk --java-options "-Xms{job_res.get_java_mem_mb()}g" \\
+    gatk --java-options "-Xms{job_res.get_java_mem_mb()}m" \\
     ReblockGVCF \\
     --reference {reference.base} \\
     -V $GVCF_NODP \\

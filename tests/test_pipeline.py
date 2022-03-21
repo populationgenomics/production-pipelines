@@ -9,8 +9,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-from cpg_pipes import to_path
-from cpg_pipes.providers.storage import Namespace
+from cpg_pipes import Namespace, to_path, Path
 from cpg_pipes.refdata import RefData
 
 try:
@@ -34,6 +33,8 @@ class TestPipeline(unittest.TestCase):
         self.local_tmp_dir = to_path(tempfile.mkdtemp())
         self.sample_name = f'Test-{self.timestamp}'
         self.sample_ids = SAMPLES[:3]
+        self.hc_intervals_num = 10
+        self.jc_intervals_num = 10
 
     def tearDown(self) -> None:
         """
@@ -41,7 +42,7 @@ class TestPipeline(unittest.TestCase):
         """
         shutil.rmtree(self.local_tmp_dir)
         
-    def _setup_pipeline(self, dry_run=False):
+    def _setup_pipeline(self):
         setup_env()
         from cpg_pipes import benchmark
         from cpg_pipes.pipeline.pipeline import Pipeline
@@ -54,8 +55,10 @@ class TestPipeline(unittest.TestCase):
             description=self._testMethodName,
             analysis_dataset=DATASET,
             namespace=Namespace.TEST,
-            config=dict(output_datasets=[DATASET]),
-            dry_run=dry_run,
+            config=dict(
+                hc_intervals_num=self.hc_intervals_num,
+                jc_intervals_num=self.jc_intervals_num,
+            ),
         )
         ds = pipeline.add_dataset(DATASET)
         for s_id in self.sample_ids:
@@ -63,15 +66,22 @@ class TestPipeline(unittest.TestCase):
             s.alignment_input = benchmark.tiny_fq
         return pipeline
 
-    def test_pipeline(self):
+    def test_wgs(self):
         """
         Constucting a pipeline and submitting it to Hail Batch.
         """
-        pipeline = self._setup_pipeline(dry_run=False)
-        pipeline.submit_batch()
+        pipeline = self._setup_pipeline()
+        pipeline.submit_batch(dry_run=False)
 
-    @patch('hail.hadoop_open', lambda a, b: tempfile.TemporaryFile('w'))
-    def test_pipeline_dry(self):
+    def test_exome(self):
+        """
+        Constucting a pipeline and submitting it to Hail Batch.
+        """
+        pipeline = self._setup_pipeline()
+        pipeline.config['exomes_bed'] = ''
+        pipeline.submit_batch(dry_run=False)
+
+    def test_dry(self):
         """
         Constucting a pipeline and submitting it to Hail Batch with dry_run.
 
@@ -83,10 +93,12 @@ class TestPipeline(unittest.TestCase):
         have to initialize hail, which steals a few seconds from this test
         which is supposed to be quick.
         """
-        pipeline = self._setup_pipeline(dry_run=True)
-        
+        with patch.object(Path, 'exists') as mock_exists:
+            mock_exists.return_value = True
+            pipeline = self._setup_pipeline()
+
         with patch('builtins.print') as mock_print:
-            pipeline.submit_batch()
+            pipeline.submit_batch(dry_run=True)
         
             # print() should be called only once:
             self.assertEqual(1, mock_print.call_count)
@@ -102,11 +114,11 @@ class TestPipeline(unittest.TestCase):
             return len([line for line in lines if line.strip().startswith(item)])
 
         self.assertEqual(_cnt('bwa mem'), len(self.sample_ids) * 2)
-        self.assertEqual(_cnt('HaplotypeCaller'), len(self.sample_ids))
+        self.assertEqual(_cnt('HaplotypeCaller'), len(self.sample_ids) * self.hc_intervals_num)
         self.assertEqual(_cnt('ReblockGVCF'), len(self.sample_ids))
-        self.assertEqual(_cnt('GenotypeGVCFs'), RefData.number_of_genomics_db_intervals)
-        self.assertEqual(_cnt('GenomicsDBImport'), RefData.number_of_genomics_db_intervals)
-        self.assertEqual(_cnt('MakeSitesOnlyVcf'), RefData.number_of_genomics_db_intervals)
+        self.assertEqual(_cnt('GenotypeGVCFs'), self.jc_intervals_num)
+        self.assertEqual(_cnt('GenomicsDBImport'), self.jc_intervals_num)
+        self.assertEqual(_cnt('MakeSitesOnlyVcf'), self.jc_intervals_num)
         self.assertEqual(_cnt('VariantRecalibrator'), 2)
         self.assertEqual(_cnt('ApplyVQSR'), 2)
         self.assertEqual(_cnt('GatherVcfsCloud'), 2)

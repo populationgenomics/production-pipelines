@@ -2,28 +2,28 @@
 Utilities and resources for running benchmarking
 """
 from . import to_path
-from .filetypes import FastqPair, CramPath
+from .types import FastqPair, CramPath
 
 BENCHMARK_BUCKET = to_path('gs://cpg-fewgenomes-test/benchmark')
 TOY_INPUTS_BUCKET = BENCHMARK_BUCKET / 'inputs/toy'
-RESULTS_BUCKET = BENCHMARK_BUCKET / 'fastqc'
+RESULTS_BUCKET = BENCHMARK_BUCKET / 'outputs'
 
 
 # 40k reads:
 tiny_fq = [
     # This set is 50MB each:
     FastqPair(
-        BENCHMARK_BUCKET / 'inputs/toy/2-699835.L001.R1.n40000.fastq.gz',
-        BENCHMARK_BUCKET / 'inputs/toy/2-699835.L001.R2.n40000.fastq.gz',
+        TOY_INPUTS_BUCKET / '2-699835.L001.R1.n40000.fastq.gz',
+        TOY_INPUTS_BUCKET / '2-699835.L001.R2.n40000.fastq.gz',
     ),
     FastqPair(
-        BENCHMARK_BUCKET / 'inputs/toy/2-699835.L002.R1.n40000.fastq.gz',
-        BENCHMARK_BUCKET / 'inputs/toy/2-699835.L002.R2.n40000.fastq.gz',
+        TOY_INPUTS_BUCKET / '2-699835.L002.R1.n40000.fastq.gz',
+        TOY_INPUTS_BUCKET / '2-699835.L002.R2.n40000.fastq.gz',
     ),
 ]
 
 # ~300k reads:
-tiny_cram = CramPath(BENCHMARK_BUCKET / 'inputs/toy/NA12878-chr21-tiny.cram')
+tiny_cram = CramPath(TOY_INPUTS_BUCKET / 'NA12878-chr21-tiny.cram')
 
 # WGS:
 giab_crams = {

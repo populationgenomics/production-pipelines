@@ -10,7 +10,7 @@ import logging
 
 from cpg_pipes import benchmark, images, Namespace
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
-from cpg_pipes.filetypes import FastqPair, CramPath
+from cpg_pipes.types import FastqPair, CramPath
 from cpg_pipes.pipeline import stage, Pipeline, SampleStage, StageInput, StageOutput
 from cpg_pipes.pipeline.targets import Sample
 

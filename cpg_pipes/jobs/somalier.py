@@ -10,7 +10,7 @@ from cpg_pipes import Path, to_path
 from cpg_pipes import images, utils
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.filetypes import CramPath, GvcfPath
+from cpg_pipes.types import CramPath, GvcfPath
 from cpg_pipes.pipeline.targets import Dataset, Sample
 from cpg_pipes.refdata import RefData
 

@@ -13,7 +13,7 @@ from hailtop.batch.job import Job
 from cpg_pipes import Path
 from cpg_pipes import utils, images
 from cpg_pipes.refdata import RefData
-from cpg_pipes.filetypes import AlignmentInput, CramPath, FastqPairs
+from cpg_pipes.types import AlignmentInput, CramPath, FastqPairs
 from cpg_pipes.jobs import picard
 from cpg_pipes.hb.prev_job import PrevJob
 from cpg_pipes.hb.command import wrap_command

@@ -3,6 +3,7 @@ Reference files and indices used in bionformatics pipelines.
 """
 
 from . import Path
+from .types import SequencingType
 
 
 class RefData:
@@ -10,7 +11,7 @@ class RefData:
     Bioinformatics reference files, indices, and constants.
     """
     number_of_haplotype_caller_intervals = 50
-    number_of_genomics_db_intervals = 50
+    number_of_joint_calling_intervals = 50
 
     def fasta_res_group(self, b, indices: list | None = None):
         """
@@ -32,7 +33,7 @@ class RefData:
         
         # BED files
         self.noalt_regions = self.bucket / 'noalt.bed'
-        
+       
         # Somalier
         self.somalier_sites = self.bucket / 'somalier/v0/sites.hg38.vcf.gz'
         self.somalier_1kg_targz = self.bucket / 'somalier/v0/1kg.somalier.tar.gz'
@@ -42,7 +43,7 @@ class RefData:
         self.vep_loftee = self.bucket / 'vep/loftee_GRCh38.tar'
         self.vep_cache = self.bucket / 'vep/homo_sapiens_vep_105_GRCh38.tar' 
 
-        self.broad_ref_bucket = bucket / 'hg38' / 'v1'
+        self.broad_ref_bucket = bucket / 'hg38' / 'v0'
 
         # Fasta
         self.ref_fasta = self.broad_ref_bucket / 'Homo_sapiens_assembly38.fasta'
@@ -59,13 +60,24 @@ class RefData:
             'repeat_mask.bin',
             'str_table.bin',
         ]
-    
+
         # BWA indices
         self.bwa_index_exts = ['sa', 'amb', 'bwt', 'ann', 'pac', 'alt']
         self.bwamem2_index_exts = ['0123', 'amb', 'bwt.2bit.64', 'ann', 'pac', 'alt']
         self.bwamem2_index_prefix = self.ref_fasta
     
         # GATK intervals
+        self.calling_interval_lists = {
+            SequencingType.WGS: self.broad_ref_bucket / 'wgs_calling_regions.hg38.interval_list',
+            SequencingType.EXOME: self.broad_ref_bucket / 'exome_calling_regions.v1.interval_list',
+        }
+        self.evaluation_interval_lists = {
+            SequencingType.WGS: self.broad_ref_bucket / 'wgs_evaluation_regions.hg38.interval_list',
+            SequencingType.EXOME: self.broad_ref_bucket / 'exome_evaluation_regions.v1.interval_list',
+        }
+        self.wgs_coverage_interval_list = (
+            self.broad_ref_bucket / 'wgs_coverage_regions.hg38.interval_list'
+        )
         self.unpadded_intervals = (
             self.broad_ref_bucket / 'hg38.even.handcurated.20k.intervals'
         )
@@ -90,7 +102,11 @@ class RefData:
     
         # Contamination check
         self.contam_bucket = self.broad_ref_bucket / 'contamination-resources/1000g'
-        self.wgs_coverage_interval_list = self.broad_ref_bucket / 'wgs_coverage_regions.hg38.interval_list'
+        self.cont_ref_d = dict(
+            ud=self.contam_bucket / '1000g.phase3.100k.b38.vcf.gz.dat.UD',
+            bed=self.contam_bucket / '1000g.phase3.100k.b38.vcf.gz.dat.bed',
+            mu=self.contam_bucket / '1000g.phase3.100k.b38.vcf.gz.dat.mu',
+        )
     
         ######################################################
         # Hail Query #

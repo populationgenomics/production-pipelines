@@ -4,6 +4,7 @@ Basic bioinformatics status types.
 
 import logging
 from dataclasses import dataclass
+from enum import Enum
 from typing import List, Union
 
 from cpg_pipes import Path, to_path
@@ -131,3 +132,25 @@ FastqPairs = List[FastqPair]
 
 # Alignment input can be a CRAM file on a bucket, or a list of Fastq pairs on a bucket.
 AlignmentInput = Union[FastqPairs, CramPath]
+
+
+class SequencingType(Enum):
+    """
+    Type (scope) of sequencing experiment.
+    """
+
+    WGS = 'wgs'
+    EXOME = 'exome'
+    SINGLE_CELL = 'single-cell'
+
+    @staticmethod
+    def parse(val: str) -> 'SequencingType':
+        """
+        Parse a string into a SequencingType object.
+        """
+        d = {v.value: v for v in SequencingType}
+        if val not in d:
+            raise ValueError(
+                f'Unrecognised sequence type {val}. Available: {list(d.keys())}'
+            )
+        return d[val.lower()]

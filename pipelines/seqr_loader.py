@@ -19,7 +19,7 @@ from cpg_pipes.pipeline import (
     Dataset, 
     stage, 
     Pipeline, 
-    StageInput, 
+    StageInput,
     StageOutput,
     CohortStage, 
     DatasetStage
@@ -77,7 +77,8 @@ class AnnotateCohortStage(CohortStage):
             # Default Hail's VEP initialization script (triggered by --vep)
             # installs VEP=v95; if we want v105, we have to use a modified
             # vep-GRCh38.sh (with --init) from production-pipelines/vep/vep-GRCh38.sh
-            init=['gs://cpg-reference/vep/vep-GRCh38.sh'],
+            # init=['gs://cpg-reference/vep/vep-GRCh38.sh'],
+            vep='GRCh38',
             worker_machine_type='n1-highmem-8',
             worker_boot_disk_size=200,
             secondary_worker_boot_disk_size=200,
@@ -234,11 +235,19 @@ def _make_seqr_metadata_files(
 
 @click.command()
 @click.option(
-    '--hc-shards-num',
-    'hc_shards_num',
+    '--hc-intervals-num',
+    'hc_intervals_num',
     type=click.INT,
     default=RefData.number_of_haplotype_caller_intervals,
-    help='Number of intervals to devide the genome for gatk HaplotypeCaller',
+    help='Number of intervals to devide the genome for sample genotyping with '
+         'gatk HaplotypeCaller',
+)
+@click.option(
+    '--jc-intervals-num',
+    'jc_intervals_num',
+    type=click.INT,
+    default=RefData.number_of_joint_calling_intervals,
+    help='Number of intervals to devide the genome for joint genotyping with GATK',
 )
 @click.option(
     '--use-gnarly/--no-use-gnarly',
@@ -268,12 +277,20 @@ def _make_seqr_metadata_files(
     is_flag=True,
     help='Perform fingerprinting and PED checks',
 )
+@click.option(
+    '--exome-bed',
+    'exome_bed',
+    type=str,
+    help=f'BED file with exome regions',
+)
 @pipeline_click_options
 def main(
-    hc_shards_num: int,
+    hc_intervals_num: int,
+    jc_intervals_num: int,
     use_gnarly: bool,
     use_as_vqsr: bool,
     ped_checks: bool,
+    exome_bed: str,
     **kwargs,
 ):
     """
@@ -286,9 +303,11 @@ def main(
         description='Seqr loader',
         config=dict(
             ped_checks=ped_checks,
-            hc_shards_num=hc_shards_num,
+            hc_intervals_num=hc_intervals_num,
+            jc_intervals_num=jc_intervals_num,
             use_gnarly=use_gnarly,
             use_as_vqsr=use_as_vqsr,
+            exome_bed=exome_bed,
         ),
         **kwargs,
     )

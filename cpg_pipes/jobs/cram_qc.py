@@ -6,7 +6,7 @@ from hailtop.batch.job import Job
 
 from cpg_pipes import Path, to_path
 from cpg_pipes import images, utils
-from cpg_pipes.filetypes import CramPath
+from cpg_pipes.types import CramPath
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 
@@ -75,11 +75,7 @@ def verify_bamid(
     STANDARD.set_resources(j, storage_gb=60)
     cram = cram_path.resource_group(b)
     reference = refs.fasta_res_group(b)
-    cont_ref_d = dict(
-        ud=to_path(refs.contam_bucket) / '1000g.phase3.100k.b38.vcf.gz.dat.UD',
-        bed=to_path(refs.contam_bucket) / '1000g.phase3.100k.b38.vcf.gz.dat.bed',
-        mu=to_path(refs.contam_bucket) / '1000g.phase3.100k.b38.vcf.gz.dat.mu',
-    )
+    cont_ref_d = refs.cont_ref_d
     res_group = b.read_input_group(**{k: str(v) for k, v in cont_ref_d.items()})
     
     cmd = f"""\
@@ -124,7 +120,7 @@ def picard_wgs_metrics(
     if utils.can_reuse(cram_path.path, overwrite):
         j.name += ' [reuse]'
         return j
-
+    
     j.image(images.SAMTOOLS_PICARD_IMAGE)
     res = STANDARD.set_resources(j, storage_gb=60)
     cram = cram_path.resource_group(b)
@@ -132,7 +128,7 @@ def picard_wgs_metrics(
     interval_file = b.read_input(refs.wgs_coverage_interval_list)
 
     cmd = f"""\
-    picard -Xms2000m -Xmx{res.get_java_mem_mb()}g \
+    picard -Xms2000m -Xmx{res.get_java_mem_mb()}m \
       CollectWgsMetrics \
       INPUT={cram.cram} \
       VALIDATION_STRINGENCY=SILENT \

@@ -8,7 +8,7 @@ from enum import Enum
 from typing import Optional
 
 from .. import Path
-from ..filetypes import AlignmentInput, CramPath, GvcfPath
+from ..types import AlignmentInput, CramPath, GvcfPath, SequencingType
 from ..providers.storage import StorageProvider, Namespace
 
 logger = logging.getLogger(__file__)
@@ -376,6 +376,27 @@ class Dataset(Target):
         Prefix job names.
         """
         return f'{self.name}: '
+
+
+class Sex(Enum):
+    """
+    Sex as in PED format
+    """
+    UNKNOWN = 0
+    MALE = 1
+    FEMALE = 2
+
+    @staticmethod
+    def parse(sex: str | None) -> 'Sex':
+        """
+        Parse a string into a Sex object.
+        """
+        if sex:
+            if sex.lower() in ('m', 'male', '1'):
+                return Sex.MALE
+            if sex.lower() in ('f', 'female', '2'):
+                return Sex.FEMALE
+        return Sex.UNKNOWN
     
 
 class Sample(Target):
@@ -387,9 +408,10 @@ class Sample(Target):
         id: str,  # pylint: disable=redefined-builtin
         external_id: str,
         dataset: 'Dataset',  # type: ignore  # noqa: F821
+        sequencing_type: SequencingType = SequencingType.WGS,
         participant_id: str | None = None,
         meta: dict | None = None,
-        sex: Optional['Sex'] = None,
+        sex: Sex | None = None,
         pedigree: Optional['PedigreeInfo'] = None,
         alignment_input: AlignmentInput | None = None
     ):
@@ -397,6 +419,7 @@ class Sample(Target):
         self.id = id
         self.external_id = external_id
         self.dataset = dataset
+        self.sequencing_type = sequencing_type
         self._participant_id = participant_id
         self.meta: dict = meta or dict()
         self.pedigree: PedigreeInfo | None = pedigree
@@ -416,6 +439,7 @@ class Sample(Target):
             f', forced={self.forced}' +
             f', active={self.active}' +
             f', meta={self.meta}' +
+            f', sequencing_type={self.sequencing_type.value}' +
             (f', alignment_input={self.alignment_input}' if self.alignment_input else '') +
             (f', pedigree={self.pedigree}' if self.pedigree else '') +
             f')'
@@ -494,27 +518,6 @@ class Sample(Target):
         Prefix job names.
         """
         return f'{self.dataset.name}/{self.id}: '
-
-
-class Sex(Enum):
-    """
-    Sex as in PED format
-    """
-    UNKNOWN = 0
-    MALE = 1
-    FEMALE = 2
-
-    @staticmethod
-    def parse(sex: str | None) -> 'Sex':
-        """
-        Parse a string into a Sex object.
-        """
-        if sex:
-            if sex.lower() in ('m', 'male', '1'):
-                return Sex.MALE
-            if sex.lower() in ('f', 'female', '2'):
-                return Sex.FEMALE
-        return Sex.UNKNOWN
 
 
 @dataclass

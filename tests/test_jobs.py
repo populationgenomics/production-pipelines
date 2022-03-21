@@ -16,7 +16,7 @@ from cpg_pipes.jobs.haplotype_caller import produce_gvcf
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
-from cpg_pipes.filetypes import CramPath
+from cpg_pipes.types import CramPath
 from cpg_pipes.pipeline import Pipeline
 from cpg_pipes import images
 

@@ -18,8 +18,9 @@ from sample_metadata.exceptions import ApiException
 
 from ... import Path, to_path
 from ... import utils
-from ...filetypes import FastqPair, CramPath, AlignmentInput
+from ...types import FastqPair, CramPath, AlignmentInput
 from ..status import AnalysisStatus
+from ...pipeline.targets import SequencingType
 
 logger = logging.getLogger(__file__)
 
@@ -47,14 +48,14 @@ class AnalysisType(Enum):
     CUSTOM = 'custom'
 
     @staticmethod
-    def parse(name: str) -> 'AnalysisType':
+    def parse(val: str) -> 'AnalysisType':
         """
         Parse str and create a AnalysisStatus object
         """
         d = {v.value: v for v in AnalysisType}
-        if name not in d:
-            raise SmdbError(f'Unrecognised analysis type {name}. Available: {list(d.keys())}')
-        return d[name.lower()]
+        if val not in d:
+            raise SmdbError(f'Unrecognised analysis type {val}. Available: {list(d.keys())}')
+        return d[val.lower()]
 
 
 @dataclass
@@ -342,8 +343,8 @@ class SMDB:
                 f'so queueing analysis {label}'
             )
             return None
-
-
+    
+    
 @dataclass
 class SmSequence:
     """
@@ -355,6 +356,7 @@ class SmSequence:
     id: str
     sample_id: str
     meta: dict
+    sequencing_type: SequencingType
     alignment_input: AlignmentInput | None = None
 
     @staticmethod
@@ -374,6 +376,7 @@ class SmSequence:
             id=data['id'],
             sample_id=sample_id,
             meta=data['meta'],
+            sequencing_type=SequencingType.parse(data['type']),
         )
         if data['meta'].get('reads'):
             sm_seq.alignment_input = SmSequence._parse_reads(

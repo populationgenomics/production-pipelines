@@ -5,7 +5,7 @@ Stage that generates a CRAM file.
 import logging
 
 from .. import Path
-from ..filetypes import CramPath
+from ..types import CramPath
 from ..pipeline import stage, SampleStage, StageInput, StageOutput, Sample, PipelineError
 from ..jobs import align
 

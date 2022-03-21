@@ -7,8 +7,8 @@ from abc import ABC, abstractmethod
 from enum import Enum
 
 from cpg_pipes.utils import exists
-from cpg_pipes.filetypes import FastqPair, CramPath, AlignmentInput
-from cpg_pipes.pipeline.targets import Cohort, Dataset, Sex
+from cpg_pipes.types import FastqPair, CramPath, AlignmentInput
+from cpg_pipes.pipeline.targets import Cohort, Dataset, Sex, SequencingType
 from cpg_pipes import Path
 
 logger = logging.getLogger(__file__)
@@ -108,7 +108,7 @@ class InputsProvider(ABC):
         """
         Get sample metadata from a sample dict.
         """
-        
+
     @abstractmethod
     def populate_alignment_inputs(
         self, 
@@ -203,6 +203,7 @@ class FieldMap(Enum):
     fqs_r2 = 'fqs_r2'
     cram = 'cram'
     sex = 'sex'
+    sequencing_type = 'sequencing_type'
 
 
 class CsvInputsProvider(InputsProvider):
@@ -297,7 +298,7 @@ class CsvInputsProvider(InputsProvider):
         Populate pedigree data
         """
         pass
-    
+
     def populate_alignment_inputs(
         self, 
         cohort: Cohort,
@@ -307,6 +308,8 @@ class CsvInputsProvider(InputsProvider):
         Populate sequencing inputs for samples.
         """
         d_by_sid: dict[str, AlignmentInput] = {}
+        seq_type_by_sid: dict[str, SequencingType] = {}
+
         for entry in self.get_entries():
             sid = self.get_sample_id(entry)
             fqs1 = [
@@ -337,6 +340,12 @@ class CsvInputsProvider(InputsProvider):
                     if not exists(cram):
                         raise InputProviderError(f'CRAM {cram} does not exist')
                 d_by_sid[sid] = CramPath(cram)
+                
+            seq_type_by_sid[sid] = SequencingType.parse(
+                entry.get(FieldMap.sequencing_type.value, None)
+            )
 
         for sample in cohort.get_samples():
             sample.alignment_input = d_by_sid.get(sample.id)
+            if sample.id:
+                sample.sequencing_type = seq_type_by_sid[sample.id]

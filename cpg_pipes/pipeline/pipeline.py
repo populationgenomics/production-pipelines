@@ -85,7 +85,6 @@ def stage(
             return cls(
                 name=cls.__name__,
                 batch=pipeline.b,
-                dry_run=pipeline.dry_run,
                 required_stages=required_stages,
                 analysis_type=analysis_type,
                 skipped=skipped,
@@ -203,8 +202,8 @@ class Pipeline:
         )
         self.refs = RefData(storage_provider.get_ref_bucket())
 
-        self.check_intermediates = check_intermediates and not dry_run
-        self.check_expected_outputs = check_expected_outputs and not dry_run
+        self.check_intermediates = check_intermediates
+        self.check_expected_outputs = check_expected_outputs
         self.skip_samples_with_missing_input = skip_samples_with_missing_input
         self.first_stage = first_stage
         self.last_stage = last_stage
@@ -725,7 +724,6 @@ class Stage(Generic[TargetT], ABC):
         check_intermediates: bool = False,
         status_reporter: StatusReporter | None = None,
         pipeline_config: dict[str, Any] | None = None,
-        dry_run: bool = False,
     ):
         """
         @param name: name of the stage
@@ -749,7 +747,6 @@ class Stage(Generic[TargetT], ABC):
         self._name = name
         self.b = batch
         self.refs = refs
-        self.dry_run = dry_run
 
         self.skip_samples_with_missing_input = skip_samples_with_missing_input
         self.check_expected_outputs = check_expected_outputs
@@ -880,20 +877,20 @@ class Stage(Generic[TargetT], ABC):
                 if target.forced:
                     logger.info(
                         f'{self.name}: can reuse, but forcing the target '
-                        f'{target.target_id} to rerun this stage'
+                        f'{target} to rerun this stage'
                     )
                     outputs = self.queue_jobs(target, inputs)
                 elif self.forced:
                     logger.info(
                         f'{self.name}: can reuse, but forcing the stage '
-                        f'to rerun, target={target.target_id}'
+                        f'to rerun, target={target}'
                     )
                     outputs = self.queue_jobs(target, inputs)
                 else:
-                    logger.info(f'{self.name}: reusing results for {target.target_id}')
+                    logger.info(f'{self.name}: reusing results for {target}')
                     outputs = self._queue_reuse_job(target, reusable_paths)
             else:
-                logger.info(f'{self.name}: adding jobs for {target.target_id}')
+                logger.info(f'{self.name}: adding jobs for {target}')
                 outputs = self.queue_jobs(target, inputs)
 
             for j in outputs.jobs:
@@ -906,7 +903,7 @@ class Stage(Generic[TargetT], ABC):
             if not reusable_paths:
                 raise ValueError(
                     f'Stage {self.name} is required, but is skipped, and '
-                    f'expected outputs for target {target.target_id} do not exist.)'
+                    f'expected outputs for target {target} do not exist'
                 )
             else:
                 return self.make_outputs(target=target, data=reusable_paths)
@@ -920,9 +917,6 @@ class Stage(Generic[TargetT], ABC):
         Returns outputs that can be reused for the stage for the target,
         or None of none can be reused
         """
-        if self.dry_run:
-            return None
-
         expected_output = self.expected_result(target)
 
         if not expected_output:

@@ -14,6 +14,7 @@ from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.refdata import RefData
+from cpg_pipes.types import SequencingType
 
 logger = logging.getLogger(__file__)
 
@@ -30,7 +31,7 @@ STANDARD_FEATURES = [
     'QD',
     'FS',
     'SOR',
-    'DP',
+    # 'DP',
 ]
 SNP_STANDARD_FEATURES = STANDARD_FEATURES + ['MQ']
 INDEL_STANDARD_FEATURES = STANDARD_FEATURES
@@ -86,9 +87,10 @@ def make_vqsr_jobs(
     b: hb.Batch,
     input_vcf_or_mt_path: Path,
     refs: RefData,
+    sequencing_type: SequencingType,
     work_bucket: Path,
     gvcf_count: int,
-    scatter_count: int = RefData.number_of_genomics_db_intervals,
+    scatter_count: int = RefData.number_of_joint_calling_intervals,
     meta_ht_path: Path | None = None,
     hard_filter_ht_path: Path | None = None,
     output_vcf_path: Path | None = None,
@@ -102,6 +104,7 @@ def make_vqsr_jobs(
     @param b: Batch object to add jobs to
     @param input_vcf_or_mt_path: path to a multi-sample VCF or matrix table
     @param refs: reference data
+    @param sequencing_type: type of sequencing experiments
     @param meta_ht_path: if input_vcf_or_mt_path is a matrix table, this table will 
            be used as a source of annotations for that matrix table, i.e. 
            to filter out samples flagged as `meta.related`
@@ -118,6 +121,12 @@ def make_vqsr_jobs(
            convert it to site-only. Otherwise, assuming it's already site-only 
     @return: a final Job, and a path to the VCF with VQSR annotations
     """
+    intervals = split_intervals.get_intervals(
+        b=b,
+        refs=refs,
+        sequencing_type=sequencing_type,
+        scatter_count=scatter_count,
+    )
 
     dbsnp_vcf = b.read_input_group(
         base=str(refs.dbsnp_vcf),
@@ -157,12 +166,6 @@ def make_vqsr_jobs(
     # To fit a joint-called VCF
     medium_disk = 100 if is_small_callset else (200 if not is_huge_callset else 500)
     huge_disk = 200 if is_small_callset else (500 if not is_huge_callset else 2000)
-
-    intervals = split_intervals.get_intervals(
-        b=b,
-        refs=refs,
-        scatter_count=scatter_count,
-    )
 
     jobs = []
 

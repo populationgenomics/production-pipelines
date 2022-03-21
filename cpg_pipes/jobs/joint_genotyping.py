@@ -5,10 +5,9 @@ Create Hail Batch jobs for joint genotyping.
 import json
 import logging
 from enum import Enum
-from typing import Optional, List, Tuple
 
-import hailtop.batch as hb
 import pandas as pd
+import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
@@ -18,7 +17,7 @@ from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.pipeline.targets import Sample
-from cpg_pipes.filetypes import GvcfPath
+from cpg_pipes.types import GvcfPath
 from cpg_pipes.refdata import RefData
 
 logger = logging.getLogger(__file__)
@@ -48,31 +47,39 @@ def make_joint_genotyping_jobs(
     # bcftools view gs://cpg-fewgenomes-test/unittest/inputs/chr20/gnarly/joint-called-siteonly.vcf.gz | zgrep 7105364
     tool: JointGenotyperTool = JointGenotyperTool.GenotypeGVCFs,
     do_filter_excesshet: bool = True,
-    scatter_count: int = RefData.number_of_genomics_db_intervals,
-    dry_run: bool = False,
+    scatter_count: int | None = None,
 ) -> list[Job]:
     """
     Adds samples to the GenomicsDB and runs joint genotyping on them.
     Outputs a multi-sample VCF under `output_vcf_path`.
     """
+    job_name = 'Joint genotyping'
+    if utils.can_reuse([out_vcf_path, out_siteonly_vcf_path], overwrite):
+        return [b.new_job(f'{job_name} [reuse]')]
+   
     if len(samples) == 0:
         raise ValueError(
             'Provided samples collection for joint calling should contain '
             'at least one active sample'
         )
-    
-    job_name = 'Joint genotyping'
-    if utils.can_reuse([out_vcf_path, out_siteonly_vcf_path], overwrite):
-        return [b.new_job(f'{job_name} [reuse]')]
 
-    logger.info(f'Submitting the joint-calling jobs.')
+    sequencing_types = set(s.sequencing_type for s in samples)
+    if len(sequencing_types) > 1:
+        raise ValueError(
+            f'Samples of more than one sequencing type used for joint calling: '
+            f'{sequencing_types}. Joint calling can be only performed on samples '
+            f'of the same type.'
+        )
+    sequencing_type = list(sequencing_types)[0]
 
-    # For small callsets, we don't apply the ExcessHet filtering anyway
-    do_filter_excesshet = len(samples) >= 1000 and do_filter_excesshet
+    logger.info(f'Submitting joint-calling jobs.')
+
+    scatter_count = scatter_count or RefData.number_of_joint_calling_intervals
 
     intervals = split_intervals.get_intervals(
         b=b,
         refs=refs,
+        sequencing_type=sequencing_type,
         scatter_count=scatter_count,
     )
     
@@ -90,7 +97,6 @@ def make_joint_genotyping_jobs(
         gvcf_by_sid=gvcf_by_sid,
         intervals=intervals,
         scatter_count=scatter_count,
-        dry_run=dry_run,
         overwrite=overwrite,
     )
     jobs: list[Job] = [v for k, v in import_gvcfs_job_per_interval.items()]
@@ -127,7 +133,8 @@ def make_joint_genotyping_jobs(
         if import_gvcfs_job_per_interval.get(idx):
             jc_vcf_j.depends_on(import_gvcfs_job_per_interval.get(idx))
 
-        if do_filter_excesshet:
+        # For small callsets, we don't apply the ExcessHet filtering anyway
+        if len(samples) >= 1000 and do_filter_excesshet:
             logger.info(f'Queueing exccess het filter job')
             exccess_filter_j, exccess_filter_jc_vcf = _add_exccess_het_filter(
                 b,
@@ -179,9 +186,8 @@ def genomicsdb(
     tmp_bucket: Path,
     gvcf_by_sid: dict[str, GvcfPath],
     intervals: hb.ResourceGroup,
-    scatter_count: int = RefData.number_of_genomics_db_intervals,    
+    scatter_count: int = RefData.number_of_joint_calling_intervals,    
     overwrite: bool = False,
-    dry_run: bool = False,
 ) -> tuple[dict[int, Job], dict[int, Path]]:
     """
     Create GenomicDBs for each interval, given new samples.
@@ -191,8 +197,7 @@ def genomicsdb(
         'id': s.id, 
         'path': str(gvcf_by_sid[s.id].path)
     } for s in samples])
-    if not dry_run:
-        df.to_csv(str(sample_map_bucket_path), index=False, header=False, sep='\t')
+    df.to_csv(str(sample_map_bucket_path), index=False, header=False, sep='\t')
 
     path_per_interval = {
         idx: genomicsdb_bucket / f'interval_{idx}_outof_{scatter_count}.tar' 
@@ -203,7 +208,7 @@ def genomicsdb(
     for idx in range(scatter_count):
         out_path = path_per_interval[idx]
 
-        job_name = 'Creating GenomicsDB'
+        job_name = 'Joint genotyping: creating GenomicsDB'
         if idx is not None:
             job_name += f' {idx + 1}/{scatter_count}'
         j = b.new_job(job_name)
@@ -272,8 +277,8 @@ def genomicsdb_cloud(
     tmp_bucket: Path,
     gvcf_by_sid: dict[str, GvcfPath],
     intervals: hb.ResourceGroup,
-    scatter_count: int = RefData.number_of_genomics_db_intervals,    
-    depends_on: Optional[List[Job]] = None,
+    scatter_count: int = RefData.number_of_joint_calling_intervals,    
+    depends_on: list[Job] | None = None,
 ) -> tuple[dict[int, Job], dict[int, Path]]:
     """
     Update or create GenomicDBs for each interval, given new samples.
@@ -425,7 +430,7 @@ def _genomicsdb_import_cloud(
     if updating_existing_db and not overwrite:
         # Update existing DB
         genomicsdb_param = f'--genomicsdb-update-workspace-path {genomicsdb_gcs_path}'
-        job_name = 'Adding to GenomicsDB'
+        job_name = 'Joint genotyping: adding to GenomicsDB'
         msg = f'Adding {len(sample_names_to_add)} samples: {", ".join(sample_names_to_add)}'
         if sample_names_to_skip:
             msg += (
@@ -434,7 +439,7 @@ def _genomicsdb_import_cloud(
             )
     else:
         # Initiate new DB
-        job_name = 'Creating GenomicsDB'
+        job_name = 'Joint genotyping: creating GenomicsDB'
 
         genomicsdb_param = f'--genomicsdb-workspace-path {genomicsdb_gcs_path}'
         # Need to remove the existing database if exists
@@ -665,7 +670,7 @@ def _add_make_sitesonly_job(
     overwrite: bool,
     disk_size: int = 32,
     output_vcf_path: Path | None = None,
-) -> Tuple[Job, hb.ResourceGroup]:
+) -> tuple[Job, hb.ResourceGroup]:
     """
     Create sites-only VCF with only site-level annotations.
     Speeds up the analysis in the AS-VQSR modeling step.

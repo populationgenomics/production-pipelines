@@ -59,7 +59,7 @@ class PicardWgsMetrics(SampleStage):
         Call a function from the `jobs` module.
         """
         cram_path = sample.get_cram_path()
-
+        
         j = picard_wgs_metrics(
             b=self.b,
             cram_path=cram_path,

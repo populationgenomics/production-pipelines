@@ -1,7 +1,7 @@
 import os
 
 from cpg_pipes import to_path
-from cpg_pipes.filetypes import GvcfPath
+from cpg_pipes.types import GvcfPath
 
 DATASET = 'fewgenomes'
 BASE_BUCKET = to_path('gs://cpg-fewgenomes-test/unittest')

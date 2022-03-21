@@ -6,11 +6,8 @@ import logging
 
 from .. import Path, to_path
 from .. import utils
-from ..filetypes import GvcfPath
-from ..jobs.joint_genotyping import (
-    make_joint_genotyping_jobs,
-    JointGenotyperTool,
-)
+from ..types import GvcfPath
+from ..jobs.joint_genotyping import make_joint_genotyping_jobs, JointGenotyperTool
 from ..pipeline.targets import Cohort
 from ..pipeline import (
     stage, CohortStage, StageInput, StageOutput, PipelineError
@@ -77,7 +74,7 @@ class JointGenotypingStage(CohortStage):
             tool=JointGenotyperTool.GnarlyGenotyper 
             if self.pipeline_config.get('use_gnarly', False) 
             else JointGenotyperTool.GenotypeGVCFs,
-            dry_run=self.dry_run,
+            scatter_count=self.pipeline_config.get('jc_intervals_num')
         )
         return self.make_outputs(
             cohort, 

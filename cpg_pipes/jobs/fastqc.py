@@ -6,7 +6,7 @@ from hailtop.batch import ResourceFile
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
-from cpg_pipes.filetypes import AlignmentInput, CramPath, FastqPair
+from cpg_pipes.types import AlignmentInput, CramPath, FastqPair
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs import align

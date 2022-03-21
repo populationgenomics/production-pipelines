@@ -93,6 +93,7 @@ class SmdbInputsProvider(InputsProvider):
             seq_info = seq_info_by_sid[sample.id]
             seq = SmSequence.parse(seq_info, do_check_seq_existence)
             sample.alignment_input = seq.alignment_input
+            sample.sequencing_type = seq.sequencing_type
 
     def populate_pedigree(
         self,

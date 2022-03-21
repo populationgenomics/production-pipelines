@@ -118,7 +118,7 @@ def main(
                 # startup script with --init gs://cpg-reference/vep/vep-GRCh38.sh,
                 # so VEP_CONFIG_URI will not be set, thus need to provide config
                 # as a function parameter here:
-                config='file:///vep_data/vep-gcloud.json'
+                # config='file:///vep_data/vep-gcloud.json'
             )
             if make_checkpoints:
                 mt.write(out_path, overwrite=True)

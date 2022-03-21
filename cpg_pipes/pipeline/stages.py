@@ -43,12 +43,12 @@ class SampleStage(Stage[Sample], ABC):
             logger.info(f'{self.name}: #{ds_i} {ds}')
             if not ds.get_samples():
                 raise ValueError(
-                    f'No active samples are found to run in the dataset {ds.name}')
+                    f'No active samples are found to run in the dataset {ds.name}'
+                )
             for sample_i, sample in enumerate(ds.get_samples()):
                 logger.info(f'{self.name}: #{sample_i}/{sample}')
                 sample_result = self._queue_jobs_with_checks(sample)
                 output_by_target[sample.target_id] = sample_result
-                logger.info('------')
             logger.info('-#-#-#-')
         return output_by_target
 
@@ -82,11 +82,8 @@ class DatasetStage(Stage, ABC):
         datasets = pipeline.cohort.get_datasets()
         if not datasets:
             raise ValueError('No active datasets are found to run')
-        for ds_i, ds in enumerate(datasets):
-            logger.info(f'{self.name}: #{ds_i}/{ds.name} {ds}')
-            output_by_target[ds.target_id] = \
-                self._queue_jobs_with_checks(ds)
-            logger.info('-#-#-#-')
+        for _, ds in enumerate(datasets):
+            output_by_target[ds.target_id] = self._queue_jobs_with_checks(ds)
         return output_by_target
 
 
