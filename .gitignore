@@ -130,9 +130,6 @@ dmypy.json
 
 .idea
 .DS_Store
-playground/
-# has patient data:
+playground
 tests/data/check_pedigree
-
-dockers/cpg_pipes/
-scripts/copy_nagim_release.py
+dockers/cpg_pipes
