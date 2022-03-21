@@ -62,7 +62,7 @@ def stage(
     required_stages: list[StageDecorator] | StageDecorator | None = None,
     skipped: bool = False,
     required: bool | None = None,
-    assume_results_exist: bool = False,
+    assume_outputs_exist: bool = False,
     forced: bool = False,
 ) -> Union[StageDecorator, Callable[..., StageDecorator]]:
     """
@@ -85,12 +85,11 @@ def stage(
             return cls(
                 name=cls.__name__,
                 batch=pipeline.b,
-                dry_run=pipeline.dry_run,
                 required_stages=required_stages,
                 analysis_type=analysis_type,
                 skipped=skipped,
                 required=required,
-                assume_results_exist=assume_results_exist, 
+                assume_outputs_exist=assume_outputs_exist, 
                 forced=forced,
                 skip_samples_with_missing_input=pipeline.skip_samples_with_missing_input,
                 check_expected_outputs=pipeline.check_expected_outputs,
@@ -112,7 +111,7 @@ def stage(
 def skip(
     _fun: Optional[StageDecorator] = None, 
     *,
-    assume_results_exist: bool = False,
+    assume_outputs_exist: bool = False,
 ) -> Union[StageDecorator, Callable[..., StageDecorator]]:
     """
     Decorator on top of `@stage` that sets the `self.skipped` field to True
@@ -123,7 +122,7 @@ def skip(
         ...
 
     @skip
-    @stage(assume_results_exist=True)
+    @stage(assume_outputs_exist=True)
     class MyStage2(SampleStage):
         ...
     """
@@ -134,7 +133,7 @@ def skip(
             """Decorator helper function."""
             s = fun(*args, **kwargs)
             s.skipped = True
-            s.assume_results_exist = assume_results_exist
+            s.assume_outputs_exist = assume_outputs_exist
             return s
 
         return wrapper_stage
@@ -203,8 +202,8 @@ class Pipeline:
         )
         self.refs = RefData(storage_provider.get_ref_bucket())
 
-        self.check_intermediates = check_intermediates and not dry_run
-        self.check_expected_outputs = check_expected_outputs and not dry_run
+        self.check_intermediates = check_intermediates
+        self.check_expected_outputs = check_expected_outputs
         self.skip_samples_with_missing_input = skip_samples_with_missing_input
         self.first_stage = first_stage
         self.last_stage = last_stage
@@ -367,7 +366,6 @@ class Pipeline:
                 continue
 
             for reqcls in stage_.required_stages_classes:
-                # breakpoint()
                 if reqcls.__name__ in self._stages_dict:
                     reqstage = self._stages_dict[reqcls.__name__]
                 elif reqcls.__name__ in additional_stages_dict:
@@ -718,14 +716,13 @@ class Stage(Generic[TargetT], ABC):
         analysis_type: str | None = None,
         skipped: bool = False,
         required: bool | None = None,
-        assume_results_exist: bool = False,
+        assume_outputs_exist: bool = False,
         forced: bool = False,
         skip_samples_with_missing_input: bool = False,
         check_expected_outputs: bool = False,
         check_intermediates: bool = False,
         status_reporter: StatusReporter | None = None,
         pipeline_config: dict[str, Any] | None = None,
-        dry_run: bool = False,
     ):
         """
         @param name: name of the stage
@@ -740,7 +737,7 @@ class Stage(Generic[TargetT], ABC):
             will be populated.
         @param required: means that the self.expected_output() results are 
             required for another active stage, even if the stage was skipped.
-        @param assume_results_exist: for skipped but required stages, 
+        @param assume_outputs_exist: for skipped but required stages, 
             the self.expected_result() output will still be checked for existence. 
             This option makes the downstream stages assume that the output exist.
         @param forced: run self.queue_jobs(), even if we can reuse the 
@@ -749,7 +746,6 @@ class Stage(Generic[TargetT], ABC):
         self._name = name
         self.b = batch
         self.refs = refs
-        self.dry_run = dry_run
 
         self.skip_samples_with_missing_input = skip_samples_with_missing_input
         self.check_expected_outputs = check_expected_outputs
@@ -776,7 +772,7 @@ class Stage(Generic[TargetT], ABC):
         self.skipped = skipped
         self.required = required if required is not None else not skipped
         self.forced = forced
-        self.assume_results_exist = assume_results_exist
+        self.assume_outputs_exist = assume_outputs_exist
 
         self.pipeline_config = pipeline_config or {}
 
@@ -880,20 +876,20 @@ class Stage(Generic[TargetT], ABC):
                 if target.forced:
                     logger.info(
                         f'{self.name}: can reuse, but forcing the target '
-                        f'{target.target_id} to rerun this stage'
+                        f'{target} to rerun this stage'
                     )
                     outputs = self.queue_jobs(target, inputs)
                 elif self.forced:
                     logger.info(
                         f'{self.name}: can reuse, but forcing the stage '
-                        f'to rerun, target={target.target_id}'
+                        f'to rerun, target={target}'
                     )
                     outputs = self.queue_jobs(target, inputs)
                 else:
-                    logger.info(f'{self.name}: reusing results for {target.target_id}')
+                    logger.info(f'{self.name}: reusing results for {target}')
                     outputs = self._queue_reuse_job(target, reusable_paths)
             else:
-                logger.info(f'{self.name}: adding jobs for {target.target_id}')
+                logger.info(f'{self.name}: adding jobs for {target}')
                 outputs = self.queue_jobs(target, inputs)
 
             for j in outputs.jobs:
@@ -906,7 +902,7 @@ class Stage(Generic[TargetT], ABC):
             if not reusable_paths:
                 raise ValueError(
                     f'Stage {self.name} is required, but is skipped, and '
-                    f'expected outputs for target {target.target_id} do not exist.)'
+                    f'expected outputs for target {target} do not exist'
                 )
             else:
                 return self.make_outputs(target=target, data=reusable_paths)
@@ -920,19 +916,19 @@ class Stage(Generic[TargetT], ABC):
         Returns outputs that can be reused for the stage for the target,
         or None of none can be reused
         """
-        if self.dry_run:
-            return None
-
         expected_output = self.expected_result(target)
 
         if not expected_output:
             return None
-        elif (
-            not self.check_expected_outputs or
-            not self.required or
-            self.assume_results_exist
-        ):
-            # Do not need to check file existence, trust it exists:
+        elif not self.check_expected_outputs:
+            if self.assume_outputs_exist:
+                # Do not check the files' existence, trust they exist:
+                return expected_output
+            else:
+                # Do not check the files' existence, assume they don't exist:
+                return None
+        elif not self.required:
+            # This stage is not required, so can just assume outputs exist:
             return expected_output
         else:
             # Checking that expected output exists:
