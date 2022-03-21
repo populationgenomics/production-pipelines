@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 from cpg_pipes import Namespace, to_path, Path
-from cpg_pipes.refdata import RefData
+from cpg_pipes.types import SequencingType
 
 try:
     from .utils import setup_env, BASE_BUCKET, DATASET, SAMPLES
@@ -31,7 +31,6 @@ class TestPipeline(unittest.TestCase):
         self.out_bucket = BASE_BUCKET / self.name / self.timestamp
         self.tmp_bucket = self.out_bucket / 'tmp'
         self.local_tmp_dir = to_path(tempfile.mkdtemp())
-        self.sample_name = f'Test-{self.timestamp}'
         self.sample_ids = SAMPLES[:3]
         self.hc_intervals_num = 10
         self.jc_intervals_num = 10
@@ -42,7 +41,7 @@ class TestPipeline(unittest.TestCase):
         """
         shutil.rmtree(self.local_tmp_dir)
         
-    def _setup_pipeline(self):
+    def _setup_pipeline(self, seq_type=SequencingType.WGS):
         setup_env()
         from cpg_pipes import benchmark
         from cpg_pipes.pipeline.pipeline import Pipeline
@@ -55,6 +54,8 @@ class TestPipeline(unittest.TestCase):
             description=self._testMethodName,
             analysis_dataset=DATASET,
             namespace=Namespace.TEST,
+            check_intermediates=False,
+            check_expected_outputs=False,
             config=dict(
                 hc_intervals_num=self.hc_intervals_num,
                 jc_intervals_num=self.jc_intervals_num,
@@ -64,21 +65,21 @@ class TestPipeline(unittest.TestCase):
         for s_id in self.sample_ids:
             s = ds.add_sample(s_id, s_id)
             s.alignment_input = benchmark.tiny_fq
+            s.sequencing_type = seq_type
         return pipeline
 
     def test_wgs(self):
         """
-        Constucting a pipeline and submitting it to Hail Batch.
+        WGS seqr-loading pipeline.
         """
         pipeline = self._setup_pipeline()
         pipeline.submit_batch(dry_run=False)
 
     def test_exome(self):
         """
-        Constucting a pipeline and submitting it to Hail Batch.
+        Exome seqr-loading pipeline.
         """
-        pipeline = self._setup_pipeline()
-        pipeline.config['exomes_bed'] = ''
+        pipeline = self._setup_pipeline(seq_type=SequencingType.EXOME)
         pipeline.submit_batch(dry_run=False)
 
     def test_dry(self):

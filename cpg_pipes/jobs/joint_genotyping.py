@@ -76,12 +76,16 @@ def make_joint_genotyping_jobs(
 
     scatter_count = scatter_count or RefData.number_of_joint_calling_intervals
 
-    intervals = split_intervals.get_intervals(
+    jobs: list[Job] = []
+    
+    intervals_j = split_intervals.get_intervals(
         b=b,
         refs=refs,
         sequencing_type=sequencing_type,
         scatter_count=scatter_count,
     )
+    intervals = [intervals_j[f'intervals{i}'] for i in range(scatter_count)]
+    jobs.append(intervals_j)
     
     # There are some problems with using GenomcsDB in cloud (`genomicsdb_cloud()`):
     # Using cloud + --consolidate on larger datasets causes a TileDB error:
@@ -99,7 +103,7 @@ def make_joint_genotyping_jobs(
         scatter_count=scatter_count,
         overwrite=overwrite,
     )
-    jobs: list[Job] = [v for k, v in import_gvcfs_job_per_interval.items()]
+    jobs.extend([v for k, v in import_gvcfs_job_per_interval.items()])
 
     vcf_by_interval: dict[int, hb.ResourceGroup] = dict()
     siteonly_vcf_by_interval: dict[int, hb.ResourceGroup] = dict()
@@ -124,7 +128,7 @@ def make_joint_genotyping_jobs(
             refs=refs,
             interval_idx=idx,
             number_of_intervals=scatter_count,
-            interval=intervals[f'interval_{idx}'],
+            interval=intervals[idx],
             tool=tool,
             output_vcf_path=jc_vcf_path,
         )
@@ -139,7 +143,7 @@ def make_joint_genotyping_jobs(
             exccess_filter_j, exccess_filter_jc_vcf = _add_exccess_het_filter(
                 b,
                 input_vcf=jc_vcf,
-                interval=intervals[f'interval_{idx}'],
+                interval=intervals[idx],
                 overwrite=overwrite,
                 output_vcf_path=filt_jc_vcf_path,
             )
@@ -185,7 +189,7 @@ def genomicsdb(
     genomicsdb_bucket: Path,
     tmp_bucket: Path,
     gvcf_by_sid: dict[str, GvcfPath],
-    intervals: hb.ResourceGroup,
+    intervals: list[hb.Resource],
     scatter_count: int = RefData.number_of_joint_calling_intervals,    
     overwrite: bool = False,
 ) -> tuple[dict[int, Job], dict[int, Path]]:
@@ -258,7 +262,7 @@ def genomicsdb(
         gatk --java-options "-Xms{xms_gb}g -Xmx{xmx_gb}g" \\
         GenomicsDBImport \\
         --genomicsdb-workspace-path $WORKSPACE \\
-        -L {intervals[f'interval_{idx}']} \\
+        -L {intervals[idx]} \\
         --sample-name-map {sample_map} \\
         --reader-threads {nthreads} \\
         {" ".join(params)}

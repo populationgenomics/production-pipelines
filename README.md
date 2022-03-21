@@ -498,14 +498,14 @@ class MyStage1(SampleStage):
     ...
 ```
 
-`assume_results_exist=True` would also tell the code that the expected results of that stage exist, and there is no need to check bucket objects for existence:
+`assume_outputs_exist=True` would also tell the code that the expected results of that stage exist, and there is no need to check bucket objects for existence:
 
 ```python
 from cpg_pipes.pipeline.pipeline import stage, skip
 from cpg_pipes.pipeline.stage import SampleStage
 
 @skip
-@stage(assume_results_exist=True)
+@stage(assume_outputs_exist=True)
 class MyStage2(SampleStage):
     ...
 ```

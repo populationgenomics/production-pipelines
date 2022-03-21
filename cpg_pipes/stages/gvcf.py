@@ -20,7 +20,7 @@ class GvcfStage(SampleStage):
     """
     Use HaplotypeCaller to genotype individual samples
     """
-    hc_intervals: hb.ResourceGroup | None = None
+    hc_intervals: list[hb.Resource] | None = None
 
     def expected_result(self, sample: Sample) -> Path:
         """
@@ -33,14 +33,20 @@ class GvcfStage(SampleStage):
         Use function from the jobs module
         """
         hc_intervals_num = self.pipeline_config.get('hc_intervals_num', 1)
+        jobs = []
         if GvcfStage.hc_intervals is None and hc_intervals_num > 1:
-            GvcfStage.hc_intervals = split_intervals.get_intervals(
+            intervals_j = split_intervals.get_intervals(
                 b=self.b,
                 refs=self.refs,
                 sequencing_type=sample.sequencing_type,
                 scatter_count=hc_intervals_num,
             )
-        jobs = haplotype_caller.produce_gvcf(
+            jobs.append(intervals_j)
+            GvcfStage.hc_intervals = [
+                intervals_j[f'intervals{i}'] 
+                for i in range(hc_intervals_num)
+            ]
+        jobs.extend(haplotype_caller.produce_gvcf(
             b=self.b,
             output_path=self.expected_result(sample),
             sample_name=sample.id,
@@ -52,7 +58,7 @@ class GvcfStage(SampleStage):
             refs=self.refs,
             tmp_bucket=sample.dataset.get_tmp_bucket(),
             overwrite=not self.check_intermediates,
-        )
+        ))
         return self.make_outputs(
             sample,
             data=self.expected_result(sample), 

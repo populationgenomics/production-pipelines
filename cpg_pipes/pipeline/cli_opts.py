@@ -166,7 +166,7 @@ def pipeline_click_options(function: Callable) -> Callable:
                  'remove this sample instead of failing.'
         ),
         click.option(
-            '--check-intermediate-existence/--no-check-intermediate-existence',
+            '--check-intermediates/--no-check-intermediates',
             'check_intermediates',
             default=True,
             is_flag=True,
@@ -174,11 +174,11 @@ def pipeline_click_options(function: Callable) -> Callable:
                  'If set to False, will overwrite all intermediates. '
         ),
         click.option(
-            '--check-job-expected-outputs-existence/--no-check-job-expected-outputs-existence',
+            '--check-expected-outputs/--no-check-expected-outputs',
             'check_expected_outputs',
             default=True,
             is_flag=True,
-            help='Before running a job, check if its input already exists. '
+            help='Before running a stage, check if its input already exists. '
                  'If it exists, submit a [reuse] job instead. '
                  'Works nicely with --previous-batch-tsv/--previous-batch-id options.',
         ),

@@ -28,7 +28,7 @@ def produce_gvcf(
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     number_of_intervals: int = 1,
-    intervals: hb.ResourceGroup | None = None,
+    intervals: list[hb.Resource] | None = None,
     overwrite: bool = True,
     dragen_mode: bool = False,
 ) -> list[Job]:
@@ -83,7 +83,7 @@ def haplotype_caller(
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     number_of_intervals: int = 1,
-    intervals: hb.ResourceGroup | None = None,
+    intervals: list[hb.Resource] | None = None,
     overwrite: bool = True,
     dragen_mode: bool = False,
 ) -> list[Job]:
@@ -97,13 +97,15 @@ def haplotype_caller(
     jobs: list[Job] = []
     if number_of_intervals > 1:
         if intervals is None:
-            intervals = split_intervals.get_intervals(
+            intervals_j = split_intervals.get_intervals(
                 b=b,
                 refs=refs,
                 sequencing_type=sequencing_type,
                 scatter_count=number_of_intervals,
                 out_bucket=tmp_bucket / 'intervals',
             )
+            jobs.append(intervals_j)
+            intervals = [intervals_j[f'intervals{i}'] for i in range(number_of_intervals)]
 
         hc_jobs = []
         # Splitting variant calling by intervals
@@ -114,7 +116,7 @@ def haplotype_caller(
                 cram_path=cram_path,
                 refs=refs,
                 job_attrs=job_attrs,
-                interval=intervals[f'interval_{idx}'],
+                interval=intervals[idx],
                 interval_idx=idx,
                 number_of_intervals=number_of_intervals,
                 dragen_mode=dragen_mode,
@@ -151,7 +153,7 @@ def _haplotype_caller_one(
     cram_path: CramPath,
     refs: RefData,
     job_attrs: dict | None = None,
-    interval: hb.ResourceFile | None = None,
+    interval: hb.Resource | None = None,
     interval_idx: int | None = None,
     number_of_intervals: int = 1,
     out_gvcf_path: Path | None = None,

@@ -121,13 +121,6 @@ def make_vqsr_jobs(
            convert it to site-only. Otherwise, assuming it's already site-only 
     @return: a final Job, and a path to the VCF with VQSR annotations
     """
-    intervals = split_intervals.get_intervals(
-        b=b,
-        refs=refs,
-        sequencing_type=sequencing_type,
-        scatter_count=scatter_count,
-    )
-
     dbsnp_vcf = b.read_input_group(
         base=str(refs.dbsnp_vcf),
         index=str(refs.dbsnp_vcf_index),
@@ -167,7 +160,15 @@ def make_vqsr_jobs(
     medium_disk = 100 if is_small_callset else (200 if not is_huge_callset else 500)
     huge_disk = 200 if is_small_callset else (500 if not is_huge_callset else 2000)
 
-    jobs = []
+    jobs: list[Job] = []
+    intervals_j = split_intervals.get_intervals(
+        b=b,
+        refs=refs,
+        sequencing_type=sequencing_type,
+        scatter_count=scatter_count,
+    )
+    intervals = [intervals_j[f'intervals{i}'] for i in range(scatter_count)]
+    jobs.append(intervals_j)
 
     if input_vcf_or_mt_path.name.endswith('.mt'):
         assert meta_ht_path
@@ -258,7 +259,7 @@ def make_vqsr_jobs(
             add_snps_variant_recalibrator_scattered_step(
                 b,
                 sites_only_vcf=siteonly_vcf,
-                interval=intervals[f'interval_{idx}'],
+                interval=intervals[idx],
                 model_file=model_j.model_file,
                 hapmap_resource_vcf=hapmap_resource_vcf,
                 omni_resource_vcf=omni_resource_vcf,
@@ -283,7 +284,7 @@ def make_vqsr_jobs(
             add_apply_recalibration_step(
                 b,
                 input_vcf=siteonly_vcf,
-                interval=intervals[f'interval_{idx}'],
+                interval=intervals[idx],
                 indels_recalibration=indels_recalibration,
                 indels_tranches=indels_tranches,
                 snps_recalibration=snps_recalibrations[idx],
@@ -385,8 +386,8 @@ def add_tabix_step(
     disk_size: int,
 ) -> Job:
     """
-    Regzip and tabix the combined VCF (for some reason the one produced by `mt2vcf`
-    is not block-gzipped).
+    Regzip and tabix the combined VCF (for some reason the one produced by 
+    `mt_to_vcf.py` is not block-gzipped).
     """
     j = b.new_job('VQSR: Tabix')
     j.image(images.BCFTOOLS_IMAGE)
