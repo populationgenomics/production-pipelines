@@ -1,11 +1,10 @@
 import os
 
-from cloudpathlib import CloudPath
-
-from cpg_pipes.pipeline.analysis import GvcfPath
+from cpg_pipes import to_path
+from cpg_pipes.filetypes import GvcfPath
 
 DATASET = 'fewgenomes'
-BASE_BUCKET = CloudPath('gs://cpg-fewgenomes-test/unittest')
+BASE_BUCKET = to_path('gs://cpg-fewgenomes-test/unittest')
 
 # Samples for joint calling
 SAMPLES = [
@@ -36,11 +35,10 @@ def setup_env(
     """
     assert os.environ.get('HAIL_TOKEN')
     os.environ['CPG_DATASET'] = dataset
-    os.environ['CPG_DATASET_GCP_PROJECT'] = dataset_gcp_project
-    os.environ['CPG_ACCESS_LEVEL'] = access_level
-    os.environ['HAIL_BUCKET'] = f'cpg-{dataset}-test-tmp/hail'
-    os.environ['HAIL_BILLING_PROJECT'] = dataset
     os.environ['CPG_OUTPUT_PREFIX'] = 'unittests'
+    os.environ['CPG_ACCESS_LEVEL'] = access_level
+    os.environ['CPG_DATASET_GCP_PROJECT'] = dataset_gcp_project
+    os.environ['HAIL_BILLING_PROJECT'] = dataset
 
 
 setup_env()

@@ -4,10 +4,8 @@ Stages that perform alignment QC on CRAM files.
 
 import logging
 
-from cpg_pipes.jobs.cram_qc import samtools_stats, verify_bamid, picard_wgs_metrics
-from cpg_pipes.pipeline.dataset import Sample
-from cpg_pipes.pipeline.pipeline import stage, SampleStage
-from cpg_pipes.pipeline.stage import StageInput, StageOutput
+from ..jobs.cram_qc import samtools_stats, verify_bamid, picard_wgs_metrics
+from ..pipeline import stage, SampleStage, StageInput, StageOutput, Sample
 
 logger = logging.getLogger(__file__)
 
@@ -35,8 +33,8 @@ class SamtoolsStats(SampleStage):
             b=self.b,
             cram_path=cram_path,
             output_path=self.expected_result(sample),
-            sample_name=sample.id,
-            dataset_name=sample.dataset.name,
+            refs=self.refs,
+            job_attrs=sample.get_job_attrs(),
         )
         return self.make_outputs(sample, data=self.expected_result(sample), jobs=[j])
 
@@ -66,8 +64,8 @@ class PicardWgsMetrics(SampleStage):
             b=self.b,
             cram_path=cram_path,
             output_path=self.expected_result(sample),
-            sample_name=sample.id,
-            dataset_name=sample.dataset.name,
+            refs=self.refs,
+            job_attrs=sample.get_job_attrs(),
         )
         return self.make_outputs(sample, data=self.expected_result(sample), jobs=[j])
 
@@ -97,7 +95,7 @@ class VerifyBamId(SampleStage):
             b=self.b,
             cram_path=cram_path,
             output_path=self.expected_result(sample),
-            sample_name=sample.id,
-            dataset_name=sample.dataset.name,
+            refs=self.refs,
+            job_attrs=sample.get_job_attrs(),
         )
         return self.make_outputs(sample, data=self.expected_result(sample), jobs=[j])

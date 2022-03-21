@@ -1,5 +1,4 @@
-class AnalysisStatus:
-pass# Production pipelines
+# Production pipelines
 
 ## cpg_pipes python package
 
@@ -36,9 +35,10 @@ Overall classes and object relationships look as follows:
 To declare a stage, derive a class from `SampleStage`, `ProjectStage`, or `CohortStage`, implement the abstract methods, and wrap the class with a `@stage` decorator:
 
 ```python
-from cpg_pipes.pipeline.pipeline import stage
-from cpg_pipes.pipeline.stage import SampleStage, StageInput, StageOutput
-from cpg_pipes.pipeline.sample import Sample
+from cpg_pipes.pipeline.pipeline import stage, SampleStage
+from cpg_pipes.pipeline.stage import StageInput, StageOutput
+from cpg_pipes.pipeline.targets import Sample
+
 
 @stage
 class WriteSampleName(SampleStage):
@@ -146,8 +146,8 @@ If a `Participant` entry is available, `sample.participant_id` will be populated
 Communication with the sample metadata DB is organised through the `cpg_pipes.smdb` module, a wrapper around the sample metadata database API. E.g., to get a dictionary of Sample entries indexed by dataset name, run:
 
 ```python
-from cpg_pipes.pipeline.smdb import SMDB
-from cpg_pipes.pipeline.cohort import Cohort
+from cpg_pipes.providers.cpg import SMDB
+from cpg_pipes.pipeline.targets import Cohort
 from cpg_pipes.storage import Namespace
 
 cohort = Cohort('seqr')
@@ -159,7 +159,7 @@ smdb.populate_cohort(cohort)
 To add an Analysis entry, run:
 
 ```python
-from cpg_pipes.pipeline.smdb import SMDB
+from cpg_pipes.providers.cpg import SMDB
 from cpg_pipes.pipeline.analysis import AnalysisStatus, AnalysisType
 
 smdb = SMDB(analysis_dataset='seqr')
@@ -176,7 +176,7 @@ analysis_id = smdb.create_analysis(
 To add a Batch job that updates an Analysis entry, run:
 
 ```python
-from cpg_pipes.pipeline.smdb import SMDB
+from cpg_pipes.providers.cpg import SMDB
 from cpg_pipes.pipeline.analysis import AnalysisType
 
 smdb = SMDB(analysis_dataset='seqr')
@@ -195,16 +195,17 @@ j = smdb.make_sm_completed_job(
 The `cpg_pipes.jobs` module defines functions that create Hail Batch Jobs for different bioinformatics purposes: alignment, fastqc, deduplication, variant calling, VQSR, etc. E.g. to implement the joint calling stage above, you can use:
 
 ```python
-from cpg_pipes.pipeline.smdb.types import AnalysisType
+from cpg_pipes.pipeline.analysis import AnalysisType
 from cpg_pipes.pipeline.pipeline import stage
-from cpg_pipes.pipeline.stage import SampleStage, CohortStage, StageInput, StageOutput
-from cpg_pipes.pipeline.sample import Sample
-from cpg_pipes.pipeline.cohort import Cohort
+from cpg_pipes.pipeline.pipeline import SampleStage, CohortStage, StageInput,
+StageOutput
+from cpg_pipes.pipeline.targets import Sample, Cohort
 from cpg_pipes.jobs import haplotype_caller, joint_genotyping
+
 
 @stage(sm_analysis_type=AnalysisType.GVCF)
 class HaplotypeCaller(SampleStage):
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput: 
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         cram_path = inputs.as_path(target=sample, stage=Align)
         expected_path = self.expected_result(sample)
         job = haplotype_caller.produce_gvcf(
@@ -217,6 +218,7 @@ class HaplotypeCaller(SampleStage):
         )
         return self.make_outputs(sample, data=expected_path, jobs=[job])
 
+
 @stage(sm_analysis_type=AnalysisType.JOINT_CALLING, required_stages=HaplotypeCaller)
 class JointCalling(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
@@ -226,7 +228,7 @@ class JointCalling(CohortStage):
         job = joint_genotyping.make_joint_genotyping_jobs(
             b=self.pipe.b,
             out_vcf_path=expected_path,
-            samples=cohort.get_all_samples(),
+            samples=cohort.get_samples(),
             gvcf_by_sid=gvcf_by_sid,
             depends_on=inputs.get_jobs(),
             smdb=self.pipe.get_db(),
@@ -285,7 +287,7 @@ from cpg_pipes.jobs import vqsr
 j = vqsr.make_vqsr_jobs(
     b,
     input_vcf_or_mt_path=siteonly_vcf_path,
-    gvcf_count=len(cohort.get_all_samples()),
+    gvcf_count=len(cohort.get_samples()),
     depends_on=inputs.get_jobs(),
     output_vcf_path=expected_path,
     use_as_annotations=True,

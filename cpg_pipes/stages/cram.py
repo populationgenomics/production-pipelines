@@ -4,23 +4,20 @@ Stage that generates a CRAM file.
 
 import logging
 
-from cloudpathlib import CloudPath
-
-from cpg_pipes.jobs import align
-from cpg_pipes.pipeline.analysis import AnalysisType, CramPath
-from cpg_pipes.pipeline.dataset import Sample
-from cpg_pipes.pipeline.pipeline import stage, PipelineError, SampleStage
-from cpg_pipes.pipeline.stage import StageInput, StageOutput
+from .. import Path
+from ..filetypes import CramPath
+from ..pipeline import stage, SampleStage, StageInput, StageOutput, Sample, PipelineError
+from ..jobs import align
 
 logger = logging.getLogger(__file__)
 
 
-@stage(sm_analysis_type=AnalysisType.CRAM)
+@stage(analysis_type='cram')
 class CramStage(SampleStage):
     """
     Align or re-align input data to produce a CRAM file
     """
-    def expected_result(self, sample: Sample) -> CloudPath:
+    def expected_result(self, sample: Sample) -> Path:
         """
         Stage is expected to generate a CRAM file and a corresponding index.
         """
@@ -41,20 +38,20 @@ class CramStage(SampleStage):
                     f'Checked: Sequence entry and type=CRAM Analysis entry'
                 )
 
-        cram_job = align.align(
+        jobs = align.align(
             b=self.b,
             alignment_input=sample.alignment_input,
             output_path=self.expected_result(sample),
             sample_name=sample.id,
-            dataset_name=sample.dataset.name,
+            job_attrs=sample.get_job_attrs(),
+            refs=self.refs,
             overwrite=not self.check_intermediates,
-            smdb=self.smdb,
             number_of_shards_for_realignment=(
                 10 if isinstance(sample.alignment_input, CramPath) else None
-            )
+            ),
         )
         return self.make_outputs(
             sample, 
             data=self.expected_result(sample), 
-            jobs=[cram_job]
+            jobs=jobs
         )

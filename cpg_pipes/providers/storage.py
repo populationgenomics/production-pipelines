@@ -1,14 +1,20 @@
 """
-Types specific to Cloud storage. 
-
-The default assumption is the CPG storage policy:
-https://github.com/populationgenomics/team-docs/tree/main/storage_policies
-across Google Cloud Storage and Azure Blob Storage.
+Abstract storage provider.
 """
+import pathlib
 from enum import Enum
 from abc import ABC, abstractmethod
+from typing import Union
 
 from cloudpathlib import CloudPath
+from cloudpathlib.anypath import to_anypath
+
+
+# Path can be both a cloud URL and local path
+Path = Union[CloudPath, pathlib.Path]
+
+# Using convenience method from cloudpathlib to parse a path string
+to_path = to_anypath
 
 
 class Namespace(Enum):
@@ -45,7 +51,7 @@ class StorageProvider(ABC):
         suffix: str | None = None,
         version: str | None = None,
         sample: str = None,
-    ) -> CloudPath:
+    ) -> Path:
         """
         Bucket to write results:
         @param dataset: dataset/stack name
@@ -61,7 +67,7 @@ class StorageProvider(ABC):
         namespace: Namespace,
         version: str | None = None,
         sample: str = None,
-    ) -> CloudPath:
+    ) -> Path:
         """
         Bucket for analysis results.
         """
@@ -79,7 +85,7 @@ class StorageProvider(ABC):
         namespace: Namespace,
         version: str | None = None,
         sample: str = None,
-    ) -> CloudPath:
+    ) -> Path:
         """
         Bucket for temporary files.
         """
@@ -97,7 +103,7 @@ class StorageProvider(ABC):
         namespace: Namespace,
         version: str | None = None,
         sample: str = None,
-    ) -> CloudPath:
+    ) -> Path:
         """
         Bucket shared with an HTTP server.
         """
@@ -109,7 +115,7 @@ class StorageProvider(ABC):
             suffix='web'
         )
 
-    # noinspection PyMethodMayBeStatic
+    @abstractmethod
     def get_web_url(
         self, 
         dataset: str,
@@ -120,58 +126,9 @@ class StorageProvider(ABC):
         """
         URL corrsponding to the WEB bucket.
         """
-        return None
-    
-    
-class CPGStorageProvider(StorageProvider):
-    """
-    CPG storage policy implementation of the StorageProvider
-    """
-    def __init__(self, cloud: Cloud = Cloud.GS):
-        super().__init__(cloud)
-        self.prefix = 'cpg'
 
-    def get_bucket(
-        self, 
-        dataset: str,
-        namespace: Namespace,
-        suffix: str = None,
-        version: str | None = None,
-        sample: str = None,
-    ) -> CloudPath:
+    @abstractmethod
+    def get_ref_bucket(self) -> Path:
         """
-        Bucket name is constructed according to the storage policy:
-        https://github.com/populationgenomics/team-docs/tree/main/storage_policies
+        Prefix for reference data
         """
-        path = CloudPath(
-            f'{self.cloud.value}://'
-            f'{self.prefix}-{dataset}-{namespace.value}'
-        )
-        if suffix:
-            path = CloudPath(f'{path}-{suffix}')
-        if version:
-            path = path / version
-        if sample:
-            path = path / sample
-        return path
-
-    # noinspection PyMethodMayBeStatic
-    def get_web_url(
-        self,
-        dataset: str,
-        namespace: Namespace,
-        version: str | None = None,
-        sample: str = None,
-    ) -> str | None:
-        """
-        URL corrsponding to the WEB bucket.
-        """
-        url = (
-            f'https://{namespace.value}-web.populationgenomics.org.au/'
-            f'{dataset}'
-        )
-        if version:
-            url += f'/{version}'
-        if sample:
-            url += f'/{sample}'
-        return url

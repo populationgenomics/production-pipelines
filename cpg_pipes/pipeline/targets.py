@@ -1,5 +1,5 @@
 """
-Pipeline stage targets: cohort, dataset, sample.
+Pipeline stage target and subclasses: Cohort, Dataset, Sample.
 """
 
 import logging
@@ -7,19 +7,67 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from cloudpathlib import CloudPath
-
-from cpg_pipes.pipeline.analysis import AlignmentInput, CramPath, GvcfPath
-from cpg_pipes.storage import Namespace, StorageProvider
-from cpg_pipes.pipeline.sequence import SmSequence
-from cpg_pipes.pipeline.target import Target
+from .. import Path
+from ..filetypes import AlignmentInput, CramPath, GvcfPath
+from ..providers.storage import StorageProvider, Namespace
 
 logger = logging.getLogger(__file__)
 
 
+class Target:
+    """
+    Defines a target that stage can act upon. Classes like Sample, Dataset, Pipeline
+    extend this class.
+    """
+    def __init__(self):
+        # Whether to process even if outputs exist:
+        self.forced: bool = False
+        # If not set, exclude from the pipeline:
+        self.active: bool = True
+
+    def get_samples(self, only_active: bool = True) -> list['Sample']:
+        """
+        Get all samples corresponding to this target
+        """
+        raise NotImplementedError
+
+    @property
+    def target_id(self) -> str:
+        """
+        ID should be unique across target of all levels. 
+
+        We are raising NotImplementedError instead of making it abstractclass because
+        mypy is not happy about binding TypeVar to abstract classes, see:
+        https://stackoverflow.com/questions/48349054/how-do-you-annotate-the-type-of
+        -an-abstract-class-with-mypy
+
+        Specifically,
+        ```
+        TypeVar('TargetT', bound=Target)
+        ```
+        Will raise:
+        ```
+        Only concrete class can be given where "Type[Target]" is expected
+        ```
+        """
+        raise NotImplementedError
+    
+    def get_job_attrs(self) -> dict[str, str]:
+        """
+        Attributes for Hail Batch job.
+        """
+        raise NotImplementedError
+
+    def get_job_prefix(self) -> str:
+        """
+        Prefix job names.
+        """
+        raise NotImplementedError
+
+
 class Cohort(Target):
     """
-    Represents a "cohort" target - all samples from all datasets in the pipeline
+    Represents a "cohort" target - all samples from all datasets in the pipeline.
     """
     def __init__(
         self, 
@@ -50,7 +98,7 @@ class Cohort(Target):
     @property
     def target_id(self) -> str:
         """Unique target ID"""
-        return f'Cohort({self.name}, {len(self.get_datasets())} datasets)'
+        return f'Cohort("{self.name}", {len(self.get_datasets())} datasets)'
 
     def get_datasets(self, only_active: bool = True) -> list['Dataset']:
         """
@@ -61,8 +109,18 @@ class Cohort(Target):
             ds for k, ds in self._datasets_by_name.items() 
             if (ds.active or not only_active)
         ]
+    
+    def get_dataset_by_name(
+        self, name: str, only_active: bool = True
+    ) -> Optional['Dataset']:
+        """
+        Get dataset by name.
+        Include only "active" datasets (unless only_active is False)
+        """
+        ds_by_name = {d.name: d for d in self.get_datasets(only_active)}
+        return ds_by_name.get(name)
 
-    def get_all_samples(self, only_active: bool = True) -> list['Sample']:
+    def get_samples(self, only_active: bool = True) -> list['Sample']:
         """
         Gets a flat list of all samples from all datasets.
         Include only "active" samples (unless only_active is False)
@@ -72,14 +130,14 @@ class Cohort(Target):
             all_samples.extend(proj.get_samples(only_active))
         return all_samples
 
-    def get_all_sample_ids(self, only_active: bool = True) -> list[str]:
+    def get_sample_ids(self, only_active: bool = True) -> list[str]:
         """
         Gets a flat list of CPG IDs for all samples from all datasets.
         """
-        return [s.id for s in self.get_all_samples(only_active=only_active)]
+        return [s.id for s in self.get_samples(only_active=only_active)]
 
     def add_dataset(
-        self, 
+        self,
         name: str, 
         namespace: Namespace | None = None,
         storage_provider: StorageProvider | None = None,
@@ -87,20 +145,67 @@ class Cohort(Target):
         """
         Create a dataset and add it into the cohort.
         """
+        namespace = namespace or self.analysis_dataset.namespace
+        # Normalising the dataset's name:
+        name = build_dataset_name(*parse_stack(name, namespace))
         if name in self._datasets_by_name:
-            logger.warning(f'Dataset {name} already exists in the cohort')
+            logger.debug(f'Dataset {name} already exists in the cohort')
             return self._datasets_by_name[name]
+
         if name == self.analysis_dataset.name:
             ds = self.analysis_dataset
         else:
             ds = Dataset(
-                name=name, 
+                name=name,
                 cohort=self,
                 namespace=namespace,
                 storage_provider=storage_provider or self.storage_provider,
             )
+
         self._datasets_by_name[ds.name] = ds
         return ds
+
+    def get_job_attrs(self) -> dict[str, str]:
+        """
+        Attributes for Hail Batch job.
+        """
+        return {}
+
+    def get_job_prefix(self) -> str:
+        """
+        Prefix job names.
+        """
+        return ''
+
+
+def parse_stack(
+    name: str, 
+    namespace: Namespace | None = None
+) -> tuple[str, Namespace]:
+    """
+    Input `name` can be either e.g. "seqr" or "seqr-test". The latter will be 
+    resolved to stack="seqr" and is_test=True, unless `namespace` is provided 
+    explicitly.
+
+    Returns the stack id and a corrected namespace.
+    """
+    namespace = namespace or Namespace.MAIN
+    if name.endswith('-test'):
+        stack = name[:-len('-test')]
+        if namespace == Namespace.MAIN:
+            namespace = Namespace.TEST
+    else:
+        stack = name
+    return stack, namespace
+
+
+def build_dataset_name(stack: str, namespace: Namespace) -> str:
+    """
+    Dataset name is suffixed with "-test" for a test dataset (matching the
+    corresponding sample-metadata project).
+    """
+    is_test = namespace != Namespace.MAIN
+    return stack + ('-test' if is_test else '')
 
 
 class Dataset(Target):
@@ -129,30 +234,14 @@ class Dataset(Target):
         namespace: Namespace | None = None,
         storage_provider: StorageProvider | None = None,
     ):
-        """
-        Input `name` can be either e.g. "seqr" or "seqr-test". The latter will be 
-        resolved to stack="seqr" and is_test=True, unless `namespace` is provided 
-        explicitly.
-
-        Also note that a Pipeline is passed as a parameter. A Dataset can exist 
-        outside `Cohort`, e.g. if it's an analysis dataset that exists only 
-        to track joint analysis of multiple datasets, but itself doesn't contain 
-        any samples.
-        """
         super().__init__()
         self.cohort = cohort
         
         self._storage_provider = storage_provider
 
-        self._samples: list[Sample] = []
-
-        self.namespace = namespace or Namespace.MAIN
-        if name.endswith('-test'):
-            self.stack = name[:-len('-test')]
-            if self.namespace == Namespace.MAIN:
-                self.namespace = Namespace.TEST
-        else:
-            self.stack = name
+        self._sample_by_id: dict[str, Sample] = {}
+        
+        self.stack, self.namespace = parse_stack(name, namespace)
 
     @property
     def is_test(self) -> bool:
@@ -164,15 +253,15 @@ class Dataset(Target):
     @property
     def name(self) -> str:
         """
-        Name is suffixed with "-test" for test dataset 
-        (matching the sample-metadata project).
+        Name is suffixed with "-test" for a test dataset (matching the
+        corresponding sample-metadata project).
         """
-        return self.stack + ('-test' if self.is_test else '')
+        return build_dataset_name(self.stack, self.namespace)
 
     @property
     def target_id(self) -> str:
         """Unique target ID"""
-        return f'Dataset({self.name})'
+        return f'Dataset("{self.name}")'
     
     def __repr__(self):
         return f'Dataset("{self.name}", {len(self.get_samples())} samples)'
@@ -192,7 +281,7 @@ class Dataset(Target):
             )
         return self._storage_provider
 
-    def get_bucket(self, **kwargs) -> CloudPath:
+    def get_bucket(self, **kwargs) -> Path:
         """
         The primary dataset bucket (-main or -test).
         """
@@ -200,7 +289,7 @@ class Dataset(Target):
             dataset=self.stack, namespace=self.namespace, **kwargs,
         )
 
-    def get_tmp_bucket(self, **kwargs) -> CloudPath:
+    def get_tmp_bucket(self, **kwargs) -> Path:
         """
         The tmp bucket (-main-tmp or -test-tmp)
         """
@@ -208,7 +297,7 @@ class Dataset(Target):
             dataset=self.stack, namespace=self.namespace, **kwargs
         )
     
-    def get_analysis_bucket(self, **kwargs) -> CloudPath:
+    def get_analysis_bucket(self, **kwargs) -> Path:
         """
         Get analysis bucket (-main-analysis or -test-analysis)
         """
@@ -216,7 +305,7 @@ class Dataset(Target):
             dataset=self.stack, namespace=self.namespace, **kwargs
         )
     
-    def get_web_bucket(self, **kwargs) -> CloudPath:
+    def get_web_bucket(self, **kwargs) -> Path:
         """
         Get web bucket (-main-web or -test-web)
         """
@@ -237,30 +326,37 @@ class Dataset(Target):
         id: str,  # pylint: disable=redefined-builtin
         external_id: str, 
         participant_id: str | None = None,
-        seq: SmSequence | None = None,
+        sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
         **kwargs
     ) -> 'Sample':
         """
         Create a new sample and add it into the dataset.
         """
+        if id in self._sample_by_id:
+            logger.debug(f'Sample {id} already exists in the dataset {self.name}')
+            return self._sample_by_id[id]
+
         s = Sample(
             id=id, 
             external_id=external_id,
             participant_id=participant_id,
-            seq=seq,
+            sex=sex,
             pedigree=pedigree,
             dataset=self,
             meta=kwargs,
         )
-        self._samples.append(s)
+        self._sample_by_id[id] = s
         return s
     
     def get_samples(self, only_active: bool = True) -> list['Sample']:
         """
         Get dataset's samples. Inlcude only "active" samples, unless only_active=False
         """
-        return [s for s in self._samples if (s.active or not only_active)]
+        return [
+            s for sid, s in self._sample_by_id.items() 
+            if (s.active or not only_active)
+        ]
 
     def get_sample_ids(self, only_active: bool = True) -> list[str]:
         """
@@ -269,12 +365,23 @@ class Dataset(Target):
         """
         return [s.id for s in self.get_samples(only_active=only_active)]
 
+    def get_job_attrs(self) -> dict[str, str]:
+        """
+        Attributes for Hail Batch job.
+        """
+        return {'dataset': self.name}
+
+    def get_job_prefix(self) -> str:
+        """
+        Prefix job names.
+        """
+        return f'{self.name}: '
+    
 
 class Sample(Target):
     """
     Represents a Sample.
     """
-
     def __init__(
         self,
         id: str,  # pylint: disable=redefined-builtin
@@ -282,7 +389,7 @@ class Sample(Target):
         dataset: 'Dataset',  # type: ignore  # noqa: F821
         participant_id: str | None = None,
         meta: dict | None = None,
-        seq: SmSequence | None = None,
+        sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
         alignment_input: AlignmentInput | None = None
     ):
@@ -292,19 +399,14 @@ class Sample(Target):
         self.dataset = dataset
         self._participant_id = participant_id
         self.meta: dict = meta or dict()
-        self.seq = seq
-        self.pedigree: PedigreeInfo | None
-        if pedigree:
-            self.pedigree = pedigree
-        elif 'sex' in self.meta:
+        self.pedigree: PedigreeInfo | None = pedigree
+        if sex:
             self.pedigree = PedigreeInfo(
                 sample=self,
                 fam_id=self.participant_id,
-                sex=Sex.parse(self.meta['sex'])
+                sex=sex,
             )
-        else:
-            self.pedigree = None
-        self._alignment_input = alignment_input
+        self.alignment_input = alignment_input
 
     def __repr__(self):
         return (
@@ -314,44 +416,23 @@ class Sample(Target):
             f', forced={self.forced}' +
             f', active={self.active}' +
             f', meta={self.meta}' +
-            (f', seq={self.seq}' if self.seq else '') +
-            (f', alignment_input={self._alignment_input}'
-             if self._alignment_input else '') +
+            (f', alignment_input={self.alignment_input}' if self.alignment_input else '') +
             (f', pedigree={self.pedigree}' if self.pedigree else '') +
             f')'
         )
 
     def __str__(self):
         ai_tag = ''
-        if self._alignment_input:
-            if isinstance(self._alignment_input, CramPath):
-                if self._alignment_input.is_bam:
+        if self.alignment_input:
+            if isinstance(self.alignment_input, CramPath):
+                if self.alignment_input.is_bam:
                     ai_tag = f'|SEQ=CRAM'
                 else:
                     ai_tag = f'|SEQ=BAM'
             else:
-                ai_tag = f'|SEQ={len(self._alignment_input)}FQS'
+                ai_tag = f'|SEQ={len(self.alignment_input)}FQS'
 
         return f'Sample({self.dataset.name}/{self.id}|{self.external_id}{ai_tag})'
-
-    @property
-    def alignment_input(self) -> AlignmentInput | None:
-        """
-        Returns input for (re-)alignment.
-        """
-        if self._alignment_input:
-            return self._alignment_input
-
-        if self.seq:
-            return self.seq.alignment_input
-        return None
-
-    @alignment_input.setter
-    def alignment_input(self, value: AlignmentInput):
-        """
-        Set alignment_input
-        """
-        self._alignment_input = value
 
     @property
     def participant_id(self) -> str:
@@ -360,11 +441,6 @@ class Sample(Target):
         Uses external_id whenever participant_id is not available in the DB
         """
         return self._participant_id or self.external_id
-
-    @property
-    def target_id(self) -> str:
-        """Unique target ID"""
-        return f'Sample({self.id})'
 
     def get_ped_dict(self, use_participant_id: bool = False) -> dict[str, str]:
         """
@@ -394,6 +470,31 @@ class Sample(Target):
         """
         return GvcfPath(self.dataset.get_bucket() / 'gvcf' / f'{self.id}.g.vcf.gz')
 
+    @property
+    def target_id(self) -> str:
+        """Unique target ID"""
+        return f'Sample("{self.id})"'
+
+    def get_samples(self, only_active: bool = True) -> list['Sample']:
+        """
+        Implementing the abstract method.
+        """
+        if only_active and not self.active:
+            return []
+        return [self]
+    
+    def get_job_attrs(self) -> dict[str, str]:
+        """
+        Attributes for Hail Batch job.
+        """
+        return {'dataset': self.dataset.name, 'sample': self.id}
+
+    def get_job_prefix(self) -> str:
+        """
+        Prefix job names.
+        """
+        return f'{self.dataset.name}/{self.id}: '
+
 
 class Sex(Enum):
     """
@@ -404,14 +505,15 @@ class Sex(Enum):
     FEMALE = 2
 
     @staticmethod
-    def parse(sex: str) -> 'Sex':
+    def parse(sex: str | None) -> 'Sex':
         """
         Parse a string into a Sex object.
         """
-        if sex.lower() in ('m', 'male', '1'):
-            return Sex.MALE
-        if sex.lower() in ('f', 'female', '2'):
-            return Sex.FEMALE
+        if sex:
+            if sex.lower() in ('m', 'male', '1'):
+                return Sex.MALE
+            if sex.lower() in ('f', 'female', '2'):
+                return Sex.FEMALE
         return Sex.UNKNOWN
 
 
@@ -448,18 +550,3 @@ class PedigreeInfo:
             'Sex': str(self.sex.value),
             'Phenotype': self.phenotype,
         }
-
-
-class Pair(Target):
-    """
-    Pair of samples
-    """
-    @property
-    def target_id(self) -> str:
-        """Unique target ID"""
-        return f'{self.s1.target_id}:{self.s2.target_id}'
-
-    def __init__(self, s1: Sample, s2: Sample):
-        super().__init__()
-        self.s1 = s1
-        self.s2 = s2

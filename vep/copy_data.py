@@ -2,9 +2,13 @@
 Use Hail Batch to transfer VEP reference data cpg-reference bucket.
 """
 
-from cpg_pipes import images, ref_data
+from cpg_pipes import images
 from cpg_pipes.hb.batch import setup_batch
 from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.providers.cpg import CpgStorageProvider
+from cpg_pipes.refdata import RefData
+
+refs = RefData(CpgStorageProvider().get_ref_bucket())
 
 
 def _vep_cache(b):
@@ -23,7 +27,7 @@ def _vep_cache(b):
     tar -cvf {j.tar} vep
     """
     j.command(wrap_command(cmd))
-    b.write_output(j.tar, ref_data.VEP_CACHE)
+    b.write_output(j.tar, refs.vep_cache)
     return j
 
 
@@ -53,7 +57,7 @@ def _loftee(b):
     tar -cvf {j.tar} .
     """
     j.command(wrap_command(cmd))
-    b.write_output(j.tar, ref_data.VEP_LOFTEE)
+    b.write_output(j.tar, refs.vep_loftee)
 
 
 b = setup_batch('Copy VEP data')

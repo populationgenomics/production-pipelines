@@ -3,29 +3,30 @@ Create Hail Batch jobs to run Picard tools (marking duplicates, QC).
 """
 
 import hailtop.batch as hb
-from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 
-from cpg_pipes import images, buckets
+from cpg_pipes import Path
+from cpg_pipes import images, utils
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.ref_data import REF_D
+from cpg_pipes.refdata import RefData
 
 
 def markdup(
     b: hb.Batch,
     sorted_bam: hb.ResourceFile,
     sample_name: str,
-    dataset_name: str | None = None,
-    output_path: CloudPath | str | None = None,
-    qc_bucket: CloudPath | str | None = None,
+    refs: RefData,
+    job_attrs: dict | None = None,
+    output_path: Path | None = None,
+    qc_bucket: Path | None = None,
     overwrite: bool = True,
 ) -> Job:
     """
     Make job that runs Picard MarkDuplicates and converts the result to CRAM.
     """
-    j = b.new_job('MarkDuplicates', dict(sample=sample_name, dataset=dataset_name))
-    if buckets.can_reuse(output_path, overwrite):
+    j = b.new_job('MarkDuplicates', job_attrs)
+    if utils.can_reuse(output_path, overwrite):
         j.name += ' [reuse]'
         return j
 
@@ -37,7 +38,7 @@ def markdup(
             'cram.crai': '{root}.cram.crai',
         }
     )
-    fasta_reference = b.read_input_group(**REF_D)
+    fasta_reference = refs.fasta_res_group(b)
 
     cmd = f"""
     picard MarkDuplicates -Xms13G \\
@@ -51,11 +52,7 @@ def markdup(
     j.command(wrap_command(cmd, monitor_space=True))
     
     if output_path:
-        output_path = CloudPath(output_path)
-
-        if qc_bucket:
-            qc_bucket = CloudPath(qc_bucket)
-        else:
+        if not qc_bucket:
             qc_bucket = output_path.parent
     
         b.write_output(j.output_cram, str(output_path.with_suffix('')))

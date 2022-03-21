@@ -5,11 +5,9 @@ Batch pipeline to generate CRAM and GVCF for all samples with alignment inputs.
 """
 
 import logging
-
 import click
 
-from cpg_pipes.pipeline.cli_opts import pipeline_click_options
-from cpg_pipes.pipeline.pipeline import Pipeline
+from cpg_pipes.pipeline import pipeline_click_options, Pipeline
 from cpg_pipes.stages.cram import CramStage
 from cpg_pipes.stages.gvcf import GvcfStage
 

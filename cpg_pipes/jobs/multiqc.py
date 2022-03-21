@@ -5,9 +5,9 @@ Batch pipeline to run WGS QC.
 """
 
 import logging
-from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 
+from cpg_pipes import Path
 from cpg_pipes.hb.batch import Batch
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
@@ -18,19 +18,18 @@ logger = logging.getLogger(__file__)
 
 def multiqc(
     b: Batch,
-    dataset_name: str,
-    tmp_bucket: CloudPath,
-    paths: list[CloudPath],
-    out_html_path: CloudPath,
-    out_json_path: CloudPath,
+    tmp_bucket: Path,
+    paths: list[Path],
+    out_html_path: Path,
+    out_json_path: Path,
     out_html_url: str | None = None,
     ending_to_trim: set[str] | None = None,
     modules_to_trim_endings: set[str] | None = None,
+    job_attrs: dict | None = None,
 ) -> Job:
     """
     Run MultiQC for the files in `qc_paths`
     @param b: batch object
-    @param dataset_name: dataset name
     @param tmp_bucket: bucket for tmp files
     @param paths: file bucket paths to pass into MultiQC 
     @param out_json_path: where to write MultiQC-generated JSON file
@@ -38,9 +37,10 @@ def multiqc(
     @param out_html_url: URL corresponding to the HTML report
     @param ending_to_trim: trim these endings from input files to get sample names
     @param modules_to_trim_endings: list of modules for which trim the endings
+    @param job_attrs: attributes to add to Hail Batch job
     @return: job object
     """
-    j = b.new_job('Run MultiQC', {'dataset': dataset_name})
+    j = b.new_job('Run MultiQC', job_attrs)
     j.image(DRIVER_IMAGE)
     STANDARD.set_resources(j, ncpu=16)
 

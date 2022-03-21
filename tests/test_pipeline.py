@@ -1,10 +1,17 @@
+"""
+Test building and running pipeline. Optionally, dry-run.
+"""
+
 import shutil
 import sys
 import tempfile
 import time
 import unittest
-from pathlib import Path
 from unittest.mock import patch
+
+from cpg_pipes import to_path
+from cpg_pipes.providers.storage import Namespace
+from cpg_pipes.refdata import RefData
 
 try:
     from .utils import setup_env, BASE_BUCKET, DATASET, SAMPLES
@@ -14,36 +21,29 @@ except ImportError:
 
 class TestPipeline(unittest.TestCase):
     """
-    Test Pipeline class
+    Test building and running pipeline. Optionally, dry-run.
     """
     def setUp(self):
+        """
+        Setting parameters, creating local tmp dir.
+        """
         self.name = self._testMethodName
         self.timestamp = time.strftime('%Y%m%d-%H%M')
         self.out_bucket = BASE_BUCKET / self.name / self.timestamp
         self.tmp_bucket = self.out_bucket / 'tmp'
-        self.local_tmp_dir = Path(tempfile.mkdtemp())
+        self.local_tmp_dir = to_path(tempfile.mkdtemp())
         self.sample_name = f'Test-{self.timestamp}'
         self.sample_ids = SAMPLES[:3]
 
     def tearDown(self) -> None:
+        """
+        Removing local tmp dir
+        """
         shutil.rmtree(self.local_tmp_dir)
-
-    @patch('hail.hadoop_open', lambda a, b: tempfile.TemporaryFile('w'))
-    def test_pipeline(self):
-        """
-        Constucting a pipeline and submitting it to Hail Batch with dry_run.
-
-        With dry_run, Hail Batch prints all code with a single print() call.
-        Thus, we capture builtins.print, and verify that it has the expected
-        job commands passed to it.
         
-        Mocking all hail methods (hail.hadoop_open in this case) so we don't 
-        have to initialize hail, which steals a few seconds from this test
-        which is supposed to be quick.
-        """
+    def _setup_pipeline(self, dry_run=False):
         setup_env()
         from cpg_pipes import benchmark
-        from cpg_pipes import ref_data
         from cpg_pipes.pipeline.pipeline import Pipeline
         # Use the seqr_loader stages. Importing it will make sure all its stages
         # are used by default:
@@ -53,16 +53,38 @@ class TestPipeline(unittest.TestCase):
             name=self._testMethodName,
             description=self._testMethodName,
             analysis_dataset=DATASET,
-            namespace='test',
-            check_smdb_seq=False,
+            namespace=Namespace.TEST,
             config=dict(output_datasets=[DATASET]),
-            dry_run=True,
+            dry_run=dry_run,
         )
         ds = pipeline.add_dataset(DATASET)
         for s_id in self.sample_ids:
             s = ds.add_sample(s_id, s_id)
             s.alignment_input = benchmark.tiny_fq
+        return pipeline
 
+    def test_pipeline(self):
+        """
+        Constucting a pipeline and submitting it to Hail Batch.
+        """
+        pipeline = self._setup_pipeline(dry_run=False)
+        pipeline.submit_batch()
+
+    @patch('hail.hadoop_open', lambda a, b: tempfile.TemporaryFile('w'))
+    def test_pipeline_dry(self):
+        """
+        Constucting a pipeline and submitting it to Hail Batch with dry_run.
+
+        With dry_run, Hail Batch prints all code with a single print() call.
+        Thus, we capture `builtins.print`, and verify that it has the expected
+        job commands passed to it.
+        
+        Mocking all hail methods (hail.hadoop_open in this case) so we don't 
+        have to initialize hail, which steals a few seconds from this test
+        which is supposed to be quick.
+        """
+        pipeline = self._setup_pipeline(dry_run=True)
+        
         with patch('builtins.print') as mock_print:
             pipeline.submit_batch()
         
@@ -82,9 +104,9 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(_cnt('bwa mem'), len(self.sample_ids) * 2)
         self.assertEqual(_cnt('HaplotypeCaller'), len(self.sample_ids))
         self.assertEqual(_cnt('ReblockGVCF'), len(self.sample_ids))
-        self.assertEqual(_cnt('GenotypeGVCFs'), ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS)
-        self.assertEqual(_cnt('GenomicsDBImport'), ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS)
-        self.assertEqual(_cnt('MakeSitesOnlyVcf'), ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS)
+        self.assertEqual(_cnt('GenotypeGVCFs'), RefData.number_of_genomics_db_intervals)
+        self.assertEqual(_cnt('GenomicsDBImport'), RefData.number_of_genomics_db_intervals)
+        self.assertEqual(_cnt('MakeSitesOnlyVcf'), RefData.number_of_genomics_db_intervals)
         self.assertEqual(_cnt('VariantRecalibrator'), 2)
         self.assertEqual(_cnt('ApplyVQSR'), 2)
         self.assertEqual(_cnt('GatherVcfsCloud'), 2)

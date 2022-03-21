@@ -6,10 +6,9 @@ import logging
 from dataclasses import dataclass
 from typing import Optional, Tuple, Dict
 
-from cloudpathlib import CloudPath
-
-from cpg_pipes import buckets
-from cpg_pipes.hb.batch import get_hail_bucket
+from .. import Path
+from .. import utils
+from .batch import get_hail_bucket
 
 logger = logging.getLogger(__file__)
 
@@ -21,20 +20,20 @@ class PrevJob:
     BATCH=6553
     mysql --ssl-ca=/sql-config/server-ca.pem --ssl-cert=/sql-config/client-cert.pem --ssl-key=/sql-config/client-key.pem --host=10.125.0.3 --user=root --password batch -e "SELECT j.batch_id, j.job_id, ja.key, ja.value FROM jobs as j INNER JOIN job_attributes as ja ON j.job_id = ja.job_id WHERE j.batch_id=$BATCH AND ja.batch_id=j.batch_id AND ja.key='name' AND j.state='Success';" > result.txt    
     """
-    cpgid: Optional[str]
-    projname: Optional[str]
+    cpgid: str | None
+    projname: str | None
     batch_number: int
     job_number: int
     jtype: str
     jname: str
     batchid: str
-    hail_bucket: str
+    hail_bucket: Path
 
     @staticmethod
     def parse(
-        fpath: str, 
+        fpath: Path, 
         batchid: str, 
-        tmp_bucket: CloudPath,
+        tmp_bucket: Path,
         keep_scratch: bool,
     ) -> Dict[Tuple[Optional[str], str], 'PrevJob']:
         """
@@ -48,10 +47,10 @@ class PrevJob:
         """
         hail_bucket = get_hail_bucket(tmp_bucket, keep_scratch)
         
-        if not buckets.exists(fpath):
+        if not utils.exists(fpath):
             return dict()
         prev_batch_jobs: Dict[Tuple[Optional[str], str], PrevJob] = dict()
-        with open(fpath) as f:
+        with fpath.open() as f:
             for line in f:
                 if 'batch_id' in line.split():
                     continue  # skip header

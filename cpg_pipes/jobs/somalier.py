@@ -1,19 +1,18 @@
 """
 Adding jobs for fingerprinting and pedigree checks. Mostly using Somalier.
 """
-import os
 import logging
-from pathlib import Path
-from cloudpathlib import CloudPath
 import pandas as pd
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
-from cpg_pipes import buckets, images, ref_data, utils
+from cpg_pipes import Path, to_path
+from cpg_pipes import images, utils
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.pipeline.analysis import CramPath, GvcfPath
-from cpg_pipes.pipeline.dataset import Dataset, Sample
+from cpg_pipes.filetypes import CramPath, GvcfPath
+from cpg_pipes.pipeline.targets import Dataset, Sample
+from cpg_pipes.refdata import RefData
 
 logger = logging.getLogger(__file__)
 
@@ -21,13 +20,13 @@ logger = logging.getLogger(__file__)
 def pedigree(
     b,
     dataset: Dataset,
-    input_path_by_sid: dict[str, CloudPath | str],
+    input_path_by_sid: dict[str, Path | str],
+    refs: RefData,
     overwrite: bool,
-    out_samples_path: CloudPath | None = None,
-    out_pairs_path: CloudPath | None = None,
-    out_html_path: CloudPath | None = None,
+    out_samples_path: Path | None = None,
+    out_pairs_path: Path | None = None,
+    out_html_path: Path | None = None,
     out_html_url: str | None = None,
-    depends_on: list[Job] | None = None,
     label: str | None = None,
     ignore_missing: bool = False,
     dry_run: bool = False,
@@ -47,9 +46,9 @@ def pedigree(
     extract_jobs, somalier_file_by_sample = _prep_somalier_files(
         b=b,
         dataset=dataset,
+        refs=refs,
         input_path_by_sid=input_path_by_sid,
         overwrite=overwrite,
-        depends_on=depends_on,
         label=label,
         ignore_missing=ignore_missing,
     )
@@ -64,7 +63,6 @@ def pedigree(
         out_pairs_path=out_pairs_path,
         out_html_path=out_html_path,
         out_html_url=out_html_url,
-        depends_on=depends_on,
         dry_run=dry_run,
     )
     
@@ -83,12 +81,12 @@ def pedigree(
 def ancestry(
     b,
     dataset: Dataset,
-    input_path_by_sid: dict[str, CloudPath | str],
+    refs: RefData,
+    input_path_by_sid: dict[str, Path | str],
     overwrite: bool,
-    out_tsv_path: CloudPath,
-    out_html_path: CloudPath,
+    out_tsv_path: Path,
+    out_html_path: Path,
     out_html_url: str | None = None,
-    depends_on: list[Job] | None = None,
     label: str | None = None,
     ignore_missing: bool = False,
 ) -> Job:
@@ -98,9 +96,9 @@ def ancestry(
     extract_jobs, somalier_file_by_sample = _prep_somalier_files(
         b=b,
         dataset=dataset,
+        refs=refs,
         input_path_by_sid=input_path_by_sid,
         overwrite=overwrite,
-        depends_on=depends_on,
         label=label,
         ignore_missing=ignore_missing,
     )
@@ -109,12 +107,12 @@ def ancestry(
         b=b,
         somalier_file_by_sample=somalier_file_by_sample,
         dataset=dataset,
+        refs=refs,
         label=label,
         extract_jobs=extract_jobs,
         out_tsv_path=out_tsv_path,
         out_html_path=out_html_path,
         out_html_url=out_html_url,
-        depends_on=depends_on,
     )
     return j
 
@@ -122,12 +120,12 @@ def ancestry(
 def _prep_somalier_files(
     b,
     dataset: Dataset,
-    input_path_by_sid: dict[str, CloudPath | str],
+    input_path_by_sid: dict[str, Path | str],
+    refs: RefData,
     overwrite: bool,
-    depends_on: list[Job] | None = None,
     label: str | None = None,
     ignore_missing: bool = False,
-) -> tuple[list[Job], dict[str, CloudPath]]:
+) -> tuple[list[Job], dict[str, Path]]:
     """
     Generate .somalier file for each input
     """
@@ -141,7 +139,7 @@ def _prep_somalier_files(
             logger.error(f'Not found somalier input for {sample.id}')
             continue
 
-        input_path = CloudPath(input_path)
+        input_path = to_path(input_path)
 
         if input_path.name.endswith('.somalier'):
             somalier_file_by_sample[sample.id] = input_path
@@ -155,10 +153,10 @@ def _prep_somalier_files(
         j = extact_job(
             b=b,
             sample=sample,
+            refs=refs,
             gvcf_or_cram_or_bam_path=gvcf_or_cram_or_bam_path,
             overwrite=overwrite,
             label=label,
-            depends_on=depends_on,
             out_fpath=gvcf_or_cram_or_bam_path.somalier_path,
         )
         somalier_file_by_sample[sample.id] = gvcf_or_cram_or_bam_path.somalier_path
@@ -198,7 +196,7 @@ def _check_pedigree(
         ])
         df.to_csv(str(sample_map_fpath), sep='\t', index=False, header=False)
     script_name = 'check_pedigree.py'
-    script_path = Path(__file__).parent.parent.parent / utils.SCRIPTS_DIR / script_name
+    script_path = to_path(__file__).parent.parent.parent / utils.SCRIPTS_DIR / script_name
     with open(script_path) as f:
         script = f.read()
     # We do not wrap the command nicely to avoid breaking python indents of {script}
@@ -218,14 +216,14 @@ def _check_pedigree(
 
 def _ancestry(
     b: Batch, 
-    somalier_file_by_sample: dict[str, CloudPath],
+    somalier_file_by_sample: dict[str, Path],
     dataset: Dataset,
+    refs: RefData,
     label: str | None,
     extract_jobs: list[Job],
-    out_tsv_path: CloudPath,
-    out_html_path: CloudPath,
+    out_tsv_path: Path,
+    out_html_path: Path,
     out_html_url: str | None = None,
-    depends_on: list[Job] | None = None,
 ) -> Job:
     j = b.new_job(
         'Somalier ancestry' + (f' {label}' if label else ''),
@@ -238,13 +236,11 @@ def _ancestry(
         j, 
         storage_gb=1 + len(dataset.get_samples()) // 4000 * 1,
     )
-    if depends_on:
-        extract_jobs.extend(depends_on)
     j.depends_on(*extract_jobs)
 
     cmd = f"""\
     mkdir /io/batch/1kg
-    mv {b.read_input(ref_data.SOMALIER_1KG_TARGZ)} /io/batch/1kg
+    mv {b.read_input(refs.somalier_1kg_targz)} /io/batch/1kg
     (cd /io/batch/1kg && tar -xzf *.tar.gz)
 
     mkdir /io/batch/somaliers
@@ -257,7 +253,7 @@ def _ancestry(
 
     cmd += f"""\
     somalier ancestry \\
-    --labels {b.read_input(ref_data.SOMALIER_1KG_LABELS_TSV)} \\
+    --labels {b.read_input(refs.somalier_1kg_labels_tsv)} \\
     /io/batch/1kg/1kg-somalier/*.somalier ++ \\
     /io/batch/somaliers/*.somalier \\
     -o ancestry
@@ -275,15 +271,14 @@ def _ancestry(
 
 def _relate(
     b: Batch, 
-    somalier_file_by_sample: dict[str, CloudPath],
+    somalier_file_by_sample: dict[str, Path],
     dataset: Dataset,
     label: str | None,
     extract_jobs: list[Job],
-    out_samples_path: CloudPath | None = None,
-    out_pairs_path: CloudPath | None = None,
-    out_html_path: CloudPath | None = None,
+    out_samples_path: Path | None = None,
+    out_pairs_path: Path | None = None,
+    out_html_path: Path | None = None,
     out_html_url: str | None = None,
-    depends_on: list[Job] | None = None,
     dry_run: bool = False,
 ) -> Job:
     j = b.new_job(
@@ -297,8 +292,6 @@ def _relate(
         j, 
         storage_gb=1 + len(dataset.get_samples()) // 4000 * 1,
     )
-    if depends_on:
-        extract_jobs.extend(depends_on)
     j.depends_on(*extract_jobs)
     ped_fpath = dataset.get_tmp_bucket() / f'{dataset.name}.ped'
     datas = []
@@ -343,10 +336,10 @@ def extact_job(
     b,
     sample: Sample,
     gvcf_or_cram_or_bam_path: CramPath | GvcfPath,
+    refs: RefData,
     overwrite: bool,
     label: str | None = None,
-    depends_on: list[Job] | None = None,
-    out_fpath: CloudPath | None = None,
+    out_fpath: Path | None = None,
 ) -> Job:
     """
     Run "somalier extract" to generate a fingerprint for a `sample`
@@ -354,55 +347,42 @@ def extact_job(
     """
     j = b.new_job(
         'Somalier extract' + (f' {label}' if label else ''),
-        dict(sample=sample.id, dataset=sample.dataset.name),
+        sample.get_job_attrs(),
     )
 
     if not out_fpath:
         out_fpath = gvcf_or_cram_or_bam_path.somalier_path
 
-    if buckets.can_reuse(out_fpath, overwrite):
+    if utils.can_reuse(out_fpath, overwrite):
         j.name += ' [reuse]'
         return j
 
     j.image(images.BIOINFO_IMAGE)
     j.memory('standard')
     if isinstance(gvcf_or_cram_or_bam_path, CramPath):
-        j.cpu(4)
+        STANDARD.request_resources(
+            ncpu=4, 
+            storage_gb=200 if gvcf_or_cram_or_bam_path.is_bam else 50
+        )
         input_file = b.read_input_group(
             base=str(gvcf_or_cram_or_bam_path),
             index=str(gvcf_or_cram_or_bam_path.index_path)
         )
-        if gvcf_or_cram_or_bam_path.is_bam:
-            j.storage(f'200G')
-        else:
-            j.storage(f'50G')
     else:
-        j.cpu(2)
-        j.storage(f'10G')
+        STANDARD.request_resources(ncpu=2, storage_gb=10)
         input_file = b.read_input_group(
             base=str(gvcf_or_cram_or_bam_path),
             index=str(gvcf_or_cram_or_bam_path.tbi_path)
         )
     
-    if depends_on:
-        j.depends_on(*depends_on)
-
-    ref_fasta = ref_data.REF_FASTA
-    ref_fai = ref_data.REF_FASTA + '.fai'
-    ref_dict = (
-        ref_fasta.replace('.fasta', '').replace('.fna', '').replace('.fa', '') + '.dict'
-    )
+    ref = refs.fasta_res_group(b)
+    sites = b.read_input(refs.somalier_sites)
 
     cmd = f"""\
-    # Copying reference data to avoid GCP bandwidth limits
-    retry gsutil cp {ref_fasta} /io/batch/{os.path.basename(ref_fasta)}
-    retry gsutil cp {ref_fai}   /io/batch/{os.path.basename(ref_fai)}
-    retry gsutil cp {ref_dict}  /io/batch/{os.path.basename(ref_dict)}
-    SITES=/io/batch/sites/{os.path.basename(ref_data.SOMALIER_SITES)}
-    retry gsutil cp {ref_data.SOMALIER_SITES} $SITES
+    SITES=/io/batch/sites/{refs.somalier_sites.name}
+    retry gsutil cp {refs.somalier_sites} $SITES
 
-    somalier extract -d extracted/ --sites $SITES \\
-    -f /io/batch/{os.path.basename(ref_fasta)} \\
+    somalier extract -d extracted/ --sites {sites} -f {ref.base} \\
     {input_file['base']}
 
     mv extracted/*.somalier {j.output_file}

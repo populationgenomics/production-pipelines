@@ -6,7 +6,6 @@ Hail script to submit on a dataproc cluster.
 Converts input multi-sample VCFs into a matrix table, and annotates it.
 """
 from enum import Enum
-from typing import Optional
 from os.path import join
 import click
 import logging
@@ -64,7 +63,12 @@ INDEL_SCORE_CUTOFF = 0
     is_flag=True,
     help='Reuse intermediate files',
 )
-@click.option('--vep-block-size', 'vep_block_size')
+@click.option(
+    '--run-vep',
+    'run_vep',
+    is_flag=True,
+    help='Run VEP',
+)
 def main(
     vcf_path: str,
     site_only_vqsr_vcf_path: str,
@@ -73,8 +77,11 @@ def main(
     disable_validation: bool,
     make_checkpoints: bool,
     overwrite: bool,
-    vep_block_size: Optional[int],
+    run_vep: bool,
 ):  # pylint: disable=missing-function-docstring
+    """
+    Entry point
+    """
     logger.info('Starting the seqr_load pipeline')
 
     hl.init(default_reference=GENOME_VERSION)
@@ -99,22 +106,23 @@ def main(
             mt.write(out_path, overwrite=True)
             mt = hl.read_matrix_table(out_path)
 
-    out_path = join(work_bucket, 'vqsr_and_37_coords.vep.mt')
-    if can_reuse(out_path, overwrite):
-        mt = hl.read_matrix_table(out_path)
-    else:
-        mt = hl.vep(
-            mt, 
-            block_size=vep_block_size or 1000,
-            # We are not starting the cluster with --vep, instead passing custom
-            # startup script with --init gs://cpg-reference/vep/vep-GRCh38.sh,
-            # so VEP_CONFIG_URI will not be set, thus need to provide config
-            # as a function parameter here:
-            config='file:///vep_data/vep-gcloud.json'
-        )
-        if make_checkpoints:
-            mt.write(out_path, overwrite=True)
+    if run_vep:
+        out_path = join(work_bucket, 'vqsr_and_37_coords.vep.mt')
+        if can_reuse(out_path, overwrite):
             mt = hl.read_matrix_table(out_path)
+        else:
+            mt = hl.vep(
+                mt, 
+                block_size=1000,
+                # We are not starting the cluster with --vep, instead passing custom
+                # startup script with --init gs://cpg-reference/vep/vep-GRCh38.sh,
+                # so VEP_CONFIG_URI will not be set, thus need to provide config
+                # as a function parameter here:
+                config='file:///vep_data/vep-gcloud.json'
+            )
+            if make_checkpoints:
+                mt.write(out_path, overwrite=True)
+                mt = hl.read_matrix_table(out_path)
 
     mt = compute_variant_annotated_vcf(
         mt, 
@@ -210,7 +218,7 @@ def import_vcf(source_paths, genome_version):
     takes advantage of all CPUs.
     :source_paths: list of paths to multi-sample VCFs
     :genome_version: GRCh37 or GRCh38
-    :return a MatrixTable
+    @return a MatrixTable
     """
     recode = {}
     if genome_version == 'GRCh38':
@@ -234,7 +242,7 @@ def annotate_old_and_split_multi_hts(mt):
 
     Saves the old allele and locus because while split_multi does this, split_multi_hts drops this. Will see if
     we can add this to split_multi_hts and then this will be deprecated.
-    :return: mt that has pre-annotations
+    @return: mt that has pre-annotations
     """
     # Named `locus_old` instead of `old_locus` because split_multi_hts drops `old_locus`.
     return hl.split_multi_hts(
@@ -349,7 +357,7 @@ def elasticsearch_row(ds):
     TODO:
     - Call validate
     - when all annotations are here, whitelist fields to send instead of blacklisting.
-    :return:
+    @return:
     """
     # Converts a mt to the row equivalent.
     if isinstance(ds, hl.MatrixTable):
@@ -370,7 +378,7 @@ def get_sample_type_stats(mt, threshold=0.3):
 
     @param mt: Matrix Table to check
     @param threshold: if the matched percentage is over this threshold, we classify as match
-    :return: a dict of coding/non-coding to dict with 'matched_count', 'total_count' and 'match' boolean.
+    @return: a dict of coding/non-coding to dict with 'matched_count', 'total_count' and 'match' boolean.
     """
     stats = {}
     types_to_ht_path = {
@@ -404,7 +412,7 @@ def validate_mt(mt, sample_type):
 
     @param mt: mt to validate
     @param sample_type: WGS or WES
-    :return: True or Exception
+    @return: True or Exception
     """
     sample_type_stats = get_sample_type_stats(mt)
 
@@ -449,7 +457,7 @@ def validate_mt(mt, sample_type):
 def add_37_coordinates(mt):
     """Annotates the GRCh38 MT with 37 coordinates using hail's built-in liftover
     @param mt: MatrixTable from VCF
-    :return: MatrixTable annotated with GRCh37 coordinates
+    @return: MatrixTable annotated with GRCh37 coordinates
     """
     rg37 = hl.get_reference('GRCh37')
     rg38 = hl.get_reference('GRCh38')

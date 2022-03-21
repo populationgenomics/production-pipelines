@@ -4,14 +4,11 @@ Stage that performs AS-VQSR.
 
 import logging
 
-from cloudpathlib import CloudPath
-
-from cpg_pipes import utils
-from cpg_pipes.jobs.vqsr import make_vqsr_jobs
-from cpg_pipes.pipeline.dataset import Cohort
-from cpg_pipes.pipeline.pipeline import stage, CohortStage
-from cpg_pipes.pipeline.stage import StageInput, StageOutput
-from cpg_pipes.stages.joint_genotyping import JointGenotypingStage
+from .. import Path
+from .. import utils
+from ..pipeline import stage, CohortStage, StageInput, StageOutput, Cohort
+from ..jobs.vqsr import make_vqsr_jobs
+from .joint_genotyping import JointGenotypingStage
 
 logger = logging.getLogger(__file__)
 
@@ -21,11 +18,11 @@ class VqsrStage(CohortStage):
     """
     Variant filtering of joint-called VCF
     """
-    def expected_result(self, cohort: Cohort) -> CloudPath:
+    def expected_result(self, cohort: Cohort) -> Path:
         """
         Expects to generate one site-only VCF
         """
-        samples_hash = utils.hash_sample_ids(cohort.get_all_sample_ids())
+        samples_hash = utils.hash_sample_ids(cohort.get_sample_ids())
         return (
             cohort.analysis_dataset.get_tmp_bucket() / 
             'vqsr' / 
@@ -43,14 +40,14 @@ class VqsrStage(CohortStage):
         tmp_vqsr_bucket = cohort.analysis_dataset.get_tmp_bucket() / 'vqsr'
         logger.info(f'Queueing VQSR job')
         expected_path = self.expected_result(cohort)
-        vqsr_job = make_vqsr_jobs(
+        jobs = make_vqsr_jobs(
             b=self.b,
+            refs=self.refs,
             input_vcf_or_mt_path=siteonly_vcf_path,
             work_bucket=tmp_vqsr_bucket,
-            gvcf_count=len(cohort.get_all_samples()),
-            depends_on=inputs.get_jobs(),
+            gvcf_count=len(cohort.get_samples()),
             output_vcf_path=expected_path,
             use_as_annotations=self.pipeline_config.get('use_as_vqsr', True),
             overwrite=not self.check_intermediates,
         )
-        return self.make_outputs(cohort, data=expected_path, jobs=[vqsr_job])
+        return self.make_outputs(cohort, data=expected_path, jobs=jobs)

@@ -4,13 +4,10 @@ Stage that runs FastQC on alignment inputs.
 
 import logging
 
-from cloudpathlib import CloudPath
-
-from cpg_pipes.jobs import fastqc
-from cpg_pipes.pipeline.dataset import Sample
-from cpg_pipes.pipeline.pipeline import stage, SampleStage
-from cpg_pipes.pipeline.exceptions import PipelineError
-from cpg_pipes.pipeline.stage import StageInput, StageOutput
+from .. import Path
+from ..jobs import fastqc
+from ..pipeline.targets import Sample
+from ..pipeline import stage, SampleStage, PipelineError, StageInput, StageOutput
 
 logger = logging.getLogger(__file__)
 
@@ -20,7 +17,7 @@ class FastQC(SampleStage):
     """
     Run FastQC on alignment inputs.
     """
-    def expected_result(self, sample: Sample) -> dict[str, CloudPath]:
+    def expected_result(self, sample: Sample) -> dict[str, Path]:
         """
         Stage is expected to generate a FastQC HTML report, and a zip file for 
         parsing with MuiltiQC.
@@ -51,8 +48,8 @@ class FastQC(SampleStage):
             output_html_path=self.expected_result(sample)['html'],
             output_zip_path=self.expected_result(sample)['zip'],
             alignment_input=sample.alignment_input,
-            sample_name=sample.id,
-            dataset_name=sample.dataset.name,
+            refs=self.refs,
+            job_attrs=sample.get_job_attrs(),
         )
         return self.make_outputs(
             sample, 

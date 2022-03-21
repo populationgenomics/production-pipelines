@@ -1,68 +1,48 @@
 """
-Provides "Pipeline" class that allows plugging multiple "stages" together
-by resolving dependencies through the sample-metadata database, or by checking
-objects on buckets directly. 
+Provides `Pipeline` class and a `@stage` decorator that allow to define pipeline
+stages and plug them together.
 
-Each stage adds jobs to Hail Batch. Each stage acts on "target", which can be a 
-sample, a dataset, or an entire cohort (= all input datasets combined). Pipeline 
-would resolve dependencies between stages of different levels accordingly.
+A Stage describes the job that are added to Hail Batch, and outputs that are expected
+to be produced. Each stage acts on a `Target`, which can be of a different level:
+a `Sample`, a `Dataset`, a `Cohort` (= all input datasets combined). Pipeline plugs
+stages together by resolving dependencies between different levels accordingly.
 
-Basic example:
-
-@stage(analysis_type=AnalysisType.CRAM)
-class CramStage(SampleStage):
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        expected_path = self.expected_result(pipe)
-        job = align.bwa(b=self.pipe.b, ..., output_path=expected_path)
-        return self.make_outputs(sample, data=expected_path, jobs=[job])
-
-@stage(analysis_type=AnalysisType.GVCF, required_stages=CramStage)
-class GvcfStage(SampleStage):
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        cram_path = inputs.as_path(target=sample, stage=CramStage)
-        expected_path = self.expected_result(pipe)
-        job = haplotype_caller.produce_gvcf(b=self.pipe.b, ..., output_path=expected_path)
-        return self.make_outputs(sample, data=expected_path, jobs=[job])
-
-@stage(analysis_type=AnalysisType.JOINT_CALLING, required_stages=GvcfStage)
-class JointCallingStage(CohortStage):
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        gvcf_by_sid = inputs.as_path_by_target(stage=GvcfStage)
-        expected_path = self.expected_result(cohort)
-        job = make_joint_genotyping_jobs(b=self.pipe.b, ..., output_path=expected_path)
-        return self.make_outputs(cohort, data=expected_path, jobs=[job])
-
-@click.command()
-@pipeline_click_options
-def main(**kwargs):
-    p = Pipeline(
-        name='my_joint_calling_pipeline',
-        title='My joint calling pipeline',
-        **kwargs
-    )
-    p.submit_batches()
-
-For more usage examples, see the "pipelines" folder in the root of this repository.
+Examples of pipelines can be found in the `pipelines/` folder in the repository root.
 """
 import functools
 import logging
+import pathlib
 import shutil
 import tempfile
 import time
 from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Optional, cast, Union, Any, Callable, Type
+from typing import Callable, cast, Union, TypeVar, Generic, Any, Optional, Type
 
 from cloudpathlib import CloudPath
+import hailtop.batch as hb
+from hailtop.batch.job import Job
 
-from .analysis import AnalysisType
-from .dataset import Dataset, Cohort, Sample, Pair
 from .exceptions import PipelineError
-from .smdb import SMDB
-from .stage import Stage, ExpectedResultT, StageInput, StageOutput
-from ..hb.batch import setup_batch, Batch
+from .targets import Target, Dataset, Sample, Cohort
+from .. import Path, to_path
+from ..providers import (
+    Cloud,
+    Namespace,
+    StoragePolicy,
+    StatusReporterType,
+    InputProviderType,
+)
+from ..providers.status import StatusReporter
+from ..providers.cpg import (
+    CpgStorageProvider,
+    SmdbStatusReporter,
+    SmdbInputsProvider,
+    SMDB,
+)
+from ..refdata import RefData
+from ..utils import exists
+from ..hb.batch import Batch, setup_batch
 from ..hb.prev_job import PrevJob
-from ..storage import Namespace, StorageProvider, CPGStorageProvider
 
 logger = logging.getLogger(__file__)
 
@@ -76,9 +56,9 @@ _ALL_DEFINED_STAGES = []
 
 
 def stage(
-    _cls: Optional[Type[Stage]] = None, 
+    _cls: Optional[Type['Stage']] = None, 
     *,
-    sm_analysis_type: AnalysisType|None = None, 
+    analysis_type: str | None = None, 
     required_stages: list[StageDecorator] | StageDecorator | None = None,
     skipped: bool = False,
     required: bool | None = None,
@@ -90,7 +70,7 @@ def stage(
     The goal is to allow cleaner defining of custom pipeline stages, without
     requiring to implement constructor. E.g.
 
-    @stage(sm_analysis_type=AnalysisType.GVCF, required_stages=CramStage)
+    @stage(analysis_type='gvcf', required_stages=CramStage)
     class GvcfStage(SampleStage):
         def expected_result(self, sample: Sample):
             ...
@@ -98,24 +78,25 @@ def stage(
             ...
     """
     def decorator_stage(cls) -> StageDecorator:
+        """Implements decorator."""
         @functools.wraps(cls)
         def wrapper_stage(pipeline: 'Pipeline') -> Stage:
+            """Decorator helper function."""
             return cls(
                 name=cls.__name__,
                 batch=pipeline.b,
                 dry_run=pipeline.dry_run,
                 required_stages=required_stages,
-                sm_analysis_type=sm_analysis_type,
+                analysis_type=analysis_type,
                 skipped=skipped,
                 required=required,
                 assume_results_exist=assume_results_exist, 
                 forced=forced,
-                validate_smdb_analyses=pipeline.validate_smdb_analyses,
                 skip_samples_with_missing_input=pipeline.skip_samples_with_missing_input,
                 check_expected_outputs=pipeline.check_expected_outputs,
                 check_intermediates=pipeline.check_intermediates,
-                smdb=pipeline.get_db(),
                 pipeline_config=pipeline.config,
+                refs=pipeline.refs,
             )
         # We record each initialised Stage subclass, so we know the default stage
         # list for the case when the user doesn't pass them explicitly with set_stages()
@@ -134,7 +115,7 @@ def skip(
     assume_results_exist: bool = False,
 ) -> Union[StageDecorator, Callable[..., StageDecorator]]:
     """
-    Decorator on top of `@stage` that sets the self.skipped field to True
+    Decorator on top of `@stage` that sets the `self.skipped` field to True
 
     @skip
     @stage
@@ -147,8 +128,10 @@ def skip(
         ...
     """
     def decorator_stage(fun) -> StageDecorator:
+        """Implements decorator."""
         @functools.wraps(fun)
         def wrapper_stage(*args, **kwargs) -> Stage:
+            """Decorator helper function."""
             s = fun(*args, **kwargs)
             s.skipped = True
             s.assume_results_exist = assume_results_exist
@@ -162,15 +145,6 @@ def skip(
         return decorator_stage(_fun)
 
 
-def run_pipeline(dry_run: bool = False, **kwargs) -> 'Pipeline':
-    """
-    Create and submit a pipeline to Hail Batch.
-    """
-    pipeline = Pipeline(**kwargs)
-    pipeline.submit_batch(dry_run=dry_run)
-    return pipeline
-
-
 class Pipeline:
     """
     Represents a Pipeline, and incapulates a Hail Batch object, stages, 
@@ -181,18 +155,18 @@ class Pipeline:
         analysis_dataset: str,
         name: str,
         description: str,
-        namespace: Namespace | str,
-        version: str | None = None,
-        storage_provider: StorageProvider | None = None,
+        namespace: Namespace,
+        storage_policy: StoragePolicy = StoragePolicy.CPG,
+        cloud: Cloud = Cloud.GS,
+        status_reporter_type: StatusReporterType = StatusReporterType.NONE,
+        input_provider_type: InputProviderType = InputProviderType.NONE,
         stages_in_order: list[StageDecorator] | None = None,
         keep_scratch: bool = True,
         dry_run: bool = False,
-        previous_batch_tsv_path: str | None = None,
+        version: str | None = None,
+        previous_batch_tsv_path: Path | None = None,
         previous_batch_id: str | None = None,
-        update_smdb_analyses: bool = False,
-        check_smdb_seq: bool = False,
         skip_samples_with_missing_input: bool = False,
-        validate_smdb_analyses: bool = False,
         check_intermediates: bool = True,
         check_expected_outputs: bool = True,
         first_stage: str | None = None,
@@ -202,7 +176,7 @@ class Pipeline:
         skip_samples: list[str] | None = None,
         only_samples: list[str] | None = None,
         force_samples: list[str] | None = None,
-        ped_files: list[CloudPath] | None = None,
+        ped_files: list[Path] | None = None,
         local_dir: Path | None = None,
     ):
         if stages_in_order and not input_datasets:
@@ -214,11 +188,12 @@ class Pipeline:
 
         self.name = name
         self.version = version or time.strftime('%Y%m%d-%H%M%S')
-        if isinstance(namespace, str):
-            namespace = Namespace(namespace)
         self.namespace = namespace
-        storage_provider = storage_provider or CPGStorageProvider()
-        self.storage_provider = storage_provider
+
+        if storage_policy == StoragePolicy.CPG:
+            storage_provider = CpgStorageProvider(cloud)
+        else:
+            raise PipelineError(f'Unsupported storage policy {storage_policy}')
 
         self.cohort = Cohort(
             self.name,
@@ -226,15 +201,15 @@ class Pipeline:
             namespace=namespace,
             storage_provider=storage_provider
         )
+        self.refs = RefData(storage_provider.get_ref_bucket())
 
         self.check_intermediates = check_intermediates and not dry_run
         self.check_expected_outputs = check_expected_outputs and not dry_run
         self.skip_samples_with_missing_input = skip_samples_with_missing_input
         self.first_stage = first_stage
         self.last_stage = last_stage
-        self.validate_smdb_analyses = validate_smdb_analyses
 
-        self.tmp_bucket = CloudPath(
+        self.tmp_bucket = to_path(
             self.cohort.analysis_dataset.get_tmp_bucket(
                 version=f'{self.name}/{self.version}'
             )
@@ -243,10 +218,10 @@ class Pipeline:
         self.dry_run: bool = dry_run
 
         if local_dir:
-            self.local_dir = Path(local_dir)
-            self.local_tmp_dir = Path(tempfile.mkdtemp(dir=local_dir))
+            self.local_dir = to_path(local_dir)
+            self.local_tmp_dir = to_path(tempfile.mkdtemp(dir=local_dir))
         else:
-            self.local_dir = self.local_tmp_dir = Path(tempfile.mkdtemp())
+            self.local_dir = self.local_tmp_dir = to_path(tempfile.mkdtemp())
 
         self.prev_batch_jobs = dict()
         if previous_batch_tsv_path is not None:
@@ -271,27 +246,27 @@ class Pipeline:
             billing_project=self.cohort.analysis_dataset.stack,
         )
 
-        self._db = None
-        if input_datasets:
-            for name in input_datasets:
-                self.cohort.add_dataset(
-                    name, 
-                    namespace=namespace, 
-                )
-            self._db = SMDB(
-                self.cohort.analysis_dataset.name,
-                do_update_analyses=update_smdb_analyses,
-                do_check_seq_existence=check_smdb_seq,
-            )
-            self._db.populate_cohort(
+        self.status_reporter = None
+        input_provider = None
+        if (input_provider_type == InputProviderType.SMDB 
+                or status_reporter_type == StatusReporterType.SMDB):
+            smdb = SMDB(self.cohort.analysis_dataset.name)
+            if status_reporter_type == StatusReporterType.SMDB:
+                self.status_reporter = SmdbStatusReporter(smdb)
+            if input_provider_type == InputProviderType.SMDB:
+                input_provider = SmdbInputsProvider(smdb)
+
+        if input_datasets and input_provider:
+            input_provider.populate_cohort(
                 cohort=self.cohort,
+                dataset_names=input_datasets,
                 skip_samples=skip_samples,
                 only_samples=only_samples,
                 ped_files=ped_files,
             )
 
         if force_samples:
-            for s in self.cohort.get_all_samples():
+            for s in self.cohort.get_samples():
                 if s.id in force_samples:
                     logger.info(
                         f'Force rerunning sample {s.id} even if its outputs exist'
@@ -299,7 +274,9 @@ class Pipeline:
                     s.forced = True
 
         self._stages_dict: dict[str, Stage] = dict()
-        self._stages_in_order: list[StageDecorator] = stages_in_order or _ALL_DEFINED_STAGES
+        self._stages_in_order: list[StageDecorator] = (
+            stages_in_order or _ALL_DEFINED_STAGES
+        )
 
     def submit_batch(
         self, 
@@ -426,7 +403,7 @@ class Pipeline:
             )
 
         # Second round - actually adding jobs from the stages.
-        for i, stage_ in enumerate(self._stages_dict.values()):
+        for i, (_, stage_) in enumerate(self._stages_dict.items()):
             if not stage_.skipped:
                 logger.info(f'*' * 60)
                 logger.info(f'Stage {stage_.name}')
@@ -440,21 +417,6 @@ class Pipeline:
                 if last_stage_num and i >= last_stage_num:
                     logger.info(f'Last stage is {stage_.name}, stopping here')
                     break
-
-    @property
-    def db(self) -> SMDB:
-        """
-        Get read-only sample-metadata DB object.
-        """
-        if self._db is None:
-            raise PipelineError('SMDB is not initialised')
-        return cast('SMDB', self._db)
-
-    def get_db(self) -> SMDB | None:
-        """
-        Like .db property, but returns None if db is not initialised.
-        """
-        return self._db
 
     def get_datasets(self, only_active: bool = True) -> list[Dataset]:
         """
@@ -472,141 +434,527 @@ class Pipeline:
         """
         Thin wrapper around corresponding Cohort method.
         """
-        return self.cohort.get_all_samples(only_active=only_active)
+        return self.cohort.get_samples(only_active=only_active)
 
     def get_all_sample_ids(self, only_active: bool = True) -> list[str]:
         """
         Thin wrapper around corresponding Cohort method.
         """
-        return self.cohort.get_all_sample_ids(only_active=only_active)
+        return self.cohort.get_sample_ids(only_active=only_active)
 
 
-class SampleStage(Stage[Sample], ABC):
+# Type variable to make sure a Stage subclass always matches the
+# correspondinng Target subclass
+TargetT = TypeVar('TargetT', bound=Target)
+
+ExpectedResultT = Union[Path, dict[str, Path], None]
+
+StageOutputData = Union[
+    Path, hb.Resource, dict[str, Path], dict[str, hb.Resource]
+]
+
+
+# noinspection PyShadowingNames
+class StageOutput:
     """
-    Sample-level stage.
+    Represents a result of a specific stage, which was run on a specific target.
+    Can be a file path, or a Hail Batch Resource. Optionally wrapped in a dict.
     """
+    def __init__(
+        self,
+        data: StageOutputData,
+        stage: 'Stage',
+        target: 'Target',
+        jobs: list[Job] | None = None,
+    ):
+        self.data = data
+        self.stage = stage
+        self.target = target
+        self.jobs: list[Job] = jobs or []
 
-    @abstractmethod
-    def expected_result(self, sample: Sample) -> ExpectedResultT:
+    def __repr__(self) -> str:
+        return f'result {self.data} for target {self.target}, stage {self.stage}'
+
+    def as_path_or_resource(self, id=None) -> Path | hb.Resource:
         """
-        CloudPath(s) to files that the stage is epxected to generate for the `target`.
-        Used within the stage to pass the output paths to commands, as well as
-        by the pipeline to get expected paths when the stage is skipped and
-        didn't return a `StageDeps` object from `add_jobs()`.
+        Cast the result to Union[str, hb.Resource], error if can't cast.
+        `id` is used to extract the value when the result is a dictionary.
         """
-
-    @abstractmethod
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        pass
-
-    def add_to_the_pipeline(self, pipeline: Pipeline) -> dict[str, StageOutput]:
-        output_by_target = dict()
-        datasets = pipeline.cohort.get_datasets()
-        if not datasets:
-            raise ValueError('No active datasets are found to run')
-        for ds_i, ds in enumerate(datasets):
-            logger.info(f'{self.name}: #{ds_i} {ds}')
-            if not ds.get_samples():
+        if id is not None:
+            if not isinstance(self.data, dict):
                 raise ValueError(
-                    f'No active samples are found to run in the dataset {ds.name}')
-            for sample_i, sample in enumerate(ds.get_samples()):
-                logger.info(f'{self.name}: #{sample_i}/{sample}')
-                sample_result = self._queue_jobs_with_checks(sample)
-                output_by_target[sample.target_id] = sample_result
-                logger.info('------')
-            logger.info('-#-#-#-')
-        return output_by_target
-
-
-class PairStage(Stage, ABC):
-    """
-    Stage on a pair os samples
-    """
-
-    @abstractmethod
-    def expected_result(self, pair: Pair) -> ExpectedResultT:
-        """
-        CloudPath(s) to files that the stage is epxected to generate for the `target`.
-        Used within the stage to pass the output paths to commands, as well as
-        by the pipeline to get expected paths when the stage is skipped and
-        didn't return a `StageDeps` object from `add_jobs()`.
-        """
-
-    @abstractmethod
-    def queue_jobs(self, pair: Pair, inputs: StageInput) -> StageOutput:
-        pass
-
-    def add_to_the_pipeline(self, pipeline: Pipeline) -> dict[str, StageOutput]:
-        output_by_target = dict()
-        datasets = pipeline.cohort.get_datasets()
-        if datasets:
-            raise ValueError('No active datasets are found to run')
-        for ds in datasets:
-            if not ds.get_samples():
-                raise ValueError(
-                    f'No active samples are found to run in the dataset {ds.name}'
+                    f'{self.data} is not a dictionary, can\'t get "{id}".'
                 )
-            for s1 in ds.get_samples():
-                for s2 in ds.get_samples():
-                    if s1 == s2:
-                        continue
-                    pair = Pair(s1, s2)
-                    output_by_target[pair.target_id] = \
-                        self._queue_jobs_with_checks(pair)
-        return output_by_target
+            return cast(dict, self.data)[id]
 
+        if isinstance(self.data, dict):
+            res = cast(dict, self.data)
+            if len(res.values()) > 1:
+                raise ValueError(
+                    f'{res} is a dictionary with more than 1 element, '
+                    f'please set the `id` parameter'
+                )
+            return list(res.values())[0]
 
-class DatasetStage(Stage, ABC):
-    """
-    Dataset-level stage
-    """
+        return self.data
 
-    @abstractmethod
-    def expected_result(self, dataset: Dataset) -> ExpectedResultT:
+    def as_path(self, id=None) -> Path:
         """
-        CloudPath(s) to files that the stage is epxected to generate for the `target`.
-        Used within the stage to pass the output paths to commands, as well as
-        by the pipeline to get expected paths when the stage is skipped and
-        didn't return a `StageDeps` object from `add_jobs()`.
+        Cast the result to path. Though exception if failed to cast.
+        `id` is used to extract the value when the result is a dictionary.
         """
+        res = self.as_path_or_resource(id)
+        if not isinstance(res, CloudPath | pathlib.Path):
+            raise ValueError(f'{res} is not a path.')
+        return cast(Path, res)
 
-    @abstractmethod
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        pass
+    def as_resource(self, id=None) -> hb.Resource:
+        """
+        Cast the result to Hail Batch Resource, or throw an error if the cast failed.
+        `id` is used to extract the value when the result is a dictionary.
+        """
+        res = self.as_path_or_resource(id)
+        if not isinstance(res, hb.Resource):
+            raise ValueError(f'{res} is not a Hail Batch Resource.')
+        return cast(hb.Resource, res)
 
-    def add_to_the_pipeline(self, pipeline: Pipeline) -> dict[str, StageOutput]:
-        output_by_target = dict()
-        datasets = pipeline.cohort.get_datasets()
-        if not datasets:
-            raise ValueError('No active datasets are found to run')
-        for ds_i, ds in enumerate(datasets):
-            logger.info(f'{self.name}: #{ds_i}/{ds.name} {ds}')
-            output_by_target[ds.target_id] = \
-                self._queue_jobs_with_checks(ds)
-            logger.info('-#-#-#-')
-        return output_by_target
+    def as_dict(self) -> dict[str, Path | hb.Resource]:
+        """
+        Cast the result to a dictionary, or throw an error if the cast failed.
+        """
+        if not isinstance(self.data, dict):
+            raise ValueError(f'{self.data} is not a dictionary.')
+        return self.data
+
+    def as_resource_dict(self) -> dict[str, hb.Resource]:
+        """
+        Cast the result to a dictionary of Hail Batch Resources, 
+        or throw an error if the cast failed
+        """
+        return {k: self.as_resource(id=k) for k in self.as_dict()}
+
+    def as_path_dict(self) -> dict[str, Path]:
+        """
+        Cast the result to a dictionary of strings, 
+        or throw an error if the cast failed.
+        """
+        return {k: self.as_path(id=k) for k in self.as_dict()}
 
 
-class CohortStage(Stage, ABC):
+# noinspection PyShadowingNames
+class StageInput:
     """
-    Entire cohort level stage
+    Represents an input for a stage run. It wraps the outputs of all required upstream stages
+    for corresponding targets (e.g. all GVCFs from a HaploytypeCallerStage
+    for a JointCallingStage, along with Hail Batch jobs).
+
+    An object of this class is passed to the public `queue_jobs` method of a Stage, 
+    and can be used to query dependency files and jobs.
     """
 
-    @abstractmethod
-    def expected_result(self, cohort: Cohort) -> ExpectedResultT:
-        """
-        CloudPath(s) to files that the stage is epxected to generate for the `target`.
-        Used within the stage to pass the output paths to commands, as well as
-        by the pipeline to get expected paths when the stage is skipped and
-        didn't return a `StageDeps` object from `add_jobs()`.
-        """
+    def __init__(self, stage: 'Stage'):
+        self.stage = stage
+        self._results_by_target_by_stage: dict[str, dict[str, StageOutput]] = {}
+        self._jobs: list[Job] = []
 
-    @abstractmethod
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        pass
+    def add_other_stage_output(self, output: StageOutput):
+        """
+        Add output from another stage run
+        """
+        if output.target.active:
+            stage_name = output.stage.name
+            target_id = output.target.target_id
 
-    def add_to_the_pipeline(self, pipeline: Pipeline) -> dict[str, StageOutput]:
+            if stage_name not in self._results_by_target_by_stage:
+                self._results_by_target_by_stage[stage_name] = dict()
+            self._results_by_target_by_stage[stage_name][target_id] = output
+
+    def _each(
+        self,
+        fun: Callable,
+        stage: StageDecorator,
+    ):
+        if stage.__name__ not in [s.name for s in self.stage.required_stages]:
+            raise PipelineError(
+                f'{self.stage.name}: getting inputs from stage {stage.__name__}, '
+                f'but {stage.__name__} is not listed in required_stages. '
+                f'Consider adding it into the decorator: '
+                f'@stage(required_stages=[{stage.__name__}])'
+            )
+
+        if stage.__name__ not in self._results_by_target_by_stage:
+            raise PipelineError(
+                f'No inputs from {stage.__name__} for {self.stage.name} found '
+                'after skipping targets with missing inputs. ' +
+                ('Check the logs if all samples were missing inputs from previous '
+                 'stages, and consider changing --first-stage'
+                 if self.stage.skip_samples_with_missing_input else '')
+            )
+
         return {
-            pipeline.cohort.target_id:
-                self._queue_jobs_with_checks(pipeline.cohort)
+            trg: fun(result)
+            for trg, result
+            in self._results_by_target_by_stage.get(stage.__name__, {}).items()
         }
+
+    def as_path_by_target(
+        self,
+        stage: StageDecorator,
+        id: str | None = None,
+    ) -> dict[str, Path]:
+        """
+        Get a single file path result, indexed by target for a specific stage
+        """
+        return self._each(fun=(lambda r: r.as_path(id=id)), stage=stage)
+
+    def as_resource_by_target(
+        self,
+        stage: StageDecorator,
+        id: str | None = None,
+    ) -> dict[str, hb.Resource]:
+        """
+        Get a single file path result, indexed by target for a specific stage
+        """
+        return self._each(fun=(lambda r: r.as_resource(id=id)), stage=stage)
+
+    def as_dict_by_target(
+        self, stage: StageDecorator
+    ) -> dict[str, dict[str, Path]]:
+        """
+        Get as a dictoinary of files/resources for a specific stage, indexed by target
+        """
+        return self._each(fun=(lambda r: r.as_dict()), stage=stage)
+
+    def as_resource_dict_by_target(
+        self,
+        stage: StageDecorator,
+    ) -> dict[str, dict[str, hb.Resource]]:
+        """
+        Get a dictoinary of resources for a specific stage, and indexed by target
+        """
+        return self._each(fun=(lambda r: r.as_resource_dict()), stage=stage)
+
+    def as_path_dict_by_target(
+        self,
+        stage: StageDecorator,
+    ) -> dict[str, dict[str, Path]]:
+        """
+        Get a dictoinary of paths for a specific stage, and indexed by target
+        """
+        return self._each(fun=(lambda r: r.as_path_dict()), stage=stage)
+
+    def as_path(
+        self,
+        target: 'Target',
+        stage: StageDecorator,
+        id: str | None = None,
+    ) -> Path:
+        """
+        Represent as a path to a file, otherwise fail.
+        `stage` can be callable, or a subclass of Stage
+        """
+        res = self._results_by_target_by_stage[stage.__name__][target.target_id]
+        return res.as_path(id)
+
+    def as_resource(
+        self,
+        target: 'Target',
+        stage: StageDecorator,
+        id: str | None = None,
+    ) -> hb.Resource:
+        """
+        Get Hail Batch Resource for a specific target and stage
+        """
+        res = self._results_by_target_by_stage[stage.__name__][target.target_id]
+        return res.as_resource(id)
+
+    def as_dict(self, target: 'Target', stage: StageDecorator) -> dict[str, Path]:
+        """
+        Get a dictoinary of files or Resources for a specific target and stage
+        """
+        res = self._results_by_target_by_stage[stage.__name__][target.target_id]
+        return res.as_dict()
+
+    def as_path_dict(
+        self, target: 'Target', stage: StageDecorator
+    ) -> dict[str, Path]:
+        """
+        Get a dictoinary of files for a specific target and stage
+        """
+        res = self._results_by_target_by_stage[stage.__name__][target.target_id]
+        return res.as_path_dict()
+
+    def as_resource_dict(
+        self, target: 'Target', stage: StageDecorator
+    ) -> dict[str, hb.Resource]:
+        """
+        Get a dictoinary of  Resources for a specific target and stage
+        """
+        res = self._results_by_target_by_stage[stage.__name__][target.target_id]
+        return res.as_resource_dict()
+
+    def get_jobs(self) -> list[Job]:
+        """
+        Build a list of hail batch dependencies from all stages and targets
+        """
+        all_jobs = []
+        for _, results_by_target in self._results_by_target_by_stage.items():
+            for _, results in results_by_target.items():
+                all_jobs.extend(results.jobs)
+        return all_jobs
+
+
+class Stage(Generic[TargetT], ABC):
+    """
+    Abstract class for a pipeline stage.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        batch: Batch,
+        refs: RefData,
+        required_stages: list[StageDecorator] | StageDecorator | None = None,
+        analysis_type: str | None = None,
+        skipped: bool = False,
+        required: bool | None = None,
+        assume_results_exist: bool = False,
+        forced: bool = False,
+        skip_samples_with_missing_input: bool = False,
+        check_expected_outputs: bool = False,
+        check_intermediates: bool = False,
+        status_reporter: StatusReporter | None = None,
+        pipeline_config: dict[str, Any] | None = None,
+        dry_run: bool = False,
+    ):
+        """
+        @param name: name of the stage
+        @param batch: Hail Batch object
+        @param refs: reference data for bioinformatics
+        @param required_stages: list of stage classes that this stage requires
+        @param analysis_type: if defined, will query the SMDB Analysis entries 
+            of this type
+        @param skipped: means that the stage is skipped and self.queue_jobs()
+            won't run. The other stages if depend on it can aassume that that 
+            self.expected_result() returns existing files and target.ouptut_by_stage 
+            will be populated.
+        @param required: means that the self.expected_output() results are 
+            required for another active stage, even if the stage was skipped.
+        @param assume_results_exist: for skipped but required stages, 
+            the self.expected_result() output will still be checked for existence. 
+            This option makes the downstream stages assume that the output exist.
+        @param forced: run self.queue_jobs(), even if we can reuse the 
+            self.expected_output().
+        """
+        self._name = name
+        self.b = batch
+        self.refs = refs
+        self.dry_run = dry_run
+
+        self.skip_samples_with_missing_input = skip_samples_with_missing_input
+        self.check_expected_outputs = check_expected_outputs
+        self.check_intermediates = check_intermediates
+
+        self.required_stages_classes: list[StageDecorator] = []
+        if required_stages:
+            if isinstance(required_stages, list):
+                self.required_stages_classes.extend(required_stages)
+            else:
+                self.required_stages_classes.append(required_stages)
+
+        # Populated in pipeline.run(), after we know all stages
+        self.required_stages: list[Stage] = []
+
+        self.status_reporter = status_reporter
+        # If analysis type is defined, it will be used to update analysis status,
+        # as well as find and reuse existing outputs from the status reporter
+        self.analysis_type = analysis_type
+
+        # Populated with the return value of `add_to_the_pipeline()`
+        self.output_by_target: dict[str, StageOutput] = dict()
+
+        self.skipped = skipped
+        self.required = required if required is not None else not skipped
+        self.forced = forced
+        self.assume_results_exist = assume_results_exist
+
+        self.pipeline_config = pipeline_config or {}
+
+    @property
+    def name(self):
+        """
+        Stage name (unique and descriptive stage)
+        """
+        return self._name
+
+    @abstractmethod
+    def queue_jobs(self, target: TargetT, inputs: StageInput) -> StageOutput:
+        """
+        Implements logic of the Stage: creates Batch jobs that do the processing.
+        Assumes that all the household work is done: checking missing inputs
+        from requried stages, checking for possible reuse of existing outputs.
+        """
+
+    @abstractmethod
+    def expected_result(self, target: TargetT) -> ExpectedResultT:
+        """
+        to_path(s) to files that the stage is epxected to generate for the `target`.
+        Used within the stage to pass the output paths to commands, as well as
+        by the pipeline to get expected paths when the stage is skipped and
+        didn't return a `StageDeps` object from `queue_jobs()`.
+
+        Can be a str or a AnyPath object, or a dictionary of str/Path objects.
+        """
+
+    @abstractmethod
+    def add_to_the_pipeline(self, pipeline: Pipeline) -> dict[str, StageOutput]:
+        """
+        Calls `output = pipeline.add_for_target(target)` on each target, 
+        which itself calls `output = queue_jobs(target, input)`, making sure to
+        construct the correct `input`.
+
+        Returns a dictionary of StageOutput, indexed by target unique_id.
+        """
+
+    def make_outputs(
+        self,
+        target: TargetT,
+        data: StageOutputData | str | dict[str, str] | None = None,
+        jobs: list[Job] | Job | None = None
+    ) -> StageOutput:
+        """
+        Builds a StageDeps object to return from a stage's queue_jobs()
+        """
+        # Converting str into Path objects.
+        path_data: StageOutputData
+        if isinstance(data, dict):
+            path_data = {k: to_path(v) for k, v in data.items()}
+        elif data is not None:
+            path_data = to_path(data)
+        else:
+            path_data = data
+        jobs = [jobs] if isinstance(jobs, Job) else jobs
+        # Adding status reporter jobs
+        if self.analysis_type:
+            if (
+                isinstance(path_data, hb.Resource) or (
+                    isinstance(path_data, dict) and 
+                    any(isinstance(d, hb.Resource) for k, d in path_data.items())
+                )
+            ):
+                raise PipelineError(
+                    'Cannot use hb.Resource objects with status reporter. '
+                    'Only supported Path objects and dicts of Path objects'
+                )
+            if self.status_reporter:
+                self.status_reporter.add_updaters_jobs(
+                    b=self.b,
+                    output=path_data,
+                    analysis_type=self.analysis_type,
+                    target=target,
+                    jobs=jobs,
+                )
+        return StageOutput(stage=self, target=target, data=data, jobs=jobs)
+
+    def _make_inputs(self) -> StageInput:
+        """
+        Collects outputs from all dependencies and create input for this stage
+        """
+        inputs = StageInput(self)
+        for prev_stage in self.required_stages:
+            for _, stage_output in prev_stage.output_by_target.items():
+                inputs.add_other_stage_output(stage_output)
+        return inputs
+
+    def _queue_jobs_with_checks(self, target: TargetT) -> StageOutput:
+        """
+        Constructs `inputs` and calls the public `output = queue_jobs(target, input)`.
+        Performs the checks like possibility to reuse existing jobs results,
+        or if required dependencies are missing.
+        """
+        if not self.skipped:
+            inputs = self._make_inputs()
+
+            reusable_paths = self._try_get_reusable_paths(target)
+            if reusable_paths:
+                if target.forced:
+                    logger.info(
+                        f'{self.name}: can reuse, but forcing the target '
+                        f'{target.target_id} to rerun this stage'
+                    )
+                    outputs = self.queue_jobs(target, inputs)
+                elif self.forced:
+                    logger.info(
+                        f'{self.name}: can reuse, but forcing the stage '
+                        f'to rerun, target={target.target_id}'
+                    )
+                    outputs = self.queue_jobs(target, inputs)
+                else:
+                    logger.info(f'{self.name}: reusing results for {target.target_id}')
+                    outputs = self._queue_reuse_job(target, reusable_paths)
+            else:
+                logger.info(f'{self.name}: adding jobs for {target.target_id}')
+                outputs = self.queue_jobs(target, inputs)
+
+            for j in outputs.jobs:
+                j.depends_on(*inputs.get_jobs())
+
+            return outputs
+
+        elif self.required:
+            reusable_paths = self._try_get_reusable_paths(target)
+            if not reusable_paths:
+                raise ValueError(
+                    f'Stage {self.name} is required, but is skipped, and '
+                    f'expected outputs for target {target.target_id} do not exist.)'
+                )
+            else:
+                return self.make_outputs(target=target, data=reusable_paths)
+
+        else:
+            # Stage is not needed, returning empty outputs
+            return self.make_outputs(target=target)
+
+    def _try_get_reusable_paths(self, target: TargetT) -> ExpectedResultT:
+        """
+        Returns outputs that can be reused for the stage for the target,
+        or None of none can be reused
+        """
+        if self.dry_run:
+            return None
+
+        expected_output = self.expected_result(target)
+
+        if not expected_output:
+            return None
+        elif (
+            not self.check_expected_outputs or
+            not self.required or
+            self.assume_results_exist
+        ):
+            # Do not need to check file existence, trust it exists:
+            return expected_output
+        else:
+            # Checking that expected output exists:
+            paths: list[Path]
+            if isinstance(expected_output, dict):
+                paths = [v for k, v in expected_output.items()]
+            else:
+                paths = [expected_output]
+            if not all(exists(path) for path in paths):
+                return None
+            return expected_output
+
+    def _queue_reuse_job(
+        self,
+        target: TargetT,
+        found_paths: Path | dict[str, Path]
+    ) -> StageOutput:
+        """
+        Queues a [reuse] Job
+        """
+        return self.make_outputs(
+            target=target,
+            data=found_paths,
+            jobs=[self.b.new_job(f'{self.name} [reuse]', target.get_job_attrs())]
+        )
