@@ -247,8 +247,10 @@ class Pipeline:
 
         self.status_reporter = None
         input_provider = None
-        if (input_provider_type == InputProviderType.SMDB 
-                or status_reporter_type == StatusReporterType.SMDB):
+        if (
+            input_provider_type == InputProviderType.SMDB 
+            or status_reporter_type == StatusReporterType.SMDB
+        ):
             smdb = SMDB(self.cohort.analysis_dataset.name)
             if status_reporter_type == StatusReporterType.SMDB:
                 self.status_reporter = SmdbStatusReporter(smdb)
