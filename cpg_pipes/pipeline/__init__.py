@@ -7,7 +7,7 @@ from .pipeline import (
 )
 from .cli_opts import pipeline_click_options
 from .exceptions import PipelineError
-from .stages import (
+from .stage_subclasses import (
     SampleStage, 
     DatasetStage, 
     CohortStage,
