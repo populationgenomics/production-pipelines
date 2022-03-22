@@ -16,6 +16,7 @@ from sample_metadata.apis import (
     SequenceApi,
     AnalysisApi,
     ParticipantApi,
+    FamilyApi,
 )
 from sample_metadata.exceptions import ApiException
 
@@ -34,14 +35,14 @@ class SMDB:
     """
 
     def __init__(
-        self, 
-        analysis_project: str, 
+        self,
+        analysis_project: str,
         do_update_analyses: bool = True,
         do_check_seq_existence: bool = True,
     ):
         """
         :param analysis_project: project where to create the "analysis" entries.
-        :param do_update_analyses: if not set, won't update "analysis" entries' 
+        :param do_update_analyses: if not set, won't update "analysis" entries'
             statuses.
         :param do_check_seq_existence: when querying "sequence" or "analysis" entries
             with files, check those files existence with gsutil. For "sequence", will
@@ -52,6 +53,7 @@ class SMDB:
         self.seqapi = SequenceApi()
         self.seqapi = SequenceApi()
         self.papi = ParticipantApi()
+        self.fapi = FamilyApi()
         self.analysis_project = analysis_project
         self.do_update_analyses = do_update_analyses
         self.do_check_seq_existence = do_check_seq_existence
@@ -78,15 +80,17 @@ class SMDB:
                     'active': True,
                 }
             )
-            logger.info(f'Finding samples for project {input_proj_name}: found {len(samples)}')
-            
+            logger.info(
+                f'Finding samples for project {input_proj_name}: found {len(samples)}'
+            )
+
             participant_id_by_cpgid = self._get_participant_id_by_sid(proj_name)
-            
+
             samples_by_project[proj_name] = []
             for s in samples:
                 s['id'] = s['id'].strip()
                 s['external_id'] = s['external_id'].strip()
-                
+
                 if only_samples:
                     if s['id'] in only_samples or s['external_id'] in only_samples:
                         logger.info(f'Taking sample: {s["id"]}')
@@ -97,10 +101,62 @@ class SMDB:
                         logger.info(f'Skiping sample: {s["id"]}')
                         continue
                 samples_by_project[proj_name].append(s)
-                
+
                 s['participant_id'] = participant_id_by_cpgid.get(s['id'])
-                
+
         return samples_by_project
+
+    def get_ped_file_by_project(
+        self, proj_name: str, response_type: str, namespace: Namespace
+    ):
+        """ Retrieve ped file for a specified SM Project """
+
+        if namespace != Namespace.MAIN:
+            proj_name += '-test'
+
+        try:
+            families = self.fapi.get_families(proj_name)
+            family_ids = [family['id'] for family in families]
+            pedigree = self.fapi.get_pedigree(
+                internal_family_ids=family_ids,
+                response_type='json',
+                project=proj_name,
+                replace_with_participant_external_ids=True,
+            )
+
+            pid_sid_map = self._get_pid_sid_map(proj_name)
+
+            # Replace External Participant IDs with Sample IDs.
+            # Assumes 1:1 Relationship.
+            for family in pedigree:
+                if family['individual_id'] != '':
+                    family['individual_id'] = pid_sid_map[family['individual_id']]
+
+                if family['maternal_id'] != '':
+                    family['maternal_id'] = pid_sid_map[family['maternal_id']]
+
+                if family['paternal_id'] != '':
+                    family['paternal_id'] = pid_sid_map[family['paternal_id']]
+
+            return pedigree
+        except ApiException:
+            traceback.print_exc()
+            return {}
+
+    def _get_pid_sid_map(self, proj_name: str) -> Dict[str, str]:
+        """Returns map of participant IDs to sample IDs"""
+
+        pid_sid_multi = self.papi.get_external_participant_id_to_internal_sample_id(
+            proj_name
+        )
+
+        pid_sid_single = {}
+        for group in pid_sid_multi:
+            participant = group[0]
+            for sample in group[1:]:
+                pid_sid_single[participant] = sample
+
+        return pid_sid_single
 
     def _get_participant_id_by_sid(self, proj_name: str) -> Dict[str, str]:
         try:
@@ -135,9 +191,8 @@ class SMDB:
             return
         try:
             self.aapi.update_analysis_status(
-                analysis.id, models.AnalysisUpdateModel(
-                    status=models.AnalysisStatus(status)
-                )
+                analysis.id,
+                models.AnalysisUpdateModel(status=models.AnalysisStatus(status)),
             )
         except ApiException:
             traceback.print_exc()
@@ -172,7 +227,7 @@ class SMDB:
         analysis_type: str,
         analysis_status: str = 'completed',
         project: Optional[str] = None,
-        meta: Optional[Dict] = None
+        meta: Optional[Dict] = None,
     ) -> Dict[str, Analysis]:
         """
         Query the DB to find the last completed analysis for the type and samples,
@@ -247,7 +302,8 @@ class SMDB:
 
         j = b.new_job(job_name)
         j.image(images.SM_IMAGE)
-        cmd = dedent(f"""\
+        cmd = dedent(
+            f"""\
         export GOOGLE_APPLICATION_CREDENTIALS=/gsa-key/key.json
         gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
 
@@ -271,7 +327,8 @@ class SMDB:
             traceback.print_exc()
         EOT
         python update.py
-        """)
+        """
+        )
         j.command(cmd)
         return j
 
@@ -303,7 +360,9 @@ class SMDB:
             traceback.print_exc()
             return None
         else:
-            logger.info(f'Created analysis of type={type_}, status={status} with ID: {aid}')
+            logger.info(
+                f'Created analysis of type={type_}, status={status} with ID: {aid}'
+            )
             return aid
 
     def process_existing_analysis(
@@ -438,7 +497,7 @@ class SMDB:
             sample_name=sample_names[0] if len(sample_names) == 1 else None,
         )
         # Set up dependencies
-        for fj in (first_j if isinstance(first_j, list) else [first_j]):
+        for fj in first_j if isinstance(first_j, list) else [first_j]:
             fj.depends_on(sm_in_progress_j)
         sm_completed_j.depends_on(last_j)
         if depends_on:

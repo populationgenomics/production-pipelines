@@ -118,6 +118,16 @@ class Cohort(Target):
         )
         for proj_name, sample_datas in samples_by_project.items():
             project = self.add_project(name=proj_name)
+            ped_file = smdb.get_ped_file_by_project(
+                proj_name=proj_name,
+                response_type='json',
+                namespace=self.pipeline.namespace,
+            )
+
+            pedigree_sample_map = {}
+            for sample in ped_file:
+                pedigree_sample_map[sample['individual_id']] = sample
+
             for s_data in sample_datas:
                 meta = s_data.get('meta', {})
                 if source_tag:
@@ -130,6 +140,23 @@ class Cohort(Target):
                     participant_id=participant_id.strip() if participant_id else None,
                     **s_data.get('meta', dict()),
                 )
+                # Here we can populate the ped.
+                sex = pedigree_sample_map[s.id]['sex']
+                phenotype = pedigree_sample_map[s.id]['affected']
+                s.pedigree = PedigreeInfo(
+                    sample=pedigree_sample_map[s.id]['individual_id'],
+                    fam_id=pedigree_sample_map[s.id]['family_id'],
+                    mom=pedigree_sample_map[s.id]['maternal_id'],
+                    dad=pedigree_sample_map[s.id]['paternal_id'],
+                    sex={
+                        '1': Sex.MALE,
+                        '2': Sex.FEMALE,
+                        'F': Sex.FEMALE,
+                        'M': Sex.MALE,
+                    }.get(sex, Sex.UNKNOWN),
+                    phenotype=phenotype or '0',
+                )
+
                 if forced_samples and s.id in forced_samples:
                     logger.info(f'Force rerunning sample {s.id} even if outputs exist')
                     s.forced = True
