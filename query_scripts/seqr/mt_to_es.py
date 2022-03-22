@@ -133,6 +133,7 @@ def main(
         index_name=es_index.lower(),
         num_shards=es_shards,
         write_null_values=True,
+        index_type_name=None,
     )
     _cleanup(es, es_index, es_shards)
 
@@ -145,12 +146,12 @@ def elasticsearch_row(mt: hl.MatrixTable):
     """
     # Converts a mt to the row equivalent.
     ht = mt.rows()
-    ht.describe()
     # Converts nested structs into one field, e.g. {a: {b: 1}} => a.b: 1
     table = ht.drop('vep').flatten()
     # When flattening, the table is unkeyed, which causes problems because our locus and alleles should not
     # be normal fields. We can also re-key, but I believe this is computational?
     table = table.drop(table.locus, table.alleles)
+    table.describe()
     return table
 
 
