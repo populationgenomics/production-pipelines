@@ -12,6 +12,7 @@ import os
 import subprocess
 import click
 import hail as hl
+from cpg_utils.hail import init_query_service
 
 from hail_scripts.v02.utils.elasticsearch_client import ElasticsearchClient
 
@@ -51,7 +52,7 @@ logger = logging.getLogger(__file__)
     'and a calculated value based on the matrix.',
 )
 @click.option(
-    '--prod', is_flag=True, help='Run under the production ES credentials instead'
+    '--use-spark', 'use_spark', is_flag=True, default=False,
 )
 def main(
     mt_path: str,
@@ -61,9 +62,15 @@ def main(
     es_password: str,
     es_index: str,
     es_index_min_num_shards: int,
-    prod: bool,  # pylint: disable=unused-argument
-):  # pylint: disable=missing-function-docstring
-    hl.init(default_reference='GRCh38')
+    use_spark: bool,
+):
+    """
+    Entry point.
+    """
+    if use_spark:
+        hl.init(default_reference='GRCh38')
+    else:
+        init_query_service()
 
     if not all([es_host, es_port, es_username, es_password]):
         if any([es_host, es_port, es_username, es_password]):
@@ -116,7 +123,7 @@ def main(
     # 'illegal_argument_exception', 'mapper [samples_gq_40_to_45] cannot be changed 
     # from type [text] to [keyword]')
     # in: https://batch.hail.populationgenomics.org.au/batches/6946/jobs/10
-    mt = mt.drop('samples_gq')  
+    # mt = mt.drop('samples_gq')  
 
     logger.info('Getting rows and exporting to the ES')
     row_table = elasticsearch_row(mt)
@@ -147,22 +154,6 @@ def elasticsearch_row(mt: hl.MatrixTable):
     return table
 
 
-def _read_es_password(
-    project_id='seqr-308602',
-    secret_id='seqr-es-password',
-    version_id='latest',
-) -> str:
-    """
-    Read a GCP secret storing the ES password
-    """
-    password = os.environ.get('SEQR_ES_PASSWORD')
-    if password:
-        return password
-    cmd = f'gcloud secrets versions access {version_id} --secret {secret_id} --project {project_id}'
-    logger.info(cmd)
-    return subprocess.check_output(cmd, shell=True).decode()
-
-
 def _mt_num_shards(mt, es_index_min_num_shards):
     """
     The greater of the user specified min shards and calculated based on the variants
@@ -178,6 +169,22 @@ def _cleanup(es, es_index, es_shards):
     # Current disk configuration requires the previous index to be deleted prior to large indices, ~1TB, transferring off loading nodes
     if es_shards < 25:
         es.wait_for_shard_transfer(es_index)
+
+
+def _read_es_password(
+    project_id='seqr-308602',
+    secret_id='seqr-es-password',
+    version_id='latest',
+) -> str:
+    """
+    Read a GCP secret storing the ES password
+    """
+    password = os.environ.get('SEQR_ES_PASSWORD')
+    if password:
+        return password
+    cmd = f'gcloud secrets versions access {version_id} --secret {secret_id} --project {project_id}'
+    logger.info(cmd)
+    return subprocess.check_output(cmd, shell=True).decode()
 
 
 if __name__ == '__main__':
