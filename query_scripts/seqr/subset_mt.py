@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Hail script to submit on a dataproc cluster. 
+Hail Query script.
 
 Subsets matrix table to a list of samples and annotate with SeqrGenotypesSchema.
 """
@@ -35,6 +35,9 @@ def main(
     out_mt_path: str,
     subset_tsv_path: str,
 ):  # pylint: disable=missing-function-docstring
+    """
+    Entry point
+    """
     hl.init(default_reference='GRCh38')
 
     mt = hl.read_matrix_table(mt_path)

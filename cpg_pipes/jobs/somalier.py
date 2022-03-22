@@ -195,6 +195,7 @@ def _check_pedigree(
             {'id': s.id, 'pid': s.participant_id} for s in dataset.get_samples()
         ])
         df.to_csv(str(sample_map_fpath), sep='\t', index=False, header=False)
+        
     script_name = 'check_pedigree.py'
     script_path = to_path(__file__).parent.parent.parent / utils.SCRIPTS_DIR / script_name
     with open(script_path) as f:

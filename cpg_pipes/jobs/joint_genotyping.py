@@ -84,7 +84,7 @@ def make_joint_genotyping_jobs(
         sequencing_type=sequencing_type,
         scatter_count=scatter_count,
     )
-    intervals = [intervals_j[f'intervals{i}'] for i in range(scatter_count)]
+    intervals = [intervals_j[f'intervals{i}.list'] for i in range(scatter_count)]
     jobs.append(intervals_j)
     
     # There are some problems with using GenomcsDB in cloud (`genomicsdb_cloud()`):

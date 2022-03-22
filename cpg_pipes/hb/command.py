@@ -4,7 +4,10 @@ Helpers to set up Job's command.
 
 import logging
 from typing import List, Union
+import textwrap
 
+from cpg_pipes import Path
+from cpg_pipes.utils import PACKAGE_DIR
 
 logger = logging.getLogger(__file__)
 
@@ -57,13 +60,20 @@ function retry_gs_cp {
 # command that monitors the instance storage space
 MONITOR_SPACE_CMD = f'df -h; du -sh /io; du -sh /io/batch'
 
+ADD_SCRIPT_CMD = """\
+cat <<EOT >> {script_name}
+{script_contents}
+EOT
+"""
+
 
 def wrap_command(
     command: Union[str, List[str]],
     monitor_space: bool = False,
     setup_gcp: bool = False,
     define_retry_function: bool = False,
-    dedent: bool = True,
+    rm_leading_space: bool = True,
+    python_script: Path | None = None,
 ) -> str:
     """
     Wraps a command for submission
@@ -78,10 +88,22 @@ def wrap_command(
     @param define_retry_function: when set, adds bash functions `retry` that attempts 
         to redo a command with a pause of default 30 seconds (useful to pull inputs 
         and get around GoogleEgressBandwidth Quota or other google quotas)
-    @param dedent: remove all common leading intendation from the command
+    @param rm_leading_space: remove all leading spaces and tabs from the command lines
+    @param python_script: if provided, copy this python script
     """
     if isinstance(command, list):
         command = '\n'.join(command)
+
+    copy_script_cmd = ''
+    if python_script:
+        with (PACKAGE_DIR / '..' / python_script).open() as f:
+            script_contents = f.read()
+        copy_script_cmd = ADD_SCRIPT_CMD.format(
+            script_name=python_script.name,
+            script_contents=script_contents,
+        )
+        # We don't want the python script tabs to be stripped:
+        rm_leading_space = False
     
     cmd = f"""\
     set -o pipefail
@@ -92,14 +114,18 @@ def wrap_command(
     {f'(while true; do {MONITOR_SPACE_CMD}; sleep 600; done) &'
     if monitor_space else ''}
     
+    {copy_script_cmd}
     {command}
     
     {MONITOR_SPACE_CMD if monitor_space else ''}
     """
 
-    if dedent:
+    if rm_leading_space:
         # remove any leading spaces and tabs
         cmd = '\n'.join(line.strip() for line in cmd.split('\n'))
         # remove sretches of spaces
         cmd = '\n'.join(' '.join(line.split()) for line in cmd.split('\n'))
+    else:
+        # Remove only common leading space:
+        cmd = textwrap.dedent(cmd)
     return cmd

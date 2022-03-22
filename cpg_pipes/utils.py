@@ -9,10 +9,8 @@ import sys
 import time
 import click
 from typing import Any, Callable, cast
-from cloudpathlib import CloudPath
 
-from . import __name__ as package_name
-from . import Path, to_path
+from . import Path, to_path, get_package_path
 
 logger = logging.getLogger(__file__)
 
@@ -21,7 +19,7 @@ DEFAULT_REF = 'GRCh38'
 
 # Packages to install on a dataproc cluster, to use with the dataproc wrapper.
 DATAPROC_PACKAGES = [
-    'cpg_pipes==0.3.0',
+    # 'cpg_pipes==0.3.0',
     'cpg_gnomad',   # github.com/populationgenomics/gnomad_methods
     'seqr_loader',  # github.com/populationgenomics/hail-elasticsearch-pipelines
     'elasticsearch',
@@ -34,13 +32,13 @@ DATAPROC_PACKAGES = [
 ]
 
 # Location of python scripts to be called directly from command line.
-SCRIPTS_DIR = 'scripts'
+SCRIPTS_DIR = to_path('scripts')
 
 # Location of Hail Query scripts, to use with the dataproc wrapper.
-QUERY_SCRIPTS_DIR = 'query_scripts'
+QUERY_SCRIPTS_DIR = to_path('query_scripts')
 
 # This python package name.
-PACKAGE_DIR = package_name
+PACKAGE_DIR = get_package_path()
 
 
 def get_validation_callback(
@@ -56,7 +54,7 @@ def get_validation_callback(
     with a different suffix also exists (e.g. genomes.mt and genomes.metadata.ht)
     @return: a callback suitable for Click parameter initialization
     """
-    def callback(_: click.Context, param: click.Option, value: Any):
+    def _callback(_: click.Context, param: click.Option, value: Any):
         if value is None:
             return value
         if ext:
@@ -80,8 +78,7 @@ def get_validation_callback(
                         f'exist'
                     )
         return value
-
-    return callback
+    return _callback
 
 
 def safe_mkdir(dirpath: Path, descriptive_name: str = '') -> Path:

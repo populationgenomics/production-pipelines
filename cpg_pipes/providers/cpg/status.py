@@ -120,5 +120,5 @@ class SmdbStatusReporter(StatusReporter):
         EOT
         python update.py
         """)
-        j.command(wrap_command(cmd, dedent=False, setup_gcp=True))
+        j.command(wrap_command(cmd, rm_leading_space=False, setup_gcp=True))
         return j

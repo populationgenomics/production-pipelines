@@ -21,11 +21,11 @@ def get_package_name() -> str:
     return __name__.split('.', 1)[0]
 
 
-def get_package_path() -> str:
+def get_package_path() -> Path:
     """
     Get local install path of the package.
     """
-    return to_path(__file__).parent.absolute
+    return to_path(__file__).parent.absolute()
 
 
 def get_version() -> str:
