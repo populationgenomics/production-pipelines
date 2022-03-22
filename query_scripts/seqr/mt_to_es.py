@@ -12,7 +12,6 @@ import os
 import subprocess
 import click
 import hail as hl
-from cpg_utils.hail import init_query_service
 
 from hail_scripts.v02.utils.elasticsearch_client import ElasticsearchClient
 
@@ -70,6 +69,7 @@ def main(
     if use_spark:
         hl.init(default_reference='GRCh38')
     else:
+        from cpg_utils.hail import init_query_service
         init_query_service()
 
     if not all([es_host, es_port, es_username, es_password]):
