@@ -2,23 +2,33 @@ import shutil
 import tempfile
 import time
 import unittest
-from os.path import join, basename
+from os.path import join
 from typing import Dict
+from hailtop.batch.job import Job
 
 from analysis_runner import dataproc
 
+from cpg_pipes import Path, to_path, Namespace
 from cpg_pipes import benchmark, utils
-from cpg_pipes.hb.inputs import fasta
 from cpg_pipes.jobs import vep
-from cpg_pipes.jobs.align import align, Aligner
+from cpg_pipes.jobs.align import align
 from cpg_pipes.jobs.haplotype_caller import produce_gvcf
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
+from cpg_pipes.types import CramPath
 from cpg_pipes.pipeline import Pipeline
-from cpg_pipes import buckets, images
+from cpg_pipes import images
 
-from utils import BASE_BUCKET, PROJECT, SAMPLES, SUBSET_GVCF_BY_SID
+try:
+    from .utils import BASE_BUCKET, DATASET, SAMPLES, SUBSET_GVCF_BY_SID
+except ImportError:
+    from utils import BASE_BUCKET, DATASET, SAMPLES, SUBSET_GVCF_BY_SID  # type: ignore
+
+
+def _read_file(path: Path) -> str:
+    with path.open() as f:
+        return f.read().strip()
 
 
 class TestJobs(unittest.TestCase):
@@ -28,127 +38,195 @@ class TestJobs(unittest.TestCase):
     def setUp(self):
         self.name = self._testMethodName
         self.timestamp = time.strftime('%Y%m%d-%H%M')
-        self.out_bucket = f'{BASE_BUCKET}/{self.name}/{self.timestamp}'
-        self.tmp_bucket = f'{self.out_bucket}/tmp'
+        self.out_bucket = BASE_BUCKET / self.name / self.timestamp
+        self.tmp_bucket = self.out_bucket / 'tmp'
         self.local_tmp_dir = tempfile.mkdtemp()
 
         self.pipeline = Pipeline(
             name=self._testMethodName,
-            title=self._testMethodName,
-            analysis_project=PROJECT,
-            output_version='v0',
-            namespace='test',
+            description=self._testMethodName,
+            analysis_dataset=DATASET,
+            namespace=Namespace.TEST,
         )
+        self.refs = self.pipeline.refs
         self.sample_name = f'Test-{self.timestamp}'
         
     def tearDown(self) -> None:
         shutil.rmtree(self.local_tmp_dir)
 
-    def _read_file(self, path):
-        local_tmp_dir = self.local_tmp_dir
-        local_path = join(local_tmp_dir, basename(path))
-        buckets.gsutil_cp(path, local_path)
-        with open(local_path) as f:
-            return f.read().strip()
-
-    def _job_get_cram_details(self, cram_path, out_bucket) -> Dict[str, str]:
+    def _job_get_cram_details(
+        self, 
+        cram_path: Path, 
+        out_bucket: Path,
+        jobs: list[Job],
+    ) -> Dict[str, Path]:
         """ 
         Add job that gets details of a CRAM file
         """
         test_j = self.pipeline.b.new_job('Parse CRAM sample name')
         test_j.image(images.SAMTOOLS_PICARD_IMAGE)
         sed = r's/.*SM:\([^\t]*\).*/\1/g'
-        fasta_reference = fasta(self.pipeline.b)
-        test_j.command(f'samtools view -T {fasta_reference.base} -c {cram_path} > {test_j.reads_num}')
-        test_j.command(f'samtools view -T {fasta_reference.base} -c {cram_path} -f2 > {test_j.reads_num_mapped_in_proper_pair}')
-        test_j.command(f'samtools view -T {fasta_reference.base} -H {cram_path} | grep \'^@RG\' | sed "{sed}" | uniq > {test_j.sample_name}')
+        fasta_reference = self.refs.fasta_res_group(self.pipeline.b)
+        test_j.command(
+            f'samtools view -T {fasta_reference.base} {cram_path} '
+            f'-c > {test_j.reads_num}'
+        )
+        test_j.command(
+            f'samtools view -T {fasta_reference.base} {cram_path} '
+            f'-c -f2 > {test_j.reads_num_mapped_in_proper_pair}'
+        )
+        test_j.command(
+            f'samtools view -T {fasta_reference.base} {cram_path} '
+            f'-H | grep \'^@RG\' | sed "{sed}" | uniq > {test_j.sample_name}'
+        )
+        test_j.depends_on(*jobs)
         d = {}
         for key in ['reads_num', 'reads_num_mapped_in_proper_pair', 'sample_name']:
-            out_path = join(out_bucket, f'{key}.out')
-            self.pipeline.b.write_output(test_j[key], out_path)
+            out_path = out_bucket / f'{key}.out'
+            self.pipeline.b.write_output(test_j[key], str(out_path))
             d[key] = out_path
         return d
 
-    def _job_get_gvcf_header(self, gvcf_path) -> str:
+    def _job_get_gvcf_header(
+        self, 
+        vcf_path: Path, 
+        jobs: list[Job],
+    ) -> Path:
         """ 
         Parses header of GVCF file
         """
+        vcf_input = self.pipeline.b.read_input(str(vcf_path))
         test_j = self.pipeline.b.new_job('Parse GVCF sample name')
         test_j.image(images.BCFTOOLS_IMAGE)
-        test_j.command(f'bcftools query -l {gvcf_path} > {test_j.output}')
+        test_j.command(f'bcftools query -l {vcf_input} > {test_j.output}')
+        test_j.depends_on(*jobs)
 
-        out_path = join(self.out_bucket, f'{self.sample_name}.out')
-        self.pipeline.b.write_output(test_j.output, out_path)
+        out_path = self.out_bucket / f'{self.sample_name}.out'
+        self.pipeline.b.write_output(test_j.output, str(out_path))
         return out_path
-    
-    def test_alignment(self):
+
+    def test_alignment_fastq(self):
         """
-        Test alignment job
+        Test alignment job on a set of two FASTQ pairs 
+        (tests processing in parallel merging and merging)
         """
-        inp = benchmark.tiny_cram
-        j = align(
-            self.pipeline.b,
-            alignment_input=inp,
+        output_path = self.out_bucket / 'align_fastq' / 'result.cram'
+        qc_bucket = self.out_bucket / 'align_fastq' / 'qc'
+        
+        jobs = align(
+            b=self.pipeline.b,
+            alignment_input=benchmark.tiny_fq,
+            output_path=output_path,
+            qc_bucket=qc_bucket,
             sample_name=self.sample_name,
-            project_name=PROJECT,
-            aligner=Aligner.DRAGMAP,
+            refs=self.refs,
         )
         cram_details_paths = self._job_get_cram_details(
-            j.output_cram.cram, out_bucket=join(self.out_bucket, f'align')
+            output_path, 
+            out_bucket=self.out_bucket / 'align_fastq',
+            jobs=jobs,
         )
-
         self.pipeline.submit_batch(wait=True)     
+        
+        self.assertTrue((
+            qc_bucket / 
+            'duplicate-metrics' / 
+            f'{self.sample_name}-duplicate-metrics.csv'
+        ).exists())
 
         self.assertEqual(
             self.sample_name, 
-            self._read_file(cram_details_paths['sample_name'])
-        )
-        self.assertEqual(
-            283306,  # 276599,
-            self._read_file(cram_details_paths['reads_num']),
+            _read_file(cram_details_paths['sample_name'])
         )
         self.assertAlmostEqual(
-            273658,  # 271728, 
-            self._read_file(cram_details_paths['reads_num_mapped_in_proper_pair']),
+            20296, 
+            int(_read_file(cram_details_paths['reads_num'])),
+            delta=10,
+        )
+        self.assertAlmostEqual(
+            18797,
+            int(_read_file(cram_details_paths['reads_num_mapped_in_proper_pair'])),
+            delta=10,
+        )
+
+    def test_alignment_cram(self):
+        """
+        Test alignment job on a CRAM input (tests realignment with bazam)
+        """
+        output_path = self.out_bucket / 'align_fastq' / 'result.cram'
+        jobs = align(
+            self.pipeline.b,
+            alignment_input=benchmark.tiny_cram,
+            output_path=output_path,
+            sample_name=self.sample_name,
+            refs=self.refs,
+        )
+        cram_details_paths = self._job_get_cram_details(
+            output_path, 
+            out_bucket=self.out_bucket / 'align',
+            jobs=jobs,
+        )
+        self.pipeline.submit_batch(wait=True)
+
+        self.assertEqual(
+            self.sample_name, 
+            _read_file(cram_details_paths['sample_name'])
+        )
+        self.assertAlmostEqual(
+            285438,
+            int(_read_file(cram_details_paths['reads_num'])),
+            delta=50
+        )
+        self.assertAlmostEqual(
+            273658,
+            int(_read_file(cram_details_paths['reads_num_mapped_in_proper_pair'])),
             delta=10
         )
 
-    @unittest.skip('Skip')
+    # @unittest.skip('Skip')
     def test_haplotype_calling(self):
         """
         Test individual sample haplotype calling
         """
-        cram_path = f'{benchmark.BENCHMARK_BUCKET}/outputs/TINY_CRAM/dragmap-picard.cram'
-        j = produce_gvcf(
+        cram_path = CramPath(
+            to_path(benchmark.BENCHMARK_BUCKET) /
+            'outputs' / 'TINY_CRAM' / 'dragmap-picard.cram'
+        )
+        out_gvcf_path = self.out_bucket / 'test_haplotype_calling.g.vcf.gz'
+        jobs = produce_gvcf(
             self.pipeline.b,
             sample_name=self.sample_name,
-            project_name=PROJECT,
+            refs=self.refs,
             cram_path=cram_path,
-            number_of_intervals=10,
+            number_of_intervals=2,
             tmp_bucket=self.tmp_bucket,
             dragen_mode=True,
+            output_path=out_gvcf_path,
         )
-        test_result_path = self._job_get_gvcf_header(j.output_gvcf['g.vcf.gz'])
+        test_result_path = self._job_get_gvcf_header(out_gvcf_path, jobs)
         self.pipeline.submit_batch(wait=True)     
-        contents = self._read_file(test_result_path)
+        contents = _read_file(test_result_path)
         self.assertEqual(self.sample_name, contents.split()[-1])
 
     def test_joint_calling(self):
         """
         Test joint variant calling
         """
-        genomicsdb_bucket = f'{self.out_bucket}/genomicsdb'
-        out_vcf_path = f'{self.out_bucket}/joint-called.vcf.gz'
-        out_siteonly_vcf_path = out_vcf_path.replace('.vcf.gz', '-siteonly.vcf.gz')
+        genomicsdb_bucket = self.out_bucket / 'genomicsdb'
+        out_vcf_path = self.out_bucket / 'joint-called.vcf.gz'
+        out_siteonly_vcf_path = to_path(
+            str(out_vcf_path).replace('.vcf.gz', '-siteonly.vcf.gz')
+        )
 
-        proj = self.pipeline.add_project(PROJECT)
+        proj = self.pipeline.cohort.add_dataset(DATASET)
         for sid in SAMPLES:
             proj.add_sample(sid, sid)
 
-        j = make_joint_genotyping_jobs(
+        jobs = make_joint_genotyping_jobs(
             b=self.pipeline.b,
             out_vcf_path=out_vcf_path,
             out_siteonly_vcf_path=out_siteonly_vcf_path,
+            refs=self.refs,
             samples=self.pipeline.get_all_samples(),
             genomicsdb_bucket=genomicsdb_bucket,
             gvcf_by_sid=SUBSET_GVCF_BY_SID,
@@ -157,28 +235,29 @@ class TestJobs(unittest.TestCase):
             scatter_count=10,
             tool=JointGenotyperTool.GenotypeGVCFs,
         )
-        test_result_path = self._job_get_gvcf_header(j.output_vcf['vcf.gz'])
+        test_result_path = self._job_get_gvcf_header(out_vcf_path, jobs)
         self.pipeline.submit_batch(wait=True)     
-        self.assertTrue(buckets.file_exists(out_vcf_path))
-        self.assertTrue(buckets.file_exists(out_siteonly_vcf_path))
-        contents = self._read_file(test_result_path)
+        self.assertTrue(utils.exists(out_vcf_path))
+        self.assertTrue(utils.exists(out_siteonly_vcf_path))
+        contents = _read_file(test_result_path)
         self.assertEqual(len(SAMPLES), len(contents.split()))
         self.assertEqual(set(SAMPLES), set(contents.split()))
 
-    @unittest.skip('Skip')
+    # @unittest.skip('Skip')
     def test_vqsr(self):
         """
         Test AS-VQSR
         """
-        siteonly_vcf_path = (
+        siteonly_vcf_path = to_path(
             'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
             'joint-called-siteonly.vcf.gz'
         )
-        tmp_vqsr_bucket = f'{self.tmp_bucket}/vqsr'
-        out_vcf_path = f'{self.out_bucket}/vqsr/vqsr.vcf.gz'
-        j = make_vqsr_jobs(
+        tmp_vqsr_bucket = self.tmp_bucket / 'vqsr'
+        out_vcf_path = self.out_bucket / 'vqsr' / 'vqsr.vcf.gz'
+        jobs = make_vqsr_jobs(
             b=self.pipeline.b,
             input_vcf_or_mt_path=siteonly_vcf_path,
+            refs=self.refs,
             work_bucket=tmp_vqsr_bucket,
             gvcf_count=len(SAMPLES),
             scatter_count=10,
@@ -186,25 +265,26 @@ class TestJobs(unittest.TestCase):
             use_as_annotations=True,
             overwrite=True,
         )
-        res_path = self._job_get_gvcf_header(j.output_vcf['vcf.gz'])
+        res_path = self._job_get_gvcf_header(out_vcf_path, jobs)
         self.pipeline.submit_batch(wait=True)     
-        self.assertTrue(buckets.file_exists(out_vcf_path))
-        contents = self._read_file(res_path)
+        self.assertTrue(utils.exists(out_vcf_path))
+        contents = _read_file(res_path)
         self.assertEqual(0, len(contents.split()))  # site-only doesn't have any samples
         
     def test_vep(self):
         """
         Tests command line VEP with LoF plugin and MANE_SELECT annotation
         """
-        site_only_vcf_path = (
+        site_only_vcf_path = to_path(
             'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
             'vqsr.vcf.gz'
         )
-        out_vcf_path = f'{self.out_bucket}/vep/vep.vcf.gz'
+        out_vcf_path = self.out_bucket / 'vep' / 'vep.vcf.gz'
 
         j = vep.vep(
             self.pipeline.b, 
-            vcf_path=site_only_vcf_path, 
+            vcf_path=site_only_vcf_path,
+            refs=self.refs,
             out_vcf_path=out_vcf_path,
         )
         self.pipeline.submit_batch(wait=True)
@@ -217,10 +297,10 @@ class TestJobs(unittest.TestCase):
         -i'BIOTYPE="protein_coding" & LoF_filter="ANC_ALLELE"' -s worst \
         > {test_j.output}
         """)
-        res_path = join(self.out_bucket, f'{self.sample_name}.out')
-        self.pipeline.b.write_output(test_j.output, res_path)
-        self.assertTrue(buckets.file_exists(out_vcf_path))
-        contents = self._read_file(res_path)
+        res_path = self.out_bucket / f'{self.sample_name}.out'
+        self.pipeline.b.write_output(test_j.output, str(res_path))
+        self.assertTrue(out_vcf_path.exists())
+        contents = _read_file(res_path)
         self.assertEqual(
             'chr20:5111495 TMEM230 protein_coding NM_001009923.2 LC ANC_ALLELE', 
             contents
@@ -241,8 +321,8 @@ class TestJobs(unittest.TestCase):
         )
         
         cohort_mt_path = f'{self.out_bucket}/seqr_loader/cohort.mt'
-        project_mt_path = f'{self.out_bucket}/seqr_loader/project.mt'
-        project_vcf_path = f'{self.out_bucket}/seqr_loader/project.vcf.bgz'
+        dataset_mt_path = f'{self.out_bucket}/seqr_loader/dataset.mt'
+        dataset_vcf_path = f'{self.out_bucket}/seqr_loader/dataset.vcf.bgz'
 
         cluster = dataproc.setup_dataproc(
             self.pipeline.b,
@@ -266,27 +346,27 @@ class TestJobs(unittest.TestCase):
             f'--make-checkpoints',
             job_name='Make MT and annotate cohort',
         )
-        mt_to_projectmt_j = cluster.add_job(
-            f'{join("..", utils.QUERY_SCRIPTS_DIR, "seqr", "mt_to_projectmt.py")} '
+        mt_to_datasetmt_j = cluster.add_job(
+            f'{join("..", utils.QUERY_SCRIPTS_DIR, "seqr", "subset_mt.py")} '
             f'--mt-path {cohort_mt_path} '
-            f'--out-mt-path {project_mt_path}',
-            job_name=f'Annotate project',
+            f'--out-mt-path {dataset_mt_path}',
+            job_name=f'Annotate dataset',
         )
-        mt_to_projectmt_j.depends_on(vcf_to_mt_j)
-        projectmt_to_es_j = cluster.add_job(
-            f'{join("..", utils.QUERY_SCRIPTS_DIR, "seqr", "projectmt_to_es.py")} '
-            f'--mt-path {project_mt_path} '
+        mt_to_datasetmt_j.depends_on(vcf_to_mt_j)
+        datasetmt_to_es_j = cluster.add_job(
+            f'{join("..", utils.QUERY_SCRIPTS_DIR, "seqr", "mt_to_es.py")} '
+            f'--mt-path {dataset_mt_path} '
             f'--es-index test-{self.timestamp} '
             f'--es-index-min-num-shards 1',
             job_name=f'Create ES index',
         )
-        projectmt_to_es_j.depends_on(mt_to_projectmt_j)
-        projectmt_to_vcf_j = cluster.add_job(
-            f'{join("..", utils.QUERY_SCRIPTS_DIR, "seqr", "projectmt_to_vcf.py")} '
-            f'--mt-path {project_mt_path} '
-            f'--out-vcf-path {project_vcf_path}',
+        datasetmt_to_es_j.depends_on(mt_to_datasetmt_j)
+        datasetmt_to_vcf_j = cluster.add_job(
+            f'{join("..", utils.QUERY_SCRIPTS_DIR, "seqr", "mt_to_vcf.py")} '
+            f'--mt-path {dataset_mt_path} '
+            f'--out-vcf-path {dataset_vcf_path}',
             job_name=f'Convert to VCF',
         )
-        projectmt_to_vcf_j.depends_on(mt_to_projectmt_j)
+        datasetmt_to_vcf_j.depends_on(mt_to_datasetmt_j)
         self.pipeline.submit_batch(wait=True)     
-        self.assertTrue(buckets.file_exists(project_vcf_path))
+        self.assertTrue(utils.exists(dataset_vcf_path))
