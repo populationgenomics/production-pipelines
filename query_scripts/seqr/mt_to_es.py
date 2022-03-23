@@ -13,7 +13,7 @@ import subprocess
 import click
 import hail as hl
 
-from hail_scripts.v02.utils.elasticsearch_client import ElasticsearchClient
+from hail_scripts.elasticsearch.hail_elasticsearch_client import HailElasticsearchClient
 
 logger = logging.getLogger(__file__)
 
@@ -84,7 +84,7 @@ def main(
         es_username = 'seqr'
         es_password = _read_es_password()
 
-    es = ElasticsearchClient(
+    es = HailElasticsearchClient(
         host=es_host,
         port=str(es_port),
         es_username=es_username,
@@ -128,12 +128,12 @@ def main(
     logger.info('Getting rows and exporting to the ES')
     row_table = elasticsearch_row(mt)
     es_shards = _mt_num_shards(mt, es_index_min_num_shards)
+   
     es.export_table_to_elasticsearch(
         row_table,
         index_name=es_index.lower(),
         num_shards=es_shards,
         write_null_values=True,
-        index_type_name=None,
     )
     _cleanup(es, es_index, es_shards)
 
@@ -166,7 +166,6 @@ def _mt_num_shards(mt, es_index_min_num_shards):
 
 
 def _cleanup(es, es_index, es_shards):
-    es.route_index_off_temp_es_cluster(es_index)
     # Current disk configuration requires the previous index to be deleted prior to large indices, ~1TB, transferring off loading nodes
     if es_shards < 25:
         es.wait_for_shard_transfer(es_index)

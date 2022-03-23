@@ -21,8 +21,9 @@ DEFAULT_REF = 'GRCh38'
 DATAPROC_PACKAGES = [
     # 'cpg_pipes==0.3.0',
     'cpg_gnomad',   # github.com/populationgenomics/gnomad_methods
-    'seqr_loader',  # github.com/populationgenomics/hail-elasticsearch-pipelines
-    'elasticsearch',
+    'seqr_loader==1.2.0',  # hail-elasticsearch-pipelines
+    'elasticsearch==8.1.1',
+    'cpg_utils',
     'click',
     'google',
     'fsspec',
