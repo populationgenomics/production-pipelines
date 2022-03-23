@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+
+"""
+Stages to run somalier tools.
+"""
+
+import logging
+
+from .. import Path
+from ..pipeline.targets import Dataset, Sample
+from ..pipeline import stage, SampleStage, DatasetStage, StageInput, StageOutput
+from ..jobs import somalier
+
+logger = logging.getLogger(__file__)
+
+
+@stage
+class CramSomalierStage(SampleStage):
+    """
+    Genereate fingerprints from CRAMs for pedigree checks.
+    """
+
+    def expected_result(self, sample: Sample) -> Path:
+        """
+        Expected to generate the fingerprints file
+        """
+        return sample.get_cram_path().somalier_path
+
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+        """
+        Using a function from the `jobs` module.
+        """
+        cram_path = sample.get_cram_path()
+
+        expected_path = self.expected_result(sample)
+        j = somalier.extact_job(
+            b=self.b,
+            sample=sample,
+            gvcf_or_cram_or_bam_path=cram_path,
+            out_fpath=expected_path,
+            overwrite=not self.check_intermediates,
+            refs=self.refs,
+        )
+        return self.make_outputs(sample, data=expected_path, jobs=[j])
+
+
+@stage(required_stages=CramSomalierStage)
+class CramSomalierPedigree(DatasetStage):
+    """
+    Checks pedigree from CRAM fingerprints.
+    """
+
+    def expected_result(self, dataset: Dataset) -> dict[str, Path]:
+        """
+        Return the report for MultiQC, plus putting an HTML into the web bucket.
+        MultiQC expects the following patterns:
+        * *.samples.tsv
+        * *.pairs.tsv
+        https://github.com/ewels/MultiQC/blob/master/multiqc/utils/search_patterns
+        .yaml#L472-L481
+        """
+
+        prefix = dataset.get_analysis_bucket() / 'somalier'
+        return {
+            'samples': prefix / f'{dataset.name}.samples.tsv',
+            'pairs': prefix / f'{dataset.name}.pairs.tsv',
+            'html': dataset.get_web_bucket() / 'somalier-pedigree.html',
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        """
+        Checks calls job from the pedigree module
+        """
+        fp_by_sid = {
+            s.id: inputs.as_path(stage=CramSomalierStage, target=s)
+            for s in dataset.get_samples()
+        }
+
+        html_path = self.expected_result(dataset)['html']
+        if base_url := dataset.get_web_url():
+            html_url = str(html_path).replace(str(dataset.get_web_bucket()), base_url)
+        else:
+            html_url = None
+
+        j = somalier.pedigree(
+            self.b,
+            dataset,
+            input_path_by_sid=fp_by_sid,
+            overwrite=not self.check_intermediates,
+            out_samples_path=self.expected_result(dataset)['samples'],
+            out_pairs_path=self.expected_result(dataset)['pairs'],
+            out_html_path=html_path,
+            out_html_url=html_url,
+            refs=self.refs,
+            dry_run=self.dry_run,
+        )
+        return self.make_outputs(dataset, data=self.expected_result(dataset), jobs=[j])
+
+
+@stage(required_stages=CramSomalierStage)
+class CramSomalierAncestry(DatasetStage):
+    """
+    Checks pedigree from CRAM fingerprints
+    """
+
+    def expected_result(self, dataset: Dataset) -> dict[str, Path]:
+        """
+        Return the report for MultiQC, plus putting an HTML into the web bucket.
+        MultiQC expects the following patterns:
+        *.somalier-ancestry.tsv
+        https://github.com/ewels/MultiQC/blob/master/multiqc/utils/search_patterns
+        .yaml#L472-L481
+        """
+
+        prefix = dataset.get_analysis_bucket() / 'ancestry'
+        return {
+            'tsv': prefix / f'{dataset.name}.somalier-ancestry.tsv',
+            'html': dataset.get_web_bucket() / 'somalier-ancestry.html',
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        """
+        Checks calls job from the pedigree module
+        """
+        fp_by_sid = {
+            s.id: inputs.as_path(stage=CramSomalierStage, target=s)
+            for s in dataset.get_samples()
+        }
+
+        html_path = self.expected_result(dataset)['html']
+        if base_url := dataset.get_web_url():
+            html_url = str(html_path).replace(str(dataset.get_web_bucket()), base_url)
+        else:
+            html_url = None
+
+        j = somalier.ancestry(
+            self.b,
+            dataset,
+            input_path_by_sid=fp_by_sid,
+            overwrite=not self.check_intermediates,
+            out_tsv_path=self.expected_result(dataset)['tsv'],
+            out_html_path=html_path,
+            out_html_url=html_url,
+            refs=self.refs,
+        )
+        return self.make_outputs(dataset, data=self.expected_result(dataset), jobs=[j])

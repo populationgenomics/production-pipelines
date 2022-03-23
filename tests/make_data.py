@@ -1,6 +1,12 @@
+#!/usr/bin/env python3
+
+"""
+Generate data for unit tests
+"""
+
 from cpg_pipes import images
-from cpg_pipes.pipeline import Pipeline, Sample
-from .utils import PROJECT, SAMPLES, FULL_GVCF_BY_SID, SUBSET_GVCF_BY_SID, setup_env
+from cpg_pipes.pipeline.pipeline import Pipeline
+from .utils import DATASET, SAMPLES, FULL_GVCF_BY_SID, SUBSET_GVCF_BY_SID, setup_env
 
 
 def make_gvcfs():
@@ -11,15 +17,17 @@ def make_gvcfs():
     
     pipeline = Pipeline(
         name='make_test_data',
-        title='Make test data',
-        analysis_project=PROJECT,
+        description='Make test data',
+        analysis_dataset=DATASET,
         output_version='v0',
         namespace='test',
     )
             
     jobs = []
+    
+    p = pipeline.cohort.add_dataset(DATASET)
     samples = [
-        Sample(s, s) for s in SAMPLES
+        p.add_sample(sid, external_id=sid) for sid in SAMPLES
     ]
     for s in samples:
         subset_j = pipeline.b.new_job(

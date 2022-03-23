@@ -8,12 +8,14 @@ from textwrap import dedent
 import hailtop.batch as hb
 import os
 
-from cpg_pipes import ref_data, images
+from cpg_pipes import images
 from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.providers.cpg import CpgStorageProvider
+from cpg_pipes.refdata import RefData
 
 
-def _index_bwa_job(b: hb.Batch):
-    reference = b.read_input_group(**ref_data.REF_D)
+def _index_bwa_job(b: hb.Batch, refs: RefData):
+    reference = refs.fasta_res_group(b)
 
     j = b.new_job('Index BWA')
     j.image(images.BWAMEM2_IMAGE)
@@ -21,7 +23,7 @@ def _index_bwa_job(b: hb.Batch):
     j.cpu(total_cpu)
     j.storage('40G')
     j.declare_resource_group(
-        bwa_index={e: '{root}.' + e for e in ref_data.BWAMEM2_INDEX_EXTS}
+        bwa_index={e: '{root}.' + e for e in refs.bwamem2_index_exts}
     )
     j.command(wrap_command(f"""\
     set -o pipefail
@@ -31,15 +33,12 @@ def _index_bwa_job(b: hb.Batch):
     
     df -h; pwd; ls | grep -v proc | xargs du -sh
     """))
-    b.write_output(j.bwa_index, ref_data.BWAMEM2_INDEX_PREFIX)
+    b.write_output(j.bwa_index, refs.bwamem2_index_prefix)
     return j
 
 
-def _test_bwa_job(b: hb.Batch):
-    bwa_reference = b.read_input_group(
-        **ref_data.REF_D,
-        **{k: f'{ref_data.REF_FASTA}.{k}' for k in ref_data.BWA_INDEX_EXTS},
-    )
+def _test_bwa_job(b: hb.Batch, refs: RefData):
+    bwa_reference = refs.fasta_res_group(b, refs.bwa_index_exts)
 
     fq1 = b.read_input('gs://cpg-seqr-test/batches/test/tmp_fq')
     j = b.new_job('Test BWA')
@@ -59,26 +58,26 @@ def _test_bwa_job(b: hb.Batch):
     rg_line = f'@RG\\tID|:{sn}\\tSM:~{sn}'
     use_bazam = True
 
-    sorted_bam = f'$(dirname {j.output_cram.cram})/sorted.bam'
+    sorted_bam = f'$(dirname {j.output_cram.cram_path})/sorted.bam'
     j.command(
         dedent(
             f"""
     set -o pipefail
     set -ex
     
-    (while true; do df -h; pwd; du -sh $(dirname {j.output_cram.cram}); sleep 600; done) &
+    (while true; do df -h; pwd; du -sh $(dirname {j.output_cram.cram_path}); sleep 600; done) &
     
     bwa-mem2 mem -K 100000000 {'-p' if use_bazam else ''} -t{bwa_cpu} -Y \\
         -R '{rg_line}' {bwa_reference.base} {fq1} - | \\
-    samtools sort -T $(dirname {j.output_cram.cram})/samtools-sort-tmp -Obam -o {sorted_bam}
+    samtools sort -T $(dirname {j.output_cram.cram_path})/samtools-sort-tmp -Obam -o {sorted_bam}
     
     picard MarkDuplicates I={sorted_bam} O=/dev/stdout M={j.duplicate_metrics} \\
         ASSUME_SORT_ORDER=coordinate | \\
-    samtools view -@30 -T {bwa_reference.base} -O cram -o {j.output_cram.cram}
+    samtools view -@30 -T {bwa_reference.base} -O cram -o {j.output_cram.cram_path}
     
-    samtools index -@{total_cpu} {j.output_cram.cram} {j.output_cram.crai}
+    samtools index -@{total_cpu} {j.output_cram.cram_path} {j.output_cram.crai}
     
-    df -h; pwd; du -sh $(dirname {j.output_cram.cram})
+    df -h; pwd; du -sh $(dirname {j.output_cram.cram_path})
     """
         )
     )
@@ -95,7 +94,8 @@ backend = hb.ServiceBackend(
     bucket=hail_bucket.replace('gs://', ''),
 )
 b = hb.Batch(backend=backend, name='Create BWA index')
-j1 = _index_bwa_job(b)
-j2 = _test_bwa_job(b)
+refs = RefData(CpgStorageProvider().get_ref_bucket())
+j1 = _index_bwa_job(b, refs)
+j2 = _test_bwa_job(b, refs)
 j2.depends_on(j1)
 b.run(wait=False)

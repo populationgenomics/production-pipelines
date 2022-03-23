@@ -1,5 +1,5 @@
 name: Test Pipeline
-on: [push]
+on: [push, workflow_dispatch]
 jobs:
   test_pipeline:
     runs-on: ubuntu-latest
@@ -34,3 +34,6 @@ jobs:
 
       - name: "Test pipelines"
         run: python -m unittest tests/test_pipeline.py
+
+      - name: "Test metadata provider"
+        run: python -m unittest tests/test_metadata_provider.py

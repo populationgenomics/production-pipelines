@@ -2,31 +2,31 @@
 Create Hail Batch jobs to run Picard tools (marking duplicates, QC).
 """
 
-from os.path import splitext, join, dirname
-from typing import Optional
-
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes import images, buckets
-from cpg_pipes.hb import inputs
+from cpg_pipes import Path
+from cpg_pipes import images, utils
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.refdata import RefData
 
 
 def markdup(
     b: hb.Batch,
     sorted_bam: hb.ResourceFile,
     sample_name: str,
-    project_name: Optional[str] = None,
-    output_path: Optional[str] = None,
+    refs: RefData,
+    job_attrs: dict | None = None,
+    output_path: Path | None = None,
+    qc_bucket: Path | None = None,
     overwrite: bool = True,
 ) -> Job:
     """
     Make job that runs Picard MarkDuplicates and converts the result to CRAM.
     """
-    j = b.new_job('MarkDuplicates', dict(sample=sample_name, project=project_name))
-    if buckets.can_reuse(output_path, overwrite):
+    j = b.new_job('MarkDuplicates', job_attrs)
+    if utils.can_reuse(output_path, overwrite):
         j.name += ' [reuse]'
         return j
 
@@ -38,26 +38,30 @@ def markdup(
             'cram.crai': '{root}.cram.crai',
         }
     )
-    fasta_reference = inputs.fasta(b)
+    fasta_reference = refs.fasta_res_group(b)
 
     cmd = f"""
     picard MarkDuplicates -Xms13G \\
     I={sorted_bam} O=/dev/stdout M={j.duplicate_metrics} \\
-    TMP_DIR=$(dirname {j.output_cram.cram})/picard-tmp \\
+    TMP_DIR=$(dirname {j.output_cram.cram_path})/picard-tmp \\
     ASSUME_SORT_ORDER=coordinate \\
-    | samtools view -@{resource.get_nthreads() - 1} -T {fasta_reference.base} -O cram -o {j.output_cram.cram}
+    | samtools view -@{resource.get_nthreads() - 1} -T {fasta_reference.base} -O cram -o {j.output_cram.cram_path}
     
-    samtools index -@{resource.get_nthreads() - 1} {j.output_cram.cram} {j.output_cram['cram.crai']}
+    samtools index -@{resource.get_nthreads() - 1} {j.output_cram.cram_path} {j.output_cram['cram.crai']}
     """
     j.command(wrap_command(cmd, monitor_space=True))
+    
     if output_path:
-        b.write_output(j.output_cram, splitext(output_path)[0])
+        if not qc_bucket:
+            qc_bucket = output_path.parent
+    
+        b.write_output(j.output_cram, str(output_path.with_suffix('')))
         b.write_output(
-            j.duplicate_metrics,
-            join(
-                dirname(output_path),
-                'duplicate-metrics',
-                f'{sample_name}-duplicate-metrics.csv',
-            ),
+            j.duplicate_metrics, str(
+                qc_bucket /
+                'duplicate-metrics' /
+                f'{sample_name}-duplicate-metrics.csv'
+            )
         )
+
     return j

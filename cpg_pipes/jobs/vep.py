@@ -4,26 +4,27 @@
 Creates a Hail Batch job to run the command line VEP tool.
 """
 
-from typing import Optional
-
 from hailtop.batch.job import Job
 
-from cpg_pipes import ref_data, images, buckets
+from cpg_pipes import images, utils, Path
+from cpg_pipes.hb.batch import Batch
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.refdata import RefData
 
 
 def vep(
-    b,
-    vcf_path: str,
-    out_vcf_path: Optional[str] = None,
+    b: Batch,
+    vcf_path: Path,
+    refs: RefData,
+    out_vcf_path: Path | None = None,
     overwrite: bool = True
 ) -> Job:
     """
     Runs VEP on provided VCF.
     """
     j = b.new_job('VEP')
-    if out_vcf_path and buckets.can_reuse(out_vcf_path, overwrite):
+    if out_vcf_path and utils.can_reuse(out_vcf_path, overwrite):
         j.name += ' [reuse]'
         return j
     
@@ -45,16 +46,14 @@ def vep(
 
     mkdir -p $CACHE_DIR
     mkdir -p $LOFTEE_DIR
-    gsutil cat {ref_data.VEP_CACHE} | tar -xf - -C $CACHE_DIR/
-    gsutil cat {ref_data.VEP_LOFTEE} | tar -xf - -C $LOFTEE_DIR/
+    gsutil cat {refs.vep_cache} | tar -xf - -C $CACHE_DIR/
+    gsutil cat {refs.vep_loftee} | tar -xf - -C $LOFTEE_DIR/
     ls $LOFTEE_DIR
 
-    retry_gs_cp {vcf_path} input.vcf.gz
-    
     vep \\
     --vcf \\
     --format vcf \\
-    -i input.vcf.gz \\
+    -i {b.read_input(str(vcf_path))} \\
     --everything \\
     --allele_number \\
     --no_stats \\
@@ -74,5 +73,5 @@ def vep(
         define_retry_function=True
     ))
     if out_vcf_path:
-        b.write_output(j.out_vcf, out_vcf_path)
+        b.write_output(j.out_vcf, str(out_vcf_path))
     return j

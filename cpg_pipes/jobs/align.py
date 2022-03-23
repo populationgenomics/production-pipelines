@@ -3,34 +3,38 @@ Create Hail Batch jobs for alignment.
 """
 from enum import Enum
 from textwrap import dedent, indent
-from typing import Optional, List, Tuple, Dict
-from os.path import splitext, basename, dirname, join
+from typing import cast
+from os.path import join
 import logging
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes import images, ref_data, buckets
-from cpg_pipes.hb import inputs
-from cpg_pipes.hb.inputs import AlignmentInput
-from cpg_pipes.hb.prev_job import PrevJob
+from cpg_pipes import Path
+from cpg_pipes import utils, images
+from cpg_pipes.refdata import RefData
+from cpg_pipes.types import AlignmentInput, CramPath, FastqPairs
 from cpg_pipes.jobs import picard
+from cpg_pipes.hb.prev_job import PrevJob
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.smdb.smdb import SMDB
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 class Aligner(Enum):
+    """
+    Tool that performs the alignment. Value must be the name of the executable.
+    """
     BWA = 'bwa'
     BWAMEM2 = 'bwa-mem2'
     DRAGMAP = 'dragmap'
 
 
 class MarkDupTool(Enum):
+    """
+    Tool that performs de-duplication.
+    """
     PICARD = 'picard'
     BIOBAMBAM = 'biobambam'
     NO_MARKDUP = 'no_markdup'
@@ -63,59 +67,22 @@ def bwamem2(*args, **kwargs):
     return align(*args, **kwargs)
 
 
-def samtools_stats(
-    b,
-    cram_path: str,
-    sample_name: str,
-    output_path: Optional[str] = None,
-    project_name: Optional[str] = None,
-    overwrite: bool = True,
-    nthreads: Optional[int] = None,
-) -> Job:
-    """
-    Run `samtools stats` for mapping QC
-    """
-    jname = 'samtools stats'
-    j = b.new_job(jname, dict(sample=sample_name, project=project_name))
-    if not output_path:
-        output_path = cram_path + '.stats'
-    if buckets.can_reuse(cram_path, overwrite):
-        j.name += ' [reuse]'
-        return j
-
-    j.image(images.SAMTOOLS_PICARD_IMAGE)
-
-    job_resource = STANDARD.set_resources(j, nthreads=nthreads)
-
-    cram = b.read_input_group(**{
-        'cram': cram_path,
-        'cram.crai': cram_path + '.crai',
-    })
-
-    j.command(wrap_command(f"""\
-    samtools stats -@{job_resource.get_nthreads() - 1} {cram.cram} > {j.output_stats}
-    """))
-    b.write_output(j.output_stats, output_path)
-    
-    return j
-
-
 def align(
     b,
     alignment_input: AlignmentInput,
     sample_name: str,
-    output_path: Optional[str] = None,
-    project_name: Optional[str] = None,
+    refs: RefData,
+    job_attrs: dict | None = None,
+    output_path: Path | None = None,
+    qc_bucket: Path | None = None,
     aligner: Aligner = Aligner.BWA,
     markdup_tool: MarkDupTool = MarkDupTool.BIOBAMBAM,
-    extra_label: Optional[str] = None,
-    depends_on: Optional[List[Job]] = None,
-    smdb: Optional[SMDB] = None,
+    extra_label: str | None = None,
     overwrite: bool = True,
-    requested_nthreads: Optional[int] = None,
-    number_of_shards_for_realignment: Optional[int] = None,
-    prev_batch_jobs: Optional[Dict[Tuple[Optional[str], str], PrevJob]] = None,
-) -> Job:
+    requested_nthreads: int | None = None,
+    number_of_shards_for_realignment: int | None = None,
+    prev_batch_jobs: dict[tuple[str | None, str], PrevJob] | None = None,
+) -> list[Job]:
     """
     - if the input is 1 fastq pair, submits one alignment job.
 
@@ -137,31 +104,35 @@ def align(
     - nthreads can be set for smaller test runs on toy instance, so the job 
       doesn't take entire 32-cpu/64-threaded instance.
     """
-    if output_path and buckets.can_reuse(output_path, overwrite):
+    if output_path and utils.can_reuse(output_path, overwrite):
         job_name = aligner.name
         if extra_label:
             job_name += f' {extra_label}'
         job_name += ' [reuse]'
-        return b.new_job(job_name, dict(sample=sample_name, project=project_name))
+        return [b.new_job(job_name, job_attrs)]
 
     if number_of_shards_for_realignment and number_of_shards_for_realignment > 1:
-        if alignment_input.is_fastq():
+        if not isinstance(alignment_input, CramPath):
             logger.warning(
                 f'Cannot use number_of_shards_for_realignment for fastq inputs. '
                 f'Sharding only works for CRAM/BAM inputs. '
-                f'Sample: {project_name}/{sample_name}'
+                f'Sample: {sample_name}'
             )
             number_of_shards_for_realignment = None
     
     # if number of threads is not requested, using whole instance
     requested_nthreads = requested_nthreads or STANDARD.max_threads()
 
-    sharded_fq = alignment_input.is_fastq() and len(alignment_input.get_fqs1()) > 1
+    sharded_fq = (
+        not isinstance(alignment_input, CramPath) and len(alignment_input) > 1
+    )
     sharded_bazam = (
-        alignment_input.is_bam_or_cram() and 
+        isinstance(alignment_input, CramPath) and 
         number_of_shards_for_realignment and number_of_shards_for_realignment > 1
     )
     sharded = sharded_fq or sharded_bazam
+
+    jobs = []
 
     if not sharded:
         jname = f'{aligner.name}'
@@ -174,12 +145,14 @@ def align(
             alignment_input=alignment_input,
             requested_nthreads=requested_nthreads,
             sample=sample_name,
-            project=project_name,
+            job_attrs=job_attrs,
+            refs=refs,
             aligner=aligner,
+            storage_gb=500,
         )
-        first_j = align_j
         stdout_is_sorted = False
         output_fmt = 'sam'
+        jobs.append(align_j)
 
     else:  # sharded alignment
         align_jobs = []
@@ -187,11 +160,10 @@ def align(
 
         if sharded_fq:
             # running alignment for each fastq pair in parallel
-            fastq_pairs = zip(alignment_input.get_fqs1(), alignment_input.get_fqs2())
-    
-            for i, (fq1, fq2) in enumerate(fastq_pairs):
+            fastq_pairs = cast(FastqPairs, alignment_input)
+            for i, pair in enumerate(fastq_pairs):
                 jname = (
-                    f'{aligner.name} {i+1}/{fq1}' + 
+                    f'{aligner.name} {i+1}/{pair.r1}' + 
                     (f' {extra_label}' if extra_label else '')
                 )
                 key = sample_name, jname 
@@ -203,10 +175,10 @@ def align(
                     existing_sorted_bam_path = (
                         f'{prevj.hail_bucket}/batch/{prevj.batchid}/{prevj.job_number}/sorted_bam'
                     )
-                    if buckets.can_reuse(existing_sorted_bam_path, overwrite):
+                    if utils.can_reuse(existing_sorted_bam_path, overwrite):
                         logger.info(f'Reusing previous batch result: {existing_sorted_bam_path}')
                         jname += ' [reuse from previous batch]'
-                        j = b.new_job(jname, dict(sample=sample_name, project=project_name))
+                        j = b.new_job(jname, job_attrs)
                         align_jobs.append(j)
                         sorted_bams.append(b.read_input(existing_sorted_bam_path))
                         continue
@@ -215,10 +187,11 @@ def align(
                 j, cmd = _align_one(
                     b=b,
                     job_name=jname,
-                    alignment_input=AlignmentInput(fqs1=[fq1], fqs2=[fq2]),
+                    alignment_input=[pair],
                     requested_nthreads=requested_nthreads,
                     sample=sample_name,
-                    project=project_name,
+                    job_attrs=job_attrs,
+                    refs=refs,
                     aligner=aligner,
                 )
                 cmd = cmd.strip()
@@ -228,7 +201,7 @@ def align(
                 j.command(wrap_command(cmd, monitor_space=True))
                 sorted_bams.append(j.sorted_bam)
                 align_jobs.append(j)
-        
+
         elif sharded_bazam:
             # running shared alignment for a CRAM, sharding with Bazam
             assert number_of_shards_for_realignment
@@ -243,7 +216,8 @@ def align(
                     job_name=jname,
                     alignment_input=alignment_input,
                     sample=sample_name,
-                    project=project_name,
+                    job_attrs=job_attrs,
+                    refs=refs,
                     aligner=aligner,
                     requested_nthreads=requested_nthreads,
                     number_of_shards_for_realignment=number_of_shards_for_realignment,
@@ -257,7 +231,7 @@ def align(
                 sorted_bams.append(j.sorted_bam)
                 align_jobs.append(j)
 
-        merge_j = b.new_job('Merge BAMs', dict(sample=sample_name, project=project_name))
+        merge_j = b.new_job('Merge BAMs', job_attrs)
         merge_j.image(images.BIOINFO_IMAGE)
         nthreads = STANDARD.set_resources(merge_j, nthreads=requested_nthreads).get_nthreads()
 
@@ -267,7 +241,7 @@ def align(
         output_fmt = 'bam'
         align_j = merge_j
         stdout_is_sorted = True
-        first_j = merge_j
+        jobs.extend(align_jobs + [merge_j])
         
     md_j = finalise_alignment(
         b=b,
@@ -275,29 +249,19 @@ def align(
         stdout_is_sorted=stdout_is_sorted,
         j=align_j,
         sample_name=sample_name,
-        project_name=project_name,
+        job_attrs=job_attrs,
+        refs=refs,
         requested_nthreads=requested_nthreads,
         markdup_tool=markdup_tool,
         output_path=output_path,
+        qc_bucket=qc_bucket,
         overwrite=overwrite,
         align_cmd_out_fmt=output_fmt,
     )
-    last_j = md_j if md_j is not None else align_j
+    if md_j:
+        jobs.append(md_j)
 
-    if depends_on:
-        first_j.depends_on(*depends_on)
-    if smdb:
-        last_j = smdb.add_running_and_completed_update_jobs(
-            b=b,
-            analysis_type='cram',
-            output_path=output_path,
-            sample_names=[sample_name],
-            project_name=project_name,
-            first_j=first_j,
-            last_j=last_j,
-            depends_on=depends_on,
-        )
-    return last_j
+    return jobs
 
 
 def _align_one(
@@ -306,12 +270,13 @@ def _align_one(
     alignment_input: AlignmentInput,
     requested_nthreads: int,
     sample: str,
-    project: Optional[str] = None,
+    refs: RefData,
+    job_attrs: dict | None = None,
     aligner: Aligner = Aligner.BWA,
-    number_of_shards_for_realignment: Optional[int] = None,
-    shard_number_1based: Optional[int] = None,
-    extra_storage_gb: Optional[float] = None,
- ) -> Tuple[Job, str]:
+    number_of_shards_for_realignment: int | None = None,
+    shard_number_1based: int | None = None,
+    storage_gb: float | None = None,
+ ) -> tuple[Job, str]:
     """
     Creates a command that (re)aligns reads to hg38, and a Job object,
     but doesn't add the command to the Job object yet, so sorting and/or
@@ -320,32 +285,28 @@ def _align_one(
     It leaves sorting and duplicate marking to the user, thus returns a command in
     a raw string in addition to the Job object.
     """
-    j = b.new_job(job_name, dict(sample=sample, project=project, label=job_name))
+    j = b.new_job(job_name, (job_attrs or {}) | dict(label=job_name))
     
     if number_of_shards_for_realignment is not None:
         assert number_of_shards_for_realignment > 1, number_of_shards_for_realignment
 
     job_resource = STANDARD.set_resources(
-        j, nthreads=requested_nthreads, attach_disk_storage_gb=extra_storage_gb
+        j, nthreads=requested_nthreads, storage_gb=storage_gb
     )
 
     if aligner in [Aligner.BWAMEM2, Aligner.BWA]:
         if aligner == Aligner.BWAMEM2:
             tool_name = 'bwa-mem2'
-            j.image(images.BWAMEM2_IMAGE)
-            index_exts = ref_data.BWAMEM2_INDEX_EXTS
+            j.image(images.BWAMEM2_IMAGE) 
+            index_exts = refs.bwamem2_index_exts
         else:
             tool_name = 'bwa'
             j.image(images.BIOINFO_IMAGE)
-            index_exts = ref_data.BWA_INDEX_EXTS
+            index_exts = refs.bwa_index_exts
 
-        bwa_reference = b.read_input_group(
-            **ref_data.REF_D,
-            **{k: f'{ref_data.REF_FASTA}.{k}' for k in index_exts},
-        )
+        bwa_reference = refs.fasta_res_group(b, index_exts)
         align_cmd = _build_bwa_command(
             b=b,
-            j=j,
             alignment_input=alignment_input,
             bwa_reference=bwa_reference,
             nthreads=job_resource.get_nthreads(),
@@ -358,25 +319,27 @@ def _align_one(
         j.image(images.BIOINFO_IMAGE)
         dragmap_index = b.read_input_group(
             **{
-                k.replace('.', '_'): join(ref_data.DRAGMAP_INDEX_BUCKET, k)
-                for k in ref_data.DRAGMAP_INDEX_FILES
+                k.replace('.', '_'): join(refs.dragmap_index_bucket, k)
+                for k in refs.dragmap_index_files
             }
         )
         prep_inp_cmd = ''
-        if alignment_input.bam_or_cram_path:
+        if isinstance(alignment_input, CramPath):
             extract_j = extract_fastq(
                 b=b,
-                cram=alignment_input.as_cram_input_group(b),
-                sample_name=sample,
-                project_name=project,
+                cram=alignment_input.resource_group(b),
+                refs=refs,
+                job_attrs=job_attrs,
             )
             input_param = f'-1 {extract_j.fq1} -2 {extract_j.fq2}'
 
         else:
-            assert alignment_input.is_fastq()
-            files1, files2 = alignment_input.as_fq_inputs(b)
+            fastq_pairs = [p.as_resources(b) for p in cast(FastqPairs, alignment_input)]
+            files1 = [pair[0] for pair in fastq_pairs]
+            files2 = [pair[1] for pair in fastq_pairs]
+
             # Allow for 100G input FQ, 50G output CRAM, plus some tmp storage
-            if len(alignment_input.get_fqs1()) == 1:
+            if len(fastq_pairs) == 1:
                 input_param = f'-1 {files1[0]} -2 {files2[0]}'
             else:
                 prep_inp_cmd = f"""\
@@ -398,35 +361,19 @@ def _align_one(
 
 def _build_bwa_command(
     b,
-    j: Job,
     alignment_input: AlignmentInput,
     bwa_reference: hb.ResourceGroup,
     nthreads: int,
     sample_name: str,
     tool_name: str,
-    number_of_shards: Optional[int] = None,
-    shard_number_1based: Optional[int] = None,
+    number_of_shards: int | None = None,
+    shard_number_1based: int | None = None,
 ) -> str:
     pull_inputs_cmd = ''
-    if alignment_input.bam_or_cram_path:
+    if isinstance(alignment_input, CramPath):
         use_bazam = True
-        assert not alignment_input.is_fastq()
-        
-        if alignment_input.bam_or_cram_path.startswith('gs://'):
-            cram = alignment_input.as_cram_input_group(b)
-            cram_localized_path = cram.base
-        else:
-            # Can't use on Batch localization mechanism with `b.read_input_group`,
-            # but have to manually localize with `wget`
-            cram_name = basename(alignment_input.bam_or_cram_path)
-            work_dir = dirname(j.output_cram.cram)
-            cram_localized_path = join(work_dir, cram_name)
-            index_ext = '.crai' if cram_name.endswith('.cram') else '.bai'
-            crai_localized_path = join(work_dir, cram_name + index_ext)
-            pull_inputs_cmd = (
-                f'wget {alignment_input.bam_or_cram_path} -O {cram_localized_path}\n'
-                f'wget {alignment_input.index_path} -O {crai_localized_path}'
-            )
+
+        cram = cast(CramPath, alignment_input).resource_group(b)
         if number_of_shards and number_of_shards > 1:
             assert shard_number_1based is not None and shard_number_1based > 0, \
                 (shard_number_1based, sample_name)
@@ -435,17 +382,18 @@ def _build_bwa_command(
             shard_param = ''
         bazam_cmd = (
             f'bazam -Xmx16g -Dsamjdk.reference_fasta={bwa_reference.base}'
-            f' -n{min(nthreads, 6)} -bam {cram_localized_path}{shard_param} | '
+            f' -n{min(nthreads, 6)} -bam {cram.cram}{shard_param} | '
         )
         r1_param = '-'
         r2_param = ''
 
     else:
-        assert alignment_input.is_fastq()
         use_bazam = False
         bazam_cmd = ''
-        files1, files2 = alignment_input.as_fq_inputs(b)
-        if len(files1) > 1:
+        fastq_pairs = [p.as_resources(b) for p in cast(FastqPairs, alignment_input)]
+        files1 = [pair[0] for pair in fastq_pairs]
+        files2 = [pair[1] for pair in fastq_pairs]
+        if len(fastq_pairs) > 1:
             r1_param = f'<(cat {" ".join(files1)})'
             r2_param = f'<(cat {" ".join(files2)})'
         else:
@@ -469,22 +417,22 @@ def _build_bwa_command(
 def extract_fastq(
     b,
     cram: hb.ResourceGroup,
-    sample_name: str,
-    project_name: Optional[str] = None,
-    output_fq1: Optional[str] = None,
-    output_fq2: Optional[str] = None,
+    refs: RefData,
+    job_attrs: dict | None = None,
+    output_fq1: str | None = None,
+    output_fq2: str | None = None,
 ) -> Job:
     """
-    Job that converts a bam or a cram to an interleaved compressed fastq file
+    Job that converts a BAM or a CRAM file to an interleaved compressed fastq file.
     """
-    j = b.new_job('Extract fastq', dict(sample=sample_name, project=project_name))
+    j = b.new_job('Extract fastq', job_attrs)
     ncpu = 16
     nthreads = ncpu * 2  # multithreading
     j.cpu(ncpu)
     j.image(images.BIOINFO_IMAGE)
     j.storage('700G')
 
-    reference = inputs.fasta(b)
+    reference = refs.fasta_res_group(b)
     cmd = f"""\
     bazam -Xmx16g -Dsamjdk.reference_fasta={reference.base} \
     -n{nthreads} -bam {cram.base} -r1 {j.fq1} -r2 {j.fq2}
@@ -497,11 +445,11 @@ def extract_fastq(
     return j
 
 
-def create_dragmap_index(b: hb.Batch) -> Job:
+def create_dragmap_index(b: hb.Batch, refs: RefData) -> Job:
     """
     Creates the index for DRAGMAP
     """
-    reference = inputs.fasta(b)
+    reference = refs.fasta_res_group(b)
 
     j = b.new_job('Index DRAGMAP')
     j.image(images.BIOINFO_IMAGE)
@@ -518,18 +466,21 @@ def create_dragmap_index(b: hb.Batch) -> Job:
     --output-directory $DIR
     """
     j.command(wrap_command(cmd))
-    for f in ref_data.DRAGMAP_INDEX_FILES:
+    for f in refs.dragmap_index_files:
         cmd += f'ln $DIR/{f} {getattr(j, f.replace(".", "_"))}\n'
     cmd += 'df -h; pwd; ls | grep -v proc | xargs du -sh'
     j.command(cmd)
-    for f in ref_data.DRAGMAP_INDEX_FILES:
+    for f in refs.dragmap_index_files:
         b.write_output(
-            getattr(j, f.replace('.', '_')), join(ref_data.DRAGMAP_INDEX_BUCKET, f)
+            getattr(j, f.replace('.', '_')), join(refs.dragmap_index_bucket, f)
         )
     return j
 
 
-def sort_cmd(requested_nthreads: int):
+def sort_cmd(requested_nthreads: int) -> str:
+    """
+    Create command that coordinate-sorts SAM file
+    """
     nthreads = STANDARD.request_resources(nthreads=requested_nthreads).get_nthreads()
     return dedent(f"""\
     | samtools sort -@{min(nthreads, 6) - 1} -T /io/batch/samtools-sort-tmp -Obam
@@ -543,19 +494,21 @@ def finalise_alignment(
     j: Job,
     requested_nthreads: int,
     sample_name: str,
-    project_name: Optional[str],
     markdup_tool: MarkDupTool,
-    output_path: Optional[str] = None,
+    refs: RefData,
+    job_attrs: dict | None = None,
+    output_path: Path | None = None,
+    qc_bucket: Path | None = None,
     overwrite: bool = True,
     align_cmd_out_fmt: str = 'sam',
-) -> Optional[Job]:
+) -> Job | None:
     """
-    For MarkDupTool.BIOBAMBAM, adds bamsormadup command piped to the existing job.
-    For MarkDupTool.PICARD, creates a new job, as Picard can't read from stdin.
+    For `MarkDupTool.BIOBAMBAM`, adds bamsormadup command piped to the existing job.
+    For `MarkDupTool.PICARD`, creates a new job, as Picard can't read from stdin.
     """
 
-    reference = b.read_input_group(**ref_data.REF_D)
-    
+    reference = refs.fasta_res_group(b)
+
     nthreads = STANDARD.request_resources(nthreads=requested_nthreads).get_nthreads()
 
     md_j = None
@@ -568,11 +521,14 @@ def finalise_alignment(
         )
         align_cmd = f"""\
         {align_cmd.strip()} \\
-        | bamsormadup inputformat={align_cmd_out_fmt} threads={min(nthreads, 6)} SO=coordinate \\
-        M={j.duplicate_metrics} outputformat=sam \\
+        | bamsormadup inputformat={align_cmd_out_fmt} threads={min(nthreads, 6)} \\
+        SO=coordinate M={j.duplicate_metrics} outputformat=sam \\
         tmpfile=$(dirname {j.output_cram.cram})/bamsormadup-tmp \\
-        | samtools view -@{min(nthreads, 6) - 1} -T {reference.base} -Ocram -o {j.output_cram.cram}       
-        samtools index -@{nthreads - 1} {j.output_cram.cram} {j.output_cram["cram.crai"]}
+        | samtools view -@{min(nthreads, 6) - 1} -T {reference.base} \\
+        -Ocram -o {j.output_cram.cram}       
+        
+        samtools index -@{nthreads - 1} {j.output_cram.cram} \\
+        {j.output_cram["cram.crai"]}
         """.strip()
         md_j = j
     else:
@@ -587,23 +543,24 @@ def finalise_alignment(
         md_j = picard.markdup(
             b,
             j.sorted_bam,
+            refs=refs,
             sample_name=sample_name,
-            project_name=project_name,
+            job_attrs=job_attrs,
             overwrite=overwrite,
         )
 
     if output_path:
+        if not qc_bucket:
+            qc_bucket = output_path.parent
+    
         if md_j is not None:
-            b.write_output(md_j.output_cram, splitext(output_path)[0])
-            b.write_output(
-                md_j.duplicate_metrics,
-                join(
-                    dirname(output_path),
-                    'duplicate-metrics',
-                    f'{sample_name}-duplicate-metrics.csv',
-                ),
-            )
+            b.write_output(md_j.output_cram, str(output_path.with_suffix('')))
+            b.write_output(md_j.duplicate_metrics, str(
+                qc_bucket /
+                'duplicate-metrics' /
+                f'{sample_name}-duplicate-metrics.csv'
+            ))
         else:
-            b.write_output(j.sorted_bam, splitext(output_path)[0])
+            b.write_output(j.sorted_bam, str(output_path.with_suffix('')))
 
     return md_j

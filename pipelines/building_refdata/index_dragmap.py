@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 
-import hailtop.batch as hb
-from os.path import join
-import os
+"""
+Create DRAGMAP reference index
+"""
 
-from cpg_pipes.jobs import wrap_command
-from cpg_pipes.jobs.align import align, create_dragmap_index
+import os
+from os.path import join
+import hailtop.batch as hb
+from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.jobs.align import create_dragmap_index
 
 AR_REPO = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
 DRAGMAP_IMAGE = f'{AR_REPO}/dragmap:1.2.1'
@@ -53,18 +56,24 @@ def _test_dragmap_job(b: hb.Batch):
     return j
 
 
-billing_project = os.getenv('HAIL_BILLING_PROJECT') or 'seqr'
-hail_bucket = os.environ.get('HAIL_BUCKET', 'cpg-seqr-test-tmp')
-print(
-    f'Starting hail Batch with the project {billing_project}, ' f'bucket {hail_bucket}'
-)
-backend = hb.ServiceBackend(
-    billing_project=billing_project,
-    bucket=hail_bucket.replace('gs://', ''),
-    token=os.environ.get('HAIL_TOKEN'),
-)
-b = hb.Batch(backend=backend, name='Create DRAGMAP index')
-j1 = create_dragmap_index(b)
-j2 = _test_dragmap_job(b)
-j2.depends_on(j1)
-b.run(wait=False)
+def main():  # pylint: disable=missing-function-docstring
+    billing_project = os.getenv('HAIL_BILLING_PROJECT') or 'seqr'
+    hail_bucket = os.environ.get('HAIL_BUCKET', 'cpg-seqr-test-tmp')
+    print(
+        f'Starting hail Batch with the project {billing_project}, ' 
+        f'bucket {hail_bucket}'
+    )
+    backend = hb.ServiceBackend(
+        billing_project=billing_project,
+        bucket=hail_bucket.replace('gs://', ''),
+        token=os.environ.get('HAIL_TOKEN'),
+    )
+    b = hb.Batch(backend=backend, name='Create DRAGMAP index')
+    j1 = create_dragmap_index(b)
+    j2 = _test_dragmap_job(b)
+    j2.depends_on(j1)
+    b.run(wait=False)
+
+
+if __name__ == '__main__':
+    main()  # pylint: disable=E1120

@@ -2,21 +2,21 @@
 Create Hail Batch jobs to create and apply a VQSR models.
 """
 
-from os.path import join
 from typing import List, Optional
 import logging
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 from analysis_runner import dataproc
 
-from cpg_pipes import ref_data, images, buckets, utils
+from cpg_pipes import Path
+from cpg_pipes import images, utils
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.refdata import RefData
+from cpg_pipes.types import SequencingType
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 # VQSR - when applying model - targets indel_filter_level and snp_filter_level
@@ -31,7 +31,7 @@ STANDARD_FEATURES = [
     'QD',
     'FS',
     'SOR',
-    'DP',
+    # 'DP',
 ]
 SNP_STANDARD_FEATURES = STANDARD_FEATURES + ['MQ']
 INDEL_STANDARD_FEATURES = STANDARD_FEATURES
@@ -85,64 +85,65 @@ INDEL_RECALIBRATION_TRANCHE_VALUES = [
 
 def make_vqsr_jobs(
     b: hb.Batch,
-    input_vcf_or_mt_path: str,
-    work_bucket: str,
+    input_vcf_or_mt_path: Path,
+    refs: RefData,
+    sequencing_type: SequencingType,
+    work_bucket: Path,
     gvcf_count: int,
-    scatter_count: int = ref_data.NUMBER_OF_GENOMICS_DB_INTERVALS,
-    depends_on: Optional[List[Job]] = None,
-    meta_ht_path: Optional[str] = None,
-    hard_filter_ht_path: Optional[str] = None,
-    output_vcf_path: Optional[str] = None,
+    scatter_count: int = RefData.number_of_joint_calling_intervals,
+    meta_ht_path: Path | None = None,
+    hard_filter_ht_path: Path | None = None,
+    output_vcf_path: Path | None = None,
     use_as_annotations: bool = True,
     overwrite: bool = True,
     convert_vcf_to_site_only: bool = False,
-) -> Job:
+) -> list[Job]:
     """
     Add jobs that perform the allele-specific VQSR variant QC
 
-    :param b: Batch object to add jobs to
-    :param input_vcf_or_mt_path: path to a multi-sample VCF or matrix table
-    :param meta_ht_path: if input_vcf_or_mt_path is a matrix table, this table will 
-           be used as a source of annotations for that matrix table, i.e. to filter out
-           samples flagged as meta.related
-    :param hard_filter_ht_path: if input_vcf_or_mt_path is a matrix table, this table 
+    @param b: Batch object to add jobs to
+    @param input_vcf_or_mt_path: path to a multi-sample VCF or matrix table
+    @param refs: reference data
+    @param sequencing_type: type of sequencing experiments
+    @param meta_ht_path: if input_vcf_or_mt_path is a matrix table, this table will 
+           be used as a source of annotations for that matrix table, i.e. 
+           to filter out samples flagged as `meta.related`
+    @param hard_filter_ht_path: if input_vcf_or_mt_path is a matrix table, this table 
            will be used as a list of samples to hard filter out
-    :param work_bucket: bucket for intermediate files
-    :param depends_on: job that the created jobs should only run after
-    :param gvcf_count: number of input samples. Can't read from combined_mt_path as it
+    @param work_bucket: bucket for intermediate files
+    @param gvcf_count: number of input samples. Can't read from combined_mt_path as it
            might not be yet genereated the point of Batch job submission
-    :param scatter_count: number of interavals
-    :param output_vcf_path: path to write final recalibrated VCF to
-    :param use_as_annotations: use allele-specific annotation for VQSR
-    :param overwrite: whether to not reuse intermediate files
-    :param convert_vcf_to_site_only: assuming input_vcf_or_mt_path is a VCF,
+    @param scatter_count: number of interavals
+    @param output_vcf_path: path to write final recalibrated VCF to
+    @param use_as_annotations: use allele-specific annotation for VQSR
+    @param overwrite: whether to not reuse intermediate files
+    @param convert_vcf_to_site_only: assuming input_vcf_or_mt_path is a VCF,
            convert it to site-only. Otherwise, assuming it's already site-only 
-    :return: a final Job, and a path to the VCF with VQSR annotations
+    @return: a final Job, and a path to the VCF with VQSR annotations
     """
-
     dbsnp_vcf = b.read_input_group(
-        base=ref_data.DBSNP_VCF, 
-        index=ref_data.DBSNP_VCF_INDEX,
+        base=str(refs.dbsnp_vcf),
+        index=str(refs.dbsnp_vcf_index),
     )
     hapmap_resource_vcf = b.read_input_group(
-        base=ref_data.HAPMAP_RESOURCE_VCF, 
-        index=ref_data.HAPMAP_RESOURCE_VCF_INDEX,
+        base=str(refs.hapmap_resource_vcf),
+        index=str(refs.hapmap_resource_vcf_index),
     )
     omni_resource_vcf = b.read_input_group(
-        base=ref_data.OMNI_RESOURCE_VCF, 
-        index=ref_data.OMNI_RESOURCE_VCF_INDEX,
+        base=str(refs.omni_resource_vcf),
+        index=str(refs.omni_resource_vcf_index),
     )
     one_thousand_genomes_resource_vcf = b.read_input_group(
-        base=ref_data.ONE_THOUSAND_GENOMES_RESOURCE_VCF,
-        index=ref_data.ONE_THOUSAND_GENOMES_RESOURCE_VCF_INDEX,
+        base=str(refs.one_thousand_genomes_resource_vcf),
+        index=str(refs.one_thousand_genomes_resource_vcf_index),
     )
     mills_resource_vcf = b.read_input_group(
-        base=ref_data.MILLS_RESOURCE_VCF, 
-        index=ref_data.MILLS_RESOURCE_VCF_INDEX,
+        base=str(refs.mills_resource_vcf),
+        index=str(refs.mills_resource_vcf_index),
     )
     axiom_poly_resource_vcf = b.read_input_group(
-        base=ref_data.AXIOM_POLY_RESOURCE_VCF, 
-        index=ref_data.AXIOM_POLY_RESOURCE_VCF_INDEX,
+        base=str(refs.axiom_poly_resource_vcf),
+        index=str(refs.axiom_poly_resource_vcf_index),
     )
     dbsnp_resource_vcf = dbsnp_vcf
 
@@ -159,17 +160,22 @@ def make_vqsr_jobs(
     medium_disk = 100 if is_small_callset else (200 if not is_huge_callset else 500)
     huge_disk = 200 if is_small_callset else (500 if not is_huge_callset else 2000)
 
-    intervals = split_intervals.get_intervals(
+    jobs: list[Job] = []
+    intervals_j = split_intervals.get_intervals(
         b=b,
+        refs=refs,
+        sequencing_type=sequencing_type,
         scatter_count=scatter_count,
     )
+    intervals = [intervals_j[f'intervals{i}.list'] for i in range(scatter_count)]
+    jobs.append(intervals_j)
 
-    if input_vcf_or_mt_path.endswith('.mt'):
+    if input_vcf_or_mt_path.name.endswith('.mt'):
         assert meta_ht_path
         assert hard_filter_ht_path
         job_name = 'VQSR: MT to site-only VCF'
-        combined_vcf_path = join(work_bucket, 'input.vcf.gz')
-        if not buckets.can_reuse(combined_vcf_path, overwrite):
+        combined_vcf_path = work_bucket / 'input.vcf.gz'
+        if not utils.can_reuse(combined_vcf_path, overwrite):
             mt_to_vcf_job = dataproc.hail_dataproc_job(
                 b,
                 f'{utils.QUERY_SCRIPTS_DIR}/mt_to_vcf.py --overwrite '
@@ -180,7 +186,6 @@ def make_vqsr_jobs(
                 max_age='8h',
                 packages=utils.DATAPROC_PACKAGES,
                 num_secondary_workers=scatter_count,
-                depends_on=depends_on,
                 # hl.export_vcf() uses non-preemptible workers' disk to merge VCF files.
                 # 10 samples take 2.3G, 400 samples take 60G, which roughly matches
                 # `huge_disk` (also used in the AS-VQSR VCF-gather job)
@@ -189,16 +194,15 @@ def make_vqsr_jobs(
             )
         else:
             mt_to_vcf_job = b.new_job(f'{job_name} [reuse]')    
-        if depends_on:
-            mt_to_vcf_job.depends_on(*depends_on)
+        jobs.append(mt_to_vcf_job)
         tabix_job = add_tabix_step(b, combined_vcf_path, medium_disk)
         tabix_job.depends_on(mt_to_vcf_job)
         siteonly_vcf = tabix_job.combined_vcf
     else:
         input_vcf = b.read_input_group(
             **{
-                'vcf.gz': input_vcf_or_mt_path,
-                'vcf.gz.tbi': input_vcf_or_mt_path + '.tbi',
+                'vcf.gz': str(input_vcf_or_mt_path),
+                'vcf.gz.tbi': str(input_vcf_or_mt_path) + '.tbi',
             }
         )
         if convert_vcf_to_site_only:
@@ -208,8 +212,7 @@ def make_vqsr_jobs(
                 overwrite=overwrite,
                 disk=medium_disk,
             )
-            if depends_on:
-                siteonly_j.depends_on(*depends_on)
+            jobs.append(siteonly_j)
             siteonly_vcf = siteonly_j.output_vcf
         else:
             siteonly_vcf = input_vcf
@@ -224,8 +227,7 @@ def make_vqsr_jobs(
         use_as_annotations=use_as_annotations,
         is_small_callset=is_small_callset,
     )
-    if depends_on:
-        indels_variant_recalibrator_job.depends_on(*depends_on)
+    jobs.append(indels_variant_recalibrator_job)
 
     indels_recalibration = indels_variant_recalibrator_job.recalibration
     indels_tranches = indels_variant_recalibrator_job.tranches
@@ -251,14 +253,13 @@ def make_vqsr_jobs(
             is_huge_callset=is_huge_callset,
             max_gaussians=snp_max_gaussians,
         )
-        if depends_on:
-            model_j.depends_on(*depends_on)
+        jobs.append(model_j)
 
         snps_recalibrator_jobs = [
             add_snps_variant_recalibrator_scattered_step(
                 b,
                 sites_only_vcf=siteonly_vcf,
-                interval=intervals[f'interval_{idx}'],
+                interval=intervals[idx],
                 model_file=model_j.model_file,
                 hapmap_resource_vcf=hapmap_resource_vcf,
                 omni_resource_vcf=omni_resource_vcf,
@@ -283,7 +284,7 @@ def make_vqsr_jobs(
             add_apply_recalibration_step(
                 b,
                 input_vcf=siteonly_vcf,
-                interval=intervals[f'interval_{idx}'],
+                interval=intervals[idx],
                 indels_recalibration=indels_recalibration,
                 indels_tranches=indels_tranches,
                 snps_recalibration=snps_recalibrations[idx],
@@ -303,6 +304,7 @@ def make_vqsr_jobs(
             site_only=True,
         )
         recalibrated_gathered_vcf_j.name = f'VQSR: {recalibrated_gathered_vcf_j.name}'
+        jobs.append(recalibrated_gathered_vcf_j)
 
     else:
         snps_recalibrator_job = add_snps_variant_recalibrator_step(
@@ -317,8 +319,7 @@ def make_vqsr_jobs(
             max_gaussians=snp_max_gaussians,
             is_small_callset=is_small_callset,
         )
-        if depends_on:
-            snps_recalibrator_job.depends_on(*depends_on)
+        jobs.append(snps_recalibrator_job)
 
         snps_recalibration = snps_recalibrator_job.recalibration
         snps_tranches = snps_recalibrator_job.tranches
@@ -336,8 +337,9 @@ def make_vqsr_jobs(
             snp_filter_level=INDEL_HARD_FILTER_LEVEL,
             output_vcf_path=output_vcf_path,
         )
+        jobs.append(recalibrated_gathered_vcf_j)
 
-    return recalibrated_gathered_vcf_j
+    return jobs
 
 
 def _add_make_sites_only_job(
@@ -354,7 +356,7 @@ def _add_make_sites_only_job(
     Returns: a Job object with a single output j.sites_only_vcf of type ResourceGroup
     """
     job_name = 'VQSR: MakeSitesOnlyVcf'
-    if buckets.can_reuse(output_vcf_path, overwrite):
+    if utils.can_reuse(output_vcf_path, overwrite):
         return b.new_job(job_name + ' [reuse]')
 
     j = b.new_job(job_name)
@@ -380,12 +382,12 @@ def _add_make_sites_only_job(
 
 def add_tabix_step(
     b: hb.Batch,
-    vcf_path: str,
+    vcf_path: Path,
     disk_size: int,
 ) -> Job:
     """
-    Regzip and tabix the combined VCF (for some reason the one output with mt2vcf
-    is not block-gzipped)
+    Regzip and tabix the combined VCF (for some reason the one produced by 
+    `mt_to_vcf.py` is not block-gzipped).
     """
     j = b.new_job('VQSR: Tabix')
     j.image(images.BCFTOOLS_IMAGE)
@@ -394,7 +396,7 @@ def add_tabix_step(
     j.declare_resource_group(
         combined_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
-    vcf_inp = b.read_input(vcf_path)
+    vcf_inp = b.read_input(str(vcf_path))
     j.command(wrap_command(f"""\
     gunzip {vcf_inp} -c | bgzip -c > {j.combined_vcf['vcf.gz']}
     tabix -p vcf {j.combined_vcf['vcf.gz']}
@@ -442,7 +444,7 @@ def add_split_intervals_step(
 
 def add_sites_only_gather_vcf_step(
     b: hb.Batch,
-    input_vcfs: List[hb.ResourceFile],
+    input_vcfs: list[hb.ResourceGroup],
     disk_size: int,
 ) -> Job:
     """
@@ -649,7 +651,7 @@ def add_snps_variant_recalibrator_scattered_step(
     dbsnp_resource_vcf: hb.ResourceGroup,
     disk_size: int,
     use_as_annotations: bool,
-    interval: Optional[hb.ResourceGroup] = None,
+    interval: hb.Resource | None = None,
     max_gaussians: int = 4,
     is_small_callset: bool = False,
 ) -> Job:
@@ -834,7 +836,7 @@ def add_snps_gather_tranches_step(
 
 def add_apply_recalibration_step(
     b: hb.Batch,
-    input_vcf: hb.ResourceFile,
+    input_vcf: hb.ResourceGroup,
     indels_recalibration: hb.ResourceGroup,
     indels_tranches: hb.ResourceFile,
     snps_recalibration: hb.ResourceGroup,
@@ -843,8 +845,8 @@ def add_apply_recalibration_step(
     use_as_annotations: bool,
     indel_filter_level: float,
     snp_filter_level: float,
-    interval: Optional[hb.ResourceGroup] = None,
-    output_vcf_path: Optional[str] = None,
+    interval: hb.Resource | None = None,
+    output_vcf_path: Path | None = None,
 ) -> Job:
     """
     Apply a score cutoff to filter variants based on a recalibration table.
@@ -924,7 +926,7 @@ def add_apply_recalibration_step(
     )
 
     if output_vcf_path:
-        b.write_output(j.output_vcf, output_vcf_path.replace('.vcf.gz', ''))
+        b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
     return j
 
 
@@ -939,7 +941,7 @@ def add_collect_metrics_sharded_step(
     """
     Run CollectVariantCallingMetrics for site-level evaluation.
 
-    This produces detailed and summary metrics report files. The summary metrics
+    This method produces detailed and summary metrics report files. The summary metrics
     provide cohort-level variant metrics and the detailed metrics segment variant
     metrics for each sample in the callset. The detail metrics give the same metrics
     as the summary metrics for the samples plus several additional metrics.
@@ -947,7 +949,7 @@ def add_collect_metrics_sharded_step(
     These are explained in detail at
     https://broadinstitute.github.io/picard/picard-metric-definitions.html.
 
-    Returns: Job object with a single ResourceGroup output j.metrics, with
+    Returns: a `Job` object with a single ResourceGroup output j.metrics, with
     j.metrics.detail_metrics and j.metrics.summary_metrics ResourceFiles
     """
     j = b.new_job('VQSR: CollectMetricsSharded')
@@ -1050,7 +1052,7 @@ def add_gather_variant_calling_metrics_step(
     """
     Combines metrics from multiple CollectVariantCallingMetrics runs.
 
-    Returns: Job object with a single ResourceGroup output j.metrics, with
+    Returns: a `Job` object with a single ResourceGroup output j.metrics, with
     j.metrics.detail_metrics and j.metrics.summary_metrics ResourceFiles
 
     Saves the QC results to a bucket with the `output_path_prefix` prefix
@@ -1066,7 +1068,7 @@ def add_gather_variant_calling_metrics_step(
         }
     )
 
-    input_cmdl = ' '.join('--INPUT {f} ' for f in input_details + input_summaries)
+    input_cmdl = ' '.join(f'--INPUT {f} ' for f in input_details + input_summaries)
     j.command(
         f"""set -euo pipefail
 

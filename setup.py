@@ -7,10 +7,8 @@ import setuptools
 
 setuptools.setup(
     name='cpg-pipes',
-    version='0.2.9',
-    description=(
-        'Hail Batch pipelines for large cohort and rare deseases projects'  
-    ),
+    version='0.3.0',
+    description='Hail Batch bioinformatics pipelines',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     url='https://github.com/populationgenomics/production-pipelines',
@@ -26,12 +24,15 @@ setuptools.setup(
     install_requires=[
         'click',
         'pandas',
-        'cpg-hail',
+        'hail>=0.2.90',
         'cpg-gnomad',   # github.com/populationgenomics/gnomad_methods
-        'gcloud',
+        'google-cloud-storage',
         'fsspec',
         'sample-metadata',
         'analysis-runner',
+        'cloudpathlib[gs]',
+        'coloredlogs',
+        'types-PyYAML',  # https://mypy.readthedocs.io/en/stable/getting_started.html#library-stubs-and-typeshed
     ],
     keywords='bioinformatics',
     classifiers=[

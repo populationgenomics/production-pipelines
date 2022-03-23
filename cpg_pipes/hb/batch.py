@@ -4,20 +4,19 @@ Extending the Hail's `Batch` class.
 
 import logging
 import os
-from typing import Optional, Dict
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
+from .. import Path, to_path
+
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 class Batch(hb.Batch):
     """
     Thin subclass of the Hail `Batch` class. The aim is to be able to register
-    the create jobs to be able to print statistics before submitting.
+    created jobs, in order to print statistics before submitting the Batch.
     """
     def __init__(self, name, backend, *args, **kwargs):
         super().__init__(name, backend, *args, **kwargs)
@@ -28,8 +27,8 @@ class Batch(hb.Batch):
 
     def new_job(
         self,
-        name: Optional[str] = None,
-        attributes: Optional[Dict[str, str]] = None,
+        name: str | None = None,
+        attributes: dict[str, str] | None = None,
         **kwargs,
     ) -> Job:
         """
@@ -40,12 +39,12 @@ class Batch(hb.Batch):
             logger.critical('Error: job name must be defined')
         
         attributes = attributes or dict()
-        project = attributes.get('project')
+        dataset = attributes.get('dataset')
         sample = attributes.get('sample')
         samples = attributes.get('samples')
         label = attributes.get('label', name)
 
-        name = job_name(name, sample, project)
+        name = job_name(name, sample, dataset)
 
         if label and (sample or samples):
             if label not in self.labelled_jobs:
@@ -57,25 +56,25 @@ class Batch(hb.Batch):
         self.total_job_num += 1
         j = super().new_job(name, attributes=attributes)
         return j
-
+    
 
 def setup_batch(
-    title: str, 
+    description: str, 
     keep_scratch: bool = False,
-    tmp_bucket: Optional[str] = None,
-    billing_project: Optional[str] = None,
-    hail_bucket: Optional[str] = None,
+    tmp_bucket: Path | None = None,
+    billing_project: str | None = None,
+    hail_bucket: Path | None = None,
 ) -> Batch:
     """
     Wrapper around the initialization of a Hail Batch object.
     Handles setting the temporary bucket and the billing project.
 
-    :param title: descriptive name of the Batch (will be displayed in the GUI)
-    :param billing_project: billing project name
-    :param tmp_bucket: path to temporary bucket. Will be used if neither 
+    @param description: descriptive name of the Batch (will be displayed in the GUI)
+    @param billing_project: Hail billing project name
+    @param tmp_bucket: path to temporary bucket. Will be used if neither 
         the hail_bucket parameter nor HAIL_BUCKET env var are set.
-    :param keep_scratch: whether scratch will be kept after the batch is finished
-    :param hail_bucket: bucket for Hail Batch intermediate files.
+    @param keep_scratch: whether scratch will be kept after the batch is finished
+    @param hail_bucket: bucket for Hail Batch intermediate files.
     """
     if not hail_bucket:
         hail_bucket = get_hail_bucket(tmp_bucket, keep_scratch)
@@ -92,22 +91,22 @@ def setup_batch(
     )
     backend = hb.ServiceBackend(
         billing_project=billing_project,
-        bucket=hail_bucket.replace('gs://', ''),
+        remote_tmpdir=str(hail_bucket),
         token=os.environ.get('HAIL_TOKEN'),
     )
-    return Batch(name=title, backend=backend)
+    return Batch(name=description, backend=backend)
 
 
 def get_hail_bucket(
-    tmp_bucket: Optional[str] = None, 
+    tmp_bucket: Path | None = None, 
     keep_scratch: bool = False,
-) -> str:
+) -> Path:
     """
     Get bucket where Hail Batch will keep scratch files
     """
-    hail_bucket = os.environ.get('HAIL_BUCKET')
+    hail_bucket_str = os.environ.get('HAIL_BUCKET')
     
-    if not hail_bucket and not tmp_bucket:
+    if not hail_bucket_str and not tmp_bucket:
         raise ValueError(
             'Either the tmp_bucket parameter, or the HAIL_BUCKET '
             'environment variable must be set.'
@@ -121,19 +120,21 @@ def get_hail_bucket(
             'automatically on schedule.'
         )
         
-    if keep_scratch or not hail_bucket:
+    if keep_scratch or not hail_bucket_str:
         assert tmp_bucket
-        hail_bucket = os.path.join(tmp_bucket, 'hail')
+        hail_bucket = tmp_bucket / 'hail'
+    else:
+        hail_bucket = to_path(hail_bucket_str)
 
     return hail_bucket
 
 
-def job_name(name, sample: str = None, project: str = None) -> str:
+def job_name(name, sample: str = None, dataset: str = None) -> str:
     """
-    Extend the descriptive job name to reflect the project and the sample names
+    Extend the descriptive job name to reflect the dataset and the sample names
     """
-    if sample and project:
-        name = f'{project}/{sample}: {name}'
-    elif project:
-        name = f'{project}: {name}'
+    if sample and dataset:
+        name = f'{dataset}/{sample}: {name}'
+    elif dataset:
+        name = f'{dataset}: {name}'
     return name
