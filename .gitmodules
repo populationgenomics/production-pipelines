@@ -1,4 +1,4 @@
 [submodule "hail-elasticsearch-pipelines"]
 	path = hail-elasticsearch-pipelines
-	url = https://github.com/populationgenomics/hail-elasticsearch-pipelines.git
+	url = git@github.com:populationgenomics/hail-elasticsearch-pipelines.git
 	branch = main
