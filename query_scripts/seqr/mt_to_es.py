@@ -89,7 +89,6 @@ def main(
         es_username=es_username,
         es_password=es_password,
         es_use_ssl=(es_host != 'localhost'),
-        index_type_name='',  # need to be empty for ES=8.x.x
     )
 
     mt = hl.read_matrix_table(mt_path)
