@@ -43,75 +43,15 @@ def main(
     init_query_service()
 
     mt = hl.read_matrix_table(mt_path)
-
+    logger.info(f'Size of mt: {mt.count()}')
+    
     logger.info('Subsetting to the requested set of samples')
     if subset_tsv_path:
         mt = _subset_samples_and_variants(mt, subset_tsv_path)
+        logger.info(f'Size of mt after subsetting: {mt.count()}')
 
-    # tmp_path = 'gs://cpg-circa-main-tmp/unittest/test_seqr_loader_annotate_dataset/' \
-    #            'dataset-tmp-allchroms.mt'
-    # # if not hl.hadoop_exists(tmp_path + '/_SUCCESS'):
-    # #     mt = hl.filter_intervals(mt, [
-    # #         hl.parse_locus_interval(f'chr{i}:1234567-1235567')
-    # #         for i in range(1, 22+1)
-    # #     ])
-    # #     mt.write(tmp_path, overwrite=True)
-    # mt = hl.read_matrix_table(tmp_path)
-    # mt.count()
-    # mt.rows().show()
-    # mt.entries().show()
-    # 
     logger.info('Annotating genotypes')
     mt = _compute_genotype_annotated_vcf(mt)
-
-    # is_called = hl.is_defined(mt.GT)
-    # _genotype_fields = {
-    #     'num_alt': hl.if_else(is_called, mt.GT.n_alt_alleles(), -1),
-    #     'gq': hl.if_else(is_called, mt.GQ, hl.missing(hl.tint)),
-    #     'ab': hl.bind(
-    #         lambda total: hl.if_else(
-    #             (is_called) & (total != 0) & (hl.len(mt.AD) > 1),
-    #             hl.float(mt.AD[1] / total),
-    #             hl.missing(hl.tfloat),
-    #         ),
-    #         hl.sum(mt.AD),
-    #     ),
-    #     'dp': hl.if_else(
-    #         is_called, hl.int(hl.min(mt.DP, 32000)), hl.missing(hl.tfloat)
-    #     ),
-    #     'sample_id': mt.s,
-    # }
-    # mt = mt.annotate_rows(
-    #     genotypes=hl.agg.collect(hl.struct(**_genotype_fields))
-    # )
-    # 
-    # logger.info('Annotating gq')
-    # def _genotype_filter_samples(filter):
-    #     return hl.set(mt.genotypes.filter(filter).map(lambda g: g.sample_id))
-    # 
-    # start = 0
-    # end = 95
-    # step = 95
-    # mt = mt.annotate_rows(samples_no_call=hl.struct(
-    #     **{
-    #         ('%i_to_%i' % (i, i + step)):
-    #             _genotype_filter_samples(
-    #                 lambda g: ((g.gq >= i) & (g.gq < i + step))
-    #             )
-    #         for i in range(start, end, step)
-    #     }
-    # ))
-
-    # Fixing NaN values in AS_MQ
-    mt.annotate_rows(
-        info=hl.struct(
-            AS_MQ=hl.if_else(
-                ~hl.is_nan(mt.info.AS_MQ),  # pylint: disable=invalid-unary-operand-type
-                mt.info.AS_MQ,
-                0,
-            ),
-        )
-    )
 
     # AS_MQ and InbreedingCoeff can be NaN, need to fix that to avoid ES loader 
     # failures like: 
@@ -251,7 +191,6 @@ class SeqrGenotypesSchema(BaseMTSchema):
             ),
             'sample_id': self.mt.s,
         }
-
 
 
 def _compute_genotype_annotated_vcf(
