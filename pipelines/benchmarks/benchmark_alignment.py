@@ -178,6 +178,9 @@ class DifferentAlignerSetups(SampleStage):
 
 @click.command()
 def main():
+    """
+    Entry point.
+    """
     pipeline = Pipeline(
         name='benchmark_alignment',
         description='Benchmark alignment',
@@ -187,11 +190,11 @@ def main():
     )
 
     p = pipeline.add_dataset('fewgenomes')
-    p.add_sample(
+    s = p.add_sample(
         id='PERTHNEURO_CRAM',
         external_id='PERTHNEURO_CRAM',
-        cram_input=benchmark.perth_neuro_cram,
     )
+    s.alignment_input = benchmark.perth_neuro_cram
 
     pipeline.set_stages([
         DifferentAlignerSetups,

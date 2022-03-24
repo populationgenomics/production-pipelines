@@ -1,0 +1,5 @@
+namespace: test
+analysis_dataset: acute-care
+input_datasets: [acute-care]
+keep_scratch: true
+skip_samples_with_missing_input: true

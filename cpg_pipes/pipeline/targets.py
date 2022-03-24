@@ -328,7 +328,7 @@ class Dataset(Target):
         participant_id: str | None = None,
         sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
-        **kwargs
+        meta: dict | None = None,
     ) -> 'Sample':
         """
         Create a new sample and add it into the dataset.
@@ -344,7 +344,7 @@ class Dataset(Target):
             sex=sex,
             pedigree=pedigree,
             dataset=self,
-            meta=kwargs,
+            meta=meta,
         )
         self._sample_by_id[id] = s
         return s

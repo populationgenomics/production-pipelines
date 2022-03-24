@@ -187,7 +187,7 @@ class InputsProvider(ABC):
             external_id=str(self.get_external_id(entry)),
             participant_id=self.get_participant_id(entry),
             sex=self.get_participant_sex(entry),
-            **self.get_sample_meta(entry),
+            meta=self.get_sample_meta(entry),
         )
 
 
@@ -288,7 +288,7 @@ class CsvInputsProvider(InputsProvider):
         Populate Analysis entries
         """
         pass
-    
+
     def populate_pedigree(
         self, 
         cohort: Cohort,

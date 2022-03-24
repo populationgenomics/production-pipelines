@@ -4,7 +4,7 @@
 Generate data for unit tests
 """
 
-from cpg_pipes import images
+from cpg_pipes import images, Namespace
 from cpg_pipes.pipeline.pipeline import Pipeline
 from .utils import DATASET, SAMPLES, FULL_GVCF_BY_SID, SUBSET_GVCF_BY_SID, setup_env
 
@@ -19,10 +19,10 @@ def make_gvcfs():
         name='make_test_data',
         description='Make test data',
         analysis_dataset=DATASET,
-        output_version='v0',
-        namespace='test',
+        version='v0',
+        namespace=Namespace.TEST,
     )
-            
+
     jobs = []
     
     p = pipeline.cohort.add_dataset(DATASET)

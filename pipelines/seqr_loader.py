@@ -277,7 +277,7 @@ def _make_seqr_metadata_files(
 @click.option(
     '--make-seqr-metadata/--no-make-seqr-metadata',
     'make_seqr_metadata',
-    default=True,
+    default=False,
     is_flag=True,
     help='Make Seqr metadata',
 )
