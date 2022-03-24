@@ -9,7 +9,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-from cpg_pipes import Namespace, to_path, Path
+from cpg_pipes import Namespace, to_path
 from cpg_pipes.types import SequencingType
 
 try:

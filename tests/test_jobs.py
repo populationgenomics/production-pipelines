@@ -1,3 +1,7 @@
+"""
+Test individual jobs on Hail Batch.
+"""
+
 import shutil
 import tempfile
 import time
@@ -188,7 +192,6 @@ class TestJobs(unittest.TestCase):
             delta=10
         )
 
-    # @unittest.skip('Skip')
     def test_haplotype_calling(self):
         """
         Test individual sample haplotype calling

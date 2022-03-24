@@ -1,5 +1,5 @@
 """
-Testing TSV metadata provider. TSV file must contain one required column "sample".
+Testing CSV inputs provider. CSV file must contain one required column "sample".
 """
 import unittest
 from io import StringIO
@@ -21,9 +21,9 @@ FQ = 'gs://cpg-fewgenomes-test-upload/MYSAMPLE1_M00{}_R{}.fastq.gz'
 CRAM = 'gs://cpg-fewgenomes-test-upload/MYSAMPLE2.cram'
 
 
-class TestTsvProvider(unittest.TestCase):
+class TestInputProvider(unittest.TestCase):
     """
-    Test TSV metadat provider.
+    Test CSV input metadata provider.
     """
 
     def test_csv_provider(self):
