@@ -32,11 +32,12 @@ from ..providers import (
     StatusReporterType,
     InputProviderType,
 )
+from ..providers.inputs import InputProvider, CsvInputProvider
 from ..providers.status import StatusReporter
 from ..providers.cpg import (
     CpgStorageProvider,
     SmdbStatusReporter,
-    SmdbInputsProvider,
+    SmdbInputProvider,
     SMDB,
 )
 from ..refdata import RefData
@@ -681,6 +682,7 @@ class Pipeline:
         cloud: Cloud = Cloud.GS,
         status_reporter_type: StatusReporterType = StatusReporterType.NONE,
         input_provider_type: InputProviderType = InputProviderType.NONE,
+        input_csv: str | None = None,
         stages_in_order: list[StageDecorator] | None = None,
         keep_scratch: bool = True,
         dry_run: bool = False,
@@ -769,8 +771,8 @@ class Pipeline:
                 hail_bucket=self.hail_bucket,
             )
 
-        self.status_reporter = None
-        input_provider = None
+        self.status_reporter: StatusReporter | None = None
+        input_provider: InputProvider | None = None
         if (
             input_provider_type == InputProviderType.SMDB 
             or status_reporter_type == StatusReporterType.SMDB
@@ -779,7 +781,16 @@ class Pipeline:
             if status_reporter_type == StatusReporterType.SMDB:
                 self.status_reporter = SmdbStatusReporter(smdb)
             if input_provider_type == InputProviderType.SMDB:
-                input_provider = SmdbInputsProvider(smdb)
+                input_provider = SmdbInputProvider(smdb)
+
+        if input_provider_type == InputProviderType.CSV:
+            if not input_csv:
+                raise PipelineError(
+                    f'input_csv (--input-csv) should be provided '
+                    f'with input_provider_type=InputProviderType.CSV '
+                    f'(--input-provider {InputProviderType.CSV.value})'
+                )
+            input_provider = CsvInputProvider(to_path(input_csv).open())
 
         if input_datasets and input_provider:
             input_provider.populate_cohort(

@@ -9,13 +9,13 @@ from sample_metadata import ApiException
 
 from ... import Path
 from ...pipeline.targets import Dataset, Cohort, Sex, PedigreeInfo
-from ..inputs import InputsProvider, InputProviderError
+from ..inputs import InputProvider, InputProviderError
 from .smdb import SMDB, SmSequence
 
 logger = logging.getLogger(__file__)
 
 
-class SmdbInputsProvider(InputsProvider):
+class SmdbInputProvider(InputProvider):
     """
     InputProvider implementation that pulls data from the sample-metadata database.
     """

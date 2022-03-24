@@ -6,7 +6,7 @@ from io import StringIO
 
 from cpg_pipes import Namespace
 from cpg_pipes.pipeline.targets import Cohort, Sex
-from cpg_pipes.providers.inputs import CsvInputsProvider
+from cpg_pipes.providers.inputs import CsvInputProvider
 from cpg_pipes.providers.cpg import CpgStorageProvider
 
 
@@ -35,7 +35,7 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex
         """.strip()
 
         with StringIO(tsv_contents) as fp:
-            provider = CsvInputsProvider(fp)
+            provider = CsvInputProvider(fp)
             
         cohort = Cohort(
             name='test',

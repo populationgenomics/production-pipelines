@@ -149,6 +149,11 @@ def pipeline_click_options(function: Callable) -> Callable:
                  f'use --input-csv to specify a CSV file location',
         ),
         click.option(
+            '--input-csv',
+            'input_csv',
+            help=f'CSV file to provide with --input-provider={InputProviderType.CSV.value}'
+        ),
+        click.option(
             '--keep-scratch/--remove-scratch', 
             'keep_scratch', 
             default=False,

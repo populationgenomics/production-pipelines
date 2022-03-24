@@ -22,7 +22,7 @@ class InputProviderError(Exception):
     pass
 
 
-class InputsProvider(ABC):
+class InputProvider(ABC):
     """
     Abstract class for implementing inputs source.
     """
@@ -206,7 +206,7 @@ class FieldMap(Enum):
     sequencing_type = 'sequencing_type'
 
 
-class CsvInputsProvider(InputsProvider):
+class CsvInputProvider(InputProvider):
     """
     Input provider that parses data from a CSV file.
     """
