@@ -5,14 +5,17 @@ Batch pipeline to load data into seqr.
 """
 
 import logging
+import os
+import subprocess
 import time
 
 import click
 import pandas as pd
 from analysis_runner import dataproc
 
-from cpg_pipes import Path, Namespace
+from cpg_pipes import Path
 from cpg_pipes import utils
+from cpg_pipes.jobs.seqr_loader import annotate_dataset
 from cpg_pipes.pipeline import (
     pipeline_click_options,
     Cohort, 
@@ -108,29 +111,17 @@ class AnnotateDatasetStage(DatasetStage):
             target=dataset.cohort, 
             stage=AnnotateCohortStage
         )
-
-        # Make a list of dataset samples to subset from the entire matrix table
-        sample_ids = [s.id for s in dataset.get_samples()]
-        proj_tmp_bucket = dataset.get_tmp_bucket()
-        subset_path = proj_tmp_bucket / 'seqr-samples.txt'
-        with subset_path.open('w') as f:
-            f.write('\n'.join(sample_ids))
-
-        expected_path = self.expected_result(dataset)    
-        j = dataproc.hail_dataproc_job(
-            self.b,
-            f'{utils.QUERY_SCRIPTS_DIR}/seqr/subset_mt.py '
-            f'--mt-path {annotated_mt_path} '
-            f'--out-mt-path {expected_path} '
-            f'--subset-tsv {subset_path}',
-            max_age='8h',
-            packages=utils.DATAPROC_PACKAGES,
-            num_secondary_workers=20,
-            num_workers=5,
-            job_name=f'{dataset.name}: annotate dataset',
-            depends_on=inputs.get_jobs(),
+        j = annotate_dataset(
+            b=self.b,
+            annotated_mt_path=annotated_mt_path,
+            sample_ids=[s.id for s in dataset.get_samples()],
+            output_mt_path=self.expected_result(dataset),
+            tmp_bucket=dataset.get_tmp_bucket(),
+            hail_billing_project=self.hail_billing_project,
+            hail_bucket=self.hail_bucket,
+            job_attrs=dataset.get_job_attrs(),
         )
-        return self.make_outputs(dataset, data=expected_path, jobs=[j])
+        return self.make_outputs(dataset, data=self.expected_result(dataset), jobs=[j])
 
 
 @stage(required_stages=[AnnotateDatasetStage])
@@ -150,14 +141,18 @@ class LoadToEsStage(DatasetStage):
         """
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetStage)
         version = time.strftime('%Y%m%d-%H%M%S')
-
+        
         j = dataproc.hail_dataproc_job(
             self.b,
             f'{utils.QUERY_SCRIPTS_DIR}/seqr/mt_to_es.py '
             f'--mt-path {dataset_mt_path} '
+            f'--es-host elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com '
+            f'--es-port 9243 '
+            f'--es-username seqr '
+            f'--es-password {_read_es_password()} '
             f'--es-index {dataset.name}-{version} '
             f'--es-index-min-num-shards 1 '
-            f'{"--prod" if dataset.namespace == Namespace.MAIN else ""}',
+            f'--use-spark ',  # es export doesn't work with the service backend
             max_age='16h',
             packages=utils.DATAPROC_PACKAGES,
             num_secondary_workers=2,
@@ -166,6 +161,22 @@ class LoadToEsStage(DatasetStage):
             scopes=['cloud-platform'],
         )
         return self.make_outputs(dataset, jobs=[j])
+
+
+def _read_es_password(
+    project_id='seqr-308602',
+    secret_id='seqr-es-password',
+    version_id='latest',
+) -> str:
+    """
+    Read a GCP secret storing the ES password
+    """
+    password = os.environ.get('SEQR_ES_PASSWORD')
+    if password:
+        return password
+    cmd = f'gcloud secrets versions access {version_id} --secret {secret_id} --project {project_id}'
+    logger.info(cmd)
+    return subprocess.check_output(cmd, shell=True).decode()
 
 
 @stage(required_stages=[AnnotateDatasetStage])

@@ -4,8 +4,8 @@ import time
 import unittest
 from os.path import join
 from typing import Dict
-from hailtop.batch.job import Job
 
+from hailtop.batch.job import Job
 from analysis_runner import dataproc
 
 from cpg_pipes import Path, to_path, Namespace
@@ -15,8 +15,9 @@ from cpg_pipes.jobs.align import align
 from cpg_pipes.jobs.haplotype_caller import produce_gvcf
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
+from cpg_pipes.jobs.seqr_loader import annotate_dataset
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
-from cpg_pipes.types import CramPath
+from cpg_pipes.types import CramPath, SequencingType
 from cpg_pipes.pipeline import Pipeline
 from cpg_pipes import images
 
@@ -39,17 +40,21 @@ class TestJobs(unittest.TestCase):
         self.name = self._testMethodName
         self.timestamp = time.strftime('%Y%m%d-%H%M')
         self.out_bucket = BASE_BUCKET / self.name / self.timestamp
-        self.tmp_bucket = self.out_bucket / 'tmp'
+        self.tmp_bucket = BASE_BUCKET / 'tmp' / self.name / self.timestamp
         self.local_tmp_dir = tempfile.mkdtemp()
 
         self.pipeline = Pipeline(
-            name=self._testMethodName,
-            description=self._testMethodName,
+            name=self.name,
+            description=self.name,
             analysis_dataset=DATASET,
             namespace=Namespace.TEST,
         )
+        self.sequencing_type = SequencingType.WGS
+        self.dataset = self.pipeline.add_dataset(DATASET)
+        sample_name = f'Test-{self.timestamp}'
+        self.sample = self.dataset.add_sample(sample_name, sample_name)
+        self.sequencing_type = self.sequencing_type
         self.refs = self.pipeline.refs
-        self.sample_name = f'Test-{self.timestamp}'
         
     def tearDown(self) -> None:
         shutil.rmtree(self.local_tmp_dir)
@@ -101,7 +106,7 @@ class TestJobs(unittest.TestCase):
         test_j.command(f'bcftools query -l {vcf_input} > {test_j.output}')
         test_j.depends_on(*jobs)
 
-        out_path = self.out_bucket / f'{self.sample_name}.out'
+        out_path = self.out_bucket / f'{self.sample.id}.out'
         self.pipeline.b.write_output(test_j.output, str(out_path))
         return out_path
 
@@ -118,7 +123,7 @@ class TestJobs(unittest.TestCase):
             alignment_input=benchmark.tiny_fq,
             output_path=output_path,
             qc_bucket=qc_bucket,
-            sample_name=self.sample_name,
+            sample_name=self.sample.id,
             refs=self.refs,
         )
         cram_details_paths = self._job_get_cram_details(
@@ -131,11 +136,11 @@ class TestJobs(unittest.TestCase):
         self.assertTrue((
             qc_bucket / 
             'duplicate-metrics' / 
-            f'{self.sample_name}-duplicate-metrics.csv'
+            f'{self.sample.id}-duplicate-metrics.csv'
         ).exists())
 
         self.assertEqual(
-            self.sample_name, 
+            self.sample.id, 
             _read_file(cram_details_paths['sample_name'])
         )
         self.assertAlmostEqual(
@@ -158,7 +163,7 @@ class TestJobs(unittest.TestCase):
             self.pipeline.b,
             alignment_input=benchmark.tiny_cram,
             output_path=output_path,
-            sample_name=self.sample_name,
+            sample_name=self.sample.id,
             refs=self.refs,
         )
         cram_details_paths = self._job_get_cram_details(
@@ -169,7 +174,7 @@ class TestJobs(unittest.TestCase):
         self.pipeline.submit_batch(wait=True)
 
         self.assertEqual(
-            self.sample_name, 
+            self.sample.id, 
             _read_file(cram_details_paths['sample_name'])
         )
         self.assertAlmostEqual(
@@ -195,18 +200,19 @@ class TestJobs(unittest.TestCase):
         out_gvcf_path = self.out_bucket / 'test_haplotype_calling.g.vcf.gz'
         jobs = produce_gvcf(
             self.pipeline.b,
-            sample_name=self.sample_name,
+            sample_name=self.sample.id,
             refs=self.refs,
             cram_path=cram_path,
             number_of_intervals=2,
             tmp_bucket=self.tmp_bucket,
             dragen_mode=True,
             output_path=out_gvcf_path,
+            sequencing_type=self.sequencing_type,
         )
         test_result_path = self._job_get_gvcf_header(out_gvcf_path, jobs)
         self.pipeline.submit_batch(wait=True)     
         contents = _read_file(test_result_path)
-        self.assertEqual(self.sample_name, contents.split()[-1])
+        self.assertEqual(self.sample.id, contents.split()[-1])
 
     def test_joint_calling(self):
         """
@@ -243,7 +249,6 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(len(SAMPLES), len(contents.split()))
         self.assertEqual(set(SAMPLES), set(contents.split()))
 
-    # @unittest.skip('Skip')
     def test_vqsr(self):
         """
         Test AS-VQSR
@@ -264,6 +269,7 @@ class TestJobs(unittest.TestCase):
             output_vcf_path=out_vcf_path,
             use_as_annotations=True,
             overwrite=True,
+            sequencing_type=self.sequencing_type,
         )
         res_path = self._job_get_gvcf_header(out_vcf_path, jobs)
         self.pipeline.submit_batch(wait=True)     
@@ -297,7 +303,7 @@ class TestJobs(unittest.TestCase):
         -i'BIOTYPE="protein_coding" & LoF_filter="ANC_ALLELE"' -s worst \
         > {test_j.output}
         """)
-        res_path = self.out_bucket / f'{self.sample_name}.out'
+        res_path = self.out_bucket / f'{self.sample.id}.out'
         self.pipeline.b.write_output(test_j.output, str(res_path))
         self.assertTrue(out_vcf_path.exists())
         contents = _read_file(res_path)
@@ -305,6 +311,52 @@ class TestJobs(unittest.TestCase):
             'chr20:5111495 TMEM230 protein_coding NM_001009923.2 LC ANC_ALLELE', 
             contents
         )
+
+    def test_seqr_loader_annotate_dataset_seqr(self):
+        """
+        Test subset_mt.py script from seqr_loader.
+        """
+        dataset = 'seqr'
+        pipeline = Pipeline(
+            name=self.name,
+            description=self.name,
+            analysis_dataset=dataset,
+            namespace=Namespace.MAIN,
+        )
+        cohort_mt_path = to_path('gs://cpg-seqr-main-tmp/mt/combined.mt')
+        dataset_mt_path = to_path(f'gs://cpg-circa-main-analysis/mt/circa-{self.timestamp}.mt')
+        samples = ['CPG200675', 'CPG200642', 'CPG200501', 'CPG200527', 'CPG200519', 'CPG200410', 'CPG200477', 'CPG200485', 'CPG200493', 'CPG200444', 'CPG200428', 'CPG200451', 'CPG200436', 'CPG200659', 'CPG200667', 'CPG200535', 'CPG200543', 'CPG200550', 'CPG200584', 'CPG200568', 'CPG200592', 'CPG200600', 'CPG200626', 'CPG200618', 'CPG200683']
+        tmp_bucket = to_path('gs://cpg-seqr-main-tmp')
+        annotate_dataset(
+            b=pipeline.b,
+            annotated_mt_path=cohort_mt_path,
+            sample_ids=samples,
+            tmp_bucket=tmp_bucket,
+            output_mt_path=dataset_mt_path,
+            hail_billing_project=dataset,
+            hail_bucket=tmp_bucket,
+        )
+        pipeline.submit_batch(wait=False)     
+
+    def test_seqr_loader_annotate_dataset(self):
+        """
+        Test subset_mt.py script from seqr_loader.
+        """
+        cohort_mt_path = to_path(
+            'gs://cpg-fewgenomes-test/unittest/inputs/chr20/seqr_loader/cohort.mt'
+        )
+        dataset_mt_path = self.out_bucket / 'dataset.mt'
+        annotate_dataset(
+            b=self.pipeline.b,
+            annotated_mt_path=cohort_mt_path,
+            sample_ids=SAMPLES[:3],
+            tmp_bucket=self.tmp_bucket,
+            output_mt_path=dataset_mt_path,
+            hail_billing_project=DATASET,
+            hail_bucket=self.tmp_bucket,
+        )
+        self.pipeline.submit_batch(wait=True)     
+        self.assertTrue(utils.exists(dataset_mt_path))
 
     def test_seqr_loader(self):
         """

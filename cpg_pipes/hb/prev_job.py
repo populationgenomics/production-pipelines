@@ -8,7 +8,6 @@ from typing import Optional, Tuple, Dict
 
 from .. import Path
 from .. import utils
-from .batch import get_hail_bucket
 
 logger = logging.getLogger(__file__)
 
@@ -33,8 +32,7 @@ class PrevJob:
     def parse(
         fpath: Path, 
         batchid: str, 
-        tmp_bucket: Path,
-        keep_scratch: bool,
+        hail_bucket: Path,
     ) -> Dict[Tuple[Optional[str], str], 'PrevJob']:
         """
         `fpath` is the path to result.txt, generated from mysql (see above), 
@@ -45,8 +43,6 @@ class PrevJob:
         Returns a dictionary of PrevJob objects indexed by a pair of optional 
         CPG ID string (for sample-level jobs) and a job name string.
         """
-        hail_bucket = get_hail_bucket(tmp_bucket, keep_scratch)
-        
         if not utils.exists(fpath):
             return dict()
         prev_batch_jobs: Dict[Tuple[Optional[str], str], PrevJob] = dict()

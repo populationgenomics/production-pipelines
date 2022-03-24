@@ -41,7 +41,7 @@ from ..providers.cpg import (
 )
 from ..refdata import RefData
 from ..utils import exists
-from ..hb.batch import Batch, setup_batch
+from ..hb.batch import Batch, setup_batch, get_billing_project
 from ..hb.prev_job import PrevJob
 
 logger = logging.getLogger(__file__)
@@ -324,6 +324,7 @@ class Stage(Generic[TargetT], ABC):
         name: str,
         batch: Batch,
         refs: RefData,
+        hail_billing_project: str,
         required_stages: list[StageDecorator] | StageDecorator | None = None,
         analysis_type: str | None = None,
         skipped: bool = False,
@@ -335,11 +336,13 @@ class Stage(Generic[TargetT], ABC):
         check_intermediates: bool = False,
         status_reporter: StatusReporter | None = None,
         pipeline_config: dict[str, Any] | None = None,
+        hail_bucket: Path | None = None,
     ):
         """
         @param name: name of the stage
         @param batch: Hail Batch object
         @param refs: reference data for bioinformatics
+        @param hail_billing_project: Hail Batch billing project
         @param required_stages: list of stage classes that this stage requires
         @param analysis_type: if defined, will query the SMDB Analysis entries 
             of this type
@@ -354,6 +357,7 @@ class Stage(Generic[TargetT], ABC):
             This option makes the downstream stages assume that the output exist.
         @param forced: run self.queue_jobs(), even if we can reuse the 
             self.expected_output().
+        @param hail_bucket: Hail Batch bucket
         """
         self._name = name
         self.b = batch
@@ -387,6 +391,9 @@ class Stage(Generic[TargetT], ABC):
         self.assume_outputs_exist = assume_outputs_exist
 
         self.pipeline_config = pipeline_config or {}
+        
+        self.hail_billing_project = hail_billing_project
+        self.hail_bucket = hail_bucket
 
     @property
     def name(self):
@@ -609,6 +616,8 @@ def stage(
                 check_intermediates=pipeline.check_intermediates,
                 pipeline_config=pipeline.config,
                 refs=pipeline.refs,
+                hail_billing_project=pipeline.hail_billing_project,
+                hail_bucket=pipeline.hail_bucket,
             )
         # We record each initialised Stage subclass, so we know the default stage
         # list for the case when the user doesn't pass them explicitly with set_stages()
@@ -735,28 +744,30 @@ class Pipeline:
         else:
             self.local_dir = self.local_tmp_dir = to_path(tempfile.mkdtemp())
 
-        self.prev_batch_jobs = dict()
-        if previous_batch_tsv_path is not None:
-            assert previous_batch_id is not None
-            self.prev_batch_jobs = PrevJob.parse(
-                previous_batch_tsv_path,
-                previous_batch_id,
-                tmp_bucket=self.tmp_bucket,
-                keep_scratch=keep_scratch,
-            )
-
         self.config = config or {}
 
         if version:
             description += f' {version}'
         if input_datasets:
             description += ': ' + ', '.join(input_datasets)
+
+        self.hail_billing_project = get_billing_project(
+            self.cohort.analysis_dataset.stack
+        )
+        self.hail_bucket = self.tmp_bucket / 'hail'
         self.b: Batch = setup_batch(
             description=description, 
-            tmp_bucket=self.tmp_bucket,
-            keep_scratch=self.keep_scratch,
-            billing_project=self.cohort.analysis_dataset.stack,
+            billing_project=self.hail_billing_project,
+            hail_bucket=self.hail_bucket,
         )
+        self.prev_batch_jobs = dict()
+        if previous_batch_tsv_path is not None:
+            assert previous_batch_id is not None
+            self.prev_batch_jobs = PrevJob.parse(
+                previous_batch_tsv_path,
+                previous_batch_id,
+                hail_bucket=self.hail_bucket,
+            )
 
         self.status_reporter = None
         input_provider = None
