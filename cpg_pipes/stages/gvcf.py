@@ -43,7 +43,7 @@ class GvcfStage(SampleStage):
             )
             jobs.append(intervals_j)
             GvcfStage.hc_intervals = [
-                intervals_j[f'intervals{i}.list'] 
+                intervals_j[f'{i}.interval_list'] 
                 for i in range(hc_intervals_num)
             ]
         jobs.extend(haplotype_caller.produce_gvcf(
