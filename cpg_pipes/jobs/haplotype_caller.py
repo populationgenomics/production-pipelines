@@ -105,7 +105,7 @@ def haplotype_caller(
                 out_bucket=tmp_bucket / 'intervals',
             )
             jobs.append(intervals_j)
-            intervals = [intervals_j[f'intervals{i}.list'] for i in range(number_of_intervals)]
+            intervals = [intervals_j[f'{i}.interval_list'] for i in range(number_of_intervals)]
 
         hc_jobs = []
         # Splitting variant calling by intervals

@@ -167,7 +167,7 @@ def make_vqsr_jobs(
         sequencing_type=sequencing_type,
         scatter_count=scatter_count,
     )
-    intervals = [intervals_j[f'intervals{i}.list'] for i in range(scatter_count)]
+    intervals = [intervals_j[f'{i}.interval_list'] for i in range(scatter_count)]
     jobs.append(intervals_j)
 
     if input_vcf_or_mt_path.name.endswith('.mt'):
