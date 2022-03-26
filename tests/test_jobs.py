@@ -289,26 +289,29 @@ class TestJobs(unittest.TestCase):
             'vqsr.vcf.gz'
         )
         out_vcf_path = self.out_bucket / 'vep' / 'vep.vcf.gz'
-
-        j = vep.vep(
+        jobs = vep.vep(
             self.pipeline.b, 
             vcf_path=site_only_vcf_path,
             refs=self.refs,
+            sequencing_type=self.sequencing_type,
             out_vcf_path=out_vcf_path,
+            scatter_count=10,
         )
-        self.pipeline.submit_batch(wait=True)
-
+        
         test_j = self.pipeline.b.new_job('Parse GVCF sample name')
         test_j.image(images.BCFTOOLS_IMAGE)
         test_j.command(f"""
-        bcftools +split-vep {j.out_vcf} \
+        bcftools +split-vep {self.pipeline.b.read_input(str(out_vcf_path))} \
         -f '%CHROM:%POS %SYMBOL %BIOTYPE %MANE_SELECT %LoF %LoF_filter\n' \
         -i'BIOTYPE="protein_coding" & LoF_filter="ANC_ALLELE"' -s worst \
         > {test_j.output}
         """)
+        test_j.depends_on(*jobs)
+        self.pipeline.submit_batch(wait=True)
+
+        self.assertTrue(out_vcf_path.exists())
         res_path = self.out_bucket / f'{self.sample.id}.out'
         self.pipeline.b.write_output(test_j.output, str(res_path))
-        self.assertTrue(out_vcf_path.exists())
         contents = _read_file(res_path)
         self.assertEqual(
             'chr20:5111495 TMEM230 protein_coding NM_001009923.2 LC ANC_ALLELE', 

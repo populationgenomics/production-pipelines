@@ -213,9 +213,10 @@ def genomicsdb(
         out_path = path_per_interval[idx]
 
         job_name = 'Joint genotyping: creating GenomicsDB'
-        if idx is not None:
-            job_name += f' {idx + 1}/{scatter_count}'
-        j = b.new_job(job_name, (job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}'))
+        j = b.new_job(
+            job_name, 
+            (job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}')
+        )
         job_per_interval[idx] = j
 
         if utils.can_reuse(out_path, overwrite):
