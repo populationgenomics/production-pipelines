@@ -5,8 +5,8 @@ Extending the Hail's `Batch` class.
 import logging
 import os
 
-import hailtop.batch as hb
 from cloudpathlib import CloudPath
+import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from .. import Path, to_path
@@ -37,15 +37,16 @@ class Batch(hb.Batch):
         statistics.
         """
         if not name:
-            logger.critical('Error: job name must be defined')
+            raise ValueError('Error: job name must be defined')
         
         attributes = attributes or dict()
         dataset = attributes.get('dataset')
         sample = attributes.get('sample')
         samples = attributes.get('samples')
+        intervals = attributes.get('intervals')
         label = attributes.get('label', name)
 
-        name = job_name(name, sample, dataset)
+        name = make_job_name(name, sample, dataset, intervals)
 
         if label and (sample or samples):
             if label not in self.labelled_jobs:
@@ -114,18 +115,30 @@ def get_billing_project(billing_project: str | None = None) -> str:
     return billing_project
 
 
-def job_name(name, sample: str = None, dataset: str = None) -> str:
+def make_job_name(
+    name: str, 
+    sample: str | None = None, 
+    dataset: str | None = None,
+    intervals: str | None = None,
+) -> str:
     """
-    Extend the descriptive job name to reflect the dataset and the sample names
+    Extend the descriptive job name to reflect job attributes:
+    dataset name, sample names, intervals name.
     """
     if sample and dataset:
         name = f'{dataset}/{sample}: {name}'
     elif dataset:
         name = f'{dataset}: {name}'
+    if intervals:
+        name += f', {intervals}'
     return name
 
 
-def hail_query_env(j: Job, hail_billing_project: str, hail_bucket: Path | None = None):
+def hail_query_env(
+    j: Job, 
+    hail_billing_project: str, 
+    hail_bucket: Path | None = None
+):
     """
     Setup environment to run Hail Query Service backend script.
     """

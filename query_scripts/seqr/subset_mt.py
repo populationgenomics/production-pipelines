@@ -44,10 +44,10 @@ def main(
 
     mt = hl.read_matrix_table(mt_path)
     logger.info(f'Size of mt: {mt.count()}')
-    
+
     logger.info('Subsetting to the requested set of samples')
     if subset_tsv_path:
-        mt = _subset_samples_and_variants(mt, subset_tsv_path)
+        mt = _subset_samples(mt, subset_tsv_path)
         logger.info(f'Size of mt after subsetting: {mt.count()}')
 
     logger.info('Annotating genotypes')
@@ -83,7 +83,7 @@ def main(
     mt.write(out_mt_path, overwrite=True)
 
 
-def _subset_samples_and_variants(mt, subset_tsv_path: str) -> hl.MatrixTable:
+def _subset_samples(mt, subset_tsv_path: str) -> hl.MatrixTable:
     """
     Subset the MatrixTable to the provided list of samples and to variants present
     in those samples
@@ -138,18 +138,18 @@ class SeqrGenotypesSchema(BaseMTSchema):
             }
         )
 
-    # @row_annotation(fn_require=genotypes)
-    # def samples_gq(self, start=0, end=95, step=5):
-    #     # struct of x_to_y to a set of samples in range of x and y for gq.
-    #     return hl.struct(
-    #         **{
-    #             ('%i_to_%i' % (i, i + step)): 
-    #             self._genotype_filter_samples(
-    #                 lambda g: ((g.gq >= i) & (g.gq < i + step))
-    #             )
-    #             for i in range(start, end, step)
-    #         }
-    #     )
+    @row_annotation(fn_require=genotypes)
+    def samples_gq(self, start=0, end=95, step=5):
+        # struct of x_to_y to a set of samples in range of x and y for gq.
+        return hl.struct(
+            **{
+                ('%i_to_%i' % (i, i + step)): 
+                self._genotype_filter_samples(
+                    lambda g: ((g.gq >= i) & (g.gq < i + step))
+                )
+                for i in range(start, end, step)
+            }
+        )
 
     @row_annotation(fn_require=genotypes)
     def samples_ab(self, start=0, end=45, step=5):

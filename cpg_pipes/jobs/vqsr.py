@@ -300,7 +300,7 @@ def make_vqsr_jobs(
             b,
             input_vcfs=scattered_vcfs,
             overwrite=overwrite,
-            output_vcf_path=output_vcf_path,
+            out_vcf_path=output_vcf_path,
             site_only=True,
         )
         recalibrated_gathered_vcf_j.name = f'VQSR: {recalibrated_gathered_vcf_j.name}'

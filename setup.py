@@ -24,13 +24,13 @@ setuptools.setup(
     install_requires=[
         'click',
         'pandas',
-        'hail>=0.2.90',
+        'hail>=0.2.91',
         'cpg-gnomad',   # github.com/populationgenomics/gnomad_methods
         'google-cloud-storage',
         'fsspec',
         'sample-metadata',
         'analysis-runner',
-        'cloudpathlib[gs]',
+        'cloudpathlib[all]',
         'coloredlogs',
         'types-PyYAML',  # https://mypy.readthedocs.io/en/stable/getting_started.html#library-stubs-and-typeshed
     ],
@@ -38,7 +38,7 @@ setuptools.setup(
     classifiers=[
         'Environment :: Console',
         'Intended Audience :: Science/Research',
-        'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+        'License :: OSI Approved :: MIT License',
         'Natural Language :: English',
         'Operating System :: MacOS :: MacOS X',
         'Operating System :: POSIX',

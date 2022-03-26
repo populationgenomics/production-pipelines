@@ -11,10 +11,10 @@ from cpg_pipes.pipeline import (
     StageOutput,
     CohortStage
 )
-from cpg_pipes.stages.joint_genotyping import JointGenotypingStage
+from cpg_pipes.stages.vqsr import VqsrStage
 
 
-@stage(required_stages=[JointGenotypingStage])
+@stage(required_stages=[VqsrStage])
 class VepStage(CohortStage):
     """
     Run VEP on a VCF
@@ -23,16 +23,18 @@ class VepStage(CohortStage):
         """
         Expected to write a matrix table.
         """
-        return cohort.analysis_dataset.get_tmp_bucket() / 'vep' / 'cohort-vep.vcf.gz'
+        return cohort.analysis_dataset.get_tmp_bucket() / 'vep' / 'siteonly-vep.vcf.gz'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
         Uses jobs vep() function.
         """
-        j = vep.vep(
+        jobs = vep.vep(
             self.b,
-            vcf_path=inputs.as_path(cohort, stage=JointGenotypingStage, id='vcf'),
+            vcf_path=inputs.as_path(cohort, stage=VqsrStage),
             refs=self.refs,
+            sequencing_type=cohort.get_sequencing_type(),
             out_vcf_path=self.expected_result(cohort),
+            scatter_count=self.pipeline_config.get('jc_intervals_num'),
         )
-        return self.make_outputs(cohort, self.expected_result(cohort), [j])
+        return self.make_outputs(cohort, self.expected_result(cohort), jobs)

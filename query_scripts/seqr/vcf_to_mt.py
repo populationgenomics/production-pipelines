@@ -99,6 +99,7 @@ def main(
             site_only_vqsr_vcf_path,
             output_ht_path=join(work_bucket, 'vqsr.ht'),
             overwrite=overwrite,
+            load_vep=not run_vep,
         )
         mt = annotate_vqsr(mt, vqsr_ht)
         mt = add_37_coordinates(mt)
@@ -163,6 +164,7 @@ def load_vqsr(
     site_only_vqsr_vcf_path: str,
     output_ht_path: str,
     overwrite: bool = False,
+    load_vep: bool = False,
 ):
     """
     Loads the VQSR'ed site-only VCF into a site-only hail table. Populates ht.filters

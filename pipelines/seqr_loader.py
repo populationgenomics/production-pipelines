@@ -34,13 +34,6 @@ from cpg_pipes.stages.vqsr import VqsrStage
 logger = logging.getLogger(__file__)
 
 
-def get_anno_tmp_bucket(cohort: Cohort) -> Path:
-    """
-    Path to write Hail Query intermediate files
-    """
-    return cohort.analysis_dataset.get_tmp_bucket() / 'mt'
-
-
 @stage(required_stages=[JointGenotypingStage, VqsrStage])
 class AnnotateCohortStage(CohortStage):
     """
@@ -50,24 +43,30 @@ class AnnotateCohortStage(CohortStage):
         """
         Expected to write a matrix table.
         """
-        return get_anno_tmp_bucket(cohort) / 'combined.mt'
+        samples_hash = utils.hash_sample_ids(cohort.get_sample_ids())
+        return (
+            cohort.analysis_dataset.get_tmp_bucket() /
+            'mt' /
+            f'{samples_hash}' /
+            'annotated-cohort.mt'
+        )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        checkpoints_bucket = get_anno_tmp_bucket(cohort) / 'checkpoints'
-
         vcf_path = inputs.as_path(target=cohort, stage=JointGenotypingStage, id='vcf')
         annotated_siteonly_vcf_path = inputs.as_path(target=cohort, stage=VqsrStage)
 
-        expected_path = self.expected_result(cohort)
+        mt_path = self.expected_result(cohort)
+        checkpoints_bucket = mt_path.parent / 'checkpoints'
+
         j = dataproc.hail_dataproc_job(
             self.b,
             f'{utils.QUERY_SCRIPTS_DIR}/seqr/vcf_to_mt.py '
             f'--vcf-path {vcf_path} '
             f'--site-only-vqsr-vcf-path {annotated_siteonly_vcf_path} '
-            f'--dest-mt-path {expected_path} '
+            f'--dest-mt-path {mt_path} '
             f'--bucket {checkpoints_bucket} '
             f'--disable-validation '
             f'--make-checkpoints '
@@ -88,7 +87,7 @@ class AnnotateCohortStage(CohortStage):
             num_secondary_workers=50,
             num_workers=8,
         )
-        return self.make_outputs(cohort, data=expected_path, jobs=[j])
+        return self.make_outputs(cohort, data=mt_path, jobs=[j])
 
 
 @stage(required_stages=[AnnotateCohortStage])

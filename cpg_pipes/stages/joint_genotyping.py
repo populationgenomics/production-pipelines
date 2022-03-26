@@ -66,6 +66,7 @@ class JointGenotypingStage(CohortStage):
             out_vcf_path=self.expected_result(cohort)['vcf'],
             out_siteonly_vcf_path=self.expected_result(cohort)['siteonly'],
             samples=cohort.get_samples(),
+            sequencing_type=cohort.get_sequencing_type(),
             genomicsdb_bucket=cohort.analysis_dataset.get_bucket() / 'genomicsdbs',
             tmp_bucket=cohort.analysis_dataset.get_tmp_bucket(),
             gvcf_by_sid=gvcf_by_sid,
