@@ -99,6 +99,10 @@ def _vep_one(
     if not isinstance(vcf, hb.Resource):
         vcf = b.read_input(str(vcf))
 
+    j.declare_resource_group(
+        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+
     cmd = f"""\
     CACHE_DIR=/io/batch/cache
     LOFTEE_DIR=/io/batch/loftee
@@ -114,6 +118,8 @@ def _vep_one(
     vep \\
     --vcf \\
     --format vcf \\
+    --compress_output bgzip \\
+    -o {j.output_vcf['vcf.gz']} \\
     -i {vcf} \\
     --everything \\
     --allele_number \\
@@ -123,9 +129,9 @@ def _vep_one(
     --dir_cache $CACHE_DIR/vep/ \\
     --dir_plugins $LOFTEE_PLUGIN_PATH \\
     --fasta $FASTA \\
-    --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \\
-    -o {j.output_vcf} \\
-    --compress_output bgzip
+    --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())}
+    
+    tabix -p vcf {j.output_vcf['vcf.gz']}
     """
     j.command(wrap_command(
         cmd, 
@@ -134,5 +140,5 @@ def _vep_one(
         define_retry_function=True
     ))
     if out_vcf_path:
-        b.write_output(j.output_vcf, str(out_vcf_path))
+        b.write_output(j.output_vcf, str(out_vcf_path).replace('.vcf.gz', ''))
     return j
