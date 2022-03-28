@@ -7,7 +7,7 @@ import os
 
 from cloudpathlib import CloudPath
 import hailtop.batch as hb
-from hailtop.batch.job import Job
+from hailtop.batch.job import Job, PythonJob
 
 from .. import Path, to_path
 
@@ -25,20 +25,19 @@ class Batch(hb.Batch):
         self.labelled_jobs = dict()
         self.other_job_num = 0
         self.total_job_num = 0
-
-    def new_job(
+    
+    def _process_attributes(
         self,
         name: str | None = None,
         attributes: dict[str, str] | None = None,
-        **kwargs,
-    ) -> Job:
+    ):
         """
-        Adds job to the Batch, and also registers it in `self.job_stats` for
-        statistics.
+        Use job attributes to make the job name more descriptibe, and add
+        labels for Batch pre-submission stats.
         """
         if not name:
             raise ValueError('Error: job name must be defined')
-        
+
         attributes = attributes or dict()
         dataset = attributes.get('dataset')
         sample = attributes.get('sample')
@@ -56,8 +55,30 @@ class Batch(hb.Batch):
         else:
             self.other_job_num += 1
         self.total_job_num += 1
-        j = super().new_job(name, attributes=attributes)
-        return j
+        return name
+
+    def new_python_job(
+        self,
+        name: str | None = None,
+        attributes: dict[str, str] | None = None,
+    ) -> PythonJob:
+        """
+        Wrapper around `new_python_job()` that processes job attributes.
+        """
+        name = self._process_attributes(name, attributes)
+        return super().new_python_job(name, attributes=attributes)
+
+    def new_job(
+        self,
+        name: str | None = None,
+        attributes: dict[str, str] | None = None,
+        **kwargs,
+    ) -> Job:
+        """
+        Wrapper around `new_job()` that processes job attributes.
+        """
+        name = self._process_attributes(name, attributes)
+        return super().new_job(name, attributes=attributes)
 
 
 def setup_batch(
@@ -122,8 +143,7 @@ def make_job_name(
     intervals: str | None = None,
 ) -> str:
     """
-    Extend the descriptive job name to reflect job attributes:
-    dataset name, sample names, intervals name.
+    Extend the descriptive job name to reflect job attributes.
     """
     if sample and dataset:
         name = f'{dataset}/{sample}: {name}'
