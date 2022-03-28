@@ -313,7 +313,9 @@ class Stage(Generic[TargetT], ABC):
         name: str,
         batch: Batch,
         refs: RefData,
+        pipeline_tmp_bucket: Path,
         hail_billing_project: str,
+        hail_bucket: Path | None = None,
         required_stages: list[StageDecorator] | StageDecorator | None = None,
         analysis_type: str | None = None,
         skipped: bool = False,
@@ -325,12 +327,13 @@ class Stage(Generic[TargetT], ABC):
         check_intermediates: bool = False,
         status_reporter: StatusReporter | None = None,
         pipeline_config: dict[str, Any] | None = None,
-        hail_bucket: Path | None = None,
     ):
         """
         @param name: name of the stage
         @param batch: Hail Batch object
         @param refs: reference data for bioinformatics
+        @param pipeline_tmp_bucket: pipeline temporary bucket
+        @param hail_bucket: Hail Batch bucket
         @param hail_billing_project: Hail Batch billing project
         @param required_stages: list of stage classes that this stage requires
         @param analysis_type: if defined, will query the SMDB Analysis entries 
@@ -346,7 +349,6 @@ class Stage(Generic[TargetT], ABC):
             This option makes the downstream stages assume that the output exist.
         @param forced: run self.queue_jobs(), even if we can reuse the 
             self.expected_output().
-        @param hail_bucket: Hail Batch bucket
         """
         self._name = name
         self.b = batch
@@ -362,7 +364,9 @@ class Stage(Generic[TargetT], ABC):
                 self.required_stages_classes.extend(required_stages)
             else:
                 self.required_stages_classes.append(required_stages)
-
+        
+        self.tmp_bucket = pipeline_tmp_bucket / name
+        
         # Populated in pipeline.run(), after we know all stages
         self.required_stages: list[Stage] = []
 
@@ -380,7 +384,7 @@ class Stage(Generic[TargetT], ABC):
         self.assume_outputs_exist = assume_outputs_exist
 
         self.pipeline_config = pipeline_config or {}
-        
+
         self.hail_billing_project = hail_billing_project
         self.hail_bucket = hail_bucket
 
@@ -594,6 +598,10 @@ def stage(
             return _cls(
                 name=_cls.__name__,
                 batch=pipeline.b,
+                refs=pipeline.refs,
+                pipeline_tmp_bucket=pipeline.tmp_bucket,
+                hail_billing_project=pipeline.hail_billing_project,
+                hail_bucket=pipeline.hail_bucket,
                 required_stages=required_stages,
                 analysis_type=analysis_type,
                 skipped=skipped,
@@ -604,9 +612,6 @@ def stage(
                 check_expected_outputs=pipeline.check_expected_outputs,
                 check_intermediates=pipeline.check_intermediates,
                 pipeline_config=pipeline.config,
-                refs=pipeline.refs,
-                hail_billing_project=pipeline.hail_billing_project,
-                hail_bucket=pipeline.hail_bucket,
             )
         # We record each initialised Stage subclass, so we know the default stage
         # list for the case when the user doesn't pass them explicitly with set_stages()
