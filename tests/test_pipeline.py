@@ -127,7 +127,7 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(_cnt('GatherVcfsCloud'), 2)
         self.assertEqual(
             _cnt('hailctl dataproc submit'), 
-            1 + len(self.datasets) * 3
+            1 + len(self.datasets)
         )
 
 

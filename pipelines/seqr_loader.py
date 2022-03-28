@@ -178,38 +178,6 @@ def _read_es_password(
     return subprocess.check_output(cmd, shell=True).decode()
 
 
-@stage(required_stages=[AnnotateDatasetStage])
-class ToVcfStage(DatasetStage):
-    """
-    Convers the annotated matrix table to a pVCF
-    """
-    def expected_outputs(self, dataset: Dataset) -> Path:
-        """
-        Generates an indexed VCF
-        """
-        return dataset.get_analysis_bucket() / 'vcf' / f'{dataset.name}.vcf.bgz'
-
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        """
-        Uses analysis-runner's dataproc helper to run a hail query script
-        """
-        dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetStage)
-
-        j = dataproc.hail_dataproc_job(
-            self.b,
-            f'{utils.QUERY_SCRIPTS_DIR}/seqr/mt_to_vcf.py '
-            f'--mt-path {dataset_mt_path} '
-            f'--out-vcf-path {self.expected_outputs(dataset)}',
-            max_age='8h',
-            packages=utils.DATAPROC_PACKAGES,
-            num_secondary_workers=20,
-            num_workers=5,
-            job_name=f'{dataset.name}: export to VCF',
-            depends_on=inputs.get_jobs(),
-        )
-        return self.make_outputs(dataset, self.expected_outputs(dataset), jobs=[j])
-
-
 def _make_seqr_metadata_files(
     dataset: Dataset, 
     bucket: Path,
