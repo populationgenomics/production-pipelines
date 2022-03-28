@@ -1,8 +1,8 @@
 """
-Provides `Pipeline` class and a `@stage` decorator that allow to define pipeline
-stages and plug them together.
+Provides a `create_pipeline` function and a `@stage` decorator that allow to define 
+pipeline stages and plug them together into a `Pipeline` instance.
 
-A Stage describes the job that are added to Hail Batch, and outputs that are expected
+A `Stage` describes the job that are added to Hail Batch, and outputs that are expected
 to be produced. Each stage acts on a `Target`, which can be of a different level:
 a `Sample`, a `Dataset`, a `Cohort` (= all input datasets combined). Pipeline plugs
 stages together by resolving dependencies between different levels accordingly.
@@ -694,13 +694,13 @@ def create_pipeline(
     local_dir: Path | None = None,
 ) -> 'Pipeline':
     """
-    Create a Pipeline instance.
+    Create a Pipeline instance. All options correspond to command line parameters 
+    described in `pipeline_click_options` in the `cli_opts` module
     """
-    if storage_policy == StoragePolicy.CPG:
-        storage_provider = CpgStorageProvider(cloud)
-    else:
+    if storage_policy != StoragePolicy.CPG:
         raise PipelineError(f'Unsupported storage policy {storage_policy}')
 
+    storage_provider = CpgStorageProvider(cloud)
     cohort = Cohort(
         name,
         analysis_dataset_name=analysis_dataset,
@@ -736,13 +736,9 @@ def create_pipeline(
         description += ': ' + ', '.join(input_datasets)
 
     tmp_bucket = to_path(
-        cohort.analysis_dataset.get_tmp_bucket(
-            version=f'{name}/{version}'
-        )
+        cohort.analysis_dataset.get_tmp_bucket(version=f'{name}/{version}')
     )
-    hail_billing_project = get_billing_project(
-        cohort.analysis_dataset.stack
-    )
+    hail_billing_project = get_billing_project(cohort.analysis_dataset.stack)
     hail_bucket = tmp_bucket / 'hail'
     batch: Batch = setup_batch(
         description=description, 
@@ -783,10 +779,11 @@ def create_pipeline(
         check_expected_outputs=check_expected_outputs,
         skip_samples_with_missing_input=skip_samples_with_missing_input,
         config=config,
+        tmp_bucket=tmp_bucket,
         local_dir=local_dir,
         dry_run=dry_run,
         keep_scratch=keep_scratch,
-    )    
+    )
     
 
 class Pipeline:
@@ -811,6 +808,7 @@ class Pipeline:
         check_expected_outputs: bool = True,
         skip_samples_with_missing_input: bool = False,
         config: dict | None = None,
+        tmp_bucket: Path | None = None,
         local_dir: Path | None = None,
         dry_run: bool = False,
         keep_scratch: bool = True,
@@ -823,6 +821,7 @@ class Pipeline:
         self.b = batch
         self.hail_billing_project = hail_billing_project
         self.hail_bucket = hail_bucket
+        self.tmp_bucket = tmp_bucket
         self.status_reporter = status_reporter
         
         self.dry_run = dry_run
@@ -853,7 +852,7 @@ class Pipeline:
         wait: bool | None = False,
     ) -> Any | None:
         """
-        Submits Hail Batch jobs.
+        Add and submit Hail Batch jobs.
         """
         if dry_run is None:
             dry_run = self.dry_run
@@ -879,7 +878,9 @@ class Pipeline:
         return None
 
     def _validate_first_last_stage(self) -> tuple[int | None, int | None]:
-        # Validating the --first-stage and --last-stage parameters
+        """
+        Validating the --first-stage and --last-stage parameters.
+        """
         stage_names = list(self._stages_dict.keys())
         lower_stage_names = [s.lower() for s in stage_names]
         first_stage_num = None
