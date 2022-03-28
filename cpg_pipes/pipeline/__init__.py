@@ -1,5 +1,5 @@
 from .pipeline import (
-    Pipeline,
+    create_pipeline,
     stage, 
     skip, 
     StageInput, 
@@ -17,3 +17,19 @@ from .targets import (
     Dataset,
     Cohort,
 )
+
+__all__ = [
+    'create_pipeline',
+    'stage',
+    'skip',
+    'StageInput',
+    'StageOutput',
+    'pipeline_click_options',
+    'PipelineError',
+    'SampleStage',
+    'DatasetStage',
+    'CohortStage',
+    'Sample',
+    'Dataset',
+    'Cohort',
+]
