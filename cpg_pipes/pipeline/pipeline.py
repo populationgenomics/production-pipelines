@@ -344,7 +344,7 @@ class Stage(Generic[TargetT], ABC):
         @param analysis_type: if defined, will query the SMDB Analysis entries 
             of this type
         @param skipped: means that the stage is skipped and self.queue_jobs()
-            won't run. The other stages if depend on it can aassume that that 
+            won't run. The other stages if depend on it can assume that 
             self.expected_result() returns existing files and target.ouptut_by_stage 
             will be populated.
         @param required: means that the self.expected_output() results are 
