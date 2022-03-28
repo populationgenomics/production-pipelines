@@ -1,5 +1,5 @@
 from .pipeline import (
-    Pipeline,
+    create_pipeline,
     stage, 
     skip, 
     StageInput, 

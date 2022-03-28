@@ -21,7 +21,7 @@ from cpg_pipes.pipeline import (
     Cohort, 
     Dataset, 
     stage, 
-    Pipeline, 
+    create_pipeline, 
     StageInput,
     StageOutput,
     CohortStage, 
@@ -308,7 +308,7 @@ def main(
     """
     make_seqr_metadata = kwargs.pop('make_seqr_metadata')
 
-    pipeline = Pipeline(
+    pipeline = create_pipeline(
         name='seqr_loader',
         description='Seqr loader',
         config=dict(

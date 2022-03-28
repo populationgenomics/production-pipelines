@@ -11,7 +11,7 @@ import logging
 from cpg_pipes import benchmark, images, Namespace
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
 from cpg_pipes.types import FastqPair, CramPath
-from cpg_pipes.pipeline import stage, Pipeline, SampleStage, StageInput, StageOutput
+from cpg_pipes.pipeline import stage, create_pipeline, SampleStage, StageInput, StageOutput
 from cpg_pipes.pipeline.targets import Sample
 
 logger = logging.getLogger(__file__)
@@ -54,12 +54,12 @@ class SubsetAlignmentInput(SampleStage):
         j1 = self.b.new_job('Subset FQ1', dict(sample=sample.id))
         j1.storage('100G')
         j1.command(f'gunzip -c {fqs1[0]} | head -n{lines} | gzip -c > {j1.out_fq}')
-        self.b.write_output(j1.out_fq, self.expected_outputs(sample)['r1'])
+        self.b.write_output(j1.out_fq, str(self.expected_outputs(sample)['r1']))
 
         j2 = self.b.new_job('Subset FQ2')
         j2.storage('100G')
         j2.command(f'gunzip -c {fqs2[0]} | head -n{lines} | gzip -c > {j2.out_fq}')
-        self.b.write_output(j2.out_fq, self.expected_outputs(sample)['r2'])
+        self.b.write_output(j2.out_fq, str(self.expected_outputs(sample)['r2']))
         
         return self.make_outputs(
             sample,
@@ -181,7 +181,7 @@ def main():
     """
     Entry point.
     """
-    pipeline = Pipeline(
+    pipeline = create_pipeline(
         name='benchmark_alignment',
         description='Benchmark alignment',
         analysis_dataset=DATASET,

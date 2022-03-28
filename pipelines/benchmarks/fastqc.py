@@ -9,7 +9,7 @@ import click
 
 from cpg_pipes import to_path, Namespace
 from cpg_pipes import benchmark
-from cpg_pipes.pipeline import Pipeline
+from cpg_pipes.pipeline import create_pipeline
 from cpg_pipes.jobs.fastqc import fastqc
 
 logger = logging.getLogger(__file__)
@@ -24,7 +24,7 @@ def main():  # pylint: disable=missing-function-docstring
     """
     Entry point
     """
-    pipe = Pipeline(
+    pipe = create_pipeline(
         analysis_dataset='fewgenomes',
         name='run_qc',
         namespace=NAMESPACE,
@@ -45,6 +45,7 @@ def main():  # pylint: disable=missing-function-docstring
             output_html_path=prefix / f'{sample_name}.html',
             output_zip_path=prefix / f'{sample_name}.zip',
             alignment_input=inp,
+            refs=pipe.refs,
         )
     
     pipe.submit_batch()

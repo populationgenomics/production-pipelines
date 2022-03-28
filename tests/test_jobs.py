@@ -22,7 +22,7 @@ from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
 from cpg_pipes.jobs.seqr_loader import annotate_dataset
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.types import CramPath, SequencingType
-from cpg_pipes.pipeline import Pipeline
+from cpg_pipes.pipeline import create_pipeline
 from cpg_pipes import images
 
 try:
@@ -53,7 +53,7 @@ class TestJobs(unittest.TestCase):
         self.timestamp = time.strftime('%Y%m%d-%H%M')
         self.local_tmp_dir = tempfile.mkdtemp()
 
-        self.pipeline = Pipeline(
+        self.pipeline = create_pipeline(
             name=self.name,
             description=self.name,
             analysis_dataset=DATASET,
@@ -249,6 +249,7 @@ class TestJobs(unittest.TestCase):
             overwrite=True,
             scatter_count=10,
             tool=JointGenotyperTool.GenotypeGVCFs,
+            sequencing_type=self.pipeline.cohort.get_sequencing_type(),
         )
         test_result_path = self._job_get_gvcf_header(out_vcf_path, jobs)
         self.pipeline.submit_batch(wait=True)     
@@ -336,7 +337,7 @@ class TestJobs(unittest.TestCase):
         Test subset_mt.py script from seqr_loader.
         """
         dataset = 'seqr'
-        pipeline = Pipeline(
+        pipeline = create_pipeline(
             name=self.name,
             description=self.name,
             analysis_dataset=dataset,

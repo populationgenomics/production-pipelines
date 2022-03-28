@@ -12,7 +12,7 @@ from cpg_pipes.utils import exists
 from cpg_pipes.pipeline import (
     pipeline_click_options, 
     stage, 
-    Pipeline, 
+    create_pipeline, 
     Dataset,
     StageInput, 
     StageOutput, 
@@ -104,7 +104,7 @@ def main(
     """
     Entry point, decorated by pipeline click options.
     """
-    pipeline = Pipeline(
+    pipeline = create_pipeline(
         name='cram_qc',
         description='CRAM QC',
         **kwargs,

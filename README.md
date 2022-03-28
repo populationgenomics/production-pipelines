@@ -71,9 +71,8 @@ class ReadCramFile(SampleStage):
 Stage of differnet levels can depend on each other, and `cpg_pipes` will resolve that correctly. E.g. joint-calling taking GVCF outputs to produce a cohort-level VCF:
 
 ```python
-from cpg_pipes.pipeline import stage, StageInput, StageOutput, Sample, SampleStage,
+from cpg_pipes.pipeline import stage, StageInput, StageOutput, Sample, SampleStage,\
     Cohort, CohortStage
-
 
 @stage()
 class HaplotypeCaller(SampleStage):
@@ -97,15 +96,15 @@ class JointCalling(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[job])
 ```
 
-To submit the constructed pipeline to Hail Batch, initialise the `Pipeline` object, and call `submit_batch()`. You need to pass a name, a description, a version of a run, the namespace according to the storage policies (`test` / `main` / `tmp`), and the `analysis_dataset` name that would be used to communicate with the sample metadata DB.
+To submit the constructed pipeline to Hail Batch, create a pipeline with `create_pipeline`, and call `submit_batch()`. You need to pass a name, a description, a version of a run, the namespace according to the storage policies (`test` / `main` / `tmp`), and the `analysis_dataset` name that would be used to communicate with the sample metadata DB.
 
 ```python
-from cpg_pipes.pipeline import Pipeline
+from cpg_pipes.pipeline import create_pipeline
 from cpg_pipes import Namespace
 
-pipeline = Pipeline(
+pipeline = create_pipeline(
     name='my_pipeline',
-    description='My Pipeline',
+    description='My pipeline',
     namespace=Namespace.TEST,
     analysis_dataset='fewgenomes',
 )
@@ -126,7 +125,7 @@ hgdp,NA12879,NA12879,NA12879_R1.fq.gz|NA12879_R2.fq.gz,,M
 ```python
 from cpg_pipes.providers import InputProviderType
 
-pipeline = Pipeline(
+pipeline = create_pipeline(
     <...>,
     input_provider_type=InputProviderType.CSV,
     input_csv='inputs.csv',
@@ -138,7 +137,7 @@ pipeline = Pipeline(
 ```python
 from cpg_pipes.providers import InputProviderType
 
-pipeline = Pipeline(
+pipeline = create_pipeline(
     <...>,
     input_datasets=['hgdp'],
     input_provider_type=InputProviderType.SMDB,
@@ -162,7 +161,7 @@ If a `Participant` entry is available, `sample.participant_id` will be populated
 
 ### Storage policies
 
-Outputs are written according to provided storage policy. Class `cpg_pipes.providers.StoragePolicy` provides an interface for abstract policy, with one implementation: `CpgStoragePolicy`, which implements the [CPG storage policy](https://github.com/populationgenomics/team-docs/tree/main/storage_policies). The default cloud storage provider is Google Cloud Storage, which can be overridden with `cloud=Cloud.AZ` parameter to `Pipeline` (or `--cloud=az` in the command line).
+Outputs are written according to provided storage policy. Class `cpg_pipes.providers.StoragePolicy` provides an interface for abstract policy, with one implementation: `CpgStoragePolicy`, which implements the [CPG storage policy](https://github.com/populationgenomics/team-docs/tree/main/storage_policies). The default cloud storage provider is Google Cloud Storage, which can be overridden with `cloud=Cloud.AZ` parameter to `create_pipeline` (or `--cloud=az` in the command line).
 
 ### Bioinformatics jobs
 
@@ -295,33 +294,33 @@ The `cpg_pipes/pipeline/cli_opts.py` module provides CLI options for Click that 
 
 ```python
 import click
-from cpg_pipes.pipeline import Pipeline, pipeline_click_options
+from cpg_pipes.pipeline import create_pipeline, pipeline_click_options
 
 @click.command()
 @pipeline_click_options
 def main(**kwargs):
-    pipeline = Pipeline(
+    pipeline = create_pipeline(
         name='my_pipeline',
         description='My pipeline',
         **kwargs,
     )
 ```
 
-When calling such a pipelne script from the command-line, the options defined in `@pipeline_click_options` will be available and passed to the `Pipeline` initialiser.
+When calling such a pipelne script from the command-line, the options defined in `@pipeline_click_options` will be available and passed to the `create_pipeline` factory.
 
 You can add more custom options like this:
 
 ```python
 import click
-from cpg_pipes.pipeline.cli_opts import pipeline_click_options
-from cpg_pipes.pipeline.pipeline import Pipeline
+from cpg_pipes.pipeline import pipeline_click_options, create_pipeline
+
 
 @click.command()
 @pipeline_click_options
 @click.option('--custom-option')
 def main(**kwargs):
     custom_option = kwargs.pop('custom_option')
-    pipeline = Pipeline(
+    pipeline = create_pipeline(
         name='my_pipeline',
         description='My pipeline',
         **kwargs,

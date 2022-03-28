@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import patch
 
 from cpg_pipes import Namespace, to_path
+from cpg_pipes.pipeline import create_pipeline
 from cpg_pipes.types import SequencingType
 
 try:
@@ -49,7 +50,7 @@ class TestPipeline(unittest.TestCase):
         # are used by default:
         from pipelines import seqr_loader  # noqa: F401
         
-        pipeline = Pipeline(
+        pipeline = create_pipeline(
             name=self._testMethodName,
             description=self._testMethodName,
             analysis_dataset=DATASET,
