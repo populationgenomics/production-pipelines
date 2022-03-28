@@ -1,6 +1,6 @@
 """
-Provides a `create_pipeline` function and a `@stage` decorator that allow to define 
-pipeline stages and plug them together into a `Pipeline` instance.
+Provides a `Pipeline` class and a `@stage` decorator that allow to define 
+pipeline stages and plug them together.
 
 A `Stage` describes the job that are added to Hail Batch, and outputs that are expected
 to be produced. Each stage acts on a `Target`, which can be of a different level:
@@ -16,33 +16,22 @@ import shutil
 import tempfile
 import time
 from abc import ABC, abstractmethod
-from typing import Callable, cast, Union, TypeVar, Generic, Any, Optional, Type
+from typing import cast, Callable, Union, TypeVar, Generic, Any, Optional, Type
 
-from cloudpathlib import CloudPath
 import hailtop.batch as hb
+from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 
 from .exceptions import PipelineError
 from .targets import Target, Dataset, Sample, Cohort
 from .. import Path, to_path
+from ..hb.batch import Batch
 from ..providers import (
-    Cloud,
     Namespace,
-    StoragePolicy,
-    StatusReporterType,
-    InputProviderType,
 )
-from ..providers.inputs import InputProvider, CsvInputProvider
 from ..providers.status import StatusReporter
-from ..providers.cpg import (
-    CpgStorageProvider,
-    SmdbStatusReporter,
-    SmdbInputProvider,
-    SMDB,
-)
 from ..refdata import RefData
 from ..utils import exists
-from ..hb.batch import Batch, setup_batch, get_billing_project
 
 logger = logging.getLogger(__file__)
 
@@ -666,126 +655,6 @@ def skip(
         return decorator_stage(_fun)
 
 
-def create_pipeline(
-    analysis_dataset: str,
-    name: str,
-    description: str,
-    namespace: Namespace,
-    storage_policy: StoragePolicy = StoragePolicy.CPG,
-    cloud: Cloud = Cloud.GS,
-    status_reporter_type: StatusReporterType = StatusReporterType.NONE,
-    input_provider_type: InputProviderType = InputProviderType.NONE,
-    input_csv: str | None = None,
-    stages: list[StageDecorator] | None = None,
-    dry_run: bool = False,
-    keep_scratch: bool = True,
-    version: str | None = None,
-    skip_samples_with_missing_input: bool = False,
-    check_intermediates: bool = True,
-    check_expected_outputs: bool = True,
-    first_stage: str | None = None,
-    last_stage: str | None = None,
-    config: dict | None = None,
-    input_datasets: list[str] | None = None,
-    skip_samples: list[str] | None = None,
-    only_samples: list[str] | None = None,
-    force_samples: list[str] | None = None,
-    ped_files: list[Path] | None = None,
-    local_dir: Path | None = None,
-) -> 'Pipeline':
-    """
-    Create a Pipeline instance. All options correspond to command line parameters 
-    described in `pipeline_click_options` in the `cli_opts` module
-    """
-    if storage_policy != StoragePolicy.CPG:
-        raise PipelineError(f'Unsupported storage policy {storage_policy}')
-
-    storage_provider = CpgStorageProvider(cloud)
-    cohort = Cohort(
-        name,
-        analysis_dataset_name=analysis_dataset,
-        namespace=namespace,
-        storage_provider=storage_provider
-    )
-    refs = RefData(storage_provider.get_ref_bucket())
-
-    status_reporter: StatusReporter | None = None
-    input_provider: InputProvider | None = None
-    if (
-        input_provider_type == InputProviderType.SMDB 
-        or status_reporter_type == StatusReporterType.SMDB
-    ):
-        smdb = SMDB(cohort.analysis_dataset.name)
-        if status_reporter_type == StatusReporterType.SMDB:
-            status_reporter = SmdbStatusReporter(smdb)
-        if input_provider_type == InputProviderType.SMDB:
-            input_provider = SmdbInputProvider(smdb)
-
-    if input_provider_type == InputProviderType.CSV:
-        if not input_csv:
-            raise PipelineError(
-                f'input_csv (--input-csv) should be provided '
-                f'with input_provider_type=InputProviderType.CSV '
-                f'(--input-provider {InputProviderType.CSV.value})'
-            )
-        input_provider = CsvInputProvider(to_path(input_csv).open())
-
-    if version:
-        description += f' {version}'
-    if input_datasets:
-        description += ': ' + ', '.join(input_datasets)
-
-    tmp_bucket = to_path(
-        cohort.analysis_dataset.get_tmp_bucket(version=f'{name}/{version}')
-    )
-    hail_billing_project = get_billing_project(cohort.analysis_dataset.stack)
-    hail_bucket = tmp_bucket / 'hail'
-    batch: Batch = setup_batch(
-        description=description, 
-        billing_project=hail_billing_project,
-        hail_bucket=hail_bucket,
-    )
-
-    if input_datasets and input_provider:
-        input_provider.populate_cohort(
-            cohort=cohort,
-            dataset_names=input_datasets,
-            skip_samples=skip_samples,
-            only_samples=only_samples,
-            ped_files=ped_files,
-        )
-
-    if force_samples:
-        for s in cohort.get_samples():
-            if s.id in force_samples:
-                logger.info(
-                    f'Force rerunning sample {s.id} even if its outputs exist'
-                )
-                s.forced = True
-
-    return Pipeline(
-        cohort=cohort,
-        namespace=namespace,
-        reference_data=refs,
-        batch=batch,
-        hail_billing_project=hail_billing_project,
-        hail_bucket=hail_bucket,
-        status_reporter=status_reporter,
-        stages=stages or _ALL_DEFINED_STAGES,
-        first_stage=first_stage,
-        last_stage=last_stage,
-        version=version,
-        check_intermediates=check_intermediates,
-        check_expected_outputs=check_expected_outputs,
-        skip_samples_with_missing_input=skip_samples_with_missing_input,
-        config=config,
-        tmp_bucket=tmp_bucket,
-        local_dir=local_dir,
-        dry_run=dry_run,
-        keep_scratch=keep_scratch,
-    )
-    
-
 class Pipeline:
     """
     Represents a Pipeline, and incapulates a Hail Batch object, stages, 
@@ -799,7 +668,7 @@ class Pipeline:
         batch: Batch,
         hail_billing_project: str,
         hail_bucket: str,
-        stages: list[StageDecorator],
+        stages: list[StageDecorator] | None = None,
         status_reporter: StatusReporter | None = None,
         first_stage: str | None = None,
         last_stage: str | None = None,
@@ -843,7 +712,7 @@ class Pipeline:
         
         # Will be filled in set_stages() in submit_batch()
         self._stages_dict: dict[str, Stage] = dict()
-        self._stages_in_order = stages
+        self._stages_in_order = stages or _ALL_DEFINED_STAGES
 
     def submit_batch(
         self, 

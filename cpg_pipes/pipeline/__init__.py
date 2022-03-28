@@ -1,10 +1,10 @@
 from .pipeline import (
-    create_pipeline,
     stage, 
     skip, 
     StageInput, 
     StageOutput,
 )
+from .create_pipeline import create_pipeline
 from .cli_opts import pipeline_click_options
 from .exceptions import PipelineError
 from .stage_subclasses import (
