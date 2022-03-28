@@ -188,22 +188,6 @@ def pipeline_click_options(function: Callable) -> Callable:
                  'Works nicely with --previous-batch-tsv/--previous-batch-id options.',
         ),
         click.option(
-            '--previous-batch-tsv',
-            'previous_batch_tsv_path',
-            help='A list of previous successful attempts from another batch, dumped '
-                 'from from the Batch database (the "jobs" table joined on '
-                 '"job_attributes"). If the intermediate output for a job exists in '
-                 'a previous attempt, it will be passed forward, and a [reuse] job will '
-                 'be submitted.'
-        ),
-        click.option(
-            '--previous-batch-id',
-            'previous_batch_id',
-            help='6-letter ID of the previous successful batch (corresponds to the '
-                 'directory name in the batch logs. e.g. feb0e9 in '
-                 'gs://cpg-seqr-main-tmp/hail/batch/feb0e9'
-        ),
-        click.option(
             '--local-dir',
             'local_dir',
             help='Local directory for temporary files. Usually takes a few KB. '
