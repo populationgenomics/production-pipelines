@@ -20,7 +20,7 @@ At the CPG, we also want to permanently record outputs of some stages (e.g. indi
 
 Motivated by that, we designed the `cpg_pipes` package. It implementes a concept of `Stage` that can act on a `Target`: e.g. a `Sample`, a `Project`, or a `Cohort`. For example, a stage that performs read alignment to produce a CRAM file would act on a sample, and a stage that performs joint-calling would act on an entire cohort. 
 
-Each stage declares paths to the outputs it would produce by implementing the abstract `expected_result()` method; and it also defines how jobs are added into Hail Batch using the `queue_jobs()` method. 
+Each stage declares paths to the outputs it would produce by implementing the abstract `expected_outputs()` method; and it also defines how jobs are added into Hail Batch using the `queue_jobs()` method. 
 
 Overall classes and object relationships look as follows:
 
@@ -37,13 +37,13 @@ from cpg_pipes import Path, to_path
 @stage
 class Align(SampleStage):
     """Stage that runs read alignment"""
-    def expected_result(self, sample: Sample) -> Path:
+    def expected_outputs(self, sample: Sample) -> Path:
         """Returning a path to a CRAM file that will be generated"""
         return to_path('gs://cpg-thousand-genomes-test/cram/NA12878.cram')
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """Defines how jobs are added into a batch object"""
-        cram_path = self.expected_result(sample)
+        cram_path = self.expected_outputs(sample)
         # This Job just writes the sample name to a file:
         j = self.pipe.b.new_job(f'Align {sample.id}')
         # Just writing a sample name for a demonstration:
@@ -71,25 +71,30 @@ class ReadCramFile(SampleStage):
 Stage of differnet levels can depend on each other, and `cpg_pipes` will resolve that correctly. E.g. joint-calling taking GVCF outputs to produce a cohort-level VCF:
 
 ```python
-from cpg_pipes.pipeline import stage, StageInput, StageOutput, Sample, SampleStage, Cohort, CohortStage
+from cpg_pipes.pipeline import stage, StageInput, StageOutput, Sample, SampleStage,
+    Cohort, CohortStage
+
 
 @stage()
 class HaplotypeCaller(SampleStage):
     """Stage that runs gatk Haplotype caller to generate a GVCF for a sample"""
+
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        jobs = <...>
-        return self.make_outputs(sample, data=self.expected_result(sample), jobs=jobs)
+        jobs = < ... >
+        return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
+
 
 @stage(required_stages=HaplotypeCaller)
 class JointCalling(CohortStage):
     """Stage that runs joint calling on GVCFs"""
+
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         # Get outputs from previous stage. Because the HaplotypeCaller stage
         # acts on a sample, we use a method `as_path_by_target` that returns
         # a dictionary index by sample ID:
         gvcf_by_sample_id = inputs.as_path_by_target(stage=HaplotypeCaller)
-        job = <...>
-        return self.make_outputs(cohort, data=self.expected_result(cohort), jobs=[job])
+        job = < ... >
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[job])
 ```
 
 To submit the constructed pipeline to Hail Batch, initialise the `Pipeline` object, and call `submit_batch()`. You need to pass a name, a description, a version of a run, the namespace according to the storage policies (`test` / `main` / `tmp`), and the `analysis_dataset` name that would be used to communicate with the sample metadata DB.
@@ -164,17 +169,20 @@ Outputs are written according to provided storage policy. Class `cpg_pipes.provi
 The `cpg_pipes.jobs` module defines functions that create Hail Batch Jobs for different bioinformatics purposes: alignment, fastqc, deduplication, variant calling, VQSR, etc. E.g. to implement the joint calling stage above, you can use:
 
 ```python
-from cpg_pipes.pipeline import stage, SampleStage, CohortStage, StageInput, StageOutput, Sample, Cohort
+from cpg_pipes.pipeline import stage, SampleStage, CohortStage, StageInput, StageOutput,
+    Sample, Cohort
 from cpg_pipes.jobs import haplotype_caller, joint_genotyping
 from cpg_pipes.types import CramPath, GvcfPath
+
 
 @stage
 class HaplotypeCaller(SampleStage):
     """Stage that runs gatk HaplotypeCaller to produde a GVCF"""
+
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """Call the function from the jobs module"""
         cram_path = inputs.as_path(target=sample, stage=Align)
-        expected_path = self.expected_result(sample)
+        expected_path = self.expected_outputs(sample)
         jobs = haplotype_caller.produce_gvcf(
             b=self.pipe.b,
             sample_name=sample.id,
@@ -191,23 +199,24 @@ class HaplotypeCaller(SampleStage):
 @stage(required_stages=HaplotypeCaller)
 class JointCalling(CohortStage):
     """Stage that runs joint calling on GVCFs"""
+
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """Call the function from the jobs module"""
         gvcf_by_sid = {
-            sample.id: GvcfPath(inputs.as_path(target=sample, stage=HaplotypeCaller)) 
+            sample.id: GvcfPath(inputs.as_path(target=sample, stage=HaplotypeCaller))
             for sample in cohort.get_samples()
         }
         jobs = joint_genotyping.make_joint_genotyping_jobs(
             b=self.pipe.b,
-            out_vcf_path=self.expected_result(cohort)['vcf'],
-            out_siteonly_vcf_path=self.expected_result(cohort)['siteonly_vcf'],
+            out_vcf_path=self.expected_outputs(cohort)['vcf'],
+            out_siteonly_vcf_path=self.expected_outputs(cohort)['siteonly_vcf'],
             samples=cohort.get_samples(),
             gvcf_by_sid=gvcf_by_sid,
             refs=self.refs,
             genomicsdb_bucket=cohort.analysis_dataset.get_tmp_bucket(),
             tmp_bucket=cohort.analysis_dataset.get_tmp_bucket(),
         )
-        return self.make_outputs(cohort, data=self.expected_result(cohort), jobs=jobs)
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
 ```
 
 Available jobs include alignment:

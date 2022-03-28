@@ -19,7 +19,7 @@ class VepStage(CohortStage):
     """
     Run VEP on a VCF
     """
-    def expected_result(self, cohort: Cohort) -> Path:
+    def expected_outputs(self, cohort: Cohort) -> Path:
         """
         Expected to write a matrix table.
         """
@@ -34,7 +34,7 @@ class VepStage(CohortStage):
             vcf_path=inputs.as_path(cohort, stage=VqsrStage),
             refs=self.refs,
             sequencing_type=cohort.get_sequencing_type(),
-            out_vcf_path=self.expected_result(cohort),
+            out_vcf_path=self.expected_outputs(cohort),
             scatter_count=self.pipeline_config.get('jc_intervals_num'),
         )
-        return self.make_outputs(cohort, self.expected_result(cohort), jobs)
+        return self.make_outputs(cohort, self.expected_outputs(cohort), jobs)

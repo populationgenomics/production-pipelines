@@ -29,7 +29,7 @@ def produce_gvcf(
     output_path: Path | None = None,
     number_of_intervals: int = 1,
     intervals: list[hb.Resource] | None = None,
-    overwrite: bool = True,
+    overwrite: bool = False,
     dragen_mode: bool = False,
 ) -> list[Job]:
     """

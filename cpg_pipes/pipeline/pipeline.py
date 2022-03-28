@@ -349,12 +349,12 @@ class Stage(Generic[TargetT], ABC):
             of this type
         @param skipped: means that the stage is skipped and self.queue_jobs()
             won't run. The other stages if depend on it can aassume that that 
-            self.expected_result() returns existing files and target.ouptut_by_stage 
+            self.expected_outputs() returns existing files and target.ouptut_by_stage 
             will be populated.
         @param required: means that the self.expected_output() results are 
             required for another active stage, even if the stage was skipped.
         @param assume_outputs_exist: for skipped but required stages, 
-            the self.expected_result() output will still be checked for existence. 
+            the self.expected_outputs() output will still be checked for existence. 
             This option makes the downstream stages assume that the output exist.
         @param forced: run self.queue_jobs(), even if we can reuse the 
             self.expected_output().
@@ -412,7 +412,7 @@ class Stage(Generic[TargetT], ABC):
         """
 
     @abstractmethod
-    def expected_result(self, target: TargetT) -> ExpectedResultT:
+    def expected_outputs(self, target: TargetT) -> ExpectedResultT:
         """
         to_path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
@@ -536,7 +536,7 @@ class Stage(Generic[TargetT], ABC):
         Returns outputs that can be reused for the stage for the target,
         or None of none can be reused
         """
-        expected_output = self.expected_result(target)
+        expected_output = self.expected_outputs(target)
 
         if not expected_output:
             return None
@@ -593,7 +593,7 @@ def stage(
 
     @stage(analysis_type='gvcf', required_stages=CramStage)
     class GvcfStage(SampleStage):
-        def expected_result(self, sample: Sample):
+        def expected_outputs(self, sample: Sample):
             ...
         def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
             ...
@@ -885,10 +885,6 @@ class Pipeline:
         # First round - checking which stages we require, even if they are skipped.
         # If there are required stages that are not defined, we defined them
         # into `additional_stages` as `skipped`.
-        # TODO: use TopologicalSorter
-        # import graphlib
-        # for stage in graphlib.TopologicalSorter(stages).static_order():
-        # https://github.com/populationgenomics/analysis-runner/pull/328/files
         additional_stages_dict: dict[str, Stage] = dict()
         for i, (stage_name, stage_) in enumerate(self._stages_dict.items()):
             if first_stage_num is not None and i < first_stage_num:

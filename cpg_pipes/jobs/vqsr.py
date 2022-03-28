@@ -95,7 +95,7 @@ def make_vqsr_jobs(
     hard_filter_ht_path: Path | None = None,
     output_vcf_path: Path | None = None,
     use_as_annotations: bool = True,
-    overwrite: bool = True,
+    overwrite: bool = False,
     convert_vcf_to_site_only: bool = False,
 ) -> list[Job]:
     """

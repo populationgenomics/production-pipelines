@@ -41,7 +41,7 @@ class MultiQC(DatasetStage):
     """
     Run MultiQC to summarise all QC.
     """
-    def expected_result(self, dataset: Dataset) -> dict[str, Path]:
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         """
         Expected to produce an HTML and a correponding JSON file.
         """
@@ -59,8 +59,8 @@ class MultiQC(DatasetStage):
         somalier_pairs = inputs.as_path(dataset, CramSomalierPedigree, id='pairs')
         somalier_ancestry = inputs.as_path(dataset, CramSomalierAncestry, id='tsv')
 
-        json_path = self.expected_result(dataset)['json']
-        html_path = self.expected_result(dataset)['html']
+        json_path = self.expected_outputs(dataset)['json']
+        html_path = self.expected_outputs(dataset)['html']
         if base_url := dataset.get_web_url():
             html_url = str(html_path).replace(str(dataset.get_web_bucket()), base_url)
         else:
@@ -93,7 +93,7 @@ class MultiQC(DatasetStage):
             out_html_url=html_url,
             job_attrs=dataset.get_job_attrs(),
         )
-        return self.make_outputs(dataset, data=self.expected_result(dataset), jobs=[j])
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])
 
 
 @click.command()

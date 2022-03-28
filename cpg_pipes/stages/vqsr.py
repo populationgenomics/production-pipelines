@@ -18,7 +18,7 @@ class VqsrStage(CohortStage):
     """
     Variant filtering of joint-called VCF
     """
-    def expected_result(self, cohort: Cohort) -> Path:
+    def expected_outputs(self, cohort: Cohort) -> Path:
         """
         Expects to generate one site-only VCF
         """
@@ -39,7 +39,7 @@ class VqsrStage(CohortStage):
 
         tmp_vqsr_bucket = cohort.analysis_dataset.get_tmp_bucket() / 'vqsr'
         logger.info(f'Queueing VQSR job')
-        expected_path = self.expected_result(cohort)
+        expected_path = self.expected_outputs(cohort)
         jobs = make_vqsr_jobs(
             b=self.b,
             refs=self.refs,

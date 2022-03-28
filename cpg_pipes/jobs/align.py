@@ -78,7 +78,7 @@ def align(
     aligner: Aligner = Aligner.BWA,
     markdup_tool: MarkDupTool = MarkDupTool.BIOBAMBAM,
     extra_label: str | None = None,
-    overwrite: bool = True,
+    overwrite: bool = False,
     requested_nthreads: int | None = None,
     number_of_shards_for_realignment: int | None = None,
     prev_batch_jobs: dict[tuple[str | None, str], PrevJob] | None = None,

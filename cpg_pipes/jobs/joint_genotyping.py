@@ -42,7 +42,7 @@ def make_joint_genotyping_jobs(
     tmp_bucket: Path,
     refs: RefData,
     gvcf_by_sid: dict[str, GvcfPath],
-    overwrite: bool = True,
+    overwrite: bool = False,
     # Default to GenotypeGVCFs because Gnarly is a bit weird, e.g. it adds <NON_REF>
     # variants with AC_adj annotations (other variants have AC):
     # bcftools view gs://cpg-fewgenomes-test/unittest/inputs/chr20/gnarly/joint-called-siteonly.vcf.gz | zgrep 7105364

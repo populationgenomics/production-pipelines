@@ -39,7 +39,7 @@ class AnnotateCohortStage(CohortStage):
     """
     Re-annotate the entire cohort. 
     """
-    def expected_result(self, cohort: Cohort) -> Path:
+    def expected_outputs(self, cohort: Cohort) -> Path:
         """
         Expected to write a matrix table.
         """
@@ -58,7 +58,7 @@ class AnnotateCohortStage(CohortStage):
         vcf_path = inputs.as_path(target=cohort, stage=JointGenotypingStage, id='vcf')
         annotated_siteonly_vcf_path = inputs.as_path(target=cohort, stage=VqsrStage)
 
-        mt_path = self.expected_result(cohort)
+        mt_path = self.expected_outputs(cohort)
         checkpoints_bucket = mt_path.parent / 'checkpoints'
 
         j = dataproc.hail_dataproc_job(
@@ -96,7 +96,7 @@ class AnnotateDatasetStage(DatasetStage):
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
     that will be loaded into Seqr)
     """
-    def expected_result(self, dataset: Dataset) -> Path:
+    def expected_outputs(self, dataset: Dataset) -> Path:
         """
         Expected to generate a matrix table
         """
@@ -114,13 +114,13 @@ class AnnotateDatasetStage(DatasetStage):
             b=self.b,
             annotated_mt_path=annotated_mt_path,
             sample_ids=[s.id for s in dataset.get_samples()],
-            output_mt_path=self.expected_result(dataset),
+            output_mt_path=self.expected_outputs(dataset),
             tmp_bucket=dataset.get_tmp_bucket(),
             hail_billing_project=self.hail_billing_project,
             hail_bucket=self.hail_bucket,
             job_attrs=dataset.get_job_attrs(),
         )
-        return self.make_outputs(dataset, data=self.expected_result(dataset), jobs=[j])
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])
 
 
 @stage(required_stages=[AnnotateDatasetStage])
@@ -128,7 +128,7 @@ class LoadToEsStage(DatasetStage):
     """
     Create a Seqr index.
     """
-    def expected_result(self, dataset: Dataset) -> None:
+    def expected_outputs(self, dataset: Dataset) -> None:
         """
         Expected to generate a Seqr index, which is not a file
         """
@@ -183,7 +183,7 @@ class ToVcfStage(DatasetStage):
     """
     Convers the annotated matrix table to a pVCF
     """
-    def expected_result(self, dataset: Dataset) -> Path:
+    def expected_outputs(self, dataset: Dataset) -> Path:
         """
         Generates an indexed VCF
         """
@@ -199,7 +199,7 @@ class ToVcfStage(DatasetStage):
             self.b,
             f'{utils.QUERY_SCRIPTS_DIR}/seqr/mt_to_vcf.py '
             f'--mt-path {dataset_mt_path} '
-            f'--out-vcf-path {self.expected_result(dataset)}',
+            f'--out-vcf-path {self.expected_outputs(dataset)}',
             max_age='8h',
             packages=utils.DATAPROC_PACKAGES,
             num_secondary_workers=20,
@@ -207,7 +207,7 @@ class ToVcfStage(DatasetStage):
             job_name=f'{dataset.name}: export to VCF',
             depends_on=inputs.get_jobs(),
         )
-        return self.make_outputs(dataset, self.expected_result(dataset), jobs=[j])
+        return self.make_outputs(dataset, self.expected_outputs(dataset), jobs=[j])
 
 
 def _make_seqr_metadata_files(

@@ -40,11 +40,17 @@ class TestJobs(unittest.TestCase):
     """
     Test individual jobs
     """
+    @property
+    def out_bucket(self):
+        return BASE_BUCKET / self.name / self.timestamp
+
+    @property
+    def tmp_bucket(self):
+        return BASE_BUCKET / 'tmp' / self.name / self.timestamp
+
     def setUp(self):
         self.name = self._testMethodName
         self.timestamp = time.strftime('%Y%m%d-%H%M')
-        self.out_bucket = BASE_BUCKET / self.name / self.timestamp
-        self.tmp_bucket = BASE_BUCKET / 'tmp' / self.name / self.timestamp
         self.local_tmp_dir = tempfile.mkdtemp()
 
         self.pipeline = Pipeline(
@@ -279,11 +285,13 @@ class TestJobs(unittest.TestCase):
         self.assertTrue(utils.exists(out_vcf_path))
         contents = _read_file(res_path)
         self.assertEqual(0, len(contents.split()))  # site-only doesn't have any samples
-        
+
     def test_vep(self):
         """
         Tests command line VEP with LoF plugin and MANE_SELECT annotation
         """
+        self.timestamp = '20220326-1639'
+
         site_only_vcf_path = to_path(
             'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
             'vqsr.vcf.gz'
@@ -296,8 +304,10 @@ class TestJobs(unittest.TestCase):
             sequencing_type=self.sequencing_type,
             out_vcf_path=out_vcf_path,
             scatter_count=10,
+            overwrite=False,
         )
         
+        # Add test job
         test_j = self.pipeline.b.new_job('Parse GVCF sample name')
         test_j.image(images.BCFTOOLS_IMAGE)
         test_j.command(f"""
@@ -307,12 +317,15 @@ class TestJobs(unittest.TestCase):
         > {test_j.output}
         """)
         test_j.depends_on(*jobs)
+        test_out_path = self.out_bucket / f'{self.sample.id}.out'
+        self.pipeline.b.write_output(test_j.output, str(test_out_path))
+        
+        # Run Batch
         self.pipeline.submit_batch(wait=True)
-
+        
+        # Check results
         self.assertTrue(out_vcf_path.exists())
-        res_path = self.out_bucket / f'{self.sample.id}.out'
-        self.pipeline.b.write_output(test_j.output, str(res_path))
-        contents = _read_file(res_path)
+        contents = _read_file(test_out_path)
         self.assertEqual(
             'chr20:5111495 TMEM230 protein_coding NM_001009923.2 LC ANC_ALLELE', 
             contents

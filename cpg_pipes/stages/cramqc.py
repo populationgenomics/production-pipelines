@@ -15,7 +15,7 @@ class SamtoolsStats(SampleStage):
     """
     Alignment QC using samtools stats.
     """
-    def expected_result(self, sample: Sample):
+    def expected_outputs(self, sample: Sample):
         """
         Expected to generate one QC file to be parsed with MultiQC:
         * Samtools stats file found by contents, so file name can be any:
@@ -32,11 +32,11 @@ class SamtoolsStats(SampleStage):
         j = samtools_stats(
             b=self.b,
             cram_path=cram_path,
-            output_path=self.expected_result(sample),
+            output_path=self.expected_outputs(sample),
             refs=self.refs,
             job_attrs=sample.get_job_attrs(),
         )
-        return self.make_outputs(sample, data=self.expected_result(sample), jobs=[j])
+        return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])
 
 
 @stage
@@ -44,7 +44,7 @@ class PicardWgsMetrics(SampleStage):
     """
     Alignment QC using picard tools wgs_metrics.
     """
-    def expected_result(self, sample: Sample):
+    def expected_outputs(self, sample: Sample):
         """
         Expected to generate one QC file to be parsed with MultiQC.
         * Picard file found by contents, so file name can be any:
@@ -63,11 +63,11 @@ class PicardWgsMetrics(SampleStage):
         j = picard_wgs_metrics(
             b=self.b,
             cram_path=cram_path,
-            output_path=self.expected_result(sample),
+            output_path=self.expected_outputs(sample),
             refs=self.refs,
             job_attrs=sample.get_job_attrs(),
         )
-        return self.make_outputs(sample, data=self.expected_result(sample), jobs=[j])
+        return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])
 
 
 @stage
@@ -75,7 +75,7 @@ class VerifyBamId(SampleStage):
     """
     Check for contamination using VerifyBAMID SelfSM.
     """
-    def expected_result(self, sample: Sample):
+    def expected_outputs(self, sample: Sample):
         """
         Expected to generate one QC file to be parsed with MultiQC.
         * VerifyBAMID file has to have *.selfSM ending:
@@ -94,8 +94,8 @@ class VerifyBamId(SampleStage):
         j = verify_bamid(
             b=self.b,
             cram_path=cram_path,
-            output_path=self.expected_result(sample),
+            output_path=self.expected_outputs(sample),
             refs=self.refs,
             job_attrs=sample.get_job_attrs(),
         )
-        return self.make_outputs(sample, data=self.expected_result(sample), jobs=[j])
+        return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])

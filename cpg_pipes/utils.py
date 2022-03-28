@@ -154,7 +154,7 @@ def exists(path: Path | str, verbose: bool = True) -> bool:
             traceback.print_exc()
             logger.error(f'Failed checking {path}')
             sys.exit(1)
-        logger.debug(f'Checked {path}: ' + ('exists' if res else 'missing'))
+        logger.debug(f'Checked {path} [' + ('exists' if res else 'missing') + ']')
         return res
     return path.exists()
 

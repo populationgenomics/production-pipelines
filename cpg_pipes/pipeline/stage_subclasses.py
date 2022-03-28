@@ -16,7 +16,7 @@ class SampleStage(Stage[Sample], ABC):
     """
 
     @abstractmethod
-    def expected_result(self, sample: Sample) -> ExpectedResultT:
+    def expected_outputs(self, sample: Sample) -> ExpectedResultT:
         """
         to_path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
@@ -59,7 +59,7 @@ class DatasetStage(Stage, ABC):
     """
 
     @abstractmethod
-    def expected_result(self, dataset: Dataset) -> ExpectedResultT:
+    def expected_outputs(self, dataset: Dataset) -> ExpectedResultT:
         """
         to_path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as
@@ -93,7 +93,7 @@ class CohortStage(Stage, ABC):
     """
 
     @abstractmethod
-    def expected_result(self, cohort: Cohort) -> ExpectedResultT:
+    def expected_outputs(self, cohort: Cohort) -> ExpectedResultT:
         """
         to_path(s) to files that the stage is epxected to generate for the `target`.
         Used within the stage to pass the output paths to commands, as well as

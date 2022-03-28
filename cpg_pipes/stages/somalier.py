@@ -20,7 +20,7 @@ class CramSomalierStage(SampleStage):
     Genereate fingerprints from CRAMs for pedigree checks.
     """
 
-    def expected_result(self, sample: Sample) -> Path:
+    def expected_outputs(self, sample: Sample) -> Path:
         """
         Expected to generate the fingerprints file
         """
@@ -32,7 +32,7 @@ class CramSomalierStage(SampleStage):
         """
         cram_path = sample.get_cram_path()
 
-        expected_path = self.expected_result(sample)
+        expected_path = self.expected_outputs(sample)
         j = somalier.extact_job(
             b=self.b,
             sample=sample,
@@ -50,7 +50,7 @@ class CramSomalierPedigree(DatasetStage):
     Checks pedigree from CRAM fingerprints.
     """
 
-    def expected_result(self, dataset: Dataset) -> dict[str, Path]:
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         """
         Return the report for MultiQC, plus putting an HTML into the web bucket.
         MultiQC expects the following patterns:
@@ -76,7 +76,7 @@ class CramSomalierPedigree(DatasetStage):
             for s in dataset.get_samples()
         }
 
-        html_path = self.expected_result(dataset)['html']
+        html_path = self.expected_outputs(dataset)['html']
         if base_url := dataset.get_web_url():
             html_url = str(html_path).replace(str(dataset.get_web_bucket()), base_url)
         else:
@@ -87,14 +87,13 @@ class CramSomalierPedigree(DatasetStage):
             dataset,
             input_path_by_sid=fp_by_sid,
             overwrite=not self.check_intermediates,
-            out_samples_path=self.expected_result(dataset)['samples'],
-            out_pairs_path=self.expected_result(dataset)['pairs'],
+            out_samples_path=self.expected_outputs(dataset)['samples'],
+            out_pairs_path=self.expected_outputs(dataset)['pairs'],
             out_html_path=html_path,
             out_html_url=html_url,
             refs=self.refs,
-            dry_run=self.dry_run,
         )
-        return self.make_outputs(dataset, data=self.expected_result(dataset), jobs=[j])
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])
 
 
 @stage(required_stages=CramSomalierStage)
@@ -103,7 +102,7 @@ class CramSomalierAncestry(DatasetStage):
     Checks pedigree from CRAM fingerprints
     """
 
-    def expected_result(self, dataset: Dataset) -> dict[str, Path]:
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         """
         Return the report for MultiQC, plus putting an HTML into the web bucket.
         MultiQC expects the following patterns:
@@ -127,7 +126,7 @@ class CramSomalierAncestry(DatasetStage):
             for s in dataset.get_samples()
         }
 
-        html_path = self.expected_result(dataset)['html']
+        html_path = self.expected_outputs(dataset)['html']
         if base_url := dataset.get_web_url():
             html_url = str(html_path).replace(str(dataset.get_web_bucket()), base_url)
         else:
@@ -138,9 +137,9 @@ class CramSomalierAncestry(DatasetStage):
             dataset,
             input_path_by_sid=fp_by_sid,
             overwrite=not self.check_intermediates,
-            out_tsv_path=self.expected_result(dataset)['tsv'],
+            out_tsv_path=self.expected_outputs(dataset)['tsv'],
             out_html_path=html_path,
             out_html_url=html_url,
             refs=self.refs,
         )
-        return self.make_outputs(dataset, data=self.expected_result(dataset), jobs=[j])
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])

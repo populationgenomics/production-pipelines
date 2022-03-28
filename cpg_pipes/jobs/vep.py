@@ -23,7 +23,7 @@ def vep(
     refs: RefData,
     sequencing_type: SequencingType,
     out_vcf_path: Path | None = None,
-    overwrite: bool = True,
+    overwrite: bool = False,
     scatter_count: int | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:

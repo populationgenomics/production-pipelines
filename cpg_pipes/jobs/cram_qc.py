@@ -21,7 +21,7 @@ def samtools_stats(
     refs: RefData,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
-    overwrite: bool = True,
+    overwrite: bool = False,
 ) -> Job:
     """
     Run `samtools stats` for alignment QC.
@@ -57,7 +57,7 @@ def verify_bamid(
     refs: RefData,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
-    overwrite: bool = True,
+    overwrite: bool = False,
 ) -> Job:
     """
     Run `VerifyBamID` contamination checks. 
@@ -106,7 +106,7 @@ def picard_wgs_metrics(
     refs: RefData,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
-    overwrite: bool = True,
+    overwrite: bool = False,
     read_length: int = 250,
 ) -> Job:
     """

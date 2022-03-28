@@ -22,7 +22,7 @@ class JointGenotypingStage(CohortStage):
     """
     Joint-calling of GVCFs together.
     """
-    def expected_result(self, cohort: Cohort) -> dict[str, Path]:
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         """
         Generate a pVCF and a site-only VCF. Returns 2 outputs, thus not checking
         the SMDB, because the Analysis entry supports only single output.
@@ -63,8 +63,8 @@ class JointGenotypingStage(CohortStage):
 
         jobs = make_joint_genotyping_jobs(
             b=self.b,
-            out_vcf_path=self.expected_result(cohort)['vcf'],
-            out_siteonly_vcf_path=self.expected_result(cohort)['siteonly'],
+            out_vcf_path=self.expected_outputs(cohort)['vcf'],
+            out_siteonly_vcf_path=self.expected_outputs(cohort)['siteonly'],
             samples=cohort.get_samples(),
             sequencing_type=cohort.get_sequencing_type(),
             genomicsdb_bucket=cohort.analysis_dataset.get_bucket() / 'genomicsdbs',
@@ -79,6 +79,6 @@ class JointGenotypingStage(CohortStage):
         )
         return self.make_outputs(
             cohort, 
-            data=self.expected_result(cohort), 
+            data=self.expected_outputs(cohort), 
             jobs=jobs
         )
