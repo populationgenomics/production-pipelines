@@ -20,7 +20,7 @@ def markdup(
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     qc_bucket: Path | None = None,
-    overwrite: bool = True,
+    overwrite: bool = False,
 ) -> Job:
     """
     Make job that runs Picard MarkDuplicates and converts the result to CRAM.

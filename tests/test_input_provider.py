@@ -1,12 +1,12 @@
 """
-Testing TSV metadata provider. TSV file must contain one required column "sample".
+Testing CSV inputs provider. CSV file must contain one required column "sample".
 """
 import unittest
 from io import StringIO
 
 from cpg_pipes import Namespace
 from cpg_pipes.pipeline.targets import Cohort, Sex
-from cpg_pipes.providers.inputs import CsvInputsProvider
+from cpg_pipes.providers.inputs import CsvInputProvider
 from cpg_pipes.providers.cpg import CpgStorageProvider
 
 
@@ -21,9 +21,9 @@ FQ = 'gs://cpg-fewgenomes-test-upload/MYSAMPLE1_M00{}_R{}.fastq.gz'
 CRAM = 'gs://cpg-fewgenomes-test-upload/MYSAMPLE2.cram'
 
 
-class TestTsvProvider(unittest.TestCase):
+class TestInputProvider(unittest.TestCase):
     """
-    Test TSV metadat provider.
+    Test CSV input metadata provider.
     """
 
     def test_csv_provider(self):
@@ -35,7 +35,7 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex
         """.strip()
 
         with StringIO(tsv_contents) as fp:
-            provider = CsvInputsProvider(fp)
+            provider = CsvInputProvider(fp)
             
         cohort = Cohort(
             name='test',

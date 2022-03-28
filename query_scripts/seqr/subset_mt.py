@@ -2,7 +2,6 @@
 
 """
 Hail Query script.
-
 Subsets matrix table to a list of samples and annotate with SeqrGenotypesSchema.
 """
 
@@ -11,7 +10,6 @@ import click
 import hail as hl
 from lib.model.base_mt_schema import row_annotation
 from lib.model.seqr_mt_schema import BaseMTSchema
-from cpg_utils.hail import init_query_service
 
 logger = logging.getLogger(__file__)
 
@@ -32,22 +30,30 @@ logger = logging.getLogger(__file__)
     'subset_tsv_path',
     help='Path to a TSV file with one column of sample IDs: s.',
 )
+@click.option(
+    '--use-spark', 'use_spark', is_flag=True, default=False,
+)
 def main(
     mt_path: str,
     out_mt_path: str,
     subset_tsv_path: str,
+    use_spark: bool,
 ):  # pylint: disable=missing-function-docstring
     """
     Entry point
     """
-    init_query_service()
-
+    if use_spark:
+        hl.init(default_reference='GRCh38')
+    else:
+        from cpg_utils.hail import init_query_service
+        init_query_service()
+    
     mt = hl.read_matrix_table(mt_path)
     logger.info(f'Size of mt: {mt.count()}')
-    
+
     logger.info('Subsetting to the requested set of samples')
     if subset_tsv_path:
-        mt = _subset_samples_and_variants(mt, subset_tsv_path)
+        mt = _subset_samples(mt, subset_tsv_path)
         logger.info(f'Size of mt after subsetting: {mt.count()}')
 
     logger.info('Annotating genotypes')
@@ -83,7 +89,7 @@ def main(
     mt.write(out_mt_path, overwrite=True)
 
 
-def _subset_samples_and_variants(mt, subset_tsv_path: str) -> hl.MatrixTable:
+def _subset_samples(mt, subset_tsv_path: str) -> hl.MatrixTable:
     """
     Subset the MatrixTable to the provided list of samples and to variants present
     in those samples
@@ -206,7 +212,6 @@ def _compute_genotype_annotated_vcf(
       CPGSeqrVariantSchema    /
                     \        /
             SeqrVariantsAndGenotypesSchema
-
     CPGSeqrVariantSchema is applied on the cohort level separately.
     """
     annotation_schema = schema_cls(mt)

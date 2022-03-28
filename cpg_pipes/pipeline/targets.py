@@ -64,6 +64,20 @@ class Target:
         """
         raise NotImplementedError
 
+    def get_sequencing_type(self) -> SequencingType:
+        """
+        Sequencing type of samples. Will throw an error if more than 
+        one sequencing type is found.
+        """
+        sequencing_types = set(s.sequencing_type for s in self.get_samples())
+        if len(sequencing_types) > 1:
+            raise ValueError(
+                f'Samples of more than one sequencing type used for joint calling: '
+                f'{sequencing_types}. Joint calling can be only performed on samples '
+                f'of the same type.'
+            )
+        return list(sequencing_types)[0]
+
 
 class Cohort(Target):
     """
@@ -328,7 +342,7 @@ class Dataset(Target):
         participant_id: str | None = None,
         sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
-        **kwargs
+        meta: dict | None = None,
     ) -> 'Sample':
         """
         Create a new sample and add it into the dataset.
@@ -344,7 +358,7 @@ class Dataset(Target):
             sex=sex,
             pedigree=pedigree,
             dataset=self,
-            meta=kwargs,
+            meta=meta,
         )
         self._sample_by_id[id] = s
         return s

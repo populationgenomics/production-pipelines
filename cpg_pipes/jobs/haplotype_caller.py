@@ -29,7 +29,7 @@ def produce_gvcf(
     output_path: Path | None = None,
     number_of_intervals: int = 1,
     intervals: list[hb.Resource] | None = None,
-    overwrite: bool = True,
+    overwrite: bool = False,
     dragen_mode: bool = False,
 ) -> list[Job]:
     """
@@ -93,7 +93,7 @@ def haplotype_caller(
     """
     if utils.can_reuse(output_path, overwrite):
         return [b.new_job('HaplotypeCaller [reuse]', job_attrs)]
-    
+
     jobs: list[Job] = []
     if number_of_intervals > 1:
         if intervals is None:
@@ -105,7 +105,7 @@ def haplotype_caller(
                 out_bucket=tmp_bucket / 'intervals',
             )
             jobs.append(intervals_j)
-            intervals = [intervals_j[f'intervals{i}.list'] for i in range(number_of_intervals)]
+            intervals = [intervals_j[f'{i}.interval_list'] for i in range(number_of_intervals)]
 
         hc_jobs = []
         # Splitting variant calling by intervals
@@ -115,10 +115,8 @@ def haplotype_caller(
                 sample_name=sample_name,
                 cram_path=cram_path,
                 refs=refs,
-                job_attrs=job_attrs,
+                job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{number_of_intervals}'),
                 interval=intervals[idx],
-                interval_idx=idx,
-                number_of_intervals=number_of_intervals,
                 dragen_mode=dragen_mode,
                 overwrite=overwrite,
             )
@@ -154,8 +152,6 @@ def _haplotype_caller_one(
     refs: RefData,
     job_attrs: dict | None = None,
     interval: hb.Resource | None = None,
-    interval_idx: int | None = None,
-    number_of_intervals: int = 1,
     out_gvcf_path: Path | None = None,
     overwrite: bool = True,
     dragen_mode: bool = False,
@@ -164,9 +160,6 @@ def _haplotype_caller_one(
     Add one HaplotypeCaller job on an interval
     """
     job_name = 'HaplotypeCaller'
-    if interval_idx is not None:
-        job_name += f', {interval_idx + 1}/{number_of_intervals}'
-
     j = b.new_job(job_name, job_attrs)
     if utils.can_reuse(out_gvcf_path, overwrite):
         j.name += ' [reuse]'
@@ -241,7 +234,7 @@ def merge_gvcfs_job(
     if utils.can_reuse(out_gvcf_path, overwrite):
         j.name += ' [reuse]'
         return j
-    
+
     j.image(images.SAMTOOLS_PICARD_IMAGE)
     j.cpu(2)
     java_mem = 7

@@ -9,7 +9,7 @@ import logging
 import click
 
 from cpg_pipes.utils import exists
-from cpg_pipes.pipeline import Pipeline, pipeline_click_options
+from cpg_pipes.pipeline import create_pipeline, pipeline_click_options
 from cpg_pipes.stages.somalier import CramSomalierAncestry, CramSomalierPedigree
 
 logger = logging.getLogger(__file__)
@@ -23,10 +23,10 @@ def main(
     """
     Entry point, decorated by pipeline click options.
     """
-    pipeline = Pipeline(
+    pipeline = create_pipeline(
         name='pedigree_check',
         description='Pedigree checks',
-        stages_in_order=[
+        stages=[
             CramSomalierPedigree, 
             CramSomalierAncestry,
         ],

@@ -7,6 +7,8 @@ import logging
 import os
 import sys
 import time
+import traceback
+
 import click
 from typing import Any, Callable, cast
 
@@ -19,9 +21,9 @@ DEFAULT_REF = 'GRCh38'
 
 # Packages to install on a dataproc cluster, to use with the dataproc wrapper.
 DATAPROC_PACKAGES = [
-    # 'cpg_pipes==0.3.0',
+    'cpg_pipes==0.3.0',
     'cpg_gnomad',   # github.com/populationgenomics/gnomad_methods
-    'seqr_loader==1.2.0',  # hail-elasticsearch-pipelines
+    'seqr_loader==1.2.5',  # hail-elasticsearch-pipelines
     'elasticsearch==8.1.1',
     'cpg_utils',
     'click',
@@ -125,7 +127,7 @@ def hash_sample_ids(sample_names: list[str]) -> str:
     return f'{h}_{len(sample_names)}'
 
 
-def exists(path: Path | str) -> bool:
+def exists(path: Path | str, verbose: bool = True) -> bool:
     """
     Check if the object exists, where the object can be:
         * local file
@@ -135,6 +137,7 @@ def exists(path: Path | str) -> bool:
           in which case it will check for the existence of a
           *.mt/_SUCCESS or *.ht/_SUCCESS file.
     @param path: path to the file/directory/object/mt/ht
+    @param verbose: print on each check
     @return: True if the object exists
     """
     path = cast(Path, to_path(path))
@@ -143,6 +146,16 @@ def exists(path: Path | str) -> bool:
     if any(str(path).rstrip('/').endswith(f'.{suf}') for suf in ['mt', 'ht']):
         path = path / '_SUCCESS'
 
+    if verbose:
+        # noinspection PyBroadException
+        try:
+            res = path.exists()
+        except BaseException:
+            traceback.print_exc()
+            logger.error(f'Failed checking {path}')
+            sys.exit(1)
+        logger.debug(f'Checked {path} [' + ('exists' if res else 'missing') + ']')
+        return res
     return path.exists()
 
 

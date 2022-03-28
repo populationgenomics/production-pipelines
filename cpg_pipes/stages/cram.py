@@ -17,7 +17,7 @@ class CramStage(SampleStage):
     """
     Align or re-align input data to produce a CRAM file
     """
-    def expected_result(self, sample: Sample) -> Path:
+    def expected_outputs(self, sample: Sample) -> Path:
         """
         Stage is expected to generate a CRAM file and a corresponding index.
         """
@@ -41,7 +41,7 @@ class CramStage(SampleStage):
         jobs = align.align(
             b=self.b,
             alignment_input=sample.alignment_input,
-            output_path=self.expected_result(sample),
+            output_path=self.expected_outputs(sample),
             sample_name=sample.id,
             job_attrs=sample.get_job_attrs(),
             refs=self.refs,
@@ -52,6 +52,6 @@ class CramStage(SampleStage):
         )
         return self.make_outputs(
             sample, 
-            data=self.expected_result(sample), 
+            data=self.expected_outputs(sample), 
             jobs=jobs
         )

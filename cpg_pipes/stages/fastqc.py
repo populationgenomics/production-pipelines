@@ -17,7 +17,7 @@ class FastQC(SampleStage):
     """
     Run FastQC on alignment inputs.
     """
-    def expected_result(self, sample: Sample) -> dict[str, Path]:
+    def expected_outputs(self, sample: Sample) -> dict[str, Path]:
         """
         Stage is expected to generate a FastQC HTML report, and a zip file for 
         parsing with MuiltiQC.
@@ -45,14 +45,14 @@ class FastQC(SampleStage):
 
         jobs = fastqc.fastqc(
             b=self.b,
-            output_html_path=self.expected_result(sample)['html'],
-            output_zip_path=self.expected_result(sample)['zip'],
+            output_html_path=self.expected_outputs(sample)['html'],
+            output_zip_path=self.expected_outputs(sample)['zip'],
             alignment_input=sample.alignment_input,
             refs=self.refs,
             job_attrs=sample.get_job_attrs(),
         )
         return self.make_outputs(
             sample, 
-            data=self.expected_result(sample), 
+            data=self.expected_outputs(sample), 
             jobs=jobs
         )

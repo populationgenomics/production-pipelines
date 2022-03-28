@@ -133,7 +133,7 @@ class SMDB:
             }
         )
         logger.info(
-            f'Finding samples for dataset {dataset_name}:'
+            f'Finding samples for dataset {dataset_name}: '
             f'found {len(sample_entries)}'
         )
         return sample_entries

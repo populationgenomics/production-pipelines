@@ -5,20 +5,23 @@ Batch pipeline to load data into seqr.
 """
 
 import logging
+import os
+import subprocess
 import time
 
 import click
 import pandas as pd
 from analysis_runner import dataproc
 
-from cpg_pipes import Path, Namespace
+from cpg_pipes import Path
 from cpg_pipes import utils
+from cpg_pipes.jobs.seqr_loader import annotate_dataset
 from cpg_pipes.pipeline import (
     pipeline_click_options,
     Cohort, 
     Dataset, 
     stage, 
-    Pipeline, 
+    create_pipeline, 
     StageInput,
     StageOutput,
     CohortStage, 
@@ -31,40 +34,39 @@ from cpg_pipes.stages.vqsr import VqsrStage
 logger = logging.getLogger(__file__)
 
 
-def get_anno_tmp_bucket(cohort: Cohort) -> Path:
-    """
-    Path to write Hail Query intermediate files
-    """
-    return cohort.analysis_dataset.get_tmp_bucket() / 'mt'
-
-
 @stage(required_stages=[JointGenotypingStage, VqsrStage])
 class AnnotateCohortStage(CohortStage):
     """
     Re-annotate the entire cohort. 
     """
-    def expected_result(self, cohort: Cohort) -> Path:
+    def expected_outputs(self, cohort: Cohort) -> Path:
         """
         Expected to write a matrix table.
         """
-        return get_anno_tmp_bucket(cohort) / 'combined.mt'
+        samples_hash = utils.hash_sample_ids(cohort.get_sample_ids())
+        return (
+            cohort.analysis_dataset.get_tmp_bucket() /
+            'mt' /
+            f'{samples_hash}' /
+            'annotated-cohort.mt'
+        )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        checkpoints_bucket = get_anno_tmp_bucket(cohort) / 'checkpoints'
-
         vcf_path = inputs.as_path(target=cohort, stage=JointGenotypingStage, id='vcf')
         annotated_siteonly_vcf_path = inputs.as_path(target=cohort, stage=VqsrStage)
 
-        expected_path = self.expected_result(cohort)
+        mt_path = self.expected_outputs(cohort)
+        checkpoints_bucket = mt_path.parent / 'checkpoints'
+
         j = dataproc.hail_dataproc_job(
             self.b,
             f'{utils.QUERY_SCRIPTS_DIR}/seqr/vcf_to_mt.py '
             f'--vcf-path {vcf_path} '
             f'--site-only-vqsr-vcf-path {annotated_siteonly_vcf_path} '
-            f'--dest-mt-path {expected_path} '
+            f'--dest-mt-path {mt_path} '
             f'--bucket {checkpoints_bucket} '
             f'--disable-validation '
             f'--make-checkpoints '
@@ -85,7 +87,7 @@ class AnnotateCohortStage(CohortStage):
             num_secondary_workers=50,
             num_workers=8,
         )
-        return self.make_outputs(cohort, data=expected_path, jobs=[j])
+        return self.make_outputs(cohort, data=mt_path, jobs=[j])
 
 
 @stage(required_stages=[AnnotateCohortStage])
@@ -94,7 +96,7 @@ class AnnotateDatasetStage(DatasetStage):
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
     that will be loaded into Seqr)
     """
-    def expected_result(self, dataset: Dataset) -> Path:
+    def expected_outputs(self, dataset: Dataset) -> Path:
         """
         Expected to generate a matrix table
         """
@@ -108,29 +110,17 @@ class AnnotateDatasetStage(DatasetStage):
             target=dataset.cohort, 
             stage=AnnotateCohortStage
         )
-
-        # Make a list of dataset samples to subset from the entire matrix table
-        sample_ids = [s.id for s in dataset.get_samples()]
-        proj_tmp_bucket = dataset.get_tmp_bucket()
-        subset_path = proj_tmp_bucket / 'seqr-samples.txt'
-        with subset_path.open('w') as f:
-            f.write('\n'.join(sample_ids))
-
-        expected_path = self.expected_result(dataset)    
-        j = dataproc.hail_dataproc_job(
-            self.b,
-            f'{utils.QUERY_SCRIPTS_DIR}/seqr/subset_mt.py '
-            f'--mt-path {annotated_mt_path} '
-            f'--out-mt-path {expected_path} '
-            f'--subset-tsv {subset_path}',
-            max_age='8h',
-            packages=utils.DATAPROC_PACKAGES,
-            num_secondary_workers=20,
-            num_workers=5,
-            job_name=f'{dataset.name}: annotate dataset',
-            depends_on=inputs.get_jobs(),
+        j = annotate_dataset(
+            b=self.b,
+            annotated_mt_path=annotated_mt_path,
+            sample_ids=[s.id for s in dataset.get_samples()],
+            output_mt_path=self.expected_outputs(dataset),
+            tmp_bucket=dataset.get_tmp_bucket(),
+            hail_billing_project=self.hail_billing_project,
+            hail_bucket=self.hail_bucket,
+            job_attrs=dataset.get_job_attrs(),
         )
-        return self.make_outputs(dataset, data=expected_path, jobs=[j])
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])
 
 
 @stage(required_stages=[AnnotateDatasetStage])
@@ -138,7 +128,7 @@ class LoadToEsStage(DatasetStage):
     """
     Create a Seqr index.
     """
-    def expected_result(self, dataset: Dataset) -> None:
+    def expected_outputs(self, dataset: Dataset) -> None:
         """
         Expected to generate a Seqr index, which is not a file
         """
@@ -150,14 +140,18 @@ class LoadToEsStage(DatasetStage):
         """
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetStage)
         version = time.strftime('%Y%m%d-%H%M%S')
-
+        
         j = dataproc.hail_dataproc_job(
             self.b,
             f'{utils.QUERY_SCRIPTS_DIR}/seqr/mt_to_es.py '
             f'--mt-path {dataset_mt_path} '
+            f'--es-host elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com '
+            f'--es-port 9243 '
+            f'--es-username seqr '
+            f'--es-password {_read_es_password()} '
             f'--es-index {dataset.name}-{version} '
             f'--es-index-min-num-shards 1 '
-            f'{"--prod" if dataset.namespace == Namespace.MAIN else ""}',
+            f'--use-spark ',  # es export doesn't work with the service backend
             max_age='16h',
             packages=utils.DATAPROC_PACKAGES,
             num_secondary_workers=2,
@@ -168,36 +162,20 @@ class LoadToEsStage(DatasetStage):
         return self.make_outputs(dataset, jobs=[j])
 
 
-@stage(required_stages=[AnnotateDatasetStage])
-class ToVcfStage(DatasetStage):
+def _read_es_password(
+    project_id='seqr-308602',
+    secret_id='seqr-es-password',
+    version_id='latest',
+) -> str:
     """
-    Convers the annotated matrix table to a pVCF
+    Read a GCP secret storing the ES password
     """
-    def expected_result(self, dataset: Dataset) -> Path:
-        """
-        Generates an indexed VCF
-        """
-        return dataset.get_analysis_bucket() / 'vcf' / f'{dataset.name}.vcf.bgz'
-
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        """
-        Uses analysis-runner's dataproc helper to run a hail query script
-        """
-        dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetStage)
-
-        j = dataproc.hail_dataproc_job(
-            self.b,
-            f'{utils.QUERY_SCRIPTS_DIR}/seqr/mt_to_vcf.py '
-            f'--mt-path {dataset_mt_path} '
-            f'--out-vcf-path {self.expected_result(dataset)}',
-            max_age='8h',
-            packages=utils.DATAPROC_PACKAGES,
-            num_secondary_workers=20,
-            num_workers=5,
-            job_name=f'{dataset.name}: export to VCF',
-            depends_on=inputs.get_jobs(),
-        )
-        return self.make_outputs(dataset, self.expected_result(dataset), jobs=[j])
+    password = os.environ.get('SEQR_ES_PASSWORD')
+    if password:
+        return password
+    cmd = f'gcloud secrets versions access {version_id} --secret {secret_id} --project {project_id}'
+    logger.info(cmd)
+    return subprocess.check_output(cmd, shell=True).decode()
 
 
 def _make_seqr_metadata_files(
@@ -266,7 +244,7 @@ def _make_seqr_metadata_files(
 @click.option(
     '--make-seqr-metadata/--no-make-seqr-metadata',
     'make_seqr_metadata',
-    default=True,
+    default=False,
     is_flag=True,
     help='Make Seqr metadata',
 )
@@ -298,7 +276,7 @@ def main(
     """
     make_seqr_metadata = kwargs.pop('make_seqr_metadata')
 
-    pipeline = Pipeline(
+    pipeline = create_pipeline(
         name='seqr_loader',
         description='Seqr loader',
         config=dict(

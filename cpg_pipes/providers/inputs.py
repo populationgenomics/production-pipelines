@@ -22,7 +22,7 @@ class InputProviderError(Exception):
     pass
 
 
-class InputsProvider(ABC):
+class InputProvider(ABC):
     """
     Abstract class for implementing inputs source.
     """
@@ -187,7 +187,7 @@ class InputsProvider(ABC):
             external_id=str(self.get_external_id(entry)),
             participant_id=self.get_participant_id(entry),
             sex=self.get_participant_sex(entry),
-            **self.get_sample_meta(entry),
+            meta=self.get_sample_meta(entry),
         )
 
 
@@ -206,7 +206,7 @@ class FieldMap(Enum):
     sequencing_type = 'sequencing_type'
 
 
-class CsvInputsProvider(InputsProvider):
+class CsvInputProvider(InputProvider):
     """
     Input provider that parses data from a CSV file.
     """
@@ -288,7 +288,7 @@ class CsvInputsProvider(InputsProvider):
         Populate Analysis entries
         """
         pass
-    
+
     def populate_pedigree(
         self, 
         cohort: Cohort,

@@ -3,10 +3,15 @@ Helpers to set up Job's command.
 """
 
 import logging
+import os
 from typing import List, Union
 import textwrap
 
+from cloudpathlib import CloudPath
+from hailtop.batch.job import Job
+
 from cpg_pipes import Path
+from cpg_pipes.hb.batch import get_hail_bucket
 from cpg_pipes.utils import PACKAGE_DIR
 
 logger = logging.getLogger(__file__)
@@ -63,7 +68,7 @@ MONITOR_SPACE_CMD = f'df -h; du -sh /io; du -sh /io/batch'
 ADD_SCRIPT_CMD = """\
 cat <<EOT >> {script_name}
 {script_contents}
-EOT
+EOT\
 """
 
 
@@ -94,17 +99,6 @@ def wrap_command(
     if isinstance(command, list):
         command = '\n'.join(command)
 
-    copy_script_cmd = ''
-    if python_script:
-        with (PACKAGE_DIR / '..' / python_script).open() as f:
-            script_contents = f.read()
-        copy_script_cmd = ADD_SCRIPT_CMD.format(
-            script_name=python_script.name,
-            script_contents=script_contents,
-        )
-        # We don't want the python script tabs to be stripped:
-        rm_leading_space = False
-    
     cmd = f"""\
     set -o pipefail
     set -ex
@@ -113,8 +107,9 @@ def wrap_command(
     
     {f'(while true; do {MONITOR_SPACE_CMD}; sleep 600; done) &'
     if monitor_space else ''}
-    
-    {copy_script_cmd}
+
+    {{copy_script_cmd}}
+
     {command}
     
     {MONITOR_SPACE_CMD if monitor_space else ''}
@@ -128,4 +123,17 @@ def wrap_command(
     else:
         # Remove only common leading space:
         cmd = textwrap.dedent(cmd)
+
+    # We don't want the python script tabs to be stripped, so
+    # we are inserting it after leadings space is removed
+    if python_script:
+        with (PACKAGE_DIR / '..' / python_script).open() as f:
+            script_contents = f.read()
+        cmd = cmd.replace('{copy_script_cmd}', ADD_SCRIPT_CMD.format(
+            script_name=python_script.name,
+            script_contents=script_contents,
+        ))
+    else:
+        cmd = cmd.replace('{copy_script_cmd}', '')
+
     return cmd

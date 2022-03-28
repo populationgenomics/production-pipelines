@@ -12,7 +12,7 @@ Problems with the currentl publicly shared somalier sites VCF:
 import logging
 from cpg_pipes import images, Namespace
 from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.pipeline.pipeline import Pipeline
+from cpg_pipes.pipeline import create_pipeline
 from cpg_pipes.providers.cpg import CpgStorageProvider
 
 logger = logging.getLogger(__file__)
@@ -20,7 +20,7 @@ logger = logging.getLogger(__file__)
 RESULT_VCF = CpgStorageProvider().get_ref_bucket() / 'somalier/v0/sites.hg38.vcf.gz'
 
 
-pipe = Pipeline(
+pipe = create_pipeline(
     analysis_dataset='fewgenomes',
     name='find-somalier-sites',
     description='find 65k somalier sites',

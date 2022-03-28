@@ -8,53 +8,54 @@ from os.path import join
 import click
 import logging
 
-from cpg_pipes import benchmark
+from cpg_pipes import benchmark, Namespace
 from cpg_pipes.jobs.haplotype_caller import produce_gvcf
-from cpg_pipes.pipeline.pipeline import Pipeline
+from cpg_pipes.pipeline import create_pipeline
 from cpg_pipes.jobs.align import Aligner, align
+from cpg_pipes.types import SequencingType
 
 logger = logging.getLogger(__file__)
 
 
 DATASET = 'fewgenomes'
-NAMESPACE = 'main'
+NAMESPACE = Namespace.MAIN
 
 
 @click.command()
 def main():
-    pipe = Pipeline(
+    pipe = create_pipeline(
         analysis_dataset='fewgenomes',
         name='benchmark_dragen',
-        output_version='v0',
+        version='v0',
         namespace=NAMESPACE,
         description='Benchmark DRAGMAP: full samples',
-        check_smdb_seq=False,
     )
     inputs = {
         'NA12878': benchmark.na12878fq,
     }
     for sample_name, inp in inputs.items():
-        cram_path = f'{benchmark.BENCHMARK_BUCKET}/outputs/{sample_name}.cram'
-        align_j = align(
+        cram_path = benchmark.BENCHMARK_BUCKET / 'outputs' / f'{sample_name}.cram'
+        align_jobs = align(
             pipe.b,
             alignment_input=inp,
             output_path=cram_path,
             sample_name=sample_name,
-            dataset_name='benchmark',
             aligner=Aligner.DRAGMAP,
+            refs=pipe.refs,
         )
-        produce_gvcf(
+        hc_jobs = produce_gvcf(
             pipe.b,
-            output_path=f'{benchmark.BENCHMARK_BUCKET}/outputs/{sample_name}.g.vcf.gz',
+            output_path=benchmark.BENCHMARK_BUCKET / 'outputs' f'{sample_name}.g.vcf.gz',
             sample_name=sample_name,
-            dataset_name='benchmark',
             cram_path=cram_path,
             number_of_intervals=10,
-            tmp_bucket=join(benchmark.BENCHMARK_BUCKET, 'tmp'),
-            depends_on=[align_j],
-            smdb=pipe.get_db(),
+            tmp_bucket=benchmark.BENCHMARK_BUCKET / 'tmp',
             dragen_mode=True,
+            refs=pipe.refs,
+            sequencing_type=SequencingType.WGS,
         )
+        for j in hc_jobs:
+            j.depends_on(*align_jobs)
 
     pipe.submit_batch()
 

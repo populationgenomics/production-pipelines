@@ -3,16 +3,18 @@ Test how Hail Batch attaches disks to instances
 """
 
 from typing import Optional
-from cpg_pipes.pipeline.pipeline import Pipeline
+
+from cpg_pipes import Namespace
+from cpg_pipes.pipeline import create_pipeline
 
 
 def main():  # pylint: disable=missing-function-docstring
-    pipeline = Pipeline(
+    pipeline = create_pipeline(
         analysis_dataset='fewgenomes',
         name='test_attach_disk',
         description='test_attach_disk',
-        output_version='v0',
-        namespace='test'
+        version='v0',
+        namespace=Namespace.TEST,
     )
     b = pipeline.b
 

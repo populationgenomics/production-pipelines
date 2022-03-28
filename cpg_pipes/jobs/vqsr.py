@@ -95,7 +95,7 @@ def make_vqsr_jobs(
     hard_filter_ht_path: Path | None = None,
     output_vcf_path: Path | None = None,
     use_as_annotations: bool = True,
-    overwrite: bool = True,
+    overwrite: bool = False,
     convert_vcf_to_site_only: bool = False,
 ) -> list[Job]:
     """
@@ -167,7 +167,7 @@ def make_vqsr_jobs(
         sequencing_type=sequencing_type,
         scatter_count=scatter_count,
     )
-    intervals = [intervals_j[f'intervals{i}.list'] for i in range(scatter_count)]
+    intervals = [intervals_j[f'{i}.interval_list'] for i in range(scatter_count)]
     jobs.append(intervals_j)
 
     if input_vcf_or_mt_path.name.endswith('.mt'):
@@ -300,7 +300,7 @@ def make_vqsr_jobs(
             b,
             input_vcfs=scattered_vcfs,
             overwrite=overwrite,
-            output_vcf_path=output_vcf_path,
+            out_vcf_path=output_vcf_path,
             site_only=True,
         )
         recalibrated_gathered_vcf_j.name = f'VQSR: {recalibrated_gathered_vcf_j.name}'

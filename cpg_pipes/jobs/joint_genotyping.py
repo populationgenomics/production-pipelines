@@ -17,7 +17,7 @@ from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.pipeline.targets import Sample
-from cpg_pipes.types import GvcfPath
+from cpg_pipes.types import GvcfPath, SequencingType
 from cpg_pipes.refdata import RefData
 
 logger = logging.getLogger(__file__)
@@ -37,40 +37,34 @@ def make_joint_genotyping_jobs(
     out_vcf_path: Path,
     out_siteonly_vcf_path: Path,
     samples: list[Sample],
+    sequencing_type: SequencingType,
     genomicsdb_bucket: Path,
     tmp_bucket: Path,
     refs: RefData,
     gvcf_by_sid: dict[str, GvcfPath],
-    overwrite: bool = True,
+    overwrite: bool = False,
     # Default to GenotypeGVCFs because Gnarly is a bit weird, e.g. it adds <NON_REF>
     # variants with AC_adj annotations (other variants have AC):
     # bcftools view gs://cpg-fewgenomes-test/unittest/inputs/chr20/gnarly/joint-called-siteonly.vcf.gz | zgrep 7105364
     tool: JointGenotyperTool = JointGenotyperTool.GenotypeGVCFs,
     do_filter_excesshet: bool = True,
     scatter_count: int | None = None,
+    job_attrs: dict | None = None,
 ) -> list[Job]:
     """
     Adds samples to the GenomicsDB and runs joint genotyping on them.
     Outputs a multi-sample VCF under `output_vcf_path`.
     """
-    job_name = 'Joint genotyping'
+    j = b.new_job('Joint genotyping', job_attrs)
     if utils.can_reuse([out_vcf_path, out_siteonly_vcf_path], overwrite):
-        return [b.new_job(f'{job_name} [reuse]')]
-   
+        j.name += ' [reuse]'
+        return [j]
+
     if len(samples) == 0:
         raise ValueError(
             'Provided samples collection for joint calling should contain '
             'at least one active sample'
         )
-
-    sequencing_types = set(s.sequencing_type for s in samples)
-    if len(sequencing_types) > 1:
-        raise ValueError(
-            f'Samples of more than one sequencing type used for joint calling: '
-            f'{sequencing_types}. Joint calling can be only performed on samples '
-            f'of the same type.'
-        )
-    sequencing_type = list(sequencing_types)[0]
 
     logger.info(f'Submitting joint-calling jobs.')
 
@@ -83,8 +77,9 @@ def make_joint_genotyping_jobs(
         refs=refs,
         sequencing_type=sequencing_type,
         scatter_count=scatter_count,
+        job_attrs=job_attrs,
     )
-    intervals = [intervals_j[f'intervals{i}.list'] for i in range(scatter_count)]
+    intervals = [intervals_j[f'{i}.interval_list'] for i in range(scatter_count)]
     jobs.append(intervals_j)
     
     # There are some problems with using GenomcsDB in cloud (`genomicsdb_cloud()`):
@@ -102,11 +97,12 @@ def make_joint_genotyping_jobs(
         intervals=intervals,
         scatter_count=scatter_count,
         overwrite=overwrite,
+        job_attrs=job_attrs,
     )
     jobs.extend([v for k, v in import_gvcfs_job_per_interval.items()])
 
-    vcf_by_interval: dict[int, hb.ResourceGroup] = dict()
-    siteonly_vcf_by_interval: dict[int, hb.ResourceGroup] = dict()
+    vcf_by_interval: dict[int, hb.ResourceFile] = {}
+    siteonly_vcf_by_interval: dict[int, hb.ResourceFile] = {}
 
     sample_ids = set(s.id for s in samples)
     samples_hash = utils.hash_sample_ids(list(sample_ids))
@@ -126,13 +122,13 @@ def make_joint_genotyping_jobs(
             overwrite=overwrite,
             number_of_samples=len(samples),
             refs=refs,
-            interval_idx=idx,
             number_of_intervals=scatter_count,
             interval=intervals[idx],
             tool=tool,
             output_vcf_path=jc_vcf_path,
+            job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}'),
         )
-        vcf_by_interval[idx] = jc_vcf
+        vcf_by_interval[idx] = jc_vcf['vcf.gz']
         jobs.append(jc_vcf_j)
         if import_gvcfs_job_per_interval.get(idx):
             jc_vcf_j.depends_on(import_gvcfs_job_per_interval.get(idx))
@@ -146,8 +142,9 @@ def make_joint_genotyping_jobs(
                 interval=intervals[idx],
                 overwrite=overwrite,
                 output_vcf_path=filt_jc_vcf_path,
+                job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}'),
             )
-            vcf_by_interval[idx] = exccess_filter_jc_vcf
+            vcf_by_interval[idx] = exccess_filter_jc_vcf['vcf.gz']
             jobs.append(exccess_filter_j)
 
         siteonly_j, siteonly_vcf = _add_make_sitesonly_job(
@@ -155,8 +152,9 @@ def make_joint_genotyping_jobs(
             input_vcf=vcf_by_interval[idx],
             overwrite=overwrite,
             output_vcf_path=siteonly_jc_vcf_path,
+            job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}'),
         )
-        siteonly_vcf_by_interval[idx] = siteonly_vcf
+        siteonly_vcf_by_interval[idx] = siteonly_vcf['vcf.gz']
         jobs.append(siteonly_j)
 
     logger.info(f'Queueing gather VCFs job')
@@ -164,7 +162,7 @@ def make_joint_genotyping_jobs(
         b,
         input_vcfs=[v for k, v in vcf_by_interval.items()],
         overwrite=overwrite,
-        output_vcf_path=out_vcf_path,
+        out_vcf_path=out_vcf_path,
         site_only=False,
     )
     gather_j.name = 'Joint genotyping: ' + gather_j.name
@@ -175,8 +173,9 @@ def make_joint_genotyping_jobs(
         b,
         input_vcfs=[v for k, v in siteonly_vcf_by_interval.items()],
         overwrite=overwrite,
-        output_vcf_path=out_siteonly_vcf_path,
+        out_vcf_path=out_siteonly_vcf_path,
         site_only=True,
+        job_attrs=job_attrs,
     )
     gather_siteonly_j.name = 'Joint genotyping: ' + gather_siteonly_j.name
     jobs.append(gather_siteonly_j)
@@ -192,6 +191,7 @@ def genomicsdb(
     intervals: list[hb.Resource],
     scatter_count: int = RefData.number_of_joint_calling_intervals,    
     overwrite: bool = False,
+    job_attrs: dict | None = None,
 ) -> tuple[dict[int, Job], dict[int, Path]]:
     """
     Create GenomicDBs for each interval, given new samples.
@@ -213,9 +213,10 @@ def genomicsdb(
         out_path = path_per_interval[idx]
 
         job_name = 'Joint genotyping: creating GenomicsDB'
-        if idx is not None:
-            job_name += f' {idx + 1}/{scatter_count}'
-        j = b.new_job(job_name)
+        j = b.new_job(
+            job_name, 
+            (job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}')
+        )
         job_per_interval[idx] = j
 
         if utils.can_reuse(out_path, overwrite):
@@ -283,6 +284,7 @@ def genomicsdb_cloud(
     intervals: hb.ResourceGroup,
     scatter_count: int = RefData.number_of_joint_calling_intervals,    
     depends_on: list[Job] | None = None,
+    job_attrs: dict | None = None,
 ) -> tuple[dict[int, Job], dict[int, Path]]:
     """
     Update or create GenomicDBs for each interval, given new samples.
@@ -321,8 +323,7 @@ def genomicsdb_cloud(
                 updating_existing_db=updating_existing_db,
                 sample_map_bucket_path=sample_map_bucket_path,
                 interval=intervals[f'interval_{idx}'],
-                interval_idx=idx,
-                number_of_intervals=scatter_count,
+                job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}')
             )
             if depends_on:
                 import_gvcfs_job.depends_on(*depends_on)
@@ -420,10 +421,9 @@ def _genomicsdb_import_cloud(
     updating_existing_db: bool,
     sample_map_bucket_path: Path,
     interval: hb.ResourceFile,
-    interval_idx: int | None = None,
-    number_of_intervals: int = 1,
     depends_on: list[Job] | None = None,
     overwrite: bool = False,
+    job_attrs: dict | None = None,
 ) -> tuple[Job, set[str]]:
     """
     Add GVCFs to a genomics database (or create a new instance if it doesn't exist)
@@ -455,10 +455,7 @@ def _genomicsdb_import_cloud(
 
     sample_map = b.read_input(str(sample_map_bucket_path))
 
-    if interval_idx is not None:
-        job_name += f' {interval_idx + 1}/{number_of_intervals}'
-
-    j = b.new_job(job_name)
+    j = b.new_job(job_name, job_attrs)
     j.image(images.GATK_IMAGE)
 
     if depends_on:
@@ -516,11 +513,11 @@ def _add_joint_genotyper_job(
     overwrite: bool,
     number_of_samples: int,
     refs: RefData,
-    interval_idx: int | None = None,
     number_of_intervals: int = 1,
     interval: hb.Resource | None = None,
     output_vcf_path: Path | None = None,
     tool: JointGenotyperTool = JointGenotyperTool.GnarlyGenotyper,
+    job_attrs: dict | None = None,
 ) -> tuple[Job, hb.ResourceGroup]:
     """
     Runs GATK GnarlyGenotyper or GenotypeGVCFs on a combined_gvcf VCF bgzipped file,
@@ -539,9 +536,7 @@ def _add_joint_genotyper_job(
     QUALapprox, VarDP, RAW_MQandDP.
     """
     job_name = f'Joint genotyping: {tool.name}'
-    if interval_idx is not None:
-        job_name += f' {interval_idx + 1}/{number_of_intervals}'
-    j = b.new_job(job_name)
+    j = b.new_job(job_name, job_attrs)
     if utils.can_reuse(output_vcf_path, overwrite):
         j.name += ' [reuse]'
         return j, b.read_input_group(**{
@@ -618,6 +613,7 @@ def _add_exccess_het_filter(
     excess_het_threshold: float = 54.69,
     interval: hb.Resource | None = None,
     output_vcf_path: Path | None = None,
+    job_attrs: dict | None = None,
 ) -> tuple[Job, hb.ResourceGroup]:
     """
     Filter a large cohort callset on Excess Heterozygosity.
@@ -635,7 +631,7 @@ def _add_exccess_het_filter(
     Returns: a Job object with a single output j.output_vcf of type ResourceGroup
     """
     job_name = 'Joint genotyping: ExcessHet filter'
-    j = b.new_job(job_name)
+    j = b.new_job(job_name, job_attrs)
     if utils.can_reuse(output_vcf_path, overwrite):
         j.name += ' [reuse]'
         return j, b.read_input_group(**{
@@ -670,10 +666,11 @@ def _add_exccess_het_filter(
 
 def _add_make_sitesonly_job(
     b: hb.Batch,
-    input_vcf: hb.ResourceGroup,
+    input_vcf: hb.ResourceFile,
     overwrite: bool,
     disk_size: int = 32,
     output_vcf_path: Path | None = None,
+    job_attrs: dict | None = None,
 ) -> tuple[Job, hb.ResourceGroup]:
     """
     Create sites-only VCF with only site-level annotations.
@@ -682,7 +679,7 @@ def _add_make_sitesonly_job(
     Returns: a Job object with a single output j.sites_only_vcf of type ResourceGroup
     """
     job_name = 'Joint genotyping: MakeSitesOnlyVcf'
-    j = b.new_job(job_name)
+    j = b.new_job(job_name, job_attrs)
     if output_vcf_path and utils.can_reuse(output_vcf_path, overwrite):
         j.name += ' [reuse]'
         return j, b.read_input_group(**{
@@ -700,7 +697,7 @@ def _add_make_sitesonly_job(
     j.command(wrap_command(f"""
     gatk --java-options -Xms6g \\
     MakeSitesOnlyVcf \\
-    -I {input_vcf['vcf.gz']} \\
+    -I {input_vcf} \\
     -O {j.output_vcf['vcf.gz']}
     """))
     if output_vcf_path:

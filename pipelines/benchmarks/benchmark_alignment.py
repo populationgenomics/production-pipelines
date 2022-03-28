@@ -11,7 +11,7 @@ import logging
 from cpg_pipes import benchmark, images, Namespace
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
 from cpg_pipes.types import FastqPair, CramPath
-from cpg_pipes.pipeline import stage, Pipeline, SampleStage, StageInput, StageOutput
+from cpg_pipes.pipeline import stage, create_pipeline, SampleStage, StageInput, StageOutput
 from cpg_pipes.pipeline.targets import Sample
 
 logger = logging.getLogger(__file__)
@@ -32,7 +32,7 @@ INPUTS_TYPE = InputsType.FULL
 
 @stage
 class SubsetAlignmentInput(SampleStage):
-    def expected_result(self, sample: Sample):
+    def expected_outputs(self, sample: Sample):
         basepath = f'{benchmark.BENCHMARK_BUCKET}/outputs/{sample.id}/subset'
         return {
             'r1': f'{basepath}/R1.fastq.gz',
@@ -54,12 +54,12 @@ class SubsetAlignmentInput(SampleStage):
         j1 = self.b.new_job('Subset FQ1', dict(sample=sample.id))
         j1.storage('100G')
         j1.command(f'gunzip -c {fqs1[0]} | head -n{lines} | gzip -c > {j1.out_fq}')
-        self.b.write_output(j1.out_fq, self.expected_result(sample)['r1'])
+        self.b.write_output(j1.out_fq, str(self.expected_outputs(sample)['r1']))
 
         j2 = self.b.new_job('Subset FQ2')
         j2.storage('100G')
         j2.command(f'gunzip -c {fqs2[0]} | head -n{lines} | gzip -c > {j2.out_fq}')
-        self.b.write_output(j2.out_fq, self.expected_result(sample)['r2'])
+        self.b.write_output(j2.out_fq, str(self.expected_outputs(sample)['r2']))
         
         return self.make_outputs(
             sample,
@@ -87,7 +87,7 @@ class SubsetAlignmentInput(SampleStage):
         )
         self.b.write_output(
             j.output_cram, 
-            str(self.expected_result(sample)).replace('.cram', '')
+            str(self.expected_outputs(sample)).replace('.cram', '')
         )
         
         return self.make_outputs(
@@ -106,7 +106,7 @@ class SubsetAlignmentInput(SampleStage):
 
 @stage(required_stages=SubsetAlignmentInput if (INPUTS_TYPE == InputsType.FULL_SUBSET) else None)
 class DifferentResources(SampleStage):
-    def expected_result(self, sample: 'Sample'):
+    def expected_outputs(self, sample: 'Sample'):
         return None
 
     def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput:
@@ -138,7 +138,7 @@ class DifferentResources(SampleStage):
 
 @stage(required_stages=SubsetAlignmentInput if (INPUTS_TYPE == InputsType.FULL_SUBSET) else None)
 class DifferentAlignerSetups(SampleStage):
-    def expected_result(self, sample: 'Sample'):
+    def expected_outputs(self, sample: 'Sample'):
         return None
 
     def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput:
@@ -178,7 +178,10 @@ class DifferentAlignerSetups(SampleStage):
 
 @click.command()
 def main():
-    pipeline = Pipeline(
+    """
+    Entry point.
+    """
+    pipeline = create_pipeline(
         name='benchmark_alignment',
         description='Benchmark alignment',
         analysis_dataset=DATASET,
@@ -187,11 +190,11 @@ def main():
     )
 
     p = pipeline.add_dataset('fewgenomes')
-    p.add_sample(
+    s = p.add_sample(
         id='PERTHNEURO_CRAM',
         external_id='PERTHNEURO_CRAM',
-        cram_input=benchmark.perth_neuro_cram,
     )
+    s.alignment_input = benchmark.perth_neuro_cram
 
     pipeline.set_stages([
         DifferentAlignerSetups,

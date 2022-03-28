@@ -22,7 +22,7 @@ class GvcfStage(SampleStage):
     """
     hc_intervals: list[hb.Resource] | None = None
 
-    def expected_result(self, sample: Sample) -> Path:
+    def expected_outputs(self, sample: Sample) -> Path:
         """
         Generate a GVCF and corresponding TBI index
         """
@@ -43,12 +43,12 @@ class GvcfStage(SampleStage):
             )
             jobs.append(intervals_j)
             GvcfStage.hc_intervals = [
-                intervals_j[f'intervals{i}.list'] 
+                intervals_j[f'{i}.interval_list'] 
                 for i in range(hc_intervals_num)
             ]
         jobs.extend(haplotype_caller.produce_gvcf(
             b=self.b,
-            output_path=self.expected_result(sample),
+            output_path=self.expected_outputs(sample),
             sample_name=sample.id,
             sequencing_type=sample.sequencing_type,
             job_attrs=sample.get_job_attrs(),
@@ -61,6 +61,6 @@ class GvcfStage(SampleStage):
         ))
         return self.make_outputs(
             sample,
-            data=self.expected_result(sample), 
+            data=self.expected_outputs(sample), 
             jobs=jobs
         )

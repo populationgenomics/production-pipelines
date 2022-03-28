@@ -23,6 +23,7 @@ def get_intervals(
     sequencing_type: SequencingType,
     scatter_count: int,
     out_bucket: Path | None = None,
+    job_attrs: dict | None = None,
 ) -> Job:
     """
     Add a job that split genome into intervals to parallelise variant calling.
@@ -37,7 +38,7 @@ def get_intervals(
     that, but Hail Batch is not dynamic and have to expect certain number of output
     files.
     """
-    j = b.new_job(f'Make {scatter_count} intervals')
+    j = b.new_job(f'Make {scatter_count} intervals', job_attrs)
     j.image(images.SAMTOOLS_PICARD_IMAGE)
     STANDARD.request_resources(storage_gb=16, mem_gb=2)
     
@@ -72,14 +73,14 @@ def get_intervals(
     for idx in range(scatter_count):
         name = f'temp_{str(idx + 1).zfill(4)}_of_{scatter_count}'
         cmd += f"""
-    ln /io/batch/out/{name}/scattered.interval_list {j[f"intervals{idx}.list"]}
+    ln /io/batch/out/{name}/scattered.interval_list {j[f'{idx}.interval_list']}
     """
     
     j.command(wrap_command(cmd))
     if out_bucket:
         for idx in range(scatter_count):
             b.write_output(
-                j[f'intervals{idx}.list'], 
+                j[f'{idx}.interval_list'], 
                 str(out_bucket / f'{scatter_count}intervals' / f'{idx}.interval_list')
             )
     return j

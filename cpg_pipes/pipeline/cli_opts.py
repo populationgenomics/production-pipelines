@@ -30,10 +30,19 @@ def val_to_enum(cls: Type[T]) -> Callable:
     """
     Callback to parse value into an Enum value
     """
-    def _callback(c, p, val: str) -> T:
+    def _callback(c, param, val: str) -> T:
         d = {
             name.lower(): item for name, item in cls.__members__.items()
         }
+        if val is None:
+            raise click.BadParameter(
+                f'parameter is required and not specified. '
+                f'Available options: {[n.lower() for n in cls.__members__]}'
+            )
+        if val not in d:
+            raise click.BadParameter(
+                f'Available options: {[n.lower() for n in cls.__members__]}'
+            )
         return d[val]
     return _callback
 
@@ -61,6 +70,7 @@ def pipeline_click_options(function: Callable) -> Callable:
         click.option(
             '--analysis-dataset',
             'analysis_dataset',
+            required=True,
             help='Dataset name to write cohort and pipeline level intermediate files',
         ),
         click.option(
@@ -149,6 +159,11 @@ def pipeline_click_options(function: Callable) -> Callable:
                  f'use --input-csv to specify a CSV file location',
         ),
         click.option(
+            '--input-csv',
+            'input_csv',
+            help=f'CSV file to provide with --input-provider={InputProviderType.CSV.value}'
+        ),
+        click.option(
             '--keep-scratch/--remove-scratch', 
             'keep_scratch', 
             default=False,
@@ -183,22 +198,6 @@ def pipeline_click_options(function: Callable) -> Callable:
                  'Works nicely with --previous-batch-tsv/--previous-batch-id options.',
         ),
         click.option(
-            '--previous-batch-tsv',
-            'previous_batch_tsv_path',
-            help='A list of previous successful attempts from another batch, dumped '
-                 'from from the Batch database (the "jobs" table joined on '
-                 '"job_attributes"). If the intermediate output for a job exists in '
-                 'a previous attempt, it will be passed forward, and a [reuse] job will '
-                 'be submitted.'
-        ),
-        click.option(
-            '--previous-batch-id',
-            'previous_batch_id',
-            help='6-letter ID of the previous successful batch (corresponds to the '
-                 'directory name in the batch logs. e.g. feb0e9 in '
-                 'gs://cpg-seqr-main-tmp/hail/batch/feb0e9'
-        ),
-        click.option(
             '--local-dir',
             'local_dir',
             help='Local directory for temporary files. Usually takes a few KB. '
@@ -219,7 +218,8 @@ def pipeline_click_options(function: Callable) -> Callable:
         with open(fp) as f:
             return yaml.load(f, Loader=yaml.SafeLoader)
     function = click_config_file.configuration_option(
-        provider=yaml_provider
+        provider=yaml_provider,
+        implicit=False,
     )(function)
- 
+
     return function

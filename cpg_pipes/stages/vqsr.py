@@ -18,7 +18,7 @@ class VqsrStage(CohortStage):
     """
     Variant filtering of joint-called VCF
     """
-    def expected_result(self, cohort: Cohort) -> Path:
+    def expected_outputs(self, cohort: Cohort) -> Path:
         """
         Expects to generate one site-only VCF
         """
@@ -37,22 +37,13 @@ class VqsrStage(CohortStage):
             stage=JointGenotypingStage, target=cohort, id='siteonly'
         )
 
-        sequencing_types = set(s.sequencing_type for s in cohort.get_samples())
-        if len(sequencing_types) > 1:
-            raise ValueError(
-                f'Samples of more than one sequencing type used for joint calling: '
-                f'{sequencing_types}. Joint calling can be only performed on samples '
-                f'of the same type.'
-            )
-        sequencing_type = list(sequencing_types)[0]
-    
         tmp_vqsr_bucket = cohort.analysis_dataset.get_tmp_bucket() / 'vqsr'
         logger.info(f'Queueing VQSR job')
-        expected_path = self.expected_result(cohort)
+        expected_path = self.expected_outputs(cohort)
         jobs = make_vqsr_jobs(
             b=self.b,
             refs=self.refs,
-            sequencing_type=sequencing_type,
+            sequencing_type=cohort.get_sequencing_type(),
             input_vcf_or_mt_path=siteonly_vcf_path,
             work_bucket=tmp_vqsr_bucket,
             gvcf_count=len(cohort.get_samples()),
