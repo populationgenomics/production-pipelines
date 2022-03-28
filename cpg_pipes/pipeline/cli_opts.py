@@ -215,11 +215,8 @@ def pipeline_click_options(function: Callable) -> Callable:
     # using https://pypi.org/project/click-config-file/
     def yaml_provider(fp, _):
         """Load options from YAML"""
-        # try:
         with open(fp) as f:
             return yaml.load(f, Loader=yaml.SafeLoader)
-        # except FileNotFoundError as e:
-        #     return {}
     function = click_config_file.configuration_option(
         provider=yaml_provider,
         implicit=False,
