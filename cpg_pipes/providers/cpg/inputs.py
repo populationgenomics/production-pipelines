@@ -36,7 +36,7 @@ class SmdbInputsProvider(InputsProvider):
 
     def get_dataset_name(self, cohort: Cohort, entry: dict[str, str]) -> str:
         """
-        Get name of the dataset. Not relevant for SMDB because we pull 
+        Get name of the dataset. Not relevant for SMDB because we pull
         specific datasets by their names.
         """
         raise NotImplementedError
@@ -125,6 +125,43 @@ class SmdbInputsProvider(InputsProvider):
                             sex=Sex.parse(sex),
                             phenotype=phenotype or '0',
                         )
+        for dataset in cohort.get_datasets():
+            samples_with_ped = [s for s in dataset.get_samples() if s.pedigree]
+            logger.info(
+                f'{dataset.name}: found pedigree info for {len(samples_with_ped)} '
+                f'samples out of {len(dataset.get_samples())}'
+            )
+
+    def populate_pedigree_from_db(self, cohort: Cohort):
+        """ Populate pedigree data for samples from SMDB """
+
+        sample_by_internal_id = dict()
+        for s in cohort.get_samples():
+            sample_by_internal_id[s.id] = s
+
+        for dataset in cohort.get_datasets():
+            pedigree = self.db.get_ped_file_by_project(
+                dataset_name=dataset.name, response_type='json'
+            )
+
+            for line in pedigree:
+                fam_id = line['family_id']
+                sam_id = line['individual_id']
+                mat_id = line['maternal_id']
+                pat_id = line['paternal_id']
+                sex = line['sex']
+                phenotype = line['affected']
+                if sam_id in sample_by_internal_id:
+                    s = sample_by_internal_id[sam_id]
+                    s.pedigree = PedigreeInfo(
+                        sample=s,
+                        fam_id=fam_id,
+                        mom=mat_id,
+                        dad=pat_id,
+                        sex=Sex.parse(str(sex)),
+                        phenotype=phenotype or '0',
+                    )
+
         for dataset in cohort.get_datasets():
             samples_with_ped = [s for s in dataset.get_samples() if s.pedigree]
             logger.info(

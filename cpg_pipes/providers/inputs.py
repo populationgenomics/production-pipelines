@@ -19,6 +19,7 @@ class InputProviderError(Exception):
     Exception thrown when there is something wrong happened parsing
     inputs.
     """
+
     pass
 
 
@@ -26,6 +27,7 @@ class InputsProvider(ABC):
     """
     Abstract class for implementing inputs source.
     """
+
     def populate_cohort(
         self,
         cohort: Cohort,
@@ -36,9 +38,10 @@ class InputsProvider(ABC):
         do_check_seq_existence: bool = False,
     ) -> Cohort:
         """
-        Add datasets in the cohort. There exists only one cohort for 
+        Add datasets in the cohort. There exists only one cohort for
         the pipeline run.
         """
+
         if dataset_names:
             # Specific datasets requested, so initialising them in advance.
             for ds_name in dataset_names:
@@ -64,12 +67,15 @@ class InputsProvider(ABC):
         self.populate_alignment_inputs(cohort, do_check_seq_existence)
         self.populate_analysis(cohort)
         self.populate_pedigree(cohort, ped_files)
+        if not ped_files:
+            self.populate_pedigree_from_db(cohort)
+
         return cohort
-    
+
     @abstractmethod
     def get_entries(self, dataset: Dataset | None = None) -> list[dict]:
         """
-        Overide this method to get a list of data entries (dicts). 
+        Overide this method to get a list of data entries (dicts).
         If dataset is not missing, it should be specific to a dataset.
         """
 
@@ -111,7 +117,7 @@ class InputsProvider(ABC):
 
     @abstractmethod
     def populate_alignment_inputs(
-        self, 
+        self,
         cohort: Cohort,
         do_check_seq_existence: bool = False,
     ):
@@ -127,12 +133,21 @@ class InputsProvider(ABC):
 
     @abstractmethod
     def populate_pedigree(
-        self, 
+        self,
         cohort: Cohort,
         ped_files: list[Path] | None = None,
     ) -> None:
         """
-        Populate pedigree data
+        Populate pedigree data from file
+        """
+
+    @abstractmethod
+    def populate_pedigree_from_db(
+        self,
+        cohort: Cohort,
+    ) -> None:
+        """
+        Populate pedigree data from database
         """
 
     def _get_entries(
@@ -173,7 +188,7 @@ class InputsProvider(ABC):
             if skip_samples:
                 if cpgid in skip_samples or extid in skip_samples:
                     logger.info(f'Skiping sample: {cpgid}|{extid}')
-                    continue 
+                    continue
             filtered_entries.append(entry)
         return filtered_entries
 
@@ -195,6 +210,7 @@ class FieldMap(Enum):
     """
     CSV field names.
     """
+
     dataset = 'dataset'
     sample = 'sample'
     external_id = 'external_id'
@@ -222,7 +238,7 @@ class CsvInputsProvider(InputsProvider):
                 f'Metadata TSV must have a header and a column "sample", '
                 f'got: {self.d[0]}'
             )
-        
+
     def get_entries(self, dataset: Dataset | None = None) -> list[dict]:
         """
         Return list of data entries. Optionally, specific for a dataset.
@@ -230,7 +246,8 @@ class CsvInputsProvider(InputsProvider):
         entries = self.d
         if dataset:
             entries = [
-                e for e in entries 
+                e
+                for e in entries
                 if self.get_dataset_name(dataset.cohort, e) == dataset.name
             ]
         return entries
@@ -282,15 +299,15 @@ class CsvInputsProvider(InputsProvider):
         """
         reserverd_fields = [f.value for f in FieldMap]
         return {k: v for k, v in entry.items() if k not in reserverd_fields}
-    
+
     def populate_analysis(self, cohort: Cohort) -> None:
         """
         Populate Analysis entries
         """
         pass
-    
+
     def populate_pedigree(
-        self, 
+        self,
         cohort: Cohort,
         ped_files: list[Path] | None = None,
     ) -> None:
@@ -300,7 +317,7 @@ class CsvInputsProvider(InputsProvider):
         pass
 
     def populate_alignment_inputs(
-        self, 
+        self,
         cohort: Cohort,
         do_check_seq_existence: bool = False,
     ) -> None:
@@ -313,11 +330,13 @@ class CsvInputsProvider(InputsProvider):
         for entry in self.get_entries():
             sid = self.get_sample_id(entry)
             fqs1 = [
-                f.strip() for f in entry.get(FieldMap.fqs_r1.value, '').split('|')
+                f.strip()
+                for f in entry.get(FieldMap.fqs_r1.value, '').split('|')
                 if f.strip()
             ]
             fqs2 = [
-                f.strip() for f in entry.get(FieldMap.fqs_r2.value, '').split('|')
+                f.strip()
+                for f in entry.get(FieldMap.fqs_r2.value, '').split('|')
                 if f.strip()
             ]
             cram = entry.get(FieldMap.cram.value, None)
@@ -328,19 +347,16 @@ class CsvInputsProvider(InputsProvider):
                         'must match.'
                     )
                 if do_check_seq_existence:
-                    for fq in (fqs1 + fqs2):
+                    for fq in fqs1 + fqs2:
                         if not exists(fq):
                             raise InputProviderError(f'FQ {fq} does not exist')
-                d_by_sid[sid] = [
-                    FastqPair(fq1, fq2) for fq1, fq2
-                    in zip(fqs1, fqs2)
-                ]
+                d_by_sid[sid] = [FastqPair(fq1, fq2) for fq1, fq2 in zip(fqs1, fqs2)]
             elif cram:
                 if do_check_seq_existence:
                     if not exists(cram):
                         raise InputProviderError(f'CRAM {cram} does not exist')
                 d_by_sid[sid] = CramPath(cram)
-                
+
             seq_type_by_sid[sid] = SequencingType.parse(
                 entry.get(FieldMap.sequencing_type.value, None)
             )
