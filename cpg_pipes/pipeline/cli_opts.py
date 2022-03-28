@@ -30,10 +30,19 @@ def val_to_enum(cls: Type[T]) -> Callable:
     """
     Callback to parse value into an Enum value
     """
-    def _callback(c, p, val: str) -> T:
+    def _callback(c, param, val: str) -> T:
         d = {
             name.lower(): item for name, item in cls.__members__.items()
         }
+        if val is None:
+            raise click.BadParameter(
+                f'parameter is required and not specified. '
+                f'Available options: {[n.lower() for n in cls.__members__]}'
+            )
+        if val not in d:
+            raise click.BadParameter(
+                f'Available options: {[n.lower() for n in cls.__members__]}'
+            )
         return d[val]
     return _callback
 
@@ -61,6 +70,7 @@ def pipeline_click_options(function: Callable) -> Callable:
         click.option(
             '--analysis-dataset',
             'analysis_dataset',
+            required=True,
             help='Dataset name to write cohort and pipeline level intermediate files',
         ),
         click.option(
@@ -205,10 +215,14 @@ def pipeline_click_options(function: Callable) -> Callable:
     # using https://pypi.org/project/click-config-file/
     def yaml_provider(fp, _):
         """Load options from YAML"""
+        # try:
         with open(fp) as f:
             return yaml.load(f, Loader=yaml.SafeLoader)
+        # except FileNotFoundError as e:
+        #     return {}
     function = click_config_file.configuration_option(
-        provider=yaml_provider
+        provider=yaml_provider,
+        implicit=False,
     )(function)
- 
+
     return function
