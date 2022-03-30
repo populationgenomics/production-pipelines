@@ -145,21 +145,16 @@ class SmdbInputProvider(InputProvider):
             )
 
             for line in pedigree:
-                fam_id = line['family_id']
                 sam_id = line['individual_id']
-                mat_id = line['maternal_id']
-                pat_id = line['paternal_id']
-                sex = line['sex']
-                phenotype = line['affected']
                 if sam_id in sample_by_internal_id:
                     s = sample_by_internal_id[sam_id]
                     s.pedigree = PedigreeInfo(
                         sample=s,
-                        fam_id=fam_id,
-                        mom=mat_id,
-                        dad=pat_id,
-                        sex=Sex.parse(str(sex)),
-                        phenotype=phenotype or '0',
+                        fam_id=line['family_id'],
+                        mom=line['maternal_id'],
+                        dad=line['paternal_id'],
+                        sex=Sex.parse(str(line['sex'])),
+                        phenotype=line['affected'] or '0',
                     )
 
         for dataset in cohort.get_datasets():
