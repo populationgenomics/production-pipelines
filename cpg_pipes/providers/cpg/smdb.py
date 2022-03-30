@@ -13,6 +13,7 @@ from sample_metadata.apis import (
     SequenceApi,
     AnalysisApi,
     ParticipantApi,
+    FamilyApi,
 )
 from sample_metadata.exceptions import ApiException
 
@@ -41,6 +42,7 @@ class AnalysisType(Enum):
     so decorators can use `@stage(analysis_type=AnalysisType.QC)` without importing
     the sample-metadata package.
     """
+
     QC = 'qc'
     JOINT_CALLING = 'joint-calling'
     GVCF = 'gvcf'
@@ -54,7 +56,9 @@ class AnalysisType(Enum):
         """
         d = {v.value: v for v in AnalysisType}
         if val not in d:
-            raise SmdbError(f'Unrecognised analysis type {val}. Available: {list(d.keys())}')
+            raise SmdbError(
+                f'Unrecognised analysis type {val}. Available: {list(d.keys())}'
+            )
         return d[val.lower()]
 
 
@@ -63,9 +67,10 @@ class Analysis:
     """
     Sample metadata DB Analysis entry.
 
-    See the sample-metadata package for more details: 
+    See the sample-metadata package for more details:
     https://github.com/populationgenomics/sample-metadata
     """
+
     id: int
     type: AnalysisType
     status: AnalysisStatus
@@ -104,8 +109,8 @@ class SMDB:
     """
 
     def __init__(
-        self, 
-        analysis_dataset: str, 
+        self,
+        analysis_dataset: str,
     ):
         """
         @param analysis_dataset: dataset where to create the "analysis" entries.
@@ -115,6 +120,7 @@ class SMDB:
         self.seqapi = SequenceApi()
         self.seqapi = SequenceApi()
         self.papi = ParticipantApi()
+        self.fapi = FamilyApi()
         self.analysis_dataset = analysis_dataset
 
     def get_sample_entries(
@@ -123,7 +129,7 @@ class SMDB:
     ) -> list[dict]:
         """
         Get Sample entries and apply `skip_samples` and `only_samples` filters.
-        This is a helper method; use public `populate_dataset` to parse samples. 
+        This is a helper method; use public `populate_dataset` to parse samples.
         """
         logger.info(f'Finding samples for dataset {dataset_name}...')
         sample_entries = self.sapi.get_samples(
@@ -144,9 +150,8 @@ class SMDB:
         """
         try:
             self.aapi.update_analysis_status(
-                analysis.id, models.AnalysisUpdateModel(
-                    status=models.AnalysisStatus(status.value)
-                )
+                analysis.id,
+                models.AnalysisUpdateModel(status=models.AnalysisStatus(status.value)),
             )
         except ApiException:
             traceback.print_exc()
@@ -181,7 +186,7 @@ class SMDB:
         analysis_type: AnalysisType,
         analysis_status: AnalysisStatus = AnalysisStatus.COMPLETED,
         dataset: str | None = None,
-        meta: dict | None = None
+        meta: dict | None = None,
     ) -> dict[str, Analysis]:
         """
         Query the DB to find the last completed analysis for the type and samples,
@@ -247,7 +252,9 @@ class SMDB:
             traceback.print_exc()
             return None
         else:
-            logger.info(f'Created analysis of type={type_}, status={status} with ID: {aid}')
+            logger.info(
+                f'Created analysis of type={type_}, status={status} with ID: {aid}'
+            )
             return aid
 
     def process_existing_analysis(
@@ -266,10 +273,10 @@ class SMDB:
         Returns the path to the output if it can be reused, otherwise None.
 
         @param sample_ids: sample IDs to pull the analysis for
-        @param completed_analysis: existing completed analysis of this type for these 
+        @param completed_analysis: existing completed analysis of this type for these
         samples
         @param analysis_type: cram, gvcf, joint_calling
-        @param expected_output_fpath: where the pipeline expects the analysis output 
+        @param expected_output_fpath: where the pipeline expects the analysis output
         file to sit on the bucket (will invalidate the analysis when it doesn't match)
         @param dataset_name: the name of the dataset where to create a new analysis
         @return: path to the output if it can be reused, otherwise None
@@ -343,16 +350,64 @@ class SMDB:
                 f'so queueing analysis {label}'
             )
             return None
-    
-    
+
+    def get_ped_file_by_project(self, dataset_name: str, response_type: str):
+        """ Retrieve ped file for a specified SM Project """
+
+        try:
+            families = self.fapi.get_families(dataset_name)
+            family_ids = [family['id'] for family in families]
+            pedigree = self.fapi.get_pedigree(
+                internal_family_ids=family_ids,
+                response_type='json',
+                project=dataset_name,
+                replace_with_participant_external_ids=True,
+            )
+
+            pid_sid_map = self._get_pid_sid_map(dataset_name)
+
+            # Replace External Participant IDs with Sample IDs.
+            # Assumes 1:1 Relationship.
+            for family in pedigree:
+                if family['individual_id'] != '':
+                    family['individual_id'] = pid_sid_map[family['individual_id']]
+
+                if family['maternal_id'] != '':
+                    family['maternal_id'] = pid_sid_map[family['maternal_id']]
+
+                if family['paternal_id'] != '':
+                    family['paternal_id'] = pid_sid_map[family['paternal_id']]
+
+            return pedigree
+        except ApiException:
+            traceback.print_exc()
+            return {}
+
+    def _get_pid_sid_map(self, dataset_name: str) -> dict[str, str]:
+        """Returns map of participant IDs to sample IDs"""
+
+        pid_sid_multi = self.papi.get_external_participant_id_to_internal_sample_id(
+            dataset_name
+        )
+
+        pid_sid_single = {}
+        for group in pid_sid_multi:
+            participant = group[0]
+            for sample in group[1:]:
+                pid_sid_single[participant] = sample
+
+        return pid_sid_single
+
+
 @dataclass
 class SmSequence:
     """
     Sample-metadata DB "Sequence" entry.
 
-    See sample-metadata for more details: 
+    See sample-metadata for more details:
     https://github.com/populationgenomics/sample-metadata
     """
+
     id: str
     sample_id: str
     meta: dict
@@ -380,9 +435,7 @@ class SmSequence:
         )
         if data['meta'].get('reads'):
             sm_seq.alignment_input = SmSequence._parse_reads(
-                sample_id=sample_id,
-                meta=data['meta'],
-                check_existence=check_existence
+                sample_id=sample_id, meta=data['meta'], check_existence=check_existence
             )
         else:
             logger.warning(
@@ -399,7 +452,7 @@ class SmSequence:
         """
         Parse a AlignmentInput object from the meta dictionary.
 
-        @param check_existence: check if fastq/crams exist on buckets. 
+        @param check_existence: check if fastq/crams exist on buckets.
         Default value is pulled from self.smdb and can be overwridden.
         """
         reads_data = meta.get('reads')
@@ -414,7 +467,8 @@ class SmSequence:
         if reads_type not in supported_types:
             logger.error(
                 f'{sample_id}: ERROR: "reads_type" is expected to be one of '
-                f'{supported_types}')
+                f'{supported_types}'
+            )
             return None
 
         if reads_type in ('bam', 'cram'):
@@ -478,9 +532,11 @@ class SmSequence:
                     )
                     return None
 
-                fastq_pairs.append(FastqPair(
-                    to_path(lane_data[0]['location']),
-                    to_path(lane_data[1]['location'])
-                ))
+                fastq_pairs.append(
+                    FastqPair(
+                        to_path(lane_data[0]['location']),
+                        to_path(lane_data[1]['location']),
+                    )
+                )
 
             return fastq_pairs
