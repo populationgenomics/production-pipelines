@@ -354,34 +354,30 @@ class SMDB:
     def get_ped_file_by_project(self, dataset_name: str, response_type: str):
         """ Retrieve ped file for a specified SM Project """
 
-        try:
-            families = self.fapi.get_families(dataset_name)
-            family_ids = [family['id'] for family in families]
-            pedigree = self.fapi.get_pedigree(
-                internal_family_ids=family_ids,
-                response_type='json',
-                project=dataset_name,
-                replace_with_participant_external_ids=True,
-            )
+        families = self.fapi.get_families(dataset_name)
+        family_ids = [family['id'] for family in families]
+        pedigree = self.fapi.get_pedigree(
+            internal_family_ids=family_ids,
+            response_type='json',
+            project=dataset_name,
+            replace_with_participant_external_ids=True,
+        )
 
-            pid_sid_map = self._get_pid_sid_map(dataset_name)
+        pid_sid_map = self._get_pid_sid_map(dataset_name)
 
-            # Replace External Participant IDs with Sample IDs.
-            # Assumes 1:1 Relationship.
-            for family in pedigree:
-                if family['individual_id'] != '':
-                    family['individual_id'] = pid_sid_map[family['individual_id']]
+        # Replace External Participant IDs with Sample IDs.
+        # Assumes 1:1 Relationship.
+        for family in pedigree:
+            if family['individual_id'] != '':
+                family['individual_id'] = pid_sid_map[family['individual_id']]
 
-                if family['maternal_id'] != '':
-                    family['maternal_id'] = pid_sid_map[family['maternal_id']]
+            if family['maternal_id'] != '':
+                family['maternal_id'] = pid_sid_map[family['maternal_id']]
 
-                if family['paternal_id'] != '':
-                    family['paternal_id'] = pid_sid_map[family['paternal_id']]
+            if family['paternal_id'] != '':
+                family['paternal_id'] = pid_sid_map[family['paternal_id']]
 
-            return pedigree
-        except ApiException:
-            traceback.print_exc()
-            return {}
+        return pedigree
 
     def _get_pid_sid_map(self, dataset_name: str) -> dict[str, str]:
         """Returns map of participant IDs to sample IDs"""
