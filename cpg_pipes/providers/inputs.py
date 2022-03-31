@@ -66,8 +66,6 @@ class InputProvider(ABC):
         self.populate_alignment_inputs(cohort, do_check_seq_existence)
         self.populate_analysis(cohort)
         self.populate_pedigree(cohort, ped_files)
-        if not ped_files:
-            self.populate_pedigree_from_db(cohort)
         return cohort
 
     @abstractmethod
@@ -137,15 +135,6 @@ class InputProvider(ABC):
     ) -> None:
         """
         Populate pedigree data from file
-        """
-
-    @abstractmethod
-    def populate_pedigree_from_db(
-        self,
-        cohort: Cohort,
-    ) -> None:
-        """
-        Populate pedigree data from database
         """
 
     def _get_entries(
@@ -313,14 +302,6 @@ class CsvInputProvider(InputProvider):
         Populate pedigree data
         """
         pass
-
-    def populate_pedigree_from_db(
-        self,
-        cohort: Cohort,
-    ) -> None:
-        """
-        Populate pedigree data from database
-        """
 
     def populate_alignment_inputs(
         self,
