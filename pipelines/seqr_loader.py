@@ -173,39 +173,6 @@ def _read_es_password(
     return subprocess.check_output(cmd, shell=True).decode()
 
 
-def _make_seqr_metadata_files(
-    dataset: Dataset, 
-    bucket: Path,
-    local_dir: Path, 
-    overwrite: bool = False
-):
-    """
-    Create Seqr metadata files
-    """
-    samplemap_bucket_path = bucket / 'seqr' / f'{dataset.name}-sample-map.csv'
-    igv_paths_path = local_dir / f'{dataset.name}-igv-paths.tsv'
-
-    # Sample map
-    if not utils.can_reuse(samplemap_bucket_path, overwrite):
-        df = pd.DataFrame({
-            'cpg_id': s.id,
-            'individual_id': s.participant_id,
-        } for s in dataset.get_samples())
-        df.to_csv(str(samplemap_bucket_path), sep=',', index=False, header=False)
-
-    # IGV
-    if not utils.can_reuse(igv_paths_path, overwrite):
-        df = pd.DataFrame({
-            'individual_id': s.participant_id,
-            'cram_path': s.get_cram_path(),
-            'cram_sample_id': s.id,
-        } for s in dataset.get_samples() if s.get_cram_path())
-        df.to_csv(str(igv_paths_path), sep='\t', index=False, header=False)
-
-    logger.info(f'Seqr sample map: {samplemap_bucket_path}')
-    logger.info(f'IGV seqr paths: {igv_paths_path}')
-
-
 @click.command()
 @click.option(
     '--hc-intervals-num',
@@ -237,13 +204,6 @@ def _make_seqr_metadata_files(
     help='Use allele-specific annotations for VQSR',
 )
 @click.option(
-    '--make-seqr-metadata/--no-make-seqr-metadata',
-    'make_seqr_metadata',
-    default=False,
-    is_flag=True,
-    help='Make Seqr metadata',
-)
-@click.option(
     '--ped-checks/--no-ped-checks',
     'ped_checks',
     default=True,
@@ -269,8 +229,6 @@ def main(
     """
     Entry point, decorated by pipeline click options.
     """
-    make_seqr_metadata = kwargs.pop('make_seqr_metadata')
-
     pipeline = create_pipeline(
         name='seqr_loader',
         description='Seqr loader',
@@ -284,17 +242,6 @@ def main(
         ),
         **kwargs,
     )
-
-    if make_seqr_metadata:
-        for dataset in pipeline.cohort.get_datasets():
-            _make_seqr_metadata_files(
-                dataset=dataset,
-                bucket=pipeline.cohort.analysis_dataset.get_analysis_bucket(
-                    version=pipeline.version,
-                ),
-                local_dir=pipeline.local_dir,
-            )
-
     pipeline.submit_batch()
 
 
