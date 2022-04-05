@@ -1,17 +1,12 @@
 """
 Helpers to set up Job's command.
 """
-
+import inspect
 import logging
-import os
-from typing import List, Union
+from typing import List, Union, Callable
 import textwrap
 
-from cloudpathlib import CloudPath
-from hailtop.batch.job import Job
-
 from cpg_pipes import Path
-from cpg_pipes.hb.batch import get_hail_bucket
 from cpg_pipes.utils import PACKAGE_DIR
 
 logger = logging.getLogger(__file__)
@@ -71,6 +66,55 @@ cat <<EOT >> {script_name}
 EOT\
 """
 
+
+def python_command(
+    func: Callable,
+    *func_args,
+    setup_gcp: bool = False,
+    hail_billing_project: str | None = None,
+    hail_bucket: str | None = None,
+    default_reference: str = 'GRCh38',
+    packages: list[str] | None = None,
+):
+    """
+    Construct a command for a Job that runs a python function.
+    If hail_billing_project is provided, Hail Query will be also initialised.
+    """
+    python_cmd = f"""
+import logging
+logger = logging.getLogger()
+"""
+    if hail_billing_project:
+        assert hail_bucket
+        python_cmd += f"""
+import asyncio
+import hail as hl
+asyncio.get_event_loop().run_until_complete(
+    hl.init_batch(
+        default_reference='{default_reference}',
+        billing_project='{hail_billing_project}',
+        remote_tmpdir='{hail_bucket}',
+    )
+)
+"""
+        python_cmd += f"""
+{textwrap.dedent(inspect.getsource(func))}
+{func.__name__}{func_args}
+"""
+    cmd = f"""
+set -o pipefail
+set -ex
+{GCLOUD_CMD if setup_gcp else ''}
+
+{('pip3 install ' + ' '.join(packages)) if packages else ''}
+
+cat << EOT >> script.py
+{python_cmd}
+EOT
+python3 script.py
+"""
+    return cmd
+    
 
 def wrap_command(
     command: Union[str, List[str]],

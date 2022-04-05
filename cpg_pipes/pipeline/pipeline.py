@@ -23,8 +23,8 @@ from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 
 from .exceptions import PipelineError
-from .targets import Target, Dataset, Sample, Cohort
 from .. import Path, to_path
+from ..targets import Target, Dataset, Sample, Cohort
 from ..hb.batch import Batch
 from ..providers import (
     Namespace,
@@ -514,7 +514,8 @@ class Stage(Generic[TargetT], ABC):
             if not reusable_paths:
                 raise ValueError(
                     f'Stage {self.name} is required, but is skipped, and '
-                    f'expected outputs for target {target} do not exist'
+                    f'expected outputs for target {target} do not exist: '
+                    f'{self.expected_outputs(target)}'
                 )
             else:
                 return self.make_outputs(target=target, data=reusable_paths)

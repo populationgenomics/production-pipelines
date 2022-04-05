@@ -9,7 +9,7 @@ from hailtop.batch.job import Job
 from ... import images, Path
 from ...hb.batch import Batch
 from ...hb.command import wrap_command
-from ...pipeline.targets import Target
+from ...targets import Target
 from ..status import (
     AnalysisStatus, 
     StatusReporterError,

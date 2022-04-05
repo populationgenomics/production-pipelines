@@ -97,15 +97,14 @@ def haplotype_caller(
     jobs: list[Job] = []
     if number_of_intervals > 1:
         if intervals is None:
-            intervals_j = split_intervals.get_intervals(
+            intervals_j, intervals = split_intervals.get_intervals(
                 b=b,
                 refs=refs,
                 sequencing_type=sequencing_type,
                 scatter_count=number_of_intervals,
-                out_bucket=tmp_bucket / 'intervals',
+                cache=True,
             )
             jobs.append(intervals_j)
-            intervals = [intervals_j[f'{i}.interval_list'] for i in range(number_of_intervals)]
 
         hc_jobs = []
         # Splitting variant calling by intervals

@@ -8,7 +8,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
-from cpg_pipes import images
+from cpg_pipes import images, utils
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.types import SequencingType
 from cpg_pipes.refdata import RefData
@@ -22,9 +22,9 @@ def get_intervals(
     refs: RefData,
     sequencing_type: SequencingType,
     scatter_count: int,
-    out_bucket: Path | None = None,
+    cache: bool = True,
     job_attrs: dict | None = None,
-) -> Job:
+) -> tuple[Job, list[hb.Resource]]:
     """
     Add a job that split genome into intervals to parallelise variant calling.
 
@@ -39,15 +39,17 @@ def get_intervals(
     files.
     """
     j = b.new_job(f'Make {scatter_count} intervals', job_attrs)
+
+    cache_bucket = refs.intervals_bucket / f'{scatter_count}intervals'
+    if utils.exists(cache_bucket / '1.interval_list'):
+        j.name += ' [use cached]'
+        return j, [
+            b.read_input(str(cache_bucket / f'{idx + 1}.interval_list')) 
+            for idx in range(scatter_count)
+        ]
+
     j.image(images.SAMTOOLS_PICARD_IMAGE)
     STANDARD.request_resources(storage_gb=16, mem_gb=2)
-    
-    j.declare_resource_group(
-        intervals={
-            f'interval_{idx}': f'{{root}}/{str(idx).zfill(4)}-scattered.interval_list'
-            for idx in range(scatter_count)
-        }
-    )
 
     intervals = refs.calling_interval_lists[sequencing_type]
     break_bands_at_multiples_of = {
@@ -73,14 +75,14 @@ def get_intervals(
     for idx in range(scatter_count):
         name = f'temp_{str(idx + 1).zfill(4)}_of_{scatter_count}'
         cmd += f"""
-    ln /io/batch/out/{name}/scattered.interval_list {j[f'{idx}.interval_list']}
+    ln /io/batch/out/{name}/scattered.interval_list {j[f'{idx + 1}.interval_list']}
     """
     
     j.command(wrap_command(cmd))
-    if out_bucket:
+    if cache:
         for idx in range(scatter_count):
             b.write_output(
-                j[f'{idx}.interval_list'], 
-                str(out_bucket / f'{scatter_count}intervals' / f'{idx}.interval_list')
+                j[f'{idx + 1}.interval_list'], 
+                str(cache_bucket / f'{idx + 1}.interval_list')
             )
-    return j
+    return j, [j[f'{idx + 1}.interval_list'] for idx in range(scatter_count)]

@@ -7,7 +7,7 @@ from typing import Callable
 
 from .pipeline import Pipeline, Stage
 from .exceptions import PipelineError
-from .targets import Cohort
+from ..targets import Cohort
 from .. import Path, to_path
 from ..hb.batch import Batch, setup_batch, get_billing_project
 from ..providers import (
@@ -21,8 +21,8 @@ from ..providers.cpg import (
     CpgStorageProvider,
     SmdbStatusReporter,
     SmdbInputProvider,
-    SMDB,
 )
+from ..providers.cpg.smdb import SMDB
 from ..providers.inputs import InputProvider, CsvInputProvider
 from ..providers.status import StatusReporter
 from ..refdata import RefData
@@ -100,7 +100,9 @@ def create_pipeline(
         description += ': ' + ', '.join(input_datasets)
 
     tmp_bucket = to_path(
-        cohort.analysis_dataset.get_tmp_bucket(version=f'{name}/{version}')
+        cohort.analysis_dataset.get_tmp_bucket(version=(
+            name + (f'/{version}' if version else '')
+        ))
     )
     hail_billing_project = get_billing_project(cohort.analysis_dataset.stack)
     hail_bucket = tmp_bucket / 'hail'

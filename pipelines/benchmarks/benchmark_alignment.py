@@ -12,7 +12,7 @@ from cpg_pipes import benchmark, images, Namespace
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
 from cpg_pipes.types import FastqPair, CramPath
 from cpg_pipes.pipeline import stage, create_pipeline, SampleStage, StageInput, StageOutput
-from cpg_pipes.pipeline.targets import Sample
+from cpg_pipes.targets import Sample
 
 logger = logging.getLogger(__file__)
 

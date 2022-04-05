@@ -234,7 +234,7 @@ Getting intervals for sharding variant calling:
 
 ```python
 from cpg_pipes.jobs import split_intervals
-j = split_intervals.get_intervals(b=b, scatter_count=20)
+j, intervals = split_intervals.get_intervals(b=b, scatter_count=20)
 ```
 
 Generate somalier pedigree fingerprints:

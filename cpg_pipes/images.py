@@ -5,7 +5,7 @@ import logging
 
 logger = logging.getLogger(__file__)
 
-DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:e2a31a60ee77061f39bce5c2469bb9c0a8bf8022-hail-e8bb4790f0fa715cb210d2ac57bd781f990bf4b2'
+DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:7f41eeb90c8bec8836a1cd20ad1911b5989a5893-hail-db65c33c29100c64405c39ebace90a7c463b4bec'
 
 AR_REPO = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
 GATK_VERSION = '4.2.3.0'

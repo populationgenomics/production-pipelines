@@ -8,7 +8,7 @@ from .. import Path, to_path
 from .. import utils
 from ..types import GvcfPath
 from ..jobs.joint_genotyping import make_joint_genotyping_jobs, JointGenotyperTool
-from ..pipeline.targets import Cohort
+from cpg_pipes.targets import Cohort
 from ..pipeline import (
     stage, CohortStage, StageInput, StageOutput, PipelineError
 )
@@ -67,8 +67,7 @@ class JointGenotypingStage(CohortStage):
             out_siteonly_vcf_path=self.expected_outputs(cohort)['siteonly'],
             samples=cohort.get_samples(),
             sequencing_type=cohort.get_sequencing_type(),
-            genomicsdb_bucket=cohort.analysis_dataset.get_bucket() / 'genomicsdbs',
-            tmp_bucket=cohort.analysis_dataset.get_tmp_bucket(),
+            tmp_bucket=self.tmp_bucket,
             gvcf_by_sid=gvcf_by_sid,
             refs=self.refs,
             overwrite=not self.check_intermediates,

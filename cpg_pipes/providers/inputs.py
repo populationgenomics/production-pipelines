@@ -6,10 +6,10 @@ import logging
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from cpg_pipes.utils import exists
-from cpg_pipes.types import FastqPair, CramPath, AlignmentInput
-from cpg_pipes.pipeline.targets import Cohort, Dataset, Sex, SequencingType
-from cpg_pipes import Path
+from ..utils import exists
+from ..types import FastqPair, CramPath, AlignmentInput
+from ..targets import Cohort, Dataset, Sex, SequencingType
+from .. import Path
 
 logger = logging.getLogger(__file__)
 

@@ -12,11 +12,6 @@ from .stage_subclasses import (
     DatasetStage, 
     CohortStage,
 )
-from .targets import (
-    Sample,
-    Dataset,
-    Cohort,
-)
 
 __all__ = [
     'create_pipeline',
@@ -29,7 +24,4 @@ __all__ = [
     'SampleStage',
     'DatasetStage',
     'CohortStage',
-    'Sample',
-    'Dataset',
-    'Cohort',
 ]

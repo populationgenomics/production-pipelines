@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from .. import Path
-from ..types import AlignmentInput, CramPath, GvcfPath, SequencingType
-from ..providers.storage import StorageProvider, Namespace
+from . import Path
+from .types import AlignmentInput, CramPath, GvcfPath, SequencingType
+from .providers.storage import StorageProvider, Namespace
 
 logger = logging.getLogger(__file__)
 

@@ -1,23 +1,115 @@
 """
 Jobs specific for seqr-loader.
 """
+import logging
+
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path, images, utils
 from cpg_pipes.hb.batch import Batch, hail_query_env
-from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.hb.command import wrap_command, python_command
+from cpg_pipes.query.seqr_loader import subset_mt_to_samples, annotate_dataset_mt, \
+    annotate_cohort
+from cpg_pipes.refdata import RefData
+from cpg_pipes.types import SequencingType
+
+logger = logging.getLogger(__file__)
 
 
-def annotate_dataset(
+def annotate_cohort_jobs(
     b: Batch,
-    annotated_mt_path: Path,
+    vcf_path: Path,
+    siteonly_vqsr_vcf_path: Path,
+    vep_ht_path: Path,
+    output_mt_path: Path,
+    checkpoints_bucket: Path,
+    sequencing_type: SequencingType,
+    hail_billing_project: str,
+    hail_bucket: Path | None = None,
+    job_attrs: dict | None = None,
+    overwrite: bool = False,
+) -> list[Job]:
+    """
+    Annotate cohort for seqr loader.
+    """
+    j = b.new_job(f'annotate cohort', job_attrs)
+    j.image(images.DRIVER_IMAGE)
+    j.command(python_command(
+        annotate_cohort,
+        str(vcf_path),
+        str(siteonly_vqsr_vcf_path),
+        str(vep_ht_path),
+        str(output_mt_path),
+        str(checkpoints_bucket),
+        overwrite,
+        RefData.genome_build,
+        sequencing_type.value.upper(),
+        setup_gcp=True,
+        hail_billing_project=hail_billing_project,
+        hail_bucket=str(hail_bucket),
+        default_reference=RefData.genome_build,
+        packages=['cpg_gnomad', 'seqr_loader'],
+    ))
+    return [j]
+
+
+def annotate_dataset_jobs(
+    b: Batch,
+    mt_path: Path,
     sample_ids: list[str],
     output_mt_path: Path,
     tmp_bucket: Path,
     hail_billing_project: str,
     hail_bucket: Path | None = None,
     job_attrs: dict | None = None,
-) -> Job:
+    overwrite: bool = False,
+) -> list[Job]:
+    """
+    Split mt by dataset and annotate dataset-specific fields (only for those datasets
+    that will be loaded into Seqr).
+    """
+    subset_mt_path = tmp_bucket / 'cohort-subset.mt'
+    subset_j = b.new_job(f'subset to dataset', job_attrs)
+    subset_j.image(images.DRIVER_IMAGE)
+    subset_j.command(python_command(
+        subset_mt_to_samples,
+        str(mt_path),
+        sample_ids,
+        str(subset_mt_path),
+        setup_gcp=True,
+        hail_billing_project=hail_billing_project,
+        hail_bucket=str(hail_bucket),
+        default_reference=RefData.genome_build,
+    ))
+
+    annotate_j = b.new_job(f'annotate dataset', job_attrs)
+    annotate_j.image(images.DRIVER_IMAGE)
+    annotate_j.command(python_command(
+        annotate_dataset_mt,
+        str(subset_mt_path),
+        str(output_mt_path),
+        str(tmp_bucket),
+        overwrite,
+        setup_gcp=True,
+        hail_billing_project=hail_billing_project,
+        hail_bucket=str(hail_bucket),
+        default_reference=RefData.genome_build,
+    ))
+    annotate_j.depends_on(subset_j)
+
+    return [subset_j, annotate_j]
+
+
+def annotate_dataset_script(
+    b: Batch,
+    mt_path: Path,
+    sample_ids: list[str],
+    output_mt_path: Path,
+    tmp_bucket: Path,
+    hail_billing_project: str,
+    hail_bucket: Path | None = None,
+    job_attrs: dict | None = None,
+) -> list[Job]:
     """
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
     that will be loaded into Seqr)
@@ -33,7 +125,7 @@ def annotate_dataset(
     cmd = f"""\
     pip3 install click cpg_utils hail seqr_loader
     python3 subset_mt.py \\
-    --mt-path {annotated_mt_path} \\
+    --mt-path {mt_path} \\
     --out-mt-path {output_mt_path} \\
     --subset-tsv {subset_path}
     """
@@ -42,7 +134,7 @@ def annotate_dataset(
         python_script=utils.QUERY_SCRIPTS_DIR / 'seqr' / 'subset_mt.py',
         setup_gcp=True,
     ))
-    return j
+    return [j]
 
 
 def load_to_es(
@@ -65,7 +157,7 @@ def load_to_es(
     j.image(images.DRIVER_IMAGE)
     hail_query_env(j, hail_billing_project, hail_bucket)
     cmd = f"""\
-    pip3 install click cpg_utils hail seqr_loader elasticsearch==7.9.1
+    pip3 install click cpg_utils hail seqr_loader elasticsearch
     python3 mt_to_es.py \\
     --mt-path {mt_path} \\
     --es-host {es_host} \\

@@ -7,7 +7,7 @@ Stages to run somalier tools.
 import logging
 
 from .. import Path
-from ..pipeline.targets import Dataset, Sample
+from ..targets import Dataset, Sample
 from ..pipeline import stage, SampleStage, DatasetStage, StageInput, StageOutput
 from ..jobs import somalier
 

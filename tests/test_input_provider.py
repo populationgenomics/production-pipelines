@@ -5,7 +5,7 @@ import unittest
 from io import StringIO
 
 from cpg_pipes import Namespace
-from cpg_pipes.pipeline.targets import Cohort, Sex
+from cpg_pipes.targets import Cohort, Sex
 from cpg_pipes.providers.inputs import CsvInputProvider
 from cpg_pipes.providers.cpg import CpgStorageProvider
 

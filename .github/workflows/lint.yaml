@@ -1,5 +1,5 @@
 name: Lint
-on: [push, pull_request]
+on: [push]
 
 jobs:
   lint:
@@ -21,9 +21,7 @@ jobs:
         pip install -r requirements-dev.txt
 
     - name: Install pre-commit
-      run: |
-        # Installing hooks
-        pre-commit install --install-hooks
+      run: pre-commit install --install-hooks
 
     - name: pre-commit
       run: pre-commit run --all-files

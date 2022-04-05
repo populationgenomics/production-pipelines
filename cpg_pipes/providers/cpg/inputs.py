@@ -7,10 +7,10 @@ import traceback
 
 from sample_metadata import ApiException
 
-from ... import Path
-from ...pipeline.targets import Dataset, Cohort, Sex, PedigreeInfo
-from ..inputs import InputProvider, InputProviderError
 from .smdb import SMDB, SmSequence
+from ..inputs import InputProvider, InputProviderError
+from ... import Path
+from ...targets import Dataset, Cohort, Sex, PedigreeInfo
 
 logger = logging.getLogger(__file__)
 

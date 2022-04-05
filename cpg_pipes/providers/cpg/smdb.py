@@ -19,9 +19,8 @@ from sample_metadata.exceptions import ApiException
 
 from ... import Path, to_path
 from ... import utils
-from ...types import FastqPair, CramPath, AlignmentInput
+from ...types import FastqPair, CramPath, AlignmentInput, SequencingType
 from ..status import AnalysisStatus
-from ...pipeline.targets import SequencingType
 
 logger = logging.getLogger(__file__)
 

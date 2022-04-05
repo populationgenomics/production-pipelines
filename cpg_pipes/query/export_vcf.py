@@ -1,38 +1,19 @@
-#!/usr/bin/env python3
-
 """
-Hail script to submit on a dataproc cluster. 
-
-Converts annotated matrix table into VCF.
+Hail query function to export an annotated matrix table into a VCF file.
 """
 
 import logging
-import click
 import hail as hl
 from gnomad.utils.vep import vep_struct_to_csq
 
 logger = logging.getLogger(__file__)
 
 
-@click.command()
-@click.option(
-    '--mt-path',
-    'mt_path',
-    required=True,
-)
-@click.option(
-    '--out-vcf-path',
-    'out_vcf_path',
-    required=True,
-)
-def main(
-    mt_path: str,
-    out_vcf_path: str,
-):  # pylint: disable=missing-function-docstring
-    hl.init(default_reference='GRCh38')
-
+def export_vcf(mt_path: str, out_vcf_path: str):
+    """
+    Export a matrix table into a VCF file.
+    """    
     mt = hl.read_matrix_table(mt_path)
-
     mt = mt.annotate_rows(
         info=mt.info.annotate(
             CSQ=vep_struct_to_csq(mt.vep),
@@ -82,9 +63,4 @@ def main(
             topmed_Het=mt.topmed.Het,
         )
     )
-
     hl.export_vcf(mt, out_vcf_path, tabix=True)
-
-
-if __name__ == '__main__':
-    main()  # pylint: disable=E1120

@@ -8,9 +8,9 @@ from enum import Enum
 
 from hailtop.batch.job import Job
 
-from cpg_pipes import Path
-from cpg_pipes.hb.batch import Batch
-from cpg_pipes.pipeline.targets import Target
+from .. import Path
+from ..hb.batch import Batch
+from ..targets import Target
 
 logger = logging.getLogger(__file__)
 
