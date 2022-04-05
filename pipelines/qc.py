@@ -13,7 +13,6 @@ from cpg_pipes.pipeline import (
     pipeline_click_options, 
     stage, 
     create_pipeline, 
-    Dataset,
     StageInput, 
     StageOutput, 
     DatasetStage
@@ -21,6 +20,7 @@ from cpg_pipes.pipeline import (
 from cpg_pipes.jobs.multiqc import multiqc
 from cpg_pipes.stages.cramqc import SamtoolsStats, PicardWgsMetrics, VerifyBamId
 from cpg_pipes.stages.fastqc import FastQC
+from cpg_pipes.targets import Dataset
 from pipelines.somalier import CramSomalierPedigree, CramSomalierAncestry
 
 logger = logging.getLogger(__file__)

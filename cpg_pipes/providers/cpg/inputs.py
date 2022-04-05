@@ -98,7 +98,6 @@ class SmdbInputProvider(InputProvider):
     def populate_pedigree(
         self,
         cohort: Cohort,
-        ped_files: list[Path] | None = None,
     ) -> None:
         """
         Populate pedigree data for samples.
@@ -111,39 +110,23 @@ class SmdbInputProvider(InputProvider):
         for s in cohort.get_samples():
             sample_by_internal_id[s.id] = s
 
-        if ped_files is None:
-            for dataset in cohort.get_datasets():
-                pedigree = self.db.get_ped_file_by_project(
-                    dataset_name=dataset.name, response_type='json'
+        for dataset in cohort.get_datasets():
+            pedigree = self.db.get_ped_file_by_project(
+                dataset_name=dataset.name, response_type='json'
+            )
+            for line in pedigree:
+                sam_id = line['individual_id']
+                if sam_id not in sample_by_internal_id:
+                    continue
+                s = sample_by_internal_id[sam_id]
+                s.pedigree = PedigreeInfo(
+                    sample=s,
+                    fam_id=line['family_id'],
+                    mom=line['maternal_id'],
+                    dad=line['paternal_id'],
+                    sex=Sex.parse(str(line['sex'])),
+                    phenotype=line['affected'] or '0',
                 )
-                for line in pedigree:
-                    sam_id = line['individual_id']
-                    if sam_id in sample_by_internal_id:
-                        s = sample_by_internal_id[sam_id]
-                        s.pedigree = PedigreeInfo(
-                            sample=s,
-                            fam_id=line['family_id'],
-                            mom=line['maternal_id'],
-                            dad=line['paternal_id'],
-                            sex=Sex.parse(str(line['sex'])),
-                            phenotype=line['affected'] or '0',
-                        )
-        else:
-            for _, ped_file in enumerate(ped_files):
-                with ped_file.open() as f:
-                    for line in f:
-                        fields = line.strip().split('\t')[:6]
-                        fam_id, sam_id, pat_id, mat_id, sex, phenotype = fields
-                        if sam_id in sample_by_participant_id:
-                            s = sample_by_participant_id[sam_id]
-                            s.pedigree = PedigreeInfo(
-                                sample=s,
-                                fam_id=fam_id,
-                                dad=sample_by_participant_id.get(pat_id),
-                                mom=sample_by_participant_id.get(mat_id),
-                                sex=Sex.parse(sex),
-                                phenotype=phenotype or '0',
-                            )
 
         for dataset in cohort.get_datasets():
             samples_with_ped = [s for s in dataset.get_samples() if s.pedigree]

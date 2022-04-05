@@ -6,7 +6,7 @@ import logging
 
 from .. import Path
 from ..jobs import fastqc
-from cpg_pipes.targets import Sample
+from ..targets import Sample
 from ..pipeline import stage, SampleStage, PipelineError, StageInput, StageOutput
 
 logger = logging.getLogger(__file__)

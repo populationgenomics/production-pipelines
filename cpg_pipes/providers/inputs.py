@@ -8,7 +8,7 @@ from enum import Enum
 
 from ..utils import exists
 from ..types import FastqPair, CramPath, AlignmentInput
-from ..targets import Cohort, Dataset, Sex, SequencingType
+from ..targets import Cohort, Dataset, Sex, SequencingType, PedigreeInfo
 from .. import Path
 
 logger = logging.getLogger(__file__)
@@ -65,7 +65,10 @@ class InputProvider(ABC):
 
         self.populate_alignment_inputs(cohort, do_check_seq_existence)
         self.populate_analysis(cohort)
-        self.populate_pedigree(cohort, ped_files)
+        self.populate_pedigree(cohort)
+        if ped_files:
+            self.populate_pedigree_from_ped_files(cohort, ped_files)
+
         return cohort
 
     @abstractmethod
@@ -123,7 +126,7 @@ class InputProvider(ABC):
 
     def populate_analysis(self, cohort: Cohort) -> None:
         """
-        Populate Analysis entries
+        Populate Analysis entries.
         """
         pass
 
@@ -131,11 +134,39 @@ class InputProvider(ABC):
     def populate_pedigree(
         self,
         cohort: Cohort,
-        ped_files: list[Path] | None = None,
     ) -> None:
         """
-        Populate pedigree data from file
+        Populate pedigree data (families, sex, relationships).
         """
+    
+    @staticmethod
+    def populate_pedigree_from_ped_files(
+        cohort: Cohort,
+        ped_files: list[Path],
+    ):
+        """
+        Populates pedigree from provided PED files.
+        """
+        sample_by_participant_id = dict()
+        for s in cohort.get_samples():
+            sample_by_participant_id[s.participant_id] = s
+
+        for _, ped_file in enumerate(ped_files):
+            with ped_file.open() as f:
+                for line in f:
+                    fields = line.strip().split('\t')[:6]
+                    fam_id, sam_id, pat_id, mat_id, sex, phenotype = fields
+                    if sam_id not in sample_by_participant_id:
+                        continue
+                    s = sample_by_participant_id[sam_id]
+                    s.pedigree = PedigreeInfo(
+                        sample=s,
+                        fam_id=fam_id,
+                        dad=sample_by_participant_id.get(pat_id),
+                        mom=sample_by_participant_id.get(mat_id),
+                        sex=Sex.parse(sex),
+                        phenotype=phenotype or '0',
+                    )
 
     def _get_entries(
         self,
