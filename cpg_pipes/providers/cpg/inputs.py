@@ -111,21 +111,19 @@ class SmdbInputProvider(InputProvider):
             sample_by_internal_id[s.id] = s
 
         for dataset in cohort.get_datasets():
-            pedigree = self.db.get_ped_file_by_project(
-                dataset_name=dataset.name, response_type='json'
-            )
-            for line in pedigree:
-                sam_id = line['individual_id']
+            ped_entries = self.db.get_ped_entries(dataset_name=dataset.name)
+            for entry in ped_entries:
+                sam_id = entry['individual_id']
                 if sam_id not in sample_by_internal_id:
                     continue
                 s = sample_by_internal_id[sam_id]
                 s.pedigree = PedigreeInfo(
                     sample=s,
-                    fam_id=line['family_id'],
-                    mom=line['maternal_id'],
-                    dad=line['paternal_id'],
-                    sex=Sex.parse(str(line['sex'])),
-                    phenotype=line['affected'] or '0',
+                    fam_id=entry['family_id'],
+                    mom=sample_by_internal_id.get(entry['maternal_id']),
+                    dad=sample_by_internal_id.get(entry['paternal_id']),
+                    sex=Sex.parse(str(entry['sex'])),
+                    phenotype=entry['affected'] or '0',
                 )
 
         for dataset in cohort.get_datasets():

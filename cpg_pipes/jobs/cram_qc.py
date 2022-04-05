@@ -30,7 +30,7 @@ def samtools_stats(
     j = b.new_job(jname, job_attrs)
     if not output_path:
         output_path = cram_path.path.with_suffix('.stats')
-    if utils.can_reuse(cram_path.path, overwrite):
+    if utils.can_reuse(output_path, overwrite):
         j.name += ' [reuse]'
         return j
 
@@ -67,7 +67,7 @@ def verify_bamid(
     j = b.new_job(jname, job_attrs)
     if not output_path:
         output_path = cram_path.path.with_suffix('.selfSM')
-    if utils.can_reuse(cram_path.path, overwrite):
+    if utils.can_reuse(output_path, overwrite):
         j.name += ' [reuse]'
         return j
 
@@ -117,7 +117,7 @@ def picard_wgs_metrics(
     j = b.new_job(jname, job_attrs)
     if not output_path:
         output_path = cram_path.path.with_suffix('.csv')
-    if utils.can_reuse(cram_path.path, overwrite):
+    if utils.can_reuse(output_path, overwrite):
         j.name += ' [reuse]'
         return j
     
@@ -125,7 +125,7 @@ def picard_wgs_metrics(
     res = STANDARD.set_resources(j, storage_gb=60)
     cram = cram_path.resource_group(b)
     reference = refs.fasta_res_group(b)
-    interval_file = b.read_input(refs.wgs_coverage_interval_list)
+    interval_file = b.read_input(str(refs.wgs_coverage_interval_list))
 
     cmd = f"""\
     picard -Xms2000m -Xmx{res.get_java_mem_mb()}m \

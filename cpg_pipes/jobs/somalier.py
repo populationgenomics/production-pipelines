@@ -4,7 +4,7 @@ Adding jobs for fingerprinting and pedigree checks. Mostly using Somalier.
 import logging
 import pandas as pd
 from hailtop.batch.job import Job
-from hailtop.batch import Batch
+from hailtop.batch import Batch, Resource
 
 from cpg_pipes import Path, to_path
 from cpg_pipes import images, utils
@@ -27,10 +27,10 @@ def pedigree(
     out_pairs_path: Path | None = None,
     out_html_path: Path | None = None,
     out_html_url: str | None = None,
+    out_checks_path: Path | None = None,
     label: str | None = None,
     ignore_missing: bool = False,
-    dry_run: bool = False,
-) -> Job:
+) -> list[Job]:
     """
     Add somalier and peddy based jobs that infer relatedness and sex, compare that
     to the provided PED file, and attempt to recover it. If unable to recover, cancel
@@ -63,19 +63,33 @@ def pedigree(
         out_pairs_path=out_pairs_path,
         out_html_path=out_html_path,
         out_html_url=out_html_url,
-        dry_run=dry_run,
-    )
-    
-    _check_pedigree(
-        b=b,
-        dataset=dataset,
-        relate_j=relate_j,
-        label=label,
-        somalier_html_url=out_html_url,
-        dry_run=dry_run,
     )
 
-    return relate_j
+    check_j = check_pedigree_job(
+        b=b,
+        sample_map_file=b.read_input(str(_make_sample_map(dataset))),
+        samples_file=relate_j.output_samples,
+        pairs_file=relate_j.output_pairs,
+        label=label,
+        somalier_html_url=out_html_url,
+        out_checks_path=out_checks_path,
+        job_attrs=dataset.get_job_attrs(),
+    )
+    check_j.depends_on(relate_j)
+
+    return extract_jobs + [relate_j, check_j]
+
+
+def _make_sample_map(dataset: Dataset):
+    """
+    Creating sample map to remap internal IDs to participant IDs
+    """
+    sample_map_fpath = dataset.get_tmp_bucket() / 'pedigree' / 'sample_map.tsv'
+    df = pd.DataFrame([
+        {'id': s.id, 'pid': s.participant_id} for s in dataset.get_samples()
+    ])
+    df.to_csv(str(sample_map_fpath), sep='\t', index=False, header=False)
+    return sample_map_fpath
 
 
 def ancestry(
@@ -174,45 +188,49 @@ def _prep_somalier_files(
     return extract_jobs, somalier_file_by_sample
 
 
-def _check_pedigree(
+def check_pedigree_job(
     b: Batch, 
-    dataset: Dataset, 
-    relate_j: Job, 
-    label: str | None,
+    samples_file: Resource, 
+    pairs_file: Resource, 
+    sample_map_file: Resource,
+    label: str | None = None,
     somalier_html_url: str | None = None,
-    dry_run: bool = False,
-):
+    out_checks_path: Path | None = None,
+    job_attrs: dict | None = None,
+) -> Job:
+    """
+    Run job that checks pedigree and batch correctness. The job will fail in case
+    of any mismatches.
+    """
     check_j = b.new_job(
         'Check relatedness and sex' + (f' {label}' if label else ''),
-        dict(dataset=dataset.name),
+        job_attrs,
     )
     STANDARD.set_resources(check_j, ncpu=2)
     check_j.image(images.PEDDY_IMAGE)
-    # Creating sample map to remap internal IDs to participant IDs
-    sample_map_fpath = dataset.get_tmp_bucket() / 'pedigree' / 'sample_maps' / f'{dataset.name}.tsv'
-    if not dry_run:
-        df = pd.DataFrame([
-            {'id': s.id, 'pid': s.participant_id} for s in dataset.get_samples()
-        ])
-        df.to_csv(str(sample_map_fpath), sep='\t', index=False, header=False)
-        
+    
     script_name = 'check_pedigree.py'
     script_path = to_path(__file__).parent.parent.parent / utils.SCRIPTS_DIR / script_name
-    with open(script_path) as f:
-        script = f.read()
-    # We do not wrap the command nicely to avoid breaking python indents of {script}
     cmd = f"""\
-    cat <<EOT >> {script_name}
-    {script}
-    EOT
-    python {script_name} \
-    --somalier-samples {relate_j.output_samples} \
-    --somalier-pairs {relate_j.output_pairs} \
-    --sample-map {b.read_input(str(sample_map_fpath))} \
+    pip3 install peddy
+
+    python3 {script_name} \\
+    --somalier-samples {samples_file} \
+    --somalier-pairs {pairs_file} \
+    --sample-map {sample_map_file} \
     {('--somalier-html ' + somalier_html_url) if somalier_html_url else ''}
+
+    touch {check_j.output}
     """
-    check_j.command(cmd)
-    check_j.depends_on(relate_j)
+    check_j.command(wrap_command(
+        cmd,
+        python_script=script_path,
+        setup_gcp=True,
+    ))
+    check_j.image(images.DRIVER_IMAGE)
+    if out_checks_path:
+        b.write_output(check_j.output, str(out_checks_path))
+    return check_j
 
 
 def _ancestry(
@@ -241,7 +259,7 @@ def _ancestry(
 
     cmd = f"""\
     mkdir /io/batch/1kg
-    mv {b.read_input(refs.somalier_1kg_targz)} /io/batch/1kg
+    mv {b.read_input(str(refs.somalier_1kg_targz))} /io/batch/1kg
     (cd /io/batch/1kg && tar -xzf *.tar.gz)
 
     mkdir /io/batch/somaliers
@@ -254,7 +272,7 @@ def _ancestry(
 
     cmd += f"""\
     somalier ancestry \\
-    --labels {b.read_input(refs.somalier_1kg_labels_tsv)} \\
+    --labels {b.read_input(str(refs.somalier_1kg_labels_tsv))} \\
     /io/batch/1kg/1kg-somalier/*.somalier ++ \\
     /io/batch/somaliers/*.somalier \\
     -o ancestry
@@ -284,7 +302,7 @@ def _relate(
 ) -> Job:
     j = b.new_job(
         'Somalier relate' + (f' {label}' if label else ''),
-        dict(dataset=dataset.name),
+        dataset.get_job_attrs(),
     )
     j.image(images.BIOINFO_IMAGE)
     # Size of one somalier file is 212K, so we add another G only if the number of
@@ -359,9 +377,9 @@ def extact_job(
         return j
 
     j.image(images.BIOINFO_IMAGE)
-    j.memory('standard')
     if isinstance(gvcf_or_cram_or_bam_path, CramPath):
-        STANDARD.request_resources(
+        STANDARD.set_resources(
+            j,
             ncpu=4, 
             storage_gb=200 if gvcf_or_cram_or_bam_path.is_bam else 50
         )
@@ -370,14 +388,14 @@ def extact_job(
             index=str(gvcf_or_cram_or_bam_path.index_path)
         )
     else:
-        STANDARD.request_resources(ncpu=2, storage_gb=10)
+        STANDARD.set_resources(j, ncpu=2, storage_gb=10)
         input_file = b.read_input_group(
             base=str(gvcf_or_cram_or_bam_path),
             index=str(gvcf_or_cram_or_bam_path.tbi_path)
         )
     
     ref = refs.fasta_res_group(b)
-    sites = b.read_input(refs.somalier_sites)
+    sites = b.read_input(str(refs.somalier_sites))
 
     cmd = f"""\
     SITES=/io/batch/sites/{refs.somalier_sites.name}

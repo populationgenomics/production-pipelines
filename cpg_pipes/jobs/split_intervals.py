@@ -49,7 +49,7 @@ def get_intervals(
         ]
 
     j.image(images.SAMTOOLS_PICARD_IMAGE)
-    STANDARD.request_resources(storage_gb=16, mem_gb=2)
+    STANDARD.set_resources(j, storage_gb=16, mem_gb=2)
 
     intervals = refs.calling_interval_lists[sequencing_type]
     break_bands_at_multiples_of = {

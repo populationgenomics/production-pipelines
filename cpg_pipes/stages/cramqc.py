@@ -37,7 +37,11 @@ class SamtoolsStats(SampleStage):
             refs=self.refs,
             job_attrs=sample.get_job_attrs(),
         )
-        return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])
+        return self.make_outputs(
+            sample, 
+            data=self.expected_outputs(sample),
+            jobs=[j]
+        )
 
 
 @stage

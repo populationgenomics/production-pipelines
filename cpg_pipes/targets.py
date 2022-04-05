@@ -85,9 +85,9 @@ class Cohort(Target):
     """
     def __init__(
         self, 
-        name: str, 
-        analysis_dataset_name: str,
+        name: str,
         namespace: Namespace,
+        analysis_dataset_name: str,
         storage_provider: StorageProvider | None = None,
     ):
         """
@@ -102,7 +102,7 @@ class Cohort(Target):
             name=analysis_dataset_name, 
             cohort=self,
             namespace=namespace,
-            storage_provider=storage_provider or self.storage_provider,
+            storage_provider=self.storage_provider,
         )
         self._datasets_by_name: dict[str, Dataset] = {}
 
