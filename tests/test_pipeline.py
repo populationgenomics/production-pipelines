@@ -7,7 +7,7 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 from cpg_pipes import Namespace, to_path
 from cpg_pipes.pipeline import create_pipeline
@@ -34,21 +34,26 @@ class TestPipeline(unittest.TestCase):
         self.tmp_bucket = self.out_bucket / 'tmp'
         self.local_tmp_dir = to_path(tempfile.mkdtemp())
         self.sample_ids = SAMPLES[:3]
-
+        
     def tearDown(self) -> None:
         """
         Removing local tmp dir
         """
         shutil.rmtree(self.local_tmp_dir)
         
-    def _setup_pipeline(self, seq_type=SequencingType.WGS):
+    def _setup_pipeline(
+        self, 
+        seq_type=SequencingType.WGS,
+        last_stage=None,
+    ):
         setup_env()
         from cpg_pipes import benchmark
-        from cpg_pipes.pipeline.pipeline import Pipeline
         # Use the seqr_loader stages. Importing it will make sure all its stages
         # are used by default:
         from pipelines import seqr_loader  # noqa: F401
-        
+
+        seqr_loader._read_es_password = Mock(return_value='TEST')
+
         pipeline = create_pipeline(
             name=self._testMethodName,
             description=self._testMethodName,
@@ -56,6 +61,7 @@ class TestPipeline(unittest.TestCase):
             namespace=Namespace.TEST,
             check_intermediates=False,
             check_expected_outputs=False,
+            last_stage=last_stage,
         )
         self.datasets = [pipeline.add_dataset(DATASET)]
         for ds in self.datasets:
@@ -69,14 +75,19 @@ class TestPipeline(unittest.TestCase):
         """
         WGS seqr-loading pipeline.
         """
-        pipeline = self._setup_pipeline()
+        pipeline = self._setup_pipeline(
+            last_stage='AnnotateDataset'
+        )
         pipeline.submit_batch(dry_run=False)
 
     def test_exome(self):
         """
         Exome seqr-loading pipeline.
         """
-        pipeline = self._setup_pipeline(seq_type=SequencingType.EXOME)
+        pipeline = self._setup_pipeline(
+            last_stage='AnnotateDataset',
+            seq_type=SequencingType.EXOME,
+        )
         pipeline.submit_batch(dry_run=False)
 
     def test_dry(self):

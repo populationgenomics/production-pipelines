@@ -93,7 +93,7 @@ def main(
 
     mt = hl.read_matrix_table(mt_path)
     
-    # Temporary fixes:
+    # TODO: Temporary fixes. Remove these:
     mt = mt.annotate_rows(
         # AS_VQSLOD can be "Infinity" for indels , e.g.:
         # AS_VQSLOD=30.0692,18.2979,Infinity,17.5854,42.2131,1.5013

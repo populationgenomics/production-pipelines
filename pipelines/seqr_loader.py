@@ -12,6 +12,7 @@ import time
 import click
 import yaml
 from analysis_runner import dataproc
+from google.cloud import secretmanager
 
 from cpg_pipes import Path, to_path
 from cpg_pipes import utils
@@ -168,7 +169,6 @@ class LoadToEsStage(DatasetStage):
 def _read_es_password(
     project_id='seqr-308602',
     secret_id='seqr-es-password',
-    version_id='latest',
 ) -> str:
     """
     Read a GCP secret storing the ES password
@@ -176,12 +176,11 @@ def _read_es_password(
     password = os.environ.get('SEQR_ES_PASSWORD')
     if password:
         return password
-    cmd = (
-        f'gcloud secrets versions access {version_id} '
-        f'--secret {secret_id} --project {project_id}'
-    )
-    logger.info(cmd)
-    return subprocess.check_output(cmd, shell=True).decode()
+    client = secretmanager.SecretManagerServiceClient()
+    secret_path = client.secret_version_path(project_id, secret_id, 'latest')
+    # noinspection PyTypeChecker
+    response = client.access_secret_version(request={'name': secret_path})
+    return response.payload.data.decode('UTF-8')
 
 
 @click.command()
