@@ -131,12 +131,16 @@ def elasticsearch_row(mt: hl.MatrixTable):
     Prepares the mt to export using ElasticsearchClient V02.
     - Flattens nested structs
     - drops locus and alleles key
+
+    Borrowed from:
+    https://github.com/broadinstitute/hail-elasticsearch-pipelines/blob/495f0d1b4d49542557ca5cccf98a23fc627260bf/luigi_pipeline/lib/model/seqr_mt_schema.py
     """
     # Converts a mt to the row equivalent.
     ht = mt.rows()
     # Converts nested structs into one field, e.g. {a: {b: 1}} => a.b: 1
     table = ht.drop('vep').flatten()
-    # When flattening, the table is unkeyed, which causes problems because our locus and alleles should not
+    # When flattening, the table is unkeyed, which causes problems because our locus 
+    # and alleles should not
     # be normal fields. We can also re-key, but I believe this is computational?
     table = table.drop(table.locus, table.alleles)
     table.describe()
