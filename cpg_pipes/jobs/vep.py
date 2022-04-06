@@ -212,7 +212,6 @@ def vep_one(
         cmd, 
         setup_gcp=True, 
         monitor_space=True, 
-        define_retry_function=True
     ))
     if out_path:
         b.write_output(j.output, str(out_path).replace('.vcf.gz', ''))
