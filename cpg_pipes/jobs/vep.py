@@ -71,7 +71,7 @@ def vep(
             vcf=vcf,
             intervals=intervals[idx],
             refs=refs,
-            job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}'),
+            job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
         jobs.append(subset_j)
         if to_hail_table:
@@ -85,7 +85,7 @@ def vep(
             out_format='json' if to_hail_table else 'vcf',
             out_path=part_path,
             refs=refs,
-            job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}'),
+            job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
         jobs.append(j)
         if to_hail_table:

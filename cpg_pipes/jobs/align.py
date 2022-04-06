@@ -230,7 +230,7 @@ def align(
                 sorted_bams.append(j.sorted_bam)
                 align_jobs.append(j)
 
-        merge_j = b.new_job('Merge BAMs', job_attrs)
+        merge_j = b.new_job('Merge BAMs', (job_attrs or {}) | dict(tool='samtools_merge'))
         merge_j.image(images.BIOINFO_IMAGE)
         nthreads = STANDARD.set_resources(merge_j, nthreads=requested_nthreads).get_nthreads()
 
@@ -257,7 +257,7 @@ def align(
         overwrite=overwrite,
         align_cmd_out_fmt=output_fmt,
     )
-    if md_j:
+    if md_j != align_j:
         jobs.append(md_j)
 
     return jobs
@@ -284,8 +284,9 @@ def _align_one(
     It leaves sorting and duplicate marking to the user, thus returns a command in
     a raw string in addition to the Job object.
     """
-    j = b.new_job(job_name, (job_attrs or {}) | dict(label=job_name))
-    
+    job_attrs = (job_attrs or {}) | dict(label=job_name, tool=aligner.name)
+    j = b.new_job(job_name, job_attrs)
+
     if number_of_shards_for_realignment is not None:
         assert number_of_shards_for_realignment > 1, number_of_shards_for_realignment
 
@@ -424,7 +425,7 @@ def extract_fastq(
     """
     Job that converts a BAM or a CRAM file to an interleaved compressed fastq file.
     """
-    j = b.new_job('Extract fastq', job_attrs)
+    j = b.new_job('Extract fastq', (job_attrs or {}) | dict(tool='bazam'))
     ncpu = 16
     nthreads = ncpu * 2  # multithreading
     j.cpu(ncpu)

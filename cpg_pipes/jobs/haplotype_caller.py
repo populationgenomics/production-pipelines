@@ -51,7 +51,6 @@ def produce_gvcf(
         refs=refs,
         job_attrs=job_attrs,
         output_path=hc_gvcf_path,
-        tmp_bucket=tmp_bucket,
         cram_path=cram_path,
         number_of_intervals=number_of_intervals,
         intervals=intervals,
@@ -77,7 +76,6 @@ def haplotype_caller(
     b: hb.Batch,
     sample_name: str,
     sequencing_type: SequencingType,
-    tmp_bucket: Path,
     cram_path: CramPath,
     refs: RefData,
     job_attrs: dict | None = None,
@@ -114,12 +112,13 @@ def haplotype_caller(
                 sample_name=sample_name,
                 cram_path=cram_path,
                 refs=refs,
-                job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{number_of_intervals}'),
+                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{number_of_intervals}'),
                 interval=intervals[idx],
                 dragen_mode=dragen_mode,
                 overwrite=overwrite,
             )
             hc_jobs.append(j)
+        jobs.extend(hc_jobs)
         merge_j = merge_gvcfs_job(
             b=b,
             sample_name=sample_name,
@@ -128,7 +127,7 @@ def haplotype_caller(
             out_gvcf_path=output_path,
             overwrite=overwrite,
         )
-        jobs.extend(jobs + [merge_j])
+        jobs.append(merge_j)
     else:
         hc_j = _haplotype_caller_one(
             b,
@@ -159,7 +158,7 @@ def _haplotype_caller_one(
     Add one HaplotypeCaller job on an interval
     """
     job_name = 'HaplotypeCaller'
-    j = b.new_job(job_name, job_attrs)
+    j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk_HaplotypeCaller'))
     if utils.can_reuse(out_gvcf_path, overwrite):
         j.name += ' [reuse]'
         return j
@@ -229,7 +228,7 @@ def merge_gvcfs_job(
     Combine by-interval GVCFs into a single sample GVCF file
     """
     job_name = f'Merge {len(gvcfs)} GVCFs'
-    j = b.new_job(job_name, job_attrs)
+    j = b.new_job(job_name, (job_attrs or {}) | dict(tool='picard_MergeVcfs'))
     if utils.can_reuse(out_gvcf_path, overwrite):
         j.name += ' [reuse]'
         return j
@@ -275,12 +274,13 @@ def postproc_gvcf(
        from Hail about mismatched INFO annotations
     4. Renames the GVCF sample name to use CPG ID.
     """
+    jname = 'Postproc GVCF'
     if utils.can_reuse(output_path, overwrite):
-        return b.new_job('Postproc GVCF [reuse]', job_attrs)
+        return b.new_job(jname + ' [reuse]', job_attrs)
 
     logger.info(f'Adding GVCF postproc job for sample {sample_name}, gvcf {gvcf_path}')
 
-    j = b.new_job(f'ReblockGVCF', job_attrs)
+    j = b.new_job(jname, (job_attrs or {}) | dict(tool='gatk_ReblockGVCF'))
     j.image(images.GATK_IMAGE)
 
     # Enough to fit a pre-reblocked GVCF, which can be as big as 10G,

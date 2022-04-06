@@ -234,6 +234,7 @@ def _read_es_password(
 )
 @pipeline_click_options
 def main(
+    datasets: list[str],
     output_datasets: list[str],
     hc_intervals_num: int,
     jc_intervals_num: int,
@@ -246,18 +247,16 @@ def main(
     """
     Entry point, decorated by pipeline click options.
     """
-    # Parsing dataset names from the analysis-runner Seqr stack:
-    from urllib import request
-    seqr_stack_url = (
-        'https://raw.githubusercontent.com/populationgenomics/analysis-runner/main'
-        '/stack/Pulumi.seqr.yaml'
-    )
-    with request.urlopen(seqr_stack_url) as f:
-        value = yaml.safe_load(f)['config']['datasets:depends_on']
-        datasets = [d.strip('"') for d in value.strip('[] ').split(', ')]
-
-    kwargs['analysis_dataset'] = 'seqr'
-    kwargs['datasets'] = datasets
+    if not datasets:
+        # Parsing dataset names from the analysis-runner Seqr stack:
+        from urllib import request
+        seqr_stack_url = (
+            'https://raw.githubusercontent.com/populationgenomics/analysis-runner/main'
+            '/stack/Pulumi.seqr.yaml'
+        )
+        with request.urlopen(seqr_stack_url) as f:
+            value = yaml.safe_load(f)['config']['datasets:depends_on']
+            datasets = [d.strip('"') for d in value.strip('[] ').split(', ')]
 
     description = 'Seqr Loader'
     if v := kwargs.get('version'):
@@ -267,9 +266,11 @@ def main(
     if output_datasets:
         description += f' → [{", ".join(output_datasets)}]'
 
+    kwargs['analysis_dataset'] = 'seqr'
     pipeline = create_pipeline(
         name='seqr_loader',
         description=description,
+        datasets=datasets,
         config=dict(
             ped_checks=ped_checks,
             hc_intervals_num=hc_intervals_num,

@@ -123,7 +123,7 @@ def make_joint_genotyping_jobs(
             interval=intervals[idx],
             tool=tool,
             output_vcf_path=jc_vcf_path,
-            job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}'),
+            job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
         vcf_by_interval[idx] = jc_vcf['vcf.gz']
         jobs.append(jc_vcf_j)
@@ -139,7 +139,7 @@ def make_joint_genotyping_jobs(
                 interval=intervals[idx],
                 overwrite=overwrite,
                 output_vcf_path=filt_jc_vcf_path,
-                job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}'),
+                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             )
             vcf_by_interval[idx] = exccess_filter_jc_vcf['vcf.gz']
             jobs.append(exccess_filter_j)
@@ -149,7 +149,7 @@ def make_joint_genotyping_jobs(
             input_vcf=vcf_by_interval[idx],
             overwrite=overwrite,
             output_vcf_path=siteonly_jc_vcf_path,
-            job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}'),
+            job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
         siteonly_vcf_by_interval[idx] = siteonly_vcf['vcf.gz']
         jobs.append(siteonly_j)
@@ -212,7 +212,7 @@ def genomicsdb(
         job_name = 'Joint genotyping: creating GenomicsDB'
         j = b.new_job(
             job_name, 
-            (job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}')
+            (job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}')
         )
         job_per_interval[idx] = j
 
@@ -320,7 +320,7 @@ def genomicsdb_cloud(
                 updating_existing_db=updating_existing_db,
                 sample_map_bucket_path=sample_map_bucket_path,
                 intervals=intervals[idx],
-                job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}')
+                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}')
             )
             if depends_on:
                 import_gvcfs_job.depends_on(*depends_on)

@@ -43,10 +43,10 @@ class Batch(hb.Batch):
         dataset = attributes.get('dataset')
         sample = attributes.get('sample')
         samples = attributes.get('samples')
-        intervals = attributes.get('intervals')
+        part = attributes.get('part')
         label = attributes.get('label', name)
 
-        name = make_job_name(name, sample, dataset, intervals)
+        name = make_job_name(name, sample, dataset, part)
 
         if label and (sample or samples):
             if label not in self.labelled_jobs:
@@ -147,7 +147,7 @@ def make_job_name(
     name: str, 
     sample: str | None = None, 
     dataset: str | None = None,
-    intervals: str | None = None,
+    part: str | None = None,
 ) -> str:
     """
     Extend the descriptive job name to reflect job attributes.
@@ -156,8 +156,8 @@ def make_job_name(
         name = f'{dataset}/{sample}: {name}'
     elif dataset:
         name = f'{dataset}: {name}'
-    if intervals:
-        name += f', {intervals}'
+    if part:
+        name += f', {part}'
     return name
 
 
