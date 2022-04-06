@@ -54,10 +54,8 @@ def make_joint_genotyping_jobs(
     Adds samples to the GenomicsDB and runs joint genotyping on them.
     Outputs a multi-sample VCF under `output_vcf_path`.
     """
-    j = b.new_job('Joint genotyping', job_attrs)
     if utils.can_reuse([out_vcf_path, out_siteonly_vcf_path], overwrite):
-        j.name += ' [reuse]'
-        return [j]
+        return [b.new_job('Joint genotyping [reuse]', job_attrs)]
 
     if len(samples) == 0:
         raise ValueError(
@@ -86,7 +84,7 @@ def make_joint_genotyping_jobs(
     # Also, disabling --consolidate decreases performance of reading, causing
     # GenotypeGVCFs to run for too long. So for now it's safer to disable cloud,
     # and use the version of function that passes a tarball around (`genomicsdb()`):
-    import_gvcfs_job_per_interval, genomicsdb_path_per_interval = genomicsdb(
+    import_gvcfs_jobs, genomicsdb_paths = genomicsdb(
         b=b,
         samples=samples,
         tmp_bucket=tmp_bucket,
@@ -96,15 +94,21 @@ def make_joint_genotyping_jobs(
         overwrite=overwrite,
         job_attrs=job_attrs,
     )
-    jobs.extend([v for k, v in import_gvcfs_job_per_interval.items()])
+    jobs.extend(import_gvcfs_jobs)
 
-    vcf_by_interval: dict[int, hb.ResourceFile] = {}
-    siteonly_vcf_by_interval: dict[int, hb.ResourceFile] = {}
+    vcfs: list[hb.ResourceFile] = []
+    siteonly_vcfs: list[hb.ResourceFile] = []
 
     sample_ids = set(s.id for s in samples)
     samples_hash = utils.hash_sample_ids(list(sample_ids))
     jc_tmp_bucket = tmp_bucket / 'joint_calling' / samples_hash
-    for idx in range(scatter_count):
+    
+    for idx, import_gvcfs_job, genomicsdb_path, interval in zip(
+        range(scatter_count),
+        import_gvcfs_jobs,
+        genomicsdb_paths,
+        intervals
+    ):
         jc_vcf_path = jc_tmp_bucket / 'by_interval' / f'interval_{idx + 1}.vcf.gz'
         filt_jc_vcf_path = (
             jc_tmp_bucket / 'by_interval_excess_het_filter' / f'interval_{idx + 1}.vcf.gz'
@@ -115,20 +119,19 @@ def make_joint_genotyping_jobs(
 
         jc_vcf_j, jc_vcf = _add_joint_genotyper_job(
             b,
-            genomicsdb_path=genomicsdb_path_per_interval[idx],
+            genomicsdb_path=genomicsdb_path,
             overwrite=overwrite,
             number_of_samples=len(samples),
             refs=refs,
             number_of_intervals=scatter_count,
-            interval=intervals[idx],
+            interval=interval,
             tool=tool,
             output_vcf_path=jc_vcf_path,
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
-        vcf_by_interval[idx] = jc_vcf['vcf.gz']
+        vcfs.append(jc_vcf['vcf.gz'])
         jobs.append(jc_vcf_j)
-        if import_gvcfs_job_per_interval.get(idx):
-            jc_vcf_j.depends_on(import_gvcfs_job_per_interval.get(idx))
+        jc_vcf_j.depends_on(import_gvcfs_job)
 
         # For small callsets, we don't apply the ExcessHet filtering anyway
         if len(samples) >= 1000 and do_filter_excesshet:
@@ -136,28 +139,28 @@ def make_joint_genotyping_jobs(
             exccess_filter_j, exccess_filter_jc_vcf = _add_exccess_het_filter(
                 b,
                 input_vcf=jc_vcf,
-                interval=intervals[idx],
+                interval=interval,
                 overwrite=overwrite,
                 output_vcf_path=filt_jc_vcf_path,
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             )
-            vcf_by_interval[idx] = exccess_filter_jc_vcf['vcf.gz']
+            vcfs.append(exccess_filter_jc_vcf['vcf.gz'])
             jobs.append(exccess_filter_j)
 
         siteonly_j, siteonly_vcf = _add_make_sitesonly_job(
             b=b,
-            input_vcf=vcf_by_interval[idx],
+            input_vcf=jc_vcf['vcf.gz'],
             overwrite=overwrite,
             output_vcf_path=siteonly_jc_vcf_path,
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
-        siteonly_vcf_by_interval[idx] = siteonly_vcf['vcf.gz']
+        siteonly_vcfs.append(siteonly_vcf['vcf.gz'])
         jobs.append(siteonly_j)
 
     logger.info(f'Queueing gather VCFs job')
     gather_j, _ = gather_vcfs(
         b,
-        input_vcfs=[v for k, v in vcf_by_interval.items()],
+        input_vcfs=vcfs,
         overwrite=overwrite,
         out_vcf_path=out_vcf_path,
         site_only=False,
@@ -168,7 +171,7 @@ def make_joint_genotyping_jobs(
     logger.info(f'Queueing gather site-only VCFs job')
     gather_siteonly_j, _ = gather_vcfs(
         b,
-        input_vcfs=[v for k, v in siteonly_vcf_by_interval.items()],
+        input_vcfs=siteonly_vcfs,
         overwrite=overwrite,
         out_vcf_path=out_siteonly_vcf_path,
         site_only=True,
@@ -188,7 +191,7 @@ def genomicsdb(
     scatter_count: int = RefData.number_of_joint_calling_intervals,    
     overwrite: bool = False,
     job_attrs: dict | None = None,
-) -> tuple[dict[int, Job], dict[int, Path]]:
+) -> tuple[list[Job], list[Path]]:
     """
     Create GenomicDBs for each interval, given new samples.
     """
@@ -200,21 +203,21 @@ def genomicsdb(
     } for s in samples])
     df.to_csv(str(sample_map_bucket_path), index=False, header=False, sep='\t')
 
-    path_per_interval = {
-        idx: genomicsdb_bucket / f'interval_{idx + 1}_outof_{scatter_count}.tar' 
-        for idx in range(scatter_count)
-    }
-
-    job_per_interval = dict()
+    out_paths = []
+    jobs = []
     for idx in range(scatter_count):
-        out_path = path_per_interval[idx]
-
+        out_path = genomicsdb_bucket / f'interval_{idx + 1}_outof_{scatter_count}.tar'
+        out_paths.append(out_path)
+        
         job_name = 'Joint genotyping: creating GenomicsDB'
         j = b.new_job(
             job_name, 
-            (job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}')
+            (job_attrs or {}) | dict(
+                part=f'{idx + 1}/{scatter_count}',
+                tool='gatk_GenomicsDBImport',
+            )
         )
-        job_per_interval[idx] = j
+        jobs.append(j)
 
         if utils.can_reuse(out_path, overwrite):
             j.name += ' [reuse]'
@@ -269,7 +272,8 @@ def genomicsdb(
         """
         j.command(wrap_command(cmd, monitor_space=True, setup_gcp=True))
         b.write_output(j.db_tar, str(out_path))
-    return job_per_interval, path_per_interval
+
+    return jobs, out_paths
 
 
 def genomicsdb_cloud(

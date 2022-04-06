@@ -81,6 +81,7 @@ class JointGenotypingStage(CohortStage):
             if self.pipeline_config.get('use_gnarly', False) 
             else JointGenotyperTool.GenotypeGVCFs,
             scatter_count=intervals_num,
+            job_attrs=dict(stage=self.name),
         )
         return self.make_outputs(
             cohort, 
