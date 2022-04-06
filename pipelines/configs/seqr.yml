@@ -1,10 +1,10 @@
 namespace: main
-output_datasets: ['acute-care']
 skip_datasets: [
   'ohmr3-mendelian', 'ohmr4-epilepsy', 'flinders-ophthal', 
   'rdnow', 'schr-neuro', 'brain-malf', 'leukodystrophies', 'mito-disease', 'ravenscroft-arch'
 ]
 skip_samples: [CPG11783,CPG12310,CPG199679,CPG13326]  # acute-care,acute-care,acute-care,perth-neuro
+output_datasets: ['circa', 'perth-neuro', 'heartkids', 'ravenscroft-rdstudy']
 keep_scratch: true
 skip_samples_with_missing_input: true
 ped_checks: false

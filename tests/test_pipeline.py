@@ -125,10 +125,11 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(_cnt('VariantRecalibrator'), 2)
         self.assertEqual(_cnt('ApplyVQSR'), 2)
         self.assertEqual(_cnt('GatherVcfsCloud'), 2)
-        self.assertEqual(
-            _cnt('hailctl dataproc submit'), 
-            1 + len(self.datasets)
-        )
+        self.assertEqual(_cnt('vep '), 1)
+        self.assertEqual(_cnt('vep_json_to_ht('), 1)
+        self.assertEqual(_cnt('annotate_cohort('), 1)
+        self.assertEqual(_cnt('annotate_dataset_mt('), len(self.datasets))
+        self.assertEqual(_cnt('hailctl dataproc submit'), 1)
 
 
 if __name__ == '__main__':

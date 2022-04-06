@@ -86,7 +86,7 @@ class AnnotateDataset(DatasetStage):
         """
         Expected to generate a matrix table
         """
-        # return to_path('gs://cpg-seqr-main-tmp/seqr_loader/v0/AnnotateDataset/mt/a9a85a4ccbddc6403725f8de1e46a7f0960119_368/circa.mt')
+        return to_path(f'gs://cpg-seqr-main-tmp/seqr_loader/v0/AnnotateDataset/mt/a9a85a4ccbddc6403725f8de1e46a7f0960119_368/{dataset.name}.mt')
         samples_hash = utils.hash_sample_ids(dataset.cohort.get_sample_ids())
         return (
             self.tmp_bucket /
