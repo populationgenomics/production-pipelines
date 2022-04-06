@@ -67,7 +67,7 @@ def annotate_cohort(
 
         logger.info(f'VQSR: fixing AS-* fields')
         # Some numeric fields are loaded as strings, so converting them to ints and 
-        # floats:
+        # floats. Also, fixing Infinity values along the way:
         ht = ht.annotate(
             info=ht.info.annotate(
                 AS_VQSLOD=ht.info.AS_VQSLOD.map(hl.float),
@@ -81,6 +81,21 @@ def annotate_cohort(
                 ),
             ),
         )
+        # AS_VQSLOD can be "Infinity" for indels , e.g.:
+        # AS_VQSLOD=30.0692,18.2979,Infinity,17.5854,42.2131,1.5013
+        # gs://cpg-seqr-main-tmp/seqr_loader/v0/AnnotateCohort/seqr_loader/checkpoints/vqsr.ht
+        # ht = hl.filter_intervals(ht, [hl.parse_locus_interval('chrX:52729395-52729396')])
+        # hl.float() correctly parses this value, however, seqr loader doesn't 
+        # recognise it, so we need to replace it with zero:
+        ht = ht.annotate(
+            info=ht.info.annotate(
+                AS_VQSLOD=hl.if_else(
+                    hl.is_infinite(ht.info.AS_VQSLOD), 
+                    0.0, 
+                    ht.info.AS_VQSLOD,
+                )
+            )
+        )
         unsplit_count = ht.count()
 
         logger.info(f'VQSR: splitting multiallelics...')
@@ -92,6 +107,8 @@ def annotate_cohort(
         ht = ht.annotate(
             filters=ht.filters.union(hl.set([ht.info.AS_FilterStatus])),
         )
+        ht = ht.annotate(filters=ht.filters.filter(lambda val: val != 'PASS'))
+
         split_count = ht.count()
         logger.info(
             f'VQSR: Found {unsplit_count} unsplit and {split_count} split variants with '
@@ -108,6 +125,7 @@ def annotate_cohort(
     mt = mt.annotate_rows(info=vqsr_ht[mt.row_key].info)
     # populating filters which is outside of info
     mt = mt.annotate_rows(filters=mt.filters.union(vqsr_ht[mt.row_key].filters))
+    mt = mt.annotate_rows(filters=mt.filters.filter(lambda val: val != 'PASS'))
     mt = mt.annotate_globals(**vqsr_ht.index_globals())
     mt = mt.checkpoint(f'{checkpoints_bucket}/mt-vep-split-vqsr.mt', _read_if_exists=not overwrite)
     logger.info(f'Wrote {checkpoints_bucket}/mt-vep-split-vqsr.mt')

@@ -82,7 +82,9 @@ def python_command(
     """
     python_cmd = f"""
 import logging
-logger = logging.getLogger()
+logger = logging.getLogger(__file__)
+logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
+logger.setLevel(logging.INFO)
 """
     if hail_billing_project:
         assert hail_bucket
