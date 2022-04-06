@@ -37,8 +37,6 @@ def annotate_cohort(
     # Annotate VEP. Do ti before splitting multi, because we run VEP on unsplit VCF,
     # and hl.split_multi_hts can handle multiallelic VEP field.
     vep_ht = hl.read_table(str(vep_ht_path))
-    vep_ht = vep_ht.checkpoint(f'{checkpoints_bucket}/vep.ht', _read_if_exists=not overwrite)
-    logger.info(f'Wrote {checkpoints_bucket}/vep.ht')
     logger.info(f'Adding VEP annotations into the Matrix Table from {vep_ht_path}')
     mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
 
