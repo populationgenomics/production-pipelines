@@ -148,7 +148,6 @@ def align(
             job_attrs=job_attrs,
             refs=refs,
             aligner=aligner,
-            storage_gb=500,
         )
         stdout_is_sorted = False
         output_fmt = 'sam'
