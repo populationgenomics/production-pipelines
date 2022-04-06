@@ -1,7 +1,7 @@
 """
 Test individual jobs on Hail Batch.
 """
-
+import logging
 import shutil
 import tempfile
 import time
@@ -9,26 +9,30 @@ import unittest
 from os.path import join
 from typing import Dict
 
-from hailtop.batch.job import Job
 from analysis_runner import dataproc
+from hailtop.batch.job import Job
 
 from cpg_pipes import Path, to_path, Namespace
 from cpg_pipes import benchmark, utils
+from cpg_pipes import images
+from cpg_pipes.hailquery import init_batch
 from cpg_pipes.jobs import vep
 from cpg_pipes.jobs.align import align
 from cpg_pipes.jobs.haplotype_caller import produce_gvcf
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
-from cpg_pipes.jobs.seqr_loader import annotate_dataset
+from cpg_pipes.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jobs
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
-from cpg_pipes.types import CramPath, SequencingType
 from cpg_pipes.pipeline import create_pipeline
-from cpg_pipes import images
+from cpg_pipes.types import CramPath, SequencingType
 
 try:
     from .utils import BASE_BUCKET, DATASET, SAMPLES, SUBSET_GVCF_BY_SID
 except ImportError:
     from utils import BASE_BUCKET, DATASET, SAMPLES, SUBSET_GVCF_BY_SID  # type: ignore
+
+
+logger = logging.getLogger(__file__)
 
 
 def _read_file(path: Path) -> str:
@@ -51,6 +55,7 @@ class TestJobs(unittest.TestCase):
     def setUp(self):
         self.name = self._testMethodName
         self.timestamp = time.strftime('%Y%m%d-%H%M')
+        logger.info(f'Timestamp: {self.timestamp}')
         self.local_tmp_dir = tempfile.mkdtemp()
 
         self.pipeline = create_pipeline(
@@ -63,9 +68,14 @@ class TestJobs(unittest.TestCase):
         self.dataset = self.pipeline.add_dataset(DATASET)
         sample_name = f'Test-{self.timestamp}'
         self.sample = self.dataset.add_sample(sample_name, sample_name)
-        self.sequencing_type = self.sequencing_type
         self.refs = self.pipeline.refs
-        
+
+        # Interval to take on chr20:
+        self.chrom = 'chr20'
+        self.locus1 = '5111495'
+        self.locus2 = '5111607'
+        self.interval = f'{self.chrom}-{self.locus1}-{self.locus2}'
+    
     def tearDown(self) -> None:
         shutil.rmtree(self.local_tmp_dir)
 
@@ -227,7 +237,6 @@ class TestJobs(unittest.TestCase):
         """
         Test joint variant calling
         """
-        genomicsdb_bucket = self.out_bucket / 'genomicsdb'
         out_vcf_path = self.out_bucket / 'joint-called.vcf.gz'
         out_siteonly_vcf_path = to_path(
             str(out_vcf_path).replace('.vcf.gz', '-siteonly.vcf.gz')
@@ -243,7 +252,6 @@ class TestJobs(unittest.TestCase):
             out_siteonly_vcf_path=out_siteonly_vcf_path,
             refs=self.refs,
             samples=self.pipeline.get_all_samples(),
-            genomicsdb_bucket=genomicsdb_bucket,
             gvcf_by_sid=SUBSET_GVCF_BY_SID,
             tmp_bucket=self.tmp_bucket,
             overwrite=True,
@@ -287,29 +295,31 @@ class TestJobs(unittest.TestCase):
         contents = _read_file(res_path)
         self.assertEqual(0, len(contents.split()))  # site-only doesn't have any samples
 
-    def test_vep(self):
+    def test_vep_vcf(self):
         """
-        Tests command line VEP with LoF plugin and MANE_SELECT annotation
+        Test VEP on VCF, parallelised by interval, with LOFtee plugin 
+        and MANE_SELECT annotation.
         """
-        self.timestamp = '20220326-1639'
-
         site_only_vcf_path = to_path(
             'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
             'vqsr.vcf.gz'
         )
         out_vcf_path = self.out_bucket / 'vep' / 'vep.vcf.gz'
         jobs = vep.vep(
-            self.pipeline.b, 
+            self.pipeline.b,
             vcf_path=site_only_vcf_path,
             refs=self.refs,
             sequencing_type=self.sequencing_type,
-            out_vcf_path=out_vcf_path,
+            out_path=out_vcf_path,
             scatter_count=10,
             overwrite=False,
+            hail_billing_project=DATASET,
+            hail_bucket=self.tmp_bucket,
+            tmp_bucket=self.tmp_bucket,
         )
-        
+
         # Add test job
-        test_j = self.pipeline.b.new_job('Parse GVCF sample name')
+        test_j = self.pipeline.b.new_job('Parse VEP VCF')
         test_j.image(images.BCFTOOLS_IMAGE)
         test_j.command(f"""
         bcftools +split-vep {self.pipeline.b.read_input(str(out_vcf_path))} \
@@ -320,65 +330,192 @@ class TestJobs(unittest.TestCase):
         test_j.depends_on(*jobs)
         test_out_path = self.out_bucket / f'{self.sample.id}.out'
         self.pipeline.b.write_output(test_j.output, str(test_out_path))
-        
+
         # Run Batch
         self.pipeline.submit_batch(wait=True)
-        
+
         # Check results
         self.assertTrue(out_vcf_path.exists())
         contents = _read_file(test_out_path)
         self.assertEqual(
-            'chr20:5111495 TMEM230 protein_coding NM_001009923.2 LC ANC_ALLELE', 
+            'chr20:5111495 TMEM230 protein_coding NM_001009923.2 LC ANC_ALLELE',
             contents
         )
 
-    def test_seqr_loader_annotate_dataset_seqr(self):
+    def test_vep_to_json(self):
         """
-        Test subset_mt.py script from seqr_loader.
+        Tests a single VEP job that outputs JSON.
         """
-        dataset = 'seqr'
-        pipeline = create_pipeline(
-            name=self.name,
-            description=self.name,
-            analysis_dataset=dataset,
-            namespace=Namespace.MAIN,
+        # Interval to take on chr20:
+        locus1 = '5111495'
+        locus2 = '5111607'
+        siteonly_vqsr_path = to_path(
+            f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/'
+            f'siteonly-vqsr-chr20-{locus1}-{locus2}.vcf.gz'
         )
-        cohort_mt_path = to_path('gs://cpg-seqr-main-tmp/mt/combined.mt')
-        dataset_mt_path = to_path(f'gs://cpg-circa-main-analysis/mt/circa-{self.timestamp}.mt')
-        samples = ['CPG200675', 'CPG200642', 'CPG200501', 'CPG200527', 'CPG200519', 'CPG200410', 'CPG200477', 'CPG200485', 'CPG200493', 'CPG200444', 'CPG200428', 'CPG200451', 'CPG200436', 'CPG200659', 'CPG200667', 'CPG200535', 'CPG200543', 'CPG200550', 'CPG200584', 'CPG200568', 'CPG200592', 'CPG200600', 'CPG200626', 'CPG200618', 'CPG200683']
-        tmp_bucket = to_path('gs://cpg-seqr-main-tmp')
-        annotate_dataset(
-            b=pipeline.b,
-            annotated_mt_path=cohort_mt_path,
-            sample_ids=samples,
-            tmp_bucket=tmp_bucket,
-            output_mt_path=dataset_mt_path,
-            hail_billing_project=dataset,
-            hail_bucket=tmp_bucket,
+        out_path = (
+            self.out_bucket / 'vep_json' / f'chr20-{locus1}-{locus2}.json_list'
         )
-        pipeline.submit_batch(wait=False)     
+        j = vep.vep_one(
+            self.pipeline.b,
+            vcf=siteonly_vqsr_path,
+            refs=self.refs,
+            out_path=out_path,
+            out_format='json',
+        )
+
+        # Add test job
+        mane_transcript = 'NM_001009923.2'  # expected transcript on locus1
+        test_j = self.pipeline.b.new_job('Parse VEP results')
+        test_j.image(images.DRIVER_IMAGE)
+        test_j.command(f"""
+        cat {self.pipeline.b.read_input(str(out_path))} | zgrep {locus1} | \
+        jq -r '.transcript_consequences[] | select(.mane_select=="{mane_transcript}") | .mane_select' \
+        > {test_j.output}
+        """)
+        test_j.depends_on(j)
+        test_out_path = self.out_bucket / f'{self.sample.id}.out'
+        self.pipeline.b.write_output(test_j.output, str(test_out_path))
+
+        # Run Batch
+        self.pipeline.submit_batch(wait=True)
+
+        # Check results
+        self.assertTrue(out_path.exists())
+        contents = _read_file(test_out_path)
+        self.assertEqual(mane_transcript, contents)
+
+    def test_vep_json_to_ht(self):
+        """
+        Test parsing VEP JSON into a Hail table.
+        """
+        vep_json_list_path = to_path(
+            f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/vep/'
+            f'{self.interval}.json_list'
+        )
+        out_path = self.out_bucket / 'vep_ht' / f'{self.interval}.ht'
+
+        vep.gather_vep_json_to_ht(
+            b=self.pipeline.b,
+            vep_results_paths=[vep_json_list_path],
+            hail_billing_project=DATASET,
+            hail_bucket=self.tmp_bucket,
+            out_path=out_path,
+        )
+        self.pipeline.submit_batch(wait=True)
+
+        import hail as hl
+        init_batch(DATASET, self.tmp_bucket)
+        ht = hl.read_table(str(out_path))
+        interval = hl.parse_locus_interval(
+            f'{self.chrom}:{self.locus1}-{int(self.locus1) + 1}'
+        )
+        ht = hl.filter_intervals(ht, [interval])
+        transcript = ht.vep.transcript_consequences.mane_select.collect()[0][1]
+        lof = ht.vep.transcript_consequences.lof.collect()[0][1]
+        self.assertEqual(lof, 'LC')
+        self.assertEqual(transcript, 'NM_001009923.2')
+
+    def test_seqr_loader_annotate_cohort(self):
+        vcf_path = to_path(
+            f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/'
+            f'joint-called-{self.interval}.vcf.gz'
+        )
+        siteonly_vqsr_path = to_path(
+            f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/'
+            f'siteonly-vqsr-{self.interval}.vcf.gz'
+        )
+        vep_ht_path = to_path(
+            f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/'
+            f'vep/{self.interval}.ht'
+        )
+        out_mt_path = (
+            self.out_bucket / 'seqr_loader' / f'cohort-{self.interval}.mt'
+        )
+        annotate_cohort_jobs(
+            self.pipeline.b,
+            vcf_path=vcf_path,
+            siteonly_vqsr_vcf_path=siteonly_vqsr_path,
+            vep_ht_path=vep_ht_path,
+            output_mt_path=out_mt_path,
+            checkpoints_bucket=self.tmp_bucket / 'seqr_loader' / 'checkpoints',
+            sequencing_type=self.sequencing_type,
+            hail_billing_project=DATASET,
+            hail_bucket=self.tmp_bucket,
+        )
+        self.pipeline.submit_batch(wait=True)     
+
+        # Testing
+        import hail as hl
+        init_batch(DATASET, self.tmp_bucket)
+        mt = hl.read_matrix_table(str(out_mt_path))
+        mt.rows().show()
+        self.assertListEqual(mt.topmed.AC.collect(), [20555, 359, 20187])
+        self.assertSetEqual(set(mt.geneIds.collect()[0]), {'ENSG00000089063'})
+
+    # def test_seqr_loader_annotate_dataset_seqr(self):
+    #     """
+    #     Test subset_mt.py script from seqr_loader.
+    #     """
+    #     dataset = 'seqr'
+    #     pipeline = create_pipeline(
+    #         name=self.name,
+    #         description=self.name,
+    #         analysis_dataset=dataset,
+    #         namespace=Namespace.MAIN,
+    #     )
+    #     cohort_mt_path = to_path('gs://cpg-seqr-main-tmp/mt/combined.mt')
+    #     dataset_mt_path = to_path(f'gs://cpg-circa-main-analysis/mt/circa-{self.timestamp}.mt')
+    #     samples = ['CPG200675', 'CPG200642', 'CPG200501', 'CPG200527', 'CPG200519', 'CPG200410', 'CPG200477', 'CPG200485', 'CPG200493', 'CPG200444', 'CPG200428', 'CPG200451', 'CPG200436', 'CPG200659', 'CPG200667', 'CPG200535', 'CPG200543', 'CPG200550', 'CPG200584', 'CPG200568', 'CPG200592', 'CPG200600', 'CPG200626', 'CPG200618', 'CPG200683']
+    #     tmp_bucket = to_path('gs://cpg-seqr-main-tmp')
+    #     annotate_dataset(
+    #         b=pipeline.b,
+    #         mt_path=cohort_mt_path,
+    #         sample_ids=samples,
+    #         tmp_bucket=tmp_bucket,
+    #         output_mt_path=dataset_mt_path,
+    #         hail_billing_project=dataset,
+    #         hail_bucket=tmp_bucket,
+    #     )
+    #     pipeline.submit_batch(wait=False)
 
     def test_seqr_loader_annotate_dataset(self):
         """
         Test subset_mt.py script from seqr_loader.
         """
-        cohort_mt_path = to_path(
-            'gs://cpg-fewgenomes-test/unittest/inputs/chr20/seqr_loader/cohort.mt'
+        mt_path = to_path(
+            f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/'
+            f'seqr_loader/cohort-{self.interval}.mt'
         )
-        dataset_mt_path = self.out_bucket / 'dataset.mt'
-        annotate_dataset(
+        out_mt_path = (
+            self.out_bucket / 'seqr_loader' / f'dataset-{self.interval}.mt'
+        )
+        annotate_dataset_jobs(
             b=self.pipeline.b,
-            annotated_mt_path=cohort_mt_path,
+            mt_path=mt_path,
             sample_ids=SAMPLES[:3],
             tmp_bucket=self.tmp_bucket,
-            output_mt_path=dataset_mt_path,
+            output_mt_path=out_mt_path,
             hail_billing_project=DATASET,
             hail_bucket=self.tmp_bucket,
         )
         self.pipeline.submit_batch(wait=True)     
-        self.assertTrue(utils.exists(dataset_mt_path))
 
-    def test_seqr_loader(self):
+        # Testing
+        self.assertTrue(utils.exists(out_mt_path))
+        import hail as hl
+        init_batch(DATASET, self.tmp_bucket)
+        mt = hl.read_matrix_table(str(out_mt_path))
+        mt.rows().show()
+        self.assertListEqual(mt.s.collect(), SAMPLES[:3])
+        self.assertSetEqual(
+            set(mt.samples_gq['20_to_25'].collect()[0]), {'CPG196519', 'CPG196527'}
+        )
+        self.assertSetEqual(
+            set(mt.samples_ab['40_to_45'].collect()[0]), {'CPG196535'}
+        )
+
+    def test_seqr_loader_load_to_es(self):
         """
         Assuming variants are called and VQSR'ed, tests loading
         into a matrix table and annotation for Seqr

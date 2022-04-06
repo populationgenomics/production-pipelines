@@ -1,7 +1,7 @@
 """
 Hail tables and matrix tables used as reference data.
 """
-
+import asyncio
 import functools
 import logging
 import operator
@@ -13,10 +13,24 @@ from typing import List, Optional, Union
 import hail as hl
 
 from .refdata import RefData
-from .utils import safe_mkdir, DEFAULT_REF
+from .utils import safe_mkdir
 
 
 logger = logging.getLogger(__file__)
+
+
+def init_batch(billing_project: str, hail_bucket: Path | str):
+    """
+    Init Hail with Batch backend.
+    """
+    asyncio.get_event_loop().run_until_complete(
+        hl.init_batch(
+            default_reference=RefData.genome_build,
+            billing_project=billing_project,
+            remote_tmpdir=str(hail_bucket),
+            token=os.environ['HAIL_TOKEN'],
+        )
+    )
 
 
 def init_hail(name: str, local_tmp_dir: Path = None):
@@ -33,7 +47,7 @@ def init_hail(name: str, local_tmp_dir: Path = None):
     hl_log = os.path.join(
         safe_mkdir(local_tmp_dir / 'log'), f'{name}-{timestamp}.log'
     )
-    hl.init(default_reference=DEFAULT_REF, log=hl_log)
+    hl.init(default_reference=RefData.genome_build, log=hl_log)
     return local_tmp_dir
 
 

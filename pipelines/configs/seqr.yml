@@ -4,6 +4,5 @@ input_datasets: [acute-care,perth-neuro,heartkids,ravenscroft-rdstudy,circa]
 skip_samples: [CPG11783,CPG12310,CPG199679,CPG13326]  # acute-care,acute-care,acute-care,perth-neuro
 keep_scratch: true
 skip_samples_with_missing_input: true
-make_seqr_metadata: false
 ped_checks: false
 version: v0

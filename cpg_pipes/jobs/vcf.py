@@ -39,8 +39,7 @@ def subset_vcf(
     reference = refs.fasta_res_group(b)
 
     cmd = f"""
-    gatk --java-options -Xms25g \\
-    SelectVariants \\
+    gatk SelectVariants \\
     -R {reference.base} \\
     -V {vcf['vcf.gz']} \\
     -L {intervals} \\

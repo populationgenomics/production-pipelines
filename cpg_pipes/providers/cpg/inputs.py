@@ -7,10 +7,10 @@ import traceback
 
 from sample_metadata import ApiException
 
-from ... import Path
-from ...pipeline.targets import Dataset, Cohort, Sex, PedigreeInfo
-from ..inputs import InputProvider, InputProviderError
 from .smdb import SMDB, SmSequence
+from ..inputs import InputProvider, InputProviderError
+from ... import Path
+from ...targets import Dataset, Cohort, Sex, PedigreeInfo
 
 logger = logging.getLogger(__file__)
 
@@ -36,7 +36,7 @@ class SmdbInputProvider(InputProvider):
 
     def get_dataset_name(self, cohort: Cohort, entry: dict[str, str]) -> str:
         """
-        Get name of the dataset. Not relevant for SMDB because we pull 
+        Get name of the dataset. Not relevant for SMDB because we pull
         specific datasets by their names.
         """
         raise NotImplementedError
@@ -98,33 +98,34 @@ class SmdbInputProvider(InputProvider):
     def populate_pedigree(
         self,
         cohort: Cohort,
-        ped_files: list[Path] | None = None,
     ) -> None:
         """
         Populate pedigree data for samples.
         """
-        if not ped_files:
-            return None
-
         sample_by_participant_id = dict()
         for s in cohort.get_samples():
             sample_by_participant_id[s.participant_id] = s
 
-        for _, ped_file in enumerate(ped_files):
-            with ped_file.open() as f:
-                for line in f:
-                    fields = line.strip().split('\t')[:6]
-                    fam_id, sam_id, pat_id, mat_id, sex, phenotype = fields
-                    if sam_id in sample_by_participant_id:
-                        s = sample_by_participant_id[sam_id]
-                        s.pedigree = PedigreeInfo(
-                            sample=s,
-                            fam_id=fam_id,
-                            dad=sample_by_participant_id.get(pat_id),
-                            mom=sample_by_participant_id.get(mat_id),
-                            sex=Sex.parse(sex),
-                            phenotype=phenotype or '0',
-                        )
+        sample_by_internal_id = dict()
+        for s in cohort.get_samples():
+            sample_by_internal_id[s.id] = s
+
+        for dataset in cohort.get_datasets():
+            ped_entries = self.db.get_ped_entries(dataset_name=dataset.name)
+            for entry in ped_entries:
+                sam_id = entry['individual_id']
+                if sam_id not in sample_by_internal_id:
+                    continue
+                s = sample_by_internal_id[sam_id]
+                s.pedigree = PedigreeInfo(
+                    sample=s,
+                    fam_id=entry['family_id'],
+                    mom=sample_by_internal_id.get(entry['maternal_id']),
+                    dad=sample_by_internal_id.get(entry['paternal_id']),
+                    sex=Sex.parse(str(entry['sex'])),
+                    phenotype=entry['affected'] or '0',
+                )
+
         for dataset in cohort.get_datasets():
             samples_with_ped = [s for s in dataset.get_samples() if s.pedigree]
             logger.info(

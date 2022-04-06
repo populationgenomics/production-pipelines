@@ -5,7 +5,8 @@ Stages that perform alignment QC on CRAM files.
 import logging
 
 from ..jobs.cram_qc import samtools_stats, verify_bamid, picard_wgs_metrics
-from ..pipeline import stage, SampleStage, StageInput, StageOutput, Sample
+from ..pipeline import stage, SampleStage, StageInput, StageOutput
+from ..targets import Sample
 
 logger = logging.getLogger(__file__)
 
@@ -36,7 +37,11 @@ class SamtoolsStats(SampleStage):
             refs=self.refs,
             job_attrs=sample.get_job_attrs(),
         )
-        return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])
+        return self.make_outputs(
+            sample, 
+            data=self.expected_outputs(sample),
+            jobs=[j]
+        )
 
 
 @stage

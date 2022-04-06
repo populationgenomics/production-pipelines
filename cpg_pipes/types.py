@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Union
 
-from cpg_pipes import Path, to_path
+from . import Path, to_path
 from hailtop.batch import ResourceGroup, ResourceFile, Batch
 
 logger = logging.getLogger(__file__)

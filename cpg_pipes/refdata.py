@@ -12,6 +12,7 @@ class RefData:
     """
     number_of_haplotype_caller_intervals = 50
     number_of_joint_calling_intervals = 50
+    genome_build = 'GRCh38'
 
     def fasta_res_group(self, b, indices: list | None = None):
         """
@@ -40,8 +41,10 @@ class RefData:
         self.somalier_1kg_labels_tsv = self.bucket / 'somalier/v0/ancestry-labels-1kg.tsv'
     
         # VEP
-        self.vep_loftee = self.bucket / 'vep/loftee_GRCh38.tar'
-        self.vep_cache = self.bucket / 'vep/homo_sapiens_vep_105_GRCh38.tar' 
+        self.vep_loftee = self.bucket / 'vep' / 'loftee_GRCh38.tar'
+        self.vep_cache = self.bucket / 'vep' / 'homo_sapiens_vep_105_GRCh38.tar' 
+        # Uncompressed tar files for mounting with gcsfuse
+        self.vep_bucket = self.bucket / 'vep' / 'GRCh38'
 
         self.broad_ref_bucket = bucket / 'hg38' / 'v0'
 
@@ -81,10 +84,7 @@ class RefData:
         self.unpadded_intervals = (
             self.broad_ref_bucket / 'hg38.even.handcurated.20k.intervals'
         )
-        self.precomputed_intervals = {
-            50: self.bucket / 'intervals' / '50intervals',
-            10: self.bucket / 'intervals' / '10intervals',
-        }
+        self.intervals_bucket = self.bucket / 'intervals'
     
         # VQSR
         self.dbsnp_vcf = self.broad_ref_bucket / 'Homo_sapiens_assembly38.dbsnp138.vcf'

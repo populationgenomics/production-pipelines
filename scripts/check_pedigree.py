@@ -5,20 +5,18 @@ This script parses "somalier relate" (https://github.com/brentp/somalier) output
 and returns a non-zero code if either sex or pedigree mismatches the data in a 
 provided PED file.
 """
-
 import contextlib
 import logging
-import subprocess
 import sys
-import tempfile
-from os.path import join, basename
-from typing import Optional, Tuple, Dict
-
-import pandas as pd
+from typing import Optional, Dict
 import click
+from io import StringIO
 from peddy import Ped
+import pandas as pd
 
-logger = logging.getLogger('check-pedigree')
+logger = logging.getLogger(__file__)
+logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
+logger.setLevel(logging.INFO)
 
 
 @click.command()
@@ -52,13 +50,31 @@ def main(
     somalier_pairs_fpath: str,
     somalier_html_fpath: Optional[str],
     sample_map_tsv_path: Optional[str],
-):  # pylint: disable=missing-function-docstring
-    
-    df, pairs_df, ped = _parse_inputs(
+): 
+    """
+    Entry point.
+    """
+    check_pedigree(
         somalier_samples_fpath,
         somalier_pairs_fpath,
         somalier_html_fpath,
         sample_map_tsv_path,
+    )
+
+
+def check_pedigree(
+    somalier_samples_fpath: str,
+    somalier_pairs_fpath: str,
+    somalier_html_fpath: Optional[str],
+    sample_map_tsv_path: Optional[str],
+):
+    """
+    Report pedigree inconsistencies, given somalier outputs.
+    """
+    sample_map = _parse_sample_map(sample_map_tsv_path) if sample_map_tsv_path else None
+
+    ped, df, pairs_df = _parse_inputs(
+        somalier_samples_fpath, somalier_pairs_fpath, sample_map
     )
 
     bad_samples = list(df[df.gt_depth_mean == 0.0].sample_id)
@@ -82,12 +98,12 @@ def main(
     mismatching_sex = mismatching_female | mismatching_male
 
     def _print_stats(df_filter):
-        for _, row in df[df_filter].iterrows():
+        for _, row_ in df[df_filter].iterrows():
             logger.info(
-                f'\t{row.sample_id} ('
-                f'provided: {row.original_pedigree_sex}, '
-                f'inferred: {row.sex}, '
-                f'mean depth: {row.gt_depth_mean})'
+                f'\t{row_.sample_id} ('
+                f'provided: {row_.original_pedigree_sex}, '
+                f'inferred: {row_.sex}, '
+                f'mean depth: {row_.gt_depth_mean})'
             )
 
     if mismatching_sex.any():
@@ -111,7 +127,7 @@ def main(
 
     logger.info('* Checking relatedness *')
     sample_by_id = {s.sample_id: s for s in ped.samples()}
-    
+
     pairs_provided_as_unrelated_but_inferred_related = []
     other_mismatching_pairs = []
     for idx, row in pairs_df.iterrows():
@@ -125,7 +141,7 @@ def main(
         with contextlib.redirect_stderr(None), contextlib.redirect_stdout(None):
             peddy_rel = ped.relation(sample_by_id[s1], sample_by_id[s2])
 
-        def _match_peddy_with_inferred(peddy_rel):
+        def _match_peddy_with_inferred(peddy_rel_):
             return {
                 'unrelated': 'unrelated',
                 'related at unknown level': 'unrelated',
@@ -138,7 +154,7 @@ def main(
                 'full siblings': 'siblings',
                 'siblings': 'siblings',
                 'unknown': 'unknown',
-            }.get(peddy_rel)
+            }.get(peddy_rel_)
 
         if (
             _match_peddy_with_inferred(peddy_rel) == 'unknown'
@@ -189,58 +205,26 @@ def main(
 
 
 def _parse_inputs(
-    somalier_samples_fpath, 
-    somalier_pairs_fpath, 
-    somalier_html_fpath,
-    sample_map_tsv_path,
-) -> Tuple[pd.DataFrame, pd.DataFrame, Ped]:
-    sample_map = _parse_sample_map(sample_map_tsv_path)
-
-    if somalier_samples_fpath.startswith('gs://'):
-        local_tmp_dir = tempfile.mkdtemp()
-        cmd = f'gsutil cp {somalier_samples_fpath} {somalier_pairs_fpath}'
-        subprocess.run(cmd, check=False, shell=True)
-        local_somalier_samples_fpath = join(
-            local_tmp_dir, basename(somalier_samples_fpath)
-        )
-        local_somalier_pairs_fpath = join(local_tmp_dir, basename(somalier_pairs_fpath))
-    else:
-        local_somalier_samples_fpath = somalier_samples_fpath
-        local_somalier_pairs_fpath = somalier_pairs_fpath
-
-    pairs_df = pd.read_csv(local_somalier_pairs_fpath, delimiter='\t')
-    if sample_map_tsv_path:
-        pairs_df = pairs_df.replace({
-            '#sample_a': sample_map,
-            'sample_b': sample_map,
-        })
-
-    df = pd.read_csv(local_somalier_samples_fpath, delimiter='\t')
-    if sample_map_tsv_path:
+    somalier_samples_fpath,
+    somalier_pairs_fpath,
+    sample_map,
+):
+    df = pd.read_csv(somalier_samples_fpath, delimiter='\t')
+    pairs_df = pd.read_csv(somalier_pairs_fpath, delimiter='\t')
+    if sample_map:
         df = df.replace({
             'sample_id': sample_map,
             'paternal_id': sample_map,
             'maternal_id': sample_map,
         })
-        # Writing the file back for parsing with peddy
-        df.to_csv(local_somalier_samples_fpath, sep='\t', index=False)
-    ped = Ped(local_somalier_samples_fpath)
-
-    return df, pairs_df, ped
-
-
-def _parse_sample_map(sample_map_tsv_path: str) -> Dict[str, str]:
-    """
-    Parse 2-column file into a dict mapping str to str
-    """
-    sample_map = dict()
-    if sample_map_tsv_path:
-        with open(sample_map_tsv_path) as f:
-            for line in f:
-                if line.strip():
-                    ori_sid, new_sid = line.strip().split('\t')
-                    sample_map[ori_sid] = new_sid
-    return sample_map
+        pairs_df = pairs_df.replace({
+            '#sample_a': sample_map,
+            'sample_b': sample_map,
+        })
+    f = StringIO()
+    df.to_csv(f, sep='\t', index=False)
+    ped = Ped(StringIO(f.getvalue()))
+    return ped, df, pairs_df
 
 
 def infer_relationship(coeff: float, ibs0: float, ibs2: float) -> str:
@@ -282,7 +266,8 @@ def print_info(
         samples_str = samples_df.to_string()
         logger.info('')
         logger.info(
-            f'Somalier results, samples (based on {somalier_samples_fpath}):\n{samples_str}\n'
+            f'Somalier results, samples (based on {somalier_samples_fpath}):\n'
+            f'{samples_str}\n'
         )
     if len(pairs_df) < 400:
         pairs_str = pairs_df[
@@ -297,10 +282,25 @@ def print_info(
             ]
         ].to_string()
         logger.info(
-            f'Somalier results, sample pairs (based on {somalier_pairs_fpath}):\n{pairs_str}\n'
+            f'Somalier results, sample pairs (based on {somalier_pairs_fpath}):\n'
+            f'{pairs_str}\n'
         )
     if somalier_html_fpath:
         logger.info(f'Somalier HTML report: {somalier_html_fpath}\n')
+
+
+def _parse_sample_map(sample_map_tsv_path: str) -> Dict[str, str]:
+    """
+    Parse 2-column file into a dict mapping str to str
+    """
+    sample_map = dict()
+    if sample_map_tsv_path:
+        with open(sample_map_tsv_path) as f:
+            for line in f:
+                if line.strip():
+                    ori_sid, new_sid = line.strip().split('\t')
+                    sample_map[ori_sid] = new_sid
+    return sample_map
 
 
 if __name__ == '__main__':

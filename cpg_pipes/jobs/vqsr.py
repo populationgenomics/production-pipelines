@@ -161,13 +161,12 @@ def make_vqsr_jobs(
     huge_disk = 200 if is_small_callset else (500 if not is_huge_callset else 2000)
 
     jobs: list[Job] = []
-    intervals_j = split_intervals.get_intervals(
+    intervals_j, intervals = split_intervals.get_intervals(
         b=b,
         refs=refs,
         sequencing_type=sequencing_type,
         scatter_count=scatter_count,
     )
-    intervals = [intervals_j[f'{i}.interval_list'] for i in range(scatter_count)]
     jobs.append(intervals_j)
 
     if input_vcf_or_mt_path.name.endswith('.mt'):
@@ -400,44 +399,6 @@ def add_tabix_step(
     j.command(wrap_command(f"""\
     gunzip {vcf_inp} -c | bgzip -c > {j.combined_vcf['vcf.gz']}
     tabix -p vcf {j.combined_vcf['vcf.gz']}
-    """))
-    return j
-
-
-def add_split_intervals_step(
-    b: hb.Batch,
-    interval_list: hb.ResourceFile,
-    scatter_count: int,
-    ref_fasta: hb.ResourceGroup,
-    disk_size: int,
-) -> Job:
-    """
-    Split genome into intervals to parallelise GnarlyGenotyper.
-
-    Returns: a Job object with a single output j.intervals of type ResourceGroup
-    """
-    j = b.new_job('VQSR: SplitIntervals')
-    j.image(images.GATK_IMAGE)
-    mem_gb = 8
-    j.memory(f'{mem_gb}G')
-    j.storage(f'{disk_size}G')
-    j.declare_resource_group(
-        intervals={
-            f'interval_{idx}': f'{{root}}/{str(idx).zfill(4)}-scattered.interval_list'
-            for idx in range(scatter_count)
-        }
-    )
-
-    j.command(wrap_command(f"""\
-    # Modes other than INTERVAL_SUBDIVISION will produce an unpredictable number
-    # of intervals. But we have to produce exactly {scatter_count} number of
-    # output files because our workflow is not dynamic.
-    gatk --java-options -Xms{mem_gb - 1}g SplitIntervals \\
-    -L {interval_list} \\
-    -O {j.intervals} \\
-    -scatter {scatter_count} \\
-    -R {ref_fasta.base} \\
-    -mode INTERVAL_SUBDIVISION
     """))
     return j
 

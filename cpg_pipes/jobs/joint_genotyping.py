@@ -16,7 +16,7 @@ from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
-from cpg_pipes.pipeline.targets import Sample
+from cpg_pipes.targets import Sample
 from cpg_pipes.types import GvcfPath, SequencingType
 from cpg_pipes.refdata import RefData
 
@@ -38,7 +38,6 @@ def make_joint_genotyping_jobs(
     out_siteonly_vcf_path: Path,
     samples: list[Sample],
     sequencing_type: SequencingType,
-    genomicsdb_bucket: Path,
     tmp_bucket: Path,
     refs: RefData,
     gvcf_by_sid: dict[str, GvcfPath],
@@ -72,14 +71,13 @@ def make_joint_genotyping_jobs(
 
     jobs: list[Job] = []
     
-    intervals_j = split_intervals.get_intervals(
+    intervals_j, intervals = split_intervals.get_intervals(
         b=b,
         refs=refs,
         sequencing_type=sequencing_type,
         scatter_count=scatter_count,
         job_attrs=job_attrs,
     )
-    intervals = [intervals_j[f'{i}.interval_list'] for i in range(scatter_count)]
     jobs.append(intervals_j)
     
     # There are some problems with using GenomcsDB in cloud (`genomicsdb_cloud()`):
@@ -91,7 +89,6 @@ def make_joint_genotyping_jobs(
     import_gvcfs_job_per_interval, genomicsdb_path_per_interval = genomicsdb(
         b=b,
         samples=samples,
-        genomicsdb_bucket=genomicsdb_bucket,
         tmp_bucket=tmp_bucket,
         gvcf_by_sid=gvcf_by_sid,
         intervals=intervals,
@@ -108,12 +105,12 @@ def make_joint_genotyping_jobs(
     samples_hash = utils.hash_sample_ids(list(sample_ids))
     jc_tmp_bucket = tmp_bucket / 'joint_calling' / samples_hash
     for idx in range(scatter_count):
-        jc_vcf_path = jc_tmp_bucket / 'by_interval' / f'interval_{idx}.vcf.gz'
+        jc_vcf_path = jc_tmp_bucket / 'by_interval' / f'interval_{idx + 1}.vcf.gz'
         filt_jc_vcf_path = (
-            jc_tmp_bucket / 'by_interval_excess_het_filter' / f'interval_{idx}.vcf.gz'
+            jc_tmp_bucket / 'by_interval_excess_het_filter' / f'interval_{idx + 1}.vcf.gz'
         )
         siteonly_jc_vcf_path = (
-           jc_tmp_bucket / 'by_interval_site_only' / f'interval_{idx}.vcf.gz'
+           jc_tmp_bucket / 'by_interval_site_only' / f'interval_{idx + 1}.vcf.gz'
         )
 
         jc_vcf_j, jc_vcf = _add_joint_genotyper_job(
@@ -185,7 +182,6 @@ def make_joint_genotyping_jobs(
 def genomicsdb(
     b: hb.Batch,
     samples: list[Sample],
-    genomicsdb_bucket: Path,
     tmp_bucket: Path,
     gvcf_by_sid: dict[str, GvcfPath],
     intervals: list[hb.Resource],
@@ -196,7 +192,8 @@ def genomicsdb(
     """
     Create GenomicDBs for each interval, given new samples.
     """
-    sample_map_bucket_path = tmp_bucket / 'genomicsdb' / 'sample_map.csv'
+    genomicsdb_bucket = tmp_bucket / 'genomicsdbs'
+    sample_map_bucket_path = genomicsdb_bucket / 'sample_map.csv'
     df = pd.DataFrame([{
         'id': s.id, 
         'path': str(gvcf_by_sid[s.id].path)
@@ -204,7 +201,7 @@ def genomicsdb(
     df.to_csv(str(sample_map_bucket_path), index=False, header=False, sep='\t')
 
     path_per_interval = {
-        idx: genomicsdb_bucket / f'interval_{idx}_outof_{scatter_count}.tar' 
+        idx: genomicsdb_bucket / f'interval_{idx + 1}_outof_{scatter_count}.tar' 
         for idx in range(scatter_count)
     }
 
@@ -281,7 +278,7 @@ def genomicsdb_cloud(
     genomicsdb_bucket: Path,
     tmp_bucket: Path,
     gvcf_by_sid: dict[str, GvcfPath],
-    intervals: hb.ResourceGroup,
+    intervals: list[hb.Resource],
     scatter_count: int = RefData.number_of_joint_calling_intervals,    
     depends_on: list[Job] | None = None,
     job_attrs: dict | None = None,
@@ -292,7 +289,7 @@ def genomicsdb_cloud(
     genomicsdb_path_per_interval = dict()
     for idx in range(scatter_count):
         genomicsdb_path_per_interval[idx] = (
-            genomicsdb_bucket / f'interval_{idx}_outof_{scatter_count}'
+            genomicsdb_bucket / f'interval_{idx + 1}_outof_{scatter_count}'
         )
         
     # Determining which samples to add. Using the first interval, so the assumption
@@ -322,7 +319,7 @@ def genomicsdb_cloud(
                 sample_names_will_be_in_db=set(s.id for s in samples),
                 updating_existing_db=updating_existing_db,
                 sample_map_bucket_path=sample_map_bucket_path,
-                interval=intervals[f'interval_{idx}'],
+                intervals=intervals[idx],
                 job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}')
             )
             if depends_on:
@@ -420,7 +417,7 @@ def _genomicsdb_import_cloud(
     sample_names_will_be_in_db: set[str],
     updating_existing_db: bool,
     sample_map_bucket_path: Path,
-    interval: hb.ResourceFile,
+    intervals: hb.Resource,
     depends_on: list[Job] | None = None,
     overwrite: bool = False,
     job_attrs: dict | None = None,
@@ -499,7 +496,7 @@ def _genomicsdb_import_cloud(
     gatk --java-options "-Xms{xms_gb}g -Xmx{xmx_gb}g" \
     GenomicsDBImport \\
     {genomicsdb_param} \\
-    -L {interval} \\
+    -L {intervals} \\
     --sample-name-map {sample_map} \\
     --reader-threads {nthreads} \\
     {" ".join(params)}

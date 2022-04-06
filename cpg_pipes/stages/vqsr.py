@@ -6,8 +6,9 @@ import logging
 
 from .. import Path
 from .. import utils
-from ..pipeline import stage, CohortStage, StageInput, StageOutput, Cohort
+from ..pipeline import stage, CohortStage, StageInput, StageOutput
 from ..jobs.vqsr import make_vqsr_jobs
+from ..targets import Cohort
 from .joint_genotyping import JointGenotypingStage
 
 logger = logging.getLogger(__file__)

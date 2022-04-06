@@ -7,7 +7,7 @@ Stages to run somalier tools.
 import logging
 
 from .. import Path
-from ..pipeline.targets import Dataset, Sample
+from ..targets import Dataset, Sample
 from ..pipeline import stage, SampleStage, DatasetStage, StageInput, StageOutput
 from ..jobs import somalier
 
@@ -65,6 +65,7 @@ class CramSomalierPedigree(DatasetStage):
             'samples': prefix / f'{dataset.name}.samples.tsv',
             'pairs': prefix / f'{dataset.name}.pairs.tsv',
             'html': dataset.get_web_bucket() / 'somalier-pedigree.html',
+            'checks': prefix / f'{dataset.name}-checks.done',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -82,7 +83,7 @@ class CramSomalierPedigree(DatasetStage):
         else:
             html_url = None
 
-        j = somalier.pedigree(
+        jobs = somalier.pedigree(
             self.b,
             dataset,
             input_path_by_sid=fp_by_sid,
@@ -91,9 +92,12 @@ class CramSomalierPedigree(DatasetStage):
             out_pairs_path=self.expected_outputs(dataset)['pairs'],
             out_html_path=html_path,
             out_html_url=html_url,
+            out_checks_path=self.expected_outputs(dataset)['checks'],
             refs=self.refs,
         )
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])
+        return self.make_outputs(
+            dataset, data=self.expected_outputs(dataset), jobs=jobs
+        )
 
 
 @stage(required_stages=CramSomalierStage)

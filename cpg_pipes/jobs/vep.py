@@ -3,18 +3,24 @@
 """
 Creates a Hail Batch job to run the command line VEP tool.
 """
+import logging
+from typing import Literal
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes import images, utils, Path
+from cpg_pipes import images, utils, Path, to_path
 from cpg_pipes.hb.batch import Batch
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.hb.command import wrap_command, python_command
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs, subset_vcf
+from cpg_pipes.query.vep import vep_json_to_ht
 from cpg_pipes.refdata import RefData
 from cpg_pipes.types import SequencingType
+
+
+logger = logging.getLogger(__file__)
 
 
 def vep(
@@ -22,20 +28,28 @@ def vep(
     vcf_path: Path,
     refs: RefData,
     sequencing_type: SequencingType,
-    out_vcf_path: Path | None = None,
+    hail_billing_project: str,
+    hail_bucket: Path,
+    tmp_bucket: Path,
+    out_path: Path | None = None,
     overwrite: bool = False,
     scatter_count: int | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """
-    Runs VEP on provided VCF.
+    Runs VEP on provided VCF. Whites a VCF into `out_path` by default,
+    unless `out_path` ends with ".ht", in which case writes a Hail table.
     """
-    if out_vcf_path and utils.can_reuse(out_vcf_path, overwrite):
+    to_hail_table = out_path and str(out_path).rstrip('/').endswith('.ht')
+    if not to_hail_table:
+        assert str(out_path).endswith('.vcf.gz'), out_path
+
+    if out_path and utils.can_reuse(out_path, overwrite):
         return [b.new_job('VEP [reuse]', job_attrs)]
 
     scatter_count = scatter_count or RefData.number_of_joint_calling_intervals
     jobs: list[Job] = []
-    intervals_j = split_intervals.get_intervals(
+    intervals_j, intervals = split_intervals.get_intervals(
         b=b,
         refs=refs,
         sequencing_type=sequencing_type,
@@ -47,98 +61,159 @@ def vep(
         **{'vcf.gz': str(vcf_path), 'vcf.gz.tbi': str(vcf_path) + '.tbi'}
     )
 
-    vep_jobs = []
+    parts_bucket = tmp_bucket / 'vep' / 'parts'
+    part_files = []
+
     # Splitting variant calling by intervals
     for idx in range(scatter_count):
         subset_j = subset_vcf(
             b,
             vcf=vcf,
-            intervals=intervals_j[f'{idx}.interval_list'],
+            intervals=intervals[idx],
             refs=refs,
             job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}'),
         )
         jobs.append(subset_j)
-        j = _vep_one(
+        if to_hail_table:
+            part_path = parts_bucket / f'part{idx + 1}.json_list'
+        else:
+            part_path = None
+        # noinspection PyTypeChecker
+        j = vep_one(
             b,
             vcf=subset_j.output_vcf['vcf.gz'],
+            out_format='json' if to_hail_table else 'vcf',
+            out_path=part_path,
             refs=refs,
             job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}'),
         )
         jobs.append(j)
-        vep_jobs.append(j)
-    gather_j, gather_vcf = gather_vcfs(
-        b=b,
-        input_vcfs=[j.output_vcf['vcf.gz'] for j in vep_jobs],
-        out_vcf_path=out_vcf_path,
-    )
+        if to_hail_table:
+            part_files.append(part_path)
+        else:
+            part_files.append(j.output['vcf.gz'])
+
+    if to_hail_table:
+        gather_j = gather_vep_json_to_ht(
+            b=b,
+            vep_results_paths=part_files,
+            hail_billing_project=hail_billing_project,
+            hail_bucket=hail_bucket,
+            out_path=out_path,
+            job_attrs=job_attrs,
+        )
+    else:
+        assert len(part_files) == scatter_count
+        gather_j, gather_vcf = gather_vcfs(
+            b=b,
+            input_vcfs=part_files,
+            out_vcf_path=out_path,
+        )
+    gather_j.depends_on(*jobs)
     jobs.append(gather_j)
     return jobs
 
 
-def _vep_one(
+def gather_vep_json_to_ht(
+    b: Batch,
+    vep_results_paths: list[Path],
+    hail_billing_project: str,
+    hail_bucket: Path,
+    out_path: Path,
+    job_attrs: dict | None = None,
+):
+    """
+    Parse results from VEP with annotations formatted in JSON,
+    and write into a Hail Table using a Batch job.
+    """
+    j = b.new_job('VEP json to Hail table', job_attrs)
+    j.image(images.DRIVER_IMAGE)
+    cmd = python_command(
+        vep_json_to_ht,
+        [str(p) for p in vep_results_paths],
+        str(out_path),
+        setup_gcp=True,
+        hail_billing_project=hail_billing_project,
+        hail_bucket=str(hail_bucket),
+        default_reference=RefData.genome_build,
+    )
+    j.command(cmd)
+    return j
+
+
+def vep_one(
     b: Batch,
     vcf: Path | hb.Resource,
     refs: RefData,
-    out_vcf_path: Path | None = None,
+    out_path: Path | None = None,
+    out_format: Literal['vcf', 'json'] = 'vcf',
     job_attrs: dict | None = None,
+    overwrite: bool = False,
 ) -> Job:
     """
-    Run VEP in a single job.
+    Run a single VEP job.
     """
     j = b.new_job('VEP', job_attrs)
+    if out_path and utils.can_reuse(out_path, overwrite):
+        j += ' [reuse]'
+        return j
+
     j.image(images.VEP_IMAGE)
     STANDARD.set_resources(j, storage_gb=50, mem_gb=50, ncpu=16)
 
-    loftee_conf = {
-        'loftee_path': '$LOFTEE_PLUGIN_PATH',
-        'gerp_bigwig': '$LOFTEE_DIR/gerp_conservation_scores.homo_sapiens.GRCh38.bw',
-        'human_ancestor_fa': '$LOFTEE_DIR/human_ancestor.fa.gz',
-        'conservation_file': '$LOFTEE_DIR/loftee.sql',
-    }
-    
     if not isinstance(vcf, hb.Resource):
         vcf = b.read_input(str(vcf))
 
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
+    if out_format == 'vcf':
+        j.declare_resource_group(
+            output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+        )
+        output = j.output['vcf.gz']
+    else:
+        output = j.output
+
+    # gcsfuse works only with the root bucket, without prefix:
+    base_bucket_name = refs.vep_bucket.drive
+    data_mount = to_path(f'/{base_bucket_name}')
+    j.cloudfuse(base_bucket_name, str(data_mount), read_only=True)
+    vep_dir = data_mount / 'vep' / 'GRCh38'
+    loftee_conf = {
+        'loftee_path': '$LOFTEE_PLUGIN_PATH',
+        'gerp_bigwig': f'{vep_dir}/gerp_conservation_scores.homo_sapiens.GRCh38.bw',
+        'human_ancestor_fa': f'{vep_dir}/human_ancestor.fa.gz',
+        'conservation_file': f'{vep_dir}/loftee.sql',
+    }
 
     cmd = f"""\
-    CACHE_DIR=/io/batch/cache
-    LOFTEE_DIR=/io/batch/loftee
-    LOFTEE_PLUGIN_PATH=/root/micromamba/share/ensembl-vep-105.0-0
-    FASTA=$CACHE_DIR/vep/homo_sapiens/105_GRCh38/Homo_sapiens.GRCh38.dna.toplevel.fa.gz
+    ls {vep_dir}
+    ls {vep_dir}/vep
 
-    mkdir -p $CACHE_DIR
-    mkdir -p $LOFTEE_DIR
-    gsutil cat {refs.vep_cache} | tar -xf - -C $CACHE_DIR/
-    gsutil cat {refs.vep_loftee} | tar -xf - -C $LOFTEE_DIR/
-    ls $LOFTEE_DIR
+    LOFTEE_PLUGIN_PATH=/root/micromamba/share/ensembl-vep-105.0-1
+    FASTA={vep_dir}/vep/homo_sapiens/105_GRCh38/Homo_sapiens.GRCh38.dna.toplevel.fa.gz
 
     vep \\
-    --vcf \\
     --format vcf \\
-    --compress_output bgzip \\
-    -o {j.output_vcf['vcf.gz']} \\
+    --{out_format} {'--compress_output bgzip' if out_format == 'vcf' else ''} \\
+    -o {output} \\
     -i {vcf} \\
     --everything \\
     --allele_number \\
-    --no_stats \\
     --minimal \\
     --cache --offline --assembly GRCh38 \\
-    --dir_cache $CACHE_DIR/vep/ \\
+    --dir_cache {vep_dir}/vep/ \\
     --dir_plugins $LOFTEE_PLUGIN_PATH \\
     --fasta $FASTA \\
     --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())}
-    
-    tabix -p vcf {j.output_vcf['vcf.gz']}
     """
+    if out_format == 'vcf':
+        cmd += f'tabix -p vcf {output}'
+
     j.command(wrap_command(
         cmd, 
         setup_gcp=True, 
         monitor_space=True, 
         define_retry_function=True
     ))
-    if out_vcf_path:
-        b.write_output(j.output_vcf, str(out_vcf_path).replace('.vcf.gz', ''))
+    if out_path:
+        b.write_output(j.output, str(out_path).replace('.vcf.gz', ''))
     return j

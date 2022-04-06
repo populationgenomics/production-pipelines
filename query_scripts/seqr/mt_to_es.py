@@ -92,37 +92,31 @@ def main(
     )
 
     mt = hl.read_matrix_table(mt_path)
-
-    # AS_MQ and InbreedingCoeff can be NaN, need to fix that to avoid ES loader 
-    # failures like: 
-    # `is.hail.relocated.org.elasticsearch.hadoop.rest.EsHadoopRemoteException: 
-    # mapper_parsing_exception: failed to parse field [info_AS_MQ] of type [double]`
-    # in: https://batch.hail.populationgenomics.org.au/batches/6621/jobs/6
-    mt = mt.annotate_rows(
-        info=mt.info.annotate(
-            AS_MQ=hl.if_else(
-                hl.is_nan(mt.info.AS_MQ), 
-                0.0, 
-                mt.info.AS_MQ
-            ),
-            InbreedingCoeff=hl.if_else(
-                hl.is_nan(mt.info.InbreedingCoeff), 
-                0.0, 
-                mt.info.InbreedingCoeff
-            ),
-            # https://batch.hail.populationgenomics.org.au/batches/6973/jobs/12
-            AS_InbreedingCoeff=hl.if_else(
-                hl.is_nan(mt.info.AS_InbreedingCoeff), 
-                0.0, 
-                mt.info.AS_InbreedingCoeff
-            ),
-        )
-    )
     
+    # Temporary fixes:
+    mt = mt.annotate_rows(
+        # AS_VQSLOD can be "Infinity" for indels , e.g.:
+        # AS_VQSLOD=30.0692,18.2979,Infinity,17.5854,42.2131,1.5013
+        # gs://cpg-seqr-main-tmp/seqr_loader/v0/AnnotateCohort/seqr_loader/checkpoints
+        # /vqsr.ht
+        # ht = hl.filter_intervals(ht, [hl.parse_locus_interval('chrX:52729395-52729396')])
+        # hl.float() correctly parses this value, however, seqr loader doesn't 
+        # recognise it, so we need to replace it with zero:
+        info=mt.info.annotate(
+            AS_VQSLOD=hl.if_else(
+                hl.is_infinite(mt.info.AS_VQSLOD),
+                0.0,
+                mt.info.AS_VQSLOD,
+            )
+        ),
+        # Seqr doesn't recognise PASS value in filters as pass, so need to remove it
+        filters=mt.filters.filter(lambda val: val != 'PASS')
+    )
+
     logger.info('Getting rows and exporting to the ES')
     row_table = elasticsearch_row(mt)
     es_shards = _mt_num_shards(mt, es_index_min_num_shards)
-   
+
     es.export_table_to_elasticsearch(
         row_table,
         index_name=es_index.lower(),

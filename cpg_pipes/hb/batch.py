@@ -10,6 +10,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job, PythonJob
 
 from .. import Path, to_path
+from ..providers import Cloud
 
 logger = logging.getLogger(__file__)
 
@@ -103,23 +104,29 @@ def setup_batch(
     )
     backend = hb.ServiceBackend(
         billing_project=billing_project,
-        remote_tmpdir=str(hail_bucket),
+        remote_tmpdir=hail_bucket,
         token=os.environ.get('HAIL_TOKEN'),
     )
     return Batch(name=description, backend=backend)
 
 
-def get_hail_bucket(hail_bucket: str | Path | None = None) -> Path:
+def get_hail_bucket(hail_bucket: str | Path | None = None, cloud=Cloud.GS) -> str:
     """
     Get Hail bucket.
     """
-    hail_bucket = hail_bucket or os.getenv('HAIL_BUCKET')
     if not hail_bucket:
-        raise ValueError(
-            'Either the hail_bucket parameter, or the HAIL_BUCKET'
-            'environment variable must be set'
-        )
-    return to_path(hail_bucket)
+        hail_bucket = os.getenv('HAIL_BUCKET')
+        if not hail_bucket:
+            raise ValueError(
+                'Either the hail_bucket parameter, or the HAIL_BUCKET '
+                'environment variable must be set'
+            )
+    hail_bucket = str(hail_bucket)
+    prefs = {Cloud.GS: 'gs', Cloud.AZ: 'hail-az'}
+    if not any(hail_bucket.startswith(f'{pref}://') for pref in prefs.values()):
+        hail_bucket = f'{prefs[cloud]}://{hail_bucket}'
+
+    return hail_bucket
 
 
 def get_billing_project(billing_project: str | None = None) -> str:
@@ -130,7 +137,7 @@ def get_billing_project(billing_project: str | None = None) -> str:
     billing_project = billing_project or os.getenv('HAIL_BILLING_PROJECT')
     if not billing_project:
         raise ValueError(
-            'Either the billing_project parameter, or the HAIL_BILLING_PROJECT'
+            'Either the billing_project parameter, or the HAIL_BILLING_PROJECT '
             'environment variable must be set'
         )
     return billing_project
@@ -157,18 +164,10 @@ def make_job_name(
 def hail_query_env(
     j: Job, 
     hail_billing_project: str, 
-    hail_bucket: Path | None = None
+    hail_bucket: str | Path | None = None
 ):
     """
     Setup environment to run Hail Query Service backend script.
     """
     j.env('HAIL_BILLING_PROJECT', hail_billing_project)
-    hail_bucket = get_hail_bucket(hail_bucket)
-    # Has to be without prefix:
-    if isinstance(hail_bucket, CloudPath):
-        bucket = str(hail_bucket)[len(hail_bucket.cloud_prefix):]
-    else:
-        bucket = str(hail_bucket)
-    j.env('HAIL_BUCKET', bucket)
-    j.env('HAIL_SHA', os.environ['HAIL_SHA'])
-    j.env('HAIL_JAR_URL', os.environ['HAIL_JAR_URL'])
+    j.env('HAIL_BUCKET', get_hail_bucket(hail_bucket))

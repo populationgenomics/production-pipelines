@@ -16,9 +16,6 @@ from . import Path, to_path, get_package_path
 
 logger = logging.getLogger(__file__)
 
-# Default reference genome build.
-DEFAULT_REF = 'GRCh38'
-
 # Packages to install on a dataproc cluster, to use with the dataproc wrapper.
 DATAPROC_PACKAGES = [
     'cpg_pipes==0.3.0',
