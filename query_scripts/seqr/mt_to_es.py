@@ -110,7 +110,8 @@ def main(
             )
         ),
         # Seqr doesn't recognise PASS value in filters as pass, so need to remove it
-        filters=mt.filters.filter(lambda val: val != 'PASS')
+        filters=mt.filters.filter(lambda val: val != 'PASS'),
+        ref=mt.alleles[0],
     )
 
     logger.info('Getting rows and exporting to the ES')
