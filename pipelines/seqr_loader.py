@@ -6,13 +6,12 @@ Batch pipeline to load data into seqr.
 
 import logging
 import os
-import subprocess
 import time
 
 import click
 import yaml
-from analysis_runner import dataproc
 from google.cloud import secretmanager
+from analysis_runner import dataproc
 
 from cpg_pipes import Path, to_path
 from cpg_pipes import utils
