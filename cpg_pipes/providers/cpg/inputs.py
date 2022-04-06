@@ -106,22 +106,26 @@ class SmdbInputProvider(InputProvider):
         for s in cohort.get_samples():
             sample_by_participant_id[s.participant_id] = s
 
-        sample_by_internal_id = dict()
-        for s in cohort.get_samples():
-            sample_by_internal_id[s.id] = s
-
         for dataset in cohort.get_datasets():
             ped_entries = self.db.get_ped_entries(dataset_name=dataset.name)
             for entry in ped_entries:
-                sam_id = entry['individual_id']
-                if sam_id not in sample_by_internal_id:
+                part_id = str(entry['individual_id'])
+                if part_id not in sample_by_participant_id.keys():
+                    logger.info(f'Participant with ID {part_id} skipped')
                     continue
-                s = sample_by_internal_id[sam_id]
+
+                s = sample_by_participant_id[part_id]
+                maternal_sample = sample_by_participant_id.get(
+                    str(entry['maternal_id'])
+                )
+                paternal_sample = sample_by_participant_id.get(
+                    str(entry['paternal_id'])
+                )
                 s.pedigree = PedigreeInfo(
                     sample=s,
                     fam_id=entry['family_id'],
-                    mom=sample_by_internal_id.get(entry['maternal_id']),
-                    dad=sample_by_internal_id.get(entry['paternal_id']),
+                    mom=maternal_sample,
+                    dad=paternal_sample,
                     sex=Sex.parse(str(entry['sex'])),
                     phenotype=entry['affected'] or '0',
                 )
