@@ -47,7 +47,7 @@ def make_joint_genotyping_jobs(
     # bcftools view gs://cpg-fewgenomes-test/unittest/inputs/chr20/gnarly/joint-called-siteonly.vcf.gz | zgrep 7105364
     tool: JointGenotyperTool = JointGenotyperTool.GenotypeGVCFs,
     do_filter_excesshet: bool = True,
-    scatter_count: int | None = None,
+    scatter_count: int = RefData.number_of_joint_calling_intervals,
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """

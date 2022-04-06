@@ -38,6 +38,7 @@ def get_intervals(
     that, but Hail Batch is not dynamic and have to expect certain number of output
     files.
     """
+    job_attrs = (job_attrs or {}) | dict(tool='picard_IntervalListTools')
     j = b.new_job(f'Make {scatter_count} intervals', job_attrs)
 
     cache_bucket = refs.intervals_bucket / f'{scatter_count}intervals'
@@ -75,9 +76,9 @@ def get_intervals(
     for idx in range(scatter_count):
         name = f'temp_{str(idx + 1).zfill(4)}_of_{scatter_count}'
         cmd += f"""
-    ln /io/batch/out/{name}/scattered.interval_list {j[f'{idx + 1}.interval_list']}
-    """
-    
+        ln /io/batch/out/{name}/scattered.interval_list {j[f'{idx + 1}.interval_list']}
+        """
+        
     j.command(wrap_command(cmd))
     if cache:
         for idx in range(scatter_count):

@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from cpg_pipes import Namespace, to_path
 from cpg_pipes.pipeline import create_pipeline
+from cpg_pipes.refdata import RefData
 from cpg_pipes.types import SequencingType
 
 try:
@@ -33,8 +34,6 @@ class TestPipeline(unittest.TestCase):
         self.tmp_bucket = self.out_bucket / 'tmp'
         self.local_tmp_dir = to_path(tempfile.mkdtemp())
         self.sample_ids = SAMPLES[:3]
-        self.hc_intervals_num = 10
-        self.jc_intervals_num = 10
 
     def tearDown(self) -> None:
         """
@@ -57,10 +56,6 @@ class TestPipeline(unittest.TestCase):
             namespace=Namespace.TEST,
             check_intermediates=False,
             check_expected_outputs=False,
-            config=dict(
-                hc_intervals_num=self.hc_intervals_num,
-                jc_intervals_num=self.jc_intervals_num,
-            ),
         )
         self.datasets = [pipeline.add_dataset(DATASET)]
         for ds in self.datasets:
@@ -117,15 +112,15 @@ class TestPipeline(unittest.TestCase):
             return len([line for line in lines if line.strip().startswith(item)])
 
         self.assertEqual(_cnt('bwa mem'), len(self.sample_ids) * 2)
-        self.assertEqual(_cnt('HaplotypeCaller'), len(self.sample_ids) * self.hc_intervals_num)
+        self.assertEqual(_cnt('HaplotypeCaller'), len(self.sample_ids) * RefData.number_of_haplotype_caller_intervals)
         self.assertEqual(_cnt('ReblockGVCF'), len(self.sample_ids))
-        self.assertEqual(_cnt('GenotypeGVCFs'), self.jc_intervals_num)
-        self.assertEqual(_cnt('GenomicsDBImport'), self.jc_intervals_num)
-        self.assertEqual(_cnt('MakeSitesOnlyVcf'), self.jc_intervals_num)
+        self.assertEqual(_cnt('GenotypeGVCFs'), RefData.number_of_joint_calling_intervals)
+        self.assertEqual(_cnt('GenomicsDBImport'), RefData.number_of_joint_calling_intervals)
+        self.assertEqual(_cnt('MakeSitesOnlyVcf'), RefData.number_of_joint_calling_intervals)
         self.assertEqual(_cnt('VariantRecalibrator'), 2)
         self.assertEqual(_cnt('ApplyVQSR'), 2)
         self.assertEqual(_cnt('GatherVcfsCloud'), 2)
-        self.assertEqual(_cnt('vep '), 1)
+        self.assertEqual(_cnt('vep '), RefData.number_of_vep_intervals)
         self.assertEqual(_cnt('vep_json_to_ht('), 1)
         self.assertEqual(_cnt('annotate_cohort('), 1)
         self.assertEqual(_cnt('annotate_dataset_mt('), len(self.datasets))

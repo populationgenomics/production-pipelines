@@ -33,7 +33,7 @@ def vep(
     tmp_bucket: Path,
     out_path: Path | None = None,
     overwrite: bool = False,
-    scatter_count: int | None = None,
+    scatter_count: int = RefData.number_of_vep_intervals,
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """
@@ -47,7 +47,6 @@ def vep(
     if out_path and utils.can_reuse(out_path, overwrite):
         return [b.new_job('VEP [reuse]', job_attrs)]
 
-    scatter_count = scatter_count or RefData.number_of_joint_calling_intervals
     jobs: list[Job] = []
     intervals_j, intervals = split_intervals.get_intervals(
         b=b,

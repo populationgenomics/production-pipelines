@@ -38,6 +38,5 @@ class VepStage(CohortStage):
             hail_bucket=self.hail_bucket,
             out_path=self.expected_outputs(cohort),
             tmp_bucket=self.tmp_bucket,
-            scatter_count=100,
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), jobs)

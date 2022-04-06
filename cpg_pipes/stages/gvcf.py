@@ -7,6 +7,7 @@ import hailtop.batch as hb
 
 from .. import Path
 from ..jobs import split_intervals, haplotype_caller
+from ..refdata import RefData
 from ..targets import Sample
 from ..pipeline import stage, SampleStage, StageInput, StageOutput
 from .cram import CramStage
@@ -32,7 +33,10 @@ class GvcfStage(SampleStage):
         """
         Use function from the jobs module
         """
-        hc_intervals_num = self.pipeline_config.get('hc_intervals_num', 1)
+        hc_intervals_num = self.pipeline_config.get(
+            'hc_intervals_num',
+            RefData.number_of_haplotype_caller_intervals,
+        )
         jobs = []
         if GvcfStage.hc_intervals is None and hc_intervals_num > 1:
             intervals_j, intervals = split_intervals.get_intervals(

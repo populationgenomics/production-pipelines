@@ -12,6 +12,7 @@ class RefData:
     """
     number_of_haplotype_caller_intervals = 50
     number_of_joint_calling_intervals = 50
+    number_of_vep_intervals = 50
     genome_build = 'GRCh38'
 
     def fasta_res_group(self, b, indices: list | None = None):

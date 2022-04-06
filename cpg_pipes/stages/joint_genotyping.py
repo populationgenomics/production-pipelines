@@ -6,6 +6,7 @@ import logging
 
 from .. import Path, to_path
 from .. import utils
+from ..refdata import RefData
 from ..types import GvcfPath
 from ..jobs.joint_genotyping import make_joint_genotyping_jobs, JointGenotyperTool
 from cpg_pipes.targets import Cohort
@@ -61,6 +62,11 @@ class JointGenotypingStage(CohortStage):
                 f'GVCFs, exiting'
             )
 
+        intervals_num = self.pipeline_config.get(
+            'jc_intervals_num',
+            RefData.number_of_joint_calling_intervals,
+        )
+        
         jobs = make_joint_genotyping_jobs(
             b=self.b,
             out_vcf_path=self.expected_outputs(cohort)['vcf'],
@@ -74,7 +80,7 @@ class JointGenotypingStage(CohortStage):
             tool=JointGenotyperTool.GnarlyGenotyper 
             if self.pipeline_config.get('use_gnarly', False) 
             else JointGenotyperTool.GenotypeGVCFs,
-            scatter_count=self.pipeline_config.get('jc_intervals_num')
+            scatter_count=intervals_num,
         )
         return self.make_outputs(
             cohort, 
