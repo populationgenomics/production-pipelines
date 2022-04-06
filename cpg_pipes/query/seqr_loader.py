@@ -189,27 +189,27 @@ def annotate_cohort(
             mt.sortedTranscriptConsequences, only_coding_genes=True
         ),
         clinvar_data=clinvar_ht[mt.row_key],
-        ref=ref_ht[mt.row_key],
+        ref_data=ref_ht[mt.row_key],
     )
     mt = mt.checkpoint(f'{checkpoints_bucket}/mt-vep-split-vqsr-round2.mt', _read_if_exists=not overwrite)
     logger.info(f'Written {checkpoints_bucket}/mt-vep-split-vqsr-round2.mt')
 
     logger.info('Annotating with seqr-loader fields: round 3')
     mt = mt.annotate_rows(
-        cadd=mt.ref.cadd,
-        dbnsfp=mt.ref.dbnsfp,
-        geno2mp=mt.ref.geno2mp,
-        gnomad_exomes=mt.ref.gnomad_exomes,
-        gnomad_exome_coverage=mt.ref.gnomad_exome_coverage,
-        gnomad_genomes=mt.ref.gnomad_genomes,
-        gnomad_genome_coverage=mt.ref.gnomad_genome_coverage,
-        eigen=mt.ref.eigen,
-        exac=mt.ref.exac,
-        g1k=mt.ref.g1k,
-        mpc=mt.ref.mpc,
-        primate_ai=mt.ref.primate_ai,
-        splice_ai=mt.ref.splice_ai,
-        topmed=mt.ref.topmed,
+        cadd=mt.ref_data.cadd,
+        dbnsfp=mt.ref_data.dbnsfp,
+        geno2mp=mt.ref_data.geno2mp,
+        gnomad_exomes=mt.ref_data.gnomad_exomes,
+        gnomad_exome_coverage=mt.ref_data.gnomad_exome_coverage,
+        gnomad_genomes=mt.ref_data.gnomad_genomes,
+        gnomad_genome_coverage=mt.ref_data.gnomad_genome_coverage,
+        eigen=mt.ref_data.eigen,
+        exac=mt.ref_data.exac,
+        g1k=mt.ref_data.g1k,
+        mpc=mt.ref_data.mpc,
+        primate_ai=mt.ref_data.primate_ai,
+        splice_ai=mt.ref_data.splice_ai,
+        topmed=mt.ref_data.topmed,
         clinvar=hl.struct(
             **{
                 'allele_id': mt.clinvar_data.info.ALLELEID,
