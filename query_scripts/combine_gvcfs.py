@@ -16,6 +16,7 @@ import click
 import hail as hl
 
 from cpg_pipes.hailquery import init_hail
+from cpg_pipes.refdata import RefData
 from cpg_pipes.utils import get_validation_callback
 from cpg_pipes import utils, version
 
@@ -77,7 +78,7 @@ def main(
         list(samples_df.gvcf_path),
         sample_names=list(samples_df.s),  # pylint: disable=no-member
         out_file=out_mt_path,
-        reference_genome=utils.DEFAULT_REF,
+        reference_genome=RefData.genome_build,
         use_genome_default_intervals=True,
         tmp_path=os.path.join(work_bucket, 'tmp'),
         overwrite=True,
