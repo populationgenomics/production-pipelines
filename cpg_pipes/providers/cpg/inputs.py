@@ -24,22 +24,26 @@ class SmdbInputProvider(InputProvider):
         super().__init__()
         self.db = db
 
-    def get_entries(self, dataset: Dataset | None = None) -> list[dict]:
+    def get_entries(self, dataset_name: str | None = None) -> list[dict]:
         """
         Return list of data entries.
         """
-        if dataset is None:
+        if dataset_name is None:
             raise InputProviderError(
-                'SmdbInputProvider: dataset must be provided for get_entries()'
+                'SmdbInputProvider: dataset_name must be provided for get_entries()'
             )
-        return self.db.get_sample_entries(dataset_name=dataset.name)
+        entries = self.db.get_sample_entries(dataset_name=dataset_name)
+        # Adding "dataset" into entries, needed for `self.get_dataset_name()`:
+        for e in entries:
+            e['dataset'] = dataset_name
+        return entries
 
-    def get_dataset_name(self, cohort: Cohort, entry: dict[str, str]) -> str:
+    def get_dataset_name(self, entry: dict) -> str:
         """
         Get name of the dataset. Not relevant for SMDB because we pull
         specific datasets by their names.
         """
-        raise NotImplementedError
+        return entry['dataset']
 
     def get_sample_id(self, entry: dict) -> str:
         """

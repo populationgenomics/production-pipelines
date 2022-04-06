@@ -10,10 +10,10 @@ import subprocess
 import time
 
 import click
-import pandas as pd
+import yaml
 from analysis_runner import dataproc
 
-from cpg_pipes import Path
+from cpg_pipes import Path, to_path
 from cpg_pipes import utils
 from cpg_pipes.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jobs
 from cpg_pipes.pipeline import (
@@ -86,6 +86,7 @@ class AnnotateDataset(DatasetStage):
         """
         Expected to generate a matrix table
         """
+        # return to_path('gs://cpg-seqr-main-tmp/seqr_loader/v0/AnnotateDataset/mt/a9a85a4ccbddc6403725f8de1e46a7f0960119_368/circa.mt')
         samples_hash = utils.hash_sample_ids(dataset.cohort.get_sample_ids())
         return (
             self.tmp_bucket /
@@ -133,6 +134,13 @@ class LoadToEsStage(DatasetStage):
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
+        if (
+            'output_datasets' in self.pipeline_config and 
+            dataset.name not in self.pipeline_config['output_datasets']
+        ):
+            # Skipping dataset that wasn't explicitly requested to upload to ES:
+            return self.make_outputs(dataset)
+
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset)
         version = time.strftime('%Y%m%d-%H%M%S')
         
@@ -168,12 +176,21 @@ def _read_es_password(
     password = os.environ.get('SEQR_ES_PASSWORD')
     if password:
         return password
-    cmd = f'gcloud secrets versions access {version_id} --secret {secret_id} --project {project_id}'
+    cmd = (
+        f'gcloud secrets versions access {version_id} '
+        f'--secret {secret_id} --project {project_id}'
+    )
     logger.info(cmd)
     return subprocess.check_output(cmd, shell=True).decode()
 
 
 @click.command()
+@click.option(
+    '--output-dataset',
+    'output_datasets',
+    multiple=True,
+    help=f'Datasets to load into Seqr',
+)
 @click.option(
     '--hc-intervals-num',
     'hc_intervals_num',
@@ -213,11 +230,11 @@ def _read_es_password(
 @click.option(
     '--exome-bed',
     'exome_bed',
-    type=str,
     help=f'BED file with exome regions',
 )
 @pipeline_click_options
 def main(
+    output_datasets: list[str],
     hc_intervals_num: int,
     jc_intervals_num: int,
     use_gnarly: bool,
@@ -229,9 +246,30 @@ def main(
     """
     Entry point, decorated by pipeline click options.
     """
+    # Parsing dataset names from the analysis-runner Seqr stack:
+    from urllib import request
+    seqr_stack_url = (
+        'https://raw.githubusercontent.com/populationgenomics/analysis-runner/main'
+        '/stack/Pulumi.seqr.yaml'
+    )
+    with request.urlopen(seqr_stack_url) as f:
+        value = yaml.safe_load(f)['config']['datasets:depends_on']
+        datasets = [d.strip('"') for d in value.strip('[] ').split(', ')]
+
+    kwargs['analysis_dataset'] = 'seqr'
+    kwargs['datasets'] = datasets
+
+    description = 'Seqr Loader'
+    if v := kwargs.get('version'):
+        description += f', {v}'
+    input_datasets = set(datasets) - set(kwargs.get('skip_datasets', []))
+    description += f': [{", ".join(input_datasets)}]'
+    if output_datasets:
+        description += f' → [{", ".join(output_datasets)}]'
+
     pipeline = create_pipeline(
         name='seqr_loader',
-        description='Seqr loader',
+        description=description,
         config=dict(
             ped_checks=ped_checks,
             hc_intervals_num=hc_intervals_num,
@@ -239,6 +277,7 @@ def main(
             use_gnarly=use_gnarly,
             use_as_vqsr=use_as_vqsr,
             exome_bed=exome_bed,
+            output_datasets=output_datasets,
         ),
         **kwargs,
     )

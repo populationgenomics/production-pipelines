@@ -34,6 +34,7 @@ class InputProvider(ABC):
         dataset_names: list[str] | None = None,
         skip_samples: list[str] | None = None,
         only_samples: list[str] | None = None,
+        skip_datasets: list[str] | None = None,
         ped_files: list[Path] | None = None,
         do_check_seq_existence: bool = False,
     ) -> Cohort:
@@ -44,22 +45,28 @@ class InputProvider(ABC):
         if dataset_names:
             # Specific datasets requested, so initialising them in advance.
             for ds_name in dataset_names:
-                dataset = cohort.add_dataset(ds_name)
+                if skip_datasets and ds_name in skip_datasets:
+                    logger.info(f'Requested to skipping dataset {ds_name}')
+                    continue
                 entries = self._get_entries(
-                    dataset=dataset,
+                    dataset_name=ds_name,
                     skip_samples=skip_samples,
                     only_samples=only_samples,
+                    skip_datasets=skip_datasets,
                 )
+                dataset = cohort.add_dataset(ds_name)
                 for entry in entries:
                     self._add_sample(dataset, entry)
 
         else:
             # We don't know dataset names in advance, so getting all entries.
             entries = self._get_entries(
-                skip_samples=skip_samples, only_samples=only_samples
+                skip_samples=skip_samples, 
+                only_samples=only_samples,
+                skip_datasets=skip_datasets,
             )
             for entry in entries:
-                ds_name = self.get_dataset_name(cohort, entry)
+                ds_name = self.get_dataset_name(entry) or cohort.analysis_dataset.name
                 dataset = cohort.add_dataset(ds_name)
                 self._add_sample(dataset, entry)
 
@@ -72,14 +79,14 @@ class InputProvider(ABC):
         return cohort
 
     @abstractmethod
-    def get_entries(self, dataset: Dataset | None = None) -> list[dict]:
+    def get_entries(self, dataset_name: str | None = None) -> list[dict]:
         """
         Overide this method to get a list of data entries (dicts).
         If dataset is not missing, it should be specific to a dataset.
         """
 
     @abstractmethod
-    def get_dataset_name(self, cohort: Cohort, entry: dict) -> str:
+    def get_dataset_name(self, entry: dict) -> str | None:
         """
         Get name of the dataset.
         """
@@ -170,18 +177,20 @@ class InputProvider(ABC):
 
     def _get_entries(
         self,
-        dataset: Dataset | None = None,
+        dataset_name: str | None = None,
         skip_samples: list[str] | None = None,
         only_samples: list[str] | None = None,
+        skip_datasets: list[str] | None = None,
     ) -> list[dict]:
         """
         Helper method to get and filter entries.
         """
-        entries = self.get_entries(dataset)
+        entries = self.get_entries(dataset_name)
         entries = self._filter_samples(
             entries=entries,
             skip_samples=skip_samples,
             only_samples=only_samples,
+            skip_datasets=skip_datasets,
         )
         return entries
 
@@ -190,6 +199,7 @@ class InputProvider(ABC):
         entries: list[dict[str, str]],
         skip_samples: list[str] | None = None,
         only_samples: list[str] | None = None,
+        skip_datasets: list[str] | None = None,
     ) -> list[dict[str, str]]:
         """
         Apply the only_samples and skip_samples filters.
@@ -198,14 +208,20 @@ class InputProvider(ABC):
         for entry in entries:
             cpgid = self.get_sample_id(entry)
             extid = self.get_external_id(entry)
+            ds = self.get_dataset_name(entry)
+            if skip_datasets and ds and ds in skip_datasets:
+                logger.info(
+                    f'Skipping sample (the dataset is skipped): {ds}|{cpgid}|{extid}'
+                )
+                continue
             if only_samples:
                 if cpgid in only_samples or extid in only_samples:
-                    logger.info(f'Picking sample: {cpgid}|{extid}')
+                    logger.info(f'Picking sample: {ds}|{cpgid}|{extid}')
                 else:
                     continue
             if skip_samples:
                 if cpgid in skip_samples or extid in skip_samples:
-                    logger.info(f'Skiping sample: {cpgid}|{extid}')
+                    logger.info(f'Skiping sample: {ds}|{cpgid}|{extid}')
                     continue
             filtered_entries.append(entry)
         return filtered_entries
@@ -257,25 +273,28 @@ class CsvInputProvider(InputProvider):
                 f'got: {self.d[0]}'
             )
 
-    def get_entries(self, dataset: Dataset | None = None) -> list[dict]:
+    def get_entries(self, dataset_name: str | None = None) -> list[dict]:
         """
         Return list of data entries. Optionally, specific for a dataset.
         """
         entries = self.d
-        if dataset:
+        if dataset_name:
             entries = [
                 e
                 for e in entries
-                if self.get_dataset_name(dataset.cohort, e) == dataset.name
+                if (
+                    not self.get_dataset_name(e) or 
+                    self.get_dataset_name(e) == dataset_name
+                )
             ]
         return entries
 
     # noinspection PyMethodMayBeStatic
-    def get_dataset_name(self, cohort: Cohort, entry: dict) -> str:
+    def get_dataset_name(self, entry: dict) -> str | None:
         """
         Get name of the dataset.
         """
-        return entry.get(FieldMap.dataset.value, cohort.analysis_dataset.name)
+        return entry.get(FieldMap.dataset.value)
 
     # noinspection PyMethodMayBeStatic
     def get_sample_id(self, entry: dict[str, str]) -> str:

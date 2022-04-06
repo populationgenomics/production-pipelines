@@ -1,8 +1,9 @@
 """
 Common pipeline command line options for "click".
 """
+import functools
 from enum import Enum
-from typing import Callable, Type, TypeVar
+from typing import Callable, Type, TypeVar, Any, Optional
 import click
 import click_config_file
 import yaml  # type: ignore
@@ -52,11 +53,19 @@ def pipeline_click_options(function: Callable) -> Callable:
     Decorator to use with click when writing a script that implements a pipeline.
     For example:
 
-    @click.command()
-    @click.argument('--custom-argument')
-    @pipeline_click_options
-    def main(custom_argument: str):
-        pass
+        @click.command()
+        @pipeline_click_options
+        def main(**kwargs):
+            pipeline = create_pipeline(**kwargs)
+        
+    You can add new options by just adding more click decorators 
+    before `@pipeline_click_options`:
+
+        @click.command()
+        @click.argument('--custom-argument')
+        @pipeline_click_options
+        def main(custom_argument: str):
+            pipeline = create_pipeline(**kwargs, config=dict(myarg=custom_argument))
     """
     options = [
         click.option(
@@ -70,12 +79,11 @@ def pipeline_click_options(function: Callable) -> Callable:
         click.option(
             '--analysis-dataset',
             'analysis_dataset',
-            required=True,
             help='Dataset name to write cohort and pipeline level intermediate files',
         ),
         click.option(
-            '--input-dataset',
-            'input_datasets',
+            '--dataset',
+            'datasets',
             multiple=True,
             help='Only read samples that belong to the dataset(s). '
                  'Can be set multiple times.',
@@ -98,6 +106,13 @@ def pipeline_click_options(function: Callable) -> Callable:
             help='Finish the pipeline after this stage',
         ),
         click.option(
+            '--skip-dataset',
+            '-D',
+            'skip_datasets',
+            multiple=True,
+            help='Don\'t process specified datasets. Can be set multiple times.',
+        ),
+        click.option(
             '--skip-sample',
             '-S',
             'skip_samples',
@@ -118,7 +133,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             help='Force reprocessing these samples. Can be set multiple times.',
         ),
         click.option(
-            '--version', '--output-version'
+            '--version', '--output-version',
             'version',
             type=str,
             help='Pipeline version. Default is a timestamp',
@@ -204,6 +219,7 @@ def pipeline_click_options(function: Callable) -> Callable:
                  'If not provided, a temp folder will be created'
         ),
     ]
+
     # Click shows options in a reverse order, so inverting the list back:
     options = options[::-1]
 
@@ -221,5 +237,4 @@ def pipeline_click_options(function: Callable) -> Callable:
         provider=yaml_provider,
         implicit=False,
     )(function)
-
     return function

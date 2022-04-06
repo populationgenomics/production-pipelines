@@ -33,8 +33,8 @@ logger = logging.getLogger(__file__)
 def create_pipeline(
     analysis_dataset: str,
     name: str,
-    description: str,
     namespace: Namespace,
+    description: str | None = None,
     storage_policy: StoragePolicy = StoragePolicy.CPG,
     cloud: Cloud = Cloud.GS,
     status_reporter_type: StatusReporterType = StatusReporterType.NONE,
@@ -50,7 +50,8 @@ def create_pipeline(
     first_stage: str | None = None,
     last_stage: str | None = None,
     config: dict | None = None,
-    input_datasets: list[str] | None = None,
+    datasets: list[str] | None = None,
+    skip_datasets: list[str] | None = None,
     skip_samples: list[str] | None = None,
     only_samples: list[str] | None = None,
     force_samples: list[str] | None = None,
@@ -94,11 +95,16 @@ def create_pipeline(
             )
         input_provider = CsvInputProvider(to_path(input_csv).open())
 
-    if version:
-        description += f' {version}'
-    if input_datasets:
-        description += ': ' + ', '.join(input_datasets)
-
+    if not description:
+        description = name
+        if version:
+            description += f' {version}'
+        if datasets:
+            datasets_ = set(datasets)
+            if skip_datasets:
+                datasets_ -= set(skip_datasets or [])
+            description += ': ' + ', '.join(datasets_)
+    
     tmp_bucket = to_path(
         cohort.analysis_dataset.get_tmp_bucket(version=(
             name + (f'/{version}' if version else '')
@@ -112,12 +118,13 @@ def create_pipeline(
         hail_bucket=hail_bucket,
     )
 
-    if input_datasets and input_provider:
+    if datasets and input_provider:
         input_provider.populate_cohort(
             cohort=cohort,
-            dataset_names=input_datasets,
+            dataset_names=datasets,
             skip_samples=skip_samples,
             only_samples=only_samples,
+            skip_datasets=skip_datasets,
             ped_files=ped_files,
         )
 
