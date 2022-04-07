@@ -55,7 +55,7 @@ def make_gvcfs():
         )
         jobs.append(subset_j)
     
-    pipeline.submit_batch(wait=True)     
+    pipeline.run(wait=True)     
 
 
 make_gvcfs()

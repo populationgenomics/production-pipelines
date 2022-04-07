@@ -130,7 +130,7 @@ class TestPipeline(unittest.TestCase):
         pipeline = self._setup_pipeline()
 
         with patch('builtins.print') as mock_print:
-            pipeline.submit_batch(dry_run=True)
+            pipeline.run(dry_run=True)
         
             # print() should be called only once:
             self.assertEqual(1, mock_print.call_count)
@@ -167,7 +167,7 @@ class TestPipeline(unittest.TestCase):
         pipeline = self._setup_pipeline(
             last_stage='AnnotateDataset'
         )
-        pipeline.submit_batch(dry_run=False, wait=True)
+        pipeline.run(dry_run=False, wait=True)
 
     def test_exome(self):
         """
@@ -177,7 +177,7 @@ class TestPipeline(unittest.TestCase):
             last_stage='AnnotateDataset',
             seq_type=SequencingType.EXOME,
         )
-        pipeline.submit_batch(dry_run=False, wait=True)
+        pipeline.run(dry_run=False, wait=True)
 
 
 if __name__ == '__main__':

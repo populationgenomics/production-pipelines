@@ -720,7 +720,7 @@ class Pipeline:
         self._stages_dict: dict[str, Stage] = dict()
         self._stages_in_order = stages or _ALL_DEFINED_STAGES
 
-    def submit_batch(
+    def run(
         self, 
         dry_run: bool | None = None,
         keep_scratch: bool | None = None,

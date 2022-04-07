@@ -28,7 +28,7 @@ def main(
         stages=[CramStage, GvcfStage],
         **kwargs,
     )
-    pipeline.submit_batch()
+    pipeline.run()
 
 
 if __name__ == '__main__':

@@ -40,7 +40,7 @@ def main():  # pylint: disable=missing-function-docstring
     for _ in range(16):
         add_storage_job(storage=185 // 4, ncpu=8, memory=30.0)
 
-    pipeline.submit_batch()
+    pipeline.run()
 
 
 if __name__ == '__main__':

@@ -150,7 +150,7 @@ class TestJobs(unittest.TestCase):
             out_bucket=self.out_bucket / 'align_fastq',
             jobs=jobs,
         )
-        self.pipeline.submit_batch(wait=True)     
+        self.pipeline.run(wait=True)     
         
         self.assertTrue((
             qc_bucket / 
@@ -190,7 +190,7 @@ class TestJobs(unittest.TestCase):
             out_bucket=self.out_bucket / 'align',
             jobs=jobs,
         )
-        self.pipeline.submit_batch(wait=True)
+        self.pipeline.run(wait=True)
 
         self.assertEqual(
             self.sample.id, 
@@ -228,7 +228,7 @@ class TestJobs(unittest.TestCase):
             sequencing_type=self.sequencing_type,
         )
         test_result_path = self._job_get_gvcf_header(out_gvcf_path, jobs)
-        self.pipeline.submit_batch(wait=True)     
+        self.pipeline.run(wait=True)     
         contents = _read_file(test_result_path)
         self.assertEqual(self.sample.id, contents.split()[-1])
 
@@ -259,7 +259,7 @@ class TestJobs(unittest.TestCase):
             sequencing_type=self.pipeline.cohort.get_sequencing_type(),
         )
         test_result_path = self._job_get_gvcf_header(out_vcf_path, jobs)
-        self.pipeline.submit_batch(wait=True)     
+        self.pipeline.run(wait=True)     
         self.assertTrue(utils.exists(out_vcf_path))
         self.assertTrue(utils.exists(out_siteonly_vcf_path))
         contents = _read_file(test_result_path)
@@ -289,7 +289,7 @@ class TestJobs(unittest.TestCase):
             sequencing_type=self.sequencing_type,
         )
         res_path = self._job_get_gvcf_header(out_vcf_path, jobs)
-        self.pipeline.submit_batch(wait=True)     
+        self.pipeline.run(wait=True)     
         self.assertTrue(utils.exists(out_vcf_path))
         contents = _read_file(res_path)
         self.assertEqual(0, len(contents.split()))  # site-only doesn't have any samples
@@ -331,7 +331,7 @@ class TestJobs(unittest.TestCase):
         self.pipeline.b.write_output(test_j.output, str(test_out_path))
 
         # Run Batch
-        self.pipeline.submit_batch(wait=True)
+        self.pipeline.run(wait=True)
 
         # Check results
         self.assertTrue(out_vcf_path.exists())
@@ -377,7 +377,7 @@ class TestJobs(unittest.TestCase):
         self.pipeline.b.write_output(test_j.output, str(test_out_path))
 
         # Run Batch
-        self.pipeline.submit_batch(wait=True)
+        self.pipeline.run(wait=True)
 
         # Check results
         self.assertTrue(out_path.exists())
@@ -401,7 +401,7 @@ class TestJobs(unittest.TestCase):
             hail_bucket=self.tmp_bucket,
             out_path=out_path,
         )
-        self.pipeline.submit_batch(wait=True)
+        self.pipeline.run(wait=True)
 
         import hail as hl
         init_batch(DATASET, self.tmp_bucket)
@@ -442,7 +442,7 @@ class TestJobs(unittest.TestCase):
             hail_billing_project=DATASET,
             hail_bucket=self.tmp_bucket,
         )
-        self.pipeline.submit_batch(wait=True)     
+        self.pipeline.run(wait=True)     
 
         # Testing
         import hail as hl
@@ -472,7 +472,7 @@ class TestJobs(unittest.TestCase):
             hail_billing_project=DATASET,
             hail_bucket=self.tmp_bucket,
         )
-        self.pipeline.submit_batch(wait=True)     
+        self.pipeline.run(wait=True)     
 
         # Testing
         self.assertTrue(utils.exists(out_mt_path))
@@ -496,4 +496,4 @@ class TestJobs(unittest.TestCase):
             samples_file=self.pipeline.b.read_input(str(inputs_bucket / 'somalier-samples.tsv')),
             pairs_file=self.pipeline.b.read_input(str(inputs_bucket / 'somalier-pairs.tsv')),
         )
-        self.pipeline.submit_batch(wait=True)
+        self.pipeline.run(wait=True)

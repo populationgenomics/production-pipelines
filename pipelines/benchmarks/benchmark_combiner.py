@@ -64,4 +64,4 @@ for n_workers in [10, 30, 20, 40, 50]:
             job_name=f'Combine {n_samples} GVCFs on {n_workers} workers',
         )
 
-pipe.submit_batch()
+pipe.run()

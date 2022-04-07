@@ -57,7 +57,7 @@ def main():
         for j in hc_jobs:
             j.depends_on(*align_jobs)
 
-    pipe.submit_batch()
+    pipe.run()
 
 
 if __name__ == '__main__':

@@ -39,7 +39,7 @@ def main(
                     f'Could not find CRAM, skipping sample {sample.id}'
                 )
                 sample.active = False
-    pipeline.submit_batch()
+    pipeline.run()
 
 
 if __name__ == '__main__':

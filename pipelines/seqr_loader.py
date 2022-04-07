@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Batch pipeline to load data into seqr.
+Seqr loading pipeline: FASTQ -> ElasticSearch index.
 """
 
 import logging
@@ -86,7 +86,6 @@ class AnnotateDataset(DatasetStage):
         """
         Expected to generate a matrix table
         """
-        return to_path(f'gs://cpg-seqr-main-tmp/seqr_loader/v0/AnnotateDataset/mt/a9a85a4ccbddc6403725f8de1e46a7f0960119_368/{dataset.name}.mt')
         samples_hash = utils.hash_sample_ids(dataset.cohort.get_sample_ids())
         return (
             self.tmp_bucket /
@@ -172,8 +171,7 @@ def _read_es_password(
     """
     Read a GCP secret storing the ES password
     """
-    password = os.environ.get('SEQR_ES_PASSWORD')
-    if password:
+    if password := os.environ.get('SEQR_ES_PASSWORD'):
         return password
     client = secretmanager.SecretManagerServiceClient()
     secret_path = client.secret_version_path(project_id, secret_id, 'latest')
@@ -243,7 +241,7 @@ def main(
     **kwargs,
 ):
     """
-    Entry point, decorated by pipeline click options.
+    Seqr loading pipeline: FASTQ -> ElasticSearch index.
     """
     if not datasets:
         # Parsing dataset names from the analysis-runner Seqr stack:
@@ -280,7 +278,7 @@ def main(
         ),
         **kwargs,
     )
-    pipeline.submit_batch()
+    pipeline.run()
 
 
 if __name__ == '__main__':

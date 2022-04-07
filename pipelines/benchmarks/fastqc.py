@@ -48,7 +48,7 @@ def main():  # pylint: disable=missing-function-docstring
             refs=pipe.refs,
         )
     
-    pipe.submit_batch()
+    pipe.run()
 
 
 if __name__ == '__main__':

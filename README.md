@@ -108,7 +108,7 @@ pipeline = create_pipeline(
     namespace=Namespace.TEST,
     analysis_dataset='fewgenomes',
 )
-pipeline.submit_batch()
+pipeline.run()
 ```
 
 ### Input sources
