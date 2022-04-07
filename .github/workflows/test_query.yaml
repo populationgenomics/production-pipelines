@@ -1,4 +1,4 @@
-name: Test individual jobs
+name: Test Query functions
 on: [workflow_dispatch]
 jobs:
   test_jobs:
@@ -33,8 +33,5 @@ jobs:
       - name: Install
         run: pip install dist/*
    
-      - name: Test individual jobs
-        run: python -m unittest tests.test_jobs
-
-      - name: Test pipelines
-        run: python -m unittest tests.test_pipeline
+      - name: Test
+        run: python -m unittest tests.test_query
