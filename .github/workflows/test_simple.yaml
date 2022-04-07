@@ -1,4 +1,4 @@
-name: Test Pipeline
+name: Simple tests
 on: [push, workflow_dispatch]
 jobs:
   test_pipeline:
