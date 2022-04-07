@@ -4,13 +4,13 @@ InputProvider implementation that pulls data from the sample-metadata database.
 
 import logging
 import traceback
+from functools import lru_cache
 
 from sample_metadata import ApiException
 
 from .smdb import SMDB, SmSequence
 from ..inputs import InputProvider, InputProviderError
-from ... import Path
-from ...targets import Dataset, Cohort, Sex, PedigreeInfo
+from ...targets import Cohort, Sex, PedigreeInfo
 
 logger = logging.getLogger(__file__)
 
@@ -56,13 +56,29 @@ class SmdbInputProvider(InputProvider):
         Get external sample ID from a sample dict.
         """
         return entry['external_id'].strip()
+    
+    @lru_cache
+    def _get_participant_id_map(self, dataset_name: str) -> dict[str, str]:
+        """
+        Returns map of participant IDs to internal CPG IDs.
+        """
+        pid_sid_multi = self.db.papi.get_external_participant_id_to_internal_sample_id(
+            dataset_name
+        )
+        sid_to_pid = {}
+        for group in pid_sid_multi:
+            pid = group[0]
+            for sid in group[1:]:
+                sid_to_pid[sid] = pid
+        return sid_to_pid
 
     def get_participant_id(self, entry: dict) -> str | None:
         """
         Get participant ID from a sample dict.
         """
-        res = entry.get('participant_id')
-        return res.strip() if res else None
+        sid_to_pid = self._get_participant_id_map(self.get_dataset_name(entry))
+        pid = sid_to_pid.get(self.get_sample_id(entry))
+        return pid.strip() if pid else None
 
     def get_participant_sex(self, entry: dict) -> Sex | None:
         """
