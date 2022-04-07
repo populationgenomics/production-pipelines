@@ -11,6 +11,7 @@ from sample_metadata import ApiException
 from .smdb import SMDB, SmSequence
 from ..inputs import InputProvider, InputProviderError
 from ...targets import Cohort, Sex, PedigreeInfo
+from ...types import SequencingType
 
 logger = logging.getLogger(__file__)
 
@@ -92,6 +93,19 @@ class SmdbInputProvider(InputProvider):
         """
         return entry.get('meta', {})
 
+    def get_sequencing_type(self, entry: dict) -> SequencingType:
+        """
+        Get sequencing type.
+        #TODO: use cached _get_seq_by_sid?
+        """
+
+    # @lru_cache
+    # def _get_seq_by_sid(self, sample_ids: list[str]):
+    #     seq_infos: list[dict] = self.db.seqapi.get_sequences_by_sample_ids(
+    #         sample_ids
+    #     )
+    #     return {seq['sample_id']: seq for seq in seq_infos}
+
     def populate_alignment_inputs(
         self,
         cohort: Cohort,
@@ -100,17 +114,12 @@ class SmdbInputProvider(InputProvider):
         """
         Populate sequencing inputs for samples.
         """
-        try:
-            seq_infos: list[dict] = self.db.seqapi.get_sequences_by_sample_ids(
-                [s.id for s in cohort.get_samples()]
-            )
-        except ApiException:
-            traceback.print_exc()
-            return
-
-        seq_info_by_sid = {seq['sample_id']: seq for seq in seq_infos}
+        seq_infos: list[dict] = self.db.seqapi.get_sequences_by_sample_ids(
+            cohort.get_sample_ids()
+        )
+        seq_by_sid = {seq['sample_id']: seq for seq in seq_infos}
         for sample in cohort.get_samples():
-            seq_info = seq_info_by_sid[sample.id]
+            seq_info = seq_by_sid[sample.id]
             seq = SmSequence.parse(seq_info, do_check_seq_existence)
             sample.alignment_input = seq.alignment_input
             sample.sequencing_type = seq.sequencing_type

@@ -8,7 +8,7 @@ from cpg_pipes import Namespace
 from cpg_pipes.targets import Cohort, Sex
 from cpg_pipes.providers.inputs import CsvInputProvider
 from cpg_pipes.providers.cpg import CpgStorageProvider
-
+from cpg_pipes.types import SequencingType
 
 DATASET = 'fewgenomes'
 SAMPLE1 = 'CPG01'
@@ -28,10 +28,10 @@ class TestInputProvider(unittest.TestCase):
 
     def test_csv_provider(self):
         tsv_contents = f"""\
-dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex
-{DATASET},{SAMPLE1},{EXTID1},{FQ.format(1, 1)}|{FQ.format(2, 1)},{FQ.format(2, 1)}|{FQ.format(2, 2)},,M
-{DATASET},{SAMPLE2},{EXTID2},,,{CRAM},
-{DATASET},{SAMPLE3},{EXTID3},,,,
+dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
+{DATASET},{SAMPLE1},{EXTID1},{FQ.format(1, 1)}|{FQ.format(2, 1)},{FQ.format(2, 1)}|{FQ.format(2, 2)},,M,wgs
+{DATASET},{SAMPLE2},{EXTID2},,,{CRAM},,wgs
+{DATASET},{SAMPLE3},{EXTID3},,,,,exome
         """.strip()
 
         with StringIO(tsv_contents) as fp:
@@ -59,10 +59,13 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex
         self.assertEqual(s1.external_id, EXTID1)
         self.assertEqual(len(s1.alignment_input), 2)
         self.assertEqual(s1.pedigree.sex, Sex.MALE)
+        self.assertEqual(s1.sequencing_type, SequencingType.WGS)
         s2 = ss[1]
         self.assertEqual(s2.external_id, EXTID2)
         self.assertTrue(s2.alignment_input.ext == 'cram')
         self.assertEqual(s2.pedigree.sex, Sex.UNKNOWN)
+        s3 = ss[2]
+        self.assertEqual(s3.sequencing_type, SequencingType.EXOME)
 
 
 if __name__ == '__main__':

@@ -122,6 +122,12 @@ class InputProvider(ABC):
         """
 
     @abstractmethod
+    def get_sequencing_type(self, entry: dict) -> SequencingType:
+        """
+        Populate sequencing type for a sample dict.
+        """
+
+    @abstractmethod
     def populate_alignment_inputs(
         self,
         cohort: Cohort,
@@ -253,7 +259,7 @@ class FieldMap(Enum):
     fqs_r2 = 'fqs_r2'
     cram = 'cram'
     sex = 'sex'
-    sequencing_type = 'sequencing_type'
+    sequencing_type = 'seq_type'
 
 
 class CsvInputProvider(InputProvider):
@@ -337,6 +343,12 @@ class CsvInputProvider(InputProvider):
         reserverd_fields = [f.value for f in FieldMap]
         return {k: v for k, v in entry.items() if k not in reserverd_fields}
 
+    def get_sequencing_type(self, entry: dict) -> SequencingType:
+        """
+        Get sequencing type.
+        """
+        return SequencingType.parse(entry[FieldMap.sequencing_type.value])
+
     def populate_analysis(self, cohort: Cohort) -> None:
         """
         Populate Analysis entries
@@ -394,9 +406,7 @@ class CsvInputProvider(InputProvider):
                         raise InputProviderError(f'CRAM {cram} does not exist')
                 d_by_sid[sid] = CramPath(cram)
 
-            seq_type_by_sid[sid] = SequencingType.parse(
-                entry.get(FieldMap.sequencing_type.value, None)
-            )
+            seq_type_by_sid[sid] = self.get_sequencing_type(entry)
 
         for sample in cohort.get_samples():
             sample.alignment_input = d_by_sid.get(sample.id)
