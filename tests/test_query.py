@@ -6,11 +6,12 @@ import shutil
 import tempfile
 import time
 import unittest
-import asyncio
+from unittest import skip
+
 import hail as hl
 
-from cpg_pipes import to_path
-from cpg_pipes.hailquery import init_batch
+from cpg_pipes import to_path, Namespace
+from cpg_pipes import hailquery
 from cpg_pipes.providers.cpg import CpgStorageProvider
 from cpg_pipes.query.seqr_loader import annotate_cohort, subset_mt_to_samples, \
     annotate_dataset_mt
@@ -42,7 +43,7 @@ class TestQuery(unittest.TestCase):
         self.local_tmp_dir = tempfile.mkdtemp()
         self.sequencing_type = SequencingType.WGS
         self.refs = RefData(CpgStorageProvider().get_ref_bucket())
-        init_batch(DATASET, self.tmp_bucket)
+        hailquery.init_batch(DATASET, self.tmp_bucket)
         # Interval to take on chr20:
         self.chrom = 'chr20'
         self.locus1 = '5111495'
@@ -143,3 +144,34 @@ class TestQuery(unittest.TestCase):
         self.assertSetEqual(
             set(mt.samples_ab['40_to_45'].collect()[0]), {'CPG196535'}
         )
+
+    @skip('Not implemented in Batch backend')
+    def test_vcf_combiner(self):
+        from cpg_pipes.targets import Cohort
+        dataset = Cohort(
+            analysis_dataset_name=DATASET,
+            namespace=Namespace.TEST,
+            storage_provider=CpgStorageProvider()
+        ).add_dataset(DATASET)
+        for sid in SAMPLES:
+            dataset.add_sample(sid)
+    
+        out_mt_path = self.out_bucket / 'combined.mt'
+        
+        hl.experimental.run_combiner(
+            [str(s.get_gvcf_path().path) for s in dataset.get_samples()],
+            sample_names=[s.id for s in dataset.get_samples()],
+            out_file=str(out_mt_path),
+            reference_genome=RefData.genome_build,
+            use_genome_default_intervals=True,
+            tmp_path=self.tmp_bucket,
+            overwrite=True,
+            key_by_locus_and_alleles=True,
+        )
+
+        mt = hl.read_matrix_table(out_mt_path)
+        logger.info(
+            f'Written {mt.cols().count()} samples to {out_mt_path}, '
+            f'n_partitions={mt.n_partitions()}'
+        )
+        self.assertSetEqual(set(mt.s.collect()), SAMPLES)

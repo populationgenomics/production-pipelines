@@ -85,9 +85,9 @@ class Cohort(Target):
     """
     def __init__(
         self, 
-        name: str,
-        namespace: Namespace,
         analysis_dataset_name: str,
+        namespace: Namespace,
+        name: str | None = None,
         storage_provider: StorageProvider | None = None,
     ):
         """
@@ -96,7 +96,7 @@ class Cohort(Target):
         dataset in case if it is also a part of the cohort datasets.
         """
         super().__init__()
-        self.name = name
+        self.name = name or analysis_dataset_name
         self.storage_provider = storage_provider
         self.analysis_dataset = Dataset(
             name=analysis_dataset_name, 
@@ -338,7 +338,7 @@ class Dataset(Target):
     def add_sample(
         self, 
         id: str,  # pylint: disable=redefined-builtin
-        external_id: str, 
+        external_id: str | None = None,
         participant_id: str | None = None,
         sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
@@ -420,8 +420,8 @@ class Sample(Target):
     def __init__(
         self,
         id: str,  # pylint: disable=redefined-builtin
-        external_id: str,
         dataset: 'Dataset',  # type: ignore  # noqa: F821
+        external_id: str | None = None,
         sequencing_type: SequencingType = SequencingType.WGS,
         participant_id: str | None = None,
         meta: dict | None = None,
@@ -431,7 +431,7 @@ class Sample(Target):
     ):
         super().__init__()
         self.id = id
-        self.external_id = external_id
+        self._external_id = external_id
         self.dataset = dataset
         self.sequencing_type = sequencing_type
         self._participant_id = participant_id
@@ -447,7 +447,8 @@ class Sample(Target):
 
     def __repr__(self):
         return (
-            f'Sample({self.dataset.name}/{self.id}|{self.external_id}' +
+            f'Sample({self.dataset.name}/{self.id}' +
+            (f'|{self._external_id}' if self._external_id else '') +
             (f', participant={self._participant_id}'
              if self._participant_id else '') +
             f', forced={self.forced}' +
@@ -469,16 +470,23 @@ class Sample(Target):
                     ai_tag = f'|SEQ=BAM'
             else:
                 ai_tag = f'|SEQ={len(self.alignment_input)}FQS'
-
-        return f'Sample({self.dataset.name}/{self.id}|{self.external_id}{ai_tag})'
+        
+        ext_id = f'|{self._external_id}' if self._external_id else ''
+        return f'Sample({self.dataset.name}/{self.id}{ext_id}{ai_tag})'
 
     @property
     def participant_id(self) -> str:
         """
-        Get participant's ID. 
-        Uses external_id whenever participant_id is not available in the DB
+        Get participant's ID corresponding to this sample.
         """
         return self._participant_id or self.external_id
+
+    @property
+    def external_id(self) -> str:
+        """
+        Get external sample ID. 
+        """
+        return self._external_id or self.id
 
     def get_ped_dict(self, use_participant_id: bool = False) -> dict[str, str]:
         """

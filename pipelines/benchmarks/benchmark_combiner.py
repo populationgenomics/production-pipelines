@@ -5,7 +5,6 @@ Benchmarking VCF combiner.
 """
 
 import logging
-from os.path import join
 import pandas as pd
 from analysis_runner import dataproc
 
@@ -22,22 +21,20 @@ BENCHMARK_BUCKET = to_path(
 )
 
 
-pipe = create_pipeline(
+pipeline = create_pipeline(
     analysis_dataset=INPUT_DATASET,
     name='benchmark_combiner',
     namespace=NAMESPACE,
     datasets=[INPUT_DATASET],
 )
 
-df = pd.DataFrame(
-    [
-        {'s': s.id, 'gvcf': s.get_gvcf_path()} 
-        for s in pipe.get_all_samples()
-        if s.get_gvcf_path().exists()
-    ]
-)
+df = pd.DataFrame([
+    {'s': s.id, 'gvcf': s.get_gvcf_path()} 
+    for s in pipeline.get_all_samples()
+    if s.get_gvcf_path().exists()
+])
 logger.info(
-    f'Found {len(df)}/{len(pipe.get_all_samples())} samples '
+    f'Found {len(df)}/{len(pipeline.get_all_samples())} samples '
     f'in {INPUT_DATASET} with GVCFs'
 )
 
@@ -53,7 +50,7 @@ for n_workers in [10, 30, 20, 40, 50]:
             subset_df.to_csv(fh, index=False, sep='\t', na_rep='NA')
 
         combiner_job = dataproc.hail_dataproc_job(
-            pipe.b,
+            pipeline.b,
             f'{utils.QUERY_SCRIPTS_DIR}/combine_gvcfs.py '
             f'--meta-csv {meta_csv_path} '
             f'--out-mt {out_mt_path} '
@@ -64,4 +61,4 @@ for n_workers in [10, 30, 20, 40, 50]:
             job_name=f'Combine {n_samples} GVCFs on {n_workers} workers',
         )
 
-pipe.run()
+pipeline.run()

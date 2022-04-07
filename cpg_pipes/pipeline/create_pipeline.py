@@ -67,9 +67,9 @@ def create_pipeline(
 
     storage_provider = CpgStorageProvider(cloud)
     cohort = Cohort(
-        name,
         analysis_dataset_name=analysis_dataset,
         namespace=namespace,
+        name=name,
         storage_provider=storage_provider
     )
     refs = RefData(storage_provider.get_ref_bucket())
