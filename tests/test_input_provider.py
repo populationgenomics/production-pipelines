@@ -30,8 +30,8 @@ class TestInputProvider(unittest.TestCase):
         tsv_contents = f"""\
 dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
 {DATASET},{SAMPLE1},{EXTID1},{FQ.format(1, 1)}|{FQ.format(2, 1)},{FQ.format(2, 1)}|{FQ.format(2, 2)},,M,wgs
-{DATASET},{SAMPLE2},{EXTID2},,,{CRAM},,wgs
-{DATASET},{SAMPLE3},{EXTID3},,,,,exome
+{DATASET},{SAMPLE2},{EXTID2},,,{CRAM},,exome
+{DATASET},{SAMPLE3},{EXTID3},,,,,wgs
         """.strip()
 
         with StringIO(tsv_contents) as fp:
@@ -48,24 +48,20 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
             do_check_seq_existence=False,
             skip_samples=[EXTID3],
         )
-        
-        dss = cohort.get_datasets()
-        self.assertEqual(len(dss), 1)
-        ds = dss[0]
+        self.assertEqual(len(cohort.get_datasets()), 1)
+        ds = cohort.get_datasets()[0]
         self.assertEqual(ds.name, f'{DATASET}-test')
-        ss = cohort.get_datasets()[0].get_samples()
-        self.assertEqual(len(ss), 2)
-        s1 = ss[0]
+        self.assertEqual(len(ds.get_samples()), 2)
+        s1 = ds.get_samples()[0]
         self.assertEqual(s1.external_id, EXTID1)
         self.assertEqual(len(s1.alignment_input), 2)
         self.assertEqual(s1.pedigree.sex, Sex.MALE)
         self.assertEqual(s1.sequencing_type, SequencingType.WGS)
-        s2 = ss[1]
+        s2 = ds.get_samples()[1]
         self.assertEqual(s2.external_id, EXTID2)
         self.assertTrue(s2.alignment_input.ext == 'cram')
         self.assertEqual(s2.pedigree.sex, Sex.UNKNOWN)
-        s3 = ss[2]
-        self.assertEqual(s3.sequencing_type, SequencingType.EXOME)
+        self.assertEqual(s2.sequencing_type, SequencingType.EXOME)
 
 
 if __name__ == '__main__':
