@@ -38,7 +38,7 @@ def create_pipeline(
     storage_policy: StoragePolicy = StoragePolicy.CPG,
     cloud: Cloud = Cloud.GS,
     status_reporter_type: StatusReporterType = StatusReporterType.NONE,
-    input_provider_type: InputProviderType = InputProviderType.NONE,
+    input_provider_type: InputProviderType = InputProviderType.SMDB,
     input_csv: str | None = None,
     stages: list[Callable[..., Stage]] | None = None,
     dry_run: bool = False,

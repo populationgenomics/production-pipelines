@@ -25,7 +25,7 @@ class VqsrStage(CohortStage):
         """
         samples_hash = utils.hash_sample_ids(cohort.get_sample_ids())
         return (
-            cohort.analysis_dataset.get_tmp_bucket() / 
+            self.tmp_bucket /
             'vqsr' / 
             f'{samples_hash}-siteonly.vcf.gz'
         )

@@ -5,37 +5,26 @@ Benchmarking VCF combiner.
 """
 
 import logging
-import sys
 from os.path import join
 import pandas as pd
 from analysis_runner import dataproc
-from sample_metadata.apis import (
-    AnalysisApi,
-    SampleApi,
-)
-from sample_metadata.models import (
-    SampleUpdateModel,
-)
 
 from cpg_pipes import utils, Namespace
 from cpg_pipes.pipeline import create_pipeline
-
-sapi = SampleApi()
-aapi = AnalysisApi()
 
 logger = logging.getLogger(__file__)
 
 # INPUT_DATASET = 'fewgenomes'
 INPUT_DATASET = 'tob-wgs'
 NAMESPACE = Namespace.MAIN
-BENCHMARK_BUCKET = f'gs://cpg-{INPUT_DATASET}-{NAMESPACE}-analysis/benchmark_combiner'
+BENCHMARK_BUCKET = f'gs://cpg-{INPUT_DATASET}-{NAMESPACE}-tmp/benchmark_combiner'
 
 
 pipe = create_pipeline(
     analysis_dataset=INPUT_DATASET,
     name='benchmark_combiner',
     namespace=NAMESPACE,
-    datasets=[INPUT_DATASET], 
+    datasets=[INPUT_DATASET],
 )
 
 df = pd.DataFrame(

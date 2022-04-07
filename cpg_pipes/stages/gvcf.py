@@ -33,17 +33,17 @@ class GvcfStage(SampleStage):
         """
         Use function from the jobs module
         """
-        hc_intervals_num = self.pipeline_config.get(
+        scatter_count = self.pipeline_config.get(
             'hc_intervals_num',
             RefData.number_of_haplotype_caller_intervals,
         )
         jobs = []
-        if GvcfStage.hc_intervals is None and hc_intervals_num > 1:
+        if GvcfStage.hc_intervals is None and scatter_count > 1:
             intervals_j, intervals = split_intervals.get_intervals(
                 b=self.b,
                 refs=self.refs,
                 sequencing_type=sample.sequencing_type,
-                scatter_count=hc_intervals_num,
+                scatter_count=scatter_count,
                 job_attrs=dict(stage=self.name),
             )
             jobs.append(intervals_j)
@@ -56,7 +56,7 @@ class GvcfStage(SampleStage):
             job_attrs=sample.get_job_attrs() | dict(stage=self.name),
             cram_path=sample.get_cram_path(),
             intervals=GvcfStage.hc_intervals,
-            number_of_intervals=hc_intervals_num,
+            number_of_intervals=scatter_count,
             refs=self.refs,
             tmp_bucket=sample.dataset.get_tmp_bucket(),
             overwrite=not self.check_intermediates,

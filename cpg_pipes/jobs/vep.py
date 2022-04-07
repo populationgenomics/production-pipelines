@@ -68,7 +68,7 @@ def vep(
         subset_j = subset_vcf(
             b,
             vcf=vcf,
-            intervals=intervals[idx],
+            interval=intervals[idx],
             refs=refs,
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
@@ -85,6 +85,7 @@ def vep(
             out_path=part_path,
             refs=refs,
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
+            overwrite=overwrite,
         )
         jobs.append(j)
         if to_hail_table:

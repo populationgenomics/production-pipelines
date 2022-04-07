@@ -63,7 +63,7 @@ def make_joint_genotyping_jobs(
             'at least one active sample'
         )
 
-    logger.info(f'Submitting joint-calling jobs.')
+    logger.info(f'Submitting joint-calling jobs')
 
     scatter_count = scatter_count or RefData.number_of_joint_calling_intervals
 

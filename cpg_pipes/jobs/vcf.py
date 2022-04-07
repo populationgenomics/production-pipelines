@@ -20,7 +20,7 @@ logger = logging.getLogger(__file__)
 def subset_vcf(
     b: hb.Batch,
     vcf: hb.ResourceGroup,
-    intervals: hb.Resource,
+    interval: hb.Resource,
     refs: RefData,
     job_attrs: dict | None = None,
     output_vcf_path: Path | None = None,
@@ -42,7 +42,7 @@ def subset_vcf(
     gatk SelectVariants \\
     -R {reference.base} \\
     -V {vcf['vcf.gz']} \\
-    -L {intervals} \\
+    -L {interval} \\
     -O {j.output_vcf['vcf.gz']}
     """
     j.command(wrap_command(

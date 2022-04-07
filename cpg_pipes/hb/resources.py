@@ -149,10 +149,6 @@ class MachineType:
             )
 
         if ncpu < MachineType.min_cpu:
-            logger.warning(
-                f'ncpu is adjusted: {ncpu} -> {MachineType.min_cpu}, '
-                f'to the minimal amount to request from an instance.'
-            )
             ncpu = MachineType.min_cpu
 
         # round to the nearest power of 2 (15 -> 16, 16 -> 16, 17 -> 32)

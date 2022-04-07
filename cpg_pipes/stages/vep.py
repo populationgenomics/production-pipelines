@@ -2,7 +2,7 @@
 VEP stage.
 """
 
-from cpg_pipes import Path
+from cpg_pipes import Path, utils
 from cpg_pipes.jobs import vep
 from cpg_pipes.pipeline import (
     stage,
@@ -10,6 +10,7 @@ from cpg_pipes.pipeline import (
     StageOutput,
     CohortStage
 )
+from cpg_pipes.refdata import RefData
 from cpg_pipes.stages.vqsr import VqsrStage
 from cpg_pipes.targets import Cohort
 
@@ -23,7 +24,8 @@ class VepStage(CohortStage):
         """
         Expected to write a matrix table.
         """
-        return cohort.analysis_dataset.get_tmp_bucket() / 'vep' / 'vep.ht'
+        samples_hash = utils.hash_sample_ids(cohort.get_sample_ids())
+        return cohort.analysis_dataset.get_tmp_bucket() / 'vep' / f'{samples_hash}.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
@@ -38,5 +40,9 @@ class VepStage(CohortStage):
             hail_bucket=self.hail_bucket,
             out_path=self.expected_outputs(cohort),
             tmp_bucket=self.tmp_bucket,
+            overwrite=not self.check_intermediates,
+            scatter_count=self.pipeline_config.get(
+                'vep_intervals_num', RefData.number_of_vep_intervals
+            ),
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), jobs)
