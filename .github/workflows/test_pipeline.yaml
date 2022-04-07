@@ -20,7 +20,7 @@ jobs:
 
       # Install gcloud, `setup-gcloud` automatically picks up authentication from `auth`
       - name: install gcloud
-        uses: google-github-actions/setup-gcloud@master
+        uses: google-github-actions/setup-gcloud@main
 
       - uses: actions/setup-python@v2
         with:
@@ -33,7 +33,10 @@ jobs:
         run: pip install dist/*
 
       - name: "Test pipelines"
-        run: python -m unittest tests/test_pipeline.py
+        run: python -m unittest tests.test_pipeline.TestPipeline.test_dry
 
       - name: "Test metadata provider"
-        run: python -m unittest tests/test_metadata_provider.py
+        run: python -m unittest tests.test_input_provider
+
+      - name: "Test metadata provider"
+        run: python -m unittest tests.test_pedigree

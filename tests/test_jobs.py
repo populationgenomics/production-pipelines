@@ -6,10 +6,8 @@ import shutil
 import tempfile
 import time
 import unittest
-from os.path import join
 from typing import Dict
 
-from analysis_runner import dataproc
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path, to_path, Namespace
@@ -22,6 +20,7 @@ from cpg_pipes.jobs.haplotype_caller import produce_gvcf
 from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
     JointGenotyperTool
 from cpg_pipes.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jobs
+from cpg_pipes.jobs.somalier import check_pedigree_job
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.pipeline import create_pipeline
 from cpg_pipes.types import CramPath, SequencingType
@@ -453,32 +452,6 @@ class TestJobs(unittest.TestCase):
         self.assertListEqual(mt.topmed.AC.collect(), [20555, 359, 20187])
         self.assertSetEqual(set(mt.geneIds.collect()[0]), {'ENSG00000089063'})
 
-    # def test_seqr_loader_annotate_dataset_seqr(self):
-    #     """
-    #     Test subset_mt.py script from seqr_loader.
-    #     """
-    #     dataset = 'seqr'
-    #     pipeline = create_pipeline(
-    #         name=self.name,
-    #         description=self.name,
-    #         analysis_dataset=dataset,
-    #         namespace=Namespace.MAIN,
-    #     )
-    #     cohort_mt_path = to_path('gs://cpg-seqr-main-tmp/mt/combined.mt')
-    #     dataset_mt_path = to_path(f'gs://cpg-circa-main-analysis/mt/circa-{self.timestamp}.mt')
-    #     samples = ['CPG200675', 'CPG200642', 'CPG200501', 'CPG200527', 'CPG200519', 'CPG200410', 'CPG200477', 'CPG200485', 'CPG200493', 'CPG200444', 'CPG200428', 'CPG200451', 'CPG200436', 'CPG200659', 'CPG200667', 'CPG200535', 'CPG200543', 'CPG200550', 'CPG200584', 'CPG200568', 'CPG200592', 'CPG200600', 'CPG200626', 'CPG200618', 'CPG200683']
-    #     tmp_bucket = to_path('gs://cpg-seqr-main-tmp')
-    #     annotate_dataset(
-    #         b=pipeline.b,
-    #         mt_path=cohort_mt_path,
-    #         sample_ids=samples,
-    #         tmp_bucket=tmp_bucket,
-    #         output_mt_path=dataset_mt_path,
-    #         hail_billing_project=dataset,
-    #         hail_bucket=tmp_bucket,
-    #     )
-    #     pipeline.submit_batch(wait=False)
-
     def test_seqr_loader_annotate_dataset(self):
         """
         Test subset_mt.py script from seqr_loader.
@@ -515,67 +488,12 @@ class TestJobs(unittest.TestCase):
             set(mt.samples_ab['40_to_45'].collect()[0]), {'CPG196535'}
         )
 
-    def test_seqr_loader_load_to_es(self):
-        """
-        Assuming variants are called and VQSR'ed, tests loading
-        into a matrix table and annotation for Seqr
-        """
-        vcf_path = (
-            'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
-            'joint-called.vcf.gz'
-        )
-        vqsr_vcf_path = (
-            'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
-            'vqsr.vcf.gz'
-        )
-        
-        cohort_mt_path = f'{self.out_bucket}/seqr_loader/cohort.mt'
-        dataset_mt_path = f'{self.out_bucket}/seqr_loader/dataset.mt'
-        dataset_vcf_path = f'{self.out_bucket}/seqr_loader/dataset.vcf.bgz'
-
-        cluster = dataproc.setup_dataproc(
+    def test_check_pedigree(self):
+        inputs_bucket = BASE_BUCKET / 'inputs' / 'check_pedigree'
+        check_pedigree_job(
             self.pipeline.b,
-            cluster_name='Test seqr loader',
-            max_age='1h',
-            packages=utils.DATAPROC_PACKAGES,
-            num_secondary_workers=10,
-            # default VEP initialization script (used with --vep) installs VEP=v95,
-            # but we need v105, so we use a modified vep-GRCh38.sh (with --init) from
-            # this repo: production-pipelines/vep/vep-GRCh38.sh
-            init=['gs://cpg-reference/vep/vep-GRCh38.sh'], 
-            scopes=['cloud-platform'],
+            sample_map_file=self.pipeline.b.read_input(str(inputs_bucket / 'sample-map.tsv')),
+            samples_file=self.pipeline.b.read_input(str(inputs_bucket / 'somalier-samples.tsv')),
+            pairs_file=self.pipeline.b.read_input(str(inputs_bucket / 'somalier-pairs.tsv')),
         )
-        vcf_to_mt_j = cluster.add_job(
-            f'{join("..", utils.QUERY_SCRIPTS_DIR, "seqr", "vcf_to_mt.py")} '
-            f'--vcf-path {vcf_path} '
-            f'--site-only-vqsr-vcf-path {vqsr_vcf_path} '
-            f'--dest-mt-path {cohort_mt_path} '
-            f'--bucket {self.out_bucket}/seqr_loader '
-            f'--disable-validation '
-            f'--make-checkpoints',
-            job_name='Make MT and annotate cohort',
-        )
-        mt_to_datasetmt_j = cluster.add_job(
-            f'{join("..", utils.QUERY_SCRIPTS_DIR, "seqr", "subset_mt.py")} '
-            f'--mt-path {cohort_mt_path} '
-            f'--out-mt-path {dataset_mt_path}',
-            job_name=f'Annotate dataset',
-        )
-        mt_to_datasetmt_j.depends_on(vcf_to_mt_j)
-        datasetmt_to_es_j = cluster.add_job(
-            f'{join("..", utils.QUERY_SCRIPTS_DIR, "seqr", "mt_to_es.py")} '
-            f'--mt-path {dataset_mt_path} '
-            f'--es-index test-{self.timestamp} '
-            f'--es-index-min-num-shards 1',
-            job_name=f'Create ES index',
-        )
-        datasetmt_to_es_j.depends_on(mt_to_datasetmt_j)
-        datasetmt_to_vcf_j = cluster.add_job(
-            f'{join("..", utils.QUERY_SCRIPTS_DIR, "seqr", "mt_to_vcf.py")} '
-            f'--mt-path {dataset_mt_path} '
-            f'--out-vcf-path {dataset_vcf_path}',
-            job_name=f'Convert to VCF',
-        )
-        datasetmt_to_vcf_j.depends_on(mt_to_datasetmt_j)
-        self.pipeline.submit_batch(wait=True)     
-        self.assertTrue(utils.exists(dataset_vcf_path))
+        self.pipeline.submit_batch(wait=True)
