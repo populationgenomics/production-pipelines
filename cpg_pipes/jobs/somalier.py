@@ -88,7 +88,8 @@ def _make_sample_map(dataset: Dataset):
     df = pd.DataFrame([
         {'id': s.id, 'pid': s.participant_id} for s in dataset.get_samples()
     ])
-    df.to_csv(str(sample_map_fpath), sep='\t', index=False, header=False)
+    with sample_map_fpath.open('w') as fp:
+        df.to_csv(fp, sep='\t', index=False, header=False)
     return sample_map_fpath
 
 
@@ -298,7 +299,6 @@ def _relate(
     out_pairs_path: Path | None = None,
     out_html_path: Path | None = None,
     out_html_url: str | None = None,
-    dry_run: bool = False,
 ) -> Job:
     j = b.new_job(
         'Somalier relate' + (f' {label}' if label else ''),
@@ -318,8 +318,8 @@ def _relate(
         if sample.pedigree:
             datas.append(sample.pedigree.get_ped_dict())
     df = pd.DataFrame(datas)
-    if not dry_run:
-        df.to_csv(str(ped_fpath), sep='\t', index=False)
+    with ped_fpath.open('w') as fp:
+        df.to_csv(fp, sep='\t', index=False)
     ped_file = b.read_input(str(ped_fpath))
     input_files_lines = ''
     for sample in dataset.get_samples():

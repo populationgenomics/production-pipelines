@@ -8,7 +8,6 @@ import tempfile
 
 import click
 import pandas as pd
-from typing import Optional
 
 from cpg_pipes import Path, Namespace, to_path
 from cpg_pipes.pipeline.cli_opts import choice_from_enum, val_to_enum
@@ -78,7 +77,8 @@ def _make_seqr_metadata_files(
         'cpg_id': s.id,
         'individual_id': s.external_id,
     } for s in dataset.get_samples())
-    df.to_csv(str(samplemap_bucket_path), sep=',', index=False, header=False)
+    with samplemap_bucket_path.open('w') as fh:
+        df.to_csv(fh, sep=',', index=False, header=False)
 
     # IGV
     df = pd.DataFrame({
@@ -86,7 +86,8 @@ def _make_seqr_metadata_files(
         'cram_path': s.get_cram_path(),
         'cram_sample_id': s.id,
     } for s in dataset.get_samples() if s.get_cram_path())
-    df.to_csv(str(igv_paths_path), sep='\t', index=False, header=False)
+    with igv_paths_path.open('w') as fh:
+        df.to_csv(fh, sep='\t', index=False, header=False)
 
     logger.info(f'{dataset.name} sample map: {samplemap_bucket_path}')
     logger.info(f'{dataset.name} IGV paths: {igv_paths_path}')

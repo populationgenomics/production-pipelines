@@ -9,7 +9,7 @@ from os.path import join
 import pandas as pd
 from analysis_runner import dataproc
 
-from cpg_pipes import utils, Namespace
+from cpg_pipes import utils, Namespace, to_path
 from cpg_pipes.pipeline import create_pipeline
 
 logger = logging.getLogger(__file__)
@@ -17,7 +17,9 @@ logger = logging.getLogger(__file__)
 # INPUT_DATASET = 'fewgenomes'
 INPUT_DATASET = 'tob-wgs'
 NAMESPACE = Namespace.MAIN
-BENCHMARK_BUCKET = f'gs://cpg-{INPUT_DATASET}-{NAMESPACE}-tmp/benchmark_combiner'
+BENCHMARK_BUCKET = to_path(
+    f'gs://cpg-{INPUT_DATASET}-{NAMESPACE}-tmp/benchmark_combiner'
+)
 
 
 pipe = create_pipeline(
@@ -42,12 +44,13 @@ logger.info(
 for n_workers in [10, 30, 20, 40, 50]:
     for n_samples in [100, 200, 300, 400, 500]:
         label = f'nsamples-{n_samples}-nworkers-{n_workers}'
-        out_mt_path = join(BENCHMARK_BUCKET, label, 'combined.mt')
+        out_mt_path = BENCHMARK_BUCKET / label / 'combined.mt'
 
-        meta_csv_path = join(BENCHMARK_BUCKET, label, 'meta.csv')
+        meta_csv_path = BENCHMARK_BUCKET / label / 'meta.csv'
         subset_df = df.sample(n=n_samples)
         logger.info(f'Subset dataframe to {len(subset_df)} samples')
-        subset_df.to_csv(meta_csv_path, index=False, sep='\t', na_rep='NA')
+        with meta_csv_path.open('w') as fh:
+            subset_df.to_csv(fh, index=False, sep='\t', na_rep='NA')
 
         combiner_job = dataproc.hail_dataproc_job(
             pipe.b,

@@ -221,9 +221,9 @@ def _parse_inputs(
             '#sample_a': sample_map,
             'sample_b': sample_map,
         })
-    f = StringIO()
-    df.to_csv(f, sep='\t', index=False)
-    ped = Ped(StringIO(f.getvalue()))
+    fp = StringIO()
+    df.to_csv(fp, sep='\t', index=False)
+    ped = Ped(StringIO(fp.getvalue()))
     return ped, df, pairs_df
 
 

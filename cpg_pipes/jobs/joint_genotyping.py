@@ -201,7 +201,8 @@ def genomicsdb(
         'id': s.id, 
         'path': str(gvcf_by_sid[s.id].path)
     } for s in samples])
-    df.to_csv(str(sample_map_bucket_path), index=False, header=False, sep='\t')
+    with sample_map_bucket_path.open('w') as fp:
+        df.to_csv(fp, index=False, header=False, sep='\t')
 
     out_paths = []
     jobs = []
