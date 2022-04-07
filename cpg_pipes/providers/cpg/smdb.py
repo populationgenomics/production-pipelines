@@ -351,7 +351,7 @@ class SMDB:
             return None
 
     def get_ped_entries(self, dataset_name: str) -> list[dict[str, str]]:
-        """ 
+        """
         Retrieve ped lines for a specified SM Project, with internal CPG IDs.
         """
 
@@ -361,47 +361,10 @@ class SMDB:
             internal_family_ids=family_ids,
             response_type='json',
             project=dataset_name,
-            replace_with_participant_external_ids=True,
+            replace_with_participant_external_ids=False,
         )
-
-        pid_sid_map = self._get_pid_sid_map(dataset_name)
-
-        # Replace External Participant IDs with internal CPG IDs.
-        # Assumes 1:1 Relationship.
-        for entry in ped_entries:
-            if entry['individual_id'] != '':
-                if entry['individual_id'] not in pid_sid_map:
-                    logger.error(
-                        f"{entry['individual_id']} not in participants: "
-                        f"{', '.join(pid_sid_map.keys())}"
-                    )
-                    continue
-                entry['individual_id'] = pid_sid_map[entry['individual_id']]
-
-            if entry['maternal_id'] != '':
-                entry['maternal_id'] = pid_sid_map[entry['maternal_id']]
-
-            if entry['paternal_id'] != '':
-                entry['paternal_id'] = pid_sid_map[entry['paternal_id']]
 
         return ped_entries
-
-    def _get_pid_sid_map(self, dataset_name: str) -> dict[str, str]:
-        """
-        Returns map of participant IDs to internal CPG IDs.
-        """
-
-        pid_sid_multi = self.papi.get_external_participant_id_to_internal_sample_id(
-            dataset_name
-        )
-
-        pid_sid_single = {}
-        for group in pid_sid_multi:
-            participant = group[0]
-            for sample in group[1:]:
-                pid_sid_single[participant] = sample
-
-        return pid_sid_single
 
 
 @dataclass
