@@ -92,28 +92,6 @@ def main(
     )
 
     mt = hl.read_matrix_table(mt_path)
-    
-    # TODO: Temporary fixes. Remove these:
-    mt = mt.annotate_rows(
-        # AS_VQSLOD can be "Infinity" for indels , e.g.:
-        # AS_VQSLOD=30.0692,18.2979,Infinity,17.5854,42.2131,1.5013
-        # gs://cpg-seqr-main-tmp/seqr_loader/v0/AnnotateCohort/seqr_loader/checkpoints
-        # /vqsr.ht
-        # ht = hl.filter_intervals(ht, [hl.parse_locus_interval('chrX:52729395-52729396')])
-        # hl.float() correctly parses this value, however, seqr loader doesn't 
-        # recognise it, so we need to replace it with zero:
-        info=mt.info.annotate(
-            AS_VQSLOD=hl.if_else(
-                hl.is_infinite(mt.info.AS_VQSLOD),
-                0.0,
-                mt.info.AS_VQSLOD,
-            )
-        ),
-        # Seqr doesn't recognise PASS value in filters as pass, so need to remove it
-        filters=mt.filters.filter(lambda val: val != 'PASS'),
-        ref=mt.alleles[0],
-    )
-
     logger.info('Getting rows and exporting to the ES')
     row_table = elasticsearch_row(mt)
     es_shards = _mt_num_shards(mt, es_index_min_num_shards)
