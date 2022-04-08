@@ -107,12 +107,9 @@ class SMDB:
     Communication with the SampleMetadata database.
     """
 
-    def __init__(
-        self,
-        analysis_dataset: str,
-    ):
+    def __init__(self, project_name: str | None = None):
         """
-        @param analysis_dataset: dataset where to create the "analysis" entries.
+        @param project_name: default SMDB project name.
         """
         self.sapi = SampleApi()
         self.aapi = AnalysisApi()
@@ -120,25 +117,27 @@ class SMDB:
         self.seqapi = SequenceApi()
         self.papi = ParticipantApi()
         self.fapi = FamilyApi()
-        self.analysis_dataset = analysis_dataset
+        self.project_name = project_name
 
     def get_sample_entries(
         self,
-        dataset_name: str,
+        project_name: str | None = None,
     ) -> list[dict]:
         """
         Get Sample entries and apply `skip_samples` and `only_samples` filters.
         This is a helper method; use public `populate_dataset` to parse samples.
         """
-        logger.info(f'Finding samples for dataset {dataset_name}...')
+        project_name = project_name or self.project_name
+
+        logger.info(f'Finding samples for dataset {project_name}...')
         sample_entries = self.sapi.get_samples(
             body_get_samples_by_criteria_api_v1_sample_post={
-                'project_ids': [dataset_name],
+                'project_ids': [project_name],
                 'active': True,
             }
         )
         logger.info(
-            f'Finding samples for dataset {dataset_name}: '
+            f'Finding samples for project {project_name}: '
             f'found {len(sample_entries)}'
         )
         return sample_entries
@@ -159,13 +158,14 @@ class SMDB:
     def find_joint_calling_analysis(
         self,
         sample_ids: list[str],
+        project_name: str | None = None,
     ) -> Analysis | None:
         """
         Query the DB to find the last completed joint-calling analysis for the samples
         """
         try:
             data = self.aapi.get_latest_complete_analysis_for_type(
-                project=self.analysis_dataset,
+                project=project_name or self.project_name,
                 analysis_type=models.AnalysisType('joint-calling'),
             )
         except ApiException:
@@ -184,23 +184,24 @@ class SMDB:
         sample_ids: list[str],
         analysis_type: AnalysisType,
         analysis_status: AnalysisStatus = AnalysisStatus.COMPLETED,
-        dataset: str | None = None,
         meta: dict | None = None,
+        project_name: str | None = None,
     ) -> dict[str, Analysis]:
         """
         Query the DB to find the last completed analysis for the type and samples,
         one Analysis object per sample. Assumes the analysis is defined for a single
         sample (e.g. cram, gvcf)
         """
-        dataset = dataset or self.analysis_dataset
+        project_name = project_name or self.project_name
+
         analysis_per_sid: dict[str, Analysis] = dict()
 
         logger.info(
-            f'Querying {analysis_type} analysis entries for dataset {dataset}...'
+            f'Querying {analysis_type} analysis entries for dataset {project_name}...'
         )
         datas = self.aapi.query_analyses(
             models.AnalysisQueryModel(
-                projects=[dataset],
+                projects=[project_name],
                 sample_ids=sample_ids,
                 type=models.AnalysisType(analysis_type.value),
                 status=models.AnalysisStatus(analysis_status.value),
@@ -217,7 +218,8 @@ class SMDB:
             assert len(a.sample_ids) == 1, data
             analysis_per_sid[list(a.sample_ids)[0]] = a
         logger.info(
-            f'Querying {analysis_type} analysis entries for dataset {dataset}: found {len(analysis_per_sid)}'
+            f'Querying {analysis_type} analysis entries for dataset {project_name}: '
+            f'found {len(analysis_per_sid)}'
         )
         return analysis_per_sid
 
@@ -227,11 +229,13 @@ class SMDB:
         type_: str | AnalysisType,
         status: str | AnalysisStatus,
         sample_ids: list[str],
-        dataset_name: str | None = None,
+        project_name: str | None = None,
     ) -> int | None:
         """
         Tries to create an Analysis entry, returns its id if successfuly
         """
+        project_name = project_name or self.project_name
+
         if isinstance(type_, AnalysisType):
             type_ = type_.value
         if isinstance(status, AnalysisStatus):
@@ -245,7 +249,7 @@ class SMDB:
         )
         try:
             aid = self.aapi.create_new_analysis(
-                project=dataset_name or self.analysis_dataset, analysis_model=am
+                project=project_name, analysis_model=am
             )
         except ApiException:
             traceback.print_exc()
@@ -262,7 +266,7 @@ class SMDB:
         completed_analysis: Analysis | None,
         analysis_type: str,
         expected_output_fpath: Path,
-        dataset_name: str | None = None,
+        project_name: str | None = None,
     ) -> Path | None:
         """
         Checks whether existing analysis exists, and output matches the expected output
@@ -277,7 +281,7 @@ class SMDB:
         @param analysis_type: cram, gvcf, joint_calling
         @param expected_output_fpath: where the pipeline expects the analysis output
         file to sit on the bucket (will invalidate the analysis when it doesn't match)
-        @param dataset_name: the name of the dataset where to create a new analysis
+        @param project_name: the name of the project where to create a new analysis
         @return: path to the output if it can be reused, otherwise None
         """
         label = f'type={analysis_type}'
@@ -338,7 +342,7 @@ class SMDB:
                 output=expected_output_fpath,
                 status='completed',
                 sample_ids=sample_ids,
-                dataset_name=dataset_name,
+                project_name=project_name or self.project_name,
             )
             return expected_output_fpath
 
@@ -350,18 +354,19 @@ class SMDB:
             )
             return None
 
-    def get_ped_entries(self, dataset_name: str) -> list[dict[str, str]]:
+    def get_ped_entries(self, project_name: str | None = None) -> list[dict[str, str]]:
         """
-        Retrieve ped lines for a specified SM Project, with internal CPG IDs.
+        Retrieve PED lines for a specified SM project, with external participant IDs.
         """
+        project_name = project_name or self.project_name
 
-        families = self.fapi.get_families(dataset_name)
+        families = self.fapi.get_families(project_name)
         family_ids = [family['id'] for family in families]
         ped_entries = self.fapi.get_pedigree(
             internal_family_ids=family_ids,
             response_type='json',
-            project=dataset_name,
-            replace_with_participant_external_ids=False,
+            project=project_name,
+            replace_with_participant_external_ids=True,
         )
 
         return ped_entries

@@ -97,9 +97,10 @@ class Cohort(Target):
         """
         super().__init__()
         self.name = name or analysis_dataset_name
+        self.namespace = namespace,
         self.storage_provider = storage_provider
         self.analysis_dataset = Dataset(
-            name=analysis_dataset_name, 
+            name=analysis_dataset_name,
             cohort=self,
             namespace=namespace,
             storage_provider=self.storage_provider,
@@ -340,6 +341,7 @@ class Dataset(Target):
         id: str,  # pylint: disable=redefined-builtin
         external_id: str | None = None,
         participant_id: str | None = None,
+        sequencing_type: SequencingType | None = None,
         sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
         meta: dict | None = None,
@@ -353,12 +355,13 @@ class Dataset(Target):
 
         s = Sample(
             id=id, 
+            dataset=self,
             external_id=external_id,
+            sequencing_type=sequencing_type,
             participant_id=participant_id,
+            meta=meta,
             sex=sex,
             pedigree=pedigree,
-            dataset=self,
-            meta=meta,
         )
         self._sample_by_id[id] = s
         return s
@@ -422,7 +425,7 @@ class Sample(Target):
         id: str,  # pylint: disable=redefined-builtin
         dataset: 'Dataset',  # type: ignore  # noqa: F821
         external_id: str | None = None,
-        sequencing_type: SequencingType = SequencingType.WGS,
+        sequencing_type: SequencingType | None = None,
         participant_id: str | None = None,
         meta: dict | None = None,
         sex: Sex | None = None,
@@ -433,7 +436,7 @@ class Sample(Target):
         self.id = id
         self._external_id = external_id
         self.dataset = dataset
-        self.sequencing_type = sequencing_type
+        self.sequencing_type = sequencing_type or SequencingType.UNKNOWN
         self._participant_id = participant_id
         self.meta: dict = meta or dict()
         self.pedigree: PedigreeInfo | None = pedigree
@@ -477,14 +480,22 @@ class Sample(Target):
     @property
     def participant_id(self) -> str:
         """
-        Get participant's ID corresponding to this sample.
+        Get ID of participant corresponding to this sample, 
+        or substitute it with external ID.
         """
         return self._participant_id or self.external_id
+
+    @participant_id.setter
+    def participant_id(self, val: str):
+        """
+        Set participant ID.
+        """
+        self._participant_id = val
 
     @property
     def external_id(self) -> str:
         """
-        Get external sample ID. 
+        Get external sample ID, or substitute it with the internal ID.
         """
         return self._external_id or self.id
 

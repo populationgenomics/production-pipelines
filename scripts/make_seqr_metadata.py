@@ -47,12 +47,10 @@ def main(
     """
     Generate sample map to upload a dataset to Seqr
     """
-    analysis_dataset = 'seqr'
-    input_provider = SmdbInputProvider(SMDB(analysis_dataset))
+    input_provider = SmdbInputProvider(SMDB())
     cohort = input_provider.populate_cohort(
         cohort=Cohort(
-            name=analysis_dataset,
-            analysis_dataset_name=analysis_dataset,
+            analysis_dataset_name='seqr',
             namespace=namespace,
             storage_provider=CpgStorageProvider(cloud)
         ),

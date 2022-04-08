@@ -11,7 +11,7 @@
 # 8. E227 (missing whitespace around bitwise or shift operator)
 # 9. E125 (continuation line with same indent as next logical line - covered by PyCharm)
 # 10. F401 imported but unused (covered by PyCharm)
-extend-ignore: F541,E203,Q003,E501,W291,W293,E227,E125,F401,B019
+extend-ignore: F541,E203,Q003,E501,W291,W293,E227,E125,F401
 
 # Maximum number of characters on a single line. Default for black, see:
 # https://black.readthedocs.io/en/stable/the_black_code_style.html#line-length

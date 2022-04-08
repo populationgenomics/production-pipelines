@@ -142,6 +142,7 @@ class SequencingType(Enum):
     WGS = 'wgs'
     EXOME = 'exome'
     SINGLE_CELL = 'single-cell'
+    UNKNOWN = 'unknown'
 
     @staticmethod
     def parse(val: str) -> 'SequencingType':
