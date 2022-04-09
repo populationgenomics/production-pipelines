@@ -1,0 +1,4 @@
+bump2version
+pre-commit
+pylint
+black
