@@ -16,6 +16,7 @@ class MachineType:
     """
     Hail Batch machine type on GCP
     """
+
     min_cpu: int = 2
     threads_on_cpu = 2  # hyperthreading
 
@@ -30,7 +31,7 @@ class MachineType:
         self.max_ncpu = ncpu
         self.mem_gb_per_core = mem_gb_per_core
         self.price_per_hour = price_per_hour
-        
+
     def max_threads(self) -> int:
         """
         Number of available threads
@@ -39,7 +40,7 @@ class MachineType:
 
     def calc_instance_disk_gb(self) -> int:
         """
-        The maximum available storage on an instance is calculated 
+        The maximum available storage on an instance is calculated
         in `batch/batch/utils.py/unreserved_worker_data_disk_size_gib()`
         as the disk size (375G) minus reserved image size (30G) minus
         reserved storage per core (5G*ncpu = 120G for a 32-core instance),
@@ -50,13 +51,13 @@ class MachineType:
         return disk_size_gb - reserved_gb - reserved_gb_per_core * self.max_ncpu
 
     def set_resources(
-        self, 
+        self,
         j: Job,
         fraction: float | None = None,
-        ncpu: int | None = None, 
-        nthreads: int | None = None, 
+        ncpu: int | None = None,
+        nthreads: int | None = None,
         mem_gb: float | None = None,
-        storage_gb: float | None = None, 
+        storage_gb: float | None = None,
     ) -> 'JobResource':
         """
         Set resources to a Job object. If any optional parameters are set,
@@ -73,34 +74,39 @@ class MachineType:
     def request_resources(
         self,
         fraction: float | None = None,
-        ncpu: int | None = None, 
-        nthreads: int | None = None, 
+        ncpu: int | None = None,
+        nthreads: int | None = None,
         mem_gb: float | None = None,
-        storage_gb: float | None = None, 
+        storage_gb: float | None = None,
     ) -> 'JobResource':
         """
         Request resources from the machine, satisfying all provided requirements.
-        If not requirements are provided, the minimal amount of cores 
+        If not requirements are provided, the minimal amount of cores
         (self.MIN_NCPU) will be used.
         """
         # determining the biggest limit to satisfy, measured in the number of CPUs:
-        min_ncpu = max(filter(None, [
-            self.adjust_ncpu(ncpu or self.min_cpu),
-            self.fraction_to_ncpu(fraction) if fraction else None,
-            self.nthreads_to_ncpu(nthreads) if nthreads else None,
-            self.mem_gb_to_ncpu(mem_gb) if mem_gb else None,
-            self.storage_gb_to_ncpu(storage_gb) if storage_gb else None,
-        ]))
-        return JobResource(
-            machine_type=self, 
-            ncpu=min_ncpu, 
-            attach_disk_storage_gb=(
-                storage_gb 
-                if storage_gb and storage_gb > self.calc_instance_disk_gb()
-                else None
+        min_ncpu = max(
+            filter(
+                None,
+                [
+                    self.adjust_ncpu(ncpu or self.min_cpu),
+                    self.fraction_to_ncpu(fraction) if fraction else None,
+                    self.nthreads_to_ncpu(nthreads) if nthreads else None,
+                    self.mem_gb_to_ncpu(mem_gb) if mem_gb else None,
+                    self.storage_gb_to_ncpu(storage_gb) if storage_gb else None,
+                ],
             )
         )
-    
+        return JobResource(
+            machine_type=self,
+            ncpu=min_ncpu,
+            attach_disk_storage_gb=(
+                storage_gb
+                if storage_gb and storage_gb > self.calc_instance_disk_gb()
+                else None
+            ),
+        )
+
     def fraction_to_ncpu(self, fraction: float) -> int:
         """
         Converts fraction to the number of CPU (e.g. fraction=1.0 to take the entire
@@ -123,8 +129,8 @@ class MachineType:
         We want to avoid attaching disks (attaching a disk to an existing instance
         might fail with `mkfs.ext4 ...` error, see:
         https://batch.hail.populationgenomics.org.au/batches/7488/jobs/12
-        So this function will calculate the number of CPU to request so your jobs 
-        can be packed to fit the default instance's available storage 
+        So this function will calculate the number of CPU to request so your jobs
+        can be packed to fit the default instance's available storage
         (caluclated with self.calc_instance_disk_gb()).
         """
         fraction = storage_gb / self.calc_instance_disk_gb()
@@ -153,10 +159,10 @@ class MachineType:
 
         # round to the nearest power of 2 (15 -> 16, 16 -> 16, 17 -> 32)
         return int(pow(2, math.ceil(math.log2(ncpu))))
-    
 
-# Default Hail Batch machine. 
-# 
+
+# Default Hail Batch machine.
+#
 # Bigger default number of cores (32 vs 16) would allow for more threads for alignment,
 # however would mean a smaller available storage (5G per core is reserved)
 STANDARD = MachineType(
@@ -167,12 +173,12 @@ STANDARD = MachineType(
 )
 
 # ~1.7 times memory per core than standard-32, but only 16 cores.
-# Total 104G - smaller than standard-32, but less expensive, so useful for 
-# memory consuming tools that don't benefit from multiple threads 
+# Total 104G - smaller than standard-32, but less expensive, so useful for
+# memory consuming tools that don't benefit from multiple threads
 HIGHMEM = MachineType(
-    'highmem', 
+    'highmem',
     ncpu=16,
-    mem_gb_per_core=6.5,  
+    mem_gb_per_core=6.5,
     price_per_hour=1.3431,
 )
 
@@ -182,6 +188,7 @@ class JobResource:
     """
     Represents a fraction of a Hail Batch instance.
     """
+
     def __init__(
         self,
         machine_type: MachineType,
@@ -192,11 +199,11 @@ class JobResource:
         @param machine_type: Hail Batch machine pool type
         @param ncpu: number of CPU request. Will be used to calculate the fraction of
             the machine to take. If not set, all machine's CPUs will be used.
-        @param attach_disk_storage_gb: if set to > MachineType.max_default_storage_gb, 
-            a larger disc will be attached by Hail Batch. 
+        @param attach_disk_storage_gb: if set to > MachineType.max_default_storage_gb,
+            a larger disc will be attached by Hail Batch.
         """
         self.machine_type = machine_type
-        
+
         self.fraction_of_full: float = 1.0
         if ncpu is not None:
             if ncpu > self.machine_type.max_ncpu:
@@ -224,7 +231,7 @@ class JobResource:
 
     def get_java_mem_mb(self) -> int:
         """
-        Calculate memory to pass to the `java -Xms` option. 
+        Calculate memory to pass to the `java -Xms` option.
         Subtracts 1G to start a java VM, and converts to MB as the option doesn't
         support fractions of GB.
         """
@@ -235,7 +242,7 @@ class JobResource:
         Number of cores/CPU
         """
         return int(self.machine_type.max_ncpu * self.fraction_of_full)
-    
+
     def get_nthreads(self) -> int:
         """
         Number of threads
@@ -250,13 +257,12 @@ class JobResource:
             storage_gb = self.attach_disk_storage_gb
         else:
             storage_gb = (
-                self.machine_type.calc_instance_disk_gb() *
-                self.fraction_of_full
+                self.machine_type.calc_instance_disk_gb() * self.fraction_of_full
             )
 
-        # Hail Batch actually requests 5% lower number than the 
+        # Hail Batch actually requests 5% lower number than the
         # requested one (e.g. "req_storage: 46.25G, actual_storage: 44.0 GiB"),
-        # so we will ask for a bigger number.        
+        # so we will ask for a bigger number.
         return storage_gb * 1.05
 
     def set_to_job(self, j: Job) -> 'JobResource':

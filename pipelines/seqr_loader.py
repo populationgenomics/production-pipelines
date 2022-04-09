@@ -13,17 +13,17 @@ import yaml
 from google.cloud import secretmanager
 from analysis_runner import dataproc
 
-from cpg_pipes import Path, to_path
+from cpg_pipes import Path
 from cpg_pipes import utils
 from cpg_pipes.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jobs
 from cpg_pipes.pipeline import (
     pipeline_click_options,
-    stage, 
-    create_pipeline, 
+    stage,
+    create_pipeline,
     StageInput,
     StageOutput,
-    CohortStage, 
-    DatasetStage
+    CohortStage,
+    DatasetStage,
 )
 from cpg_pipes.refdata import RefData
 from cpg_pipes.stages.vep import VepStage
@@ -37,19 +37,15 @@ logger = logging.getLogger(__file__)
 @stage(required_stages=[JointGenotypingStage, VepStage, VqsrStage])
 class AnnotateCohort(CohortStage):
     """
-    Re-annotate the entire cohort. 
+    Re-annotate the entire cohort.
     """
+
     def expected_outputs(self, cohort: Cohort) -> Path:
         """
         Expected to write a matrix table.
         """
         samples_hash = utils.hash_sample_ids(cohort.get_sample_ids())
-        return (
-            self.tmp_bucket /
-            'mt' /
-            f'{samples_hash}' /
-            'annotated-cohort.mt'
-        )
+        return self.tmp_bucket / 'mt' / f'{samples_hash}' / 'annotated-cohort.mt'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
@@ -83,17 +79,13 @@ class AnnotateDataset(DatasetStage):
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
     that will be loaded into Seqr)
     """
+
     def expected_outputs(self, dataset: Dataset) -> Path:
         """
         Expected to generate a matrix table
         """
         samples_hash = utils.hash_sample_ids(dataset.cohort.get_sample_ids())
-        return (
-            self.tmp_bucket /
-            'mt' /
-            f'{samples_hash}' /
-            f'{dataset.name}.mt'
-        )
+        return self.tmp_bucket / 'mt' / f'{samples_hash}' / f'{dataset.name}.mt'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
@@ -113,9 +105,7 @@ class AnnotateDataset(DatasetStage):
             overwrite=not self.check_intermediates,
         )
         return self.make_outputs(
-            dataset, 
-            data=self.expected_outputs(dataset), 
-            jobs=jobs
+            dataset, data=self.expected_outputs(dataset), jobs=jobs
         )
 
 
@@ -124,6 +114,7 @@ class LoadToEsStage(DatasetStage):
     """
     Create a Seqr index.
     """
+
     def expected_outputs(self, dataset: Dataset) -> None:
         """
         Expected to generate a Seqr index, which is not a file
@@ -135,15 +126,15 @@ class LoadToEsStage(DatasetStage):
         Uses analysis-runner's dataproc helper to run a hail query script
         """
         if (
-            'output_datasets' in self.pipeline_config and 
-            dataset.name not in self.pipeline_config['output_datasets']
+            'output_datasets' in self.pipeline_config
+            and dataset.name not in self.pipeline_config['output_datasets']
         ):
             # Skipping dataset that wasn't explicitly requested to upload to ES:
             return self.make_outputs(dataset)
 
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset)
         version = time.strftime('%Y%m%d-%H%M%S')
-        
+
         j = dataproc.hail_dataproc_job(
             self.b,
             f'{utils.QUERY_SCRIPTS_DIR}/seqr/mt_to_es.py '
@@ -162,7 +153,7 @@ class LoadToEsStage(DatasetStage):
             depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
         )
-        j.attributes = self.get_job_attrs(dataset),
+        j.attributes = (self.get_job_attrs(dataset),)
         return self.make_outputs(dataset, jobs=[j])
 
 
@@ -195,7 +186,7 @@ def _read_es_password(
     type=click.INT,
     default=RefData.number_of_haplotype_caller_intervals,
     help='Number of intervals to devide the genome for sample genotyping with '
-         'gatk HaplotypeCaller',
+    'gatk HaplotypeCaller',
 )
 @click.option(
     '--jc-intervals-num',
@@ -248,6 +239,7 @@ def main(
     if not datasets:
         # Parsing dataset names from the analysis-runner Seqr stack:
         from urllib import request
+
         seqr_stack_url = (
             'https://raw.githubusercontent.com/populationgenomics/analysis-runner/main'
             '/stack/Pulumi.seqr.yaml'

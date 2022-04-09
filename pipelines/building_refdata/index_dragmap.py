@@ -49,10 +49,14 @@ def _test_dragmap_job(b: hb.Batch):
         }
     )
     sn = 'TEST'
-    j.command(wrap_command(f"""\
+    j.command(
+        wrap_command(
+            f"""\
     dragen-os -r {dragmap_index} -1 {fq1} -2 {fq1} --RGID {sn} --RGSM {sn} |
     samtools sort -T $(dirname {j.sorted_bam})/samtools-sort-tmp -Obam -o {j.sorted_bam}
-    """))
+    """
+        )
+    )
     return j
 
 
@@ -60,7 +64,7 @@ def main():  # pylint: disable=missing-function-docstring
     billing_project = os.getenv('HAIL_BILLING_PROJECT') or 'seqr'
     hail_bucket = os.environ.get('HAIL_BUCKET', 'cpg-seqr-test-tmp')
     print(
-        f'Starting hail Batch with the project {billing_project}, ' 
+        f'Starting hail Batch with the project {billing_project}, '
         f'bucket {hail_bucket}'
     )
     backend = hb.ServiceBackend(

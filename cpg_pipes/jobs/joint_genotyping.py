@@ -25,12 +25,13 @@ logger = logging.getLogger(__file__)
 
 class JointGenotyperTool(Enum):
     """
-    Tool used for joint genotyping. GenotypeGVCFs is more stable, 
+    Tool used for joint genotyping. GenotypeGVCFs is more stable,
     GnarlyGenotyper is fater but more experimental.
     """
+
     GenotypeGVCFs = 1
     GnarlyGenotyper = 2
-    
+
 
 def make_joint_genotyping_jobs(
     b: hb.Batch,
@@ -66,7 +67,7 @@ def make_joint_genotyping_jobs(
     logger.info(f'Submitting joint-calling jobs')
     scatter_count = scatter_count or RefData.number_of_joint_calling_intervals
     jobs: list[Job] = []
-    
+
     intervals_j, intervals = split_intervals.get_intervals(
         b=b,
         refs=refs,
@@ -75,7 +76,7 @@ def make_joint_genotyping_jobs(
         job_attrs=job_attrs,
     )
     jobs.append(intervals_j)
-    
+
     # There are some problems with using GenomcsDB in cloud (`genomicsdb_cloud()`):
     # Using cloud + --consolidate on larger datasets causes a TileDB error:
     # https://github.com/broadinstitute/gatk/issues/7653
@@ -100,19 +101,18 @@ def make_joint_genotyping_jobs(
     sample_ids = set(s.id for s in samples)
     samples_hash = utils.hash_sample_ids(list(sample_ids))
     jc_tmp_bucket = tmp_bucket / 'joint_calling' / samples_hash
-    
+
     for idx, import_gvcfs_job, genomicsdb_path, interval in zip(
-        range(scatter_count),
-        import_gvcfs_jobs,
-        genomicsdb_paths,
-        intervals
+        range(scatter_count), import_gvcfs_jobs, genomicsdb_paths, intervals
     ):
         jc_vcf_path = jc_tmp_bucket / 'by_interval' / f'interval_{idx + 1}.vcf.gz'
         filt_jc_vcf_path = (
-            jc_tmp_bucket / 'by_interval_excess_het_filter' / f'interval_{idx + 1}.vcf.gz'
+            jc_tmp_bucket
+            / 'by_interval_excess_het_filter'
+            / f'interval_{idx + 1}.vcf.gz'
         )
         siteonly_jc_vcf_path = (
-           jc_tmp_bucket / 'by_interval_site_only' / f'interval_{idx + 1}.vcf.gz'
+            jc_tmp_bucket / 'by_interval_site_only' / f'interval_{idx + 1}.vcf.gz'
         )
 
         jc_vcf_j, jc_vcf = _add_joint_genotyper_job(
@@ -186,7 +186,7 @@ def genomicsdb(
     tmp_bucket: Path,
     gvcf_by_sid: dict[str, GvcfPath],
     intervals: list[hb.Resource],
-    scatter_count: int = RefData.number_of_joint_calling_intervals,    
+    scatter_count: int = RefData.number_of_joint_calling_intervals,
     overwrite: bool = False,
     job_attrs: dict | None = None,
 ) -> tuple[list[Job], list[Path]]:
@@ -195,10 +195,9 @@ def genomicsdb(
     """
     genomicsdb_bucket = tmp_bucket / 'genomicsdbs'
     sample_map_bucket_path = genomicsdb_bucket / 'sample_map.csv'
-    df = pd.DataFrame([{
-        'id': s.id, 
-        'path': str(gvcf_by_sid[s.id].path)
-    } for s in samples])
+    df = pd.DataFrame(
+        [{'id': s.id, 'path': str(gvcf_by_sid[s.id].path)} for s in samples]
+    )
     with sample_map_bucket_path.open('w') as fp:
         df.to_csv(fp, index=False, header=False, sep='\t')
 
@@ -207,14 +206,15 @@ def genomicsdb(
     for idx in range(scatter_count):
         out_path = genomicsdb_bucket / f'interval_{idx + 1}_outof_{scatter_count}.tar'
         out_paths.append(out_path)
-        
+
         job_name = 'Joint genotyping: creating GenomicsDB'
         j = b.new_job(
-            job_name, 
-            (job_attrs or {}) | dict(
+            job_name,
+            (job_attrs or {})
+            | dict(
                 part=f'{idx + 1}/{scatter_count}',
                 tool='gatk_GenomicsDBImport',
-            )
+            ),
         )
         jobs.append(j)
 
@@ -223,37 +223,38 @@ def genomicsdb(
             continue
 
         j.image(images.GATK_IMAGE)
-    
+
         sample_map = b.read_input(str(sample_map_bucket_path))
-        
+
         # The Broad: testing has shown that the multithreaded reader initialization
         # does not scale well beyond 5 threads, so don't increase beyond that.
         nthreads = 5
-    
+
         # The Broad: The memory setting here is very important and must be several
         # GiB lower than the total memory allocated to the VM because this tool uses
         # a significant amount of non-heap memory for native libraries.
         xms_gb = 8
         xmx_gb = 25
-    
+
         STANDARD.set_resources(
             j,
-            nthreads=nthreads, 
+            nthreads=nthreads,
             mem_gb=xmx_gb + 1,
             storage_gb=20,
         )
 
         params = [
-            # The Broad: We've seen some GenomicsDB performance regressions related 
+            # The Broad: We've seen some GenomicsDB performance regressions related
             # to intervals, so we're going to pretend we only have a single interval
             # using the --merge-input-intervals arg. There's no data in between since we
             # didn't run HaplotypeCaller over those loci, so we're not wasting any compute
             '--merge-input-intervals',
             '--consolidate',
-            # The batch_size value was carefully chosen here as it is the optimal value for 
-            # the amount of memory allocated within the task; please do not change it 
+            # The batch_size value was carefully chosen here as it is the optimal value for
+            # the amount of memory allocated within the task; please do not change it
             # without consulting the Hellbender (GATK engine) team!
-            '--batch-size', '50',
+            '--batch-size',
+            '50',
         ]
 
         cmd = f"""\
@@ -282,7 +283,7 @@ def genomicsdb_cloud(
     tmp_bucket: Path,
     gvcf_by_sid: dict[str, GvcfPath],
     intervals: list[hb.Resource],
-    scatter_count: int = RefData.number_of_joint_calling_intervals,    
+    scatter_count: int = RefData.number_of_joint_calling_intervals,
     depends_on: list[Job] | None = None,
     job_attrs: dict | None = None,
 ) -> tuple[dict[int, Job], dict[int, Path]]:
@@ -294,7 +295,7 @@ def genomicsdb_cloud(
         genomicsdb_path_per_interval[idx] = (
             genomicsdb_bucket / f'interval_{idx + 1}_outof_{scatter_count}'
         )
-        
+
     # Determining which samples to add. Using the first interval, so the assumption
     # is that all DBs have the same set of samples.
     (
@@ -323,7 +324,7 @@ def genomicsdb_cloud(
                 updating_existing_db=updating_existing_db,
                 sample_map_bucket_path=sample_map_bucket_path,
                 intervals=intervals[idx],
-                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}')
+                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             )
             if depends_on:
                 import_gvcfs_job.depends_on(*depends_on)
@@ -430,7 +431,7 @@ def _genomicsdb_import_cloud(
     Returns a Job, or None if no new samples to add
     """
     rm_cmd = ''
-    
+
     if updating_existing_db and not overwrite:
         # Update existing DB
         genomicsdb_param = f'--genomicsdb-update-workspace-path {genomicsdb_gcs_path}'
@@ -447,7 +448,9 @@ def _genomicsdb_import_cloud(
 
         genomicsdb_param = f'--genomicsdb-workspace-path {genomicsdb_gcs_path}'
         # Need to remove the existing database if exists
-        rm_cmd = f'gsutil ls {genomicsdb_gcs_path} && gsutil -q rm -rf {genomicsdb_gcs_path}'
+        rm_cmd = (
+            f'gsutil ls {genomicsdb_gcs_path} && gsutil -q rm -rf {genomicsdb_gcs_path}'
+        )
         msg = (
             f'Creating a new DB with {len(sample_names_to_add)} samples: '
             f'{", ".join(sample_names_to_add)}'
@@ -460,7 +463,7 @@ def _genomicsdb_import_cloud(
 
     if depends_on:
         j.depends_on(*depends_on)
-    
+
     # The Broad: testing has shown that the multithreaded reader initialization
     # does not scale well beyond 5 threads, so don't increase beyond that.
     nthreads = 5
@@ -472,25 +475,28 @@ def _genomicsdb_import_cloud(
     xmx_gb = 25
 
     STANDARD.set_resources(j, nthreads=nthreads, mem_gb=xmx_gb + 1)
-    
+
     params = [
-        # The Broad: We've seen some GenomicsDB performance regressions related 
+        # The Broad: We've seen some GenomicsDB performance regressions related
         # to intervals, so we're going to pretend we only have a single interval
         # using the --merge-input-intervals arg. There's no data in between since we
         # didn't run HaplotypeCaller over those loci, so we're not wasting any compute
         '--merge-input-intervals',
         '--consolidate',
-        # The batch_size value was carefully chosen here as it is the optimal value for 
-        # the amount of memory allocated within the task; please do not change it 
+        # The batch_size value was carefully chosen here as it is the optimal value for
+        # the amount of memory allocated within the task; please do not change it
         # without consulting the Hellbender (GATK engine) team!
-        '--batch-size', '50',
+        '--batch-size',
+        '50',
         # Using cloud + --consolidate causes a TileDB error:
         # https://github.com/broadinstitute/gatk/issues/7653
         # However disabling --consolidate decreases performance of reading, cause
         # GenotypeGVCFs to run forever. So instead, using non-cloud GenomicsDB.
     ]
 
-    j.command(wrap_command(f"""\
+    j.command(
+        wrap_command(
+            f"""\
 
     echo "{msg}"
 
@@ -503,7 +509,11 @@ def _genomicsdb_import_cloud(
     --sample-name-map {sample_map} \\
     --reader-threads {nthreads} \\
     {" ".join(params)}
-    """, monitor_space=True, setup_gcp=True))
+    """,
+            monitor_space=True,
+            setup_gcp=True,
+        )
+    )
     return j, sample_names_will_be_in_db
 
 
@@ -525,8 +535,8 @@ def _add_joint_genotyper_job(
 
     GenotypeGVCFs is a standard GATK joint-genotyping tool.
 
-    GnarlyGenotyper is an experimental GATK joint-genotyping tool that performs 
-    "quick and dirty" joint genotyping on large cohorts, of GVCFs post-processed 
+    GnarlyGenotyper is an experimental GATK joint-genotyping tool that performs
+    "quick and dirty" joint genotyping on large cohorts, of GVCFs post-processed
     with ReblockGVCF.
 
     HaplotypeCaller must be used with `-ERC GVCF` or `-ERC BP_RESOLUTION` to add
@@ -539,10 +549,12 @@ def _add_joint_genotyper_job(
     j = b.new_job(job_name, job_attrs)
     if utils.can_reuse(output_vcf_path, overwrite):
         j.name += ' [reuse]'
-        return j, b.read_input_group(**{
-            'vcf.gz': str(output_vcf_path),
-            'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
-        })
+        return j, b.read_input_group(
+            **{
+                'vcf.gz': str(output_vcf_path),
+                'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
+            }
+        )
 
     j.image(images.GATK_IMAGE)
 
@@ -550,10 +562,10 @@ def _add_joint_genotyper_job(
     xmx_gb = 25
 
     STANDARD.set_resources(
-        j, 
+        j,
         mem_gb=xmx_gb + 1,
         # 4G (fasta+fai+dict) + 4G per sample divided by the number of intervals:
-        storage_gb=4 + number_of_samples * 4 // scatter_count
+        storage_gb=4 + number_of_samples * 4 // scatter_count,
     )
 
     j.declare_resource_group(
@@ -561,7 +573,7 @@ def _add_joint_genotyper_job(
     )
 
     reference = refs.fasta_res_group(b)
-    
+
     if str(genomicsdb_path).endswith('.tar'):
         # can't use directly from cloud, need to copy and uncompress:
         input_cmd = f"""\
@@ -596,10 +608,11 @@ def _add_joint_genotyper_job(
     --merge-input-intervals \\
     -G AS_StandardAnnotation
     """
-    j.command(wrap_command(
-        cmd, monitor_space=True, setup_gcp=True, 
-        define_retry_function=True
-    ))
+    j.command(
+        wrap_command(
+            cmd, monitor_space=True, setup_gcp=True, define_retry_function=True
+        )
+    )
     if output_vcf_path:
         b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
     return j, j.output_vcf
@@ -634,10 +647,12 @@ def _add_exccess_het_filter(
     j = b.new_job(job_name, job_attrs)
     if utils.can_reuse(output_vcf_path, overwrite):
         j.name += ' [reuse]'
-        return j, b.read_input_group(**{
-            'vcf.gz': str(output_vcf_path),
-            'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
-        })
+        return j, b.read_input_group(
+            **{
+                'vcf.gz': str(output_vcf_path),
+                'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
+            }
+        )
 
     j.image(images.GATK_IMAGE)
     j.memory('8G')
@@ -646,7 +661,9 @@ def _add_exccess_het_filter(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
 
-    j.command(wrap_command(f"""
+    j.command(
+        wrap_command(
+            f"""
     # Captring stderr to avoid Batch pod from crashing with OOM from millions of
     # warning messages from VariantFiltration, e.g.:
     # > JexlEngine - ![0,9]: 'ExcessHet > 54.69;' undefined variable ExcessHet
@@ -658,7 +675,9 @@ def _add_exccess_het_filter(
     -O {j.output_vcf['vcf.gz']} \\
     -V {input_vcf['vcf.gz']} \\
     2> {j.stderr}
-    """))
+    """
+        )
+    )
     if output_vcf_path:
         b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
     return j, j.output_vcf
@@ -682,10 +701,12 @@ def _add_make_sitesonly_job(
     j = b.new_job(job_name, job_attrs)
     if output_vcf_path and utils.can_reuse(output_vcf_path, overwrite):
         j.name += ' [reuse]'
-        return j, b.read_input_group(**{
-            'vcf.gz': str(output_vcf_path),
-            'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
-        })
+        return j, b.read_input_group(
+            **{
+                'vcf.gz': str(output_vcf_path),
+                'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
+            }
+        )
 
     j.image(images.GATK_IMAGE)
     j.memory('8G')
@@ -694,12 +715,16 @@ def _add_make_sitesonly_job(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
 
-    j.command(wrap_command(f"""
+    j.command(
+        wrap_command(
+            f"""
     gatk --java-options -Xms6g \\
     MakeSitesOnlyVcf \\
     -I {input_vcf} \\
     -O {j.output_vcf['vcf.gz']}
-    """))
+    """
+        )
+    )
     if output_vcf_path:
         b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
     return j, j.output_vcf

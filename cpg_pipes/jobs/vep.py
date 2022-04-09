@@ -8,9 +8,9 @@ from typing import Literal
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
+from hailtop.batch import Batch
 
 from cpg_pipes import images, utils, Path, to_path
-from cpg_pipes.hb.batch import Batch
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.hb.command import wrap_command, python_command
 from cpg_pipes.jobs import split_intervals
@@ -56,7 +56,7 @@ def vep(
         scatter_count=scatter_count,
     )
     jobs.append(intervals_j)
-    
+
     vcf = b.read_input_group(
         **{'vcf.gz': str(vcf_path), 'vcf.gz.tbi': str(vcf_path) + '.tbi'}
     )
@@ -209,11 +209,13 @@ def vep_one(
     if out_format == 'vcf':
         cmd += f'tabix -p vcf {output}'
 
-    j.command(wrap_command(
-        cmd, 
-        setup_gcp=True, 
-        monitor_space=True, 
-    ))
+    j.command(
+        wrap_command(
+            cmd,
+            setup_gcp=True,
+            monitor_space=True,
+        )
+    )
     if out_path:
         b.write_output(j.output, str(out_path).replace('.vcf.gz', ''))
     return j

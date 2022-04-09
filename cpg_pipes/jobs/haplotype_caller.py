@@ -84,7 +84,7 @@ def haplotype_caller(
     dragen_mode: bool = False,
 ) -> list[Job]:
     """
-    Run haplotype caller in parallel sharded by intervals. 
+    Run haplotype caller in parallel sharded by intervals.
     Returns jobs and path to the output GVCF file.
     """
     if utils.can_reuse(output_path, overwrite):
@@ -180,7 +180,7 @@ def _haplotype_caller_one(
     )
 
     reference = refs.fasta_res_group(b)
-    
+
     cmd = f"""\
     CRAM=/io/batch/{sample_name}.cram
     CRAI=/io/batch/{sample_name}.cram.crai
@@ -207,9 +207,11 @@ def _haplotype_caller_one(
     -ERC GVCF \\
     --create-output-variant-index
     """
-    j.command(wrap_command(
-        cmd, monitor_space=True, setup_gcp=True, define_retry_function=True
-    ))
+    j.command(
+        wrap_command(
+            cmd, monitor_space=True, setup_gcp=True, define_retry_function=True
+        )
+    )
     if out_gvcf_path:
         b.write_output(j.output_gvcf, str(out_gvcf_path).replace('.g.vcf.gz', ''))
     return j
@@ -283,9 +285,9 @@ def postproc_gvcf(
     j.image(images.GATK_IMAGE)
 
     # Enough to fit a pre-reblocked GVCF, which can be as big as 10G,
-    # the reblocked result (1G), and ref data (5G). 
+    # the reblocked result (1G), and ref data (5G).
     # We need at least 2 CPU, so on 16-core instance it would be 8 jobs,
-    # meaning we have more than enough disk (265/8=33.125G). 
+    # meaning we have more than enough disk (265/8=33.125G).
     job_res = STANDARD.set_resources(j, storage_gb=20)
 
     j.declare_resource_group(
@@ -337,9 +339,11 @@ def postproc_gvcf(
 
     tabix -p vcf {j.output_gvcf['g.vcf.gz']}
     """
-    j.command(wrap_command(
-        cmd, setup_gcp=True, monitor_space=True, define_retry_function=True
-    ))
+    j.command(
+        wrap_command(
+            cmd, setup_gcp=True, monitor_space=True, define_retry_function=True
+        )
+    )
     if output_path:
         b.write_output(j.output_gvcf, str(output_path).replace('.g.vcf.gz', ''))
     if depends_on:

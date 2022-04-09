@@ -50,7 +50,7 @@ def main(
     somalier_pairs_fpath: str,
     somalier_html_fpath: Optional[str],
     sample_map_tsv_path: Optional[str],
-): 
+):
     """
     Entry point.
     """
@@ -212,15 +212,19 @@ def _parse_inputs(
     df = pd.read_csv(somalier_samples_fpath, delimiter='\t')
     pairs_df = pd.read_csv(somalier_pairs_fpath, delimiter='\t')
     if sample_map:
-        df = df.replace({
-            'sample_id': sample_map,
-            'paternal_id': sample_map,
-            'maternal_id': sample_map,
-        })
-        pairs_df = pairs_df.replace({
-            '#sample_a': sample_map,
-            'sample_b': sample_map,
-        })
+        df = df.replace(
+            {
+                'sample_id': sample_map,
+                'paternal_id': sample_map,
+                'maternal_id': sample_map,
+            }
+        )
+        pairs_df = pairs_df.replace(
+            {
+                '#sample_a': sample_map,
+                'sample_b': sample_map,
+            }
+        )
     fp = StringIO()
     df.to_csv(fp, sep='\t', index=False)
     ped = Ped(StringIO(fp.getvalue()))

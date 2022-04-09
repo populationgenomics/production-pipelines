@@ -4,12 +4,7 @@ VEP stage.
 
 from cpg_pipes import Path, utils
 from cpg_pipes.jobs import vep
-from cpg_pipes.pipeline import (
-    stage,
-    StageInput,
-    StageOutput,
-    CohortStage
-)
+from cpg_pipes.pipeline import stage, StageInput, StageOutput, CohortStage
 from cpg_pipes.refdata import RefData
 from cpg_pipes.stages.vqsr import VqsrStage
 from cpg_pipes.targets import Cohort
@@ -20,6 +15,7 @@ class VepStage(CohortStage):
     """
     Run VEP on a VCF
     """
+
     def expected_outputs(self, cohort: Cohort) -> Path:
         """
         Expected to write a matrix table.

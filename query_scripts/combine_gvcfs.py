@@ -68,7 +68,7 @@ def main(
     """
     init_hail('combine_gvcfs', Path(local_tmp_dir))
 
-    # Copy the metadata file locally    
+    # Copy the metadata file locally
     local_meta_csv_path = join(local_tmp_dir, basename(meta_csv_path))
     gsutil_cp(meta_csv_path, local_meta_csv_path)
     samples_df = pd.read_table(local_meta_csv_path)

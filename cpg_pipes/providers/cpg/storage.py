@@ -12,6 +12,7 @@ class CpgStorageProvider(StorageProvider):
     """
     CPG storage policy implementation of the StorageProvider
     """
+
     def __init__(self, cloud: Cloud = Cloud.GS):
         super().__init__(cloud)
         self.prefix = 'cpg'
@@ -29,8 +30,7 @@ class CpgStorageProvider(StorageProvider):
         https://github.com/populationgenomics/team-docs/tree/main/storage_policies
         """
         path = CloudPath(
-            f'{self.cloud.value}://'
-            f'{self.prefix}-{dataset}-{namespace.value}'
+            f'{self.cloud.value}://' f'{self.prefix}-{dataset}-{namespace.value}'
         )
         if suffix:
             path = CloudPath(f'{path}-{suffix}')
@@ -51,10 +51,7 @@ class CpgStorageProvider(StorageProvider):
         """
         URL corrsponding to the WEB bucket.
         """
-        url = (
-            f'https://{namespace.value}-web.populationgenomics.org.au/'
-            f'{dataset}'
-        )
+        url = f'https://{namespace.value}-web.populationgenomics.org.au/' f'{dataset}'
         if version:
             url += f'/{version}'
         if sample:

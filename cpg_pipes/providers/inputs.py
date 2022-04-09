@@ -27,6 +27,7 @@ class InputProvider(ABC):
     """
     Abstract class for implementing inputs source.
     """
+
     def __init__(self, check_files: bool = True):
         self.check_files = check_files
 
@@ -82,7 +83,7 @@ class InputProvider(ABC):
 
     @abstractmethod
     def get_entries(
-        self, 
+        self,
         dataset: Dataset | None = None,
     ) -> list[dict]:
         """
@@ -155,7 +156,7 @@ class InputProvider(ABC):
         """
         Populate pedigree data (families, sex, relationships).
         """
-    
+
     @staticmethod
     def populate_pedigree_from_ped_files(
         cohort: Cohort,
@@ -297,8 +298,8 @@ class CsvInputProvider(InputProvider):
                 e
                 for e in entries
                 if (
-                    not self.get_dataset_name(e) or 
-                    self.get_dataset_name(e) == dataset.name
+                    not self.get_dataset_name(e)
+                    or self.get_dataset_name(e) == dataset.name
                 )
             ]
         return entries

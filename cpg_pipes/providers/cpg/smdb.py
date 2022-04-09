@@ -248,9 +248,7 @@ class SMDB:
             sample_ids=list(sample_ids),
         )
         try:
-            aid = self.aapi.create_new_analysis(
-                project=project_name, analysis_model=am
-            )
+            aid = self.aapi.create_new_analysis(project=project_name, analysis_model=am)
         except ApiException:
             traceback.print_exc()
             return None

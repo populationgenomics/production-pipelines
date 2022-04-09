@@ -19,7 +19,7 @@ gcloud -q auth activate-service-account \
 --key-file=$GOOGLE_APPLICATION_CREDENTIALS
 """
 
-# commands that declare functions that pull files on an instance, 
+# commands that declare functions that pull files on an instance,
 # handling transitive errors
 RETRY_CMD = """\
 function fail {
@@ -116,7 +116,7 @@ EOT
 python3 script.py
 """
     return cmd
-    
+
 
 def wrap_command(
     command: Union[str, List[str]],
@@ -133,11 +133,11 @@ def wrap_command(
     and if it does, skips running the rest of the job.
 
     @param command: command to wrap (can be a list of commands)
-    @param monitor_space: add a background process that checks the instance disk 
+    @param monitor_space: add a background process that checks the instance disk
         space every 5 minutes and prints it to the screen
     @param setup_gcp: login to GCP
-    @param define_retry_function: when set, adds bash functions `retry` that attempts 
-        to redo a command with a pause of default 30 seconds (useful to pull inputs 
+    @param define_retry_function: when set, adds bash functions `retry` that attempts
+        to redo a command with a pause of default 30 seconds (useful to pull inputs
         and get around GoogleEgressBandwidth Quota or other google quotas)
     @param rm_leading_space: remove all leading spaces and tabs from the command lines
     @param python_script: if provided, copy this python script
@@ -175,10 +175,13 @@ def wrap_command(
     if python_script:
         with (PACKAGE_DIR / '..' / python_script).open() as f:
             script_contents = f.read()
-        cmd = cmd.replace('{copy_script_cmd}', ADD_SCRIPT_CMD.format(
-            script_name=python_script.name,
-            script_contents=script_contents,
-        ))
+        cmd = cmd.replace(
+            '{copy_script_cmd}',
+            ADD_SCRIPT_CMD.format(
+                script_name=python_script.name,
+                script_contents=script_contents,
+            ),
+        )
     else:
         cmd = cmd.replace('{copy_script_cmd}', '')
 

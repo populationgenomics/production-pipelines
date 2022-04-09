@@ -20,6 +20,7 @@ class Target:
     Defines a target that stage can act upon. Classes like Sample, Dataset, Pipeline
     extend this class.
     """
+
     def __init__(self):
         # Whether to process even if outputs exist:
         self.forced: bool = False
@@ -41,7 +42,7 @@ class Target:
     @property
     def target_id(self) -> str:
         """
-        ID should be unique across target of all levels. 
+        ID should be unique across target of all levels.
 
         We are raising NotImplementedError instead of making it abstractclass because
         mypy is not happy about binding TypeVar to abstract classes, see:
@@ -58,7 +59,7 @@ class Target:
         ```
         """
         raise NotImplementedError
-    
+
     def get_job_attrs(self) -> dict[str, str]:
         """
         Attributes for Hail Batch job.
@@ -73,7 +74,7 @@ class Target:
 
     def get_sequencing_type(self) -> SequencingType:
         """
-        Sequencing type of samples. Will throw an error if more than 
+        Sequencing type of samples. Will throw an error if more than
         one sequencing type is found.
         """
         sequencing_types = set(s.sequencing_type for s in self.get_samples())
@@ -83,15 +84,16 @@ class Target:
                 f'{sequencing_types}. Joint calling can be only performed on samples '
                 f'of the same type.'
             )
-        return list(sequencing_types)[0]        
+        return list(sequencing_types)[0]
 
 
 class Cohort(Target):
     """
     Represents a "cohort" target - all samples from all datasets in the pipeline.
     """
+
     def __init__(
-        self, 
+        self,
         analysis_dataset_name: str,
         namespace: Namespace,
         name: str | None = None,
@@ -104,7 +106,7 @@ class Cohort(Target):
         """
         super().__init__()
         self.name = name or analysis_dataset_name
-        self.namespace = namespace,
+        self.namespace = (namespace,)
         self.storage_provider = storage_provider
         self.analysis_dataset = Dataset(
             name=analysis_dataset_name,
@@ -124,14 +126,15 @@ class Cohort(Target):
 
     def get_datasets(self, only_active: bool = True) -> list['Dataset']:
         """
-        Gets list of all datasets. 
+        Gets list of all datasets.
         Include only "active" datasets (unless only_active is False)
         """
         return [
-            ds for k, ds in self._datasets_by_name.items() 
+            ds
+            for k, ds in self._datasets_by_name.items()
             if (ds.active or not only_active)
         ]
-    
+
     def get_dataset_by_name(
         self, name: str, only_active: bool = True
     ) -> Optional['Dataset']:
@@ -154,7 +157,7 @@ class Cohort(Target):
 
     def add_dataset(
         self,
-        name: str, 
+        name: str,
         namespace: Namespace | None = None,
         storage_provider: StorageProvider | None = None,
     ) -> 'Dataset':
@@ -194,20 +197,17 @@ class Cohort(Target):
         return ''
 
 
-def parse_stack(
-    name: str, 
-    namespace: Namespace | None = None
-) -> tuple[str, Namespace]:
+def parse_stack(name: str, namespace: Namespace | None = None) -> tuple[str, Namespace]:
     """
-    Input `name` can be either e.g. "seqr" or "seqr-test". The latter will be 
-    resolved to stack="seqr" and is_test=True, unless `namespace` is provided 
+    Input `name` can be either e.g. "seqr" or "seqr-test". The latter will be
+    resolved to stack="seqr" and is_test=True, unless `namespace` is provided
     explicitly.
 
     Returns the stack id and a corrected namespace.
     """
     namespace = namespace or Namespace.MAIN
     if name.endswith('-test'):
-        stack = name[:-len('-test')]
+        stack = name[: -len('-test')]
         if namespace == Namespace.MAIN:
             namespace = Namespace.TEST
     else:
@@ -232,9 +232,9 @@ class Dataset(Target):
     * one GCP project: https://github.com/populationgenomics/team-docs/tree/main/storage_policies
     * one Pulumi stack: https://github.com/populationgenomics/analysis-runner/tree/main/stack
     * two sample metadata projects: main and test (the latter has a `-test` ending).
-    
+
     An object of this class is parametrised by a dataset name and a namespace,
-    meaning that it matches exactly one GCP project, exactly one stack, and exactly 
+    meaning that it matches exactly one GCP project, exactly one stack, and exactly
     one sample metadata project.
 
     An object has two ID-like fields: `stack` and `name`:
@@ -243,8 +243,9 @@ class Dataset(Target):
     * `name` is the name of the namespace-specific sample-metadata project,
        e.g. "seqr", "seqr-test", "hgdp", "hgdp-test".
     """
+
     def __init__(
-        self, 
+        self,
         name: str,
         cohort: Cohort,
         namespace: Namespace | None = None,
@@ -252,11 +253,11 @@ class Dataset(Target):
     ):
         super().__init__()
         self.cohort = cohort
-        
+
         self._storage_provider = storage_provider
 
         self._sample_by_id: dict[str, Sample] = {}
-        
+
         self.stack, self.namespace = parse_stack(name, namespace)
 
     @property
@@ -265,7 +266,7 @@ class Dataset(Target):
         If it's a test dataset.
         """
         return self.namespace != Namespace.MAIN
-    
+
     @property
     def name(self) -> str:
         """
@@ -278,7 +279,7 @@ class Dataset(Target):
     def target_id(self) -> str:
         """Unique target ID"""
         return f'Dataset("{self.name}")'
-    
+
     def __repr__(self):
         return f'Dataset("{self.name}", {len(self.get_samples())} samples)'
 
@@ -302,7 +303,9 @@ class Dataset(Target):
         The primary dataset bucket (-main or -test).
         """
         return self.storage_provider.get_bucket(
-            dataset=self.stack, namespace=self.namespace, **kwargs,
+            dataset=self.stack,
+            namespace=self.namespace,
+            **kwargs,
         )
 
     def get_tmp_bucket(self, **kwargs) -> Path:
@@ -312,7 +315,7 @@ class Dataset(Target):
         return self.storage_provider.get_tmp_bucket(
             dataset=self.stack, namespace=self.namespace, **kwargs
         )
-    
+
     def get_analysis_bucket(self, **kwargs) -> Path:
         """
         Get analysis bucket (-main-analysis or -test-analysis)
@@ -320,7 +323,7 @@ class Dataset(Target):
         return self.storage_provider.get_analysis_bucket(
             dataset=self.stack, namespace=self.namespace, **kwargs
         )
-    
+
     def get_web_bucket(self, **kwargs) -> Path:
         """
         Get web bucket (-main-web or -test-web)
@@ -336,9 +339,9 @@ class Dataset(Target):
         return self.storage_provider.get_web_url(
             dataset=self.stack, namespace=self.namespace, **kwargs
         )
-    
+
     def add_sample(
-        self, 
+        self,
         id: str,  # pylint: disable=redefined-builtin
         external_id: str | None = None,
         participant_id: str | None = None,
@@ -355,7 +358,7 @@ class Dataset(Target):
             return self._sample_by_id[id]
 
         s = Sample(
-            id=id, 
+            id=id,
             dataset=self,
             external_id=external_id,
             sequencing_type=sequencing_type,
@@ -366,14 +369,13 @@ class Dataset(Target):
         )
         self._sample_by_id[id] = s
         return s
-    
+
     def get_samples(self, only_active: bool = True) -> list['Sample']:
         """
         Get dataset's samples. Inlcude only "active" samples, unless only_active=False
         """
         return [
-            s for sid, s in self._sample_by_id.items() 
-            if (s.active or not only_active)
+            s for sid, s in self._sample_by_id.items() if (s.active or not only_active)
         ]
 
     def get_job_attrs(self) -> dict[str, str]:
@@ -409,6 +411,7 @@ class Sex(Enum):
     """
     Sex as in PED format
     """
+
     UNKNOWN = 0
     MALE = 1
     FEMALE = 2
@@ -424,12 +427,13 @@ class Sex(Enum):
             if sex.lower() in ('f', 'female', '2'):
                 return Sex.FEMALE
         return Sex.UNKNOWN
-    
+
 
 class Sample(Target):
     """
     Represents a Sample.
     """
+
     def __init__(
         self,
         id: str,  # pylint: disable=redefined-builtin
@@ -440,7 +444,7 @@ class Sample(Target):
         meta: dict | None = None,
         sex: Sex | None = None,
         pedigree: Optional['PedigreeInfo'] = None,
-        alignment_input: AlignmentInput | None = None
+        alignment_input: AlignmentInput | None = None,
     ):
         super().__init__()
         self.id = id
@@ -460,17 +464,20 @@ class Sample(Target):
 
     def __repr__(self):
         return (
-            f'Sample({self.dataset.name}/{self.id}' +
-            (f'|{self._external_id}' if self._external_id else '') +
-            (f', participant={self._participant_id}'
-             if self._participant_id else '') +
-            f', forced={self.forced}' +
-            f', active={self.active}' +
-            f', meta={self.meta}' +
-            f', sequencing_type={self.sequencing_type.value}' +
-            (f', alignment_input={self.alignment_input}' if self.alignment_input else '') +
-            (f', pedigree={self.pedigree}' if self.pedigree else '') +
-            f')'
+            f'Sample({self.dataset.name}/{self.id}'
+            + (f'|{self._external_id}' if self._external_id else '')
+            + (f', participant={self._participant_id}' if self._participant_id else '')
+            + f', forced={self.forced}'
+            + f', active={self.active}'
+            + f', meta={self.meta}'
+            + f', sequencing_type={self.sequencing_type.value}'
+            + (
+                f', alignment_input={self.alignment_input}'
+                if self.alignment_input
+                else ''
+            )
+            + (f', pedigree={self.pedigree}' if self.pedigree else '')
+            + f')'
         )
 
     def __str__(self):
@@ -483,14 +490,14 @@ class Sample(Target):
                     ai_tag = f'|SEQ=BAM'
             else:
                 ai_tag = f'|SEQ={len(self.alignment_input)}FQS'
-        
+
         ext_id = f'|{self._external_id}' if self._external_id else ''
         return f'Sample({self.dataset.name}/{self.id}{ext_id}{ai_tag})'
 
     @property
     def participant_id(self) -> str:
         """
-        Get ID of participant corresponding to this sample, 
+        Get ID of participant corresponding to this sample,
         or substitute it with external ID.
         """
         return self._participant_id or self.external_id
@@ -549,7 +556,7 @@ class Sample(Target):
         if only_active and not self.active:
             return []
         return [self]
-    
+
     def get_job_attrs(self) -> dict[str, str]:
         """
         Attributes for Hail Batch job.
@@ -568,6 +575,7 @@ class PedigreeInfo:
     """
     Pedigree relationsips with other samples in the cohort, and other PED data
     """
+
     sample: Sample
     sex: Sex
     fam_id: str | None = None

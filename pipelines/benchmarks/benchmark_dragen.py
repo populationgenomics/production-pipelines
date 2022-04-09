@@ -45,7 +45,8 @@ def main():
         )
         hc_jobs = produce_gvcf(
             pipe.b,
-            output_path=benchmark.BENCHMARK_BUCKET / 'outputs' f'{sample_name}.g.vcf.gz',
+            output_path=benchmark.BENCHMARK_BUCKET / 'outputs'
+            f'{sample_name}.g.vcf.gz',
             sample_name=sample_name,
             cram_path=cram_path,
             scatter_count=10,

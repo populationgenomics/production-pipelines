@@ -44,9 +44,7 @@ def init_hail(name: str, local_tmp_dir: Path = None):
         local_tmp_dir = Path(tempfile.mkdtemp())
 
     timestamp = time.strftime('%Y%m%d-%H%M')
-    hl_log = os.path.join(
-        safe_mkdir(local_tmp_dir / 'log'), f'{name}-{timestamp}.log'
-    )
+    hl_log = os.path.join(safe_mkdir(local_tmp_dir / 'log'), f'{name}-{timestamp}.log')
     hl.init(default_reference=RefData.genome_build, log=hl_log)
     return local_tmp_dir
 

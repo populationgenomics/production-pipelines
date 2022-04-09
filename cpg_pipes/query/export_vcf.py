@@ -12,7 +12,7 @@ logger = logging.getLogger(__file__)
 def export_vcf(mt_path: str, out_vcf_path: str):
     """
     Export a matrix table into a VCF file.
-    """    
+    """
     mt = hl.read_matrix_table(mt_path)
     mt = mt.annotate_rows(
         info=mt.info.annotate(

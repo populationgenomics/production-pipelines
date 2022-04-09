@@ -17,9 +17,10 @@ class FastQC(SampleStage):
     """
     Run FastQC on alignment inputs.
     """
+
     def expected_outputs(self, sample: Sample) -> dict[str, Path]:
         """
-        Stage is expected to generate a FastQC HTML report, and a zip file for 
+        Stage is expected to generate a FastQC HTML report, and a zip file for
         parsing with MuiltiQC.
         """
         folder = sample.dataset.get_bucket() / 'qc'
@@ -51,8 +52,4 @@ class FastQC(SampleStage):
             refs=self.refs,
             job_attrs=self.get_job_attrs(sample),
         )
-        return self.make_outputs(
-            sample, 
-            data=self.expected_outputs(sample), 
-            jobs=jobs
-        )
+        return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)

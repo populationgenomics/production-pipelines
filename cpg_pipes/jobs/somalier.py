@@ -39,8 +39,8 @@ def pedigree(
 
     Returns a job, a path to a fixed PED file if able to recover, and a path to a file
     with relatedness information for each sample pair
-    
-    input_path_by_sid can have paths to CRAMs, BAMs, GVCFs, or .somalier 
+
+    input_path_by_sid can have paths to CRAMs, BAMs, GVCFs, or .somalier
     fingerprints, which will be determined based on extention. Unless a .somalier
     print is provided, `somalier extract` will be run to extract one.
     """
@@ -53,7 +53,7 @@ def pedigree(
         label=label,
         ignore_missing=ignore_missing,
     )
-    
+
     relate_j = _relate(
         b=b,
         somalier_file_by_sample=somalier_file_by_sample,
@@ -86,9 +86,9 @@ def _make_sample_map(dataset: Dataset):
     Creating sample map to remap internal IDs to participant IDs
     """
     sample_map_fpath = dataset.get_tmp_bucket() / 'pedigree' / 'sample_map.tsv'
-    df = pd.DataFrame([
-        {'id': s.id, 'pid': s.participant_id} for s in dataset.get_samples()
-    ])
+    df = pd.DataFrame(
+        [{'id': s.id, 'pid': s.participant_id} for s in dataset.get_samples()]
+    )
     with sample_map_fpath.open('w') as fp:
         df.to_csv(fp, sep='\t', index=False, header=False)
     return sample_map_fpath
@@ -194,9 +194,9 @@ def _prep_somalier_files(
 
 
 def check_pedigree_job(
-    b: Batch, 
-    samples_file: Resource, 
-    pairs_file: Resource, 
+    b: Batch,
+    samples_file: Resource,
+    pairs_file: Resource,
     sample_map_file: Resource,
     label: str | None = None,
     somalier_html_url: str | None = None,
@@ -213,9 +213,11 @@ def check_pedigree_job(
     )
     STANDARD.set_resources(check_j, ncpu=2)
     check_j.image(images.PEDDY_IMAGE)
-    
+
     script_name = 'check_pedigree.py'
-    script_path = to_path(__file__).parent.parent.parent / utils.SCRIPTS_DIR / script_name
+    script_path = (
+        to_path(__file__).parent.parent.parent / utils.SCRIPTS_DIR / script_name
+    )
     cmd = f"""\
     pip3 install peddy
 
@@ -227,11 +229,13 @@ def check_pedigree_job(
 
     touch {check_j.output}
     """
-    check_j.command(wrap_command(
-        cmd,
-        python_script=script_path,
-        setup_gcp=True,
-    ))
+    check_j.command(
+        wrap_command(
+            cmd,
+            python_script=script_path,
+            setup_gcp=True,
+        )
+    )
     check_j.image(images.DRIVER_IMAGE)
     if out_checks_path:
         b.write_output(check_j.output, str(out_checks_path))
@@ -239,7 +243,7 @@ def check_pedigree_job(
 
 
 def _ancestry(
-    b: Batch, 
+    b: Batch,
     somalier_file_by_sample: dict[str, Path],
     sample_ids: list[str],
     refs: RefData,
@@ -288,7 +292,7 @@ def _ancestry(
 
 
 def _relate(
-    b: Batch, 
+    b: Batch,
     somalier_file_by_sample: dict[str, Path],
     sample_ids: list[str],
     ped_path: Path,
@@ -361,21 +365,19 @@ def extact_job(
     j.image(images.BIOINFO_IMAGE)
     if isinstance(gvcf_or_cram_or_bam_path, CramPath):
         STANDARD.set_resources(
-            j,
-            ncpu=4, 
-            storage_gb=200 if gvcf_or_cram_or_bam_path.is_bam else 50
+            j, ncpu=4, storage_gb=200 if gvcf_or_cram_or_bam_path.is_bam else 50
         )
         input_file = b.read_input_group(
             base=str(gvcf_or_cram_or_bam_path),
-            index=str(gvcf_or_cram_or_bam_path.index_path)
+            index=str(gvcf_or_cram_or_bam_path.index_path),
         )
     else:
         STANDARD.set_resources(j, ncpu=2, storage_gb=10)
         input_file = b.read_input_group(
             base=str(gvcf_or_cram_or_bam_path),
-            index=str(gvcf_or_cram_or_bam_path.tbi_path)
+            index=str(gvcf_or_cram_or_bam_path.tbi_path),
         )
-    
+
     ref = refs.fasta_res_group(b)
     sites = b.read_input(str(refs.somalier_sites))
 

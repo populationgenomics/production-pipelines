@@ -16,6 +16,7 @@ class SamtoolsStats(SampleStage):
     """
     Alignment QC using samtools stats.
     """
+
     def expected_outputs(self, sample: Sample):
         """
         Expected to generate one QC file to be parsed with MultiQC:
@@ -29,7 +30,7 @@ class SamtoolsStats(SampleStage):
         Call a function from the `jobs` module.
         """
         cram_path = sample.get_cram_path()
-        
+
         j = samtools_stats(
             b=self.b,
             cram_path=cram_path,
@@ -37,11 +38,7 @@ class SamtoolsStats(SampleStage):
             refs=self.refs,
             job_attrs=self.get_job_attrs(sample),
         )
-        return self.make_outputs(
-            sample, 
-            data=self.expected_outputs(sample),
-            jobs=[j]
-        )
+        return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])
 
 
 @stage
@@ -49,6 +46,7 @@ class PicardWgsMetrics(SampleStage):
     """
     Alignment QC using picard tools wgs_metrics.
     """
+
     def expected_outputs(self, sample: Sample):
         """
         Expected to generate one QC file to be parsed with MultiQC.
@@ -64,7 +62,7 @@ class PicardWgsMetrics(SampleStage):
         Call a function from the `jobs` module.
         """
         cram_path = sample.get_cram_path()
-        
+
         j = picard_wgs_metrics(
             b=self.b,
             cram_path=cram_path,
@@ -80,15 +78,14 @@ class VerifyBamId(SampleStage):
     """
     Check for contamination using VerifyBAMID SelfSM.
     """
+
     def expected_outputs(self, sample: Sample):
         """
         Expected to generate one QC file to be parsed with MultiQC.
         * VerifyBAMID file has to have *.selfSM ending:
           https://github.com/ewels/MultiQC/blob/master/multiqc/utils/search_patterns.yaml#L783-L784
         """
-        return (
-            sample.dataset.get_bucket() / 'qc' / (sample.id + '_verify_bamid.selfSM')
-        )
+        return sample.dataset.get_bucket() / 'qc' / (sample.id + '_verify_bamid.selfSM')
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """

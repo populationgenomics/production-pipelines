@@ -4,34 +4,48 @@ Extending the Hail's `Batch` class.
 
 import logging
 import os
+from typing import TypedDict
 
-from cloudpathlib import CloudPath
 import hailtop.batch as hb
 from hailtop.batch.job import Job, PythonJob
 
-from .. import Path, to_path
+from .. import Path
 from ..providers import Cloud
 
 logger = logging.getLogger(__file__)
 
 
-class Batch(hb.Batch):
+class JobAttributes(TypedDict, total=False):
+    """
+    Job attributes specification.
+    """
+    sample: str
+    dataset: str
+    samples: str
+    part: str
+    label: str
+    stage: str
+    tool: str
+
+
+class RegisteringBatch(hb.Batch):
     """
     Thin subclass of the Hail `Batch` class. The aim is to be able to register
     created jobs, in order to print statistics before submitting the Batch.
     """
+
     def __init__(self, name, backend, *args, **kwargs):
         super().__init__(name, backend, *args, **kwargs)
         # Job stats registry:
         self.labelled_jobs = dict()
         self.other_job_num = 0
         self.total_job_num = 0
-    
+
     def _process_attributes(
         self,
         name: str | None = None,
-        attributes: dict[str, str] | None = None,
-    ):
+        attributes: JobAttributes | None = None,
+    ) -> str:
         """
         Use job attributes to make the job name more descriptibe, and add
         labels for Batch pre-submission stats.
@@ -39,20 +53,26 @@ class Batch(hb.Batch):
         if not name:
             raise ValueError('Error: job name must be defined')
 
-        attributes = attributes or dict()
+        attributes = attributes or JobAttributes()
         dataset = attributes.get('dataset')
         sample = attributes.get('sample')
-        samples = attributes.get('samples')
+        sample_list = attributes.get('samples')
         part = attributes.get('part')
         label = attributes.get('label', name)
 
         name = make_job_name(name, sample, dataset, part)
 
-        if label and (sample or samples):
+        samples = []
+        if sample_list:
+            samples = sample_list.split(',')
+        elif sample:
+            samples = [sample]
+
+        if label and samples:
             if label not in self.labelled_jobs:
                 self.labelled_jobs[label] = {'job_n': 0, 'samples': set()}
             self.labelled_jobs[label]['job_n'] += 1
-            self.labelled_jobs[label]['samples'] |= (samples or {sample})
+            self.labelled_jobs[label]['samples'] |= set(samples)
         else:
             self.other_job_num += 1
         self.total_job_num += 1
@@ -61,7 +81,7 @@ class Batch(hb.Batch):
     def new_python_job(
         self,
         name: str | None = None,
-        attributes: dict[str, str] | None = None,
+        attributes: JobAttributes | None = None,
     ) -> PythonJob:
         """
         Wrapper around `new_python_job()` that processes job attributes.
@@ -72,7 +92,7 @@ class Batch(hb.Batch):
     def new_job(
         self,
         name: str | None = None,
-        attributes: dict[str, str] | None = None,
+        attributes: JobAttributes | None = None,
         **kwargs,
     ) -> Job:
         """
@@ -83,10 +103,10 @@ class Batch(hb.Batch):
 
 
 def setup_batch(
-    description: str, 
+    description: str,
     billing_project: str | None = None,
     hail_bucket: Path | None = None,
-) -> Batch:
+) -> RegisteringBatch:
     """
     Wrapper around the initialization of a Hail Batch object.
     Handles setting the temporary bucket and the billing project.
@@ -107,7 +127,7 @@ def setup_batch(
         remote_tmpdir=hail_bucket,
         token=os.environ.get('HAIL_TOKEN'),
     )
-    return Batch(name=description, backend=backend)
+    return RegisteringBatch(name=description, backend=backend)
 
 
 def get_hail_bucket(hail_bucket: str | Path | None = None, cloud=Cloud.GS) -> str:
@@ -133,7 +153,7 @@ def get_billing_project(billing_project: str | None = None) -> str:
     """
     Get Hail billing project.
     """
-    
+
     billing_project = billing_project or os.getenv('HAIL_BILLING_PROJECT')
     if not billing_project:
         raise ValueError(
@@ -144,8 +164,8 @@ def get_billing_project(billing_project: str | None = None) -> str:
 
 
 def make_job_name(
-    name: str, 
-    sample: str | None = None, 
+    name: str,
+    sample: str | None = None,
     dataset: str | None = None,
     part: str | None = None,
 ) -> str:
@@ -162,9 +182,7 @@ def make_job_name(
 
 
 def hail_query_env(
-    j: Job, 
-    hail_billing_project: str, 
-    hail_bucket: str | Path | None = None
+    j: Job, hail_billing_project: str, hail_bucket: str | Path | None = None
 ):
     """
     Setup environment to run Hail Query Service backend script.

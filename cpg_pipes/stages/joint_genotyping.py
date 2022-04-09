@@ -10,9 +10,7 @@ from ..refdata import RefData
 from ..types import GvcfPath
 from ..jobs.joint_genotyping import make_joint_genotyping_jobs, JointGenotyperTool
 from ..targets import Cohort
-from ..pipeline import (
-    stage, CohortStage, StageInput, StageOutput, PipelineError
-)
+from ..pipeline import stage, CohortStage, StageInput, StageOutput, PipelineError
 from .gvcf import GvcfStage
 
 logger = logging.getLogger(__file__)
@@ -23,6 +21,7 @@ class JointGenotypingStage(CohortStage):
     """
     Joint-calling of GVCFs together.
     """
+
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         """
         Generate a pVCF and a site-only VCF. Returns 2 outputs, thus not checking
@@ -30,9 +29,9 @@ class JointGenotypingStage(CohortStage):
         """
         samples_hash = utils.hash_sample_ids(cohort.get_sample_ids())
         expected_jc_vcf_path = (
-            cohort.analysis_dataset.get_tmp_bucket() / 
-            'joint_calling' / 
-            f'{samples_hash}.vcf.gz'
+            cohort.analysis_dataset.get_tmp_bucket()
+            / 'joint_calling'
+            / f'{samples_hash}.vcf.gz'
         )
         return {
             'vcf': expected_jc_vcf_path,
@@ -46,8 +45,7 @@ class JointGenotypingStage(CohortStage):
         Use function defined in jobs module
         """
         gvcf_by_sid = {
-            sample.id: 
-                GvcfPath(inputs.as_path(target=sample, stage=GvcfStage)) 
+            sample.id: GvcfPath(inputs.as_path(target=sample, stage=GvcfStage))
             for sample in cohort.get_samples()
         }
 
@@ -72,14 +70,10 @@ class JointGenotypingStage(CohortStage):
             gvcf_by_sid=gvcf_by_sid,
             refs=self.refs,
             overwrite=not self.check_intermediates,
-            tool=JointGenotyperTool.GnarlyGenotyper 
-            if self.pipeline_config.get('use_gnarly', False) 
+            tool=JointGenotyperTool.GnarlyGenotyper
+            if self.pipeline_config.get('use_gnarly', False)
             else JointGenotyperTool.GenotypeGVCFs,
             scatter_count=self.pipeline_config.get('jc_intervals_num'),
             job_attrs=self.get_job_attrs(),
         )
-        return self.make_outputs(
-            cohort, 
-            data=self.expected_outputs(cohort), 
-            jobs=jobs
-        )
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)

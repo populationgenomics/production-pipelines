@@ -19,16 +19,13 @@ class VqsrStage(CohortStage):
     """
     Variant filtering of joint-called VCF
     """
+
     def expected_outputs(self, cohort: Cohort) -> Path:
         """
         Expects to generate one site-only VCF
         """
         samples_hash = utils.hash_sample_ids(cohort.get_sample_ids())
-        return (
-            self.tmp_bucket /
-            'vqsr' / 
-            f'{samples_hash}-siteonly.vcf.gz'
-        )
+        return self.tmp_bucket / 'vqsr' / f'{samples_hash}-siteonly.vcf.gz'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """

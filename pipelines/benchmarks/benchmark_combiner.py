@@ -28,11 +28,13 @@ pipeline = create_pipeline(
     datasets=[INPUT_DATASET],
 )
 
-df = pd.DataFrame([
-    {'s': s.id, 'gvcf': s.get_gvcf_path()} 
-    for s in pipeline.get_all_samples()
-    if s.get_gvcf_path().exists()
-])
+df = pd.DataFrame(
+    [
+        {'s': s.id, 'gvcf': s.get_gvcf_path()}
+        for s in pipeline.get_all_samples()
+        if s.get_gvcf_path().exists()
+    ]
+)
 logger.info(
     f'Found {len(df)}/{len(pipeline.get_all_samples())} samples '
     f'in {INPUT_DATASET} with GVCFs'

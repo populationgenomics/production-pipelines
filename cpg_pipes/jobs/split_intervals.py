@@ -28,12 +28,12 @@ def get_intervals(
     """
     Add a job that split genome into intervals to parallelise variant calling.
 
-    This job calls picard's IntervalListTools to scatter the input interval list 
+    This job calls picard's IntervalListTools to scatter the input interval list
     into scatter_count sub-interval lists, inspired by this WARP task :
     https://github.com/broadinstitute/warp/blob/bc90b0db0138747685b459c83ce52c8576ce03cd/tasks/broad/Utilities.wdl
-    
-    Note that we use the mode INTERVAL_SUBDIVISION instead of 
-    BALANCING_WITHOUT_INTERVAL_SUBDIVISION_WITH_OVERFLOW. Modes other than 
+
+    Note that we use the mode INTERVAL_SUBDIVISION instead of
+    BALANCING_WITHOUT_INTERVAL_SUBDIVISION_WITH_OVERFLOW. Modes other than
     INTERVAL_SUBDIVISION produce an unpredicted number of intervals. WDL can handle
     that, but Hail Batch is not dynamic and have to expect certain number of output
     files.
@@ -45,7 +45,7 @@ def get_intervals(
     if utils.exists(cache_bucket / '1.interval_list'):
         j.name += ' [use cached]'
         return j, [
-            b.read_input(str(cache_bucket / f'{idx + 1}.interval_list')) 
+            b.read_input(str(cache_bucket / f'{idx + 1}.interval_list'))
             for idx in range(scatter_count)
         ]
 
@@ -78,12 +78,12 @@ def get_intervals(
         cmd += f"""
         ln /io/batch/out/{name}/scattered.interval_list {j[f'{idx + 1}.interval_list']}
         """
-        
+
     j.command(wrap_command(cmd))
     if cache:
         for idx in range(scatter_count):
             b.write_output(
-                j[f'{idx + 1}.interval_list'], 
-                str(cache_bucket / f'{idx + 1}.interval_list')
+                j[f'{idx + 1}.interval_list'],
+                str(cache_bucket / f'{idx + 1}.interval_list'),
             )
     return j, [j[f'{idx + 1}.interval_list'] for idx in range(scatter_count)]

@@ -19,7 +19,7 @@ logger = logging.getLogger(__file__)
 # Packages to install on a dataproc cluster, to use with the dataproc wrapper.
 DATAPROC_PACKAGES = [
     'cpg_pipes==0.3.0',
-    'cpg_gnomad',   # github.com/populationgenomics/gnomad_methods
+    'cpg_gnomad',  # github.com/populationgenomics/gnomad_methods
     'seqr_loader==1.2.5',  # hail-elasticsearch-pipelines
     'elasticsearch==8.1.1',
     'cpg_utils',
@@ -54,6 +54,7 @@ def get_validation_callback(
     with a different suffix also exists (e.g. genomes.mt and genomes.metadata.ht)
     @return: a callback suitable for Click parameter initialization
     """
+
     def _callback(_: click.Context, param: click.Option, value: Any):
         if value is None:
             return value
@@ -78,6 +79,7 @@ def get_validation_callback(
                         f'exist'
                     )
         return value
+
     return _callback
 
 

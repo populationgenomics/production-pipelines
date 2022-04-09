@@ -11,7 +11,13 @@ import logging
 from cpg_pipes import benchmark, images, Namespace
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
 from cpg_pipes.types import FastqPair, CramPath
-from cpg_pipes.pipeline import stage, create_pipeline, SampleStage, StageInput, StageOutput
+from cpg_pipes.pipeline import (
+    stage,
+    create_pipeline,
+    SampleStage,
+    StageInput,
+    StageOutput,
+)
 from cpg_pipes.targets import Sample
 
 logger = logging.getLogger(__file__)
@@ -38,16 +44,16 @@ class SubsetAlignmentInput(SampleStage):
             'r1': f'{basepath}/R1.fastq.gz',
             'r2': f'{basepath}/R2.fastq.gz',
         }
-    
+
     NA12878_read_pairs = 787265109
     FQ_LINES_PER_READ = 4
     SUBSET_FRACTION = 4
-    
+
     def _subset_fastq(self, alignment_input, sample):
         fqs1, fqs2 = alignment_input.as_fq_inputs(self.b)
 
-        # We want to take 1/4 of all reads in NA12878. Total read count is 1574530218 
-        # (787265109 pairs), so subsetting to 196816277 pairs (196816277*4=787265108 
+        # We want to take 1/4 of all reads in NA12878. Total read count is 1574530218
+        # (787265109 pairs), so subsetting to 196816277 pairs (196816277*4=787265108
         # lines from each file)
         lines = self.NA12878_read_pairs * self.FQ_LINES_PER_READ / self.SUBSET_FRACTION
 
@@ -60,13 +66,13 @@ class SubsetAlignmentInput(SampleStage):
         j2.storage('100G')
         j2.command(f'gunzip -c {fqs2[0]} | head -n{lines} | gzip -c > {j2.out_fq}')
         self.b.write_output(j2.out_fq, str(self.expected_outputs(sample)['r2']))
-        
+
         return self.make_outputs(
             sample,
             data={'r1': j1.out_fq, 'r2': j2.out_fq},
             jobs=[j1, j2],
         )
-    
+
     def _subset_cram(self, cram: CramPath, sample: Sample):
         j = self.b.new_job('Subset CRAM')
         j.image(images.BIOINFO_IMAGE)
@@ -86,16 +92,15 @@ class SubsetAlignmentInput(SampleStage):
             f'samtools index -@31 {j.output_cram.cram_path} {j.output_cram["cram.crai"]}'
         )
         self.b.write_output(
-            j.output_cram, 
-            str(self.expected_outputs(sample)).replace('.cram', '')
+            j.output_cram, str(self.expected_outputs(sample)).replace('.cram', '')
         )
-        
+
         return self.make_outputs(
-            sample, 
+            sample,
             data={'cram': j.output_cram},
             jobs=[j],
         )
-    
+
     def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput:
         if 'fastq_input' in sample.meta:
             alignment_input = sample.meta['fastq_input']
@@ -104,13 +109,19 @@ class SubsetAlignmentInput(SampleStage):
             return self.make_outputs(sample, None)
 
 
-@stage(required_stages=SubsetAlignmentInput if (INPUTS_TYPE == InputsType.FULL_SUBSET) else None)
+@stage(
+    required_stages=SubsetAlignmentInput
+    if (INPUTS_TYPE == InputsType.FULL_SUBSET)
+    else None
+)
 class DifferentResources(SampleStage):
     def expected_outputs(self, sample: 'Sample'):
         return None
 
     def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput:
-        basepath = benchmark.BENCHMARK_BUCKET / f'outputs/{INPUTS_TYPE.value}/{sample.id}'
+        basepath = (
+            benchmark.BENCHMARK_BUCKET / f'outputs/{INPUTS_TYPE.value}/{sample.id}'
+        )
 
         if INPUTS_TYPE == InputsType.FULL_SUBSET:
             d = inputs.as_dict(sample, stage=SubsetAlignmentInput)
@@ -121,22 +132,29 @@ class DifferentResources(SampleStage):
         jobs = []
         for nthreads in [8, 16, 32]:
             for aligner in [Aligner.DRAGMAP, Aligner.BWA]:
-                jobs.extend(align(
-                    self.b,
-                    alignment_input=alignment_input,
-                    sample_name=sample.id,
-                    output_path=basepath / f'nomarkdup/{aligner.name}_nthreads{nthreads}.bam',
-                    job_attrs=sample.get_job_attrs(),
-                    refs=self.refs,
-                    aligner=aligner,
-                    markdup_tool=MarkDupTool.NO_MARKDUP,
-                    extra_label=f'nomarkdup_fromfastq_{aligner.name}nthreads{nthreads}',
-                    requested_nthreads=nthreads,
-                ))
+                jobs.extend(
+                    align(
+                        self.b,
+                        alignment_input=alignment_input,
+                        sample_name=sample.id,
+                        output_path=basepath
+                        / f'nomarkdup/{aligner.name}_nthreads{nthreads}.bam',
+                        job_attrs=sample.get_job_attrs(),
+                        refs=self.refs,
+                        aligner=aligner,
+                        markdup_tool=MarkDupTool.NO_MARKDUP,
+                        extra_label=f'nomarkdup_fromfastq_{aligner.name}nthreads{nthreads}',
+                        requested_nthreads=nthreads,
+                    )
+                )
         return self.make_outputs(sample, jobs=jobs)
 
 
-@stage(required_stages=SubsetAlignmentInput if (INPUTS_TYPE == InputsType.FULL_SUBSET) else None)
+@stage(
+    required_stages=SubsetAlignmentInput
+    if (INPUTS_TYPE == InputsType.FULL_SUBSET)
+    else None
+)
 class DifferentAlignerSetups(SampleStage):
     def expected_outputs(self, sample: 'Sample'):
         return None
@@ -155,24 +173,27 @@ class DifferentAlignerSetups(SampleStage):
 
         jobs = []
         for aligner in [
-            Aligner.DRAGMAP, 
+            Aligner.DRAGMAP,
             Aligner.BWA,
             # Aligner.BWAMEM2
         ]:
             for markdup in [MarkDupTool.PICARD]:
-                jobs.extend(align(
-                    self.b,
-                    alignment_input=alignment_input,
-                    sample_name=sample.id,
-                    job_attrs=sample.get_job_attrs(),
-                    refs=self.refs,
-                    output_path=basepath / f'{aligner.name}-{markdup.name}.bam',
-                    aligner=aligner,
-                    markdup_tool=markdup,
-                    extra_label=f', dedup with {markdup.name}',
-                    number_of_shards_for_realignment=10 if 
-                    isinstance(alignment_input, CramPath) else 0,
-                ))
+                jobs.extend(
+                    align(
+                        self.b,
+                        alignment_input=alignment_input,
+                        sample_name=sample.id,
+                        job_attrs=sample.get_job_attrs(),
+                        refs=self.refs,
+                        output_path=basepath / f'{aligner.name}-{markdup.name}.bam',
+                        aligner=aligner,
+                        markdup_tool=markdup,
+                        extra_label=f', dedup with {markdup.name}',
+                        number_of_shards_for_realignment=10
+                        if isinstance(alignment_input, CramPath)
+                        else 0,
+                    )
+                )
         return self.make_outputs(sample, jobs=jobs)
 
 
@@ -196,9 +217,11 @@ def main():
     )
     s.alignment_input = benchmark.perth_neuro_cram
 
-    pipeline.set_stages([
-        DifferentAlignerSetups,
-    ])
+    pipeline.set_stages(
+        [
+            DifferentAlignerSetups,
+        ]
+    )
 
     pipeline.run()
 

@@ -22,6 +22,7 @@ class Namespace(Enum):
     Storage namespace.
     https://github.com/populationgenomics/team-docs/tree/main/storage_policies#main-vs-test
     """
+
     MAIN = 'main'
     TEST = 'test'
 
@@ -30,6 +31,7 @@ class Cloud(Enum):
     """
     Cloud storage provider and correponding protocol prefix.
     """
+
     GS = 'gs'
     AZ = 'az'
 
@@ -40,12 +42,13 @@ class StorageProvider(ABC):
     Onty get_bucket() method is required, however other methods
     are available to override as well.
     """
+
     def __init__(self, cloud: Cloud):
         self.cloud = cloud
 
     @abstractmethod
     def get_bucket(
-        self, 
+        self,
         dataset: str,
         namespace: Namespace,
         suffix: str | None = None,
@@ -72,15 +75,15 @@ class StorageProvider(ABC):
         Bucket for analysis results.
         """
         return self.get_bucket(
-            dataset=dataset, 
-            namespace=namespace, 
-            version=version, 
-            sample=sample, 
-            suffix='analysis'
+            dataset=dataset,
+            namespace=namespace,
+            version=version,
+            sample=sample,
+            suffix='analysis',
         )
 
     def get_tmp_bucket(
-        self, 
+        self,
         dataset: str,
         namespace: Namespace,
         version: str | None = None,
@@ -90,15 +93,15 @@ class StorageProvider(ABC):
         Bucket for temporary files.
         """
         return self.get_bucket(
-            dataset=dataset, 
-            namespace=namespace, 
-            version=version, 
-            sample=sample, 
-            suffix='tmp'
+            dataset=dataset,
+            namespace=namespace,
+            version=version,
+            sample=sample,
+            suffix='tmp',
         )
 
     def get_web_bucket(
-        self, 
+        self,
         dataset: str,
         namespace: Namespace,
         version: str | None = None,
@@ -108,16 +111,16 @@ class StorageProvider(ABC):
         Bucket shared with an HTTP server.
         """
         return self.get_bucket(
-            dataset=dataset, 
-            namespace=namespace, 
-            version=version, 
-            sample=sample, 
-            suffix='web'
+            dataset=dataset,
+            namespace=namespace,
+            version=version,
+            sample=sample,
+            suffix='web',
         )
 
     @abstractmethod
     def get_web_url(
-        self, 
+        self,
         dataset: str,
         namespace: Namespace,
         version: str | None = None,

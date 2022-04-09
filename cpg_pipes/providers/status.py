@@ -7,9 +7,9 @@ from abc import ABC, abstractmethod
 from enum import Enum
 
 from hailtop.batch.job import Job
+from hailtop.batch import Batch
 
 from .. import Path
-from ..hb.batch import Batch
 from ..targets import Target
 
 logger = logging.getLogger(__file__)
@@ -27,6 +27,7 @@ class AnalysisStatus(Enum):
     https://github.com/populationgenomics/sample-metadata/blob/dev/models/enums
     /analysis.py#L14-L21
     """
+
     QUEUED = 'queued'
     IN_PROGRESS = 'in-progress'
     FAILED = 'failed'
@@ -45,6 +46,7 @@ class StatusReporter(ABC):
     """
     Status reporter
     """
+
     @abstractmethod
     def add_updaters_jobs(
         self,

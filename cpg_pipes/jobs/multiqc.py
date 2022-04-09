@@ -6,9 +6,9 @@ Batch pipeline to run WGS QC.
 
 import logging
 from hailtop.batch.job import Job
+from hailtop.batch import Batch
 
 from cpg_pipes import Path
-from cpg_pipes.hb.batch import Batch
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.images import DRIVER_IMAGE
@@ -31,7 +31,7 @@ def multiqc(
     Run MultiQC for the files in `qc_paths`
     @param b: batch object
     @param tmp_bucket: bucket for tmp files
-    @param paths: file bucket paths to pass into MultiQC 
+    @param paths: file bucket paths to pass into MultiQC
     @param out_json_path: where to write MultiQC-generated JSON file
     @param out_html_path: where to write the HTML report
     @param out_html_url: URL corresponding to the HTML report
@@ -50,8 +50,9 @@ def multiqc(
     file_list = b.read_input(str(file_list_path))
 
     endings_conf = ', '.join(list(ending_to_trim)) if ending_to_trim else ''
-    modules_conf = ', '.join(
-        list(modules_to_trim_endings)) if modules_to_trim_endings else ''
+    modules_conf = (
+        ', '.join(list(modules_to_trim_endings)) if modules_to_trim_endings else ''
+    )
 
     cmd = f"""\
     pip install multiqc

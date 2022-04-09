@@ -13,8 +13,11 @@ import hail as hl
 from cpg_pipes import to_path, Namespace
 from cpg_pipes import hailquery
 from cpg_pipes.providers.cpg import CpgStorageProvider
-from cpg_pipes.query.seqr_loader import annotate_cohort, subset_mt_to_samples, \
-    annotate_dataset_mt
+from cpg_pipes.query.seqr_loader import (
+    annotate_cohort,
+    subset_mt_to_samples,
+    annotate_dataset_mt,
+)
 from cpg_pipes.query.vep import vep_json_to_ht
 from cpg_pipes.refdata import RefData
 from cpg_pipes.types import SequencingType, logger
@@ -29,6 +32,7 @@ class TestQuery(unittest.TestCase):
     """
     Test Hail Query functions.
     """
+
     @property
     def out_bucket(self):
         """Property to allow re-setting the timestamp in a method"""
@@ -52,7 +56,7 @@ class TestQuery(unittest.TestCase):
         self.locus1 = '5111495'
         self.locus2 = '5111607'
         self.interval = f'{self.chrom}-{self.locus1}-{self.locus2}'
-        
+
     def tearDown(self) -> None:
         """Remove tmp dir"""
         shutil.rmtree(self.local_tmp_dir)
@@ -97,12 +101,9 @@ class TestQuery(unittest.TestCase):
             f'siteonly-vqsr-{self.interval}.vcf.gz'
         )
         vep_ht_path = to_path(
-            f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/'
-            f'vep/{self.interval}.ht'
+            f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/' f'vep/{self.interval}.ht'
         )
-        out_mt_path = (
-            self.out_bucket / 'seqr_loader' / f'cohort-{self.interval}.mt'
-        )
+        out_mt_path = self.out_bucket / 'seqr_loader' / f'cohort-{self.interval}.mt'
         annotate_cohort(
             str(vcf_path),
             str(siteonly_vqsr_path),
@@ -122,21 +123,15 @@ class TestQuery(unittest.TestCase):
             f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/'
             f'seqr_loader/cohort-{self.interval}.mt'
         )
-        subset_mt_path = (
-            self.tmp_bucket / 'seqr_loader' / f'subset-{self.interval}.mt'
-        )
-        out_mt_path = (
-            self.out_bucket / 'seqr_loader' / f'dataset-{self.interval}.mt'
-        )
+        subset_mt_path = self.tmp_bucket / 'seqr_loader' / f'subset-{self.interval}.mt'
+        out_mt_path = self.out_bucket / 'seqr_loader' / f'dataset-{self.interval}.mt'
         subset_mt_to_samples(
             str(mt_path),
             SAMPLES[:3],
             str(subset_mt_path),
         )
         annotate_dataset_mt(
-            str(subset_mt_path),
-            str(out_mt_path),
-            str(self.tmp_bucket / 'seqr_loader')
+            str(subset_mt_path), str(out_mt_path), str(self.tmp_bucket / 'seqr_loader')
         )
         # Testing
         mt = hl.read_matrix_table(str(out_mt_path))
@@ -145,23 +140,22 @@ class TestQuery(unittest.TestCase):
         self.assertSetEqual(
             set(mt.samples_gq['20_to_25'].collect()[0]), {'CPG196519', 'CPG196527'}
         )
-        self.assertSetEqual(
-            set(mt.samples_ab['40_to_45'].collect()[0]), {'CPG196535'}
-        )
+        self.assertSetEqual(set(mt.samples_ab['40_to_45'].collect()[0]), {'CPG196535'})
 
     @skip('Not implemented in Batch backend')
     def test_vcf_combiner(self):
         from cpg_pipes.targets import Cohort
+
         dataset = Cohort(
             analysis_dataset_name=DATASET,
             namespace=Namespace.TEST,
-            storage_provider=CpgStorageProvider()
+            storage_provider=CpgStorageProvider(),
         ).add_dataset(DATASET)
         for sid in SAMPLES:
             dataset.add_sample(sid)
-    
+
         out_mt_path = self.out_bucket / 'combined.mt'
-        
+
         hl.experimental.run_combiner(
             [str(s.get_gvcf_path().path) for s in dataset.get_samples()],
             sample_names=[s.id for s in dataset.get_samples()],

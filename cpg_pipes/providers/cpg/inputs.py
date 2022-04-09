@@ -21,7 +21,7 @@ class SmdbInputProvider(InputProvider):
     def __init__(self, db: SMDB, check_files: bool = False):
         super().__init__(check_files=check_files)
         self.db = db
-        
+
     def populate_cohort(
         self,
         cohort: Cohort,
@@ -32,7 +32,7 @@ class SmdbInputProvider(InputProvider):
         ped_files: list[Path] | None = None,
     ) -> Cohort:
         """
-        Overwriding the superclass method. 
+        Overwriding the superclass method.
         """
         if not dataset_names:
             raise InputProviderError(
@@ -48,7 +48,7 @@ class SmdbInputProvider(InputProvider):
         )
 
     def get_entries(
-        self, 
+        self,
         dataset: Dataset | None = None,
     ) -> list[dict]:
         """
@@ -132,15 +132,17 @@ class SmdbInputProvider(InputProvider):
         Populate Participant entries.
         """
         for dataset in cohort.get_datasets():
-            pid_sid_multi = self.db.papi.get_external_participant_id_to_internal_sample_id(
-                dataset.name
+            pid_sid_multi = (
+                self.db.papi.get_external_participant_id_to_internal_sample_id(
+                    dataset.name
+                )
             )
             participant_by_sid = {}
             for group in pid_sid_multi:
                 pid = group[0]
                 for sid in group[1:]:
                     participant_by_sid[sid] = pid.strip()
-                    
+
             for sample in dataset.get_samples():
                 if pid := participant_by_sid.get(sample.id):
                     sample.participant_id = pid

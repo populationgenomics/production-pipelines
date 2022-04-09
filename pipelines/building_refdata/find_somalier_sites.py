@@ -37,20 +37,27 @@ gnomad_vcf_paths = [
     f'gnomad.genomes.v3.1.2.hgdp_tgp.chr{c}.vcf.bgz'
     for c in [str(i + 1) for i in range(22)] + ['X', 'Y']
 ]
-gnomad_vcfs = [
-    pipe.b.read_input(path) for path in gnomad_vcf_paths
-]
-concat_j.command(wrap_command(f"""\
+gnomad_vcfs = [pipe.b.read_input(path) for path in gnomad_vcf_paths]
+concat_j.command(
+    wrap_command(
+        f"""\
 bcftools concat {" ".join(gnomad_vcfs)} -Oz -o {concat_j.gnomad_vcf}
-""", monitor_space=True))
+""",
+        monitor_space=True,
+    )
+)
 
 make_sites_j = pipe.b.new_job('Make somalier sites')
 make_sites_j.image(images.SOMALIER_IMAGE)
 make_sites_j.storage('6T')
 make_sites_j.cpu(4)
-make_sites_j.command(wrap_command(f"""
+make_sites_j.command(
+    wrap_command(
+        f"""
 cd /io/batch
 somalier find-sites {concat_j.gnomad_vcf}
 mv sites.vcf.gz {make_sites_j.sites_vcf}
-"""))
+"""
+    )
+)
 pipe.b.write_output(make_sites_j.sites_vcf, RESULT_VCF)

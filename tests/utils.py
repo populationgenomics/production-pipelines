@@ -8,8 +8,16 @@ BASE_BUCKET = to_path('gs://cpg-fewgenomes-test/unittest')
 
 # Samples for joint calling
 SAMPLES = [
-    'CPG196519', 'CPG196527', 'CPG196535', 'CPG196543', 'CPG196550', 
-    'CPG196568', 'CPG196576', 'CPG196584', 'CPG196592', 'CPG196600'
+    'CPG196519',
+    'CPG196527',
+    'CPG196535',
+    'CPG196543',
+    'CPG196550',
+    'CPG196568',
+    'CPG196576',
+    'CPG196584',
+    'CPG196592',
+    'CPG196600',
 ]
 FULL_GVCF_BY_SID = {
     s: GvcfPath(f'gs://cpg-fewgenomes-test/unittest/inputs/gvcf/{s}.g.vcf.gz')
@@ -28,7 +36,7 @@ def setup_env(
     access_level: str = 'test',
 ):
     """
-    Make sure that setup_env() is called before importing cpg_pipes, because 
+    Make sure that setup_env() is called before importing cpg_pipes, because
     cpg_pipes imports analysis_runner.dataproc, which in turns requires
     DATASET_GCP_PROJECT to be set on import time. Also, unittest doesn't pick
     exported environment variables with EnvFile, so have to do it here.

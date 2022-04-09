@@ -32,7 +32,9 @@ def markdup(
         return j
 
     j.image(images.SAMTOOLS_PICARD_IMAGE)
-    resource = STANDARD.set_resources(j, storage_gb=175)  # enough for input BAM and output CRAM
+    resource = STANDARD.set_resources(
+        j, storage_gb=175
+    )  # enough for input BAM and output CRAM
     j.declare_resource_group(
         output_cram={
             'cram': '{root}.cram',
@@ -51,18 +53,17 @@ def markdup(
     samtools index -@{resource.get_nthreads() - 1} {j.output_cram.cram_path} {j.output_cram['cram.crai']}
     """
     j.command(wrap_command(cmd, monitor_space=True))
-    
+
     if output_path:
         if not qc_bucket:
             qc_bucket = output_path.parent
-    
+
         b.write_output(j.output_cram, str(output_path.with_suffix('')))
         b.write_output(
-            j.duplicate_metrics, str(
-                qc_bucket /
-                'duplicate-metrics' /
-                f'{sample_name}-duplicate-metrics.csv'
-            )
+            j.duplicate_metrics,
+            str(
+                qc_bucket / 'duplicate-metrics' / f'{sample_name}-duplicate-metrics.csv'
+            ),
         )
 
     return j

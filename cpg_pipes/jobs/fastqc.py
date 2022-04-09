@@ -14,7 +14,7 @@ from cpg_pipes.refdata import RefData
 
 
 def fastqc(
-    b: hb.Batch, 
+    b: hb.Batch,
     output_html_path: Path,
     output_zip_path: Path,
     alignment_input: AlignmentInput,
@@ -24,11 +24,12 @@ def fastqc(
     """
     Adds FastQC jobs. If the input is a set of fqs, runs FastQC on each fq file.
     """
+
     def _fastqc_one(jname_, inp: ResourceFile):
         j = b.new_job(jname_, job_attrs)
         j.image('biocontainers/fastqc:v0.11.9_cv8')
         res = STANDARD.set_resources(j, ncpu=16)
-        
+
         cmd = f"""\
         mkdir -p /io/batch/outdir
         fastqc -t{res.get_nthreads()} {inp} \\
@@ -39,11 +40,11 @@ def fastqc(
         unzip /io/batch/outdir/*_fastqc.zip
         """
         j.command(wrap_command(cmd, monitor_space=True))
-    
+
         b.write_output(j.out_html, str(output_html_path))
         b.write_output(j.out_zip, str(output_zip_path))
         return j
-    
+
     jobs = []
     if isinstance(alignment_input, CramPath) and alignment_input.is_bam:
         bam = alignment_input.resource_group(b)

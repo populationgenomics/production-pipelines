@@ -10,12 +10,12 @@ import click
 from cpg_pipes import Path
 from cpg_pipes.utils import exists
 from cpg_pipes.pipeline import (
-    pipeline_click_options, 
-    stage, 
-    create_pipeline, 
-    StageInput, 
-    StageOutput, 
-    DatasetStage
+    pipeline_click_options,
+    stage,
+    create_pipeline,
+    StageInput,
+    StageOutput,
+    DatasetStage,
 )
 from cpg_pipes.jobs.multiqc import multiqc
 from cpg_pipes.stages.cramqc import SamtoolsStats, PicardWgsMetrics, VerifyBamId
@@ -29,30 +29,31 @@ logger = logging.getLogger(__file__)
 @stage(
     required_stages=[
         FastQC,
-        SamtoolsStats, 
+        SamtoolsStats,
         PicardWgsMetrics,
         VerifyBamId,
-        CramSomalierPedigree, 
+        CramSomalierPedigree,
         CramSomalierAncestry,
-    ], 
-    forced=True
+    ],
+    forced=True,
 )
 class MultiQC(DatasetStage):
     """
     Run MultiQC to summarise all QC.
     """
+
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         """
         Expected to produce an HTML and a correponding JSON file.
         """
         return {
             'html': dataset.get_web_bucket() / 'qc' / 'multiqc.html',
-            'json': dataset.get_analysis_bucket() / 'qc' / 'multiqc_data.json'
+            'json': dataset.get_analysis_bucket() / 'qc' / 'multiqc_data.json',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
-        Call a function from the `jobs` module using inputs from `cramqc` 
+        Call a function from the `jobs` module using inputs from `cramqc`
         and `somalier` stages.
         """
         somalier_samples = inputs.as_path(dataset, CramSomalierPedigree, id='samples')
@@ -79,7 +80,10 @@ class MultiQC(DatasetStage):
                 ending_to_trim.add(path.name.replace(sample.id, ''))
         assert ending_to_trim
         modules_to_trim_endings = {
-            'fastqc/zip', 'samtools', 'picard/wgs_metrics', 'verifybamid/selfsm'
+            'fastqc/zip',
+            'samtools',
+            'picard/wgs_metrics',
+            'verifybamid/selfsm',
         }
 
         j = multiqc(
@@ -112,9 +116,7 @@ def main(
     if pipeline.skip_samples_with_missing_input:
         for sample in pipeline.get_all_samples():
             if not exists(sample.get_cram_path().path):
-                logger.warning(
-                    f'Could not find CRAM, skipping sample {sample.id}'
-                )
+                logger.warning(f'Could not find CRAM, skipping sample {sample.id}')
                 sample.active = False
 
     pipeline.run()

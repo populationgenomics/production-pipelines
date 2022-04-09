@@ -25,14 +25,18 @@ def _index_bwa_job(b: hb.Batch, refs: RefData):
     j.declare_resource_group(
         bwa_index={e: '{root}.' + e for e in refs.bwamem2_index_exts}
     )
-    j.command(wrap_command(f"""\
+    j.command(
+        wrap_command(
+            f"""\
     set -o pipefail
     set -ex
     
     bwa-mem2 index {reference.base} -p {j.bwa_index}
     
     df -h; pwd; ls | grep -v proc | xargs du -sh
-    """))
+    """
+        )
+    )
     b.write_output(j.bwa_index, refs.bwamem2_index_prefix)
     return j
 

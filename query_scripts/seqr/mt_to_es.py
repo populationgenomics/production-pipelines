@@ -50,7 +50,10 @@ logger = logging.getLogger(__file__)
     'and a calculated value based on the matrix.',
 )
 @click.option(
-    '--use-spark', 'use_spark', is_flag=True, default=False,
+    '--use-spark',
+    'use_spark',
+    is_flag=True,
+    default=False,
 )
 def main(
     mt_path: str,
@@ -69,6 +72,7 @@ def main(
         hl.init(default_reference='GRCh38')
     else:
         from cpg_utils.hail import init_query_service
+
         init_query_service()
 
     if not all([es_host, es_port, es_username, es_password]):
@@ -118,7 +122,7 @@ def elasticsearch_row(mt: hl.MatrixTable):
     ht = mt.rows()
     # Converts nested structs into one field, e.g. {a: {b: 1}} => a.b: 1
     table = ht.drop('vep').flatten()
-    # When flattening, the table is unkeyed, which causes problems because our locus 
+    # When flattening, the table is unkeyed, which causes problems because our locus
     # and alleles should not
     # be normal fields. We can also re-key, but I believe this is computational?
     table = table.drop(table.locus, table.alleles)
@@ -131,7 +135,7 @@ def _mt_num_shards(mt, es_index_min_num_shards):
     The greater of the user specified min shards and calculated based on the variants
     and samples
     """
-    denominator = 1.4 * 10 ** 9
+    denominator = 1.4 * 10**9
     calculated_num_shards = math.ceil((mt.count_rows() * mt.count_cols()) / denominator)
     return max(es_index_min_num_shards, calculated_num_shards)
 

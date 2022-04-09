@@ -5,13 +5,13 @@ CPG implementation of status reporter.
 from textwrap import dedent
 
 from hailtop.batch.job import Job
+from hailtop.batch import Batch
 
 from ... import images, Path
-from ...hb.batch import Batch
 from ...hb.command import wrap_command
 from ...targets import Target
 from ..status import (
-    AnalysisStatus, 
+    AnalysisStatus,
     StatusReporterError,
     StatusReporter,
 )
@@ -22,6 +22,7 @@ class SmdbStatusReporter(StatusReporter):
     """
     Job status reporter.
     """
+
     def __init__(self, smdb: SMDB):
         self.smdb = smdb
 
@@ -38,8 +39,7 @@ class SmdbStatusReporter(StatusReporter):
         """
         if isinstance(output, dict):
             raise StatusReporterError(
-                'SmdbStatusReporter only supports a single Path '
-                'as an output data.'
+                'SmdbStatusReporter only supports a single Path ' 'as an output data.'
             )
         if not jobs:
             return []
@@ -99,7 +99,8 @@ class SmdbStatusReporter(StatusReporter):
 
         j = b.new_job(job_name, job_attrs)
         j.image(images.SM_IMAGE)
-        cmd = dedent(f"""\
+        cmd = dedent(
+            f"""\
         export SM_ENVIRONMENT=PRODUCTION
 
         cat <<EOT >> update.py
@@ -119,6 +120,7 @@ class SmdbStatusReporter(StatusReporter):
             traceback.print_exc()
         EOT
         python update.py
-        """)
+        """
+        )
         j.command(wrap_command(cmd, rm_leading_space=False, setup_gcp=True))
         return j

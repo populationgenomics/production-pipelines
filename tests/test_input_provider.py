@@ -28,7 +28,7 @@ class TestInputProvider(unittest.TestCase):
         extid3 = 'MYSAMPLE3'
         fq = 'gs://cpg-fewgenomes-test-upload/MYSAMPLE1_M00{}_R{}.fastq.gz'
         cram = 'gs://cpg-fewgenomes-test-upload/MYSAMPLE2.cram'
-        
+
         tsv_contents = f"""\
 dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
 {dataset},{sample1},{extid1},{fq.format(1, 1)}|{fq.format(2, 1)},{fq.format(2, 1)}|{fq.format(2, 2)},,M,wgs
@@ -38,7 +38,7 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
 
         with StringIO(tsv_contents) as fp:
             provider = CsvInputProvider(fp, check_files=False)
-            
+
         cohort = Cohort(
             name='test',
             analysis_dataset_name=dataset,
@@ -46,7 +46,7 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
             storage_provider=CpgStorageProvider(),
         )
         provider.populate_cohort(
-            cohort, 
+            cohort,
             skip_samples=[extid3],
         )
         self.assertEqual(len(cohort.get_datasets()), 1)
@@ -63,11 +63,11 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
         self.assertTrue(s2.alignment_input.ext == 'cram')
         self.assertEqual(s2.pedigree.sex, Sex.UNKNOWN)
         self.assertEqual(s2.sequencing_type, SequencingType.EXOME)
-    
+
     @skip('Figure out SMDB permissions from GitHub workflows')
     def test_smdb_provider(self):
         dataset = 'acute-care'
-        
+
         input_provider = SmdbInputProvider(SMDB())
         cohort = input_provider.populate_cohort(
             cohort=Cohort(

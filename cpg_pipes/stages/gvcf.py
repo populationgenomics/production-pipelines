@@ -21,6 +21,7 @@ class GvcfStage(SampleStage):
     """
     Use HaplotypeCaller to genotype individual samples
     """
+
     hc_intervals: list[hb.Resource] | None = None
 
     def expected_outputs(self, sample: Sample) -> Path:
@@ -48,21 +49,19 @@ class GvcfStage(SampleStage):
             )
             jobs.append(intervals_j)
             GvcfStage.hc_intervals = intervals
-        jobs.extend(haplotype_caller.produce_gvcf(
-            b=self.b,
-            output_path=self.expected_outputs(sample),
-            sample_name=sample.id,
-            sequencing_type=sample.sequencing_type,
-            cram_path=sample.get_cram_path(),
-            intervals=GvcfStage.hc_intervals,
-            scatter_count=scatter_count,
-            refs=self.refs,
-            tmp_bucket=sample.dataset.get_tmp_bucket(),
-            overwrite=not self.check_intermediates,
-            job_attrs=self.get_job_attrs(sample),
-        ))
-        return self.make_outputs(
-            sample,
-            data=self.expected_outputs(sample), 
-            jobs=jobs
+        jobs.extend(
+            haplotype_caller.produce_gvcf(
+                b=self.b,
+                output_path=self.expected_outputs(sample),
+                sample_name=sample.id,
+                sequencing_type=sample.sequencing_type,
+                cram_path=sample.get_cram_path(),
+                intervals=GvcfStage.hc_intervals,
+                scatter_count=scatter_count,
+                refs=self.refs,
+                tmp_bucket=sample.dataset.get_tmp_bucket(),
+                overwrite=not self.check_intermediates,
+                job_attrs=self.get_job_attrs(sample),
+            )
         )
+        return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)

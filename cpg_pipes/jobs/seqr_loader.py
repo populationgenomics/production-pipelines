@@ -4,12 +4,16 @@ Jobs specific for seqr-loader.
 import logging
 
 from hailtop.batch.job import Job
+from hailtop.batch import Batch
 
 from cpg_pipes import Path, images, utils
-from cpg_pipes.hb.batch import Batch, hail_query_env
+from cpg_pipes.hb.batch import hail_query_env
 from cpg_pipes.hb.command import wrap_command, python_command
-from cpg_pipes.query.seqr_loader import subset_mt_to_samples, annotate_dataset_mt, \
-    annotate_cohort
+from cpg_pipes.query.seqr_loader import (
+    subset_mt_to_samples,
+    annotate_dataset_mt,
+    annotate_cohort,
+)
 from cpg_pipes.refdata import RefData
 from cpg_pipes.types import SequencingType
 
@@ -34,22 +38,24 @@ def annotate_cohort_jobs(
     """
     j = b.new_job(f'annotate cohort', job_attrs)
     j.image(images.DRIVER_IMAGE)
-    j.command(python_command(
-        annotate_cohort,
-        str(vcf_path),
-        str(siteonly_vqsr_vcf_path),
-        str(vep_ht_path),
-        str(output_mt_path),
-        overwrite,
-        RefData.genome_build,
-        sequencing_type.value.upper(),
-        str(checkpoints_bucket),
-        setup_gcp=True,
-        hail_billing_project=hail_billing_project,
-        hail_bucket=str(hail_bucket),
-        default_reference=RefData.genome_build,
-        packages=['cpg_gnomad', 'seqr_loader'],
-    ))
+    j.command(
+        python_command(
+            annotate_cohort,
+            str(vcf_path),
+            str(siteonly_vqsr_vcf_path),
+            str(vep_ht_path),
+            str(output_mt_path),
+            overwrite,
+            RefData.genome_build,
+            sequencing_type.value.upper(),
+            str(checkpoints_bucket),
+            setup_gcp=True,
+            hail_billing_project=hail_billing_project,
+            hail_bucket=str(hail_bucket),
+            default_reference=RefData.genome_build,
+            packages=['cpg_gnomad', 'seqr_loader'],
+        )
+    )
     return [j]
 
 
@@ -71,30 +77,34 @@ def annotate_dataset_jobs(
     subset_mt_path = tmp_bucket / 'cohort-subset.mt'
     subset_j = b.new_job(f'subset to dataset', job_attrs)
     subset_j.image(images.DRIVER_IMAGE)
-    subset_j.command(python_command(
-        subset_mt_to_samples,
-        str(mt_path),
-        sample_ids,
-        str(subset_mt_path),
-        setup_gcp=True,
-        hail_billing_project=hail_billing_project,
-        hail_bucket=str(hail_bucket),
-        default_reference=RefData.genome_build,
-    ))
+    subset_j.command(
+        python_command(
+            subset_mt_to_samples,
+            str(mt_path),
+            sample_ids,
+            str(subset_mt_path),
+            setup_gcp=True,
+            hail_billing_project=hail_billing_project,
+            hail_bucket=str(hail_bucket),
+            default_reference=RefData.genome_build,
+        )
+    )
 
     annotate_j = b.new_job(f'annotate dataset', job_attrs)
     annotate_j.image(images.DRIVER_IMAGE)
-    annotate_j.command(python_command(
-        annotate_dataset_mt,
-        str(subset_mt_path),
-        str(output_mt_path),
-        str(tmp_bucket),
-        overwrite,
-        setup_gcp=True,
-        hail_billing_project=hail_billing_project,
-        hail_bucket=str(hail_bucket),
-        default_reference=RefData.genome_build,
-    ))
+    annotate_j.command(
+        python_command(
+            annotate_dataset_mt,
+            str(subset_mt_path),
+            str(output_mt_path),
+            str(tmp_bucket),
+            overwrite,
+            setup_gcp=True,
+            hail_billing_project=hail_billing_project,
+            hail_bucket=str(hail_bucket),
+            default_reference=RefData.genome_build,
+        )
+    )
     annotate_j.depends_on(subset_j)
 
     return [subset_j, annotate_j]
@@ -129,11 +139,13 @@ def annotate_dataset_script(
     --out-mt-path {output_mt_path} \\
     --subset-tsv {subset_path}
     """
-    j.command(wrap_command(
-        cmd,
-        python_script=utils.QUERY_SCRIPTS_DIR / 'seqr' / 'subset_mt.py',
-        setup_gcp=True,
-    ))
+    j.command(
+        wrap_command(
+            cmd,
+            python_script=utils.QUERY_SCRIPTS_DIR / 'seqr' / 'subset_mt.py',
+            setup_gcp=True,
+        )
+    )
     return [j]
 
 
@@ -166,9 +178,11 @@ def load_to_es(
     --es-password {es_password} \\
     --es-index {es_index}
     """
-    j.command(wrap_command(
-        cmd,
-        python_script=utils.QUERY_SCRIPTS_DIR / 'seqr' / 'mt_to_es.py',
-        setup_gcp=True,
-    ))
+    j.command(
+        wrap_command(
+            cmd,
+            python_script=utils.QUERY_SCRIPTS_DIR / 'seqr' / 'mt_to_es.py',
+            setup_gcp=True,
+        )
+    )
     return j

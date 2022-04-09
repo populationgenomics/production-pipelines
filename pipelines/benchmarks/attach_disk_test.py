@@ -19,7 +19,7 @@ def main():  # pylint: disable=missing-function-docstring
     b = pipeline.b
 
     def add_storage_job(
-        storage: float, 
+        storage: float,
         ncpu: Optional[int] = None,
         memory: Optional[float] = None,
     ):
@@ -29,7 +29,7 @@ def main():  # pylint: disable=missing-function-docstring
         if ncpu:
             j.name += f' ncpu={ncpu}'
             j.cpu(ncpu)
-    
+
         if memory:
             j.name += f' memory={memory}G'
             j.memory(f'{memory}G')

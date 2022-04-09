@@ -20,7 +20,7 @@ logger = logging.getLogger(__file__)
 
 
 # VQSR - when applying model - targets indel_filter_level and snp_filter_level
-# sensitivities. The tool matches them internally to a VQSLOD score cutoff 
+# sensitivities. The tool matches them internally to a VQSLOD score cutoff
 # based on the model's estimated sensitivity to a set of true variants.
 SNP_HARD_FILTER_LEVEL = 99.7
 INDEL_HARD_FILTER_LEVEL = 99.0
@@ -45,8 +45,8 @@ ALLELE_SPECIFIC_FEATURES = [
     # Not using depth for the following reaasons:
     # 1. The Broad pipelines don't use it;
     # 2. -G AS_StandardAnnotation flag to GenotypeGVCFs doesn't include it;
-    # 3. For exomes, depth is an irrelevant feature and should be skipped.   
-    # 'AS_VarDP',  
+    # 3. For exomes, depth is an irrelevant feature and should be skipped.
+    # 'AS_VarDP',
 ]
 SNP_ALLELE_SPECIFIC_FEATURES = ALLELE_SPECIFIC_FEATURES + ['AS_MQ']
 INDEL_ALLELE_SPECIFIC_FEATURES = ALLELE_SPECIFIC_FEATURES
@@ -105,10 +105,10 @@ def make_vqsr_jobs(
     @param input_vcf_or_mt_path: path to a site-only VCF, or a matrix table
     @param refs: reference data
     @param sequencing_type: type of sequencing experiments
-    @param meta_ht_path: if input_vcf_or_mt_path is a matrix table, this table will 
-           be used as a source of annotations for that matrix table, i.e. 
+    @param meta_ht_path: if input_vcf_or_mt_path is a matrix table, this table will
+           be used as a source of annotations for that matrix table, i.e.
            to filter out samples flagged as `meta.related`
-    @param hard_filter_ht_path: if input_vcf_or_mt_path is a matrix table, this table 
+    @param hard_filter_ht_path: if input_vcf_or_mt_path is a matrix table, this table
            will be used as a list of samples to hard filter out
     @param tmp_bucket: bucket for intermediate files
     @param gvcf_count: number of input samples. Can't read from combined_mt_path as it
@@ -152,7 +152,7 @@ def make_vqsr_jobs(
     # collected from them.
     is_huge_callset = gvcf_count >= 100000
     # For huge callsets, we allocate more memory for the SNPs Create Model step
-    
+
     # To fit only a site-only VCF
     small_disk = 50 if is_small_callset else (100 if not is_huge_callset else 200)
     # To fit a joint-called VCF
@@ -196,8 +196,8 @@ def make_vqsr_jobs(
             mt_to_vcf_job = b.new_job(f'{job_name} [reuse]', job_attrs)
         jobs.append(mt_to_vcf_job)
         tabix_job = add_tabix_job(
-            b, 
-            combined_vcf_path, 
+            b,
+            combined_vcf_path,
             medium_disk,
             job_attrs=job_attrs,
         )
@@ -368,13 +368,17 @@ def _add_make_sites_only_job(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
 
-    j.command(wrap_command(f"""\
+    j.command(
+        wrap_command(
+            f"""\
     gatk --java-options -Xms6g \\
     MakeSitesOnlyVcf \\
     -I {input_vcf['vcf.gz']} \\
     -O {j.output_vcf['vcf.gz']} \\
     --CREATE_INDEX
-    """))
+    """
+        )
+    )
     if output_vcf_path:
         b.write_output(j.output_vcf, output_vcf_path.replace('.vcf.gz', ''))
 
@@ -388,7 +392,7 @@ def add_tabix_job(
     job_attrs: dict | None = None,
 ) -> Job:
     """
-    Regzip and tabix the combined VCF (for some reason the one produced by 
+    Regzip and tabix the combined VCF (for some reason the one produced by
     `mt_to_vcf.py` is not block-gzipped).
     """
     j = b.new_job('VQSR: Tabix', job_attrs)
@@ -399,10 +403,14 @@ def add_tabix_job(
         combined_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
     vcf_inp = b.read_input(str(vcf_path))
-    j.command(wrap_command(f"""\
+    j.command(
+        wrap_command(
+            f"""\
     gunzip {vcf_inp} -c | bgzip -c > {j.combined_vcf['vcf.gz']}
     tabix -p vcf {j.combined_vcf['vcf.gz']}
-    """))
+    """
+        )
+    )
     return j
 
 
@@ -427,7 +435,9 @@ def add_sites_only_gather_vcf_step(
     )
 
     input_cmdl = ' '.join([f'--input {v["vcf.gz"]}' for v in input_vcfs])
-    j.command(wrap_command(f"""\
+    j.command(
+        wrap_command(
+            f"""\
     # --ignore-safety-checks makes a big performance difference so we include it in
     # our invocation. This argument disables expensive checks that the file headers
     # contain the same set of genotyped samples and that files are in order by position
@@ -439,7 +449,9 @@ def add_sites_only_gather_vcf_step(
     --output {j.output_vcf['vcf.gz']}
 
     tabix {j.output_vcf['vcf.gz']}
-    """))
+    """
+        )
+    )
     return j
 
 
@@ -474,7 +486,7 @@ def add_indels_variant_recalibrator_job(
     # however, for smaller datasets we take a standard instance, and for larger
     # ones we take a highmem instance
     if is_small_callset:
-        mem_gb = 52  # 
+        mem_gb = 52  #
         j.memory('standard')
     else:
         mem_gb = 104  # hail would allocate 104G
@@ -562,7 +574,7 @@ def add_snps_variant_recalibrator_create_model_step(
     # however, for smaller datasets we take a standard instance, and for larger
     # ones we take a highmem instance
     if is_small_callset:
-        mem_gb = 52  # 
+        mem_gb = 52  #
         j.memory('standard')
     else:
         mem_gb = 104  # hail would allocate 104G
@@ -718,7 +730,7 @@ def add_snps_variant_recalibrator_step(
     # however, for smaller datasets we take a standard instance, and for larger
     # ones we take a highmem instance
     if is_small_callset:
-        mem_gb = 52  # 
+        mem_gb = 52  #
         j.memory('standard')
     else:
         mem_gb = 104  # hail would allocate 104G
@@ -842,7 +854,7 @@ def add_apply_recalibration_step(
 
     j.cpu(2)  # memory: 3.75G * 2 = 7.5G on a standard instance
     java_mem = 7
-    
+
     j.storage(f'{disk_size}G')
 
     j.declare_resource_group(

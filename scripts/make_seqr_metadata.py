@@ -24,7 +24,9 @@ logger.setLevel(logging.INFO)
 @click.command()
 @click.option('--dataset', 'datasets', multiple=True)
 @click.option(
-    '-n', '--namespace', 'namespace',
+    '-n',
+    '--namespace',
+    'namespace',
     type=choice_from_enum(Namespace),
     callback=val_to_enum(Namespace),
     help='The bucket namespace to write the results to',
@@ -36,14 +38,18 @@ logger.setLevel(logging.INFO)
     default=Cloud.GS.value,
     help='Cloud storage provider',
 )
-@click.option('--use-participant-id/--use-external-id', 
-              'use_external_id', default=False, is_flag=True)
+@click.option(
+    '--use-participant-id/--use-external-id',
+    'use_external_id',
+    default=False,
+    is_flag=True,
+)
 def main(
-    datasets: list[str], 
-    namespace: Namespace, 
+    datasets: list[str],
+    namespace: Namespace,
     cloud: Cloud,
     use_external_id: bool = False,
-): 
+):
     """
     Generate sample map to upload a dataset to Seqr
     """
@@ -52,7 +58,7 @@ def main(
         cohort=Cohort(
             analysis_dataset_name='seqr',
             namespace=namespace,
-            storage_provider=CpgStorageProvider(cloud)
+            storage_provider=CpgStorageProvider(cloud),
         ),
         dataset_names=datasets,
     )
@@ -68,9 +74,9 @@ def main(
 
 
 def _make_seqr_metadata_files(
-    dataset: Dataset, 
+    dataset: Dataset,
     bucket: Path,
-    local_dir: Path, 
+    local_dir: Path,
     use_external_id: bool,
 ):
     """
@@ -80,19 +86,26 @@ def _make_seqr_metadata_files(
     igv_paths_path = local_dir / f'{dataset.name}-igv-paths.tsv'
 
     # Sample map
-    df = pd.DataFrame({
-        'cpg_id': s.id,
-        'individual_id': s.external_id if use_external_id else s.participant_id,
-    } for s in dataset.get_samples())
+    df = pd.DataFrame(
+        {
+            'cpg_id': s.id,
+            'individual_id': s.external_id if use_external_id else s.participant_id,
+        }
+        for s in dataset.get_samples()
+    )
     with samplemap_bucket_path.open('w') as fh:
         df.to_csv(fh, sep=',', index=False, header=False)
 
     # IGV
-    df = pd.DataFrame({
-        'individual_id': s.external_id if use_external_id else s.participant_id,
-        'cram_path': s.get_cram_path(),
-        'cram_sample_id': s.id,
-    } for s in dataset.get_samples() if s.get_cram_path())
+    df = pd.DataFrame(
+        {
+            'individual_id': s.external_id if use_external_id else s.participant_id,
+            'cram_path': s.get_cram_path(),
+            'cram_sample_id': s.id,
+        }
+        for s in dataset.get_samples()
+        if s.get_cram_path()
+    )
     with igv_paths_path.open('w') as fh:
         df.to_csv(fh, sep='\t', index=False, header=False)
 
