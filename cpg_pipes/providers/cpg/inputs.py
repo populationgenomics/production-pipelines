@@ -18,8 +18,8 @@ class SmdbInputProvider(InputProvider):
     InputProvider implementation that pulls data from the sample-metadata database.
     """
 
-    def __init__(self, db: SMDB, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, db: SMDB, check_files: bool = False):
+        super().__init__(check_files=check_files)
         self.db = db
         
     def populate_cohort(

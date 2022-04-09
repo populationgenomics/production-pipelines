@@ -30,14 +30,11 @@ class CramStage(SampleStage):
         """
         if not sample.alignment_input:
             if self.skip_samples_with_missing_input:
-                logger.error(f'Could not find read data, skipping sample {sample.id}')
+                logger.error(f'No alignment input found, skipping sample {sample.id}')
                 sample.active = False
                 return self.make_outputs(sample)  # return empty output
             else:
-                raise PipelineError(
-                    f'No alignment input found for {sample.id}. '
-                    f'Checked: Sequence entry and type=CRAM Analysis entry'
-                )
+                raise PipelineError(f'No alignment input found for {sample.id}')
 
         jobs = align.align(
             b=self.b,

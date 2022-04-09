@@ -292,13 +292,21 @@ class StageInput:
         res = self._results_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_resource_dict()
 
-    def get_jobs(self) -> list[Job]:
+    def get_jobs(
+        self, 
+        target: Optional['Target'] = None, 
+        stage: StageDecorator | None = None,
+    ) -> list[Job]:
         """
-        Build a list of hail batch dependencies from all stages and targets
+        Build a list of Hail Batch upstream jobs.
         """
         all_jobs = []
-        for _, results_by_target in self._results_by_target_by_stage.items():
-            for _, results in results_by_target.items():
+        for stage_name, results_by_target in self._results_by_target_by_stage.items():
+            if stage is not None and stage.__name__ != stage_name:
+                continue
+            for targ, results in results_by_target.items():
+                if target is not None and target.target_id != targ:
+                    continue
                 all_jobs.extend(results.jobs)
         return all_jobs
 
@@ -480,11 +488,10 @@ class Stage(Generic[TargetT], ABC):
         Performs the checks like possibility to reuse existing jobs results,
         or if required dependencies are missing.
         """
+        expected_out = self.expected_outputs(target)
         if not self.skipped:
             inputs = self._make_inputs()
-
-            reusable_paths = self._try_get_reusable_paths(target)
-            if reusable_paths:
+            if self._check_if_reusable(expected_out):
                 if target.forced:
                     logger.info(
                         f'{self.name}: can reuse, but forcing the target '
@@ -499,60 +506,63 @@ class Stage(Generic[TargetT], ABC):
                     outputs = self.queue_jobs(target, inputs)
                 else:
                     logger.info(f'{self.name}: reusing results for {target}')
-                    outputs = self._queue_reuse_job(target, reusable_paths)
+                    outputs = self._queue_reuse_job(target, expected_out)
             else:
                 logger.info(f'{self.name}: adding jobs for {target}')
                 outputs = self.queue_jobs(target, inputs)
 
             for j in outputs.jobs:
-                j.depends_on(*inputs.get_jobs())
+                j.depends_on(*inputs.get_jobs(target))
 
             return outputs
 
         elif self.required:
-            reusable_paths = self._try_get_reusable_paths(target)
-            if not reusable_paths:
-                raise ValueError(
-                    f'Stage {self.name} is required, but is skipped, and '
-                    f'expected outputs for target {target} do not exist: '
-                    f'{self.expected_outputs(target)}'
-                )
+            if self._check_if_reusable(expected_out):
+                return self.make_outputs(target=target, data=expected_out)
             else:
-                return self.make_outputs(target=target, data=reusable_paths)
+                if self.skip_samples_with_missing_input:
+                    logger.warning(
+                        f'Skipping sample {target}: stage {self.name} is required, '
+                        f'but is skipped, and expected outputs for the target do not '
+                        f'exist: {expected_out}'
+                    )
+                else:
+                    raise ValueError(
+                        f'Stage {self.name} is required, but is skipped, and '
+                        f'expected outputs for target {target} do not exist: '
+                        f'{expected_out}'
+                    )
+        # Stage is not needed, returning empty outputs
+        target.active = False
+        return self.make_outputs(target=target)
 
-        else:
-            # Stage is not needed, returning empty outputs
-            return self.make_outputs(target=target)
-
-    def _try_get_reusable_paths(self, target: TargetT) -> ExpectedResultT:
+    def _check_if_reusable(self, expected_outputs: ExpectedResultT) -> bool:
         """
         Returns outputs that can be reused for the stage for the target,
         or None of none can be reused
         """
-        expected_output = self.expected_outputs(target)
-
-        if not expected_output:
-            return None
+        if not expected_outputs:
+            return False
         elif not self.check_expected_outputs:
             if self.assume_outputs_exist:
                 # Do not check the files' existence, trust they exist:
-                return expected_output
+                return True
             else:
                 # Do not check the files' existence, assume they don't exist:
-                return None
+                return False
         elif not self.required:
             # This stage is not required, so can just assume outputs exist:
-            return expected_output
+            return True
         else:
             # Checking that expected output exists:
             paths: list[Path]
-            if isinstance(expected_output, dict):
-                paths = [v for k, v in expected_output.items()]
+            if isinstance(expected_outputs, dict):
+                paths = [v for k, v in expected_outputs.items()]
             else:
-                paths = [expected_output]
+                paths = [expected_outputs]
             if not all(exists(path) for path in paths):
-                return None
-            return expected_output
+                return False
+            return True
 
     def _queue_reuse_job(
         self,
