@@ -4,12 +4,13 @@ using concrete implementations of the input and storage providers.
 """
 import logging
 from typing import Callable
+from hailtop.batch import Batch
 
 from .pipeline import Pipeline, Stage
 from .exceptions import PipelineError
 from ..targets import Cohort
 from .. import Path, to_path
-from ..hb.batch import Batch, setup_batch, get_billing_project
+from ..hb.batch import setup_batch, get_billing_project
 from ..providers import (
     Cloud,
     Namespace,

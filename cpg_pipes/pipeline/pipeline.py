@@ -21,11 +21,11 @@ from typing import cast, Callable, Union, TypeVar, Generic, Any, Optional, Type
 import hailtop.batch as hb
 from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
+from hailtop.batch import Batch
 
 from .exceptions import PipelineError
 from .. import Path, to_path, Namespace
 from ..targets import Target, Dataset, Sample, Cohort
-from ..hb.batch import Batch
 from ..providers.status import StatusReporter
 from ..refdata import RefData
 from ..utils import exists
