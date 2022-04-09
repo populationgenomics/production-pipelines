@@ -1,6 +1,7 @@
 """
-Subclasses of `Stage` specific for a target subclass.
+Subclasses of Stage class specific for a Target subclass.
 """
+
 import logging
 from abc import ABC, abstractmethod
 
@@ -18,10 +19,7 @@ class SampleStage(Stage[Sample], ABC):
     @abstractmethod
     def expected_outputs(self, sample: Sample) -> ExpectedResultT:
         """
-        to_path(s) to files that the stage is epxected to generate for the `target`.
-        Used within the stage to pass the output paths to commands, as well as
-        by the pipeline to get expected paths when the stage is skipped and
-        didn't return a `StageDeps` object from `add_jobs()`.
+        Override to declare expected output paths.
         """
 
     @abstractmethod
@@ -61,10 +59,7 @@ class DatasetStage(Stage, ABC):
     @abstractmethod
     def expected_outputs(self, dataset: Dataset) -> ExpectedResultT:
         """
-        to_path(s) to files that the stage is epxected to generate for the `target`.
-        Used within the stage to pass the output paths to commands, as well as
-        by the pipeline to get expected paths when the stage is skipped and
-        didn't return a `StageDeps` object from `add_jobs()`.
+        Override to declare expected output paths.
         """
 
     @abstractmethod
@@ -89,16 +84,13 @@ class DatasetStage(Stage, ABC):
 
 class CohortStage(Stage, ABC):
     """
-    Entire cohort level stage
+    Cohort-level stage (all datasets of a pipeline run).
     """
 
     @abstractmethod
     def expected_outputs(self, cohort: Cohort) -> ExpectedResultT:
         """
-        to_path(s) to files that the stage is epxected to generate for the `target`.
-        Used within the stage to pass the output paths to commands, as well as
-        by the pipeline to get expected paths when the stage is skipped and
-        didn't return a `StageDeps` object from `add_jobs()`.
+        Override to declare expected output paths.
         """
 
     @abstractmethod
