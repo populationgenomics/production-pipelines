@@ -1,15 +1,15 @@
 from .pipeline import (
-    stage, 
-    skip, 
-    StageInput, 
+    stage,
+    skip,
+    StageInput,
     StageOutput,
 )
 from .create_pipeline import create_pipeline
 from .cli_opts import pipeline_click_options
 from .exceptions import PipelineError
 from .stage_subclasses import (
-    SampleStage, 
-    DatasetStage, 
+    SampleStage,
+    DatasetStage,
     CohortStage,
 )
 from .targets import (

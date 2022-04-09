@@ -18,15 +18,16 @@ setuptools.setup(
     include_package_data=True,
     zip_safe=False,
     scripts=[
-        join('scripts', fname) 
-        for fname in os.listdir('scripts') if fname.endswith('.py')
+        join('scripts', fname)
+        for fname in os.listdir('scripts')
+        if fname.endswith('.py')
     ],
     install_requires=[
         'click',
         'click-config-file',
         'pandas',
         'hail>=0.2.91',
-        'cpg-gnomad',   # github.com/populationgenomics/gnomad_methods
+        'cpg-gnomad',  # github.com/populationgenomics/gnomad_methods
         'google-cloud-storage',
         'google-cloud-secret-manager',
         'fsspec',

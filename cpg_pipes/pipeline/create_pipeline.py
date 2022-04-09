@@ -59,7 +59,7 @@ def create_pipeline(
     local_dir: Path | None = None,
 ) -> 'Pipeline':
     """
-    Create a Pipeline instance. All options correspond to command line parameters 
+    Create a Pipeline instance. All options correspond to command line parameters
     described in `pipeline_click_options` in the `cli_opts` module
     """
     if storage_policy_type != StoragePolicyType.CPG:
@@ -70,14 +70,14 @@ def create_pipeline(
         analysis_dataset_name=analysis_dataset,
         namespace=namespace,
         name=name,
-        storage_provider=storage_provider
+        storage_provider=storage_provider,
     )
     refs = RefData(storage_provider.get_ref_bucket())
 
     status_reporter: StatusReporter | None = None
     input_provider: InputProvider | None = None
     if (
-        input_provider_type == InputProviderType.SMDB 
+        input_provider_type == InputProviderType.SMDB
         or status_reporter_type == StatusReporterType.SMDB
     ):
         smdb = SMDB(cohort.analysis_dataset.name)
@@ -104,16 +104,16 @@ def create_pipeline(
             if skip_datasets:
                 datasets_ -= set(skip_datasets or [])
             description += ': ' + ', '.join(datasets_)
-    
+
     tmp_bucket = to_path(
-        cohort.analysis_dataset.get_tmp_bucket(version=(
-            name + (f'/{version}' if version else '')
-        ))
+        cohort.analysis_dataset.get_tmp_bucket(
+            version=(name + (f'/{version}' if version else ''))
+        )
     )
     hail_billing_project = get_billing_project(cohort.analysis_dataset.stack)
     hail_bucket = tmp_bucket / 'hail'
     batch: Batch = setup_batch(
-        description=description, 
+        description=description,
         billing_project=hail_billing_project,
         hail_bucket=hail_bucket,
     )
@@ -131,9 +131,7 @@ def create_pipeline(
     if force_samples:
         for s in cohort.get_samples():
             if s.id in force_samples:
-                logger.info(
-                    f'Force rerunning sample {s.id} even if its outputs exist'
-                )
+                logger.info(f'Force rerunning sample {s.id} even if its outputs exist')
                 s.forced = True
 
     return Pipeline(
