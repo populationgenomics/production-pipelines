@@ -1,5 +1,5 @@
 """
-Abstract class to report jobs statuses.
+Abstract reporter of stages statuses.
 """
 
 import logging

@@ -1,6 +1,7 @@
 """
 Abstract provider if input data source.
 """
+
 import csv
 import logging
 from abc import ABC, abstractmethod

@@ -1,8 +1,9 @@
 """
-CPG implementation of StorageProvider:
+CPG implementation of StorageProvider, according to the storage policies:
 https://github.com/populationgenomics/team-docs/tree/main/storage_policies
-across Google Cloud Storage and Azure Blob Storage.
+Works across Google Cloud Storage and Azure Blob Storage.
 """
+
 from cloudpathlib import CloudPath
 
 from ..storage import StorageProvider, Cloud, Namespace, Path, to_path
@@ -26,7 +27,7 @@ class CpgStorageProvider(StorageProvider):
         sample: str = None,
     ) -> Path:
         """
-        Bucket name is constructed according to the storage policy:
+        Bucket name is constructed according to the CPG storage policy:
         https://github.com/populationgenomics/team-docs/tree/main/storage_policies
         """
         path = CloudPath(
@@ -49,7 +50,7 @@ class CpgStorageProvider(StorageProvider):
         sample: str = None,
     ) -> str | None:
         """
-        URL corrsponding to the WEB bucket.
+        URL corresponding to the WEB bucket.
         """
         url = f'https://{namespace.value}-web.populationgenomics.org.au/' f'{dataset}'
         if version:
@@ -60,6 +61,6 @@ class CpgStorageProvider(StorageProvider):
 
     def get_ref_bucket(self) -> Path:
         """
-        Prefix for reference data
+        Prefix for reference data.
         """
         return to_path(f'{self.cloud.value}://cpg-reference')

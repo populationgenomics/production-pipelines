@@ -1,6 +1,7 @@
 """
 Abstract storage provider.
 """
+
 import pathlib
 from enum import Enum
 from abc import ABC, abstractmethod
@@ -10,10 +11,10 @@ from cloudpathlib import CloudPath
 from cloudpathlib.anypath import to_anypath
 
 
-# Path can be both a cloud URL and local path
+# Path can be either a cloud URL or a local posix file path.
 Path = Union[CloudPath, pathlib.Path]
 
-# Using convenience method from cloudpathlib to parse a path string
+# Using convenience method from cloudpathlib to parse a path string.
 to_path = to_anypath
 
 
@@ -56,7 +57,7 @@ class StorageProvider(ABC):
         sample: str = None,
     ) -> Path:
         """
-        Bucket to write results:
+        Bucket to write primary results.
         @param dataset: dataset/stack name
         @param namespace: namespace (test or main)
         @param suffix: (optional) suffix to append to the bucket name
@@ -72,7 +73,7 @@ class StorageProvider(ABC):
         sample: str = None,
     ) -> Path:
         """
-        Bucket for analysis results.
+        Bucket to write analysis results.
         """
         return self.get_bucket(
             dataset=dataset,
@@ -90,7 +91,7 @@ class StorageProvider(ABC):
         sample: str = None,
     ) -> Path:
         """
-        Bucket for temporary files.
+        Bucket to write temporary files.
         """
         return self.get_bucket(
             dataset=dataset,
@@ -127,11 +128,11 @@ class StorageProvider(ABC):
         sample: str = None,
     ) -> str | None:
         """
-        URL corrsponding to the WEB bucket.
+        URL corresponding to the WEB bucket.
         """
 
     @abstractmethod
     def get_ref_bucket(self) -> Path:
         """
-        Prefix for reference data
+        Prefix for reference data.
         """

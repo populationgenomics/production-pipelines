@@ -1,9 +1,8 @@
 """
-Common pipeline command line options for "click".
+Common pipeline command line options for Click.
 """
-import functools
 from enum import Enum
-from typing import Callable, Type, TypeVar, Any, Optional
+from typing import Callable, Type, TypeVar
 import click
 import click_config_file
 import yaml  # type: ignore
@@ -19,7 +18,7 @@ from ..providers import (
 
 def choice_from_enum(cls: Type[Enum]) -> click.Choice:
     """
-    List of an Enum items to use with click.Choice
+    Create click.Choice from Enum items.
     """
     return click.Choice([n.lower() for n in cls.__members__])
 
@@ -29,7 +28,7 @@ T = TypeVar('T', bound=Enum)
 
 def val_to_enum(cls: Type[T]) -> Callable:
     """
-    Callback to parse value into an Enum value
+    Callback to parse a value into an Enum item.
     """
 
     def _callback(ctx, param, val: str) -> T | None:
@@ -47,16 +46,17 @@ def val_to_enum(cls: Type[T]) -> Callable:
 
 def pipeline_click_options(function: Callable) -> Callable:
     """
-    Decorator to use with click when writing a script that implements a pipeline.
-    For example:
+    Decorator to use with Click that adds common pipeline options.
+    Useful to use with a script that implements a pipeline. Arguments can
+    be passed directly to `create_pipeline`, for example:
 
         @click.command()
         @pipeline_click_options
         def main(**kwargs):
             pipeline = create_pipeline(**kwargs)
 
-    You can add new options by just adding more click decorators
-    before `@pipeline_click_options`:
+    New options can be added by adding more click decorators before
+    `@pipeline_click_options`, e.g.:
 
         @click.command()
         @click.argument('--custom-argument')

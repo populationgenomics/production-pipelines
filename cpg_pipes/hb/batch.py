@@ -19,6 +19,7 @@ class JobAttributes(TypedDict, total=False):
     """
     Job attributes specification.
     """
+
     sample: str
     dataset: str
     samples: str

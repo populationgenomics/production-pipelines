@@ -1,5 +1,5 @@
 """
-Functions to find the pipeline inputs and communicate with the SM server
+Helpers to communicate with the sample-metadata database.
 """
 
 import logging
@@ -27,7 +27,7 @@ logger = logging.getLogger(__file__)
 
 class SmdbError(Exception):
     """
-    Raised for problems interacting with sample-metadata DB
+    Raised for problems interacting with sample-metadata database.
     """
 
 
@@ -79,7 +79,7 @@ class Analysis:
     @staticmethod
     def parse(data: dict) -> 'Analysis':
         """
-        Parse data to create an Analysis object
+        Parse data to create an Analysis object.
         """
         req_keys = ['id', 'type', 'status']
         if any(k not in data for k in req_keys):
@@ -122,18 +122,18 @@ class SMDB:
     def get_sample_entries(
         self,
         project_name: str | None = None,
+        active: bool = True,
     ) -> list[dict]:
         """
-        Get Sample entries and apply `skip_samples` and `only_samples` filters.
-        This is a helper method; use public `populate_dataset` to parse samples.
+        Get samples in the project as a list of dictionaries.
         """
         project_name = project_name or self.project_name
 
-        logger.info(f'Finding samples for dataset {project_name}...')
+        logger.debug(f'Finding samples for dataset {project_name}...')
         sample_entries = self.sapi.get_samples(
             body_get_samples_by_criteria_api_v1_sample_post={
                 'project_ids': [project_name],
-                'active': True,
+                'active': active,
             }
         )
         logger.info(
@@ -144,7 +144,7 @@ class SMDB:
 
     def update_analysis(self, analysis: Analysis, status: AnalysisStatus):
         """
-        Update "status" of an Analysis entry
+        Update "status" of an Analysis entry.
         """
         try:
             self.aapi.update_analysis_status(
@@ -161,7 +161,7 @@ class SMDB:
         project_name: str | None = None,
     ) -> Analysis | None:
         """
-        Query the DB to find the last completed joint-calling analysis for the samples
+        Query the DB to find the last completed joint-calling analysis for the samples.
         """
         try:
             data = self.aapi.get_latest_complete_analysis_for_type(
@@ -190,7 +190,7 @@ class SMDB:
         """
         Query the DB to find the last completed analysis for the type and samples,
         one Analysis object per sample. Assumes the analysis is defined for a single
-        sample (e.g. cram, gvcf)
+        sample (e.g. cram, gvcf).
         """
         project_name = project_name or self.project_name
 
@@ -232,7 +232,7 @@ class SMDB:
         project_name: str | None = None,
     ) -> int | None:
         """
-        Tries to create an Analysis entry, returns its id if successfuly
+        Tries to create an Analysis entry, returns its id if successful.
         """
         project_name = project_name or self.project_name
 

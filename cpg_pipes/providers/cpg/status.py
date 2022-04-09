@@ -20,7 +20,8 @@ from .smdb import SMDB, SmdbError
 
 class SmdbStatusReporter(StatusReporter):
     """
-    Job status reporter.
+    Job status reporter. Works through creating and updating sample-metadata
+    database Analysis entries.
     """
 
     def __init__(self, smdb: SMDB):
