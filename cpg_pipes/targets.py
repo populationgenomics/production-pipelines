@@ -28,9 +28,15 @@ class Target:
 
     def get_samples(self, only_active: bool = True) -> list['Sample']:
         """
-        Get all samples corresponding to this target
+        Get flat list of all samples corresponding to this target.
         """
         raise NotImplementedError
+
+    def get_sample_ids(self, only_active: bool = True) -> list[str]:
+        """
+        Get flat list of all sample IDs corresponding to this target.
+        """
+        return [s.id for s in self.get_samples(only_active=only_active)]
 
     @property
     def target_id(self) -> str:
@@ -145,12 +151,6 @@ class Cohort(Target):
         for proj in self.get_datasets(only_active=only_active):
             all_samples.extend(proj.get_samples(only_active))
         return all_samples
-
-    def get_sample_ids(self, only_active: bool = True) -> list[str]:
-        """
-        Gets a flat list of CPG IDs for all samples from all datasets.
-        """
-        return [s.id for s in self.get_samples(only_active=only_active)]
 
     def add_dataset(
         self,
@@ -375,13 +375,6 @@ class Dataset(Target):
             s for sid, s in self._sample_by_id.items() 
             if (s.active or not only_active)
         ]
-
-    def get_sample_ids(self, only_active: bool = True) -> list[str]:
-        """
-        Get dataset's sample IDs. Inlcude only "active" samples, 
-        unless only_active=False.
-        """
-        return [s.id for s in self.get_samples(only_active=only_active)]
 
     def get_job_attrs(self) -> dict[str, str]:
         """

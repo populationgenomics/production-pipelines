@@ -159,7 +159,7 @@ class LoadToEsStage(DatasetStage):
             packages=utils.DATAPROC_PACKAGES,
             num_secondary_workers=2,
             job_name=f'{dataset.name}: create ES index',
-            depends_on=inputs.get_jobs(),
+            depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
         )
         j.attributes = self.get_job_attrs(dataset),

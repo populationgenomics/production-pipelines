@@ -42,8 +42,11 @@ _ALL_DEFINED_STAGES = []
 
 StageDecorator = Callable[..., 'Stage']
 
-# Type variable to make sure a Stage subclass always matches the
-# correspondinng Target subclass
+# Type variable to use with Generic to make sure a Stage subclass always matches the 
+# correspondinng Target subclass.
+# We can't just use the Target supercalss because it violates Liskov substitution 
+# principle (i.e. any Stage subclass would have to be able to work on any Target 
+# subclass).
 TargetT = TypeVar('TargetT', bound=Target)
 
 ExpectedResultT = Union[Path, dict[str, Path], None]
@@ -153,8 +156,7 @@ class StageInput:
 
     def __init__(self, stage: 'Stage'):
         self.stage = stage
-        self._results_by_target_by_stage: dict[str, dict[str, StageOutput]] = {}
-        self._jobs: list[Job] = []
+        self._outputs_by_target_by_stage: dict[str, dict[str, StageOutput]] = {}
 
     def add_other_stage_output(self, output: StageOutput):
         """
@@ -164,9 +166,9 @@ class StageInput:
             stage_name = output.stage.name
             target_id = output.target.target_id
 
-            if stage_name not in self._results_by_target_by_stage:
-                self._results_by_target_by_stage[stage_name] = dict()
-            self._results_by_target_by_stage[stage_name][target_id] = output
+            if stage_name not in self._outputs_by_target_by_stage:
+                self._outputs_by_target_by_stage[stage_name] = dict()
+            self._outputs_by_target_by_stage[stage_name][target_id] = output
 
     def _each(
         self,
@@ -181,7 +183,7 @@ class StageInput:
                 f'@stage(required_stages=[{stage.__name__}])'
             )
 
-        if stage.__name__ not in self._results_by_target_by_stage:
+        if stage.__name__ not in self._outputs_by_target_by_stage:
             raise PipelineError(
                 f'No inputs from {stage.__name__} for {self.stage.name} found '
                 'after skipping targets with missing inputs. ' +
@@ -193,7 +195,7 @@ class StageInput:
         return {
             trg: fun(result)
             for trg, result
-            in self._results_by_target_by_stage.get(stage.__name__, {}).items()
+            in self._outputs_by_target_by_stage.get(stage.__name__, {}).items()
         }
 
     def as_path_by_target(
@@ -252,7 +254,7 @@ class StageInput:
         Represent as a path to a file, otherwise fail.
         `stage` can be callable, or a subclass of Stage
         """
-        res = self._results_by_target_by_stage[stage.__name__][target.target_id]
+        res = self._outputs_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_path(id)
 
     def as_resource(
@@ -264,14 +266,14 @@ class StageInput:
         """
         Get Hail Batch Resource for a specific target and stage
         """
-        res = self._results_by_target_by_stage[stage.__name__][target.target_id]
+        res = self._outputs_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_resource(id)
 
     def as_dict(self, target: 'Target', stage: StageDecorator) -> dict[str, Path]:
         """
         Get a dict of files or Resources for a specific target and stage
         """
-        res = self._results_by_target_by_stage[stage.__name__][target.target_id]
+        res = self._outputs_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_dict()
 
     def as_path_dict(
@@ -280,7 +282,7 @@ class StageInput:
         """
         Get a dict of files for a specific target and stage
         """
-        res = self._results_by_target_by_stage[stage.__name__][target.target_id]
+        res = self._outputs_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_path_dict()
 
     def as_resource_dict(
@@ -289,31 +291,25 @@ class StageInput:
         """
         Get a dict of  Resources for a specific target and stage
         """
-        res = self._results_by_target_by_stage[stage.__name__][target.target_id]
+        res = self._outputs_by_target_by_stage[stage.__name__][target.target_id]
         return res.as_resource_dict()
 
-    def get_jobs(
-        self, 
-        target: Optional['Target'] = None, 
-        stage: StageDecorator | None = None,
-    ) -> list[Job]:
+    def get_jobs(self, target: 'Target') -> list[Job]:
         """
-        Build a list of Hail Batch upstream jobs.
+        Get list of jobs that the next stage would depend on. 
         """
         all_jobs = []
-        for stage_name, results_by_target in self._results_by_target_by_stage.items():
-            if stage is not None and stage.__name__ != stage_name:
-                continue
-            for targ, results in results_by_target.items():
-                if target is not None and target.target_id != targ:
-                    continue
-                all_jobs.extend(results.jobs)
+        for _, outputs_by_target in self._outputs_by_target_by_stage.items():
+            for _, output in outputs_by_target.items():
+                if set(target.get_sample_ids()) & set(output.target.get_sample_ids()):
+                    all_jobs.extend(output.jobs)
         return all_jobs
 
 
 class Stage(Generic[TargetT], ABC):
     """
-    Abstract class for a pipeline stage.
+    Abstract class for a pipeline stage. Parametrised by specific Target subclass,
+    i.e. SampleStage(Stage[Sample]) should only be able to work on Sample(Target).
     """
 
     def __init__(
@@ -419,7 +415,7 @@ class Stage(Generic[TargetT], ABC):
         by the pipeline to get expected paths when the stage is skipped and
         didn't return a `StageDeps` object from `queue_jobs()`.
 
-        Can be a str or a AnyPath object, or a dictionary of str/Path objects.
+        Can be a str or a Path object, or a dictionary of str/Path objects.
         """
 
     @abstractmethod
@@ -436,7 +432,7 @@ class Stage(Generic[TargetT], ABC):
         self,
         target: TargetT,
         data: StageOutputData | str | dict[str, str] | None = None,
-        jobs: list[Job] | Job | None = None
+        jobs: list[Job] | Job | None = None,
     ) -> StageOutput:
         """
         Builds a StageDeps object to return from a stage's queue_jobs()
@@ -599,11 +595,11 @@ def stage(
     forced: bool = False,
 ) -> Union[StageDecorator, Callable[..., StageDecorator]]:
     """
-    Implements a standard class decorator pattern with an optional argument.
-    The goal is to allow cleaner defining of custom pipeline stages, without
-    requiring to implement constructor. E.g.
+    Implements a standard class decorator pattern with optional arguments.
+    The goal is to allow declaring pipeline stages without requiring to implement 
+    a constructor method. E.g.
 
-    @stage(analysis_type='gvcf', required_stages=CramStage)
+    @stage(required_stages=[CramStage])
     class GvcfStage(SampleStage):
         def expected_outputs(self, sample: Sample):
             ...
@@ -633,8 +629,8 @@ def stage(
                 check_intermediates=pipeline.check_intermediates,
                 pipeline_config=pipeline.config,
             )
-        # We record each initialised Stage subclass, so we know the default stage
-        # list for the case when the user doesn't pass them explicitly with set_stages()
+        # We record all initialised Stage subclasses, which we then use as a default
+        # list of stages when the user didn't pass them explicitly.
         _ALL_DEFINED_STAGES.append(wrapper_stage)
         return wrapper_stage
 
@@ -650,7 +646,7 @@ def skip(
     assume_outputs_exist: bool = False,
 ) -> Union[StageDecorator, Callable[..., StageDecorator]]:
     """
-    Decorator on top of `@stage` that sets the `self.skipped` field to True
+    Decorator on top of `@stage` that sets the `self.skipped` field to True.
 
     @skip
     @stage
@@ -682,7 +678,7 @@ def skip(
 
 class Pipeline:
     """
-    Represents a Pipeline, and incapulates a Hail Batch object, stages, 
+    Represents a Pipeline, and incapsulates a Hail Batch object, stages, 
     and a cohort of datasets of samples.
     """
     def __init__(
