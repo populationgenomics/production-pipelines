@@ -23,10 +23,12 @@ setuptools.setup(
     ],
     install_requires=[
         'click',
+        'click-config-file',
         'pandas',
         'hail>=0.2.91',
         'cpg-gnomad',   # github.com/populationgenomics/gnomad_methods
         'google-cloud-storage',
+        'google-cloud-secret-manager',
         'fsspec',
         'sample-metadata',
         'analysis-runner',

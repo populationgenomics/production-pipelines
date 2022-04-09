@@ -31,7 +31,8 @@ Overall classes and object relationships look as follows:
 To declare a stage, derive a class from `SampleStage`, `ProjectStage`, or `CohortStage`, implement the abstract methods, and wrap the class with a `@stage` decorator:
 
 ```python
-from cpg_pipes.pipeline import stage, StageInput, StageOutput, Sample, SampleStage
+from cpg_pipes.pipeline import stage, StageInput, StageOutput, SampleStage
+from cpg_pipes.targets import Sample
 from cpg_pipes import Path, to_path
 
 @stage
@@ -59,27 +60,30 @@ The `queue_jobs` method is expected to return an output of type `StageOutput`: y
 Stages can depend on each other. Use the `required_stages` parameter to `@stage` to set dependencies, and use the `inputs` parameter in `queue_jobs` to get the output of a previous stage:
 
 ```python
+from cpg_pipes.pipeline import stage, StageInput, StageOutput, SampleStage
+from cpg_pipes.targets import Sample
+
 @stage(required_stages=[Align])
 class ReadCramFile(SampleStage):
     """Stage that reads the CRAM file genereated by a Align stage"""
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         # Read the `Align` stage outputs:
         cram_path = inputs.as_path(sample, stage=Align)
-        <...>
+        return ...
 ```
 
 Stage of differnet levels can depend on each other, and `cpg_pipes` will resolve that correctly. E.g. joint-calling taking GVCF outputs to produce a cohort-level VCF:
 
 ```python
-from cpg_pipes.pipeline import stage, StageInput, StageOutput, Sample, SampleStage,\
-    Cohort, CohortStage
+from cpg_pipes.pipeline import stage, StageInput, StageOutput, SampleStage, CohortStage
+from cpg_pipes.targets import Sample, Cohort
 
-@stage()
+@stage
 class HaplotypeCaller(SampleStage):
     """Stage that runs gatk Haplotype caller to generate a GVCF for a sample"""
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        jobs = < ... >
+        jobs = ...
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
 
 
@@ -92,8 +96,9 @@ class JointCalling(CohortStage):
         # acts on a sample, we use a method `as_path_by_target` that returns
         # a dictionary index by sample ID:
         gvcf_by_sample_id = inputs.as_path_by_target(stage=HaplotypeCaller)
-        job = < ... >
+        job = ...
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[job])
+    ...
 ```
 
 To submit the constructed pipeline to Hail Batch, create a pipeline with `create_pipeline`, and call `submit_batch()`. You need to pass a name, a description, a version of a run, the namespace according to the storage policies (`test` / `main` / `tmp`), and the `analysis_dataset` name that would be used to communicate with the sample metadata DB.
@@ -108,7 +113,7 @@ pipeline = create_pipeline(
     namespace=Namespace.TEST,
     analysis_dataset='fewgenomes',
 )
-pipeline.submit_batch()
+pipeline.run()
 ```
 
 ### Input sources
@@ -124,9 +129,10 @@ hgdp,NA12879,NA12879,NA12879_R1.fq.gz|NA12879_R2.fq.gz,,M
 
 ```python
 from cpg_pipes.providers import InputProviderType
+from cpg_pipes.pipeline import create_pipeline
 
 pipeline = create_pipeline(
-    <...>,
+    ...,
     input_provider_type=InputProviderType.CSV,
     input_csv='inputs.csv',
 )
@@ -136,17 +142,18 @@ pipeline = create_pipeline(
 
 ```python
 from cpg_pipes.providers import InputProviderType
+from cpg_pipes.pipeline import create_pipeline
 
 pipeline = create_pipeline(
-    <...>,
-    input_datasets=['hgdp'],
+    ...,
+    datasets=['hgdp'],
     input_provider_type=InputProviderType.SMDB,
 )
 ```
 
 The defailt input provider type is `InputProviderType.NONE`, which means that no samples and datasets are loaded, but you can add them manually into the automatically created `cohort` object:
 
-```python
+```
 >>> pipeline.cohort.get_datasets()
 ['hgdp']
 
@@ -169,7 +176,7 @@ The `cpg_pipes.jobs` module defines functions that create Hail Batch Jobs for di
 
 ```python
 from cpg_pipes.pipeline import stage, SampleStage, CohortStage, StageInput, StageOutput,
-    Sample, Cohort
+from cpg_pipes.targets import Sample, Cohort
 from cpg_pipes.jobs import haplotype_caller, joint_genotyping
 from cpg_pipes.types import CramPath, GvcfPath
 
@@ -187,7 +194,7 @@ class HaplotypeCaller(SampleStage):
             sample_name=sample.id,
             cram_path=CramPath(cram_path),
             output_path=expected_path,
-            number_of_intervals=50,
+            scatter_count=50,
             tmp_bucket=sample.dataset.get_tmp_bucket(),
             refs=self.refs,
             sequencing_type=sample.sequencing_type,
@@ -212,7 +219,7 @@ class JointCalling(CohortStage):
             samples=cohort.get_samples(),
             gvcf_by_sid=gvcf_by_sid,
             refs=self.refs,
-            genomicsdb_bucket=cohort.analysis_dataset.get_tmp_bucket(),
+            sequencing_type=cohort.get_sequencing_type(),
             tmp_bucket=cohort.analysis_dataset.get_tmp_bucket(),
         )
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
@@ -222,10 +229,12 @@ Available jobs include alignment:
 
 ```python
 from cpg_pipes.jobs import align
+
+sample = ...
 j = align.align(
-    b=b,
+    b=...,
     alignment_input=sample.alignment_input,
-    output_path=expected_path,
+    output_path=...,
     number_of_shards_for_realignment=10
 )
 ```
@@ -234,7 +243,7 @@ Getting intervals for sharding variant calling:
 
 ```python
 from cpg_pipes.jobs import split_intervals
-j = split_intervals.get_intervals(b=b, scatter_count=20)
+j, intervals = split_intervals.get_intervals(b=..., scatter_count=20)
 ```
 
 Generate somalier pedigree fingerprints:
@@ -242,10 +251,9 @@ Generate somalier pedigree fingerprints:
 ```python
 from cpg_pipes.jobs import somalier
 fingerprint_job, fingerprint_path = somalier.extact_job(
-    b,
-    sample,
-    gvcf_or_cram_or_bam_path=gvcf_path,
-    out_fpath=expected_path,
+    b=...,
+    gvcf_or_cram_or_bam_path=...,
+    refs=...,
 )
 ```
 
@@ -253,25 +261,31 @@ Infer pedigree relashionships and sex of samples in a dataset, and check with a 
 
 ```python
 from cpg_pipes.jobs import somalier
+dataset = ...
 j, somalier_samples_path, somalier_pairs_path = somalier.ancestry(
-    b,
-    dataset,
-    input_path_by_sid=fingerprint_by_sid,
-    out_tsv_path=output_tsv_path,
-    out_html_path=output_html_path,
-    out_html_url=output_html_url,
+    b=...,
+    dataset=...,
+    refs=...,
+    input_path_by_sid=...,
+    out_tsv_path=...,
+    out_html_path=...,
+    out_html_url=...,
 )
 ```
 
-VQSR:
+VQSR (from a site-only VCF or a Hail matrix table):
 
 ```python
 from cpg_pipes.jobs import vqsr
+cohort = ...
 j = vqsr.make_vqsr_jobs(
-    b,
-    input_vcf_or_mt_path=siteonly_vcf_path,
+    b=...,
+    input_vcf_or_mt_path=...,
     gvcf_count=len(cohort.get_samples()),
-    output_vcf_path=expected_path,
+    output_vcf_path=...,
+    refs=...,
+    sequencing_type=cohort.get_sequencing_type(),
+    tmp_bucket=cohort.get_tmp_bucket(),
     use_as_annotations=True,
 )
 ```
@@ -360,6 +374,7 @@ fewgenomes/CPG196535: My job
 
 ```python
 from cpg_pipes.hb.command import wrap_command
+b = ...
 j = b.new_job('My job')
 j.command(wrap_command(
     'sleep 600',
