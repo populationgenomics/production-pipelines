@@ -1,6 +1,6 @@
 name: Test individual jobs
-on: 
-  workflow_dispatch
+# TODO: re-enamble for push when https://github.com/hail-is/hail/pull/11747 is merged
+on: [workflow_dispatch]
 jobs:
   test_jobs:
     runs-on: ubuntu-latest
