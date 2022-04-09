@@ -105,6 +105,5 @@ class CohortStage(Stage, ABC):
         Override to plug in stage into the pipeline.
         """
         return {
-            pipeline.cohort.target_id:
-                self._queue_jobs_with_checks(pipeline.cohort)
+            pipeline.cohort.target_id: self._queue_jobs_with_checks(pipeline.cohort)
         }
