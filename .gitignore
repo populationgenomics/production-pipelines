@@ -130,7 +130,6 @@ dmypy.json
 
 .idea
 .DS_Store
-playground/
 
-dockers/cpg_pipes/
-scripts/copy_nagim_release.py
+playground
+dockers/cpg_pipes

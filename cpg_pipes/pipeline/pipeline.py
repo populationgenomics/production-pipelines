@@ -23,12 +23,9 @@ from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 
 from .exceptions import PipelineError
-from .. import Path, to_path
+from .. import Path, to_path, Namespace
 from ..targets import Target, Dataset, Sample, Cohort
 from ..hb.batch import Batch
-from ..providers import (
-    Namespace,
-)
 from ..providers.status import StatusReporter
 from ..refdata import RefData
 from ..utils import exists
@@ -36,17 +33,17 @@ from ..utils import exists
 logger = logging.getLogger(__file__)
 
 
-# list for the case when the user doesn't pass them explicitly with set_stages()
+# We record all initialised Stage subclasses, which we then use as a default
+# list of stages when the user didn't pass them explicitly.
 _ALL_DEFINED_STAGES = []
 
 
 StageDecorator = Callable[..., 'Stage']
 
 # Type variable to use with Generic to make sure a Stage subclass always matches the 
-# correspondinng Target subclass.
-# We can't just use the Target supercalss because it violates Liskov substitution 
-# principle (i.e. any Stage subclass would have to be able to work on any Target 
-# subclass).
+# correspondinng Target subclass. We can't just use the Target supercalss because 
+# it would violate the Liskov substitution principle (i.e. any Stage subclass would 
+# have to be able to work on any Target subclass).
 TargetT = TypeVar('TargetT', bound=Target)
 
 ExpectedResultT = Union[Path, dict[str, Path], None]
@@ -402,7 +399,7 @@ class Stage(Generic[TargetT], ABC):
     @abstractmethod
     def queue_jobs(self, target: TargetT, inputs: StageInput) -> StageOutput:
         """
-        Implements logic of the Stage: creates Batch jobs that do the processing.
+        Adds Hail Batch jobs that process `target`.
         Assumes that all the household work is done: checking missing inputs
         from requried stages, checking for possible reuse of existing outputs.
         """
@@ -410,12 +407,12 @@ class Stage(Generic[TargetT], ABC):
     @abstractmethod
     def expected_outputs(self, target: TargetT) -> ExpectedResultT:
         """
-        to_path(s) to files that the stage is epxected to generate for the `target`.
-        Used within the stage to pass the output paths to commands, as well as
-        by the pipeline to get expected paths when the stage is skipped and
-        didn't return a `StageDeps` object from `queue_jobs()`.
+        Get path(s) to files that the stage is expected to generate for a `target`.
+        Used within in `queue_jobs()` to pass paths to outputs to job commands, 
+        as well as by the pipeline to check if the stage's expected outputs already
+        exist and can be reused.
 
-        Can be a str or a Path object, or a dictionary of str/Path objects.
+        Can be a str, a Path object, or a dictionary of str/Path objects.
         """
 
     @abstractmethod
@@ -425,7 +422,7 @@ class Stage(Generic[TargetT], ABC):
         which itself calls `output = queue_jobs(target, input)`, making sure to
         construct the correct `input`.
 
-        Returns a dictionary of StageOutput, indexed by target unique_id.
+        Returns a dictionary of `StageOutput` objects indexed by target unique_id.
         """
 
     def make_outputs(
@@ -629,8 +626,6 @@ def stage(
                 check_intermediates=pipeline.check_intermediates,
                 pipeline_config=pipeline.config,
             )
-        # We record all initialised Stage subclasses, which we then use as a default
-        # list of stages when the user didn't pass them explicitly.
         _ALL_DEFINED_STAGES.append(wrapper_stage)
         return wrapper_stage
 
@@ -647,6 +642,8 @@ def skip(
 ) -> Union[StageDecorator, Callable[..., StageDecorator]]:
     """
     Decorator on top of `@stage` that sets the `self.skipped` field to True.
+    By default, expected outputs of a skipped stage will be checked, 
+    unless `assume_outputs_exist` is True.
 
     @skip
     @stage
@@ -731,7 +728,7 @@ class Pipeline:
 
         self.config = config or {}
         
-        # Will be filled in set_stages() in submit_batch()
+        # Will be populated by set_stages() in submit_batch()
         self._stages_dict: dict[str, Stage] = dict()
         self._stages_in_order = stages or _ALL_DEFINED_STAGES
 
@@ -769,7 +766,7 @@ class Pipeline:
 
     def _validate_first_last_stage(self) -> tuple[int | None, int | None]:
         """
-        Validating the --first-stage and --last-stage parameters.
+        Validating the first_stage and the last_stage parameters.
         """
         stage_names = list(self._stages_dict.keys())
         lower_stage_names = [s.lower() for s in stage_names]
@@ -880,24 +877,24 @@ class Pipeline:
 
     def get_datasets(self, only_active: bool = True) -> list[Dataset]:
         """
-        Thin wrapper around corresponding Cohort method.
+        Thin wrapper.
         """
         return self.cohort.get_datasets(only_active=only_active)
 
     def add_dataset(self, name: str) -> Dataset:
         """
-        Thin wrapper around corresponding Cohort method.
+        Thin wrapper.
         """
         return self.cohort.add_dataset(name)
 
     def get_all_samples(self, only_active: bool = True) -> list[Sample]:
         """
-        Thin wrapper around corresponding Cohort method.
+        Thin wrapper.
         """
         return self.cohort.get_samples(only_active=only_active)
 
     def get_all_sample_ids(self, only_active: bool = True) -> list[str]:
         """
-        Thin wrapper around corresponding Cohort method.
+        Thin wrapper.
         """
         return self.cohort.get_sample_ids(only_active=only_active)
