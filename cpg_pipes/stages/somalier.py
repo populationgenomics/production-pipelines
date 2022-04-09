@@ -35,11 +35,11 @@ class CramSomalierStage(SampleStage):
         expected_path = self.expected_outputs(sample)
         j = somalier.extact_job(
             b=self.b,
-            sample=sample,
             gvcf_or_cram_or_bam_path=cram_path,
             out_fpath=expected_path,
             overwrite=not self.check_intermediates,
             refs=self.refs,
+            job_attrs=self.get_job_attrs(sample),
         )
         return self.make_outputs(sample, data=expected_path, jobs=[j])
 
@@ -94,6 +94,7 @@ class CramSomalierPedigree(DatasetStage):
             out_html_url=html_url,
             out_checks_path=self.expected_outputs(dataset)['checks'],
             refs=self.refs,
+            job_attrs=self.get_job_attrs(dataset),
         )
         return self.make_outputs(
             dataset, data=self.expected_outputs(dataset), jobs=jobs
@@ -145,5 +146,6 @@ class CramSomalierAncestry(DatasetStage):
             out_html_path=html_path,
             out_html_url=html_url,
             refs=self.refs,
+            job_attrs=self.get_job_attrs(dataset),
         )
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])

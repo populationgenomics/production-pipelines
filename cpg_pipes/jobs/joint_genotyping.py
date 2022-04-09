@@ -47,7 +47,7 @@ def make_joint_genotyping_jobs(
     # bcftools view gs://cpg-fewgenomes-test/unittest/inputs/chr20/gnarly/joint-called-siteonly.vcf.gz | zgrep 7105364
     tool: JointGenotyperTool = JointGenotyperTool.GenotypeGVCFs,
     do_filter_excesshet: bool = True,
-    scatter_count: int = RefData.number_of_joint_calling_intervals,
+    scatter_count: int | None = RefData.number_of_joint_calling_intervals,
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """
@@ -64,9 +64,7 @@ def make_joint_genotyping_jobs(
         )
 
     logger.info(f'Submitting joint-calling jobs')
-
     scatter_count = scatter_count or RefData.number_of_joint_calling_intervals
-
     jobs: list[Job] = []
     
     intervals_j, intervals = split_intervals.get_intervals(
@@ -123,7 +121,7 @@ def make_joint_genotyping_jobs(
             overwrite=overwrite,
             number_of_samples=len(samples),
             refs=refs,
-            number_of_intervals=scatter_count,
+            scatter_count=scatter_count,
             interval=interval,
             tool=tool,
             output_vcf_path=jc_vcf_path,
@@ -515,7 +513,7 @@ def _add_joint_genotyper_job(
     overwrite: bool,
     number_of_samples: int,
     refs: RefData,
-    number_of_intervals: int = 1,
+    scatter_count: int = RefData.number_of_joint_calling_intervals,
     interval: hb.Resource | None = None,
     output_vcf_path: Path | None = None,
     tool: JointGenotyperTool = JointGenotyperTool.GnarlyGenotyper,
@@ -555,7 +553,7 @@ def _add_joint_genotyper_job(
         j, 
         mem_gb=xmx_gb + 1,
         # 4G (fasta+fai+dict) + 4G per sample divided by the number of intervals:
-        storage_gb=4 + number_of_samples * 4 // number_of_intervals
+        storage_gb=4 + number_of_samples * 4 // scatter_count
     )
 
     j.declare_resource_group(

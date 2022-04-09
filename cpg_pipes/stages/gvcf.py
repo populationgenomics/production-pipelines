@@ -44,7 +44,7 @@ class GvcfStage(SampleStage):
                 refs=self.refs,
                 sequencing_type=sample.sequencing_type,
                 scatter_count=scatter_count,
-                job_attrs=dict(stage=self.name),
+                job_attrs=self.get_job_attrs(),
             )
             jobs.append(intervals_j)
             GvcfStage.hc_intervals = intervals
@@ -53,13 +53,13 @@ class GvcfStage(SampleStage):
             output_path=self.expected_outputs(sample),
             sample_name=sample.id,
             sequencing_type=sample.sequencing_type,
-            job_attrs=sample.get_job_attrs() | dict(stage=self.name),
             cram_path=sample.get_cram_path(),
             intervals=GvcfStage.hc_intervals,
-            number_of_intervals=scatter_count,
+            scatter_count=scatter_count,
             refs=self.refs,
             tmp_bucket=sample.dataset.get_tmp_bucket(),
             overwrite=not self.check_intermediates,
+            job_attrs=self.get_job_attrs(sample),
         ))
         return self.make_outputs(
             sample,

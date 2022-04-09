@@ -44,7 +44,7 @@ class CramStage(SampleStage):
             alignment_input=sample.alignment_input,
             output_path=self.expected_outputs(sample),
             sample_name=sample.id,
-            job_attrs=sample.get_job_attrs() | dict(stage=self.name),
+            job_attrs=self.get_job_attrs(sample),
             refs=self.refs,
             overwrite=not self.check_intermediates,
             number_of_shards_for_realignment=(

@@ -48,7 +48,7 @@ def main():
             output_path=benchmark.BENCHMARK_BUCKET / 'outputs' f'{sample_name}.g.vcf.gz',
             sample_name=sample_name,
             cram_path=cram_path,
-            number_of_intervals=10,
+            scatter_count=10,
             tmp_bucket=benchmark.BENCHMARK_BUCKET / 'tmp',
             dragen_mode=True,
             refs=pipe.refs,

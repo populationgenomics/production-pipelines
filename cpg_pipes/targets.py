@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
+import pandas as pd
 
 from . import Path
 from .types import AlignmentInput, CramPath, GvcfPath, SequencingType
@@ -76,7 +77,7 @@ class Target:
                 f'{sequencing_types}. Joint calling can be only performed on samples '
                 f'of the same type.'
             )
-        return list(sequencing_types)[0]
+        return list(sequencing_types)[0]        
 
 
 class Cohort(Target):
@@ -393,6 +394,22 @@ class Dataset(Target):
         Prefix job names.
         """
         return f'{self.name}: '
+
+    def make_ped_file(self) -> Path:
+        """
+        Create a PED file for all samples
+        """
+        datas = []
+        for sample in self.get_samples():
+            if sample.pedigree:
+                datas.append(sample.pedigree.get_ped_dict())
+        df = pd.DataFrame(datas)
+
+        ped_path = self.get_tmp_bucket() / f'{self.name}.ped'
+        with ped_path.open('w') as fp:
+            df.to_csv(fp, sep='\t', index=False)
+
+        return ped_path
 
 
 class Sex(Enum):

@@ -41,8 +41,7 @@ class VepStage(CohortStage):
             out_path=self.expected_outputs(cohort),
             tmp_bucket=self.tmp_bucket,
             overwrite=not self.check_intermediates,
-            scatter_count=self.pipeline_config.get(
-                'vep_intervals_num', RefData.number_of_vep_intervals
-            ),
+            scatter_count=self.pipeline_config.get('vep_intervals_num'),
+            job_attrs=self.get_job_attrs(),
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), jobs)

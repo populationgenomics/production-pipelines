@@ -31,13 +31,16 @@ class TestQuery(unittest.TestCase):
     """
     @property
     def out_bucket(self):
+        """Property to allow re-setting the timestamp in a method"""
         return BASE_BUCKET / self.name / self.timestamp
 
     @property
     def tmp_bucket(self):
+        """Property to allow re-setting the timestamp in a method"""
         return BASE_BUCKET / 'tmp' / self.name / self.timestamp
 
     def setUp(self):
+        """Called for each test method"""
         self.name = self._testMethodName
         self.timestamp = time.strftime('%Y%m%d-%H%M')
         self.local_tmp_dir = tempfile.mkdtemp()
@@ -51,6 +54,7 @@ class TestQuery(unittest.TestCase):
         self.interval = f'{self.chrom}-{self.locus1}-{self.locus2}'
         
     def tearDown(self) -> None:
+        """Remove tmp dir"""
         shutil.rmtree(self.local_tmp_dir)
 
     def test_vep_json_to_ht(self):

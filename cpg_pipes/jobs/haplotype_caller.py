@@ -27,7 +27,7 @@ def produce_gvcf(
     refs: RefData,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
-    number_of_intervals: int = RefData.number_of_haplotype_caller_intervals,
+    scatter_count: int | None = RefData.number_of_haplotype_caller_intervals,
     intervals: list[hb.Resource] | None = None,
     overwrite: bool = False,
     dragen_mode: bool = False,
@@ -43,7 +43,7 @@ def produce_gvcf(
         return [b.new_job('Make GVCF [reuse]', job_attrs)]
 
     hc_gvcf_path = tmp_bucket / 'haplotypecaller' / f'{sample_name}.g.vcf.gz'
-
+    scatter_count = scatter_count or RefData.number_of_haplotype_caller_intervals
     jobs = haplotype_caller(
         b=b,
         sample_name=sample_name,
@@ -52,12 +52,11 @@ def produce_gvcf(
         job_attrs=job_attrs,
         output_path=hc_gvcf_path,
         cram_path=cram_path,
-        number_of_intervals=number_of_intervals,
+        scatter_count=scatter_count,
         intervals=intervals,
         overwrite=overwrite,
         dragen_mode=dragen_mode,
     )
-
     postproc_j = postproc_gvcf(
         b=b,
         gvcf_path=GvcfPath(hc_gvcf_path),
@@ -68,7 +67,6 @@ def produce_gvcf(
         overwrite=overwrite,
     )
     postproc_j.depends_on(*jobs)
-    
     return jobs + [postproc_j]
 
 
@@ -80,7 +78,7 @@ def haplotype_caller(
     refs: RefData,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
-    number_of_intervals: int = RefData.number_of_haplotype_caller_intervals,
+    scatter_count: int | None = RefData.number_of_haplotype_caller_intervals,
     intervals: list[hb.Resource] | None = None,
     overwrite: bool = True,
     dragen_mode: bool = False,
@@ -92,27 +90,28 @@ def haplotype_caller(
     if utils.can_reuse(output_path, overwrite):
         return [b.new_job('HaplotypeCaller [reuse]', job_attrs)]
 
+    scatter_count = scatter_count or RefData.number_of_haplotype_caller_intervals
     jobs: list[Job] = []
-    if number_of_intervals > 1:
+    if scatter_count > 1:
         if intervals is None:
             intervals_j, intervals = split_intervals.get_intervals(
                 b=b,
                 refs=refs,
                 sequencing_type=sequencing_type,
-                scatter_count=number_of_intervals,
+                scatter_count=scatter_count,
                 cache=True,
             )
             jobs.append(intervals_j)
 
         hc_jobs = []
         # Splitting variant calling by intervals
-        for idx in range(number_of_intervals):
+        for idx in range(scatter_count):
             j = _haplotype_caller_one(
                 b,
                 sample_name=sample_name,
                 cram_path=cram_path,
                 refs=refs,
-                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{number_of_intervals}'),
+                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
                 interval=intervals[idx],
                 dragen_mode=dragen_mode,
                 overwrite=overwrite,

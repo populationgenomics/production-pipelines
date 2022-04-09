@@ -49,7 +49,7 @@ class FastQC(SampleStage):
             output_zip_path=self.expected_outputs(sample)['zip'],
             alignment_input=sample.alignment_input,
             refs=self.refs,
-            job_attrs=sample.get_job_attrs(),
+            job_attrs=self.get_job_attrs(sample),
         )
         return self.make_outputs(
             sample, 

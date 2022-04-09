@@ -11,7 +11,7 @@ import yaml  # type: ignore
 from ..providers import (
     Namespace, 
     Cloud,
-    StoragePolicy, 
+    StoragePolicyType, 
     StatusReporterType, 
     InputProviderType,
 )
@@ -31,15 +31,12 @@ def val_to_enum(cls: Type[T]) -> Callable:
     """
     Callback to parse value into an Enum value
     """
-    def _callback(c, param, val: str) -> T:
+    def _callback(ctx, param, val: str) -> T | None:
+        if val is None:
+            return None
         d = {
             name.lower(): item for name, item in cls.__members__.items()
         }
-        if val is None:
-            raise click.BadParameter(
-                f'parameter is required and not specified. '
-                f'Available options: {[n.lower() for n in cls.__members__]}'
-            )
         if val not in d:
             raise click.BadParameter(
                 f'Available options: {[n.lower() for n in cls.__members__]}'
@@ -74,6 +71,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             'namespace',
             type=choice_from_enum(Namespace),
             callback=val_to_enum(Namespace),
+            required=True,
             help='The bucket namespace to write the results to',
         ),
         click.option(
@@ -140,10 +138,10 @@ def pipeline_click_options(function: Callable) -> Callable:
         ),
         click.option(
             '--storage-policy', 
-            'storage_policy',
-            type=choice_from_enum(StoragePolicy),
-            callback=val_to_enum(StoragePolicy),
-            default=StoragePolicy.CPG.value,
+            'storage_policy_type',
+            type=choice_from_enum(StoragePolicyType),
+            callback=val_to_enum(StoragePolicyType),
+            default=StoragePolicyType.CPG.value,
             help='Storage policy is used to determine bucket names for intermediate '
                  'and output files',
         ),
@@ -160,7 +158,6 @@ def pipeline_click_options(function: Callable) -> Callable:
             'status_reporter_type',
             type=choice_from_enum(StatusReporterType),
             callback=val_to_enum(StatusReporterType),
-            default=StatusReporterType.NONE.value,
             help='Use a status reporter implementation to report jobs statuses',
         ),
         click.option(

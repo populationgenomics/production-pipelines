@@ -13,7 +13,7 @@ from ..hb.batch import Batch, setup_batch, get_billing_project
 from ..providers import (
     Cloud,
     Namespace,
-    StoragePolicy,
+    StoragePolicyType,
     StatusReporterType,
     InputProviderType,
 )
@@ -35,9 +35,9 @@ def create_pipeline(
     name: str,
     namespace: Namespace,
     description: str | None = None,
-    storage_policy: StoragePolicy = StoragePolicy.CPG,
+    storage_policy_type: StoragePolicyType = StoragePolicyType.CPG,
     cloud: Cloud = Cloud.GS,
-    status_reporter_type: StatusReporterType = StatusReporterType.NONE,
+    status_reporter_type: StatusReporterType = None,
     input_provider_type: InputProviderType = InputProviderType.SMDB,
     input_csv: str | None = None,
     stages: list[Callable[..., Stage]] | None = None,
@@ -62,8 +62,8 @@ def create_pipeline(
     Create a Pipeline instance. All options correspond to command line parameters 
     described in `pipeline_click_options` in the `cli_opts` module
     """
-    if storage_policy != StoragePolicy.CPG:
-        raise PipelineError(f'Unsupported storage policy {storage_policy}')
+    if storage_policy_type != StoragePolicyType.CPG:
+        raise PipelineError(f'Unsupported storage policy {storage_policy_type}')
 
     storage_provider = CpgStorageProvider(cloud)
     cohort = Cohort(

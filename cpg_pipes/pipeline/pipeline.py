@@ -567,6 +567,15 @@ class Stage(Generic[TargetT], ABC):
             data=found_paths,
             jobs=[self.b.new_job(f'{self.name} [reuse]', target.get_job_attrs())]
         )
+    
+    def get_job_attrs(self, target: TargetT | None = None) -> dict[str, str]:
+        """
+        Create Hail Batch Job attributes dictionary
+        """
+        job_attrs = dict(stage=self.name)
+        if target:
+            job_attrs |= target.get_job_attrs()
+        return job_attrs
 
 
 def stage(

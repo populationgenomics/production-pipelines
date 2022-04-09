@@ -11,10 +11,9 @@ class InputProviderType(Enum):
     """Available types of input prpviders"""
     SMDB = 'smdb'
     CSV = 'csv'
-    NONE = 'none'
 
 
-class StoragePolicy(Enum):
+class StoragePolicyType(Enum):
     """Available storage policies"""
     CPG = 'cpg'
 
@@ -22,4 +21,3 @@ class StoragePolicy(Enum):
 class StatusReporterType(Enum):
     """Available types of status reporters"""
     SMDB = 'smdb'
-    NONE = 'none'

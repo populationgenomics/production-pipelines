@@ -30,6 +30,7 @@ def pedigree(
     out_checks_path: Path | None = None,
     label: str | None = None,
     ignore_missing: bool = False,
+    job_attrs: dict | None = None,
 ) -> list[Job]:
     """
     Add somalier and peddy based jobs that infer relatedness and sex, compare that
@@ -56,7 +57,8 @@ def pedigree(
     relate_j = _relate(
         b=b,
         somalier_file_by_sample=somalier_file_by_sample,
-        dataset=dataset,
+        sample_ids=dataset.get_sample_ids(),
+        ped_path=dataset.make_ped_file(),
         label=label,
         extract_jobs=extract_jobs,
         out_samples_path=out_samples_path,
@@ -76,7 +78,6 @@ def pedigree(
         job_attrs=dataset.get_job_attrs(),
     )
     check_j.depends_on(relate_j)
-
     return extract_jobs + [relate_j, check_j]
 
 
@@ -98,12 +99,13 @@ def ancestry(
     dataset: Dataset,
     refs: RefData,
     input_path_by_sid: dict[str, Path | str],
-    overwrite: bool,
     out_tsv_path: Path,
     out_html_path: Path,
+    overwrite: bool = True,
     out_html_url: str | None = None,
     label: str | None = None,
     ignore_missing: bool = False,
+    job_attrs: dict | None = None,
 ) -> Job:
     """
     Run somalier ancestry https://github.com/brentp/somalier/wiki/ancestry
@@ -116,18 +118,19 @@ def ancestry(
         overwrite=overwrite,
         label=label,
         ignore_missing=ignore_missing,
+        job_attrs=job_attrs,
     )
-
     j = _ancestry(
         b=b,
         somalier_file_by_sample=somalier_file_by_sample,
-        dataset=dataset,
+        sample_ids=dataset.get_sample_ids(),
         refs=refs,
         label=label,
         extract_jobs=extract_jobs,
         out_tsv_path=out_tsv_path,
         out_html_path=out_html_path,
         out_html_url=out_html_url,
+        job_attrs=job_attrs,
     )
     return j
 
@@ -140,6 +143,7 @@ def _prep_somalier_files(
     overwrite: bool,
     label: str | None = None,
     ignore_missing: bool = False,
+    job_attrs: dict | None = None,
 ) -> tuple[list[Job], dict[str, Path]]:
     """
     Generate .somalier file for each input
@@ -167,12 +171,12 @@ def _prep_somalier_files(
             gvcf_or_cram_or_bam_path = GvcfPath(input_path)
         j = extact_job(
             b=b,
-            sample=sample,
             refs=refs,
             gvcf_or_cram_or_bam_path=gvcf_or_cram_or_bam_path,
             overwrite=overwrite,
             label=label,
             out_fpath=gvcf_or_cram_or_bam_path.somalier_path,
+            job_attrs=(job_attrs or {}) | sample.get_job_attrs(),
         )
         somalier_file_by_sample[sample.id] = gvcf_or_cram_or_bam_path.somalier_path
         extract_jobs.append(j)
@@ -237,25 +241,20 @@ def check_pedigree_job(
 def _ancestry(
     b: Batch, 
     somalier_file_by_sample: dict[str, Path],
-    dataset: Dataset,
+    sample_ids: list[str],
     refs: RefData,
     label: str | None,
     extract_jobs: list[Job],
     out_tsv_path: Path,
     out_html_path: Path,
     out_html_url: str | None = None,
+    job_attrs: dict | None = None,
 ) -> Job:
-    j = b.new_job(
-        'Somalier ancestry' + (f' {label}' if label else ''),
-        dict(dataset=dataset.name),
-    )
+    j = b.new_job('Somalier ancestry' + (f' {label}' if label else ''), job_attrs)
     j.image(images.BIOINFO_IMAGE)
     # Size of one somalier file is 212K, so we add another G only if the number of
     # samples is >4k
-    STANDARD.set_resources(
-        j, 
-        storage_gb=1 + len(dataset.get_samples()) // 4000 * 1,
-    )
+    STANDARD.set_resources(j, storage_gb=1 + len(sample_ids) // 4000 * 1)
     j.depends_on(*extract_jobs)
 
     cmd = f"""\
@@ -266,10 +265,9 @@ def _ancestry(
     mkdir /io/batch/somaliers
     """
 
-    for sample in dataset.get_samples():
-        if sample.id:
-            somalier_file = b.read_input(str(somalier_file_by_sample[sample.id]))
-            cmd += f'    cp {somalier_file} /io/batch/somaliers/\n'
+    for sample_id in sample_ids:
+        somalier_file = b.read_input(str(somalier_file_by_sample[sample_id]))
+        cmd += f'    cp {somalier_file} /io/batch/somaliers/\n'
 
     cmd += f"""\
     somalier ancestry \\
@@ -292,42 +290,29 @@ def _ancestry(
 def _relate(
     b: Batch, 
     somalier_file_by_sample: dict[str, Path],
-    dataset: Dataset,
+    sample_ids: list[str],
+    ped_path: Path,
     label: str | None,
     extract_jobs: list[Job],
     out_samples_path: Path | None = None,
     out_pairs_path: Path | None = None,
     out_html_path: Path | None = None,
     out_html_url: str | None = None,
+    job_attrs: dict | None = None,
 ) -> Job:
-    j = b.new_job(
-        'Somalier relate' + (f' {label}' if label else ''),
-        dataset.get_job_attrs(),
-    )
+    j = b.new_job('Somalier relate' + (f' {label}' if label else ''), job_attrs)
     j.image(images.BIOINFO_IMAGE)
     # Size of one somalier file is 212K, so we add another G only if the number of
     # samples is >4k
-    STANDARD.set_resources(
-        j, 
-        storage_gb=1 + len(dataset.get_samples()) // 4000 * 1,
-    )
+    STANDARD.set_resources(j, storage_gb=1 + len(sample_ids) // 4000 * 1)
     j.depends_on(*extract_jobs)
-    ped_fpath = dataset.get_tmp_bucket() / f'{dataset.name}.ped'
-    datas = []
-    for sample in dataset.get_samples():
-        if sample.pedigree:
-            datas.append(sample.pedigree.get_ped_dict())
-    df = pd.DataFrame(datas)
-    with ped_fpath.open('w') as fp:
-        df.to_csv(fp, sep='\t', index=False)
-    ped_file = b.read_input(str(ped_fpath))
+
     input_files_lines = ''
-    for sample in dataset.get_samples():
-        if sample.id:
-            somalier_file = b.read_input(str(somalier_file_by_sample[sample.id]))
-            input_files_lines += f'{somalier_file} \\\n'
+    for sample_id in sample_ids:
+        somalier_file = b.read_input(str(somalier_file_by_sample[sample_id]))
+        input_files_lines += f'{somalier_file} \\\n'
     cmd = f"""\
-    cat {ped_file} | grep -v Family.ID > /io/samples.ped 
+    cat {b.read_input(str(ped_path))} | grep -v Family.ID > /io/samples.ped 
     
     somalier relate \\
     {input_files_lines} \\
@@ -353,21 +338,18 @@ def _relate(
 
 def extact_job(
     b,
-    sample: Sample,
     gvcf_or_cram_or_bam_path: CramPath | GvcfPath,
     refs: RefData,
-    overwrite: bool,
+    overwrite: bool = True,
     label: str | None = None,
     out_fpath: Path | None = None,
+    job_attrs: dict | None = None,
 ) -> Job:
     """
     Run "somalier extract" to generate a fingerprint for a `sample`
     from `fpath` (which can be a GVCF, a CRAM or a BAM)
     """
-    j = b.new_job(
-        'Somalier extract' + (f' {label}' if label else ''),
-        sample.get_job_attrs(),
-    )
+    j = b.new_job('Somalier extract' + (f' {label}' if label else ''), job_attrs)
 
     if not out_fpath:
         out_fpath = gvcf_or_cram_or_bam_path.somalier_path

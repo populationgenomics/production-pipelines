@@ -91,7 +91,7 @@ class MultiQC(DatasetStage):
             out_json_path=json_path,
             out_html_path=html_path,
             out_html_url=html_url,
-            job_attrs=dataset.get_job_attrs(),
+            job_attrs=self.get_job_attrs(dataset),
         )
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])
 

@@ -90,7 +90,11 @@ def annotate_cohort(
         from gnomad.utils.sparse_mt import split_info_annotation
         ht = ht.annotate(
             info=ht.info.annotate(**split_info_annotation(ht.info, ht.a_index)),
-            filters=ht.filters.union(hl.set([ht.info.AS_FilterStatus])).filter(lambda val: val != 'PASS'),
+        )
+        # Annotating filters separately because they depend on info
+        ht = ht.annotate(
+            filters=ht.filters.union(hl.set([ht.info.AS_FilterStatus])).filter(
+                lambda val: val != 'PASS'),
         )
         split_count = ht.count()
         logger.info(

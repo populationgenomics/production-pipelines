@@ -72,6 +72,7 @@ class AnnotateCohort(CohortStage):
             hail_billing_project=self.hail_billing_project,
             hail_bucket=self.hail_bucket,
             overwrite=not self.check_intermediates,
+            job_attrs=self.get_job_attrs(),
         )
         return self.make_outputs(cohort, data=mt_path, jobs=jobs)
 
@@ -108,7 +109,7 @@ class AnnotateDataset(DatasetStage):
             tmp_bucket=self.tmp_bucket / 'mt' / 'checkpoints' / dataset.name,
             hail_billing_project=self.hail_billing_project,
             hail_bucket=self.hail_bucket,
-            job_attrs=dataset.get_job_attrs(),
+            job_attrs=self.get_job_attrs(dataset),
             overwrite=not self.check_intermediates,
         )
         return self.make_outputs(
@@ -161,6 +162,7 @@ class LoadToEsStage(DatasetStage):
             depends_on=inputs.get_jobs(),
             scopes=['cloud-platform'],
         )
+        j.attributes = self.get_job_attrs(dataset),
         return self.make_outputs(dataset, jobs=[j])
 
 
