@@ -113,7 +113,7 @@ def annotate_cohort(
         # returns False for NaNs and Infs.
         ht = ht.annotate(
             info=ht.info.annotate(
-                AS_VQSLOD=ht.info.if_else(
+                AS_VQSLOD=hl.if_else(
                     hl.is_finite(ht.info.AS_VQSLOD),
                     ht.info.AS_VQSLOD,
                     0.0, 
