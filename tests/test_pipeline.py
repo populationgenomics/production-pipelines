@@ -102,6 +102,7 @@ class TestPipeline(unittest.TestCase):
             check_intermediates=False,
             check_expected_outputs=False,
             last_stage=last_stage,
+            version=self.timestamp,
             config=dict(
                 hc_intervals_num=self.hc_intervals_num,
                 jc_intervals_num=self.jc_intervals_num,
@@ -133,7 +134,8 @@ class TestPipeline(unittest.TestCase):
         pipeline = self._setup_pipeline()
 
         with patch('builtins.print') as mock_print:
-            pipeline.run(dry_run=True)
+            result = pipeline.run(dry_run=True)
+            self.assertEqual('success', result.status()['state'])
 
             # print() should be called only once:
             self.assertEqual(1, mock_print.call_count)
@@ -169,8 +171,11 @@ class TestPipeline(unittest.TestCase):
         """
         WGS seqr-loading pipeline.
         """
-        pipeline = self._setup_pipeline(last_stage='AnnotateDataset')
-        pipeline.run(dry_run=False, wait=True)
+        pipeline = self._setup_pipeline(
+            last_stage='AnnotateDataset'
+        )
+        result = pipeline.run(dry_run=False, wait=True)
+        self.assertEqual('success', result.status()['state'])
 
     def test_exome(self):
         """
@@ -180,7 +185,8 @@ class TestPipeline(unittest.TestCase):
             last_stage='AnnotateDataset',
             seq_type=SequencingType.EXOME,
         )
-        pipeline.run(dry_run=False, wait=True)
+        result = pipeline.run(dry_run=False, wait=True)
+        self.assertEqual('success', result.status()['state'])
 
 
 if __name__ == '__main__':
