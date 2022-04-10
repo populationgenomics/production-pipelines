@@ -7,7 +7,6 @@ from typing import List, Union, Callable
 import textwrap
 
 from cpg_pipes import Path
-from cpg_pipes.utils import PACKAGE_DIR
 
 logger = logging.getLogger(__file__)
 
@@ -124,7 +123,7 @@ def wrap_command(
     setup_gcp: bool = False,
     define_retry_function: bool = False,
     rm_leading_space: bool = True,
-    python_script: Path | None = None,
+    python_script_path: Path | None = None,
 ) -> str:
     """
     Wraps a command for submission
@@ -140,7 +139,7 @@ def wrap_command(
         to redo a command with a pause of default 30 seconds (useful to pull inputs
         and get around GoogleEgressBandwidth Quota or other google quotas)
     @param rm_leading_space: remove all leading spaces and tabs from the command lines
-    @param python_script: if provided, copy this python script
+    @param python_script_path: if provided, copy this python script
     """
     if isinstance(command, list):
         command = '\n'.join(command)
@@ -172,13 +171,13 @@ def wrap_command(
 
     # We don't want the python script tabs to be stripped, so
     # we are inserting it after leadings space is removed
-    if python_script:
-        with (PACKAGE_DIR / '..' / python_script).open() as f:
+    if python_script_path:
+        with python_script_path.open() as f:
             script_contents = f.read()
         cmd = cmd.replace(
             '{copy_script_cmd}',
             ADD_SCRIPT_CMD.format(
-                script_name=python_script.name,
+                script_name=python_script_path.name,
                 script_contents=script_contents,
             ),
         )

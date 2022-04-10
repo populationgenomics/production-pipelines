@@ -37,3 +37,6 @@ jobs:
 
       - name: Test metadata provider
         run: python -m unittest tests.test_input_provider
+
+      - name: Test pedigree checks
+        run: python -m unittest tests.test_pedigree

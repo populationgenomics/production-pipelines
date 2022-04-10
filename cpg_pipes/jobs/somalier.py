@@ -11,8 +11,9 @@ from cpg_pipes import images, utils
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.types import CramPath, GvcfPath
-from cpg_pipes.targets import Dataset, Sample
+from cpg_pipes.targets import Dataset
 from cpg_pipes.refdata import RefData
+from cpg_pipes.jobs.scripts import check_pedigree
 
 logger = logging.getLogger(__file__)
 
@@ -214,10 +215,8 @@ def check_pedigree_job(
     STANDARD.set_resources(check_j, ncpu=2)
     check_j.image(images.PEDDY_IMAGE)
 
-    script_name = 'check_pedigree.py'
-    script_path = (
-        to_path(__file__).parent.parent.parent / utils.SCRIPTS_DIR / script_name
-    )
+    script_path = to_path(check_pedigree.__file__)
+    script_name = script_path.name
     cmd = f"""\
     pip3 install peddy
 
@@ -232,7 +231,7 @@ def check_pedigree_job(
     check_j.command(
         wrap_command(
             cmd,
-            python_script=script_path,
+            python_script_path=script_path,
             setup_gcp=True,
         )
     )

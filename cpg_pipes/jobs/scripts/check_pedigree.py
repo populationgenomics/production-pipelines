@@ -5,6 +5,7 @@ This script parses "somalier relate" (https://github.com/brentp/somalier) output
 and returns a non-zero code if either sex or pedigree mismatches the data in a 
 provided PED file.
 """
+
 import contextlib
 import logging
 import sys
@@ -52,7 +53,7 @@ def main(
     sample_map_tsv_path: Optional[str],
 ):
     """
-    Entry point.
+    Report pedigree inconsistencies, given somalier outputs.
     """
     check_pedigree(
         somalier_samples_fpath,
@@ -65,8 +66,8 @@ def main(
 def check_pedigree(
     somalier_samples_fpath: str,
     somalier_pairs_fpath: str,
-    somalier_html_fpath: Optional[str],
-    sample_map_tsv_path: Optional[str],
+    somalier_html_fpath: Optional[str] = None,
+    sample_map_tsv_path: Optional[str] = None,
 ):
     """
     Report pedigree inconsistencies, given somalier outputs.
@@ -301,8 +302,12 @@ def _parse_sample_map(sample_map_tsv_path: str) -> Dict[str, str]:
     if sample_map_tsv_path:
         with open(sample_map_tsv_path) as f:
             for line in f:
-                if line.strip():
-                    ori_sid, new_sid = line.strip().split('\t')
+                if line := line.strip():
+                    try:
+                        ori_sid, new_sid = line.split('\t')
+                    except ValueError:
+                        logger.warning(line)
+                        raise
                     sample_map[ori_sid] = new_sid
     return sample_map
 
