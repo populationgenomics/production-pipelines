@@ -75,7 +75,7 @@ def annotate_dataset_jobs(
     that will be loaded into Seqr).
     """
     subset_mt_path = tmp_bucket / 'cohort-subset.mt'
-    subset_j = b.new_job(f'subset to dataset', job_attrs)
+    subset_j = b.new_job(f'subset cohort to dataset', job_attrs)
     subset_j.image(images.DRIVER_IMAGE)
     subset_j.command(
         python_command(
@@ -106,7 +106,6 @@ def annotate_dataset_jobs(
         )
     )
     annotate_j.depends_on(subset_j)
-
     return [subset_j, annotate_j]
 
 

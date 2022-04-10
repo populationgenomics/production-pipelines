@@ -44,8 +44,8 @@ class AnnotateCohort(CohortStage):
         """
         Expected to write a matrix table.
         """
-        samples_hash = utils.hash_sample_ids(cohort.get_sample_ids())
-        return self.tmp_bucket / 'mt' / f'{samples_hash}' / 'annotated-cohort.mt'
+        h = cohort.alignment_inputs_hash()
+        return cohort.analysis_dataset.get_analysis_bucket() / 'mt' / f'{h}.mt'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
@@ -84,8 +84,8 @@ class AnnotateDataset(DatasetStage):
         """
         Expected to generate a matrix table
         """
-        samples_hash = utils.hash_sample_ids(dataset.cohort.get_sample_ids())
-        return self.tmp_bucket / 'mt' / f'{samples_hash}' / f'{dataset.name}.mt'
+        h = dataset.cohort.alignment_inputs_hash()
+        return self.tmp_bucket / f'{h}-{dataset.name}.mt'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
@@ -98,7 +98,7 @@ class AnnotateDataset(DatasetStage):
             mt_path=mt_path,
             sample_ids=[s.id for s in dataset.get_samples()],
             output_mt_path=self.expected_outputs(dataset),
-            tmp_bucket=self.tmp_bucket / 'mt' / 'checkpoints' / dataset.name,
+            tmp_bucket=self.tmp_bucket / 'checkpoints' / dataset.name,
             hail_billing_project=self.hail_billing_project,
             hail_bucket=self.hail_bucket,
             job_attrs=self.get_job_attrs(dataset),

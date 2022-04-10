@@ -156,7 +156,7 @@ def vep_one(
     """
     j = b.new_job('VEP', job_attrs)
     if out_path and utils.can_reuse(out_path, overwrite):
-        j += ' [reuse]'
+        j.name += ' [reuse]'
         return j
 
     j.image(images.VEP_IMAGE)

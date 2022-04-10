@@ -98,22 +98,12 @@ def make_joint_genotyping_jobs(
     vcfs: list[hb.ResourceFile] = []
     siteonly_vcfs: list[hb.ResourceFile] = []
 
-    sample_ids = set(s.id for s in samples)
-    samples_hash = utils.hash_sample_ids(list(sample_ids))
-    jc_tmp_bucket = tmp_bucket / 'joint_calling' / samples_hash
-
     for idx, import_gvcfs_job, genomicsdb_path, interval in zip(
         range(scatter_count), import_gvcfs_jobs, genomicsdb_paths, intervals
     ):
-        jc_vcf_path = jc_tmp_bucket / 'by_interval' / f'interval_{idx + 1}.vcf.gz'
-        filt_jc_vcf_path = (
-            jc_tmp_bucket
-            / 'by_interval_excess_het_filter'
-            / f'interval_{idx + 1}.vcf.gz'
-        )
-        siteonly_jc_vcf_path = (
-            jc_tmp_bucket / 'by_interval_site_only' / f'interval_{idx + 1}.vcf.gz'
-        )
+        jc_vcf_path = tmp_bucket / 'joint-genotyper' / 'parts' / f'part{idx + 1}.vcf.gz'
+        filt_jc_vcf_path = tmp_bucket / 'excess-filter' / 'parts' / f'part{idx + 1}.vcf.gz'
+        siteonly_jc_vcf_path = tmp_bucket / 'siteonly' / 'parts' / f'part{idx + 1}.vcf.gz'
 
         jc_vcf_j, jc_vcf = _add_joint_genotyper_job(
             b,

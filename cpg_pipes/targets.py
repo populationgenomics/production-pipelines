@@ -1,7 +1,7 @@
 """
 Pipeline stage target and subclasses: Cohort, Dataset, Sample.
 """
-
+import hashlib
 import logging
 from dataclasses import dataclass
 from enum import Enum
@@ -38,6 +38,19 @@ class Target:
         Get flat list of all sample IDs corresponding to this target.
         """
         return [s.id for s in self.get_samples(only_active=only_active)]
+
+    def alignment_inputs_hash(self) -> str:
+        """
+        Unique hash string of sample alignment inputs. Useful to decide 
+        whether the analysis on the target needs to be rerun.
+        """
+        s = ' '.join(sorted([
+            str(s.alignment_input) 
+            for s in self.get_samples()
+            if s.alignment_input is not None
+        ]))
+        h = hashlib.sha256(s.encode()).hexdigest()[:38]
+        return f'{h}_{len(self.get_sample_ids())}'
 
     @property
     def target_id(self) -> str:
@@ -460,7 +473,7 @@ class Sample(Target):
                 fam_id=self.participant_id,
                 sex=sex,
             )
-        self.alignment_input = alignment_input
+        self.alignment_input: AlignmentInput | None = alignment_input
 
     def __repr__(self):
         return (

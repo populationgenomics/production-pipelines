@@ -114,18 +114,6 @@ def safe_mkdir(dirpath: Path, descriptive_name: str = '') -> Path:
     return dirpath
 
 
-def hash_sample_ids(sample_names: list[str]) -> str:
-    """
-    Return a unique hash string from a set of strings
-    @param sample_names: set of strings
-    @return: a string hash
-    """
-    for sn in sample_names:
-        assert ' ' not in sn, sn
-    h = hashlib.sha256(' '.join(sorted(sample_names)).encode()).hexdigest()[:38]
-    return f'{h}_{len(sample_names)}'
-
-
 def exists(path: Path | str, verbose: bool = True) -> bool:
     """
     Check if the object exists, where the object can be:

@@ -2,10 +2,9 @@
 VEP stage.
 """
 
-from cpg_pipes import Path, utils
+from cpg_pipes import Path
 from cpg_pipes.jobs import vep
 from cpg_pipes.pipeline import stage, StageInput, StageOutput, CohortStage
-from cpg_pipes.refdata import RefData
 from cpg_pipes.stages.vqsr import VqsrStage
 from cpg_pipes.targets import Cohort
 
@@ -13,19 +12,19 @@ from cpg_pipes.targets import Cohort
 @stage(required_stages=[VqsrStage])
 class VepStage(CohortStage):
     """
-    Run VEP on a VCF
+    Run VEP on a VCF.
     """
 
     def expected_outputs(self, cohort: Cohort) -> Path:
         """
-        Expected to write a matrix table.
+        Expected to write a hail table.
         """
-        samples_hash = utils.hash_sample_ids(cohort.get_sample_ids())
-        return cohort.analysis_dataset.get_tmp_bucket() / 'vep' / f'{samples_hash}.ht'
+        h = cohort.alignment_inputs_hash()
+        return self.tmp_bucket / 'vep' / f'{h}.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
-        Uses jobs vep() function.
+        Submit jobs.
         """
         jobs = vep.vep(
             self.b,

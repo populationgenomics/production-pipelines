@@ -4,9 +4,7 @@ Stage that performs joint genotyping of GVCFs using GATK.
 
 import logging
 
-from .. import Path, to_path
-from .. import utils
-from ..refdata import RefData
+from .. import Path
 from ..types import GvcfPath
 from ..jobs.joint_genotyping import make_joint_genotyping_jobs, JointGenotyperTool
 from ..targets import Cohort
@@ -27,22 +25,15 @@ class JointGenotypingStage(CohortStage):
         Generate a pVCF and a site-only VCF. Returns 2 outputs, thus not checking
         the SMDB, because the Analysis entry supports only single output.
         """
-        samples_hash = utils.hash_sample_ids(cohort.get_sample_ids())
-        expected_jc_vcf_path = (
-            cohort.analysis_dataset.get_tmp_bucket()
-            / 'joint_calling'
-            / f'{samples_hash}.vcf.gz'
-        )
+        h = cohort.alignment_inputs_hash()
         return {
-            'vcf': expected_jc_vcf_path,
-            'siteonly': to_path(
-                str(expected_jc_vcf_path).replace('.vcf.gz', '-siteonly.vcf.gz')
-            ),
+            'vcf': self.tmp_bucket / f'{h}.vcf.gz',
+            'siteonly': self.tmp_bucket / f'{h}-siteonly.vcf.gz',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
-        Use function defined in jobs module
+        Submit jobs.
         """
         gvcf_by_sid = {
             sample.id: GvcfPath(inputs.as_path(target=sample, stage=GvcfStage))

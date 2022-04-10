@@ -72,7 +72,8 @@ def annotate_cohort(
         ).rows()
 
         # Some AS annotations are not correctly represented in the VCF to be parsed
-        # as lists by Hail, so parsing them here:
+        # as lists by Hail, so reparsing them here. Also, some annotations are not 
+        # correctly parsed as numbers, so converting them to floats here.
         ht = ht.annotate(
             info=ht.info.annotate(
                 AS_QUALapprox=ht.info.AS_QUALapprox.split(r'\|')[1:].map(hl.int),
@@ -84,6 +85,9 @@ def annotate_cohort(
                         x.split(',').map(hl.int),
                     )
                 ),
+                AS_VQSLOD=ht.info.AS_VQSLOD.map(hl.float),
+                InbreedingCoeff=hl.float(ht.info.InbreedingCoeff),
+                AS_InbreedingCoeff=ht.info.AS_InbreedingCoeff.map(hl.float),
             )
         )
         logger.info(f'AS-VQSR: splitting multiallelics...')
@@ -115,25 +119,18 @@ def annotate_cohort(
         # Hail's hl.float() correctly parses this value, however, seqr loader doesn't
         # recognise infs and nans, so we need to replace it with zero. hl.is_finite()
         # returns False for NaNs and Infs.
+        # Example of NaN: https://batch.hail.populationgenomics.org
+        # .au/batches/6973/jobs/12
+        
+        def _fix_inf(x):
+            return hl.if_else(hl.is_finite(x), x, 0.0)
+        
         ht = ht.annotate(
             info=ht.info.annotate(
-                AS_VQSLOD=hl.if_else(
-                    hl.is_finite(ht.info.AS_VQSLOD),
-                    ht.info.AS_VQSLOD,
-                    0.0,
-                ),
-                AS_MQ=hl.if_else(hl.is_nan(ht.info.AS_MQ), 0.0, mt.info.AS_MQ),
-                InbreedingCoeff=hl.if_else(
-                    hl.is_finite(mt.info.InbreedingCoeff),
-                    mt.info.InbreedingCoeff,
-                    0.0,
-                ),
-                # https://batch.hail.populationgenomics.org.au/batches/6973/jobs/12
-                AS_InbreedingCoeff=hl.if_else(
-                    hl.is_finite(mt.info.AS_InbreedingCoeff),
-                    mt.info.AS_InbreedingCoeff,
-                    0.0,
-                ),
+                AS_VQSLOD=_fix_inf(ht.info.AS_VQSLOD),
+                AS_MQ=_fix_inf(ht.info.AS_MQ),
+                InbreedingCoeff=_fix_inf(ht.info.InbreedingCoeff),
+                AS_InbreedingCoeff=_fix_inf(ht.info.AS_InbreedingCoeff),
             )
         )
         return _checkpoint(ht, 'vqsr.ht')
