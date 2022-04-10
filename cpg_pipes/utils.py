@@ -2,17 +2,14 @@
 Utility functions and constants.
 """
 
-import hashlib
 import logging
 import os
 import sys
-import time
 import traceback
-
 import click
 from typing import Any, Callable, cast
 
-from . import Path, to_path, get_package_path
+from . import Path, to_path
 
 logger = logging.getLogger(__file__)
 
@@ -30,15 +27,6 @@ DATAPROC_PACKAGES = [
     'gcloud',
     'selenium',
 ]
-
-# Location of python scripts to be called directly from command line.
-SCRIPTS_DIR = to_path('scripts')
-
-# Location of Hail Query scripts, to use with the dataproc wrapper.
-QUERY_SCRIPTS_DIR = to_path('query_scripts')
-
-# This python package name.
-PACKAGE_DIR = get_package_path()
 
 
 def get_validation_callback(
@@ -81,37 +69,6 @@ def get_validation_callback(
         return value
 
     return _callback
-
-
-def safe_mkdir(dirpath: Path, descriptive_name: str = '') -> Path:
-    """
-    Multiprocessing-safely and recursively creates a directory
-    """
-    if not dirpath:
-        sys.stderr.write(
-            f'Path is empty: {descriptive_name if descriptive_name else ""}\n'
-        )
-
-    if dirpath.is_dir():
-        return dirpath
-
-    if dirpath.is_file():
-        sys.stderr.write(f'{descriptive_name} {dirpath} is a file.\n')
-
-    num_tries = 0
-    max_tries = 10
-
-    while not dirpath.exists():
-        # we could get an error here if multiple processes are creating
-        # the directory at the same time. Grr, concurrency.
-        try:
-            os.makedirs(str(dirpath))
-        except OSError:
-            if num_tries > max_tries:
-                raise
-            num_tries += 1
-            time.sleep(2)
-    return dirpath
 
 
 def exists(path: Path | str, verbose: bool = True) -> bool:

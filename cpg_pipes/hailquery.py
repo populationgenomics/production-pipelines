@@ -13,7 +13,6 @@ from typing import List, Optional, Union
 import hail as hl
 
 from .refdata import RefData
-from .utils import safe_mkdir
 
 
 logger = logging.getLogger(__file__)
@@ -38,14 +37,15 @@ def init_hail(name: str, local_tmp_dir: Path = None):
     Initialise Hail, and set up a local directory for logs.
     @param name: name to prefix the log file
     @param local_tmp_dir: local directory to write Hail logs
-    @return:
+    @return: local_tmp_dir
     """
     if not local_tmp_dir:
         local_tmp_dir = Path(tempfile.mkdtemp())
 
     timestamp = time.strftime('%Y%m%d-%H%M')
-    hl_log = os.path.join(safe_mkdir(local_tmp_dir / 'log'), f'{name}-{timestamp}.log')
-    hl.init(default_reference=RefData.genome_build, log=hl_log)
+    local_tmp_dir.mkdir(parents=True)
+    hl_log = local_tmp_dir / f'{name}-{timestamp}.log'
+    hl.init(default_reference=RefData.genome_build, log=str(hl_log))
     return local_tmp_dir
 
 
@@ -61,6 +61,7 @@ def filter_low_conf_regions(
     Filter low-confidence regions.
 
     @param mt: MatrixTable or Table to filter
+    @param refs: reference data
     @param filter_lcr: Whether to filter LCR regions
     @param filter_segdup: Whether to filter Segdup regions
     @param filter_telomeres_and_centromeres: Whether to filter telomeres and centromeres

@@ -63,7 +63,7 @@ class AnnotateCohort(CohortStage):
             vep_ht_path=vep_ht_path,
             siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
             output_mt_path=mt_path,
-            checkpoints_bucket=self.tmp_bucket / 'seqr_loader' / 'checkpoints',
+            checkpoints_bucket=self.tmp_bucket / 'checkpoints',
             sequencing_type=cohort.get_sequencing_type(),
             hail_billing_project=self.hail_billing_project,
             hail_bucket=self.hail_bucket,
@@ -137,7 +137,7 @@ class LoadToEs(DatasetStage):
 
         j = dataproc.hail_dataproc_job(
             self.b,
-            f'{utils.QUERY_SCRIPTS_DIR}/seqr/mt_to_es.py '
+            f'cpg_pipes/dataproc_scripts/seqr/mt_to_es.py '
             f'--mt-path {dataset_mt_path} '
             f'--es-host elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com '
             f'--es-port 9243 '

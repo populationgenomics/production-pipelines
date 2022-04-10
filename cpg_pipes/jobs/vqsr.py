@@ -178,7 +178,7 @@ def make_vqsr_jobs(
         if not utils.can_reuse(combined_vcf_path, overwrite):
             mt_to_vcf_job = dataproc.hail_dataproc_job(
                 b,
-                f'{utils.QUERY_SCRIPTS_DIR}/mt_to_vcf.py --overwrite '
+                f'cpg_pipes/dataproc_scripts/mt_to_siteonlyvcf.py --overwrite '
                 f'--mt {input_vcf_or_mt_path} '
                 f'--meta-ht {meta_ht_path} '
                 f'--hard-filtered-samples-ht {hard_filter_ht_path} '

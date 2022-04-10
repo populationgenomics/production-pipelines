@@ -20,7 +20,7 @@ class Vep(CohortStage):
         Expected to write a hail table.
         """
         h = cohort.alignment_inputs_hash()
-        return self.tmp_bucket / 'vep' / f'{h}.ht'
+        return self.tmp_bucket / f'{h}.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """

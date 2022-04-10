@@ -53,7 +53,7 @@ for n_workers in [10, 30, 20, 40, 50]:
 
         combiner_job = dataproc.hail_dataproc_job(
             pipeline.b,
-            f'{utils.QUERY_SCRIPTS_DIR}/combine_gvcfs.py '
+            f'cpg_pipes/dataproc_scripts/combine_gvcfs.py '
             f'--meta-csv {meta_csv_path} '
             f'--out-mt {out_mt_path} '
             f'--bucket {BENCHMARK_BUCKET}/work',

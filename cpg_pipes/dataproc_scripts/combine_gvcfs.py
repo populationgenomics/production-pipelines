@@ -51,17 +51,11 @@ logger = logging.getLogger(__name__)
     'local_tmp_dir',
     help='local directory for temporary files and Hail logs (must be local).',
 )
-@click.option(
-    '--hail-billing',
-    'hail_billing',
-    help='Hail billing account ID.',
-)
 def main(
     meta_csv_path: str,
     out_mt_path: str,
     work_bucket: str,
     local_tmp_dir: str,
-    hail_billing: str,  # pylint: disable=unused-argument
 ):  # pylint: disable=missing-function-docstring
     """
     Entry point
