@@ -9,13 +9,13 @@ from ..types import GvcfPath
 from ..jobs.joint_genotyping import make_joint_genotyping_jobs, JointGenotyperTool
 from ..targets import Cohort
 from ..pipeline import stage, CohortStage, StageInput, StageOutput, PipelineError
-from .gvcf import GvcfStage
+from .gvcf import GenotypeSample
 
 logger = logging.getLogger(__file__)
 
 
-@stage(required_stages=GvcfStage)
-class JointGenotypingStage(CohortStage):
+@stage(required_stages=GenotypeSample)
+class JointGenotyping(CohortStage):
     """
     Joint-calling of GVCFs together.
     """
@@ -36,7 +36,7 @@ class JointGenotypingStage(CohortStage):
         Submit jobs.
         """
         gvcf_by_sid = {
-            sample.id: GvcfPath(inputs.as_path(target=sample, stage=GvcfStage))
+            sample.id: GvcfPath(inputs.as_path(target=sample, stage=GenotypeSample))
             for sample in cohort.get_samples()
         }
 

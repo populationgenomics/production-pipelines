@@ -5,12 +5,12 @@ VEP stage.
 from cpg_pipes import Path
 from cpg_pipes.jobs import vep
 from cpg_pipes.pipeline import stage, StageInput, StageOutput, CohortStage
-from cpg_pipes.stages.vqsr import VqsrStage
+from cpg_pipes.stages.vqsr import Vqsr
 from cpg_pipes.targets import Cohort
 
 
-@stage(required_stages=[VqsrStage])
-class VepStage(CohortStage):
+@stage(required_stages=[Vqsr])
+class Vep(CohortStage):
     """
     Run VEP on a VCF.
     """
@@ -28,7 +28,7 @@ class VepStage(CohortStage):
         """
         jobs = vep.vep(
             self.b,
-            vcf_path=inputs.as_path(cohort, stage=VqsrStage),
+            vcf_path=inputs.as_path(cohort, stage=Vqsr),
             refs=self.refs,
             sequencing_type=cohort.get_sequencing_type(),
             hail_billing_project=self.hail_billing_project,

@@ -14,7 +14,7 @@ logger = logging.getLogger(__file__)
 
 
 @stage(analysis_type='cram')
-class CramStage(SampleStage):
+class Align(SampleStage):
     """
     Align or re-align input data to produce a CRAM file
     """

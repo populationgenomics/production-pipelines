@@ -8,13 +8,13 @@ from .. import Path
 from ..pipeline import stage, CohortStage, StageInput, StageOutput
 from ..jobs.vqsr import make_vqsr_jobs
 from ..targets import Cohort
-from .joint_genotyping import JointGenotypingStage
+from .joint_genotyping import JointGenotyping
 
 logger = logging.getLogger(__file__)
 
 
-@stage(required_stages=JointGenotypingStage)
-class VqsrStage(CohortStage):
+@stage(required_stages=JointGenotyping)
+class Vqsr(CohortStage):
     """
     Variant filtering of joint-called VCF.
     """
@@ -31,7 +31,7 @@ class VqsrStage(CohortStage):
         Submit jobs.
         """
         siteonly_vcf_path = inputs.as_path(
-            stage=JointGenotypingStage, target=cohort, id='siteonly'
+            stage=JointGenotyping, target=cohort, id='siteonly'
         )
         jobs = make_vqsr_jobs(
             b=self.b,

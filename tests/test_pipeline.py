@@ -66,7 +66,7 @@ class TestPipeline(unittest.TestCase):
         original_fn = StageOutput.as_path
 
         def _mock_as_path(self_, id_=None):
-            if self_.stage.name == 'JointGenotypingStage':
+            if self_.stage.name == 'JointGenotyping':
                 d = {
                     'vcf': jc_vcf,
                     'siteonly': siteonly_vcf,

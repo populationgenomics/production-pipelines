@@ -26,15 +26,15 @@ from cpg_pipes.pipeline import (
     DatasetStage,
 )
 from cpg_pipes.refdata import RefData
-from cpg_pipes.stages.vep import VepStage
-from cpg_pipes.stages.joint_genotyping import JointGenotypingStage
-from cpg_pipes.stages.vqsr import VqsrStage
+from cpg_pipes.stages.vep import Vep
+from cpg_pipes.stages.joint_genotyping import JointGenotyping
+from cpg_pipes.stages.vqsr import Vqsr
 from cpg_pipes.targets import Cohort, Dataset
 
 logger = logging.getLogger(__file__)
 
 
-@stage(required_stages=[JointGenotypingStage, VepStage, VqsrStage])
+@stage(required_stages=[JointGenotyping, Vep, Vqsr])
 class AnnotateCohort(CohortStage):
     """
     Re-annotate the entire cohort.
@@ -51,9 +51,9 @@ class AnnotateCohort(CohortStage):
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        vcf_path = inputs.as_path(target=cohort, stage=JointGenotypingStage, id='vcf')
-        siteonly_vqsr_vcf_path = inputs.as_path(target=cohort, stage=VqsrStage)
-        vep_ht_path = inputs.as_path(target=cohort, stage=VepStage)
+        vcf_path = inputs.as_path(target=cohort, stage=JointGenotyping, id='vcf')
+        siteonly_vqsr_vcf_path = inputs.as_path(target=cohort, stage=Vqsr)
+        vep_ht_path = inputs.as_path(target=cohort, stage=Vep)
 
         mt_path = self.expected_outputs(cohort)
 
@@ -110,7 +110,7 @@ class AnnotateDataset(DatasetStage):
 
 
 @stage(required_stages=[AnnotateDataset])
-class LoadToEsStage(DatasetStage):
+class LoadToEs(DatasetStage):
     """
     Create a Seqr index.
     """
@@ -153,7 +153,7 @@ class LoadToEsStage(DatasetStage):
             depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
         )
-        j.attributes = (self.get_job_attrs(dataset),)
+        j.attributes = self.get_job_attrs(dataset)
         return self.make_outputs(dataset, jobs=[j])
 
 

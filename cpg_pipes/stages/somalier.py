@@ -15,7 +15,7 @@ logger = logging.getLogger(__file__)
 
 
 @stage
-class CramSomalierStage(SampleStage):
+class CramSomalier(SampleStage):
     """
     Genereate fingerprints from CRAMs for pedigree checks.
     """
@@ -44,7 +44,7 @@ class CramSomalierStage(SampleStage):
         return self.make_outputs(sample, data=expected_path, jobs=[j])
 
 
-@stage(required_stages=CramSomalierStage)
+@stage(required_stages=CramSomalier)
 class CramSomalierPedigree(DatasetStage):
     """
     Checks pedigree from CRAM fingerprints.
@@ -73,7 +73,7 @@ class CramSomalierPedigree(DatasetStage):
         Checks calls job from the pedigree module
         """
         fp_by_sid = {
-            s.id: inputs.as_path(stage=CramSomalierStage, target=s)
+            s.id: inputs.as_path(stage=CramSomalier, target=s)
             for s in dataset.get_samples()
         }
 
@@ -101,7 +101,7 @@ class CramSomalierPedigree(DatasetStage):
         )
 
 
-@stage(required_stages=CramSomalierStage)
+@stage(required_stages=CramSomalier)
 class CramSomalierAncestry(DatasetStage):
     """
     Checks pedigree from CRAM fingerprints
@@ -127,7 +127,7 @@ class CramSomalierAncestry(DatasetStage):
         Checks calls job from the pedigree module
         """
         fp_by_sid = {
-            s.id: inputs.as_path(stage=CramSomalierStage, target=s)
+            s.id: inputs.as_path(stage=CramSomalier, target=s)
             for s in dataset.get_samples()
         }
 

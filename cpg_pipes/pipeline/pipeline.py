@@ -589,8 +589,8 @@ def stage(
     The goal is to allow declaring pipeline stages without requiring to implement
     a constructor method. E.g.
 
-    @stage(required_stages=[CramStage])
-    class GvcfStage(SampleStage):
+    @stage(required_stages=[Align])
+    class GenotypeSample(SampleStage):
         def expected_outputs(self, sample: Sample):
             ...
         def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:

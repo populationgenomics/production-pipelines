@@ -190,7 +190,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             is_flag=True,
             help='For the first (not-skipped) stage, if the input for a target does not'
             'exist, just skip this target instead of failing. E.g. if the first'
-            'stage is CramStage, and sequence.meta files for a sample do not exist,'
+            'stage is Align, and sequence.meta files for a sample do not exist,'
             'remove this sample instead of failing.',
         ),
         click.option(

@@ -10,16 +10,16 @@ from ..jobs import split_intervals, haplotype_caller
 from ..refdata import RefData
 from ..targets import Sample
 from ..pipeline import stage, SampleStage, StageInput, StageOutput
-from .cram import CramStage
+from .align import Align
 
 
 logger = logging.getLogger(__file__)
 
 
-@stage(required_stages=CramStage, analysis_type='gvcf')
-class GvcfStage(SampleStage):
+@stage(required_stages=Align, analysis_type='gvcf')
+class GenotypeSample(SampleStage):
     """
-    Use HaplotypeCaller to genotype individual samples
+    Use HaplotypeCaller to genotype individual samples (i.e. CRAM -> GVCF).
     """
 
     hc_intervals: list[hb.Resource] | None = None
@@ -39,7 +39,7 @@ class GvcfStage(SampleStage):
             RefData.number_of_haplotype_caller_intervals,
         )
         jobs = []
-        if GvcfStage.hc_intervals is None and scatter_count > 1:
+        if GenotypeSample.hc_intervals is None and scatter_count > 1:
             intervals_j, intervals = split_intervals.get_intervals(
                 b=self.b,
                 refs=self.refs,
@@ -48,7 +48,7 @@ class GvcfStage(SampleStage):
                 job_attrs=self.get_job_attrs(),
             )
             jobs.append(intervals_j)
-            GvcfStage.hc_intervals = intervals
+            GenotypeSample.hc_intervals = intervals
         jobs.extend(
             haplotype_caller.produce_gvcf(
                 b=self.b,
@@ -56,7 +56,7 @@ class GvcfStage(SampleStage):
                 sample_name=sample.id,
                 sequencing_type=sample.sequencing_type,
                 cram_path=sample.get_cram_path(),
-                intervals=GvcfStage.hc_intervals,
+                intervals=GenotypeSample.hc_intervals,
                 scatter_count=scatter_count,
                 refs=self.refs,
                 tmp_bucket=sample.dataset.get_tmp_bucket(),
