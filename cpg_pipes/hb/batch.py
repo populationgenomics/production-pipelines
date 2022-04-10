@@ -101,6 +101,18 @@ class RegisteringBatch(hb.Batch):
         """
         name = self._process_attributes(name, attributes)
         return super().new_job(name, attributes=attributes)
+    
+    def run(self, **kwargs):
+        """
+        Execute a batch. Overridden to print pre-submission statistics.
+        """
+        logger.info(f'Will submit {self.total_job_num} jobs:')
+        for label, stat in self.labelled_jobs.items():
+            logger.info(
+                f'  {label}: {stat["job_n"]} for {len(stat["samples"])} samples'
+            )
+        logger.info(f'  Other jobs: {self.other_job_num}')
+        return super().run(**kwargs)
 
 
 def setup_batch(

@@ -18,10 +18,10 @@ import time
 from abc import ABC, abstractmethod
 from typing import cast, Callable, Union, TypeVar, Generic, Any, Optional, Type
 
-import hailtop.batch as hb
 from cloudpathlib import CloudPath
-from hailtop.batch.job import Job
+import hailtop.batch as hb
 from hailtop.batch import Batch
+from hailtop.batch.job import Job
 
 from .exceptions import PipelineError
 from .. import Path, to_path, Namespace
@@ -747,21 +747,15 @@ class Pipeline:
 
         self.set_stages(self._stages_in_order)
 
+        result = None
         if self.b:
-            logger.info(f'Will submit {self.b.total_job_num} jobs:')
-            for label, stat in self.b.labelled_jobs.items():
-                logger.info(
-                    f'  {label}: {stat["job_n"]} for {len(stat["samples"])} samples'
-                )
-            logger.info(f'  Other jobs: {self.b.other_job_num}')
-
-            return self.b.run(
+            result = self.b.run(
                 dry_run=dry_run,
                 delete_scratch_on_exit=not keep_scratch,
                 wait=wait,
             )
         shutil.rmtree(self.local_tmp_dir)
-        return None
+        return result
 
     def _validate_first_last_stage(self) -> tuple[int | None, int | None]:
         """
