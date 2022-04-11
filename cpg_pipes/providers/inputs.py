@@ -17,7 +17,7 @@ logger = logging.getLogger(__file__)
 
 class InputProviderError(Exception):
     """
-    Exception thrown when there is something wrong happened parsing
+    Exception thrown when there is something wrong while parsing
     inputs.
     """
 
