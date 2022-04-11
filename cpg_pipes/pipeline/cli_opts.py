@@ -83,7 +83,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             '--dataset',
             'datasets',
             multiple=True,
-            help='Only read samples that belong to the dataset(s). '
+            help='Only read samples that belong to the given dataset(s). '
             'Can be set multiple times.',
         ),
         click.option(
