@@ -143,7 +143,7 @@ class StageOutput:
 # noinspection PyShadowingNames
 class StageInput:
     """
-    Represents an input for a stage run. It wraps the outputs of all required upstream 
+    Represents an input for a stage run. It wraps the outputs of all required upstream
     stages for corresponding targets (e.g. all GVCFs from a GenotypeSample stage
     for a JointCalling stage, along with Hail Batch jobs).
 

@@ -211,8 +211,8 @@ def pipeline_click_options(function: Callable) -> Callable:
         ),
     ]
 
-    # Applying decorators. Doing that in reverse order, because Click actually 
-    # inverts the order of shown options, assuming the decorators order of 
+    # Applying decorators. Doing that in reverse order, because Click actually
+    # inverts the order of shown options, assuming the decorators order of
     # application which is bottom to top.
     for opt in options[::-1]:
         function = opt(function)

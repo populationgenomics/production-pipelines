@@ -233,7 +233,7 @@ def make_vqsr_jobs(
     elif is_huge_callset:
         snp_max_gaussians = 8
 
-    if is_huge_callset:
+    if scatter_count > 1:
         # Run SNP recalibrator in a scattered mode
         model_j = add_snps_variant_recalibrator_create_model_step(
             b,
