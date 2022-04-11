@@ -485,7 +485,7 @@ class Stage(Generic[TargetT], ABC):
         expected_out = self.expected_outputs(target)
 
         reusable = self._check_if_reusable(expected_out)
-        
+
         if not self.skipped:
             inputs = self._make_inputs()
             if reusable:

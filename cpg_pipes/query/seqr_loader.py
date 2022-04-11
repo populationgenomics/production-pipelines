@@ -72,7 +72,7 @@ def annotate_cohort(
         ).rows()
 
         # Some AS annotations are not correctly represented in the VCF to be parsed
-        # as lists by Hail, so reparsing them here. Also, some annotations are not 
+        # as lists by Hail, so reparsing them here. Also, some annotations are not
         # correctly parsed as numbers, so converting them to floats here.
         ht = ht.annotate(
             info=ht.info.annotate(
@@ -121,10 +121,10 @@ def annotate_cohort(
         # returns False for NaNs and Infs.
         # Example of NaN: https://batch.hail.populationgenomics.org
         # .au/batches/6973/jobs/12
-        
+
         def _fix_inf(x):
             return hl.if_else(hl.is_finite(x), x, 0.0)
-        
+
         ht = ht.annotate(
             info=ht.info.annotate(
                 AS_VQSLOD=_fix_inf(ht.info.AS_VQSLOD),

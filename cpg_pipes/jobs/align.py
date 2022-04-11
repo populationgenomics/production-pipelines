@@ -127,10 +127,7 @@ def align(
     requested_nthreads = requested_nthreads or STANDARD.max_threads()
 
     sharded_fq = not isinstance(alignment_input, CramPath) and len(alignment_input) > 1
-    sharded_bazam = (
-        isinstance(alignment_input, CramPath)
-        and realignment_shards_num > 1
-    )
+    sharded_bazam = isinstance(alignment_input, CramPath) and realignment_shards_num > 1
     sharded = sharded_fq or sharded_bazam
 
     jobs = []

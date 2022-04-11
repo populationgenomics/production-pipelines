@@ -101,7 +101,7 @@ class RegisteringBatch(hb.Batch):
         """
         name = self._process_attributes(name, attributes)
         return super().new_job(name, attributes=attributes)
-    
+
     def run(self, **kwargs):
         """
         Execute a batch. Overridden to print pre-submission statistics.

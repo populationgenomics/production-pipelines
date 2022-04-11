@@ -13,7 +13,17 @@ from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes.types import SequencingType, CramPath
 
 try:
-    from .utils import BASE_BUCKET, DATASET, SAMPLES, SUBSET_GVCF_BY_SID, setup_env, SUBSET_FQ_BY_SID, FULL_GVCF_BY_SID, FULL_CRAM_BY_SID, SUBSET_CRAM_BY_SID
+    from .utils import (
+        BASE_BUCKET,
+        DATASET,
+        SAMPLES,
+        SUBSET_GVCF_BY_SID,
+        setup_env,
+        SUBSET_FQ_BY_SID,
+        FULL_GVCF_BY_SID,
+        FULL_CRAM_BY_SID,
+        SUBSET_CRAM_BY_SID,
+    )
 except ImportError:
     from utils import BASE_BUCKET, DATASET, SAMPLES, SUBSET_GVCF_BY_SID, setup_env, SUBSET_FQ_BY_SID, FULL_GVCF_BY_SID, FULL_CRAM_BY_SID, SUBSET_CRAM_BY_SID  # type: ignore
 
@@ -43,20 +53,25 @@ def make_subset_crams(pipeline: Pipeline):
     """
     b = pipeline.b
     d = pipeline.cohort.create_dataset(DATASET)
-    samples = [d.add_sample(
-        sid, external_id=sid, alignment_input=CramPath(FULL_CRAM_BY_SID[sid])
-    ) for sid in SAMPLES]
+    samples = [
+        d.add_sample(
+            sid, external_id=sid, alignment_input=CramPath(FULL_CRAM_BY_SID[sid])
+        )
+        for sid in SAMPLES
+    ]
 
     refs = pipeline.refs
 
     intervals_j = pipeline.b.new_job('Make toy intervals')
     in_intervals = b.read_input(str(refs.calling_interval_lists[SequencingType.EXOME]))
-    intervals_j.command(f"""
+    intervals_j.command(
+        f"""
     grep ^@ {in_intervals} > {intervals_j.out}
     grep -v ^@  {in_intervals} \
     | awk 'BEGIN {{srand()}} !/^$/ {{ if (rand() <= .01) print $0 }}' \
     >> {intervals_j.out}
-    """)
+    """
+    )
     out_intervals = refs.calling_interval_lists[SequencingType.TOY]
     b.write_output(intervals_j.out, str(out_intervals))
 
@@ -75,7 +90,8 @@ def make_subset_crams(pipeline: Pipeline):
             }
         )
 
-        cram_j.command(f"""
+        cram_j.command(
+            f"""
         grep -v ^@ {intervals_j.out} > regions.bed
         
         samtools view {cram.cram} -@{nthreads - 1} \
@@ -84,10 +100,10 @@ def make_subset_crams(pipeline: Pipeline):
         
         samtools index -@{nthreads - 1} {cram_j.output_cram.cram} \
         {cram_j.output_cram['cram.crai']}
-        """)
+        """
+        )
         b.write_output(
-            cram_j.output_cram, 
-            str(SUBSET_CRAM_BY_SID[s.id]).replace('.cram', '')
+            cram_j.output_cram, str(SUBSET_CRAM_BY_SID[s.id]).replace('.cram', '')
         )
 
         fastq_j = extract_fastq(

@@ -15,6 +15,7 @@ from cpg_pipes.providers.cpg import CpgStorageProvider
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
 from cpg_pipes.types import SequencingType, CramPath
+
 # Importing `seqr_loader` will make pipeline use all its stages by default.
 from pipelines import seqr_loader
 from pipelines.seqr_loader import AnnotateDataset
@@ -31,10 +32,11 @@ class UnittestStorageProvider(CpgStorageProvider):
     main bucket, without versioning. We need to override this behaviour to
     support writing into the test output directory.
     """
+
     def __init__(self, test_output_bucket: Path):
         super().__init__()
         self.test_output_bucket = test_output_bucket
-    
+
     def _dataset_bucket(
         self,
         dataset: str,
@@ -129,7 +131,8 @@ class TestPipeline(unittest.TestCase):
             last_stage=last_stage,
             version=self.timestamp,
             config=dict(
-                realignment_shards_num=realignment_shards_num or self.realignment_shards_num,
+                realignment_shards_num=realignment_shards_num
+                or self.realignment_shards_num,
                 hc_intervals_num=hc_intervals_num or self.hc_intervals_num,
                 jc_intervals_num=jc_intervals_num or self.jc_intervals_num,
                 vep_intervals_num=vep_intervals_num or self.vep_intervals_num,
@@ -198,7 +201,7 @@ class TestPipeline(unittest.TestCase):
         )
         result = pipeline.run(dry_run=False, wait=True)
         self.assertEqual('success', result.status()['state'])
-    
+
     def test_after_joint_calling(self):
         """
         Stages after joint-calling (running separately, because
@@ -209,7 +212,7 @@ class TestPipeline(unittest.TestCase):
             last_stage=AnnotateDataset.__name__,
             seq_type=SequencingType.WGS,
         )
-        # Mocking joint-calling outputs. Toy CRAM/GVCF don't produce enough variant 
+        # Mocking joint-calling outputs. Toy CRAM/GVCF don't produce enough variant
         # data for AS-VQSR to work properly: gatk would throw a "Bad input: Values for
         # AS_ReadPosRankSum annotation not detected for ANY training variant in the
         # input callset", like in this Batch:
@@ -219,9 +222,13 @@ class TestPipeline(unittest.TestCase):
         siteonly_vcf = to_path(str(jc_vcf).replace('.vcf.gz', '-siteonly.vcf.gz'))
         expected_output = JointGenotyping(pipeline).expected_outputs(pipeline.cohort)
         jc_vcf.copy(expected_output['vcf'], force_overwrite_to_cloud=True)
-        to_path(str(jc_vcf) + '.tbi').copy(str(expected_output['vcf']) + '.tbi', force_overwrite_to_cloud=True)
+        to_path(str(jc_vcf) + '.tbi').copy(
+            str(expected_output['vcf']) + '.tbi', force_overwrite_to_cloud=True
+        )
         siteonly_vcf.copy(expected_output['siteonly'], force_overwrite_to_cloud=True)
-        to_path(str(siteonly_vcf) + '.tbi').copy(str(expected_output['siteonly']) + '.tbi', force_overwrite_to_cloud=True)
+        to_path(str(siteonly_vcf) + '.tbi').copy(
+            str(expected_output['siteonly']) + '.tbi', force_overwrite_to_cloud=True
+        )
 
         result = pipeline.run(dry_run=False, wait=True)
 

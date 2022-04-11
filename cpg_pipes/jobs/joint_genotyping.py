@@ -102,8 +102,12 @@ def make_joint_genotyping_jobs(
         range(scatter_count), import_gvcfs_jobs, genomicsdb_paths, intervals
     ):
         jc_vcf_path = tmp_bucket / 'joint-genotyper' / 'parts' / f'part{idx + 1}.vcf.gz'
-        filt_jc_vcf_path = tmp_bucket / 'excess-filter' / 'parts' / f'part{idx + 1}.vcf.gz'
-        siteonly_jc_vcf_path = tmp_bucket / 'siteonly' / 'parts' / f'part{idx + 1}.vcf.gz'
+        filt_jc_vcf_path = (
+            tmp_bucket / 'excess-filter' / 'parts' / f'part{idx + 1}.vcf.gz'
+        )
+        siteonly_jc_vcf_path = (
+            tmp_bucket / 'siteonly' / 'parts' / f'part{idx + 1}.vcf.gz'
+        )
 
         jc_vcf_j, jc_vcf = _add_joint_genotyper_job(
             b,

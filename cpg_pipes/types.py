@@ -132,7 +132,7 @@ class FastqPair:
             self.r2 if isinstance(self.r2, ResourceFile) else b.read_input(str(self.r2))
         )
         return FastqPair(r1, r2)
-    
+
     def __str__(self):
         return f'{self.r1}|{self.r2}'
 

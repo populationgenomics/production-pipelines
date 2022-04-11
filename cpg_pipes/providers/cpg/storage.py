@@ -17,7 +17,7 @@ class CpgStorageProvider(StorageProvider):
     def __init__(self, cloud: Cloud = Cloud.GS):
         super().__init__(cloud)
         self.prefix = 'cpg'
-        
+
     def _dataset_bucket(
         self,
         dataset: str,

@@ -15,7 +15,7 @@ class TestPedigree(unittest.TestCase):
 
     def test_csv_provider(self):
         data_dir = to_path(__file__).parent / 'data' / 'check_pedigree'
-        
+
         check_pedigree.check_pedigree(
             somalier_samples_fpath=str(data_dir / 'somalier-samples.tsv'),
             somalier_pairs_fpath=str(data_dir / 'somalier-pairs.tsv'),

@@ -141,7 +141,10 @@ def load_to_es(
     j.command(
         wrap_command(
             cmd,
-            python_script_path=to_path(__file__).parent.parent / 'dataproc_scripts' / 'seqr' / 'mt_to_es.py',
+            python_script_path=to_path(__file__).parent.parent
+            / 'dataproc_scripts'
+            / 'seqr'
+            / 'mt_to_es.py',
             setup_gcp=True,
         )
     )

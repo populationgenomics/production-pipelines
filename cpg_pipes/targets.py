@@ -41,14 +41,18 @@ class Target:
 
     def alignment_inputs_hash(self) -> str:
         """
-        Unique hash string of sample alignment inputs. Useful to decide 
+        Unique hash string of sample alignment inputs. Useful to decide
         whether the analysis on the target needs to be rerun.
         """
-        s = ' '.join(sorted([
-            str(s.alignment_input) 
-            for s in self.get_samples()
-            if s.alignment_input is not None
-        ]))
+        s = ' '.join(
+            sorted(
+                [
+                    str(s.alignment_input)
+                    for s in self.get_samples()
+                    if s.alignment_input is not None
+                ]
+            )
+        )
         h = hashlib.sha256(s.encode()).hexdigest()[:38]
         return f'{h}_{len(self.get_sample_ids())}'
 
@@ -166,7 +170,7 @@ class Cohort(Target):
         for proj in self.get_datasets(only_active=only_active):
             all_samples.extend(proj.get_samples(only_active))
         return all_samples
-    
+
     def add_dataset(self, dataset: 'Dataset') -> 'Dataset':
         """
         Add existing dataset into the cohort.

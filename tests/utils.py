@@ -21,12 +21,10 @@ SAMPLES = [
 ]
 
 FULL_CRAM_BY_SID = {
-    s: GvcfPath(BASE_BUCKET / f'inputs/cram/{s}.cram')
-    for s in SAMPLES
+    s: GvcfPath(BASE_BUCKET / f'inputs/cram/{s}.cram') for s in SAMPLES
 }  # from gs://cpg-thousand-genomes-test/cram
 SUBSET_CRAM_BY_SID = {
-    s: GvcfPath(BASE_BUCKET / f'inputs/subset/cram/{s}.cram')
-    for s in SAMPLES
+    s: GvcfPath(BASE_BUCKET / f'inputs/subset/cram/{s}.cram') for s in SAMPLES
 }
 # CRAM above converted into FASTQ
 SUBSET_FQ_BY_SID = {
@@ -38,16 +36,13 @@ SUBSET_FQ_BY_SID = {
 }
 
 FULL_GVCF_BY_SID = {
-    s: GvcfPath(BASE_BUCKET / f'inputs/gvcf/{s}.g.vcf.gz')
-    for s in SAMPLES
+    s: GvcfPath(BASE_BUCKET / f'inputs/gvcf/{s}.g.vcf.gz') for s in SAMPLES
 }  # from gs://cpg-thousand-genomes-test/gvcf
 SUBSET_GVCF_BY_SID = {
-    s: GvcfPath(BASE_BUCKET / f'inputs/subset/gvcf/{s}.g.vcf.gz')
-    for s in SAMPLES
+    s: GvcfPath(BASE_BUCKET / f'inputs/subset/gvcf/{s}.g.vcf.gz') for s in SAMPLES
 }
 CHR20_GVCF_BY_SID = {
-    s: GvcfPath(BASE_BUCKET / f'inputs/chr20/gvcf/{s}.g.vcf.gz')
-    for s in SAMPLES
+    s: GvcfPath(BASE_BUCKET / f'inputs/chr20/gvcf/{s}.g.vcf.gz') for s in SAMPLES
 }
 
 
