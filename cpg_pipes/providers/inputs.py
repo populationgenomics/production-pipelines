@@ -1,5 +1,5 @@
 """
-Abstract provider if input data source.
+Abstract provider of input data sources.
 """
 
 import csv
