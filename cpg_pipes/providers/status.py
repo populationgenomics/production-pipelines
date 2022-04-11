@@ -57,5 +57,5 @@ class StatusReporter(ABC):
         jobs: list[Job] | None = None,
     ):
         """
-        Add Hail Batch jobs that update the anlaysis status.
+        Add Hail Batch jobs that update the analysis status.
         """

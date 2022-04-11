@@ -41,7 +41,7 @@ _ALL_DEFINED_STAGES = []
 StageDecorator = Callable[..., 'Stage']
 
 # Type variable to use with Generic to make sure a Stage subclass always matches the
-# correspondinng Target subclass. We can't just use the Target supercalss because
+# corresponding Target subclass. We can't just use the Target superclass because
 # it would violate the Liskov substitution principle (i.e. any Stage subclass would
 # have to be able to work on any Target subclass).
 TargetT = TypeVar('TargetT', bound=Target)
@@ -140,9 +140,9 @@ class StageOutput:
 # noinspection PyShadowingNames
 class StageInput:
     """
-    Represents an input for a stage run. It wraps the outputs of all required upstream stages
-    for corresponding targets (e.g. all GVCFs from a HaploytypeCallerStage
-    for a JointCallingStage, along with Hail Batch jobs).
+    Represents an input for a stage run. It wraps the outputs of all required upstream 
+    stages for corresponding targets (e.g. all GVCFs from a GenotypeSample stage
+    for a JointCalling stage, along with Hail Batch jobs).
 
     An object of this class is passed to the public `queue_jobs` method of a Stage,
     and can be used to query dependency files and jobs.
@@ -337,8 +337,8 @@ class Stage(Generic[TargetT], ABC):
         @param analysis_type: if defined, will query the SMDB Analysis entries
             of this type
         @param skipped: means that the stage is skipped and self.queue_jobs()
-            won't run. The other stages if depend on it can aassume that
-            self.expected_outputs() returns existing files and target.ouptut_by_stage
+            won't run. The other stages if depend on it can assume that
+            self.expected_outputs() returns existing files and target.output_by_stage
             will be populated.
         @param required: means that the self.expected_output() results are
             required for another active stage, even if the stage was skipped.
@@ -398,7 +398,7 @@ class Stage(Generic[TargetT], ABC):
         """
         Adds Hail Batch jobs that process `target`.
         Assumes that all the household work is done: checking missing inputs
-        from requried stages, checking for possible reuse of existing outputs.
+        from required stages, checking for possible reuse of existing outputs.
         """
 
     @abstractmethod
@@ -589,8 +589,8 @@ def stage(
     The goal is to allow declaring pipeline stages without requiring to implement
     a constructor method. E.g.
 
-    @stage(required_stages=[CramStage])
-    class GvcfStage(SampleStage):
+    @stage(required_stages=[Align])
+    class GenotypeSample(SampleStage):
         def expected_outputs(self, sample: Sample):
             ...
         def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
@@ -673,7 +673,7 @@ def skip(
 
 class Pipeline:
     """
-    Represents a Pipeline, and incapsulates a Hail Batch object, stages,
+    Represents a Pipeline, and encapsulates a Hail Batch object, stages,
     and a cohort of datasets of samples.
     """
 

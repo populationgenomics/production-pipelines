@@ -88,7 +88,7 @@ class InputProvider(ABC):
         dataset: Dataset | None = None,
     ) -> list[dict]:
         """
-        Overide this method to get a list of data entries (dicts).
+        Override this method to get a list of data entries (dicts).
         If dataset is not missing, it should be specific to a dataset.
         """
 
@@ -233,7 +233,7 @@ class InputProvider(ABC):
                     continue
             if skip_samples:
                 if cpgid in skip_samples or extid in skip_samples:
-                    logger.info(f'Skiping sample: {ds}|{cpgid}|{extid}')
+                    logger.info(f'Skipping sample: {ds}|{cpgid}|{extid}')
                     continue
             filtered_entries.append(entry)
         return filtered_entries
@@ -350,8 +350,8 @@ class CsvInputProvider(InputProvider):
         """
         Get sample metadata.
         """
-        reserverd_fields = [f.value for f in FieldMap]
-        return {k: v for k, v in entry.items() if k not in reserverd_fields}
+        reserved_fields = [f.value for f in FieldMap]
+        return {k: v for k, v in entry.items() if k not in reserved_fields}
 
     def get_sequencing_type(self, entry: dict) -> SequencingType:
         """
