@@ -341,7 +341,7 @@ class CsvInputProvider(InputProvider):
     # noinspection PyMethodMayBeStatic
     def get_participant_sex(self, entry: dict) -> Sex:
         """
-        Get participant's sex/gender from a sample dict.
+        Get participant's sex from a sample dict.
         """
         return Sex.parse(entry.get(FieldMap.sex.value, None))
 
