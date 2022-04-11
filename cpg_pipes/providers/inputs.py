@@ -26,7 +26,7 @@ class InputProviderError(Exception):
 
 class InputProvider(ABC):
     """
-    Abstract class for implementing inputs source.
+    Abstract class for implementing input sources.
     """
 
     def __init__(self, check_files: bool = True):
