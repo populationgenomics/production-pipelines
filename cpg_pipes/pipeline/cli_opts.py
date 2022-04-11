@@ -213,7 +213,7 @@ def pipeline_click_options(function: Callable) -> Callable:
         click.option(
             '--local-dir',
             'local_dir',
-            help='Local directory for temporary files. Usually takes a few KB. '
+            help='Local directory for temporary files. Usually takes a few kB. '
             'If not provided, a temp folder will be created',
         ),
     ]
