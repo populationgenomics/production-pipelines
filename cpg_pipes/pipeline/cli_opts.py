@@ -122,7 +122,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             '-s',
             'only_samples',
             multiple=True,
-            help='Only take these samples (can be set multiple times)',
+            help='Only process these samples (can be set multiple times)',
         ),
         click.option(
             '--force-sample',
