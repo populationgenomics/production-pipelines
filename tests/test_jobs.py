@@ -4,14 +4,13 @@ Test individual jobs on Hail Batch.
 import logging
 import shutil
 import tempfile
-import time
 import unittest
 from typing import Dict
 
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path, to_path, Namespace
-from cpg_pipes import benchmark, utils
+from cpg_pipes import benchmark
 from cpg_pipes import images
 from cpg_pipes.hailquery import init_batch
 from cpg_pipes.jobs import vep
@@ -27,10 +26,7 @@ from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.pipeline import create_pipeline
 from cpg_pipes.types import CramPath, SequencingType
 
-try:
-    from .utils import BASE_BUCKET, DATASET, SAMPLES, SUBSET_GVCF_BY_SID
-except ImportError:
-    from utils import BASE_BUCKET, DATASET, SAMPLES, SUBSET_GVCF_BY_SID  # type: ignore
+from . import utils
 
 
 logger = logging.getLogger(__file__)
@@ -48,26 +44,26 @@ class TestJobs(unittest.TestCase):
 
     @property
     def out_bucket(self):
-        return BASE_BUCKET / self.name / self.timestamp
+        return utils.BASE_BUCKET / self.name / self.timestamp
 
     @property
     def tmp_bucket(self):
-        return BASE_BUCKET / 'tmp' / self.name / self.timestamp
+        return utils.BASE_BUCKET / 'tmp' / self.name / self.timestamp
 
     def setUp(self):
         self.name = self._testMethodName
-        self.timestamp = time.strftime('%Y%m%d-%H%M')
+        self.timestamp = utils.timestamp()
         logger.info(f'Timestamp: {self.timestamp}')
         self.local_tmp_dir = tempfile.mkdtemp()
 
         self.pipeline = create_pipeline(
             name=self.name,
             description=self.name,
-            analysis_dataset=DATASET,
+            analysis_dataset=utils.DATASET,
             namespace=Namespace.TEST,
         )
         self.sequencing_type = SequencingType.WGS
-        self.dataset = self.pipeline.create_dataset(DATASET)
+        self.dataset = self.pipeline.create_dataset(utils.DATASET)
         sample_name = f'Test-{self.timestamp}'
         self.sample = self.dataset.add_sample(sample_name, sample_name)
         self.refs = self.pipeline.refs
@@ -240,8 +236,8 @@ class TestJobs(unittest.TestCase):
             str(out_vcf_path).replace('.vcf.gz', '-siteonly.vcf.gz')
         )
 
-        proj = self.pipeline.cohort.create_dataset(DATASET)
-        for sid in SAMPLES:
+        proj = self.pipeline.cohort.create_dataset(utils.DATASET)
+        for sid in utils.SAMPLES:
             proj.add_sample(sid, sid)
 
         jobs = make_joint_genotyping_jobs(
@@ -250,7 +246,7 @@ class TestJobs(unittest.TestCase):
             out_siteonly_vcf_path=out_siteonly_vcf_path,
             refs=self.refs,
             samples=self.pipeline.get_all_samples(),
-            gvcf_by_sid=SUBSET_GVCF_BY_SID,
+            gvcf_by_sid=utils.SUBSET_GVCF_BY_SID,
             tmp_bucket=self.tmp_bucket,
             overwrite=True,
             scatter_count=10,
@@ -259,11 +255,11 @@ class TestJobs(unittest.TestCase):
         )
         test_result_path = self._job_get_gvcf_header(out_vcf_path, jobs)
         self.pipeline.run(wait=True)
-        self.assertTrue(utils.exists(out_vcf_path))
-        self.assertTrue(utils.exists(out_siteonly_vcf_path))
+        self.assertTrue(out_vcf_path.exists())
+        self.assertTrue(out_siteonly_vcf_path.exists())
         contents = _read_file(test_result_path)
-        self.assertEqual(len(SAMPLES), len(contents.split()))
-        self.assertEqual(set(SAMPLES), set(contents.split()))
+        self.assertEqual(len(utils.SAMPLES), len(contents.split()))
+        self.assertEqual(set(utils.SAMPLES), set(contents.split()))
 
     def test_vqsr(self):
         """
@@ -280,7 +276,7 @@ class TestJobs(unittest.TestCase):
             input_vcf_or_mt_path=siteonly_vcf_path,
             refs=self.refs,
             tmp_bucket=tmp_vqsr_bucket,
-            gvcf_count=len(SAMPLES),
+            gvcf_count=len(utils.SAMPLES),
             scatter_count=10,
             output_vcf_path=out_vcf_path,
             use_as_annotations=True,
@@ -289,7 +285,7 @@ class TestJobs(unittest.TestCase):
         )
         res_path = self._job_get_gvcf_header(out_vcf_path, jobs)
         self.pipeline.run(wait=True)
-        self.assertTrue(utils.exists(out_vcf_path))
+        self.assertTrue(out_vcf_path.exists())
         contents = _read_file(res_path)
         self.assertEqual(0, len(contents.split()))  # site-only doesn't have any samples
 
@@ -311,7 +307,7 @@ class TestJobs(unittest.TestCase):
             out_path=out_vcf_path,
             scatter_count=10,
             overwrite=False,
-            hail_billing_project=DATASET,
+            hail_billing_project=utils.DATASET,
             hail_bucket=self.tmp_bucket,
             tmp_bucket=self.tmp_bucket,
         )
@@ -398,7 +394,7 @@ class TestJobs(unittest.TestCase):
         vep.gather_vep_json_to_ht(
             b=self.pipeline.b,
             vep_results_paths=[vep_json_list_path],
-            hail_billing_project=DATASET,
+            hail_billing_project=utils.DATASET,
             hail_bucket=self.tmp_bucket,
             out_path=out_path,
         )
@@ -406,7 +402,7 @@ class TestJobs(unittest.TestCase):
 
         import hail as hl
 
-        init_batch(DATASET, self.tmp_bucket)
+        init_batch(utils.DATASET, self.tmp_bucket)
         ht = hl.read_table(str(out_path))
         interval = hl.parse_locus_interval(
             f'{self.chrom}:{self.locus1}-{int(self.locus1) + 1}'
@@ -438,7 +434,7 @@ class TestJobs(unittest.TestCase):
             output_mt_path=out_mt_path,
             checkpoints_bucket=self.tmp_bucket / 'seqr_loader' / 'checkpoints',
             sequencing_type=self.sequencing_type,
-            hail_billing_project=DATASET,
+            hail_billing_project=utils.DATASET,
             hail_bucket=self.tmp_bucket,
         )
         self.pipeline.run(wait=True)
@@ -446,7 +442,7 @@ class TestJobs(unittest.TestCase):
         # Testing
         import hail as hl
 
-        init_batch(DATASET, self.tmp_bucket)
+        init_batch(utils.DATASET, self.tmp_bucket)
         mt = hl.read_matrix_table(str(out_mt_path))
         mt.rows().show()
         self.assertListEqual(mt.topmed.AC.collect(), [20555, 359, 20187])
@@ -464,29 +460,29 @@ class TestJobs(unittest.TestCase):
         annotate_dataset_jobs(
             b=self.pipeline.b,
             mt_path=mt_path,
-            sample_ids=SAMPLES[:3],
+            sample_ids=utils.SAMPLES[:3],
             tmp_bucket=self.tmp_bucket,
             output_mt_path=out_mt_path,
-            hail_billing_project=DATASET,
+            hail_billing_project=utils.DATASET,
             hail_bucket=self.tmp_bucket,
         )
         self.pipeline.run(wait=True)
 
         # Testing
-        self.assertTrue(utils.exists(out_mt_path))
+        self.assertTrue(out_mt_path.exists())
         import hail as hl
 
-        init_batch(DATASET, self.tmp_bucket)
+        init_batch(utils.DATASET, self.tmp_bucket)
         mt = hl.read_matrix_table(str(out_mt_path))
         mt.rows().show()
-        self.assertListEqual(mt.s.collect(), SAMPLES[:3])
+        self.assertListEqual(mt.s.collect(), utils.SAMPLES[:3])
         self.assertSetEqual(
             set(mt.samples_gq['20_to_25'].collect()[0]), {'CPG196519', 'CPG196527'}
         )
         self.assertSetEqual(set(mt.samples_ab['40_to_45'].collect()[0]), {'CPG196535'})
 
     def test_check_pedigree(self):
-        inputs_bucket = BASE_BUCKET / 'inputs' / 'check_pedigree'
+        inputs_bucket = utils.BASE_BUCKET / 'inputs' / 'check_pedigree'
         check_pedigree_job(
             self.pipeline.b,
             sample_map_file=self.pipeline.b.read_input(

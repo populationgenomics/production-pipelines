@@ -1,4 +1,7 @@
 import os
+import string
+import time
+from random import random, choices
 
 from cpg_pipes import to_path
 from cpg_pipes.types import GvcfPath, FastqPair
@@ -44,6 +47,14 @@ SUBSET_GVCF_BY_SID = {
 CHR20_GVCF_BY_SID = {
     s: GvcfPath(BASE_BUCKET / f'inputs/chr20/gvcf/{s}.g.vcf.gz') for s in SAMPLES
 }
+
+
+def timestamp():
+    """
+    Generate a timestamp plus a short random string for guaranteed uniqueness.
+    """
+    rand_bit = ''.join(choices(string.ascii_uppercase + string.digits, k=3))
+    return time.strftime('%Y-%m%d-%H%M') + rand_bit
 
 
 def setup_env(

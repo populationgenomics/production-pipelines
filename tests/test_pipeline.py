@@ -5,7 +5,6 @@ Test building and running pipelines.
 import shutil
 import sys
 import tempfile
-import time
 import unittest
 from unittest.mock import patch, Mock
 
@@ -20,10 +19,7 @@ from cpg_pipes.types import SequencingType, CramPath
 from pipelines import seqr_loader
 from pipelines.seqr_loader import AnnotateDataset
 
-try:
-    from .utils import BASE_BUCKET, SAMPLES, setup_env, DATASET, SUBSET_CRAM_BY_SID
-except ImportError:
-    from utils import BASE_BUCKET, SAMPLES, setup_env, DATASET, SUBSET_CRAM_BY_SID  # type: ignore
+from . import utils
 
 
 class UnittestStorageProvider(CpgStorageProvider):
@@ -62,11 +58,11 @@ class TestPipeline(unittest.TestCase):
         Setting parameters, creating local tmp dir.
         """
         self.name = self._testMethodName
-        self.timestamp = time.strftime('%Y%m%d-%H%M')
-        self.out_bucket = BASE_BUCKET / self.name / self.timestamp
+        self.timestamp = utils.timestamp()
+        self.out_bucket = utils.BASE_BUCKET / self.name / self.timestamp
         self.tmp_bucket = self.out_bucket / 'tmp'
         self.local_tmp_dir = to_path(tempfile.mkdtemp())
-        self.sample_ids = SAMPLES[:3]
+        self.sample_ids = utils.SAMPLES[:3]
 
         self.realignment_shards_num = 4
         self.hc_intervals_num = 4
@@ -89,7 +85,7 @@ class TestPipeline(unittest.TestCase):
         https://batch.hail.populationgenomics.org.au/batches/46981/jobs/322.
         So instead, we are using mocks to plug in a larger file here.
         """
-        jc_vcf = BASE_BUCKET / 'inputs/chr20/genotypegvcfs/joint-called.vcf.gz'
+        jc_vcf = utils.BASE_BUCKET / 'inputs/chr20/genotypegvcfs/joint-called.vcf.gz'
         siteonly_vcf = to_path(str(jc_vcf).replace('.vcf.gz', '-siteonly.vcf.gz'))
         from cpg_pipes.pipeline.pipeline import StageOutput
 
@@ -116,7 +112,7 @@ class TestPipeline(unittest.TestCase):
         jc_intervals_num: int = None,
         vep_intervals_num: int = None,
     ):
-        setup_env()
+        utils.setup_env()
 
         # Mocking elastic search password for the full dry run test:
         seqr_loader._read_es_password = Mock(return_value='TEST')
@@ -124,7 +120,7 @@ class TestPipeline(unittest.TestCase):
         pipeline = Pipeline(
             namespace=Namespace.TEST,
             name=self._testMethodName,
-            analysis_dataset_name=DATASET,
+            analysis_dataset_name=utils.DATASET,
             check_intermediates=False,
             storage_provider=UnittestStorageProvider(self.out_bucket),
             first_stage=first_stage,
@@ -138,11 +134,11 @@ class TestPipeline(unittest.TestCase):
                 vep_intervals_num=vep_intervals_num or self.vep_intervals_num,
             ),
         )
-        self.datasets = [pipeline.create_dataset(DATASET)]
+        self.datasets = [pipeline.create_dataset(utils.DATASET)]
         for ds in self.datasets:
             for s_id in self.sample_ids:
                 s = ds.add_sample(s_id, s_id)
-                s.alignment_input = CramPath(SUBSET_CRAM_BY_SID[s.id])
+                s.alignment_input = CramPath(utils.SUBSET_CRAM_BY_SID[s.id])
                 s.sequencing_type = seq_type
         return pipeline
 
@@ -218,7 +214,7 @@ class TestPipeline(unittest.TestCase):
         # input callset", like in this Batch:
         # https://batch.hail.populationgenomics.org.au/batches/46981/jobs/322.
         # So instead, we are copying a larger file into JointGenotyping expected output.
-        jc_vcf = BASE_BUCKET / 'inputs/chr20/genotypegvcfs/joint-called.vcf.gz'
+        jc_vcf = utils.BASE_BUCKET / 'inputs/chr20/genotypegvcfs/joint-called.vcf.gz'
         siteonly_vcf = to_path(str(jc_vcf).replace('.vcf.gz', '-siteonly.vcf.gz'))
         expected_output = JointGenotyping(pipeline).expected_outputs(pipeline.cohort)
         jc_vcf.copy(expected_output['vcf'], force_overwrite_to_cloud=True)

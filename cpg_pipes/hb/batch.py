@@ -10,7 +10,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job, PythonJob
 
 from .. import Path
-from ..providers import Cloud
+from ..providers.storage import Cloud
 
 logger = logging.getLogger(__file__)
 

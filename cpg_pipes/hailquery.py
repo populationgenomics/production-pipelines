@@ -6,6 +6,8 @@ import functools
 import logging
 import operator
 import os
+import random
+import string
 import tempfile
 import time
 from pathlib import Path
@@ -42,7 +44,8 @@ def init_hail(name: str, local_tmp_dir: Path = None):
     if not local_tmp_dir:
         local_tmp_dir = Path(tempfile.mkdtemp())
 
-    timestamp = time.strftime('%Y%m%d-%H%M')
+    rand_bit = ''.join(random.choices(string.ascii_uppercase + string.digits, k=3))
+    timestamp = time.strftime('%Y-%m%d-%H%M') + rand_bit
     local_tmp_dir.mkdir(parents=True)
     hl_log = local_tmp_dir / f'{name}-{timestamp}.log'
     hl.init(default_reference=RefData.genome_build, log=str(hl_log))

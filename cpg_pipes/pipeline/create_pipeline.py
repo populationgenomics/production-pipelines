@@ -9,12 +9,11 @@ from .exceptions import PipelineError
 from .pipeline import Pipeline, Stage
 from .. import Path, to_path
 from ..providers import (
-    Cloud,
-    Namespace,
     StoragePolicyType,
     StatusReporterType,
     InputProviderType,
 )
+from ..providers.storage import Namespace, Cloud
 from ..providers.cpg import (
     CpgStorageProvider,
     SmdbStatusReporter,

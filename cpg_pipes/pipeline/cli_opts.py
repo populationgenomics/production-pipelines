@@ -8,12 +8,11 @@ import click_config_file
 import yaml  # type: ignore
 
 from ..providers import (
-    Namespace,
-    Cloud,
     StoragePolicyType,
     StatusReporterType,
     InputProviderType,
 )
+from ..providers.storage import Namespace, Cloud
 
 
 def choice_from_enum(cls: Type[Enum]) -> click.Choice:
