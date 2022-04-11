@@ -32,7 +32,7 @@ class SmdbInputProvider(InputProvider):
         ped_files: list[Path] | None = None,
     ) -> Cohort:
         """
-        Overwriding the superclass method.
+        Overriding the superclass method.
         """
         if not dataset_names:
             raise InputProviderError(
