@@ -1,5 +1,5 @@
 """
-Providers that can be overriden in specific infrastructutres.
+Providers that can be overridden in specific infrastructures.
 """
 
 from enum import Enum
