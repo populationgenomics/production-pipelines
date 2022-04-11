@@ -9,7 +9,7 @@ from ..types import GvcfPath
 from ..jobs.joint_genotyping import make_joint_genotyping_jobs, JointGenotyperTool
 from ..targets import Cohort
 from ..pipeline import stage, CohortStage, StageInput, StageOutput, PipelineError
-from .gvcf import GenotypeSample
+from .genotype_sample import GenotypeSample
 
 logger = logging.getLogger(__file__)
 

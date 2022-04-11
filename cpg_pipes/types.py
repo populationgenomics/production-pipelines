@@ -151,6 +151,7 @@ class SequencingType(Enum):
 
     WGS = 'wgs'
     EXOME = 'exome'
+    TOY = 'toy'  # 1% of exome, for tests
     SINGLE_CELL = 'single-cell'
     UNKNOWN = 'unknown'
 

@@ -25,6 +25,9 @@ from hailtop.batch.job import Job
 
 from .exceptions import PipelineError
 from .. import Path, to_path, Namespace
+from ..hb.batch import setup_batch, get_billing_project
+from ..providers.inputs import InputProvider
+from ..providers.storage import StorageProvider
 from ..targets import Target, Dataset, Sample, Cohort
 from ..providers.status import StatusReporter
 from ..refdata import RefData
@@ -310,6 +313,7 @@ class Stage(Generic[TargetT], ABC):
         self,
         name: str,
         batch: Batch,
+        cohort: Cohort,
         refs: RefData,
         pipeline_tmp_bucket: Path,
         hail_billing_project: str,
@@ -329,6 +333,7 @@ class Stage(Generic[TargetT], ABC):
         """
         @param name: name of the stage
         @param batch: Hail Batch object
+        @param cohort: cohort of input datasets
         @param refs: reference data for bioinformatics
         @param pipeline_tmp_bucket: pipeline temporary bucket
         @param hail_bucket: Hail Batch bucket
@@ -350,6 +355,7 @@ class Stage(Generic[TargetT], ABC):
         """
         self._name = name
         self.b = batch
+        self.cohort = cohort
         self.refs = refs
 
         self.skip_samples_with_missing_input = skip_samples_with_missing_input
@@ -477,9 +483,12 @@ class Stage(Generic[TargetT], ABC):
         or if required dependencies are missing.
         """
         expected_out = self.expected_outputs(target)
+
+        reusable = self._check_if_reusable(expected_out)
+        
         if not self.skipped:
             inputs = self._make_inputs()
-            if self._check_if_reusable(expected_out):
+            if reusable:
                 if target.forced:
                     logger.info(
                         f'{self.name}: can reuse, but forcing the target '
@@ -505,7 +514,7 @@ class Stage(Generic[TargetT], ABC):
             return outputs
 
         elif self.required:
-            if self._check_if_reusable(expected_out):
+            if reusable:
                 return self.make_outputs(target=target, data=expected_out)
             else:
                 if self.skip_samples_with_missing_input:
@@ -524,33 +533,33 @@ class Stage(Generic[TargetT], ABC):
         target.active = False
         return self.make_outputs(target=target)
 
-    def _check_if_reusable(self, expected_outputs: ExpectedResultT) -> bool:
+    def _check_if_reusable(self, expected_out: ExpectedResultT) -> bool:
         """
         Returns outputs that can be reused for the stage for the target,
         or None of none can be reused
         """
-        if not expected_outputs:
-            return False
-        elif not self.check_expected_outputs:
-            if self.assume_outputs_exist:
-                # Do not check the files' existence, trust they exist:
-                return True
-            else:
-                # Do not check the files' existence, assume they don't exist:
-                return False
+        if not expected_out:
+            reusable = False
         elif not self.required:
             # This stage is not required, so can just assume outputs exist:
-            return True
+            reusable = True
+        elif not self.check_expected_outputs:
+            if self.assume_outputs_exist or self.skipped:
+                # Do not check the files' existence, trust they exist.
+                # note that for skipped stages, we automatically assume outputs exist
+                reusable = True
+            else:
+                # Do not check the files' existence, assume they don't exist:
+                reusable = False
         else:
             # Checking that expected output exists:
             paths: list[Path]
-            if isinstance(expected_outputs, dict):
-                paths = [v for k, v in expected_outputs.items()]
+            if isinstance(expected_out, dict):
+                paths = [v for k, v in expected_out.items()]
             else:
-                paths = [expected_outputs]
-            if not all(exists(path) for path in paths):
-                return False
-            return True
+                paths = [expected_out]
+            reusable = all(exists(path) for path in paths)
+        return reusable
 
     def _queue_reuse_job(
         self, target: TargetT, found_paths: Path | dict[str, Path]
@@ -606,6 +615,7 @@ def stage(
             return _cls(
                 name=_cls.__name__,
                 batch=pipeline.b,
+                cohort=pipeline.cohort,
                 refs=pipeline.refs,
                 pipeline_tmp_bucket=pipeline.tmp_bucket,
                 hail_billing_project=pipeline.hail_billing_project,
@@ -679,14 +689,19 @@ class Pipeline:
 
     def __init__(
         self,
-        cohort: Cohort,
         namespace: Namespace,
-        reference_data: RefData,
-        batch: Batch,
-        hail_billing_project: str,
-        hail_bucket: str,
+        name: str,
+        analysis_dataset_name: str,
+        storage_provider: StorageProvider,
+        description: str | None = None,
         stages: list[StageDecorator] | None = None,
+        input_provider: InputProvider | None = None,
         status_reporter: StatusReporter | None = None,
+        datasets: list[str] | None = None,
+        skip_datasets: list[str] | None = None,
+        skip_samples: list[str] | None = None,
+        only_samples: list[str] | None = None,
+        force_samples: list[str] | None = None,
         first_stage: str | None = None,
         last_stage: str | None = None,
         version: str | None = None,
@@ -694,20 +709,51 @@ class Pipeline:
         check_expected_outputs: bool = True,
         skip_samples_with_missing_input: bool = False,
         config: dict | None = None,
-        tmp_bucket: Path | None = None,
         local_dir: Path | None = None,
         dry_run: bool = False,
         keep_scratch: bool = True,
     ):
-        self.cohort = cohort
-        self.name = cohort.name
+        self.storage_provider = storage_provider
+        self.cohort = Cohort(
+            analysis_dataset_name=analysis_dataset_name,
+            namespace=namespace,
+            name=name,
+            storage_provider=storage_provider,
+        )
+        if datasets and input_provider:
+            input_provider.populate_cohort(
+                cohort=self.cohort,
+                dataset_names=datasets,
+                skip_samples=skip_samples,
+                only_samples=only_samples,
+                skip_datasets=skip_datasets,
+            )
+        self.force_samples = force_samples
+
+        self.name = name
         self.version = version or time.strftime('%Y%m%d-%H%M%S')
         self.namespace = namespace
-        self.refs = reference_data
-        self.b = batch
-        self.hail_billing_project = hail_billing_project
-        self.hail_bucket = hail_bucket
-        self.tmp_bucket = tmp_bucket
+        self.refs = RefData(self.storage_provider.get_ref_bucket())
+        self.hail_billing_project = get_billing_project(
+            self.cohort.analysis_dataset.stack
+        )
+        self.tmp_bucket = to_path(
+            self.cohort.analysis_dataset.get_tmp_bucket(
+                version=(name + (f'/{version}' if version else ''))
+            )
+        )
+        self.hail_bucket = self.tmp_bucket / 'hail'
+        if not description:
+            description = name
+            if version:
+                description += f' {version}'
+            if dnames := set([d.name for d in self.cohort.get_datasets()]):
+                description += ': ' + ', '.join(dnames)
+        self.b: Batch = setup_batch(
+            description=description,
+            billing_project=self.hail_billing_project,
+            hail_bucket=self.hail_bucket,
+        )
         self.status_reporter = status_reporter
 
         self.dry_run = dry_run
@@ -876,11 +922,11 @@ class Pipeline:
         """
         return self.cohort.get_datasets(only_active=only_active)
 
-    def add_dataset(self, name: str) -> Dataset:
+    def create_dataset(self, name: str) -> Dataset:
         """
         Thin wrapper.
         """
-        return self.cohort.add_dataset(name)
+        return self.cohort.create_dataset(name)
 
     def get_all_samples(self, only_active: bool = True) -> list[Sample]:
         """

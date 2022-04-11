@@ -45,7 +45,7 @@ class AnnotateCohort(CohortStage):
         Expected to write a matrix table.
         """
         h = cohort.alignment_inputs_hash()
-        return cohort.analysis_dataset.get_analysis_bucket() / 'mt' / f'{h}.mt'
+        return cohort.analysis_dataset.get_bucket() / 'mt' / f'{h}.mt'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
@@ -84,14 +84,14 @@ class AnnotateDataset(DatasetStage):
         """
         Expected to generate a matrix table
         """
-        h = dataset.cohort.alignment_inputs_hash()
+        h = self.cohort.alignment_inputs_hash()
         return self.tmp_bucket / f'{h}-{dataset.name}.mt'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateCohort)
+        mt_path = inputs.as_path(target=self.cohort, stage=AnnotateCohort)
 
         jobs = annotate_dataset_jobs(
             b=self.b,
@@ -189,6 +189,13 @@ def _read_es_password(
     'gatk HaplotypeCaller',
 )
 @click.option(
+    '--realignment-shards-num',
+    'realignment_shards_num',
+    type=click.INT,
+    default=RefData.number_of_shards_for_realignment,
+    help='Number of shards to parallelise realignment',
+)
+@click.option(
     '--jc-intervals-num',
     'jc_intervals_num',
     type=click.INT,
@@ -227,6 +234,7 @@ def main(
     output_datasets: list[str],
     hc_intervals_num: int,
     jc_intervals_num: int,
+    realignment_shards_num: int,
     use_gnarly: bool,
     use_as_vqsr: bool,
     ped_checks: bool,
@@ -265,6 +273,7 @@ def main(
             ped_checks=ped_checks,
             hc_intervals_num=hc_intervals_num,
             jc_intervals_num=jc_intervals_num,
+            realignment_shards_num=realignment_shards_num,
             use_gnarly=use_gnarly,
             use_as_vqsr=use_as_vqsr,
             exome_bed=exome_bed,

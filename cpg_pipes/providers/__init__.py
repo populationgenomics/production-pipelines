@@ -18,6 +18,7 @@ class StoragePolicyType(Enum):
     """Available storage policies"""
 
     CPG = 'cpg'
+    UNITTESTS = 'unittests'
 
 
 class StatusReporterType(Enum):

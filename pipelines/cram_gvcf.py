@@ -9,7 +9,7 @@ import click
 
 from cpg_pipes.pipeline import pipeline_click_options, create_pipeline
 from cpg_pipes.stages.align import Align
-from cpg_pipes.stages.gvcf import GenotypeSample
+from cpg_pipes.stages.genotype_sample import GenotypeSample
 
 logger = logging.getLogger(__file__)
 

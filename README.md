@@ -235,7 +235,7 @@ j = align.align(
     b=...,
     alignment_input=sample.alignment_input,
     output_path=...,
-    number_of_shards_for_realignment=10
+    realignment_shards_num=10
 )
 ```
 

@@ -67,7 +67,7 @@ def main(
     for dataset in cohort.get_datasets():
         _make_seqr_metadata_files(
             dataset=dataset,
-            bucket=cohort.analysis_dataset.get_analysis_bucket(),
+            bucket=cohort.analysis_dataset.get_bucket(),
             local_dir=tmp_dir,
             use_external_id=use_external_id,
         )
@@ -82,7 +82,7 @@ def _make_seqr_metadata_files(
     """
     Create Seqr metadata files
     """
-    samplemap_bucket_path = bucket / 'seqr' / f'{dataset.name}-sample-map.csv'
+    samplemap_bucket_path = bucket / 'sample-maps' / f'{dataset.name}-sample-map.csv'
     igv_paths_path = local_dir / f'{dataset.name}-igv-paths.tsv'
 
     # Sample map

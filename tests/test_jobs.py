@@ -67,7 +67,7 @@ class TestJobs(unittest.TestCase):
             namespace=Namespace.TEST,
         )
         self.sequencing_type = SequencingType.WGS
-        self.dataset = self.pipeline.add_dataset(DATASET)
+        self.dataset = self.pipeline.create_dataset(DATASET)
         sample_name = f'Test-{self.timestamp}'
         self.sample = self.dataset.add_sample(sample_name, sample_name)
         self.refs = self.pipeline.refs
@@ -240,7 +240,7 @@ class TestJobs(unittest.TestCase):
             str(out_vcf_path).replace('.vcf.gz', '-siteonly.vcf.gz')
         )
 
-        proj = self.pipeline.cohort.add_dataset(DATASET)
+        proj = self.pipeline.cohort.create_dataset(DATASET)
         for sid in SAMPLES:
             proj.add_sample(sid, sid)
 

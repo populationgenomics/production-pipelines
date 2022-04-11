@@ -48,7 +48,7 @@ class MultiQC(DatasetStage):
         """
         return {
             'html': dataset.get_web_bucket() / 'qc' / 'multiqc.html',
-            'json': dataset.get_analysis_bucket() / 'qc' / 'multiqc_data.json',
+            'json': dataset.get_bucket() / 'qc' / 'multiqc_data.json',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:

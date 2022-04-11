@@ -7,7 +7,6 @@ import logging
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes import Path
 from cpg_pipes import images, utils
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.types import SequencingType
@@ -41,7 +40,9 @@ def get_intervals(
     job_attrs = (job_attrs or {}) | dict(tool='picard_IntervalListTools')
     j = b.new_job(f'Make {scatter_count} intervals', job_attrs)
 
-    cache_bucket = refs.intervals_bucket / f'{scatter_count}intervals'
+    cache_bucket = (
+        refs.intervals_bucket / sequencing_type.value / f'{scatter_count}intervals'
+    )
     if utils.exists(cache_bucket / '1.interval_list'):
         j.name += ' [use cached]'
         return j, [
@@ -56,7 +57,7 @@ def get_intervals(
     break_bands_at_multiples_of = {
         SequencingType.WGS: 100000,
         SequencingType.EXOME: 0,
-    }[sequencing_type]
+    }.get(sequencing_type, 0)
 
     cmd = f"""
     mkdir /io/batch/out

@@ -254,7 +254,7 @@ def _ancestry(
     job_attrs: dict | None = None,
 ) -> Job:
     j = b.new_job('Somalier ancestry' + (f' {label}' if label else ''), job_attrs)
-    j.image(images.BIOINFO_IMAGE)
+    j.image(images.SOMALIER_IMAGE)
     # Size of one somalier file is 212K, so we add another G only if the number of
     # samples is >4k
     STANDARD.set_resources(j, storage_gb=1 + len(sample_ids) // 4000 * 1)
@@ -304,7 +304,7 @@ def _relate(
     job_attrs: dict | None = None,
 ) -> Job:
     j = b.new_job('Somalier relate' + (f' {label}' if label else ''), job_attrs)
-    j.image(images.BIOINFO_IMAGE)
+    j.image(images.SOMALIER_IMAGE)
     # Size of one somalier file is 212K, so we add another G only if the number of
     # samples is >4k
     STANDARD.set_resources(j, storage_gb=1 + len(sample_ids) // 4000 * 1)
@@ -361,7 +361,7 @@ def extact_job(
         j.name += ' [reuse]'
         return j
 
-    j.image(images.BIOINFO_IMAGE)
+    j.image(images.SOMALIER_IMAGE)
     if isinstance(gvcf_or_cram_or_bam_path, CramPath):
         STANDARD.set_resources(
             j, ncpu=4, storage_gb=200 if gvcf_or_cram_or_bam_path.is_bam else 50

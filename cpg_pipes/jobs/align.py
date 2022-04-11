@@ -82,7 +82,7 @@ def align(
     extra_label: str | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
-    number_of_shards_for_realignment: int | None = None,
+    realignment_shards_num: int | None = None,
     prev_batch_jobs: dict[tuple[str | None, str], PrevJob] | None = None,
 ) -> list[Job]:
     """
@@ -113,14 +113,15 @@ def align(
         job_name += ' [reuse]'
         return [b.new_job(job_name, job_attrs)]
 
-    if number_of_shards_for_realignment and number_of_shards_for_realignment > 1:
+    if realignment_shards_num and realignment_shards_num > 1:
         if not isinstance(alignment_input, CramPath):
             logger.warning(
-                f'Cannot use number_of_shards_for_realignment for fastq inputs. '
+                f'Cannot use realignment_shards_num for fastq inputs. '
                 f'Sharding only works for CRAM/BAM inputs. '
                 f'Sample: {sample_name}'
             )
-            number_of_shards_for_realignment = None
+    if not realignment_shards_num:
+        realignment_shards_num = RefData.number_of_shards_for_realignment
 
     # if number of threads is not requested, using whole instance
     requested_nthreads = requested_nthreads or STANDARD.max_threads()
@@ -128,8 +129,7 @@ def align(
     sharded_fq = not isinstance(alignment_input, CramPath) and len(alignment_input) > 1
     sharded_bazam = (
         isinstance(alignment_input, CramPath)
-        and number_of_shards_for_realignment
-        and number_of_shards_for_realignment > 1
+        and realignment_shards_num > 1
     )
     sharded = sharded_fq or sharded_bazam
 
@@ -203,11 +203,11 @@ def align(
 
         elif sharded_bazam:
             # running shared alignment for a CRAM, sharding with Bazam
-            assert number_of_shards_for_realignment
-            for shard_number_0based in range(number_of_shards_for_realignment):
+            assert realignment_shards_num
+            for shard_number_0based in range(realignment_shards_num):
                 shard_number_1based = shard_number_0based + 1
                 jname = (
-                    f'{aligner.name} {shard_number_1based}/{number_of_shards_for_realignment}'
+                    f'{aligner.name} {shard_number_1based}/{realignment_shards_num}'
                     + (f' {extra_label}' if extra_label else '')
                 )
                 j, cmd = _align_one(
@@ -219,7 +219,7 @@ def align(
                     refs=refs,
                     aligner=aligner,
                     requested_nthreads=requested_nthreads,
-                    number_of_shards_for_realignment=number_of_shards_for_realignment,
+                    number_of_shards_for_realignment=realignment_shards_num,
                     shard_number_1based=shard_number_1based,
                 )
                 cmd = cmd.strip()
@@ -233,7 +233,7 @@ def align(
         merge_j = b.new_job(
             'Merge BAMs', (job_attrs or {}) | dict(tool='samtools_merge')
         )
-        merge_j.image(images.BIOINFO_IMAGE)
+        merge_j.image(images.BWA_IMAGE)
         nthreads = STANDARD.set_resources(
             merge_j, nthreads=requested_nthreads
         ).get_nthreads()
@@ -305,7 +305,7 @@ def _align_one(
             index_exts = refs.bwamem2_index_exts
         else:
             tool_name = 'bwa'
-            j.image(images.BIOINFO_IMAGE)
+            j.image(images.BWA_IMAGE)
             index_exts = refs.bwa_index_exts
 
         bwa_reference = refs.fasta_res_group(b, index_exts)
@@ -320,7 +320,7 @@ def _align_one(
             shard_number_1based=shard_number_1based,
         )
     else:
-        j.image(images.BIOINFO_IMAGE)
+        j.image(images.DRAGMAP_IMAGE)
         dragmap_index = b.read_input_group(
             **{
                 k.replace('.', '_'): refs.dragmap_index_bucket / k
@@ -333,6 +333,7 @@ def _align_one(
                 b=b,
                 cram=alignment_input.resource_group(b),
                 refs=refs,
+                ext=alignment_input.ext,
                 job_attrs=job_attrs,
             )
             input_param = f'-1 {extract_j.fq1} -2 {extract_j.fq2}'
@@ -426,9 +427,10 @@ def extract_fastq(
     b,
     cram: hb.ResourceGroup,
     refs: RefData,
+    ext: str = 'cram',
     job_attrs: dict | None = None,
-    output_fq1: str | None = None,
-    output_fq2: str | None = None,
+    output_fq1: str | Path | None = None,
+    output_fq2: str | Path | None = None,
 ) -> Job:
     """
     Job that converts a BAM or a CRAM file to an interleaved compressed fastq file.
@@ -437,19 +439,19 @@ def extract_fastq(
     ncpu = 16
     nthreads = ncpu * 2  # multithreading
     j.cpu(ncpu)
-    j.image(images.BIOINFO_IMAGE)
+    j.image(images.BWA_IMAGE)
     j.storage('700G')
 
     reference = refs.fasta_res_group(b)
     cmd = f"""\
     bazam -Xmx16g -Dsamjdk.reference_fasta={reference.base} \
-    -n{nthreads} -bam {cram.base} -r1 {j.fq1} -r2 {j.fq2}
+    -n{nthreads} -bam {cram[ext]} -r1 {j.fq1} -r2 {j.fq2}
     """
     j.command(wrap_command(cmd, monitor_space=True))
     if output_fq1 or output_fq2:
         assert output_fq1 and output_fq2, (output_fq1, output_fq2)
-        b.write_output(j.fq1, output_fq1)
-        b.write_output(j.fq2, output_fq2)
+        b.write_output(j.fq1, str(output_fq1))
+        b.write_output(j.fq2, str(output_fq2))
     return j
 
 

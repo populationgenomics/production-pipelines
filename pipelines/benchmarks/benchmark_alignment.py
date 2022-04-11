@@ -75,7 +75,7 @@ class SubsetAlignmentInput(SampleStage):
 
     def _subset_cram(self, cram: CramPath, sample: Sample):
         j = self.b.new_job('Subset CRAM')
-        j.image(images.BIOINFO_IMAGE)
+        j.image(images.SAMTOOLS_PICARD_IMAGE)
         j.storage('100G')
         reference = self.refs.fasta_res_group(self.b)
         cram_group = cram.resource_group(self.b)
@@ -102,6 +102,7 @@ class SubsetAlignmentInput(SampleStage):
         )
 
     def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput:
+        """Queue jobs"""
         if 'fastq_input' in sample.meta:
             alignment_input = sample.meta['fastq_input']
             return self._subset_fastq(alignment_input, sample)
@@ -189,7 +190,7 @@ class DifferentAlignerSetups(SampleStage):
                         aligner=aligner,
                         markdup_tool=markdup,
                         extra_label=f', dedup with {markdup.name}',
-                        number_of_shards_for_realignment=10
+                        realignment_shards_num=10
                         if isinstance(alignment_input, CramPath)
                         else 0,
                     )
@@ -210,7 +211,7 @@ def main():
         keep_scratch=True,
     )
 
-    p = pipeline.add_dataset('fewgenomes')
+    p = pipeline.create_dataset('fewgenomes')
     s = p.add_sample(
         id='PERTHNEURO_CRAM',
         external_id='PERTHNEURO_CRAM',

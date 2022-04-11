@@ -123,7 +123,6 @@ class Cohort(Target):
         self.storage_provider = storage_provider
         self.analysis_dataset = Dataset(
             name=analysis_dataset_name,
-            cohort=self,
             namespace=namespace,
             storage_provider=self.storage_provider,
         )
@@ -167,8 +166,18 @@ class Cohort(Target):
         for proj in self.get_datasets(only_active=only_active):
             all_samples.extend(proj.get_samples(only_active))
         return all_samples
+    
+    def add_dataset(self, dataset: 'Dataset') -> 'Dataset':
+        """
+        Add existing dataset into the cohort.
+        """
+        if dataset.name in self._datasets_by_name:
+            logger.debug(f'Dataset {dataset.name} already exists in the cohort')
+            return dataset
+        self._datasets_by_name[dataset.name] = dataset
+        return dataset
 
-    def add_dataset(
+    def create_dataset(
         self,
         name: str,
         namespace: Namespace | None = None,
@@ -189,7 +198,6 @@ class Cohort(Target):
         else:
             ds = Dataset(
                 name=name,
-                cohort=self,
                 namespace=namespace,
                 storage_provider=storage_provider or self.storage_provider,
             )
@@ -260,13 +268,10 @@ class Dataset(Target):
     def __init__(
         self,
         name: str,
-        cohort: Cohort,
         namespace: Namespace | None = None,
         storage_provider: StorageProvider | None = None,
     ):
         super().__init__()
-        self.cohort = cohort
-
         self._storage_provider = storage_provider
 
         self._sample_by_id: dict[str, Sample] = {}
@@ -329,14 +334,6 @@ class Dataset(Target):
             dataset=self.stack, namespace=self.namespace, **kwargs
         )
 
-    def get_analysis_bucket(self, **kwargs) -> Path:
-        """
-        Get analysis bucket (-main-analysis or -test-analysis)
-        """
-        return self.storage_provider.get_analysis_bucket(
-            dataset=self.stack, namespace=self.namespace, **kwargs
-        )
-
     def get_web_bucket(self, **kwargs) -> Path:
         """
         Get web bucket (-main-web or -test-web)
@@ -359,9 +356,10 @@ class Dataset(Target):
         external_id: str | None = None,
         participant_id: str | None = None,
         sequencing_type: SequencingType | None = None,
+        meta: dict | None = None,
         sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
-        meta: dict | None = None,
+        alignment_input: AlignmentInput | None = None,
     ) -> 'Sample':
         """
         Create a new sample and add it into the dataset.
@@ -379,6 +377,7 @@ class Dataset(Target):
             meta=meta,
             sex=sex,
             pedigree=pedigree,
+            alignment_input=alignment_input,
         )
         self._sample_by_id[id] = s
         return s

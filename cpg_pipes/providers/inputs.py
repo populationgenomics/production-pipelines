@@ -51,7 +51,7 @@ class InputProvider(ABC):
                 if skip_datasets and ds_name in skip_datasets:
                     logger.info(f'Requested to skipping dataset {ds_name}')
                     continue
-                dataset = cohort.add_dataset(ds_name)
+                dataset = cohort.create_dataset(ds_name)
                 entries = self._get_entries(
                     dataset,
                     skip_samples=skip_samples,
@@ -70,7 +70,7 @@ class InputProvider(ABC):
             )
             for entry in entries:
                 ds_name = self.get_dataset_name(entry) or cohort.analysis_dataset.name
-                dataset = cohort.add_dataset(ds_name)
+                dataset = cohort.create_dataset(ds_name)
                 self._add_sample(dataset, entry)
 
         self.populate_alignment_inputs(cohort)

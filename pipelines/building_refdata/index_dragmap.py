@@ -33,7 +33,7 @@ def _index_dragmap_job(b: hb.Batch, refs: RefData) -> Job:
     reference = refs.fasta_res_group(b)
 
     j = b.new_job('Index DRAGMAP')
-    j.image(images.BIOINFO_IMAGE)
+    j.image(images.DRAGMAP_IMAGE)
     j.memory('standard')
     j.cpu(32)
     j.storage('40G')
@@ -67,7 +67,7 @@ def _test_dragmap_job(b: hb.Batch, refs: RefData) -> Job:
     )
     fq1 = b.read_input('gs://cpg-seqr-test/batches/test/tmp_fq')
     j = b.new_job('Test DRAGMAP')
-    j.image(images.BIOINFO_IMAGE)
+    j.image(images.DRAGMAP_IMAGE)
     j.cpu(32)
     j.memory('standard')
     j.storage('300G')

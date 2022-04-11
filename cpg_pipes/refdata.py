@@ -11,6 +11,7 @@ class RefData:
     Bioinformatics reference files, indices, and constants.
     """
 
+    number_of_shards_for_realignment = 10
     number_of_haplotype_caller_intervals = 50
     number_of_joint_calling_intervals = 50
     number_of_vep_intervals = 50
@@ -34,7 +35,7 @@ class RefData:
     def __init__(self, bucket: Path):
         self.bucket = bucket
 
-        # BED files
+        # To clean up WGS VCFs
         self.noalt_regions = self.bucket / 'noalt.bed'
 
         # Somalier
@@ -73,18 +74,21 @@ class RefData:
         self.bwamem2_index_exts = ['0123', 'amb', 'bwt.2bit.64', 'ann', 'pac', 'alt']
         self.bwamem2_index_prefix = self.ref_fasta
 
-        # GATK intervals
+        # Intervals
+        self.intervals_bucket = self.bucket / 'intervals'
         self.calling_interval_lists = {
             SequencingType.WGS: self.broad_ref_bucket
             / 'wgs_calling_regions.hg38.interval_list',
             SequencingType.EXOME: self.broad_ref_bucket
             / 'exome_calling_regions.v1.interval_list',
+            SequencingType.TOY: self.intervals_bucket / 'toy_calling_regions.interval_list',
         }
         self.evaluation_interval_lists = {
             SequencingType.WGS: self.broad_ref_bucket
             / 'wgs_evaluation_regions.hg38.interval_list',
             SequencingType.EXOME: self.broad_ref_bucket
             / 'exome_evaluation_regions.v1.interval_list',
+            SequencingType.TOY: self.calling_interval_lists[SequencingType.TOY]
         }
         self.wgs_coverage_interval_list = (
             self.broad_ref_bucket / 'wgs_coverage_regions.hg38.interval_list'
@@ -92,7 +96,10 @@ class RefData:
         self.unpadded_intervals = (
             self.broad_ref_bucket / 'hg38.even.handcurated.20k.intervals'
         )
-        self.intervals_bucket = self.bucket / 'intervals'
+        self.exome_bed = (
+            self.broad_ref_bucket / 
+            'Homo_sapiens_assembly38.contam.exome_calling_regions.v1.bed'
+        )
 
         # VQSR
         self.dbsnp_vcf = self.broad_ref_bucket / 'Homo_sapiens_assembly38.dbsnp138.vcf'

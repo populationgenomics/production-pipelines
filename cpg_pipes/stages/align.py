@@ -6,7 +6,6 @@ import logging
 
 from .. import Path
 from ..targets import Sample
-from ..types import CramPath
 from ..pipeline import stage, SampleStage, StageInput, StageOutput, PipelineError
 from ..jobs import align
 
@@ -45,8 +44,6 @@ class Align(SampleStage):
             job_attrs=self.get_job_attrs(sample),
             refs=self.refs,
             overwrite=not self.check_intermediates,
-            number_of_shards_for_realignment=(
-                10 if isinstance(sample.alignment_input, CramPath) else None
-            ),
+            realignment_shards_num=self.pipeline_config.get('realignment_shards_num'),
         )
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)

@@ -60,7 +60,7 @@ class CramSomalierPedigree(DatasetStage):
         .yaml#L472-L481
         """
 
-        prefix = dataset.get_analysis_bucket() / 'somalier'
+        prefix = dataset.get_bucket() / 'somalier' / dataset.alignment_inputs_hash()
         return {
             'samples': prefix / f'{dataset.name}.samples.tsv',
             'pairs': prefix / f'{dataset.name}.pairs.tsv',
@@ -116,7 +116,7 @@ class CramSomalierAncestry(DatasetStage):
         .yaml#L472-L481
         """
 
-        prefix = dataset.get_analysis_bucket() / 'ancestry'
+        prefix = dataset.get_bucket() / 'ancestry' / dataset.alignment_inputs_hash()
         return {
             'tsv': prefix / f'{dataset.name}.somalier-ancestry.tsv',
             'html': dataset.get_web_bucket() / 'somalier-ancestry.html',

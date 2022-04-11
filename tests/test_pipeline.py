@@ -9,15 +9,45 @@ import time
 import unittest
 from unittest.mock import patch, Mock
 
-from cpg_pipes import Namespace, to_path
-from cpg_pipes.pipeline import create_pipeline
-from cpg_pipes.refdata import RefData
-from cpg_pipes.types import SequencingType
+from cpg_pipes import Namespace, Path, to_path
+from cpg_pipes.pipeline.pipeline import Pipeline
+from cpg_pipes.providers.cpg import CpgStorageProvider
+from cpg_pipes.stages.joint_genotyping import JointGenotyping
+from cpg_pipes.stages.vqsr import Vqsr
+from cpg_pipes.types import SequencingType, CramPath
+# Importing `seqr_loader` will make pipeline use all its stages by default.
+from pipelines import seqr_loader
+from pipelines.seqr_loader import AnnotateDataset
 
 try:
-    from .utils import setup_env, BASE_BUCKET, DATASET, SAMPLES
+    from .utils import BASE_BUCKET, SAMPLES, setup_env, DATASET, SUBSET_CRAM_BY_SID
 except ImportError:
-    from utils import setup_env, BASE_BUCKET, DATASET, SAMPLES  # type: ignore
+    from utils import BASE_BUCKET, SAMPLES, setup_env, DATASET, SUBSET_CRAM_BY_SID  # type: ignore
+
+
+class UnittestStorageProvider(CpgStorageProvider):
+    """
+    Align and GenotypeSample stages write cram and gvcf into the datasets
+    main bucket, without versioning. We need to override this behaviour to
+    support writing into the test output directory.
+    """
+    def __init__(self, test_output_bucket: Path):
+        super().__init__()
+        self.test_output_bucket = test_output_bucket
+    
+    def _dataset_bucket(
+        self,
+        dataset: str,
+        namespace: Namespace,
+        suffix: str = None,
+    ) -> Path:
+        """
+        Overiding main bucket name
+        """
+        path = self.test_output_bucket
+        if suffix:
+            path /= suffix
+        return path
 
 
 class TestPipeline(unittest.TestCase):
@@ -36,6 +66,7 @@ class TestPipeline(unittest.TestCase):
         self.local_tmp_dir = to_path(tempfile.mkdtemp())
         self.sample_ids = SAMPLES[:3]
 
+        self.realignment_shards_num = 4
         self.hc_intervals_num = 4
         self.jc_intervals_num = 4
         self.vep_intervals_num = 4
@@ -49,17 +80,14 @@ class TestPipeline(unittest.TestCase):
     @staticmethod
     def _mock_joint_calling():
         """
-        Mocking joint-calling outputs. Toy FASTQs don't produce enough variant data
+        Mocking joint-calling outputs. Toy CRAM/GVCF don't produce enough variant data
         for AS-VQSR to work properly: gatk would throw a "Bad input: Values for
         AS_ReadPosRankSum annotation not detected for ANY training variant in the
         input callset", like in this Batch:
         https://batch.hail.populationgenomics.org.au/batches/46981/jobs/322.
         So instead, we are using mocks to plug in a larger file here.
         """
-        jc_vcf = to_path(
-            'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
-            'joint-called.vcf.gz'
-        )
+        jc_vcf = BASE_BUCKET / 'inputs/chr20/genotypegvcfs/joint-called.vcf.gz'
         siteonly_vcf = to_path(str(jc_vcf).replace('.vcf.gz', '-siteonly.vcf.gz'))
         from cpg_pipes.pipeline.pipeline import StageOutput
 
@@ -79,41 +107,39 @@ class TestPipeline(unittest.TestCase):
     def _setup_pipeline(
         self,
         seq_type=SequencingType.WGS,
-        last_stage=None,
+        first_stage: str | None = None,
+        last_stage: str | None = None,
+        realignment_shards_num: int = None,
+        hc_intervals_num: int = None,
+        jc_intervals_num: int = None,
+        vep_intervals_num: int = None,
     ):
         setup_env()
-        from cpg_pipes import benchmark
-
-        # Use the seqr_loader stages. Importing it will make sure all its stages
-        # are used by default:
-        from pipelines import seqr_loader  # noqa: F401
 
         # Mocking elastic search password for the full dry run test:
         seqr_loader._read_es_password = Mock(return_value='TEST')
 
-        # Mocking joint-calling results:
-        self._mock_joint_calling()
-
-        pipeline = create_pipeline(
-            name=self._testMethodName,
-            description=self._testMethodName,
-            analysis_dataset=DATASET,
+        pipeline = Pipeline(
             namespace=Namespace.TEST,
+            name=self._testMethodName,
+            analysis_dataset_name=DATASET,
             check_intermediates=False,
-            check_expected_outputs=False,
+            storage_provider=UnittestStorageProvider(self.out_bucket),
+            first_stage=first_stage,
             last_stage=last_stage,
             version=self.timestamp,
             config=dict(
-                hc_intervals_num=self.hc_intervals_num,
-                jc_intervals_num=self.jc_intervals_num,
-                vep_intervals_num=self.vep_intervals_num,
+                realignment_shards_num=realignment_shards_num or self.realignment_shards_num,
+                hc_intervals_num=hc_intervals_num or self.hc_intervals_num,
+                jc_intervals_num=jc_intervals_num or self.jc_intervals_num,
+                vep_intervals_num=vep_intervals_num or self.vep_intervals_num,
             ),
         )
-        self.datasets = [pipeline.add_dataset(DATASET)]
+        self.datasets = [pipeline.create_dataset(DATASET)]
         for ds in self.datasets:
             for s_id in self.sample_ids:
                 s = ds.add_sample(s_id, s_id)
-                s.alignment_input = benchmark.tiny_fq
+                s.alignment_input = CramPath(SUBSET_CRAM_BY_SID[s.id])
                 s.sequencing_type = seq_type
         return pipeline
 
@@ -125,12 +151,7 @@ class TestPipeline(unittest.TestCase):
         Thus, we capture `builtins.print`, and verify that it has the expected
         job commands passed to it.
 
-        # Mocking all hail methods (hail.hadoop_open in this case) so we don't
-        # have to initialize hail, which steals a few seconds from this test
-        # which is supposed to be quick.
-        #"""
-        # with patch('cpg_pipes.utils.exists') as mock_exists:
-        #     mock_exists.return_value = True
+        """
         pipeline = self._setup_pipeline()
 
         with patch('builtins.print') as mock_print:
@@ -167,25 +188,43 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(_cnt('annotate_dataset_mt('), len(self.datasets))
         self.assertEqual(_cnt('hailctl dataproc submit'), 1)
 
-    def test_wgs(self):
+    def test_joint_calling(self):
         """
-        WGS seqr-loading pipeline.
+        Stages up to joint calling.
         """
         pipeline = self._setup_pipeline(
-            last_stage='AnnotateDataset'
+            last_stage=JointGenotyping.__name__,
+            seq_type=SequencingType.TOY,
         )
         result = pipeline.run(dry_run=False, wait=True)
         self.assertEqual('success', result.status()['state'])
-
-    def test_exome(self):
+    
+    def test_after_joint_calling(self):
         """
-        Exome seqr-loading pipeline.
+        Stages after joint-calling (running separately, because
+        VQSR needs more inputs than provided by toy regions)
         """
         pipeline = self._setup_pipeline(
-            last_stage='AnnotateDataset',
-            seq_type=SequencingType.EXOME,
+            first_stage=Vqsr.__name__,
+            last_stage=AnnotateDataset.__name__,
+            seq_type=SequencingType.WGS,
         )
+        # Mocking joint-calling outputs. Toy CRAM/GVCF don't produce enough variant 
+        # data for AS-VQSR to work properly: gatk would throw a "Bad input: Values for
+        # AS_ReadPosRankSum annotation not detected for ANY training variant in the
+        # input callset", like in this Batch:
+        # https://batch.hail.populationgenomics.org.au/batches/46981/jobs/322.
+        # So instead, we are copying a larger file into JointGenotyping expected output.
+        jc_vcf = BASE_BUCKET / 'inputs/chr20/genotypegvcfs/joint-called.vcf.gz'
+        siteonly_vcf = to_path(str(jc_vcf).replace('.vcf.gz', '-siteonly.vcf.gz'))
+        expected_output = JointGenotyping(pipeline).expected_outputs(pipeline.cohort)
+        jc_vcf.copy(expected_output['vcf'], force_overwrite_to_cloud=True)
+        to_path(str(jc_vcf) + '.tbi').copy(str(expected_output['vcf']) + '.tbi', force_overwrite_to_cloud=True)
+        siteonly_vcf.copy(expected_output['siteonly'], force_overwrite_to_cloud=True)
+        to_path(str(siteonly_vcf) + '.tbi').copy(str(expected_output['siteonly']) + '.tbi', force_overwrite_to_cloud=True)
+
         result = pipeline.run(dry_run=False, wait=True)
+
         self.assertEqual('success', result.status()['state'])
 
 

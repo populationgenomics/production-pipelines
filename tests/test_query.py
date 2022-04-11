@@ -150,7 +150,7 @@ class TestQuery(unittest.TestCase):
             analysis_dataset_name=DATASET,
             namespace=Namespace.TEST,
             storage_provider=CpgStorageProvider(),
-        ).add_dataset(DATASET)
+        ).create_dataset(DATASET)
         for sid in SAMPLES:
             dataset.add_sample(sid)
 

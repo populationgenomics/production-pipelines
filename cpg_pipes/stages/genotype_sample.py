@@ -59,7 +59,7 @@ class GenotypeSample(SampleStage):
                 intervals=GenotypeSample.hc_intervals,
                 scatter_count=scatter_count,
                 refs=self.refs,
-                tmp_bucket=sample.dataset.get_tmp_bucket(),
+                tmp_bucket=self.tmp_bucket / sample.id,
                 overwrite=not self.check_intermediates,
                 job_attrs=self.get_job_attrs(sample),
             )
