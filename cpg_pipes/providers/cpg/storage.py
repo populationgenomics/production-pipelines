@@ -18,6 +18,19 @@ class CpgStorageProvider(StorageProvider):
         super().__init__(cloud)
         self.prefix = 'cpg'
 
+    def _dataset_bucket(
+        self,
+        dataset: str,
+        namespace: Namespace,
+        suffix: str = None,
+    ) -> Path:
+        path = CloudPath(
+            f'{self.cloud.value}://' f'{self.prefix}-{dataset}-{namespace.value}'
+        )
+        if suffix:
+            path = CloudPath(f'{path}-{suffix}')
+        return path
+
     def get_bucket(
         self,
         dataset: str,
@@ -30,11 +43,7 @@ class CpgStorageProvider(StorageProvider):
         Bucket name is constructed according to the CPG storage policy:
         https://github.com/populationgenomics/team-docs/tree/main/storage_policies
         """
-        path = CloudPath(
-            f'{self.cloud.value}://' f'{self.prefix}-{dataset}-{namespace.value}'
-        )
-        if suffix:
-            path = CloudPath(f'{path}-{suffix}')
+        path = self._dataset_bucket(dataset, namespace, suffix)
         if version:
             path = path / version
         if sample:
