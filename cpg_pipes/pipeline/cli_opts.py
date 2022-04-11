@@ -90,7 +90,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             '--ped-file',
             'ped_files',
             multiple=True,
-            help='PED file (will override sample-meatadata family data if available)',
+            help='PED file (will override sample-metadata family data if available)',
         ),
         click.option(
             '--first-stage',
