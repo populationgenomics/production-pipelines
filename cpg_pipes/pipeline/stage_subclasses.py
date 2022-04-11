@@ -31,7 +31,7 @@ class SampleStage(Stage[Sample], ABC):
 
     def add_to_the_pipeline(self, pipeline: Pipeline) -> dict[str, StageOutput]:
         """
-        Pplug in stage into the pipeline.
+        Plug in stage into the pipeline.
         """
         output_by_target = dict()
         datasets = pipeline.cohort.get_datasets()
@@ -71,7 +71,7 @@ class DatasetStage(Stage, ABC):
 
     def add_to_the_pipeline(self, pipeline: Pipeline) -> dict[str, StageOutput]:
         """
-        Pplug in stage into the pipeline.
+        Plug in stage into the pipeline.
         """
         output_by_target = dict()
         datasets = pipeline.cohort.get_datasets()

@@ -424,7 +424,7 @@ class SmSequence:
         Parse a AlignmentInput object from the meta dictionary.
 
         @param check_existence: check if fastq/crams exist on buckets.
-        Default value is pulled from self.smdb and can be overwridden.
+        Default value is pulled from self.smdb and can be overridden.
         """
         reads_data = meta.get('reads')
         reads_type = meta.get('reads_type')
@@ -450,13 +450,13 @@ class SmSequence:
             bam_path = reads_data[0]['location']
             if not (bam_path.endswith('.cram') or bam_path.endswith('.bam')):
                 logger.error(
-                    f'{sample_id}: ERROR: expected the file to have an extention '
+                    f'{sample_id}: ERROR: expected the file to have an extension '
                     f'.cram or .bam, got: {bam_path}'
                 )
                 return None
             if check_existence and not utils.exists(bam_path):
                 logger.error(
-                    f'{sample_id}: ERROR: index file doesn\'t exist: {bam_path}'
+                    f'{sample_id}: ERROR: index file does not exist: {bam_path}'
                 )
                 return None
 
@@ -475,12 +475,12 @@ class SmSequence:
                 and not index_path.endswith('.bai')
             ):
                 logger.error(
-                    f'{sample_id}: ERROR: expected the index file to have an extention '
+                    f'{sample_id}: ERROR: expected the index file to have an extension '
                     f'.crai or .bai, got: {index_path}'
                 )
             if check_existence and not utils.exists(index_path):
                 logger.error(
-                    f'{sample_id}: ERROR: index file doesn\'t exist: {index_path}'
+                    f'{sample_id}: ERROR: index file does not exist: {index_path}'
                 )
                 return None
 
@@ -492,13 +492,13 @@ class SmSequence:
                 assert len(lane_data) == 2, lane_data
                 if check_existence and not utils.exists(lane_data[0]['location']):
                     logger.error(
-                        f'{sample_id}: ERROR: read 1 file doesn\'t exist: '
+                        f'{sample_id}: ERROR: read 1 file does not exist: '
                         f'{lane_data[0]["location"]}'
                     )
                     return None
                 if check_existence and not utils.exists(lane_data[1]['location']):
                     logger.error(
-                        f'{sample_id}: ERROR: read 2 file doesn\'t exist: '
+                        f'{sample_id}: ERROR: read 2 file does not exist: '
                         f'{lane_data[1]["location"]}'
                     )
                     return None
