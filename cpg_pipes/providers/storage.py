@@ -30,7 +30,7 @@ class Namespace(Enum):
 
 class Cloud(Enum):
     """
-    Cloud storage provider and correponding protocol prefix.
+    Cloud storage provider and corresponding protocol prefix.
     """
 
     GS = 'gs'
