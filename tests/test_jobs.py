@@ -26,7 +26,7 @@ from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.pipeline import create_pipeline
 from cpg_pipes.types import CramPath, SequencingType
 
-from . import utils
+import utils
 
 
 logger = logging.getLogger(__file__)
@@ -246,7 +246,7 @@ class TestJobs(unittest.TestCase):
             out_siteonly_vcf_path=out_siteonly_vcf_path,
             refs=self.refs,
             samples=self.pipeline.get_all_samples(),
-            gvcf_by_sid=utils.SUBSET_GVCF_BY_SID,
+            gvcf_by_sid=utils.CHR20_GVCF_BY_SID,
             tmp_bucket=self.tmp_bucket,
             overwrite=True,
             scatter_count=10,
@@ -266,7 +266,7 @@ class TestJobs(unittest.TestCase):
         Test AS-VQSR
         """
         siteonly_vcf_path = to_path(
-            'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
+            'gs://cpg-fewgenomes-test/unittest/inputs/exome/'
             'joint-called-siteonly.vcf.gz'
         )
         tmp_vqsr_bucket = self.tmp_bucket / 'vqsr'
@@ -295,8 +295,7 @@ class TestJobs(unittest.TestCase):
         and MANE_SELECT annotation.
         """
         site_only_vcf_path = to_path(
-            'gs://cpg-fewgenomes-test/unittest/inputs/chr20/genotypegvcfs/'
-            'vqsr.vcf.gz'
+            'gs://cpg-fewgenomes-test/unittest/inputs/chr20/vqsr.vcf.gz'
         )
         out_vcf_path = self.out_bucket / 'vep' / 'vep.vcf.gz'
         jobs = vep.vep(

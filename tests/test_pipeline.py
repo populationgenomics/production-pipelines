@@ -19,7 +19,7 @@ from cpg_pipes.types import SequencingType, CramPath
 from pipelines import seqr_loader
 from pipelines.seqr_loader import AnnotateDataset
 
-from . import utils
+import utils
 
 
 class UnittestStorageProvider(CpgStorageProvider):
@@ -75,32 +75,32 @@ class TestPipeline(unittest.TestCase):
         """
         shutil.rmtree(self.local_tmp_dir)
 
-    @staticmethod
-    def _mock_joint_calling():
-        """
-        Mocking joint-calling outputs. Toy CRAM/GVCF don't produce enough variant data
-        for AS-VQSR to work properly: gatk would throw a "Bad input: Values for
-        AS_ReadPosRankSum annotation not detected for ANY training variant in the
-        input callset", like in this Batch:
-        https://batch.hail.populationgenomics.org.au/batches/46981/jobs/322.
-        So instead, we are using mocks to plug in a larger file here.
-        """
-        jc_vcf = utils.BASE_BUCKET / 'inputs/chr20/genotypegvcfs/joint-called.vcf.gz'
-        siteonly_vcf = to_path(str(jc_vcf).replace('.vcf.gz', '-siteonly.vcf.gz'))
-        from cpg_pipes.pipeline.pipeline import StageOutput
-
-        original_fn = StageOutput.as_path
-
-        def _mock_as_path(self_, id_=None):
-            if self_.stage.name == 'JointGenotyping':
-                d = {
-                    'vcf': jc_vcf,
-                    'siteonly': siteonly_vcf,
-                }
-                return d[id_] if id_ else d
-            return original_fn(self_, id_)
-
-        StageOutput.as_path = _mock_as_path
+    # @staticmethod
+    # def _mock_joint_calling():
+    #     """
+    #     Mocking joint-calling outputs. Toy CRAM/GVCF don't produce enough variant data
+    #     for AS-VQSR to work properly: gatk would throw a "Bad input: Values for
+    #     AS_ReadPosRankSum annotation not detected for ANY training variant in the
+    #     input callset", like in this Batch:
+    #     https://batch.hail.populationgenomics.org.au/batches/46981/jobs/322.
+    #     So instead, we are using mocks to plug in a larger file here.
+    #     """
+    #     jc_vcf = utils.BASE_BUCKET / 'inputs/chr20/genotypegvcfs/joint-called.vcf.gz'
+    #     siteonly_vcf = to_path(str(jc_vcf).replace('.vcf.gz', '-siteonly.vcf.gz'))
+    #     from cpg_pipes.pipeline.pipeline import StageOutput
+    #
+    #     original_fn = StageOutput.as_path
+    #
+    #     def _mock_as_path(self_, id_=None):
+    #         if self_.stage.name == 'JointGenotyping':
+    #             d = {
+    #                 'vcf': jc_vcf,
+    #                 'siteonly': siteonly_vcf,
+    #             }
+    #             return d[id_] if id_ else d
+    #         return original_fn(self_, id_)
+    #
+    #     StageOutput.as_path = _mock_as_path
 
     def _setup_pipeline(
         self,
@@ -138,7 +138,7 @@ class TestPipeline(unittest.TestCase):
         for ds in self.datasets:
             for s_id in self.sample_ids:
                 s = ds.add_sample(s_id, s_id)
-                s.alignment_input = CramPath(utils.SUBSET_CRAM_BY_SID[s.id])
+                s.alignment_input = CramPath(utils.TOY_CRAM_BY_SID[s.id])
                 s.sequencing_type = seq_type
         return pipeline
 
@@ -214,7 +214,9 @@ class TestPipeline(unittest.TestCase):
         # input callset", like in this Batch:
         # https://batch.hail.populationgenomics.org.au/batches/46981/jobs/322.
         # So instead, we are copying a larger file into JointGenotyping expected output.
-        jc_vcf = utils.BASE_BUCKET / 'inputs/chr20/genotypegvcfs/joint-called.vcf.gz'
+        # jc_vcf = utils.BASE_BUCKET / 'inputs/chr20/genotypegvcfs/joint-called.vcf.gz'
+        jc_vcf = utils.BASE_BUCKET / 'inputs/exome/9samples-joint-called.vcf.gz'
+
         siteonly_vcf = to_path(str(jc_vcf).replace('.vcf.gz', '-siteonly.vcf.gz'))
         expected_output = JointGenotyping(pipeline).expected_outputs(pipeline.cohort)
         jc_vcf.copy(expected_output['vcf'], force_overwrite_to_cloud=True)

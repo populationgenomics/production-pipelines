@@ -12,52 +12,40 @@ from cpg_pipes.pipeline import create_pipeline
 from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes.types import SequencingType, CramPath
 
-try:
-    from .utils import (
-        BASE_BUCKET,
-        DATASET,
-        SAMPLES,
-        SUBSET_GVCF_BY_SID,
-        setup_env,
-        SUBSET_FQ_BY_SID,
-        FULL_GVCF_BY_SID,
-        FULL_CRAM_BY_SID,
-        SUBSET_CRAM_BY_SID,
-    )
-except ImportError:
-    from utils import BASE_BUCKET, DATASET, SAMPLES, SUBSET_GVCF_BY_SID, setup_env, SUBSET_FQ_BY_SID, FULL_GVCF_BY_SID, FULL_CRAM_BY_SID, SUBSET_CRAM_BY_SID  # type: ignore
+import utils
 
 
 def main():
     """
     Generate data for unit tests
     """
-    setup_env()
+    utils.setup_env()
     pipeline = create_pipeline(
         name='make_test_data',
         description='Make test data',
-        analysis_dataset=DATASET,
+        analysis_dataset=utils.DATASET,
         namespace=Namespace.TEST,
     )
-    make_subset_crams(pipeline)
-    make_gvcfs_for_joint_calling(pipeline)
+    # make_subset_crams(pipeline)
+    # make_gvcfs_for_joint_calling(pipeline)
+    make_joint_calling_vcf(pipeline)
 
 
 def make_subset_crams(pipeline: Pipeline):
     """
     Make toy CRAMs that span entire genome, not just chr20.
-    1. Take WGS CRAMs,
-    2. Randomly create regions.
-    3. Reduce the coverage to ~5x,
-    4. Convert to fastq pairs.
+    1. Take WGS CRAMs
+    2. Randomly select 1% of exome regions
+    3. Reduce the coverage to 1% of original, write CRAMs
+    4. Extract FASTQ pairs
     """
     b = pipeline.b
-    d = pipeline.cohort.create_dataset(DATASET)
+    d = pipeline.cohort.create_dataset(utils.DATASET)
     samples = [
         d.add_sample(
-            sid, external_id=sid, alignment_input=CramPath(FULL_CRAM_BY_SID[sid])
+            sid, external_id=sid, alignment_input=CramPath(utils.FULL_CRAM_BY_SID[sid])
         )
-        for sid in SAMPLES
+        for sid in utils.SAMPLES
     ]
 
     refs = pipeline.refs
@@ -103,7 +91,7 @@ def make_subset_crams(pipeline: Pipeline):
         """
         )
         b.write_output(
-            cram_j.output_cram, str(SUBSET_CRAM_BY_SID[s.id]).replace('.cram', '')
+            cram_j.output_cram, str(utils.TOY_CRAM_BY_SID[s.id]).replace('.cram', '')
         )
 
         fastq_j = extract_fastq(
@@ -112,8 +100,8 @@ def make_subset_crams(pipeline: Pipeline):
             ext='cram',
             refs=refs,
             job_attrs=s.get_job_attrs(),
-            output_fq1=SUBSET_FQ_BY_SID[s.id].r1,
-            output_fq2=SUBSET_FQ_BY_SID[s.id].r2,
+            output_fq1=utils.TOY_FQ_BY_SID[s.id].r1,
+            output_fq2=utils.TOY_FQ_BY_SID[s.id].r2,
         )
         fastq_j.depends_on(cram_j)
 
@@ -123,6 +111,8 @@ def make_subset_crams(pipeline: Pipeline):
 def make_gvcfs_for_joint_calling(pipeline):
     """
     Subset GVCFs to exome for joint-calling.
+    UPD: not needed, replaced with make_joint_calling_vcf
+    (jointgenotying works fine, it's VQSR that needs mocking)
     """
 
     b = pipeline.b
@@ -131,15 +121,15 @@ def make_gvcfs_for_joint_calling(pipeline):
         str(refs.calling_interval_lists[SequencingType.EXOME])
     )
 
-    p = pipeline.cohort.create_dataset(DATASET)
-    samples = [p.add_sample(sid, external_id=sid) for sid in SAMPLES]
+    d = pipeline.cohort.create_dataset(utils.DATASET)
+    samples = [d.add_sample(sid, external_id=sid) for sid in utils.SAMPLES]
     for s in samples:
         j = pipeline.b.new_job('Subset GVCF', dict(sample=s.id))
         j.image(images.BCFTOOLS_IMAGE)
         inp_gvcf = pipeline.b.read_input_group(
             **{
-                'g.vcf.gz': str(FULL_GVCF_BY_SID[s.id]),
-                'g.vcf.gz.tbi': str(FULL_GVCF_BY_SID[s.id]) + '.tbi',
+                'g.vcf.gz': str(utils.FULL_GVCF_BY_SID[s.id]),
+                'g.vcf.gz.tbi': str(utils.FULL_GVCF_BY_SID[s.id]) + '.tbi',
             }
         )
         j.declare_resource_group(
@@ -158,9 +148,75 @@ def make_gvcfs_for_joint_calling(pipeline):
             """
         )
         b.write_output(
-            j.output_gvcf, str(SUBSET_GVCF_BY_SID[s.id]).replace('.g.vcf.gz', '')
+            j.output_gvcf, str(utils.EXOME_GVCF_BY_SID[s.id]).replace('.g.vcf.gz', '')
         )
 
+    pipeline.run(wait=True)
+
+
+def make_joint_calling_vcf(pipeline):
+    """
+    Subset joint-calling VCF to exome.
+    """
+    b = pipeline.b
+    refs = pipeline.refs
+    exome_intervals = b.read_input(
+        str(refs.calling_interval_lists[SequencingType.EXOME])
+    )
+
+    j = b.new_job('Subset joint-calling VCF')
+    j.image(images.BCFTOOLS_IMAGE)
+
+    full_vcf = utils.BASE_BUCKET / 'inputs/full/9samples-joint-called.vcf.gz'
+    full_siteonly_vcf = (
+        utils.BASE_BUCKET / 'inputs/full/9samples-joint-called-siteonly.vcf.gz'
+    )
+
+    vcf = b.read_input_group(
+        **{
+            'vcf.gz': str(full_vcf),
+            'vcf.gz.tbi': str(full_vcf) + '.tbi',
+        }
+    )
+    siteonly_vcf = b.read_input_group(
+        **{
+            'vcf.gz': str(full_siteonly_vcf),
+            'vcf.gz.tbi': str(full_siteonly_vcf) + '.tbi',
+        }
+    )
+    j.declare_resource_group(
+        out_vcf={
+            'vcf.gz': '{root}-joint-called.vcf.gz',
+            'vcf.gz.tbi': '{root}-joint-called.vcf.gz.tbi',
+        }
+    )
+    j.declare_resource_group(
+        out_siteonly_vcf={
+            'vcf.gz': '{root}-joint-called-siteonly.vcf.gz',
+            'vcf.gz.tbi': '{root}-joint-called-siteonly.vcf.gz.tbi',
+        }
+    )
+    j.command(
+        f"""
+        grep -v ^@ {exome_intervals} > regions.bed
+    
+        bcftools view -R regions.bed {vcf['vcf.gz']} \\
+        -Oz -o {j.out_vcf['vcf.gz']}
+        tabix -p vcf {j.out_vcf['vcf.gz']}
+
+        bcftools view -R regions.bed {siteonly_vcf['vcf.gz']} \\
+        -Oz -o {j.out_siteonly_vcf['vcf.gz']}
+        tabix -p vcf {j.out_siteonly_vcf['vcf.gz']}
+        """
+    )
+    STANDARD.set_resources(j, fraction=0.5)
+    full_vcf = utils.BASE_BUCKET / 'inputs/exome/9samples-joint-called.vcf.gz'
+    full_siteonly_vcf = (
+        utils.BASE_BUCKET / 'inputs/exome/9samples-joint-called-siteonly.vcf.gz'
+    )
+
+    b.write_output(j.out_vcf, str(full_vcf).replace('.vcf.gz', ''))
+    b.write_output(j.out_siteonly_vcf, str(full_siteonly_vcf).replace('.vcf.gz', ''))
     pipeline.run(wait=True)
 
 

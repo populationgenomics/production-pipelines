@@ -21,7 +21,7 @@ from cpg_pipes.query.vep import vep_json_to_ht
 from cpg_pipes.refdata import RefData
 from cpg_pipes.types import SequencingType, logger
 
-from . import utils
+import utils
 
 
 class TestQuery(unittest.TestCase):
