@@ -232,8 +232,7 @@ def pipeline_click_options(function: Callable) -> Callable:
         with open(fp) as f:
             return yaml.load(f, Loader=yaml.SafeLoader)
 
-    function = click_config_file.configuration_option(
+    return click_config_file.configuration_option(
         provider=yaml_provider,
         implicit=False,
     )(function)
-    return function
