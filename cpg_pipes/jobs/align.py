@@ -1,10 +1,10 @@
 """
 Create Hail Batch jobs for alignment.
 """
+
 from enum import Enum
 from textwrap import dedent, indent
 from typing import cast
-from os.path import join
 import logging
 
 import hailtop.batch as hb
@@ -323,7 +323,7 @@ def _align_one(
         j.image(images.BIOINFO_IMAGE)
         dragmap_index = b.read_input_group(
             **{
-                k.replace('.', '_'): join(refs.dragmap_index_bucket, k)
+                k.replace('.', '_'): refs.dragmap_index_bucket / k
                 for k in refs.dragmap_index_files
             }
         )
@@ -450,38 +450,6 @@ def extract_fastq(
         assert output_fq1 and output_fq2, (output_fq1, output_fq2)
         b.write_output(j.fq1, output_fq1)
         b.write_output(j.fq2, output_fq2)
-    return j
-
-
-def create_dragmap_index(b: hb.Batch, refs: RefData) -> Job:
-    """
-    Creates the index for DRAGMAP
-    """
-    reference = refs.fasta_res_group(b)
-
-    j = b.new_job('Index DRAGMAP')
-    j.image(images.BIOINFO_IMAGE)
-    j.memory('standard')
-    j.cpu(32)
-    j.storage('40G')
-    cmd = f"""\
-    DIR=$(dirname {j.hash_table_cfg})
-
-    dragen-os \\
-    --build-hash-table true \\
-    --ht-reference {reference.base} \\
-    --ht-num-threads 32 \\
-    --output-directory $DIR
-    """
-    j.command(wrap_command(cmd))
-    for f in refs.dragmap_index_files:
-        cmd += f'ln $DIR/{f} {getattr(j, f.replace(".", "_"))}\n'
-    cmd += 'df -h; pwd; ls | grep -v proc | xargs du -sh'
-    j.command(cmd)
-    for f in refs.dragmap_index_files:
-        b.write_output(
-            getattr(j, f.replace('.', '_')), join(refs.dragmap_index_bucket, f)
-        )
     return j
 
 

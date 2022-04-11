@@ -1,9 +1,6 @@
 """
 Docker images used in the pipelines.
 """
-import logging
-
-logger = logging.getLogger(__file__)
 
 DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:7f41eeb90c8bec8836a1cd20ad1911b5989a5893-hail-db65c33c29100c64405c39ebace90a7c463b4bec'
 
