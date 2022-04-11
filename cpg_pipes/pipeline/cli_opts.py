@@ -83,20 +83,14 @@ def pipeline_click_options(function: Callable) -> Callable:
             '--dataset',
             'datasets',
             multiple=True,
-            help='Only read samples that belong to the dataset(s). '
+            help='Only read samples that belong to the given dataset(s). '
             'Can be set multiple times.',
-        ),
-        click.option(
-            '--ped-file',
-            'ped_files',
-            multiple=True,
-            help='PED file (will override sample-meatadata family data if available)',
         ),
         click.option(
             '--first-stage',
             'first_stage',
             help='Skip previous stages and pick their expected results if further '
-            'stages depend on thems',
+            'stages depend on them',
         ),
         click.option(
             '--last-stage',
@@ -122,7 +116,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             '-s',
             'only_samples',
             multiple=True,
-            help='Only take these samples (can be set multiple times)',
+            help='Only process these samples (can be set multiple times)',
         ),
         click.option(
             '--force-sample',
@@ -188,9 +182,9 @@ def pipeline_click_options(function: Callable) -> Callable:
             'skip_samples_with_missing_input',
             default=False,
             is_flag=True,
-            help='For the first (not-skipped) stage, if the input for a target does not'
-            'exist, just skip this target instead of failing. E.g. if the first'
-            'stage is Align, and sequence.meta files for a sample do not exist,'
+            help='For the first (not-skipped) stage, if the input for a target does not '
+            'exist, just skip this target instead of failing. E.g. if the first '
+            'stage is Align, and sequence.meta files for a sample do not exist, '
             'remove this sample instead of failing.',
         ),
         click.option(
@@ -213,27 +207,25 @@ def pipeline_click_options(function: Callable) -> Callable:
         click.option(
             '--local-dir',
             'local_dir',
-            help='Local directory for temporary files. Usually takes a few KB. '
+            help='Local directory for temporary files. Usually takes a few kB. '
             'If not provided, a temp folder will be created',
         ),
     ]
 
-    # Click shows options in a reverse order, so inverting the list back:
-    options = options[::-1]
-
-    # Applying decorators:
-    for opt in options:
+    # Applying decorators. Doing that in reverse order, because Click actually 
+    # inverts the order of shown options, assuming the decorators order of 
+    # application which is bottom to top.
+    for opt in options[::-1]:
         function = opt(function)
 
-    # Add ability to load options from a yaml file
-    # using https://pypi.org/project/click-config-file/
+    # Adding ability to load options from a yaml file
+    # using https://pypi.org/project/click-config-file
     def yaml_provider(fp, _):
         """Load options from YAML"""
         with open(fp) as f:
             return yaml.load(f, Loader=yaml.SafeLoader)
 
-    function = click_config_file.configuration_option(
+    return click_config_file.configuration_option(
         provider=yaml_provider,
         implicit=False,
     )(function)
-    return function
