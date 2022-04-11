@@ -88,7 +88,7 @@ class InputProvider(ABC):
         dataset: Dataset | None = None,
     ) -> list[dict]:
         """
-        Overide this method to get a list of data entries (dicts).
+        Override this method to get a list of data entries (dicts).
         If dataset is not missing, it should be specific to a dataset.
         """
 
