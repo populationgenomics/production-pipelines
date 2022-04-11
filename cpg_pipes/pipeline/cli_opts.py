@@ -96,7 +96,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             '--first-stage',
             'first_stage',
             help='Skip previous stages and pick their expected results if further '
-            'stages depend on thems',
+            'stages depend on them',
         ),
         click.option(
             '--last-stage',
