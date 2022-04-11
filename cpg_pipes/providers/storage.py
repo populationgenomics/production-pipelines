@@ -65,24 +65,6 @@ class StorageProvider(ABC):
         @param sample: (optional) sample name
         """
 
-    def get_analysis_bucket(
-        self,
-        dataset: str,
-        namespace: Namespace,
-        version: str | None = None,
-        sample: str = None,
-    ) -> Path:
-        """
-        Bucket to write analysis results.
-        """
-        return self.get_bucket(
-            dataset=dataset,
-            namespace=namespace,
-            version=version,
-            sample=sample,
-            suffix='analysis',
-        )
-
     def get_tmp_bucket(
         self,
         dataset: str,
