@@ -131,7 +131,7 @@ class TestJobs(unittest.TestCase):
         self.pipeline.b.write_output(test_j.output, str(out_path))
         return out_path
 
-    def test_alignment_fastq(self):
+    def test_align_fastq(self):
         """
         Test alignment job on a set of two FASTQ pairs
         (tests processing in parallel merging and merging)
@@ -174,7 +174,7 @@ class TestJobs(unittest.TestCase):
             delta=10,
         )
 
-    def test_alignment_cram(self):
+    def test_align_cram(self):
         """
         Test alignment job on a CRAM input (tests realignment with bazam)
         """
@@ -203,12 +203,12 @@ class TestJobs(unittest.TestCase):
             delta=10,
         )
 
-    def test_haplotype_calling(self):
+    def test_genotype_samples(self):
         """
-        Test individual sample haplotype calling
+        Test individual sample haplotype calling.
         """
         cram_path = CramPath(
-            to_path(benchmark.BENCHMARK_BUCKET)
+            benchmark.BENCHMARK_BUCKET
             / 'outputs'
             / 'TINY_CRAM'
             / 'dragmap-picard.cram'
@@ -232,7 +232,7 @@ class TestJobs(unittest.TestCase):
 
     def test_joint_calling(self):
         """
-        Test joint variant calling
+        Test joint variant calling.
         """
         out_vcf_path = self.out_bucket / 'joint-called.vcf.gz'
         out_siteonly_vcf_path = to_path(
@@ -249,7 +249,7 @@ class TestJobs(unittest.TestCase):
             out_siteonly_vcf_path=out_siteonly_vcf_path,
             refs=self.refs,
             samples=self.pipeline.get_all_samples(),
-            gvcf_by_sid=utils.CHR20_GVCF_BY_SID,
+            gvcf_by_sid=utils.EXOME_1PCT_GVCF_BY_SID,
             tmp_bucket=self.tmp_bucket,
             overwrite=True,
             scatter_count=10,
@@ -266,12 +266,9 @@ class TestJobs(unittest.TestCase):
 
     def test_vqsr(self):
         """
-        Test AS-VQSR
+        Test AS-VQSR. Needs 5% exome to avoid issues.
         """
-        siteonly_vcf_path = to_path(
-            'gs://cpg-fewgenomes-test/unittest/inputs/exome/'
-            'joint-called-siteonly.vcf.gz'
-        )
+        siteonly_vcf_path = utils.BASE_BUCKET / 'inputs/exome5pct/9samples-joint-called.vcf.gz'
         tmp_vqsr_bucket = self.tmp_bucket / 'vqsr'
         out_vcf_path = self.out_bucket / 'vqsr' / 'vqsr.vcf.gz'
         jobs = make_vqsr_jobs(
@@ -297,13 +294,11 @@ class TestJobs(unittest.TestCase):
         Test VEP on VCF, parallelised by interval, with LOFtee plugin
         and MANE_SELECT annotation.
         """
-        site_only_vcf_path = to_path(
-            'gs://cpg-fewgenomes-test/unittest/inputs/chr20/vqsr.vcf.gz'
-        )
+        siteonly_vcf_path = utils.BASE_BUCKET / 'inputs/exome1pct/9samples-joint-called.vcf.gz'
         out_vcf_path = self.out_bucket / 'vep' / 'vep.vcf.gz'
         jobs = vep.vep_jobs(
             self.pipeline.b,
-            vcf_path=site_only_vcf_path,
+            vcf_path=siteonly_vcf_path,
             refs=self.refs,
             sequencing_type=self.sequencing_type,
             out_path=out_vcf_path,
@@ -425,7 +420,8 @@ class TestJobs(unittest.TestCase):
             f'siteonly-vqsr-{self.interval}.vcf.gz'
         )
         vep_ht_path = to_path(
-            f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/' f'vep/{self.interval}.ht'
+            f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/'
+            f'vep/{self.interval}.ht'
         )
         out_mt_path = self.out_bucket / 'seqr_loader' / f'cohort-{self.interval}.mt'
         annotate_cohort_jobs(

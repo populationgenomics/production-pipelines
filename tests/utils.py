@@ -39,10 +39,13 @@ TOY_FQ_BY_SID = {
 }
 
 FULL_GVCF_BY_SID = {
-    s: GvcfPath(BASE_BUCKET / f'inputs/gvcf/{s}.g.vcf.gz') for s in SAMPLES
+    s: GvcfPath(BASE_BUCKET / f'inputs/full/gvcf/{s}.g.vcf.gz') for s in SAMPLES
 }  # from gs://cpg-thousand-genomes-test/gvcf
 EXOME_GVCF_BY_SID = {
     s: GvcfPath(BASE_BUCKET / f'inputs/exome/gvcf/{s}.g.vcf.gz') for s in SAMPLES
+}
+EXOME_1PCT_GVCF_BY_SID = {
+    s: GvcfPath(BASE_BUCKET / f'inputs/exome1pct/gvcf/{s}.g.vcf.gz') for s in SAMPLES
 }
 CHR20_GVCF_BY_SID = {
     s: GvcfPath(BASE_BUCKET / f'inputs/chr20/gvcf/{s}.g.vcf.gz') for s in SAMPLES

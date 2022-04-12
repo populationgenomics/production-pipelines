@@ -18,6 +18,7 @@ from cpg_pipes.types import CramPath
 
 # Importing `seqr_loader` will make pipeline use all its stages by default.
 from pipelines import seqr_loader
+from pipelines.seqr_loader import AnnotateDataset
 
 try:
     import utils
@@ -187,7 +188,7 @@ class TestPipeline(unittest.TestCase):
         """
         pipeline = self._setup_pipeline(
             first_stage=Vqsr.__name__,
-            last_stage=Vqsr.__name__,
+            last_stage=AnnotateDataset.__name__,
             intervals_path=utils.BASE_BUCKET
             / 'inputs/exome5pct/calling_regions.interval_list',
         )
