@@ -81,15 +81,12 @@ class RefData:
             / 'wgs_calling_regions.hg38.interval_list',
             SequencingType.EXOME: self.broad_ref_bucket
             / 'exome_calling_regions.v1.interval_list',
-            SequencingType.TOY: self.intervals_bucket
-            / 'toy_calling_regions.interval_list',
         }
         self.evaluation_interval_lists = {
             SequencingType.WGS: self.broad_ref_bucket
             / 'wgs_evaluation_regions.hg38.interval_list',
             SequencingType.EXOME: self.broad_ref_bucket
             / 'exome_evaluation_regions.v1.interval_list',
-            SequencingType.TOY: self.calling_interval_lists[SequencingType.TOY],
         }
         self.wgs_coverage_interval_list = (
             self.broad_ref_bucket / 'wgs_coverage_regions.hg38.interval_list'

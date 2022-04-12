@@ -27,13 +27,14 @@ def vep(
     b: Batch,
     vcf_path: Path,
     refs: RefData,
-    sequencing_type: SequencingType,
     hail_billing_project: str,
     hail_bucket: Path,
     tmp_bucket: Path,
     out_path: Path | None = None,
     overwrite: bool = False,
     scatter_count: int | None = RefData.number_of_vep_intervals,
+    sequencing_type: SequencingType = SequencingType.WGS,
+    intervals_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """
@@ -53,6 +54,7 @@ def vep(
         b=b,
         refs=refs,
         sequencing_type=sequencing_type,
+        intervals_path=intervals_path,
         scatter_count=scatter_count,
     )
     jobs.append(intervals_j)

@@ -56,7 +56,6 @@ class JointGenotyping(CohortStage):
             out_vcf_path=self.expected_outputs(cohort)['vcf'],
             out_siteonly_vcf_path=self.expected_outputs(cohort)['siteonly'],
             samples=cohort.get_samples(),
-            sequencing_type=cohort.get_sequencing_type(),
             tmp_bucket=self.tmp_bucket,
             gvcf_by_sid=gvcf_by_sid,
             refs=self.refs,
@@ -65,6 +64,8 @@ class JointGenotyping(CohortStage):
             if self.pipeline_config.get('use_gnarly', False)
             else JointGenotyperTool.GenotypeGVCFs,
             scatter_count=self.pipeline_config.get('jc_intervals_num'),
+            sequencing_type=cohort.get_sequencing_type(),
+            intervals_path=self.pipeline_config.get('intervals_path'),
             job_attrs=self.get_job_attrs(),
         )
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)

@@ -43,6 +43,7 @@ class GenotypeSample(SampleStage):
             intervals_j, intervals = split_intervals.get_intervals(
                 b=self.b,
                 refs=self.refs,
+                intervals_path=self.pipeline_config.get('intervals_path'),
                 sequencing_type=sample.sequencing_type,
                 scatter_count=scatter_count,
                 job_attrs=self.get_job_attrs(),
@@ -54,10 +55,8 @@ class GenotypeSample(SampleStage):
                 b=self.b,
                 output_path=self.expected_outputs(sample),
                 sample_name=sample.id,
-                sequencing_type=sample.sequencing_type,
                 cram_path=sample.get_cram_path(),
                 intervals=GenotypeSample.hc_intervals,
-                scatter_count=scatter_count,
                 refs=self.refs,
                 tmp_bucket=self.tmp_bucket / sample.id,
                 overwrite=not self.check_intermediates,

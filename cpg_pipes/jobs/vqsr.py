@@ -87,7 +87,6 @@ def make_vqsr_jobs(
     b: hb.Batch,
     input_vcf_or_mt_path: Path,
     refs: RefData,
-    sequencing_type: SequencingType,
     tmp_bucket: Path,
     gvcf_count: int,
     meta_ht_path: Path | None = None,
@@ -96,6 +95,8 @@ def make_vqsr_jobs(
     use_as_annotations: bool = True,
     overwrite: bool = False,
     scatter_count: int | None = RefData.number_of_joint_calling_intervals,
+    sequencing_type: SequencingType = SequencingType.WGS,
+    intervals_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """
@@ -104,7 +105,6 @@ def make_vqsr_jobs(
     @param b: Batch object to add jobs to
     @param input_vcf_or_mt_path: path to a site-only VCF, or a matrix table
     @param refs: reference data
-    @param sequencing_type: type of sequencing experiments
     @param meta_ht_path: if input_vcf_or_mt_path is a matrix table, this table will
            be used as a source of annotations for that matrix table, i.e.
            to filter out samples flagged as `meta.related`
@@ -114,6 +114,8 @@ def make_vqsr_jobs(
     @param gvcf_count: number of input samples. Can't read from combined_mt_path as it
            might not be yet genereated the point of Batch job submission
     @param scatter_count: number of intervals to parallelise SNP model creation
+    @param sequencing_type: type of sequencing experiments
+    @param intervals_path: path to specific interval list
     @param output_vcf_path: path to write final recalibrated VCF to
     @param use_as_annotations: use allele-specific annotation for VQSR
     @param overwrite: whether to not reuse intermediate files
@@ -166,6 +168,7 @@ def make_vqsr_jobs(
         refs=refs,
         sequencing_type=sequencing_type,
         scatter_count=scatter_count,
+        intervals_path=intervals_path,
         job_attrs=job_attrs,
     )
     jobs.append(intervals_j)

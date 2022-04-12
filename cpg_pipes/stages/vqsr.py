@@ -36,7 +36,6 @@ class Vqsr(CohortStage):
         jobs = make_vqsr_jobs(
             b=self.b,
             refs=self.refs,
-            sequencing_type=cohort.get_sequencing_type(),
             input_vcf_or_mt_path=siteonly_vcf_path,
             tmp_bucket=self.tmp_bucket,
             gvcf_count=len(cohort.get_samples()),
@@ -44,6 +43,8 @@ class Vqsr(CohortStage):
             use_as_annotations=self.pipeline_config.get('use_as_vqsr', True),
             overwrite=not self.check_intermediates,
             scatter_count=self.pipeline_config.get('jc_intervals_num'),
+            sequencing_type=cohort.get_sequencing_type(),
+            intervals_path=self.pipeline_config.get('intervals_path'),
             job_attrs=self.get_job_attrs(),
         )
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)

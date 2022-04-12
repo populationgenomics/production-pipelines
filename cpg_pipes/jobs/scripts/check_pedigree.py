@@ -138,7 +138,7 @@ def check_pedigree(
             continue
 
         inferred_rel = infer_relationship(row['relatedness'], row['ibs0'], row['ibs2'])
-        # Supressing all logging output from peddy as it would clutter the logs
+        # Supressing all logging output from peddy, otherwise it would clutter the logs
         with contextlib.redirect_stderr(None), contextlib.redirect_stdout(None):
             peddy_rel = ped.relation(sample_by_id[s1], sample_by_id[s2])
 

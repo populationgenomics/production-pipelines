@@ -38,7 +38,6 @@ def make_joint_genotyping_jobs(
     out_vcf_path: Path,
     out_siteonly_vcf_path: Path,
     samples: list[Sample],
-    sequencing_type: SequencingType,
     tmp_bucket: Path,
     refs: RefData,
     gvcf_by_sid: dict[str, GvcfPath],
@@ -49,6 +48,8 @@ def make_joint_genotyping_jobs(
     tool: JointGenotyperTool = JointGenotyperTool.GenotypeGVCFs,
     do_filter_excesshet: bool = True,
     scatter_count: int | None = RefData.number_of_joint_calling_intervals,
+    sequencing_type: SequencingType = SequencingType.WGS,
+    intervals_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """
@@ -72,6 +73,7 @@ def make_joint_genotyping_jobs(
         b=b,
         refs=refs,
         sequencing_type=sequencing_type,
+        intervals_path=intervals_path,
         scatter_count=scatter_count,
         job_attrs=job_attrs,
     )

@@ -21,7 +21,6 @@ logger = logging.getLogger(__file__)
 def produce_gvcf(
     b: hb.Batch,
     sample_name: str,
-    sequencing_type: SequencingType,
     tmp_bucket: Path,
     cram_path: CramPath,
     refs: RefData,
@@ -29,6 +28,8 @@ def produce_gvcf(
     output_path: Path | None = None,
     scatter_count: int | None = RefData.number_of_haplotype_caller_intervals,
     intervals: list[hb.Resource] | None = None,
+    sequencing_type: SequencingType = SequencingType.WGS,
+    intervals_path: Path | None = None,
     overwrite: bool = False,
     dragen_mode: bool = False,
 ) -> list[Job]:
@@ -44,16 +45,18 @@ def produce_gvcf(
 
     hc_gvcf_path = tmp_bucket / 'haplotypecaller' / f'{sample_name}.g.vcf.gz'
     scatter_count = scatter_count or RefData.number_of_haplotype_caller_intervals
+
     jobs = haplotype_caller(
         b=b,
         sample_name=sample_name,
-        sequencing_type=sequencing_type,
         refs=refs,
         job_attrs=job_attrs,
         output_path=hc_gvcf_path,
         cram_path=cram_path,
         scatter_count=scatter_count,
         intervals=intervals,
+        sequencing_type=sequencing_type,
+        intervals_path=intervals_path,
         overwrite=overwrite,
         dragen_mode=dragen_mode,
     )
@@ -73,13 +76,14 @@ def produce_gvcf(
 def haplotype_caller(
     b: hb.Batch,
     sample_name: str,
-    sequencing_type: SequencingType,
     cram_path: CramPath,
     refs: RefData,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     scatter_count: int | None = RefData.number_of_haplotype_caller_intervals,
     intervals: list[hb.Resource] | None = None,
+    sequencing_type: SequencingType = SequencingType.WGS,
+    intervals_path: Path | None = None,
     overwrite: bool = True,
     dragen_mode: bool = False,
 ) -> list[Job]:
@@ -97,11 +101,13 @@ def haplotype_caller(
             intervals_j, intervals = split_intervals.get_intervals(
                 b=b,
                 refs=refs,
+                intervals_path=intervals_path,
                 sequencing_type=sequencing_type,
                 scatter_count=scatter_count,
-                cache=True,
             )
             jobs.append(intervals_j)
+        else:
+            scatter_count = len(intervals)
 
         hc_jobs = []
         # Splitting variant calling by intervals
