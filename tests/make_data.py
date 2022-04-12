@@ -32,7 +32,7 @@ def main():
     # make_subset_crams(pipeline)
     # make_gvcfs_for_joint_calling(pipeline)
     # jointcalling_vcf_to_exome(pipeline)
-    jointcalling_vcf_to_sub_exome(pipeline, pct=1)
+    jointcalling_vcf_to_sub_exome(pipeline, fraction=0.001)
 
 
 def make_subset_crams(pipeline: Pipeline):
@@ -171,23 +171,24 @@ def jointcalling_vcf_to_exome(pipeline):
     pipeline.run(wait=True)
 
 
-def jointcalling_vcf_to_sub_exome(pipeline, pct=5):
+def jointcalling_vcf_to_sub_exome(pipeline, fraction=0.05):
     """
-    Subset joint-calling VCF to a subset of exome.
+    Subset joint-calling VCF to a fraction of exome.
     """
     b = pipeline.b
     refs = pipeline.refs
 
-    intervals_j = pipeline.b.new_job(f'Make toy intervals: {pct}% of exome')
+    intervals_j = pipeline.b.new_job(f'Make toy intervals: {fraction} of exome')
     in_intervals = b.read_input(str(refs.calling_interval_lists[SequencingType.EXOME]))
     intervals_j.command(
         f"""
     grep ^@ {in_intervals} > {intervals_j.out}
     grep -v ^@  {in_intervals} \
-    | awk 'BEGIN {{srand()}} !/^$/ {{ if (rand() <= {pct / 100}) print $0 }}' \
+    | awk 'BEGIN {{srand()}} !/^$/ {{ if (rand() <= {fraction}) print $0 }}' \
     >> {intervals_j.out}
     """
     )
+    pct = fraction * 100
     out_intervals_path = (
         utils.BASE_BUCKET / f'inputs/exome{pct}pct/calling_regions.interval_list'
     )

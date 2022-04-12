@@ -6,6 +6,7 @@ import shutil
 import tempfile
 import unittest
 from typing import Dict
+from unittest import skip
 
 from hailtop.batch.job import Job
 
@@ -93,16 +94,20 @@ class TestJobs(unittest.TestCase):
         test_j.image(images.SAMTOOLS_PICARD_IMAGE)
         sed = r's/.*SM:\([^\t]*\).*/\1/g'
         fasta_reference = self.refs.fasta_res_group(self.pipeline.b)
+        cram = self.pipeline.b.read_input_group(**{
+            'cram': str(cram_path),
+            'cram.crai': str(cram_path) + '.crai',
+        })
         test_j.command(
-            f'samtools view -T {fasta_reference.base} {cram_path} '
+            f'samtools view -T {fasta_reference.base} {cram.cram} '
             f'-c > {test_j.reads_num}'
         )
         test_j.command(
-            f'samtools view -T {fasta_reference.base} {cram_path} '
+            f'samtools view -T {fasta_reference.base} {cram.cram} '
             f'-c -f2 > {test_j.reads_num_mapped_in_proper_pair}'
         )
         test_j.command(
-            f'samtools view -T {fasta_reference.base} {cram_path} '
+            f'samtools view -T {fasta_reference.base} {cram.cram} '
             f'-H | grep \'^@RG\' | sed "{sed}" | uniq > {test_j.sample_name}'
         )
         test_j.depends_on(*jobs)
@@ -178,13 +183,16 @@ class TestJobs(unittest.TestCase):
         """
         Test alignment job on a CRAM input (tests realignment with bazam)
         """
-        output_path = self.out_bucket / 'align_fastq' / 'result.cram'
+        sid = 'CPG196519'
+        cram_path = CramPath(utils.BASE_BUCKET / f'inputs/toy/cram/{sid}.cram')
+        output_path = self.out_bucket / 'result.cram'
         jobs = align(
             self.pipeline.b,
-            alignment_input=benchmark.tiny_cram,
+            alignment_input=cram_path,
             output_path=output_path,
-            sample_name=self.sample.id,
+            sample_name=sid,
             refs=self.refs,
+            realignment_shards_num=4,
         )
         cram_details_paths = self._job_get_cram_details(
             output_path,
@@ -193,42 +201,44 @@ class TestJobs(unittest.TestCase):
         )
         self.pipeline.run(wait=True)
 
-        self.assertEqual(self.sample.id, _read_file(cram_details_paths['sample_name']))
+        self.assertEqual(sid, _read_file(cram_details_paths['sample_name']))
+        cram_details = {
+            k: _read_file(v) for k, v in cram_details_paths.items()
+        }
+        print(cram_details_paths)
+        self.assertAlmostEqual(223007, int(cram_details['reads_num']), delta=50)
         self.assertAlmostEqual(
-            285438, int(_read_file(cram_details_paths['reads_num'])), delta=50
-        )
-        self.assertAlmostEqual(
-            273658,
-            int(_read_file(cram_details_paths['reads_num_mapped_in_proper_pair'])),
-            delta=10,
+            222678, 
+            int(cram_details['reads_num_mapped_in_proper_pair']),
+            delta=50,
         )
 
-    def test_genotype_samples(self):
+    def test_genotype_sample(self):
         """
         Test individual sample haplotype calling.
         """
+        sid = 'CPG196519'
         cram_path = CramPath(
-            benchmark.BENCHMARK_BUCKET
-            / 'outputs'
-            / 'TINY_CRAM'
-            / 'dragmap-picard.cram'
+            utils.BASE_BUCKET / f'inputs/toy/cram_realigned/{sid}.cram'
         )
-        out_gvcf_path = self.out_bucket / 'test_haplotype_calling.g.vcf.gz'
+        out_gvcf_path = self.out_bucket / 'test.g.vcf.gz'
         jobs = produce_gvcf(
             self.pipeline.b,
-            sample_name=self.sample.id,
+            sample_name=sid,
             refs=self.refs,
             cram_path=cram_path,
-            scatter_count=2,
+            scatter_count=4,
             tmp_bucket=self.tmp_bucket,
             dragen_mode=True,
             output_path=out_gvcf_path,
             sequencing_type=self.sequencing_type,
+            intervals_path=utils.BASE_BUCKET
+            / 'inputs/exome1pct/calling_regions.interval_list',
         )
         test_result_path = self._job_get_gvcf_header(out_gvcf_path, jobs)
         self.pipeline.run(wait=True)
         contents = _read_file(test_result_path)
-        self.assertEqual(self.sample.id, contents.split()[-1])
+        self.assertEqual(sid, contents.split()[-1])
 
     def test_joint_calling(self):
         """
@@ -248,13 +258,14 @@ class TestJobs(unittest.TestCase):
             out_vcf_path=out_vcf_path,
             out_siteonly_vcf_path=out_siteonly_vcf_path,
             refs=self.refs,
-            samples=self.pipeline.get_all_samples(),
             gvcf_by_sid=utils.EXOME_1PCT_GVCF_BY_SID,
             tmp_bucket=self.tmp_bucket,
             overwrite=True,
-            scatter_count=10,
+            scatter_count=4,
             tool=JointGenotyperTool.GenotypeGVCFs,
             sequencing_type=self.pipeline.cohort.get_sequencing_type(),
+            intervals_path=utils.BASE_BUCKET
+            / 'inputs/exome1pct/calling_regions.interval_list',
         )
         test_result_path = self._job_get_gvcf_header(out_vcf_path, jobs)
         self.pipeline.run(wait=True)
@@ -266,9 +277,11 @@ class TestJobs(unittest.TestCase):
 
     def test_vqsr(self):
         """
-        Test AS-VQSR. Needs 5% exome to avoid issues.
+        Test AS-VQSR. Needs 5% exome to avoid issues like
+         "One or more annotations (usually MQ) may have insufficient variance.":
+        https://batch.hail.populationgenomics.org.au/batches/55673/jobs/3
         """
-        siteonly_vcf_path = utils.BASE_BUCKET / 'inputs/exome5pct/9samples-joint-called.vcf.gz'
+        siteonly_vcf_path = utils.BASE_BUCKET / 'inputs/exome5pct/9samples-joint-called-siteonly.vcf.gz'
         tmp_vqsr_bucket = self.tmp_bucket / 'vqsr'
         out_vcf_path = self.out_bucket / 'vqsr' / 'vqsr.vcf.gz'
         jobs = make_vqsr_jobs(
@@ -277,11 +290,13 @@ class TestJobs(unittest.TestCase):
             refs=self.refs,
             tmp_bucket=tmp_vqsr_bucket,
             gvcf_count=len(utils.SAMPLES),
-            scatter_count=10,
+            scatter_count=4,
             output_vcf_path=out_vcf_path,
             use_as_annotations=True,
             overwrite=True,
             sequencing_type=self.sequencing_type,
+            intervals_path=utils.BASE_BUCKET
+            / 'inputs/exome5pct/calling_regions.interval_list',
         )
         res_path = self._job_get_gvcf_header(out_vcf_path, jobs)
         self.pipeline.run(wait=True)
@@ -294,7 +309,7 @@ class TestJobs(unittest.TestCase):
         Test VEP on VCF, parallelised by interval, with LOFtee plugin
         and MANE_SELECT annotation.
         """
-        siteonly_vcf_path = utils.BASE_BUCKET / 'inputs/exome1pct/9samples-joint-called.vcf.gz'
+        siteonly_vcf_path = utils.BASE_BUCKET / 'inputs/exome0.1pct/9samples-joint-called-siteonly.vcf.gz'
         out_vcf_path = self.out_bucket / 'vep' / 'vep.vcf.gz'
         jobs = vep.vep_jobs(
             self.pipeline.b,
@@ -302,11 +317,13 @@ class TestJobs(unittest.TestCase):
             refs=self.refs,
             sequencing_type=self.sequencing_type,
             out_path=out_vcf_path,
-            scatter_count=10,
+            scatter_count=4,
             overwrite=False,
             hail_billing_project=utils.DATASET,
             hail_bucket=self.tmp_bucket,
             tmp_bucket=self.tmp_bucket,
+            intervals_path=utils.BASE_BUCKET
+            / 'inputs/exome1pct/calling_regions.interval_list',
         )
 
         # Add test job
@@ -330,9 +347,9 @@ class TestJobs(unittest.TestCase):
         # Check results
         self.assertTrue(out_vcf_path.exists())
         contents = _read_file(test_out_path)
-        self.assertEqual(
-            'chr20:5111495 TMEM230 protein_coding NM_001009923.2 LC ANC_ALLELE',
-            contents,
+        self.assertListEqual(
+            'chr8:22163875 SFTPC protein_coding . LC ANC_ALLELE'.split(),
+            contents.split(),
         )
 
     def test_vep_to_json(self):
@@ -410,6 +427,31 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(lof, 'LC')
         self.assertEqual(transcript, 'NM_001009923.2')
 
+    @skip('Large test')
+    def test_seqr_loader_annotate_cohort_large(self):
+        vcf_path = to_path(
+            utils.BASE_BUCKET / 'inputs/exome5pct/9samples-joint-called.vcf.gz'
+        )
+        siteonly_vqsr_path = (
+            utils.BASE_BUCKET / 'inputs/exome5pct/9samples-joint-called-siteonly-vqsr.vcf.gz'
+        )
+        vep_ht_path = to_path(
+            utils.BASE_BUCKET / 'inputs/exome5pct/9samples-vep.ht'
+        )
+        out_mt_path = self.out_bucket / f'cohort-exome5pct.mt'
+        annotate_cohort_jobs(
+            self.pipeline.b,
+            vcf_path=vcf_path,
+            siteonly_vqsr_vcf_path=siteonly_vqsr_path,
+            vep_ht_path=vep_ht_path,
+            output_mt_path=out_mt_path,
+            checkpoints_bucket=self.tmp_bucket / 'checkpoints',
+            sequencing_type=self.sequencing_type,
+            hail_billing_project=utils.DATASET,
+            hail_bucket=self.tmp_bucket,
+        )
+        self.pipeline.run(wait=True)
+
     def test_seqr_loader_annotate_cohort(self):
         vcf_path = to_path(
             f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/'
@@ -423,14 +465,14 @@ class TestJobs(unittest.TestCase):
             f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/'
             f'vep/{self.interval}.ht'
         )
-        out_mt_path = self.out_bucket / 'seqr_loader' / f'cohort-{self.interval}.mt'
+        out_mt_path = self.out_bucket / f'cohort-{self.interval}.mt'
         annotate_cohort_jobs(
             self.pipeline.b,
             vcf_path=vcf_path,
             siteonly_vqsr_vcf_path=siteonly_vqsr_path,
             vep_ht_path=vep_ht_path,
             output_mt_path=out_mt_path,
-            checkpoints_bucket=self.tmp_bucket / 'seqr_loader' / 'checkpoints',
+            checkpoints_bucket=self.tmp_bucket / 'checkpoints',
             sequencing_type=self.sequencing_type,
             hail_billing_project=utils.DATASET,
             hail_bucket=self.tmp_bucket,

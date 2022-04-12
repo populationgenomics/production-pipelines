@@ -15,7 +15,7 @@ from cpg_pipes.types import SequencingType
 
 class TestInputProvider(unittest.TestCase):
     """
-    Test CSV input metadata provider.
+    Test CSV input metadata provider (i.e. populating samples from a CSV file)
     """
 
     def test_csv_provider(self):

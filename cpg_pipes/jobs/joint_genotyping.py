@@ -35,12 +35,11 @@ class JointGenotyperTool(Enum):
 
 def make_joint_genotyping_jobs(
     b: hb.Batch,
+    gvcf_by_sid: dict[str, GvcfPath],
     out_vcf_path: Path,
     out_siteonly_vcf_path: Path,
-    samples: list[Sample],
     tmp_bucket: Path,
     refs: RefData,
-    gvcf_by_sid: dict[str, GvcfPath],
     overwrite: bool = False,
     # Default to GenotypeGVCFs because Gnarly is a bit weird, e.g. it adds <NON_REF>
     # variants with AC_adj annotations (other variants have AC):
@@ -59,7 +58,7 @@ def make_joint_genotyping_jobs(
     if utils.can_reuse([out_vcf_path, out_siteonly_vcf_path], overwrite):
         return [b.new_job('Joint genotyping [reuse]', job_attrs)]
 
-    if len(samples) == 0:
+    if len(gvcf_by_sid) == 0:
         raise ValueError(
             'Provided samples collection for joint calling should contain '
             'at least one active sample'
@@ -87,7 +86,6 @@ def make_joint_genotyping_jobs(
     # and use the version of function that passes a tarball around (`genomicsdb()`):
     import_gvcfs_jobs, genomicsdb_paths = genomicsdb(
         b=b,
-        samples=samples,
         tmp_bucket=tmp_bucket,
         gvcf_by_sid=gvcf_by_sid,
         intervals=intervals,
@@ -115,7 +113,7 @@ def make_joint_genotyping_jobs(
             b,
             genomicsdb_path=genomicsdb_path,
             overwrite=overwrite,
-            number_of_samples=len(samples),
+            number_of_samples=len(gvcf_by_sid),
             refs=refs,
             scatter_count=scatter_count,
             interval=interval,
@@ -128,7 +126,7 @@ def make_joint_genotyping_jobs(
         jc_vcf_j.depends_on(import_gvcfs_job)
 
         # For small callsets, we don't apply the ExcessHet filtering anyway
-        if len(samples) >= 1000 and do_filter_excesshet:
+        if len(gvcf_by_sid) >= 1000 and do_filter_excesshet:
             logger.info(f'Queueing exccess het filter job')
             exccess_filter_j, exccess_filter_jc_vcf = _add_exccess_het_filter(
                 b,
@@ -178,7 +176,6 @@ def make_joint_genotyping_jobs(
 
 def genomicsdb(
     b: hb.Batch,
-    samples: list[Sample],
     tmp_bucket: Path,
     gvcf_by_sid: dict[str, GvcfPath],
     intervals: list[hb.Resource],
@@ -192,7 +189,7 @@ def genomicsdb(
     genomicsdb_bucket = tmp_bucket / 'genomicsdbs'
     sample_map_bucket_path = genomicsdb_bucket / 'sample_map.csv'
     df = pd.DataFrame(
-        [{'id': s.id, 'path': str(gvcf_by_sid[s.id].path)} for s in samples]
+        [{'id': sid, 'path': str(path)} for sid, path in gvcf_by_sid.items()]
     )
     with sample_map_bucket_path.open('w') as fp:
         df.to_csv(fp, index=False, header=False, sep='\t')

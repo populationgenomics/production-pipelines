@@ -216,7 +216,6 @@ class JointCalling(CohortStage):
             b=self.pipe.b,
             out_vcf_path=self.expected_outputs(cohort)['vcf'],
             out_siteonly_vcf_path=self.expected_outputs(cohort)['siteonly_vcf'],
-            samples=cohort.get_samples(),
             gvcf_by_sid=gvcf_by_sid,
             refs=self.refs,
             sequencing_type=cohort.get_sequencing_type(),

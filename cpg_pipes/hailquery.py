@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 from typing import List, Optional, Union
 import hail as hl
+from hail.utils.java import Env
 
 from .refdata import RefData
 
@@ -24,6 +25,9 @@ def init_batch(billing_project: str, hail_bucket: Path | str):
     """
     Init Hail with Batch backend.
     """
+    # noinspection PyProtectedMember
+    if Env._hc:  # already initialised
+        return
     asyncio.get_event_loop().run_until_complete(
         hl.init_batch(
             default_reference=RefData.genome_build,

@@ -55,7 +55,6 @@ class JointGenotyping(CohortStage):
             b=self.b,
             out_vcf_path=self.expected_outputs(cohort)['vcf'],
             out_siteonly_vcf_path=self.expected_outputs(cohort)['siteonly'],
-            samples=cohort.get_samples(),
             tmp_bucket=self.tmp_bucket,
             gvcf_by_sid=gvcf_by_sid,
             refs=self.refs,
