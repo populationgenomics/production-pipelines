@@ -291,12 +291,12 @@ def make_vqsr_jobs(
                 snp_filter_level=SNP_HARD_FILTER_LEVEL,
                 indel_filter_level=INDEL_HARD_FILTER_LEVEL,
                 job_attrs=job_attrs,
-            ).recalibrated_vcf
+            ).output_vcf
             for idx in range(scatter_count)
         ]
         recalibrated_gathered_vcf_j, recalibrated_gathered_vcf = gather_vcfs(
             b,
-            input_vcfs=scattered_vcfs,
+            input_vcfs=[v['vcf.gz'] for v in scattered_vcfs],
             overwrite=overwrite,
             out_vcf_path=output_vcf_path,
             site_only=True,
