@@ -6,14 +6,10 @@ import logging
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
-from cpg_pipes import Path, images, utils, to_path
+from cpg_pipes import Path, images, to_path
 from cpg_pipes.hb.batch import hail_query_env
 from cpg_pipes.hb.command import wrap_command, python_command
-from cpg_pipes.query.seqr_loader import (
-    subset_mt_to_samples,
-    annotate_dataset_mt,
-    annotate_cohort,
-)
+from cpg_pipes.query import seqr_loader
 from cpg_pipes.refdata import RefData
 from cpg_pipes.types import SequencingType
 
@@ -40,7 +36,8 @@ def annotate_cohort_jobs(
     j.image(images.DRIVER_IMAGE)
     j.command(
         python_command(
-            annotate_cohort,
+            seqr_loader,
+            seqr_loader.annotate_cohort.__name__,
             str(vcf_path),
             str(siteonly_vqsr_vcf_path),
             str(vep_ht_path),
@@ -79,7 +76,8 @@ def annotate_dataset_jobs(
     subset_j.image(images.DRIVER_IMAGE)
     subset_j.command(
         python_command(
-            subset_mt_to_samples,
+            seqr_loader,
+            seqr_loader.subset_mt_to_samples.__name__,
             str(mt_path),
             sample_ids,
             str(subset_mt_path),
@@ -94,7 +92,8 @@ def annotate_dataset_jobs(
     annotate_j.image(images.DRIVER_IMAGE)
     annotate_j.command(
         python_command(
-            annotate_dataset_mt,
+            seqr_loader,
+            seqr_loader.annotate_dataset_mt.__name__,
             str(subset_mt_path),
             str(output_mt_path),
             str(tmp_bucket),

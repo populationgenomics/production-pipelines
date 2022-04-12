@@ -15,7 +15,7 @@ from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.hb.command import wrap_command, python_command
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs, subset_vcf
-from cpg_pipes.query.vep import vep_json_to_ht
+from cpg_pipes.query import vep as vep_module
 from cpg_pipes.refdata import RefData
 from cpg_pipes.types import SequencingType
 
@@ -23,7 +23,7 @@ from cpg_pipes.types import SequencingType
 logger = logging.getLogger(__file__)
 
 
-def vep(
+def vep_jobs(
     b: Batch,
     vcf_path: Path,
     refs: RefData,
@@ -132,7 +132,8 @@ def gather_vep_json_to_ht(
     j = b.new_job('VEP json to Hail table', job_attrs)
     j.image(images.DRIVER_IMAGE)
     cmd = python_command(
-        vep_json_to_ht,
+        vep_module,
+        vep_module.vep_json_to_ht.__name__,
         [str(p) for p in vep_results_paths],
         str(out_path),
         setup_gcp=True,

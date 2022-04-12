@@ -26,7 +26,10 @@ from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.pipeline import create_pipeline
 from cpg_pipes.types import CramPath, SequencingType
 
-import utils
+try:
+    import utils
+except ModuleNotFoundError:
+    from . import utils
 
 
 logger = logging.getLogger(__file__)
@@ -298,7 +301,7 @@ class TestJobs(unittest.TestCase):
             'gs://cpg-fewgenomes-test/unittest/inputs/chr20/vqsr.vcf.gz'
         )
         out_vcf_path = self.out_bucket / 'vep' / 'vep.vcf.gz'
-        jobs = vep.vep(
+        jobs = vep.vep_jobs(
             self.pipeline.b,
             vcf_path=site_only_vcf_path,
             refs=self.refs,

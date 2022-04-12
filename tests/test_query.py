@@ -5,6 +5,7 @@ Test Hail Query functions.
 import shutil
 import tempfile
 import unittest
+from pprint import pprint
 from unittest import skip
 
 import hail as hl
@@ -16,12 +17,16 @@ from cpg_pipes.query.seqr_loader import (
     annotate_cohort,
     subset_mt_to_samples,
     annotate_dataset_mt,
+    load_vqsr,
 )
 from cpg_pipes.query.vep import vep_json_to_ht
 from cpg_pipes.refdata import RefData
 from cpg_pipes.types import SequencingType, logger
 
-import utils
+try:
+    import utils
+except ModuleNotFoundError:
+    from . import utils
 
 
 class TestQuery(unittest.TestCase):
@@ -83,6 +88,26 @@ class TestQuery(unittest.TestCase):
         lof = ht.vep.transcript_consequences.lof.collect()[0][1]
         self.assertEqual(lof, 'LC')
         self.assertEqual(transcript, 'NM_001009923.2')
+
+    def test_export_vqsr_vcf(self):
+        """
+        Test exporting AS-VQSR site-only VCF (it's done test_seqr_loader_annotate_cohort),
+        but we want to test it separately.
+        """
+        siteonly_vqsr_path = to_path(
+            'gs://cpg-fewgenomes-test/unittest/inputs/vqsr_parse/siteonly-regions.vcf.gz'
+        )
+        ht = load_vqsr(str(siteonly_vqsr_path))
+        results = ht.info.collect()
+        pprint(results)
+        self.assertEqual(results[0].AS_FilterStatus, 'PASS')
+        self.assertEqual(results[1].AS_FilterStatus, 'VQSRTrancheINDEL99.50to99.90')
+        # Checking that AS-VQSR-used INFO/AS_* fields are parsed correctly
+        self.assertEqual(results[0].AS_ReadPosRankSum, -0.3)
+        self.assertEqual(results[0].AS_MQRankSum, -3.8)
+        self.assertEqual(results[1].AS_MQ, 11.37)
+        self.assertEqual(results[1].AS_FS, 3.592)
+        self.assertEqual(results[1].AS_SOR, 1.267)
 
     def test_seqr_loader_annotate_cohort(self):
         """

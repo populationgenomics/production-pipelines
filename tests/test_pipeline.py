@@ -6,6 +6,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import skip
 from unittest.mock import patch, Mock
 
 from cpg_pipes import Namespace, Path, to_path
@@ -13,13 +14,15 @@ from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes.providers.cpg import CpgStorageProvider
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
-from cpg_pipes.types import SequencingType, CramPath
+from cpg_pipes.types import CramPath
 
 # Importing `seqr_loader` will make pipeline use all its stages by default.
 from pipelines import seqr_loader
-from pipelines.seqr_loader import AnnotateDataset
 
-import utils
+try:
+    import utils
+except ModuleNotFoundError:
+    from . import utils
 
 
 class UnittestStorageProvider(CpgStorageProvider):
@@ -75,39 +78,12 @@ class TestPipeline(unittest.TestCase):
         """
         shutil.rmtree(self.local_tmp_dir)
 
-    # @staticmethod
-    # def _mock_joint_calling():
-    #     """
-    #     Mocking joint-calling outputs. Toy CRAM/GVCF don't produce enough variant data
-    #     for AS-VQSR to work properly: gatk would throw a "Bad input: Values for
-    #     AS_ReadPosRankSum annotation not detected for ANY training variant in the
-    #     input callset", like in this Batch:
-    #     https://batch.hail.populationgenomics.org.au/batches/46981/jobs/322.
-    #     So instead, we are using mocks to plug in a larger file here.
-    #     """
-    #     jc_vcf = utils.BASE_BUCKET / 'inputs/chr20/genotypegvcfs/joint-called.vcf.gz'
-    #     siteonly_vcf = to_path(str(jc_vcf).replace('.vcf.gz', '-siteonly.vcf.gz'))
-    #     from cpg_pipes.pipeline.pipeline import StageOutput
-    #
-    #     original_fn = StageOutput.as_path
-    #
-    #     def _mock_as_path(self_, id_=None):
-    #         if self_.stage.name == 'JointGenotyping':
-    #             d = {
-    #                 'vcf': jc_vcf,
-    #                 'siteonly': siteonly_vcf,
-    #             }
-    #             return d[id_] if id_ else d
-    #         return original_fn(self_, id_)
-    #
-    #     StageOutput.as_path = _mock_as_path
-
     def _setup_pipeline(
         self,
-        seq_type=SequencingType.WGS,
         first_stage: str | None = None,
         last_stage: str | None = None,
         realignment_shards_num: int = None,
+        intervals_path: Path | None = None,
         hc_intervals_num: int = None,
         jc_intervals_num: int = None,
         vep_intervals_num: int = None,
@@ -132,6 +108,7 @@ class TestPipeline(unittest.TestCase):
                 hc_intervals_num=hc_intervals_num or self.hc_intervals_num,
                 jc_intervals_num=jc_intervals_num or self.jc_intervals_num,
                 vep_intervals_num=vep_intervals_num or self.vep_intervals_num,
+                intervals_path=intervals_path,
             ),
         )
         self.datasets = [pipeline.create_dataset(utils.DATASET)]
@@ -139,7 +116,6 @@ class TestPipeline(unittest.TestCase):
             for s_id in self.sample_ids:
                 s = ds.add_sample(s_id, s_id)
                 s.alignment_input = CramPath(utils.TOY_CRAM_BY_SID[s.id])
-                s.sequencing_type = seq_type
         return pipeline
 
     def test_dry(self):
@@ -154,8 +130,7 @@ class TestPipeline(unittest.TestCase):
         pipeline = self._setup_pipeline()
 
         with patch('builtins.print') as mock_print:
-            result = pipeline.run(dry_run=True)
-            self.assertEqual('success', result.status()['state'])
+            pipeline.run(dry_run=True)
 
             # print() should be called only once:
             self.assertEqual(1, mock_print.call_count)
@@ -170,7 +145,9 @@ class TestPipeline(unittest.TestCase):
             """Number of lines that start with item"""
             return len([line for line in lines if line.strip().startswith(item)])
 
-        self.assertEqual(_cnt('bwa mem'), len(self.sample_ids) * 2)
+        self.assertEqual(
+            _cnt('bazam'), len(self.sample_ids) * self.realignment_shards_num
+        )
         self.assertEqual(
             _cnt('HaplotypeCaller'), len(self.sample_ids) * self.hc_intervals_num
         )
@@ -178,35 +155,41 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(_cnt('GenotypeGVCFs'), self.jc_intervals_num)
         self.assertEqual(_cnt('GenomicsDBImport'), self.jc_intervals_num)
         self.assertEqual(_cnt('MakeSitesOnlyVcf'), self.jc_intervals_num)
-        self.assertEqual(_cnt('VariantRecalibrator'), 2)
-        self.assertEqual(_cnt('ApplyVQSR'), 2)
-        self.assertEqual(_cnt('GatherVcfsCloud'), 2)
+        # Indel + SNP create model + SNP scattered
+        self.assertEqual(_cnt('VariantRecalibrator'), 2 + self.jc_intervals_num)
+        # Twice to each interva: apply indels, apply SNPs
+        self.assertEqual(_cnt('ApplyVQSR'), 2 * self.jc_intervals_num)
+        # Gather JC, gather siteonly JC, gather VQSR
+        self.assertEqual(_cnt('GatherVcfsCloud'), 3)
         self.assertEqual(_cnt('vep '), self.vep_intervals_num)
         self.assertEqual(_cnt('vep_json_to_ht('), 1)
         self.assertEqual(_cnt('annotate_cohort('), 1)
         self.assertEqual(_cnt('annotate_dataset_mt('), len(self.datasets))
         self.assertEqual(_cnt('hailctl dataproc submit'), 1)
 
+    @skip('Running only dry tests in ths module')
     def test_joint_calling(self):
         """
         Stages up to joint calling.
         """
         pipeline = self._setup_pipeline(
             last_stage=JointGenotyping.__name__,
-            seq_type=SequencingType.TOY,
+            intervals_path=utils.BASE_BUCKET
+            / 'inputs/exome1pct/calling_regions.interval_list',
         )
         result = pipeline.run(dry_run=False, wait=True)
         self.assertEqual('success', result.status()['state'])
 
+    @skip('Running only dry tests in ths module. VEP runs too long')
     def test_after_joint_calling(self):
         """
-        Stages after joint-calling (running separately, because
-        VQSR needs more inputs than provided by toy regions)
+        VQSR needs more inputs than provided by toy regions.
         """
         pipeline = self._setup_pipeline(
             first_stage=Vqsr.__name__,
-            last_stage=AnnotateDataset.__name__,
-            seq_type=SequencingType.WGS,
+            last_stage=Vqsr.__name__,
+            intervals_path=utils.BASE_BUCKET
+            / 'inputs/exome5pct/calling_regions.interval_list',
         )
         # Mocking joint-calling outputs. Toy CRAM/GVCF don't produce enough variant
         # data for AS-VQSR to work properly: gatk would throw a "Bad input: Values for
@@ -214,8 +197,7 @@ class TestPipeline(unittest.TestCase):
         # input callset", like in this Batch:
         # https://batch.hail.populationgenomics.org.au/batches/46981/jobs/322.
         # So instead, we are copying a larger file into JointGenotyping expected output.
-        # jc_vcf = utils.BASE_BUCKET / 'inputs/chr20/genotypegvcfs/joint-called.vcf.gz'
-        jc_vcf = utils.BASE_BUCKET / 'inputs/exome/9samples-joint-called.vcf.gz'
+        jc_vcf = utils.BASE_BUCKET / 'inputs/exome5pct/9samples-joint-called.vcf.gz'
 
         siteonly_vcf = to_path(str(jc_vcf).replace('.vcf.gz', '-siteonly.vcf.gz'))
         expected_output = JointGenotyping(pipeline).expected_outputs(pipeline.cohort)

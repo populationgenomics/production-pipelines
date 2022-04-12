@@ -26,10 +26,10 @@ def get_intervals(
 ) -> tuple[Job, list[hb.Resource]]:
     """
     Add a job that split genome into intervals to parallelise variant calling.
-    
+
     As input interval file, takes intervals_path if provided, otherwise checks refs
     for the intervals of provided sequencing_type.
-    
+
     This job calls picard's IntervalListTools to scatter the input interval list
     into scatter_count sub-interval lists, inspired by this WARP task :
     https://github.com/broadinstitute/warp/blob/bc90b0db0138747685b459c83ce52c8576ce03cd/tasks/broad/Utilities.wdl

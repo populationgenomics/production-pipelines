@@ -67,7 +67,8 @@ EOT\
 
 
 def python_command(
-    func: Callable,
+    module,
+    func_name: str,
     *func_args,
     setup_gcp: bool = False,
     hail_billing_project: str | None = None,
@@ -99,8 +100,8 @@ asyncio.get_event_loop().run_until_complete(
 )
 """
         python_cmd += f"""
-{textwrap.dedent(inspect.getsource(func))}
-{func.__name__}{func_args}
+{textwrap.dedent(inspect.getsource(module))}
+{func_name}{func_args}
 """
     cmd = f"""
 set -o pipefail

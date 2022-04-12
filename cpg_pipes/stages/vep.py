@@ -26,7 +26,7 @@ class Vep(CohortStage):
         """
         Submit jobs.
         """
-        jobs = vep.vep(
+        jobs = vep.vep_jobs(
             self.b,
             vcf_path=inputs.as_path(cohort, stage=Vqsr),
             refs=self.refs,

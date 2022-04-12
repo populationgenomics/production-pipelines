@@ -8,6 +8,116 @@ import hail as hl
 logger = logging.getLogger(__file__)
 
 
+def _split_info_annotation(
+    info_expr: hl.expr.StructExpression, a_index: hl.expr.Int32Expression
+) -> hl.expr.StructExpression:
+    """
+    Split multi-allelic allele-specific info fields.
+    Borrowed from "from gnomad.utils.sparse_mt import split_info_annotation",
+    but additionally ignores AS_RAW_* fields.
+    """
+    # Index AS annotations
+    fields = [
+        f
+        for f in info_expr
+        if f.startswith('AC')
+        or (
+            f.startswith('AS_')
+            and not f == 'AS_SB_TABLE'
+            and not f.startswith('AS_RAW_')
+        )
+    ]
+    info_expr = info_expr.annotate(
+        **{f: info_expr[f][a_index - 1] for f in fields},
+        AS_SB_TABLE=info_expr.AS_SB_TABLE[0].extend(info_expr.AS_SB_TABLE[a_index]),
+    )
+    return info_expr
+
+
+def load_vqsr(site_only_vqsr_vcf_path: str, genome_build: str = 'GRCh38'):
+    """
+    Loads the VQSR'ed site-only VCF into a site-only hail table.
+    Populates "ht.filters".
+    """
+    logger.info(
+        f'AS-VQSR: importing annotations from a site-only VCF '
+        f'{site_only_vqsr_vcf_path}'
+    )
+    ht = hl.import_vcf(
+        str(site_only_vqsr_vcf_path),
+        force_bgz=True,
+        reference_genome=genome_build,
+    ).rows()
+
+    # Some AS annotations are not correctly represented in the VCF to be parsed
+    # as lists by Hail, so reparsing them here. Also, some annotations are not
+    # correctly parsed as numbers, so converting them to floats here.
+    ht = ht.annotate(
+        info=ht.info.annotate(
+            AS_QUALapprox=hl.if_else(
+                ht.info.AS_QUALapprox.contains('|'),
+                ht.info.AS_QUALapprox.split(r'\|')[1:].map(hl.int),
+                ht.info.AS_QUALapprox.split(r',')[1:].map(hl.int),
+            ),
+            AS_VarDP=ht.info.AS_VarDP.split(r'\|')[1:].map(hl.int),
+            AS_SB_TABLE=ht.info.AS_SB_TABLE.split(r'\|').map(
+                lambda x: hl.if_else(
+                    x == '',
+                    hl.missing(hl.tarray(hl.tint32)),
+                    x.split(',').map(hl.int),
+                )
+            ),
+            AS_VQSLOD=ht.info.AS_VQSLOD.map(hl.float),
+            InbreedingCoeff=hl.float(ht.info.InbreedingCoeff),
+            AS_InbreedingCoeff=ht.info.AS_InbreedingCoeff.map(hl.float),
+            AC_adj=hl.missing('array<int32>'),
+        )
+    )
+    logger.info(f'AS-VQSR: splitting multiallelics...')
+    unsplit_count = ht.count()
+    ht = hl.split_multi_hts(ht)
+
+    ht = ht.annotate(
+        info=ht.info.annotate(**_split_info_annotation(ht.info, ht.a_index)),
+    )
+    # Annotating filters separately because they depend on info
+    ht = ht.annotate(
+        filters=ht.filters.union(hl.set([ht.info.AS_FilterStatus])).filter(
+            lambda val: val != 'PASS'
+        ),
+    )
+    split_count = ht.count()
+    logger.info(
+        f'AS-VQSR: Found {unsplit_count} unsplit and {split_count} split variants '
+        f'with AS-VQSR annotations'
+    )
+
+    logger.info(f'AS-VQSR: fixing AS-* fields')
+    # Some AS annotations can be NaN or Inifinite. E.g. AS_VQSLOD can be "Infinity"
+    # for indels:
+    #   AS_VQSLOD=30.0692,18.2979,Infinity,17.5854,42.2131,1.5013
+    #   gs://cpg-seqr-main-tmp/seqr_loader/v0/AnnotateCohort/seqr_loader/checkpoints/vqsr.ht
+    #   ht = hl.filter_intervals(ht, [hl.parse_locus_interval('chrX:52729395-52729396')])
+    # Hail's hl.float() correctly parses this value, however, seqr loader doesn't
+    # recognise infs and nans, so we need to replace it with zero. hl.is_finite()
+    # returns False for NaNs and Infs.
+    # Example of NaN: https://batch.hail.populationgenomics.org
+    # .au/batches/6973/jobs/12
+
+    def _fix_inf(x):
+        return hl.if_else(hl.is_finite(x), x, 0.0)
+
+    ht = ht.annotate(
+        info=ht.info.annotate(
+            AS_VQSLOD=_fix_inf(ht.info.AS_VQSLOD),
+            AS_MQ=_fix_inf(ht.info.AS_MQ),
+            InbreedingCoeff=_fix_inf(ht.info.InbreedingCoeff),
+            AS_InbreedingCoeff=_fix_inf(ht.info.AS_InbreedingCoeff),
+        )
+    )
+    return ht
+
+
 def annotate_cohort(
     vcf_path,
     site_only_vqsr_vcf_path,
@@ -47,7 +157,7 @@ def annotate_cohort(
     # and hl.split_multi_hts can handle multiallelic VEP field.
     vep_ht = hl.read_table(str(vep_ht_path))
     logger.info(f'Adding VEP annotations into the Matrix Table from {vep_ht_path}')
-    mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
+    mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep_jobs)
 
     # Splitting multi-allellics. We do not handle AS info fields here - we handle
     # them when loading VQSR instead, and populate entrie "info" from VQSR.
@@ -56,86 +166,9 @@ def annotate_cohort(
     )
     mt = _checkpoint(mt, 'mt-vep-split.mt')
 
-    def load_vqsr(site_only_vqsr_vcf_path_):
-        """
-        Loads the VQSR'ed site-only VCF into a site-only hail table.
-        Populates "ht.filters".
-        """
-        logger.info(
-            f'AS-VQSR: importing annotations from a site-only VCF '
-            f'{site_only_vqsr_vcf_path_}'
-        )
-        ht = hl.import_vcf(
-            str(site_only_vqsr_vcf_path_),
-            force_bgz=True,
-            reference_genome=genome_build,
-        ).rows()
+    vqsr_ht = load_vqsr(site_only_vqsr_vcf_path, genome_build)
+    vqsr_ht = _checkpoint(vqsr_ht, 'vqsr.ht')
 
-        # Some AS annotations are not correctly represented in the VCF to be parsed
-        # as lists by Hail, so reparsing them here. Also, some annotations are not
-        # correctly parsed as numbers, so converting them to floats here.
-        ht = ht.annotate(
-            info=ht.info.annotate(
-                AS_QUALapprox=ht.info.AS_QUALapprox.split(r'\|')[1:].map(hl.int),
-                AS_VarDP=ht.info.AS_VarDP.split(r'\|')[1:].map(hl.int),
-                AS_SB_TABLE=ht.info.AS_SB_TABLE.split(r'\|').map(
-                    lambda x: hl.if_else(
-                        x == '',
-                        hl.missing(hl.tarray(hl.tint32)),
-                        x.split(',').map(hl.int),
-                    )
-                ),
-                AS_VQSLOD=ht.info.AS_VQSLOD.map(hl.float),
-                InbreedingCoeff=hl.float(ht.info.InbreedingCoeff),
-                AS_InbreedingCoeff=ht.info.AS_InbreedingCoeff.map(hl.float),
-            )
-        )
-        logger.info(f'AS-VQSR: splitting multiallelics...')
-        unsplit_count = ht.count()
-        ht = hl.split_multi_hts(ht)
-        from gnomad.utils.sparse_mt import split_info_annotation
-
-        ht = ht.annotate(
-            info=ht.info.annotate(**split_info_annotation(ht.info, ht.a_index)),
-        )
-        # Annotating filters separately because they depend on info
-        ht = ht.annotate(
-            filters=ht.filters.union(hl.set([ht.info.AS_FilterStatus])).filter(
-                lambda val: val != 'PASS'
-            ),
-        )
-        split_count = ht.count()
-        logger.info(
-            f'AS-VQSR: Found {unsplit_count} unsplit and {split_count} split variants '
-            f'with AS-VQSR annotations'
-        )
-
-        logger.info(f'AS-VQSR: fixing AS-* fields')
-        # Some AS annotations can be NaN or Inifinite. E.g. AS_VQSLOD can be "Infinity"
-        # for indels:
-        #   AS_VQSLOD=30.0692,18.2979,Infinity,17.5854,42.2131,1.5013
-        #   gs://cpg-seqr-main-tmp/seqr_loader/v0/AnnotateCohort/seqr_loader/checkpoints/vqsr.ht
-        #   ht = hl.filter_intervals(ht, [hl.parse_locus_interval('chrX:52729395-52729396')])
-        # Hail's hl.float() correctly parses this value, however, seqr loader doesn't
-        # recognise infs and nans, so we need to replace it with zero. hl.is_finite()
-        # returns False for NaNs and Infs.
-        # Example of NaN: https://batch.hail.populationgenomics.org
-        # .au/batches/6973/jobs/12
-
-        def _fix_inf(x):
-            return hl.if_else(hl.is_finite(x), x, 0.0)
-
-        ht = ht.annotate(
-            info=ht.info.annotate(
-                AS_VQSLOD=_fix_inf(ht.info.AS_VQSLOD),
-                AS_MQ=_fix_inf(ht.info.AS_MQ),
-                InbreedingCoeff=_fix_inf(ht.info.InbreedingCoeff),
-                AS_InbreedingCoeff=_fix_inf(ht.info.AS_InbreedingCoeff),
-            )
-        )
-        return _checkpoint(ht, 'vqsr.ht')
-
-    vqsr_ht = load_vqsr(site_only_vqsr_vcf_path)
     logger.info('Adding VQSR annotations into the Matrix Table')
     mt = mt.annotate_globals(**vqsr_ht.index_globals())
     mt = mt.annotate_rows(
@@ -178,7 +211,7 @@ def annotate_cohort(
             mt.locus_old, mt.alleles_old
         ),
         sortedTranscriptConsequences=vep.get_expr_for_vep_sorted_transcript_consequences_array(
-            mt.vep
+            mt.vep_jobs
         ),
         variantId=variant_id.get_expr_for_variant_id(mt),
         contig=variant_id.get_expr_for_contig(mt.locus),
