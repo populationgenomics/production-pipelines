@@ -92,7 +92,10 @@ class StorageProvider(ABC):
         sample: str = None,
     ) -> Path:
         """
-        Bucket shared with an HTTP server.
+        Bucket shared with an HTTP server. `get_web_url()` with same parameters 
+        should return corresponding URL.
+        Inspired by the CPG storage policy: 
+        https://github.com/populationgenomics/team-docs/blob/main/storage_policies/README.md#web-gscpg-dataset-maintest-web
         """
         return self.get_bucket(
             dataset=dataset,
