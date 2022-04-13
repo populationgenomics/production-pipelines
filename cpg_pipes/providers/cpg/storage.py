@@ -61,7 +61,7 @@ class CpgStorageProvider(StorageProvider):
         """
         URL corresponding to the WEB bucket.
         """
-        url = f'https://{namespace.value}-web.populationgenomics.org.au/' f'{dataset}'
+        url = f'https://{namespace.value}-web.populationgenomics.org.au/{dataset}'
         if version:
             url += f'/{version}'
         if sample:
