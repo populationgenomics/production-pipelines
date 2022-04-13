@@ -24,8 +24,7 @@ class StatusReporterError(Exception):
 class AnalysisStatus(Enum):
     """
     Corresponds to SMDB Analysis statuses:
-    https://github.com/populationgenomics/sample-metadata/blob/dev/models/enums
-    /analysis.py#L14-L21
+    https://github.com/populationgenomics/sample-metadata/blob/dev/models/enums/analysis.py#L14-L21
     """
 
     QUEUED = 'queued'
