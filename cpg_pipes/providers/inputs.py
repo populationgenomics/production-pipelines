@@ -403,9 +403,9 @@ class CsvInputProvider(InputProvider):
                         'must match.'
                     )
                 if self.check_files:
-                    for fq in fqs1 + fqs2:
-                        if not exists(fq):
-                            raise InputProviderError(f'FQ {fq} does not exist')
+                    missing_fastqs = [fq for fq in fqs1 + fqs2 if not exists(fq)]:
+                    if missing_fastqs:
+                        raise InputProviderError(f'FQs {missing_fastqs} does not exist')
                 d_by_sid[sid] = [FastqPair(fq1, fq2) for fq1, fq2 in zip(fqs1, fqs2)]
             elif cram:
                 if self.check_files:
