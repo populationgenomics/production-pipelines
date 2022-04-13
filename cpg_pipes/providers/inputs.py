@@ -397,7 +397,7 @@ class CsvInputProvider(InputProvider):
             ]
             cram = entry.get(FieldMap.cram.value, None)
             if fqs1:
-                if len(fqs1) != len(fqs1):
+                if len(fqs1) != len(fqs2):
                     raise InputProviderError(
                         'Numbers of fqs_r1 and fqs_r2 values (pipe-separated) '
                         'must match.'
