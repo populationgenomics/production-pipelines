@@ -75,7 +75,7 @@ class SmdbStatusReporter(StatusReporter):
 
         in_progress_j.depends_on(jobs[0])
         completed_j.depends_on(*jobs)
-        return [in_progress_j] + jobs + [completed_j]
+        return [in_progress_j, *jobs, completed_j]
 
     @staticmethod
     def add_status_updater_job(
@@ -93,8 +93,7 @@ class SmdbStatusReporter(StatusReporter):
         except ValueError:
             raise SmdbError('Analysis ID for sample-metadata must be int')
 
-        job_name = ''
-        job_name += f'Update status to {status.value}'
+        job_name = f'Update status to {status.value}'
         if analysis_type:
             job_name += f' (for {analysis_type})'
 
@@ -102,8 +101,6 @@ class SmdbStatusReporter(StatusReporter):
         j.image(images.SM_IMAGE)
         cmd = dedent(
             f"""\
-        export SM_ENVIRONMENT=PRODUCTION
-
         cat <<EOT >> update.py
         from sample_metadata.apis import AnalysisApi
         from sample_metadata.models import AnalysisUpdateModel, AnalysisStatus

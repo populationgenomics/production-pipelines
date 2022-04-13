@@ -170,7 +170,7 @@ class InputProvider(ABC):
         for s in cohort.get_samples():
             sample_by_participant_id[s.participant_id] = s
 
-        for _, ped_file in enumerate(ped_files):
+        for ped_file in ped_files:
             with ped_file.open() as f:
                 for line in f:
                     fields = line.strip().split('\t')[:6]
@@ -255,7 +255,7 @@ class InputProvider(ABC):
 
 class FieldMap(Enum):
     """
-    CSV field names.
+    CSV/TSV field names.
     """
 
     dataset = 'dataset'
@@ -271,7 +271,7 @@ class FieldMap(Enum):
 
 class CsvInputProvider(InputProvider):
     """
-    Input provider that parses data from a CSV file.
+    Input provider that parses data from a CSV/TSV file.
     """
 
     def __init__(self, fp, *args, **kwargs):
@@ -279,10 +279,10 @@ class CsvInputProvider(InputProvider):
 
         self.d = list(csv.DictReader(fp))
         if len(self.d) == 0:
-            raise InputProviderError('Empty metadata TSV')
+            raise InputProviderError('Empty metadata file')
         if 'sample' not in self.d[0]:
             raise InputProviderError(
-                f'Metadata TSV must have a header and a column "sample", '
+                f'Metadata file must have a header and a column "sample", '
                 f'got: {self.d[0]}'
             )
 
@@ -397,15 +397,15 @@ class CsvInputProvider(InputProvider):
             ]
             cram = entry.get(FieldMap.cram.value, None)
             if fqs1:
-                if len(fqs1) != len(fqs1):
+                if len(fqs1) != len(fqs2):
                     raise InputProviderError(
                         'Numbers of fqs_r1 and fqs_r2 values (pipe-separated) '
                         'must match.'
                     )
                 if self.check_files:
-                    for fq in fqs1 + fqs2:
-                        if not exists(fq):
-                            raise InputProviderError(f'FQ {fq} does not exist')
+                    missing_fastqs = [fq for fq in (fqs1 + fqs2) if not exists(fq)]
+                    if missing_fastqs:
+                        raise InputProviderError(f'FQs {missing_fastqs} does not exist')
                 d_by_sid[sid] = [FastqPair(fq1, fq2) for fq1, fq2 in zip(fqs1, fqs2)]
             elif cram:
                 if self.check_files:
