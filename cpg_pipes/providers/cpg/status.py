@@ -75,7 +75,7 @@ class SmdbStatusReporter(StatusReporter):
 
         in_progress_j.depends_on(jobs[0])
         completed_j.depends_on(*jobs)
-        return [in_progress_j] + jobs + [completed_j]
+        return [in_progress_j, *jobs, completed_j]
 
     @staticmethod
     def add_status_updater_job(
