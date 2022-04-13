@@ -68,7 +68,6 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
         self.assertEqual(s2.pedigree.sex, Sex.UNKNOWN)
         self.assertEqual(s2.sequencing_type, SequencingType.EXOME)
 
-    @skip('Figure out SMDB permissions from GitHub workflows')
     def test_smdb_provider(self):
         """
         Test sample-metadata input provider.
