@@ -93,8 +93,7 @@ class SmdbStatusReporter(StatusReporter):
         except ValueError:
             raise SmdbError('Analysis ID for sample-metadata must be int')
 
-        job_name = ''
-        job_name += f'Update status to {status.value}'
+        job_name = f'Update status to {status.value}'
         if analysis_type:
             job_name += f' (for {analysis_type})'
 
