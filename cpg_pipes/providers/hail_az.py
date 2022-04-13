@@ -53,7 +53,10 @@ class HailAzureBlobPath(AzureBlobPath):
             fstype = m.group('type') or 'blob'
             account_url = f'https://{account}.{fstype}.core.windows.net/'
             optional_type = '' if fstype == 'blob' else '.' + fstype
-            cloud_path = f"{HailAzureBlobPath.cloud_prefix}{account}{optional_type}/{parsed.path.lstrip('/')}"
+            cloud_path = (
+                f'{HailAzureBlobPath.cloud_prefix}{account}{optional_type}/'
+                f'{parsed.path.lstrip("/")}'
+            )
             if (
                 client is None
                 or parsed.query

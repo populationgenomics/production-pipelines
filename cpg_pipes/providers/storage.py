@@ -1,7 +1,7 @@
 """
 Abstract storage provider.
 """
-
+import os
 import pathlib
 from enum import Enum
 from abc import ABC, abstractmethod
@@ -35,21 +35,28 @@ class Cloud(Enum):
     """
 
     GS = 'gs'
-    AZ = 'az'
+    HAIL_AZ = 'hail-az'
 
 
 class StorageProvider(ABC):
     """
-    Abstract class for implementing storage bucket policy.
-    Onty get_bucket() method is required, however other methods
-    are available to override as well.
+    Abstract class for implementing storage path policy.
+    Onty get_base() method is required, however other methods are available to 
+    override as well.
     """
 
-    def __init__(self, cloud: Cloud):
+    def __init__(
+        self, 
+        cloud: Cloud, 
+        az_account: str | None = None,
+        az_container: str | None = None,
+    ):
         self.cloud = cloud
+        self.az_account = az_account or os.environ.get('STORAGE_ACCOUNT_NAME')
+        self.az_container = az_container or os.environ.get('STORAGE_CONTAINER_NAME')
 
     @abstractmethod
-    def get_bucket(
+    def get_base(
         self,
         dataset: str,
         namespace: Namespace,
@@ -58,7 +65,7 @@ class StorageProvider(ABC):
         sample: str = None,
     ) -> Path:
         """
-        Bucket to write primary results.
+        Base path for primary results.
         @param dataset: dataset/stack name
         @param namespace: namespace (test or main)
         @param suffix: (optional) suffix to append to the bucket name
@@ -66,7 +73,7 @@ class StorageProvider(ABC):
         @param sample: (optional) sample name
         """
 
-    def get_tmp_bucket(
+    def get_tmp_base(
         self,
         dataset: str,
         namespace: Namespace,
@@ -74,9 +81,9 @@ class StorageProvider(ABC):
         sample: str = None,
     ) -> Path:
         """
-        Bucket to write temporary files.
+        Base path for temporary files.
         """
-        return self.get_bucket(
+        return self.get_base(
             dataset=dataset,
             namespace=namespace,
             version=version,
@@ -84,7 +91,7 @@ class StorageProvider(ABC):
             suffix='tmp',
         )
 
-    def get_web_bucket(
+    def get_web_base(
         self,
         dataset: str,
         namespace: Namespace,
@@ -92,12 +99,12 @@ class StorageProvider(ABC):
         sample: str = None,
     ) -> Path:
         """
-        Bucket shared with an HTTP server. `get_web_url()` with same parameters 
-        should return corresponding URL.
-        Inspired by the CPG storage policy: 
+        Path base corresponding to the HTTP server. Used to expose files in web:
+        `get_web_url()` with same parameters should return a HTTP URL matching this 
+        object. Inspired by the CPG storage policy: 
         https://github.com/populationgenomics/team-docs/blob/main/storage_policies/README.md#web-gscpg-dataset-maintest-web
         """
-        return self.get_bucket(
+        return self.get_base(
             dataset=dataset,
             namespace=namespace,
             version=version,
@@ -118,7 +125,7 @@ class StorageProvider(ABC):
         """
 
     @abstractmethod
-    def get_ref_bucket(self) -> Path:
+    def get_ref_base(self) -> Path:
         """
         Prefix for reference data.
         """

@@ -73,7 +73,7 @@ def create_pipeline(
         name=name,
         storage_provider=storage_provider,
     )
-    refs = RefData(storage_provider.get_ref_bucket())
+    refs = RefData(storage_provider.get_ref_base())
 
     status_reporter: StatusReporter | None = None
     input_provider: InputProvider | None = None
@@ -107,7 +107,7 @@ def create_pipeline(
             description += ': ' + ', '.join(datasets_)
 
     tmp_bucket = to_path(
-        cohort.analysis_dataset.get_tmp_bucket(
+        cohort.analysis_dataset.get_tmp_base(
             version=(name + (f'/{version}' if version else ''))
         )
     )
