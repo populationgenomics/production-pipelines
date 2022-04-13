@@ -1,5 +1,5 @@
 """
-Testing CSV inputs provider. CSV file must contain one required column "sample".
+Testing inputs providers.
 """
 import unittest
 from io import StringIO
@@ -15,10 +15,14 @@ from cpg_pipes.types import SequencingType
 
 class TestInputProvider(unittest.TestCase):
     """
-    Test CSV input metadata provider.
+    Testing inputs providers.
     """
 
     def test_csv_provider(self):
+        """
+        Test CSV/CSV input metadata provider. A file must contain one required
+        column "sample".
+        """
         dataset = 'fewgenomes'
         sample1 = 'CPG01'
         sample2 = 'CPG02'
@@ -66,6 +70,9 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
 
     @skip('Figure out SMDB permissions from GitHub workflows')
     def test_smdb_provider(self):
+        """
+        Test sample-metadata input provider.
+        """
         dataset = 'acute-care'
 
         input_provider = SmdbInputProvider(SMDB())

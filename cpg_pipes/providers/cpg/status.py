@@ -101,8 +101,6 @@ class SmdbStatusReporter(StatusReporter):
         j.image(images.SM_IMAGE)
         cmd = dedent(
             f"""\
-        export SM_ENVIRONMENT=PRODUCTION
-
         cat <<EOT >> update.py
         from sample_metadata.apis import AnalysisApi
         from sample_metadata.models import AnalysisUpdateModel, AnalysisStatus
