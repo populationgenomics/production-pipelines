@@ -216,6 +216,6 @@ def seds_to_extend_sample_ids(
         if sid != new_sid:
             new_id = f'{sid}|{new_sid}'
             for fname in fnames:
-                cmd += f'sed -i \'s/{sid}/{new_id}/g\' {fname}'
+                cmd += f'sed -iBAK \'s/{sid}/{new_id}/g\' {fname}'
                 cmd += '\n'
     return cmd

@@ -44,7 +44,7 @@ class CramSomalier(SampleStage):
         return self.make_outputs(sample, data=expected_path, jobs=[j])
 
 
-@stage(required_stages=CramSomalier)
+@stage(required_stages=CramSomalier, forced=True)
 class CramSomalierPedigree(DatasetStage):
     """
     Checks pedigree from CRAM fingerprints.
@@ -100,7 +100,7 @@ class CramSomalierPedigree(DatasetStage):
         )
 
 
-@stage(required_stages=CramSomalier)
+@stage(required_stages=CramSomalier, forced=True)
 class CramSomalierAncestry(DatasetStage):
     """
     Checks pedigree from CRAM fingerprints

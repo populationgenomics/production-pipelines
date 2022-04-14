@@ -23,7 +23,7 @@ def main(
     Entry point, decorated by pipeline click options.
     """
     pipeline = create_pipeline(
-        name='CRAM+GVCF+QC',
+        name='cram_gvcf',
         stages=[Align, GenotypeSample],
         **kwargs,
     )

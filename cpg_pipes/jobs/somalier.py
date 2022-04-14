@@ -219,11 +219,13 @@ def check_pedigree_job(
     script_path = to_path(check_pedigree.__file__)
     script_name = script_path.name
     cmd = f"""\
+    pip3 install peddy slack_sdk google-cloud-secret-manager
     {seds_to_extend_sample_ids(external_id_map, [samples_file, pairs_file])}
     python3 {script_name} \\
     --somalier-samples {samples_file} \
     --somalier-pairs {pairs_file} \
-    {('--somalier-html ' + somalier_html_url) if somalier_html_url else ''}
+    {('--somalier-html ' + somalier_html_url) if somalier_html_url else ''} \
+    --slack
 
     touch {check_j.output}
     """

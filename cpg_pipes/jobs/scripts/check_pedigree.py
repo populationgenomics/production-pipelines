@@ -2,22 +2,30 @@
 
 """
 This script parses "somalier relate" (https://github.com/brentp/somalier) outputs,
-and returns a non-zero code if either sex or pedigree mismatches the data in a 
-provided PED file.
+and returns a report whether sex and pedigree matches the provided PED file.
+
+You can have report sent to channel. To do that, add "Seqr Loader" app into a channel:
+
+```
+/invite @Seqr Loader
+```
+
+And run the script with `--slack-channel channel_name`
 """
 
 import contextlib
 import logging
-import sys
-from typing import Optional, Dict
-import click
+import os
+from typing import Optional
 from io import StringIO
+import click
+import slack_sdk
+from google.cloud import secretmanager
 from peddy import Ped
 import pandas as pd
+from slack_sdk.errors import SlackApiError
 
-logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 @click.command()
@@ -38,38 +46,102 @@ logger.setLevel(logging.INFO)
     'somalier_html_fpath',
     help='Path to somalier {prefix}.html output file',
 )
+@click.option(
+    '--slack-channel',
+    'slack_channel',
+    help='Send results to a Slack channel.'
+)
 def main(
     somalier_samples_fpath: str,
     somalier_pairs_fpath: str,
     somalier_html_fpath: Optional[str],
+    slack_channel: str,
 ):
     """
     Report pedigree inconsistencies, given somalier outputs.
     """
-    check_pedigree(
+    result = check_pedigree(
         somalier_samples_fpath,
         somalier_pairs_fpath,
         somalier_html_fpath,
     )
+    if slack_channel:
+        secret_manager = secretmanager.SecretManagerServiceClient()
+        project_id = 'cpg-common'
+        secret_name = 'slack-seqr-loader-token'
+        path = f'projects/{project_id}/secrets/{secret_name}/versions/latest'
+        # noinspection PyTypeChecker
+        response = secret_manager.access_secret_version(request={'name': path})
+        slack_token = response.payload.data.decode('UTF-8')
+        slack_client = slack_sdk.WebClient(token=slack_token)
+        try:
+            slack_client.api_call(  # pylint: disable=duplicate-code
+                'chat.postMessage',
+                json={
+                    'channel': slack_channel,
+                    'text': '\n'.join(result.messages),
+                },
+            )
+        except SlackApiError as err:
+            logging.error(f'Error posting to Slack: {err}')
+
+
+class PedigreeLogger:
+    """
+    Recording messages to send a report to Slack.
+    """
+    def __init__(self):
+        self.mismatching_sex = False
+        self.mismatching_relationships = False
+        self.messages: list[str] = []
+        logger = logging.getLogger(__file__)
+        logger.setLevel(logging.INFO)
+        self._logger = logger
+
+    def info(self, msg):
+        """
+        Record and forward.
+        """
+        self.messages.append(msg)
+        self._logger.info(msg)
+        
+    def warning(self, msg):
+        """
+        Record and forward.
+        """
+        self.messages.append(msg)
+        self._logger.info(msg)
+
+    def error(self, msg):
+        """
+        Record and forward.
+        """
+        self.messages.append(msg)
+        self._logger.error(msg)
 
 
 def check_pedigree(
     somalier_samples_fpath: str,
     somalier_pairs_fpath: str,
     somalier_html_fpath: Optional[str] = None,
-):
+) -> PedigreeLogger:
     """
     Report pedigree inconsistencies, given somalier outputs.
     """
-    ped, df, pairs_df = _parse_inputs(
-        somalier_samples_fpath, somalier_pairs_fpath
-    )
+    print(os.getcwd())
+    print(somalier_samples_fpath)
+    df = pd.read_csv(somalier_samples_fpath, delimiter='\t')
+    pairs_df = pd.read_csv(somalier_pairs_fpath, delimiter='\t')
+    fp = StringIO()
+    df.to_csv(fp, sep='\t', index=False)
+    ped = Ped(StringIO(fp.getvalue()))
+    
+    logger = PedigreeLogger()
 
     bad_samples = list(df[df.gt_depth_mean == 0.0].sample_id)
     if bad_samples:
         logger.warning(
-            f'Excluding samples with non enough coverage to make inference: '
-            f'{", ".join(bad_samples)}'
+            f'Excluding samples with zero coverage: {", ".join(bad_samples)}'
         )
     logger.info('-' * 10)
 
@@ -183,26 +255,16 @@ def check_pedigree(
 
     logger.info('-' * 10)
     print_info(
+        logger,
         df,
         pairs_df,
         somalier_samples_fpath,
         somalier_pairs_fpath,
         somalier_html_fpath,
     )
-    if mismatching_sex.any() or other_mismatching_pairs:
-        sys.exit(1)
-
-
-def _parse_inputs(
-    somalier_samples_fpath,
-    somalier_pairs_fpath,
-):
-    df = pd.read_csv(somalier_samples_fpath, delimiter='\t')
-    pairs_df = pd.read_csv(somalier_pairs_fpath, delimiter='\t')
-    fp = StringIO()
-    df.to_csv(fp, sep='\t', index=False)
-    ped = Ped(StringIO(fp.getvalue()))
-    return ped, df, pairs_df
+    logger.mismatching_sex = mismatching_sex.any()
+    logger.mismatching_relationships = other_mismatching_pairs
+    return logger
 
 
 def infer_relationship(kin: float, ibs0: float, ibs2: float) -> tuple[str, str]:
@@ -253,6 +315,7 @@ def infer_relationship(kin: float, ibs0: float, ibs2: float) -> tuple[str, str]:
 
 
 def print_info(
+    logger,
     samples_df,
     pairs_df,
     somalier_samples_fpath,
@@ -287,24 +350,6 @@ def print_info(
         )
     if somalier_html_fpath:
         logger.info(f'Somalier HTML report: {somalier_html_fpath}\n')
-
-
-def _parse_sample_map(sample_map_tsv_path: str) -> Dict[str, str]:
-    """
-    Parse 2-column file into a dict mapping str to str
-    """
-    sample_map = dict()
-    if sample_map_tsv_path:
-        with open(sample_map_tsv_path) as f:
-            for line in f:
-                if line := line.strip():
-                    try:
-                        ori_sid, new_sid = line.split('\t')
-                    except ValueError:
-                        logger.warning(line)
-                        raise
-                    sample_map[ori_sid] = new_sid
-    return sample_map
 
 
 if __name__ == '__main__':

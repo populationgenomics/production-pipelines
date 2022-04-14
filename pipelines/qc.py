@@ -27,7 +27,7 @@ def main(
     Entry point, decorated by pipeline click options.
     """
     pipeline = create_pipeline(
-        name='CRAM QC',
+        name='qc',
         stages=[MultiQC],
         **kwargs,
     )
