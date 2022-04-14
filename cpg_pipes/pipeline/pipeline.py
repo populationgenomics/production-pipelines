@@ -38,7 +38,7 @@ logger = logging.getLogger(__file__)
 
 # We record all initialised Stage subclasses, which we then use as a default
 # list of stages when the user didn't pass them explicitly.
-_ALL_DEFINED_STAGES = []
+_ALL_DECLARED_STAGES = []
 
 
 StageDecorator = Callable[..., 'Stage']
@@ -321,7 +321,6 @@ class Stage(Generic[TargetT], ABC):
         required_stages: list[StageDecorator] | StageDecorator | None = None,
         analysis_type: str | None = None,
         skipped: bool = False,
-        required: bool | None = None,
         assume_outputs_exist: bool = False,
         forced: bool = False,
         skip_samples_with_missing_input: bool = False,
@@ -345,8 +344,6 @@ class Stage(Generic[TargetT], ABC):
             won't run. The other stages if depend on it can assume that
             self.expected_outputs() returns existing files and target.output_by_stage
             will be populated.
-        @param required: means that the self.expected_output() results are
-            required for another active stage, even if the stage was skipped.
         @param assume_outputs_exist: for skipped but required stages,
             the self.expected_outputs() output will still be checked for existence.
             This option makes the downstream stages assume that the output exist.
@@ -371,7 +368,7 @@ class Stage(Generic[TargetT], ABC):
 
         self.tmp_bucket = pipeline_tmp_bucket / name
 
-        # Populated in pipeline.run(), after we know all stages
+        # Dependencies. Populated in pipeline.run(), after we know all stages.
         self.required_stages: list[Stage] = []
 
         self.status_reporter = status_reporter
@@ -383,7 +380,6 @@ class Stage(Generic[TargetT], ABC):
         self.output_by_target: dict[str, StageOutput] = dict()
 
         self.skipped = skipped
-        self.required = required if required is not None else not skipped
         self.forced = forced
         self.assume_outputs_exist = assume_outputs_exist
 
@@ -391,6 +387,18 @@ class Stage(Generic[TargetT], ABC):
 
         self.hail_billing_project = hail_billing_project
         self.hail_bucket = hail_bucket
+        
+    def __str__(self):
+        res = f'{self._name}'
+        if self.skipped:
+            res += ' [skipped]'
+        if self.forced:
+            res += ' [forced]'
+        if self.assume_outputs_exist:
+            res += ' [assume_outputs_exist]'
+        if self.required_stages:
+            res += ' ' + ', '.join([s.name for s in self.required_stages])
+        return res
 
     @property
     def name(self):
@@ -513,22 +521,21 @@ class Stage(Generic[TargetT], ABC):
 
             return outputs
 
-        elif self.required:
-            if reusable:
-                return self.make_outputs(target=target, data=expected_out)
+        if reusable:
+            return self.make_outputs(target=target, data=expected_out)
+        else:
+            if self.skip_samples_with_missing_input:
+                logger.warning(
+                    f'Skipping sample {target}: stage {self.name} is required, '
+                    f'but is skipped, and expected outputs for the target do not '
+                    f'exist: {expected_out}'
+                )
             else:
-                if self.skip_samples_with_missing_input:
-                    logger.warning(
-                        f'Skipping sample {target}: stage {self.name} is required, '
-                        f'but is skipped, and expected outputs for the target do not '
-                        f'exist: {expected_out}'
-                    )
-                else:
-                    raise ValueError(
-                        f'Stage {self.name} is required, but is skipped, and '
-                        f'expected outputs for target {target} do not exist: '
-                        f'{expected_out}'
-                    )
+                raise ValueError(
+                    f'Stage {self.name} is required, but is skipped, and '
+                    f'expected outputs for target {target} do not exist: '
+                    f'{expected_out}'
+                )
         # Stage is not needed, returning empty outputs
         target.active = False
         return self.make_outputs(target=target)
@@ -540,9 +547,6 @@ class Stage(Generic[TargetT], ABC):
         """
         if not expected_out:
             reusable = False
-        elif not self.required:
-            # This stage is not required, so can just assume outputs exist:
-            reusable = True
         elif not self.check_expected_outputs:
             if self.assume_outputs_exist or self.skipped:
                 # Do not check the files' existence, trust they exist.
@@ -589,7 +593,6 @@ def stage(
     analysis_type: str | None = None,
     required_stages: list[StageDecorator] | StageDecorator | None = None,
     skipped: bool = False,
-    required: bool | None = None,
     assume_outputs_exist: bool = False,
     forced: bool = False,
 ) -> Union[StageDecorator, Callable[..., StageDecorator]]:
@@ -623,7 +626,6 @@ def stage(
                 required_stages=required_stages,
                 analysis_type=analysis_type,
                 skipped=skipped,
-                required=required,
                 assume_outputs_exist=assume_outputs_exist,
                 forced=forced,
                 skip_samples_with_missing_input=pipeline.skip_samples_with_missing_input,
@@ -632,7 +634,7 @@ def stage(
                 pipeline_config=pipeline.config,
             )
 
-        _ALL_DEFINED_STAGES.append(wrapper_stage)
+        _ALL_DECLARED_STAGES.append(wrapper_stage)
         return wrapper_stage
 
     if cls is None:
@@ -775,23 +777,26 @@ class Pipeline:
 
         # Will be populated by set_stages() in submit_batch()
         self._stages_dict: dict[str, Stage] = dict()
-        self._stages_in_order = stages or _ALL_DEFINED_STAGES
+        self._stages_in_order = stages or _ALL_DECLARED_STAGES
 
     def run(
         self,
         dry_run: bool | None = None,
         keep_scratch: bool | None = None,
         wait: bool | None = False,
+        force_all_implicit_stages: bool = False,
     ) -> Any | None:
         """
-        Add and submit Hail Batch jobs.
+        Resolve stages, add and submit Hail Batch jobs.
+        When `run_all_implicit_stages` is set, all required stages that were not defined
+        explicitly would still be executed.
         """
         if dry_run is None:
             dry_run = self.dry_run
         if keep_scratch is None:
             keep_scratch = self.keep_scratch
 
-        self.set_stages(self._stages_in_order)
+        self.set_stages(self._stages_in_order, force_all_implicit_stages)
 
         result = None
         if self.b:
@@ -827,76 +832,89 @@ class Pipeline:
             last_stage_num = lower_stage_names.index(self.last_stage.lower())
         return first_stage_num, last_stage_num
 
-    def set_stages(self, stages_classes: list[StageDecorator]):
+    def set_stages(
+        self, 
+        stages_classes: list[StageDecorator],
+        force_all_implicit_stages: bool = False,
+    ):
         """
         Iterate over stages and call add_to_the_pipeline() on each.
         Effectively creates all Hail Batch jobs through Stage.queue_jobs().
+        
+        When `run_all_implicit_stages` is set, all required stages that were not set
+        explicitly would still be run.
         """
         if not self.cohort:
             raise PipelineError('Cohort must be populated before adding stages')
 
-        # Initializing stage objects
+        # First round: initialising stage objects
         stages = [cls(self) for cls in stages_classes]
         for stage_ in stages:
             if stage_.name in self._stages_dict:
                 raise ValueError(
-                    f'Stage {stage_.name} is already defined. Check your '
+                    f'Stage {stage_.name} is already defined. Check this '
                     f'list for duplicates: {", ".join(s.name for s in stages)}'
                 )
             self._stages_dict[stage_.name] = stage_
 
-        first_stage_num, last_stage_num = self._validate_first_last_stage()
+        # Second round: checking which stages are required, even implicitly.
+        # implicit_stages_d: dict[str, Stage] = dict()  # If there are required 
+        # dependency stages that are not requested explicitly, we are putting them 
+        # into this dict as `skipped`.
+        while True:  # Might need several rounds to resolve dependencies recursively.
+            newly_implicitly_added_d = dict()
+            for stage_ in self._stages_dict.values():
+                for reqcls in stage_.required_stages_classes:  # check dependencies
+                    if reqcls.__name__ in self._stages_dict:  # already added
+                        continue
+                    # Initialising and adding as explicit.
+                    reqstage = reqcls(self)
+                    newly_implicitly_added_d[reqstage.name] = reqstage
+                    if not force_all_implicit_stages:
+                        # Stage is not declared or requrested implicitly, so setting 
+                        # it as skipped:
+                        reqstage.skipped = True
+                        logger.info(
+                            f'Stage {reqstage.name} is skipped, '
+                            f'but the output will be required for the stage {stage_.name}'
+                        )
+                    # stage_.required_stages.append(reqstage)
+            if newly_implicitly_added_d:
+                logger.info(
+                    f'Additional implicit stages: '
+                    f'{list(newly_implicitly_added_d.keys())}'
+                )
+                # Adding new stages back into the ordered dict, so they are 
+                # executed first.
+                self._stages_dict = newly_implicitly_added_d | self._stages_dict
+            else:
+                # No new implicit stages added, can stop here.
+                break
 
-        # First round - checking which stages we require, even if they are skipped.
-        # If there are required stages that are not defined, we defined them
-        # into `additional_stages` as `skipped`.
-        additional_stages_dict: dict[str, Stage] = dict()
+        for stage_ in self._stages_dict.values():
+            stage_.required_stages = [
+                self._stages_dict[cls.__name__] 
+                for cls in stage_.required_stages_classes
+            ]
+
+        # Second round - applying first and last stage options.
+        first_stage_num, last_stage_num = self._validate_first_last_stage()
         for i, (stage_name, stage_) in enumerate(self._stages_dict.items()):
             if first_stage_num is not None and i < first_stage_num:
                 stage_.skipped = True
-                stage_.required = False
                 logger.info(f'Skipping stage {stage_name}')
                 continue
-
             if last_stage_num is not None and i > last_stage_num:
                 stage_.skipped = True
-                stage_.required = False
                 continue
-
-            for reqcls in stage_.required_stages_classes:
-                if reqcls.__name__ in self._stages_dict:
-                    reqstage = self._stages_dict[reqcls.__name__]
-                elif reqcls.__name__ in additional_stages_dict:
-                    reqstage = additional_stages_dict[reqcls.__name__]
-                else:
-                    # stage is not initialized, so we defining it as skipped
-                    reqstage = reqcls(self)
-                    reqstage.skipped = True
-                    additional_stages_dict[reqcls.__name__] = reqstage
-                reqstage.required = True
-                if reqstage.skipped:
-                    logger.info(
-                        f'Stage {reqstage.name} is skipped, '
-                        f'but the output will be required for the stage {stage_.name}'
-                    )
-                stage_.required_stages.append(reqstage)
-
-        if additional_stages_dict:
-            logger.info(
-                f'Additional required stages added as "skipped": '
-                f'{additional_stages_dict.keys()}'
-            )
-            for name, stage_ in self._stages_dict.items():
-                additional_stages_dict[name] = stage_
-            self._stages_dict = additional_stages_dict
 
         logger.info(
             f'Setting stages: {", ".join(s.name for s in stages if not s.skipped)}'
         )
-        required_skipped_stages = [s for s in stages if s.skipped and s.required]
+        required_skipped_stages = [s for s in stages if s.skipped]
         if required_skipped_stages:
             logger.info(
-                f'Skipped stages that are used to get inputs: '
+                f'Skipped stages: '
                 f'{", ".join(s.name for s in required_skipped_stages)}'
             )
 
@@ -906,9 +924,8 @@ class Pipeline:
                 logger.info(f'*' * 60)
                 logger.info(f'Stage {stage_.name}')
 
-            if stage_.required:
-                logger.info(f'Adding jobs for stage {stage_.name}')
-                stage_.output_by_target = stage_.add_to_the_pipeline(self)
+            logger.info(f'Running stage {stage_}')
+            stage_.output_by_target = stage_.add_to_the_pipeline(self)
 
             if not stage_.skipped:
                 logger.info(f'')

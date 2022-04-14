@@ -76,6 +76,7 @@ def pipeline_click_options(function: Callable) -> Callable:
         click.option(
             '--analysis-dataset',
             'analysis_dataset',
+            required=True,
             help='Dataset name to write cohort and pipeline level intermediate files',
         ),
         click.option(
