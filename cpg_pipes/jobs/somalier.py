@@ -201,6 +201,7 @@ def check_pedigree_job(
     pairs_file: ResourceFile,
     external_id_map: dict[str, str],
     label: str | None = None,
+    dataset_name: str | None = None,
     somalier_html_url: str | None = None,
     out_checks_path: Path | None = None,
     job_attrs: dict | None = None,
@@ -224,6 +225,7 @@ def check_pedigree_job(
     python3 {script_name} \\
     --somalier-samples {samples_file} \
     --somalier-pairs {pairs_file} \
+    {('--dataset ' + dataset_name) if dataset_name else ''} \
     {('--somalier-html ' + somalier_html_url) if somalier_html_url else ''} \
     --slack
 
