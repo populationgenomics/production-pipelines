@@ -97,7 +97,7 @@ def create_pipeline(
 
     return Pipeline(
         namespace=namespace,
-        name=name,
+        name=name.replace(' ', '_'),
         description=description,
         analysis_dataset_name=analysis_dataset,
         storage_provider=storage_provider,

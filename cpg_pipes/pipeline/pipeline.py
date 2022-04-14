@@ -16,6 +16,7 @@ import shutil
 import tempfile
 import time
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import cast, Callable, Union, TypeVar, Generic, Any, Optional, Type
 
 from cloudpathlib import CloudPath
@@ -67,11 +68,13 @@ class StageOutput:
         stage: 'Stage',
         target: 'Target',
         jobs: list[Job] | None = None,
+        reusable: bool = False,
     ):
         self.data = data
         self.stage = stage
         self.target = target
         self.jobs: list[Job] = jobs or []
+        self.reusable = reusable
 
     def __repr__(self) -> str:
         return f'result {self.data} for target {self.target}, stage {self.stage}'
@@ -302,6 +305,15 @@ class StageInput:
                     all_jobs.extend(output.jobs)
         return all_jobs
 
+    
+class Action(Enum):
+    """
+    Indicates what a stage should do with a specific target.
+    """
+    QUEUE = 1
+    SKIP = 2
+    REUSE = 3
+
 
 class Stage(Generic[TargetT], ABC):
     """
@@ -427,11 +439,9 @@ class Stage(Generic[TargetT], ABC):
         """
 
     @abstractmethod
-    def add_to_the_pipeline(self, pipeline: 'Pipeline') -> dict[str, StageOutput]:
+    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput]:
         """
-        Calls `output = pipeline.add_for_target(target)` on each target,
-        which itself calls `output = queue_jobs(target, input)`, making sure to
-        construct the correct `input`.
+        Queues jobs for each corresponding target, defined by Stage subclass.
 
         Returns a dictionary of `StageOutput` objects indexed by target unique_id.
         """
@@ -484,45 +494,71 @@ class Stage(Generic[TargetT], ABC):
                 inputs.add_other_stage_output(stage_output)
         return inputs
 
-    def _queue_jobs_with_checks(self, target: TargetT) -> StageOutput:
+    def _queue_jobs_with_checks(
+        self, 
+        target: TargetT, 
+        action: Action | None = None,
+    ) -> StageOutput:
         """
-        Constructs `inputs` and calls the public `output = queue_jobs(target, input)`.
-        Performs the checks like possibility to reuse existing jobs results,
-        or if required dependencies are missing.
+        Checks what to do with target, and either queue jobs, or skip/reuse results.
+        """
+        if not action:
+            action = self._get_action(target)
+
+        inputs = self._make_inputs()
+        expected_out = self.expected_outputs(target)
+        
+        if action == Action.QUEUE:
+            outputs = self.queue_jobs(target, inputs)
+        elif action == Action.REUSE:
+            outputs = self.make_outputs(
+                target=target,
+                data=expected_out,
+                jobs=self.new_reuse_job(target),
+            )
+        else:
+            outputs = self.make_outputs(target=target)
+        for j in outputs.jobs:
+            j.depends_on(*inputs.get_jobs(target))
+        return outputs
+
+    def new_reuse_job(self, target: Target) -> Job:
+        """
+        Add "reuse" job. Target doesn't have to be specific for a stage here,
+        this using abstract class Target instead of generic parameter TargetT.
+        """
+        return self.b.new_job(f'{self.name} [reuse]', target.get_job_attrs())
+
+    def _get_action(self, target: TargetT) -> Action:
+        """
+        Based on stage parameters and expected outputs existence, determines what
+        to do with the target: queue, skip or reuse, etc..
         """
         expected_out = self.expected_outputs(target)
-
-        reusable = self._check_if_reusable(expected_out)
-
+        reusable = self._outputs_are_reusable(expected_out)
         if not self.skipped:
-            inputs = self._make_inputs()
             if reusable:
                 if target.forced:
                     logger.info(
                         f'{self.name}: can reuse, but forcing the target '
                         f'{target} to rerun this stage'
                     )
-                    outputs = self.queue_jobs(target, inputs)
+                    return Action.QUEUE
                 elif self.forced:
                     logger.info(
                         f'{self.name}: can reuse, but forcing the stage '
                         f'to rerun, target={target}'
                     )
-                    outputs = self.queue_jobs(target, inputs)
+                    return Action.QUEUE
                 else:
                     logger.info(f'{self.name}: reusing results for {target}')
-                    outputs = self._queue_reuse_job(target, expected_out)
+                    return Action.REUSE
             else:
                 logger.info(f'{self.name}: adding jobs for {target}')
-                outputs = self.queue_jobs(target, inputs)
-
-            for j in outputs.jobs:
-                j.depends_on(*inputs.get_jobs(target))
-
-            return outputs
+                return Action.QUEUE
 
         if reusable:
-            return self.make_outputs(target=target, data=expected_out)
+            return Action.REUSE
         else:
             if self.skip_samples_with_missing_input:
                 logger.warning(
@@ -536,11 +572,11 @@ class Stage(Generic[TargetT], ABC):
                     f'expected outputs for target {target} do not exist: '
                     f'{expected_out}'
                 )
-        # Stage is not needed, returning empty outputs
+        # Stage is not needed, returning empty outputs.
         target.active = False
-        return self.make_outputs(target=target)
+        return Action.SKIP
 
-    def _check_if_reusable(self, expected_out: ExpectedResultT) -> bool:
+    def _outputs_are_reusable(self, expected_out: ExpectedResultT) -> bool:
         """
         Returns outputs that can be reused for the stage for the target,
         or None of none can be reused
@@ -838,7 +874,7 @@ class Pipeline:
         force_all_implicit_stages: bool = False,
     ):
         """
-        Iterate over stages and call add_to_the_pipeline() on each.
+        Iterate over stages and call queue_for_cohort(cohort) on each.
         Effectively creates all Hail Batch jobs through Stage.queue_jobs().
         
         When `run_all_implicit_stages` is set, all required stages that were not set
@@ -924,8 +960,8 @@ class Pipeline:
                 logger.info(f'*' * 60)
                 logger.info(f'Stage {stage_.name}')
 
-            logger.info(f'Running stage {stage_}')
-            stage_.output_by_target = stage_.add_to_the_pipeline(self)
+            logger.info(f'Stage {stage_}')
+            stage_.output_by_target = stage_.queue_for_cohort(self.cohort)
 
             if not stage_.skipped:
                 logger.info(f'')
