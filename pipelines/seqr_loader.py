@@ -126,8 +126,8 @@ class LoadToEs(DatasetStage):
         Uses analysis-runner's dataproc helper to run a hail query script
         """
         if (
-            'output_datasets' in self.pipeline_config
-            and dataset.name not in self.pipeline_config['output_datasets']
+            (es_datasets := self.pipeline_config.get('create_es_index_for_datasets'))
+            and dataset.name not in es_datasets
         ):
             # Skipping dataset that wasn't explicitly requested to upload to ES:
             return self.make_outputs(dataset)
@@ -175,10 +175,10 @@ def _read_es_password(
 
 @click.command()
 @click.option(
-    '--output-dataset',
-    'output_datasets',
+    '--es-dataset',
+    'create_es_index_for_datasets',
     multiple=True,
-    help=f'Datasets to load into Seqr',
+    help=f'Create Seqr ElasticSearch indices for these datasets.',
 )
 @click.option(
     '--hc-intervals-num',
@@ -231,7 +231,7 @@ def _read_es_password(
 @pipeline_click_options
 def main(
     datasets: list[str],
-    output_datasets: list[str],
+    create_es_index_for_datasets: list[str],
     hc_intervals_num: int,
     jc_intervals_num: int,
     realignment_shards_num: int,
@@ -261,12 +261,12 @@ def main(
         description += f', {v}'
     input_datasets = set(datasets) - set(kwargs.get('skip_datasets', []))
     description += f': [{", ".join(input_datasets)}]'
-    if output_datasets:
-        description += f' → [{", ".join(output_datasets)}]'
+    if create_es_index_for_datasets:
+        description += f' → [{", ".join(create_es_index_for_datasets)}]'
 
     kwargs['analysis_dataset'] = 'seqr'
     pipeline = create_pipeline(
-        name='seqr_loader',
+        name='Seqr Loader',
         description=description,
         datasets=datasets,
         config=dict(
@@ -277,7 +277,7 @@ def main(
             use_gnarly=use_gnarly,
             use_as_vqsr=use_as_vqsr,
             exome_bed=exome_bed,
-            output_datasets=output_datasets,
+            create_es_index_for_datasets=create_es_index_for_datasets,
         ),
         **kwargs,
     )
