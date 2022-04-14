@@ -94,7 +94,6 @@ class CramSomalierPedigree(DatasetStage):
             out_html_url=html_url,
             out_checks_path=self.expected_outputs(dataset)['checks'],
             refs=self.refs,
-            job_attrs=self.get_job_attrs(dataset),
         )
         return self.make_outputs(
             dataset, data=self.expected_outputs(dataset), jobs=jobs

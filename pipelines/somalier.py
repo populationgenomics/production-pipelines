@@ -24,8 +24,7 @@ def main(
     Entry point, decorated by pipeline click options.
     """
     pipeline = create_pipeline(
-        name='pedigree_check',
-        description='Pedigree checks',
+        name='Pedigree checks',
         stages=[
             CramSomalierPedigree,
             CramSomalierAncestry,

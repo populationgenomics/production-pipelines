@@ -4,11 +4,11 @@ Adding jobs for fingerprinting and pedigree checks. Mostly using Somalier.
 import logging
 import pandas as pd
 from hailtop.batch.job import Job
-from hailtop.batch import Batch, Resource
+from hailtop.batch import Batch, Resource, ResourceFile
 
 from cpg_pipes import Path, to_path
 from cpg_pipes import images, utils
-from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.hb.command import wrap_command, seds_to_extend_sample_ids
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.types import CramPath, GvcfPath
 from cpg_pipes.targets import Dataset
@@ -31,7 +31,6 @@ def pedigree(
     out_checks_path: Path | None = None,
     label: str | None = None,
     ignore_missing: bool = False,
-    job_attrs: dict | None = None,
 ) -> list[Job]:
     """
     Add somalier and peddy based jobs that infer relatedness and sex, compare that
@@ -57,8 +56,9 @@ def pedigree(
 
     relate_j = _relate(
         b=b,
-        somalier_file_by_sample=somalier_file_by_sample,
+        somalier_file_by_sid=somalier_file_by_sample,
         sample_ids=dataset.get_sample_ids(),
+        external_id_map={s.id: s.participant_id for s in dataset.get_samples()},
         ped_path=dataset.make_ped_file(),
         label=label,
         extract_jobs=extract_jobs,
@@ -70,9 +70,9 @@ def pedigree(
 
     check_j = check_pedigree_job(
         b=b,
-        sample_map_file=b.read_input(str(_make_sample_map(dataset))),
         samples_file=relate_j.output_samples,
         pairs_file=relate_j.output_pairs,
+        external_id_map={s.id: s.participant_id for s in dataset.get_samples()},
         label=label,
         somalier_html_url=out_html_url,
         out_checks_path=out_checks_path,
@@ -125,6 +125,7 @@ def ancestry(
         b=b,
         somalier_file_by_sample=somalier_file_by_sample,
         sample_ids=dataset.get_sample_ids(),
+        external_id_map={s.id: s.participant_id for s in dataset.get_samples()},
         refs=refs,
         label=label,
         extract_jobs=extract_jobs,
@@ -196,9 +197,9 @@ def _prep_somalier_files(
 
 def check_pedigree_job(
     b: Batch,
-    samples_file: Resource,
-    pairs_file: Resource,
-    sample_map_file: Resource,
+    samples_file: ResourceFile,
+    pairs_file: ResourceFile,
+    external_id_map: dict[str, str],
     label: str | None = None,
     somalier_html_url: str | None = None,
     out_checks_path: Path | None = None,
@@ -218,12 +219,10 @@ def check_pedigree_job(
     script_path = to_path(check_pedigree.__file__)
     script_name = script_path.name
     cmd = f"""\
-    pip3 install peddy
-
+    {seds_to_extend_sample_ids(external_id_map, [samples_file, pairs_file])}
     python3 {script_name} \\
     --somalier-samples {samples_file} \
     --somalier-pairs {pairs_file} \
-    --sample-map {sample_map_file} \
     {('--somalier-html ' + somalier_html_url) if somalier_html_url else ''}
 
     touch {check_j.output}
@@ -245,6 +244,7 @@ def _ancestry(
     b: Batch,
     somalier_file_by_sample: dict[str, Path],
     sample_ids: list[str],
+    external_id_map: dict[str, str],
     refs: RefData,
     label: str | None,
     extract_jobs: list[Job],
@@ -278,8 +278,9 @@ def _ancestry(
     /io/batch/1kg/1kg-somalier/*.somalier ++ \\
     /io/batch/somaliers/*.somalier \\
     -o ancestry
-
+    ls
     mv ancestry.somalier-ancestry.tsv {j.output_tsv}
+    {seds_to_extend_sample_ids(external_id_map, ['ancestry.somalier-ancestry.html'])}
     mv ancestry.somalier-ancestry.html {j.output_html}
     """
     if out_html_url:
@@ -292,8 +293,9 @@ def _ancestry(
 
 def _relate(
     b: Batch,
-    somalier_file_by_sample: dict[str, Path],
+    somalier_file_by_sid: dict[str, Path],
     sample_ids: list[str],
+    external_id_map: dict[str, str],
     ped_path: Path,
     label: str | None,
     extract_jobs: list[Job],
@@ -312,7 +314,7 @@ def _relate(
 
     input_files_lines = ''
     for sample_id in sample_ids:
-        somalier_file = b.read_input(str(somalier_file_by_sample[sample_id]))
+        somalier_file = b.read_input(str(somalier_file_by_sid[sample_id]))
         input_files_lines += f'{somalier_file} \\\n'
     cmd = f"""\
     cat {b.read_input(str(ped_path))} | grep -v Family.ID > /io/samples.ped 
@@ -322,16 +324,16 @@ def _relate(
     --ped /io/samples.ped \\
     -o related \\
     --infer
-    
     ls
-    mv related.html {j.output_html}
     mv related.pairs.tsv {j.output_pairs}
     mv related.samples.tsv {j.output_samples}
+    {seds_to_extend_sample_ids(external_id_map, ['related.html'])}
+    mv related.html {j.output_html}
     """
     if out_html_url:
         cmd += '\n' + f'echo "HTML URL: {out_html_url}"'
     j.command(wrap_command(cmd))
-    # Copy somalier outputs to buckets
+    # Copy somalier outputs to final destination.
     b.write_output(j.output_samples, str(out_samples_path))
     b.write_output(j.output_pairs, str(out_pairs_path))
     if out_html_path:

@@ -9,7 +9,7 @@ from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
 from cpg_pipes import Path
-from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.hb.command import wrap_command, seds_to_extend_sample_ids
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.images import DRIVER_IMAGE
 
@@ -20,6 +20,7 @@ def multiqc(
     b: Batch,
     tmp_bucket: Path,
     paths: list[Path],
+    external_id_map: dict[str, str],
     out_html_path: Path,
     out_json_path: Path,
     out_html_url: str | None = None,
@@ -32,6 +33,7 @@ def multiqc(
     @param b: batch object
     @param tmp_bucket: bucket for tmp files
     @param paths: file bucket paths to pass into MultiQC
+    @param external_id_map: to replace sample IDs in resulting files
     @param out_json_path: where to write MultiQC-generated JSON file
     @param out_html_path: where to write the HTML report
     @param out_html_url: URL corresponding to the HTML report
@@ -63,6 +65,8 @@ def multiqc(
     multiqc inputs -o output -f \\
     --cl_config "extra_fn_clean_exts: [{endings_conf}]" \\
     --cl_config "use_filename_as_sample_name: [{modules_conf}]"
+
+    {seds_to_extend_sample_ids(external_id_map, ['output/multiqc_report.html'])}
 
     cp output/multiqc_report.html {j.html}
     cp output/multiqc_data/multiqc_data.json {j.json}

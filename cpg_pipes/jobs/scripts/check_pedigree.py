@@ -38,19 +38,10 @@ logger.setLevel(logging.INFO)
     'somalier_html_fpath',
     help='Path to somalier {prefix}.html output file',
 )
-@click.option(
-    '--sample-map',
-    'sample_map_tsv_path',
-    help=(
-        'Path a file with 2 columns (tab-separated): '
-        'current sample ID as in input files, and the new sample ID'
-    ),
-)
 def main(
     somalier_samples_fpath: str,
     somalier_pairs_fpath: str,
     somalier_html_fpath: Optional[str],
-    sample_map_tsv_path: Optional[str],
 ):
     """
     Report pedigree inconsistencies, given somalier outputs.
@@ -59,7 +50,6 @@ def main(
         somalier_samples_fpath,
         somalier_pairs_fpath,
         somalier_html_fpath,
-        sample_map_tsv_path,
     )
 
 
@@ -67,15 +57,12 @@ def check_pedigree(
     somalier_samples_fpath: str,
     somalier_pairs_fpath: str,
     somalier_html_fpath: Optional[str] = None,
-    sample_map_tsv_path: Optional[str] = None,
 ):
     """
     Report pedigree inconsistencies, given somalier outputs.
     """
-    sample_map = _parse_sample_map(sample_map_tsv_path) if sample_map_tsv_path else None
-
     ped, df, pairs_df = _parse_inputs(
-        somalier_samples_fpath, somalier_pairs_fpath, sample_map
+        somalier_samples_fpath, somalier_pairs_fpath
     )
 
     bad_samples = list(df[df.gt_depth_mean == 0.0].sample_id)
@@ -131,13 +118,16 @@ def check_pedigree(
 
     pairs_provided_as_unrelated_but_inferred_related = []
     other_mismatching_pairs = []
+
     for idx, row in pairs_df.iterrows():
         s1 = row['#sample_a']
         s2 = row['sample_b']
         if s1 in bad_samples or s2 in bad_samples:
             continue
 
-        inferred_rel = infer_relationship(row['relatedness'], row['ibs0'], row['ibs2'])
+        inferred_rel, reason = infer_relationship(
+            row['relatedness'], row['ibs0'], row['ibs2']
+        )
         # Supressing all logging output from peddy, otherwise it would clutter the logs
         with contextlib.redirect_stderr(None), contextlib.redirect_stdout(None):
             peddy_rel = ped.relation(sample_by_id[s1], sample_by_id[s2])
@@ -166,15 +156,13 @@ def check_pedigree(
             pairs_provided_as_unrelated_but_inferred_related.append(
                 f'"{s1}" and "{s2}", '
                 f'provided: "{peddy_rel}", '
-                f'inferred: "{inferred_rel}" '
-                f'(rel={row["relatedness"]})'
+                f'inferred: "{inferred_rel}" ({reason})'
             )
         elif inferred_rel != _match_peddy_with_inferred(peddy_rel):
             other_mismatching_pairs.append(
                 f'"{s1}" and "{s2}", '
                 f'provided: "{peddy_rel}", '
-                f'inferred: "{inferred_rel}" '
-                f'(rel={row["relatedness"]})'
+                f'inferred: "{inferred_rel}" ({reason})'
             )
         pairs_df.loc[idx, 'provided_rel'] = peddy_rel
         pairs_df.loc[idx, 'inferred_rel'] = inferred_rel
@@ -208,52 +196,59 @@ def check_pedigree(
 def _parse_inputs(
     somalier_samples_fpath,
     somalier_pairs_fpath,
-    sample_map,
 ):
     df = pd.read_csv(somalier_samples_fpath, delimiter='\t')
     pairs_df = pd.read_csv(somalier_pairs_fpath, delimiter='\t')
-    if sample_map:
-        df = df.replace(
-            {
-                'sample_id': sample_map,
-                'paternal_id': sample_map,
-                'maternal_id': sample_map,
-            }
-        )
-        pairs_df = pairs_df.replace(
-            {
-                '#sample_a': sample_map,
-                'sample_b': sample_map,
-            }
-        )
     fp = StringIO()
     df.to_csv(fp, sep='\t', index=False)
     ped = Ped(StringIO(fp.getvalue()))
     return ped, df, pairs_df
 
 
-def infer_relationship(coeff: float, ibs0: float, ibs2: float) -> str:
+def infer_relationship(kin: float, ibs0: float, ibs2: float) -> tuple[str, str]:
     """
     Inferres relashionship labels based on the kin coefficient
-    and ibs0 and ibs2 values.
+    and ibs0 and ibs2 values. Returns relashionship label and reason.
     """
-    if coeff < 0.1:
-        result = 'unrelated'
-    elif coeff < 0.38:
-        result = 'below_first_degree'
-    elif coeff <= 0.62:
-        if ibs0 / ibs2 < 0.005:
-            result = 'parent-child'
-        elif 0.015 < ibs0 / ibs2 < 0.052:
-            result = 'siblings'
+    if kin < 0.1:
+        result = (
+            'unrelated', 
+            f'kin={kin} < 0.1'
+        )
+    elif kin < 0.38:
+        result = (
+            'below_first_degree', 
+            f'kin={kin} < 0.38'
+        )
+    elif kin <= 0.62:
+        reason = f'kin={kin} < 0.62'
+        if (ibs0 / ibs2) < 0.005:
+            result = (
+                'parent-child',
+                reason + f' ibs0/ibs2={ibs0 / ibs2} < 0.005'
+            )
+        elif 0.015 < (ibs0 / ibs2) < 0.052:
+            result = (
+                'siblings', 
+                reason + f' 0.015 < ibs0/ibs2={ibs0 / ibs2} < 0.052'
+            )
         else:
-            result = 'first_degree'
-    elif coeff < 0.8:
-        result = 'first_degree_or_duplicate_or_twins'
-    elif coeff >= 0.8:
-        result = 'duplicate_or_twins'
+            result = (
+                'first_degree', 
+                reason + f', not parent-child (ibs0/ibs2={ibs0 / ibs2} > 0.005)'
+                         f', not sibling (0.015 < ibs0/ibs2={ibs0 / ibs2} < 0.052)'
+            )
+    elif kin < 0.8:
+        result = (
+            'first_degree_or_duplicate_or_twins', 
+            f'kin={kin} < 0.8'
+        )
     else:
-        result = 'nan'
+        assert kin >= 0.8
+        result = (
+            'duplicate_or_twins',
+            f'kin={kin} >= 0.8'
+        )
     return result
 
 

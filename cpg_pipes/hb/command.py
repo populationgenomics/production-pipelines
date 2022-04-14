@@ -6,6 +6,8 @@ import logging
 from typing import List, Union, Callable
 import textwrap
 
+from hailtop.batch import ResourceFile
+
 from cpg_pipes import Path
 
 logger = logging.getLogger(__file__)
@@ -185,4 +187,35 @@ def wrap_command(
     else:
         cmd = cmd.replace('{copy_script_cmd}', '')
 
+    return cmd
+
+
+def seds_to_extend_sample_ids(
+    id_map: dict[str, str],
+    fnames: list[str | ResourceFile],
+) -> str:
+    """
+    Helper function to add seds into a command that would extend samples IDs 
+    in each file in `fnames` with an external ID, only if external ID is
+    different from the original.
+    
+    Examples:
+    
+    id_map {'CPG1': 'MYID'}
+    Result: 'CPG1|MYID'
+    
+    id_map {'CPG1': 'CPG1'}
+    Result: 'CPG1'
+
+    @param id_map: replace according to this map,
+    @param fnames: file names where to replace IDs.
+    @return: 
+    """
+    cmd = ''
+    for sid, new_sid in id_map.items():
+        if sid != new_sid:
+            new_id = f'{sid}|{new_sid}'
+            for fname in fnames:
+                cmd += f'sed -i {fname} "s/{sid}/{new_id}/g"'
+                cmd += '\n'
     return cmd
