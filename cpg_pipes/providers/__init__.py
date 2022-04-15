@@ -15,4 +15,4 @@ class InputProviderType(Enum):
 class StatusReporterType(Enum):
     """Available types of status reporters"""
 
-    SMDB = 'smdb'
+    CPG = 'cpg'

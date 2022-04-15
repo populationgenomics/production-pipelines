@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 
 from hailtop.batch.job import Job
-from hailtop.batch import Batch
+from hailtop.batch import Batch, Resource
 
 from .. import Path
 from ..targets import Target
@@ -50,11 +50,12 @@ class StatusReporter(ABC):
     def add_updaters_jobs(
         self,
         b: Batch,
-        output: Path | dict[str, Path],
+        output: Path | Resource | dict[str, Path | Resource],
         analysis_type: str,
         target: Target,
         jobs: list[Job] | None = None,
+        prev_jobs: list[Job] | None = None,
     ):
         """
-        Add Hail Batch jobs that update the anlaysis status.
+        Add Hail Batch jobs that update the analysis status.
         """
