@@ -67,7 +67,6 @@ def create_pipeline(
     only_samples: list[str] | None = None,
     force_samples: list[str] | None = None,
     local_dir: Path | None = None,
-    slack_channel: str | None = None,
 ) -> 'Pipeline':
     """
     Create a Pipeline instance. All options correspond to command line parameters
@@ -84,7 +83,7 @@ def create_pipeline(
         sm_proj = Dataset(analysis_dataset, namespace=namespace).stack
         smdb = SMDB(sm_proj)
         if status_reporter_type == StatusReporterType.CPG:
-            status_reporter = CpgStatusReporter(smdb, slack_channel=slack_channel)
+            status_reporter = CpgStatusReporter(smdb)
         if input_provider_type == InputProviderType.SMDB:
             input_provider = SmdbInputProvider(smdb)
 
