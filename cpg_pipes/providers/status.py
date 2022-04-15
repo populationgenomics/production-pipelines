@@ -45,6 +45,7 @@ class StatusReporter(ABC):
     """
     Status reporter
     """
+
     def __init__(self):
         self.slack_channel = None
         self.slack_token = None
@@ -72,14 +73,14 @@ class StatusReporter(ABC):
             j.env('SLACK_TOKEN', self.slack_token)
 
     def slack_message_cmd(
-        self, 
-        text: str | None = None, 
+        self,
+        text: str | None = None,
         data: dict[str, str] | None = None,
     ) -> str:
         """
         Add command to the job that sends Slack message.
         Message can be a dictionary (`data`), which will be correspondingly formatted;
-        or text (`text`). Either can use Slack mrkdwn for formatting: 
+        or text (`text`). Either can use Slack mrkdwn for formatting:
         https://api.slack.com/reference/surfaces/formatting
         """
         if not self.slack_channel or not self.slack_token:

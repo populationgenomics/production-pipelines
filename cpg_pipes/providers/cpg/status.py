@@ -95,7 +95,7 @@ class CpgStatusReporter(StatusReporter):
             analysis_type=analysis_type,
             job_attrs=target.get_job_attrs(),
         )
-        
+
         if prev_jobs:
             in_progress_j.depends_on(*prev_jobs)
         completed_j.depends_on(*jobs)

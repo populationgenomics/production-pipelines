@@ -122,7 +122,7 @@ class TestQuery(unittest.TestCase):
             f'siteonly-vqsr-{self.interval}.vcf.gz'
         )
         vep_ht_path = to_path(
-            f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/' f'vep/{self.interval}.ht'
+            f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/vep/{self.interval}.ht'
         )
         out_mt_path = self.out_bucket / 'seqr_loader' / f'cohort-{self.interval}.mt'
         annotate_cohort(

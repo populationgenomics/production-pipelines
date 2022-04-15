@@ -60,8 +60,8 @@ class MultiQC(DatasetStage):
             html_url = None
 
         paths = [
-            somalier_samples, 
-            somalier_pairs, 
+            somalier_samples,
+            somalier_pairs,
         ]
         ending_to_trim = set()  # endings to trim to get sample names
         for sample in dataset.get_samples():

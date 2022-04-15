@@ -42,7 +42,7 @@ def make_subset_crams(pipeline: Pipeline):
     2. Randomly select 1% of exome regions
     3. Reduce the coverage to 1% of original, write CRAMs
     4. Extract FASTQ pairs
-    
+
     For alignment testing.
     """
     b = pipeline.b

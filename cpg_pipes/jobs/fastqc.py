@@ -30,10 +30,10 @@ def fastqc(
         j = b.new_job(jname_, job_attrs)
         j.image(images.FASTQC_IMAGE)
         threads = STANDARD.set_resources(j, ncpu=16).get_nthreads()
-        
+
         cmd = ''
         input_file = b.read_input(str(input_path))
-        if isinstance(input_path, CramPath) and not input_path.is_bam: 
+        if isinstance(input_path, CramPath) and not input_path.is_bam:
             new_file = f'/io/batch/{basename(str(input_path))}'
             # FastQC doesn't support CRAMs, converting CRAM->BAM
             cmd += f"""\

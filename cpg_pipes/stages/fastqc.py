@@ -35,19 +35,19 @@ class FastQC(SampleStage):
         """
         alignment_input = sample.alignment_input
         if not alignment_input or (
-            self.check_inputs and 
-            not types.alignment_input_exists(alignment_input)
+            self.check_inputs and not types.alignment_input_exists(alignment_input)
         ):
-            if self.pipeline_config.get('fastqc_on_realigned_cram', False) and sample.get_cram_path().exists():
+            if (
+                self.pipeline_config.get('fastqc_on_realigned_cram', False)
+                and sample.get_cram_path().exists()
+            ):
                 logger.info(
                     f'No alignment inputs found for sample {sample.id}, using '
                     f'aligned CRAM instead'
                 )
                 alignment_input = sample.get_cram_path()
             else:
-                logger.warning(
-                    f'No alignment inputs, skipping sample {sample.id}'
-                )
+                logger.warning(f'No alignment inputs, skipping sample {sample.id}')
                 return self.make_outputs(sample)  # return empty output
 
         jobs = fastqc.fastqc(

@@ -29,8 +29,8 @@ class Align(SampleStage):
         Using the "align" function implemented in the jobs module
         """
         if not sample.alignment_input or (
-            self.check_inputs and 
-            not types.alignment_input_exists(sample.alignment_input)
+            self.check_inputs
+            and not types.alignment_input_exists(sample.alignment_input)
         ):
             if self.skip_samples_with_missing_input:
                 logger.error(f'No alignment inputs, skipping sample {sample.id}')
@@ -38,8 +38,7 @@ class Align(SampleStage):
                 return self.make_outputs(sample)  # return empty output
             else:
                 return self.make_outputs(
-                    target=sample, 
-                    error_msg=f'No alignment input found for {sample.id}'
+                    target=sample, error_msg=f'No alignment input found for {sample.id}'
                 )
 
         jobs = align.align(

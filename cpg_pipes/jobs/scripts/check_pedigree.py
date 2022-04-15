@@ -41,11 +41,7 @@ logger.setLevel(logging.INFO)
     required=True,
     help='Path to somalier {prefix}.pairs.tsv output file',
 )
-@click.option(
-    '--dataset',
-    'dataset',
-    help='Dataset name'
-)
+@click.option('--dataset', 'dataset', help='Dataset name')
 def main(
     somalier_samples_fpath: str,
     somalier_pairs_fpath: str,
@@ -82,6 +78,7 @@ class PedigreeLogger:
     """
     Recording messages to send a report to Slack.
     """
+
     def __init__(self):
         self.mismatching_sex = False
         self.mismatching_relationships = False
@@ -93,7 +90,7 @@ class PedigreeLogger:
         """
         self.messages.append(msg)
         logger.info(msg)
-        
+
     def warning(self, msg):
         """
         Record and forward.
@@ -125,7 +122,7 @@ def check_pedigree(
     fp = StringIO()
     df.to_csv(fp, sep='\t', index=False)
     ped = Ped(StringIO(fp.getvalue()))
-    
+
     pedlog = pedlog or PedigreeLogger()
 
     bad = df.gt_depth_mean == 0.0
@@ -149,7 +146,11 @@ def check_pedigree(
     mismatching_female = (df.sex == 'female') & (df.original_pedigree_sex == 'male')
     mismatching_male = (df.sex == 'male') & (df.original_pedigree_sex == 'female')
     mismatching_sex = mismatching_female | mismatching_male
-    mismatching_other = (df.sex != df.original_pedigree_sex) & (~mismatching_female) & (~mismatching_male)
+    mismatching_other = (
+        (df.sex != df.original_pedigree_sex)
+        & (~mismatching_female)
+        & (~mismatching_male)
+    )
     matching_sex = ~mismatching_sex & ~mismatching_other
 
     def _print_stats(df_filter):
@@ -162,13 +163,19 @@ def check_pedigree(
             )
 
     if mismatching_sex.any():
-        pedlog.info(f'{len(df[mismatching_sex])}/{len(df)} PED samples with mismatching sex:')
+        pedlog.info(
+            f'{len(df[mismatching_sex])}/{len(df)} PED samples with mismatching sex:'
+        )
         _print_stats(mismatching_sex)
     if missing_provided_sex.any():
-        pedlog.info(f'{len(df[missing_provided_sex])}/{len(df)} samples with missing provided sex:')
+        pedlog.info(
+            f'{len(df[missing_provided_sex])}/{len(df)} samples with missing provided sex:'
+        )
         _print_stats(missing_provided_sex)
     if missing_inferred_sex.any():
-        pedlog.info(f'{len(df[missing_inferred_sex])}/{len(df)} samples with failed inferred sex:')
+        pedlog.info(
+            f'{len(df[missing_inferred_sex])}/{len(df)} samples with failed inferred sex:'
+        )
         _print_stats(missing_inferred_sex)
     inferred_cnt = len(df[~missing_inferred_sex])
     matching_cnt = len(df[matching_sex])
@@ -255,7 +262,7 @@ def check_pedigree(
         somalier_samples_fpath,
         somalier_pairs_fpath,
     )
-    
+
     pedlog.mismatching_sex = mismatching_sex.any()
     pedlog.mismatching_relationships = other_mismatching_pairs
     return pedlog
@@ -267,46 +274,35 @@ def infer_relationship(kin: float, ibs0: float, ibs2: float) -> Tuple[str, str]:
     and ibs0 and ibs2 values. Returns relashionship label and reason.
     """
     if kin < 0.1:
-        result = (
-            'unrelated', 
-            f'kin={kin:.3f} < 0.1'
-        )
+        result = ('unrelated', f'kin={kin:.3f} < 0.1')
     elif kin < 0.38:
-        result = (
-            'below_first_degree', 
-            f'kin={kin:.3f} < 0.38'
-        )
+        result = ('below_first_degree', f'kin={kin:.3f} < 0.38')
     elif kin <= 0.62:
         reason = f'kin={kin:.3f} < 0.62'
         if (ibs0 / ibs2) < 0.005:
             result = (
                 'parent-child',
-                reason + f' ibs0/ibs2={(ibs0 / ibs2):.4f} < 0.005'
+                reason + f' ibs0/ibs2={(ibs0 / ibs2):.4f} < 0.005',
             )
         elif 0.015 < (ibs0 / ibs2) < 0.052:
             result = (
-                'siblings', 
-                reason + f' 0.015 < ibs0/ibs2={(ibs0 / ibs2):.4f} < 0.052'
+                'siblings',
+                reason + f' 0.015 < ibs0/ibs2={(ibs0 / ibs2):.4f} < 0.052',
             )
         else:
             result = (
-                'first_degree', 
-                reason + (
+                'first_degree',
+                reason
+                + (
                     f', not parent-child (ibs0/ibs2={(ibs0 / ibs2):.4f} > 0.005)'
                     f', not sibling (0.015 < ibs0/ibs2={(ibs0 / ibs2):.4f} < 0.052)'
-                )
+                ),
             )
     elif kin < 0.8:
-        result = (
-            'first_degree_or_duplicate_or_twins', 
-            f'kin={kin:.3f} < 0.8'
-        )
+        result = ('first_degree_or_duplicate_or_twins', f'kin={kin:.3f} < 0.8')
     else:
         assert kin >= 0.8
-        result = (
-            'duplicate_or_twins',
-            f'kin={kin:.3f} >= 0.8'
-        )
+        result = ('duplicate_or_twins', f'kin={kin:.3f} >= 0.8')
     return result
 
 

@@ -70,7 +70,7 @@ class StageOutput:
         jobs: list[Job] | Job | None = None,
         reusable: bool = False,
         error_msg: str | None = None,
-        stage: Optional['Stage'] = None
+        stage: Optional['Stage'] = None,
     ):
         # Converting str into Path objects.
         self.data: StageOutputData | None
@@ -91,10 +91,10 @@ class StageOutput:
         res = (
             f'StageOutput({self.data}'
             f' target={self.target}'
-            f' stage={self.stage}' +
-            (f' [reusable]' if self.reusable else '') +
-            (f' [error: {self.error_msg}]' if self.error_msg else '') +
-            f')'
+            f' stage={self.stage}'
+            + (f' [reusable]' if self.reusable else '')
+            + (f' [error: {self.error_msg}]' if self.error_msg else '')
+            + f')'
         )
         return res
 
@@ -325,11 +325,12 @@ class StageInput:
                     all_jobs.extend(output.jobs)
         return all_jobs
 
-    
+
 class Action(Enum):
     """
     Indicates what a stage should do with a specific target.
     """
+
     QUEUE = 1
     SKIP = 2
     REUSE = 3
@@ -421,7 +422,7 @@ class Stage(Generic[TargetT], ABC):
 
         self.hail_billing_project = hail_billing_project
         self.hail_bucket = hail_bucket
-        
+
     def __str__(self):
         res = f'{self._name}'
         if self.skipped:
@@ -477,7 +478,7 @@ class Stage(Generic[TargetT], ABC):
             for _, stage_output in prev_stage.output_by_target.items():
                 inputs.add_other_stage_output(stage_output)
         return inputs
-    
+
     def make_outputs(
         self,
         target: 'Target',
@@ -490,17 +491,17 @@ class Stage(Generic[TargetT], ABC):
         Create StageOutput for this stage.
         """
         return StageOutput(
-            target=target, 
-            data=data, 
-            jobs=jobs, 
-            reusable=reusable, 
-            error_msg=error_msg, 
+            target=target,
+            data=data,
+            jobs=jobs,
+            reusable=reusable,
+            error_msg=error_msg,
             stage=self,
         )
 
     def _queue_jobs_with_checks(
-        self, 
-        target: TargetT, 
+        self,
+        target: TargetT,
         action: Action | None = None,
     ) -> StageOutput:
         """
@@ -511,7 +512,7 @@ class Stage(Generic[TargetT], ABC):
 
         inputs = self._make_inputs()
         expected_out = self.expected_outputs(target)
-        
+
         if action == Action.QUEUE:
             outputs = self.queue_jobs(target, inputs)
         elif action == Action.REUSE:
@@ -893,14 +894,14 @@ class Pipeline:
         return first_stage_num, last_stage_num
 
     def set_stages(
-        self, 
+        self,
         stages_classes: list[StageDecorator],
         force_all_implicit_stages: bool = False,
     ):
         """
         Iterate over stages and call queue_for_cohort(cohort) on each.
         Effectively creates all Hail Batch jobs through Stage.queue_jobs().
-        
+
         When `run_all_implicit_stages` is set, all required stages that were not set
         explicitly would still be run.
         """
@@ -918,8 +919,8 @@ class Pipeline:
             self._stages_dict[stage_.name] = stage_
 
         # Second round: checking which stages are required, even implicitly.
-        # implicit_stages_d: dict[str, Stage] = dict()  # If there are required 
-        # dependency stages that are not requested explicitly, we are putting them 
+        # implicit_stages_d: dict[str, Stage] = dict()  # If there are required
+        # dependency stages that are not requested explicitly, we are putting them
         # into this dict as `skipped`.
         while True:  # Might need several rounds to resolve dependencies recursively.
             newly_implicitly_added_d = dict()
@@ -931,7 +932,7 @@ class Pipeline:
                     reqstage = reqcls(self)
                     newly_implicitly_added_d[reqstage.name] = reqstage
                     if not force_all_implicit_stages:
-                        # Stage is not declared or requrested implicitly, so setting 
+                        # Stage is not declared or requrested implicitly, so setting
                         # it as skipped:
                         reqstage.skipped = True
                         logger.info(
@@ -944,7 +945,7 @@ class Pipeline:
                     f'Additional implicit stages: '
                     f'{list(newly_implicitly_added_d.keys())}'
                 )
-                # Adding new stages back into the ordered dict, so they are 
+                # Adding new stages back into the ordered dict, so they are
                 # executed first.
                 self._stages_dict = newly_implicitly_added_d | self._stages_dict
             else:
@@ -953,7 +954,7 @@ class Pipeline:
 
         for stage_ in self._stages_dict.values():
             stage_.required_stages = [
-                self._stages_dict[cls.__name__] 
+                self._stages_dict[cls.__name__]
                 for cls in stage_.required_stages_classes
             ]
 
@@ -985,8 +986,8 @@ class Pipeline:
             stage_.output_by_target = stage_.queue_for_cohort(self.cohort)
             if errors := self._process_stage_errors(stage_.output_by_target):
                 raise PipelineError(
-                    f'Stage {stage} failed to queue jobs with errors: ' + 
-                    '\n'.join(errors)
+                    f'Stage {stage} failed to queue jobs with errors: '
+                    + '\n'.join(errors)
                 )
 
             if not stage_.skipped:
@@ -994,7 +995,7 @@ class Pipeline:
                 if last_stage_num and i >= last_stage_num:
                     logger.info(f'Last stage is {stage_.name}, stopping here')
                     break
-    
+
     @staticmethod
     def _process_stage_errors(output_by_target: dict) -> list[str]:
         targets_by_error = defaultdict(list)
@@ -1002,7 +1003,7 @@ class Pipeline:
             if output.error_msg:
                 targets_by_error[output.error_msg].append(target.target_id)
         return [
-            f'{error}: {", ".join(target_ids)}' 
+            f'{error}: {", ".join(target_ids)}'
             for error, target_ids in targets_by_error.items()
         ]
 

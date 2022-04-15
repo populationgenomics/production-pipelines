@@ -201,8 +201,8 @@ def pipeline_click_options(function: Callable) -> Callable:
             default=False,
             is_flag=True,
             help='Chech input file existence (e.g. FASTQ files). If they are missing '
-                 'the --skip-samples-with-missing-input option controls whether such '
-                 'should be ignored, or raise an error.',
+            'the --skip-samples-with-missing-input option controls whether such '
+            'should be ignored, or raise an error.',
         ),
         click.option(
             '--check-expected-outputs/--no-check-expected-outputs',
@@ -222,8 +222,8 @@ def pipeline_click_options(function: Callable) -> Callable:
         click.option(
             '--slack-channel',
             'slack_channel',
-            help='Slack channel to send status reports with CPG status reporter.'
-        )
+            help='Slack channel to send status reports with CPG status reporter.',
+        ),
     ]
 
     # Applying decorators. Doing that in reverse order, because Click actually

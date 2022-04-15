@@ -5,8 +5,7 @@ Subclasses of Stage class specific for a Target subclass.
 import logging
 from abc import ABC, abstractmethod
 
-from .pipeline import Stage, ExpectedResultT, StageInput, StageOutput, \
-    Action
+from .pipeline import Stage, ExpectedResultT, StageInput, StageOutput, Action
 from ..targets import Sample, Cohort, Dataset
 
 logger = logging.getLogger(__file__)
@@ -55,7 +54,7 @@ class SampleStage(Stage[Sample], ABC):
             if len(set(action_by_sid.values())) == 1:
                 action = list(action_by_sid.values())[0]
                 if action == Action.REUSE:
-                    # All stages to be reused, but adding only one reuse job 
+                    # All stages to be reused, but adding only one reuse job
                     # (for whole dataset):
                     j = self.new_reuse_job(dataset)
                     inputs = self._make_inputs()
@@ -74,9 +73,11 @@ class SampleStage(Stage[Sample], ABC):
             logger.info(f'{self.name}: #{ds_i} {dataset}')
             for sample_i, sample in enumerate(dataset.get_samples()):
                 logger.info(f'{self.name}: #{sample_i}/{sample}')
-                output_by_target[sample.target_id] = self._queue_jobs_with_checks(sample)
+                output_by_target[sample.target_id] = self._queue_jobs_with_checks(
+                    sample
+                )
             logger.info('-#-#-#-')
-            
+
         return output_by_target
 
 
@@ -133,6 +134,4 @@ class CohortStage(Stage, ABC):
         """
         Override to plug in stage into the pipeline.
         """
-        return {
-            cohort.target_id: self._queue_jobs_with_checks(cohort)
-        }
+        return {cohort.target_id: self._queue_jobs_with_checks(cohort)}

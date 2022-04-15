@@ -152,9 +152,7 @@ def alignment_input_exists(v: AlignmentInput) -> bool:
     if isinstance(v, CramPath):
         return utils.exists(v.path)
     else:
-        return all(
-            utils.exists(pair.r1) and utils.exists(pair.r2) for pair in v
-        )
+        return all(utils.exists(pair.r1) and utils.exists(pair.r2) for pair in v)
 
 
 class SequencingType(Enum):

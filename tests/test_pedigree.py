@@ -12,6 +12,7 @@ class TestPedigree(unittest.TestCase):
     """
     Test pedigree checks.
     """
+
     def test_check_pedigree_good(self):
         data_dir = to_path(__file__).parent / 'data' / 'check_pedigree'
         result = check_pedigree.check_pedigree(

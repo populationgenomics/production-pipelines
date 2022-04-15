@@ -94,10 +94,12 @@ class TestJobs(unittest.TestCase):
         test_j.image(images.SAMTOOLS_PICARD_IMAGE)
         sed = r's/.*SM:\([^\t]*\).*/\1/g'
         fasta_reference = self.refs.fasta_res_group(self.pipeline.b)
-        cram = self.pipeline.b.read_input_group(**{
-            'cram': str(cram_path),
-            'cram.crai': str(cram_path) + '.crai',
-        })
+        cram = self.pipeline.b.read_input_group(
+            **{
+                'cram': str(cram_path),
+                'cram.crai': str(cram_path) + '.crai',
+            }
+        )
         test_j.command(
             f'samtools view -T {fasta_reference.base} {cram.cram} '
             f'-c > {test_j.reads_num}'
@@ -202,13 +204,11 @@ class TestJobs(unittest.TestCase):
         self.pipeline.run(wait=True)
 
         self.assertEqual(sid, _read_file(cram_details_paths['sample_name']))
-        cram_details = {
-            k: _read_file(v) for k, v in cram_details_paths.items()
-        }
+        cram_details = {k: _read_file(v) for k, v in cram_details_paths.items()}
         print(cram_details_paths)
         self.assertAlmostEqual(223007, int(cram_details['reads_num']), delta=50)
         self.assertAlmostEqual(
-            222678, 
+            222678,
             int(cram_details['reads_num_mapped_in_proper_pair']),
             delta=50,
         )
@@ -281,7 +281,9 @@ class TestJobs(unittest.TestCase):
          "One or more annotations (usually MQ) may have insufficient variance.":
         https://batch.hail.populationgenomics.org.au/batches/55673/jobs/3
         """
-        siteonly_vcf_path = utils.BASE_BUCKET / 'inputs/exome5pct/9samples-joint-called-siteonly.vcf.gz'
+        siteonly_vcf_path = (
+            utils.BASE_BUCKET / 'inputs/exome5pct/9samples-joint-called-siteonly.vcf.gz'
+        )
         tmp_vqsr_bucket = self.tmp_bucket / 'vqsr'
         out_vcf_path = self.out_bucket / 'vqsr' / 'vqsr.vcf.gz'
         jobs = make_vqsr_jobs(
@@ -309,7 +311,10 @@ class TestJobs(unittest.TestCase):
         Test VEP on VCF, parallelised by interval, with LOFtee plugin
         and MANE_SELECT annotation.
         """
-        siteonly_vcf_path = utils.BASE_BUCKET / 'inputs/exome0.1pct/9samples-joint-called-siteonly.vcf.gz'
+        siteonly_vcf_path = (
+            utils.BASE_BUCKET
+            / 'inputs/exome0.1pct/9samples-joint-called-siteonly.vcf.gz'
+        )
         out_vcf_path = self.out_bucket / 'vep' / 'vep.vcf.gz'
         jobs = vep.vep_jobs(
             self.pipeline.b,
@@ -433,11 +438,10 @@ class TestJobs(unittest.TestCase):
             utils.BASE_BUCKET / 'inputs/exome5pct/9samples-joint-called.vcf.gz'
         )
         siteonly_vqsr_path = (
-            utils.BASE_BUCKET / 'inputs/exome5pct/9samples-joint-called-siteonly-vqsr.vcf.gz'
+            utils.BASE_BUCKET
+            / 'inputs/exome5pct/9samples-joint-called-siteonly-vqsr.vcf.gz'
         )
-        vep_ht_path = to_path(
-            utils.BASE_BUCKET / 'inputs/exome5pct/9samples-vep.ht'
-        )
+        vep_ht_path = to_path(utils.BASE_BUCKET / 'inputs/exome5pct/9samples-vep.ht')
         out_mt_path = self.out_bucket / f'cohort-exome5pct.mt'
         annotate_cohort_jobs(
             self.pipeline.b,
@@ -462,8 +466,7 @@ class TestJobs(unittest.TestCase):
             f'siteonly-vqsr-{self.interval}.vcf.gz'
         )
         vep_ht_path = to_path(
-            f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/'
-            f'vep/{self.interval}.ht'
+            f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/' f'vep/{self.interval}.ht'
         )
         out_mt_path = self.out_bucket / f'cohort-{self.interval}.mt'
         annotate_cohort_jobs(
