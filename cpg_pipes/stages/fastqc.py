@@ -4,10 +4,10 @@ Stage that runs FastQC on alignment inputs.
 
 import logging
 
-from .. import Path
+from .. import Path, types
 from ..jobs import fastqc
 from ..targets import Sample
-from ..pipeline import stage, SampleStage, PipelineError, StageInput, StageOutput
+from ..pipeline import stage, SampleStage, StageInput, StageOutput
 
 logger = logging.getLogger(__file__)
 
@@ -31,24 +31,30 @@ class FastQC(SampleStage):
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """
-        Using the "fastqc" function implemented in the jobs module
+        Only running FastQC if sequencing inputs are available.
         """
-        if not sample.alignment_input:
-            if self.skip_samples_with_missing_input:
-                logger.error(f'Could not find read data, skipping sample {sample.id}')
-                sample.active = False
-                return self.make_outputs(sample)  # return empty output
-            else:
-                raise PipelineError(
-                    f'No alignment input found for {sample.id}. '
-                    f'Checked: Sequence entry and type=CRAM Analysis entry'
+        alignment_input = sample.alignment_input
+        if not alignment_input or (
+            self.check_inputs and 
+            not types.alignment_input_exists(alignment_input)
+        ):
+            if self.pipeline_config.get('fastqc_on_realigned_cram', False) and sample.get_cram_path().exists():
+                logger.info(
+                    f'No alignment inputs found for sample {sample.id}, using '
+                    f'aligned CRAM instead'
                 )
+                alignment_input = sample.get_cram_path()
+            else:
+                logger.warning(
+                    f'No alignment inputs, skipping sample {sample.id}'
+                )
+                return self.make_outputs(sample)  # return empty output
 
         jobs = fastqc.fastqc(
             b=self.b,
             output_html_path=self.expected_outputs(sample)['html'],
             output_zip_path=self.expected_outputs(sample)['zip'],
-            alignment_input=sample.alignment_input,
+            alignment_input=alignment_input,
             refs=self.refs,
             job_attrs=self.get_job_attrs(sample),
         )

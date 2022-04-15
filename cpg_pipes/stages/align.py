@@ -4,15 +4,15 @@ Stage that generates a CRAM file.
 
 import logging
 
-from .. import Path
+from .. import Path, types
 from ..targets import Sample
-from ..pipeline import stage, SampleStage, StageInput, StageOutput, PipelineError
+from ..pipeline import stage, SampleStage, StageInput, StageOutput
 from ..jobs import align
 
 logger = logging.getLogger(__file__)
 
 
-@stage(analysis_type='cram')
+@stage
 class Align(SampleStage):
     """
     Align or re-align input data to produce a CRAM file
@@ -28,13 +28,19 @@ class Align(SampleStage):
         """
         Using the "align" function implemented in the jobs module
         """
-        if not sample.alignment_input:
+        if not sample.alignment_input or (
+            self.check_inputs and 
+            not types.alignment_input_exists(sample.alignment_input)
+        ):
             if self.skip_samples_with_missing_input:
-                logger.error(f'No alignment input found, skipping sample {sample.id}')
+                logger.error(f'No alignment inputs, skipping sample {sample.id}')
                 sample.active = False
                 return self.make_outputs(sample)  # return empty output
             else:
-                raise PipelineError(f'No alignment input found for {sample.id}')
+                return self.make_outputs(
+                    target=sample, 
+                    error_msg=f'No alignment input found for {sample.id}'
+                )
 
         jobs = align.align(
             b=self.b,

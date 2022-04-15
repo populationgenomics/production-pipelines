@@ -15,7 +15,7 @@ from cpg_pipes.pipeline import (
 from cpg_pipes.stages.cramqc import SamtoolsStats, PicardWgsMetrics, VerifyBamId
 from cpg_pipes.stages.fastqc import FastQC
 from cpg_pipes.targets import Dataset
-from pipelines.somalier import CramSomalierPedigree, CramSomalierAncestry
+from pipelines.somalier import CramSomalierPedigree
 
 logger = logging.getLogger(__file__)
 
@@ -27,7 +27,6 @@ logger = logging.getLogger(__file__)
         PicardWgsMetrics,
         VerifyBamId,
         CramSomalierPedigree,
-        CramSomalierAncestry,
     ],
     forced=True,
 )
@@ -52,7 +51,6 @@ class MultiQC(DatasetStage):
         """
         somalier_samples = inputs.as_path(dataset, CramSomalierPedigree, id='samples')
         somalier_pairs = inputs.as_path(dataset, CramSomalierPedigree, id='pairs')
-        somalier_ancestry = inputs.as_path(dataset, CramSomalierAncestry, id='tsv')
 
         json_path = self.expected_outputs(dataset)['json']
         html_path = self.expected_outputs(dataset)['html']
@@ -61,17 +59,28 @@ class MultiQC(DatasetStage):
         else:
             html_url = None
 
-        paths = [somalier_samples, somalier_pairs, somalier_ancestry]
+        paths = [
+            somalier_samples, 
+            somalier_pairs, 
+        ]
         ending_to_trim = set()  # endings to trim to get sample names
         for sample in dataset.get_samples():
             for path in [
-                inputs.as_path(sample, FastQC, id='zip'),
                 inputs.as_path(sample, SamtoolsStats),
                 inputs.as_path(sample, PicardWgsMetrics),
                 inputs.as_path(sample, VerifyBamId),
             ]:
                 paths.append(path)
                 ending_to_trim.add(path.name.replace(sample.id, ''))
+            try:
+                path = inputs.as_path(sample, FastQC, id='zip')
+            except ValueError:
+                # We do not require FastQC for all samples
+                logger.warning(f'FastQC not found for {sample}, skipping')
+            else:
+                paths.append(path)
+                ending_to_trim.add(path.name.replace(sample.id, ''))
+
         assert ending_to_trim
         modules_to_trim_endings = {
             'fastqc/zip',
@@ -87,9 +96,11 @@ class MultiQC(DatasetStage):
             external_id_map={s.id: s.participant_id for s in dataset.get_samples()},
             ending_to_trim=ending_to_trim,
             modules_to_trim_endings=modules_to_trim_endings,
+            dataset_name=dataset.name,
             out_json_path=json_path,
             out_html_path=html_path,
             out_html_url=html_url,
             job_attrs=self.get_job_attrs(dataset),
+            status_reporter=self.status_reporter,
         )
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])

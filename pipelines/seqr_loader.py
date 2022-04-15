@@ -260,9 +260,9 @@ def main(
     if v := kwargs.get('version'):
         description += f', {v}'
     input_datasets = set(datasets) - set(kwargs.get('skip_datasets', []))
-    description += f': [{", ".join(input_datasets)}]'
+    description += f': [{", ".join(sorted(input_datasets))}]'
     if create_es_index_for_datasets:
-        description += f' → [{", ".join(create_es_index_for_datasets)}]'
+        description += f' → [{", ".join(sorted(create_es_index_for_datasets))}]'
 
     kwargs['analysis_dataset'] = 'seqr'
     pipeline = create_pipeline(

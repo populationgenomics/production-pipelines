@@ -16,7 +16,7 @@ from .align import Align
 logger = logging.getLogger(__file__)
 
 
-@stage(required_stages=Align, analysis_type='gvcf')
+@stage(required_stages=Align)
 class GenotypeSample(SampleStage):
     """
     Use HaplotypeCaller to genotype individual samples (i.e. CRAM -> GVCF).

@@ -16,7 +16,7 @@ from ..providers import (
 from ..providers.storage import Namespace, Cloud
 from ..providers.cpg import (
     CpgStorageProvider,
-    SmdbStatusReporter,
+    CpgStatusReporter,
     SmdbInputProvider,
 )
 from ..providers.cpg.smdb import SMDB
@@ -55,6 +55,7 @@ def create_pipeline(
     keep_scratch: bool = True,
     version: str | None = None,
     skip_samples_with_missing_input: bool = False,
+    check_inputs: bool = False,
     check_intermediates: bool = True,
     check_expected_outputs: bool = True,
     first_stage: str | None = None,
@@ -66,6 +67,7 @@ def create_pipeline(
     only_samples: list[str] | None = None,
     force_samples: list[str] | None = None,
     local_dir: Path | None = None,
+    slack_channel: str | None = None,
 ) -> 'Pipeline':
     """
     Create a Pipeline instance. All options correspond to command line parameters
@@ -77,12 +79,12 @@ def create_pipeline(
     input_provider: InputProvider | None = None
     if (
         input_provider_type == InputProviderType.SMDB
-        or status_reporter_type == StatusReporterType.SMDB
+        or status_reporter_type == StatusReporterType.CPG
     ):
         sm_proj = Dataset(analysis_dataset, namespace=namespace).stack
         smdb = SMDB(sm_proj)
-        if status_reporter_type == StatusReporterType.SMDB:
-            status_reporter = SmdbStatusReporter(smdb)
+        if status_reporter_type == StatusReporterType.CPG:
+            status_reporter = CpgStatusReporter(smdb, slack_channel=slack_channel)
         if input_provider_type == InputProviderType.SMDB:
             input_provider = SmdbInputProvider(smdb)
 
@@ -112,6 +114,7 @@ def create_pipeline(
         first_stage=first_stage,
         last_stage=last_stage,
         version=version,
+        check_inputs=check_inputs,
         check_intermediates=check_intermediates,
         check_expected_outputs=check_expected_outputs,
         skip_samples_with_missing_input=skip_samples_with_missing_input,

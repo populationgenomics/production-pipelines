@@ -76,8 +76,8 @@ def pipeline_click_options(function: Callable) -> Callable:
         click.option(
             '--analysis-dataset',
             'analysis_dataset',
-            required=True,
             help='Dataset name to write cohort and pipeline level intermediate files',
+            required=True,
         ),
         click.option(
             '--dataset',
@@ -153,7 +153,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             'status_reporter_type',
             type=choice_from_enum(StatusReporterType),
             callback=val_to_enum(StatusReporterType),
-            help='Use a status reporter implementation to report jobs statuses',
+            help='Report jobs statuses and results',
         ),
         click.option(
             '--input-provider',
@@ -184,7 +184,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             is_flag=True,
             help='For the first (not-skipped) stage, if the input for a target does not '
             'exist, just skip this target instead of failing. E.g. if the first '
-            'stage is Align, and sequence.meta files for a sample do not exist, '
+            'stage is Align, and `sequence.meta` files for a sample do not exist, '
             'remove this sample instead of failing.',
         ),
         click.option(
@@ -193,7 +193,16 @@ def pipeline_click_options(function: Callable) -> Callable:
             default=True,
             is_flag=True,
             help='Within jobs, check all in-job intermediate files for possible reuse. '
-            'If set to False, will overwrite all intermediates. ',
+            'If set to False, will overwrite all intermediates.',
+        ),
+        click.option(
+            '--check-inputs/--no-check-inputs',
+            'check_inputs',
+            default=False,
+            is_flag=True,
+            help='Chech input file existence (e.g. FASTQ files). If they are missing '
+                 'the --skip-samples-with-missing-input option controls whether such '
+                 'should be ignored, or raise an error.',
         ),
         click.option(
             '--check-expected-outputs/--no-check-expected-outputs',
@@ -210,6 +219,11 @@ def pipeline_click_options(function: Callable) -> Callable:
             help='Local directory for temporary files. Usually takes a few kB. '
             'If not provided, a temp folder will be created',
         ),
+        click.option(
+            '--slack-channel',
+            'slack_channel',
+            help='Slack channel to send status reports with CPG status reporter.'
+        )
     ]
 
     # Applying decorators. Doing that in reverse order, because Click actually

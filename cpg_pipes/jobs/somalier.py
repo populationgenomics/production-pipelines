@@ -2,14 +2,18 @@
 Adding jobs for fingerprinting and pedigree checks. Mostly using Somalier.
 """
 import logging
+from os.path import basename
+from textwrap import dedent
+
 import pandas as pd
 from hailtop.batch.job import Job
-from hailtop.batch import Batch, Resource, ResourceFile
+from hailtop.batch import Batch, ResourceFile
 
 from cpg_pipes import Path, to_path
 from cpg_pipes import images, utils
 from cpg_pipes.hb.command import wrap_command, seds_to_extend_sample_ids
 from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.providers.status import StatusReporter
 from cpg_pipes.types import CramPath, GvcfPath
 from cpg_pipes.targets import Dataset
 from cpg_pipes.refdata import RefData
@@ -31,6 +35,8 @@ def pedigree(
     out_checks_path: Path | None = None,
     label: str | None = None,
     ignore_missing: bool = False,
+    job_attrs: dict | None = None,
+    status_reporter: StatusReporter | None = None,
 ) -> list[Job]:
     """
     Add somalier and peddy based jobs that infer relatedness and sex, compare that
@@ -52,6 +58,7 @@ def pedigree(
         overwrite=overwrite,
         label=label,
         ignore_missing=ignore_missing,
+        job_attrs=job_attrs,
     )
 
     relate_j = _relate(
@@ -66,7 +73,12 @@ def pedigree(
         out_pairs_path=out_pairs_path,
         out_html_path=out_html_path,
         out_html_url=out_html_url,
+        job_attrs=job_attrs,
     )
+    if out_html_url and status_reporter:
+        status_reporter.slack_env(relate_j)
+        text = f'*[{dataset.name}]* <{out_html_url}|somalier report>'
+        relate_j.command(dedent(status_reporter.slack_message_cmd(text=text)))
 
     check_j = check_pedigree_job(
         b=b,
@@ -74,11 +86,14 @@ def pedigree(
         pairs_file=relate_j.output_pairs,
         external_id_map={s.id: s.participant_id for s in dataset.get_samples()},
         label=label,
-        somalier_html_url=out_html_url,
+        dataset_name=dataset.name,
         out_checks_path=out_checks_path,
-        job_attrs=dataset.get_job_attrs(),
+        job_attrs=job_attrs,
     )
+    if status_reporter:
+        status_reporter.slack_env(check_j)
     check_j.depends_on(relate_j)
+
     return extract_jobs + [relate_j, check_j]
 
 
@@ -107,6 +122,7 @@ def ancestry(
     label: str | None = None,
     ignore_missing: bool = False,
     job_attrs: dict | None = None,
+    status_reporter: StatusReporter | None = None,
 ) -> Job:
     """
     Run somalier ancestry https://github.com/brentp/somalier/wiki/ancestry
@@ -134,6 +150,13 @@ def ancestry(
         out_html_url=out_html_url,
         job_attrs=job_attrs,
     )
+    if out_html_url and status_reporter:
+        status_reporter.slack_env(j)
+        text = (
+            f'*[{dataset.name}]* ancestry report: '
+            f'<{out_html_url}|{basename(out_html_url)}>'
+        )
+        j.command(dedent(status_reporter.slack_message_cmd(text=text)))
     return j
 
 
@@ -220,17 +243,17 @@ def check_pedigree_job(
     script_path = to_path(check_pedigree.__file__)
     script_name = script_path.name
     cmd = f"""\
-    pip3 install peddy slack_sdk google-cloud-secret-manager
     {seds_to_extend_sample_ids(external_id_map, [samples_file, pairs_file])}
     python3 {script_name} \\
-    --somalier-samples {samples_file} \
-    --somalier-pairs {pairs_file} \
-    {('--dataset ' + dataset_name) if dataset_name else ''} \
-    {('--somalier-html ' + somalier_html_url) if somalier_html_url else ''} \
-    --slack
+    --somalier-samples {samples_file} \\
+    --somalier-pairs {pairs_file} \\
+    {('--dataset ' + dataset_name) if dataset_name else ''} \\
 
     touch {check_j.output}
     """
+    if somalier_html_url:
+        cmd += '\n' + f'echo "HTML URL: {somalier_html_url}"'
+
     check_j.command(
         wrap_command(
             cmd,
@@ -238,7 +261,8 @@ def check_pedigree_job(
             setup_gcp=True,
         )
     )
-    check_j.image(images.DRIVER_IMAGE)
+    check_j.image(images.PEDDY_IMAGE)
+
     if out_checks_path:
         b.write_output(check_j.output, str(out_checks_path))
     return check_j

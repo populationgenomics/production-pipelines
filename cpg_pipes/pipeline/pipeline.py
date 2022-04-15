@@ -16,6 +16,7 @@ import shutil
 import tempfile
 import time
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from enum import Enum
 from typing import cast, Callable, Union, TypeVar, Generic, Any, Optional, Type
 
@@ -64,20 +65,38 @@ class StageOutput:
 
     def __init__(
         self,
-        data: StageOutputData,
-        stage: 'Stage',
         target: 'Target',
-        jobs: list[Job] | None = None,
+        data: StageOutputData | str | dict[str, str] | None = None,
+        jobs: list[Job] | Job | None = None,
         reusable: bool = False,
+        error_msg: str | None = None,
+        stage: Optional['Stage'] = None
     ):
-        self.data = data
+        # Converting str into Path objects.
+        self.data: StageOutputData | None
+        if isinstance(data, dict):
+            self.data = {k: to_path(v) for k, v in data.items()}
+        elif data is not None:
+            self.data = to_path(data)
+        else:
+            self.data = data
+
         self.stage = stage
         self.target = target
-        self.jobs: list[Job] = jobs or []
+        self.jobs: list[Job] = [jobs] if isinstance(jobs, Job) else (jobs or [])
         self.reusable = reusable
+        self.error_msg = error_msg
 
     def __repr__(self) -> str:
-        return f'result {self.data} for target {self.target}, stage {self.stage}'
+        res = (
+            f'StageOutput({self.data}'
+            f' target={self.target}'
+            f' stage={self.stage}' +
+            (f' [reusable]' if self.reusable else '') +
+            (f' [error: {self.error_msg}]' if self.error_msg else '') +
+            f')'
+        )
+        return res
 
     def as_path_or_resource(self, id=None) -> Path | hb.Resource:
         """
@@ -162,6 +181,7 @@ class StageInput:
         """
         Add output from another stage run
         """
+        assert output.stage is not None, output
         if output.target.active:
             stage_name = output.stage.name
             target_id = output.target.target_id
@@ -335,9 +355,10 @@ class Stage(Generic[TargetT], ABC):
         skipped: bool = False,
         assume_outputs_exist: bool = False,
         forced: bool = False,
-        skip_samples_with_missing_input: bool = False,
-        check_expected_outputs: bool = False,
+        check_inputs: bool = False,
         check_intermediates: bool = False,
+        check_expected_outputs: bool = False,
+        skip_samples_with_missing_input: bool = False,
         status_reporter: StatusReporter | None = None,
         pipeline_config: dict[str, Any] | None = None,
     ):
@@ -367,9 +388,10 @@ class Stage(Generic[TargetT], ABC):
         self.cohort = cohort
         self.refs = refs
 
-        self.skip_samples_with_missing_input = skip_samples_with_missing_input
-        self.check_expected_outputs = check_expected_outputs
+        self.check_inputs = check_inputs
         self.check_intermediates = check_intermediates
+        self.check_expected_outputs = check_expected_outputs
+        self.skip_samples_with_missing_input = skip_samples_with_missing_input
 
         self.required_stages_classes: list[StageDecorator] = []
         if required_stages:
@@ -446,44 +468,6 @@ class Stage(Generic[TargetT], ABC):
         Returns a dictionary of `StageOutput` objects indexed by target unique_id.
         """
 
-    def make_outputs(
-        self,
-        target: TargetT,
-        data: StageOutputData | str | dict[str, str] | None = None,
-        jobs: list[Job] | Job | None = None,
-    ) -> StageOutput:
-        """
-        Builds a StageDeps object to return from a stage's queue_jobs()
-        """
-        # Converting str into Path objects.
-        path_data: StageOutputData
-        if isinstance(data, dict):
-            path_data = {k: to_path(v) for k, v in data.items()}
-        elif data is not None:
-            path_data = to_path(data)
-        else:
-            path_data = data
-        jobs = [jobs] if isinstance(jobs, Job) else jobs
-        # Adding status reporter jobs
-        if self.analysis_type:
-            if isinstance(path_data, hb.Resource) or (
-                isinstance(path_data, dict)
-                and any(isinstance(d, hb.Resource) for k, d in path_data.items())
-            ):
-                raise PipelineError(
-                    'Cannot use hb.Resource objects with status reporter. '
-                    'Only supported Path objects and dicts of Path objects'
-                )
-            if self.status_reporter:
-                self.status_reporter.add_updaters_jobs(
-                    b=self.b,
-                    output=path_data,
-                    analysis_type=self.analysis_type,
-                    target=target,
-                    jobs=jobs,
-                )
-        return StageOutput(stage=self, target=target, data=data, jobs=jobs)
-
     def _make_inputs(self) -> StageInput:
         """
         Collects outputs from all dependencies and create input for this stage
@@ -493,6 +477,26 @@ class Stage(Generic[TargetT], ABC):
             for _, stage_output in prev_stage.output_by_target.items():
                 inputs.add_other_stage_output(stage_output)
         return inputs
+    
+    def make_outputs(
+        self,
+        target: 'Target',
+        data: StageOutputData | str | dict[str, str] | None = None,
+        jobs: list[Job] | Job | None = None,
+        reusable: bool = False,
+        error_msg: str | None = None,
+    ) -> StageOutput:
+        """
+        Create StageOutput for this stage.
+        """
+        return StageOutput(
+            target=target, 
+            data=data, 
+            jobs=jobs, 
+            reusable=reusable, 
+            error_msg=error_msg, 
+            stage=self,
+        )
 
     def _queue_jobs_with_checks(
         self, 
@@ -516,10 +520,26 @@ class Stage(Generic[TargetT], ABC):
                 data=expected_out,
                 jobs=self.new_reuse_job(target),
             )
+            outputs.reusable = True
         else:
             outputs = self.make_outputs(target=target)
+        outputs.stage = self
         for j in outputs.jobs:
             j.depends_on(*inputs.get_jobs(target))
+
+        if outputs.error_msg:
+            return outputs
+
+        # Adding status reporter jobs
+        if self.analysis_type and self.status_reporter:
+            self.status_reporter.add_updaters_jobs(
+                b=self.b,
+                output=outputs.data,
+                analysis_type=self.analysis_type,
+                target=target,
+                jobs=outputs.jobs,
+                prev_jobs=inputs.get_jobs(target),
+            )
         return outputs
 
     def new_reuse_job(self, target: Target) -> Job:
@@ -661,12 +681,14 @@ def stage(
                 hail_bucket=pipeline.hail_bucket,
                 required_stages=required_stages,
                 analysis_type=analysis_type,
+                status_reporter=pipeline.status_reporter,
                 skipped=skipped,
                 assume_outputs_exist=assume_outputs_exist,
                 forced=forced,
-                skip_samples_with_missing_input=pipeline.skip_samples_with_missing_input,
-                check_expected_outputs=pipeline.check_expected_outputs,
+                check_inputs=pipeline.check_inputs,
                 check_intermediates=pipeline.check_intermediates,
+                check_expected_outputs=pipeline.check_expected_outputs,
+                skip_samples_with_missing_input=pipeline.skip_samples_with_missing_input,
                 pipeline_config=pipeline.config,
             )
 
@@ -743,6 +765,7 @@ class Pipeline:
         first_stage: str | None = None,
         last_stage: str | None = None,
         version: str | None = None,
+        check_inputs: bool = False,
         check_intermediates: bool = True,
         check_expected_outputs: bool = True,
         skip_samples_with_missing_input: bool = False,
@@ -785,8 +808,8 @@ class Pipeline:
             description = name
             if version:
                 description += f' {version}'
-            if dnames := set([d.name for d in self.cohort.get_datasets()]):
-                description += ': ' + ', '.join(dnames)
+            if ds_set := set(d.name for d in self.cohort.get_datasets()):
+                description += ': ' + ', '.join(sorted(ds_set))
         self.b: Batch = setup_batch(
             description=description,
             billing_project=self.hail_billing_project,
@@ -797,6 +820,7 @@ class Pipeline:
         self.dry_run = dry_run
         self.keep_scratch = keep_scratch
 
+        self.check_inputs = check_inputs
         self.check_intermediates = check_intermediates
         self.check_expected_outputs = check_expected_outputs
         self.skip_samples_with_missing_input = skip_samples_with_missing_input
@@ -956,18 +980,31 @@ class Pipeline:
 
         # Second round - actually adding jobs from the stages.
         for i, (_, stage_) in enumerate(self._stages_dict.items()):
-            if not stage_.skipped:
-                logger.info(f'*' * 60)
-                logger.info(f'Stage {stage_.name}')
-
+            logger.info(f'*' * 60)
             logger.info(f'Stage {stage_}')
             stage_.output_by_target = stage_.queue_for_cohort(self.cohort)
+            if errors := self._process_stage_errors(stage_.output_by_target):
+                raise PipelineError(
+                    f'Stage {stage} failed to queue jobs with errors: ' + 
+                    '\n'.join(errors)
+                )
 
             if not stage_.skipped:
                 logger.info(f'')
                 if last_stage_num and i >= last_stage_num:
                     logger.info(f'Last stage is {stage_.name}, stopping here')
                     break
+    
+    @staticmethod
+    def _process_stage_errors(output_by_target: dict) -> list[str]:
+        targets_by_error = defaultdict(list)
+        for target, output in output_by_target.items():
+            if output.error_msg:
+                targets_by_error[output.error_msg].append(target.target_id)
+        return [
+            f'{error}: {", ".join(target_ids)}' 
+            for error, target_ids in targets_by_error.items()
+        ]
 
     def get_datasets(self, only_active: bool = True) -> list[Dataset]:
         """

@@ -1,13 +1,14 @@
 """
 Basic bioinformatics status types.
 """
-import hashlib
+
 import logging
 from dataclasses import dataclass
 from enum import Enum
 from typing import List, Union
 
 from . import Path, to_path
+from . import utils
 from hailtop.batch import ResourceGroup, ResourceFile, Batch
 
 logger = logging.getLogger(__file__)
@@ -142,6 +143,18 @@ FastqPairs = List[FastqPair]
 
 # Alignment input can be a CRAM file on a bucket, or a list of Fastq pairs on a bucket.
 AlignmentInput = Union[FastqPairs, CramPath]
+
+
+def alignment_input_exists(v: AlignmentInput) -> bool:
+    """
+    Check if all files in alignment inputs exist.
+    """
+    if isinstance(v, CramPath):
+        return utils.exists(v.path)
+    else:
+        return all(
+            utils.exists(pair.r1) and utils.exists(pair.r2) for pair in v
+        )
 
 
 class SequencingType(Enum):

@@ -14,9 +14,11 @@ BWAMEM2_IMAGE = f'{AR_REPO}/bwamem2:v0'
 DRAGMAP_IMAGE = f'{AR_REPO}/dragmap:1.2.1'
 SAMTOOLS_PICARD_IMAGE = f'{AR_REPO}/picard_samtools:v0'
 SOMALIER_IMAGE = f'{AR_REPO}/somalier:v0.2.15'
-PEDDY_IMAGE = f'{AR_REPO}/peddy:0.4.8--pyh5e36f6f_0'
+PEDDY_IMAGE = f'{AR_REPO}/peddy:v0'
 VEP_IMAGE = f'{AR_REPO}/vep:105'
 VERIFY_BAMID = f'{AR_REPO}/verify-bam-id:1.0.1'
+MULTIQC_IMAGE = f'{AR_REPO}/multiqc:v1.12'
+FASTQC_IMAGE = f'{AR_REPO}/fastqc:v0.11.9_cv8'
 
 # For exploration
 BIOINFO_IMAGE = f'{AR_REPO}/bioinformatics:v1-1'
