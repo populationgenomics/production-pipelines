@@ -8,12 +8,11 @@ import click_config_file
 import yaml  # type: ignore
 
 from ..providers import (
-    Namespace,
-    Cloud,
     StoragePolicyType,
     StatusReporterType,
     InputProviderType,
 )
+from ..providers.storage import Namespace, Cloud
 
 
 def choice_from_enum(cls: Type[Enum]) -> click.Choice:
@@ -78,6 +77,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             '--analysis-dataset',
             'analysis_dataset',
             help='Dataset name to write cohort and pipeline level intermediate files',
+            required=True,
         ),
         click.option(
             '--dataset',
@@ -85,12 +85,6 @@ def pipeline_click_options(function: Callable) -> Callable:
             multiple=True,
             help='Only read samples that belong to the given dataset(s). '
             'Can be set multiple times.',
-        ),
-        click.option(
-            '--ped-file',
-            'ped_files',
-            multiple=True,
-            help='PED file (will override sample-metadata family data if available)',
         ),
         click.option(
             '--first-stage',
@@ -159,7 +153,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             'status_reporter_type',
             type=choice_from_enum(StatusReporterType),
             callback=val_to_enum(StatusReporterType),
-            help='Use a status reporter implementation to report jobs statuses',
+            help='Report jobs statuses and results',
         ),
         click.option(
             '--input-provider',
@@ -190,7 +184,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             is_flag=True,
             help='For the first (not-skipped) stage, if the input for a target does not '
             'exist, just skip this target instead of failing. E.g. if the first '
-            'stage is Align, and sequence.meta files for a sample do not exist, '
+            'stage is Align, and `sequence.meta` files for a sample do not exist, '
             'remove this sample instead of failing.',
         ),
         click.option(
@@ -199,7 +193,16 @@ def pipeline_click_options(function: Callable) -> Callable:
             default=True,
             is_flag=True,
             help='Within jobs, check all in-job intermediate files for possible reuse. '
-            'If set to False, will overwrite all intermediates. ',
+            'If set to False, will overwrite all intermediates.',
+        ),
+        click.option(
+            '--check-inputs/--no-check-inputs',
+            'check_inputs',
+            default=False,
+            is_flag=True,
+            help='Chech input file existence (e.g. FASTQ files). If they are missing '
+            'the --skip-samples-with-missing-input option controls whether such '
+            'should be ignored, or raise an error.',
         ),
         click.option(
             '--check-expected-outputs/--no-check-expected-outputs',
@@ -218,15 +221,14 @@ def pipeline_click_options(function: Callable) -> Callable:
         ),
     ]
 
-    # Click shows options in a reverse order, so inverting the list back:
-    options = options[::-1]
-
-    # Applying decorators:
-    for opt in options:
+    # Applying decorators. Doing that in reverse order, because Click actually
+    # inverts the order of shown options, assuming the decorators order of
+    # application which is bottom to top.
+    for opt in options[::-1]:
         function = opt(function)
 
-    # Add ability to load options from a yaml file
-    # using https://pypi.org/project/click-config-file/
+    # Adding ability to load options from a yaml file
+    # using https://pypi.org/project/click-config-file
     def yaml_provider(fp, _):
         """Load options from YAML"""
         with open(fp) as f:
