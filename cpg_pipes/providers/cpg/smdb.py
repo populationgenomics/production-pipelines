@@ -155,6 +155,74 @@ class SMDB:
             traceback.print_exc()
         analysis.status = status
 
+    def find_joint_calling_analysis(
+        self,
+        sample_ids: list[str],
+        project_name: str | None = None,
+    ) -> Analysis | None:
+        """
+        Query the DB to find the last completed joint-calling analysis for the samples.
+        """
+        try:
+            data = self.aapi.get_latest_complete_analysis_for_type(
+                project=project_name or self.project_name,
+                analysis_type=models.AnalysisType('joint-calling'),
+            )
+        except ApiException:
+            return None
+        a = Analysis.parse(data)
+        if not a:
+            return None
+        assert a.type == AnalysisType.JOINT_CALLING, data
+        assert a.status == AnalysisStatus.COMPLETED, data
+        if a.sample_ids != set(sample_ids):
+            return None
+        return a
+
+    def find_analyses_by_sid(
+        self,
+        sample_ids: list[str],
+        analysis_type: AnalysisType,
+        analysis_status: AnalysisStatus = AnalysisStatus.COMPLETED,
+        meta: dict | None = None,
+        project_name: str | None = None,
+    ) -> dict[str, Analysis]:
+        """
+        Query the DB to find the last completed analysis for the type and samples,
+        one Analysis object per sample. Assumes the analysis is defined for a single
+        sample (e.g. cram, gvcf).
+        """
+        project_name = project_name or self.project_name
+
+        analysis_per_sid: dict[str, Analysis] = dict()
+
+        logger.info(
+            f'Querying {analysis_type} analysis entries for dataset {project_name}...'
+        )
+        datas = self.aapi.query_analyses(
+            models.AnalysisQueryModel(
+                projects=[project_name],
+                sample_ids=sample_ids,
+                type=models.AnalysisType(analysis_type.value),
+                status=models.AnalysisStatus(analysis_status.value),
+                meta=meta or {},
+            )
+        )
+
+        for data in datas:
+            a = Analysis.parse(data)
+            if not a:
+                continue
+            assert a.status == AnalysisStatus.COMPLETED, data
+            assert a.type == analysis_type, data
+            assert len(a.sample_ids) == 1, data
+            analysis_per_sid[list(a.sample_ids)[0]] = a
+        logger.info(
+            f'Querying {analysis_type} analysis entries for dataset {project_name}: '
+            f'found {len(analysis_per_sid)}'
+        )
+        return analysis_per_sid
+
     def create_analysis(
         self,
         output: Path | str,
@@ -190,6 +258,100 @@ class SMDB:
             )
             return aid
 
+    def process_existing_analysis(
+        self,
+        sample_ids: list[str],
+        completed_analysis: Analysis | None,
+        analysis_type: str,
+        expected_output_fpath: Path,
+        project_name: str | None = None,
+    ) -> Path | None:
+        """
+        Checks whether existing analysis exists, and output matches the expected output
+        file. Invalidates bad analysis by setting status=failure, and submits a
+        status=completed analysis if the expected output already exists.
+
+        Returns the path to the output if it can be reused, otherwise None.
+
+        @param sample_ids: sample IDs to pull the analysis for
+        @param completed_analysis: existing completed analysis of this type for these
+        samples
+        @param analysis_type: cram, gvcf, joint_calling
+        @param expected_output_fpath: where the pipeline expects the analysis output
+        file to sit on the bucket (will invalidate the analysis when it doesn't match)
+        @param project_name: the name of the project where to create a new analysis
+        @return: path to the output if it can be reused, otherwise None
+        """
+        label = f'type={analysis_type}'
+        if len(sample_ids) > 1:
+            label += f' for {", ".join(sample_ids)}'
+
+        found_output_fpath: Path | None = None
+        if not completed_analysis:
+            logger.warning(
+                f'Not found completed analysis {label} for '
+                f'{f"sample {sample_ids}" if len(sample_ids) == 1 else f"{len(sample_ids)} samples" }'
+            )
+        elif not completed_analysis.output:
+            logger.error(
+                f'Found a completed analysis {label}, '
+                f'but the "output" field does not exist or empty'
+            )
+        else:
+            found_output_fpath = completed_analysis.output
+            if found_output_fpath != expected_output_fpath:
+                logger.error(
+                    f'Found a completed analysis {label}, but the "output" path '
+                    f'{found_output_fpath} does not match the expected path '
+                    f'{expected_output_fpath}'
+                )
+                found_output_fpath = None
+            elif not utils.exists(found_output_fpath):
+                logger.error(
+                    f'Found a completed analysis {label}, '
+                    f'but the "output" file {found_output_fpath} does not exist'
+                )
+                found_output_fpath = None
+
+        # completed and good exists, can reuse
+        if found_output_fpath:
+            logger.info(
+                f'Completed analysis {label} exists, '
+                f'reusing the result {found_output_fpath}'
+            )
+            return found_output_fpath
+
+        # can't reuse, need to invalidate
+        if completed_analysis:
+            logger.warning(
+                f'Invalidating the analysis {label} by setting the status to "failure", '
+                f'and resubmitting the analysis.'
+            )
+            self.update_analysis(completed_analysis, status=AnalysisStatus.FAILED)
+
+        # can reuse, need to create a completed one?
+        if utils.exists(expected_output_fpath):
+            logger.info(
+                f'Output file {expected_output_fpath} already exists, so creating '
+                f'an analysis {label} with status=completed'
+            )
+            self.create_analysis(
+                type_=analysis_type,
+                output=expected_output_fpath,
+                status='completed',
+                sample_ids=sample_ids,
+                project_name=project_name or self.project_name,
+            )
+            return expected_output_fpath
+
+        # proceeding with the standard pipeline (creating status=queued, submitting jobs)
+        else:
+            logger.info(
+                f'Expected output file {expected_output_fpath} does not exist, '
+                f'so queueing analysis {label}'
+            )
+            return None
+
     def get_ped_entries(self, project_name: str | None = None) -> list[dict[str, str]]:
         """
         Retrieve PED lines for a specified SM project, with external participant IDs.
@@ -204,6 +366,7 @@ class SMDB:
             project=project_name,
             replace_with_participant_external_ids=True,
         )
+
         return ped_entries
 
 

@@ -9,7 +9,8 @@ from typing import Union
 
 from cloudpathlib import CloudPath
 from cloudpathlib.anypath import to_anypath
-import hail_az  # importing to register hail-az prefix.
+# noinspection PyUnresolvedReferences
+from . import hail_az  # importing to register hail-az prefix.
 
 
 # Path can be either a cloud URL or a local posix file path.

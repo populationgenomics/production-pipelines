@@ -4,8 +4,6 @@ Providers that can be overridden in specific infrastructures.
 
 from enum import Enum
 
-from .storage import Namespace, Cloud
-
 
 class InputProviderType(Enum):
     """Available types of input providers"""
@@ -23,4 +21,4 @@ class StoragePolicyType(Enum):
 class StatusReporterType(Enum):
     """Available types of status reporters"""
 
-    SMDB = 'smdb'
+    CPG = 'cpg'

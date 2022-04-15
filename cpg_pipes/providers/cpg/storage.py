@@ -16,6 +16,7 @@ class CpgStorageProvider(StorageProvider):
     """
 
     def __init__(self, cloud: Cloud = Cloud.GS):
+        super().__init__(cloud)
         self.gc_prefix = 'cpg'
         super().__init__(cloud, az_account='cpg')
 

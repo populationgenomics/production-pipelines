@@ -1,11 +1,12 @@
 """
 CPG implementation of status reporter.
 """
-
+import os
 from textwrap import dedent
 
+from google.cloud import secretmanager
 from hailtop.batch.job import Job
-from hailtop.batch import Batch
+from hailtop.batch import Batch, Resource
 
 from ... import images, Path
 from ...hb.command import wrap_command
@@ -18,30 +19,52 @@ from ..status import (
 from .smdb import SMDB, SmdbError
 
 
-class SmdbStatusReporter(StatusReporter):
+class CpgStatusReporter(StatusReporter):
     """
     Job status reporter. Works through creating and updating sample-metadata
     database Analysis entries.
     """
 
-    def __init__(self, smdb: SMDB):
+    def __init__(self, smdb: SMDB, slack_channel: str | None = None):
+        super().__init__()
         self.smdb = smdb
+        self.slack_channel = slack_channel or os.environ.get('CPG_SLACK_CHANNEL')
+        self.slack_token = os.environ.get('CPG_SLACK_TOKEN')
+        if self.slack_channel and not self.slack_token:
+            project_id = 'cpg-common'
+            secret_name = 'slack-seqr-loader-token'
+            slack_token_secret = (
+                f'projects/{project_id}/secrets/{secret_name}/versions/latest'
+            )
+            secret_manager = secretmanager.SecretManagerServiceClient()
+            # noinspection PyTypeChecker
+            response = secret_manager.access_secret_version(
+                request={'name': slack_token_secret}
+            )
+            self.slack_token = response.payload.data.decode('UTF-8')
 
     def add_updaters_jobs(
         self,
         b: Batch,
-        output: Path | dict[str, Path],
+        output: Path | Resource | dict[str, Path | Resource],
         analysis_type: str,
         target: Target,
         jobs: list[Job] | None = None,
+        prev_jobs: list[Job] | None = None,
     ) -> list[Job]:
         """
-        Create "queued" analysis and insert "in_progress", and "completed" updater jobs.
+        Create "queued" analysis and insert "in_progress" and "completed" updater jobs.
         """
         if isinstance(output, dict):
             raise StatusReporterError(
-                'SmdbStatusReporter only supports a single Path ' 'as an output data.'
+                'SmdbStatusReporter only supports a single Path as output data.'
             )
+        if isinstance(output, Resource):
+            raise StatusReporterError(
+                'Cannot use hail.batch.Resource objects with status reporter. '
+                'Only supported single Path objects'
+            )
+
         if not jobs:
             return []
         # Interacting with the sample metadata server:
@@ -73,7 +96,8 @@ class SmdbStatusReporter(StatusReporter):
             job_attrs=target.get_job_attrs(),
         )
 
-        in_progress_j.depends_on(jobs[0])
+        if prev_jobs:
+            in_progress_j.depends_on(*prev_jobs)
         completed_j.depends_on(*jobs)
         return [in_progress_j, *jobs, completed_j]
 
