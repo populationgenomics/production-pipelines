@@ -11,6 +11,4 @@ RUN apt-get update && apt-get install -y git wget bash bzip2 zip curl && \
     micromamba install -y --prefix $MAMBA_ROOT_PREFIX -c bioconda -c conda-forge \
     google-cloud-sdk && \
     rm -r /root/micromamba/pkgs && \
-    wget https://github.com/brentp/somalier/releases/download/v0.2.15/somalier && \
-    mv ./somalier /root/micromamba/bin/somalier && \
-    chmod +x /root/micromamba/bin/somalier
+    pip3 install multiqc
