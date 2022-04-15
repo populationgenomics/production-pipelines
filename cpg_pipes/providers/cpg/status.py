@@ -25,8 +25,23 @@ class CpgStatusReporter(StatusReporter):
     database Analysis entries.
     """
 
-    def __init__(self, smdb: SMDB):
+    def __init__(self, smdb: SMDB, slack_channel: str | None = None):
+        super().__init__()
         self.smdb = smdb
+        self.slack_channel = slack_channel or os.environ.get('CPG_SLACK_CHANNEL')
+        self.slack_token = os.environ.get('CPG_SLACK_TOKEN')
+        if self.slack_channel and not self.slack_token:
+            project_id = 'cpg-common'
+            secret_name = 'slack-seqr-loader-token'
+            slack_token_secret = (
+                f'projects/{project_id}/secrets/{secret_name}/versions/latest'
+            )
+            secret_manager = secretmanager.SecretManagerServiceClient()
+            # noinspection PyTypeChecker
+            response = secret_manager.access_secret_version(
+                request={'name': slack_token_secret}
+            )
+            self.slack_token = response.payload.data.decode('UTF-8')
 
     def add_updaters_jobs(
         self,
