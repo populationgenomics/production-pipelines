@@ -12,14 +12,32 @@ class TestPedigree(unittest.TestCase):
     """
     Test pedigree checks.
     """
-
-    def test_check_pedigree(self):
+    def test_check_pedigree_good(self):
         data_dir = to_path(__file__).parent / 'data' / 'check_pedigree'
-
-        check_pedigree.check_pedigree(
-            somalier_samples_fpath=str(data_dir / 'somalier-samples.tsv'),
-            somalier_pairs_fpath=str(data_dir / 'somalier-pairs.tsv'),
+        result = check_pedigree.check_pedigree(
+            somalier_samples_fpath=str(data_dir / 'output_samples_good.tsv'),
+            somalier_pairs_fpath=str(data_dir / 'output_pairs_good.tsv'),
         )
+        for expected_line in [
+            'Sex inferred for 28/28 samples, matching in all samples.',
+            'Inferred pedigree matches for all 28 samples.',
+        ]:
+            self.assertTrue(any(expected_line in msg for msg in result.messages))
+
+    def test_check_pedigree_bad(self):
+        data_dir = to_path(__file__).parent / 'data' / 'check_pedigree'
+        result = check_pedigree.check_pedigree(
+            somalier_samples_fpath=str(data_dir / 'output_samples_bad.tsv'),
+            somalier_pairs_fpath=str(data_dir / 'output_pairs_bad.tsv'),
+        )
+        for expected_line in [
+            '1/27 PED samples with mismatching sex',
+            '2/27 samples with missing provided sex',
+            '2/27 samples with failed inferred sex',
+            'Sex inferred for 25/27 samples, matching in 24 samples',
+            '1 sample pair(s) with mismatched relatedness',
+        ]:
+            self.assertTrue(any(expected_line in msg for msg in result.messages))
 
 
 if __name__ == '__main__':
