@@ -163,6 +163,32 @@ class TestQuery(unittest.TestCase):
         )
         self.assertSetEqual(set(mt.samples_ab['40_to_45'].collect()[0]), {'CPG196535'})
 
+    def test_seqr_loader_annotate_dataset_old(self):
+        mt_path = to_path(
+            f'gs://cpg-fewgenomes-test/unittest/inputs/chr20/'
+            f'seqr_loader/cohort-{self.interval}.mt'
+        )
+        self.timestamp = '2022-0419-1404TMA'
+        subset_mt_path = self.tmp_bucket / 'seqr_loader' / f'subset-{self.interval}.mt'
+        out_mt_path = self.out_bucket / 'seqr_loader' / f'dataset-{self.interval}.mt'
+        subset_mt_to_samples(
+            str(mt_path),
+            utils.SAMPLES[:3],
+            str(subset_mt_path),
+        )
+        from cpg_pipes.query.seqr_loader_old import annotate_dataset_mt_old
+        annotate_dataset_mt_old(
+            str(subset_mt_path), str(out_mt_path), str(self.tmp_bucket / 'seqr_loader')
+        )
+        # Testing
+        mt = hl.read_matrix_table(str(out_mt_path))
+        mt.rows().show()
+        self.assertListEqual(mt.s.collect(), utils.SAMPLES[:3])
+        self.assertSetEqual(
+            set(mt.samples_gq['20_to_25'].collect()[0]), {'CPG196519', 'CPG196527'}
+        )
+        self.assertSetEqual(set(mt.samples_ab['40_to_45'].collect()[0]), {'CPG196535'})
+
     @skip('Not implemented in Batch backend')
     def test_vcf_combiner(self):
         from cpg_pipes.targets import Cohort

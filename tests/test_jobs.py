@@ -538,3 +538,26 @@ class TestJobs(unittest.TestCase):
             ),
         )
         self.pipeline.run(wait=True)
+
+    def test_seqr_load_es(self):
+        self.timestamp = '2022-0419-1404TMA'
+        mt_path = 'gs://cpg-fewgenomes-test/unittest/test_seqr_loader_annotate_dataset_old/2022-0419-1404TMA/seqr_loader/dataset-chr20-5111495-5111607.mt'
+        from analysis_runner import dataproc
+        from cpg_pipes.dataproc_scripts.seqr.mt_to_es import read_es_password
+        es_index = f'{utils.DATASET}-{self.timestamp}'.lower()
+    
+        dataproc._add_submit_job(
+            batch=self.pipeline.b,
+            cluster_id='dp-2cafe8919cd441d7974e',
+            script=f'cpg_pipes/dataproc_scripts/seqr/mt_to_es.py '
+            f'--mt-path {mt_path} '
+            f'--es-host elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com '
+            f'--es-port 9243 '
+            f'--es-username seqr '
+            f'--es-password {read_es_password()} '
+            f'--es-index {es_index} '
+            f'--es-index-min-num-shards 1 '
+            f'--use-spark ',  # es export doesn't work with the service backend
+            job_name=f'{utils.DATASET}: create ES index',
+        )
+        self.pipeline.run(wait=True)
