@@ -85,7 +85,7 @@ def main(
         es_host = 'elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com'
         es_port = '9243'
         es_username = 'seqr'
-        es_password = _read_es_password()
+        es_password = read_es_password()
 
     es = HailElasticsearchClient(
         host=es_host,
@@ -146,7 +146,7 @@ def _cleanup(es, es_index, es_shards):
         es.wait_for_shard_transfer(es_index)
 
 
-def _read_es_password(
+def read_es_password(
     project_id='seqr-308602',
     secret_id='seqr-es-password',
     version_id='latest',

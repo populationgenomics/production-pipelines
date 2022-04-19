@@ -222,7 +222,7 @@ def check_pedigree_job(
     b: Batch,
     samples_file: ResourceFile,
     pairs_file: ResourceFile,
-    external_id_map: dict[str, str],
+    external_id_map: dict[str, str] | None = None,
     label: str | None = None,
     dataset_name: str | None = None,
     somalier_html_url: str | None = None,
@@ -243,7 +243,8 @@ def check_pedigree_job(
     script_path = to_path(check_pedigree.__file__)
     script_name = script_path.name
     cmd = f"""\
-    {seds_to_extend_sample_ids(external_id_map, [samples_file, pairs_file])}
+    {seds_to_extend_sample_ids(external_id_map, [samples_file, pairs_file])
+    if external_id_map else ''}
     python3 {script_name} \\
     --somalier-samples {samples_file} \\
     --somalier-pairs {pairs_file} \\

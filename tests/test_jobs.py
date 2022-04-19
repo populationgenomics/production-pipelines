@@ -55,6 +55,8 @@ class TestJobs(unittest.TestCase):
         return utils.BASE_BUCKET / 'tmp' / self.name / self.timestamp
 
     def setUp(self):
+        utils.setup_env()
+
         self.name = self._testMethodName
         self.timestamp = utils.timestamp()
         logger.info(f'Timestamp: {self.timestamp}')
@@ -528,9 +530,6 @@ class TestJobs(unittest.TestCase):
         inputs_bucket = utils.BASE_BUCKET / 'inputs' / 'check_pedigree'
         check_pedigree_job(
             self.pipeline.b,
-            sample_map_file=self.pipeline.b.read_input(
-                str(inputs_bucket / 'sample-map.tsv')
-            ),
             samples_file=self.pipeline.b.read_input(
                 str(inputs_bucket / 'somalier-samples.tsv')
             ),

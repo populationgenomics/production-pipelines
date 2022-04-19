@@ -71,9 +71,7 @@ def setup_env(
     DATASET_GCP_PROJECT to be set on import time. Also, unittest doesn't pick
     exported environment variables with EnvFile, so have to do it here.
     """
-    token = os.environ.get('HAIL_TOKEN')
-    assert token
-    os.environ['HAIL_TOKEN'] = token
+    assert os.environ.get('HAIL_TOKEN')
     os.environ['CPG_DATASET'] = dataset
     os.environ['CPG_OUTPUT_PREFIX'] = 'unittests'
     os.environ['CPG_ACCESS_LEVEL'] = access_level

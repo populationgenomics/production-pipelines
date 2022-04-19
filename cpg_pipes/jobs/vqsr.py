@@ -6,7 +6,6 @@ from typing import List, Optional
 import logging
 import hailtop.batch as hb
 from hailtop.batch.job import Job
-from analysis_runner import dataproc
 
 from cpg_pipes import Path
 from cpg_pipes import images, utils
@@ -174,6 +173,9 @@ def make_vqsr_jobs(
     jobs.append(intervals_j)
 
     if input_vcf_or_mt_path.name.endswith('.mt'):
+        # Importing dynamically to make sure $CPG_DATASET_GCP_PROJECT is set.
+        from analysis_runner import dataproc
+        
         assert meta_ht_path
         assert hard_filter_ht_path
         job_name = 'VQSR: MT to site-only VCF'
