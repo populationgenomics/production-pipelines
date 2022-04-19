@@ -8,4 +8,6 @@ skip_samples_with_missing_input: false
 ped_checks: false
 version: v0
 status_reporter_type: cpg
-slack_channel: seqr-loader-test
+slack_channel: seqr-loader
+skip_samples_stages:
+  VerifyBamId: [CPG13409]  # https://batch.hail.populationgenomics.org.au/batches/56236/jobs/372

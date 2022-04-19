@@ -48,7 +48,7 @@ class FastQC(SampleStage):
                 alignment_input = sample.get_cram_path()
             else:
                 logger.warning(f'No alignment inputs, skipping sample {sample.id}')
-                return self.make_outputs(sample)  # return empty output
+                return None
 
         jobs = fastqc.fastqc(
             b=self.b,
@@ -57,5 +57,6 @@ class FastQC(SampleStage):
             alignment_input=alignment_input,
             refs=self.refs,
             job_attrs=self.get_job_attrs(sample),
+            subsample=False,
         )
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)

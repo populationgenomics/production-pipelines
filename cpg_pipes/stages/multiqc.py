@@ -12,7 +12,8 @@ from cpg_pipes.pipeline import (
     StageOutput,
     DatasetStage,
 )
-from cpg_pipes.stages.cramqc import SamtoolsStats, PicardWgsMetrics, VerifyBamId
+from cpg_pipes.pipeline.exceptions import StageInputNotFound
+from cpg_pipes.stages.cram_qc import SamtoolsStats, PicardWgsMetrics, VerifyBamId
 from cpg_pipes.stages.fastqc import FastQC
 from cpg_pipes.targets import Dataset
 from pipelines.somalier import CramSomalierPedigree
@@ -37,7 +38,7 @@ class MultiQC(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         """
-        Expected to produce an HTML and a correponding JSON file.
+        Expected to produce an HTML and a corresponding JSON file.
         """
         return {
             'html': dataset.get_web_bucket() / 'qc' / 'multiqc.html',
@@ -65,21 +66,22 @@ class MultiQC(DatasetStage):
         ]
         ending_to_trim = set()  # endings to trim to get sample names
         for sample in dataset.get_samples():
-            for path in [
-                inputs.as_path(sample, SamtoolsStats),
-                inputs.as_path(sample, PicardWgsMetrics),
-                inputs.as_path(sample, VerifyBamId),
+            for st, key in [
+                (SamtoolsStats, None),
+                (PicardWgsMetrics, None),
+                (VerifyBamId, None),
+                (FastQC, 'zip'),
             ]:
-                paths.append(path)
-                ending_to_trim.add(path.name.replace(sample.id, ''))
-            try:
-                path = inputs.as_path(sample, FastQC, id='zip')
-            except ValueError:
-                # We do not require FastQC for all samples
-                logger.warning(f'FastQC not found for {sample}, skipping')
-            else:
-                paths.append(path)
-                ending_to_trim.add(path.name.replace(sample.id, ''))
+                try:
+                    path = inputs.as_path(sample, st, key)
+                except StageInputNotFound:  # allow missing inputs
+                    logger.warning(
+                        f'Output for stage {st.__name__} not found for {sample}, '
+                        f'skipping'
+                    )
+                else:
+                    paths.append(path)
+                    ending_to_trim.add(path.name.replace(sample.id, ''))
 
         assert ending_to_trim
         modules_to_trim_endings = {
@@ -88,12 +90,28 @@ class MultiQC(DatasetStage):
             'picard/wgs_metrics',
             'verifybamid/selfsm',
         }
+        
+        # Building sample maps to MultiQC bulk rename. Only adding samples to the map
+        # if the extrenal/participant IDs are differrent:
+        external_id_map = {
+            s.id: s.external_id for s in dataset.get_samples()
+            if s.id != s.external_id
+        }
+        participant_id_map = {
+            s.id: s.participant_id 
+            for s in dataset.get_samples()
+            if s.id != s.participant_id and s.participant_id != s.external_id
+        }
+        sid_maps = dict()
+        if external_id_map:
+            sid_maps['External ID'] = external_id_map
+        if participant_id_map:
+            sid_maps['Participant ID'] = participant_id_map
 
         j = multiqc(
             self.b,
             tmp_bucket=dataset.get_tmp_bucket(),
             paths=paths,
-            external_id_map={s.id: s.participant_id for s in dataset.get_samples()},
             ending_to_trim=ending_to_trim,
             modules_to_trim_endings=modules_to_trim_endings,
             dataset_name=dataset.name,
@@ -102,5 +120,6 @@ class MultiQC(DatasetStage):
             out_html_url=html_url,
             job_attrs=self.get_job_attrs(dataset),
             status_reporter=self.status_reporter,
+            sample_id_maps=sid_maps,
         )
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])

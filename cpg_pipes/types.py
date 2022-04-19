@@ -17,7 +17,7 @@ logger = logging.getLogger(__file__)
 class CramPath:
     """
     Represents alignment data on a bucket within the pipeline.
-    Includes a path to a CRAM or a BAM file along with a correponding index,
+    Includes a path to a CRAM or a BAM file along with a corresponding index,
     and a corresponding fingerprint path.
     """
 
@@ -67,7 +67,7 @@ class CramPath:
 class GvcfPath:
     """
     Represents GVCF data on a bucket within the pipeline.
-    Includes a path to a GVCF file along with a correponding TBI index,
+    Includes a path to a GVCF file along with a corresponding TBI index,
     and a corresponding fingerprint path.
     """
 

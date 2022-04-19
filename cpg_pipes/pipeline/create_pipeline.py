@@ -68,6 +68,7 @@ def create_pipeline(
     force_samples: list[str] | None = None,
     local_dir: Path | None = None,
     slack_channel: str | None = None,
+    skip_samples_stages: dict[str, list[str]] | None = None,
 ) -> 'Pipeline':
     """
     Create a Pipeline instance. All options correspond to command line parameters
@@ -122,4 +123,5 @@ def create_pipeline(
         local_dir=local_dir,
         dry_run=dry_run,
         keep_scratch=keep_scratch,
+        skip_samples_stages=skip_samples_stages,
     )

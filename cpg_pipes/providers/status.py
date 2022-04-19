@@ -78,10 +78,10 @@ class StatusReporter(ABC):
         data: dict[str, str] | None = None,
     ) -> str:
         """
-        Add command to the job that sends Slack message.
-        Message can be a dictionary (`data`), which will be correspondingly formatted;
-        or text (`text`). Either can use Slack mrkdwn for formatting:
-        https://api.slack.com/reference/surfaces/formatting
+        Make a bash command that prepares and sends a Slack message.
+        Message can be constructed from a dict `data`, or can be passed directly 
+        as text (`text`). In either case, strings can use Slack `mrkdwn` 
+        for formatting: https://api.slack.com/reference/surfaces/formatting
         """
         if not self.slack_channel or not self.slack_token:
             return ''

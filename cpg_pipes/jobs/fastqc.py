@@ -47,13 +47,19 @@ def fastqc(
             """
             input_file = new_file
 
+        fname = basename(str(input_path))
+        if not str(input_path).endswith('.gz'):
+            cmd += f"""\
+            mv {input_file} {input_file}.gz
+            """
+            input_file = f'{input_file}.gz'
+            fname += '.gz'
+
         if subsample and not isinstance(input_path, CramPath):
             n = 10_000_000
-            new_file = f'/io/batch/{basename(str(input_path))}'
+            new_file = f'/io/batch/{fname}'
             cmd += f"""\
-            gunzip -c {input_file} | \\
-            head -n{n * 4} | \\
-            gzip -c > {new_file}
+            gunzip -c {input_file} | head -n{n * 4} | gzip -c > {new_file}
             """
             input_file = new_file
 

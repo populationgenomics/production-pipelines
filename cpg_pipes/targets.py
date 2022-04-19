@@ -133,12 +133,12 @@ class Cohort(Target):
         self._datasets_by_name: dict[str, Dataset] = {}
 
     def __repr__(self):
-        return self.name
+        return f'Cohort("{self.name}", {len(self.get_datasets())} datasets)'
 
     @property
     def target_id(self) -> str:
         """Unique target ID"""
-        return f'Cohort("{self.name}", {len(self.get_datasets())} datasets)'
+        return self.name
 
     def get_datasets(self, only_active: bool = True) -> list['Dataset']:
         """
@@ -300,7 +300,7 @@ class Dataset(Target):
     @property
     def target_id(self) -> str:
         """Unique target ID"""
-        return f'Dataset("{self.name}")'
+        return self.name
 
     def __repr__(self):
         return f'Dataset("{self.name}", {len(self.get_samples())} samples)'
@@ -324,7 +324,7 @@ class Dataset(Target):
         """
         The primary dataset bucket (-main or -test).
         """
-        return self.storage_provider.get_bucket(
+        return self.storage_provider.get_base(
             dataset=self.stack,
             namespace=self.namespace,
             **kwargs,
@@ -334,7 +334,7 @@ class Dataset(Target):
         """
         The tmp bucket (-main-tmp or -test-tmp)
         """
-        return self.storage_provider.get_tmp_bucket(
+        return self.storage_provider.get_tmp_base(
             dataset=self.stack, namespace=self.namespace, **kwargs
         )
 
@@ -342,7 +342,7 @@ class Dataset(Target):
         """
         Get web bucket (-main-web or -test-web)
         """
-        return self.storage_provider.get_web_bucket(
+        return self.storage_provider.get_web_base(
             dataset=self.stack, namespace=self.namespace, **kwargs
         )
 
@@ -563,7 +563,7 @@ class Sample(Target):
     @property
     def target_id(self) -> str:
         """Unique target ID"""
-        return f'Sample("{self.id})"'
+        return self.id
 
     def get_samples(self, only_active: bool = True) -> list['Sample']:
         """

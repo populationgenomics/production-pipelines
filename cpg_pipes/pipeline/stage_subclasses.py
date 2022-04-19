@@ -37,7 +37,7 @@ class SampleStage(Stage[Sample], ABC):
         if not datasets:
             raise ValueError('No active datasets are found to run')
 
-        output_by_target = dict()
+        output_by_target: dict[str, StageOutput] = dict()
 
         for ds_i, dataset in enumerate(datasets):
             if not dataset.get_samples():
@@ -67,12 +67,12 @@ class SampleStage(Stage[Sample], ABC):
                         for j in outputs.jobs:
                             j.depends_on(*inputs.get_jobs(sample))
                         output_by_target[sample.target_id] = outputs
-                continue
+                    continue
 
             # Some samples can't be reused, queuing each sample:
-            logger.info(f'{self.name}: #{ds_i} {dataset}')
+            logger.info(f'{self.name}: #{ds_i + 1} {dataset}')
             for sample_i, sample in enumerate(dataset.get_samples()):
-                logger.info(f'{self.name}: #{sample_i}/{sample}')
+                logger.info(f'{self.name}: #{sample_i + 1}/{sample}')
                 output_by_target[sample.target_id] = self._queue_jobs_with_checks(
                     sample
                 )

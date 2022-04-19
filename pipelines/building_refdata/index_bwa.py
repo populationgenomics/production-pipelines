@@ -21,7 +21,7 @@ def main():
     Create index for BWA and BWA-MEM2.
     """
     b = setup_batch('Create BWA index')
-    refs = RefData(CpgStorageProvider().get_ref_bucket())
+    refs = RefData(CpgStorageProvider().get_ref_base())
     j1 = _index_bwa_job(b, refs)
     j2 = _test_bwa_job(b, refs)
     j2.depends_on(j1)

@@ -4,11 +4,11 @@
 This script parses "somalier relate" (https://github.com/brentp/somalier) outputs,
 and returns a report whether sex and pedigree matches the provided PED file.
 
-You can have report sent to channel. To do that, add "Seqr Loader" app into a channel:
+Script can send a report to a Slack channel. To enable that, set `SLACK_TOKEN`
+and `SLACK_CHANNEL` environment variables, and add "Seqr Loader" app into 
+a channel with:
 
 /invite @Seqr Loader
-
-And run the script with "--slack-channel channel_name".
 """
 
 import contextlib
@@ -128,7 +128,7 @@ def check_pedigree(
     bad = df.gt_depth_mean == 0.0
     if bad.any():
         pedlog.warning(
-            f'*[{dataset}]* excluding {len(df[bad])}/{len(df)} samples with zero '
+            f'*[{dataset}]* excluded {len(df[bad])}/{len(df)} samples with zero '
             f'mean GT depth from pedigree/sex checks: {", ".join(df[bad].sample_id)}'
         )
         pedlog.info('')
@@ -181,7 +181,7 @@ def check_pedigree(
     matching_cnt = len(df[matching_sex])
     pedlog.info(
         f'Sex inferred for {inferred_cnt}/{len(df)} samples, matching '
-        f'in {matching_cnt if matching_cnt != inferred_cnt else "all"} samples.'
+        f'for {matching_cnt if matching_cnt != inferred_cnt else "all"} samples.'
     )
     pedlog.info('')
 
@@ -282,12 +282,12 @@ def infer_relationship(kin: float, ibs0: float, ibs2: float) -> Tuple[str, str]:
         if (ibs0 / ibs2) < 0.005:
             result = (
                 'parent-child',
-                reason + f' ibs0/ibs2={(ibs0 / ibs2):.4f} < 0.005',
+                reason + f', ibs0/ibs2={(ibs0 / ibs2):.4f} < 0.005',
             )
         elif 0.015 < (ibs0 / ibs2) < 0.052:
             result = (
                 'siblings',
-                reason + f' 0.015 < ibs0/ibs2={(ibs0 / ibs2):.4f} < 0.052',
+                reason + f', 0.015 < ibs0/ibs2={(ibs0 / ibs2):.4f} < 0.052',
             )
         else:
             result = (

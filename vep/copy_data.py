@@ -19,7 +19,7 @@ PREPARE_MOUNTABLE_BUCKET = False
 def main():
     """Entry point"""
     b = setup_batch('Copy VEP data')
-    refs = RefData(CpgStorageProvider().get_ref_bucket())
+    refs = RefData(CpgStorageProvider().get_ref_base())
     if MAKE_VEP_CACHE_TAR:
         _vep_cache(b, refs)
     if MAKE_LOFTEE_TAR:

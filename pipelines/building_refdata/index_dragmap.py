@@ -19,7 +19,7 @@ def main():
     Create index for DRAGMAP.
     """
     b = setup_batch('Create DRAGMAP index')
-    refs = RefData(CpgStorageProvider().get_ref_bucket())
+    refs = RefData(CpgStorageProvider().get_ref_base())
     j1 = _index_dragmap_job(b, refs)
     j2 = _test_dragmap_job(b, refs)
     j2.depends_on(j1)

@@ -849,7 +849,7 @@ def add_apply_recalibration_step(
     desired level but retains the information necessary to increase sensitivity
     if needed.
 
-    Returns: a Job object with one ResourceGroup output j.output_vcf, correponding
+    Returns: a Job object with one ResourceGroup output j.output_vcf, corresponding
     to a VCF with tranche annotated in the FILTER field
     """
     j = b.new_job('VQSR: ApplyRecalibration', job_attrs)

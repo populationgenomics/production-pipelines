@@ -16,22 +16,28 @@ class CpgStorageProvider(StorageProvider):
 
     def __init__(self, cloud: Cloud = Cloud.GS):
         super().__init__(cloud)
-        self.prefix = 'cpg'
+        self.gc_prefix = 'cpg'
+        super().__init__(cloud, az_account='cpg')
 
-    def _dataset_bucket(
+    def _dataset_base(
         self,
         dataset: str,
         namespace: Namespace,
         suffix: str = None,
     ) -> Path:
-        path = CloudPath(
-            f'{self.cloud.value}://' f'{self.prefix}-{dataset}-{namespace.value}'
-        )
+        """
+        Base path for a dataset.
+        """
+        container = f'{dataset}-{namespace.value}'
         if suffix:
-            path = CloudPath(f'{path}-{suffix}')
-        return path
+            container = f'{container}-{suffix}'
 
-    def get_bucket(
+        if self.cloud == Cloud.HAIL_AZ:
+            return CloudPath(f'{self.cloud.value}://{self.az_account}/{container}')
+        else:
+            return CloudPath(f'{self.cloud.value}://{self.gc_prefix}-{container}')
+
+    def get_base(
         self,
         dataset: str,
         namespace: Namespace,
@@ -43,7 +49,7 @@ class CpgStorageProvider(StorageProvider):
         Bucket name is constructed according to the CPG storage policy:
         https://github.com/populationgenomics/team-docs/tree/main/storage_policies
         """
-        path = self._dataset_bucket(dataset, namespace, suffix)
+        path = self._dataset_base(dataset, namespace, suffix)
         if version:
             path = path / version
         if sample:
@@ -61,14 +67,14 @@ class CpgStorageProvider(StorageProvider):
         """
         URL corresponding to the WEB bucket.
         """
-        url = f'https://{namespace.value}-web.populationgenomics.org.au/' f'{dataset}'
+        url = f'https://{namespace.value}-web.populationgenomics.org.au/{dataset}'
         if version:
             url += f'/{version}'
         if sample:
             url += f'/{sample}'
         return url
 
-    def get_ref_bucket(self) -> Path:
+    def get_ref_base(self) -> Path:
         """
         Prefix for reference data.
         """

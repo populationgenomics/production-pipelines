@@ -1,6 +1,7 @@
 """
 CPG implementation of status reporter.
 """
+
 import os
 from textwrap import dedent
 
@@ -22,7 +23,11 @@ from .smdb import SMDB, SmdbError
 class CpgStatusReporter(StatusReporter):
     """
     Job status reporter. Works through creating and updating sample-metadata
-    database Analysis entries.
+    database Analysis entries. It is also able to send notifications to Slack.
+    To enable that, create a channel, set `CPG_SLACK_CHANNEL` and `CPG_SLACK_TOKEN` 
+    environment  variables, and add "Seqr Loader" app into a channel with:
+
+    /invite @Seqr Loader
     """
 
     def __init__(self, smdb: SMDB, slack_channel: str | None = None):

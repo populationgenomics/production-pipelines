@@ -224,6 +224,12 @@ def pipeline_click_options(function: Callable) -> Callable:
             'slack_channel',
             help='Slack channel to send status reports with CPG status reporter.',
         ),
+        click.option(
+            '--skip-samples-stages',
+            'skip_samples_stages',
+            type=dict,
+            help='Map of stages to lists of samples, to skip for specific stages.',
+        ),
     ]
 
     # Applying decorators. Doing that in reverse order, because Click actually

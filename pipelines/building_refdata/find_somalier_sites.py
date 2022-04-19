@@ -17,7 +17,7 @@ from cpg_pipes.providers.cpg import CpgStorageProvider
 
 logger = logging.getLogger(__file__)
 
-RESULT_VCF = CpgStorageProvider().get_ref_bucket() / 'somalier/v0/sites.hg38.vcf.gz'
+RESULT_VCF = CpgStorageProvider().get_ref_base() / 'somalier/v0/sites.hg38.vcf.gz'
 
 
 pipe = create_pipeline(
