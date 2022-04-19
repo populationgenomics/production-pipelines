@@ -40,7 +40,7 @@ logger = logging.getLogger(__file__)
 GATK_SV_COMMIT = 'c9e88f056fa154a01e2fcd7f8f0703342537a06e'
 SV_CALLERS = ['manta', 'wham']
 
-ACCESS_LEVEL = os.environ['ACCESS_LEVEL']
+ACCESS_LEVEL = os.environ['CPG_ACCESS_LEVEL']
 
 
 def get_dockers(keys: list[str]) -> dict[str, str]:
@@ -77,6 +77,7 @@ def add_gatksv_job(
         outputs_to_collect[key] = CromwellOutputType.single_path(f'{wfl_name}.{key}')
     
     job_prefix = make_job_name(wfl_name, sample=sample_id, dataset=dataset_name)
+    assert ACCESS_LEVEL
     output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
         b=batch,
         job_prefix=job_prefix,
@@ -128,7 +129,10 @@ class GatherSampleEvidence(SampleStage):
 
         for key, fname in fname_by_key.items():
             stage_name = self.name.lower()
-            d[key] = sample.dataset.get_bucket() / 'gatk_sv' / stage_name / sample.id + '-' + fname
+            d[key] = (
+                sample.dataset.get_bucket() / 'gatk_sv' / stage_name /
+                (sample.id + '-' + fname)
+            )
         return d
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
