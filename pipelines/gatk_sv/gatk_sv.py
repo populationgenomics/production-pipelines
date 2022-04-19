@@ -31,7 +31,7 @@ from cpg_pipes.hb.batch import make_job_name
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.pipeline import stage, SampleStage, StageOutput, DatasetStage, \
     CohortStage, pipeline_click_options, create_pipeline
-from cpg_pipes.pipeline.pipeline import ExpectedResultT, StageInput
+from cpg_pipes.pipeline.pipeline import StageInput
 from cpg_pipes.targets import Sample, Dataset, Cohort
 
 logger = logging.getLogger(__file__)
@@ -57,7 +57,7 @@ def get_references(keys: list[str]) -> dict[str, str]:
 
 def add_gatksv_job(
     batch: Batch,
-    dataset_name: str,
+    dataset: Dataset,
     wfl_name: str,
     input_dict: dict[str, Any], 
     expected_out_dict: dict[str, Path],
@@ -68,7 +68,7 @@ def add_gatksv_job(
     """
     # Where Cromwell writes the output. 
     # Will be different from paths in expected_out_dict:
-    output_prefix = f'gatk_sv/output/{wfl_name}/{dataset_name}'
+    output_prefix = f'gatk_sv/output/{wfl_name}/{dataset.name}'
     if sample_id: 
         output_prefix = join(output_prefix, sample_id)
 
@@ -76,12 +76,12 @@ def add_gatksv_job(
     for key in expected_out_dict.keys():
         outputs_to_collect[key] = CromwellOutputType.single_path(f'{wfl_name}.{key}')
     
-    job_prefix = make_job_name(wfl_name, sample=sample_id, dataset=dataset_name)
+    job_prefix = make_job_name(wfl_name, sample=sample_id, dataset=dataset.name)
     assert ACCESS_LEVEL
     output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
         b=batch,
         job_prefix=job_prefix,
-        dataset=dataset_name,
+        dataset=dataset.stack,
         access_level=ACCESS_LEVEL,
         repo='gatk-sv',
         commit=GATK_SV_COMMIT,
@@ -179,7 +179,7 @@ class GatherSampleEvidence(SampleStage):
 
         output_dict, j = add_gatksv_job(
             batch=self.b,
-            dataset_name=sample.dataset.name,
+            dataset=sample.dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
@@ -250,7 +250,7 @@ class EvidenceQC(DatasetStage):
 
         output_dict, j = add_gatksv_job(
             batch=self.b,
-            dataset_name=dataset.name,
+            dataset=dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
@@ -313,7 +313,7 @@ class TrainGCNV(CohortStage):
 
         output_dict, j = add_gatksv_job(
             batch=self.b,
-            dataset_name=cohort.analysis_dataset.name,
+            dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
