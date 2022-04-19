@@ -3,61 +3,98 @@ Create Hail Batch jobs to split genomics intervals for parallel variant calling.
 """
 
 import logging
-from os.path import join
-from typing import Optional
 
 import hailtop.batch as hb
+from hailtop.batch.job import Job
 
-from cpg_pipes import ref_data, images
+from cpg_pipes import images, utils, Path
+from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.types import SequencingType
+from cpg_pipes.refdata import RefData
 from cpg_pipes.hb.command import wrap_command
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
 def get_intervals(
     b: hb.Batch,
+    refs: RefData,
     scatter_count: int,
-    out_bucket: Optional[str] = None,
-) -> hb.ResourceGroup:
+    intervals_path: Path | None = None,
+    sequencing_type: SequencingType = SequencingType.WGS,
+    job_attrs: dict | None = None,
+) -> tuple[Job, list[hb.Resource]]:
     """
-    Add a job that split genome into intervals to parallelise GnarlyGenotyper
+    Add a job that split genome into intervals to parallelise variant calling.
 
-    Returns a ResourceGroup instead of a Job because if the intervals are already
-    pre-computed, no need to submit a job.
+    As input interval file, takes intervals_path if provided, otherwise checks refs
+    for the intervals of provided sequencing_type.
+
+    This job calls picard's IntervalListTools to scatter the input interval list
+    into scatter_count sub-interval lists, inspired by this WARP task :
+    https://github.com/broadinstitute/warp/blob/bc90b0db0138747685b459c83ce52c8576ce03cd/tasks/broad/Utilities.wdl
+
+    Note that we use the mode INTERVAL_SUBDIVISION instead of
+    BALANCING_WITHOUT_INTERVAL_SUBDIVISION_WITH_OVERFLOW. Modes other than
+    INTERVAL_SUBDIVISION produce an unpredicted number of intervals. WDL can handle
+    that, but Hail Batch is not dynamic and have to expect certain number of output
+    files.
     """
-    if scatter_count in ref_data.PRECOMPUTED_INTERVALS:
-        intervals_bucket = ref_data.PRECOMPUTED_INTERVALS[scatter_count]
-        return b.read_input_group(**{
-            f'interval_{idx}': f'{intervals_bucket}/{str(idx).zfill(4)}-scattered.interval_list'
-            for idx in range(scatter_count)
-        })
-
-    j = b.new_job(f'Make {scatter_count} intervals')
-    j.image(images.GATK_IMAGE)
-    java_mem = 3
-    j.memory('standard')  # ~ 4G/core ~ 4G
-    j.storage('16G')
-    j.declare_resource_group(
-        intervals={
-            f'interval_{idx}': f'{{root}}/{str(idx).zfill(4)}-scattered.interval_list'
-            for idx in range(scatter_count)
-        }
+    job_attrs = (job_attrs or {}) | dict(tool='picard_IntervalListTools')
+    j = b.new_job(f'Make {scatter_count} intervals', job_attrs)
+    cache_bucket = (
+        refs.intervals_bucket / sequencing_type.value / f'{scatter_count}intervals'
     )
 
+    if intervals_path:
+        # For custom interval lists, we are not caching
+        cache = False
+    else:
+        cache = True
+        # Checking previously cached split intervals.
+        if utils.exists(cache_bucket / '1.interval_list'):
+            j.name += ' [use cached]'
+            return j, [
+                b.read_input(str(cache_bucket / f'{idx + 1}.interval_list'))
+                for idx in range(scatter_count)
+            ]
+        # Taking intervals file for the sequencing_type.
+        intervals_path = refs.calling_interval_lists[sequencing_type]
+
+    j.image(images.SAMTOOLS_PICARD_IMAGE)
+    STANDARD.set_resources(j, storage_gb=16, mem_gb=2)
+
+    break_bands_at_multiples_of = {
+        SequencingType.WGS: 100000,
+        SequencingType.EXOME: 0,
+    }.get(sequencing_type, 0)
+
     cmd = f"""
-    # Modes other than INTERVAL_SUBDIVISION will produce an unpredicted number 
-    # of intervals. But we have to expect exactly the {scatter_count} number of 
-    # output files because our workflow is not dynamic.
-    gatk --java-options -Xms{java_mem}g SplitIntervals \\
-    -L {ref_data.UNPADDED_INTERVALS} \\
-    -O {j.intervals} \\
-    -scatter {scatter_count} \\
-    -R {ref_data.REF_FASTA} \\
-    -mode INTERVAL_SUBDIVISION
+    mkdir /io/batch/out
+    
+    picard -Xms1000m -Xmx1500m \
+    IntervalListTools \
+    SCATTER_COUNT={scatter_count} \
+    SUBDIVISION_MODE=INTERVAL_SUBDIVISION \
+    UNIQUE=true \
+    SORT=true \
+    BREAK_BANDS_AT_MULTIPLES_OF={break_bands_at_multiples_of} \
+    INPUT={b.read_input(str(intervals_path))} \
+    OUTPUT=/io/batch/out
+    ls /io/batch/out
+    ls /io/batch/out/*
     """
+    for idx in range(scatter_count):
+        name = f'temp_{str(idx + 1).zfill(4)}_of_{scatter_count}'
+        cmd += f"""
+        ln /io/batch/out/{name}/scattered.interval_list {j[f'{idx + 1}.interval_list']}
+        """
+
     j.command(wrap_command(cmd))
-    if out_bucket:
-        b.write_output(j.intervals, join(out_bucket, f'{scatter_count}intervals'))
-    return j.intervals
+    if cache:
+        for idx in range(scatter_count):
+            b.write_output(
+                j[f'{idx + 1}.interval_list'],
+                str(cache_bucket / f'{idx + 1}.interval_list'),
+            )
+    return j, [j[f'{idx + 1}.interval_list'] for idx in range(scatter_count)]

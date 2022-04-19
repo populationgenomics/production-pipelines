@@ -1,5 +1,6 @@
 name: Test individual jobs
-on: [push, workflow_dispatch]
+# TODO: re-enamble for push when https://github.com/hail-is/hail/pull/11747 is merged
+on: [workflow_dispatch]
 jobs:
   test_jobs:
     runs-on: ubuntu-latest
@@ -21,7 +22,7 @@ jobs:
 
       # Install gcloud, `setup-gcloud` automatically picks up authentication from `auth`
       - name: install gcloud
-        uses: google-github-actions/setup-gcloud@master
+        uses: google-github-actions/setup-gcloud@main
 
       - uses: actions/setup-python@v2
         with:
@@ -33,5 +34,8 @@ jobs:
       - name: Install
         run: pip install dist/*
    
-      - name: "Test jobs"
-        run: python -m unittest tests/test_jobs.py
+      - name: Test individual jobs
+        run: python -m unittest tests.test_jobs
+
+      - name: Test pipelines
+        run: python -m unittest tests.test_pipeline

@@ -7,10 +7,8 @@ import setuptools
 
 setuptools.setup(
     name='cpg-pipes',
-    version='0.2.9',
-    description=(
-        'Hail Batch pipelines for large cohort and rare deseases projects'  
-    ),
+    version='0.3.0',
+    description='Hail Batch bioinformatics pipelines',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     url='https://github.com/populationgenomics/production-pipelines',
@@ -20,24 +18,30 @@ setuptools.setup(
     include_package_data=True,
     zip_safe=False,
     scripts=[
-        join('scripts', fname) 
-        for fname in os.listdir('scripts') if fname.endswith('.py')
+        join('scripts', fname)
+        for fname in os.listdir('scripts')
+        if fname.endswith('.py')
     ],
     install_requires=[
         'click',
+        'click-config-file',
         'pandas',
-        'cpg-hail',
-        'cpg-gnomad',   # github.com/populationgenomics/gnomad_methods
-        'gcloud',
+        'hail>=0.2.91',
+        'cpg-gnomad',  # github.com/populationgenomics/gnomad_methods
+        'google-cloud-storage',
+        'google-cloud-secret-manager',
         'fsspec',
         'sample-metadata',
         'analysis-runner',
+        'cloudpathlib[all]',
+        'coloredlogs',
+        'types-PyYAML',  # https://mypy.readthedocs.io/en/stable/getting_started.html#library-stubs-and-typeshed
     ],
     keywords='bioinformatics',
     classifiers=[
         'Environment :: Console',
         'Intended Audience :: Science/Research',
-        'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+        'License :: OSI Approved :: MIT License',
         'Natural Language :: English',
         'Operating System :: MacOS :: MacOS X',
         'Operating System :: POSIX',

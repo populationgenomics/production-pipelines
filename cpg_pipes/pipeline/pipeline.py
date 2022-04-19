@@ -1,152 +1,755 @@
 """
-Provides "Pipeline" class that allows plugging multiple "stages" together
-by resolving dependencies through the sample-metadata database, or by checking
-objects on buckets directly. 
+Provides a `Pipeline` class and a `@stage` decorator that allow to define 
+pipeline stages and plug them together.
 
-Each stage adds jobs to Hail Batch. Each stage acts on "target", which can be a 
-sample, a project, or an entire cohort. Pipeline would resolve dependencies between
-stages of different levels accordingly.
+A `Stage` describes the job that are added to Hail Batch, and outputs that are expected
+to be produced. Each stage acts on a `Target`, which can be of a different level:
+a `Sample`, a `Dataset`, a `Cohort` (= all input datasets combined). Pipeline plugs
+stages together by resolving dependencies between different levels accordingly.
 
-Basic example:
-
-@stage(analysis_type=AnalysisType.CRAM)
-class CramStage(SampleStage):
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        expected_path = self.expected_result(pipe)
-        job = align.bwa(b=self.pipe.b, ..., output_path=expected_path)
-        return self.make_outputs(sample, data=expected_path, jobs=[job])
-
-@stage(analysis_type=AnalysisType.GVCF, requires_stages=CramStage)
-class GvcfStage(SampleStage):
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        cram_path = inputs.as_path(target=sample, stage=CramStage)
-        expected_path = self.expected_result(pipe)
-        job = haplotype_caller.produce_gvcf(b=self.pipe.b, ..., output_path=expected_path)
-        return self.make_outputs(sample, data=expected_path, jobs=[job])
-
-@stage(analysis_type=AnalysisType.JOINT_CALLING, requires_stages=GvcfStage)
-class JointCallingStage(CohortStage):
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        gvcf_by_sid = inputs.as_path_by_target(stage=GvcfStage)
-        expected_path = self.expected_result(cohort)
-        job = make_joint_genotyping_jobs(b=self.pipe.b, ..., output_path=expected_path)
-        return self.make_outputs(cohort, data=expected_path, jobs=[job])
-
-@click.command()
-@pipeline_click_options
-def main(**kwargs):
-    p = Pipeline(
-        name='my_joint_calling_pipeline',
-        title='My joint calling pipeline',
-        **kwargs
-    )
-    p.submit_batches()
-
-For more usage examples, see the "pipelines" folder in the root of this repository.
+Examples of pipelines can be found in the `pipelines/` folder in the repository root.
 """
 import functools
 import logging
+import pathlib
 import shutil
 import tempfile
-from typing import List, Dict, Optional, Tuple, cast, Union, Any, Callable, Type
+import time
+from abc import ABC, abstractmethod
+from collections import defaultdict
+from enum import Enum
+from typing import cast, Callable, Union, TypeVar, Generic, Any, Optional, Type
 
-from cpg_pipes import buckets
-from cpg_pipes.hb.batch import setup_batch, Batch
-from cpg_pipes.hb.prev_job import PrevJob
-from cpg_pipes.namespace import Namespace
-from cpg_pipes.pipeline.cohort import Cohort
-from cpg_pipes.pipeline.project import Project
-from cpg_pipes.pipeline.sample import Sample
-from cpg_pipes.pipeline.stage import Stage
-from cpg_pipes.smdb.types import AnalysisType
-from cpg_pipes.smdb.smdb import SMDB
+from cloudpathlib import CloudPath
+import hailtop.batch as hb
+from hailtop.batch import Batch
+from hailtop.batch.job import Job
 
+from .exceptions import PipelineError, StageInputNotFound
+from .. import Path, to_path, Namespace
+from ..hb.batch import setup_batch, get_billing_project
+from ..providers.inputs import InputProvider
+from ..providers.storage import StorageProvider
+from ..targets import Target, Dataset, Sample, Cohort
+from ..providers.status import StatusReporter
+from ..refdata import RefData
+from ..utils import exists
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
+
+
+# We record all initialised Stage subclasses, which we then use as a default
+# list of stages when the user didn't pass them explicitly.
+_ALL_DECLARED_STAGES = []
 
 
 StageDecorator = Callable[..., 'Stage']
 
+# Type variable to use with Generic to make sure a Stage subclass always matches the
+# corresponding Target subclass. We can't just use the Target superclass because
+# it would violate the Liskov substitution principle (i.e. any Stage subclass would
+# have to be able to work on any Target subclass).
+TargetT = TypeVar('TargetT', bound=Target)
 
-# We record each initialised Stage subclass, so we know the default stage
-# list for the case when the user doesn't pass them explicitly with set_stages()
-_all_defined_stages = []
+ExpectedResultT = Union[Path, dict[str, Path], None]
+
+StageOutputData = Union[Path, hb.Resource, dict[str, Path], dict[str, hb.Resource]]
+
+StageOutput = Optional['StageOutput_']
+
+
+# noinspection PyShadowingNames
+class StageOutput_:
+    """
+    Represents a result of a specific stage, which was run on a specific target.
+    Can be a file path, or a Hail Batch Resource. Optionally wrapped in a dict.
+    """
+
+    def __init__(
+        self,
+        target: 'Target',
+        data: StageOutputData | str | dict[str, str] | None = None,
+        jobs: list[Job] | Job | None = None,
+        reusable: bool = False,
+        error_msg: str | None = None,
+        stage: Optional['Stage'] = None,
+    ):
+        # Converting str into Path objects.
+        self.data: StageOutputData | None
+        if isinstance(data, dict):
+            self.data = {k: to_path(v) for k, v in data.items()}
+        elif data is not None:
+            self.data = to_path(data)
+        else:
+            self.data = data
+
+        self.stage = stage
+        self.target = target
+        self.jobs: list[Job] = [jobs] if isinstance(jobs, Job) else (jobs or [])
+        self.reusable = reusable
+        self.error_msg = error_msg
+
+    def __repr__(self) -> str:
+        res = (
+            f'StageOutput({self.data}'
+            f' target={self.target}'
+            f' stage={self.stage}'
+            + (f' [reusable]' if self.reusable else '')
+            + (f' [error: {self.error_msg}]' if self.error_msg else '')
+            + f')'
+        )
+        return res
+
+    def as_path_or_resource(self, id=None) -> Path | hb.Resource:
+        """
+        Cast the result to Union[str, hb.Resource], error if can't cast.
+        `id` is used to extract the value when the result is a dictionary.
+        """
+        if self.data is None:
+            raise ValueError(f'{self.stage}: output data is not available')
+
+        if id is not None:
+            if not isinstance(self.data, dict):
+                raise ValueError(
+                    f'{self.stage}: {self.data} is not a dictionary, can\'t get "{id}"'
+                )
+            return cast(dict, self.data)[id]
+
+        if isinstance(self.data, dict):
+            res = cast(dict, self.data)
+            if len(res.values()) > 1:
+                raise ValueError(
+                    f'{res} is a dictionary with more than 1 element, '
+                    f'please set the `id` parameter'
+                )
+            return list(res.values())[0]
+
+        return self.data
+
+    def as_path(self, id=None) -> Path:
+        """
+        Cast the result to path. Though exception if failed to cast.
+        `id` is used to extract the value when the result is a dictionary.
+        """
+        res = self.as_path_or_resource(id)
+        if not isinstance(res, CloudPath | pathlib.Path):
+            raise ValueError(f'{res} is not a path.')
+        return cast(Path, res)
+
+    def as_resource(self, id=None) -> hb.Resource:
+        """
+        Cast the result to Hail Batch Resource, or throw an error if the cast failed.
+        `id` is used to extract the value when the result is a dictionary.
+        """
+        res = self.as_path_or_resource(id)
+        if not isinstance(res, hb.Resource):
+            raise ValueError(f'{res} is not a Hail Batch Resource.')
+        return cast(hb.Resource, res)
+
+    def as_dict(self) -> dict[str, Path | hb.Resource]:
+        """
+        Cast the result to a dictionary, or throw an error if the cast failed.
+        """
+        if not isinstance(self.data, dict):
+            raise ValueError(f'{self.data} is not a dictionary.')
+        return self.data
+
+    def as_resource_dict(self) -> dict[str, hb.Resource]:
+        """
+        Cast the result to a dictionary of Hail Batch Resources,
+        or throw an error if the cast failed
+        """
+        return {k: self.as_resource(id=k) for k in self.as_dict()}
+
+    def as_path_dict(self) -> dict[str, Path]:
+        """
+        Cast the result to a dictionary of strings,
+        or throw an error if the cast failed.
+        """
+        return {k: self.as_path(id=k) for k in self.as_dict()}
+
+
+# noinspection PyShadowingNames
+class StageInput:
+    """
+    Represents an input for a stage run. It wraps the outputs of all required upstream
+    stages for corresponding targets (e.g. all GVCFs from a GenotypeSample stage
+    for a JointCalling stage, along with Hail Batch jobs).
+
+    An object of this class is passed to the public `queue_jobs` method of a Stage,
+    and can be used to query dependency files and jobs.
+    """
+
+    def __init__(self, stage: 'Stage'):
+        self.stage = stage
+        self._outputs_by_target_by_stage: dict[str, dict[str, StageOutput]] = {}
+
+    def add_other_stage_output(self, output: StageOutput_):
+        """
+        Add output from another stage run.
+        """
+        assert output.stage is not None, output
+        if not output.target.active:
+            return
+        if not output.data or not output.jobs:
+            return
+        stage_name = output.stage.name
+        target_id = output.target.target_id
+        if stage_name not in self._outputs_by_target_by_stage:
+            self._outputs_by_target_by_stage[stage_name] = dict()
+        self._outputs_by_target_by_stage[stage_name][target_id] = output
+
+    def _each(
+        self,
+        fun: Callable,
+        stage: StageDecorator,
+    ):
+        if stage.__name__ not in [s.name for s in self.stage.required_stages]:
+            raise PipelineError(
+                f'{self.stage.name}: getting inputs from stage {stage.__name__}, '
+                f'but {stage.__name__} is not listed in required_stages. '
+                f'Consider adding it into the decorator: '
+                f'@stage(required_stages=[{stage.__name__}])'
+            )
+
+        if stage.__name__ not in self._outputs_by_target_by_stage:
+            raise PipelineError(
+                f'No inputs from {stage.__name__} for {self.stage.name} found '
+                'after skipping targets with missing inputs. '
+                + (
+                    'Check the logs if all samples were missing inputs from previous '
+                    'stages, and consider changing --first-stage'
+                    if self.stage.skip_samples_with_missing_input
+                    else ''
+                )
+            )
+
+        return {
+            trg: fun(result)
+            for trg, result in self._outputs_by_target_by_stage.get(
+                stage.__name__, {}
+            ).items()
+        }
+
+    def as_path_by_target(
+        self,
+        stage: StageDecorator,
+        id: str | None = None,
+    ) -> dict[str, Path]:
+        """
+        Get a single file path result, indexed by target for a specific stage
+        """
+        return self._each(fun=(lambda r: r.as_path(id=id)), stage=stage)
+
+    def as_resource_by_target(
+        self,
+        stage: StageDecorator,
+        id: str | None = None,
+    ) -> dict[str, hb.Resource]:
+        """
+        Get a single file path result, indexed by target for a specific stage
+        """
+        return self._each(fun=(lambda r: r.as_resource(id=id)), stage=stage)
+
+    def as_dict_by_target(self, stage: StageDecorator) -> dict[str, dict[str, Path]]:
+        """
+        Get as a dict of files/resources for a specific stage, indexed by target
+        """
+        return self._each(fun=(lambda r: r.as_dict()), stage=stage)
+
+    def as_resource_dict_by_target(
+        self,
+        stage: StageDecorator,
+    ) -> dict[str, dict[str, hb.Resource]]:
+        """
+        Get a dict of resources for a specific stage, and indexed by target
+        """
+        return self._each(fun=(lambda r: r.as_resource_dict()), stage=stage)
+
+    def as_path_dict_by_target(
+        self,
+        stage: StageDecorator,
+    ) -> dict[str, dict[str, Path]]:
+        """
+        Get a dict of paths for a specific stage, and indexed by target
+        """
+        return self._each(fun=(lambda r: r.as_path_dict()), stage=stage)
+
+    def _get(
+        self,
+        target: 'Target',
+        stage: StageDecorator,
+    ):
+        if not self._outputs_by_target_by_stage.get(stage.__name__):
+            raise StageInputNotFound()
+        if not self._outputs_by_target_by_stage[stage.__name__].get(target.target_id):
+            raise StageInputNotFound()
+        return self._outputs_by_target_by_stage[stage.__name__][target.target_id]
+
+    def as_path(
+        self,
+        target: 'Target',
+        stage: StageDecorator,
+        id: str | None = None,
+    ) -> Path:
+        """
+        Represent as a path to a file, otherwise fail.
+        `stage` can be callable, or a subclass of Stage
+        """
+        res = self._get(target=target, stage=stage)
+        return res.as_path(id)
+    
+    def as_resource(
+        self,
+        target: 'Target',
+        stage: StageDecorator,
+        id: str | None = None,
+    ) -> hb.Resource:
+        """
+        Get Hail Batch Resource for a specific target and stage
+        """
+        res = self._get(target=target, stage=stage)
+        return res.as_resource(id)
+
+    def as_dict(self, target: 'Target', stage: StageDecorator) -> dict[str, Path]:
+        """
+        Get a dict of files or Resources for a specific target and stage
+        """
+        res = self._get(target=target, stage=stage)
+        return res.as_dict()
+
+    def as_path_dict(self, target: 'Target', stage: StageDecorator) -> dict[str, Path]:
+        """
+        Get a dict of files for a specific target and stage
+        """
+        res = self._get(target=target, stage=stage)
+        return res.as_path_dict()
+
+    def as_resource_dict(
+        self, target: 'Target', stage: StageDecorator
+    ) -> dict[str, hb.Resource]:
+        """
+        Get a dict of  Resources for a specific target and stage
+        """
+        res = self._get(target=target, stage=stage)
+        return res.as_resource_dict()
+
+    def get_jobs(self, target: 'Target') -> list[Job]:
+        """
+        Get list of jobs that the next stage would depend on.
+        """
+        all_jobs: list[Job] = []
+        for _, outputs_by_target in self._outputs_by_target_by_stage.items():
+            for _, output in outputs_by_target.items():
+                if output:
+                    these_samples = target.get_sample_ids()
+                    those_samples = output.target.get_sample_ids()
+                    samples_intersect = set(these_samples) & set(those_samples)
+                    if samples_intersect:
+                        all_jobs.extend(output.jobs)
+        return all_jobs
+
+
+class Action(Enum):
+    """
+    Indicates what a stage should do with a specific target.
+    """
+
+    QUEUE = 1
+    SKIP = 2
+    REUSE = 3
+
+
+class Stage(Generic[TargetT], ABC):
+    """
+    Abstract class for a pipeline stage. Parametrised by specific Target subclass,
+    i.e. SampleStage(Stage[Sample]) should only be able to work on Sample(Target).
+    """
+
+    def __init__(
+        self,
+        name: str,
+        batch: Batch,
+        cohort: Cohort,
+        refs: RefData,
+        pipeline_tmp_bucket: Path,
+        hail_billing_project: str,
+        hail_bucket: Path | None = None,
+        required_stages: list[StageDecorator] | StageDecorator | None = None,
+        analysis_type: str | None = None,
+        skipped: bool = False,
+        assume_outputs_exist: bool = False,
+        forced: bool = False,
+        check_inputs: bool = False,
+        check_intermediates: bool = False,
+        check_expected_outputs: bool = False,
+        skip_samples_with_missing_input: bool = False,
+        skip_samples_stages: dict[str, list[str]] | None = None,
+        status_reporter: StatusReporter | None = None,
+        pipeline_config: dict[str, Any] | None = None,
+    ):
+        self._name = name
+        self.b = batch
+        self.cohort = cohort
+        self.refs = refs
+
+        self.check_inputs = check_inputs
+        self.check_intermediates = check_intermediates
+        self.check_expected_outputs = check_expected_outputs
+        self.skip_samples_with_missing_input = skip_samples_with_missing_input
+        self.skip_samples_stages = skip_samples_stages
+
+        self.required_stages_classes: list[StageDecorator] = []
+        if required_stages:
+            if isinstance(required_stages, list):
+                self.required_stages_classes.extend(required_stages)
+            else:
+                self.required_stages_classes.append(required_stages)
+
+        self.tmp_bucket = pipeline_tmp_bucket / name
+
+        # Dependencies. Populated in pipeline.run(), after we know all stages.
+        self.required_stages: list[Stage] = []
+
+        self.status_reporter = status_reporter
+        # If analysis type is defined, it will be used to update analysis status,
+        # as well as find and reuse existing outputs from the status reporter
+        self.analysis_type = analysis_type
+
+        # Populated with the return value of `add_to_the_pipeline()`
+        self.output_by_target: dict[str, StageOutput] = dict()
+
+        self.skipped = skipped
+        self.forced = forced
+        self.assume_outputs_exist = assume_outputs_exist
+
+        self.pipeline_config = pipeline_config or {}
+
+        self.hail_billing_project = hail_billing_project
+        self.hail_bucket = hail_bucket
+
+    def __str__(self):
+        res = f'{self._name}'
+        if self.skipped:
+            res += ' [skipped]'
+        if self.forced:
+            res += ' [forced]'
+        if self.assume_outputs_exist:
+            res += ' [assume_outputs_exist]'
+        if self.required_stages:
+            res += ' ' + ', '.join([s.name for s in self.required_stages])
+        return res
+
+    @property
+    def name(self):
+        """
+        Stage name (unique and descriptive stage)
+        """
+        return self._name
+
+    @abstractmethod
+    def queue_jobs(self, target: TargetT, inputs: StageInput) -> StageOutput:
+        """
+        Adds Hail Batch jobs that process `target`.
+        Assumes that all the household work is done: checking missing inputs
+        from required stages, checking for possible reuse of existing outputs.
+        """
+
+    @abstractmethod
+    def expected_outputs(self, target: TargetT) -> ExpectedResultT:
+        """
+        Get path(s) to files that the stage is expected to generate for a `target`.
+        Used within in `queue_jobs()` to pass paths to outputs to job commands,
+        as well as by the pipeline to check if the stage's expected outputs already
+        exist and can be reused.
+
+        Can be a str, a Path object, or a dictionary of str/Path objects.
+        """
+
+    @abstractmethod
+    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput]:
+        """
+        Queues jobs for each corresponding target, defined by Stage subclass.
+
+        Returns a dictionary of `StageOutput` objects indexed by target unique_id.
+        """
+
+    def _make_inputs(self) -> StageInput:
+        """
+        Collects outputs from all dependencies and create input for this stage
+        """
+        inputs = StageInput(self)
+        for prev_stage in self.required_stages:
+            for _, stage_output in prev_stage.output_by_target.items():
+                if stage_output:
+                    inputs.add_other_stage_output(stage_output)
+        return inputs
+
+    def make_outputs(
+        self,
+        target: 'Target',
+        data: StageOutputData | str | dict[str, str] | None = None,
+        jobs: list[Job] | Job | None = None,
+        reusable: bool = False,
+        error_msg: str | None = None,
+    ) -> StageOutput_:
+        """
+        Create StageOutput for this stage.
+        """
+        return StageOutput_(
+            target=target,
+            data=data,
+            jobs=jobs,
+            reusable=reusable,
+            error_msg=error_msg,
+            stage=self,
+        )
+
+    def _queue_jobs_with_checks(
+        self,
+        target: TargetT,
+        action: Action | None = None,
+    ) -> StageOutput:
+        """
+        Checks what to do with target, and either queue jobs, or skip/reuse results.
+        """
+        if not action:
+            action = self._get_action(target)
+
+        inputs = self._make_inputs()
+        expected_out = self.expected_outputs(target)
+
+        if action == Action.QUEUE:
+            outputs = self.queue_jobs(target, inputs)
+        elif action == Action.REUSE:
+            outputs = self.make_outputs(
+                target=target,
+                data=expected_out,
+                jobs=self.new_reuse_job(target),
+                reusable=True,
+            )
+        else:  # Action.SKIPPED
+            outputs = None
+
+        if not outputs:
+            return None
+
+        outputs.stage = self
+        for j in outputs.jobs:
+            j.depends_on(*inputs.get_jobs(target))
+
+        if outputs.error_msg:
+            return outputs
+
+        # Adding status reporter jobs
+        if self.analysis_type and self.status_reporter:
+            self.status_reporter.add_updaters_jobs(
+                b=self.b,
+                output=outputs.data,
+                analysis_type=self.analysis_type,
+                target=target,
+                jobs=outputs.jobs,
+                prev_jobs=inputs.get_jobs(target),
+            )
+        return outputs
+
+    def new_reuse_job(self, target: Target) -> Job:
+        """
+        Add "reuse" job. Target doesn't have to be specific for a stage here,
+        this using abstract class Target instead of generic parameter TargetT.
+        """
+        return self.b.new_job(f'{self.name} [reuse]', target.get_job_attrs())
+
+    def _get_action(self, target: TargetT) -> Action:
+        """
+        Based on stage parameters and expected outputs existence, determines what
+        to do with the target: queue, skip or reuse, etc..
+        """
+        if self.skip_samples_stages and self.name in self.skip_samples_stages:
+            skip_targets = self.skip_samples_stages[self.name]
+            if target.target_id in skip_targets:
+                logger.info(f'{self.name}: requested to skip {target}')
+                return Action.SKIP
+
+        expected_out = self.expected_outputs(target)
+        reusable = self._outputs_are_reusable(expected_out)
+        if not self.skipped:
+            if reusable:
+                if target.forced:
+                    logger.info(
+                        f'{self.name}: can reuse, but forcing the target '
+                        f'{target} to rerun this stage'
+                    )
+                    return Action.QUEUE
+                elif self.forced:
+                    logger.info(
+                        f'{self.name}: can reuse, but forcing the stage '
+                        f'to rerun, target={target}'
+                    )
+                    return Action.QUEUE
+                else:
+                    logger.info(f'{self.name}: reusing results for {target}')
+                    return Action.REUSE
+            else:
+                logger.info(f'{self.name}: running queue_jobs(target={target})')
+                return Action.QUEUE
+
+        if reusable:
+            return Action.REUSE
+        else:
+            if self.skip_samples_with_missing_input:
+                logger.warning(
+                    f'Skipping sample {target}: stage {self.name} is required, '
+                    f'but is skipped, and expected outputs for the target do not '
+                    f'exist: {expected_out}'
+                )
+            else:
+                raise ValueError(
+                    f'Stage {self.name} is required, but is skipped, and '
+                    f'expected outputs for target {target} do not exist: '
+                    f'{expected_out}'
+                )
+        # Stage is not needed, returning empty outputs.
+        target.active = False
+        return Action.SKIP
+
+    def _outputs_are_reusable(self, expected_out: ExpectedResultT) -> bool:
+        """
+        Returns outputs that can be reused for the stage for the target,
+        or None of none can be reused
+        """
+        if not expected_out:
+            reusable = False
+        elif not self.check_expected_outputs:
+            if self.assume_outputs_exist or self.skipped:
+                # Do not check the files' existence, trust they exist.
+                # note that for skipped stages, we automatically assume outputs exist
+                reusable = True
+            else:
+                # Do not check the files' existence, assume they don't exist:
+                reusable = False
+        else:
+            # Checking that expected output exists:
+            paths: list[Path]
+            if isinstance(expected_out, dict):
+                paths = [v for k, v in expected_out.items()]
+            else:
+                paths = [expected_out]
+            reusable = all(exists(path) for path in paths)
+        return reusable
+
+    def _queue_reuse_job(
+        self, target: TargetT, found_paths: Path | dict[str, Path]
+    ) -> StageOutput:
+        """
+        Queues a [reuse] Job
+        """
+        return self.make_outputs(
+            target=target,
+            data=found_paths,
+            jobs=[self.b.new_job(f'{self.name} [reuse]', target.get_job_attrs())],
+        )
+
+    def get_job_attrs(self, target: TargetT | None = None) -> dict[str, str]:
+        """
+        Create Hail Batch Job attributes dictionary
+        """
+        job_attrs = dict(stage=self.name)
+        if target:
+            job_attrs |= target.get_job_attrs()
+        return job_attrs
 
 
 def stage(
-    _cls: Optional[Type[Stage]] = None, 
+    cls: Optional[Type['Stage']] = None,
     *,
-    sm_analysis_type: Optional[AnalysisType] = None, 
-    requires_stages: Optional[Union[List[StageDecorator], StageDecorator]] = None,
+    analysis_type: str | None = None,
+    required_stages: list[StageDecorator] | StageDecorator | None = None,
     skipped: bool = False,
-    required: bool = True,
-    assume_results_exist: bool = False,
+    assume_outputs_exist: bool = False,
     forced: bool = False,
 ) -> Union[StageDecorator, Callable[..., StageDecorator]]:
     """
-    Implements a standard class decorator pattern with an optional argument.
-    The goal is to allow cleaner defining of custom pipeline stages, without
-    requiring to implement constructor. E.g.
+    Implements a standard class decorator pattern with optional arguments.
+    The goal is to allow declaring pipeline stages without requiring to implement
+    a constructor method. E.g.
 
-    @stage(sm_analysis_type=AnalysisType.GVCF, requires_stages=CramStage)
-    class GvcfStage(SampleStage):
-        def expected_result(self, sample: Sample):
+    @stage(required_stages=[Align])
+    class GenotypeSample(SampleStage):
+        def expected_outputs(self, sample: Sample):
             ...
         def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
             ...
     """
-    def decorator_stage(cls) -> StageDecorator:
-        @functools.wraps(cls)
+
+    def decorator_stage(_cls) -> StageDecorator:
+        """Implements decorator."""
+
+        @functools.wraps(_cls)
         def wrapper_stage(pipeline: 'Pipeline') -> Stage:
-            return cls(
-                name=cls.__name__,
-                pipeline=pipeline,
-                requires_stages=requires_stages,
-                sm_analysis_type=sm_analysis_type,
+            """Decorator helper function."""
+            return _cls(
+                name=_cls.__name__,
+                batch=pipeline.b,
+                cohort=pipeline.cohort,
+                refs=pipeline.refs,
+                pipeline_tmp_bucket=pipeline.tmp_bucket,
+                hail_billing_project=pipeline.hail_billing_project,
+                hail_bucket=pipeline.hail_bucket,
+                required_stages=required_stages,
+                analysis_type=analysis_type,
+                status_reporter=pipeline.status_reporter,
                 skipped=skipped,
-                required=required,
-                assume_results_exist=assume_results_exist, 
+                assume_outputs_exist=assume_outputs_exist,
                 forced=forced,
+                check_inputs=pipeline.check_inputs,
+                check_intermediates=pipeline.check_intermediates,
+                check_expected_outputs=pipeline.check_expected_outputs,
+                skip_samples_with_missing_input=pipeline.skip_samples_with_missing_input,
+                skip_samples_stages=pipeline.skip_samples_stages,
+                pipeline_config=pipeline.config,
             )
-        # We record each initialised Stage subclass, so we know the default stage
-        # list for the case when the user doesn't pass them explicitly with set_stages()
-        global _all_defined_stages
-        _all_defined_stages.append(wrapper_stage)
+
+        _ALL_DECLARED_STAGES.append(wrapper_stage)
         return wrapper_stage
 
-    if _cls is None:
+    if cls is None:
         return decorator_stage
     else:
-        return decorator_stage(_cls)
+        return decorator_stage(cls)
 
 
-def skipped(
-    _fun: Optional[StageDecorator] = None, 
+def skip(
+    _fun: Optional[StageDecorator] = None,
     *,
-    assume_results_exist: bool = False,
+    assume_outputs_exist: bool = False,
 ) -> Union[StageDecorator, Callable[..., StageDecorator]]:
     """
-    Decorator on top of `@stage` that sets the self.skipped field to True
+    Decorator on top of `@stage` that sets the `self.skipped` field to True.
+    By default, expected outputs of a skipped stage will be checked,
+    unless `assume_outputs_exist` is True.
 
-    @skipped
+    @skip
     @stage
     class MyStage1(SampleStage):
         ...
 
-    @skipped
-    @stage(assume_results_exist=True)
+    @skip
+    @stage(assume_outputs_exist=True)
     class MyStage2(SampleStage):
         ...
     """
+
     def decorator_stage(fun) -> StageDecorator:
+        """Implements decorator."""
+
         @functools.wraps(fun)
         def wrapper_stage(*args, **kwargs) -> Stage:
-            stage = fun(*args, **kwargs)
-            stage.skipped = True
-            stage.assume_results_exist = assume_results_exist
-            return stage
+            """Decorator helper function."""
+            s = fun(*args, **kwargs)
+            s.skipped = True
+            s.assume_outputs_exist = assume_outputs_exist
+            return s
 
         return wrapper_stage
 
@@ -156,192 +759,139 @@ def skipped(
         return decorator_stage(_fun)
 
 
-def run_pipeline(dry_run: bool = False, **kwargs) -> 'Pipeline':
-    """
-    Create and submit a pipeline to Hail Batch.
-    """
-    pipeline = Pipeline(**kwargs)
-    pipeline.submit_batch(dry_run=dry_run)
-    return pipeline
-
-
-class PipelineException(Exception):
-    pass
-
-
 class Pipeline:
     """
-    Represents a Pipeline, and incapulates a Hail Batch object,
-    stages, and a cohort of projects with samples.
+    Represents a Pipeline, and encapsulates a Hail Batch object, stages,
+    and a cohort of datasets of samples.
     """
+
     def __init__(
         self,
-        analysis_project: str,
+        namespace: Namespace,
         name: str,
-        title: str,
-        output_version: str,
-        namespace: Union[Namespace, str],
-        stages_in_order: Optional[List[StageDecorator]] = None,
-        keep_scratch: bool = True,
+        analysis_dataset_name: str,
+        storage_provider: StorageProvider,
+        description: str | None = None,
+        stages: list[StageDecorator] | None = None,
+        input_provider: InputProvider | None = None,
+        status_reporter: StatusReporter | None = None,
+        datasets: list[str] | None = None,
+        skip_datasets: list[str] | None = None,
+        skip_samples: list[str] | None = None,
+        only_samples: list[str] | None = None,
+        force_samples: list[str] | None = None,
+        first_stage: str | None = None,
+        last_stage: str | None = None,
+        version: str | None = None,
+        check_inputs: bool = False,
+        check_intermediates: bool = True,
+        check_expected_outputs: bool = True,
+        skip_samples_with_missing_input: bool = False,
+        skip_samples_stages: dict[str, list[str]] | None = None,
+        config: dict | None = None,
+        local_dir: Path | None = None,
         dry_run: bool = False,
-        previous_batch_tsv_path: Optional[str] = None,
-        previous_batch_id: Optional[str] = None,
-        update_smdb_analyses: bool = False,
-        check_smdb_seq_existence: bool = False,
-        skip_samples_without_first_stage_input: bool = False,
-        validate_smdb_analyses: bool = False,
-        check_intermediate_existence: bool = True,
-        check_job_expected_outputs_existence: bool = True,
-        first_stage: Optional[str] = None,
-        last_stage: Optional[str] = None,
-        config: Optional[Dict] = None,
-        input_projects: Optional[List[str]] = None,
-        source_tag: Optional[str] = None,
-        skip_samples: Optional[List[str]] = None,
-        only_samples: Optional[List[str]] = None,
-        force_samples: Optional[List[str]] = None,
-        ped_files: Optional[List[str]] = None,
-        local_dir: Optional[str] = None,
+        keep_scratch: bool = True,
     ):
-        if stages_in_order and not input_projects:
-            raise ValueError(
-                'Projects must be populated before adding stages. '
-                'Provide `input_projects`, or omit `stages_in_order` and call '
-                'pipeline.set_stages(stages_in_order) later.'
-            )
-
-        super().__init__()
-        if isinstance(namespace, str):
-            namespace = Namespace(namespace)
-        self.analysis_project = Project(
-            name=analysis_project,
+        self.storage_provider = storage_provider
+        self.cohort = Cohort(
+            analysis_dataset_name=analysis_dataset_name,
             namespace=namespace,
-            pipeline=self,
+            name=name,
+            storage_provider=storage_provider,
         )
+        if datasets and input_provider:
+            input_provider.populate_cohort(
+                cohort=self.cohort,
+                dataset_names=datasets,
+                skip_samples=skip_samples,
+                only_samples=only_samples,
+                skip_datasets=skip_datasets,
+            )
+        self.force_samples = force_samples
+
         self.name = name
-        self.output_version = output_version
+        self.version = version or time.strftime('%Y%m%d-%H%M%S')
         self.namespace = namespace
-        self.check_intermediate_existence = check_intermediate_existence and not dry_run
-        self.check_job_expected_outputs_existence = check_job_expected_outputs_existence and not dry_run
-        self.skip_samples_without_first_stage_input = skip_samples_without_first_stage_input
+        self.refs = RefData(self.storage_provider.get_ref_base())
+        self.hail_billing_project = get_billing_project(
+            self.cohort.analysis_dataset.stack
+        )
+        self.tmp_bucket = to_path(
+            self.cohort.analysis_dataset.get_tmp_bucket(
+                version=(name + (f'/{version}' if version else ''))
+            )
+        )
+        self.hail_bucket = self.tmp_bucket / 'hail'
+        if not description:
+            description = name
+            if version:
+                description += f' {version}'
+            if ds_set := set(d.name for d in self.cohort.get_datasets()):
+                description += ': ' + ', '.join(sorted(ds_set))
+        self.b: Batch = setup_batch(
+            description=description,
+            billing_project=self.hail_billing_project,
+            hail_bucket=self.hail_bucket,
+        )
+        self.status_reporter = status_reporter
+
+        self.dry_run = dry_run
+        self.keep_scratch = keep_scratch
+
+        self.check_inputs = check_inputs
+        self.check_intermediates = check_intermediates
+        self.check_expected_outputs = check_expected_outputs
+        self.skip_samples_with_missing_input = skip_samples_with_missing_input
+        self.skip_samples_stages = skip_samples_stages
         self.first_stage = first_stage
         self.last_stage = last_stage
-        self.validate_smdb_analyses = validate_smdb_analyses
-
-        if namespace == Namespace.TMP:
-            tmp_suf = 'test-tmp'
-            analysis_suf = 'test-tmp/analysis'
-            web_suf = 'test-tmp/web'
-            self.output_suf = 'test-tmp'
-            self.proj_output_suf = 'test'
-        elif namespace == Namespace.TEST:
-            tmp_suf = 'test-tmp'
-            analysis_suf = 'test-analysis'
-            web_suf = 'test-web'
-            self.output_suf = 'test'
-            self.proj_output_suf = 'test'
-        else:
-            tmp_suf = 'main-tmp'
-            analysis_suf = 'main-analysis'
-            web_suf = 'main-web'
-            self.output_suf = 'main'
-            self.proj_output_suf = 'main'
-        
-        path_ptrn = (
-            f'gs://cpg-{self.analysis_project.stack}-{{suffix}}/'
-            f'{self.name}/'
-            f'{self.output_version}'
-        )
-        self.tmp_bucket = path_ptrn.format(suffix=tmp_suf)
-        self.analysis_bucket = path_ptrn.format(suffix=analysis_suf)
-        self.web_bucket = path_ptrn.format(suffix=web_suf)
-        self.web_url = (
-            f'https://{self.namespace.value}-web.populationgenomics.org.au/'
-            f'{self.analysis_project.stack}/'
-            f'{self.name}/'
-            f'{self.output_version}'
-        )
-        self.keep_scratch = keep_scratch
-        self.dry_run: bool = dry_run
 
         if local_dir:
-            self.local_dir = local_dir
-            self.local_tmp_dir = tempfile.mkdtemp(dir=local_dir)
+            self.local_dir = to_path(local_dir)
+            self.local_tmp_dir = to_path(tempfile.mkdtemp(dir=local_dir))
         else:
-            self.local_dir = self.local_tmp_dir = tempfile.mkdtemp()
-
-        self.prev_batch_jobs = dict()
-        if previous_batch_tsv_path is not None:
-            assert previous_batch_id is not None
-            self.prev_batch_jobs = PrevJob.parse(
-                previous_batch_tsv_path,
-                previous_batch_id,
-                tmp_bucket=self.tmp_bucket,
-                keep_scratch=keep_scratch,
-            )
+            self.local_dir = self.local_tmp_dir = to_path(tempfile.mkdtemp())
 
         self.config = config or {}
 
-        self.b: Batch = setup_batch(
-            title=title, 
-            tmp_bucket=self.tmp_bucket,
-            keep_scratch=self.keep_scratch,
-            billing_project=self.analysis_project.stack,
-        )
+        # Will be populated by set_stages() in submit_batch()
+        self._stages_dict: dict[str, Stage] = dict()
+        self._stages_in_order = stages or _ALL_DECLARED_STAGES
 
-        self.cohort = Cohort(self.name, pipeline=self)
-        self._db = None
-        if input_projects:
-            self._db = SMDB(
-                self.analysis_project.name,
-                do_update_analyses=update_smdb_analyses,
-                do_check_seq_existence=check_smdb_seq_existence,
-            )
-            self.cohort.populate(
-                smdb=self._db,
-                input_projects=input_projects,
-                local_tmp_dir=self.local_dir,
-                source_tag=source_tag,
-                skip_samples=skip_samples,
-                only_samples=only_samples,
-                ped_files=ped_files,
-                forced_samples=force_samples,
-            )
-
-        self._stages_dict: Dict[str, Stage] = dict()
-        self._stages_in_order: List[StageDecorator] = stages_in_order or _all_defined_stages
-
-    def submit_batch(
-        self, 
-        dry_run: Optional[bool] = None,
-        wait: Optional[bool] = False,
-    ) -> Optional[Any]:
+    def run(
+        self,
+        dry_run: bool | None = None,
+        keep_scratch: bool | None = None,
+        wait: bool | None = False,
+        force_all_implicit_stages: bool = False,
+    ) -> Any | None:
         """
-        Submits Hail Batch jobs.
+        Resolve stages, add and submit Hail Batch jobs.
+        When `run_all_implicit_stages` is set, all required stages that were not defined
+        explicitly would still be executed.
         """
         if dry_run is None:
             dry_run = self.dry_run
-        
-        self.set_stages(self._stages_in_order)
-            
-        if self.b:
-            logger.info(f'Will submit {self.b.total_job_num} jobs:')
-            for label, stat in self.b.labelled_jobs.items():
-                logger.info(
-                    f'  {label}: {stat["job_n"]} for {len(stat["samples"])} samples'
-                )
-            logger.info(f'  Other jobs: {self.b.other_job_num}')
+        if keep_scratch is None:
+            keep_scratch = self.keep_scratch
 
-            return self.b.run(
+        self.set_stages(self._stages_in_order, force_all_implicit_stages)
+
+        result = None
+        if self.b:
+            result = self.b.run(
                 dry_run=dry_run,
-                delete_scratch_on_exit=not self.keep_scratch,
+                delete_scratch_on_exit=not keep_scratch,
                 wait=wait,
             )
         shutil.rmtree(self.local_tmp_dir)
-        return None
+        return result
 
-    def _validate_first_last_stage(self) -> Tuple[Optional[int], Optional[int]]:
-        # Validating the --first-stage and --last-stage parameters
+    def _validate_first_last_stage(self) -> tuple[int | None, int | None]:
+        """
+        Validating the first_stage and the last_stage parameters.
+        """
         stage_names = list(self._stages_dict.keys())
         lower_stage_names = [s.lower() for s in stage_names]
         first_stage_num = None
@@ -362,139 +912,139 @@ class Pipeline:
             last_stage_num = lower_stage_names.index(self.last_stage.lower())
         return first_stage_num, last_stage_num
 
-    def set_stages(self, stages_classes: List[StageDecorator]):
+    def set_stages(
+        self,
+        stages_classes: list[StageDecorator],
+        force_all_implicit_stages: bool = False,
+    ):
         """
-        Iterate over stages and call add_to_the_pipeline() on each.
+        Iterate over stages and call queue_for_cohort(cohort) on each.
         Effectively creates all Hail Batch jobs through Stage.queue_jobs().
+
+        When `run_all_implicit_stages` is set, all required stages that were not set
+        explicitly would still be run.
         """
-        # Initializing stage objects
+        if not self.cohort:
+            raise PipelineError('Cohort must be populated before adding stages')
+
+        # First round: initialising stage objects
         stages = [cls(self) for cls in stages_classes]
-        for stage in stages:
-            if stage.name in self._stages_dict:
+        for stage_ in stages:
+            if stage_.name in self._stages_dict:
                 raise ValueError(
-                    f'Stage {stage.name} is already defined. Check your '
+                    f'Stage {stage_.name} is already defined. Check this '
                     f'list for duplicates: {", ".join(s.name for s in stages)}'
                 )
-            self._stages_dict[stage.name] = stage
+            self._stages_dict[stage_.name] = stage_
 
+        # Second round: checking which stages are required, even implicitly.
+        # implicit_stages_d: dict[str, Stage] = dict()  # If there are required
+        # dependency stages that are not requested explicitly, we are putting them
+        # into this dict as `skipped`.
+        while True:  # Might need several rounds to resolve dependencies recursively.
+            newly_implicitly_added_d = dict()
+            for stage_ in self._stages_dict.values():
+                for reqcls in stage_.required_stages_classes:  # check dependencies
+                    if reqcls.__name__ in self._stages_dict:  # already added
+                        continue
+                    # Initialising and adding as explicit.
+                    reqstage = reqcls(self)
+                    newly_implicitly_added_d[reqstage.name] = reqstage
+                    if not force_all_implicit_stages:
+                        # Stage is not declared or requested implicitly, so setting
+                        # it as skipped:
+                        reqstage.skipped = True
+                        logger.info(
+                            f'Stage {reqstage.name} is skipped, '
+                            f'but the output will be required for the stage {stage_.name}'
+                        )
+            if newly_implicitly_added_d:
+                logger.info(
+                    f'Additional implicit stages: '
+                    f'{list(newly_implicitly_added_d.keys())}'
+                )
+                # Adding new stages back into the ordered dict, so they are
+                # executed first.
+                self._stages_dict = newly_implicitly_added_d | self._stages_dict
+            else:
+                # No new implicit stages added, can stop here.
+                break
+
+        for stage_ in self._stages_dict.values():
+            stage_.required_stages = [
+                self._stages_dict[cls.__name__]
+                for cls in stage_.required_stages_classes
+            ]
+
+        # Second round - applying first and last stage options.
         first_stage_num, last_stage_num = self._validate_first_last_stage()
-
-        # First round - checking which stages we require, even if they are skipped.
-        # If there are required stages that are not defined, we defined them
-        # into `additional_stages` as `skipped`.
-        # TODO: use TopologicalSorter
-        # import graphlib
-        # for stage in graphlib.TopologicalSorter(stages).static_order():
-        # https://github.com/populationgenomics/analysis-runner/pull/328/files
-        additional_stages_dict: Dict[str, Stage] = dict()
-        for i, (stage_name, stage) in enumerate(self._stages_dict.items()):
+        for i, (stage_name, stage_) in enumerate(self._stages_dict.items()):
             if first_stage_num is not None and i < first_stage_num:
-                stage.skipped = True
-                stage.required = False
+                stage_.skipped = True
                 logger.info(f'Skipping stage {stage_name}')
                 continue
-
             if last_stage_num is not None and i > last_stage_num:
-                stage.skipped = True
-                stage.required = False
+                stage_.skipped = True
                 continue
 
-            for reqcls in stage.required_stages_classes:
-                if reqcls.__name__ in self._stages_dict:
-                    reqstage = self._stages_dict[reqcls.__name__]
-                elif reqcls.__name__ in additional_stages_dict:
-                    reqstage = additional_stages_dict[reqcls.__name__]
-                else:
-                    # stage is not initialized, so we defining it as skipped
-                    reqstage = reqcls(self)
-                    reqstage.skipped = True
-                    additional_stages_dict[reqcls.__name__] = reqstage
-                reqstage.required = True
-                if reqstage.skipped:
-                    logger.info(
-                        f'Stage {reqstage.name} is skipped, '
-                        f'but the output will be required for the stage {stage.name}'
-                    )
-                stage.required_stages.append(reqstage)
-        
-        if additional_stages_dict:
+        logger.info(
+            f'Setting stages: {", ".join(s.name for s in stages if not s.skipped)}'
+        )
+        required_skipped_stages = [s for s in stages if s.skipped]
+        if required_skipped_stages:
             logger.info(
-                f'Additional required stages added as "skipped": '
-                f'{additional_stages_dict.keys()}'
+                f'Skipped stages: '
+                f'{", ".join(s.name for s in required_skipped_stages)}'
             )
-            for name, stage in self._stages_dict.items():
-                additional_stages_dict[name] = stage    
-            self._stages_dict = additional_stages_dict
-
-        logger.info(f'Setting stages: {", ".join(s.name for s in stages if not s.skipped)}')
 
         # Second round - actually adding jobs from the stages.
-        for i, stage in enumerate(self._stages_dict.values()):
-            if not stage.skipped:
-                logger.info(f'*' * 60)
-                logger.info(f'Stage {stage.name}')
+        for i, (_, stage_) in enumerate(self._stages_dict.items()):
+            logger.info(f'*' * 60)
+            logger.info(f'Stage {stage_}')
+            stage_.output_by_target = stage_.queue_for_cohort(self.cohort)
+            if errors := self._process_stage_errors(stage_.output_by_target):
+                raise PipelineError(
+                    f'Stage {stage} failed to queue jobs with errors: '
+                    + '\n'.join(errors)
+                )
 
-            if stage.required:
-                logger.info(f'Adding jobs for stage {stage.name}')
-                stage.output_by_target = stage.add_to_the_pipeline(self)
-
-            if not stage.skipped:
+            if not stage_.skipped:
                 logger.info(f'')
                 if last_stage_num and i >= last_stage_num:
-                    logger.info(f'Last stage is {stage.name}, stopping here')
+                    logger.info(f'Last stage is {stage_.name}, stopping here')
                     break
 
-    def can_reuse(self, fpath: Optional[str]) -> bool:
-        """
-        Checks if the fpath exists, 
-        but always returns False if not check_intermediate_existence
-        """
-        return buckets.can_reuse(fpath, overwrite=not self.check_intermediate_existence)
+    @staticmethod
+    def _process_stage_errors(output_by_target: dict[str, StageOutput]) -> list[str]:
+        targets_by_error = defaultdict(list)
+        for target, output in output_by_target.items():
+            if output and output.error_msg:
+                targets_by_error[output.error_msg].append(target)
+        return [
+            f'{error}: {", ".join(target_ids)}'
+            for error, target_ids in targets_by_error.items()
+        ]
 
-    def db_process_existing_analysis(self, *args, **kwargs):
+    def get_datasets(self, only_active: bool = True) -> list[Dataset]:
         """
-        Thin wrapper around SMDB.process_existing_analysis
+        Thin wrapper.
         """
-        if self._db is None:
-            raise PipelineException('SMDB is not initialised')
-        
-        return self._db.process_existing_analysis(*args, **kwargs)
+        return self.cohort.get_datasets(only_active=only_active)
 
-    @property
-    def db(self) -> SMDB:
+    def create_dataset(self, name: str) -> Dataset:
         """
-        Get read-only sample-metadata DB object.
+        Thin wrapper.
         """
-        if self._db is None:
-            raise PipelineException('SMDB is not initialised')
-        return cast('SMDB', self._db)
+        return self.cohort.create_dataset(name)
 
-    def get_db(self) -> Optional[SMDB]:
+    def get_all_samples(self, only_active: bool = True) -> list[Sample]:
         """
-        Like .db property, but returns None if db is not initialised.
+        Thin wrapper.
         """
-        return self._db
+        return self.cohort.get_samples(only_active=only_active)
 
-    def get_projects(self, only_active: bool = True) -> List[Project]:
+    def get_all_sample_ids(self, only_active: bool = True) -> list[str]:
         """
-        Thin wrapper around corresponding Cohort method.
+        Thin wrapper.
         """
-        return self.cohort.get_projects(only_active=only_active)
-
-    def add_project(self, name: str) -> Project:
-        """
-        Thin wrapper around corresponding Cohort method.
-        """
-        return self.cohort.add_project(name)
-
-    def get_all_samples(self, only_active: bool = True) -> List[Sample]:
-        """
-        Thin wrapper around corresponding Cohort method.
-        """
-        return self.cohort.get_all_samples(only_active=only_active)
-
-    def get_all_sample_ids(self, only_active: bool = True) -> List[str]:
-        """
-        Thin wrapper around corresponding Cohort method.
-        """
-        return self.cohort.get_all_sample_ids(only_active=only_active)
+        return self.cohort.get_sample_ids(only_active=only_active)

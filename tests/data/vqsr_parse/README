@@ -1,0 +1,4 @@
+bcftools view -R regions.bed \
+  gs://cpg-fewgenomes-test/unittest/test_after_joint_calling/2022-0412-1124SEO/tmp/test_after_joint_calling/2022-0412-1124SEO/Vqsr/51231718c29cdd7194fdf0790ac2126e7ecb45_3-siteonly.vcf.gz \
+  -Oz -o siteonly-regions.vcf.gz
+gsutil cp siteonly-regions.vcf.gz gs://cpg-fewgenomes-test/unittest/inputs/vqsr_parse/

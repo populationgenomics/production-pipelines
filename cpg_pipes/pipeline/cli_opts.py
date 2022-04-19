@@ -1,68 +1,108 @@
 """
-Common pipeline command line options for "click".
+Common pipeline command line options for Click.
 """
-from typing import Callable
+from enum import Enum
+from typing import Callable, Type, TypeVar
 import click
+import click_config_file
+import yaml  # type: ignore
 
-from cpg_pipes.namespace import Namespace
+from ..providers import (
+    StoragePolicyType,
+    StatusReporterType,
+    InputProviderType,
+)
+from ..providers.storage import Namespace, Cloud
+
+
+def choice_from_enum(cls: Type[Enum]) -> click.Choice:
+    """
+    Create click.Choice from Enum items.
+    """
+    return click.Choice([n.lower() for n in cls.__members__])
+
+
+T = TypeVar('T', bound=Enum)
+
+
+def val_to_enum(cls: Type[T]) -> Callable:
+    """
+    Callback to parse a value into an Enum item.
+    """
+
+    def _callback(ctx, param, val: str) -> T | None:
+        if val is None:
+            return None
+        d = {name.lower(): item for name, item in cls.__members__.items()}
+        if val not in d:
+            raise click.BadParameter(
+                f'Available options: {[n.lower() for n in cls.__members__]}'
+            )
+        return d[val]
+
+    return _callback
 
 
 def pipeline_click_options(function: Callable) -> Callable:
     """
-    Decorator to use with click when writing a script that implements a pipeline.
-    For example:
+    Decorator to use with Click that adds common pipeline options.
+    Useful to use with a script that implements a pipeline. Arguments can
+    be passed directly to `create_pipeline`, for example:
 
-    @click.command()
-    @pipeline_click_options
-    @click.argument('--custom-argument')
-    def main():
-        pass
+        @click.command()
+        @pipeline_click_options
+        def main(**kwargs):
+            pipeline = create_pipeline(**kwargs)
+
+    New options can be added by adding more click decorators before
+    `@pipeline_click_options`, e.g.:
+
+        @click.command()
+        @click.argument('--custom-argument')
+        @pipeline_click_options
+        def main(custom_argument: str):
+            pipeline = create_pipeline(**kwargs, config=dict(myarg=custom_argument))
     """
     options = [
         click.option(
             '-n',
             '--namespace',
             'namespace',
-            type=click.Choice([n.lower() for n in Namespace.__members__]),
-            callback=lambda c, p, v: getattr(Namespace, v.upper()) if v else None,
+            type=choice_from_enum(Namespace),
+            callback=val_to_enum(Namespace),
+            required=True,
             help='The bucket namespace to write the results to',
         ),
         click.option(
-            '--analysis-project',
-            'analysis_project',
-            default='seqr',
-            help='SM project name to write the intermediate/joint-calling analysis '
-                 'entries',
-        ),
-        click.option(
-            '--input-project',
-            'input_projects',
-            multiple=True,
+            '--analysis-dataset',
+            'analysis_dataset',
+            help='Dataset name to write cohort and pipeline level intermediate files',
             required=True,
-            help='Only read samples that belong to the project(s). Can be set multiple '
-                 'times.',
         ),
         click.option(
-            '--source-tag',
-            'source_tag',
-            help='Subset found analysis to "meta={source: <source_tag>}"',
-        ),
-        click.option(
-            '--ped-file',
-            'ped_files',
+            '--dataset',
+            'datasets',
             multiple=True,
-            help='PED file (will override sample-meatadata family data if available)'
+            help='Only read samples that belong to the given dataset(s). '
+            'Can be set multiple times.',
         ),
         click.option(
             '--first-stage',
             'first_stage',
             help='Skip previous stages and pick their expected results if further '
-                 'stages depend on thems',
+            'stages depend on them',
         ),
         click.option(
             '--last-stage',
             'last_stage',
             help='Finish the pipeline after this stage',
+        ),
+        click.option(
+            '--skip-dataset',
+            '-D',
+            'skip_datasets',
+            multiple=True,
+            help='Don\'t process specified datasets. Can be set multiple times.',
         ),
         click.option(
             '--skip-sample',
@@ -76,7 +116,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             '-s',
             'only_samples',
             multiple=True,
-            help='Only take these samples (can be set multiple times)',
+            help='Only process these samples (can be set multiple times)',
         ),
         click.option(
             '--force-sample',
@@ -85,91 +125,127 @@ def pipeline_click_options(function: Callable) -> Callable:
             help='Force reprocessing these samples. Can be set multiple times.',
         ),
         click.option(
+            '--version',
             '--output-version',
-            'output_version',
+            'version',
             type=str,
-            default='v0',
-            help='Suffix the outputs with this version tag. Useful for testing',
+            help='Pipeline version. Default is a timestamp',
         ),
         click.option(
-            '--keep-scratch/--remove-scratch', 
-            'keep_scratch', 
-            default=True,
+            '--storage-policy',
+            'storage_policy_type',
+            type=choice_from_enum(StoragePolicyType),
+            callback=val_to_enum(StoragePolicyType),
+            default=StoragePolicyType.CPG.value,
+            help='Storage policy is used to determine bucket names for intermediate '
+            'and output files',
+        ),
+        click.option(
+            '--cloud',
+            'cloud',
+            type=choice_from_enum(Cloud),
+            callback=val_to_enum(Cloud),
+            default=Cloud.GS.value,
+            help='Cloud storage provider',
+        ),
+        click.option(
+            '--status-reporter',
+            'status_reporter_type',
+            type=choice_from_enum(StatusReporterType),
+            callback=val_to_enum(StatusReporterType),
+            help='Report jobs statuses and results',
+        ),
+        click.option(
+            '--input-provider',
+            'input_provider_type',
+            type=choice_from_enum(InputProviderType),
+            callback=val_to_enum(InputProviderType),
+            default=InputProviderType.SMDB.value,
+            help=f'Source of inputs. '
+            f'For "--input-source={InputProviderType.CSV.value}", '
+            f'use --input-csv to specify a CSV file location',
+        ),
+        click.option(
+            '--input-csv',
+            'input_csv',
+            help=f'CSV file to provide with --input-provider={InputProviderType.CSV.value}',
+        ),
+        click.option(
+            '--keep-scratch/--remove-scratch',
+            'keep_scratch',
+            default=False,
             is_flag=True,
         ),
         click.option('--dry-run', 'dry_run', is_flag=True),
         click.option(
-            '--check-smdb-seq-existence/--no-check-smdb-seq-existence',
-            'check_smdb_seq_existence',
+            '--skip-samples-with-missing-input',
+            'skip_samples_with_missing_input',
             default=False,
             is_flag=True,
-            help='Check that files in sequence.meta exist'
+            help='For the first (not-skipped) stage, if the input for a target does not '
+            'exist, just skip this target instead of failing. E.g. if the first '
+            'stage is Align, and `sequence.meta` files for a sample do not exist, '
+            'remove this sample instead of failing.',
         ),
         click.option(
-            '--skip-samples-without-first-stage-input',
-            'skip_samples_without_first_stage_input',
-            default=False,
-            is_flag=True,
-            help='For the first not-skipped stage, if the input for a target does not'
-                 'exist, just skip this target instead of failing. E.g. if the first'
-                 'stage is CramStage, and sequence.meta files for a sample do not exist,'
-                 'remove this sample instead of failing.'
-        ),
-        click.option(
-            '--check-intermediate-existence/--no-check-intermediate-existence',
-            'check_intermediate_existence',
+            '--check-intermediates/--no-check-intermediates',
+            'check_intermediates',
             default=True,
             is_flag=True,
             help='Within jobs, check all in-job intermediate files for possible reuse. '
-                 'If set to False, will overwrite all intermediates. '
+            'If set to False, will overwrite all intermediates.',
         ),
         click.option(
-            '--check-job-expected-outputs-existence/--no-check-job-expected-outputs-existence',
-            'check_job_expected_outputs_existence',
-            default=True,
-            is_flag=True,
-            help='Before running a job, check if its input already exists. '
-                 'If it exists, submit a [reuse] job instead. '
-                 'Works nicely with --previous-batch-tsv/--previous-batch-id options.',
-        ),
-        click.option(
-            '--update-smdb-analyses/--no-update-smdb-analyses',
-            'update_smdb_analyses',
-            is_flag=True,
-            default=True,
-            help='Create analysis entries for queued/running/completed jobs'
-        ),
-        click.option(
-            '--validate-smdb-analyses/--no-validate-smdb-analyses',
-            'validate_smdb_analyses',
-            is_flag=True,
+            '--check-inputs/--no-check-inputs',
+            'check_inputs',
             default=False,
-            help='Validate existing analysis entries by checking if a.output exists on '
-                 'the bucket. Set the analysis entry to "failure" if output doesn\'t '
-                 'exist'
+            is_flag=True,
+            help='Chech input file existence (e.g. FASTQ files). If they are missing '
+            'the --skip-samples-with-missing-input option controls whether such '
+            'should be ignored, or raise an error.',
         ),
         click.option(
-            '--previous-batch-tsv',
-            'previous_batch_tsv_path',
-            help='A list of previous successful attempts from another batch, dumped '
-                 'from from the Batch database (the "jobs" table joined on '
-                 '"job_attributes"). If the intermediate output for a job exists in '
-                 'a previous attempt, it will be passed forward, and a [reuse] job will '
-                 'be submitted.'
-        ),
-        click.option(
-            '--previous-batch-id',
-            'previous_batch_id',
-            help='6-letter ID of the previous successful batch (corresponds to the '
-                 'directory name in the batch logs. e.g. feb0e9 in '
-                 'gs://cpg-seqr-main-tmp/hail/batch/feb0e9'
+            '--check-expected-outputs/--no-check-expected-outputs',
+            'check_expected_outputs',
+            default=True,
+            is_flag=True,
+            help='Before running a stage, check if its input already exists. '
+            'If it exists, submit a [reuse] job instead. '
+            'Works nicely with --previous-batch-tsv/--previous-batch-id options.',
         ),
         click.option(
             '--local-dir',
             'local_dir',
+            help='Local directory for temporary files. Usually takes a few kB. '
+            'If not provided, a temp folder will be created',
+        ),
+        click.option(
+            '--slack-channel',
+            'slack_channel',
+            help='Slack channel to send status reports with CPG status reporter.',
+        ),
+        click.option(
+            '--skip-samples-stages',
+            'skip_samples_stages',
+            type=dict,
+            help='Map of stages to lists of samples, to skip for specific stages.',
         ),
     ]
-    # click shows options in a reverse order, so inverting the list back:
+
+    # Applying decorators. Doing that in reverse order, because Click actually
+    # inverts the order of shown options, assuming the decorators order of
+    # application which is bottom to top.
     for opt in options[::-1]:
         function = opt(function)
-    return function
+
+    # Adding ability to load options from a yaml file
+    # using https://pypi.org/project/click-config-file
+    def yaml_provider(fp, _):
+        """Load options from YAML"""
+        with open(fp) as f:
+            return yaml.load(f, Loader=yaml.SafeLoader)
+
+    return click_config_file.configuration_option(
+        provider=yaml_provider,
+        implicit=False,
+    )(function)

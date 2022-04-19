@@ -1,28 +1,25 @@
 """
-Various utility functions and constants.
+Utility functions and constants.
 """
 
-import hashlib
+import logging
 import os
 import sys
-import time
-from os.path import isdir, isfile, exists
-from typing import Any, Callable, Iterable
-
+import traceback
 import click
+from typing import Any, Callable, cast
 
-from cpg_pipes import __name__ as package_name
-from cpg_pipes.buckets import file_exists
+from . import Path, to_path
 
-# Default reference genome build.
-DEFAULT_REF = 'GRCh38'
+logger = logging.getLogger(__file__)
 
 # Packages to install on a dataproc cluster, to use with the dataproc wrapper.
 DATAPROC_PACKAGES = [
-    'cpg-pipes',
-    'cpg-gnomad',   # github.com/populationgenomics/gnomad_methods
-    'seqr-loader',  # github.com/populationgenomics/hail-elasticsearch-pipelines
-    'elasticsearch',
+    'cpg_pipes==0.3.0',
+    'cpg_gnomad',  # github.com/populationgenomics/gnomad_methods
+    'seqr_loader==1.2.5',  # hail-elasticsearch-pipelines
+    'elasticsearch==8.1.1',
+    'cpg_utils',
     'click',
     'google',
     'fsspec',
@@ -30,15 +27,6 @@ DATAPROC_PACKAGES = [
     'gcloud',
     'selenium',
 ]
-
-# Location of python scripts to be called directly from command line.
-SCRIPTS_DIR = 'scripts'
-
-# Location of Hail Query scripts, to use with the dataproc wrapper.
-QUERY_SCRIPTS_DIR = 'query_scripts'
-
-# This python package name.
-PACKAGE_DIR = package_name
 
 
 def get_validation_callback(
@@ -48,13 +36,14 @@ def get_validation_callback(
 ) -> Callable:
     """
     Get callback for Click parameters validation
-    :param ext: check that the path has the expected extension
-    :param must_exist: check that the input file/object/directory exists
-    :param accompanying_metadata_suffix: checks that a file at the same location but
+    @param ext: check that the path has the expected extension
+    @param must_exist: check that the input file/object/directory exists
+    @param accompanying_metadata_suffix: checks that a file at the same location but
     with a different suffix also exists (e.g. genomes.mt and genomes.metadata.ht)
-    :return: a callback suitable for Click parameter initialization
+    @return: a callback suitable for Click parameter initialization
     """
-    def callback(_: click.Context, param: click.Option, value: Any):
+
+    def _callback(_: click.Context, param: click.Option, value: Any):
         if value is None:
             return value
         if ext:
@@ -66,59 +55,75 @@ def get_validation_callback(
                     f'an extension .{ext}, got: {value}'
                 )
         if must_exist:
-            if not file_exists(value):
+            if not exists(value):
                 raise click.BadParameter(f"{value} doesn't exist or incomplete")
             if accompanying_metadata_suffix:
                 accompanying_metadata_fpath = (
                     os.path.splitext(value)[0] + accompanying_metadata_suffix
                 )
-                if not file_exists(accompanying_metadata_fpath):
+                if not exists(accompanying_metadata_fpath):
                     raise click.BadParameter(
                         f"An accompanying file {accompanying_metadata_fpath} doesn't "
                         f'exist'
                     )
         return value
 
-    return callback
+    return _callback
 
 
-def safe_mkdir(dirpath: str, descriptive_name: str = '') -> str:
+def exists(path: Path | str, verbose: bool = True) -> bool:
     """
-    Multiprocessing-safely and recursively creates a directory
+    Check if the object exists, where the object can be:
+        * local file
+        * local directory
+        * cloud object
+        * cloud URL representing a *.mt or *.ht Hail data,
+          in which case it will check for the existence of a
+          *.mt/_SUCCESS or *.ht/_SUCCESS file.
+    @param path: path to the file/directory/object/mt/ht
+    @param verbose: print on each check
+    @return: True if the object exists
     """
-    if not dirpath:
-        sys.stderr.write(
-            f'Path is empty: {descriptive_name if descriptive_name else ""}\n'
-        )
+    path = cast(Path, to_path(path))
 
-    if isdir(dirpath):
-        return dirpath
+    # rstrip to ".mt/" -> ".mt"
+    if any(str(path).rstrip('/').endswith(f'.{suf}') for suf in ['mt', 'ht']):
+        path = path / '_SUCCESS'
 
-    if isfile(dirpath):
-        sys.stderr.write(descriptive_name + ' ' + dirpath + ' is a file.\n')
-
-    num_tries = 0
-    max_tries = 10
-
-    while not exists(dirpath):
-        # we could get an error here if multiple processes are creating
-        # the directory at the same time. Grr, concurrency.
+    if verbose:
+        # noinspection PyBroadException
         try:
-            os.makedirs(dirpath)
-        except OSError:
-            if num_tries > max_tries:
-                raise
-            num_tries += 1
-            time.sleep(2)
-    return dirpath
+            res = path.exists()
+        except BaseException:
+            traceback.print_exc()
+            logger.error(f'Failed checking {path}')
+            sys.exit(1)
+        logger.debug(f'Checked {path} [' + ('exists' if res else 'missing') + ']')
+        return res
+    return path.exists()
 
 
-def hash_sample_ids(sample_names: Iterable[str]) -> str:
+def can_reuse(
+    path: list[Path] | Path | str | None,
+    overwrite: bool,
+) -> bool:
     """
-    Return a unique hash string from a set of strings
-    :param sample_names: set of strings
-    :return: a string hash
+    Checks if `fpath` is good to reuse in the analysis: it exists
+    and `overwrite` is False.
+
+    If `fpath` is a collection, it requires all files in it to exist.
     """
-    for sn in sample_names:
-        assert ' ' not in sn, sn
-    return hashlib.sha256(' '.join(sorted(sample_names)).encode()).hexdigest()[:32]
+    if overwrite:
+        return False
+
+    if not path:
+        return False
+
+    if isinstance(path, list):
+        return all(can_reuse(fp, overwrite) for fp in path)
+
+    if not exists(path):
+        return False
+
+    logger.debug(f'Reusing existing {path}. Use --overwrite to overwrite')
+    return True

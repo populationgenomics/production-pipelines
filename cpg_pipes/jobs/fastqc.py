@@ -1,69 +1,93 @@
-from os.path import join
-from typing import Optional, List
+"""
+Jobs to run FastQC
+"""
+from os.path import basename
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
+from cpg_pipes import Path, images
+from cpg_pipes.types import AlignmentInput, CramPath, FastqPath
 from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.hb.inputs import AlignmentInput
-from cpg_pipes.jobs import align
+from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.refdata import RefData
 
 
 def fastqc(
-    b: hb.Batch, 
-    results_bucket: str,
-    sample_name: str, 
-    project_name: Optional[str], 
+    b: hb.Batch,
+    output_html_path: Path,
+    output_zip_path: Path,
     alignment_input: AlignmentInput,
-) -> List[Job]:
+    refs: RefData,
+    subsample: bool = True,
+    job_attrs: dict | None = None,
+) -> list[Job]:
     """
     Adds FastQC jobs. If the input is a set of fqs, runs FastQC on each fq file.
     """
-    def _fastqc_one(name, inp):
-        j = b.new_job(name, dict(sample=sample_name, project=project_name))
-        j.image('biocontainers/fastqc:v0.11.9_cv8')
-        j.cpu(32)
-        j.storage('150G')
 
-        j.command(wrap_command(f"""\
+    def _fastqc_one(jname_, input_path: CramPath | FastqPath):
+        j = b.new_job(jname_, job_attrs)
+        j.image(images.FASTQC_IMAGE)
+        threads = STANDARD.set_resources(j, ncpu=16).get_nthreads()
+
+        cmd = ''
+        input_file = b.read_input(str(input_path))
+        if isinstance(input_path, CramPath) and not input_path.is_bam:
+            new_file = f'/io/batch/{basename(str(input_path))}'
+            # FastQC doesn't support CRAMs, converting CRAM->BAM
+            cmd += f"""\
+            samtools view \\
+            -T {refs.fasta_res_group(b).base} \\
+            -@{threads - 1} \\
+            -b {input_file} \\
+            {"--subsample 0.01" if subsample else ''} \\
+            -O {new_file}
+            rm {input_file} 
+            """
+            input_file = new_file
+
+        fname = basename(str(input_path))
+        if not str(input_path).endswith('.gz'):
+            cmd += f"""\
+            mv {input_file} {input_file}.gz
+            """
+            input_file = f'{input_file}.gz'
+            fname += '.gz'
+
+        if subsample and not isinstance(input_path, CramPath):
+            n = 10_000_000
+            new_file = f'/io/batch/{fname}'
+            cmd += f"""\
+            gunzip -c {input_file} | head -n{n * 4} | gzip -c > {new_file}
+            """
+            input_file = new_file
+
+        cmd += f"""\
         mkdir -p /io/batch/outdir
-        fastqc -t64 {inp} --outdir /io/batch/outdir
+        fastqc -t{threads} {input_file} \\
+        --outdir /io/batch/outdir
         ls /io/batch/outdir
         ln /io/batch/outdir/*_fastqc.html {j.out_html}
-        """, monitor_space=True))
-    
-        out_fname = name.replace(' ', '_').replace('/', '_').replace('=', '_') + '_fastqc.html'
-        b.write_output(j.out_html, join(results_bucket, out_fname))
+        ln /io/batch/outdir/*_fastqc.zip {j.out_zip}
+        unzip /io/batch/outdir/*_fastqc.zip
+        """
+        j.command(wrap_command(cmd, monitor_space=True))
+
+        b.write_output(j.out_html, str(output_html_path))
+        b.write_output(j.out_zip, str(output_zip_path))
         return j
 
     jobs = []
-    if alignment_input.bam_or_cram_path and alignment_input.bam_or_cram_path.endswith('.bam'):
-        bam = alignment_input.as_cram_input_group(b)
-        j = _fastqc_one('FastQC', bam.base)
+    if isinstance(alignment_input, CramPath):
+        j = _fastqc_one('FastQC', alignment_input)
         jobs.append(j)
         return jobs
-
-    if alignment_input.bam_or_cram_path:
-        assert alignment_input.bam_or_cram_path.endswith('.cram'), alignment_input
-        extract_j = align.extract_fastq(
-            b=b,
-            cram=alignment_input.as_cram_input_group(b),
-            sample_name=sample_name,
-            project_name=project_name,
-        )
-        fqs1 = [extract_j.fq1]
-        fqs2 = [extract_j.fq2]
-
     else:
-        assert alignment_input.fqs1 and alignment_input.fqs2
-        fqs1 = [b.read_input(fq) for fq in alignment_input.fqs1]
-        fqs2 = [b.read_input(fq) for fq in alignment_input.fqs2]
-
-    for lane_i in range(len(fqs1)):
-        for r_i, fq in enumerate([fqs1[lane_i], fqs2[lane_i]]):
-            name = f'FastQC R={r_i + 1}'
-            if len(fqs1) > 1:
-                name += f' lane={lane_i}'
-            j = _fastqc_one(name, fq)
+        for lane_i, pair in enumerate(alignment_input):
+            jname = f'FastQC R1'
+            if len(alignment_input) > 1:
+                jname += f' lane={lane_i}'
+            j = _fastqc_one(jname, pair.r1)
             jobs.append(j)
     return jobs

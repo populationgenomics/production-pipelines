@@ -1,20 +1,25 @@
+"""
+Test how Hail Batch attaches disks to instances
+"""
+
 from typing import Optional
 
-from cpg_pipes.pipeline import Pipeline
+from cpg_pipes import Namespace
+from cpg_pipes.pipeline import create_pipeline
 
 
-def main():
-    pipeline = Pipeline(
-        analysis_project='fewgenomes',
+def main():  # pylint: disable=missing-function-docstring
+    pipeline = create_pipeline(
+        analysis_dataset='fewgenomes',
         name='test_attach_disk',
-        title='test_attach_disk',
-        output_version='v0',
-        namespace='test'
+        description='test_attach_disk',
+        version='v0',
+        namespace=Namespace.TEST,
     )
     b = pipeline.b
 
     def add_storage_job(
-        storage: float, 
+        storage: float,
         ncpu: Optional[int] = None,
         memory: Optional[float] = None,
     ):
@@ -24,7 +29,7 @@ def main():
         if ncpu:
             j.name += f' ncpu={ncpu}'
             j.cpu(ncpu)
-    
+
         if memory:
             j.name += f' memory={memory}G'
             j.memory(f'{memory}G')
@@ -35,8 +40,8 @@ def main():
     for _ in range(16):
         add_storage_job(storage=185 // 4, ncpu=8, memory=30.0)
 
-    pipeline.submit_batch()
+    pipeline.run()
 
 
 if __name__ == '__main__':
-    main()
+    main()  # pylint: disable=E1120

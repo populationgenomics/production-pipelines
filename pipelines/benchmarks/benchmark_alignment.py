@@ -1,22 +1,30 @@
 #!/usr/bin/env python3
-from enum import Enum
 
+"""
+Benchmarking different aligment setups.
+"""
+
+from enum import Enum
 import click
 import logging
 
-from cpg_pipes import benchmark, resources
-from cpg_pipes.hailbatch import AlignmentInput, fasta_ref_resource
-from cpg_pipes.pipeline import Pipeline, stage, SampleStage, StageInput, \
-    StageOutput, Sample
+from cpg_pipes import benchmark, images, Namespace
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
+from cpg_pipes.types import FastqPair, CramPath
+from cpg_pipes.pipeline import (
+    stage,
+    create_pipeline,
+    SampleStage,
+    StageInput,
+    StageOutput,
+)
+from cpg_pipes.targets import Sample
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
-PROJECT = 'fewgenomes'
-NAMESPACE = 'main'
+DATASET = 'fewgenomes'
+NAMESPACE = Namespace.MAIN
 
 
 class InputsType(Enum):
@@ -28,49 +36,49 @@ class InputsType(Enum):
 INPUTS_TYPE = InputsType.FULL
 
 
-@stage()
+@stage
 class SubsetAlignmentInput(SampleStage):
-    def expected_result(self, sample: 'Sample'):
+    def expected_outputs(self, sample: Sample):
         basepath = f'{benchmark.BENCHMARK_BUCKET}/outputs/{sample.id}/subset'
         return {
             'r1': f'{basepath}/R1.fastq.gz',
             'r2': f'{basepath}/R2.fastq.gz',
         }
-    
+
     NA12878_read_pairs = 787265109
     FQ_LINES_PER_READ = 4
     SUBSET_FRACTION = 4
-    
-    def _subset_fastq(self, alignment_input, sample):
-        fqs1, fqs2 = alignment_input.as_fq_inputs(self.pipe.b)
 
-        # We want to take 1/4 of all reads in NA12878. Total read count is 1574530218 
-        # (787265109 pairs), so subsetting to 196816277 pairs (196816277*4=787265108 
+    def _subset_fastq(self, alignment_input, sample):
+        fqs1, fqs2 = alignment_input.as_fq_inputs(self.b)
+
+        # We want to take 1/4 of all reads in NA12878. Total read count is 1574530218
+        # (787265109 pairs), so subsetting to 196816277 pairs (196816277*4=787265108
         # lines from each file)
         lines = self.NA12878_read_pairs * self.FQ_LINES_PER_READ / self.SUBSET_FRACTION
 
-        j1 = self.pipe.b.new_job('Subset FQ1', dict(sample=sample.id))
+        j1 = self.b.new_job('Subset FQ1', dict(sample=sample.id))
         j1.storage('100G')
         j1.command(f'gunzip -c {fqs1[0]} | head -n{lines} | gzip -c > {j1.out_fq}')
-        self.pipe.b.write_output(j1.out_fq, self.expected_result(sample)['r1'])
+        self.b.write_output(j1.out_fq, str(self.expected_outputs(sample)['r1']))
 
-        j2 = self.pipe.b.new_job('Subset FQ2')
+        j2 = self.b.new_job('Subset FQ2')
         j2.storage('100G')
         j2.command(f'gunzip -c {fqs2[0]} | head -n{lines} | gzip -c > {j2.out_fq}')
-        self.pipe.b.write_output(j2.out_fq, self.expected_result(sample)['r2'])
-        
+        self.b.write_output(j2.out_fq, str(self.expected_outputs(sample)['r2']))
+
         return self.make_outputs(
             sample,
             data={'r1': j1.out_fq, 'r2': j2.out_fq},
             jobs=[j1, j2],
         )
-    
-    def _subset_cram(self, alignment_input: AlignmentInput, sample: Sample):
-        j = self.pipe.b.new_job('Subset CRAM')
-        j.image(resources.BIOINFO_IMAGE)
+
+    def _subset_cram(self, cram: CramPath, sample: Sample):
+        j = self.b.new_job('Subset CRAM')
+        j.image(images.SAMTOOLS_PICARD_IMAGE)
         j.storage('100G')
-        reference = fasta_ref_resource(self.b)
-        cram = alignment_input.as_cram_input_group(self.b)
+        reference = self.refs.fasta_res_group(self.b)
+        cram_group = cram.resource_group(self.b)
 
         j.declare_resource_group(
             output_cram={
@@ -79,19 +87,22 @@ class SubsetAlignmentInput(SampleStage):
             }
         )
         j.command(
-            f'samtools view {cram.base} -@31 --subsample {1/self.SUBSET_FRACTION} '
-            f'-T {reference.base} -Ocram -o {j.output_cram.cram}\n'
-            f'samtools index -@31 {j.output_cram.cram} {j.output_cram["cram.crai"]}'
+            f'samtools view {cram_group.cram} -@31 --subsample {1/self.SUBSET_FRACTION} '
+            f'-T {reference.base} -Ocram -o {j.output_cram.cram_path}\n'
+            f'samtools index -@31 {j.output_cram.cram_path} {j.output_cram["cram.crai"]}'
         )
-        self.pipe.b.write_output(j.output_cram, self.expected_result(sample).replace('.cram', ''))
-        
+        self.b.write_output(
+            j.output_cram, str(self.expected_outputs(sample)).replace('.cram', '')
+        )
+
         return self.make_outputs(
-            sample, 
+            sample,
             data={'cram': j.output_cram},
             jobs=[j],
         )
-    
+
     def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput:
+        """Queue jobs"""
         if 'fastq_input' in sample.meta:
             alignment_input = sample.meta['fastq_input']
             return self._subset_fastq(alignment_input, sample)
@@ -99,49 +110,62 @@ class SubsetAlignmentInput(SampleStage):
             return self.make_outputs(sample, None)
 
 
-@stage(requires_stages=SubsetAlignmentInput if (INPUTS_TYPE == InputsType.FULL_SUBSET) else None)
+@stage(
+    required_stages=SubsetAlignmentInput
+    if (INPUTS_TYPE == InputsType.FULL_SUBSET)
+    else None
+)
 class DifferentResources(SampleStage):
-    def expected_result(self, sample: 'Sample'):
+    def expected_outputs(self, sample: 'Sample'):
         return None
 
     def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput:
-        basepath = f'{benchmark.BENCHMARK_BUCKET}/outputs/{INPUTS_TYPE.value}/{sample.id}'
+        basepath = (
+            benchmark.BENCHMARK_BUCKET / f'outputs/{INPUTS_TYPE.value}/{sample.id}'
+        )
 
         if INPUTS_TYPE == InputsType.FULL_SUBSET:
             d = inputs.as_dict(sample, stage=SubsetAlignmentInput)
-            alignment_input = AlignmentInput(fqs1=[d['r1']], fqs2=[d['r2']])
+            alignment_input = [FastqPair(d['r1'], d['r2'])]
         else:
             alignment_input = sample.meta['fastq_input']
 
         jobs = []
         for nthreads in [8, 16, 32]:
             for aligner in [Aligner.DRAGMAP, Aligner.BWA]:
-                jobs.append(align(
-                    self.pipe.b,
-                    alignment_input=alignment_input,
-                    sample_name=sample.id,
-                    output_path=f'{basepath}/nomarkdup/{aligner.name}_nthreads{nthreads}.bam',
-                    project_name=PROJECT,
-                    aligner=aligner,
-                    markdup_tool=MarkDupTool.NO_MARKDUP,
-                    extra_label=f'nomarkdup_fromfastq_{aligner.name}nthreads{nthreads}',
-                    depends_on=inputs.get_jobs(),
-                    requested_nthreads=nthreads,
-                ))
+                jobs.extend(
+                    align(
+                        self.b,
+                        alignment_input=alignment_input,
+                        sample_name=sample.id,
+                        output_path=basepath
+                        / f'nomarkdup/{aligner.name}_nthreads{nthreads}.bam',
+                        job_attrs=sample.get_job_attrs(),
+                        refs=self.refs,
+                        aligner=aligner,
+                        markdup_tool=MarkDupTool.NO_MARKDUP,
+                        extra_label=f'nomarkdup_fromfastq_{aligner.name}nthreads{nthreads}',
+                        requested_nthreads=nthreads,
+                    )
+                )
         return self.make_outputs(sample, jobs=jobs)
 
 
-@stage(requires_stages=SubsetAlignmentInput if (INPUTS_TYPE == InputsType.FULL_SUBSET) else None)
+@stage(
+    required_stages=SubsetAlignmentInput
+    if (INPUTS_TYPE == InputsType.FULL_SUBSET)
+    else None
+)
 class DifferentAlignerSetups(SampleStage):
-    def expected_result(self, sample: 'Sample'):
+    def expected_outputs(self, sample: 'Sample'):
         return None
 
     def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput:
-        basepath = f'{benchmark.BENCHMARK_BUCKET}/outputs/{sample.id}'
+        basepath = benchmark.BENCHMARK_BUCKET / f'outputs/{sample.id}'
 
         if INPUTS_TYPE == InputsType.FULL_SUBSET:
             d = inputs.as_dict(sample, stage=SubsetAlignmentInput)
-            alignment_input = AlignmentInput(fqs1=[d['r1']], fqs2=[d['r2']])
+            alignment_input = [FastqPair(d['r1'], d['r2'])]
         else:
             if 'fastq_input' in sample.meta:
                 alignment_input = sample.meta['fastq_input']
@@ -150,71 +174,57 @@ class DifferentAlignerSetups(SampleStage):
 
         jobs = []
         for aligner in [
-            # Aligner.DRAGMAP, 
-            Aligner.BWA, 
-            Aligner.BWAMEM2
+            Aligner.DRAGMAP,
+            Aligner.BWA,
+            # Aligner.BWAMEM2
         ]:
             for markdup in [MarkDupTool.PICARD]:
-                jobs.append(align(
-                    self.pipe.b,
-                    alignment_input=alignment_input,
-                    sample_name=sample.id,
-                    project_name=PROJECT,
-                    output_path=f'{basepath}/{aligner.name}-{markdup.name}.bam',
-                    aligner=aligner,
-                    markdup_tool=markdup,
-                    extra_label=f', dedup with {markdup.name}',
-                    depends_on=inputs.get_jobs(),
-                    number_of_shards_for_realignment=10 if alignment_input.is_bam_or_cram() else 0,
-                ))
+                jobs.extend(
+                    align(
+                        self.b,
+                        alignment_input=alignment_input,
+                        sample_name=sample.id,
+                        job_attrs=sample.get_job_attrs(),
+                        refs=self.refs,
+                        output_path=basepath / f'{aligner.name}-{markdup.name}.bam',
+                        aligner=aligner,
+                        markdup_tool=markdup,
+                        extra_label=f', dedup with {markdup.name}',
+                        realignment_shards_num=10
+                        if isinstance(alignment_input, CramPath)
+                        else 0,
+                    )
+                )
         return self.make_outputs(sample, jobs=jobs)
 
 
 @click.command()
 def main():
-    pipeline = Pipeline(
+    """
+    Entry point.
+    """
+    pipeline = create_pipeline(
         name='benchmark_alignment',
-        title='Benchmark alignment',
-        analysis_project=PROJECT,
-        output_version='v0',
+        description='Benchmark alignment',
+        analysis_dataset=DATASET,
         namespace=NAMESPACE,
-        check_smdb_seq_existence=False,
         keep_scratch=True,
     )
 
-    p = pipeline.add_project('fewgenomes')
-    # p.add_sample(
-    #     id='NA12878',
-    #     external_id='NA12878',
-    #     fastq_input=benchmark.na12878fq,
-    # )
-    # p.add_sample(
-    #     id='PERTHNEURO_FQ',
-    #     external_id='PERTHNEURO_FQ',
-    #     fastq_input=benchmark.perth_neuro_fq,
-    # )
-    p.add_sample(
+    p = pipeline.create_dataset('fewgenomes')
+    s = p.add_sample(
         id='PERTHNEURO_CRAM',
         external_id='PERTHNEURO_CRAM',
-        cram_input=benchmark.perth_neuro_cram,
     )
-    # p.add_sample(
-    #     id='TOY_FQ',
-    #     external_id='TOY_FQ',
-    #     fastq_input=benchmark.tiny_fq
-    # )
-    # p.add_sample(
-    #     id='TOY_CRAM',
-    #     external_id='TOY_CRAM',
-    #     fastq_input=benchmark.tiny_cram
-    # )
+    s.alignment_input = benchmark.perth_neuro_cram
 
-    pipeline.set_stages([
-        # SubsetAlignmentInput,
-        DifferentAlignerSetups,
-    ])
+    pipeline.set_stages(
+        [
+            DifferentAlignerSetups,
+        ]
+    )
 
-    pipeline.submit_batch()
+    pipeline.run()
 
 
 if __name__ == '__main__':

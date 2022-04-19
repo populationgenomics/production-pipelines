@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y git wget bash bzip2 zip tmux && \
         samtools \
         picard \
         gatk4 \
+        bedtools \
         bcftools && \
     micromamba install -y --prefix $MAMBA_ROOT_PREFIX -c vladsaveliev -c conda-forge tsvfmt && \
     rm -r /root/micromamba/pkgs && \

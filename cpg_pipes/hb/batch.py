@@ -4,21 +4,37 @@ Extending the Hail's `Batch` class.
 
 import logging
 import os
-from typing import Optional, Dict
+from typing import TypedDict
 
 import hailtop.batch as hb
-from hailtop.batch.job import Job
+from hailtop.batch.job import Job, PythonJob
+
+from .. import Path
+from ..providers.storage import Cloud
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
-class Batch(hb.Batch):
+class JobAttributes(TypedDict, total=False):
+    """
+    Job attributes specification.
+    """
+
+    sample: str
+    dataset: str
+    samples: str
+    part: str
+    label: str
+    stage: str
+    tool: str
+
+
+class RegisteringBatch(hb.Batch):
     """
     Thin subclass of the Hail `Batch` class. The aim is to be able to register
-    the create jobs to be able to print statistics before submitting.
+    created jobs, in order to print statistics before submitting the Batch.
     """
+
     def __init__(self, name, backend, *args, **kwargs):
         super().__init__(name, backend, *args, **kwargs)
         # Job stats registry:
@@ -26,114 +42,163 @@ class Batch(hb.Batch):
         self.other_job_num = 0
         self.total_job_num = 0
 
-    def new_job(
+    def _process_attributes(
         self,
-        name: Optional[str] = None,
-        attributes: Optional[Dict[str, str]] = None,
-        **kwargs,
-    ) -> Job:
+        name: str | None = None,
+        attributes: JobAttributes | None = None,
+    ) -> str:
         """
-        Adds job to the Batch, and also registers it in `self.job_stats` for
-        statistics.
+        Use job attributes to make the job name more descriptibe, and add
+        labels for Batch pre-submission stats.
         """
         if not name:
-            logger.critical('Error: job name must be defined')
-        
-        attributes = attributes or dict()
-        project = attributes.get('project')
+            raise ValueError('Error: job name must be defined')
+
+        attributes = attributes or JobAttributes()
+        dataset = attributes.get('dataset')
         sample = attributes.get('sample')
-        samples = attributes.get('samples')
+        sample_list = attributes.get('samples')
+        part = attributes.get('part')
         label = attributes.get('label', name)
 
-        name = job_name(name, sample, project)
+        name = make_job_name(name, sample, dataset, part)
 
-        if label and (sample or samples):
+        samples = []
+        if sample_list:
+            samples = sample_list.split(',')
+        elif sample:
+            samples = [sample]
+
+        if label and samples:
             if label not in self.labelled_jobs:
                 self.labelled_jobs[label] = {'job_n': 0, 'samples': set()}
             self.labelled_jobs[label]['job_n'] += 1
-            self.labelled_jobs[label]['samples'] |= (samples or {sample})
+            self.labelled_jobs[label]['samples'] |= set(samples)
         else:
             self.other_job_num += 1
         self.total_job_num += 1
-        j = super().new_job(name, attributes=attributes)
-        return j
+        return name
+
+    def new_python_job(
+        self,
+        name: str | None = None,
+        attributes: JobAttributes | None = None,
+    ) -> PythonJob:
+        """
+        Wrapper around `new_python_job()` that processes job attributes.
+        """
+        name = self._process_attributes(name, attributes)
+        return super().new_python_job(name, attributes=attributes)
+
+    def new_job(
+        self,
+        name: str | None = None,
+        attributes: JobAttributes | None = None,
+        **kwargs,
+    ) -> Job:
+        """
+        Wrapper around `new_job()` that processes job attributes.
+        """
+        name = self._process_attributes(name, attributes)
+        return super().new_job(name, attributes=attributes)
+
+    def run(self, **kwargs):
+        """
+        Execute a batch. Overridden to print pre-submission statistics.
+        """
+        logger.info(f'Will submit {self.total_job_num} jobs:')
+        for label, stat in self.labelled_jobs.items():
+            logger.info(
+                f'  {label}: {stat["job_n"]} for {len(stat["samples"])} samples'
+            )
+        logger.info(f'  Other jobs: {self.other_job_num}')
+        return super().run(**kwargs)
 
 
 def setup_batch(
-    title: str, 
-    keep_scratch: bool = False,
-    tmp_bucket: Optional[str] = None,
-    billing_project: Optional[str] = None,
-    hail_bucket: Optional[str] = None,
-) -> Batch:
+    description: str,
+    billing_project: str | None = None,
+    hail_bucket: Path | None = None,
+) -> RegisteringBatch:
     """
     Wrapper around the initialization of a Hail Batch object.
     Handles setting the temporary bucket and the billing project.
 
-    :param title: descriptive name of the Batch (will be displayed in the GUI)
-    :param billing_project: billing project name
-    :param tmp_bucket: path to temporary bucket. Will be used if neither 
-        the hail_bucket parameter nor HAIL_BUCKET env var are set.
-    :param keep_scratch: whether scratch will be kept after the batch is finished
-    :param hail_bucket: bucket for Hail Batch intermediate files.
+    @param description: descriptive name of the Batch (will be displayed in the GUI)
+    @param billing_project: Hail billing project name
+    @param hail_bucket: bucket for Hail Batch intermediate files.
     """
-    if not hail_bucket:
-        hail_bucket = get_hail_bucket(tmp_bucket, keep_scratch)
+    billing_project = get_billing_project(billing_project)
+    hail_bucket = get_hail_bucket(hail_bucket)
 
-    billing_project = billing_project or os.getenv('HAIL_BILLING_PROJECT')
-    if not billing_project:
-        raise ValueError(
-            'Either the billing_project parameter, or the HAIL_BILLING_PROJECT'
-            'environment variable must be set'
-        )
     logger.info(
         f'Starting Hail Batch with the project {billing_project}, '
         f'bucket {hail_bucket}'
     )
     backend = hb.ServiceBackend(
         billing_project=billing_project,
-        bucket=hail_bucket.replace('gs://', ''),
+        remote_tmpdir=hail_bucket,
         token=os.environ.get('HAIL_TOKEN'),
     )
-    return Batch(name=title, backend=backend)
+    return RegisteringBatch(name=description, backend=backend)
 
 
-def get_hail_bucket(
-    tmp_bucket: Optional[str] = None, 
-    keep_scratch: bool = False,
-) -> str:
+def get_hail_bucket(hail_bucket: str | Path | None = None, cloud=Cloud.GS) -> str:
     """
-    Get bucket where Hail Batch will keep scratch files
+    Get Hail bucket.
     """
-    hail_bucket = os.environ.get('HAIL_BUCKET')
-    
-    if not hail_bucket and not tmp_bucket:
-        raise ValueError(
-            'Either the tmp_bucket parameter, or the HAIL_BUCKET '
-            'environment variable must be set.'
-        )
-
-    if keep_scratch and not tmp_bucket:
-        raise ValueError(
-            'When keep_scratch=True, the tmp_bucket parameter must be set. '
-            'Scratch files can be large, so we want to use the tmp bucket '
-            'to store them, which is expected to set up to get cleaned '
-            'automatically on schedule.'
-        )
-        
-    if keep_scratch or not hail_bucket:
-        assert tmp_bucket
-        hail_bucket = os.path.join(tmp_bucket, 'hail')
+    if not hail_bucket:
+        hail_bucket = os.getenv('HAIL_BUCKET')
+        if not hail_bucket:
+            raise ValueError(
+                'Either the hail_bucket parameter, or the HAIL_BUCKET '
+                'environment variable must be set'
+            )
+    hail_bucket = str(hail_bucket)
+    prefs = {Cloud.GS: 'gs', Cloud.HAIL_AZ: 'hail-az'}
+    if not any(hail_bucket.startswith(f'{pref}://') for pref in prefs.values()):
+        hail_bucket = f'{prefs[cloud]}://{hail_bucket}'
 
     return hail_bucket
 
 
-def job_name(name, sample: str = None, project: str = None) -> str:
+def get_billing_project(billing_project: str | None = None) -> str:
     """
-    Extend the descriptive job name to reflect the project and the sample names
+    Get Hail billing project.
     """
-    if sample and project:
-        name = f'{project}/{sample}: {name}'
-    elif project:
-        name = f'{project}: {name}'
+
+    billing_project = billing_project or os.getenv('HAIL_BILLING_PROJECT')
+    if not billing_project:
+        raise ValueError(
+            'Either the billing_project parameter, or the HAIL_BILLING_PROJECT '
+            'environment variable must be set'
+        )
+    return billing_project
+
+
+def make_job_name(
+    name: str,
+    sample: str | None = None,
+    dataset: str | None = None,
+    part: str | None = None,
+) -> str:
+    """
+    Extend the descriptive job name to reflect job attributes.
+    """
+    if sample and dataset:
+        name = f'{dataset}/{sample}: {name}'
+    elif dataset:
+        name = f'{dataset}: {name}'
+    if part:
+        name += f', {part}'
     return name
+
+
+def hail_query_env(
+    j: Job, hail_billing_project: str, hail_bucket: str | Path | None = None
+):
+    """
+    Setup environment to run Hail Query Service backend script.
+    """
+    j.env('HAIL_BILLING_PROJECT', hail_billing_project)
+    j.env('HAIL_BUCKET', get_hail_bucket(hail_bucket))

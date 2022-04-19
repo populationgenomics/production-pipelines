@@ -1,527 +1,205 @@
 #!/usr/bin/env python3
 
 """
-Batch pipeline to laod data into seqr
+Seqr loading pipeline: FASTQ -> ElasticSearch index.
 """
 
 import logging
-import sys
+import os
 import time
-from os.path import join, basename
-from typing import Optional, List
 
 import click
-import hail as hl
-import pandas as pd
-
+import yaml
+from google.cloud import secretmanager
 from analysis_runner import dataproc
 
-from cpg_pipes import buckets, ref_data, utils
-from cpg_pipes.jobs import align, split_intervals, haplotype_caller, \
-    pedigree
-from cpg_pipes.jobs.joint_genotyping import make_joint_genotyping_jobs, \
-    JointGenotyperTool
-from cpg_pipes.jobs.vqsr import make_vqsr_jobs
-from cpg_pipes.namespace import Namespace
-from cpg_pipes.smdb.types import AnalysisType
-from cpg_pipes.pipeline.cli_opts import pipeline_click_options
-from cpg_pipes.pipeline.pipeline import stage, Pipeline
-from cpg_pipes.pipeline.stage import SampleStage, CohortStage, ProjectStage, \
-    StageInput, StageOutput
-from cpg_pipes.pipeline.sample import Sample
-from cpg_pipes.pipeline.project import Project
-from cpg_pipes.pipeline.cohort import Cohort
+from cpg_pipes import Path
+from cpg_pipes import utils
+from cpg_pipes.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jobs
+from cpg_pipes.pipeline import (
+    pipeline_click_options,
+    stage,
+    create_pipeline,
+    StageInput,
+    StageOutput,
+    CohortStage,
+    DatasetStage,
+)
+from cpg_pipes.refdata import RefData
+from cpg_pipes.stages.vep import Vep
+from cpg_pipes.stages.joint_genotyping import JointGenotyping
+from cpg_pipes.stages.vqsr import Vqsr
+from cpg_pipes.targets import Cohort, Dataset
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
-logger.setLevel(logging.INFO)
 
 
-class NoAlignmentInputError(Exception):
-    pass
+@stage(required_stages=[JointGenotyping, Vep, Vqsr])
+class AnnotateCohort(CohortStage):
+    """
+    Re-annotate the entire cohort.
+    """
 
-
-@stage(sm_analysis_type=AnalysisType.CRAM)
-class CramStage(SampleStage):
-    def expected_result(self, sample: Sample):
-        return f'{sample.project.get_bucket()}/cram/{sample.id}.cram'
-
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        if not sample.alignment_input:
-            if self.pipe.skip_samples_without_first_stage_input:
-                logger.error(f'Could not find read data, skipping sample {sample.id}')
-                sample.active = False
-                return self.make_outputs(sample)  # return empty output
-            else:
-                raise NoAlignmentInputError(
-                    f'No alignment input found for {sample.id}. '
-                    f'Checked: Sequence entry and type=CRAM Analysis entry'
-                )
-
-        expected_path = self.expected_result(sample)
-        cram_job = align.align(
-            b=self.pipe.b,
-            alignment_input=sample.alignment_input,
-            output_path=expected_path,
-            sample_name=sample.id,
-            project_name=sample.project.name,
-            overwrite=not self.pipe.check_intermediate_existence,
-            smdb=self.pipe.get_db(),
-            prev_batch_jobs=self.pipe.prev_batch_jobs,
-            number_of_shards_for_realignment=(
-                10 if sample.alignment_input.is_bam_or_cram() else None
-            )
-        )
-        return self.make_outputs(sample, data=expected_path, jobs=[cram_job])
-
-
-@stage(requires_stages=CramStage)
-class CramSomalierStage(SampleStage):
-    def expected_result(self, sample: Sample):
-        return f'{sample.project.get_bucket()}/cram/{sample.id}.somalier'
-
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        cram_path = inputs.as_path(target=sample, stage=CramStage)
-        expected_path = self.expected_result(sample)
-        fingerprint_job, fingerprint_path = pedigree.somalier_extact_job(
-            b=self.pipe.b,
-            sample=sample,
-            gvcf_or_cram_or_bam_path=cram_path,
-            out_fpath=expected_path,
-            overwrite=not self.pipe.check_intermediate_existence,
-            label='(CRAMs)',
-            depends_on=inputs.get_jobs(),
-        )
-        return self.make_outputs(sample, data=expected_path, jobs=[fingerprint_job])
-
-
-@stage(requires_stages=CramSomalierStage)
-class CramPedCheckStage(ProjectStage):
-    def expected_result(self, project: Project):
-        pass
-
-    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
-        fp_by_sid = inputs.as_path_by_target(stage=CramSomalierStage)
-
-        j, somalier_samples_path, somalier_pairs_path = pedigree.add_pedigree_jobs(
-            self.pipe.b,
-            project,
-            input_path_by_sid=fp_by_sid,
-            overwrite=not self.pipe.check_intermediate_existence,
-            fingerprints_bucket=join(self.pipe.analysis_bucket, 'fingerprints'),
-            web_bucket=self.pipe.web_bucket,
-            web_url=self.pipe.web_url,
-            tmp_bucket=self.pipe.tmp_bucket,
-            depends_on=inputs.get_jobs(),
-            label='(CRAMs)',
-            dry_run=self.pipe.dry_run,
-        )
-        return self.make_outputs(project, data=somalier_samples_path, jobs=[j])
-
-
-@stage(requires_stages=CramStage, sm_analysis_type=AnalysisType.GVCF)
-class GvcfStage(SampleStage):
-    hc_intervals = None
-
-    def expected_result(self, sample: Sample):
-        return f'{sample.project.get_bucket()}/gvcf/{sample.id}.g.vcf.gz'
-
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        cram_path = inputs.as_path(target=sample, stage=CramStage)
-        
-        hc_shards_num = self.pipe.config.get('hc_shards_num', 1)
-        if GvcfStage.hc_intervals is None and hc_shards_num > 1:
-            GvcfStage.hc_intervals = split_intervals.get_intervals(
-                b=self.pipe.b,
-                scatter_count=hc_shards_num,
-            )
-        expected_path = self.expected_result(sample)
-        gvcf_job = haplotype_caller.produce_gvcf(
-            b=self.pipe.b,
-            output_path=expected_path,
-            sample_name=sample.id,
-            project_name=sample.project.name,
-            cram_path=cram_path,
-            crai_path=cram_path + '.crai',
-            intervals=GvcfStage.hc_intervals,
-            number_of_intervals=hc_shards_num,
-            tmp_bucket=self.pipe.tmp_bucket,
-            overwrite=not self.pipe.check_intermediate_existence,
-            depends_on=inputs.get_jobs(),
-            smdb=self.pipe.get_db(),
-        )
-        return self.make_outputs(sample, data=expected_path, jobs=[gvcf_job])
-
-
-@stage(requires_stages=GvcfStage)
-class GvcfSomalierStage(SampleStage):
-    def expected_result(self, sample: Sample):
-        return f'{sample.project.get_bucket()}/gvcf/{sample.id}.somalier'
-
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        gvcf_path = inputs.as_path(target=sample, stage=GvcfStage)
-        expected_path = self.expected_result(sample)
-        fingerprint_job, fingerprint_path = pedigree.somalier_extact_job(
-            b=self.pipe.b,
-            sample=sample,
-            gvcf_or_cram_or_bam_path=gvcf_path,
-            out_fpath=expected_path,
-            overwrite=not self.pipe.check_intermediate_existence,
-            label='(GVCFs)',
-            depends_on=inputs.get_jobs(),
-        )
-        return self.make_outputs(sample, data=expected_path, jobs=[fingerprint_job])
-
-
-@stage(requires_stages=GvcfSomalierStage)
-class GvcfPedCheckStage(ProjectStage):
-    def expected_result(self, project: Project):
-        pass
-
-    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
-        fp_by_sid = inputs.as_path_by_target(stage=GvcfSomalierStage)
-
-        j, somalier_samples_path, somalier_pairs_path = pedigree.add_pedigree_jobs(
-            self.pipe.b,
-            project,
-            input_path_by_sid=fp_by_sid,
-            overwrite=not self.pipe.check_intermediate_existence,
-            fingerprints_bucket=join(self.pipe.analysis_bucket, 'fingerprints'),
-            web_bucket=self.pipe.web_bucket,
-            web_url=self.pipe.web_url,
-            tmp_bucket=self.pipe.tmp_bucket,
-            depends_on=inputs.get_jobs(),
-            label='(GVCFs)',
-            dry_run=self.pipe.dry_run,
-        )
-        return self.make_outputs(project, data=somalier_samples_path, jobs=[j])
-
-
-def make_expected_siteonly_path(output_path):
-    return output_path.replace('.vcf.gz', '-siteonly.vcf.gz')
-
-
-@stage(requires_stages=GvcfStage, sm_analysis_type=AnalysisType.JOINT_CALLING)
-class JointGenotypingStage(CohortStage):
-    def expected_result(self, cohort: Cohort):
-        samples_hash = utils.hash_sample_ids(cohort.get_all_sample_ids())
-        expected_jc_vcf_path = f'{self.pipe.tmp_bucket}/joint_calling/{samples_hash}.vcf.gz'
-        return expected_jc_vcf_path
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        """
+        Expected to write a matrix table.
+        """
+        h = cohort.alignment_inputs_hash()
+        return cohort.analysis_dataset.get_bucket() / 'mt' / f'{h}.mt'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        gvcf_by_sid = inputs.as_path_by_target(stage=GvcfStage)
+        """
+        Uses analysis-runner's dataproc helper to run a hail query script
+        """
+        vcf_path = inputs.as_path(target=cohort, stage=JointGenotyping, id='vcf')
+        siteonly_vqsr_vcf_path = inputs.as_path(target=cohort, stage=Vqsr)
+        vep_ht_path = inputs.as_path(target=cohort, stage=Vep)
 
-        not_found_gvcfs: List[str] = []
-        for sid, gvcf_path in gvcf_by_sid.items():
-            if gvcf_path is None:
-                logger.error(f'Joint genotyping: could not find GVCF for {sid}')
-                not_found_gvcfs.append(sid)
-        if not_found_gvcfs:
-            logger.critical(
-                f'Joint genotyping: could not find {len(not_found_gvcfs)} '
-                f'GVCFs, exiting')
-            sys.exit(1)
+        mt_path = self.expected_outputs(cohort)
 
-        expected_path = self.expected_result(cohort)
-        jc_job = make_joint_genotyping_jobs(
-            b=self.pipe.b,
-            out_vcf_path=expected_path,
-            out_siteonly_vcf_path=make_expected_siteonly_path(expected_path),
-            samples=cohort.get_all_samples(),
-            genomicsdb_bucket=f'{self.pipe.analysis_bucket}/genomicsdbs',
-            tmp_bucket=self.pipe.tmp_bucket,
-            gvcf_by_sid=gvcf_by_sid,
-            overwrite=not self.pipe.check_intermediate_existence,
-            depends_on=inputs.get_jobs(),
-            smdb=self.pipe.get_db(),
-            tool=JointGenotyperTool.GnarlyGenotyper 
-            if self.pipe.config.get('use_gnarly', False) 
-            else JointGenotyperTool.GenotypeGVCFs,
-            dry_run=self.pipe.dry_run,
+        jobs = annotate_cohort_jobs(
+            b=self.b,
+            vcf_path=vcf_path,
+            vep_ht_path=vep_ht_path,
+            siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
+            output_mt_path=mt_path,
+            checkpoints_bucket=self.tmp_bucket / 'checkpoints',
+            sequencing_type=cohort.get_sequencing_type(),
+            hail_billing_project=self.hail_billing_project,
+            hail_bucket=self.hail_bucket,
+            overwrite=not self.check_intermediates,
+            job_attrs=self.get_job_attrs(),
         )
-        return self.make_outputs(cohort, data=expected_path, jobs=[jc_job])
+        return self.make_outputs(cohort, data=mt_path, jobs=jobs)
 
 
-@stage(requires_stages=JointGenotypingStage)
-class VqsrStage(CohortStage):
-    def expected_result(self, cohort: Cohort):
-        samples_hash = utils.hash_sample_ids(cohort.get_all_sample_ids())
-        expected_jc_vcf_path = f'{self.pipe.tmp_bucket}/vqsr/{samples_hash}-site-only.vcf.gz'
-        return expected_jc_vcf_path
+@stage(required_stages=[AnnotateCohort])
+class AnnotateDataset(DatasetStage):
+    """
+    Split mt by dataset and annotate dataset-specific fields (only for those datasets
+    that will be loaded into Seqr)
+    """
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        jc_vcf_path = inputs.as_path(stage=JointGenotypingStage, target=cohort)
-        siteonly_vcf_path = make_expected_siteonly_path(jc_vcf_path)
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        """
+        Expected to generate a matrix table
+        """
+        h = self.cohort.alignment_inputs_hash()
+        return self.tmp_bucket / f'{h}-{dataset.name}.mt'
 
-        tmp_vqsr_bucket = f'{self.pipe.tmp_bucket}/vqsr'
-        logger.info(f'Queueing VQSR job')
-        expected_path = self.expected_result(cohort)
-        vqsr_job = make_vqsr_jobs(
-            b=self.pipe.b,
-            input_vcf_or_mt_path=siteonly_vcf_path,
-            work_bucket=tmp_vqsr_bucket,
-            gvcf_count=len(cohort.get_all_samples()),
-            depends_on=inputs.get_jobs(),
-            output_vcf_path=expected_path,
-            use_as_annotations=self.pipe.config.get('use_as_vqsr', True),
-            overwrite=not self.pipe.check_intermediate_existence,
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        """
+        Uses analysis-runner's dataproc helper to run a hail query script
+        """
+        mt_path = inputs.as_path(target=self.cohort, stage=AnnotateCohort)
+
+        jobs = annotate_dataset_jobs(
+            b=self.b,
+            mt_path=mt_path,
+            sample_ids=[s.id for s in dataset.get_samples()],
+            output_mt_path=self.expected_outputs(dataset),
+            tmp_bucket=self.tmp_bucket / 'checkpoints' / dataset.name,
+            hail_billing_project=self.hail_billing_project,
+            hail_bucket=self.hail_bucket,
+            job_attrs=self.get_job_attrs(dataset),
+            overwrite=not self.check_intermediates,
         )
-        return self.make_outputs(cohort, data=expected_path, jobs=[vqsr_job])
-
-
-def get_anno_tmp_bucket(pipe: Pipeline):
-    return join(pipe.tmp_bucket, 'mt')
-
-
-@stage(requires_stages=[JointGenotypingStage, VqsrStage])
-class AnnotateCohortStage(CohortStage):
-    def expected_result(self, cohort: Cohort):
-        return join(get_anno_tmp_bucket(self.pipe), 'combined.mt')
-
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        checkpoints_bucket = join(get_anno_tmp_bucket(self.pipe), 'checkpoints')
-
-        vcf_path = inputs.as_path(target=cohort, stage=JointGenotypingStage)
-        annotated_site_only_vcf_path = inputs.as_path(target=cohort, stage=VqsrStage)
-
-        expected_path = self.expected_result(cohort)
-        j = dataproc.hail_dataproc_job(
-            self.pipe.b,
-            f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "vcf_to_mt.py")} '
-            f'--vcf-path {vcf_path} '
-            f'--site-only-vqsr-vcf-path {annotated_site_only_vcf_path} '
-            f'--dest-mt-path {expected_path} '
-            f'--bucket {checkpoints_bucket} '
-            f'--disable-validation '
-            f'--make-checkpoints '
-            + ('--overwrite ' if not self.pipe.check_intermediate_existence else ''),
-            max_age='16h',
-            packages=utils.DATAPROC_PACKAGES,
-            job_name='Make MT and annotate cohort',
-            depends_on=inputs.get_jobs(),
-            # Default Hail's VEP initialization script (triggered by --vep) 
-            # installs VEP=v95; if we want v105, we have to use a modified 
-            # vep-GRCh38.sh (with --init) from production-pipelines/vep/vep-GRCh38.sh
-            init=['gs://cpg-reference/vep/vep-GRCh38.sh'],
-            worker_machine_type='n1-highmem-8',
-            worker_boot_disk_size=200,
-            secondary_worker_boot_disk_size=200,
-            num_secondary_workers=50,
-            num_workers=8,
-        )
-        return self.make_outputs(cohort, data=expected_path, jobs=[j])
-
-
-@stage(requires_stages=[AnnotateCohortStage])
-class AnnotateProjectStage(ProjectStage):
-    def expected_result(self, project: Project):
-        return f'{self.pipe.analysis_bucket}/mt/{project.name}.mt'
-
-    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
-        output_projects = self.pipe.config.get('output_projects', self.pipe.get_projects())
-        if project.stack not in output_projects:
-            logger.info(
-                f'Skipping annotating project {project.stack} because it is not'
-                f'in the --output-projects: {output_projects}'
-            )
-            return self.make_outputs(project)
-        
-        annotated_mt_path = inputs.as_path(
-            target=self.pipe.cohort, 
-            stage=AnnotateCohortStage
+        return self.make_outputs(
+            dataset, data=self.expected_outputs(dataset), jobs=jobs
         )
 
-        # Make a list of project samples to subset from the entire matrix table
-        sample_ids = [s.id for s in project.get_samples()]
-        proj_tmp_bucket = project.get_tmp_bucket()
-        subset_path = f'{proj_tmp_bucket}/seqr-samples.txt'
-        with hl.hadoop_open(subset_path, 'w') as f:
-            f.write('\n'.join(sample_ids))
 
-        expected_path = self.expected_result(project)    
-        j = dataproc.hail_dataproc_job(
-            self.pipe.b,
-            f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "mt_to_projectmt.py")} '
-            f'--mt-path {annotated_mt_path} '
-            f'--out-mt-path {expected_path} '
-            f'--subset-tsv {subset_path}',
-            max_age='8h',
-            packages=utils.DATAPROC_PACKAGES,
-            num_secondary_workers=20,
-            num_workers=5,
-            job_name=f'{project.name}: annotate project',
-            depends_on=inputs.get_jobs(),
-        )
-        return self.make_outputs(project, data=expected_path, jobs=[j])
+@stage(required_stages=[AnnotateDataset])
+class LoadToEs(DatasetStage):
+    """
+    Create a Seqr index.
+    """
 
-
-@stage(requires_stages=[AnnotateProjectStage])
-class LoadToEsStage(ProjectStage):
-    def expected_result(self, project: Project):
+    def expected_outputs(self, dataset: Dataset) -> None:
+        """
+        Expected to generate a Seqr index, which is not a file
+        """
         return None
 
-    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
-        output_projects = self.pipe.config.get('output_projects', self.pipe.get_projects())
-        if project.stack not in output_projects:
-            logger.info(
-                f'Skipping loading project {project.stack} because it is not'
-                f'in the --output-projects: {output_projects}'
-            )
-            return self.make_outputs(project)
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        """
+        Uses analysis-runner's dataproc helper to run a hail query script
+        """
+        if (
+            es_datasets := self.pipeline_config.get('create_es_index_for_datasets')
+        ) and dataset.name not in es_datasets:
+            # Skipping dataset that wasn't explicitly requested to upload to ES:
+            return self.make_outputs(dataset)
 
-        project_mt_path = inputs.as_path(target=project, stage=AnnotateProjectStage)
+        dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset)
+        version = time.strftime('%Y%m%d-%H%M%S')
 
-        timestamp = time.strftime('%Y%m%d-%H%M%S')
         j = dataproc.hail_dataproc_job(
-            self.pipe.b,
-            f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "projectmt_to_es.py")} '
-            f'--mt-path {project_mt_path} '
-            f'--es-index {project.name}-{self.pipe.output_version}-{timestamp} '
+            self.b,
+            f'cpg_pipes/dataproc_scripts/seqr/mt_to_es.py '
+            f'--mt-path {dataset_mt_path} '
+            f'--es-host elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com '
+            f'--es-port 9243 '
+            f'--es-username seqr '
+            f'--es-password {_read_es_password()} '
+            f'--es-index {dataset.name}-{version} '
             f'--es-index-min-num-shards 1 '
-            f'{"--prod" if self.pipe.namespace == Namespace.MAIN else ""}',
+            f'--use-spark ',  # es export doesn't work with the service backend
             max_age='16h',
             packages=utils.DATAPROC_PACKAGES,
             num_secondary_workers=2,
-            job_name=f'{project.name}: create ES index',
-            depends_on=inputs.get_jobs(),
+            job_name=f'{dataset.name}: create ES index',
+            depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
         )
-        return self.make_outputs(project, jobs=[j])
+        j.attributes = self.get_job_attrs(dataset)
+        return self.make_outputs(dataset, jobs=[j])
 
 
-@stage(requires_stages=[AnnotateProjectStage])
-class ToVcfStage(ProjectStage):
-    def expected_result(self, project: Project):
-        return f'{self.pipe.analysis_bucket}/mt/{project.name}.vcf.bgz'
-
-    def queue_jobs(self, project: Project, inputs: StageInput) -> StageOutput:
-        output_projects = self.pipe.config.get('output_projects', self.pipe.get_projects())
-        if project.stack not in output_projects:
-            logger.info(
-                f'Skipping loading project {project.stack} because it is not'
-                f'in the --output-projects: {output_projects}'
-            )
-            return self.make_outputs(project)
-
-        project_mt_path = inputs.as_path(target=project, stage=AnnotateProjectStage)
-
-        j = dataproc.hail_dataproc_job(
-            self.pipe.b,
-            f'{join(utils.QUERY_SCRIPTS_DIR, "seqr", "projectmt_to_vcf.py")} '
-            f'--mt-path {project_mt_path} '
-            f'--out-vcf-path {self.expected_result(project)}',
-            max_age='8h',
-            packages=utils.DATAPROC_PACKAGES,
-            num_secondary_workers=20,
-            num_workers=5,
-            job_name=f'{project.name}: export to VCF',
-            depends_on=inputs.get_jobs(),
-        )
-        return self.make_outputs(project, jobs=[j])
-
-
-def make_pipeline(
-    input_projects: List[str],
-    output_projects: Optional[List[str]],
-    output_version: str,
-    skip_ped_checks: bool,  # pylint: disable=unused-argument
-    hc_shards_num: int,
-    use_gnarly: bool,
-    use_as_vqsr: bool,
-    **kwargs,
-) -> Pipeline:
+def _read_es_password(
+    project_id='seqr-308602',
+    secret_id='seqr-es-password',
+) -> str:
     """
-    Create seqr loader Pipeline
+    Read a GCP secret storing the ES password
     """
-    assert input_projects
-    title = f'Seqr loading: joint call from: {", ".join(input_projects)}'
-    if output_projects:
-        title += f', ES index for: {", ".join(output_projects)}'
-    title += f', version {output_version}'
-
-    if not output_projects:
-        output_projects = input_projects
-    if not all(op in input_projects for op in output_projects):
-        raise click.BadParameter(
-            f'All output projects must be contained within the specified input '
-            f'projects. Input project: {input_projects}, output projects: '
-            f'{output_projects}'
-        )
-
-    pipeline = Pipeline(
-        name='seqr_loader',
-        title=title,
-        config=dict(
-            output_projects=output_projects,
-            skip_ped_checks=skip_ped_checks,
-            hc_shards_num=hc_shards_num,
-            use_gnarly=use_gnarly,
-            use_as_vqsr=use_as_vqsr,
-        ),
-        input_projects=input_projects,
-        output_version=output_version,
-        **kwargs,
-    )
-    return pipeline
-
-
-def _make_seqr_metadata_files(
-    local_dir, bucket, project, overwrite: bool = False
-):
-    """
-    Create Seqr metadata files.
-    """
-    sample_map_path = join(local_dir, f'{project.name}-sample-map.csv')
-    igv_paths_path = join(local_dir, f'{project.name}-igv-paths.tsv')
-
-    # Sample map
-    if not buckets.can_reuse(sample_map_path, overwrite):
-        df = pd.DataFrame({
-            'cpg_id': s.id,
-            'individual_id': s.participant_id,
-        } for s in project.get_samples())
-        df.to_csv(sample_map_path, sep=',', index=False, header=False)
-        # Sample map has to sit on a bucket
-        sample_map_path = buckets.gsutil_cp(
-            sample_map_path, 
-            f'{bucket}/seqr/{basename(sample_map_path)}'
-        )
-
-    # IGV
-    if not buckets.can_reuse(igv_paths_path, overwrite):
-        df = pd.DataFrame({
-            'individual_id': s.participant_id,
-            'cram_path': s.cram_path,
-            'cram_sample_id': s.id,
-        } for s in project.get_samples() if s.cram_path)
-        df.to_csv(igv_paths_path, sep='\t', index=False, header=False)
-
-    logger.info(f'Seqr sample map: {sample_map_path}')
-    logger.info(f'IGV seqr paths: {igv_paths_path}')
+    if password := os.environ.get('SEQR_ES_PASSWORD'):
+        return password
+    client = secretmanager.SecretManagerServiceClient()
+    secret_path = client.secret_version_path(project_id, secret_id, 'latest')
+    # noinspection PyTypeChecker
+    response = client.access_secret_version(request={'name': secret_path})
+    return response.payload.data.decode('UTF-8')
 
 
 @click.command()
-@pipeline_click_options
 @click.option(
-    '--output-project',
-    'output_projects',
+    '--es-dataset',
+    'create_es_index_for_datasets',
     multiple=True,
-    help='Only create ES indicies for the project(s). Can be set multiple times. '
-    'Defaults to --input-projects. The name of the ES index will be suffixed '
-    'with the dataset version (set by --version)',
+    help=f'Create Seqr ElasticSearch indices for these datasets.',
 )
 @click.option(
-    '--skip-ped-checks',
-    'skip_ped_checks',
-    is_flag=True,
-    help='Skip checking provided sex and pedigree against the inferred one',
-)
-@click.option(
-    '--hc-shards-num',
-    'hc_shards_num',
+    '--hc-intervals-num',
+    'hc_intervals_num',
     type=click.INT,
-    default=ref_data.NUMBER_OF_HAPLOTYPE_CALLER_INTERVALS,
-    help='Number of intervals to devide the genome for gatk HaplotypeCaller',
+    default=RefData.number_of_haplotype_caller_intervals,
+    help='Number of intervals to devide the genome for sample genotyping with '
+    'gatk HaplotypeCaller',
+)
+@click.option(
+    '--realignment-shards-num',
+    'realignment_shards_num',
+    type=click.INT,
+    default=RefData.number_of_shards_for_realignment,
+    help='Number of shards to parallelise realignment',
+)
+@click.option(
+    '--jc-intervals-num',
+    'jc_intervals_num',
+    type=click.INT,
+    default=RefData.number_of_joint_calling_intervals,
+    help='Number of intervals to devide the genome for joint genotyping with GATK',
 )
 @click.option(
     '--use-gnarly/--no-use-gnarly',
@@ -538,27 +216,72 @@ def _make_seqr_metadata_files(
     help='Use allele-specific annotations for VQSR',
 )
 @click.option(
-    '--make-seqr-metadata/--no-make-seqr-metadata',
-    'make_seqr_metadata',
+    '--ped-checks/--no-ped-checks',
+    'ped_checks',
     default=True,
     is_flag=True,
-    help='Make Seqr metadata',
+    help='Perform fingerprinting and PED checks',
 )
-def main(**kwargs):  # pylint: disable=missing-function-docstring
-    make_seqr_metadata = kwargs.pop('make_seqr_metadata')
-    
-    pipeline = make_pipeline(**kwargs)
-    pipeline.submit_batch()
+@click.option(
+    '--exome-bed',
+    'exome_bed',
+    help=f'BED file with exome regions',
+)
+@pipeline_click_options
+def main(
+    datasets: list[str],
+    create_es_index_for_datasets: list[str],
+    hc_intervals_num: int,
+    jc_intervals_num: int,
+    realignment_shards_num: int,
+    use_gnarly: bool,
+    use_as_vqsr: bool,
+    ped_checks: bool,
+    exome_bed: str,
+    **kwargs,
+):
+    """
+    Seqr loading pipeline: FASTQ -> ElasticSearch index.
+    """
+    if not datasets:
+        # Parsing dataset names from the analysis-runner Seqr stack:
+        from urllib import request
 
-    if make_seqr_metadata:
-        for project in pipeline.cohort.get_projects():
-            if project.stack in pipeline.config.get('output_projects', []):
-                _make_seqr_metadata_files(
-                    local_dir=pipeline.local_dir,
-                    bucket=pipeline.analysis_bucket,
-                    project=project,
-                )
-    
+        seqr_stack_url = (
+            'https://raw.githubusercontent.com/populationgenomics/analysis-runner/main'
+            '/stack/Pulumi.seqr.yaml'
+        )
+        with request.urlopen(seqr_stack_url) as f:
+            value = yaml.safe_load(f)['config']['datasets:depends_on']
+            datasets = [d.strip('"') for d in value.strip('[] ').split(', ')]
+
+    description = 'Seqr Loader'
+    if v := kwargs.get('version'):
+        description += f', {v}'
+    input_datasets = set(datasets) - set(kwargs.get('skip_datasets', []))
+    description += f': [{", ".join(sorted(input_datasets))}]'
+    if create_es_index_for_datasets:
+        description += f' → [{", ".join(sorted(create_es_index_for_datasets))}]'
+
+    kwargs['analysis_dataset'] = 'seqr'
+    pipeline = create_pipeline(
+        name='Seqr Loader',
+        description=description,
+        datasets=datasets,
+        config=dict(
+            ped_checks=ped_checks,
+            hc_intervals_num=hc_intervals_num,
+            jc_intervals_num=jc_intervals_num,
+            realignment_shards_num=realignment_shards_num,
+            use_gnarly=use_gnarly,
+            use_as_vqsr=use_as_vqsr,
+            exome_bed=exome_bed,
+            create_es_index_for_datasets=create_es_index_for_datasets,
+        ),
+        **kwargs,
+    )
+    pipeline.run()
+
 
 if __name__ == '__main__':
     main()  # pylint: disable=E1120
