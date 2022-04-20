@@ -131,9 +131,9 @@ class TestPipeline(unittest.TestCase):
         pipeline = self._setup_pipeline()
         
         with patch('builtins.print') as mock_print:
-            # with patch.object(Stage, '_outputs_are_reusable') as mock_reusable:
-            #     mock_reusable.return_value = False
-            pipeline.run(dry_run=True)
+            with patch.object(Stage, '_outputs_are_reusable') as mock_reusable:
+                mock_reusable.return_value = False
+                pipeline.run(dry_run=True)
 
             # print() should be called only once:
             self.assertEqual(1, mock_print.call_count)
