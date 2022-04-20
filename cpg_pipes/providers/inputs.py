@@ -50,15 +50,17 @@ class InputProvider(ABC):
                 if skip_datasets and ds_name in skip_datasets:
                     logger.info(f'Requested to skipping dataset {ds_name}')
                     continue
-                dataset = cohort.create_dataset(ds_name)
+                dataset = Dataset.create(ds_name, cohort.namespace, cohort.storage_provider)
                 entries = self._get_entries(
                     dataset,
                     skip_samples=skip_samples,
                     only_samples=only_samples,
                     skip_datasets=skip_datasets,
                 )
-                for entry in entries:
-                    self._add_sample(dataset, entry)
+                if entries:
+                    dataset = cohort.add_dataset(dataset)
+                    for entry in entries:
+                        self._add_sample(dataset, entry)
 
         else:
             # We don't know dataset names in advance, so getting all entries.
@@ -71,6 +73,11 @@ class InputProvider(ABC):
                 ds_name = self.get_dataset_name(entry) or cohort.analysis_dataset.name
                 dataset = cohort.create_dataset(ds_name)
                 self._add_sample(dataset, entry)
+        if not cohort.get_datasets():
+            msg = 'No active datasets populated'
+            if skip_samples or only_samples or skip_datasets:
+                msg += ' (after skipping/picking samples)'
+            raise InputProviderError(msg)
 
         self.populate_alignment_inputs(cohort)
         self.populate_analysis(cohort)

@@ -123,7 +123,7 @@ class Cohort(Target):
         """
         super().__init__()
         self.name = name or analysis_dataset_name
-        self.namespace = (namespace,)
+        self.namespace = namespace
         self.storage_provider = storage_provider
         self.analysis_dataset = Dataset(
             name=analysis_dataset_name,
@@ -282,6 +282,23 @@ class Dataset(Target):
 
         self.stack, self.namespace = parse_stack(name, namespace)
 
+    @staticmethod
+    def create(
+        name: str,
+        namespace: Namespace,
+        storage_provider: StorageProvider | None = None,
+    ) -> 'Dataset':
+        """
+        Create a dataset and add it into the cohort.
+        """
+        # Normalising the dataset's name:
+        name = build_dataset_name(*parse_stack(name, namespace))
+        return Dataset(
+            name=name,
+            namespace=namespace,
+            storage_provider=storage_provider,
+        )
+    
     @property
     def is_test(self) -> bool:
         """
