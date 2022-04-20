@@ -26,7 +26,7 @@ class Vqsr(CohortStage):
         h = cohort.alignment_inputs_hash()
         return self.tmp_bucket / f'{h}-siteonly.vcf.gz'
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
         Submit jobs.
         """

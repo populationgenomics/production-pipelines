@@ -30,7 +30,7 @@ class GenotypeSample(SampleStage):
         """
         return sample.get_gvcf_path().path
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
         Use function from the jobs module
         """

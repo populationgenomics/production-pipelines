@@ -47,7 +47,7 @@ class AnnotateCohort(CohortStage):
         h = cohort.alignment_inputs_hash()
         return cohort.analysis_dataset.get_bucket() / 'mt' / f'{h}.mt'
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
@@ -87,7 +87,7 @@ class AnnotateDataset(DatasetStage):
         h = self.cohort.alignment_inputs_hash()
         return self.tmp_bucket / f'{h}-{dataset.name}.mt'
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
@@ -121,7 +121,7 @@ class LoadToEs(DatasetStage):
         """
         return None
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """

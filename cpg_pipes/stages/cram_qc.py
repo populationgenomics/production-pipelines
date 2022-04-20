@@ -25,7 +25,7 @@ class SamtoolsStats(SampleStage):
         """
         return sample.dataset.get_bucket() / 'qc' / (sample.id + '_samtools_stats.txt')
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
         Call a function from the `jobs` module.
         """
@@ -57,7 +57,7 @@ class PicardWgsMetrics(SampleStage):
             sample.dataset.get_bucket() / 'qc' / (sample.id + '_picard_wgs_metrics.csv')
         )
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
         Call a function from the `jobs` module.
         """
@@ -87,7 +87,7 @@ class VerifyBamId(SampleStage):
         """
         return sample.dataset.get_bucket() / 'qc' / (sample.id + '_verify_bamid.selfSM')
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
         Call a function from the `jobs` module.
         """

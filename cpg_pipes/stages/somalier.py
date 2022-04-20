@@ -26,7 +26,7 @@ class CramSomalier(SampleStage):
         """
         return sample.get_cram_path().somalier_path
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
         Using a function from the `jobs` module.
         """
@@ -68,7 +68,7 @@ class CramSomalierPedigree(DatasetStage):
             'checks': prefix / f'{dataset.name}-checks.done',
         }
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
         Checks calls job from the pedigree module
         """
@@ -123,7 +123,7 @@ class CramSomalierAncestry(DatasetStage):
             'html': dataset.get_web_bucket() / 'somalier-ancestry.html',
         }
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
         Checks calls job from the pedigree module
         """
