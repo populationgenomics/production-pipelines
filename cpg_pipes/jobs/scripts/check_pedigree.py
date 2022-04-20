@@ -19,9 +19,7 @@ from typing import Optional, Tuple, List
 
 import click
 import pandas as pd
-import slack_sdk
 from peddy import Ped
-from slack_sdk.errors import SlackApiError
 
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger = logging.getLogger(__file__)
@@ -61,7 +59,9 @@ def main(
     slack_token = os.environ.get('SLACK_TOKEN')
     slack_channel = os.environ.get('SLACK_CHANNEL')
     if slack_token and slack_channel:
-        slack_client = slack_sdk.WebClient(token=slack_token)
+        from slack_sdk.errors import SlackApiError
+        from slack_sdk import WebClient
+        slack_client = WebClient(token=slack_token)
         try:
             slack_client.api_call(  # pylint: disable=duplicate-code
                 'chat.postMessage',
