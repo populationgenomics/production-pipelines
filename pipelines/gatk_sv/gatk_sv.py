@@ -3,21 +3,34 @@ Driver for computing structural variants from GATK-SV.
 Uses metadata from the sample-metadata server.
 
 Example running:
-gatk_sv.py \
+
+```
+pipelines/gatk_sv.py 
     -n test \
-    --analysis-project seqr \
-    --input-project acute-care \
-    -s CPG199869 -s CPG199877 -s CPG199885 \
-    -s CPG199893 -s CPG199901 -s CPG199919 \
-    -s CPG199927 -s CPG199935 -s CPG199943 \
-    -s CPG54098
+    --analysis-dataset acute-care
+    --dataset acute-care
+```
+
+OR with a config:
+
+```
+pipelines/gatk_sv.py --config pipelines/configs/acute-care-test.yml
+```
+
+WHERE pipelines/configs/acute-care-test.yml:
+
+```
+namespace: test
+analysis_dataset: acute-care
+datasets: [acute-care]
+```
 """
 
 import json
 import logging
 import os
 from os.path import join, dirname
-from typing import Any
+from typing import Any, Mapping
 
 import click
 from analysis_runner.cromwell import (
@@ -31,7 +44,7 @@ from cpg_pipes.hb.batch import make_job_name
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.pipeline import stage, SampleStage, StageOutput, DatasetStage, \
     CohortStage, pipeline_click_options, create_pipeline
-from cpg_pipes.pipeline.pipeline import StageInput
+from cpg_pipes.pipeline.pipeline import StageInput, skip
 from cpg_pipes.targets import Sample, Dataset, Cohort
 
 logger = logging.getLogger(__file__)
@@ -59,6 +72,8 @@ def add_gatksv_job(
     batch: Batch,
     dataset: Dataset,
     wfl_name: str,
+    # "dict" is invariant (supports updating), "Mapping" is covariant (read-only)
+    # we have to support inputs of type dict[str, str], so using Mapping here:
     input_dict: dict[str, Any], 
     expected_out_dict: dict[str, Path],
     sample_id: str | None = None,
@@ -141,7 +156,7 @@ class GatherSampleEvidence(SampleStage):
         """
         cram_path = sample.dataset.get_bucket() / 'cram' / f'{sample.id}.cram'
 
-        input_dict: dict[str, str] = {
+        input_dict: dict[str, Any] = {
             'bam_or_cram_file': str(cram_path),
             'bam_or_cram_index': str(cram_path) + '.crai',
             'sample_id': sample.id,
@@ -225,26 +240,28 @@ class EvidenceQC(DatasetStage):
 
         sids = [s.id for s in dataset.get_samples()]
 
-        input_dict = {
+        input_dict: dict[str, Any] = {
             'batch': dataset.name,
             'samples': sids,
             'run_vcf_qc': True,  # generates <caller>_qc_low/<caller>_qc_high
-            'counts': [d[sid]['coverage_counts'] for sid in sids],
+            'counts': [str(d[sid]['coverage_counts']) for sid in sids],
         }
         for caller in SV_CALLERS:
-            input_dict[f'{caller}_vcfs'] = [d[sid][f'{caller}_vcf'] for sid in sids]
+            input_dict[f'{caller}_vcfs'] = [
+                str(d[sid][f'{caller}_vcf']) for sid in sids
+            ]
 
-        input_dict.update(get_dockers([
+        input_dict |= get_dockers([
             'sv_base_mini_docker',
             'sv_base_docker',
             'sv_pipeline_docker',
             'sv_pipeline_qc_docker',
-        ]))
+        ])
         
-        input_dict.update(get_references([
+        input_dict |= get_references([
             'genome_file',
             'wgd_scoring_mask',
-        ]))
+        ])
 
         expected_d = self.expected_outputs(dataset)
 
@@ -259,6 +276,8 @@ class EvidenceQC(DatasetStage):
         return self.make_outputs(dataset, data=output_dict, jobs=[j])
 
 
+@skip(reason='This step is essencially generation of a reference database. '
+             'We can use one pre-calculated for 1KG')
 @stage(required_stages=[GatherSampleEvidence])
 class TrainGCNV(CohortStage):
     """
