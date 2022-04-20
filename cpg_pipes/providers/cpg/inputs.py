@@ -111,6 +111,7 @@ class SmdbInputProvider(InputProvider):
         """
         Populate sequencing inputs for samples.
         """
+        assert cohort.get_sample_ids()
         seq_infos: list[dict] = self.db.seqapi.get_sequences_by_sample_ids(
             cohort.get_sample_ids()
         )
