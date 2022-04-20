@@ -13,7 +13,7 @@ from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
 from cpg_pipes import Path
-from cpg_pipes.hb.command import wrap_command, seds_to_extend_sample_ids
+from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.images import MULTIQC_IMAGE
 from cpg_pipes.providers.status import StatusReporter

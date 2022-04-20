@@ -10,7 +10,7 @@ from unittest import skip
 from unittest.mock import patch, Mock
 
 from cpg_pipes import Namespace, Path, to_path
-from cpg_pipes.pipeline.pipeline import Pipeline
+from cpg_pipes.pipeline.pipeline import Pipeline, Stage
 from cpg_pipes.providers.cpg import CpgStorageProvider
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
@@ -129,8 +129,10 @@ class TestPipeline(unittest.TestCase):
 
         """
         pipeline = self._setup_pipeline()
-
+        
         with patch('builtins.print') as mock_print:
+            # with patch.object(Stage, '_outputs_are_reusable') as mock_reusable:
+            #     mock_reusable.return_value = False
             pipeline.run(dry_run=True)
 
             # print() should be called only once:

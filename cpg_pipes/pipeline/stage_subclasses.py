@@ -23,13 +23,13 @@ class SampleStage(Stage[Sample], ABC):
         """
 
     @abstractmethod
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
         Override to add Hail Batch jobs.
         """
         pass
 
-    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput]:
+    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
         """
         Plug in stage into the pipeline.
         """
@@ -37,7 +37,7 @@ class SampleStage(Stage[Sample], ABC):
         if not datasets:
             raise ValueError('No active datasets are found to run')
 
-        output_by_target: dict[str, StageOutput] = dict()
+        output_by_target: dict[str, StageOutput | None] = dict()
 
         for ds_i, dataset in enumerate(datasets):
             if not dataset.get_samples():
@@ -93,13 +93,13 @@ class DatasetStage(Stage, ABC):
         """
 
     @abstractmethod
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
         Override to add Hail Batch jobs.
         """
         pass
 
-    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput]:
+    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
         """
         Plug in stage into the pipeline.
         """
@@ -124,13 +124,13 @@ class CohortStage(Stage, ABC):
         """
 
     @abstractmethod
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
         Override to add Hail Batch jobs.
         """
         pass
 
-    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput]:
+    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
         """
         Override to plug in stage into the pipeline.
         """

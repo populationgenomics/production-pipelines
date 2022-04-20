@@ -101,7 +101,7 @@ class SubsetAlignmentInput(SampleStage):
             jobs=[j],
         )
 
-    def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput | None:
         """Queue jobs"""
         if 'fastq_input' in sample.meta:
             alignment_input = sample.meta['fastq_input']
@@ -119,7 +119,7 @@ class DifferentResources(SampleStage):
     def expected_outputs(self, sample: 'Sample'):
         return None
 
-    def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput | None:
         basepath = (
             benchmark.BENCHMARK_BUCKET / f'outputs/{INPUTS_TYPE.value}/{sample.id}'
         )
@@ -160,7 +160,7 @@ class DifferentAlignerSetups(SampleStage):
     def expected_outputs(self, sample: 'Sample'):
         return None
 
-    def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput | None:
         basepath = benchmark.BENCHMARK_BUCKET / f'outputs/{sample.id}'
 
         if INPUTS_TYPE == InputsType.FULL_SUBSET:

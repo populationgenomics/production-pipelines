@@ -29,7 +29,7 @@ class FastQC(SampleStage):
             'zip': folder / (sample.id + '_fastqc.zip'),
         }
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
         Only running FastQC if sequencing inputs are available.
         """

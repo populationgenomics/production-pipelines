@@ -55,11 +55,9 @@ ExpectedResultT = Union[Path, dict[str, Path], None]
 
 StageOutputData = Union[Path, hb.Resource, dict[str, Path], dict[str, hb.Resource]]
 
-StageOutput = Optional['StageOutput_']
-
 
 # noinspection PyShadowingNames
-class StageOutput_:
+class StageOutput:
     """
     Represents a result of a specific stage, which was run on a specific target.
     Can be a file path, or a Hail Batch Resource. Optionally wrapped in a dict.
@@ -182,9 +180,9 @@ class StageInput:
 
     def __init__(self, stage: 'Stage'):
         self.stage = stage
-        self._outputs_by_target_by_stage: dict[str, dict[str, StageOutput]] = {}
+        self._outputs_by_target_by_stage: dict[str, dict[str, StageOutput | None]] = {}
 
-    def add_other_stage_output(self, output: StageOutput_):
+    def add_other_stage_output(self, output: StageOutput):
         """
         Add output from another stage run.
         """
@@ -417,7 +415,7 @@ class Stage(Generic[TargetT], ABC):
         self.analysis_type = analysis_type
 
         # Populated with the return value of `add_to_the_pipeline()`
-        self.output_by_target: dict[str, StageOutput] = dict()
+        self.output_by_target: dict[str, StageOutput | None] = dict()
 
         self.skipped = skipped
         self.forced = forced
@@ -448,7 +446,7 @@ class Stage(Generic[TargetT], ABC):
         return self._name
 
     @abstractmethod
-    def queue_jobs(self, target: TargetT, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, target: TargetT, inputs: StageInput) -> StageOutput | None:
         """
         Adds Hail Batch jobs that process `target`.
         Assumes that all the household work is done: checking missing inputs
@@ -467,7 +465,7 @@ class Stage(Generic[TargetT], ABC):
         """
 
     @abstractmethod
-    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput]:
+    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
         """
         Queues jobs for each corresponding target, defined by Stage subclass.
 
@@ -492,11 +490,11 @@ class Stage(Generic[TargetT], ABC):
         jobs: list[Job] | Job | None = None,
         reusable: bool = False,
         error_msg: str | None = None,
-    ) -> StageOutput_:
+    ) -> StageOutput:
         """
         Create StageOutput for this stage.
         """
-        return StageOutput_(
+        return StageOutput(
             target=target,
             data=data,
             jobs=jobs,
@@ -509,7 +507,7 @@ class Stage(Generic[TargetT], ABC):
         self,
         target: TargetT,
         action: Action | None = None,
-    ) -> StageOutput:
+    ) -> StageOutput | None:
         """
         Checks what to do with target, and either queue jobs, or skip/reuse results.
         """
@@ -640,7 +638,7 @@ class Stage(Generic[TargetT], ABC):
 
     def _queue_reuse_job(
         self, target: TargetT, found_paths: Path | dict[str, Path]
-    ) -> StageOutput:
+    ) -> StageOutput | None:
         """
         Queues a [reuse] Job
         """
@@ -1015,7 +1013,7 @@ class Pipeline:
                     break
 
     @staticmethod
-    def _process_stage_errors(output_by_target: dict[str, StageOutput]) -> list[str]:
+    def _process_stage_errors(output_by_target: dict[str, StageOutput | None]) -> list[str]:
         targets_by_error = defaultdict(list)
         for target, output in output_by_target.items():
             if output and output.error_msg:

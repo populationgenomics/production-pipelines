@@ -45,7 +45,7 @@ class MultiQC(DatasetStage):
             'json': dataset.get_bucket() / 'qc' / 'multiqc_data.json',
         }
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
         Call a function from the `jobs` module using inputs from `cramqc`
         and `somalier` stages.

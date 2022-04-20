@@ -24,7 +24,7 @@ class Align(SampleStage):
         """
         return sample.get_cram_path().path
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
         Using the "align" function implemented in the jobs module
         """

@@ -22,7 +22,7 @@ class Vep(CohortStage):
         h = cohort.alignment_inputs_hash()
         return self.tmp_bucket / f'{h}.ht'
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
         Submit jobs.
         """
