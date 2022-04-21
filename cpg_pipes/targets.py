@@ -61,8 +61,8 @@ class Target:
         """
         ID should be unique across target of all levels.
 
-        We are raising NotImplementedError instead of making it abstractclass because
-        mypy is not happy about binding TypeVar to abstract classes, see:
+        We are raising NotImplementedError instead of making it an abstract class, 
+        because mypy is not happy about binding TypeVar to abstract classes, see:
         https://stackoverflow.com/questions/48349054/how-do-you-annotate-the-type-of
         -an-abstract-class-with-mypy
 
@@ -405,7 +405,7 @@ class Dataset(Target):
 
     def get_samples(self, only_active: bool = True) -> list['Sample']:
         """
-        Get dataset's samples. Inlcude only "active" samples, unless only_active=False
+        Get dataset's samples. Include only "active" samples, unless only_active=False
         """
         return [
             s for sid, s in self._sample_by_id.items() if (s.active or not only_active)
@@ -551,7 +551,7 @@ class Sample(Target):
 
     def get_ped_dict(self, use_participant_id: bool = False) -> dict[str, str]:
         """
-        Returns a dictionary of pedigree fields for this sample, corresponging
+        Returns a dictionary of pedigree fields for this sample, corresponding
         a PED file entry.
         """
         if self.pedigree:
@@ -606,7 +606,7 @@ class Sample(Target):
 @dataclass
 class PedigreeInfo:
     """
-    Pedigree relationsips with other samples in the cohort, and other PED data
+    Pedigree relationships with other samples in the cohort, and other PED data
     """
 
     sample: Sample
@@ -618,7 +618,7 @@ class PedigreeInfo:
 
     def get_ped_dict(self, use_participant_id: bool = False) -> dict:
         """
-        Returns a dictionary of pedigree fields for this sample, corresponging
+        Returns a dictionary of pedigree fields for this sample, corresponding
         a PED file entry.
         """
 
