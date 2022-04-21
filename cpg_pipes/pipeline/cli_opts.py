@@ -200,7 +200,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             'check_inputs',
             default=False,
             is_flag=True,
-            help='Chech input file existence (e.g. FASTQ files). If they are missing '
+            help='Check input file existence (e.g. FASTQ files). If they are missing '
             'the --skip-samples-with-missing-input option controls whether such '
             'should be ignored, or raise an error.',
         ),
