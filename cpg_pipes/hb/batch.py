@@ -155,7 +155,7 @@ def get_hail_bucket(hail_bucket: str | Path | None = None, cloud=Cloud.GS) -> st
                 'environment variable must be set'
             )
     hail_bucket = str(hail_bucket)
-    prefs = {Cloud.GS: 'gs', Cloud.HAIL_AZ: 'hail-az'}
+    prefs = {Cloud.GS: 'gs'}
     if not any(hail_bucket.startswith(f'{pref}://') for pref in prefs.values()):
         hail_bucket = f'{prefs[cloud]}://{hail_bucket}'
 

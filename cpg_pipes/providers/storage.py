@@ -9,8 +9,6 @@ from typing import Union
 
 from cloudpathlib import CloudPath
 from cloudpathlib.anypath import to_anypath
-# noinspection PyUnresolvedReferences
-from . import hail_az  # importing to register hail-az prefix.
 
 
 # Path can be either a cloud URL or a local posix file path.
@@ -36,7 +34,6 @@ class Cloud(Enum):
     """
 
     GS = 'gs'
-    HAIL_AZ = 'hail-az'
 
 
 class StorageProvider(ABC):
@@ -49,12 +46,8 @@ class StorageProvider(ABC):
     def __init__(
         self, 
         cloud: Cloud, 
-        az_account: str | None = None,
-        az_container: str | None = None,
     ):
         self.cloud = cloud
-        self.az_account = az_account or os.environ.get('STORAGE_ACCOUNT_NAME')
-        self.az_container = az_container or os.environ.get('STORAGE_CONTAINER_NAME')
 
     @abstractmethod
     def get_base(

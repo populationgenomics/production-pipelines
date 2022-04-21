@@ -175,15 +175,14 @@ If a `Participant` entry is available, `sample.participant_id` will be populated
 
 ### Storage policies
 
-Outputs are written according to provided storage policy. Class `cpg_pipes.providers.StoragePolicy` provides an interface for abstract policy, with one implementation: `CpgStoragePolicy`, which implements the [CPG storage policy](https://github.com/populationgenomics/team-docs/tree/main/storage_policies). The default cloud storage provider is Google Cloud Storage, which can be overridden with `cloud=Cloud.AZ` parameter to `create_pipeline` (or `--cloud=az` in the command line).
+Outputs are written according to provided storage policy. Class `cpg_pipes.providers.StoragePolicy` provides an interface for abstract policy, with one implementation: `CpgStoragePolicy`, which implements the [CPG storage policy](https://github.com/populationgenomics/team-docs/tree/main/storage_policies). The default cloud storage provider is Google Cloud Storage, which can be overridden with `cloud` parameter to `create_pipeline` (or `--cloud <val>` in the command line).
 
 ### Bioinformatics jobs
 
 The `cpg_pipes.jobs` module defines functions that create Hail Batch Jobs for different bioinformatics purposes: alignment, fastqc, deduplication, variant calling, VQSR, etc. E.g. to implement the joint calling stage above, you can use:
 
 ```python
-from cpg_pipes.pipeline import stage, SampleStage, CohortStage, StageInput,
-    StageOutput | None,
+from cpg_pipes.pipeline import stage, SampleStage, CohortStage, StageInput, StageOutput
 from cpg_pipes.targets import Sample, Cohort
 from cpg_pipes.jobs import haplotype_caller, joint_genotyping
 from cpg_pipes.types import CramPath, GvcfPath
@@ -416,7 +415,7 @@ You can use `@skip` decorator to force skipping a stage:
 ```python
 from cpg_pipes.pipeline import stage, skip, SampleStage
 
-@skip
+@skip(reason='Stage is not needed')
 @stage
 class MyStage1(SampleStage):
     ...
@@ -443,8 +442,8 @@ To start the `seqr_loader` pipeline on 2 datasets `acute-care` and `perth-neuro`
 python pipelines/seqr_loader.py \
 -n main \
 --analysis-dataset seqr \
---input-dataset acute-care \
---input-dataset perth-neuro \
+--dataset acute-care \
+--dataset perth-neuro \
 --skip-sample CPG11783 \
 --skip-sample CPG13326 \
 --keep-scratch
