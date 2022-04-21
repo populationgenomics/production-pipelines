@@ -220,10 +220,15 @@ def pipeline_click_options(function: Callable) -> Callable:
             'If not provided, a temp folder will be created',
         ),
         click.option(
+            '--slack-channel',
+            'slack_channel',
+            help='Slack channel to send status reports with CPG status reporter.',
+        ),
+        click.option(
             '--skip-samples-stages',
             'skip_samples_stages',
             type=dict,
-            help='Map of stages to lists of samples, to skip for specific stages.',
+            help='Maps stage IDs to lists of samples, to skip for specific stages.',
         ),
     ]
 
