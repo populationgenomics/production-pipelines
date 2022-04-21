@@ -415,7 +415,7 @@ You can use `@skip` decorator to force skipping a stage:
 ```python
 from cpg_pipes.pipeline import stage, skip, SampleStage
 
-@skip
+@skip(reason='Stage is not needed')
 @stage
 class MyStage1(SampleStage):
     ...
@@ -442,8 +442,8 @@ To start the `seqr_loader` pipeline on 2 datasets `acute-care` and `perth-neuro`
 python pipelines/seqr_loader.py \
 -n main \
 --analysis-dataset seqr \
---input-dataset acute-care \
---input-dataset perth-neuro \
+--dataset acute-care \
+--dataset perth-neuro \
 --skip-sample CPG11783 \
 --skip-sample CPG13326 \
 --keep-scratch
