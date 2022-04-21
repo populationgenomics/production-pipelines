@@ -306,12 +306,12 @@ class TrainGCNV(CohortStage):
         input_dict = {
             'cohort': cohort.target_id,
             'samples': sids,
-            'count_files': [d[sid]['coverage_counts'] for sid in sids],
+            'count_files': [str(d[sid]['coverage_counts']) for sid in sids],
             'ref_copy_number_autosomal_contigs': 2,
             'num_intervals_per_scatter': 5000,
         }
         for caller in SV_CALLERS:
-            input_dict[f'{caller}_vcfs'] = [d[sid][f'{caller}_vcf'] for sid in sids]
+            input_dict[f'{caller}_vcfs'] = [str(d[sid][f'{caller}_vcf']) for sid in sids]
 
         input_dict.update(get_dockers([
             'sv_base_mini_docker',
