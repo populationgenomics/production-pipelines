@@ -219,6 +219,12 @@ def pipeline_click_options(function: Callable) -> Callable:
             help='Local directory for temporary files. Usually takes a few kB. '
             'If not provided, a temp folder will be created',
         ),
+        click.option(
+            '--skip-samples-stages',
+            'skip_samples_stages',
+            type=dict,
+            help='Map of stages to lists of samples, to skip for specific stages.',
+        ),
     ]
 
     # Applying decorators. Doing that in reverse order, because Click actually
