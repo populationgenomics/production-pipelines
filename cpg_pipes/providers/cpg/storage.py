@@ -1,7 +1,7 @@
 """
 CPG implementation of StorageProvider, according to the storage policies:
 https://github.com/populationgenomics/team-docs/tree/main/storage_policies
-Works across Google Cloud Storage and Azure Blob Storage.
+Works only on Google Cloud Storage for now.
 """
 
 from cloudpathlib import CloudPath
@@ -15,9 +15,8 @@ class CpgStorageProvider(StorageProvider):
     """
 
     def __init__(self, cloud: Cloud = Cloud.GS):
-        super().__init__(cloud)
         self.gc_prefix = 'cpg'
-        super().__init__(cloud, az_account='cpg')
+        super().__init__(cloud)
 
     def _dataset_base(
         self,
@@ -31,11 +30,7 @@ class CpgStorageProvider(StorageProvider):
         container = f'{dataset}-{namespace.value}'
         if suffix:
             container = f'{container}-{suffix}'
-
-        if self.cloud == Cloud.HAIL_AZ:
-            return CloudPath(f'{self.cloud.value}://{self.az_account}/{container}')
-        else:
-            return CloudPath(f'{self.cloud.value}://{self.gc_prefix}-{container}')
+        return CloudPath(f'{self.cloud.value}://{self.gc_prefix}-{container}')
 
     def get_base(
         self,
