@@ -220,10 +220,17 @@ def pipeline_click_options(function: Callable) -> Callable:
             'If not provided, a temp folder will be created',
         ),
         click.option(
+            '--crash-on-db-erorrs/--lenient-on-db-erorrs',
+            'crash_on_db_errors',
+            default=True,
+            help='When the sample-metadata database API returns an error from the '
+                 'database, only show the error and continue, instead of crashing',
+        ),
+        click.option(
             '--skip-samples-stages',
             'skip_samples_stages',
             type=dict,
-            help='Map of stages to lists of samples, to skip for specific stages.',
+            help='Maps stage IDs to lists of samples, to skip for specific stages.',
         ),
     ]
 

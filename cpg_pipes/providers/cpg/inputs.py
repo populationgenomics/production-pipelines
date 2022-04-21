@@ -3,6 +3,9 @@ InputProvider implementation that pulls data from the sample-metadata database.
 """
 
 import logging
+import traceback
+
+from sample_metadata import ApiException
 
 from .smdb import SMDB, SmSequence
 from ..inputs import InputProvider, InputProviderError
@@ -18,9 +21,15 @@ class SmdbInputProvider(InputProvider):
     InputProvider implementation that pulls data from the sample-metadata database.
     """
 
-    def __init__(self, db: SMDB, check_files: bool = False):
+    def __init__(
+        self, 
+        db: SMDB, 
+        check_files: bool = False, 
+        crash_on_erorrs: bool = True,
+    ):
         super().__init__(check_files=check_files)
         self.db = db
+        self.crash_on_erorrs = crash_on_erorrs
 
     def populate_cohort(
         self,
@@ -111,15 +120,40 @@ class SmdbInputProvider(InputProvider):
         """
         Populate sequencing inputs for samples.
         """
-        seq_infos: list[dict] = self.db.seqapi.get_sequences_by_sample_ids(
-            cohort.get_sample_ids()
-        )
+        assert cohort.get_sample_ids()
+        try:
+            seq_infos: list[dict] = self.db.seqapi.get_sequences_by_sample_ids(
+                cohort.get_sample_ids()
+            )
+        except ApiException:
+            if self.crash_on_erorrs:
+                raise
+            else:
+                logger.error(
+                    'Getting sequencing data from SMDB resulted in an error. '
+                    'Continueing without sequencing data because lenient=true. '
+                    'However, here is the error: '
+                )
+                traceback.print_exc()
+                seq_infos = []
         seq_by_sid = {seq['sample_id']: seq for seq in seq_infos}
+        seq_info_by_sid = {
+            sample.id: seq_by_sid.get(sample.id) for sample in cohort.get_samples()
+        }
+        sids_with_missing_seq = [k for k, v in seq_info_by_sid.items() if v is None]
+        if sids_with_missing_seq:
+            msg = f'No sequencing data for samples: {", ".join(sids_with_missing_seq)}'
+            if self.crash_on_erorrs:
+                raise InputProviderError(msg)
+            else:
+                logger.warning(
+                    f'{msg}. Continuing without sequencing data because lenient=true'
+                )
         for sample in cohort.get_samples():
-            seq_info = seq_by_sid[sample.id]
-            seq = SmSequence.parse(seq_info, self.check_files)
-            sample.alignment_input = seq.alignment_input
-            sample.sequencing_type = seq.sequencing_type
+            if seq_info := seq_by_sid.get(sample.id):
+                seq = SmSequence.parse(seq_info, self.check_files)
+                sample.alignment_input = seq.alignment_input
+                sample.sequencing_type = seq.sequencing_type
 
     def populate_analysis(self, cohort: Cohort) -> None:
         """

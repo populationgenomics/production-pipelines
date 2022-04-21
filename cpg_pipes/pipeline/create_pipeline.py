@@ -68,6 +68,7 @@ def create_pipeline(
     force_samples: list[str] | None = None,
     local_dir: Path | None = None,
     skip_samples_stages: dict[str, list[str]] | None = None,
+    crash_on_db_errors: bool = True,
 ) -> 'Pipeline':
     """
     Create a Pipeline instance. All options correspond to command line parameters
@@ -86,7 +87,7 @@ def create_pipeline(
         if status_reporter_type == StatusReporterType.CPG:
             status_reporter = CpgStatusReporter(smdb)
         if input_provider_type == InputProviderType.SMDB:
-            input_provider = SmdbInputProvider(smdb)
+            input_provider = SmdbInputProvider(smdb, crash_on_erorrs=crash_on_db_errors)
 
     if input_provider_type == InputProviderType.CSV:
         if not input_csv:
