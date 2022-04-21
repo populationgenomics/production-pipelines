@@ -47,7 +47,8 @@ class SampleStage(Stage[Sample], ABC):
 
             # Checking if all samples can be reused, queuing only one job per target:
             action_by_sid = dict()
-            for _, sample in enumerate(dataset.get_samples()):
+            for sample_i, sample in enumerate(dataset.get_samples()):
+                logger.info(f'{self.name}: #{sample_i + 1}/{sample}')
                 action = self._get_action(sample)
                 action_by_sid[sample.id] = action
 
@@ -56,7 +57,10 @@ class SampleStage(Stage[Sample], ABC):
                 if action == Action.REUSE:
                     # All stages to be reused, but adding only one reuse job
                     # (for whole dataset):
-                    j = self.new_reuse_job(dataset)
+                    j = self.b.new_job(
+                        f'{self.name} [reuse {len(dataset.get_samples())} samples]', 
+                        dataset.get_job_attrs()
+                    )
                     inputs = self._make_inputs()
                     for _, sample in enumerate(dataset.get_samples()):
                         outputs = self.make_outputs(
