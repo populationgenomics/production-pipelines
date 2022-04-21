@@ -3,4 +3,5 @@ CPG implementations of providers.
 """
 
 from .inputs import SmdbInputProvider
-from .status import SmdbStatusReporter
+from .storage import CpgStorageProvider
+from .status import CpgStatusReporter

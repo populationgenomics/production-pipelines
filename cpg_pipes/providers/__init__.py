@@ -12,6 +12,12 @@ class InputProviderType(Enum):
     CSV = 'csv'
 
 
+class StoragePolicyType(Enum):
+    """Available storage policies"""
+
+    CPG = 'cpg'
+
+
 class StatusReporterType(Enum):
     """Available types of status reporters"""
 

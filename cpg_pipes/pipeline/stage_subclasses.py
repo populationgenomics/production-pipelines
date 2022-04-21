@@ -23,13 +23,13 @@ class SampleStage(Stage[Sample], ABC):
         """
 
     @abstractmethod
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
         Override to add Hail Batch jobs.
         """
         pass
 
-    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput]:
+    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
         """
         Plug in stage into the pipeline.
         """
@@ -37,7 +37,7 @@ class SampleStage(Stage[Sample], ABC):
         if not datasets:
             raise ValueError('No active datasets are found to run')
 
-        output_by_target = dict()
+        output_by_target: dict[str, StageOutput | None] = dict()
 
         for ds_i, dataset in enumerate(datasets):
             if not dataset.get_samples():
@@ -47,7 +47,8 @@ class SampleStage(Stage[Sample], ABC):
 
             # Checking if all samples can be reused, queuing only one job per target:
             action_by_sid = dict()
-            for _, sample in enumerate(dataset.get_samples()):
+            for sample_i, sample in enumerate(dataset.get_samples()):
+                logger.info(f'{self.name}: #{sample_i + 1}/{sample}')
                 action = self._get_action(sample)
                 action_by_sid[sample.id] = action
 
@@ -56,7 +57,10 @@ class SampleStage(Stage[Sample], ABC):
                 if action == Action.REUSE:
                     # All stages to be reused, but adding only one reuse job
                     # (for whole dataset):
-                    j = self.new_reuse_job(dataset)
+                    j = self.b.new_job(
+                        f'{self.name} [reuse {len(dataset.get_samples())} samples]', 
+                        dataset.get_job_attrs()
+                    )
                     inputs = self._make_inputs()
                     for _, sample in enumerate(dataset.get_samples()):
                         outputs = self.make_outputs(
@@ -67,12 +71,12 @@ class SampleStage(Stage[Sample], ABC):
                         for j in outputs.jobs:
                             j.depends_on(*inputs.get_jobs(sample))
                         output_by_target[sample.target_id] = outputs
-                continue
+                    continue
 
             # Some samples can't be reused, queuing each sample:
-            logger.info(f'{self.name}: #{ds_i} {dataset}')
+            logger.info(f'{self.name}: #{ds_i + 1} {dataset}')
             for sample_i, sample in enumerate(dataset.get_samples()):
-                logger.info(f'{self.name}: #{sample_i}/{sample}')
+                logger.info(f'{self.name}: #{sample_i + 1}/{sample}')
                 output_by_target[sample.target_id] = self._queue_jobs_with_checks(
                     sample
                 )
@@ -93,13 +97,13 @@ class DatasetStage(Stage, ABC):
         """
 
     @abstractmethod
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
         Override to add Hail Batch jobs.
         """
         pass
 
-    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput]:
+    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
         """
         Plug in stage into the pipeline.
         """
@@ -124,13 +128,13 @@ class CohortStage(Stage, ABC):
         """
 
     @abstractmethod
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
         Override to add Hail Batch jobs.
         """
         pass
 
-    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput]:
+    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
         """
         Override to plug in stage into the pipeline.
         """

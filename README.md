@@ -35,14 +35,16 @@ from cpg_pipes.pipeline import stage, StageInput, StageOutput, SampleStage
 from cpg_pipes.targets import Sample
 from cpg_pipes import Path, to_path
 
+
 @stage
 class Align(SampleStage):
     """Stage that runs read alignment"""
+
     def expected_outputs(self, sample: Sample) -> Path:
         """Returning a path to a CRAM file that will be generated"""
         return to_path('gs://cpg-thousand-genomes-test/cram/NA12878.cram')
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """Defines how jobs are added into a batch object"""
         cram_path = self.expected_outputs(sample)
         # This Job just writes the sample name to a file:
@@ -63,10 +65,12 @@ Stages can depend on each other. Use the `required_stages` parameter to `@stage`
 from cpg_pipes.pipeline import stage, StageInput, StageOutput, SampleStage
 from cpg_pipes.targets import Sample
 
+
 @stage(required_stages=[Align])
 class ReadCramFile(SampleStage):
     """Stage that reads the CRAM file genereated by a Align stage"""
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         # Read the `Align` stage outputs:
         cram_path = inputs.as_path(sample, stage=Align)
         return ...
@@ -75,14 +79,16 @@ class ReadCramFile(SampleStage):
 Stage of differnet levels can depend on each other, and `cpg_pipes` will resolve that correctly. E.g. joint-calling taking GVCF outputs to produce a cohort-level VCF:
 
 ```python
-from cpg_pipes.pipeline import stage, StageInput, StageOutput, SampleStage, CohortStage
+from cpg_pipes.pipeline import stage, StageInput, StageOutput, SampleStage,
+    CohortStage
 from cpg_pipes.targets import Sample, Cohort
+
 
 @stage
 class HaplotypeCaller(SampleStage):
     """Stage that runs gatk Haplotype caller to generate a GVCF for a sample"""
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         jobs = ...
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
 
@@ -91,13 +97,14 @@ class HaplotypeCaller(SampleStage):
 class JointCalling(CohortStage):
     """Stage that runs joint calling on GVCFs"""
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         # Get outputs from previous stage. Because the HaplotypeCaller stage
         # acts on a sample, we use a method `as_path_by_target` that returns
         # a dictionary index by sample ID:
         gvcf_by_sample_id = inputs.as_path_by_target(stage=HaplotypeCaller)
         job = ...
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[job])
+
     ...
 ```
 
@@ -168,14 +175,14 @@ If a `Participant` entry is available, `sample.participant_id` will be populated
 
 ### Storage policies
 
-Outputs are written according to provided storage policy. Class `cpg_pipes.providers.StoragePolicy` provides an interface for abstract policy, with one implementation: `CpgStoragePolicy`, which implements the [CPG storage policy](https://github.com/populationgenomics/team-docs/tree/main/storage_policies). The default cloud storage provider is Google Cloud Storage, which can be overridden with `cloud=Cloud.AZ` parameter to `create_pipeline` (or `--cloud=az` in the command line).
+Outputs are written according to provided storage policy. Class `cpg_pipes.providers.StoragePolicy` provides an interface for abstract policy, with one implementation: `CpgStoragePolicy`, which implements the [CPG storage policy](https://github.com/populationgenomics/team-docs/tree/main/storage_policies). The default cloud storage provider is Google Cloud Storage, which can be overridden with `cloud` parameter to `create_pipeline` (or `--cloud <val>` in the command line).
 
 ### Bioinformatics jobs
 
 The `cpg_pipes.jobs` module defines functions that create Hail Batch Jobs for different bioinformatics purposes: alignment, fastqc, deduplication, variant calling, VQSR, etc. E.g. to implement the joint calling stage above, you can use:
 
 ```python
-from cpg_pipes.pipeline import stage, SampleStage, CohortStage, StageInput, StageOutput,
+from cpg_pipes.pipeline import stage, SampleStage, CohortStage, StageInput, StageOutput
 from cpg_pipes.targets import Sample, Cohort
 from cpg_pipes.jobs import haplotype_caller, joint_genotyping
 from cpg_pipes.types import CramPath, GvcfPath
@@ -185,7 +192,7 @@ from cpg_pipes.types import CramPath, GvcfPath
 class HaplotypeCaller(SampleStage):
     """Stage that runs gatk HaplotypeCaller to produde a GVCF"""
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """Call the function from the jobs module"""
         cram_path = inputs.as_path(target=sample, stage=Align)
         expected_path = self.expected_outputs(sample)
@@ -206,7 +213,7 @@ class HaplotypeCaller(SampleStage):
 class JointCalling(CohortStage):
     """Stage that runs joint calling on GVCFs"""
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """Call the function from the jobs module"""
         gvcf_by_sid = {
             sample.id: GvcfPath(inputs.as_path(target=sample, stage=HaplotypeCaller))
@@ -216,7 +223,6 @@ class JointCalling(CohortStage):
             b=self.pipe.b,
             out_vcf_path=self.expected_outputs(cohort)['vcf'],
             out_siteonly_vcf_path=self.expected_outputs(cohort)['siteonly_vcf'],
-            samples=cohort.get_samples(),
             gvcf_by_sid=gvcf_by_sid,
             refs=self.refs,
             sequencing_type=cohort.get_sequencing_type(),
@@ -235,7 +241,7 @@ j = align.align(
     b=...,
     alignment_input=sample.alignment_input,
     output_path=...,
-    number_of_shards_for_realignment=10
+    realignment_shards_num=10
 )
 ```
 
@@ -409,7 +415,7 @@ You can use `@skip` decorator to force skipping a stage:
 ```python
 from cpg_pipes.pipeline import stage, skip, SampleStage
 
-@skip
+@skip(reason='Stage is not needed')
 @stage
 class MyStage1(SampleStage):
     ...
@@ -436,8 +442,8 @@ To start the `seqr_loader` pipeline on 2 datasets `acute-care` and `perth-neuro`
 python pipelines/seqr_loader.py \
 -n main \
 --analysis-dataset seqr \
---input-dataset acute-care \
---input-dataset perth-neuro \
+--dataset acute-care \
+--dataset perth-neuro \
 --skip-sample CPG11783 \
 --skip-sample CPG13326 \
 --keep-scratch
