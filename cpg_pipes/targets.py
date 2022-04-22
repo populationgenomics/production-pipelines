@@ -1,5 +1,6 @@
 """
 Pipeline stage target and subclasses: Cohort, Dataset, Sample.
+Plus Sample properties: PedigreeInfo, Sex.
 """
 import hashlib
 import logging
