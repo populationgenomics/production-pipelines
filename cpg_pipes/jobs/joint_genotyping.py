@@ -47,7 +47,7 @@ def make_joint_genotyping_jobs(
     tool: JointGenotyperTool = JointGenotyperTool.GenotypeGVCFs,
     do_filter_excesshet: bool = True,
     scatter_count: int | None = RefData.number_of_joint_calling_intervals,
-    sequencing_type: SequencingType = SequencingType.WGS,
+    sequencing_type: SequencingType = SequencingType.GENOME,
     intervals_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:

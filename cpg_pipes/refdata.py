@@ -77,13 +77,13 @@ class RefData:
         # Intervals
         self.intervals_bucket = self.bucket / 'intervals'
         self.calling_interval_lists = {
-            SequencingType.WGS: self.broad_ref_bucket
+            SequencingType.GENOME: self.broad_ref_bucket
             / 'wgs_calling_regions.hg38.interval_list',
             SequencingType.EXOME: self.broad_ref_bucket
             / 'exome_calling_regions.v1.interval_list',
         }
         self.evaluation_interval_lists = {
-            SequencingType.WGS: self.broad_ref_bucket
+            SequencingType.GENOME: self.broad_ref_bucket
             / 'wgs_evaluation_regions.hg38.interval_list',
             SequencingType.EXOME: self.broad_ref_bucket
             / 'exome_evaluation_regions.v1.interval_list',

@@ -62,7 +62,7 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
         self.assertEqual(s1.external_id, extid1)
         self.assertEqual(len(s1.alignment_input), 2)
         self.assertEqual(s1.pedigree.sex, Sex.MALE)
-        self.assertEqual(s1.sequencing_type, SequencingType.WGS)
+        self.assertEqual(s1.sequencing_type, SequencingType.GENOME)
         s2 = ds.get_samples()[1]
         self.assertEqual(s2.external_id, extid2)
         self.assertTrue(s2.alignment_input.ext == 'cram')

@@ -49,7 +49,7 @@ class TestQuery(unittest.TestCase):
         self.name = self._testMethodName
         self.timestamp = utils.timestamp()
         self.local_tmp_dir = tempfile.mkdtemp()
-        self.sequencing_type = SequencingType.WGS
+        self.sequencing_type = SequencingType.GENOME
         self.refs = RefData(CpgStorageProvider().get_ref_base())
         hailquery.init_batch(utils.DATASET, self.tmp_bucket)
         # Interval to take on chr20:

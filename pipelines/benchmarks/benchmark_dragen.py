@@ -53,7 +53,7 @@ def main():
             tmp_bucket=benchmark.BENCHMARK_BUCKET / 'tmp',
             dragen_mode=True,
             refs=pipe.refs,
-            sequencing_type=SequencingType.WGS,
+            sequencing_type=SequencingType.GENOME,
         )
         for j in hc_jobs:
             j.depends_on(*align_jobs)
