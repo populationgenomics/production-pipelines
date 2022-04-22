@@ -1,5 +1,6 @@
 """
 Pipeline stage target and subclasses: Cohort, Dataset, Sample.
+Plus Sample properties: PedigreeInfo, Sex.
 """
 import hashlib
 import logging
@@ -107,6 +108,8 @@ class Target:
 class Cohort(Target):
     """
     Represents a "cohort" target - all samples from all datasets in the pipeline.
+    Analysis dataset name is required and will be used as the default name for the 
+    cohort.
     """
 
     def __init__(
@@ -116,11 +119,6 @@ class Cohort(Target):
         name: str | None = None,
         storage_provider: StorageProvider | None = None,
     ):
-        """
-        @param name: name of the cohort
-        @param analysis_dataset_name: deferring creation of the analysis
-        dataset in case if it is also a part of the cohort datasets.
-        """
         super().__init__()
         self.name = name or analysis_dataset_name
         self.namespace = namespace
@@ -188,7 +186,7 @@ class Cohort(Target):
         storage_provider: StorageProvider | None = None,
     ) -> 'Dataset':
         """
-        Create a dataset and add it into the cohort.
+        Create a dataset and add it to the cohort.
         """
         namespace = namespace or self.analysis_dataset.namespace
         # Normalising the dataset's name:
@@ -233,8 +231,7 @@ def parse_stack(name: str, namespace: Namespace | None = None) -> tuple[str, Nam
     namespace = namespace or Namespace.MAIN
     if name.endswith('-test'):
         stack = name[: -len('-test')]
-        if namespace == Namespace.MAIN:
-            namespace = Namespace.TEST
+        namespace = Namespace.TEST
     else:
         stack = name
     return stack, namespace
@@ -289,7 +286,7 @@ class Dataset(Target):
         storage_provider: StorageProvider | None = None,
     ) -> 'Dataset':
         """
-        Create a dataset and add it into the cohort.
+        Create a dataset.
         """
         # Normalising the dataset's name:
         name = build_dataset_name(*parse_stack(name, namespace))
@@ -383,7 +380,7 @@ class Dataset(Target):
         alignment_input: AlignmentInput | None = None,
     ) -> 'Sample':
         """
-        Create a new sample and add it into the dataset.
+        Create a new sample and add it to the dataset.
         """
         if id in self._sample_by_id:
             logger.debug(f'Sample {id} already exists in the dataset {self.name}')
@@ -459,6 +456,9 @@ class Sex(Enum):
                 return Sex.MALE
             if sex.lower() in ('f', 'female', '2'):
                 return Sex.FEMALE
+            if sex.lower() in ('u', 'unknown', '0'):
+                return Sex.UNKNOWN
+            raise ValueError(f'Unrecognised sex value {sex}')
         return Sex.UNKNOWN
 
 
@@ -496,22 +496,19 @@ class Sample(Target):
         self.alignment_input: AlignmentInput | None = alignment_input
 
     def __repr__(self):
-        return (
-            f'Sample({self.dataset.name}/{self.id}'
-            + (f'|{self._external_id}' if self._external_id else '')
-            + (f', participant={self._participant_id}' if self._participant_id else '')
-            + f', forced={self.forced}'
-            + f', active={self.active}'
-            + f', meta={self.meta}'
-            + f', sequencing_type={self.sequencing_type.value}'
-            + (
-                f', alignment_input={self.alignment_input}'
-                if self.alignment_input
-                else ''
-            )
-            + (f', pedigree={self.pedigree}' if self.pedigree else '')
-            + f')'
-        )
+        values = {
+            'participant': self._participant_id if self._participant_id else '',
+            'forced': str(self.forced),
+            'active': str(self.active),
+            'meta': str(self.meta),
+            'sequencing_type': str(self.sequencing_type.value),
+            'alignment_input': self.alignment_input if self.alignment_input else '',
+            'pedigree': self.pedigree if self.pedigree else ''
+        }
+        retval = f'Sample({self.dataset.name}/{self.id}'
+        if self._external_id:
+            retval += f'|{self._external_id}'
+        return retval + ''.join(f', {k}={v}' for k, v in values.items())
 
     def __str__(self):
         ai_tag = ''

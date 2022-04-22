@@ -182,10 +182,11 @@ def pipeline_click_options(function: Callable) -> Callable:
             'skip_samples_with_missing_input',
             default=False,
             is_flag=True,
-            help='For the first (not-skipped) stage, if the input for a target does not '
-            'exist, just skip this target instead of failing. E.g. if the first '
-            'stage is Align, and `sequence.meta` files for a sample do not exist, '
-            'remove this sample instead of failing.',
+            help='For the first (not-skipped) stage, if the input for a target does '
+            'not exist, just skip this target instead of failing. E.g. if the first '
+            'stage is Align, and `sample.alignment_input` for a sample do not exist, '
+            'remove this sample, instead of failing. In order words, ignore samples '
+            'that are missing results from skipped stages.',
         ),
         click.option(
             '--check-intermediates/--no-check-intermediates',
@@ -225,8 +226,8 @@ def pipeline_click_options(function: Callable) -> Callable:
             help='Slack channel to send status reports with CPG status reporter.',
         ),
         click.option(
-            '--crash-on-db-erorrs/--lenient-on-db-erorrs',
-            'crash_on_db_errors',
+            '--smdb-errors-are-fatal/--no-smdb-errors-are-fatal',
+            'smdb_errors_are_fatal',
             default=True,
             help='When the sample-metadata database API returns an error from the '
                  'database, only show the error and continue, instead of crashing',
