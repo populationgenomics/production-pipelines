@@ -188,7 +188,7 @@ class Cohort(Target):
         storage_provider: StorageProvider | None = None,
     ) -> 'Dataset':
         """
-        Create a dataset and add it into the cohort.
+        Create a dataset and add it to the cohort.
         """
         namespace = namespace or self.analysis_dataset.namespace
         # Normalising the dataset's name:
