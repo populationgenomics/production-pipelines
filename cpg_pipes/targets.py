@@ -289,7 +289,7 @@ class Dataset(Target):
         storage_provider: StorageProvider | None = None,
     ) -> 'Dataset':
         """
-        Create a dataset and add it into the cohort.
+        Create a dataset.
         """
         # Normalising the dataset's name:
         name = build_dataset_name(*parse_stack(name, namespace))
