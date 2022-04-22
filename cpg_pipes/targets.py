@@ -383,7 +383,7 @@ class Dataset(Target):
         alignment_input: AlignmentInput | None = None,
     ) -> 'Sample':
         """
-        Create a new sample and add it into the dataset.
+        Create a new sample and add it to the dataset.
         """
         if id in self._sample_by_id:
             logger.debug(f'Sample {id} already exists in the dataset {self.name}')
