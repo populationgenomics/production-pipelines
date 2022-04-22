@@ -131,7 +131,7 @@ class SmdbInputProvider(InputProvider):
             else:
                 logger.error(
                     'Getting sequencing data from SMDB resulted in an error. '
-                    'Continueing without sequencing data because lenient=true. '
+                    'Continuing without sequencing data because of flag override. '
                     'However, here is the error: '
                 )
                 traceback.print_exc()
