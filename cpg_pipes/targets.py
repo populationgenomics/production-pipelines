@@ -1,5 +1,6 @@
 """
 Pipeline stage target and subclasses: Cohort, Dataset, Sample.
+Plus Sample properties: PedigreeInfo, Sex.
 """
 import hashlib
 import logging
@@ -483,7 +484,7 @@ class Sample(Target):
         self.id = id
         self._external_id = external_id
         self.dataset = dataset
-        self.sequencing_type = sequencing_type or SequencingType.WGS
+        self.sequencing_type = sequencing_type or SequencingType.GENOME
         self._participant_id = participant_id
         self.meta: dict = meta or dict()
         self.pedigree: PedigreeInfo | None = pedigree
