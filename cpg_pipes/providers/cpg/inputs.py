@@ -25,11 +25,11 @@ class SmdbInputProvider(InputProvider):
         self, 
         db: SMDB, 
         check_files: bool = False, 
-        crash_on_erorrs: bool = True,
+        smdb_errors_are_fatal: bool = True,
     ):
         super().__init__(check_files=check_files)
         self.db = db
-        self.crash_on_erorrs = crash_on_erorrs
+        self.smdb_errors_are_fatal = smdb_errors_are_fatal
 
     def populate_cohort(
         self,
@@ -126,7 +126,7 @@ class SmdbInputProvider(InputProvider):
                 cohort.get_sample_ids()
             )
         except ApiException:
-            if self.crash_on_erorrs:
+            if self.smdb_errors_are_fatal:
                 raise
             else:
                 logger.error(
@@ -143,7 +143,7 @@ class SmdbInputProvider(InputProvider):
         sids_with_missing_seq = [k for k, v in seq_info_by_sid.items() if v is None]
         if sids_with_missing_seq:
             msg = f'No sequencing data for samples: {", ".join(sids_with_missing_seq)}'
-            if self.crash_on_erorrs:
+            if self.smdb_errors_are_fatal:
                 raise InputProviderError(msg)
             else:
                 logger.warning(
