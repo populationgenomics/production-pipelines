@@ -21,7 +21,7 @@ def get_intervals(
     refs: RefData,
     scatter_count: int,
     intervals_path: Path | None = None,
-    sequencing_type: SequencingType = SequencingType.WGS,
+    sequencing_type: SequencingType = SequencingType.GENOME,
     job_attrs: dict | None = None,
 ) -> tuple[Job, list[hb.Resource]]:
     """
@@ -65,7 +65,7 @@ def get_intervals(
     STANDARD.set_resources(j, storage_gb=16, mem_gb=2)
 
     break_bands_at_multiples_of = {
-        SequencingType.WGS: 100000,
+        SequencingType.GENOME: 100000,
         SequencingType.EXOME: 0,
     }.get(sequencing_type, 0)
 

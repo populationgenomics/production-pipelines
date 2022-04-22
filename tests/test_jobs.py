@@ -68,7 +68,7 @@ class TestJobs(unittest.TestCase):
             analysis_dataset=utils.DATASET,
             namespace=Namespace.TEST,
         )
-        self.sequencing_type = SequencingType.WGS
+        self.sequencing_type = SequencingType.GENOME
         self.dataset = self.pipeline.create_dataset(utils.DATASET)
         sample_name = f'Test-{self.timestamp}'
         self.sample = self.dataset.add_sample(sample_name, sample_name)

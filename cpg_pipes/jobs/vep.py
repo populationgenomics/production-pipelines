@@ -33,7 +33,7 @@ def vep_jobs(
     out_path: Path | None = None,
     overwrite: bool = False,
     scatter_count: int | None = RefData.number_of_vep_intervals,
-    sequencing_type: SequencingType = SequencingType.WGS,
+    sequencing_type: SequencingType = SequencingType.GENOME,
     intervals_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:

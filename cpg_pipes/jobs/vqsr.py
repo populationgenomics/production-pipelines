@@ -94,7 +94,7 @@ def make_vqsr_jobs(
     use_as_annotations: bool = True,
     overwrite: bool = False,
     scatter_count: int | None = RefData.number_of_joint_calling_intervals,
-    sequencing_type: SequencingType = SequencingType.WGS,
+    sequencing_type: SequencingType = SequencingType.GENOME,
     intervals_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:

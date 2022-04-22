@@ -157,21 +157,32 @@ def alignment_input_exists(v: AlignmentInput) -> bool:
 
 class SequencingType(Enum):
     """
-    Type (scope) of sequencing experiment.
+    Type (scope) of a sequencing experiment.
     """
 
-    WGS = 'wgs'
+    GENOME = 'genome'
     EXOME = 'exome'
-    SINGLE_CELL = 'single-cell'
+    SINGLE_CELL = 'single_cell'
 
     @staticmethod
-    def parse(val: str) -> 'SequencingType':
+    def parse(str_val: str) -> 'SequencingType':
         """
         Parse a string into a SequencingType object.
         """
-        d = {v.value: v for v in SequencingType}
-        if val not in d:
+        str_to_val: dict[str, SequencingType] = {} 
+        for val, str_vals in {
+            SequencingType.GENOME: ['wgs', 'genome'],
+            SequencingType.EXOME: ['exome', 'wts', 'wes'],
+            SequencingType.SINGLE_CELL: ['single_cell', 'single_cell_rna'],
+        }.items():
+            for str_v in str_vals:
+                str_v = str_v.lower()
+                assert str_v not in str_to_val, (str_v, str_to_val)
+                str_to_val[str_v] = val
+        str_val = str_val.lower()
+        if str_val not in str_to_val:
             raise ValueError(
-                f'Unrecognised sequence type {val}. Available: {list(d.keys())}'
+                f'Unrecognised sequence type {str_val}. '
+                f'Available: {list(str_to_val.keys())}'
             )
-        return d[val.lower()]
+        return str_to_val[str_val]
