@@ -225,6 +225,13 @@ def pipeline_click_options(function: Callable) -> Callable:
             help='Slack channel to send status reports with CPG status reporter.',
         ),
         click.option(
+            '--smdb-errors-are-fatal/--no-smdb-errors-are-fatal',
+            'smdb_errors_are_fatal',
+            default=True,
+            help='When the sample-metadata database API returns an error from the '
+                 'database, only show the error and continue, instead of crashing',
+        ),
+        click.option(
             '--skip-samples-stages',
             'skip_samples_stages',
             type=dict,
