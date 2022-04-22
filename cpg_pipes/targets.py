@@ -108,6 +108,8 @@ class Target:
 class Cohort(Target):
     """
     Represents a "cohort" target - all samples from all datasets in the pipeline.
+    Analysis dataset name is required and will be used as the default name for the 
+    cohort.
     """
 
     def __init__(
@@ -117,11 +119,6 @@ class Cohort(Target):
         name: str | None = None,
         storage_provider: StorageProvider | None = None,
     ):
-        """
-        @param name: name of the cohort
-        @param analysis_dataset_name: deferring creation of the analysis
-        dataset in case if it is also a part of the cohort datasets.
-        """
         super().__init__()
         self.name = name or analysis_dataset_name
         self.namespace = namespace
