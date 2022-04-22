@@ -189,7 +189,7 @@ class Cohort(Target):
         storage_provider: StorageProvider | None = None,
     ) -> 'Dataset':
         """
-        Create a dataset and add it into the cohort.
+        Create a dataset and add it to the cohort.
         """
         namespace = namespace or self.analysis_dataset.namespace
         # Normalising the dataset's name:
@@ -290,7 +290,7 @@ class Dataset(Target):
         storage_provider: StorageProvider | None = None,
     ) -> 'Dataset':
         """
-        Create a dataset and add it into the cohort.
+        Create a dataset.
         """
         # Normalising the dataset's name:
         name = build_dataset_name(*parse_stack(name, namespace))
@@ -384,7 +384,7 @@ class Dataset(Target):
         alignment_input: AlignmentInput | None = None,
     ) -> 'Sample':
         """
-        Create a new sample and add it into the dataset.
+        Create a new sample and add it to the dataset.
         """
         if id in self._sample_by_id:
             logger.debug(f'Sample {id} already exists in the dataset {self.name}')
