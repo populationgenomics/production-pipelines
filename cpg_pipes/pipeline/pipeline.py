@@ -526,7 +526,7 @@ class Stage(Generic[TargetT], ABC):
                 jobs=self.new_reuse_job(target),
                 reusable=True,
             )
-        else:  # Action.SKIPPED
+        else:  # Action.SKIP
             outputs = None
 
         if not outputs:
@@ -571,45 +571,47 @@ class Stage(Generic[TargetT], ABC):
 
         expected_out = self.expected_outputs(target)
         reusable = self._outputs_are_reusable(expected_out)
-        if not self.skipped:
-            if reusable:
-                if target.forced:
-                    logger.info(
-                        f'{self.name}: can reuse, but forcing the target '
-                        f'{target} to rerun this stage'
-                    )
-                    return Action.QUEUE
-                elif self.forced:
-                    logger.info(
-                        f'{self.name}: can reuse, but forcing the stage '
-                        f'to rerun, target={target}'
-                    )
-                    return Action.QUEUE
-                else:
-                    logger.info(f'{self.name}: reusing results for {target}')
-                    return Action.REUSE
-            else:
-                logger.info(f'{self.name}: running queue_jobs(target={target})')
-                return Action.QUEUE
 
-        if reusable:
-            return Action.REUSE
-        else:
+        if self.skipped:
+            if reusable:
+                return Action.REUSE
             if self.skip_samples_with_missing_input:
                 logger.warning(
                     f'Skipping sample {target}: stage {self.name} is required, '
                     f'but is skipped, and expected outputs for the target do not '
                     f'exist: {expected_out}'
                 )
-            else:
-                raise ValueError(
-                    f'Stage {self.name} is required, but is skipped, and '
-                    f'expected outputs for target {target} do not exist: '
-                    f'{expected_out}'
+                # self.skip_samples_with_missing_input means that we can ignore 
+                # samples/datasets that have missing results from skipped stages. 
+                # This is our case, so indicating that this sample/dataset should 
+                # be ignored: 
+                target.active = False
+                return Action.SKIP
+            raise ValueError(
+                f'Stage {self.name} is required, but is skipped, and '
+                f'expected outputs for target {target} do not exist: '
+                f'{expected_out}'
+            )
+        
+        if reusable:
+            if target.forced:
+                logger.info(
+                    f'{self.name}: can reuse, but forcing the target '
+                    f'{target} to rerun this stage'
                 )
-        # Stage is not needed, returning empty outputs.
-        target.active = False
-        return Action.SKIP
+                return Action.QUEUE
+            elif self.forced:
+                logger.info(
+                    f'{self.name}: can reuse, but forcing the stage '
+                    f'to rerun, target={target}'
+                )
+                return Action.QUEUE
+            else:
+                logger.info(f'{self.name}: reusing results for {target}')
+                return Action.REUSE
+
+        logger.info(f'{self.name}: running queue_jobs(target={target})')
+        return Action.QUEUE
 
     def _outputs_are_reusable(self, expected_out: ExpectedResultT) -> bool:
         """
