@@ -45,19 +45,20 @@ def main():
         )
         hc_jobs = produce_gvcf(
             pipe.b,
-            output_path=benchmark.BENCHMARK_BUCKET / 'outputs' f'{sample_name}.g.vcf.gz',
+            output_path=benchmark.BENCHMARK_BUCKET / 'outputs'
+            f'{sample_name}.g.vcf.gz',
             sample_name=sample_name,
             cram_path=cram_path,
-            number_of_intervals=10,
+            scatter_count=10,
             tmp_bucket=benchmark.BENCHMARK_BUCKET / 'tmp',
             dragen_mode=True,
             refs=pipe.refs,
-            sequencing_type=SequencingType.WGS,
+            sequencing_type=SequencingType.GENOME,
         )
         for j in hc_jobs:
             j.depends_on(*align_jobs)
 
-    pipe.submit_batch()
+    pipe.run()
 
 
 if __name__ == '__main__':

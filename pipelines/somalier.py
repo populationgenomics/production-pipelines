@@ -24,10 +24,9 @@ def main(
     Entry point, decorated by pipeline click options.
     """
     pipeline = create_pipeline(
-        name='pedigree_check',
-        description='Pedigree checks',
+        name='pedigree',
         stages=[
-            CramSomalierPedigree, 
+            CramSomalierPedigree,
             CramSomalierAncestry,
         ],
         **kwargs,
@@ -35,11 +34,9 @@ def main(
     if pipeline.skip_samples_with_missing_input:
         for sample in pipeline.get_all_samples():
             if not exists(sample.get_cram_path().path):
-                logger.warning(
-                    f'Could not find CRAM, skipping sample {sample.id}'
-                )
+                logger.warning(f'Could not find CRAM, skipping sample {sample.id}')
                 sample.active = False
-    pipeline.submit_batch()
+    pipeline.run()
 
 
 if __name__ == '__main__':

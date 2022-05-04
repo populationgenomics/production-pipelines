@@ -2,7 +2,7 @@ default_language_version:
     python: python3.10
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.1.0
+  rev: v4.2.0
   hooks:
   - id: check-yaml
     exclude: '\.*conda/.*'
@@ -23,3 +23,4 @@ repos:
   rev: 'v0.942'
   hooks:
   - id: mypy
+    additional_dependencies: [ types-PyYAML==6.0.4 ]

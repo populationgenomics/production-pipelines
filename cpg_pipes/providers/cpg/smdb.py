@@ -1,5 +1,5 @@
 """
-Functions to find the pipeline inputs and communicate with the SM server
+Helpers to communicate with the sample-metadata database.
 """
 
 import logging
@@ -27,7 +27,7 @@ logger = logging.getLogger(__file__)
 
 class SmdbError(Exception):
     """
-    Raised for problems interacting with sample-metadata DB
+    Raised for problems interacting with sample-metadata database.
     """
 
 
@@ -79,7 +79,7 @@ class Analysis:
     @staticmethod
     def parse(data: dict) -> 'Analysis':
         """
-        Parse data to create an Analysis object
+        Parse data to create an Analysis object.
         """
         req_keys = ['id', 'type', 'status']
         if any(k not in data for k in req_keys):
@@ -107,12 +107,9 @@ class SMDB:
     Communication with the SampleMetadata database.
     """
 
-    def __init__(
-        self,
-        analysis_dataset: str,
-    ):
+    def __init__(self, project_name: str | None = None):
         """
-        @param analysis_dataset: dataset where to create the "analysis" entries.
+        @param project_name: default SMDB project name.
         """
         self.sapi = SampleApi()
         self.aapi = AnalysisApi()
@@ -120,32 +117,34 @@ class SMDB:
         self.seqapi = SequenceApi()
         self.papi = ParticipantApi()
         self.fapi = FamilyApi()
-        self.analysis_dataset = analysis_dataset
+        self.project_name = project_name
 
     def get_sample_entries(
         self,
-        dataset_name: str,
+        project_name: str | None = None,
+        active: bool = True,
     ) -> list[dict]:
         """
-        Get Sample entries and apply `skip_samples` and `only_samples` filters.
-        This is a helper method; use public `populate_dataset` to parse samples.
+        Get samples in the project as a list of dictionaries.
         """
-        logger.info(f'Finding samples for dataset {dataset_name}...')
+        project_name = project_name or self.project_name
+
+        logger.debug(f'Finding samples for dataset {project_name}...')
         sample_entries = self.sapi.get_samples(
             body_get_samples_by_criteria_api_v1_sample_post={
-                'project_ids': [dataset_name],
-                'active': True,
+                'project_ids': [project_name],
+                'active': active,
             }
         )
         logger.info(
-            f'Finding samples for dataset {dataset_name}: '
+            f'Finding samples for project {project_name}: '
             f'found {len(sample_entries)}'
         )
         return sample_entries
 
     def update_analysis(self, analysis: Analysis, status: AnalysisStatus):
         """
-        Update "status" of an Analysis entry
+        Update "status" of an Analysis entry.
         """
         try:
             self.aapi.update_analysis_status(
@@ -159,13 +158,14 @@ class SMDB:
     def find_joint_calling_analysis(
         self,
         sample_ids: list[str],
+        project_name: str | None = None,
     ) -> Analysis | None:
         """
-        Query the DB to find the last completed joint-calling analysis for the samples
+        Query the DB to find the last completed joint-calling analysis for the samples.
         """
         try:
             data = self.aapi.get_latest_complete_analysis_for_type(
-                project=self.analysis_dataset,
+                project=project_name or self.project_name,
                 analysis_type=models.AnalysisType('joint-calling'),
             )
         except ApiException:
@@ -184,23 +184,24 @@ class SMDB:
         sample_ids: list[str],
         analysis_type: AnalysisType,
         analysis_status: AnalysisStatus = AnalysisStatus.COMPLETED,
-        dataset: str | None = None,
         meta: dict | None = None,
+        project_name: str | None = None,
     ) -> dict[str, Analysis]:
         """
         Query the DB to find the last completed analysis for the type and samples,
         one Analysis object per sample. Assumes the analysis is defined for a single
-        sample (e.g. cram, gvcf)
+        sample (e.g. cram, gvcf).
         """
-        dataset = dataset or self.analysis_dataset
+        project_name = project_name or self.project_name
+
         analysis_per_sid: dict[str, Analysis] = dict()
 
         logger.info(
-            f'Querying {analysis_type} analysis entries for dataset {dataset}...'
+            f'Querying {analysis_type} analysis entries for dataset {project_name}...'
         )
         datas = self.aapi.query_analyses(
             models.AnalysisQueryModel(
-                projects=[dataset],
+                projects=[project_name],
                 sample_ids=sample_ids,
                 type=models.AnalysisType(analysis_type.value),
                 status=models.AnalysisStatus(analysis_status.value),
@@ -217,7 +218,8 @@ class SMDB:
             assert len(a.sample_ids) == 1, data
             analysis_per_sid[list(a.sample_ids)[0]] = a
         logger.info(
-            f'Querying {analysis_type} analysis entries for dataset {dataset}: found {len(analysis_per_sid)}'
+            f'Querying {analysis_type} analysis entries for dataset {project_name}: '
+            f'found {len(analysis_per_sid)}'
         )
         return analysis_per_sid
 
@@ -227,11 +229,13 @@ class SMDB:
         type_: str | AnalysisType,
         status: str | AnalysisStatus,
         sample_ids: list[str],
-        dataset_name: str | None = None,
+        project_name: str | None = None,
     ) -> int | None:
         """
-        Tries to create an Analysis entry, returns its id if successfuly
+        Tries to create an Analysis entry, returns its id if successful.
         """
+        project_name = project_name or self.project_name
+
         if isinstance(type_, AnalysisType):
             type_ = type_.value
         if isinstance(status, AnalysisStatus):
@@ -244,9 +248,7 @@ class SMDB:
             sample_ids=list(sample_ids),
         )
         try:
-            aid = self.aapi.create_new_analysis(
-                project=dataset_name or self.analysis_dataset, analysis_model=am
-            )
+            aid = self.aapi.create_new_analysis(project=project_name, analysis_model=am)
         except ApiException:
             traceback.print_exc()
             return None
@@ -262,7 +264,7 @@ class SMDB:
         completed_analysis: Analysis | None,
         analysis_type: str,
         expected_output_fpath: Path,
-        dataset_name: str | None = None,
+        project_name: str | None = None,
     ) -> Path | None:
         """
         Checks whether existing analysis exists, and output matches the expected output
@@ -277,7 +279,7 @@ class SMDB:
         @param analysis_type: cram, gvcf, joint_calling
         @param expected_output_fpath: where the pipeline expects the analysis output
         file to sit on the bucket (will invalidate the analysis when it doesn't match)
-        @param dataset_name: the name of the dataset where to create a new analysis
+        @param project_name: the name of the project where to create a new analysis
         @return: path to the output if it can be reused, otherwise None
         """
         label = f'type={analysis_type}'
@@ -338,7 +340,7 @@ class SMDB:
                 output=expected_output_fpath,
                 status='completed',
                 sample_ids=sample_ids,
-                dataset_name=dataset_name,
+                project_name=project_name or self.project_name,
             )
             return expected_output_fpath
 
@@ -350,58 +352,22 @@ class SMDB:
             )
             return None
 
-    def get_ped_entries(self, dataset_name: str) -> list[dict[str, str]]:
-        """ 
-        Retrieve ped lines for a specified SM Project, with internal CPG IDs.
+    def get_ped_entries(self, project_name: str | None = None) -> list[dict[str, str]]:
         """
+        Retrieve PED lines for a specified SM project, with external participant IDs.
+        """
+        project_name = project_name or self.project_name
 
-        families = self.fapi.get_families(dataset_name)
+        families = self.fapi.get_families(project_name)
         family_ids = [family['id'] for family in families]
         ped_entries = self.fapi.get_pedigree(
             internal_family_ids=family_ids,
             response_type='json',
-            project=dataset_name,
+            project=project_name,
             replace_with_participant_external_ids=True,
         )
 
-        pid_sid_map = self._get_pid_sid_map(dataset_name)
-
-        # Replace External Participant IDs with internal CPG IDs.
-        # Assumes 1:1 Relationship.
-        for entry in ped_entries:
-            if entry['individual_id'] != '':
-                if entry['individual_id'] not in pid_sid_map:
-                    logger.error(
-                        f"{entry['individual_id']} not in participants: "
-                        f"{', '.join(pid_sid_map.keys())}"
-                    )
-                    continue
-                entry['individual_id'] = pid_sid_map[entry['individual_id']]
-
-            if entry['maternal_id'] != '':
-                entry['maternal_id'] = pid_sid_map[entry['maternal_id']]
-
-            if entry['paternal_id'] != '':
-                entry['paternal_id'] = pid_sid_map[entry['paternal_id']]
-
         return ped_entries
-
-    def _get_pid_sid_map(self, dataset_name: str) -> dict[str, str]:
-        """
-        Returns map of participant IDs to internal CPG IDs.
-        """
-
-        pid_sid_multi = self.papi.get_external_participant_id_to_internal_sample_id(
-            dataset_name
-        )
-
-        pid_sid_single = {}
-        for group in pid_sid_multi:
-            participant = group[0]
-            for sample in group[1:]:
-                pid_sid_single[participant] = sample
-
-        return pid_sid_single
 
 
 @dataclass
@@ -458,7 +424,7 @@ class SmSequence:
         Parse a AlignmentInput object from the meta dictionary.
 
         @param check_existence: check if fastq/crams exist on buckets.
-        Default value is pulled from self.smdb and can be overwridden.
+        Default value is pulled from self.smdb and can be overridden.
         """
         reads_data = meta.get('reads')
         reads_type = meta.get('reads_type')
@@ -484,13 +450,13 @@ class SmSequence:
             bam_path = reads_data[0]['location']
             if not (bam_path.endswith('.cram') or bam_path.endswith('.bam')):
                 logger.error(
-                    f'{sample_id}: ERROR: expected the file to have an extention '
+                    f'{sample_id}: ERROR: expected the file to have an extension '
                     f'.cram or .bam, got: {bam_path}'
                 )
                 return None
             if check_existence and not utils.exists(bam_path):
                 logger.error(
-                    f'{sample_id}: ERROR: index file doesn\'t exist: {bam_path}'
+                    f'{sample_id}: ERROR: index file does not exist: {bam_path}'
                 )
                 return None
 
@@ -509,12 +475,12 @@ class SmSequence:
                 and not index_path.endswith('.bai')
             ):
                 logger.error(
-                    f'{sample_id}: ERROR: expected the index file to have an extention '
+                    f'{sample_id}: ERROR: expected the index file to have an extension '
                     f'.crai or .bai, got: {index_path}'
                 )
             if check_existence and not utils.exists(index_path):
                 logger.error(
-                    f'{sample_id}: ERROR: index file doesn\'t exist: {index_path}'
+                    f'{sample_id}: ERROR: index file does not exist: {index_path}'
                 )
                 return None
 
@@ -526,13 +492,13 @@ class SmSequence:
                 assert len(lane_data) == 2, lane_data
                 if check_existence and not utils.exists(lane_data[0]['location']):
                     logger.error(
-                        f'{sample_id}: ERROR: read 1 file doesn\'t exist: '
+                        f'{sample_id}: ERROR: read 1 file does not exist: '
                         f'{lane_data[0]["location"]}'
                     )
                     return None
                 if check_existence and not utils.exists(lane_data[1]['location']):
                     logger.error(
-                        f'{sample_id}: ERROR: read 2 file doesn\'t exist: '
+                        f'{sample_id}: ERROR: read 2 file does not exist: '
                         f'{lane_data[1]["location"]}'
                     )
                     return None

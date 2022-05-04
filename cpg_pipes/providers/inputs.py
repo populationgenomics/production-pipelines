@@ -1,6 +1,7 @@
 """
-Abstract provider if input data source.
+Abstract provider of input data sources.
 """
+
 import csv
 import logging
 from abc import ABC, abstractmethod
@@ -16,8 +17,7 @@ logger = logging.getLogger(__file__)
 
 class InputProviderError(Exception):
     """
-    Exception thrown when there is something wrong happened parsing
-    inputs.
+    Exception thrown when there is something wrong while parsing inputs.
     """
 
     pass
@@ -25,8 +25,11 @@ class InputProviderError(Exception):
 
 class InputProvider(ABC):
     """
-    Abstract class for implementing inputs source.
+    Abstract class for implementing input sources.
     """
+
+    def __init__(self, check_files: bool = True):
+        self.check_files = check_files
 
     def populate_cohort(
         self,
@@ -34,8 +37,8 @@ class InputProvider(ABC):
         dataset_names: list[str] | None = None,
         skip_samples: list[str] | None = None,
         only_samples: list[str] | None = None,
+        skip_datasets: list[str] | None = None,
         ped_files: list[Path] | None = None,
-        do_check_seq_existence: bool = False,
     ) -> Cohort:
         """
         Add datasets in the cohort. There exists only one cohort for
@@ -44,27 +47,41 @@ class InputProvider(ABC):
         if dataset_names:
             # Specific datasets requested, so initialising them in advance.
             for ds_name in dataset_names:
-                dataset = cohort.add_dataset(ds_name)
+                if skip_datasets and ds_name in skip_datasets:
+                    logger.info(f'Requested to skipping dataset {ds_name}')
+                    continue
+                dataset = Dataset.create(ds_name, cohort.namespace, cohort.storage_provider)
                 entries = self._get_entries(
-                    dataset=dataset,
+                    dataset,
                     skip_samples=skip_samples,
                     only_samples=only_samples,
+                    skip_datasets=skip_datasets,
                 )
-                for entry in entries:
-                    self._add_sample(dataset, entry)
+                if entries:
+                    dataset = cohort.add_dataset(dataset)
+                    for entry in entries:
+                        self._add_sample(dataset, entry)
 
         else:
             # We don't know dataset names in advance, so getting all entries.
             entries = self._get_entries(
-                skip_samples=skip_samples, only_samples=only_samples
+                skip_samples=skip_samples,
+                only_samples=only_samples,
+                skip_datasets=skip_datasets,
             )
             for entry in entries:
-                ds_name = self.get_dataset_name(cohort, entry)
-                dataset = cohort.add_dataset(ds_name)
+                ds_name = self.get_dataset_name(entry) or cohort.analysis_dataset.name
+                dataset = cohort.create_dataset(ds_name)
                 self._add_sample(dataset, entry)
+        if not cohort.get_datasets():
+            msg = 'No active datasets populated'
+            if skip_samples or only_samples or skip_datasets:
+                msg += ' (after skipping/picking samples)'
+            raise InputProviderError(msg)
 
-        self.populate_alignment_inputs(cohort, do_check_seq_existence)
+        self.populate_alignment_inputs(cohort)
         self.populate_analysis(cohort)
+        self.populate_participants(cohort)
         self.populate_pedigree(cohort)
         if ped_files:
             self.populate_pedigree_from_ped_files(cohort, ped_files)
@@ -72,14 +89,17 @@ class InputProvider(ABC):
         return cohort
 
     @abstractmethod
-    def get_entries(self, dataset: Dataset | None = None) -> list[dict]:
+    def get_entries(
+        self,
+        dataset: Dataset | None = None,
+    ) -> list[dict]:
         """
-        Overide this method to get a list of data entries (dicts).
+        Override this method to get a list of data entries (dicts).
         If dataset is not missing, it should be specific to a dataset.
         """
 
     @abstractmethod
-    def get_dataset_name(self, cohort: Cohort, entry: dict) -> str:
+    def get_dataset_name(self, entry: dict) -> str | None:
         """
         Get name of the dataset.
         """
@@ -87,63 +107,68 @@ class InputProvider(ABC):
     @abstractmethod
     def get_sample_id(self, entry: dict) -> str:
         """
-        Get sample ID from a sample dict.
+        Get sample ID.
         """
 
     @abstractmethod
     def get_external_id(self, entry: dict) -> str | None:
         """
-        Get external sample ID from a sample dict.
+        Get external sample ID.
         """
 
     @abstractmethod
     def get_participant_id(self, entry: dict) -> str | None:
         """
-        Get participant ID from a sample dict.
+        Get participant ID. Can be also set later.
         """
 
     @abstractmethod
     def get_participant_sex(self, entry: dict) -> Sex | None:
         """
-        Get participant ID from a sample dict.
+        Get participant sex. Can be also set later.
         """
 
     @abstractmethod
     def get_sample_meta(self, entry: dict) -> dict:
         """
-        Get sample metadata from a sample dict.
+        Get sample metadata. Can be also set later.
         """
 
     @abstractmethod
-    def populate_alignment_inputs(
-        self,
-        cohort: Cohort,
-        do_check_seq_existence: bool = False,
-    ):
+    def get_sequencing_type(self, entry: dict) -> SequencingType | None:
         """
-        Populate sequencing inputs for samples
+        Get sequencing type. Can be also set later.
         """
 
+    @abstractmethod
+    def populate_alignment_inputs(self, cohort: Cohort) -> None:
+        """
+        Populate alignment inputs for samples.
+        """
+
+    @abstractmethod
     def populate_analysis(self, cohort: Cohort) -> None:
         """
-        Populate Analysis entries.
+        Populate analysis information.
         """
-        pass
 
     @abstractmethod
-    def populate_pedigree(
-        self,
-        cohort: Cohort,
-    ) -> None:
+    def populate_participants(self, cohort: Cohort) -> None:
+        """
+        Populate participant information.
+        """
+
+    @abstractmethod
+    def populate_pedigree(self, cohort: Cohort) -> None:
         """
         Populate pedigree data (families, sex, relationships).
         """
-    
+
     @staticmethod
     def populate_pedigree_from_ped_files(
         cohort: Cohort,
         ped_files: list[Path],
-    ):
+    ) -> None:
         """
         Populates pedigree from provided PED files.
         """
@@ -151,7 +176,7 @@ class InputProvider(ABC):
         for s in cohort.get_samples():
             sample_by_participant_id[s.participant_id] = s
 
-        for _, ped_file in enumerate(ped_files):
+        for ped_file in ped_files:
             with ped_file.open() as f:
                 for line in f:
                     fields = line.strip().split('\t')[:6]
@@ -173,6 +198,7 @@ class InputProvider(ABC):
         dataset: Dataset | None = None,
         skip_samples: list[str] | None = None,
         only_samples: list[str] | None = None,
+        skip_datasets: list[str] | None = None,
     ) -> list[dict]:
         """
         Helper method to get and filter entries.
@@ -182,6 +208,7 @@ class InputProvider(ABC):
             entries=entries,
             skip_samples=skip_samples,
             only_samples=only_samples,
+            skip_datasets=skip_datasets,
         )
         return entries
 
@@ -190,6 +217,7 @@ class InputProvider(ABC):
         entries: list[dict[str, str]],
         skip_samples: list[str] | None = None,
         only_samples: list[str] | None = None,
+        skip_datasets: list[str] | None = None,
     ) -> list[dict[str, str]]:
         """
         Apply the only_samples and skip_samples filters.
@@ -198,14 +226,20 @@ class InputProvider(ABC):
         for entry in entries:
             cpgid = self.get_sample_id(entry)
             extid = self.get_external_id(entry)
+            ds = self.get_dataset_name(entry)
+            if skip_datasets and ds and ds in skip_datasets:
+                logger.info(
+                    f'Skipping sample (the dataset is skipped): {ds}|{cpgid}|{extid}'
+                )
+                continue
             if only_samples:
                 if cpgid in only_samples or extid in only_samples:
-                    logger.info(f'Picking sample: {cpgid}|{extid}')
+                    logger.info(f'Picking sample: {ds}|{cpgid}|{extid}')
                 else:
                     continue
             if skip_samples:
                 if cpgid in skip_samples or extid in skip_samples:
-                    logger.info(f'Skiping sample: {cpgid}|{extid}')
+                    logger.info(f'Skipping sample: {ds}|{cpgid}|{extid}')
                     continue
             filtered_entries.append(entry)
         return filtered_entries
@@ -220,13 +254,14 @@ class InputProvider(ABC):
             external_id=str(self.get_external_id(entry)),
             participant_id=self.get_participant_id(entry),
             sex=self.get_participant_sex(entry),
+            sequencing_type=self.get_sequencing_type(entry),
             meta=self.get_sample_meta(entry),
         )
 
 
 class FieldMap(Enum):
     """
-    CSV field names.
+    CSV/TSV field names.
     """
 
     dataset = 'dataset'
@@ -237,27 +272,30 @@ class FieldMap(Enum):
     fqs_r2 = 'fqs_r2'
     cram = 'cram'
     sex = 'sex'
-    sequencing_type = 'sequencing_type'
+    sequencing_type = 'seq_type'
 
 
 class CsvInputProvider(InputProvider):
     """
-    Input provider that parses data from a CSV file.
+    Input provider that parses data from a CSV/TSV file.
     """
 
-    def __init__(self, fp):
-        super().__init__()
+    def __init__(self, fp, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         self.d = list(csv.DictReader(fp))
         if len(self.d) == 0:
-            raise InputProviderError('Empty metadata TSV')
+            raise InputProviderError('Empty metadata file')
         if 'sample' not in self.d[0]:
             raise InputProviderError(
-                f'Metadata TSV must have a header and a column "sample", '
+                f'Metadata file must have a header and a column "sample", '
                 f'got: {self.d[0]}'
             )
 
-    def get_entries(self, dataset: Dataset | None = None) -> list[dict]:
+    def get_entries(
+        self,
+        dataset: Dataset | None = None,
+    ) -> list[dict]:
         """
         Return list of data entries. Optionally, specific for a dataset.
         """
@@ -266,16 +304,19 @@ class CsvInputProvider(InputProvider):
             entries = [
                 e
                 for e in entries
-                if self.get_dataset_name(dataset.cohort, e) == dataset.name
+                if (
+                    not self.get_dataset_name(e)
+                    or self.get_dataset_name(e) == dataset.name
+                )
             ]
         return entries
 
     # noinspection PyMethodMayBeStatic
-    def get_dataset_name(self, cohort: Cohort, entry: dict) -> str:
+    def get_dataset_name(self, entry: dict) -> str | None:
         """
         Get name of the dataset.
         """
-        return entry.get(FieldMap.dataset.value, cohort.analysis_dataset.name)
+        return entry.get(FieldMap.dataset.value)
 
     # noinspection PyMethodMayBeStatic
     def get_sample_id(self, entry: dict[str, str]) -> str:
@@ -315,35 +356,38 @@ class CsvInputProvider(InputProvider):
         """
         Get sample metadata.
         """
-        reserverd_fields = [f.value for f in FieldMap]
-        return {k: v for k, v in entry.items() if k not in reserverd_fields}
+        reserved_fields = [f.value for f in FieldMap]
+        return {k: v for k, v in entry.items() if k not in reserved_fields}
+
+    def get_sequencing_type(self, entry: dict) -> SequencingType:
+        """
+        Get sequencing type.
+        """
+        return SequencingType.parse(entry[FieldMap.sequencing_type.value])
 
     def populate_analysis(self, cohort: Cohort) -> None:
         """
-        Populate Analysis entries
+        Populate Analysis entries.
         """
         pass
 
-    def populate_pedigree(
-        self,
-        cohort: Cohort,
-        ped_files: list[Path] | None = None,
-    ) -> None:
+    def populate_participants(self, cohort: Cohort) -> None:
         """
-        Populate pedigree data
+        Populate Participant entries.
         """
         pass
 
-    def populate_alignment_inputs(
-        self,
-        cohort: Cohort,
-        do_check_seq_existence: bool = False,
-    ) -> None:
+    def populate_pedigree(self, cohort: Cohort) -> None:
+        """
+        Populate pedigree data.
+        """
+        pass
+
+    def populate_alignment_inputs(self, cohort: Cohort) -> None:
         """
         Populate sequencing inputs for samples.
         """
         d_by_sid: dict[str, AlignmentInput] = {}
-        seq_type_by_sid: dict[str, SequencingType] = {}
 
         for entry in self.get_entries():
             sid = self.get_sample_id(entry)
@@ -359,27 +403,21 @@ class CsvInputProvider(InputProvider):
             ]
             cram = entry.get(FieldMap.cram.value, None)
             if fqs1:
-                if len(fqs1) != len(fqs1):
+                if len(fqs1) != len(fqs2):
                     raise InputProviderError(
                         'Numbers of fqs_r1 and fqs_r2 values (pipe-separated) '
                         'must match.'
                     )
-                if do_check_seq_existence:
-                    for fq in fqs1 + fqs2:
-                        if not exists(fq):
-                            raise InputProviderError(f'FQ {fq} does not exist')
+                if self.check_files:
+                    missing_fastqs = [fq for fq in (fqs1 + fqs2) if not exists(fq)]
+                    if missing_fastqs:
+                        raise InputProviderError(f'FQs {missing_fastqs} does not exist')
                 d_by_sid[sid] = [FastqPair(fq1, fq2) for fq1, fq2 in zip(fqs1, fqs2)]
             elif cram:
-                if do_check_seq_existence:
+                if self.check_files:
                     if not exists(cram):
                         raise InputProviderError(f'CRAM {cram} does not exist')
                 d_by_sid[sid] = CramPath(cram)
 
-            seq_type_by_sid[sid] = SequencingType.parse(
-                entry.get(FieldMap.sequencing_type.value, None)
-            )
-
         for sample in cohort.get_samples():
             sample.alignment_input = d_by_sid.get(sample.id)
-            if sample.id:
-                sample.sequencing_type = seq_type_by_sid[sample.id]

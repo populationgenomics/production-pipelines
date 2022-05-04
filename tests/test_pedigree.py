@@ -1,44 +1,44 @@
 """
-Testing CSV inputs provider. CSV file must contain one required column "sample".
+Testing pedigree checks.
 """
-import time
+
 import unittest
 
-from cpg_pipes.hb.batch import setup_batch
-from cpg_pipes.jobs.somalier import check_pedigree_job
-
-try:
-    from .utils import BASE_BUCKET, DATASET, SAMPLES
-except ImportError:
-    from utils import BASE_BUCKET, DATASET, SAMPLES  # type: ignore
+from cpg_pipes import to_path
+from cpg_pipes.jobs.scripts import check_pedigree
 
 
 class TestPedigree(unittest.TestCase):
     """
-    Test Pedigree checks.
+    Test pedigree checks.
     """
-    def setUp(self) -> None:
-        self.name = self._testMethodName
-        self.timestamp = time.strftime('%Y%m%d-%H%M')
-        self.b = setup_batch(
-            self.name, 
-            billing_project=DATASET,
-            hail_bucket=self.tmp_bucket
-        )
 
-    @property
-    def tmp_bucket(self):
-        return BASE_BUCKET / 'tmp' / self.name / self.timestamp
-
-    def test_check_pedigree(self):
-        inputs_bucket = BASE_BUCKET / 'inputs' / 'check_pedigree/'
-        check_pedigree_job(
-            self.b,
-            sample_map_file=self.b.read_input(str(inputs_bucket / 'sample-map.tsv')),
-            samples_file=self.b.read_input(str(inputs_bucket / 'somalier-samples.tsv')),
-            pairs_file=self.b.read_input(str(inputs_bucket / 'somalier-pairs.tsv')),
+    def test_check_pedigree_good(self):
+        data_dir = to_path(__file__).parent / 'data' / 'check_pedigree'
+        result = check_pedigree.check_pedigree(
+            somalier_samples_fpath=str(data_dir / 'output_samples_good.tsv'),
+            somalier_pairs_fpath=str(data_dir / 'output_pairs_good.tsv'),
         )
-        self.b.run()
+        for expected_line in [
+            'Sex inferred for 28/28 samples, matching in all samples.',
+            'Inferred pedigree matches for all 28 samples.',
+        ]:
+            self.assertTrue(any(expected_line in msg for msg in result.messages))
+
+    def test_check_pedigree_bad(self):
+        data_dir = to_path(__file__).parent / 'data' / 'check_pedigree'
+        result = check_pedigree.check_pedigree(
+            somalier_samples_fpath=str(data_dir / 'output_samples_bad.tsv'),
+            somalier_pairs_fpath=str(data_dir / 'output_pairs_bad.tsv'),
+        )
+        for expected_line in [
+            '1/27 PED samples with mismatching sex',
+            '2/27 samples with missing provided sex',
+            '2/27 samples with failed inferred sex',
+            'Sex inferred for 25/27 samples, matching in 24 samples',
+            '1 sample pair(s) with mismatched relatedness',
+        ]:
+            self.assertTrue(any(expected_line in msg for msg in result.messages))
 
 
 if __name__ == '__main__':

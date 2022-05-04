@@ -6,14 +6,16 @@ import functools
 import logging
 import operator
 import os
+import random
+import string
 import tempfile
 import time
 from pathlib import Path
 from typing import List, Optional, Union
 import hail as hl
+from hail.utils.java import Env
 
 from .refdata import RefData
-from .utils import safe_mkdir
 
 
 logger = logging.getLogger(__file__)
@@ -23,6 +25,9 @@ def init_batch(billing_project: str, hail_bucket: Path | str):
     """
     Init Hail with Batch backend.
     """
+    # noinspection PyProtectedMember
+    if Env._hc:  # already initialised
+        return
     asyncio.get_event_loop().run_until_complete(
         hl.init_batch(
             default_reference=RefData.genome_build,
@@ -38,16 +43,16 @@ def init_hail(name: str, local_tmp_dir: Path = None):
     Initialise Hail, and set up a local directory for logs.
     @param name: name to prefix the log file
     @param local_tmp_dir: local directory to write Hail logs
-    @return:
+    @return: local_tmp_dir
     """
     if not local_tmp_dir:
         local_tmp_dir = Path(tempfile.mkdtemp())
 
-    timestamp = time.strftime('%Y%m%d-%H%M')
-    hl_log = os.path.join(
-        safe_mkdir(local_tmp_dir / 'log'), f'{name}-{timestamp}.log'
-    )
-    hl.init(default_reference=RefData.genome_build, log=hl_log)
+    rand_bit = ''.join(random.choices(string.ascii_uppercase + string.digits, k=3))
+    timestamp = time.strftime('%Y-%m%d-%H%M') + rand_bit
+    local_tmp_dir.mkdir(parents=True)
+    hl_log = local_tmp_dir / f'{name}-{timestamp}.log'
+    hl.init(default_reference=RefData.genome_build, log=str(hl_log))
     return local_tmp_dir
 
 
@@ -63,6 +68,7 @@ def filter_low_conf_regions(
     Filter low-confidence regions.
 
     @param mt: MatrixTable or Table to filter
+    @param refs: reference data
     @param filter_lcr: Whether to filter LCR regions
     @param filter_segdup: Whether to filter Segdup regions
     @param filter_telomeres_and_centromeres: Whether to filter telomeres and centromeres

@@ -1,0 +1,6 @@
+namespace: test
+datasets: ['acute-care']
+create_es_index_for_datasets: ['acute-care']
+keep_scratch: true
+skip_samples_with_missing_input: true
+version: v0

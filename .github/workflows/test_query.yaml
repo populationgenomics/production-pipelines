@@ -1,7 +1,8 @@
-name: Test Pipeline
-on: [push, workflow_dispatch]
+name: Test Query functions
+# TODO: re-enamble for push when https://github.com/hail-is/hail/pull/11747 is merged
+on: [workflow_dispatch]
 jobs:
-  test_pipeline:
+  test_jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -9,6 +10,7 @@ jobs:
     env:
       GSA_KEY: ${{ secrets.GCP_SA_KEY }}
       HAIL_TOKEN: ${{ secrets.HAIL_TOKEN }}
+      SEQR_ES_PASSWORD: ${{ secrets.SEQR_ES_PASSWORD }}
     steps:
       - name: Check out repository code
         uses: actions/checkout@v2
@@ -20,7 +22,7 @@ jobs:
 
       # Install gcloud, `setup-gcloud` automatically picks up authentication from `auth`
       - name: install gcloud
-        uses: google-github-actions/setup-gcloud@master
+        uses: google-github-actions/setup-gcloud@main
 
       - uses: actions/setup-python@v2
         with:
@@ -31,9 +33,6 @@ jobs:
 
       - name: Install
         run: pip install dist/*
-
-      - name: "Test pipelines"
-        run: python -m unittest tests/test_pipeline.py
-
-      - name: "Test metadata provider"
-        run: python -m unittest tests/test_metadata_provider.py
+   
+      - name: Test
+        run: python -m unittest tests.test_query

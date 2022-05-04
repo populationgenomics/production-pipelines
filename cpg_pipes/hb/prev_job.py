@@ -17,8 +17,9 @@ class PrevJob:
     """
     Represents a Job from a previous Batch, parsed from the Batch database with:
     BATCH=6553
-    mysql --ssl-ca=/sql-config/server-ca.pem --ssl-cert=/sql-config/client-cert.pem --ssl-key=/sql-config/client-key.pem --host=10.125.0.3 --user=root --password batch -e "SELECT j.batch_id, j.job_id, ja.key, ja.value FROM jobs as j INNER JOIN job_attributes as ja ON j.job_id = ja.job_id WHERE j.batch_id=$BATCH AND ja.batch_id=j.batch_id AND ja.key='name' AND j.state='Success';" > result.txt    
+    mysql --ssl-ca=/sql-config/server-ca.pem --ssl-cert=/sql-config/client-cert.pem --ssl-key=/sql-config/client-key.pem --host=10.125.0.3 --user=root --password batch -e "SELECT j.batch_id, j.job_id, ja.key, ja.value FROM jobs as j INNER JOIN job_attributes as ja ON j.job_id = ja.job_id WHERE j.batch_id=$BATCH AND ja.batch_id=j.batch_id AND ja.key='name' AND j.state='Success';" > result.txt
     """
+
     cpgid: str | None
     projname: str | None
     batch_number: int
@@ -30,17 +31,17 @@ class PrevJob:
 
     @staticmethod
     def parse(
-        fpath: Path, 
-        batchid: str, 
+        fpath: Path,
+        batchid: str,
         hail_bucket: Path,
     ) -> Dict[Tuple[Optional[str], str], 'PrevJob']:
         """
-        `fpath` is the path to result.txt, generated from mysql (see above), 
-        and `batchid` is a 6-letter batch ID (e.g. feb0e9 
+        `fpath` is the path to result.txt, generated from mysql (see above),
+        and `batchid` is a 6-letter batch ID (e.g. feb0e9
         in gs://cpg-seqr-main-tmp/seqr_loader/v0/hail/batch/feb0e9)
         which is not to be confused with a batch number from the URL.
 
-        Returns a dictionary of PrevJob objects indexed by a pair of optional 
+        Returns a dictionary of PrevJob objects indexed by a pair of optional
         CPG ID string (for sample-level jobs) and a job name string.
         """
         if not utils.exists(fpath):
@@ -50,8 +51,7 @@ class PrevJob:
             for line in f:
                 if 'batch_id' in line.split():
                     continue  # skip header
-                batch_number, job_number, _, jname = \
-                    line.strip().split('\t')
+                batch_number, job_number, _, jname = line.strip().split('\t')
 
                 proj_cpgid = ''
                 if ': ' in jname:

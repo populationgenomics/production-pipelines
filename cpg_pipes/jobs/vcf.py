@@ -20,7 +20,7 @@ logger = logging.getLogger(__file__)
 def subset_vcf(
     b: hb.Batch,
     vcf: hb.ResourceGroup,
-    intervals: hb.Resource,
+    interval: hb.Resource,
     refs: RefData,
     job_attrs: dict | None = None,
     output_vcf_path: Path | None = None,
@@ -42,13 +42,15 @@ def subset_vcf(
     gatk SelectVariants \\
     -R {reference.base} \\
     -V {vcf['vcf.gz']} \\
-    -L {intervals} \\
+    -L {interval} \\
     -O {j.output_vcf['vcf.gz']}
     """
-    j.command(wrap_command(
-        cmd,
-        monitor_space=True,
-    ))
+    j.command(
+        wrap_command(
+            cmd,
+            monitor_space=True,
+        )
+    )
     if output_vcf_path:
         b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
     return j
@@ -70,10 +72,12 @@ def gather_vcfs(
     j = b.new_job(job_name, job_attrs)
     if out_vcf_path and utils.can_reuse(out_vcf_path, overwrite):
         j.name += ' [reuse]'
-        return j, b.read_input_group(**{
-            'vcf.gz': str(out_vcf_path),
-            'vcf.gz.tbi': f'{out_vcf_path}.tbi',
-        })
+        return j, b.read_input_group(
+            **{
+                'vcf.gz': str(out_vcf_path),
+                'vcf.gz.tbi': f'{out_vcf_path}.tbi',
+            }
+        )
 
     j.image(images.GATK_IMAGE)
     STANDARD.set_resources(j, fraction=1)

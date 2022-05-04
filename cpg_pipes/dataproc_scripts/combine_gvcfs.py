@@ -16,6 +16,7 @@ import click
 import hail as hl
 
 from cpg_pipes.hailquery import init_hail
+from cpg_pipes.refdata import RefData
 from cpg_pipes.utils import get_validation_callback
 from cpg_pipes import utils, version
 
@@ -50,24 +51,18 @@ logger = logging.getLogger(__name__)
     'local_tmp_dir',
     help='local directory for temporary files and Hail logs (must be local).',
 )
-@click.option(
-    '--hail-billing',
-    'hail_billing',
-    help='Hail billing account ID.',
-)
 def main(
     meta_csv_path: str,
     out_mt_path: str,
     work_bucket: str,
     local_tmp_dir: str,
-    hail_billing: str,  # pylint: disable=unused-argument
 ):  # pylint: disable=missing-function-docstring
     """
     Entry point
     """
     init_hail('combine_gvcfs', Path(local_tmp_dir))
 
-    # Copy the metadata file locally    
+    # Copy the metadata file locally
     local_meta_csv_path = join(local_tmp_dir, basename(meta_csv_path))
     gsutil_cp(meta_csv_path, local_meta_csv_path)
     samples_df = pd.read_table(local_meta_csv_path)
@@ -77,7 +72,7 @@ def main(
         list(samples_df.gvcf_path),
         sample_names=list(samples_df.s),  # pylint: disable=no-member
         out_file=out_mt_path,
-        reference_genome=utils.DEFAULT_REF,
+        reference_genome=RefData.genome_build,
         use_genome_default_intervals=True,
         tmp_path=os.path.join(work_bucket, 'tmp'),
         overwrite=True,

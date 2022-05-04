@@ -60,7 +60,7 @@ def verify_bamid(
     overwrite: bool = False,
 ) -> Job:
     """
-    Run `VerifyBamID` contamination checks. 
+    Run `VerifyBamID` contamination checks.
     Based on https://github.com/broadinstitute/warp/blob/57edec5591182d120b7d288b4b409e92a6539871/tasks/broad/BamProcessing.wdl#L395
     """
     jname = 'VerifyBamID'
@@ -77,7 +77,7 @@ def verify_bamid(
     reference = refs.fasta_res_group(b)
     cont_ref_d = refs.cont_ref_d
     res_group = b.read_input_group(**{k: str(v) for k, v in cont_ref_d.items()})
-    
+
     cmd = f"""\
     # creates a *.selfSM file, a TSV file with 2 rows, 19 columns.
     # First row are the keys (e.g., SEQ_SM, RG, FREEMIX), second row are the associated values
@@ -110,7 +110,7 @@ def picard_wgs_metrics(
     read_length: int = 250,
 ) -> Job:
     """
-    Run PicardTools CollectWgsMetrics metrics. 
+    Run PicardTools CollectWgsMetrics metrics.
     Based on https://github.com/broadinstitute/warp/blob/e1ac6718efd7475ca373b7988f81e54efab608b4/tasks/broad/Qc.wdl#L444
     """
     jname = 'Picard CollectWgsMetrics'
@@ -120,7 +120,7 @@ def picard_wgs_metrics(
     if utils.can_reuse(output_path, overwrite):
         j.name += ' [reuse]'
         return j
-    
+
     j.image(images.SAMTOOLS_PICARD_IMAGE)
     res = STANDARD.set_resources(j, storage_gb=60)
     cram = cram_path.resource_group(b)

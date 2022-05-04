@@ -1,20 +1,34 @@
 #!/usr/bin/env python3
+
 """
-Create index for BWA and BWA-MEM2.
+Create indices for BWA and BWA-MEM2.
 """
 
 from textwrap import dedent
 
 import hailtop.batch as hb
-import os
+from hailtop.batch.job import Job
 
 from cpg_pipes import images
+from cpg_pipes.hb.batch import setup_batch
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.providers.cpg import CpgStorageProvider
 from cpg_pipes.refdata import RefData
 
 
-def _index_bwa_job(b: hb.Batch, refs: RefData):
+def main():
+    """
+    Create index for BWA and BWA-MEM2.
+    """
+    b = setup_batch('Create BWA index')
+    refs = RefData(CpgStorageProvider().get_ref_base())
+    j1 = _index_bwa_job(b, refs)
+    j2 = _test_bwa_job(b, refs)
+    j2.depends_on(j1)
+    b.run(wait=False)
+
+
+def _index_bwa_job(b: hb.Batch, refs: RefData) -> Job:
     reference = refs.fasta_res_group(b)
 
     j = b.new_job('Index BWA')
@@ -25,19 +39,23 @@ def _index_bwa_job(b: hb.Batch, refs: RefData):
     j.declare_resource_group(
         bwa_index={e: '{root}.' + e for e in refs.bwamem2_index_exts}
     )
-    j.command(wrap_command(f"""\
+    j.command(
+        wrap_command(
+            f"""\
     set -o pipefail
     set -ex
     
     bwa-mem2 index {reference.base} -p {j.bwa_index}
     
     df -h; pwd; ls | grep -v proc | xargs du -sh
-    """))
+    """
+        )
+    )
     b.write_output(j.bwa_index, refs.bwamem2_index_prefix)
     return j
 
 
-def _test_bwa_job(b: hb.Batch, refs: RefData):
+def _test_bwa_job(b: hb.Batch, refs: RefData) -> Job:
     bwa_reference = refs.fasta_res_group(b, refs.bwa_index_exts)
 
     fq1 = b.read_input('gs://cpg-seqr-test/batches/test/tmp_fq')
@@ -84,18 +102,5 @@ def _test_bwa_job(b: hb.Batch, refs: RefData):
     return j
 
 
-billing_project = os.getenv('HAIL_BILLING_PROJECT') or 'seqr'
-hail_bucket = os.environ.get('HAIL_BUCKET', 'cpg-seqr-test-tmp')
-print(
-    f'Starting hail Batch with the project {billing_project}, ' f'bucket {hail_bucket}'
-)
-backend = hb.ServiceBackend(
-    billing_project=billing_project,
-    bucket=hail_bucket.replace('gs://', ''),
-)
-b = hb.Batch(backend=backend, name='Create BWA index')
-refs = RefData(CpgStorageProvider().get_ref_bucket())
-j1 = _index_bwa_job(b, refs)
-j2 = _test_bwa_job(b, refs)
-j2.depends_on(j1)
-b.run(wait=False)
+if __name__ == '__main__':
+    main()

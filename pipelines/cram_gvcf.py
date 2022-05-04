@@ -8,8 +8,8 @@ import logging
 import click
 
 from cpg_pipes.pipeline import pipeline_click_options, create_pipeline
-from cpg_pipes.stages.cram import CramStage
-from cpg_pipes.stages.gvcf import GvcfStage
+from cpg_pipes.stages.align import Align
+from cpg_pipes.stages.genotype_sample import GenotypeSample
 
 logger = logging.getLogger(__file__)
 
@@ -24,11 +24,10 @@ def main(
     """
     pipeline = create_pipeline(
         name='cram_gvcf',
-        description='CRAM+GVCF',
-        stages=[CramStage, GvcfStage],
+        stages=[Align, GenotypeSample],
         **kwargs,
     )
-    pipeline.submit_batch()
+    pipeline.run()
 
 
 if __name__ == '__main__':

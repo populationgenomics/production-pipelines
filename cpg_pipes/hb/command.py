@@ -6,8 +6,9 @@ import logging
 from typing import List, Union, Callable
 import textwrap
 
+from hailtop.batch import ResourceFile
+
 from cpg_pipes import Path
-from cpg_pipes.utils import PACKAGE_DIR
 
 logger = logging.getLogger(__file__)
 
@@ -19,7 +20,7 @@ gcloud -q auth activate-service-account \
 --key-file=$GOOGLE_APPLICATION_CREDENTIALS
 """
 
-# commands that declare functions that pull files on an instance, 
+# commands that declare functions that pull files on an instance,
 # handling transitive errors
 RETRY_CMD = """\
 function fail {
@@ -68,7 +69,8 @@ EOT\
 
 
 def python_command(
-    func: Callable,
+    module,
+    func_name: str,
     *func_args,
     setup_gcp: bool = False,
     hail_billing_project: str | None = None,
@@ -100,8 +102,8 @@ asyncio.get_event_loop().run_until_complete(
 )
 """
         python_cmd += f"""
-{textwrap.dedent(inspect.getsource(func))}
-{func.__name__}{func_args}
+{textwrap.dedent(inspect.getsource(module))}
+{func_name}{func_args}
 """
     cmd = f"""
 set -o pipefail
@@ -116,7 +118,7 @@ EOT
 python3 script.py
 """
     return cmd
-    
+
 
 def wrap_command(
     command: Union[str, List[str]],
@@ -124,7 +126,7 @@ def wrap_command(
     setup_gcp: bool = False,
     define_retry_function: bool = False,
     rm_leading_space: bool = True,
-    python_script: Path | None = None,
+    python_script_path: Path | None = None,
 ) -> str:
     """
     Wraps a command for submission
@@ -133,14 +135,14 @@ def wrap_command(
     and if it does, skips running the rest of the job.
 
     @param command: command to wrap (can be a list of commands)
-    @param monitor_space: add a background process that checks the instance disk 
+    @param monitor_space: add a background process that checks the instance disk
         space every 5 minutes and prints it to the screen
     @param setup_gcp: login to GCP
-    @param define_retry_function: when set, adds bash functions `retry` that attempts 
-        to redo a command with a pause of default 30 seconds (useful to pull inputs 
+    @param define_retry_function: when set, adds bash functions `retry` that attempts
+        to redo a command with a pause of default 30 seconds (useful to pull inputs
         and get around GoogleEgressBandwidth Quota or other google quotas)
     @param rm_leading_space: remove all leading spaces and tabs from the command lines
-    @param python_script: if provided, copy this python script
+    @param python_script_path: if provided, copy this python script
     """
     if isinstance(command, list):
         command = '\n'.join(command)
@@ -172,14 +174,48 @@ def wrap_command(
 
     # We don't want the python script tabs to be stripped, so
     # we are inserting it after leadings space is removed
-    if python_script:
-        with (PACKAGE_DIR / '..' / python_script).open() as f:
+    if python_script_path:
+        with python_script_path.open() as f:
             script_contents = f.read()
-        cmd = cmd.replace('{copy_script_cmd}', ADD_SCRIPT_CMD.format(
-            script_name=python_script.name,
-            script_contents=script_contents,
-        ))
+        cmd = cmd.replace(
+            '{copy_script_cmd}',
+            ADD_SCRIPT_CMD.format(
+                script_name=python_script_path.name,
+                script_contents=script_contents,
+            ),
+        )
     else:
         cmd = cmd.replace('{copy_script_cmd}', '')
 
+    return cmd
+
+
+def seds_to_extend_sample_ids(
+    id_map: dict[str, str],
+    fnames: list[str | ResourceFile],
+) -> str:
+    """
+    Helper function to add seds into a command that would extend samples IDs
+    in each file in `fnames` with an external ID, only if external ID is
+    different from the original.
+
+    Examples:
+
+    id_map {'CPG1': 'MYID'}
+    Result: 'CPG1|MYID'
+
+    id_map {'CPG1': 'CPG1'}
+    Result: 'CPG1'
+
+    @param id_map: replace according to this map,
+    @param fnames: file names where to replace IDs.
+    @return:
+    """
+    cmd = ''
+    for sid, new_sid in id_map.items():
+        if sid != new_sid:
+            new_id = f'{sid}|{new_sid}'
+            for fname in fnames:
+                cmd += f'sed -iBAK \'s/{sid}/{new_id}/g\' {fname}'
+                cmd += '\n'
     return cmd

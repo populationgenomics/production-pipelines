@@ -30,14 +30,20 @@ giab_crams = {
     sn: CramPath(f'gs://cpg-reference/validation/giab/cram/{sn}.cram')
     for sn in ['NA12878', 'NA12891', 'NA12892']
 }
-na12878fq = [FastqPair(
-    BENCHMARK_BUCKET / 'inputs/NA12878/ERR194147_1.fastq.gz',
-    BENCHMARK_BUCKET / 'inputs/NA12878/ERR194147_2.fastq.gz',
-)]
-perth_neuro_fq = [FastqPair(
-    BENCHMARK_BUCKET / 'inputs/PERTHNEURO_FQ/HNFWKCCXY_3_181017_FD07777491_Homo-sapiens__R_170503_GINRAV_DNA_M002_R1.fastq.gz',
-    BENCHMARK_BUCKET / 'inputs/PERTHNEURO_FQ/HNFWKCCXY_3_181017_FD07777491_Homo-sapiens__R_170503_GINRAV_DNA_M002_R2.fastq.gz',
-)]
+na12878fq = [
+    FastqPair(
+        BENCHMARK_BUCKET / 'inputs/NA12878/ERR194147_1.fastq.gz',
+        BENCHMARK_BUCKET / 'inputs/NA12878/ERR194147_2.fastq.gz',
+    )
+]
+perth_neuro_fq = [
+    FastqPair(
+        BENCHMARK_BUCKET
+        / 'inputs/PERTHNEURO_FQ/HNFWKCCXY_3_181017_FD07777491_Homo-sapiens__R_170503_GINRAV_DNA_M002_R1.fastq.gz',
+        BENCHMARK_BUCKET
+        / 'inputs/PERTHNEURO_FQ/HNFWKCCXY_3_181017_FD07777491_Homo-sapiens__R_170503_GINRAV_DNA_M002_R2.fastq.gz',
+    )
+]
 perth_neuro_cram = CramPath(
     BENCHMARK_BUCKET / 'inputs/PERTHNEURO_CRAM/CPG13045.cram',
 )

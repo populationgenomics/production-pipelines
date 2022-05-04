@@ -1,25 +1,24 @@
 """
-Providers that can be overriden in specific infrastructutres.
+Providers that can be overridden in specific infrastructures.
 """
 
 from enum import Enum
 
-from .storage import Namespace, Cloud
-
 
 class InputProviderType(Enum):
-    """Available types of input prpviders"""
+    """Available types of input providers"""
+
     SMDB = 'smdb'
     CSV = 'csv'
-    NONE = 'none'
 
 
-class StoragePolicy(Enum):
+class StoragePolicyType(Enum):
     """Available storage policies"""
+
     CPG = 'cpg'
 
 
 class StatusReporterType(Enum):
     """Available types of status reporters"""
-    SMDB = 'smdb'
-    NONE = 'none'
+
+    CPG = 'cpg'

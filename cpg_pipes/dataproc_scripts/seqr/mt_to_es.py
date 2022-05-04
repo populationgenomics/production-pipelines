@@ -50,7 +50,10 @@ logger = logging.getLogger(__file__)
     'and a calculated value based on the matrix.',
 )
 @click.option(
-    '--use-spark', 'use_spark', is_flag=True, default=False,
+    '--use-spark',
+    'use_spark',
+    is_flag=True,
+    default=False,
 )
 def main(
     mt_path: str,
@@ -69,6 +72,7 @@ def main(
         hl.init(default_reference='GRCh38')
     else:
         from cpg_utils.hail import init_query_service
+
         init_query_service()
 
     if not all([es_host, es_port, es_username, es_password]):
@@ -81,7 +85,7 @@ def main(
         es_host = 'elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com'
         es_port = '9243'
         es_username = 'seqr'
-        es_password = _read_es_password()
+        es_password = read_es_password()
 
     es = HailElasticsearchClient(
         host=es_host,
@@ -92,27 +96,6 @@ def main(
     )
 
     mt = hl.read_matrix_table(mt_path)
-    
-    # Temporary fixes:
-    mt = mt.annotate_rows(
-        # AS_VQSLOD can be "Infinity" for indels , e.g.:
-        # AS_VQSLOD=30.0692,18.2979,Infinity,17.5854,42.2131,1.5013
-        # gs://cpg-seqr-main-tmp/seqr_loader/v0/AnnotateCohort/seqr_loader/checkpoints
-        # /vqsr.ht
-        # ht = hl.filter_intervals(ht, [hl.parse_locus_interval('chrX:52729395-52729396')])
-        # hl.float() correctly parses this value, however, seqr loader doesn't 
-        # recognise it, so we need to replace it with zero:
-        info=mt.info.annotate(
-            AS_VQSLOD=hl.if_else(
-                hl.is_infinite(mt.info.AS_VQSLOD),
-                0.0,
-                mt.info.AS_VQSLOD,
-            )
-        ),
-        # Seqr doesn't recognise PASS value in filters as pass, so need to remove it
-        filters=mt.filters.filter(lambda val: val != 'PASS')
-    )
-
     logger.info('Getting rows and exporting to the ES')
     row_table = elasticsearch_row(mt)
     es_shards = _mt_num_shards(mt, es_index_min_num_shards)
@@ -131,12 +114,16 @@ def elasticsearch_row(mt: hl.MatrixTable):
     Prepares the mt to export using ElasticsearchClient V02.
     - Flattens nested structs
     - drops locus and alleles key
+
+    Borrowed from:
+    https://github.com/broadinstitute/hail-elasticsearch-pipelines/blob/495f0d1b4d49542557ca5cccf98a23fc627260bf/luigi_pipeline/lib/model/seqr_mt_schema.py
     """
     # Converts a mt to the row equivalent.
     ht = mt.rows()
     # Converts nested structs into one field, e.g. {a: {b: 1}} => a.b: 1
     table = ht.drop('vep').flatten()
-    # When flattening, the table is unkeyed, which causes problems because our locus and alleles should not
+    # When flattening, the table is unkeyed, which causes problems because our locus
+    # and alleles should not
     # be normal fields. We can also re-key, but I believe this is computational?
     table = table.drop(table.locus, table.alleles)
     table.describe()
@@ -148,7 +135,7 @@ def _mt_num_shards(mt, es_index_min_num_shards):
     The greater of the user specified min shards and calculated based on the variants
     and samples
     """
-    denominator = 1.4 * 10 ** 9
+    denominator = 1.4 * 10**9
     calculated_num_shards = math.ceil((mt.count_rows() * mt.count_cols()) / denominator)
     return max(es_index_min_num_shards, calculated_num_shards)
 
@@ -159,7 +146,7 @@ def _cleanup(es, es_index, es_shards):
         es.wait_for_shard_transfer(es_index)
 
 
-def _read_es_password(
+def read_es_password(
     project_id='seqr-308602',
     secret_id='seqr-es-password',
     version_id='latest',

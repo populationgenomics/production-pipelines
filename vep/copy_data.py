@@ -2,8 +2,10 @@
 Use Hail Batch to transfer VEP reference data cpg-reference bucket.
 """
 
+import hailtop.batch as hb
+
 from cpg_pipes import images, to_path
-from cpg_pipes.hb.batch import setup_batch, Batch
+from cpg_pipes.hb.batch import setup_batch
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.providers.cpg import CpgStorageProvider
 from cpg_pipes.refdata import RefData
@@ -17,7 +19,7 @@ PREPARE_MOUNTABLE_BUCKET = False
 def main():
     """Entry point"""
     b = setup_batch('Copy VEP data')
-    refs = RefData(CpgStorageProvider().get_ref_bucket())
+    refs = RefData(CpgStorageProvider().get_ref_base())
     if MAKE_VEP_CACHE_TAR:
         _vep_cache(b, refs)
     if MAKE_LOFTEE_TAR:
@@ -30,7 +32,7 @@ def main():
     assert res_status['state'] == 'success', str((res_status, res.debug_info()))
 
 
-def _test(b: Batch, refs: RefData):
+def _test(b: hb.Batch, refs: RefData):
     j = b.new_job('Test VEP mount')
     j.image(images.VEP_IMAGE)
     # gcsfuse works only with the root bucket, without prefix:
@@ -44,9 +46,9 @@ def _test(b: Batch, refs: RefData):
     cat {vep_dir}/vep/homo_sapiens/105_GRCh38/info.txt
     """
     j.command(wrap_command(cmd))
-    
 
-def _uncompress(b: Batch, refs: RefData):
+
+def _uncompress(b: hb.Batch, refs: RefData):
     """
     Assuming tars are made and put on buckets, uncompresses them into a bucket
     to mount with gcsfuse.
@@ -77,7 +79,7 @@ def _uncompress(b: Batch, refs: RefData):
     return j
 
 
-def _vep_cache(b: Batch, refs: RefData):
+def _vep_cache(b: hb.Batch, refs: RefData):
     """
     Prepare a tarball with VEP cache.
     """
@@ -85,7 +87,7 @@ def _vep_cache(b: Batch, refs: RefData):
     j.image(images.VEP_IMAGE)
     j.storage(f'30G')
     j.cpu(16)
-    
+
     cmd = f"""\
     cd /io/batch
     
@@ -100,7 +102,7 @@ def _vep_cache(b: Batch, refs: RefData):
     return j
 
 
-def _loftee(b: Batch, refs: RefData):
+def _loftee(b: hb.Batch, refs: RefData):
     """
     Prepare a tarball with LOFTEE ref data.
     """

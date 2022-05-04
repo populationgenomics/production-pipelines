@@ -15,8 +15,7 @@ __all__ = [
 
 
 coloredlogs.install(
-    level='DEBUG', 
-    fmt='%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
+    level='DEBUG', fmt='%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
 )
 
 

@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 
 """
-Batch pipeline to load data into seqr.
+Seqr loading pipeline: FASTQ -> ElasticSearch index.
 """
 
 import logging
 import os
-import subprocess
 import time
 
 import click
-import pandas as pd
+import yaml
+from google.cloud import secretmanager
 from analysis_runner import dataproc
 
 from cpg_pipes import Path
@@ -18,46 +18,42 @@ from cpg_pipes import utils
 from cpg_pipes.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jobs
 from cpg_pipes.pipeline import (
     pipeline_click_options,
-    stage, 
-    create_pipeline, 
+    stage,
+    create_pipeline,
     StageInput,
     StageOutput,
-    CohortStage, 
-    DatasetStage
+    CohortStage,
+    DatasetStage,
 )
 from cpg_pipes.refdata import RefData
-from cpg_pipes.stages.vep import VepStage
-from cpg_pipes.stages.joint_genotyping import JointGenotypingStage
-from cpg_pipes.stages.vqsr import VqsrStage
+from cpg_pipes.stages.vep import Vep
+from cpg_pipes.stages.joint_genotyping import JointGenotyping
+from cpg_pipes.stages.vqsr import Vqsr
 from cpg_pipes.targets import Cohort, Dataset
 
 logger = logging.getLogger(__file__)
 
 
-@stage(required_stages=[JointGenotypingStage, VepStage, VqsrStage])
+@stage(required_stages=[JointGenotyping, Vep, Vqsr])
 class AnnotateCohort(CohortStage):
     """
-    Re-annotate the entire cohort. 
+    Re-annotate the entire cohort.
     """
+
     def expected_outputs(self, cohort: Cohort) -> Path:
         """
         Expected to write a matrix table.
         """
-        samples_hash = utils.hash_sample_ids(cohort.get_sample_ids())
-        return (
-            self.tmp_bucket /
-            'mt' /
-            f'{samples_hash}' /
-            'annotated-cohort.mt'
-        )
+        h = cohort.alignment_inputs_hash()
+        return cohort.analysis_dataset.get_bucket() / 'mt' / f'{h}.mt'
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        vcf_path = inputs.as_path(target=cohort, stage=JointGenotypingStage, id='vcf')
-        siteonly_vqsr_vcf_path = inputs.as_path(target=cohort, stage=VqsrStage)
-        vep_ht_path = inputs.as_path(target=cohort, stage=VepStage)
+        vcf_path = inputs.as_path(target=cohort, stage=JointGenotyping, id='vcf')
+        siteonly_vqsr_vcf_path = inputs.as_path(target=cohort, stage=Vqsr)
+        vep_ht_path = inputs.as_path(target=cohort, stage=Vep)
 
         mt_path = self.expected_outputs(cohort)
 
@@ -67,11 +63,12 @@ class AnnotateCohort(CohortStage):
             vep_ht_path=vep_ht_path,
             siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
             output_mt_path=mt_path,
-            checkpoints_bucket=self.tmp_bucket / 'seqr_loader' / 'checkpoints',
+            checkpoints_bucket=self.tmp_bucket / 'checkpoints',
             sequencing_type=cohort.get_sequencing_type(),
             hail_billing_project=self.hail_billing_project,
             hail_bucket=self.hail_bucket,
             overwrite=not self.check_intermediates,
+            job_attrs=self.get_job_attrs(),
         )
         return self.make_outputs(cohort, data=mt_path, jobs=jobs)
 
@@ -82,63 +79,64 @@ class AnnotateDataset(DatasetStage):
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
     that will be loaded into Seqr)
     """
+
     def expected_outputs(self, dataset: Dataset) -> Path:
         """
         Expected to generate a matrix table
         """
-        samples_hash = utils.hash_sample_ids(dataset.cohort.get_sample_ids())
-        return (
-            self.tmp_bucket /
-            'mt' /
-            f'{samples_hash}' /
-            f'{dataset.name}.mt'
-        )
+        h = self.cohort.alignment_inputs_hash()
+        return self.tmp_bucket / f'{h}-{dataset.name}.mt'
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateCohort)
+        mt_path = inputs.as_path(target=self.cohort, stage=AnnotateCohort)
 
         jobs = annotate_dataset_jobs(
             b=self.b,
             mt_path=mt_path,
             sample_ids=[s.id for s in dataset.get_samples()],
             output_mt_path=self.expected_outputs(dataset),
-            tmp_bucket=self.tmp_bucket / 'mt' / 'checkpoints' / dataset.name,
+            tmp_bucket=self.tmp_bucket / 'checkpoints' / dataset.name,
             hail_billing_project=self.hail_billing_project,
             hail_bucket=self.hail_bucket,
-            job_attrs=dataset.get_job_attrs(),
+            job_attrs=self.get_job_attrs(dataset),
             overwrite=not self.check_intermediates,
         )
         return self.make_outputs(
-            dataset, 
-            data=self.expected_outputs(dataset), 
-            jobs=jobs
+            dataset, data=self.expected_outputs(dataset), jobs=jobs
         )
 
 
 @stage(required_stages=[AnnotateDataset])
-class LoadToEsStage(DatasetStage):
+class LoadToEs(DatasetStage):
     """
     Create a Seqr index.
     """
+
     def expected_outputs(self, dataset: Dataset) -> None:
         """
         Expected to generate a Seqr index, which is not a file
         """
         return None
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
+        if (
+            es_datasets := self.pipeline_config.get('create_es_index_for_datasets')
+        ) and dataset.name not in es_datasets:
+            # Skipping dataset that wasn't explicitly requested to upload to ES:
+            return self.make_outputs(dataset)
+
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset)
         version = time.strftime('%Y%m%d-%H%M%S')
-        
+
         j = dataproc.hail_dataproc_job(
             self.b,
-            f'{utils.QUERY_SCRIPTS_DIR}/seqr/mt_to_es.py '
+            f'cpg_pipes/dataproc_scripts/seqr/mt_to_es.py '
             f'--mt-path {dataset_mt_path} '
             f'--es-host elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com '
             f'--es-port 9243 '
@@ -151,36 +149,50 @@ class LoadToEsStage(DatasetStage):
             packages=utils.DATAPROC_PACKAGES,
             num_secondary_workers=2,
             job_name=f'{dataset.name}: create ES index',
-            depends_on=inputs.get_jobs(),
+            depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
         )
+        j.attributes = self.get_job_attrs(dataset)
         return self.make_outputs(dataset, jobs=[j])
 
 
 def _read_es_password(
     project_id='seqr-308602',
     secret_id='seqr-es-password',
-    version_id='latest',
 ) -> str:
     """
     Read a GCP secret storing the ES password
     """
-    password = os.environ.get('SEQR_ES_PASSWORD')
-    if password:
+    if password := os.environ.get('SEQR_ES_PASSWORD'):
         return password
-    cmd = f'gcloud secrets versions access {version_id} --secret {secret_id} --project {project_id}'
-    logger.info(cmd)
-    return subprocess.check_output(cmd, shell=True).decode()
+    client = secretmanager.SecretManagerServiceClient()
+    secret_path = client.secret_version_path(project_id, secret_id, 'latest')
+    # noinspection PyTypeChecker
+    response = client.access_secret_version(request={'name': secret_path})
+    return response.payload.data.decode('UTF-8')
 
 
 @click.command()
+@click.option(
+    '--es-dataset',
+    'create_es_index_for_datasets',
+    multiple=True,
+    help=f'Create Seqr ElasticSearch indices for these datasets.',
+)
 @click.option(
     '--hc-intervals-num',
     'hc_intervals_num',
     type=click.INT,
     default=RefData.number_of_haplotype_caller_intervals,
     help='Number of intervals to devide the genome for sample genotyping with '
-         'gatk HaplotypeCaller',
+    'gatk HaplotypeCaller',
+)
+@click.option(
+    '--realignment-shards-num',
+    'realignment_shards_num',
+    type=click.INT,
+    default=RefData.number_of_shards_for_realignment,
+    help='Number of shards to parallelise realignment',
 )
 @click.option(
     '--jc-intervals-num',
@@ -213,13 +225,15 @@ def _read_es_password(
 @click.option(
     '--exome-bed',
     'exome_bed',
-    type=str,
     help=f'BED file with exome regions',
 )
 @pipeline_click_options
 def main(
+    datasets: list[str],
+    create_es_index_for_datasets: list[str],
     hc_intervals_num: int,
     jc_intervals_num: int,
+    realignment_shards_num: int,
     use_gnarly: bool,
     use_as_vqsr: bool,
     ped_checks: bool,
@@ -227,22 +241,46 @@ def main(
     **kwargs,
 ):
     """
-    Entry point, decorated by pipeline click options.
+    Seqr loading pipeline: FASTQ -> ElasticSearch index.
     """
+    if not datasets:
+        # Parsing dataset names from the analysis-runner Seqr stack:
+        from urllib import request
+
+        seqr_stack_url = (
+            'https://raw.githubusercontent.com/populationgenomics/analysis-runner/main'
+            '/stack/Pulumi.seqr.yaml'
+        )
+        with request.urlopen(seqr_stack_url) as f:
+            value = yaml.safe_load(f)['config']['datasets:depends_on']
+            datasets = [d.strip('"') for d in value.strip('[] ').split(', ')]
+
+    description = 'Seqr Loader'
+    if v := kwargs.get('version'):
+        description += f', {v}'
+    input_datasets = set(datasets) - set(kwargs.get('skip_datasets', []))
+    description += f': [{", ".join(sorted(input_datasets))}]'
+    if create_es_index_for_datasets:
+        description += f' → [{", ".join(sorted(create_es_index_for_datasets))}]'
+
+    kwargs['analysis_dataset'] = 'seqr'
     pipeline = create_pipeline(
-        name='seqr_loader',
-        description='Seqr loader',
+        name='Seqr Loader',
+        description=description,
+        datasets=datasets,
         config=dict(
             ped_checks=ped_checks,
             hc_intervals_num=hc_intervals_num,
             jc_intervals_num=jc_intervals_num,
+            realignment_shards_num=realignment_shards_num,
             use_gnarly=use_gnarly,
             use_as_vqsr=use_as_vqsr,
             exome_bed=exome_bed,
+            create_es_index_for_datasets=create_es_index_for_datasets,
         ),
         **kwargs,
     )
-    pipeline.submit_batch()
+    pipeline.run()
 
 
 if __name__ == '__main__':

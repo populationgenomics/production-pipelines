@@ -35,11 +35,7 @@ def main():  # pylint: disable=missing-function-docstring
     }
 
     for sample_name, inp in inputs.items():
-        prefix = (
-            to_path(benchmark.BENCHMARK_BUCKET) / 
-            'outputs' /
-            'fastqc'
-        )
+        prefix = to_path(benchmark.BENCHMARK_BUCKET) / 'outputs' / 'fastqc'
         fastqc(
             pipe.b,
             output_html_path=prefix / f'{sample_name}.html',
@@ -47,8 +43,8 @@ def main():  # pylint: disable=missing-function-docstring
             alignment_input=inp,
             refs=pipe.refs,
         )
-    
-    pipe.submit_batch()
+
+    pipe.run()
 
 
 if __name__ == '__main__':

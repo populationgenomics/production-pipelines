@@ -15,7 +15,7 @@ logger = logging.getLogger(__file__)
 
 
 @stage
-class CramSomalierStage(SampleStage):
+class CramSomalier(SampleStage):
     """
     Genereate fingerprints from CRAMs for pedigree checks.
     """
@@ -26,7 +26,7 @@ class CramSomalierStage(SampleStage):
         """
         return sample.get_cram_path().somalier_path
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
         Using a function from the `jobs` module.
         """
@@ -35,16 +35,16 @@ class CramSomalierStage(SampleStage):
         expected_path = self.expected_outputs(sample)
         j = somalier.extact_job(
             b=self.b,
-            sample=sample,
             gvcf_or_cram_or_bam_path=cram_path,
             out_fpath=expected_path,
             overwrite=not self.check_intermediates,
             refs=self.refs,
+            job_attrs=self.get_job_attrs(sample),
         )
         return self.make_outputs(sample, data=expected_path, jobs=[j])
 
 
-@stage(required_stages=CramSomalierStage)
+@stage(required_stages=CramSomalier, forced=True)
 class CramSomalierPedigree(DatasetStage):
     """
     Checks pedigree from CRAM fingerprints.
@@ -60,7 +60,7 @@ class CramSomalierPedigree(DatasetStage):
         .yaml#L472-L481
         """
 
-        prefix = dataset.get_analysis_bucket() / 'somalier'
+        prefix = dataset.get_bucket() / 'somalier' / dataset.alignment_inputs_hash()
         return {
             'samples': prefix / f'{dataset.name}.samples.tsv',
             'pairs': prefix / f'{dataset.name}.pairs.tsv',
@@ -68,12 +68,12 @@ class CramSomalierPedigree(DatasetStage):
             'checks': prefix / f'{dataset.name}-checks.done',
         }
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
         Checks calls job from the pedigree module
         """
         fp_by_sid = {
-            s.id: inputs.as_path(stage=CramSomalierStage, target=s)
+            s.id: inputs.as_path(stage=CramSomalier, target=s)
             for s in dataset.get_samples()
         }
 
@@ -94,13 +94,15 @@ class CramSomalierPedigree(DatasetStage):
             out_html_url=html_url,
             out_checks_path=self.expected_outputs(dataset)['checks'],
             refs=self.refs,
+            job_attrs=self.get_job_attrs(dataset),
+            status_reporter=self.status_reporter,
         )
         return self.make_outputs(
             dataset, data=self.expected_outputs(dataset), jobs=jobs
         )
 
 
-@stage(required_stages=CramSomalierStage)
+@stage(required_stages=CramSomalier, forced=True)
 class CramSomalierAncestry(DatasetStage):
     """
     Checks pedigree from CRAM fingerprints
@@ -115,18 +117,18 @@ class CramSomalierAncestry(DatasetStage):
         .yaml#L472-L481
         """
 
-        prefix = dataset.get_analysis_bucket() / 'ancestry'
+        prefix = dataset.get_bucket() / 'ancestry' / dataset.alignment_inputs_hash()
         return {
             'tsv': prefix / f'{dataset.name}.somalier-ancestry.tsv',
             'html': dataset.get_web_bucket() / 'somalier-ancestry.html',
         }
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
         Checks calls job from the pedigree module
         """
         fp_by_sid = {
-            s.id: inputs.as_path(stage=CramSomalierStage, target=s)
+            s.id: inputs.as_path(stage=CramSomalier, target=s)
             for s in dataset.get_samples()
         }
 
@@ -145,5 +147,7 @@ class CramSomalierAncestry(DatasetStage):
             out_html_path=html_path,
             out_html_url=html_url,
             refs=self.refs,
+            job_attrs=self.get_job_attrs(dataset),
+            status_reporter=self.status_reporter,
         )
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])

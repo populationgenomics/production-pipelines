@@ -21,14 +21,15 @@ logger = logging.getLogger(__file__)
 def produce_gvcf(
     b: hb.Batch,
     sample_name: str,
-    sequencing_type: SequencingType,
     tmp_bucket: Path,
     cram_path: CramPath,
     refs: RefData,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
-    number_of_intervals: int = 1,
+    scatter_count: int | None = RefData.number_of_haplotype_caller_intervals,
     intervals: list[hb.Resource] | None = None,
+    sequencing_type: SequencingType = SequencingType.GENOME,
+    intervals_path: Path | None = None,
     overwrite: bool = False,
     dragen_mode: bool = False,
 ) -> list[Job]:
@@ -43,22 +44,22 @@ def produce_gvcf(
         return [b.new_job('Make GVCF [reuse]', job_attrs)]
 
     hc_gvcf_path = tmp_bucket / 'haplotypecaller' / f'{sample_name}.g.vcf.gz'
+    scatter_count = scatter_count or RefData.number_of_haplotype_caller_intervals
 
     jobs = haplotype_caller(
         b=b,
         sample_name=sample_name,
-        sequencing_type=sequencing_type,
         refs=refs,
         job_attrs=job_attrs,
         output_path=hc_gvcf_path,
-        tmp_bucket=tmp_bucket,
         cram_path=cram_path,
-        number_of_intervals=number_of_intervals,
+        scatter_count=scatter_count,
         intervals=intervals,
+        sequencing_type=sequencing_type,
+        intervals_path=intervals_path,
         overwrite=overwrite,
         dragen_mode=dragen_mode,
     )
-
     postproc_j = postproc_gvcf(
         b=b,
         gvcf_path=GvcfPath(hc_gvcf_path),
@@ -69,57 +70,60 @@ def produce_gvcf(
         overwrite=overwrite,
     )
     postproc_j.depends_on(*jobs)
-    
     return jobs + [postproc_j]
 
 
 def haplotype_caller(
     b: hb.Batch,
     sample_name: str,
-    sequencing_type: SequencingType,
-    tmp_bucket: Path,
     cram_path: CramPath,
     refs: RefData,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
-    number_of_intervals: int = 1,
+    scatter_count: int | None = RefData.number_of_haplotype_caller_intervals,
     intervals: list[hb.Resource] | None = None,
+    sequencing_type: SequencingType = SequencingType.GENOME,
+    intervals_path: Path | None = None,
     overwrite: bool = True,
     dragen_mode: bool = False,
 ) -> list[Job]:
     """
-    Run haplotype caller in parallel sharded by intervals. 
+    Run haplotype caller in parallel sharded by intervals.
     Returns jobs and path to the output GVCF file.
     """
     if utils.can_reuse(output_path, overwrite):
         return [b.new_job('HaplotypeCaller [reuse]', job_attrs)]
 
+    scatter_count = scatter_count or RefData.number_of_haplotype_caller_intervals
     jobs: list[Job] = []
-    if number_of_intervals > 1:
+    if scatter_count > 1:
         if intervals is None:
             intervals_j, intervals = split_intervals.get_intervals(
                 b=b,
                 refs=refs,
+                intervals_path=intervals_path,
                 sequencing_type=sequencing_type,
-                scatter_count=number_of_intervals,
-                cache=True,
+                scatter_count=scatter_count,
             )
             jobs.append(intervals_j)
+        else:
+            scatter_count = len(intervals)
 
         hc_jobs = []
         # Splitting variant calling by intervals
-        for idx in range(number_of_intervals):
+        for idx in range(scatter_count):
             j = _haplotype_caller_one(
                 b,
                 sample_name=sample_name,
                 cram_path=cram_path,
                 refs=refs,
-                job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{number_of_intervals}'),
+                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
                 interval=intervals[idx],
                 dragen_mode=dragen_mode,
                 overwrite=overwrite,
             )
             hc_jobs.append(j)
+        jobs.extend(hc_jobs)
         merge_j = merge_gvcfs_job(
             b=b,
             sample_name=sample_name,
@@ -128,7 +132,7 @@ def haplotype_caller(
             out_gvcf_path=output_path,
             overwrite=overwrite,
         )
-        jobs.extend(jobs + [merge_j])
+        jobs.append(merge_j)
     else:
         hc_j = _haplotype_caller_one(
             b,
@@ -159,7 +163,7 @@ def _haplotype_caller_one(
     Add one HaplotypeCaller job on an interval
     """
     job_name = 'HaplotypeCaller'
-    j = b.new_job(job_name, job_attrs)
+    j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk_HaplotypeCaller'))
     if utils.can_reuse(out_gvcf_path, overwrite):
         j.name += ' [reuse]'
         return j
@@ -182,7 +186,7 @@ def _haplotype_caller_one(
     )
 
     reference = refs.fasta_res_group(b)
-    
+
     cmd = f"""\
     CRAM=/io/batch/{sample_name}.cram
     CRAI=/io/batch/{sample_name}.cram.crai
@@ -209,9 +213,11 @@ def _haplotype_caller_one(
     -ERC GVCF \\
     --create-output-variant-index
     """
-    j.command(wrap_command(
-        cmd, monitor_space=True, setup_gcp=True, define_retry_function=True
-    ))
+    j.command(
+        wrap_command(
+            cmd, monitor_space=True, setup_gcp=True, define_retry_function=True
+        )
+    )
     if out_gvcf_path:
         b.write_output(j.output_gvcf, str(out_gvcf_path).replace('.g.vcf.gz', ''))
     return j
@@ -229,7 +235,7 @@ def merge_gvcfs_job(
     Combine by-interval GVCFs into a single sample GVCF file
     """
     job_name = f'Merge {len(gvcfs)} GVCFs'
-    j = b.new_job(job_name, job_attrs)
+    j = b.new_job(job_name, (job_attrs or {}) | dict(tool='picard_MergeVcfs'))
     if utils.can_reuse(out_gvcf_path, overwrite):
         j.name += ' [reuse]'
         return j
@@ -275,18 +281,19 @@ def postproc_gvcf(
        from Hail about mismatched INFO annotations
     4. Renames the GVCF sample name to use CPG ID.
     """
+    jname = 'Postproc GVCF'
     if utils.can_reuse(output_path, overwrite):
-        return b.new_job('Postproc GVCF [reuse]', job_attrs)
+        return b.new_job(jname + ' [reuse]', job_attrs)
 
     logger.info(f'Adding GVCF postproc job for sample {sample_name}, gvcf {gvcf_path}')
 
-    j = b.new_job(f'ReblockGVCF', job_attrs)
+    j = b.new_job(jname, (job_attrs or {}) | dict(tool='gatk_ReblockGVCF'))
     j.image(images.GATK_IMAGE)
 
     # Enough to fit a pre-reblocked GVCF, which can be as big as 10G,
-    # the reblocked result (1G), and ref data (5G). 
+    # the reblocked result (1G), and ref data (5G).
     # We need at least 2 CPU, so on 16-core instance it would be 8 jobs,
-    # meaning we have more than enough disk (265/8=33.125G). 
+    # meaning we have more than enough disk (265/8=33.125G).
     job_res = STANDARD.set_resources(j, storage_gb=20)
 
     j.declare_resource_group(
@@ -338,9 +345,11 @@ def postproc_gvcf(
 
     tabix -p vcf {j.output_gvcf['g.vcf.gz']}
     """
-    j.command(wrap_command(
-        cmd, setup_gcp=True, monitor_space=True, define_retry_function=True
-    ))
+    j.command(
+        wrap_command(
+            cmd, setup_gcp=True, monitor_space=True, define_retry_function=True
+        )
+    )
     if output_path:
         b.write_output(j.output_gvcf, str(output_path).replace('.g.vcf.gz', ''))
     if depends_on:

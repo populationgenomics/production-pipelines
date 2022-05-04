@@ -3,59 +3,252 @@
 """
 Generate data for unit tests
 """
+from typing import cast
 
-from cpg_pipes import images, Namespace
+from hailtop.batch import Batch
+from hailtop.batch.job import Job
+
+from cpg_pipes import images, Namespace, Path
+from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.jobs.align import extract_fastq
 from cpg_pipes.pipeline import create_pipeline
-from .utils import DATASET, SAMPLES, FULL_GVCF_BY_SID, SUBSET_GVCF_BY_SID, setup_env
+from cpg_pipes.pipeline.pipeline import Pipeline
+from cpg_pipes.types import SequencingType, CramPath
+
+import utils
 
 
-def make_gvcfs():
+def main():
     """
-    Subset GVCFs to chr20 for joint-calling
+    Generate data for unit tests
     """
-    setup_env()
-    
+    utils.setup_env()
     pipeline = create_pipeline(
         name='make_test_data',
         description='Make test data',
-        analysis_dataset=DATASET,
-        version='v0',
+        analysis_dataset=utils.DATASET,
         namespace=Namespace.TEST,
     )
+    # make_subset_crams(pipeline)
+    # make_gvcfs_for_joint_calling(pipeline)
+    # jointcalling_vcf_to_exome(pipeline)
+    jointcalling_vcf_to_sub_exome(pipeline, fraction=0.001)
 
-    jobs = []
-    
-    p = pipeline.cohort.add_dataset(DATASET)
+
+def make_subset_crams(pipeline: Pipeline):
+    """
+    Make toy CRAMs that span entire genome (not just chr20), but are small:
+    1. Take WGS CRAMs
+    2. Randomly select 1% of exome regions
+    3. Reduce the coverage to 1% of original, write CRAMs
+    4. Extract FASTQ pairs
+
+    For alignment testing.
+    """
+    b = pipeline.b
+    d = pipeline.cohort.create_dataset(utils.DATASET)
     samples = [
-        p.add_sample(sid, external_id=sid) for sid in SAMPLES
-    ]
-    for s in samples:
-        subset_j = pipeline.b.new_job(
-            'Subset GVCF', dict(sample_name=s.id)
+        d.add_sample(
+            sid, external_id=sid, alignment_input=CramPath(utils.FULL_CRAM_BY_SID[sid])
         )
-        subset_j.image(images.BCFTOOLS_IMAGE)
-        inp_gvcf = pipeline.b.read_input_group(**{
-            'g.vcf.gz': FULL_GVCF_BY_SID[s.id],
-            'g.vcf.gz.tbi': FULL_GVCF_BY_SID[s.id] + '.tbi',
-        })
-        subset_j.declare_resource_group(
-            output_gvcf={
-                'g.vcf.gz': '{root}-' + s.id + '.g.vcf.gz',
-                'g.vcf.gz.tbi': '{root}-' + s.id + '.g.vcf.gz.tbi',
+        for sid in utils.SAMPLES
+    ]
+
+    refs = pipeline.refs
+
+    intervals_j = pipeline.b.new_job('Make toy intervals: 1% of exome')
+    in_intervals = b.read_input(str(refs.calling_interval_lists[SequencingType.EXOME]))
+    intervals_j.command(
+        f"""
+    grep ^@ {in_intervals} > {intervals_j.out}
+    grep -v ^@  {in_intervals} \
+    | awk 'BEGIN {{srand()}} !/^$/ {{ if (rand() <= .01) print $0 }}' \
+    >> {intervals_j.out}
+    """
+    )
+
+    fasta = refs.fasta_res_group(b)
+    for s in samples:
+        cram_j = b.new_job('Subset CRAM', s.get_job_attrs())
+        cram_j.depends_on(intervals_j)
+        cram_j.image(images.SAMTOOLS_PICARD_IMAGE)
+        nthreads = STANDARD.set_resources(cram_j, fraction=0.5).get_nthreads()
+        cram = cast(CramPath, s.alignment_input).resource_group(b)
+
+        cram_j.declare_resource_group(
+            output_cram={
+                'cram': '{root}.cram',
+                'cram.crai': '{root}.cram.crai',
             }
         )
-        subset_j.command(f"""
-            bcftools view -r chr20 {inp_gvcf['g.vcf.gz']} \\
-            -Oz -o {subset_j.output_gvcf['g.vcf.gz']}
-            tabix -p vcf {subset_j.output_gvcf['g.vcf.gz']}
-        """)
-        pipeline.b.write_output(
-            subset_j.output_gvcf,
-            SUBSET_GVCF_BY_SID[s.id].replace('.g.vcf.gz', '')
+
+        cram_j.command(
+            f"""
+        grep -v ^@ {intervals_j.out} > regions.bed
+        
+        samtools view {cram.cram} -@{nthreads - 1} \
+        -L regions.bed --subsample 0.1 \
+        -T {fasta.base} -Ocram -o {cram_j.output_cram.cram}
+        
+        samtools index -@{nthreads - 1} {cram_j.output_cram.cram} \
+        {cram_j.output_cram['cram.crai']}
+        """
         )
-        jobs.append(subset_j)
-    
-    pipeline.submit_batch(wait=True)     
+        b.write_output(
+            cram_j.output_cram, str(utils.TOY_CRAM_BY_SID[s.id]).replace('.cram', '')
+        )
+
+        fastq_j = extract_fastq(
+            b=b,
+            cram=cram_j.output_cram,
+            ext='cram',
+            refs=refs,
+            job_attrs=s.get_job_attrs(),
+            output_fq1=utils.TOY_FQ_BY_SID[s.id].r1,
+            output_fq2=utils.TOY_FQ_BY_SID[s.id].r2,
+        )
+        fastq_j.depends_on(cram_j)
+
+    pipeline.run(wait=True)
 
 
-make_gvcfs()
+def make_gvcfs_for_joint_calling(pipeline, pct=1):
+    """
+    Subset GVCFs to {pct}% of exome for joint-calling test.
+    """
+
+    b = pipeline.b
+    refs = pipeline.refs
+
+    intervals_j = pipeline.b.new_job(f'Make toy intervals: {pct}% of exome')
+    in_intervals = b.read_input(str(refs.calling_interval_lists[SequencingType.EXOME]))
+    intervals_j.command(
+        f"""
+    grep ^@ {in_intervals} > {intervals_j.out}
+    grep -v ^@  {in_intervals} \
+    | awk 'BEGIN {{srand()}} !/^$/ {{ if (rand() <= {pct / 100}) print $0 }}' \
+    >> {intervals_j.out}
+    """
+    )
+    out_intervals_path = (
+        utils.BASE_BUCKET / f'inputs/exome{pct}pct/calling_regions.interval_list'
+    )
+    b.write_output(intervals_j.out, str(out_intervals_path))
+
+    d = pipeline.cohort.create_dataset(utils.DATASET)
+    samples = [d.add_sample(sid, external_id=sid) for sid in utils.SAMPLES]
+    for s in samples:
+        _subset_vcf(
+            b,
+            utils.FULL_GVCF_BY_SID[s.id],
+            out_intervals_path,
+            utils.EXOME_1PCT_GVCF_BY_SID[s.id],
+        )
+
+    pipeline.run(wait=True)
+
+
+def jointcalling_vcf_to_exome(pipeline):
+    """
+    Subset joint-calling VCF to exome.
+    """
+    b = pipeline.b
+    refs = pipeline.refs
+
+    # Subsetting full to exomes
+    _subset_vcf(
+        b,
+        utils.BASE_BUCKET / 'inputs/full/9samples-joint-called.vcf.gz',
+        refs.calling_interval_lists[SequencingType.EXOME],
+        utils.BASE_BUCKET / 'inputs/exome/9samples-joint-called.vcf.gz',
+    )
+    _subset_vcf(
+        b,
+        utils.BASE_BUCKET / 'inputs/full/9samples-joint-called-siteonly.vcf.gz',
+        refs.calling_interval_lists[SequencingType.EXOME],
+        utils.BASE_BUCKET / 'inputs/exome/9samples-joint-called-siteonly.vcf.gz',
+    )
+    pipeline.run(wait=True)
+
+
+def jointcalling_vcf_to_sub_exome(pipeline, fraction=0.05):
+    """
+    Subset joint-calling VCF to a fraction of exome.
+    """
+    b = pipeline.b
+    refs = pipeline.refs
+
+    intervals_j = pipeline.b.new_job(f'Make toy intervals: {fraction} of exome')
+    in_intervals = b.read_input(str(refs.calling_interval_lists[SequencingType.EXOME]))
+    intervals_j.command(
+        f"""
+    grep ^@ {in_intervals} > {intervals_j.out}
+    grep -v ^@  {in_intervals} \
+    | awk 'BEGIN {{srand()}} !/^$/ {{ if (rand() <= {fraction}) print $0 }}' \
+    >> {intervals_j.out}
+    """
+    )
+    pct = fraction * 100
+    out_intervals_path = (
+        utils.BASE_BUCKET / f'inputs/exome{pct}pct/calling_regions.interval_list'
+    )
+    b.write_output(intervals_j.out, str(out_intervals_path))
+
+    _subset_vcf(
+        b,
+        utils.BASE_BUCKET / 'inputs/exome/9samples-joint-called.vcf.gz',
+        out_intervals_path,
+        utils.BASE_BUCKET / f'inputs/exome{pct}pct/9samples-joint-called.vcf.gz',
+    )
+    _subset_vcf(
+        b,
+        utils.BASE_BUCKET / 'inputs/exome/9samples-joint-called-siteonly.vcf.gz',
+        out_intervals_path,
+        utils.BASE_BUCKET
+        / f'inputs/exome{pct}pct/9samples-joint-called-siteonly.vcf.gz',
+    )
+    pipeline.run(wait=True)
+
+
+def _subset_vcf(
+    b: Batch,
+    vcf_path: Path,
+    intervals_path: Path,
+    out_path: Path,
+) -> Job:
+    """
+    Make job that subsets VCF or GVCF to intervals.
+    """
+    intervals = b.read_input(str(intervals_path))
+
+    j = b.new_job(f'Subset VCF {vcf_path} -> {out_path}')
+    j.image(images.BCFTOOLS_IMAGE)
+
+    vcf = b.read_input_group(
+        **{
+            'vcf.gz': str(vcf_path),
+            'vcf.gz.tbi': str(vcf_path) + '.tbi',
+        }
+    )
+    j.declare_resource_group(
+        out_vcf={
+            'vcf.gz': '{root}.vcf.gz',
+            'vcf.gz.tbi': '{root}.vcf.gz.tbi',
+        }
+    )
+    j.command(
+        f"""
+        grep -v ^@ {intervals} > regions.bed
+
+        bcftools view -R regions.bed {vcf['vcf.gz']} \\
+        -Oz -o {j.out_vcf['vcf.gz']}
+        tabix -p vcf {j.out_vcf['vcf.gz']}
+        """
+    )
+    STANDARD.set_resources(j, fraction=0.5)
+    b.write_output(j.out_vcf, str(out_path).replace('.vcf.gz', ''))
+    return j
+
+
+if __name__ == '__main__':
+    main()

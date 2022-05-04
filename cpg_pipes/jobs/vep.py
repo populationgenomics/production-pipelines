@@ -8,14 +8,14 @@ from typing import Literal
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
+from hailtop.batch import Batch
 
 from cpg_pipes import images, utils, Path, to_path
-from cpg_pipes.hb.batch import Batch
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.hb.command import wrap_command, python_command
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs, subset_vcf
-from cpg_pipes.query.vep import vep_json_to_ht
+from cpg_pipes.query import vep as vep_module
 from cpg_pipes.refdata import RefData
 from cpg_pipes.types import SequencingType
 
@@ -23,17 +23,18 @@ from cpg_pipes.types import SequencingType
 logger = logging.getLogger(__file__)
 
 
-def vep(
+def vep_jobs(
     b: Batch,
     vcf_path: Path,
     refs: RefData,
-    sequencing_type: SequencingType,
     hail_billing_project: str,
     hail_bucket: Path,
     tmp_bucket: Path,
     out_path: Path | None = None,
     overwrite: bool = False,
-    scatter_count: int | None = None,
+    scatter_count: int | None = RefData.number_of_vep_intervals,
+    sequencing_type: SequencingType = SequencingType.GENOME,
+    intervals_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """
@@ -47,16 +48,17 @@ def vep(
     if out_path and utils.can_reuse(out_path, overwrite):
         return [b.new_job('VEP [reuse]', job_attrs)]
 
-    scatter_count = scatter_count or RefData.number_of_joint_calling_intervals
+    scatter_count = scatter_count or RefData.number_of_vep_intervals
     jobs: list[Job] = []
     intervals_j, intervals = split_intervals.get_intervals(
         b=b,
         refs=refs,
         sequencing_type=sequencing_type,
+        intervals_path=intervals_path,
         scatter_count=scatter_count,
     )
     jobs.append(intervals_j)
-    
+
     vcf = b.read_input_group(
         **{'vcf.gz': str(vcf_path), 'vcf.gz.tbi': str(vcf_path) + '.tbi'}
     )
@@ -69,9 +71,9 @@ def vep(
         subset_j = subset_vcf(
             b,
             vcf=vcf,
-            intervals=intervals[idx],
+            interval=intervals[idx],
             refs=refs,
-            job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}'),
+            job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
         jobs.append(subset_j)
         if to_hail_table:
@@ -85,7 +87,8 @@ def vep(
             out_format='json' if to_hail_table else 'vcf',
             out_path=part_path,
             refs=refs,
-            job_attrs=(job_attrs or {}) | dict(intervals=f'{idx + 1}/{scatter_count}'),
+            job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
+            overwrite=overwrite,
         )
         jobs.append(j)
         if to_hail_table:
@@ -129,7 +132,8 @@ def gather_vep_json_to_ht(
     j = b.new_job('VEP json to Hail table', job_attrs)
     j.image(images.DRIVER_IMAGE)
     cmd = python_command(
-        vep_json_to_ht,
+        vep_module,
+        vep_module.vep_json_to_ht.__name__,
         [str(p) for p in vep_results_paths],
         str(out_path),
         setup_gcp=True,
@@ -155,7 +159,7 @@ def vep_one(
     """
     j = b.new_job('VEP', job_attrs)
     if out_path and utils.can_reuse(out_path, overwrite):
-        j += ' [reuse]'
+        j.name += ' [reuse]'
         return j
 
     j.image(images.VEP_IMAGE)
@@ -208,12 +212,13 @@ def vep_one(
     if out_format == 'vcf':
         cmd += f'tabix -p vcf {output}'
 
-    j.command(wrap_command(
-        cmd, 
-        setup_gcp=True, 
-        monitor_space=True, 
-        define_retry_function=True
-    ))
+    j.command(
+        wrap_command(
+            cmd,
+            setup_gcp=True,
+            monitor_space=True,
+        )
+    )
     if out_path:
         b.write_output(j.output, str(out_path).replace('.vcf.gz', ''))
     return j

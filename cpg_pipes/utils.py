@@ -2,24 +2,21 @@
 Utility functions and constants.
 """
 
-import hashlib
 import logging
 import os
 import sys
-import time
 import traceback
-
 import click
 from typing import Any, Callable, cast
 
-from . import Path, to_path, get_package_path
+from . import Path, to_path
 
 logger = logging.getLogger(__file__)
 
 # Packages to install on a dataproc cluster, to use with the dataproc wrapper.
 DATAPROC_PACKAGES = [
     'cpg_pipes==0.3.0',
-    'cpg_gnomad',   # github.com/populationgenomics/gnomad_methods
+    'cpg_gnomad',  # github.com/populationgenomics/gnomad_methods
     'seqr_loader==1.2.5',  # hail-elasticsearch-pipelines
     'elasticsearch==8.1.1',
     'cpg_utils',
@@ -30,15 +27,6 @@ DATAPROC_PACKAGES = [
     'gcloud',
     'selenium',
 ]
-
-# Location of python scripts to be called directly from command line.
-SCRIPTS_DIR = to_path('scripts')
-
-# Location of Hail Query scripts, to use with the dataproc wrapper.
-QUERY_SCRIPTS_DIR = to_path('query_scripts')
-
-# This python package name.
-PACKAGE_DIR = get_package_path()
 
 
 def get_validation_callback(
@@ -54,6 +42,7 @@ def get_validation_callback(
     with a different suffix also exists (e.g. genomes.mt and genomes.metadata.ht)
     @return: a callback suitable for Click parameter initialization
     """
+
     def _callback(_: click.Context, param: click.Option, value: Any):
         if value is None:
             return value
@@ -78,50 +67,8 @@ def get_validation_callback(
                         f'exist'
                     )
         return value
+
     return _callback
-
-
-def safe_mkdir(dirpath: Path, descriptive_name: str = '') -> Path:
-    """
-    Multiprocessing-safely and recursively creates a directory
-    """
-    if not dirpath:
-        sys.stderr.write(
-            f'Path is empty: {descriptive_name if descriptive_name else ""}\n'
-        )
-
-    if dirpath.is_dir():
-        return dirpath
-
-    if dirpath.is_file():
-        sys.stderr.write(f'{descriptive_name} {dirpath} is a file.\n')
-
-    num_tries = 0
-    max_tries = 10
-
-    while not dirpath.exists():
-        # we could get an error here if multiple processes are creating
-        # the directory at the same time. Grr, concurrency.
-        try:
-            os.makedirs(str(dirpath))
-        except OSError:
-            if num_tries > max_tries:
-                raise
-            num_tries += 1
-            time.sleep(2)
-    return dirpath
-
-
-def hash_sample_ids(sample_names: list[str]) -> str:
-    """
-    Return a unique hash string from a set of strings
-    @param sample_names: set of strings
-    @return: a string hash
-    """
-    for sn in sample_names:
-        assert ' ' not in sn, sn
-    h = hashlib.sha256(' '.join(sorted(sample_names)).encode()).hexdigest()[:38]
-    return f'{h}_{len(sample_names)}'
 
 
 def exists(path: Path | str, verbose: bool = True) -> bool:
