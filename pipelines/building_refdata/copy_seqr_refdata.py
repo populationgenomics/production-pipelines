@@ -18,7 +18,7 @@ dst_seqr_bucket = 'gs://cpg-reference/seqr'
 
 def main():
     b = setup_batch(
-        description='Copy reference data',
+        description='Copy seqr reference data',
         billing_project=os.environ['HAIL_BILLING_PROJECT'],
         hail_bucket=to_path('gs://cpg-reference/hail-tmp'),
     )
@@ -26,7 +26,7 @@ def main():
     j = b.new_job('Copy reference data')
     j.image(os.environ['CPG_DRIVER_IMAGE'])
     cmd = f"""
-    gsutil -q rm -rf {dst_seqr_bucket}
+    # gsutil -q rm -rf {dst_seqr_bucket}
     gsutil -q cp -r {src_referen_path} {dst_seqr_bucket}/
     gsutil -q cp -r {src_clinvar_path} {dst_seqr_bucket}/
     """
