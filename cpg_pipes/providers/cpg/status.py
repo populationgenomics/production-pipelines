@@ -36,7 +36,7 @@ class CpgStatusReporter(StatusReporter):
         self.slack_channel = slack_channel or os.environ.get('CPG_SLACK_CHANNEL')
         self.slack_token = os.environ.get('CPG_SLACK_TOKEN')
         if self.slack_channel and not self.slack_token:
-            project_id = 'cpg-common'
+            project_id = 'seqr-308602'
             secret_name = 'slack-seqr-loader-token'
             slack_token_secret = (
                 f'projects/{project_id}/secrets/{secret_name}/versions/latest'
