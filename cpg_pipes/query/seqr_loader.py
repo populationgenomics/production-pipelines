@@ -1,5 +1,5 @@
 """
-Hail query functions for seqr loader.
+Hail Query functions for seqr loader.
 """
 
 import logging

@@ -62,6 +62,7 @@ def gather_vcfs(
     overwrite: bool = True,
     out_vcf_path: Path | None = None,
     site_only: bool = False,
+    gvcf_count: int | None = None,
     job_attrs: dict | None = None,
 ) -> Tuple[Job, hb.ResourceGroup]:
     """
@@ -70,6 +71,8 @@ def gather_vcfs(
     """
     job_name = f'Gather {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
     j = b.new_job(job_name, job_attrs)
+    j.image(images.GATK_IMAGE)
+
     if out_vcf_path and utils.can_reuse(out_vcf_path, overwrite):
         j.name += ' [reuse]'
         return j, b.read_input_group(
@@ -79,8 +82,12 @@ def gather_vcfs(
             }
         )
 
-    j.image(images.GATK_IMAGE)
-    STANDARD.set_resources(j, fraction=1)
+    if gvcf_count:
+        storage_gb = (1 if site_only else 2) * gvcf_count
+        STANDARD.set_resources(j, fraction=1, storage_gb=storage_gb)
+    else:
+        STANDARD.set_resources(j, fraction=1)
+        
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
