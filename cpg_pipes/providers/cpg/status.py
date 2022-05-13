@@ -51,7 +51,7 @@ class CpgStatusReporter(StatusReporter):
     def add_updaters_jobs(
         self,
         b: Batch,
-        output: Path | Resource | dict[str, Path | Resource],
+        output: str | Path | Resource | dict[str, Path | Resource],
         analysis_type: str,
         target: Target,
         jobs: list[Job] | None = None,
