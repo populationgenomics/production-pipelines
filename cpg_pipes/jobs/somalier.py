@@ -15,7 +15,7 @@ from cpg_pipes.hb.command import wrap_command, seds_to_extend_sample_ids
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.providers.status import StatusReporter
 from cpg_pipes.types import CramPath, GvcfPath
-from cpg_pipes.targets import Dataset
+from cpg_pipes.targets import Dataset, Sample
 from cpg_pipes.refdata import RefData
 from cpg_pipes.jobs.scripts import check_pedigree
 
@@ -37,6 +37,7 @@ def pedigree(
     ignore_missing: bool = False,
     job_attrs: dict | None = None,
     status_reporter: StatusReporter | None = None,
+    tmp_bucket: Path | None = None,
 ) -> list[Job]:
     """
     Add somalier and peddy based jobs that infer relatedness and sex, compare that
@@ -52,7 +53,7 @@ def pedigree(
     """
     extract_jobs, somalier_file_by_sample = _prep_somalier_files(
         b=b,
-        dataset=dataset,
+        samples=dataset.get_samples(),
         refs=refs,
         input_path_by_sid=input_path_by_sid,
         overwrite=overwrite,
@@ -66,7 +67,7 @@ def pedigree(
         somalier_file_by_sid=somalier_file_by_sample,
         sample_ids=dataset.get_sample_ids(),
         external_id_map={s.id: s.participant_id for s in dataset.get_samples()},
-        ped_path=dataset.make_ped_file(),
+        ped_path=dataset.make_ped_file(tmp_bucket=tmp_bucket),
         label=label,
         extract_jobs=extract_jobs,
         out_samples_path=out_samples_path,
@@ -129,7 +130,7 @@ def ancestry(
     """
     extract_jobs, somalier_file_by_sample = _prep_somalier_files(
         b=b,
-        dataset=dataset,
+        samples=dataset.get_samples(),
         refs=refs,
         input_path_by_sid=input_path_by_sid,
         overwrite=overwrite,
@@ -162,7 +163,7 @@ def ancestry(
 
 def _prep_somalier_files(
     b,
-    dataset: Dataset,
+    samples: list[Sample],
     input_path_by_sid: dict[str, Path | str],
     refs: RefData,
     overwrite: bool,
@@ -171,12 +172,12 @@ def _prep_somalier_files(
     job_attrs: dict | None = None,
 ) -> tuple[list[Job], dict[str, Path]]:
     """
-    Generate .somalier file for each input
+    Generate .somalier file for each input.
     """
     extract_jobs = []
     missing_input = []
     somalier_file_by_sample = dict()
-    for sample in dataset.get_samples():
+    for sample in samples:
         input_path = input_path_by_sid.get(sample.id)
         if input_path is None:
             missing_input.append(sample)
@@ -209,7 +210,7 @@ def _prep_somalier_files(
     if len(missing_input) > 0:
         msg = (
             f'Could not find input for '
-            f'{len(missing_input)}/{len(dataset.get_samples())} samples'
+            f'{len(missing_input)}/{len(samples)} samples'
         )
         if ignore_missing:
             logger.warning(msg)

@@ -133,7 +133,8 @@ class LoadToEs(DatasetStage):
 
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset)
         version = time.strftime('%Y%m%d-%H%M%S')
-
+        index_name = f'{dataset.name}-{version}'
+        
         j = dataproc.hail_dataproc_job(
             self.b,
             f'cpg_pipes/dataproc_scripts/seqr/mt_to_es.py '
@@ -142,7 +143,7 @@ class LoadToEs(DatasetStage):
             f'--es-port 9243 '
             f'--es-username seqr '
             f'--es-password {_read_es_password()} '
-            f'--es-index {dataset.name}-{version} '
+            f'--es-index {index_name} '
             f'--es-index-min-num-shards 1 '
             f'--use-spark ',  # es export doesn't work with the service backend
             max_age='16h',
@@ -152,8 +153,17 @@ class LoadToEs(DatasetStage):
             depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
         )
+        jobs = [j]
+        if self.status_reporter:
+            jobs = self.status_reporter.add_updaters_jobs(
+                self.b,
+                output=index_name,
+                analysis_type='seqr_index',
+                target=dataset,
+                jobs=jobs,
+            )
         j.attributes = self.get_job_attrs(dataset)
-        return self.make_outputs(dataset, jobs=[j])
+        return self.make_outputs(dataset, jobs=jobs)
 
 
 def _read_es_password(

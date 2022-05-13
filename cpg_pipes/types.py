@@ -153,7 +153,7 @@ def alignment_input_exists(v: AlignmentInput) -> bool:
         return utils.exists(v.path)
     else:
         return all(utils.exists(pair.r1) and utils.exists(pair.r2) for pair in v)
-
+    
 
 class SequencingType(Enum):
     """

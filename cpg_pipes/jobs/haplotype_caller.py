@@ -31,7 +31,7 @@ def produce_gvcf(
     sequencing_type: SequencingType = SequencingType.GENOME,
     intervals_path: Path | None = None,
     overwrite: bool = False,
-    dragen_mode: bool = False,
+    dragen_mode: bool = True,
 ) -> list[Job]:
     """
     Takes all samples with a 'file' of 'type'='bam' in `samples_df`,
@@ -85,7 +85,7 @@ def haplotype_caller(
     sequencing_type: SequencingType = SequencingType.GENOME,
     intervals_path: Path | None = None,
     overwrite: bool = True,
-    dragen_mode: bool = False,
+    dragen_mode: bool = True,
 ) -> list[Job]:
     """
     Run haplotype caller in parallel sharded by intervals.
@@ -157,7 +157,7 @@ def _haplotype_caller_one(
     interval: hb.Resource | None = None,
     out_gvcf_path: Path | None = None,
     overwrite: bool = True,
-    dragen_mode: bool = False,
+    dragen_mode: bool = True,
 ) -> Job:
     """
     Add one HaplotypeCaller job on an interval

@@ -156,6 +156,7 @@ def make_joint_genotyping_jobs(
         overwrite=overwrite,
         out_vcf_path=out_vcf_path,
         site_only=False,
+        gvcf_count=len(gvcf_by_sid),
     )
     gather_j.name = 'Joint genotyping: ' + gather_j.name
     jobs.append(gather_j)

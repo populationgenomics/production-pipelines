@@ -320,7 +320,7 @@ def _align_one(
         j.image(images.DRAGMAP_IMAGE)
         dragmap_index = b.read_input_group(
             **{
-                k.replace('.', '_'): refs.dragmap_index_bucket / k
+                k.replace('.', '_'): str(refs.dragmap_index_bucket / k)
                 for k in refs.dragmap_index_files
             }
         )
