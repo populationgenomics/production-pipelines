@@ -8,7 +8,7 @@ from analysis_runner import dataproc
 from cpg_pipes import to_path
 from cpg_pipes.hb.batch import setup_batch
 
-VERSION = 'v0'
+VERSION = 'v0-1'
 
 
 @click.command()
