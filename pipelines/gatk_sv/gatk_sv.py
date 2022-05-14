@@ -26,98 +26,20 @@ datasets: [acute-care]
 ```
 """
 
-import json
 import logging
-import os
-from os.path import join, dirname
-from typing import Any, Mapping
+from typing import Any
 
 import click
-from analysis_runner.cromwell import (
-    run_cromwell_workflow_from_repo_and_get_outputs,
-    CromwellOutputType,
-)
-from hailtop.batch import Batch
 
-from cpg_pipes import images, Path
-from cpg_pipes.hb.batch import make_job_name
-from cpg_pipes.hb.command import wrap_command
+from cpg_pipes import Path
 from cpg_pipes.pipeline import stage, SampleStage, StageOutput, DatasetStage, \
     CohortStage, pipeline_click_options, create_pipeline
-from cpg_pipes.pipeline.pipeline import StageInput, skip
+from cpg_pipes.pipeline.pipeline import StageInput
 from cpg_pipes.targets import Sample, Dataset, Cohort
 
+from .utils import add_gatksv_job, get_references, get_dockers, SV_CALLERS
+
 logger = logging.getLogger(__file__)
-
-
-GATK_SV_COMMIT = 'c9e88f056fa154a01e2fcd7f8f0703342537a06e'
-SV_CALLERS = ['manta', 'wham']
-
-ACCESS_LEVEL = os.environ['CPG_ACCESS_LEVEL']
-
-
-def get_dockers(keys: list[str]) -> dict[str, str]:
-    """parse the WDL inputs with docker images"""
-    with open(join(dirname(__file__), 'dockers.json')) as f:
-        return {k: v for k, v in json.load(f).items() if k in keys}
-
-
-def get_references(keys: list[str]) -> dict[str, str]:
-    """parse the WDL inputs with reference files"""
-    with open(join(dirname(__file__), 'references.json')) as f:
-        return {k: v for k, v in json.load(f).items() if k in keys}
-
-
-def add_gatksv_job(
-    batch: Batch,
-    dataset: Dataset,
-    wfl_name: str,
-    # "dict" is invariant (supports updating), "Mapping" is covariant (read-only)
-    # we have to support inputs of type dict[str, str], so using Mapping here:
-    input_dict: dict[str, Any], 
-    expected_out_dict: dict[str, Path],
-    sample_id: str | None = None,
-):
-    """
-    Generic function to add a job that would run one GATK-SV workflow.
-    """
-    # Where Cromwell writes the output. 
-    # Will be different from paths in expected_out_dict:
-    output_prefix = f'gatk_sv/output/{wfl_name}/{dataset.name}'
-    if sample_id: 
-        output_prefix = join(output_prefix, sample_id)
-
-    outputs_to_collect = dict()
-    for key in expected_out_dict.keys():
-        outputs_to_collect[key] = CromwellOutputType.single_path(f'{wfl_name}.{key}')
-    
-    job_prefix = make_job_name(wfl_name, sample=sample_id, dataset=dataset.name)
-    assert ACCESS_LEVEL
-    output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
-        b=batch,
-        job_prefix=job_prefix,
-        dataset=dataset.stack,
-        access_level=ACCESS_LEVEL,
-        repo='gatk-sv',
-        commit=GATK_SV_COMMIT,
-        cwd='wdl',
-        workflow=f'{wfl_name}.wdl',
-        libs=['.'],
-        output_prefix=output_prefix,
-        input_dict={f'{wfl_name}.{k}': v for k, v in input_dict.items()},
-        outputs_to_collect=outputs_to_collect,
-        driver_image=images.DRIVER_IMAGE,
-    )
-
-    copy_j = batch.new_job(f'{job_prefix}: copy outputs')
-    copy_j.image(images.DRIVER_IMAGE)
-    cmds = []
-    for key, resource in output_dict.items():
-        out_path = expected_out_dict[key]
-        cmds.append(f'gsutil cp $(cat {resource}) {out_path}')
-    copy_j.command(wrap_command(cmds, setup_gcp=True))
-
-    return output_dict, copy_j
 
 
 @stage
@@ -171,7 +93,6 @@ class GatherSampleEvidence(SampleStage):
             'genomes_in_the_cloud_docker',
             'cloud_sdk_docker',
             'wham_docker',
-            # 'melt_docker',
             'manta_docker',
             'sv_pipeline_base_docker',
             'gatk_docker_pesr_override',
@@ -187,7 +108,6 @@ class GatherSampleEvidence(SampleStage):
             'preprocessed_intervals',
             'manta_region_bed',
             'wham_include_list_bed_file',
-            # 'melt_standard_vcf_header',
         ]))
 
         expected_d = self.expected_outputs(sample)
@@ -274,71 +194,6 @@ class EvidenceQC(DatasetStage):
         )
 
         return self.make_outputs(dataset, data=output_dict, jobs=[j])
-
-
-@skip(reason='This step is essencially generation of a reference database. '
-             'We can use one pre-calculated for 1KG')
-@stage(required_stages=[GatherSampleEvidence])
-class TrainGCNV(CohortStage):
-    """
-    # https://github.com/populationgenomics/gatk-sv/blob/main/wdl/TrainGCNV.wdl
-    """
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        """
-        Expected to return 2 tarballs
-        """
-        d = dict()
-        fname_by_key = {
-            'cohort_contig_ploidy_model_tar': 'cohort_contig_ploidy_model.tar',
-            'cohort_contig_ploidy_calls_tar': 'cohort_contig_ploidy_calls.tar',
-        }
-        for key, fname in fname_by_key.items():
-            d[key] = cohort.analysis_dataset.get_bucket() / 'gatk_sv' / self.name.lower() / fname
-        return d
-
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        """
-        Queue jobs
-        """
-        d = inputs.as_dict_by_target(GatherSampleEvidence)
-        
-        sids = cohort.get_sample_ids()
-        input_dict = {
-            'cohort': cohort.target_id,
-            'samples': sids,
-            'count_files': [str(d[sid]['coverage_counts']) for sid in sids],
-            'ref_copy_number_autosomal_contigs': 2,
-            'num_intervals_per_scatter': 5000,
-        }
-        for caller in SV_CALLERS:
-            input_dict[f'{caller}_vcfs'] = [str(d[sid][f'{caller}_vcf']) for sid in sids]
-
-        input_dict.update(get_dockers([
-            'sv_base_mini_docker',
-            'condense_counts_docker',
-            'gatk_docker',
-            'linux_docker',
-        ]))
-        
-        input_dict.update(get_references([
-            'reference_fasta',
-            'reference_index',
-            'reference_dict',
-            'allosomal_contigs',
-            'contig_ploidy_priors',
-        ]))
-
-        expected_d = self.expected_outputs(cohort)
-
-        output_dict, j = add_gatksv_job(
-            batch=self.b,
-            dataset=cohort.analysis_dataset,
-            wfl_name=self.name,
-            input_dict=input_dict,
-            expected_out_dict=expected_d,
-        )
-
-        return self.make_outputs(cohort, data=output_dict, jobs=[j])
 
 
 @click.command()
