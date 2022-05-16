@@ -71,8 +71,7 @@ def main():
     #     out_gvcf_path=BUCKET / f'{SID}-v4210-dragen-false-reproduce-exactly' / 'out.g.vcf.gz'
     # )
     
-    # re-alignment?
-    # TODO: start a docker and only re-align the region?
+    # re-alignment:
     alignment_input = [
         FastqPair(
             UPLOAD_BUCKET / 'cpg_acute_positives_20211003_213917/200212_A00692_0063_ML201946_20W000180-FAM000358_MAN-20200212_NEXTERAFLEXWGS_L001_R1.fastq.gz',
@@ -91,17 +90,39 @@ def main():
     #     refs=pipe.refs,
     #     output_path=BUCKET / 'realigned' / f'{sid}-bwa-biobambam.cram',
     # )
-    # align.align(
-    #     pipe.b,
-    #     alignment_input=alignment_input,
-    #     sample_name=sid,
-    #     refs=pipe.refs,
-    #     aligner=Aligner.DRAGMAP,
-    #     markdup_tool=MarkDupTool.BIOBAMBAM,
-    #     output_path=BUCKET / 'realigned' / f'{sid}-dragmap-picard.cram',
-    # )
-    
-    _index_cram(pipe.b, BUCKET / 'cram/bwamem/CPG54353.cram')
+    align.align(
+        pipe.b,
+        alignment_input=alignment_input,
+        sample_name=sid,
+        refs=pipe.refs,
+        aligner=Aligner.DRAGMAP,
+        output_path=BUCKET / 'realigned' / f'{sid}-dragmap-biobambam-altmask.cram',
+    )
+    # for path in [
+    #     # 'gs://cpg-fewgenomes-test-tmp/test-missing-variant-CPG54353/v0/hail/c8f336'
+    #     # '/BWA_1_gs___cpg-fewgenomes-test_tmp_acute-care-main'
+    #     # '-upload_cpg_acute_positives_20211003_213917_200212_A00692_0063_ML201946_20W000180-FAM000358_MAN-20200212_NEXTERAFLEXWGS_L001_R1_fastq_gz-OUjHG/sorted_bam.bam',
+    #     # 'gs://cpg-fewgenomes-test-tmp/test-missing-variant-CPG54353/v0/hail/c8f336'
+    #     # '/BWA_2_gs___cpg-fewgenomes-test_tmp_acute-care-main'
+    #     # '-upload_cpg_acute_positives_20211003_213917_200212_A00692_0063_ML201946_20W000180-FAM000358_MAN-20200212_NEXTERAFLEXWGS_L002_R1_fastq_gz-oBT6w/sorted_bam.bam',
+    #     # 'gs://cpg-fewgenomes-test-tmp/test-missing-variant-CPG54353/v0/hail/c8f336'
+    #     # '/DRAGMAP_1_gs___cpg-fewgenomes-test_tmp_acute-care-main'
+    #     # '-upload_cpg_acute_positives_20211003_213917_200212_A00692_0063_ML201946_20W000180-FAM000358_MAN-20200212_NEXTERAFLEXWGS_L001_R1_fastq_gz-V3aqd/sorted_bam.bam',
+    #     # 'gs://cpg-fewgenomes-test-tmp/test-missing-variant-CPG54353/v0/hail/c8f336'
+    #     # '/DRAGMAP_2_gs___cpg-fewgenomes-test_tmp_acute-care-main'
+    #     # '-upload_cpg_acute_positives_20211003_213917_200212_A00692_0063_ML201946_20W000180-FAM000358_MAN-20200212_NEXTERAFLEXWGS_L002_R1_fastq_gz-NDSf5/sorted_bam.bam',
+    #     BUCKET / 'realigned' / f'{sid}-bwa-biobambam.cram',
+    #     BUCKET / 'realigned' / f'{sid}-dragmap-picard.cram',
+    # ]:
+    #     # _index_cram(
+    #     #     pipe.b, 
+    #     #     path,
+    #     # )
+    #     _grep_cram(
+    #         pipe.b, 
+    #         path,
+    #         'A00692:63:HN3KTDMXX:1:1362:27082:5087',
+    #     )
 
     # _gatk_reproduce_exactly_job_hc(
     #     pipe=pipe,
@@ -118,17 +139,32 @@ def main():
     pipe.run(keep_scratch=True)
 
 
-def _index_cram(b, cram):
+def _grep_cram(b, cram_path, read_name):
+    j = b.new_job(f'Grep cram {cram_path}')
+    j.storage('50G')
+    j.cpu(4)
+    j.image(images.SAMTOOLS_PICARD_IMAGE)
+    
+    cram = b.read_input(str(cram_path))
+    j.command(f"""
+    samtools view {cram} | grep {read_name}
+    """)
+
+
+def _index_cram(b, cram_path):
     j = b.new_job('Re-index')
     j.storage('50G')
     j.cpu(16)
     j.image(images.SAMTOOLS_PICARD_IMAGE)
-    cram = b.read_input(str(cram))
+    
+    ext = '.crai' if cram_path.endswith('.cram') else '.bai'
+    out_path = str(cram_path) + ext
+    cram = b.read_input(str(cram_path))
     j.command(f"""
     samtools index {cram}
-    cp {cram}.crai {j.out_crai}
+    cp {cram}{ext} {j.out_crai}
     """)
-    b.write_output(j.out_crai, str(cram) + '.crai')
+    b.write_output(j.out_crai, out_path)
 
 
 def run_somalier(pipe):

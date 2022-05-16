@@ -14,11 +14,9 @@ from ..providers import (
     InputProviderType,
 )
 from ..providers.storage import Namespace, Cloud
-from ..providers.cpg import (
-    CpgStorageProvider,
-    CpgStatusReporter,
-    SmdbInputProvider,
-)
+from ..providers.cpg.inputs import SmdbInputProvider
+from ..providers.cpg.storage import CpgStorageProvider
+from ..providers.cpg.status import CpgStatusReporter
 from ..providers.cpg.smdb import SMDB
 from ..providers.inputs import InputProvider, CsvInputProvider
 from ..providers.status import StatusReporter
@@ -83,7 +81,7 @@ def create_pipeline(
         input_provider_type == InputProviderType.SMDB
         or status_reporter_type == StatusReporterType.CPG
     ):
-        sm_proj = Dataset(analysis_dataset, namespace=namespace).stack
+        sm_proj = Dataset(analysis_dataset, namespace=namespace).name
         smdb = SMDB(sm_proj)
         if status_reporter_type == StatusReporterType.CPG:
             status_reporter = CpgStatusReporter(smdb, slack_channel=slack_channel)

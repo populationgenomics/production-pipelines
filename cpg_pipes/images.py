@@ -5,7 +5,6 @@ import os
 
 from cpg_utils.hail_batch import image_path
 
-os.environ['CPG_IMAGE_REGISTRY_PREFIX'] = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
 GATK_IMAGE = image_path('gatk:4.2.3.0')
 BCFTOOLS_IMAGE = image_path('bcftools:1.10.2--h4f4756c_2')
 SM_IMAGE = image_path('sm-api:4.0.0')
@@ -19,4 +18,4 @@ VEP_IMAGE = image_path('vep:105')
 VERIFY_BAMID = image_path('verify-bam-id:1.0.1')
 MULTIQC_IMAGE = image_path('multiqc:v1.12')
 FASTQC_IMAGE = image_path('fastqc:v0.11.9_cv8')
-DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:7f41eeb90c8bec8836a1cd20ad1911b5989a5893-hail-db65c33c29100c64405c39ebace90a7c463b4bec'
+DRIVER_IMAGE = os.environ['CPG_DRIVER_IMAGE']
