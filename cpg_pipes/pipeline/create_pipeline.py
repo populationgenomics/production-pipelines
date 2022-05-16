@@ -14,11 +14,9 @@ from ..providers import (
     InputProviderType,
 )
 from ..providers.storage import Namespace, Cloud
-from ..providers.cpg import (
-    CpgStorageProvider,
-    CpgStatusReporter,
-    SmdbInputProvider,
-)
+from ..providers.cpg.inputs import SmdbInputProvider
+from ..providers.cpg.storage import CpgStorageProvider
+from ..providers.cpg.status import CpgStatusReporter
 from ..providers.cpg.smdb import SMDB
 from ..providers.inputs import InputProvider, CsvInputProvider
 from ..providers.status import StatusReporter
