@@ -27,6 +27,7 @@ class RefData:
             base=str(self.ref_fasta),
             fai=str(self.ref_fasta) + '.fai',
             dict=str(self.ref_fasta.with_suffix('.dict')),
+            str=str(self.ref_fasta.with_suffix('.str')),
         )
         if indices:
             d |= {ext: f'{self.ref_fasta}.{ext}' for ext in indices}
@@ -57,16 +58,11 @@ class RefData:
         self.ref_fasta = self.broad_ref_bucket / 'Homo_sapiens_assembly38.fasta'
 
         # DRAGMAP indices
-        self.dragmap_index_bucket = self.bucket / 'dragmap/v0'
+        self.dragmap_index_bucket = self.broad_ref_bucket / 'dragen_reference'
         self.dragmap_index_files = [
-            'hash_table.cfg',
             'hash_table.cfg.bin',
             'hash_table.cmp',
-            'hash_table_stats.txt',
-            'ref_index.bin',
             'reference.bin',
-            'repeat_mask.bin',
-            'str_table.bin',
         ]
 
         # BWA indices
