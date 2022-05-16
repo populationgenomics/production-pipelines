@@ -14,8 +14,8 @@ from cpg_pipes.pipeline import stage, StageOutput, CohortStage, \
 from cpg_pipes.pipeline.pipeline import StageInput
 from cpg_pipes.targets import Cohort
 
-from .gatk_sv import GatherSampleEvidence
-from .utils import add_gatksv_job, get_references, get_dockers, \
+from pipelines.gatk_sv.gatk_sv import GatherSampleEvidence
+from pipelines.gatk_sv.utils import add_gatksv_job, get_references, get_dockers, \
     SV_CALLERS
 
 logger = logging.getLogger(__file__)

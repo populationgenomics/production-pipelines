@@ -33,11 +33,11 @@ import click
 
 from cpg_pipes import Path
 from cpg_pipes.pipeline import stage, SampleStage, StageOutput, DatasetStage, \
-    CohortStage, pipeline_click_options, create_pipeline
-from cpg_pipes.pipeline.pipeline import StageInput
+    pipeline_click_options, create_pipeline
+from cpg_pipes.pipeline.pipeline import StageInput, ExpectedResultT
 from cpg_pipes.targets import Sample, Dataset, Cohort
 
-from .utils import add_gatksv_job, get_references, get_dockers, SV_CALLERS
+from pipelines.gatk_sv.utils import add_gatksv_job, get_references, get_dockers, get_gcnv_models, SV_CALLERS
 
 logger = logging.getLogger(__file__)
 
@@ -45,11 +45,12 @@ logger = logging.getLogger(__file__)
 @stage
 class GatherSampleEvidence(SampleStage):
     """
-    https://github.com/broadinstitute/gatk-sv#gathersampleevidence    
+    https://github.com/broadinstitute/gatk-sv#gathersampleevidence
+    https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherSampleEvidence.wdl
     """
     def expected_outputs(self, sample: Sample) -> dict[str, Path]:
         """
-        Expectes to produce coverage counts, and VCF for each variant caller
+        Expected to produce coverage counts, and a VCF for each variant caller.
         """
         d: dict[str, Path] = dict()
         fname_by_key = {
@@ -73,9 +74,7 @@ class GatherSampleEvidence(SampleStage):
         return d
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        """
-        Queue jobs
-        """
+        """Add jobs to batch"""
         cram_path = sample.dataset.get_bucket() / 'cram' / f'{sample.id}.cram'
 
         input_dict: dict[str, Any] = {
@@ -85,7 +84,7 @@ class GatherSampleEvidence(SampleStage):
             # 'revise_base_cram_to_bam': True,
         }
 
-        input_dict.update(get_dockers([
+        input_dict |= get_dockers([
             'sv_pipeline_docker',
             'sv_base_mini_docker',
             'samtools_cloud_docker',
@@ -96,19 +95,18 @@ class GatherSampleEvidence(SampleStage):
             'manta_docker',
             'sv_pipeline_base_docker',
             'gatk_docker_pesr_override',
-        ]))
-
-        input_dict.update(get_references([
+        ])
+        input_dict |= get_references([
             'primary_contigs_fai',
             'primary_contigs_list',
             'reference_fasta',
             'reference_index',
             'reference_dict',
-            'reference_version',
             'preprocessed_intervals',
             'manta_region_bed',
             'wham_include_list_bed_file',
-        ]))
+        ])
+        input_dict['reference_version'] = '38'
 
         expected_d = self.expected_outputs(sample)
 
@@ -127,7 +125,7 @@ class GatherSampleEvidence(SampleStage):
 @stage(required_stages=GatherSampleEvidence)
 class EvidenceQC(DatasetStage):
     """
-    # https://github.com/broadinstitute/gatk-sv#evidenceqc
+    https://github.com/broadinstitute/gatk-sv#evidenceqc
     """
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         """
@@ -153,12 +151,10 @@ class EvidenceQC(DatasetStage):
         return d
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        """
-        Queue jobs
-        """
+        """Add jobs to batch"""
         d = inputs.as_dict_by_target(GatherSampleEvidence)
 
-        sids = [s.id for s in dataset.get_samples()]
+        sids = dataset.get_sample_ids()
 
         input_dict: dict[str, Any] = {
             'batch': dataset.name,
@@ -184,7 +180,6 @@ class EvidenceQC(DatasetStage):
         ])
 
         expected_d = self.expected_outputs(dataset)
-
         output_dict, j = add_gatksv_job(
             batch=self.b,
             dataset=dataset,
@@ -192,8 +187,151 @@ class EvidenceQC(DatasetStage):
             input_dict=input_dict,
             expected_out_dict=expected_d,
         )
-
         return self.make_outputs(dataset, data=output_dict, jobs=[j])
+
+
+@stage(required_stages=[GatherSampleEvidence, EvidenceQC])
+class GatherBatchEvidence(DatasetStage):
+    """
+    https://github.com/broadinstitute/gatk-sv#gather-batch-evidence
+    https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherBatchEvidence.wdl    
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+        d: dict[str, Path] = dict()
+        fname_by_key = {
+            'merged_BAF': '',
+            'merged_BAF_index': '',
+            'merged_SR': '',
+            'merged_SR_index': '',
+            'merged_PE': '',
+            'merged_PE_index': '',
+            'merged_bincov': '',
+            'merged_bincov_index': '',
+
+            'ploidy_matrix': '',
+            'ploidy_plots': '',
+        
+            'combined_ped_file': '',
+        
+            'merged_dels': '',
+            'merged_dups': '',
+        
+            'cnmops_del': '',
+            'cnmops_del_index': '',
+            'cnmops_dup': '',
+            'cnmops_dup_index': '',
+        
+            'cnmops_large_del': '',
+            'cnmops_large_del_index': '',
+            'cnmops_large_dup': '',
+            'cnmops_large_dup_index': '',
+        
+            'median_cov': '',
+        
+            'std_manta_vcf': '', 
+            'std_delly_vcf': '', 
+            'std_melt_vcf': '', 
+            'std_scramble_vcf': '', 
+            'std_wham_vcf': '', 
+        
+            'PE_stats': '',
+            'RD_stats': '',
+            'SR_stats': '',
+            'BAF_stats': '',
+            'Matrix_QC_plot': '',
+            
+            'manta_tloc': '',
+        
+            'metrics_file_batchevidence': '',
+        }
+        for key, fname in fname_by_key.items():
+            d[key] = dataset.get_bucket() / 'gatk_sv' / self.name.lower() / fname
+        return d
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """Add jobs to batch"""
+        d = inputs.as_dict_by_target(stage=GatherSampleEvidence)
+        
+        sids = dataset.get_sample_ids()
+        
+        input_dict: dict[str, Any] = {
+            'batch': dataset.name,
+            'samples': sids,
+            'ped_file': str(dataset.make_ped_file()),
+            'counts': [str(d[sid]['coverage_counts']) for sid in sids],
+            'PE_files': [str(d[sid]['pesr_disc']) for sid in sids],
+            'SR_files': [str(d[sid]['pesr_split']) for sid in sids],
+            # BAF generation
+            # Required for cohorts if BAF_files not provided
+            # Note: pipeline output is not sensitive to having some samples (~1%) missing BAF
+            'gvcfs': [str(s.get_gvcf_path()) for s in dataset.get_samples()],
+        }
+        input_dict |= get_references([
+            'genome_file',
+            'primary_contigs_fai',
+            'ref_fasta',
+            'ref_fasta_index',
+            'ref_dict',
+            'inclusion_bed',
+            'unpadded_intervals_file',
+            'dbsnp_vcf',
+            'dbsnp_vcf_index',
+            'cnmops_chrom_file',
+            'cnmops_exclude_list',
+            'cnmops_allo_file',
+            'cytoband',
+            'mei_bed',
+        ])
+        input_dict |= get_gcnv_models()
+        input_dict['ref_copy_number_autosomal_contigs'] = 2
+        input_dict['allosomal_contigs'] = ['chrX', 'chrY'],
+        input_dict['gcnv_qs_cutoff'] = 30,
+        input_dict['min_svsize'] = 50,
+        input_dict['matrix_qc_distance'] = 1000000,
+
+        input_dict |= get_dockers([
+            'sv_base_mini_docker',
+            'sv_base_docker',
+            'sv_pipeline_docker',
+            'sv_pipeline_qc_docker',
+            'linux_docker',
+            'condense_counts_docker',
+            'gatk_docker',
+            'gcnv_gatk_docker',
+            'cnmops_docker',
+        ])
+
+        expected_d = self.expected_outputs(dataset)
+        output_dict, j = add_gatksv_job(
+            batch=self.b,
+            dataset=dataset,
+            wfl_name=self.name,
+            input_dict=input_dict,
+            expected_out_dict=expected_d,
+        )
+        return self.make_outputs(dataset, data=output_dict, jobs=[j])
+    
+
+@stage(required_stages=GatherBatchEvidence)
+class ClusterBatch(DatasetStage):
+    """
+    https://github.com/broadinstitute/gatk-sv#clusterbatch
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> ExpectedResultT:
+        """
+        Clustered SV VCFs
+        Clustered depth-only call VCF
+        """
+        pass
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """
+        Inputs:
+        Standardized call VCFs (GatherBatchEvidence)
+        Depth-only (DEL/DUP) calls (GatherBatchEvidence)
+        """
 
 
 @click.command()
@@ -204,6 +342,7 @@ def main(
     """
     GATK-SV workflow.
     """
+    kwargs['version'] = 'v0-1'
     pipeline = create_pipeline(
         name='gatk_sv',
         **kwargs
