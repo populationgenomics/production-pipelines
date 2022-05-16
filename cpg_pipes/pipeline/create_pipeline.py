@@ -83,7 +83,7 @@ def create_pipeline(
         input_provider_type == InputProviderType.SMDB
         or status_reporter_type == StatusReporterType.CPG
     ):
-        sm_proj = Dataset(analysis_dataset, namespace=namespace).stack
+        sm_proj = Dataset(analysis_dataset, namespace=namespace).name
         smdb = SMDB(sm_proj)
         if status_reporter_type == StatusReporterType.CPG:
             status_reporter = CpgStatusReporter(smdb, slack_channel=slack_channel)
