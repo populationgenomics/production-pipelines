@@ -325,7 +325,7 @@ class Dataset(Target):
     @property
     def storage_provider(self) -> StorageProvider:
         """
-        Storage provider object resonsible for dataset file paths.
+        Storage provider object responsible for dataset file paths.
         """
         if not self._storage_provider:
             raise ValueError(
