@@ -58,6 +58,8 @@ def create_pipeline(
     Create a Pipeline instance. All options correspond to command line parameters
     described in `pipeline_click_options` in the `cli_opts` module
     """
+    refs = CpgRefData()
+
     if storage_policy_type == StoragePolicyType.CPG:
         storage_provider = CpgStorageProvider()
     else:
@@ -91,6 +93,7 @@ def create_pipeline(
         description=description,
         analysis_dataset_name=analysis_dataset,
         storage_provider=storage_provider,
+        refs=refs,
         status_reporter=status_reporter,
         input_provider=input_provider,
         datasets=datasets,
