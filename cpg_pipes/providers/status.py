@@ -50,12 +50,12 @@ class StatusReporter(ABC):
     def add_updaters_jobs(
         self,
         b: Batch,
-        output: Path | Resource | dict[str, Path | Resource],
+        output: str | Path | Resource | dict[str, Path | Resource],
         analysis_type: str,
         target: Target,
         jobs: list[Job] | None = None,
         prev_jobs: list[Job] | None = None,
-    ):
+    ) -> list[Job]:
         """
         Add Hail Batch jobs that update the analysis status.
         """

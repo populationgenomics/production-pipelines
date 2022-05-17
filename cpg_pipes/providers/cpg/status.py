@@ -1,14 +1,13 @@
 """
 CPG implementation of status reporter.
 """
-import os
 from textwrap import dedent
 
-from google.cloud import secretmanager
 from hailtop.batch.job import Job
 from hailtop.batch import Batch, Resource
 
-from ... import images, Path
+from ..images import Images
+from ... import Path
 from ...hb.command import wrap_command
 from ...targets import Target
 from ..status import (
@@ -25,13 +24,19 @@ class CpgStatusReporter(StatusReporter):
     database Analysis entries.
     """
 
-    def __init__(self, smdb: SMDB):
+    def __init__(
+        self, 
+        smdb: SMDB, 
+        images: Images, 
+    ):
+        super().__init__()
         self.smdb = smdb
+        self.images = images
 
     def add_updaters_jobs(
         self,
         b: Batch,
-        output: Path | Resource | dict[str, Path | Resource],
+        output: str | Path | Resource | dict[str, Path | Resource],
         analysis_type: str,
         target: Target,
         jobs: list[Job] | None = None,
@@ -67,6 +72,7 @@ class CpgStatusReporter(StatusReporter):
         # 2. Queue a job that updates the status to "in-progress"
         in_progress_j = self.add_status_updater_job(
             b,
+            images=self.images,
             analysis_id=aid,
             status=AnalysisStatus.IN_PROGRESS,
             analysis_type=analysis_type,
@@ -75,6 +81,7 @@ class CpgStatusReporter(StatusReporter):
         # 2. Queue a job that updates the status to "completed"
         completed_j = self.add_status_updater_job(
             b,
+            images=self.images,
             analysis_id=aid,
             status=AnalysisStatus.COMPLETED,
             analysis_type=analysis_type,
@@ -89,6 +96,7 @@ class CpgStatusReporter(StatusReporter):
     @staticmethod
     def add_status_updater_job(
         b: Batch,
+        images: Images,
         analysis_id: int,
         status: AnalysisStatus,
         analysis_type: str,
@@ -107,7 +115,7 @@ class CpgStatusReporter(StatusReporter):
             job_name += f' (for {analysis_type})'
 
         j = b.new_job(job_name, job_attrs)
-        j.image(images.SM_IMAGE)
+        j.image(images.get('sm-api'))
         cmd = dedent(
             f"""\
         cat <<EOT >> update.py
