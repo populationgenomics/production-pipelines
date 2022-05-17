@@ -11,7 +11,9 @@ from unittest.mock import patch, Mock
 
 from cpg_pipes import Namespace, Path, to_path
 from cpg_pipes.pipeline.pipeline import Pipeline, Stage
-from cpg_pipes.providers.cpg import CpgStorageProvider
+from cpg_pipes.providers.cpg.images import CpgImages
+from cpg_pipes.providers.cpg.refdata import CpgRefData
+from cpg_pipes.providers.cpg.storage import CpgStorageProvider
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
 from cpg_pipes.types import CramPath
@@ -103,6 +105,8 @@ class TestPipeline(unittest.TestCase):
             first_stage=first_stage,
             last_stage=last_stage,
             version=self.timestamp,
+            refs=CpgRefData(),
+            images=CpgImages(),
             config=dict(
                 realignment_shards_num=realignment_shards_num
                 or self.realignment_shards_num,

@@ -74,7 +74,7 @@ def gather_vcfs(
     """
     job_name = f'Gather {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
     j = b.new_job(job_name, job_attrs)
-    j.image(images.get('tak'))
+    j.image(images.get('gatk'))
 
     if out_vcf_path and utils.can_reuse(out_vcf_path, overwrite):
         j.name += ' [reuse]'

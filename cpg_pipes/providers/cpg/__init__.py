@@ -23,27 +23,40 @@ def get_server_config() -> dict:
 
 def analysis_runner_environment(
     dataset: str | None = None,
-    namespace: Namespace | None = None,
+    access_level: str | None = None,
 ):
     """Simulate analysis-runner environment"""
-    dataset = dataset or os.environ['ANALYSIS_DATASET']
+    access_level = os.getenv('CPG_ACCESS_LEVEL', access_level)
+    dataset = os.getenv('CPG_DATASET', dataset)
+    if not dataset:
+        raise ValueError('CPG_DATASET environment variable must be set')
+
+    namespace = Namespace.TEST if access_level == 'test' else Namespace.MAIN
     stack, namespace = parse_stack(dataset, namespace)
 
-    server_config = get_server_config()
-    
-    access_level = 'test' if namespace == Namespace.TEST else 'full'
-    hail_token = server_config[stack].get(f'{access_level}Token')
-
-    os.environ['CPG_ACCESS_LEVEL'] = access_level
+    # overriding in case if dataset was in form of "dataset-test"
     os.environ['CPG_DATASET'] = stack
-    os.environ['CPG_DATASET_GCP_PROJECT'] = server_config[stack]['projectId']
-    os.environ['CPG_DRIVER_IMAGE'] = DRIVER_IMAGE
-    os.environ['CPG_IMAGE_REGISTRY_PREFIX'] = IMAGE_REGISTRY_PREFIX
-    os.environ['CPG_REFERENCE_PREFIX'] = REFERENCE_PREFIX
-    os.environ['CPG_OUTPUT_PREFIX'] = 'cpg-pipes'
-    os.environ['HAIL_BILLING_PROJECT'] = stack
-    os.environ['HAIL_BUCKET'] = f'cpg-{stack}-hail'
-    os.environ['HAIL_TOKEN'] = hail_token
+    if namespace == Namespace.TEST or not access_level:
+        access_level = 'test'
+    os.environ['CPG_ACCESS_LEVEL'] = access_level
+
+    server_config = get_server_config()
+    hail_token = server_config[stack][f'{access_level}Token']
+
+    os.environ.setdefault('CPG_DATASET_GCP_PROJECT', server_config[stack]['projectId'])
+    os.environ.setdefault('CPG_DRIVER_IMAGE', DRIVER_IMAGE)
+    os.environ.setdefault('CPG_IMAGE_REGISTRY_PREFIX', IMAGE_REGISTRY_PREFIX)
+    os.environ.setdefault('CPG_REFERENCE_PREFIX', REFERENCE_PREFIX)
+    os.environ.setdefault('CPG_OUTPUT_PREFIX', 'cpg-pipes')
+    os.environ.setdefault('HAIL_BILLING_PROJECT', stack)
+    os.environ.setdefault('HAIL_BUCKET', f'cpg-{stack}-hail')
+    os.environ.setdefault('HAIL_TOKEN', hail_token)
 
 
-analysis_runner_environment()
+cpg_dataset = os.environ.get('CPG_DATASET')
+cpg_access_level = os.environ.get('CPG_ACCESS_LEVEL')
+if cpg_dataset:
+    analysis_runner_environment(
+        dataset=cpg_dataset, 
+        access_level=cpg_access_level,
+    )
