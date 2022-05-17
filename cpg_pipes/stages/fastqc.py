@@ -23,7 +23,7 @@ class FastQC(SampleStage):
         Stage is expected to generate a FastQC HTML report, and a zip file for
         parsing with MuiltiQC.
         """
-        folder = sample.dataset.get_bucket() / 'qc'
+        folder = sample.dataset.path() / 'qc'
         return {
             'html': folder / (sample.id + '_fastqc.html'),
             'zip': folder / (sample.id + '_fastqc.zip'),
@@ -56,6 +56,7 @@ class FastQC(SampleStage):
             output_zip_path=self.expected_outputs(sample)['zip'],
             alignment_input=alignment_input,
             refs=self.refs,
+            images=self.images,
             job_attrs=self.get_job_attrs(sample),
             subsample=False,
         )

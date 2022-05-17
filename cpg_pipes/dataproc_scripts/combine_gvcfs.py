@@ -16,9 +16,9 @@ import click
 import hail as hl
 
 from cpg_pipes.hailquery import init_hail
-from cpg_pipes.refdata import RefData
+from cpg_pipes.providers.refdata import RefData
 from cpg_pipes.utils import get_validation_callback
-from cpg_pipes import utils, version
+from cpg_pipes import version
 
 logger = logging.getLogger(__name__)
 

@@ -39,6 +39,7 @@ class CramSomalier(SampleStage):
             out_fpath=expected_path,
             overwrite=not self.check_intermediates,
             refs=self.refs,
+            images=self.images,
             job_attrs=self.get_job_attrs(sample),
         )
         return self.make_outputs(sample, data=expected_path, jobs=[j])
@@ -60,11 +61,11 @@ class CramSomalierPedigree(DatasetStage):
         .yaml#L472-L481
         """
 
-        prefix = dataset.get_bucket() / 'somalier' / dataset.alignment_inputs_hash()
+        prefix = dataset.path() / 'somalier' / dataset.alignment_inputs_hash()
         return {
             'samples': prefix / f'{dataset.name}.samples.tsv',
             'pairs': prefix / f'{dataset.name}.pairs.tsv',
-            'html': dataset.get_web_bucket() / 'somalier-pedigree.html',
+            'html': dataset.web_path() / 'somalier-pedigree.html',
             'checks': prefix / f'{dataset.name}-checks.done',
         }
 
@@ -78,8 +79,8 @@ class CramSomalierPedigree(DatasetStage):
         }
 
         html_path = self.expected_outputs(dataset)['html']
-        if base_url := dataset.get_web_url():
-            html_url = str(html_path).replace(str(dataset.get_web_bucket()), base_url)
+        if base_url := dataset.web_url():
+            html_url = str(html_path).replace(str(dataset.web_path()), base_url)
         else:
             html_url = None
 
@@ -94,6 +95,7 @@ class CramSomalierPedigree(DatasetStage):
             out_html_url=html_url,
             out_checks_path=self.expected_outputs(dataset)['checks'],
             refs=self.refs,
+            images=self.images,
             job_attrs=self.get_job_attrs(dataset),
             status_reporter=self.status_reporter,
         )
@@ -117,10 +119,10 @@ class CramSomalierAncestry(DatasetStage):
         .yaml#L472-L481
         """
 
-        prefix = dataset.get_bucket() / 'ancestry' / dataset.alignment_inputs_hash()
+        prefix = dataset.path() / 'ancestry' / dataset.alignment_inputs_hash()
         return {
             'tsv': prefix / f'{dataset.name}.somalier-ancestry.tsv',
-            'html': dataset.get_web_bucket() / 'somalier-ancestry.html',
+            'html': dataset.web_path() / 'somalier-ancestry.html',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -133,8 +135,8 @@ class CramSomalierAncestry(DatasetStage):
         }
 
         html_path = self.expected_outputs(dataset)['html']
-        if base_url := dataset.get_web_url():
-            html_url = str(html_path).replace(str(dataset.get_web_bucket()), base_url)
+        if base_url := dataset.web_url():
+            html_url = str(html_path).replace(str(dataset.web_path()), base_url)
         else:
             html_url = None
 
@@ -147,6 +149,7 @@ class CramSomalierAncestry(DatasetStage):
             out_html_path=html_path,
             out_html_url=html_url,
             refs=self.refs,
+            images=self.images,
             job_attrs=self.get_job_attrs(dataset),
             status_reporter=self.status_reporter,
         )

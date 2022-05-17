@@ -10,7 +10,6 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job, PythonJob
 
 from .. import Path
-from ..providers.storage import Cloud
 
 logger = logging.getLogger(__file__)
 
@@ -143,7 +142,7 @@ def setup_batch(
     return RegisteringBatch(name=description, backend=backend)
 
 
-def get_hail_bucket(hail_bucket: str | Path | None = None, cloud=Cloud.GS) -> str:
+def get_hail_bucket(hail_bucket: str | Path | None = None) -> str:
     """
     Get Hail bucket.
     """
@@ -154,12 +153,7 @@ def get_hail_bucket(hail_bucket: str | Path | None = None, cloud=Cloud.GS) -> st
                 'Either the hail_bucket parameter, or the HAIL_BUCKET '
                 'environment variable must be set'
             )
-    hail_bucket = str(hail_bucket)
-    prefs = {Cloud.GS: 'gs'}
-    if not any(hail_bucket.startswith(f'{pref}://') for pref in prefs.values()):
-        hail_bucket = f'{prefs[cloud]}://{hail_bucket}'
-
-    return hail_bucket
+    return str(hail_bucket)
 
 
 def get_billing_project(billing_project: str | None = None) -> str:

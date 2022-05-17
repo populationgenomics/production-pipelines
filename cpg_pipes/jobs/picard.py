@@ -6,10 +6,11 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
-from cpg_pipes import images, utils
+from cpg_pipes import utils
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.refdata import RefData
+from cpg_pipes.providers.images import Images
+from cpg_pipes.providers.refdata import RefData
 
 
 def markdup(
@@ -17,6 +18,7 @@ def markdup(
     sorted_bam: hb.ResourceFile,
     sample_name: str,
     refs: RefData,
+    images: Images,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     qc_bucket: Path | None = None,
@@ -31,7 +33,7 @@ def markdup(
         j.name += ' [reuse]'
         return j
 
-    j.image(images.SAMTOOLS_PICARD_IMAGE)
+    j.image(images.get('picard_samtools'))
     resource = STANDARD.set_resources(
         j, storage_gb=175
     )  # enough for input BAM and output CRAM

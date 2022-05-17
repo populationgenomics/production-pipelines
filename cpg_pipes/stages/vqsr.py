@@ -36,6 +36,7 @@ class Vqsr(CohortStage):
         jobs = make_vqsr_jobs(
             b=self.b,
             refs=self.refs,
+            images=self.images,
             input_vcf_or_mt_path=siteonly_vcf_path,
             tmp_bucket=self.tmp_bucket,
             gvcf_count=len(cohort.get_samples()),

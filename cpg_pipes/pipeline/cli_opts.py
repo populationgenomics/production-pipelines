@@ -12,7 +12,7 @@ from ..providers import (
     StatusReporterType,
     InputProviderType,
 )
-from ..providers.storage import Namespace, Cloud
+from ..providers.storage import Namespace
 
 
 def choice_from_enum(cls: Type[Enum]) -> click.Choice:
@@ -139,14 +139,6 @@ def pipeline_click_options(function: Callable) -> Callable:
             default=StoragePolicyType.CPG.value,
             help='Storage policy is used to determine bucket names for intermediate '
             'and output files',
-        ),
-        click.option(
-            '--cloud',
-            'cloud',
-            type=choice_from_enum(Cloud),
-            callback=val_to_enum(Cloud),
-            default=Cloud.GS.value,
-            help='Cloud storage provider',
         ),
         click.option(
             '--status-reporter',

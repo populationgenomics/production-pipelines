@@ -6,7 +6,6 @@ Batch pipeline to run WGS QC.
 
 import logging
 from collections import defaultdict
-from os.path import basename
 
 import pandas as pd
 from hailtop.batch.job import Job
@@ -15,7 +14,7 @@ from hailtop.batch import Batch
 from cpg_pipes import Path
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.images import MULTIQC_IMAGE
+from cpg_pipes.providers.images import Images
 from cpg_pipes.providers.status import StatusReporter
 
 logger = logging.getLogger(__file__)
@@ -23,6 +22,7 @@ logger = logging.getLogger(__file__)
 
 def multiqc(
     b: Batch,
+    images: Images,
     tmp_bucket: Path,
     paths: list[Path],
     dataset_name: str,
@@ -38,6 +38,7 @@ def multiqc(
     """
     Run MultiQC for the files in `qc_paths`
     @param b: batch object
+    @param images: Images object
     @param tmp_bucket: bucket for tmp files
     @param paths: file bucket paths to pass into MultiQC
     @param dataset_name: dataset name
@@ -53,7 +54,7 @@ def multiqc(
     @return: job object
     """
     j = b.new_job('Run MultiQC', job_attrs)
-    j.image(MULTIQC_IMAGE)
+    j.image(images.get('multiqc'))
     STANDARD.set_resources(j, ncpu=16)
 
     file_list_path = tmp_bucket / 'multiqc-file-list.txt'

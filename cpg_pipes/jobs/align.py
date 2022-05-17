@@ -11,8 +11,9 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
-from cpg_pipes import utils, images
-from cpg_pipes.refdata import RefData
+from cpg_pipes import utils
+from cpg_pipes.providers.images import Images
+from cpg_pipes.providers.refdata import RefData
 from cpg_pipes.types import AlignmentInput, CramPath, FastqPairs
 from cpg_pipes.jobs import picard
 from cpg_pipes.hb.prev_job import PrevJob
@@ -74,6 +75,7 @@ def align(
     alignment_input: AlignmentInput,
     sample_name: str,
     refs: RefData,
+    images: Images,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     qc_bucket: Path | None = None,
@@ -145,6 +147,7 @@ def align(
             sample=sample_name,
             job_attrs=job_attrs,
             refs=refs,
+            images=images,
             aligner=aligner,
         )
         stdout_is_sorted = False
@@ -188,6 +191,7 @@ def align(
                     sample=sample_name,
                     job_attrs=job_attrs,
                     refs=refs,
+                    images=images,
                     aligner=aligner,
                 )
                 cmd = cmd.strip()
@@ -214,6 +218,7 @@ def align(
                     sample=sample_name,
                     job_attrs=job_attrs,
                     refs=refs,
+                    images=images,
                     aligner=aligner,
                     requested_nthreads=requested_nthreads,
                     number_of_shards_for_realignment=realignment_shards_num,
@@ -230,7 +235,7 @@ def align(
         merge_j = b.new_job(
             'Merge BAMs', (job_attrs or {}) | dict(tool='samtools_merge')
         )
-        merge_j.image(images.BWA_IMAGE)
+        merge_j.image(images.get('bwa'))
         nthreads = STANDARD.set_resources(
             merge_j, nthreads=requested_nthreads
         ).get_nthreads()
@@ -251,6 +256,7 @@ def align(
         sample_name=sample_name,
         job_attrs=job_attrs,
         refs=refs,
+        images=images,
         requested_nthreads=requested_nthreads,
         markdup_tool=markdup_tool,
         output_path=output_path,
@@ -271,6 +277,7 @@ def _align_one(
     requested_nthreads: int,
     sample: str,
     refs: RefData,
+    images: Images,
     job_attrs: dict | None = None,
     aligner: Aligner = Aligner.BWA,
     number_of_shards_for_realignment: int | None = None,
@@ -298,11 +305,11 @@ def _align_one(
     if aligner in [Aligner.BWAMEM2, Aligner.BWA]:
         if aligner == Aligner.BWAMEM2:
             tool_name = 'bwa-mem2'
-            j.image(images.BWAMEM2_IMAGE)
+            j.image(images.get('bwamem2'))
             index_exts = refs.bwamem2_index_exts
         else:
             tool_name = 'bwa'
-            j.image(images.BWA_IMAGE)
+            j.image(images.get('bwa'))
             index_exts = refs.bwa_index_exts
 
         bwa_reference = refs.fasta_res_group(b, index_exts)
@@ -317,7 +324,7 @@ def _align_one(
             shard_number_1based=shard_number_1based,
         )
     else:
-        j.image(images.DRAGMAP_IMAGE)
+        j.image(images.get('dragmap'))
         dragmap_index = b.read_input_group(
             **{
                 k.replace('.', '_'): str(refs.dragmap_index_bucket / k)
@@ -330,6 +337,7 @@ def _align_one(
                 b=b,
                 cram=alignment_input.resource_group(b),
                 refs=refs,
+                images=images,
                 ext=alignment_input.ext,
                 job_attrs=job_attrs,
             )
@@ -424,6 +432,7 @@ def extract_fastq(
     b,
     cram: hb.ResourceGroup,
     refs: RefData,
+    images: Images,
     ext: str = 'cram',
     job_attrs: dict | None = None,
     output_fq1: str | Path | None = None,
@@ -436,7 +445,7 @@ def extract_fastq(
     ncpu = 16
     nthreads = ncpu * 2  # multithreading
     j.cpu(ncpu)
-    j.image(images.BWA_IMAGE)
+    j.image(images.get('bwa'))
     j.storage('700G')
 
     reference = refs.fasta_res_group(b)
@@ -473,6 +482,7 @@ def finalise_alignment(
     sample_name: str,
     markdup_tool: MarkDupTool,
     refs: RefData,
+    images: Images,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     qc_bucket: Path | None = None,
@@ -521,6 +531,7 @@ def finalise_alignment(
             b,
             j.sorted_bam,
             refs=refs,
+            images=images,
             sample_name=sample_name,
             job_attrs=job_attrs,
             overwrite=overwrite,

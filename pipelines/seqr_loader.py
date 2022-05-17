@@ -25,7 +25,7 @@ from cpg_pipes.pipeline import (
     CohortStage,
     DatasetStage,
 )
-from cpg_pipes.refdata import RefData
+from cpg_pipes.providers.refdata import RefData
 from cpg_pipes.stages.vep import Vep
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
@@ -45,7 +45,7 @@ class AnnotateCohort(CohortStage):
         Expected to write a matrix table.
         """
         h = cohort.alignment_inputs_hash()
-        return cohort.analysis_dataset.get_bucket() / 'mt' / f'{h}.mt'
+        return cohort.analysis_dataset.path() / 'mt' / f'{h}.mt'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
@@ -59,6 +59,7 @@ class AnnotateCohort(CohortStage):
 
         jobs = annotate_cohort_jobs(
             b=self.b,
+            images=self.images,
             vcf_path=vcf_path,
             vep_ht_path=vep_ht_path,
             siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
@@ -95,6 +96,7 @@ class AnnotateDataset(DatasetStage):
 
         jobs = annotate_dataset_jobs(
             b=self.b,
+            images=self.images,
             mt_path=mt_path,
             sample_ids=[s.id for s in dataset.get_samples()],
             output_mt_path=self.expected_outputs(dataset),

@@ -28,11 +28,12 @@ from hailtop.batch.job import Job
 from .exceptions import PipelineError, StageInputNotFound
 from .. import Path, to_path, Namespace
 from ..hb.batch import setup_batch, get_billing_project
+from ..providers.images import Images
 from ..providers.inputs import InputProvider
 from ..providers.storage import StorageProvider
 from ..targets import Target, Dataset, Sample, Cohort
 from ..providers.status import StatusReporter
-from ..refdata import RefData
+from cpg_pipes.providers.refdata import RefData
 from ..utils import exists
 
 logger = logging.getLogger(__file__)
@@ -370,6 +371,7 @@ class Stage(Generic[TargetT], ABC):
         batch: Batch,
         cohort: Cohort,
         refs: RefData,
+        images: Images,
         pipeline_tmp_bucket: Path,
         hail_billing_project: str,
         hail_bucket: Path | None = None,
@@ -390,6 +392,7 @@ class Stage(Generic[TargetT], ABC):
         self.b = batch
         self.cohort = cohort
         self.refs = refs
+        self.images = images
 
         self.check_inputs = check_inputs
         self.check_intermediates = check_intermediates
@@ -693,6 +696,7 @@ def stage(
                 batch=pipeline.b,
                 cohort=pipeline.cohort,
                 refs=pipeline.refs,
+                images=pipeline.images,
                 pipeline_tmp_bucket=pipeline.tmp_bucket,
                 hail_billing_project=pipeline.hail_billing_project,
                 hail_bucket=pipeline.hail_bucket,
@@ -772,6 +776,8 @@ class Pipeline:
         name: str,
         analysis_dataset_name: str,
         storage_provider: StorageProvider,
+        refs: RefData,
+        images: Images,
         description: str | None = None,
         stages: list[StageDecorator] | None = None,
         input_provider: InputProvider | None = None,
@@ -809,17 +815,19 @@ class Pipeline:
                 only_samples=only_samples,
                 skip_datasets=skip_datasets,
             )
+        self.refs = refs
+        self.images = images
+
         self.force_samples = force_samples
 
         self.name = name
         self.version = version or time.strftime('%Y%m%d-%H%M%S')
         self.namespace = namespace
-        self.refs = RefData(self.storage_provider.get_ref_base())
         self.hail_billing_project = get_billing_project(
             self.cohort.analysis_dataset.stack
         )
         self.tmp_bucket = to_path(
-            self.cohort.analysis_dataset.get_tmp_bucket(
+            self.cohort.analysis_dataset.storage_tmp_path(
                 version=(name + (f'/{version}' if version else ''))
             )
         )

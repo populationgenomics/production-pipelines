@@ -15,7 +15,7 @@ from typing import List, Optional, Union
 import hail as hl
 from hail.utils.java import Env
 
-from .refdata import RefData
+from cpg_pipes.providers.refdata import RefData
 
 
 logger = logging.getLogger(__file__)

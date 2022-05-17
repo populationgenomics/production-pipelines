@@ -12,7 +12,8 @@ import hail as hl
 
 from cpg_pipes import to_path, Namespace
 from cpg_pipes import hailquery
-from cpg_pipes.providers.cpg import CpgStorageProvider
+from cpg_pipes.providers.cpg.refdata import CpgRefData
+from cpg_pipes.providers.cpg.storage import CpgStorageProvider
 from cpg_pipes.query.seqr_loader import (
     annotate_cohort,
     subset_mt_to_samples,
@@ -20,7 +21,7 @@ from cpg_pipes.query.seqr_loader import (
     load_vqsr,
 )
 from cpg_pipes.query.vep import vep_json_to_ht
-from cpg_pipes.refdata import RefData
+from cpg_pipes.providers.refdata import RefData
 from cpg_pipes.types import SequencingType, logger
 
 try:
@@ -50,7 +51,7 @@ class TestQuery(unittest.TestCase):
         self.timestamp = utils.timestamp()
         self.local_tmp_dir = tempfile.mkdtemp()
         self.sequencing_type = SequencingType.GENOME
-        self.refs = RefData(CpgStorageProvider().get_ref_base())
+        self.refs = CpgRefData()
         hailquery.init_batch(utils.DATASET, self.tmp_bucket)
         # Interval to take on chr20:
         self.chrom = 'chr20'

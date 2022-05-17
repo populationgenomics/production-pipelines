@@ -30,6 +30,7 @@ class Vep(CohortStage):
             self.b,
             vcf_path=inputs.as_path(cohort, stage=Vqsr),
             refs=self.refs,
+            images=self.images,
             hail_billing_project=self.hail_billing_project,
             hail_bucket=self.hail_bucket,
             out_path=self.expected_outputs(cohort),

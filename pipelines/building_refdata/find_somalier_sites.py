@@ -10,15 +10,11 @@ Problems with the currentl publicly shared somalier sites VCF:
 """
 
 import logging
-from cpg_pipes import images, Namespace
+from cpg_pipes import Namespace
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.pipeline import create_pipeline
-from cpg_pipes.providers.cpg import CpgStorageProvider
 
 logger = logging.getLogger(__file__)
-
-RESULT_VCF = CpgStorageProvider().get_ref_base() / 'somalier/v0/sites.hg38.vcf.gz'
-
 
 pipe = create_pipeline(
     analysis_dataset='fewgenomes',
@@ -28,8 +24,11 @@ pipe = create_pipeline(
     keep_scratch=True,
 )
 
+results_vcf = pipe.refs.somalier_sites
+
+
 concat_j = pipe.b.new_job('Make somalier sites')
-concat_j.image(images.BCFTOOLS_IMAGE)
+concat_j.image(pipe.images.get('bcftools'))
 concat_j.storage('1000G')
 concat_j.cpu(4)
 gnomad_vcf_paths = [
@@ -48,7 +47,7 @@ bcftools concat {" ".join(gnomad_vcfs)} -Oz -o {concat_j.gnomad_vcf}
 )
 
 make_sites_j = pipe.b.new_job('Make somalier sites')
-make_sites_j.image(images.SOMALIER_IMAGE)
+make_sites_j.image(pipe.images.get('somalier'))
 make_sites_j.storage('6T')
 make_sites_j.cpu(4)
 make_sites_j.command(
@@ -60,4 +59,4 @@ mv sites.vcf.gz {make_sites_j.sites_vcf}
 """
     )
 )
-pipe.b.write_output(make_sites_j.sites_vcf, RESULT_VCF)
+pipe.b.write_output(make_sites_j.sites_vcf, str(results_vcf))
