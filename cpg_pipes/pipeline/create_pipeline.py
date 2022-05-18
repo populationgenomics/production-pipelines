@@ -88,7 +88,9 @@ def create_pipeline(
         if status_reporter_type == StatusReporterType.CPG:
             status_reporter = CpgStatusReporter(smdb, slack_channel=slack_channel)
         if input_provider_type == InputProviderType.SMDB:
-            input_provider = SmdbInputProvider(smdb, smdb_errors_are_fatal=smdb_errors_are_fatal)
+            input_provider = SmdbInputProvider(
+                smdb, smdb_errors_are_fatal=smdb_errors_are_fatal
+            )
 
     if input_provider_type == InputProviderType.CSV:
         if not input_csv:

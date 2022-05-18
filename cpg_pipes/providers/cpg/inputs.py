@@ -22,9 +22,9 @@ class SmdbInputProvider(InputProvider):
     """
 
     def __init__(
-        self, 
-        db: SMDB, 
-        check_files: bool = False, 
+        self,
+        db: SMDB,
+        check_files: bool = False,
         smdb_errors_are_fatal: bool = True,
     ):
         super().__init__(check_files=check_files)
