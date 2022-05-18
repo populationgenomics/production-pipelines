@@ -16,6 +16,9 @@ from ..providers.storage import Namespace
 
 logger = logging.getLogger(__file__)
 
+# Whether to fail if a configuration file has unknown parameters.
+CONFIG_FILE_STRICT = True
+
 
 def choice_from_enum(cls: Type[Enum]) -> click.Choice:
     """
@@ -274,11 +277,15 @@ def get_config_callback(defined_options: list[click.Option]):
         defined_opts = [_opt.name for _opt in defined_options]
         unused_defaults = [k for k in d.keys() if k not in defined_opts]
         if unused_defaults:
-            logger.warning(
+            msg = (
                 f'Found unknown option(s) in the config {yaml_path}: '
                 f'{unused_defaults}'
             )
-        
+            if CONFIG_FILE_STRICT:
+                raise click.BadOptionUsage(param, msg, ctx)
+            else:
+                logger.warning(msg)
+
         ctx.default_map = ctx.default_map or {}
         ctx.default_map.update(d)
     return config_callback
