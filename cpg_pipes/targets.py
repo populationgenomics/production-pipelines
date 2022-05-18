@@ -325,7 +325,7 @@ class Dataset(Target):
     @property
     def storage_provider(self) -> StorageProvider:
         """
-        Storage provider required to get bucket paths for the dataset.
+        Storage provider object resonsible for dataset file paths.
         """
         if not self._storage_provider:
             raise ValueError(
@@ -334,38 +334,47 @@ class Dataset(Target):
             )
         return self._storage_provider
 
-    def get_bucket(self, **kwargs) -> Path:
+    def path(self, **kwargs) -> Path:
         """
-        The primary dataset bucket (-main or -test).
+        The primary storage path.
         """
-        return self.storage_provider.get_base(
+        return self.storage_provider.path(
             dataset=self.stack,
             namespace=self.namespace,
             **kwargs,
         )
 
-    def get_tmp_bucket(self, **kwargs) -> Path:
+    def storage_tmp_path(self, **kwargs) -> Path:
         """
-        The tmp bucket (-main-tmp or -test-tmp)
+        Storage path for temporary files.
         """
-        return self.storage_provider.get_tmp_base(
-            dataset=self.stack, namespace=self.namespace, **kwargs
+        return self.storage_provider.path(
+            dataset=self.stack, 
+            namespace=self.namespace,
+            category='tmp',
+            **kwargs,
         )
 
-    def get_web_bucket(self, **kwargs) -> Path:
+    def web_path(self, **kwargs) -> Path:
         """
-        Get web bucket (-main-web or -test-web)
+        Path for files served by an HTTP server Matches corresponding URLs returns by
+        self.web_url() URLs.
         """
-        return self.storage_provider.get_web_base(
-            dataset=self.stack, namespace=self.namespace, **kwargs
+        return self.storage_provider.path(
+            dataset=self.stack, 
+            namespace=self.namespace,
+            category='web',
+            **kwargs
         )
 
-    def get_web_url(self, **kwargs) -> str | None:
+    def web_url(self, **kwargs) -> str | None:
         """
-        Get web base URL.
+        URLs matching self.storage_web_path() files serverd by an HTTP server. 
         """
-        return self.storage_provider.get_web_url(
-            dataset=self.stack, namespace=self.namespace, **kwargs
+        return self.storage_provider.web_url(
+            dataset=self.stack, 
+            namespace=self.namespace, 
+            **kwargs
         )
 
     def add_sample(
@@ -430,7 +439,7 @@ class Dataset(Target):
                 datas.append(sample.pedigree.get_ped_dict())
         df = pd.DataFrame(datas)
 
-        ped_path = (tmp_bucket or self.get_tmp_bucket()) / f'{self.name}.ped'
+        ped_path = (tmp_bucket or self.storage_tmp_path()) / f'{self.name}.ped'
         with ped_path.open('w') as fp:
             df.to_csv(fp, sep='\t', index=False)
 
@@ -566,13 +575,13 @@ class Sample(Target):
         """
         Path to a CRAM file. Not checking its existence here.
         """
-        return CramPath(self.dataset.get_bucket() / 'cram' / f'{self.id}.cram')
+        return CramPath(self.dataset.path() / 'cram' / f'{self.id}.cram')
 
     def get_gvcf_path(self) -> GvcfPath:
         """
         Path to a GVCF file. Not checking its existence here.
         """
-        return GvcfPath(self.dataset.get_bucket() / 'gvcf' / f'{self.id}.g.vcf.gz')
+        return GvcfPath(self.dataset.path() / 'gvcf' / f'{self.id}.g.vcf.gz')
 
     @property
     def target_id(self) -> str:

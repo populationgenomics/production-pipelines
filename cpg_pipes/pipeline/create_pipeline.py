@@ -13,12 +13,12 @@ from ..providers import (
     StatusReporterType,
     InputProviderType,
 )
-from ..providers.storage import Namespace, Cloud
-from ..providers.cpg import (
-    CpgStorageProvider,
-    CpgStatusReporter,
-    SmdbInputProvider,
-)
+from ..providers.cpg.images import CpgImages
+from ..providers.cpg.refdata import CpgRefData
+from ..providers.storage import Namespace
+from ..providers.cpg.inputs import SmdbInputProvider
+from ..providers.cpg.storage import CpgStorageProvider
+from ..providers.cpg.status import CpgStatusReporter
 from ..providers.cpg.smdb import SMDB
 from ..providers.inputs import InputProvider, CsvInputProvider
 from ..providers.status import StatusReporter
@@ -27,26 +27,12 @@ from ..targets import Dataset
 logger = logging.getLogger(__file__)
 
 
-def init_storage_provider(
-    storage_policy_type: StoragePolicyType = None,
-    cloud: Cloud = Cloud.GS,
-):
-    """
-    Create storage provider based on enum options
-    """
-    if storage_policy_type == StoragePolicyType.CPG:
-        return CpgStorageProvider(cloud)
-    else:
-        raise PipelineError(f'Unsupported storage policy {storage_policy_type}')
-
-
 def create_pipeline(
     analysis_dataset: str,
     name: str,
     namespace: Namespace,
     description: str | None = None,
     storage_policy_type: StoragePolicyType = StoragePolicyType.CPG,
-    cloud: Cloud = Cloud.GS,
     status_reporter_type: StatusReporterType = None,
     input_provider_type: InputProviderType = InputProviderType.SMDB,
     input_csv: str | None = None,
@@ -75,7 +61,13 @@ def create_pipeline(
     Create a Pipeline instance. All options correspond to command line parameters
     described in `pipeline_click_options` in the `cli_opts` module
     """
-    storage_provider = init_storage_provider(storage_policy_type, cloud)
+    refs = CpgRefData()
+    images = CpgImages()
+
+    if storage_policy_type == StoragePolicyType.CPG:
+        storage_provider = CpgStorageProvider()
+    else:
+        raise PipelineError(f'Unsupported storage policy {storage_policy_type}')
 
     status_reporter: StatusReporter | None = None
     input_provider: InputProvider | None = None
@@ -83,13 +75,18 @@ def create_pipeline(
         input_provider_type == InputProviderType.SMDB
         or status_reporter_type == StatusReporterType.CPG
     ):
-        sm_proj = Dataset(analysis_dataset, namespace=namespace).stack
+        sm_proj = Dataset(analysis_dataset, namespace=namespace).name
         smdb = SMDB(sm_proj)
         if status_reporter_type == StatusReporterType.CPG:
-            status_reporter = CpgStatusReporter(smdb, slack_channel=slack_channel)
+            status_reporter = CpgStatusReporter(
+                smdb=smdb,
+                images=images,
+                slack_channel=slack_channel,
+            )
         if input_provider_type == InputProviderType.SMDB:
             input_provider = SmdbInputProvider(
-                smdb, smdb_errors_are_fatal=smdb_errors_are_fatal
+                smdb,
+                smdb_errors_are_fatal=smdb_errors_are_fatal,
             )
 
     if input_provider_type == InputProviderType.CSV:
@@ -107,6 +104,8 @@ def create_pipeline(
         description=description,
         analysis_dataset_name=analysis_dataset,
         storage_provider=storage_provider,
+        refs=refs,
+        images=images,
         status_reporter=status_reporter,
         input_provider=input_provider,
         datasets=datasets,

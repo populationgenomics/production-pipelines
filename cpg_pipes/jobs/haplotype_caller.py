@@ -8,12 +8,13 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
+from cpg_pipes.providers.images import Images
 from cpg_pipes.types import CramPath, GvcfPath, SequencingType
-from cpg_pipes import images, utils
+from cpg_pipes import utils
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs import split_intervals
-from cpg_pipes.refdata import RefData
+from cpg_pipes.providers.refdata import RefData
 
 logger = logging.getLogger(__file__)
 
@@ -24,6 +25,7 @@ def produce_gvcf(
     tmp_bucket: Path,
     cram_path: CramPath,
     refs: RefData,
+    images: Images,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     scatter_count: int | None = RefData.number_of_haplotype_caller_intervals,
@@ -50,6 +52,7 @@ def produce_gvcf(
         b=b,
         sample_name=sample_name,
         refs=refs,
+        images=images,
         job_attrs=job_attrs,
         output_path=hc_gvcf_path,
         cram_path=cram_path,
@@ -65,6 +68,7 @@ def produce_gvcf(
         gvcf_path=GvcfPath(hc_gvcf_path),
         sample_name=sample_name,
         refs=refs,
+        images=images,
         job_attrs=job_attrs,
         output_path=output_path,
         overwrite=overwrite,
@@ -78,6 +82,7 @@ def haplotype_caller(
     sample_name: str,
     cram_path: CramPath,
     refs: RefData,
+    images: Images,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     scatter_count: int | None = RefData.number_of_haplotype_caller_intervals,
@@ -101,6 +106,7 @@ def haplotype_caller(
             intervals_j, intervals = split_intervals.get_intervals(
                 b=b,
                 refs=refs,
+                images=images,
                 intervals_path=intervals_path,
                 sequencing_type=sequencing_type,
                 scatter_count=scatter_count,
@@ -117,6 +123,7 @@ def haplotype_caller(
                 sample_name=sample_name,
                 cram_path=cram_path,
                 refs=refs,
+                images=images,
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
                 interval=intervals[idx],
                 dragen_mode=dragen_mode,
@@ -127,8 +134,9 @@ def haplotype_caller(
         merge_j = merge_gvcfs_job(
             b=b,
             sample_name=sample_name,
-            job_attrs=job_attrs,
             gvcfs=[j.output_gvcf for j in hc_jobs],
+            images=images,
+            job_attrs=job_attrs,
             out_gvcf_path=output_path,
             overwrite=overwrite,
         )
@@ -138,6 +146,7 @@ def haplotype_caller(
             b,
             sample_name=sample_name,
             refs=refs,
+            images=images,
             job_attrs=job_attrs,
             cram_path=cram_path,
             out_gvcf_path=output_path,
@@ -153,6 +162,7 @@ def _haplotype_caller_one(
     sample_name: str,
     cram_path: CramPath,
     refs: RefData,
+    images: Images, 
     job_attrs: dict | None = None,
     interval: hb.Resource | None = None,
     out_gvcf_path: Path | None = None,
@@ -168,7 +178,7 @@ def _haplotype_caller_one(
         j.name += ' [reuse]'
         return j
 
-    j.image(images.GATK_IMAGE)
+    j.image(images.get('gatk'))
 
     # Enough storage to localize CRAMs (can't pass GCS URL to CRAM to gatk directly
     # because we will hit GCP egress bandwidth limit:
@@ -227,6 +237,7 @@ def merge_gvcfs_job(
     b: hb.Batch,
     sample_name: str,
     gvcfs: list[hb.ResourceGroup],
+    images: Images,
     job_attrs: dict | None = None,
     out_gvcf_path: Path | None = None,
     overwrite: bool = True,
@@ -240,7 +251,7 @@ def merge_gvcfs_job(
         j.name += ' [reuse]'
         return j
 
-    j.image(images.SAMTOOLS_PICARD_IMAGE)
+    j.image(images.get('picard'))
     j.cpu(2)
     java_mem = 7
     j.memory('standard')  # ~ 4G/core ~ 7.5G
@@ -268,6 +279,7 @@ def postproc_gvcf(
     gvcf_path: GvcfPath,
     sample_name: str,
     refs: RefData,
+    images: Images,
     job_attrs: dict | None = None,
     overwrite: bool = True,
     output_path: Path | None = None,
@@ -288,7 +300,7 @@ def postproc_gvcf(
     logger.info(f'Adding GVCF postproc job for sample {sample_name}, gvcf {gvcf_path}')
 
     j = b.new_job(jname, (job_attrs or {}) | dict(tool='gatk_ReblockGVCF'))
-    j.image(images.GATK_IMAGE)
+    j.image(images.get('gatk'))
 
     # Enough to fit a pre-reblocked GVCF, which can be as big as 10G,
     # the reblocked result (1G), and ref data (5G).

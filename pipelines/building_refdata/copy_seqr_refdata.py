@@ -1,38 +1,33 @@
 """
-Copy seqr reference data to gs://cpg-reference
-
-Would first clean up existing data.
+Copy seqr reference data to gs://cpg-reference.
 """
 import os
 
+import click
+from analysis_runner import dataproc
 from cpg_pipes import to_path
 from cpg_pipes.hb.batch import setup_batch
-from cpg_pipes.hb.command import wrap_command
 
-src_seqr_bucket = 'gs://cpg-seqr-reference-data'
-src_referen_path = f'{src_seqr_bucket}/GRCh38/all_reference_data/v2/combined_reference_data_grch38-2.0.3.ht'
-src_clinvar_path = f'{src_seqr_bucket}/GRCh38/clinvar/clinvar.GRCh38.ht'
-
-dst_seqr_bucket = 'gs://cpg-reference/seqr'
+VERSION = 'v0-1'
 
 
+@click.command()
 def main():
+    """Copy seqr reference data under ."""
     b = setup_batch(
         description='Copy seqr reference data',
         billing_project=os.environ['HAIL_BILLING_PROJECT'],
         hail_bucket=to_path('gs://cpg-reference/hail-tmp'),
     )
-    
-    j = b.new_job('Copy reference data')
-    j.image(os.environ['CPG_DRIVER_IMAGE'])
-    cmd = f"""
-    # gsutil -q rm -rf {dst_seqr_bucket}
-    gsutil -q cp -r {src_referen_path} {dst_seqr_bucket}/
-    gsutil -q cp -r {src_clinvar_path} {dst_seqr_bucket}/
-    """
-    j.command(wrap_command(cmd, setup_gcp=True))
-
+    dataproc.hail_dataproc_job(
+        b,
+        f'cpg_pipes/dataproc_scripts/copy_seqr_refdata.py {VERSION}',
+        max_age='8h',
+        num_secondary_workers=50,
+        job_name='Copy Seqr reference data',
+    )
     b.run(wait=False)
 
 
-main()
+if __name__ == '__main__':
+    main()

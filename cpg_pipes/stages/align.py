@@ -48,6 +48,7 @@ class Align(SampleStage):
             sample_name=sample.id,
             job_attrs=self.get_job_attrs(sample),
             refs=self.refs,
+            images=self.images,
             overwrite=not self.check_intermediates,
             realignment_shards_num=self.pipeline_config.get('realignment_shards_num'),
         )

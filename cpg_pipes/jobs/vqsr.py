@@ -8,11 +8,12 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
-from cpg_pipes import images, utils
+from cpg_pipes import utils
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.refdata import RefData
+from cpg_pipes.providers.images import Images
+from cpg_pipes.providers.refdata import RefData
 from cpg_pipes.types import SequencingType
 
 logger = logging.getLogger(__file__)
@@ -86,6 +87,7 @@ def make_vqsr_jobs(
     b: hb.Batch,
     input_vcf_or_mt_path: Path,
     refs: RefData,
+    images: Images,
     tmp_bucket: Path,
     gvcf_count: int,
     meta_ht_path: Path | None = None,
@@ -103,7 +105,8 @@ def make_vqsr_jobs(
 
     @param b: Batch object to add jobs to
     @param input_vcf_or_mt_path: path to a site-only VCF, or a matrix table
-    @param refs: reference data
+    @param refs: reference data provider
+    @param images: docker images provider
     @param meta_ht_path: if input_vcf_or_mt_path is a matrix table, this table will
            be used as a source of annotations for that matrix table, i.e.
            to filter out samples flagged as `meta.related`
@@ -165,6 +168,7 @@ def make_vqsr_jobs(
     intervals_j, intervals = split_intervals.get_intervals(
         b=b,
         refs=refs,
+        images=images,
         sequencing_type=sequencing_type,
         scatter_count=scatter_count,
         intervals_path=intervals_path,
@@ -202,8 +206,9 @@ def make_vqsr_jobs(
         jobs.append(mt_to_vcf_job)
         tabix_job = add_tabix_job(
             b,
-            combined_vcf_path,
-            medium_disk,
+            images=images,
+            vcf_path=combined_vcf_path,
+            disk_size=medium_disk,
             job_attrs=job_attrs,
         )
         tabix_job.depends_on(mt_to_vcf_job)
@@ -217,7 +222,8 @@ def make_vqsr_jobs(
         )
 
     indels_variant_recalibrator_job = add_indels_variant_recalibrator_job(
-        b,
+        b=b,
+        images=images,
         sites_only_variant_filtered_vcf=siteonly_vcf,
         mills_resource_vcf=mills_resource_vcf,
         axiom_poly_resource_vcf=axiom_poly_resource_vcf,
@@ -242,6 +248,7 @@ def make_vqsr_jobs(
         # Run SNP recalibrator in a scattered mode
         model_j = add_snps_variant_recalibrator_create_model_step(
             b,
+            images=images,
             sites_only_variant_filtered_vcf=siteonly_vcf,
             hapmap_resource_vcf=hapmap_resource_vcf,
             omni_resource_vcf=omni_resource_vcf,
@@ -259,6 +266,7 @@ def make_vqsr_jobs(
         snps_recalibrator_jobs = [
             add_snps_variant_recalibrator_scattered_step(
                 b,
+                images=images,
                 sites_only_vcf=siteonly_vcf,
                 interval=intervals[idx],
                 model_file=model_j.model_file,
@@ -278,6 +286,7 @@ def make_vqsr_jobs(
         snps_tranches = [j.tranches for j in snps_recalibrator_jobs]
         snps_gathered_tranches = add_snps_gather_tranches_step(
             b,
+            images=images,
             tranches=snps_tranches,
             disk_size=small_disk,
         ).out_tranches
@@ -285,6 +294,7 @@ def make_vqsr_jobs(
         scattered_vcfs = [
             add_apply_recalibration_step(
                 b,
+                images=images,
                 input_vcf=siteonly_vcf,
                 interval=intervals[idx],
                 indels_recalibration=indels_recalibration,
@@ -300,7 +310,8 @@ def make_vqsr_jobs(
             for idx in range(scatter_count)
         ]
         recalibrated_gathered_vcf_j, recalibrated_gathered_vcf = gather_vcfs(
-            b,
+            b=b,
+            images=images,
             input_vcfs=[v['vcf.gz'] for v in scattered_vcfs],
             overwrite=overwrite,
             out_vcf_path=output_vcf_path,
@@ -314,6 +325,7 @@ def make_vqsr_jobs(
     else:
         snps_recalibrator_job = add_snps_variant_recalibrator_step(
             b,
+            images=images,
             sites_only_variant_filtered_vcf=siteonly_vcf,
             hapmap_resource_vcf=hapmap_resource_vcf,
             omni_resource_vcf=omni_resource_vcf,
@@ -332,6 +344,7 @@ def make_vqsr_jobs(
 
         recalibrated_gathered_vcf_j = add_apply_recalibration_step(
             b,
+            images=images,
             input_vcf=siteonly_vcf,
             indels_recalibration=indels_recalibration,
             indels_tranches=indels_tranches,
@@ -351,6 +364,7 @@ def make_vqsr_jobs(
 
 def _add_make_sites_only_job(
     b: hb.Batch,
+    images: Images,
     input_vcf: hb.ResourceGroup,
     overwrite: bool,
     disk: int,
@@ -367,7 +381,7 @@ def _add_make_sites_only_job(
         return b.new_job(job_name + ' [reuse]')
 
     j = b.new_job(job_name)
-    j.image(images.GATK_IMAGE)
+    j.image(images.get('gatk'))
     j.memory('8G')
     j.storage(f'{disk}G')
     j.declare_resource_group(
@@ -393,6 +407,7 @@ def _add_make_sites_only_job(
 
 def add_tabix_job(
     b: hb.Batch,
+    images: Images,
     vcf_path: Path,
     disk_size: int,
     job_attrs: dict | None = None,
@@ -402,7 +417,7 @@ def add_tabix_job(
     `mt_to_vcf.py` is not block-gzipped).
     """
     j = b.new_job('VQSR: Tabix', job_attrs)
-    j.image(images.BCFTOOLS_IMAGE)
+    j.image(images.get('bcftools'))
     j.memory(f'8G')
     j.storage(f'{disk_size}G')
     j.declare_resource_group(
@@ -422,6 +437,7 @@ def add_tabix_job(
 
 def add_sites_only_gather_vcf_step(
     b: hb.Batch,
+    images: Images,
     input_vcfs: list[hb.ResourceGroup],
     disk_size: int,
     job_attrs: dict | None = None,
@@ -432,7 +448,7 @@ def add_sites_only_gather_vcf_step(
     Returns: a Job object with a single output j.output_vcf of type ResourceGroup
     """
     j = b.new_job('VQSR: SitesOnlyGatherVcf', job_attrs)
-    j.image(images.GATK_IMAGE)
+    j.image(images.get('gatk'))
     j.memory('8G')
     j.storage(f'{disk_size}G')
 
@@ -463,6 +479,7 @@ def add_sites_only_gather_vcf_step(
 
 def add_indels_variant_recalibrator_job(
     b: hb.Batch,
+    images: Images,
     sites_only_variant_filtered_vcf: hb.ResourceGroup,
     mills_resource_vcf: hb.ResourceGroup,
     axiom_poly_resource_vcf: hb.ResourceGroup,
@@ -485,7 +502,7 @@ def add_indels_variant_recalibrator_job(
     Returns: a Job object with 2 outputs: j.recalibration (ResourceGroup), j.tranches.
     """
     j = b.new_job('VQSR: IndelsVariantRecalibrator', job_attrs)
-    j.image(images.GATK_IMAGE)
+    j.image(images.get('gatk'))
 
     # we run it for the entire dataset in one job, so can take an entire instance:
     j.cpu(16)
@@ -539,6 +556,7 @@ def add_indels_variant_recalibrator_job(
 
 def add_snps_variant_recalibrator_create_model_step(
     b: hb.Batch,
+    images: Images,
     sites_only_variant_filtered_vcf: hb.ResourceGroup,
     hapmap_resource_vcf: hb.ResourceGroup,
     omni_resource_vcf: hb.ResourceGroup,
@@ -573,7 +591,7 @@ def add_snps_variant_recalibrator_create_model_step(
     The latter is useful to produce the optional tranche plot.
     """
     j = b.new_job('VQSR: SNPsVariantRecalibratorCreateModel', job_attrs)
-    j.image(images.GATK_IMAGE)
+    j.image(images.get('gatk'))
 
     # we run it for the entire dataset in one job, so can take an entire instance:
     j.cpu(16)
@@ -628,6 +646,7 @@ def add_snps_variant_recalibrator_create_model_step(
 
 def add_snps_variant_recalibrator_scattered_step(
     b: hb.Batch,
+    images: Images,
     sites_only_vcf: hb.ResourceGroup,
     model_file: hb.ResourceGroup,
     hapmap_resource_vcf: hb.ResourceGroup,
@@ -662,7 +681,7 @@ def add_snps_variant_recalibrator_scattered_step(
     Returns: a Job object with 2 outputs: j.recalibration (ResourceGroup) and j.tranches
     """
     j = b.new_job('VQSR: SNPsVariantRecalibratorScattered', job_attrs)
-    j.image(images.GATK_IMAGE)
+    j.image(images.get('gatk'))
 
     if is_small_callset:
         j.cpu(4)
@@ -714,6 +733,7 @@ def add_snps_variant_recalibrator_scattered_step(
 
 def add_snps_variant_recalibrator_step(
     b: hb.Batch,
+    images: Images,
     sites_only_variant_filtered_vcf: hb.ResourceGroup,
     hapmap_resource_vcf: hb.ResourceGroup,
     omni_resource_vcf: hb.ResourceGroup,
@@ -729,7 +749,7 @@ def add_snps_variant_recalibrator_step(
     Recalibrate SNPs in one run (alternative to scatter-gather approach)
     """
     j = b.new_job('VQSR: SNPsVariantRecalibrator', job_attrs)
-    j.image(images.GATK_IMAGE)
+    j.image(images.get('gatk'))
 
     # we run it for the entire dataset in one job, so can take an entire instance:
     j.cpu(16)
@@ -783,6 +803,7 @@ def add_snps_variant_recalibrator_step(
 
 def add_snps_gather_tranches_step(
     b: hb.Batch,
+    images: Images,
     tranches: List[hb.ResourceFile],
     disk_size: int,
     job_attrs: dict | None = None,
@@ -803,7 +824,7 @@ def add_snps_gather_tranches_step(
     Returns: a Job object with one output j.out_tranches
     """
     j = b.new_job('VQSR: SNPGatherTranches', job_attrs)
-    j.image(images.GATK_IMAGE)
+    j.image(images.get('gatk'))
     j.memory('8G')
     j.cpu(2)
     j.storage(f'{disk_size}G')
@@ -823,6 +844,7 @@ def add_snps_gather_tranches_step(
 
 def add_apply_recalibration_step(
     b: hb.Batch,
+    images: Images,
     input_vcf: hb.ResourceGroup,
     indels_recalibration: hb.ResourceGroup,
     indels_tranches: hb.ResourceFile,
@@ -856,7 +878,7 @@ def add_apply_recalibration_step(
     to a VCF with tranche annotated in the FILTER field
     """
     j = b.new_job('VQSR: ApplyRecalibration', job_attrs)
-    j.image(images.GATK_IMAGE)
+    j.image(images.get('gatk'))
 
     j.cpu(2)  # memory: 3.75G * 2 = 7.5G on a standard instance
     java_mem = 7
@@ -920,6 +942,7 @@ def add_apply_recalibration_step(
 
 def add_collect_metrics_sharded_step(
     b: hb.Batch,
+    images: Images,
     input_vcf: hb.ResourceGroup,
     dbsnp_vcf: hb.ResourceGroup,
     interval_list: hb.ResourceFile,
@@ -942,7 +965,7 @@ def add_collect_metrics_sharded_step(
     j.metrics.detail_metrics and j.metrics.summary_metrics ResourceFiles
     """
     j = b.new_job('VQSR: CollectMetricsSharded', job_attrs)
-    j.image(images.GATK_IMAGE)
+    j.image(images.get('gatk'))
     j.memory('8G')
     j.cpu(2)
     j.storage(f'{disk_size}G')
@@ -970,6 +993,7 @@ def add_collect_metrics_sharded_step(
 
 def _add_final_filter_job(
     b: hb.Batch,
+    images: Images,
     input_vcf: hb.ResourceGroup,
     output_vcf_path: str = None,
     job_attrs: dict | None = None,
@@ -978,7 +1002,7 @@ def _add_final_filter_job(
     Hard-filters the VQSR'ed VCF
     """
     j = b.new_job('VQSR: final filter', job_attrs)
-    j.image(images.BCFTOOLS_IMAGE)
+    j.image(images.get('bcftools'))
     j.memory(f'8G')
     j.storage(f'100G')
     j.declare_resource_group(
@@ -1002,6 +1026,7 @@ def _add_final_filter_job(
 
 def _add_variant_eval_step(
     b: hb.Batch,
+    images: Images,
     input_vcf: hb.ResourceGroup,
     ref_fasta: hb.ResourceGroup,
     dbsnp_vcf: hb.ResourceGroup,
@@ -1014,7 +1039,7 @@ def _add_variant_eval_step(
     Saves the QC to `output_path` bucket
     """
     j = b.new_job('VQSR: VariantEval', job_attrs)
-    j.image(images.GATK_IMAGE)
+    j.image(images.get('gatk'))
     j.memory(f'8G')
     j.storage(f'{disk_size}G')
 
@@ -1035,6 +1060,7 @@ def _add_variant_eval_step(
 
 def add_gather_variant_calling_metrics_step(
     b: hb.Batch,
+    images: Images,
     input_details: List[hb.ResourceGroup],
     input_summaries: List[hb.ResourceGroup],
     disk_size: int,
@@ -1050,7 +1076,7 @@ def add_gather_variant_calling_metrics_step(
     Saves the QC results to a bucket with the `output_path_prefix` prefix
     """
     j = b.new_job('VQSR: GatherVariantCallingMetrics', job_attrs)
-    j.image(images.GATK_IMAGE)
+    j.image(images.get('gatk'))
     j.memory(f'8G')
     j.storage(f'{disk_size}G')
     j.declare_resource_group(

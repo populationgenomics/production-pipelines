@@ -6,11 +6,12 @@ from os.path import basename
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes import Path, images
+from cpg_pipes import Path
+from cpg_pipes.providers.images import Images
 from cpg_pipes.types import AlignmentInput, CramPath, FastqPath
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.refdata import RefData
+from cpg_pipes.providers.refdata import RefData
 
 
 def fastqc(
@@ -19,6 +20,7 @@ def fastqc(
     output_zip_path: Path,
     alignment_input: AlignmentInput,
     refs: RefData,
+    images: Images,
     subsample: bool = True,
     job_attrs: dict | None = None,
 ) -> list[Job]:
@@ -28,7 +30,7 @@ def fastqc(
 
     def _fastqc_one(jname_, input_path: CramPath | FastqPath):
         j = b.new_job(jname_, job_attrs)
-        j.image(images.FASTQC_IMAGE)
+        j.image(images.get('fastqc'))
         threads = STANDARD.set_resources(j, ncpu=16).get_nthreads()
 
         cmd = ''

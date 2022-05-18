@@ -7,10 +7,11 @@ from io import StringIO
 from unittest import skip
 
 from cpg_pipes import Namespace
+from cpg_pipes.providers.cpg.inputs import SmdbInputProvider
 from cpg_pipes.providers.cpg.smdb import SMDB
+from cpg_pipes.providers.cpg.storage import CpgStorageProvider
 from cpg_pipes.targets import Cohort, Sex
 from cpg_pipes.providers.inputs import CsvInputProvider
-from cpg_pipes.providers.cpg import CpgStorageProvider, SmdbInputProvider
 from cpg_pipes.types import SequencingType
 
 

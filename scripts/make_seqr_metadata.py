@@ -11,9 +11,9 @@ import pandas as pd
 
 from cpg_pipes import Path, Namespace, to_path
 from cpg_pipes.pipeline.cli_opts import choice_from_enum, val_to_enum
-from cpg_pipes.providers.storage import Cloud
-from cpg_pipes.providers.cpg import SmdbInputProvider, CpgStorageProvider
+from cpg_pipes.providers.cpg.inputs import SmdbInputProvider
 from cpg_pipes.providers.cpg.smdb import SMDB
+from cpg_pipes.providers.cpg.storage import CpgStorageProvider
 from cpg_pipes.targets import Dataset, Cohort
 
 logger = logging.getLogger(__file__)
@@ -32,13 +32,6 @@ logger.setLevel(logging.INFO)
     help='The bucket namespace to write the results to',
 )
 @click.option(
-    '--cloud',
-    type=choice_from_enum(Cloud),
-    callback=val_to_enum(Cloud),
-    default=Cloud.GS.value,
-    help='Cloud storage provider',
-)
-@click.option(
     '--use-participant-id/--use-external-id',
     'use_external_id',
     default=False,
@@ -47,7 +40,6 @@ logger.setLevel(logging.INFO)
 def main(
     datasets: list[str],
     namespace: Namespace,
-    cloud: Cloud,
     use_external_id: bool = False,
 ):
     """
@@ -58,7 +50,7 @@ def main(
         cohort=Cohort(
             analysis_dataset_name='seqr',
             namespace=namespace,
-            storage_provider=CpgStorageProvider(cloud),
+            storage_provider=CpgStorageProvider(),
         ),
         dataset_names=datasets,
     )
@@ -67,7 +59,7 @@ def main(
     for dataset in cohort.get_datasets():
         _make_seqr_metadata_files(
             dataset=dataset,
-            bucket=cohort.analysis_dataset.get_bucket(),
+            bucket=cohort.analysis_dataset.path(),
             local_dir=tmp_dir,
             use_external_id=use_external_id,
         )

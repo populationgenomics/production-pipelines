@@ -23,7 +23,7 @@ class SamtoolsStats(SampleStage):
         * Samtools stats file found by contents, so file name can be any:
           https://github.com/ewels/MultiQC/blob/master/multiqc/utils/search_patterns.yaml#L652-L654
         """
-        return sample.dataset.get_bucket() / 'qc' / (sample.id + '_samtools_stats.txt')
+        return sample.dataset.path() / 'qc' / (sample.id + '_samtools_stats.txt')
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
@@ -36,6 +36,7 @@ class SamtoolsStats(SampleStage):
             cram_path=cram_path,
             output_path=self.expected_outputs(sample),
             refs=self.refs,
+            images=self.images,
             job_attrs=self.get_job_attrs(sample),
         )
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])
@@ -54,7 +55,7 @@ class PicardWgsMetrics(SampleStage):
           https://github.com/ewels/MultiQC/blob/master/multiqc/utils/search_patterns.yaml#L539-L541
         """
         return (
-            sample.dataset.get_bucket() / 'qc' / (sample.id + '_picard_wgs_metrics.csv')
+            sample.dataset.path() / 'qc' / (sample.id + '_picard_wgs_metrics.csv')
         )
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
@@ -68,6 +69,7 @@ class PicardWgsMetrics(SampleStage):
             cram_path=cram_path,
             output_path=self.expected_outputs(sample),
             refs=self.refs,
+            images=self.images,
             job_attrs=self.get_job_attrs(sample),
         )
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])
@@ -85,7 +87,7 @@ class VerifyBamId(SampleStage):
         * VerifyBAMID file has to have *.selfSM ending:
           https://github.com/ewels/MultiQC/blob/master/multiqc/utils/search_patterns.yaml#L783-L784
         """
-        return sample.dataset.get_bucket() / 'qc' / (sample.id + '_verify_bamid.selfSM')
+        return sample.dataset.path() / 'qc' / (sample.id + '_verify_bamid.selfSM')
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
@@ -98,6 +100,7 @@ class VerifyBamId(SampleStage):
             cram_path=cram_path,
             output_path=self.expected_outputs(sample),
             refs=self.refs,
+            images=self.images,
             job_attrs=self.get_job_attrs(sample),
         )
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])

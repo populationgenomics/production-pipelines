@@ -9,30 +9,37 @@ from textwrap import dedent
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes import images
+from cpg_pipes.jobs.align import Aligner
+from cpg_pipes.providers.cpg.images import CpgImages
+from cpg_pipes.providers.images import Images
 from cpg_pipes.hb.batch import setup_batch
 from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.providers.cpg import CpgStorageProvider
-from cpg_pipes.refdata import RefData
+from cpg_pipes.providers.cpg.refdata import CpgRefData
+from cpg_pipes.providers.refdata import RefData
 
 
 def main():
     """
     Create index for BWA and BWA-MEM2.
     """
-    b = setup_batch('Create BWA index')
-    refs = RefData(CpgStorageProvider().get_ref_base())
-    j1 = _index_bwa_job(b, refs)
-    j2 = _test_bwa_job(b, refs)
+    tool = Aligner.BWA
+    b = setup_batch(f'Create {tool.name} index')
+    refs = CpgRefData()
+    images = CpgImages()
+    j1 = _index_bwa_job(b, tool, refs, images)
+    j2 = _test_bwa_job(b, tool, refs, images)
     j2.depends_on(j1)
     b.run(wait=False)
 
 
-def _index_bwa_job(b: hb.Batch, refs: RefData) -> Job:
+def _index_bwa_job(b: hb.Batch, tool: Aligner, refs: RefData, images: Images) -> Job:
     reference = refs.fasta_res_group(b)
 
-    j = b.new_job('Index BWA')
-    j.image(images.BWAMEM2_IMAGE)
+    j = b.new_job(f'Index {tool.name}')
+    if tool == Aligner.BWA:
+        j.image(images.get('bwa'))
+    else:
+        j.image(images.get('bwamem2'))
     total_cpu = 32
     j.cpu(total_cpu)
     j.storage('40G')
@@ -45,7 +52,7 @@ def _index_bwa_job(b: hb.Batch, refs: RefData) -> Job:
     set -o pipefail
     set -ex
     
-    bwa-mem2 index {reference.base} -p {j.bwa_index}
+    {tool.value} index {reference.base} -p {j.bwa_index}
     
     df -h; pwd; ls | grep -v proc | xargs du -sh
     """
@@ -55,12 +62,15 @@ def _index_bwa_job(b: hb.Batch, refs: RefData) -> Job:
     return j
 
 
-def _test_bwa_job(b: hb.Batch, refs: RefData) -> Job:
+def _test_bwa_job(b: hb.Batch, tool: Aligner, refs: RefData, images: Images) -> Job:
     bwa_reference = refs.fasta_res_group(b, refs.bwa_index_exts)
 
     fq1 = b.read_input('gs://cpg-seqr-test/batches/test/tmp_fq')
-    j = b.new_job('Test BWA')
-    j.image(images.BWAMEM2_IMAGE)
+    j = b.new_job(f'Test {tool.name}')
+    if tool == Aligner.BWA:
+        j.image(images.get('bwa'))
+    else:
+        j.image(images.get('bwamem2'))
     total_cpu = 16
     bwa_cpu = 1
     j.memory('highmem')
@@ -85,7 +95,7 @@ def _test_bwa_job(b: hb.Batch, refs: RefData) -> Job:
     
     (while true; do df -h; pwd; du -sh $(dirname {j.output_cram.cram_path}); sleep 600; done) &
     
-    bwa-mem2 mem -K 100000000 {'-p' if use_bazam else ''} -t{bwa_cpu} -Y \\
+    {tool.value} mem -K 100000000 {'-p' if use_bazam else ''} -t{bwa_cpu} -Y \\
         -R '{rg_line}' {bwa_reference.base} {fq1} - | \\
     samtools sort -T $(dirname {j.output_cram.cram_path})/samtools-sort-tmp -Obam -o {sorted_bam}
     

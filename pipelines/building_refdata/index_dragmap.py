@@ -7,11 +7,12 @@ Create DRAGMAP reference index
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_pipes import images
+from cpg_pipes.providers.cpg.images import CpgImages
+from cpg_pipes.providers.images import Images
 from cpg_pipes.hb.batch import setup_batch
 from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.providers.cpg import CpgStorageProvider
-from cpg_pipes.refdata import RefData
+from cpg_pipes.providers.cpg.refdata import CpgRefData
+from cpg_pipes.providers.refdata import RefData
 
 
 def main():
@@ -19,21 +20,22 @@ def main():
     Create index for DRAGMAP.
     """
     b = setup_batch('Create DRAGMAP index')
-    refs = RefData(CpgStorageProvider().get_ref_base())
-    j1 = _index_dragmap_job(b, refs)
-    j2 = _test_dragmap_job(b, refs)
+    refs = CpgRefData()
+    images = CpgImages()
+    j1 = _index_dragmap_job(b, refs, images)
+    j2 = _test_dragmap_job(b, refs, images)
     j2.depends_on(j1)
     b.run(wait=False)
 
 
-def _index_dragmap_job(b: hb.Batch, refs: RefData) -> Job:
+def _index_dragmap_job(b: hb.Batch, refs: RefData, images: Images) -> Job:
     """
     Creates the index for DRAGMAP
     """
     reference = refs.fasta_res_group(b)
 
     j = b.new_job('Index DRAGMAP')
-    j.image(images.DRAGMAP_IMAGE)
+    j.image(images.get('dragmap'))
     j.memory('standard')
     j.cpu(32)
     j.storage('40G')
@@ -56,7 +58,7 @@ def _index_dragmap_job(b: hb.Batch, refs: RefData) -> Job:
     return j
 
 
-def _test_dragmap_job(b: hb.Batch, refs: RefData) -> Job:
+def _test_dragmap_job(b: hb.Batch, refs: RefData, images: Images) -> Job:
     dragmap_index = b.read_input_group(
         **{
             k.replace('.', '_'): refs.dragmap_index_bucket / k
@@ -65,7 +67,7 @@ def _test_dragmap_job(b: hb.Batch, refs: RefData) -> Job:
     )
     fq1 = b.read_input('gs://cpg-seqr-test/batches/test/tmp_fq')
     j = b.new_job('Test DRAGMAP')
-    j.image(images.DRAGMAP_IMAGE)
+    j.image(images.get('dragmap'))
     j.cpu(32)
     j.memory('standard')
     j.storage('300G')

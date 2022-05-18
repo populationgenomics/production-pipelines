@@ -58,6 +58,7 @@ class JointGenotyping(CohortStage):
             tmp_bucket=self.tmp_bucket,
             gvcf_by_sid=gvcf_by_sid,
             refs=self.refs,
+            images=self.images,
             overwrite=not self.check_intermediates,
             tool=JointGenotyperTool.GnarlyGenotyper
             if self.pipeline_config.get('use_gnarly', False)
