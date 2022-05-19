@@ -189,7 +189,7 @@ def pipeline_click_options(function: Callable) -> Callable:
         click.option(
             '--check-intermediates/--no-check-intermediates',
             'check_intermediates',
-            default=True,
+            default=False,
             is_flag=True,
             help='Within jobs, check all in-job intermediate files for possible reuse. '
             'If set to False, will overwrite all intermediates.',

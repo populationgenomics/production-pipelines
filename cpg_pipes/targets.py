@@ -211,7 +211,7 @@ class Cohort(Target):
         """
         Attributes for Hail Batch job.
         """
-        return {}
+        return {'samples': ','.join(self.get_sample_ids())}
 
     def get_job_prefix(self) -> str:
         """
@@ -325,7 +325,7 @@ class Dataset(Target):
     @property
     def storage_provider(self) -> StorageProvider:
         """
-        Storage provider object resonsible for dataset file paths.
+        Storage provider object responsible for dataset file paths.
         """
         if not self._storage_provider:
             raise ValueError(
@@ -421,7 +421,7 @@ class Dataset(Target):
         """
         Attributes for Hail Batch job.
         """
-        return {'dataset': self.name}
+        return {'dataset': self.name, 'samples': ','.join(self.get_sample_ids())}
 
     def get_job_prefix(self) -> str:
         """

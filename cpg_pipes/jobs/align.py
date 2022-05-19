@@ -14,7 +14,8 @@ from cpg_pipes import Path
 from cpg_pipes import utils
 from cpg_pipes.providers.images import Images
 from cpg_pipes.providers.refdata import RefData
-from cpg_pipes.types import AlignmentInput, CramPath, FastqPairs
+from cpg_pipes.types import AlignmentInput, CramPath, FastqPairs, \
+    alignment_input_short_str
 from cpg_pipes.jobs import picard
 from cpg_pipes.hb.prev_job import PrevJob
 from cpg_pipes.hb.command import wrap_command
@@ -108,12 +109,12 @@ def align(
     - nthreads can be set for smaller test runs on toy instance, so the job
       doesn't take entire 32-cpu/64-threaded instance.
     """
+    base_jname = 'Align'
+    if extra_label:
+        base_jname += f' {extra_label}'
+
     if output_path and utils.can_reuse(output_path, overwrite):
-        job_name = aligner.name
-        if extra_label:
-            job_name += f' {extra_label}'
-        job_name += ' [reuse]'
-        return [b.new_job(job_name, job_attrs)]
+        return [b.new_job(f'{base_jname} [reuse]', job_attrs)]
 
     if not realignment_shards_num:
         realignment_shards_num = RefData.number_of_shards_for_realignment
@@ -126,15 +127,11 @@ def align(
     sharded = sharded_fq or sharded_bazam
 
     jobs = []
-
+    
     if not sharded:
-        jname = f'{aligner.name}'
-        if extra_label:
-            jname += f' {extra_label}'
-
         align_j, align_cmd = _align_one(
             b=b,
-            job_name=jname,
+            job_name=base_jname,
             alignment_input=alignment_input,
             requested_nthreads=requested_nthreads,
             sample=sample_name,
@@ -154,31 +151,11 @@ def align(
         if sharded_fq:
             # running alignment for each fastq pair in parallel
             fastq_pairs = cast(FastqPairs, alignment_input)
-            for i, pair in enumerate(fastq_pairs):
-                jname = f'{aligner.name} {i+1}/{pair.r1}' + (
-                    f' {extra_label}' if extra_label else ''
-                )
-                key = sample_name, jname
-                if prev_batch_jobs and key in prev_batch_jobs:
-                    prevj = prev_batch_jobs[key]
-                    logger.info(
-                        f'Job was run in the previous batch {prevj.batch_number}: {key}'
-                    )
-                    existing_sorted_bam_path = f'{prevj.hail_bucket}/batch/{prevj.batchid}/{prevj.job_number}/sorted_bam'
-                    if utils.can_reuse(existing_sorted_bam_path, overwrite):
-                        logger.info(
-                            f'Reusing previous batch result: {existing_sorted_bam_path}'
-                        )
-                        jname += ' [reuse from previous batch]'
-                        j = b.new_job(jname, job_attrs)
-                        align_jobs.append(j)
-                        sorted_bams.append(b.read_input(existing_sorted_bam_path))
-                        continue
-
+            for pair in fastq_pairs:
                 # bwa-mem or dragmap command, but without sorting and deduplication:
                 j, cmd = _align_one(
                     b=b,
-                    job_name=jname,
+                    job_name=base_jname,
                     alignment_input=[pair],
                     requested_nthreads=requested_nthreads,
                     sample=sample_name,
@@ -198,15 +175,10 @@ def align(
         elif sharded_bazam:
             # running shared alignment for a CRAM, sharding with Bazam
             assert realignment_shards_num
-            for shard_number_0based in range(realignment_shards_num):
-                shard_number_1based = shard_number_0based + 1
-                jname = (
-                    f'{aligner.name} {shard_number_1based}/{realignment_shards_num}'
-                    + (f' {extra_label}' if extra_label else '')
-                )
+            for shard_number in range(realignment_shards_num):
                 j, cmd = _align_one(
                     b=b,
-                    job_name=jname,
+                    job_name=base_jname,
                     alignment_input=alignment_input,
                     sample=sample_name,
                     job_attrs=job_attrs,
@@ -215,7 +187,7 @@ def align(
                     aligner=aligner,
                     requested_nthreads=requested_nthreads,
                     number_of_shards_for_realignment=realignment_shards_num,
-                    shard_number_1based=shard_number_1based,
+                    shard_number=shard_number,
                 )
                 cmd = cmd.strip()
                 # Sorting with samtools, but not adding deduplication yet, because we
@@ -274,7 +246,7 @@ def _align_one(
     job_attrs: dict | None = None,
     aligner: Aligner = Aligner.BWA,
     number_of_shards_for_realignment: int | None = None,
-    shard_number_1based: int | None = None,
+    shard_number: int | None = None,
     storage_gb: float | None = None,
 ) -> tuple[Job, str]:
     """
@@ -286,6 +258,12 @@ def _align_one(
     a raw string in addition to the Job object.
     """
     job_attrs = (job_attrs or {}) | dict(label=job_name, tool=aligner.name)
+    if shard_number is not None:
+        job_name = (
+            f'{job_name} '
+            f'{shard_number + 1}/{number_of_shards_for_realignment} '
+        )
+    job_name = f'{job_name} {alignment_input_short_str(alignment_input)}'
     j = b.new_job(job_name, job_attrs)
 
     if number_of_shards_for_realignment is not None:
@@ -314,7 +292,7 @@ def _align_one(
             sample_name=sample,
             tool_name=tool_name,
             number_of_shards=number_of_shards_for_realignment,
-            shard_number_1based=shard_number_1based,
+            shard_number_1based=(shard_number + 1) if shard_number else None,
         )
     else:
         j.image(images.get('dragmap'))

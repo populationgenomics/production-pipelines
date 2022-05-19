@@ -57,9 +57,11 @@ class SampleStage(Stage[Sample], ABC):
                 if action == Action.REUSE:
                     # All stages to be reused, but adding only one reuse job
                     # (for whole dataset):
+                    attrs = dataset.get_job_attrs()
+                    attrs |= dict(stage=self.name, tool='[reuse]')
                     j = self.b.new_job(
                         f'{self.name} [reuse {len(dataset.get_samples())} samples]', 
-                        dataset.get_job_attrs()
+                        attrs
                     )
                     inputs = self._make_inputs()
                     for _, sample in enumerate(dataset.get_samples()):

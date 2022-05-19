@@ -153,7 +153,23 @@ def alignment_input_exists(v: AlignmentInput) -> bool:
         return utils.exists(v.path)
     else:
         return all(utils.exists(pair.r1) and utils.exists(pair.r2) for pair in v)
-    
+
+
+def alignment_input_short_str(v: AlignmentInput) -> str:
+    """
+    For CRAM, it's just a path to CRAM. For FASTQ pairs, it's a FASTQ path glob.
+    """
+    if isinstance(v, CramPath):
+        return str(v.path)
+    else:
+        all_fastq_paths = []
+        for pair in v:
+            all_fastq_paths.extend([pair.r1, pair.r2])
+        return ''.join([
+            f'{{{",".join(set(chars))}}}' if len(set(chars)) > 1 else chars[0] 
+            for chars in zip(*map(str, all_fastq_paths))
+        ])
+
 
 class SequencingType(Enum):
     """
@@ -163,6 +179,7 @@ class SequencingType(Enum):
     GENOME = 'genome'
     EXOME = 'exome'
     SINGLE_CELL = 'single_cell'
+    MTSEQ = 'mtseq'
 
     @staticmethod
     def parse(str_val: str) -> 'SequencingType':
@@ -171,9 +188,10 @@ class SequencingType(Enum):
         """
         str_to_val: dict[str, SequencingType] = {} 
         for val, str_vals in {
-            SequencingType.GENOME: ['wgs', 'genome'],
+            SequencingType.GENOME: ['genome', 'wgs'],
             SequencingType.EXOME: ['exome', 'wts', 'wes'],
             SequencingType.SINGLE_CELL: ['single_cell', 'single_cell_rna'],
+            SequencingType.MTSEQ: ['mtseq']
         }.items():
             for str_v in str_vals:
                 str_v = str_v.lower()

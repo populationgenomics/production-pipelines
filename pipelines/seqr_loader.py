@@ -10,6 +10,7 @@ import time
 
 import click
 import yaml
+from cpg_pipes.types import SequencingType
 from google.cloud import secretmanager
 from analysis_runner import dataproc
 
@@ -32,6 +33,10 @@ from cpg_pipes.stages.vqsr import Vqsr
 from cpg_pipes.targets import Cohort, Dataset
 
 logger = logging.getLogger(__file__)
+
+SUPPORTED_SEQUENCING_TYPES = [
+    SequencingType.GENOME,
+]
 
 
 @stage(required_stages=[JointGenotyping, Vep, Vqsr])
@@ -266,6 +271,7 @@ def main(
         with request.urlopen(seqr_stack_url) as f:
             value = yaml.safe_load(f)['config']['datasets:depends_on']
             datasets = [d.strip('"') for d in value.strip('[] ').split(', ')]
+            logger.info(f'Found Seqr datasets: {datasets}')
 
     description = 'Seqr Loader'
     if v := kwargs.get('version'):
@@ -292,6 +298,15 @@ def main(
         ),
         **kwargs,
     )
+    for s in pipeline.get_all_samples():
+        if s.sequencing_type not in SUPPORTED_SEQUENCING_TYPES:
+            logger.warning(
+                f'{s} skipping because of unsupported data type '
+                f'{s.sequencing_type.value}. Supported types: '
+                f'{[st.value for st in SUPPORTED_SEQUENCING_TYPES]} '
+            )
+            s.active = False
+
     pipeline.run()
 
 

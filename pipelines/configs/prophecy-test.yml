@@ -3,4 +3,4 @@ analysis_dataset: prophecy
 datasets: [prophecy]
 keep_scratch: true
 skip_samples_with_missing_input: true
-only_samples: [CPG213934, CPG214015, CPG213728]
+only_samples: [CPG202317]

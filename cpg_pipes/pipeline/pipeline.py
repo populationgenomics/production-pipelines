@@ -438,7 +438,7 @@ class Stage(Generic[TargetT], ABC):
         if self.assume_outputs_exist:
             res += ' [assume_outputs_exist]'
         if self.required_stages:
-            res += ' ' + ', '.join([s.name for s in self.required_stages])
+            res += f' <- [{", ".join([s.name for s in self.required_stages])}]'
         return res
 
     @property
@@ -559,7 +559,9 @@ class Stage(Generic[TargetT], ABC):
         Add "reuse" job. Target doesn't have to be specific for a stage here,
         this using abstract class Target instead of generic parameter TargetT.
         """
-        return self.b.new_job(f'{self.name} [reuse]', target.get_job_attrs())
+        attrs = dict(stage=self.name, tool='[reuse]')
+        attrs |= target.get_job_attrs()
+        return self.b.new_job(f'{self.name} [reuse]', attrs)
 
     def _get_action(self, target: TargetT) -> Action:
         """
@@ -580,7 +582,7 @@ class Stage(Generic[TargetT], ABC):
                 return Action.REUSE
             if self.skip_samples_with_missing_input:
                 logger.warning(
-                    f'Skipping sample {target}: stage {self.name} is required, '
+                    f'Skipping {target}: stage {self.name} is required, '
                     f'but is skipped, and expected outputs for the target do not '
                     f'exist: {expected_out}'
                 )
@@ -791,7 +793,7 @@ class Pipeline:
         last_stage: str | None = None,
         version: str | None = None,
         check_inputs: bool = False,
-        check_intermediates: bool = True,
+        check_intermediates: bool = False,
         check_expected_outputs: bool = True,
         skip_samples_with_missing_input: bool = False,
         skip_samples_stages: dict[str, list[str]] | None = None,
@@ -842,6 +844,7 @@ class Pipeline:
             description=description,
             billing_project=self.hail_billing_project,
             hail_bucket=self.hail_bucket,
+            use_private_pool=True,
         )
         self.status_reporter = status_reporter
 
@@ -997,13 +1000,13 @@ class Pipeline:
                 continue
 
         logger.info(
-            f'Setting stages: {", ".join(s.name for s in stages if not s.skipped)}'
+            f'Setting stages: {[s.name for s in stages if not s.skipped]}'
         )
         required_skipped_stages = [s for s in stages if s.skipped]
         if required_skipped_stages:
             logger.info(
                 f'Skipped stages: '
-                f'{", ".join(s.name for s in required_skipped_stages)}'
+                f'{[s.name for s in required_skipped_stages]}'
             )
 
         # Second round - actually adding jobs from the stages.
@@ -1017,11 +1020,10 @@ class Pipeline:
                     + '\n'.join(errors)
                 )
 
-            if not stage_.skipped:
-                logger.info(f'')
-                if last_stage_num and i >= last_stage_num:
-                    logger.info(f'Last stage is {stage_.name}, stopping here')
-                    break
+            logger.info(f'')
+            if last_stage_num is not None and i >= last_stage_num:
+                logger.info(f'Last stage was {stage_.name}, stopping here')
+                break
 
     @staticmethod
     def _process_stage_errors(output_by_target: dict[str, StageOutput | None]) -> list[str]:
