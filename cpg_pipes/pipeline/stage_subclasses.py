@@ -78,7 +78,7 @@ class SampleStage(Stage[Sample], ABC):
             for sample_i, sample in enumerate(dataset.get_samples()):
                 logger.info(f'{self.name}: #{sample_i + 1}/{sample}')
                 output_by_target[sample.target_id] = self._queue_jobs_with_checks(
-                    sample
+                    sample, action=action_by_sid[sample.id]
                 )
             logger.info('-#-#-#-')
 

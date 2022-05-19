@@ -115,13 +115,6 @@ def align(
         job_name += ' [reuse]'
         return [b.new_job(job_name, job_attrs)]
 
-    if realignment_shards_num and realignment_shards_num > 1:
-        if not isinstance(alignment_input, CramPath):
-            logger.warning(
-                f'Cannot use realignment_shards_num for fastq inputs. '
-                f'Sharding only works for CRAM/BAM inputs. '
-                f'Sample: {sample_name}'
-            )
     if not realignment_shards_num:
         realignment_shards_num = RefData.number_of_shards_for_realignment
 
