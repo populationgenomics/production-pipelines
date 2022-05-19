@@ -253,10 +253,7 @@ def pipeline_click_options(function: Callable) -> Callable:
         'config',
         type=click.Path(exists=True, dir_okay=False, readable=True),
         help='Read configuration from a YAML FILE.',
-        callback=get_config_callback(getattr(function, '__click_params__', [])),
-        expose_value=False,  # don't poss parameter to `main()`
-        is_eager=True,  # process before other options, to make sure we don't fail 
-                        # is required command line options are missing
+        callback=get_config_callback(getattr(function, '__click_params__', []))
     )(function)
 
 
