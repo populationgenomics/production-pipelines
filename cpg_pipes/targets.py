@@ -62,7 +62,7 @@ class Target:
         """
         ID should be unique across target of all levels.
 
-        We are raising NotImplementedError instead of making it an abstract class, 
+        We are raising NotImplementedError instead of making it an abstract class,
         because mypy is not happy about binding TypeVar to abstract classes, see:
         https://stackoverflow.com/questions/48349054/how-do-you-annotate-the-type-of
         -an-abstract-class-with-mypy
@@ -108,7 +108,7 @@ class Target:
 class Cohort(Target):
     """
     Represents a "cohort" target - all samples from all datasets in the pipeline.
-    Analysis dataset name is required and will be used as the default name for the 
+    Analysis dataset name is required and will be used as the default name for the
     cohort.
     """
 
@@ -295,7 +295,7 @@ class Dataset(Target):
             namespace=namespace,
             storage_provider=storage_provider,
         )
-    
+
     @property
     def is_test(self) -> bool:
         """
@@ -512,7 +512,7 @@ class Sample(Target):
             'meta': str(self.meta),
             'sequencing_type': str(self.sequencing_type.value),
             'alignment_input': self.alignment_input if self.alignment_input else '',
-            'pedigree': self.pedigree if self.pedigree else ''
+            'pedigree': self.pedigree if self.pedigree else '',
         }
         retval = f'Sample({self.dataset.name}/{self.id}'
         if self._external_id:

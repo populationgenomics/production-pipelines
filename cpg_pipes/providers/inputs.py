@@ -50,7 +50,9 @@ class InputProvider(ABC):
                 if skip_datasets and ds_name in skip_datasets:
                     logger.info(f'Requested to skipping dataset {ds_name}')
                     continue
-                dataset = Dataset.create(ds_name, cohort.namespace, cohort.storage_provider)
+                dataset = Dataset.create(
+                    ds_name, cohort.namespace, cohort.storage_provider
+                )
                 entries = self._get_entries(
                     dataset,
                     skip_samples=skip_samples,

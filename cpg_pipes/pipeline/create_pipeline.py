@@ -63,7 +63,7 @@ def create_pipeline(
     """
     refs = CpgRefData()
     images = CpgImages()
-    
+
     if storage_policy_type == StoragePolicyType.CPG:
         storage_provider = CpgStorageProvider()
     else:
@@ -79,13 +79,13 @@ def create_pipeline(
         smdb = SMDB(sm_proj)
         if status_reporter_type == StatusReporterType.CPG:
             status_reporter = CpgStatusReporter(
-                smdb=smdb, 
+                smdb=smdb,
                 images=images,
                 slack_channel=slack_channel,
             )
         if input_provider_type == InputProviderType.SMDB:
             input_provider = SmdbInputProvider(
-                smdb, 
+                smdb,
                 smdb_errors_are_fatal=smdb_errors_are_fatal,
             )
 
