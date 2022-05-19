@@ -1,10 +1,10 @@
 """
 Common pipeline command line options for Click.
 """
-import logging
 from enum import Enum
 from typing import Callable, Type, TypeVar
 import click
+import click_config_file
 import yaml  # type: ignore
 
 from ..providers import (
@@ -13,8 +13,6 @@ from ..providers import (
     InputProviderType,
 )
 from ..providers.storage import Namespace
-
-logger = logging.getLogger(__file__)
 
 
 def choice_from_enum(cls: Type[Enum]) -> click.Choice:
@@ -65,7 +63,6 @@ def pipeline_click_options(function: Callable) -> Callable:
         def main(custom_argument: str):
             pipeline = create_pipeline(**kwargs, config=dict(myarg=custom_argument))
     """
-
     options = [
         click.option(
             '-n',
@@ -240,45 +237,15 @@ def pipeline_click_options(function: Callable) -> Callable:
     # application which is bottom to top.
     for opt in options[::-1]:
         function = opt(function)
-    
-    # Adding a special option to read defaults from a user-provided configuration file. 
-    # Adding it last, so we are able to compare parameters in the file with the "normal" 
-    # options that would be populated in function.__click_params__ by click at this 
-    # point.
-    return click.option(
-        '--config',
-        'config',
-        type=click.Path(exists=True, dir_okay=False, readable=True),
-        help='Read configuration from a YAML FILE.',
-        callback=get_config_callback(getattr(function, '__click_params__', []))
+
+    # Adding ability to load options from a yaml file
+    # using https://pypi.org/project/click-config-file
+    def yaml_provider(fp, _):
+        """Load options from YAML"""
+        with open(fp) as f:
+            return yaml.load(f, Loader=yaml.SafeLoader)
+
+    return click_config_file.configuration_option(
+        provider=yaml_provider,
+        implicit=False,
     )(function)
-
-
-def get_config_callback(defined_options: list[click.Option]):
-    """
-    Create callback for the --config option. We want to be able to check what params 
-    are defined by "normal" click options to compare them with the params in the 
-    config file, so for this reason we parametrise the callback with `defined_options`
-    by wrapping it with another function `get_config_callback`.
-    """
-    def config_callback(ctx, param, yaml_path):
-        """Read default option values from a YAML config file"""
-        try:
-            with open(yaml_path) as f:
-                d = yaml.load(f, Loader=yaml.SafeLoader)
-        except Exception as e:
-            raise click.BadOptionUsage(
-                param, f'Error reading configuration file: {e}', ctx
-            )
-        
-        defined_opts = [_opt.name for _opt in defined_options]
-        unused_defaults = [k for k in d.keys() if k not in defined_opts]
-        if unused_defaults:
-            logger.warning(
-                f'Found unknown option(s) in the config {yaml_path}: '
-                f'{unused_defaults}'
-            )
-        
-        ctx.default_map = ctx.default_map or {}
-        ctx.default_map.update(d)
-    return config_callback
