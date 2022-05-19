@@ -5,6 +5,7 @@ Create Hail Batch jobs to create and apply a VQSR models.
 from typing import List, Optional
 import logging
 import hailtop.batch as hb
+from cpg_pipes.hb.resources import STANDARD, HIGHMEM
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
@@ -367,7 +368,7 @@ def _add_make_sites_only_job(
     images: Images,
     input_vcf: hb.ResourceGroup,
     overwrite: bool,
-    disk: int,
+    disk_size: int,
     output_vcf_path: Optional[str] = None,
 ) -> Job:
     """
@@ -382,8 +383,7 @@ def _add_make_sites_only_job(
 
     j = b.new_job(job_name)
     j.image(images.get('gatk'))
-    j.memory('8G')
-    j.storage(f'{disk}G')
+    res = STANDARD.set_resources(j, mem_gb=8, storage_gb=disk_size)
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
@@ -391,7 +391,7 @@ def _add_make_sites_only_job(
     j.command(
         wrap_command(
             f"""\
-    gatk --java-options -Xms6g \\
+    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
     MakeSitesOnlyVcf \\
     -I {input_vcf['vcf.gz']} \\
     -O {j.output_vcf['vcf.gz']} \\
@@ -418,8 +418,7 @@ def add_tabix_job(
     """
     j = b.new_job('VQSR: Tabix', job_attrs)
     j.image(images.get('bcftools'))
-    j.memory(f'8G')
-    j.storage(f'{disk_size}G')
+    STANDARD.set_resources(j, mem_gb=8, storage_gb=disk_size)
     j.declare_resource_group(
         combined_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
@@ -449,8 +448,7 @@ def add_sites_only_gather_vcf_step(
     """
     j = b.new_job('VQSR: SitesOnlyGatherVcf', job_attrs)
     j.image(images.get('gatk'))
-    j.memory('8G')
-    j.storage(f'{disk_size}G')
+    res = STANDARD.set_resources(j, mem_gb=8, storage_gb=disk_size)
 
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
@@ -464,7 +462,7 @@ def add_sites_only_gather_vcf_step(
     # our invocation. This argument disables expensive checks that the file headers
     # contain the same set of genotyped samples and that files are in order by position
     # of first record.
-    gatk --java-options -Xms6g GatherVcfsCloud \\
+    gatk --java-options -Xms{res.get_java_mem_mb()}m GatherVcfsCloud \\
     --ignore-safety-checks \\
     --gather-type BLOCK \\
     {input_cmdl} \\
@@ -504,18 +502,14 @@ def add_indels_variant_recalibrator_job(
     j = b.new_job('VQSR: IndelsVariantRecalibrator', job_attrs)
     j.image(images.get('gatk'))
 
-    # we run it for the entire dataset in one job, so can take an entire instance:
-    j.cpu(16)
+    # We run it for the entire dataset in one job, so can take an entire instance.
+    instance_fraction = 1
     # however, for smaller datasets we take a standard instance, and for larger
     # ones we take a highmem instance
     if is_small_callset:
-        mem_gb = 52  #
-        j.memory('standard')
+        res = STANDARD.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
     else:
-        mem_gb = 104  # hail would allocate 104G
-        j.memory('highmem')
-    java_mem = mem_gb - 2
-    j.storage(f'{disk_size}G')
+        res = HIGHMEM.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
 
     j.declare_resource_group(recalibration={'index': '{root}.idx', 'base': '{root}'})
 
@@ -535,7 +529,7 @@ def add_indels_variant_recalibrator_job(
     j.command(
         f"""set -euo pipefail
 
-    gatk --java-options -Xms{java_mem}g \\
+    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
       VariantRecalibrator \\
       -V {sites_only_variant_filtered_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
@@ -593,18 +587,14 @@ def add_snps_variant_recalibrator_create_model_step(
     j = b.new_job('VQSR: SNPsVariantRecalibratorCreateModel', job_attrs)
     j.image(images.get('gatk'))
 
-    # we run it for the entire dataset in one job, so can take an entire instance:
-    j.cpu(16)
+    # We run it for the entire dataset in one job, so can take an entire instance.
+    instance_fraction = 1
     # however, for smaller datasets we take a standard instance, and for larger
     # ones we take a highmem instance
     if is_small_callset:
-        mem_gb = 52  #
-        j.memory('standard')
+        res = STANDARD.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
     else:
-        mem_gb = 104  # hail would allocate 104G
-        j.memory('highmem')
-    java_mem = mem_gb - 2
-    j.storage(f'{disk_size}G')
+        res = HIGHMEM.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
 
     downsample_factor = 75 if is_huge_callset else 10
 
@@ -622,7 +612,7 @@ def add_snps_variant_recalibrator_create_model_step(
     j.command(
         f"""set -euo pipefail
 
-    gatk --java-options -Xms{java_mem}g \\
+    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
       VariantRecalibrator \\
       -V {sites_only_variant_filtered_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
@@ -684,13 +674,9 @@ def add_snps_variant_recalibrator_scattered_step(
     j.image(images.get('gatk'))
 
     if is_small_callset:
-        j.cpu(4)
-        mem_gb = 15  # ~ 3.75G/core ~ 15G
+        res = STANDARD.set_resources(j, ncpu=4, storage_gb=disk_size)
     else:
-        j.cpu(8)
-        mem_gb = 30  # ~ 3.75G/core ~ 30G
-    java_mem = mem_gb - 1
-    j.storage(f'{disk_size}G')
+        res = STANDARD.set_resources(j, ncpu=8, storage_gb=disk_size)
 
     j.declare_resource_group(recalibration={'index': '{root}.idx', 'base': '{root}'})
 
@@ -710,7 +696,7 @@ def add_snps_variant_recalibrator_scattered_step(
 
     MODEL_REPORT={model_file}
 
-    gatk --java-options -Xms{java_mem}g \\
+    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
       VariantRecalibrator \\
       -V {sites_only_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
@@ -751,17 +737,14 @@ def add_snps_variant_recalibrator_step(
     j = b.new_job('VQSR: SNPsVariantRecalibrator', job_attrs)
     j.image(images.get('gatk'))
 
-    # we run it for the entire dataset in one job, so can take an entire instance:
-    j.cpu(16)
+    # We run it for the entire dataset in one job, so can take an entire instance.
+    instance_fraction = 1
     # however, for smaller datasets we take a standard instance, and for larger
     # ones we take a highmem instance
     if is_small_callset:
-        mem_gb = 52  #
-        j.memory('standard')
+        res = STANDARD.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
     else:
-        mem_gb = 104  # hail would allocate 104G
-        j.memory('highmem')
-    java_mem = mem_gb - 2
+        res = HIGHMEM.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
 
     j.storage(f'{disk_size}G')
 
@@ -781,7 +764,7 @@ def add_snps_variant_recalibrator_step(
     j.command(
         f"""set -euo pipefail
 
-    gatk --java-options -Xms{java_mem}g \\
+    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
       VariantRecalibrator \\
       -V {sites_only_variant_filtered_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
@@ -825,15 +808,13 @@ def add_snps_gather_tranches_step(
     """
     j = b.new_job('VQSR: SNPGatherTranches', job_attrs)
     j.image(images.get('gatk'))
-    j.memory('8G')
-    j.cpu(2)
-    j.storage(f'{disk_size}G')
+    res = STANDARD.set_resources(j, ncpu=2, storage_gb=disk_size)
 
     inputs_cmdl = ' '.join([f'--input {t}' for t in tranches])
     j.command(
         f"""set -euo pipefail
 
-    gatk --java-options -Xms6g \\
+    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
       GatherTranches \\
       --mode SNP \\
       {inputs_cmdl} \\
@@ -879,11 +860,7 @@ def add_apply_recalibration_step(
     """
     j = b.new_job('VQSR: ApplyRecalibration', job_attrs)
     j.image(images.get('gatk'))
-
-    j.cpu(2)  # memory: 3.75G * 2 = 7.5G on a standard instance
-    java_mem = 7
-
-    j.storage(f'{disk_size}G')
+    res = STANDARD.set_resources(j, ncpu=2, storage_gb=disk_size)
 
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
@@ -898,7 +875,7 @@ def add_apply_recalibration_step(
     mkdir $TMP_DIR
 
     TMP_INDEL_RECALIBRATED=/io/batch/tmp.indel.recalibrated.vcf.gz
-    gatk --java-options -Xms{java_mem}g \\
+    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
       ApplyVQSR \\
       --tmp-dir $TMP_DIR \\
       -O $TMP_INDEL_RECALIBRATED \\
@@ -966,9 +943,7 @@ def add_collect_metrics_sharded_step(
     """
     j = b.new_job('VQSR: CollectMetricsSharded', job_attrs)
     j.image(images.get('gatk'))
-    j.memory('8G')
-    j.cpu(2)
-    j.storage(f'{disk_size}G')
+    res = STANDARD.set_resources(j, ncpu=2, storage_gb=disk_size)
     j.declare_resource_group(
         metrics={
             'detail_metrics': '{root}.variant_calling_detail_metrics',
@@ -979,7 +954,7 @@ def add_collect_metrics_sharded_step(
     j.command(
         f"""set -euo pipefail
 
-    gatk --java-options -Xms6g \\
+    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
       CollectVariantCallingMetrics \\
       --INPUT {input_vcf['vcf.gz']} \\
       --DBSNP {dbsnp_vcf.base} \\
@@ -988,39 +963,6 @@ def add_collect_metrics_sharded_step(
       --THREAD_COUNT 8 \\
       --TARGET_INTERVALS {interval_list}"""
     )
-    return j
-
-
-def _add_final_filter_job(
-    b: hb.Batch,
-    images: Images,
-    input_vcf: hb.ResourceGroup,
-    output_vcf_path: str = None,
-    job_attrs: dict | None = None,
-) -> Job:
-    """
-    Hard-filters the VQSR'ed VCF
-    """
-    j = b.new_job('VQSR: final filter', job_attrs)
-    j.image(images.get('bcftools'))
-    j.memory(f'8G')
-    j.storage(f'100G')
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
-
-    j.command(
-        f"""
-    df -h; pwd; free -m
-
-    bcftools view -f.,PASS {input_vcf['vcf.gz']} -Oz -o {j.output_vcf['vcf.gz']} && \\
-    tabix {j.output_vcf['vcf.gz']}
-
-    df -h; pwd; free -m
-    """
-    )
-    if output_vcf_path:
-        b.write_output(j.output_vcf, output_vcf_path.replace('.vcf.gz', ''))
     return j
 
 
@@ -1040,13 +982,12 @@ def _add_variant_eval_step(
     """
     j = b.new_job('VQSR: VariantEval', job_attrs)
     j.image(images.get('gatk'))
-    j.memory(f'8G')
-    j.storage(f'{disk_size}G')
+    res = STANDARD.set_resources(j, ncpu=2, storage_gb=disk_size)
 
     j.command(
         f"""set -euo pipefail
 
-    gatk --java-options -Xms6g \\
+    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
       VariantEval \\
       --eval {input_vcf['vcf.gz']} \\
       -R {ref_fasta.base} \\
@@ -1077,8 +1018,7 @@ def add_gather_variant_calling_metrics_step(
     """
     j = b.new_job('VQSR: GatherVariantCallingMetrics', job_attrs)
     j.image(images.get('gatk'))
-    j.memory(f'8G')
-    j.storage(f'{disk_size}G')
+    res = STANDARD.set_resources(j, ncpu=2, storage_gb=disk_size)
     j.declare_resource_group(
         metrics={
             'detail_metrics': '{root}.variant_calling_detail_metrics',
@@ -1090,7 +1030,7 @@ def add_gather_variant_calling_metrics_step(
     j.command(
         f"""set -euo pipefail
 
-    gatk --java-options -Xms2g \\
+    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
       AccumulateVariantCallingMetrics \\
       {input_cmdl} \\
       --OUTPUT {j.metrics}"""
