@@ -11,12 +11,16 @@ from hailtop.batch.job import Job
 logger = logging.getLogger(__file__)
 
 
+def _is_power_of_two(n: int) -> bool:
+    return math.ceil(math.log(n, 2)) == math.floor(math.log(n, 2))
+
+
 def gcp_machine_name(name: str, ncpu: int) -> str:
     """
     Machine type name in the GCP world
     """
     assert name in ['standard', 'highmem', 'highcpu'], name
-    assert ncpu in [4, 8, 16, 32], ncpu
+    assert _is_power_of_two(ncpu), ncpu
     return f'n1-{name}-{ncpu}'
 
 
@@ -296,7 +300,7 @@ class JobResource:
                 j._machine_type = self.machine_type.gcp_name()
             else:
                 # Private pools don't support binning, so replacing with a smaller machine
-                ncpu = min(4, self.get_ncpu())
+                ncpu = max(2, self.get_ncpu())
                 j._machine_type = gcp_machine_name(self.machine_type.name, ncpu)
         else:
             j.cpu(self.get_ncpu())
