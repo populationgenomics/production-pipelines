@@ -6,6 +6,8 @@ import logging
 import os
 import sys
 import traceback
+from functools import lru_cache
+
 import click
 from typing import Any, Callable, cast
 
@@ -71,7 +73,19 @@ def get_validation_callback(
     return _callback
 
 
+@lru_cache
 def exists(path: Path | str, verbose: bool = True) -> bool:
+    """
+    Caching version of the existence check. 
+    The python code runtime happens entirely during the pipeline submittion, 
+    without waiting for it to finish, so there is no expectation that object 
+    existence status would change during the runtime. This, this function uses
+    `@lru_cache` to make sure that object existence is checked only once.
+    """
+    return exists_not_cached(path, verbose)
+
+
+def exists_not_cached(path: Path | str, verbose: bool = True) -> bool:
     """
     Check if the object exists, where the object can be:
         * local file
