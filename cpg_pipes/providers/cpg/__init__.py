@@ -14,6 +14,7 @@ ANALYSIS_RUNNER_PROJECT_ID = 'analysis-runner'
 DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:7f41eeb90c8bec8836a1cd20ad1911b5989a5893-hail-db65c33c29100c64405c39ebace90a7c463b4bec'
 IMAGE_REGISTRY_PREFIX = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
 REFERENCE_PREFIX = 'gs://cpg-reference'
+WEB_URL_TEMPLATE = f'https://{{namespace}}-web.populationgenomics.org.au/{{dataset}}'
 
 
 def get_server_config() -> dict:
@@ -48,10 +49,11 @@ def analysis_runner_environment(
         gcp_project = server_config[stack]['projectId']
     assert hail_token
     assert gcp_project
-    
+
     os.environ.setdefault('CPG_DRIVER_IMAGE', DRIVER_IMAGE)
     os.environ.setdefault('CPG_IMAGE_REGISTRY_PREFIX', IMAGE_REGISTRY_PREFIX)
     os.environ.setdefault('CPG_REFERENCE_PREFIX', REFERENCE_PREFIX)
+    os.environ.setdefault('CPG_WEB_URL_TEMPLATE', WEB_URL_TEMPLATE)
     os.environ.setdefault('CPG_OUTPUT_PREFIX', 'cpg-pipes')
     os.environ.setdefault('CPG_DATASET_GCP_PROJECT', gcp_project)
     os.environ.setdefault('HAIL_BILLING_PROJECT', stack)
