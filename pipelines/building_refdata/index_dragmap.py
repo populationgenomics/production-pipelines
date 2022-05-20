@@ -54,14 +54,14 @@ def _index_dragmap_job(b: hb.Batch, refs: RefData, images: Images) -> Job:
     cmd += 'df -h; pwd; ls | grep -v proc | xargs du -sh'
     j.command(cmd)
     for f in refs.dragmap_index_files:
-        b.write_output(getattr(j, f.replace('.', '_')), refs.dragmap_index_bucket / f)
+        b.write_output(getattr(j, f.replace('.', '_')), refs.dragmap_ref_bucket / f)
     return j
 
 
 def _test_dragmap_job(b: hb.Batch, refs: RefData, images: Images) -> Job:
     dragmap_index = b.read_input_group(
         **{
-            k.replace('.', '_'): refs.dragmap_index_bucket / k
+            k.replace('.', '_'): refs.dragmap_ref_bucket / k
             for k in refs.dragmap_index_files
         }
     )

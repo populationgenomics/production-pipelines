@@ -11,6 +11,15 @@ from hailtop.batch.job import Job
 logger = logging.getLogger(__file__)
 
 
+def gcp_machine_name(name: str, ncpu: int) -> str:
+    """
+    Machine type name in the GCP world
+    """
+    assert name in ['standard', 'highmem', 'highcpu'], name
+    assert ncpu in [4, 8, 16, 32], ncpu
+    return f'n1-{name}-{ncpu}'
+
+
 @dataclass(init=False)
 class MachineType:
     """
@@ -36,7 +45,7 @@ class MachineType:
         """
         Machine type name in the GCP world
         """
-        return f'n1-{self.name}-{self.max_ncpu}'
+        return gcp_machine_name(self.name, self.max_ncpu)
 
     def max_threads(self) -> int:
         """
@@ -276,16 +285,22 @@ class JobResource:
         Set the resources to a Job object. Return self to allow chaining, e.g.:
         >>> nthreads = STANDARD.request_resources(nthreads=4).set_to_job(j).get_nthreads()
         """
-   
-        j.storage(f'{self.get_storage_gb()}G')
 
+        j.storage(f'{self.get_storage_gb()}G')
+        
         if j['use_private_pool']:
             # Force setting j._machine_type send the job to the private pool:
             # https://github.com/populationgenomics/hail/blob/ad1fc0e2a30f67855aee84ae9adabc3f3135bd47/batch/batch/inst_coll_config.py#L324-L344
-            j._machine_type = self.machine_type.gcp_name()
+            if self.get_ncpu() == self.machine_type.max_ncpu:
+                # Taking entire machine
+                j._machine_type = self.machine_type.gcp_name()
+            else:
+                # Private pools don't support binning, so replacing with a smaller machine
+                ncpu = min(4, self.get_ncpu())
+                j._machine_type = gcp_machine_name(self.machine_type.name, ncpu)
         else:
             j.cpu(self.get_ncpu())
             j.memory(f'{self.get_mem_gb()}G')
     
-        # returning self to allow command chaining.
+        # Returning self to allow command chaining.
         return self
