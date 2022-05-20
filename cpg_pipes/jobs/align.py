@@ -292,7 +292,7 @@ def _align_one(
             sample_name=sample,
             tool_name=tool_name,
             number_of_shards=number_of_shards_for_realignment,
-            shard_number_1based=(shard_number + 1) if shard_number else None,
+            shard_number=shard_number,
         )
     else:
         j.image(images.get('dragmap'))
@@ -348,7 +348,7 @@ def _build_bwa_command(
     sample_name: str,
     tool_name: str,
     number_of_shards: int | None = None,
-    shard_number_1based: int | None = None,
+    shard_number: int | None = None,
 ) -> str:
     pull_inputs_cmd = ''
     if isinstance(alignment_input, CramPath):
@@ -356,11 +356,10 @@ def _build_bwa_command(
 
         cram = cast(CramPath, alignment_input).resource_group(b)
         if number_of_shards and number_of_shards > 1:
-            assert shard_number_1based is not None and shard_number_1based > 0, (
-                shard_number_1based,
-                sample_name,
+            assert shard_number is not None and shard_number >= 0, (
+                shard_number, sample_name,
             )
-            shard_param = f' -s {shard_number_1based},{number_of_shards}'
+            shard_param = f' -s {shard_number + 1},{number_of_shards}'
         else:
             shard_param = ''
         bazam_cmd = (
