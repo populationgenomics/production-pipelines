@@ -39,19 +39,25 @@ def analysis_runner_environment(
     if namespace == Namespace.TEST or not access_level:
         access_level = 'test'
     os.environ['CPG_ACCESS_LEVEL'] = access_level
-
-    server_config = get_server_config()
-    hail_token = server_config[stack][f'{access_level}Token']
-
-    os.environ.setdefault('CPG_DATASET_GCP_PROJECT', server_config[stack]['projectId'])
+    
+    hail_token = os.getenv('HAIL_TOKEN')
+    gcp_project = os.getenv('CPG_DATASET_GCP_PROJECT')
+    if not hail_token or not gcp_project:
+        server_config = get_server_config()
+        hail_token = server_config[stack][f'{access_level}Token']
+        gcp_project = server_config[stack]['projectId']
+    assert hail_token
+    assert gcp_project
+    
     os.environ.setdefault('CPG_DRIVER_IMAGE', DRIVER_IMAGE)
     os.environ.setdefault('CPG_IMAGE_REGISTRY_PREFIX', IMAGE_REGISTRY_PREFIX)
     os.environ.setdefault('CPG_REFERENCE_PREFIX', REFERENCE_PREFIX)
     os.environ.setdefault('CPG_OUTPUT_PREFIX', 'cpg-pipes')
+    os.environ.setdefault('CPG_DATASET_GCP_PROJECT', gcp_project)
     os.environ.setdefault('HAIL_BILLING_PROJECT', stack)
     os.environ.setdefault('HAIL_BUCKET', f'cpg-{stack}-hail')
     os.environ.setdefault('HAIL_TOKEN', hail_token)
-
+    
 
 cpg_dataset = os.environ.get('CPG_DATASET')
 cpg_access_level = os.environ.get('CPG_ACCESS_LEVEL')
