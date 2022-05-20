@@ -13,6 +13,7 @@ from ..providers import (
     StatusReporterType,
     InputProviderType,
 )
+from ..providers.cpg import analysis_runner_environment
 from ..providers.cpg.images import CpgImages
 from ..providers.cpg.refdata import CpgRefData
 from ..providers.storage import Namespace
@@ -61,9 +62,19 @@ def create_pipeline(
     Create a Pipeline instance. All options correspond to command line parameters
     described in `pipeline_click_options` in the `cli_opts` module
     """
+    if any([
+        input_provider_type == InputProviderType.SMDB,
+        storage_policy_type == StoragePolicyType.CPG,
+        status_reporter_type == StatusReporterType.CPG,
+    ]):
+        analysis_runner_environment(
+            dataset=analysis_dataset, 
+            access_level='full' if namespace == Namespace.MAIN else 'test',
+        )
+
     refs = CpgRefData()
     images = CpgImages()
-
+    
     if storage_policy_type == StoragePolicyType.CPG:
         storage_provider = CpgStorageProvider()
     else:

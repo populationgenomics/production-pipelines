@@ -70,9 +70,7 @@ def setup_env(dataset: str = DATASET, namespace: Namespace = NAMESPACE):
     exported environment variables with EnvFile, so have to do it here.
     """
     os.environ['CPG_DATASET'] = dataset
+    os.environ['CPG_DATASET_GCP_PROJECT'] = dataset
     os.environ['CPG_ACCESS_LEVEL'] = namespace.value
     os.environ['CPG_OUTPUT_PREFIX'] = 'unittests'
     analysis_runner_environment()
-
-
-setup_env()

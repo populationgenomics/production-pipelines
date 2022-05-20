@@ -269,6 +269,8 @@ def get_config_callback(defined_options: list[click.Option]):
     """
     def config_callback(ctx, param, yaml_path):
         """Read default option values from a YAML config file"""
+        if not yaml_path:
+            return
         try:
             with open(yaml_path) as f:
                 d = yaml.load(f, Loader=yaml.SafeLoader)

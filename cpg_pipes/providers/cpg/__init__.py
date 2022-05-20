@@ -3,8 +3,10 @@ CPG implementations of providers.
 """
 import json
 import os
+from urllib import request
 
-from cpg_utils.cloud import read_secret
+import yaml
+from cpg_utils.cloud import read_secret, email_from_id_token
 
 from ... import Namespace
 from ...targets import parse_stack
@@ -19,14 +21,34 @@ WEB_URL_TEMPLATE = f'https://{{namespace}}-web.populationgenomics.org.au/{{datas
 
 def get_server_config() -> dict:
     """Get the server-config from the secret manager"""
-    return json.loads(read_secret(ANALYSIS_RUNNER_PROJECT_ID, 'server-config'))
+    secret = read_secret(ANALYSIS_RUNNER_PROJECT_ID, 'server-config')
+    if not secret:
+        raise ValueError(
+            f'Cannot read secret "server-config" from the GCP project '
+            f'"{ANALYSIS_RUNNER_PROJECT_ID}". Please, set HAIL_TOKEN and '
+            f'CPG_DATASET_GCP_PROJECT environment variables explicitly.'
+        )
+    return json.loads(secret)
+
+
+def get_stack_sa_email(stack: str, access_level: str) -> str:
+    """Parse service account email from Pulumi yaml"""
+    seqr_stack_url = (
+        f'https://raw.githubusercontent.com/populationgenomics/analysis-runner/main'
+        f'/stack/Pulumi.{stack}.yaml'
+    )
+    with request.urlopen(seqr_stack_url) as f:
+        data = yaml.safe_load(f)['config']
+    return data[f'datasets:hail_service_account_{access_level}']
 
 
 def analysis_runner_environment(
     dataset: str | None = None,
     access_level: str | None = None,
 ):
-    """Simulate analysis-runner environment"""
+    """
+    Simulate the analysis-runner environment
+    """
     access_level = os.getenv('CPG_ACCESS_LEVEL', access_level)
     dataset = os.getenv('CPG_DATASET', dataset)
     if not dataset:
@@ -34,11 +56,16 @@ def analysis_runner_environment(
 
     namespace = Namespace.TEST if access_level == 'test' else Namespace.MAIN
     stack, namespace = parse_stack(dataset, namespace)
+    if namespace == Namespace.TEST or not access_level:
+        access_level = 'test'
+
+    sa_email = get_stack_sa_email(stack, access_level)
+    if sa_key_template := os.getenv('CPG_SA_PATH_TEMPLATE'):
+        sa_key_path = sa_key_template.format(sa_name=sa_email.split('@')[0])
+        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = sa_key_path
 
     # overriding in case if dataset was in form of "dataset-test"
     os.environ['CPG_DATASET'] = stack
-    if namespace == Namespace.TEST or not access_level:
-        access_level = 'test'
     os.environ['CPG_ACCESS_LEVEL'] = access_level
     
     hail_token = os.getenv('HAIL_TOKEN')
@@ -59,12 +86,3 @@ def analysis_runner_environment(
     os.environ.setdefault('HAIL_BILLING_PROJECT', stack)
     os.environ.setdefault('HAIL_BUCKET', f'cpg-{stack}-hail')
     os.environ.setdefault('HAIL_TOKEN', hail_token)
-    
-
-cpg_dataset = os.environ.get('CPG_DATASET')
-cpg_access_level = os.environ.get('CPG_ACCESS_LEVEL')
-if cpg_dataset:
-    analysis_runner_environment(
-        dataset=cpg_dataset, 
-        access_level=cpg_access_level,
-    )
