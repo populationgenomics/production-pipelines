@@ -5,6 +5,7 @@ Stage that generates a CRAM file.
 import logging
 
 from .. import Path, types
+from ..jobs.align import Aligner
 from ..targets import Sample
 from ..pipeline import stage, SampleStage, StageInput, StageOutput
 from ..jobs import align
@@ -51,5 +52,6 @@ class Align(SampleStage):
             images=self.images,
             overwrite=not self.check_intermediates,
             realignment_shards_num=self.pipeline_config.get('realignment_shards_num'),
+            aligner=Aligner.DRAGMAP,
         )
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)

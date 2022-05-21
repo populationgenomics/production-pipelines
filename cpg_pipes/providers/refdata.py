@@ -204,7 +204,6 @@ class RefData:
             base=str(self.ref_fasta),
             fai=str(self.ref_fasta) + '.fai',
             dict=str(self.ref_fasta.with_suffix('.dict')),
-            str=str(self.ref_fasta.with_suffix('.str')),
         )
         if indices:
             d |= {ext: f'{self.ref_fasta}.{ext}' for ext in indices}
