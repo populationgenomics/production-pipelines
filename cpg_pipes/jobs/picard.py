@@ -48,11 +48,11 @@ def markdup(
     cmd = f"""
     picard MarkDuplicates -Xms13G \\
     I={sorted_bam} O=/dev/stdout M={j.duplicate_metrics} \\
-    TMP_DIR=$(dirname {j.output_cram.cram_path})/picard-tmp \\
+    TMP_DIR=$(dirname {j.output_cram.cram})/picard-tmp \\
     ASSUME_SORT_ORDER=coordinate \\
-    | samtools view -@{resource.get_nthreads() - 1} -T {fasta_reference.base} -O cram -o {j.output_cram.cram_path}
+    | samtools view -@{resource.get_nthreads() - 1} -T {fasta_reference.base} -O cram -o {j.output_cram.cram}
     
-    samtools index -@{resource.get_nthreads() - 1} {j.output_cram.cram_path} {j.output_cram['cram.crai']}
+    samtools index -@{resource.get_nthreads() - 1} {j.output_cram.cram} {j.output_cram['cram.crai']}
     """
     j.command(wrap_command(cmd, monitor_space=True))
 

@@ -81,7 +81,7 @@ def align(
     output_path: Path | None = None,
     qc_bucket: Path | None = None,
     aligner: Aligner = Aligner.BWA,
-    markdup_tool: MarkDupTool = MarkDupTool.BIOBAMBAM,
+    markdup_tool: MarkDupTool = MarkDupTool.PICARD,
     extra_label: str | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
