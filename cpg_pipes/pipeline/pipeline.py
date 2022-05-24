@@ -801,6 +801,7 @@ class Pipeline:
         local_dir: Path | None = None,
         dry_run: bool = False,
         keep_scratch: bool = True,
+        use_private_pool: bool = False,
     ):
         self.storage_provider = storage_provider
         self.cohort = Cohort(
@@ -844,7 +845,7 @@ class Pipeline:
             description=description,
             billing_project=self.hail_billing_project,
             hail_bucket=self.hail_bucket,
-            use_private_pool=True,
+            use_private_pool=use_private_pool,
         )
         self.status_reporter = status_reporter
 

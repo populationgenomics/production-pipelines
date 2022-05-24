@@ -213,6 +213,12 @@ def pipeline_click_options(function: Callable) -> Callable:
             'Works nicely with --previous-batch-tsv/--previous-batch-id options.',
         ),
         click.option(
+            '--use-private-pool/--no-use-private-pool',
+            'use_private_pool',
+            default=False,
+            is_flag=True,
+        ),
+        click.option(
             '--local-dir',
             'local_dir',
             help='Local directory for temporary files. Usually takes a few kB. '
