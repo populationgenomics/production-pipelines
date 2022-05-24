@@ -8,8 +8,9 @@ from urllib import request
 import yaml
 from cpg_utils.cloud import read_secret, email_from_id_token
 
-from ... import Namespace
+from ... import Namespace, to_path
 from ...targets import parse_stack
+from ...utils import exists
 
 ANALYSIS_RUNNER_PROJECT_ID = 'analysis-runner'
 
@@ -59,15 +60,11 @@ def analysis_runner_environment(
     if namespace == Namespace.TEST or not access_level:
         access_level = 'test'
 
-    sa_email = get_stack_sa_email(stack, access_level)
-    if sa_key_template := os.getenv('CPG_SA_PATH_TEMPLATE'):
-        sa_key_path = sa_key_template.format(sa_name=sa_email.split('@')[0])
-        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = sa_key_path
-
-    # overriding in case if dataset was in form of "dataset-test"
+    # Overriding in case if dataset was in form of "dataset-test"
     os.environ['CPG_DATASET'] = stack
     os.environ['CPG_ACCESS_LEVEL'] = access_level
     
+    # Parse server config to get Hail token and the GCP project name
     hail_token = os.getenv('HAIL_TOKEN')
     gcp_project = os.getenv('CPG_DATASET_GCP_PROJECT')
     if not hail_token or not gcp_project:
@@ -76,7 +73,16 @@ def analysis_runner_environment(
         gcp_project = server_config[stack]['projectId']
     assert hail_token
     assert gcp_project
-
+    
+    # Active dataset service account
+    sa_email = get_stack_sa_email(stack, access_level)
+    if sa_key_template := os.getenv('CPG_SA_PATH_TEMPLATE'):
+        sa_key_path = sa_key_template.format(sa_name=sa_email.split('@')[0])
+        if not exists(sa_key_path):
+            raise ValueError(f'SA key {sa_key_path} does not exist')
+        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = sa_key_path
+    
+    # Finalise environment variables
     os.environ.setdefault('CPG_DRIVER_IMAGE', DRIVER_IMAGE)
     os.environ.setdefault('CPG_IMAGE_REGISTRY_PREFIX', IMAGE_REGISTRY_PREFIX)
     os.environ.setdefault('CPG_REFERENCE_PREFIX', REFERENCE_PREFIX)
