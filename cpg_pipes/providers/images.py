@@ -5,12 +5,12 @@ import os
 
 
 AVAILABLE = {
-    'gatk': 'gatk:4.2.3.0',
+    'gatk': 'gatk:4.2.6.1',
     'bcftools': 'bcftools:1.10.2--h4f4756c_2',
     'sm-api': 'sm-api:4.0.0',
     'bwa': 'bwa:v0',
     'bwamem2': 'bwamem2:v0',
-    'dragmap': 'dragmap:1.2.1',
+    'dragmap': 'dragmap:1.3.0',
     'samtools': 'picard_samtools:v0',
     'picard': 'picard_samtools:v0',
     'picard_samtools': 'picard_samtools:v0',
