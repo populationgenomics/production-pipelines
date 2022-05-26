@@ -1,4 +1,7 @@
-FROM debian:buster-slim
+# Using rocky as temp replacement for CentOS
+FROM rockylinux:8.5 
+
+ARG DRAGMAP_VERSION=1.3.0
 
 ENV VERSION 1.3.0
 
