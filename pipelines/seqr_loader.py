@@ -281,7 +281,7 @@ def main(
     if create_es_index_for_datasets:
         description += f' → [{", ".join(sorted(create_es_index_for_datasets))}]'
 
-    kwargs['analysis_dataset'] = 'seqr'
+    kwargs['analysis_dataset'] = kwargs.get('analysis_dataset', 'seqr')
     pipeline = create_pipeline(
         name='Seqr Loader',
         description=description,
