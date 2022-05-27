@@ -14,6 +14,7 @@ from cpg_pipes.pipeline.pipeline import Pipeline, Stage
 from cpg_pipes.providers.cpg.images import CpgImages
 from cpg_pipes.providers.cpg.refdata import CpgRefData
 from cpg_pipes.providers.cpg.storage import CpgStorageProvider
+from cpg_pipes.stages.genotype_sample import GenotypeSample
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
 from cpg_pipes.types import CramPath
@@ -101,6 +102,7 @@ class TestPipeline(unittest.TestCase):
             name=self._testMethodName,
             analysis_dataset_name=utils.DATASET,
             check_intermediates=False,
+            check_expected_outputs=False,
             storage_provider=UnittestStorageProvider(self.out_bucket),
             first_stage=first_stage,
             last_stage=last_stage,
@@ -180,6 +182,7 @@ class TestPipeline(unittest.TestCase):
         Stages up to joint calling.
         """
         pipeline = self._setup_pipeline(
+            first_stage=GenotypeSample.__name__,
             last_stage=JointGenotyping.__name__,
             intervals_path=utils.BASE_BUCKET
             / 'inputs/exome1pct/calling_regions.interval_list',
@@ -187,7 +190,7 @@ class TestPipeline(unittest.TestCase):
         result = pipeline.run(dry_run=False, wait=True)
         self.assertEqual('success', result.status()['state'])
 
-    @skip('Running only dry tests in ths module. VEP runs too long')
+    @skip('Running only dry tests in ths module. VEP takes too long')
     def test_after_joint_calling(self):
         """
         VQSR needs more inputs than provided by toy regions.

@@ -178,12 +178,12 @@ class TestJobs(unittest.TestCase):
 
         self.assertEqual(self.sample.id, _read_file(cram_details_paths['sample_name']))
         self.assertAlmostEqual(
-            20296,
+            20180,
             int(_read_file(cram_details_paths['reads_num'])),
             delta=10,
         )
         self.assertAlmostEqual(
-            18797,
+            14536,
             int(_read_file(cram_details_paths['reads_num_mapped_in_proper_pair'])),
             delta=10,
         )
@@ -393,7 +393,7 @@ class TestJobs(unittest.TestCase):
         # Add test job
         mane_transcript = 'NM_001009923.2'  # expected transcript on locus1
         test_j = self.pipeline.b.new_job('Parse VEP results')
-        test_j.image(self.images.driver_image())
+        test_j.image(self.images.get('hail'))
         test_j.command(
             f"""
         cat {self.pipeline.b.read_input(str(out_path))} | zgrep {locus1} | \
