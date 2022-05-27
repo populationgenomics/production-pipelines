@@ -12,7 +12,7 @@ from ..providers import (
     StatusReporterType,
     InputProviderType,
 )
-from ..providers.storage import Namespace, Cloud
+from ..providers.storage import Namespace
 
 
 def choice_from_enum(cls: Type[Enum]) -> click.Choice:
@@ -141,14 +141,6 @@ def pipeline_click_options(function: Callable) -> Callable:
             'and output files',
         ),
         click.option(
-            '--cloud',
-            'cloud',
-            type=choice_from_enum(Cloud),
-            callback=val_to_enum(Cloud),
-            default=Cloud.GS.value,
-            help='Cloud storage provider',
-        ),
-        click.option(
             '--status-reporter',
             'status_reporter_type',
             type=choice_from_enum(StatusReporterType),
@@ -200,7 +192,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             'check_inputs',
             default=False,
             is_flag=True,
-            help='Chech input file existence (e.g. FASTQ files). If they are missing '
+            help='Check input file existence (e.g. FASTQ files). If they are missing '
             'the --skip-samples-with-missing-input option controls whether such '
             'should be ignored, or raise an error.',
         ),
@@ -230,7 +222,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             '--skip-samples-stages',
             'skip_samples_stages',
             type=dict,
-            help='Maps stage IDs to lists of samples, to skip for specific stages.',
+            help='Map of stages to lists of samples, to skip for specific stages.',
         ),
     ]
 

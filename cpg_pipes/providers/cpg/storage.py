@@ -1,50 +1,39 @@
 """
-CPG implementation of StorageProvider, according to the storage policies:
+CPG storage policy implementation of the StorageProvider
+Using cpg_utils to construct paths, according to the CPG storage policy:
 https://github.com/populationgenomics/team-docs/tree/main/storage_policies
-Works only on Google Cloud Storage for now.
 """
 
-from cloudpathlib import CloudPath
+from cpg_utils import hail_batch
 
-from ..storage import StorageProvider, Cloud, Namespace, Path, to_path
+from ..storage import StorageProvider, Namespace, Path, to_path
 
 
 class CpgStorageProvider(StorageProvider):
     """
     CPG storage policy implementation of the StorageProvider
+    Using cpg_utils to construct paths, according to the CPG storage policy:
+    https://github.com/populationgenomics/team-docs/tree/main/storage_policies
     """
 
-    def __init__(self, cloud: Cloud = Cloud.GS):
-        self.gc_prefix = 'cpg'
-        super().__init__(cloud)
-
-    def _dataset_base(
+    # noinspection PyMethodMayBeStatic
+    def path(
         self,
         dataset: str,
         namespace: Namespace,
-        suffix: str = None,
-    ) -> Path:
-        """
-        Base path for a dataset.
-        """
-        container = f'{dataset}-{namespace.value}'
-        if suffix:
-            container = f'{container}-{suffix}'
-        return CloudPath(f'{self.cloud.value}://{self.gc_prefix}-{container}')
-
-    def get_base(
-        self,
-        dataset: str,
-        namespace: Namespace,
-        suffix: str = None,
+        category: str = None,
         version: str | None = None,
         sample: str = None,
     ) -> Path:
         """
-        Bucket name is constructed according to the CPG storage policy:
-        https://github.com/populationgenomics/team-docs/tree/main/storage_policies
+        Path prefix for primary results.
         """
-        path = self._dataset_base(dataset, namespace, suffix)
+        path = to_path(hail_batch.dataset_path(
+            suffix='', 
+            category=category,
+            dataset=dataset,
+            access_level=namespace.value,
+        ))
         if version:
             path = path / version
         if sample:
@@ -52,7 +41,7 @@ class CpgStorageProvider(StorageProvider):
         return path
 
     # noinspection PyMethodMayBeStatic
-    def get_web_url(
+    def web_url(
         self,
         dataset: str,
         namespace: Namespace,
@@ -62,15 +51,13 @@ class CpgStorageProvider(StorageProvider):
         """
         URL corresponding to the WEB bucket.
         """
-        url = f'https://{namespace.value}-web.populationgenomics.org.au/{dataset}'
+        url = hail_batch.web_url(
+            suffix='', 
+            dataset=dataset,
+            access_level=namespace.value,
+        )
         if version:
             url += f'/{version}'
         if sample:
             url += f'/{sample}'
         return url
-
-    def get_ref_base(self) -> Path:
-        """
-        Prefix for reference data.
-        """
-        return to_path(f'{self.cloud.value}://cpg-reference')
