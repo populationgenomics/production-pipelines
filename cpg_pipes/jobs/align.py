@@ -80,7 +80,7 @@ def align(
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     qc_bucket: Path | None = None,
-    aligner: Aligner = Aligner.BWA,
+    aligner: Aligner = Aligner.DRAGMAP,
     markdup_tool: MarkDupTool = MarkDupTool.PICARD,
     extra_label: str | None = None,
     overwrite: bool = False,
@@ -128,13 +128,13 @@ def align(
 
     jobs = []
     
-    if not sharded:
+    if not sharded:  # Just running one alignment job
         align_j, align_cmd = _align_one(
             b=b,
             job_name=base_jname,
             alignment_input=alignment_input,
             requested_nthreads=requested_nthreads,
-            sample=sample_name,
+            sample_name=sample_name,
             job_attrs=job_attrs,
             refs=refs,
             images=images,
@@ -144,11 +144,11 @@ def align(
         output_fmt = 'sam'
         jobs.append(align_j)
 
-    else:  # sharded alignment
+    else:  # Aligning in parallel and merging afterwards
         align_jobs = []
         sorted_bams = []
 
-        if sharded_fq:
+        if sharded_fq:  # Aligning each lane separately, merging after
             # running alignment for each fastq pair in parallel
             fastq_pairs = cast(FastqPairs, alignment_input)
             for pair in fastq_pairs:
@@ -158,13 +158,12 @@ def align(
                     job_name=base_jname,
                     alignment_input=[pair],
                     requested_nthreads=requested_nthreads,
-                    sample=sample_name,
+                    sample_name=sample_name,
                     job_attrs=job_attrs,
                     refs=refs,
                     images=images,
                     aligner=aligner,
                 )
-                cmd = cmd.strip()
                 # Sorting with samtools, but not adding deduplication yet, because we
                 # need to merge first.
                 cmd += ' ' + sort_cmd(requested_nthreads) + f' -o {j.sorted_bam}'
@@ -172,15 +171,14 @@ def align(
                 sorted_bams.append(j.sorted_bam)
                 align_jobs.append(j)
 
-        elif sharded_bazam:
-            # running shared alignment for a CRAM, sharding with Bazam
+        elif sharded_bazam:  # Using BAZAM to shard CRAM
             assert realignment_shards_num
             for shard_number in range(realignment_shards_num):
                 j, cmd = _align_one(
                     b=b,
                     job_name=base_jname,
                     alignment_input=alignment_input,
-                    sample=sample_name,
+                    sample_name=sample_name,
                     job_attrs=job_attrs,
                     refs=refs,
                     images=images,
@@ -189,7 +187,6 @@ def align(
                     number_of_shards_for_realignment=realignment_shards_num,
                     shard_number=shard_number,
                 )
-                cmd = cmd.strip()
                 # Sorting with samtools, but not adding deduplication yet, because we
                 # need to merge first.
                 cmd += ' ' + sort_cmd(requested_nthreads) + f' -o {j.sorted_bam}'
@@ -240,7 +237,7 @@ def _align_one(
     job_name: str,
     alignment_input: AlignmentInput,
     requested_nthreads: int,
-    sample: str,
+    sample_name: str,
     refs: RefData,
     images: Images,
     job_attrs: dict | None = None,
@@ -250,13 +247,13 @@ def _align_one(
     storage_gb: float | None = None,
 ) -> tuple[Job, str]:
     """
-    Creates a command that (re)aligns reads to hg38, and a Job object,
-    but doesn't add the command to the Job object yet, so sorting and/or
-    deduplication can be appended to the command.
-
-    It leaves sorting and duplicate marking to the user, thus returns a command in
-    a raw string in addition to the Job object.
+    Creates a job that (re)aligns reads to hg38. Returns the job object and a command 
+    separately, and doesn't add the command to the Job object, so stream-sorting 
+    and/or deduplication can be appended to the command later.
     """
+    if number_of_shards_for_realignment is not None:
+        assert number_of_shards_for_realignment > 1, number_of_shards_for_realignment
+
     job_attrs = (job_attrs or {}) | dict(label=job_name, tool=aligner.name)
     if shard_number is not None:
         job_name = (
@@ -265,108 +262,28 @@ def _align_one(
         )
     job_name = f'{job_name} {alignment_input_short_str(alignment_input)}'
     j = b.new_job(job_name, job_attrs)
-
-    if number_of_shards_for_realignment is not None:
-        assert number_of_shards_for_realignment > 1, number_of_shards_for_realignment
-
-    job_resource = STANDARD.set_resources(
+    nthreads = STANDARD.set_resources(
         j, nthreads=requested_nthreads, storage_gb=storage_gb
-    )
+    ).get_nthreads()
 
-    if aligner in [Aligner.BWAMEM2, Aligner.BWA]:
-        if aligner == Aligner.BWAMEM2:
-            tool_name = 'bwa-mem2'
-            j.image(images.get('bwamem2'))
-            index_exts = refs.bwamem2_index_exts
-        else:
-            tool_name = 'bwa'
-            j.image(images.get('bwa'))
-            index_exts = refs.bwa_index_exts
+    fasta = refs.fasta_res_group(b)
 
-        bwa_reference = refs.fasta_res_group(b, index_exts)
-        align_cmd = _build_bwa_command(
-            b=b,
-            alignment_input=alignment_input,
-            bwa_reference=bwa_reference,
-            nthreads=job_resource.get_nthreads(),
-            sample_name=sample,
-            tool_name=tool_name,
-            number_of_shards=number_of_shards_for_realignment,
-            shard_number=shard_number,
-        )
-    else:
-        j.image(images.get('dragmap'))
-        dragmap_index = b.read_input_group(
-            **{
-                k.replace('.', '_'): str(refs.dragmap_ref_bucket / k)
-                for k in refs.dragmap_index_files
-            }
-        )
-        prep_inp_cmd = ''
-        if isinstance(alignment_input, CramPath):
-            extract_j = extract_fastq(
-                b=b,
-                cram=alignment_input.resource_group(b),
-                refs=refs,
-                images=images,
-                ext=alignment_input.ext,
-                job_attrs=job_attrs,
-            )
-            input_param = f'-1 {extract_j.fq1} -2 {extract_j.fq2}'
-
-        else:
-            fastq_pairs = [p.as_resources(b) for p in cast(FastqPairs, alignment_input)]
-            files1 = [pair[0] for pair in fastq_pairs]
-            files2 = [pair[1] for pair in fastq_pairs]
-
-            # Allow for 100G input FQ, 50G output CRAM, plus some tmp storage
-            if len(fastq_pairs) == 1:
-                input_param = f'-1 {files1[0]} -2 {files2[0]}'
-            else:
-                prep_inp_cmd = f"""\
-                cat {" ".join(files1)} >reads.R1.fq.gz
-                cat {" ".join(files2)} >reads.R2.fq.gz
-                # After merging lanes, we don't need input FQs anymore:
-                rm {" ".join(files1 + files2)}  
-                """
-                input_param = f'-1 reads.R1.fq.gz -2 reads.R2.fq.gz'
-
-        align_cmd = f"""\
-        {indent(dedent(prep_inp_cmd), ' '*8)}
-        dragen-os -r {dragmap_index} {input_param} \\
-        --RGID {sample} --RGSM {sample}
-        """
-
-    return j, align_cmd
-
-
-def _build_bwa_command(
-    b,
-    alignment_input: AlignmentInput,
-    bwa_reference: hb.ResourceGroup,
-    nthreads: int,
-    sample_name: str,
-    tool_name: str,
-    number_of_shards: int | None = None,
-    shard_number: int | None = None,
-) -> str:
-    pull_inputs_cmd = ''
     if isinstance(alignment_input, CramPath):
         use_bazam = True
 
         cram = cast(CramPath, alignment_input).resource_group(b)
-        if number_of_shards and number_of_shards > 1:
+        if number_of_shards_for_realignment and number_of_shards_for_realignment > 1:
             assert shard_number is not None and shard_number >= 0, (
                 shard_number, sample_name,
             )
-            shard_param = f' -s {shard_number + 1},{number_of_shards}'
+            shard_param = f' -s {shard_number + 1},{number_of_shards_for_realignment}'
         else:
             shard_param = ''
-        bazam_cmd = (
-            f'bazam -Xmx16g -Dsamjdk.reference_fasta={bwa_reference.base}'
-            f' -n{min(nthreads, 6)} -bam {cram.cram}{shard_param} | '
-        )
-        r1_param = '-'
+        bazam_cmd = dedent(f"""\
+        bazam -Xmx16g -Dsamjdk.reference_fasta={fasta.base} \
+        -n{min(nthreads, 6)} -bam {cram.cram}{shard_param} \
+        """)
+        r1_param = f'<({bazam_cmd})'
         r2_param = ''
 
     else:
@@ -382,20 +299,50 @@ def _build_bwa_command(
             r1_param = files1[0]
             r2_param = files2[0]
 
-    rg_line = f'@RG\\tID:{sample_name}\\tSM:{sample_name}'
-    # BWA command options:
-    # -K   process INT input bases in each batch regardless of nThreads (for reproducibility)
-    # -p   smart pairing (ignoring in2.fq)
-    # -t16 threads
-    # -Y   use soft clipping for supplementary alignments
-    # -R   read group header line such as '@RG\tID:foo\tSM:bar'
-    return dedent(
-        f"""\
-    {pull_inputs_cmd}
-    {bazam_cmd} {tool_name} mem -K 100000000 {'-p' if use_bazam else ''} \\
-    -t{nthreads - 1} -Y -R '{rg_line}' {bwa_reference.base} {r1_param} {r2_param}
-    """
-    ).strip()
+    if aligner in [Aligner.BWAMEM2, Aligner.BWA]:
+        if aligner == Aligner.BWAMEM2:
+            tool_name = 'bwa-mem2'
+            j.image(images.get('bwamem2'))
+            index_exts = refs.bwamem2_index_exts
+        else:
+            tool_name = 'bwa'
+            j.image(images.get('bwa'))
+            index_exts = refs.bwa_index_exts
+        bwa_reference = refs.fasta_res_group(b, index_exts)
+        rg_line = f'@RG\\tID:{sample_name}\\tSM:{sample_name}'
+        # BWA command options:
+        # -K   process INT input bases in each batch regardless of nThreads (for reproducibility)
+        # -p   smart pairing (ignoring in2.fq)
+        # -t16 threads
+        # -Y   use soft clipping for supplementary alignments
+        # -R   read group header line such as '@RG\tID:foo\tSM:bar'
+        cmd = f"""\
+        {tool_name} mem -K 100000000 \\
+        {'-p' if use_bazam else ''} -t{nthreads - 1} -Y -R '{rg_line}' \\
+        {bwa_reference.base} {r1_param} {r2_param}
+        """
+
+    elif aligner == Aligner.DRAGMAP:
+        j.image(images.get('dragmap'))
+        dragmap_index = b.read_input_group(
+            **{
+                k.replace('.', '_'): str(refs.dragmap_ref_bucket / k)
+                for k in refs.dragmap_index_files
+            }
+        )
+        if use_bazam:
+            input_cmd = f'--interleaved=1 -b {r1_param}'
+        else:
+            input_cmd = f'-1 {r1_param} -2 {r2_param}'
+        cmd = f"""\
+        dragen-os -r {dragmap_index} {input_cmd} \\
+        --RGID {sample_name} --RGSM {sample_name}
+        """
+
+    else:
+        raise ValueError(f'Unsupported aligner: {aligner.value}')
+    
+    return j, dedent(cmd).strip()
 
 
 def extract_fastq(
