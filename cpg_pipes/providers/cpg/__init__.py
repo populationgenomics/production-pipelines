@@ -3,12 +3,16 @@ CPG implementations of providers.
 """
 import json
 import os
+import tempfile
+import uuid
 from urllib import request
 
+import toml
 import yaml
-from cpg_utils.cloud import read_secret, email_from_id_token
+from cpg_utils.cloud import read_secret
+from cpg_utils.config import set_config_path
 
-from ... import Namespace, to_path
+from ... import Namespace, to_path, Path
 from ...targets import parse_stack
 from ...utils import exists
 
@@ -44,26 +48,32 @@ def get_stack_sa_email(stack: str, access_level: str) -> str:
 
 
 def analysis_runner_environment(
+    local_tmp_dir: Path | None = None,
     dataset: str | None = None,
-    access_level: str | None = None,
+    namespace: Namespace | None = None,
 ):
     """
-    Simulate the analysis-runner environment
+    Simulate the analysis-runner environment. Requires only the CPG_DATASET environment 
+    variable or `dataset` parameter set. Optionally, SERVICE_ACCOUNT_KEY can be set
+    to run as a specific user. In this case, GOOGLE_APPLICATION_CREDENTIALS should be
+    set with permissions to pull Hail tokens secret.
+    
+    Writes a config to gs://cpg-config and sets CPG_CONFIG_PATH, the only required
+    environment variable for cpg-utils. Also sets HAIL_TOKEN.
     """
-    access_level = os.getenv('CPG_ACCESS_LEVEL', access_level)
+    if not local_tmp_dir:
+        local_tmp_dir = to_path(tempfile.mkdtemp())
+    assert local_tmp_dir
+
     dataset = os.getenv('CPG_DATASET', dataset)
     if not dataset:
-        raise ValueError('CPG_DATASET environment variable must be set')
+        raise ValueError(
+            'CPG_DATASET environment variable or dataset parameter must be set'
+        )
 
-    namespace = Namespace.TEST if access_level == 'test' else Namespace.MAIN
     stack, namespace = parse_stack(dataset, namespace)
-    if namespace == Namespace.TEST or not access_level:
-        access_level = 'test'
+    access_level = 'test' if namespace == Namespace.TEST else 'full'
 
-    # Overriding in case if dataset was in form of "dataset-test"
-    os.environ['CPG_DATASET'] = stack
-    os.environ['CPG_ACCESS_LEVEL'] = access_level
-    
     # Parse server config to get Hail token and the GCP project name
     hail_token = os.getenv('HAIL_TOKEN')
     gcp_project = os.getenv('CPG_DATASET_GCP_PROJECT')
@@ -73,22 +83,36 @@ def analysis_runner_environment(
         gcp_project = server_config[stack]['projectId']
     assert hail_token
     assert gcp_project
+    os.environ['HAIL_TOKEN'] = hail_token
     
     # Active dataset service account
-    sa_email = get_stack_sa_email(stack, access_level)
-    if sa_key_template := os.getenv('CPG_SA_PATH_TEMPLATE'):
-        sa_key_path = sa_key_template.format(sa_name=sa_email.split('@')[0])
+    if sa_key_path := os.getenv('SERVICE_ACCOUNT_KEY'):
+        if '{name}' in sa_key_path:
+            sa_email = get_stack_sa_email(stack, access_level)
+            sa_key_path = sa_key_path.format(name=sa_email.split('@')[0])
         if not exists(sa_key_path):
-            raise ValueError(f'SA key {sa_key_path} does not exist')
+            raise ValueError(f'Service account key does not exist: {sa_key_path}')
         os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = sa_key_path
-    
-    # Finalise environment variables
-    os.environ.setdefault('CPG_DRIVER_IMAGE', DRIVER_IMAGE)
-    os.environ.setdefault('CPG_IMAGE_REGISTRY_PREFIX', IMAGE_REGISTRY_PREFIX)
-    os.environ.setdefault('CPG_REFERENCE_PREFIX', REFERENCE_PREFIX)
-    os.environ.setdefault('CPG_WEB_URL_TEMPLATE', WEB_URL_TEMPLATE)
-    os.environ.setdefault('CPG_OUTPUT_PREFIX', 'cpg-pipes')
-    os.environ.setdefault('CPG_DATASET_GCP_PROJECT', gcp_project)
-    os.environ.setdefault('HAIL_BILLING_PROJECT', stack)
-    os.environ.setdefault('HAIL_BUCKET', f'cpg-{stack}-hail')
-    os.environ.setdefault('HAIL_TOKEN', hail_token)
+
+    config = {
+        'hail': {
+            'billing_project': dataset,
+            'bucket': f'cpg-{stack}-hail',
+        },
+        'workflow': {
+            'access_level': access_level,
+            'dataset': stack,
+            'dataset_gcp_project': gcp_project,
+            'driver_image': DRIVER_IMAGE,
+            'image_registry_prefix': IMAGE_REGISTRY_PREFIX,
+            'reference_prefix': REFERENCE_PREFIX,
+            'output_prefix': 'cpg-pipes',
+            'web_url_template': WEB_URL_TEMPLATE,
+        },
+    }
+
+    config_path = local_tmp_dir / (str(uuid.uuid4()) + '.toml')
+    with config_path.open('w') as f:
+        toml.dump(config, f)
+
+    set_config_path(config_path)

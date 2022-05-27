@@ -68,10 +68,7 @@ def create_pipeline(
         storage_policy_type == StoragePolicyType.CPG,
         status_reporter_type == StatusReporterType.CPG,
     ]):
-        analysis_runner_environment(
-            dataset=analysis_dataset, 
-            access_level='full' if namespace == Namespace.MAIN else 'test',
-        )
+        analysis_runner_environment(local_dir, analysis_dataset, namespace)
 
     refs = CpgRefData()
     images = CpgImages()

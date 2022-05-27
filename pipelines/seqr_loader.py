@@ -12,7 +12,6 @@ import click
 import yaml
 from cpg_pipes.types import SequencingType
 from google.cloud import secretmanager
-from analysis_runner import dataproc
 
 from cpg_pipes import Path
 from cpg_pipes import utils
@@ -142,6 +141,7 @@ class LoadToEs(DatasetStage):
         version = time.strftime('%Y%m%d-%H%M%S')
         index_name = f'{dataset.name}-{version}'
         
+        from analysis_runner import dataproc
         j = dataproc.hail_dataproc_job(
             self.b,
             f'cpg_pipes/dataproc_scripts/seqr/mt_to_es.py '
