@@ -138,7 +138,7 @@ def gather_vep_json_to_ht(
     and write into a Hail Table using a Batch job.
     """
     j = b.new_job('VEP json to Hail table', job_attrs)
-    j.image(images.driver_image())
+    j.image(images.get('hail'))
     cmd = python_command(
         vep_module,
         vep_module.vep_json_to_ht.__name__,

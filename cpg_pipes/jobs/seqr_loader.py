@@ -35,7 +35,7 @@ def annotate_cohort_jobs(
     Annotate cohort for seqr loader.
     """
     j = b.new_job(f'annotate cohort', job_attrs)
-    j.image(images.driver_image())
+    j.image(images.get('hail'))
     j.command(
         python_command(
             seqr_loader,
@@ -76,7 +76,7 @@ def annotate_dataset_jobs(
     """
     subset_mt_path = tmp_bucket / 'cohort-subset.mt'
     subset_j = b.new_job(f'subset cohort to dataset', job_attrs)
-    subset_j.image(images.driver_image())
+    subset_j.image(images.get('hail'))
     subset_j.command(
         python_command(
             seqr_loader,
@@ -92,7 +92,7 @@ def annotate_dataset_jobs(
     )
 
     annotate_j = b.new_job(f'annotate dataset', job_attrs)
-    annotate_j.image(images.driver_image())
+    annotate_j.image(images.get('hail'))
     annotate_j.command(
         python_command(
             seqr_loader,
@@ -129,7 +129,7 @@ def load_to_es(
     """
     # Make a list of dataset samples to subset from the entire matrix table
     j = b.new_job(f'create ES index', job_attrs)
-    j.image(images.driver_image())
+    j.image(images.get('hail'))
     hail_query_env(j, hail_billing_project, hail_bucket)
     cmd = f"""\
     pip3 install click cpg_utils hail seqr_loader elasticsearch

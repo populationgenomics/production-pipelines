@@ -20,6 +20,7 @@ AVAILABLE = {
     'verify-bam-id': 'verify-bam-id:1.0.1',
     'multiqc': 'multiqc:v1.12',
     'fastqc': 'fastqc:v0.11.9_cv8',
+    'hail': 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:7d00c4871b2e96f50bae208e4184c3c4789a2fa4-hail-83056327f288917537531475ba475287b413db1c',
 }
 
 
@@ -40,10 +41,3 @@ class Images:
                 f'Image {name} is not available. Known images: {AVAILABLE}'
             )
         return os.path.join(self._prefix, AVAILABLE[name])
-
-    @staticmethod
-    def driver_image() -> str:
-        """
-        Hail "driver" image.
-        """
-        return os.environ['CPG_DRIVER_IMAGE']
