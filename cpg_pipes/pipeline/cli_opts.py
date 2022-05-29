@@ -131,12 +131,6 @@ def pipeline_click_options(function: Callable) -> Callable:
             help='Force reprocessing these samples. Can be set multiple times.',
         ),
         click.option(
-            '--skip-samples-stages',
-            'skip_samples_stages',
-            type=dict,
-            help='Map of stages to lists of samples, to skip for specific stages.',
-        ),
-        click.option(
             '--version',
             '--output-version',
             'version',
@@ -193,21 +187,21 @@ def pipeline_click_options(function: Callable) -> Callable:
             'that are missing results from skipped stages.',
         ),
         click.option(
-            '--check-inputs/--no-check-inputs',
-            'check_inputs',
-            default=True,
-            is_flag=True,
-            help='Check input file existence (e.g. FASTQ files). If they are missing '
-            'the --skip-samples-with-missing-input option controls whether such '
-            'should be ignored, or raise an error.',
-        ),
-        click.option(
             '--check-intermediates/--no-check-intermediates',
             'check_intermediates',
             default=False,
             is_flag=True,
             help='Within jobs, check all in-job intermediate files for possible reuse. '
             'If set to False, will overwrite all intermediates.',
+        ),
+        click.option(
+            '--check-inputs/--no-check-inputs',
+            'check_inputs',
+            default=False,
+            is_flag=True,
+            help='Check input file existence (e.g. FASTQ files). If they are missing '
+            'the --skip-samples-with-missing-input option controls whether such '
+            'should be ignored, or raise an error.',
         ),
         click.option(
             '--check-expected-outputs/--no-check-expected-outputs',
@@ -241,6 +235,12 @@ def pipeline_click_options(function: Callable) -> Callable:
             default=True,
             help='When the sample-metadata database API returns an error from the '
                  'database, only show the error and continue, instead of crashing',
+        ),
+        click.option(
+            '--skip-samples-stages',
+            'skip_samples_stages',
+            type=dict,
+            help='Map of stages to lists of samples, to skip for specific stages.',
         ),
     ]
 

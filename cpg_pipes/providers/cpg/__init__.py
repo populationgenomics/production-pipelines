@@ -7,7 +7,7 @@ import tempfile
 import uuid
 from urllib import request
 
-import toml  # noqa
+import toml
 import yaml
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import set_config_path
