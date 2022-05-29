@@ -141,36 +141,6 @@ class FastqPair:
 FastqPairs = List[FastqPair]
 
 
-# Alignment input can be a CRAM file on a bucket, or a list of Fastq pairs on a bucket.
-AlignmentInput = Union[FastqPairs, CramPath]
-
-
-def alignment_input_exists(v: AlignmentInput) -> bool:
-    """
-    Check if all files in alignment inputs exist.
-    """
-    if isinstance(v, CramPath):
-        return utils.exists(v.path)
-    else:
-        return all(utils.exists(pair.r1) and utils.exists(pair.r2) for pair in v)
-
-
-def alignment_input_short_str(v: AlignmentInput) -> str:
-    """
-    For CRAM, it's just a path to CRAM. For FASTQ pairs, it's a FASTQ path glob.
-    """
-    if isinstance(v, CramPath):
-        return str(v.path)
-    else:
-        all_fastq_paths = []
-        for pair in v:
-            all_fastq_paths.extend([pair.r1, pair.r2])
-        return ''.join([
-            f'{{{",".join(set(chars))}}}' if len(set(chars)) > 1 else chars[0] 
-            for chars in zip(*map(str, all_fastq_paths))
-        ])
-
-
 class SequencingType(Enum):
     """
     Type (scope) of a sequencing experiment.
@@ -204,3 +174,51 @@ class SequencingType(Enum):
                 f'Available: {list(str_to_val.keys())}'
             )
         return str_to_val[str_val]
+
+
+class AlignmentInput:
+    """
+    Alignment input can be an indexed CRAM file, or a list of FASTQ file pairs.
+    """
+    def __init__(
+        self, 
+        data: Union[CramPath, FastqPairs],
+        sequencing_type: SequencingType,
+    ):
+        self.data = data
+        self.is_cram_or_bam = isinstance(data, CramPath)
+        self.sequencing_type = sequencing_type
+        
+    def __str__(self):
+        return f'{self.sequencing_type.value}:{str(self.data)}'
+
+    def exists(self) -> bool:
+        """
+        Check if all files in alignment inputs exist.
+        """
+        if isinstance(self.data, CramPath):
+            return utils.exists(self.data.path)
+        else:
+            return all(
+                utils.exists(pair.r1) and utils.exists(pair.r2) 
+                for pair in self.data
+            )
+
+    def compact_file_paths(self) -> str:
+        """
+        Compact representation of file paths. 
+        For CRAM, it's simply path to CRAM. 
+        For FASTQ pairs, it's glob string to find all FASTQ files.
+        """
+        if isinstance(self.data, CramPath):
+            result = str(self.data.path)
+        else:
+            all_fastq_paths = []
+            for pair in self.data:
+                all_fastq_paths.extend([pair.r1, pair.r2])
+            # Triple { intentional: they are resolved to single {
+            result = ''.join([
+                f'{{{",".join(set(chars))}}}' if len(set(chars)) > 1 else chars[0] 
+                for chars in zip(*map(str, all_fastq_paths))
+            ])
+        return f'{self.sequencing_type.value}:{result}'

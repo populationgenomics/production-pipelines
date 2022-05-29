@@ -20,7 +20,7 @@ from sample_metadata.exceptions import ApiException
 
 from ... import Path, to_path
 from ... import utils
-from ...types import FastqPair, CramPath, AlignmentInput, SequencingType
+from ...types import FastqPair, CramPath, AlignmentInput, SequencingType, FastqPairs
 from ..status import AnalysisStatus
 
 logger = logging.getLogger(__file__)
@@ -383,7 +383,6 @@ class SmSequence:
     id: str
     sample_id: str
     meta: dict
-    sequencing_type: SequencingType
     alignment_input: AlignmentInput | None = None
 
     @staticmethod
@@ -403,12 +402,17 @@ class SmSequence:
             id=data['id'],
             sample_id=sample_id,
             meta=data['meta'],
-            sequencing_type=SequencingType.parse(data['type']),
         )
         if data['meta'].get('reads'):
-            sm_seq.alignment_input = SmSequence._parse_reads(
-                sample_id=sample_id, meta=data['meta'], check_existence=check_existence
+            reads = SmSequence._parse_reads(
+                sample_id=sample_id, 
+                meta=data['meta'], 
+                check_existence=check_existence,
             )
+            sm_seq.alignment_input = AlignmentInput(
+                reads,
+                sequencing_type=SequencingType.parse(data['type']),
+            ) if reads else None
         else:
             logger.warning(
                 f'{sample_id} sequence: no meta/reads found with FASTQ information'
@@ -420,7 +424,7 @@ class SmSequence:
         sample_id: str,
         meta: dict,
         check_existence: bool,
-    ) -> AlignmentInput | None:
+    ) -> CramPath | FastqPairs | None:
         """
         Parse a AlignmentInput object from the meta dictionary.
 

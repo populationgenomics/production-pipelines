@@ -414,12 +414,19 @@ class CsvInputProvider(InputProvider):
                     missing_fastqs = [fq for fq in (fqs1 + fqs2) if not exists(fq)]
                     if missing_fastqs:
                         raise InputProviderError(f'FQs {missing_fastqs} does not exist')
-                d_by_sid[sid] = [FastqPair(fq1, fq2) for fq1, fq2 in zip(fqs1, fqs2)]
+                d_by_sid[sid] = AlignmentInput(
+                    [FastqPair(fq1, fq2) for fq1, fq2 in zip(fqs1, fqs2)],
+                    sequencing_type=self.get_sequencing_type(entry)
+                )
             elif cram:
                 if self.check_files:
                     if not exists(cram):
                         raise InputProviderError(f'CRAM {cram} does not exist')
-                d_by_sid[sid] = CramPath(cram)
+                d_by_sid[sid] = AlignmentInput(
+                    CramPath(cram), 
+                    self.get_sequencing_type(entry)
+                )
 
         for sample in cohort.get_samples():
-            sample.alignment_input = d_by_sid.get(sample.id)
+            if d := d_by_sid.get(sample.id):
+                sample.alignment_input_by_seq_type[d.sequencing_type] = d

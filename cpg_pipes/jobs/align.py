@@ -3,7 +3,7 @@ Create Hail Batch jobs for alignment.
 """
 
 from enum import Enum
-from textwrap import dedent, indent
+from textwrap import dedent
 from typing import cast
 import logging
 
@@ -14,8 +14,7 @@ from cpg_pipes import Path
 from cpg_pipes import utils
 from cpg_pipes.providers.images import Images
 from cpg_pipes.providers.refdata import RefData
-from cpg_pipes.types import AlignmentInput, CramPath, FastqPairs, \
-    alignment_input_short_str
+from cpg_pipes.types import AlignmentInput, FastqPairs, CramPath
 from cpg_pipes.jobs import picard
 from cpg_pipes.hb.prev_job import PrevJob
 from cpg_pipes.hb.command import wrap_command
@@ -122,8 +121,8 @@ def align(
     # if number of threads is not requested, using whole instance
     requested_nthreads = requested_nthreads or STANDARD.max_threads()
 
-    sharded_fq = not isinstance(alignment_input, CramPath) and len(alignment_input) > 1
-    sharded_bazam = isinstance(alignment_input, CramPath) and realignment_shards_num > 1
+    sharded_fq = not isinstance(alignment_input.data, CramPath) and len(alignment_input.data) > 1
+    sharded_bazam = isinstance(alignment_input.data, CramPath) and realignment_shards_num > 1
     sharded = sharded_fq or sharded_bazam
 
     jobs = []
@@ -150,13 +149,13 @@ def align(
 
         if sharded_fq:  # Aligning each lane separately, merging after
             # running alignment for each fastq pair in parallel
-            fastq_pairs = cast(FastqPairs, alignment_input)
+            fastq_pairs = cast(FastqPairs, alignment_input.data)
             for pair in fastq_pairs:
                 # bwa-mem or dragmap command, but without sorting and deduplication:
                 j, cmd = _align_one(
                     b=b,
                     job_name=base_jname,
-                    alignment_input=[pair],
+                    alignment_input=AlignmentInput([pair], alignment_input.sequencing_type),
                     requested_nthreads=requested_nthreads,
                     sample_name=sample_name,
                     job_attrs=job_attrs,
@@ -260,7 +259,7 @@ def _align_one(
             f'{job_name} '
             f'{shard_number + 1}/{number_of_shards_for_realignment} '
         )
-    job_name = f'{job_name} {alignment_input_short_str(alignment_input)}'
+    job_name = f'{job_name} {alignment_input.compact_file_paths()}'
     j = b.new_job(job_name, job_attrs)
     nthreads = STANDARD.set_resources(
         j, nthreads=requested_nthreads, storage_gb=storage_gb
@@ -268,10 +267,9 @@ def _align_one(
 
     fasta = refs.fasta_res_group(b)
 
-    if isinstance(alignment_input, CramPath):
+    if alignment_input.is_cram_or_bam:
         use_bazam = True
-
-        cram = cast(CramPath, alignment_input).resource_group(b)
+        cram = cast(CramPath, alignment_input.data).resource_group(b)
         if number_of_shards_for_realignment and number_of_shards_for_realignment > 1:
             assert shard_number is not None and shard_number >= 0, (
                 shard_number, sample_name,
@@ -288,8 +286,9 @@ def _align_one(
 
     else:
         use_bazam = False
-        bazam_cmd = ''
-        fastq_pairs = [p.as_resources(b) for p in cast(FastqPairs, alignment_input)]
+        fastq_pairs = [
+            p.as_resources(b) for p in cast(FastqPairs, alignment_input.data)
+        ]
         files1 = [pair[0] for pair in fastq_pairs]
         files2 = [pair[1] for pair in fastq_pairs]
         if len(fastq_pairs) > 1:

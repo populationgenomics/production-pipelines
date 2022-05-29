@@ -24,7 +24,7 @@ from cpg_pipes.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jo
 from cpg_pipes.jobs.somalier import check_pedigree_job
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.pipeline import create_pipeline
-from cpg_pipes.types import CramPath, SequencingType
+from cpg_pipes.types import CramPath, SequencingType, AlignmentInput
 
 try:
     import utils
@@ -151,10 +151,11 @@ class TestJobs(unittest.TestCase):
         """
         output_path = self.out_bucket / 'align_fastq' / 'result.cram'
         qc_bucket = self.out_bucket / 'align_fastq' / 'qc'
+        sequencing_type = SequencingType.GENOME
 
         jobs = align(
             b=self.pipeline.b,
-            alignment_input=benchmark.tiny_fq,
+            alignment_input=AlignmentInput(benchmark.tiny_fq, sequencing_type),
             output_path=output_path,
             qc_bucket=qc_bucket,
             sample_name=self.sample.id,
@@ -195,9 +196,11 @@ class TestJobs(unittest.TestCase):
         sid = 'CPG196519'
         cram_path = CramPath(utils.BASE_BUCKET / f'inputs/toy/cram/{sid}.cram')
         output_path = self.out_bucket / 'result.cram'
+        sequencing_type = SequencingType.GENOME
+
         jobs = align(
             self.pipeline.b,
-            alignment_input=cram_path,
+            alignment_input=AlignmentInput(cram_path, sequencing_type),
             output_path=output_path,
             sample_name=sid,
             refs=self.refs,
@@ -214,11 +217,11 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(sid, _read_file(cram_details_paths['sample_name']))
         cram_details = {k: _read_file(v) for k, v in cram_details_paths.items()}
         print(cram_details_paths)
-        self.assertAlmostEqual(223007, int(cram_details['reads_num']), delta=50)
+        self.assertAlmostEqual(223007, int(cram_details['reads_num']), delta=100)
         self.assertAlmostEqual(
             222678,
             int(cram_details['reads_num_mapped_in_proper_pair']),
-            delta=50,
+            delta=100,
         )
 
     def test_genotype_sample(self):

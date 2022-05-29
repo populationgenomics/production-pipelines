@@ -10,6 +10,8 @@ import time
 
 import click
 import yaml
+
+from cpg_pipes.pipeline.cli_opts import choice_from_enum, val_to_enum
 from cpg_pipes.types import SequencingType
 from google.cloud import secretmanager
 
@@ -212,6 +214,14 @@ def _read_es_password(
     help='Number of shards to parallelise realignment',
 )
 @click.option(
+    '--realign',
+    '--realign-from-cram-version',
+    'realign_from_cram_version',
+    help='Realign CRAM whenever available, instead of using FASTQ. '
+         'The parameter value should correspond to CRAM version '
+         '(e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPG0123.cram)'
+)
+@click.option(
     '--jc-intervals-num',
     'jc_intervals_num',
     type=click.INT,
@@ -233,16 +243,24 @@ def _read_es_password(
     help='Use allele-specific annotations for VQSR',
 )
 @click.option(
-    '--ped-checks/--no-ped-checks',
-    'ped_checks',
+    '--cram-qc/--no-cram-qc',
+    'cram_qc',
     default=True,
     is_flag=True,
-    help='Perform fingerprinting and PED checks',
+    help='Run CRAM QC and PED checks',
 )
 @click.option(
     '--exome-bed',
     'exome_bed',
     help=f'BED file with exome regions',
+)
+@click.option(
+    '--sequencing-type',
+    'sequencing_type',
+    type=choice_from_enum(SequencingType),
+    callback=val_to_enum(SequencingType),
+    help='Use data with this sequencing type',
+    default=SequencingType.GENOME,
 )
 @pipeline_click_options
 def main(
@@ -251,10 +269,12 @@ def main(
     hc_intervals_num: int,
     jc_intervals_num: int,
     realignment_shards_num: int,
+    realign_from_cram_version: str,
     use_gnarly: bool,
     use_as_vqsr: bool,
-    ped_checks: bool,
     exome_bed: str,
+    cram_qc: bool,
+    sequencing_type: SequencingType,
     **kwargs,
 ):
     """
@@ -281,32 +301,41 @@ def main(
     if create_es_index_for_datasets:
         description += f' → [{", ".join(sorted(create_es_index_for_datasets))}]'
 
+    if sequencing_type not in SUPPORTED_SEQUENCING_TYPES:
+        raise click.BadParameter(
+            f'Unsupported sequencing data type {sequencing_type.value}. '
+            f'Supported types: {[st.value for st in SUPPORTED_SEQUENCING_TYPES]} '
+        )
+
     kwargs['analysis_dataset'] = kwargs.get('analysis_dataset', 'seqr')
     pipeline = create_pipeline(
         name='Seqr Loader',
         description=description,
         datasets=datasets,
         config=dict(
-            ped_checks=ped_checks,
+            create_es_index_for_datasets=create_es_index_for_datasets,
             hc_intervals_num=hc_intervals_num,
             jc_intervals_num=jc_intervals_num,
             realignment_shards_num=realignment_shards_num,
+            realign_from_cram_version=realign_from_cram_version,
             use_gnarly=use_gnarly,
             use_as_vqsr=use_as_vqsr,
             exome_bed=exome_bed,
-            create_es_index_for_datasets=create_es_index_for_datasets,
+            cram_qc=cram_qc,
+            sequencing_type=sequencing_type,
         ),
         **kwargs,
     )
-    for s in pipeline.get_all_samples():
-        if s.sequencing_type not in SUPPORTED_SEQUENCING_TYPES:
+
+    # Filtering to the samples with only requested sequencing types
+    for s in pipeline.cohort.get_samples():
+        if sequencing_type not in s.alignment_input_by_seq_type:
             logger.warning(
-                f'{s} skipping because of unsupported data type '
+                f'{s}: skipping because of unsupported data type '
                 f'{s.sequencing_type.value}. Supported types: '
                 f'{[st.value for st in SUPPORTED_SEQUENCING_TYPES]} '
             )
             s.active = False
-
     pipeline.run()
 
 

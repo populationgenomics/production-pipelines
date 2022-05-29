@@ -4,6 +4,8 @@ InputProvider implementation that pulls data from the sample-metadata database.
 
 import logging
 import traceback
+from collections import defaultdict
+from itertools import groupby
 
 from sample_metadata import ApiException
 
@@ -122,7 +124,7 @@ class SmdbInputProvider(InputProvider):
         """
         assert cohort.get_sample_ids()
         try:
-            seq_infos: list[dict] = self.db.seqapi.get_sequences_by_sample_ids(
+            found_seqs: list[dict] = self.db.seqapi.get_sequences_by_sample_ids(
                 cohort.get_sample_ids()
             )
         except ApiException:
@@ -135,25 +137,40 @@ class SmdbInputProvider(InputProvider):
                     'However, here is the error: '
                 )
                 traceback.print_exc()
-                seq_infos = []
-        seq_by_sid = {seq['sample_id']: seq for seq in seq_infos}
-        seq_info_by_sid = {
-            sample.id: seq_by_sid.get(sample.id) for sample in cohort.get_samples()
-        }
-        sids_with_missing_seq = [k for k, v in seq_info_by_sid.items() if v is None]
-        if sids_with_missing_seq:
-            msg = f'No sequencing data for samples: {", ".join(sids_with_missing_seq)}'
+                found_seqs = []
+        found_seqs_by_sid = defaultdict(list)
+        for found_seq in found_seqs:
+            found_seqs_by_sid[found_seq['sample_id']].append(found_seq)
+        
+        # Checking missing sequences
+        if sample_wo_seq := [
+            s for s in cohort.get_samples() if s.id not in found_seqs_by_sid
+        ]:
+            msg = f'No sequencing data found for samples:\n'
+            for ds, samples in groupby(sample_wo_seq, key=lambda s: s.dataset.name):
+                msg += (
+                    f'\t{ds}, {len(list(samples))} samples: '
+                    f'{", ".join([s.id for s in samples])}\n'
+                )
             if self.smdb_errors_are_fatal:
                 raise InputProviderError(msg)
             else:
-                logger.warning(
-                    f'{msg}. Continuing without sequencing data because lenient=true'
-                )
+                msg += '\nContinuing without sequencing data because lenient=true'
+                logger.warning(msg)
+
         for sample in cohort.get_samples():
-            if seq_info := seq_by_sid.get(sample.id):
-                seq = SmSequence.parse(seq_info, self.check_files)
-                sample.alignment_input = seq.alignment_input
-                sample.sequencing_type = seq.sequencing_type
+            for d in found_seqs_by_sid.get(sample.id, []):
+                seq = SmSequence.parse(d, self.check_files)
+                if seq.alignment_input:
+                    seq_type = seq.alignment_input.sequencing_type
+                    if seq_type in sample.alignment_input_by_seq_type:
+                        raise InputProviderError(
+                            f'{sample}: found more than 1 alignment input with '
+                            f'sequencing type: {seq_type.value}. Check your input '
+                            f'provider to make sure there is only one data source of '
+                            f'sequencing type per sample.'
+                        )
+                    sample.alignment_input_by_seq_type[seq_type] = seq.alignment_input
 
     def populate_analysis(self, cohort: Cohort) -> None:
         """

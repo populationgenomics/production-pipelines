@@ -48,9 +48,12 @@ class Target:
         s = ' '.join(
             sorted(
                 [
-                    str(s.alignment_input)
+                    ' '.join(sorted(
+                        str(alignment_input.data)
+                        for alignment_input in s.alignment_input_by_seq_type.values()
+                    ))
                     for s in self.get_samples()
-                    if s.alignment_input is not None
+                    if s.alignment_input_by_seq_type
                 ]
             )
         )
@@ -386,7 +389,7 @@ class Dataset(Target):
         meta: dict | None = None,
         sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
-        alignment_input: AlignmentInput | None = None,
+        alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] | None = None,
     ) -> 'Sample':
         """
         Create a new sample and add it to the dataset.
@@ -404,7 +407,7 @@ class Dataset(Target):
             meta=meta,
             sex=sex,
             pedigree=pedigree,
-            alignment_input=alignment_input,
+            alignment_input_by_seq_type=alignment_input_by_seq_type,
         )
         self._sample_by_id[id] = s
         return s
@@ -486,7 +489,7 @@ class Sample(Target):
         meta: dict | None = None,
         sex: Sex | None = None,
         pedigree: Optional['PedigreeInfo'] = None,
-        alignment_input: AlignmentInput | None = None,
+        alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] | None = None,
     ):
         super().__init__()
         self.id = id
@@ -502,7 +505,8 @@ class Sample(Target):
                 fam_id=self.participant_id,
                 sex=sex,
             )
-        self.alignment_input: AlignmentInput | None = alignment_input
+        self.alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] = \
+            alignment_input_by_seq_type or dict()
 
     def __repr__(self):
         values = {
@@ -510,8 +514,7 @@ class Sample(Target):
             'forced': str(self.forced),
             'active': str(self.active),
             'meta': str(self.meta),
-            'sequencing_type': str(self.sequencing_type.value),
-            'alignment_input': self.alignment_input if self.alignment_input else '',
+            'alignment_inputs': ','.join(map(str, self.alignment_input_by_seq_type.values())),
             'pedigree': self.pedigree if self.pedigree else '',
         }
         retval = f'Sample({self.dataset.name}/{self.id}'
@@ -521,14 +524,15 @@ class Sample(Target):
 
     def __str__(self):
         ai_tag = ''
-        if self.alignment_input:
-            if isinstance(self.alignment_input, CramPath):
-                if self.alignment_input.is_bam:
-                    ai_tag = f'|SEQ=CRAM'
+        for seq_type, alignment_input in self.alignment_input_by_seq_type.items():
+            ai_tag += f'|SEQ={seq_type.value}:'
+            if isinstance(alignment_input, CramPath):
+                if alignment_input.is_bam:
+                    ai_tag += 'CRAM'
                 else:
-                    ai_tag = f'|SEQ=BAM'
+                    ai_tag += 'BAM'
             else:
-                ai_tag = f'|SEQ={len(self.alignment_input)}FQS'
+                ai_tag += f'{len(alignment_input)}FQS'
 
         ext_id = f'|{self._external_id}' if self._external_id else ''
         return f'Sample({self.dataset.name}/{self.id}{ext_id}{ai_tag})'

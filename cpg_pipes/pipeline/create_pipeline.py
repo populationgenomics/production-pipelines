@@ -42,7 +42,7 @@ def create_pipeline(
     keep_scratch: bool = True,
     version: str | None = None,
     skip_samples_with_missing_input: bool = False,
-    check_inputs: bool = False,
+    check_inputs: bool = True,
     check_intermediates: bool = False,
     check_expected_outputs: bool = True,
     first_stage: str | None = None,

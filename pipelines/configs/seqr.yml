@@ -1,12 +1,17 @@
 namespace: main
 analysis_dataset: seqr
-skip_datasets: ['ohmr3-mendelian', 'ohmr4-epilepsy', 'mito-disease', 'flinders-ophthal']
+#skip_datasets: ['ohmr3-mendelian', 'ohmr4-epilepsy', 'mito-disease', 'flinders-ophthal']
 skip_samples: [CPG11783,CPG12310,CPG199679,CPG13326]  # acute-care,acute-care,acute-care,perth-neuro
+datasets: ['ohmr3-mendelian', 'ohmr4-epilepsy']  # ['heartkids', 'ravenscroft-rdstudy']  # ['circa', 'acute-care', 'perth-neuro', 'heartkids', 'ravenscroft-rdstudy']
+check_inputs: true
 keep_scratch: true
 skip_samples_with_missing_input: false
-ped_checks: false
-version: may21
+version: 'may21'
 status_reporter_type: cpg
-slack_channel: seqr-loader
-skip_samples_stages:
-  VerifyBamId: [CPG13409]  # https://batch.hail.populationgenomics.org.au/batches/56236/jobs/372
+slack_channel: 'seqr-loader'
+# Bioinformatics
+cram_qc: false
+sequencing_type: genome
+realign_from_cram_version: 'bwamem'
+#skip_samples_stages:
+#  VerifyBamId: [CPG13409]  # https://batch.hail.populationgenomics.org.au/batches/56236/jobs/372
