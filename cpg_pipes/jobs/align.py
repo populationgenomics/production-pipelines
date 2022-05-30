@@ -275,7 +275,6 @@ def _align_one(
     aligner: Aligner = Aligner.BWA,
     number_of_shards_for_realignment: int | None = None,
     shard_number: int | None = None,
-    storage_gb: float | None = None,
 ) -> tuple[Job, str]:
     """
     Creates a job that (re)aligns reads to hg38. Returns the job object and a command 
@@ -294,7 +293,8 @@ def _align_one(
     job_name = f'{job_name} {alignment_input.path_glob()}'
     j = b.new_job(job_name, job_attrs)
     nthreads = STANDARD.set_resources(
-        j, nthreads=requested_nthreads, storage_gb=storage_gb
+        j, nthreads=requested_nthreads, 
+        storage_gb=(None if alignment_input.is_cram_or_bam else 400)
     ).get_nthreads()
 
     fasta = refs.fasta_res_group(b)
