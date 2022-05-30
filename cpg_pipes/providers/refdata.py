@@ -84,11 +84,8 @@ class RefData:
     def __init__(self, path_prefix: Path):
         self.prefix = path_prefix
 
-        # Fasta
-        self.ref_fasta = self.broad_ref_prefix / 'Homo_sapiens_assembly38.fasta'
-
-        # DRAGMAP indices
-        self.dragmap_index_bucket = self.broad_ref_prefix / 'dragen_reference'
+        self.dragmap_ref_bucket = self.broad_ref_prefix / 'dragen_reference'
+        self.ref_fasta = self.dragmap_ref_bucket / 'Homo_sapiens_assembly38_masked.fasta'
         self.dragmap_index_files = [
             'hash_table.cfg.bin',
             'hash_table.cmp',
@@ -207,7 +204,6 @@ class RefData:
             base=str(self.ref_fasta),
             fai=str(self.ref_fasta) + '.fai',
             dict=str(self.ref_fasta.with_suffix('.dict')),
-            str=str(self.ref_fasta.with_suffix('.str')),
         )
         if indices:
             d |= {ext: f'{self.ref_fasta}.{ext}' for ext in indices}
