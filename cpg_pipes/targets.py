@@ -532,7 +532,7 @@ class Sample(Target):
                 else:
                     ai_tag += 'BAM'
             else:
-                ai_tag += f'{len(alignment_input)}FQS'
+                ai_tag += f'{len(alignment_input.data)}FQS'
 
         ext_id = f'|{self._external_id}' if self._external_id else ''
         return f'Sample({self.dataset.name}/{self.id}{ext_id}{ai_tag})'
