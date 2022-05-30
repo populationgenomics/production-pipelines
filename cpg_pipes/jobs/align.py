@@ -294,7 +294,7 @@ def _align_one(
     j = b.new_job(job_name, job_attrs)
     nthreads = STANDARD.set_resources(
         j, nthreads=requested_nthreads, 
-        storage_gb=(None if alignment_input.is_cram_or_bam else 400)
+        storage_gb=(None if isinstance(alignment_input, CramPath) else 400)
     ).get_nthreads()
 
     fasta = refs.fasta_res_group(b)
