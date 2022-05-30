@@ -526,8 +526,8 @@ class Sample(Target):
         ai_tag = ''
         for seq_type, alignment_input in self.alignment_input_by_seq_type.items():
             ai_tag += f'|SEQ={seq_type.value}:'
-            if isinstance(alignment_input, CramPath):
-                if alignment_input.is_bam:
+            if isinstance(alignment_input.data, CramPath):
+                if alignment_input.data.is_bam:
                     ai_tag += 'CRAM'
                 else:
                     ai_tag += 'BAM'

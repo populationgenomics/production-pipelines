@@ -158,7 +158,7 @@ class TestPipeline(unittest.TestCase):
             return len([line for line in lines if line.strip().startswith(item)])
 
         self.assertEqual(
-            _cnt('bazam'), len(self.sample_ids) * self.realignment_shards_num
+            _cnt('dragen-os'), len(self.sample_ids) * self.realignment_shards_num
         )
         self.assertEqual(
             _cnt('HaplotypeCaller'), len(self.sample_ids) * self.hc_intervals_num
