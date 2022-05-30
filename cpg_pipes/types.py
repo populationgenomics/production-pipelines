@@ -4,15 +4,56 @@ Wrappers for bioinformatics file types (CRAM, GVCF, FASTQ, etc).
 
 import logging
 from dataclasses import dataclass
+from enum import Enum
 from typing import List, Union
 
-from sample_metadata.model.sequence_type import SequenceType as sm_SequenceType
 from hailtop.batch import ResourceGroup, ResourceFile, Batch
 
 from . import Path, to_path
 from . import utils
 
 logger = logging.getLogger(__file__)
+
+
+class SequencingType(Enum):
+    """
+    Type (scope) of a sequencing experiment.
+    """
+
+    GENOME = 'genome'
+    EXOME = 'exome'
+    SINGLE_CELL = 'single_cell'
+    MTSEQ = 'mtseq'
+    ONT = 'ont'
+
+    @staticmethod
+    def parse(str_val: str) -> 'SequencingType':
+        """
+        Parse a string into a SequencingType object.
+        
+        >>> SequencingType.parse('genome')
+        SequencingType.GENOME
+        >>> SequencingType.parse('wes')
+        SequencingType.EXOME
+        """
+        str_to_val: dict[str, SequencingType] = {} 
+        for val, str_vals in {
+            SequencingType.GENOME: ['genome', 'wgs'],
+            SequencingType.EXOME: ['exome', 'wts', 'wes'],
+            SequencingType.SINGLE_CELL: ['single_cell', 'single_cell_rna'],
+            SequencingType.MTSEQ: ['mtseq']
+        }.items():
+            for str_v in str_vals:
+                str_v = str_v.lower()
+                assert str_v not in str_to_val, (str_v, str_to_val)
+                str_to_val[str_v] = val
+        str_val = str_val.lower()
+        if str_val not in str_to_val:
+            raise ValueError(
+                f'Unrecognised sequence type {str_val}. '
+                f'Available: {list(str_to_val.keys())}'
+            )
+        return str_to_val[str_val]
 
 
 class CramPath:
@@ -127,49 +168,16 @@ class FastqPair:
         """
         Makes a pair of ResourceFile objects for r1 and r2.
         """
-        r1 = (
-            self.r1 if isinstance(self.r1, ResourceFile) else b.read_input(str(self.r1))
-        )
-        r2 = (
-            self.r2 if isinstance(self.r2, ResourceFile) else b.read_input(str(self.r2))
-        )
-        return FastqPair(r1, r2)
+        return FastqPair(*[
+            self[i] if isinstance(self[i], ResourceFile) else b.read_input(str(self[i]))
+            for i in [0, 1]
+        ])
 
     def __str__(self):
         return f'{self.r1}|{self.r2}'
 
 
 FastqPairs = List[FastqPair]
-
-
-class SequencingType(sm_SequenceType):
-    """
-    Type (scope) of a sequencing experiment. Extends sample-metadata type.
-    """
-
-    @staticmethod
-    def parse(str_val: str) -> 'SequencingType':
-        """
-        Parse a string into a SequencingType object.
-        """
-        str_to_val: dict[str, SequencingType] = {} 
-        for val, str_vals in {
-            SequencingType.GENOME: ['genome', 'wgs'],
-            SequencingType.EXOME: ['exome', 'wts', 'wes'],
-            SequencingType.SINGLE_CELL: ['single_cell', 'single_cell_rna'],
-            SequencingType.MTSEQ: ['mtseq']
-        }.items():
-            for str_v in str_vals:
-                str_v = str_v.lower()
-                assert str_v not in str_to_val, (str_v, str_to_val)
-                str_to_val[str_v] = val
-        str_val = str_val.lower()
-        if str_val not in str_to_val:
-            raise ValueError(
-                f'Unrecognised sequence type {str_val}. '
-                f'Available: {list(str_to_val.keys())}'
-            )
-        return str_to_val[str_val]
 
 
 class AlignmentInput:
@@ -205,6 +213,18 @@ class AlignmentInput:
         Compact representation of file paths. 
         For CRAM, it's simply path to CRAM. 
         For FASTQ pairs, it's glob string to find all FASTQ files.
+        
+        >>> AlignmentInput(CramPath('gs://mycram.cram'), SequencingType.GENOME).compact_file_paths()
+        'genome:gs://mycram.cram'
+        >>> AlignmentInput([
+        >>>     FastqPair('gs://sample_R1.fq.gz', 'gs://sample_R2.fq.gz'),
+        >>> ], SequencingType.EXOME).compact_file_paths()
+        'exome:gs://sample_R{2,1}.fq.gz'
+        >>> AlignmentInput([
+        >>>     FastqPair('gs://sample_L1_R1.fq.gz', 'gs://sample_L1_R2.fq.gz'), 
+        >>>     FastqPair('gs://sample_L2_R1.fq.gz', 'gs://sample_L2_R2.fq.gz'),
+        >>> ], SequencingType.MTSEQ).compact_file_paths()
+        'mtseq:gs://sample_L{2,1}_R{2,1}.fq.gz'
         """
         if isinstance(self.data, CramPath):
             result = str(self.data.path)
