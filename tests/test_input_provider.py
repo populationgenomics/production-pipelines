@@ -4,6 +4,7 @@ Testing input providers.
 
 import unittest
 from io import StringIO
+from typing import cast
 from unittest import skip
 
 from cpg_pipes import Namespace
@@ -12,7 +13,7 @@ from cpg_pipes.providers.cpg.smdb import SMDB
 from cpg_pipes.providers.cpg.storage import CpgStorageProvider
 from cpg_pipes.targets import Cohort, Sex
 from cpg_pipes.providers.inputs import CsvInputProvider
-from cpg_pipes.types import SequencingType
+from cpg_pipes.types import SequencingType, CramPath
 
 
 class TestInputProvider(unittest.TestCase):
@@ -61,12 +62,14 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
         self.assertEqual(len(ds.get_samples()), 2)
         s1 = ds.get_samples()[0]
         self.assertEqual(s1.external_id, extid1)
-        self.assertEqual(len(s1.alignment_input), 2)
+        self.assertEqual(len(s1.alignment_input_by_seq_type.values()), 2)
         self.assertEqual(s1.pedigree.sex, Sex.MALE)
         self.assertEqual(s1.sequencing_type, SequencingType.GENOME)
         s2 = ds.get_samples()[1]
         self.assertEqual(s2.external_id, extid2)
-        self.assertTrue(s2.alignment_input.ext == 'cram')
+        cram = s2.alignment_input_by_seq_type[SequencingType.EXOME]
+        self.assertTrue(isinstance(cram, CramPath))
+        self.assertTrue(cast(CramPath, cram).path.ext == 'cram')
         self.assertEqual(s2.pedigree.sex, Sex.UNKNOWN)
         self.assertEqual(s2.sequencing_type, SequencingType.EXOME)
 
@@ -94,7 +97,7 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
         s1 = ds.get_samples()[0]
         s2 = ds.get_samples()[1]
         self.assertEqual(s1.external_id, '20W002328')
-        self.assertEqual(len(s1.alignment_input), 2)
+        self.assertEqual(len(s1.alignment_input_by_seq_type.values()), 2)
         self.assertEqual(s1.pedigree.sex, Sex.FEMALE)
         self.assertEqual(s1.pedigree.fam_id, s2.pedigree.fam_id)
         self.assertEqual(s1.pedigree.mom.id, s2.id)
