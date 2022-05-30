@@ -1,3 +1,7 @@
+"""
+Common test utilities.
+"""
+
 import os
 import string
 import time

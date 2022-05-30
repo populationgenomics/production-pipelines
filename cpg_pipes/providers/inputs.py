@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 
 from ..utils import exists
-from ..types import FastqPair, CramPath, AlignmentInput
+from ..types import FastqPair, CramPath, AlignmentInput, FastqPairs
 from ..targets import Cohort, Dataset, Sex, SequencingType, PedigreeInfo
 from .. import Path
 
@@ -389,7 +389,7 @@ class CsvInputProvider(InputProvider):
         """
         Populate sequencing inputs for samples.
         """
-        d_by_sid: dict[str, AlignmentInput] = {}
+        d_by_sid: dict[str, tuple[AlignmentInput, SequencingType]] = {}
 
         for entry in self.get_entries():
             sid = self.get_sample_id(entry)
@@ -414,19 +414,16 @@ class CsvInputProvider(InputProvider):
                     missing_fastqs = [fq for fq in (fqs1 + fqs2) if not exists(fq)]
                     if missing_fastqs:
                         raise InputProviderError(f'FQs {missing_fastqs} does not exist')
-                d_by_sid[sid] = AlignmentInput(
-                    [FastqPair(fq1, fq2) for fq1, fq2 in zip(fqs1, fqs2)],
-                    sequencing_type=self.get_sequencing_type(entry)
-                )
+                d_by_sid[sid] = FastqPairs([
+                    FastqPair(fq1, fq2) for fq1, fq2 in zip(fqs1, fqs2)
+                ]), self.get_sequencing_type(entry)
             elif cram:
                 if self.check_files:
                     if not exists(cram):
                         raise InputProviderError(f'CRAM {cram} does not exist')
-                d_by_sid[sid] = AlignmentInput(
-                    CramPath(cram), 
-                    self.get_sequencing_type(entry)
-                )
+                d_by_sid[sid] = CramPath(cram), self.get_sequencing_type(entry)
 
         for sample in cohort.get_samples():
             if d := d_by_sid.get(sample.id):
-                sample.alignment_input_by_seq_type[d.sequencing_type] = d
+                alignment_input, seq_type = d
+                sample.alignment_input_by_seq_type[seq_type] = alignment_input

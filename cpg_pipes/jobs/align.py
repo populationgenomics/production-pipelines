@@ -4,7 +4,7 @@ Create Hail Batch jobs for alignment.
 
 from enum import Enum
 from textwrap import dedent
-from typing import cast
+from typing import cast, Tuple
 import logging
 
 import hailtop.batch as hb
@@ -75,7 +75,7 @@ def process_alignment_input(
     sample: Sample, 
     seq_type: SequencingType | None = None,
     realign_cram_ver: str | None = None,
-) -> AlignmentInput | None:
+) -> Tuple[SequencingType | None, AlignmentInput | None]:
     """
     Checks alignment_data of a Sample object and prepares it for alignment.
     """
@@ -91,16 +91,15 @@ def process_alignment_input(
     if seq_type:
         alignment_input = sample.alignment_input_by_seq_type.get(seq_type)
     else:
-        alignment_input = list(sample.alignment_input_by_seq_type.values())[0]
-        seq_type = alignment_input.sequencing_type
+        seq_type, alignment_input = list(sample.alignment_input_by_seq_type.items())[0]
 
     # Check CRAM for realignment:
     if realign_cram_ver:
         older_cram = sample.dataset.path() / 'cram' / realign_cram_ver / f'{sample.id}.cram'
         if older_cram.exists():
             logger.info(f'Realigning from {realign_cram_ver} CRAM {older_cram}')
-            alignment_input = AlignmentInput(CramPath(older_cram), seq_type)
-    return alignment_input
+            alignment_input = CramPath(older_cram)
+    return seq_type, alignment_input
 
 
 def align(
@@ -154,8 +153,8 @@ def align(
     # if number of threads is not requested, using whole instance
     requested_nthreads = requested_nthreads or STANDARD.max_threads()
 
-    sharded_fq = not isinstance(alignment_input.data, CramPath) and len(alignment_input.data) > 1
-    sharded_bazam = isinstance(alignment_input.data, CramPath) and realignment_shards_num > 1
+    sharded_fq = isinstance(alignment_input, FastqPairs) and len(alignment_input) > 1
+    sharded_bazam = isinstance(alignment_input, CramPath) and realignment_shards_num > 1
     sharded = sharded_fq or sharded_bazam
 
     jobs = []
@@ -182,13 +181,13 @@ def align(
 
         if sharded_fq:  # Aligning each lane separately, merging after
             # running alignment for each fastq pair in parallel
-            fastq_pairs = cast(FastqPairs, alignment_input.data)
+            fastq_pairs = cast(FastqPairs, alignment_input)
             for pair in fastq_pairs:
                 # bwa-mem or dragmap command, but without sorting and deduplication:
                 j, cmd = _align_one(
                     b=b,
                     job_name=base_jname,
-                    alignment_input=AlignmentInput([pair], alignment_input.sequencing_type),
+                    alignment_input=FastqPairs([pair]),
                     requested_nthreads=requested_nthreads,
                     sample_name=sample_name,
                     job_attrs=job_attrs,
@@ -292,7 +291,7 @@ def _align_one(
             f'{job_name} '
             f'{shard_number + 1}/{number_of_shards_for_realignment} '
         )
-    job_name = f'{job_name} {alignment_input.compact_file_paths()}'
+    job_name = f'{job_name} {alignment_input.path_glob()}'
     j = b.new_job(job_name, job_attrs)
     nthreads = STANDARD.set_resources(
         j, nthreads=requested_nthreads, storage_gb=storage_gb
@@ -300,9 +299,9 @@ def _align_one(
 
     fasta = refs.fasta_res_group(b)
 
-    if alignment_input.is_cram_or_bam:
+    if isinstance(alignment_input, CramPath):
         use_bazam = True
-        cram = cast(CramPath, alignment_input.data).resource_group(b)
+        cram = alignment_input.resource_group(b)
         if number_of_shards_for_realignment and number_of_shards_for_realignment > 1:
             assert shard_number is not None and shard_number >= 0, (
                 shard_number, sample_name,
@@ -318,9 +317,10 @@ def _align_one(
         r2_param = ''
 
     else:
+        assert isinstance(alignment_input, FastqPairs)
         use_bazam = False
         fastq_pairs = [
-            p.as_resources(b) for p in cast(FastqPairs, alignment_input.data)
+            p.as_resources(b) for p in alignment_input
         ]
         files1 = [pair[0] for pair in fastq_pairs]
         files2 = [pair[1] for pair in fastq_pairs]

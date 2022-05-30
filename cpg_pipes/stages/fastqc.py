@@ -34,7 +34,7 @@ class FastQC(SampleStage):
         """
         Only running FastQC if sequencing inputs are available.
         """
-        alignment_input = process_alignment_input(
+        seq_type, alignment_input = process_alignment_input(
             sample, 
             seq_type=self.pipeline_config.get('sequencing_type'),
             realign_cram_ver=self.pipeline_config.get('realign_from_cram_version'),

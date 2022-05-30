@@ -4,12 +4,11 @@ Stage that generates a CRAM file.
 
 import logging
 
-from .. import Path, types
+from .. import Path
 from ..jobs.align import Aligner, MarkDupTool, process_alignment_input
 from ..targets import Sample
 from ..pipeline import stage, SampleStage, StageInput, StageOutput
 from ..jobs import align
-from ..types import CramPath, AlignmentInput
 
 logger = logging.getLogger(__file__)
 
@@ -32,7 +31,7 @@ class Align(SampleStage):
         Checks the `realign_from_cram_version` pipeline config argument, and 
         prioritises realignment from CRAM vs alignment from FASTQ if it's set.
         """
-        alignment_input = process_alignment_input(
+        seq_type, alignment_input = process_alignment_input(
             sample, 
             seq_type=self.pipeline_config.get('sequencing_type'),
             realign_cram_ver=self.pipeline_config.get('realign_from_cram_version'),
@@ -50,6 +49,10 @@ class Align(SampleStage):
                     target=sample, error_msg=f'No alignment input found for {sample.id}'
                 )
         assert alignment_input
+        
+        job_attrs = self.get_job_attrs(sample)
+        if seq_type:
+            job_attrs['seq_type'] = seq_type.value
 
         jobs = align.align(
             b=self.b,

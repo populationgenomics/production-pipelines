@@ -17,7 +17,7 @@ from cpg_pipes.providers.cpg.storage import CpgStorageProvider
 from cpg_pipes.stages.genotype_sample import GenotypeSample
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
-from cpg_pipes.types import CramPath, AlignmentInput
+from cpg_pipes.types import CramPath
 
 # Importing `seqr_loader` will make pipeline use all its stages by default.
 from pipelines import seqr_loader
@@ -122,10 +122,8 @@ class TestPipeline(unittest.TestCase):
         for ds in self.datasets:
             for s_id in self.sample_ids:
                 s = ds.add_sample(s_id, s_id)
-                s.alignment_input_by_seq_type[utils.SEQ_TYPE] = AlignmentInput(
-                    CramPath(utils.TOY_CRAM_BY_SID[s.id]),
-                    utils.SEQ_TYPE,
-                )
+                s.alignment_input_by_seq_type[utils.SEQ_TYPE] = \
+                    CramPath(utils.TOY_CRAM_BY_SID[s.id])
         return pipeline
 
     def test_dry(self):

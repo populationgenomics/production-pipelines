@@ -14,7 +14,7 @@ from cpg_pipes.jobs.align import extract_fastq
 from cpg_pipes.pipeline import create_pipeline
 from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes.providers.images import Images
-from cpg_pipes.types import SequencingType, CramPath, AlignmentInput
+from cpg_pipes.types import SequencingType, CramPath
 
 import utils
 
@@ -53,10 +53,7 @@ def make_subset_crams(pipeline: Pipeline):
             sid, 
             external_id=sid, 
             alignment_input_by_seq_type={
-                utils.SEQ_TYPE: AlignmentInput(
-                    CramPath(utils.FULL_CRAM_BY_SID[sid]),
-                    utils.SEQ_TYPE
-                )
+                utils.SEQ_TYPE: CramPath(utils.FULL_CRAM_BY_SID[sid])
             }
         )
         for sid in utils.SAMPLES
@@ -82,8 +79,7 @@ def make_subset_crams(pipeline: Pipeline):
         cram_j.image(pipeline.images.get('samtools'))
         nthreads = STANDARD.set_resources(cram_j, fraction=0.5).get_nthreads()
         cram = cast(
-            CramPath, 
-            s.alignment_input_by_seq_type[utils.SEQ_TYPE].data
+            CramPath, s.alignment_input_by_seq_type[utils.SEQ_TYPE]
         ).resource_group(b)
 
         cram_j.declare_resource_group(

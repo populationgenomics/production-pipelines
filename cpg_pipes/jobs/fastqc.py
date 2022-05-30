@@ -9,7 +9,7 @@ from hailtop.batch.job import Job
 
 from cpg_pipes import Path
 from cpg_pipes.providers.images import Images
-from cpg_pipes.types import AlignmentInput, CramPath, FastqPath
+from cpg_pipes.types import AlignmentInput, CramPath, FastqPath, FastqPairs
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.providers.refdata import RefData
@@ -82,14 +82,15 @@ def fastqc(
         return j
 
     jobs = []
-    if isinstance(alignment_input.data, CramPath):
-        j = _fastqc_one('FastQC', cast(CramPath, alignment_input.data))
+    if isinstance(alignment_input, CramPath):
+        j = _fastqc_one('FastQC', cast(CramPath, alignment_input))
         jobs.append(j)
         return jobs
     else:
-        for lane_i, pair in enumerate(alignment_input.data):
+        assert isinstance(alignment_input, FastqPairs)
+        for lane_i, pair in enumerate(alignment_input):
             jname = f'FastQC R1'
-            if len(alignment_input.data) > 1:
+            if len(alignment_input) > 1:
                 jname += f' lane={lane_i}'
             j = _fastqc_one(jname, pair.r1)
             jobs.append(j)
