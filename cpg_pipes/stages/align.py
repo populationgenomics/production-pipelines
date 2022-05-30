@@ -5,7 +5,7 @@ Stage that generates a CRAM file.
 import logging
 
 from .. import Path, types
-from ..jobs.align import Aligner, MarkDupTool
+from ..jobs.align import Aligner, MarkDupTool, process_alignment_input
 from ..targets import Sample
 from ..pipeline import stage, SampleStage, StageInput, StageOutput
 from ..jobs import align
@@ -32,28 +32,11 @@ class Align(SampleStage):
         Checks the `realign_from_cram_version` pipeline config argument, and 
         prioritises realignment from CRAM vs alignment from FASTQ if it's set.
         """
-        seq_type = self.pipeline_config.get('sequencing_type')
-        avail_seq_types = set(
-            st.value for st in sample.alignment_input_by_seq_type.keys()
+        alignment_input = process_alignment_input(
+            sample, 
+            seq_type=self.pipeline_config.get('sequencing_type'),
+            realign_cram_ver=self.pipeline_config.get('realign_from_cram_version'),
         )
-        if len(avail_seq_types) > 1 and not seq_type:
-            raise ValueError(
-                f'{sample}: found alignment inputs with more than one sequencing '
-                f'type: {", ".join(avail_seq_types)}. Consider option '
-                f'--sequencing-type to use data of specific sequencing type.'
-            )
-        if seq_type:
-            alignment_input = sample.alignment_input_by_seq_type.get(seq_type)
-        else:
-            alignment_input = list(sample.alignment_input_by_seq_type.values())[0]
-            seq_type = alignment_input.sequencing_type
-
-        # Check CRAM for realignment:
-        if cram_ver := self.pipeline_config.get('realign_from_cram_version'):
-            older_cram = sample.dataset.path() / 'cram' / cram_ver / f'{sample.id}.cram'
-            if older_cram.exists():
-                logger.info(f'Realigning from {cram_ver} CRAM {older_cram}')
-                alignment_input = AlignmentInput(CramPath(older_cram), seq_type)
 
         if alignment_input is None or (
             self.check_inputs and not alignment_input.exists()
@@ -66,6 +49,7 @@ class Align(SampleStage):
                 return self.make_outputs(
                     target=sample, error_msg=f'No alignment input found for {sample.id}'
                 )
+        assert alignment_input
 
         jobs = align.align(
             b=self.b,

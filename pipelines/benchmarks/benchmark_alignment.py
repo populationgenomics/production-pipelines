@@ -11,7 +11,7 @@ import logging
 from cpg_pipes import benchmark, Namespace
 from cpg_pipes.providers.images import Images
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
-from cpg_pipes.types import FastqPair, CramPath
+from cpg_pipes.types import FastqPair, CramPath, SequencingType, AlignmentInput
 from cpg_pipes.pipeline import (
     stage,
     create_pipeline,
@@ -127,9 +127,15 @@ class DifferentResources(SampleStage):
 
         if INPUTS_TYPE == InputsType.FULL_SUBSET:
             d = inputs.as_dict(sample, stage=SubsetAlignmentInput)
-            alignment_input = [FastqPair(d['r1'], d['r2'])]
+            alignment_input = AlignmentInput(
+                [FastqPair(d['r1'], d['r2'])],
+                sequencing_type=SequencingType.GENOME,
+            )
         else:
-            alignment_input = sample.meta['fastq_input']
+            alignment_input = AlignmentInput(
+                sample.meta['fastq_input'],
+                sequencing_type=SequencingType.GENOME,
+            )
 
         jobs = []
         for nthreads in [8, 16, 32]:
@@ -167,12 +173,18 @@ class DifferentAlignerSetups(SampleStage):
 
         if INPUTS_TYPE == InputsType.FULL_SUBSET:
             d = inputs.as_dict(sample, stage=SubsetAlignmentInput)
-            alignment_input = [FastqPair(d['r1'], d['r2'])]
+            alignment_input = AlignmentInput(
+                [FastqPair(d['r1'], d['r2'])], SequencingType.GENOME
+            )
         else:
             if 'fastq_input' in sample.meta:
-                alignment_input = sample.meta['fastq_input']
+                alignment_input = AlignmentInput(
+                    sample.meta['fastq_input'], SequencingType.GENOME
+                )
             else:
-                alignment_input = sample.meta['cram_input']
+                alignment_input = AlignmentInput(
+                    sample.meta['cram_input'], SequencingType.GENOME
+                )
 
         jobs = []
         for aligner in [
@@ -194,7 +206,7 @@ class DifferentAlignerSetups(SampleStage):
                         markdup_tool=markdup,
                         extra_label=f', dedup with {markdup.name}',
                         realignment_shards_num=10
-                        if isinstance(alignment_input, CramPath)
+                        if alignment_input.is_cram_or_bam
                         else 0,
                     )
                 )
@@ -219,7 +231,8 @@ def main():
         id='PERTHNEURO_CRAM',
         external_id='PERTHNEURO_CRAM',
     )
-    s.alignment_input = benchmark.perth_neuro_cram
+    alignment_input = AlignmentInput(benchmark.perth_neuro_cram, SequencingType.GENOME)
+    s.alignment_input_by_seq_type[alignment_input.sequencing_type] = alignment_input
 
     pipeline.set_stages(
         [

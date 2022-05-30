@@ -14,7 +14,8 @@ from cpg_pipes import Path
 from cpg_pipes import utils
 from cpg_pipes.providers.images import Images
 from cpg_pipes.providers.refdata import RefData
-from cpg_pipes.types import AlignmentInput, FastqPairs, CramPath
+from cpg_pipes.targets import Sample
+from cpg_pipes.types import AlignmentInput, FastqPairs, CramPath, SequencingType
 from cpg_pipes.jobs import picard
 from cpg_pipes.hb.prev_job import PrevJob
 from cpg_pipes.hb.command import wrap_command
@@ -68,6 +69,38 @@ def bwamem2(*args, **kwargs):
     """
     kwargs['aligner'] = Aligner.BWAMEM2
     return align(*args, **kwargs)
+
+
+def process_alignment_input(
+    sample: Sample, 
+    seq_type: SequencingType | None = None,
+    realign_cram_ver: str | None = None,
+) -> AlignmentInput | None:
+    """
+    Checks alignment_data of a Sample object and prepares it for alignment.
+    """
+    avail_seq_types = set(
+        st.value for st in sample.alignment_input_by_seq_type.keys()
+    )
+    if len(avail_seq_types) > 1 and not seq_type:
+        raise ValueError(
+            f'{sample}: found alignment inputs with more than one sequencing '
+            f'type: {", ".join(avail_seq_types)}. Consider option '
+            f'--sequencing-type to use data of specific sequencing type.'
+        )
+    if seq_type:
+        alignment_input = sample.alignment_input_by_seq_type.get(seq_type)
+    else:
+        alignment_input = list(sample.alignment_input_by_seq_type.values())[0]
+        seq_type = alignment_input.sequencing_type
+
+    # Check CRAM for realignment:
+    if realign_cram_ver:
+        older_cram = sample.dataset.path() / 'cram' / realign_cram_ver / f'{sample.id}.cram'
+        if older_cram.exists():
+            logger.info(f'Realigning from {realign_cram_ver} CRAM {older_cram}')
+            alignment_input = AlignmentInput(CramPath(older_cram), seq_type)
+    return alignment_input
 
 
 def align(

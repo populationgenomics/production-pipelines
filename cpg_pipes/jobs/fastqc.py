@@ -2,6 +2,7 @@
 Jobs to run FastQC
 """
 from os.path import basename
+from typing import cast
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
@@ -81,14 +82,14 @@ def fastqc(
         return j
 
     jobs = []
-    if isinstance(alignment_input, CramPath):
-        j = _fastqc_one('FastQC', alignment_input)
+    if isinstance(alignment_input.data, CramPath):
+        j = _fastqc_one('FastQC', cast(CramPath, alignment_input.data))
         jobs.append(j)
         return jobs
     else:
-        for lane_i, pair in enumerate(alignment_input):
+        for lane_i, pair in enumerate(alignment_input.data):
             jname = f'FastQC R1'
-            if len(alignment_input) > 1:
+            if len(alignment_input.data) > 1:
                 jname += f' lane={lane_i}'
             j = _fastqc_one(jname, pair.r1)
             jobs.append(j)
