@@ -1,15 +1,16 @@
 """
-Basic bioinformatics status types.
+Wrappers for bioinformatics file types (CRAM, GVCF, FASTQ, etc).
 """
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
 from typing import List, Union
+
+from sample_metadata.model.sequence_type import SequenceType as sm_SequenceType
+from hailtop.batch import ResourceGroup, ResourceFile, Batch
 
 from . import Path, to_path
 from . import utils
-from hailtop.batch import ResourceGroup, ResourceFile, Batch
 
 logger = logging.getLogger(__file__)
 
@@ -141,15 +142,10 @@ class FastqPair:
 FastqPairs = List[FastqPair]
 
 
-class SequencingType(Enum):
+class SequencingType(sm_SequenceType):
     """
-    Type (scope) of a sequencing experiment.
+    Type (scope) of a sequencing experiment. Extends sample-metadata type.
     """
-
-    GENOME = 'genome'
-    EXOME = 'exome'
-    SINGLE_CELL = 'single_cell'
-    MTSEQ = 'mtseq'
 
     @staticmethod
     def parse(str_val: str) -> 'SequencingType':
