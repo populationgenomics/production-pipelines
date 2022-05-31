@@ -3,6 +3,7 @@ Helpers to communicate with the sample-metadata database.
 """
 
 import logging
+import pprint
 import traceback
 from dataclasses import dataclass
 from enum import Enum
@@ -19,7 +20,7 @@ from sample_metadata.exceptions import ApiException
 
 from ... import Path, to_path
 from ... import utils
-from ...types import FastqPair, CramPath, AlignmentInput, SequencingType
+from ...types import FastqPair, CramPath, AlignmentInput, SequencingType, FastqPairs
 from ..status import AnalysisStatus
 
 logger = logging.getLogger(__file__)
@@ -405,9 +406,12 @@ class SmSequence:
             sequencing_type=SequencingType.parse(data['type']),
         )
         if data['meta'].get('reads'):
-            sm_seq.alignment_input = SmSequence._parse_reads(
-                sample_id=sample_id, meta=data['meta'], check_existence=check_existence
-            )
+            if alignment_input := SmSequence._parse_reads(
+                sample_id=sample_id, 
+                meta=data['meta'], 
+                check_existence=check_existence,
+            ):
+                sm_seq.alignment_input = alignment_input
         else:
             logger.warning(
                 f'{sample_id} sequence: no meta/reads found with FASTQ information'
@@ -487,26 +491,32 @@ class SmSequence:
             return CramPath(bam_path, index_path=index_path)
 
         else:
-            fastq_pairs = []
-            for lane_data in reads_data:
-                assert len(lane_data) == 2, lane_data
-                if check_existence and not utils.exists(lane_data[0]['location']):
+            fastq_pairs = FastqPairs()
+            for lane_pair in reads_data:
+                if len(lane_pair) != 2:
+                    raise ValueError(
+                        f'Sequence data for sample {sample_id} is incorrectly '
+                        f'formatted. Expecting 2 entries per lane (R1 and R2 fastqs), '
+                        f'but got {len(lane_pair)}. '
+                        f'Read data: {pprint.pformat(reads_data)}'
+                    )
+                if check_existence and not utils.exists(lane_pair[0]['location']):
                     logger.error(
                         f'{sample_id}: ERROR: read 1 file does not exist: '
-                        f'{lane_data[0]["location"]}'
+                        f'{lane_pair[0]["location"]}'
                     )
                     return None
-                if check_existence and not utils.exists(lane_data[1]['location']):
+                if check_existence and not utils.exists(lane_pair[1]['location']):
                     logger.error(
                         f'{sample_id}: ERROR: read 2 file does not exist: '
-                        f'{lane_data[1]["location"]}'
+                        f'{lane_pair[1]["location"]}'
                     )
                     return None
 
                 fastq_pairs.append(
                     FastqPair(
-                        to_path(lane_data[0]['location']),
-                        to_path(lane_data[1]['location']),
+                        to_path(lane_pair[0]['location']),
+                        to_path(lane_pair[1]['location']),
                     )
                 )
 

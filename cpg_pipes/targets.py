@@ -10,7 +10,7 @@ from typing import Optional
 import pandas as pd
 
 from . import Path
-from .types import AlignmentInput, CramPath, GvcfPath, SequencingType
+from .types import AlignmentInput, CramPath, GvcfPath, SequencingType, FastqPairs
 from .providers.storage import StorageProvider, Namespace
 
 logger = logging.getLogger(__file__)
@@ -48,9 +48,12 @@ class Target:
         s = ' '.join(
             sorted(
                 [
-                    str(s.alignment_input)
+                    ' '.join(sorted(
+                        str(alignment_input)
+                        for alignment_input in s.alignment_input_by_seq_type.values()
+                    ))
                     for s in self.get_samples()
-                    if s.alignment_input is not None
+                    if s.alignment_input_by_seq_type
                 ]
             )
         )
@@ -62,7 +65,7 @@ class Target:
         """
         ID should be unique across target of all levels.
 
-        We are raising NotImplementedError instead of making it an abstract class, 
+        We are raising NotImplementedError instead of making it an abstract class,
         because mypy is not happy about binding TypeVar to abstract classes, see:
         https://stackoverflow.com/questions/48349054/how-do-you-annotate-the-type-of
         -an-abstract-class-with-mypy
@@ -108,7 +111,7 @@ class Target:
 class Cohort(Target):
     """
     Represents a "cohort" target - all samples from all datasets in the pipeline.
-    Analysis dataset name is required and will be used as the default name for the 
+    Analysis dataset name is required and will be used as the default name for the
     cohort.
     """
 
@@ -211,7 +214,7 @@ class Cohort(Target):
         """
         Attributes for Hail Batch job.
         """
-        return {}
+        return {'samples': ','.join(self.get_sample_ids())}
 
     def get_job_prefix(self) -> str:
         """
@@ -295,7 +298,7 @@ class Dataset(Target):
             namespace=namespace,
             storage_provider=storage_provider,
         )
-    
+
     @property
     def is_test(self) -> bool:
         """
@@ -386,7 +389,7 @@ class Dataset(Target):
         meta: dict | None = None,
         sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
-        alignment_input: AlignmentInput | None = None,
+        alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] | None = None,
     ) -> 'Sample':
         """
         Create a new sample and add it to the dataset.
@@ -404,7 +407,7 @@ class Dataset(Target):
             meta=meta,
             sex=sex,
             pedigree=pedigree,
-            alignment_input=alignment_input,
+            alignment_input_by_seq_type=alignment_input_by_seq_type,
         )
         self._sample_by_id[id] = s
         return s
@@ -421,7 +424,7 @@ class Dataset(Target):
         """
         Attributes for Hail Batch job.
         """
-        return {'dataset': self.name}
+        return {'dataset': self.name, 'samples': ','.join(self.get_sample_ids())}
 
     def get_job_prefix(self) -> str:
         """
@@ -486,7 +489,7 @@ class Sample(Target):
         meta: dict | None = None,
         sex: Sex | None = None,
         pedigree: Optional['PedigreeInfo'] = None,
-        alignment_input: AlignmentInput | None = None,
+        alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] | None = None,
     ):
         super().__init__()
         self.id = id
@@ -502,7 +505,8 @@ class Sample(Target):
                 fam_id=self.participant_id,
                 sex=sex,
             )
-        self.alignment_input: AlignmentInput | None = alignment_input
+        self.alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] = \
+            alignment_input_by_seq_type or dict()
 
     def __repr__(self):
         values = {
@@ -510,9 +514,11 @@ class Sample(Target):
             'forced': str(self.forced),
             'active': str(self.active),
             'meta': str(self.meta),
-            'sequencing_type': str(self.sequencing_type.value),
-            'alignment_input': self.alignment_input if self.alignment_input else '',
-            'pedigree': self.pedigree if self.pedigree else ''
+            'alignment_inputs': ','.join([
+                f'{seq_t.value}: {al_inp}' 
+                for seq_t, al_inp in self.alignment_input_by_seq_type.items()
+            ]),
+            'pedigree': self.pedigree if self.pedigree else '',
         }
         retval = f'Sample({self.dataset.name}/{self.id}'
         if self._external_id:
@@ -521,14 +527,16 @@ class Sample(Target):
 
     def __str__(self):
         ai_tag = ''
-        if self.alignment_input:
-            if isinstance(self.alignment_input, CramPath):
-                if self.alignment_input.is_bam:
-                    ai_tag = f'|SEQ=CRAM'
+        for seq_type, alignment_input in self.alignment_input_by_seq_type.items():
+            ai_tag += f'|SEQ={seq_type.value}:'
+            if isinstance(alignment_input, CramPath):
+                if alignment_input.is_bam:
+                    ai_tag += 'CRAM'
                 else:
-                    ai_tag = f'|SEQ=BAM'
+                    ai_tag += 'BAM'
             else:
-                ai_tag = f'|SEQ={len(self.alignment_input)}FQS'
+                assert isinstance(alignment_input, FastqPairs)
+                ai_tag += f'{len(alignment_input)}FQS'
 
         ext_id = f'|{self._external_id}' if self._external_id else ''
         return f'Sample({self.dataset.name}/{self.id}{ext_id}{ai_tag})'
