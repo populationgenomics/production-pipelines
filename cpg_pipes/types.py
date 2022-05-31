@@ -6,7 +6,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Union
+from typing import Union
 
 from hailtop.batch import ResourceGroup, ResourceFile, Batch
 
@@ -207,7 +207,7 @@ class FastqPair:
 class FastqPairs(list[FastqPair], AlignmentInput):
     """
     Multiple FASTQ file pairs belonging to the same sample 
-    (e.g. multuple lanes or top-ups).
+    (e.g. multiple lanes or top-ups).
     """
     def exists(self) -> bool:
         """
