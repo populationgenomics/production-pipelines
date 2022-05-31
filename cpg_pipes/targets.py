@@ -10,7 +10,7 @@ from typing import Optional
 import pandas as pd
 
 from . import Path
-from .types import AlignmentInput, CramPath, GvcfPath, SequencingType
+from .types import AlignmentInput, CramPath, GvcfPath, SequencingType, FastqPairs
 from .providers.storage import StorageProvider, Namespace
 
 logger = logging.getLogger(__file__)
@@ -49,7 +49,7 @@ class Target:
             sorted(
                 [
                     ' '.join(sorted(
-                        str(alignment_input.data)
+                        str(alignment_input)
                         for alignment_input in s.alignment_input_by_seq_type.values()
                     ))
                     for s in self.get_samples()
@@ -514,7 +514,10 @@ class Sample(Target):
             'forced': str(self.forced),
             'active': str(self.active),
             'meta': str(self.meta),
-            'alignment_inputs': ','.join(map(str, self.alignment_input_by_seq_type.values())),
+            'alignment_inputs': ','.join([
+                f'{seq_t.value}: {al_inp}' 
+                for seq_t, al_inp in self.alignment_input_by_seq_type.items()
+            ]),
             'pedigree': self.pedigree if self.pedigree else '',
         }
         retval = f'Sample({self.dataset.name}/{self.id}'
@@ -532,7 +535,8 @@ class Sample(Target):
                 else:
                     ai_tag += 'BAM'
             else:
-                ai_tag += f'{len(alignment_input.data)}FQS'
+                assert isinstance(alignment_input, FastqPairs)
+                ai_tag += f'{len(alignment_input)}FQS'
 
         ext_id = f'|{self._external_id}' if self._external_id else ''
         return f'Sample({self.dataset.name}/{self.id}{ext_id}{ai_tag})'

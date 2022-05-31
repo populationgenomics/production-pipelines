@@ -1,3 +1,7 @@
+"""
+Common test utilities.
+"""
+
 import os
 import string
 import time
@@ -5,7 +9,7 @@ from random import choices
 
 from cpg_pipes import to_path, Namespace
 from cpg_pipes.providers.cpg import analysis_runner_environment
-from cpg_pipes.types import GvcfPath, FastqPair
+from cpg_pipes.types import GvcfPath, FastqPair, SequencingType
 
 DATASET = 'fewgenomes'
 NAMESPACE = Namespace.TEST
@@ -52,6 +56,8 @@ EXOME_1PCT_GVCF_BY_SID = {
 CHR20_GVCF_BY_SID = {
     s: GvcfPath(BASE_BUCKET / f'inputs/chr20/gvcf/{s}.g.vcf.gz') for s in SAMPLES
 }
+
+SEQ_TYPE = SequencingType.GENOME
 
 
 def timestamp():

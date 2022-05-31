@@ -27,6 +27,7 @@ setuptools.setup(
         'pandas',
         'hail>=0.2.91',
         'cpg-gnomad',  # github.com/populationgenomics/gnomad_methods
+        'peddy',
         'google-cloud-storage',
         'google-cloud-secret-manager',
         'fsspec',

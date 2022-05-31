@@ -11,7 +11,7 @@ import logging
 from cpg_pipes import benchmark, Namespace
 from cpg_pipes.providers.images import Images
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
-from cpg_pipes.types import FastqPair, CramPath
+from cpg_pipes.types import FastqPair, CramPath, SequencingType, FastqPairs
 from cpg_pipes.pipeline import (
     stage,
     create_pipeline,
@@ -29,6 +29,9 @@ NAMESPACE = Namespace.MAIN
 
 
 class InputsType(Enum):
+    """
+    Scope of benchmark
+    """
     TOY = 'toy'
     FULL = 'full'
     FULL_SUBSET = 'full_subset'
@@ -39,7 +42,13 @@ INPUTS_TYPE = InputsType.FULL
 
 @stage
 class SubsetAlignmentInput(SampleStage):
+    """
+    Subset FASTQ to target number of reads
+    """
     def expected_outputs(self, sample: Sample):
+        """
+        Expected to generate a pair of FASTQs
+        """
         basepath = f'{benchmark.BENCHMARK_BUCKET}/outputs/{sample.id}/subset'
         return {
             'r1': f'{basepath}/R1.fastq.gz',
@@ -117,17 +126,26 @@ class SubsetAlignmentInput(SampleStage):
     else None
 )
 class DifferentResources(SampleStage):
+    """
+    Benchmark different resources
+    """
     def expected_outputs(self, sample: 'Sample'):
+        """
+        Not exptected to produce anything
+        """
         return None
 
     def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput | None:
+        """
+        Add align jobs for each combination of resources/tools
+        """
         basepath = (
             benchmark.BENCHMARK_BUCKET / f'outputs/{INPUTS_TYPE.value}/{sample.id}'
         )
 
         if INPUTS_TYPE == InputsType.FULL_SUBSET:
             d = inputs.as_dict(sample, stage=SubsetAlignmentInput)
-            alignment_input = [FastqPair(d['r1'], d['r2'])]
+            alignment_input = FastqPairs([FastqPair(d['r1'], d['r2'])])
         else:
             alignment_input = sample.meta['fastq_input']
 
@@ -159,26 +177,34 @@ class DifferentResources(SampleStage):
     else None
 )
 class DifferentAlignerSetups(SampleStage):
+    """
+    Try different setups of tools (alingners and deduplicators)
+    """
     def expected_outputs(self, sample: 'Sample'):
+        """
+        Not exptected to produce anything
+        """
         return None
 
     def queue_jobs(self, sample: 'Sample', inputs: StageInput) -> StageOutput | None:
+        """
+        Add align jobs for each combination of tools
+        """
         basepath = benchmark.BENCHMARK_BUCKET / f'outputs/{sample.id}'
 
         if INPUTS_TYPE == InputsType.FULL_SUBSET:
             d = inputs.as_dict(sample, stage=SubsetAlignmentInput)
-            alignment_input = [FastqPair(d['r1'], d['r2'])]
+            alignment_input = FastqPairs([FastqPair(d['r1'], d['r2'])])
         else:
             if 'fastq_input' in sample.meta:
-                alignment_input = sample.meta['fastq_input']
+                alignment_input = FastqPairs(sample.meta['fastq_input'])
             else:
-                alignment_input = sample.meta['cram_input']
+                alignment_input = FastqPairs(sample.meta['cram_input'])
 
         jobs = []
         for aligner in [
             Aligner.DRAGMAP,
             Aligner.BWA,
-            # Aligner.BWAMEM2
         ]:
             for markdup in [MarkDupTool.PICARD]:
                 jobs.extend(
@@ -219,7 +245,7 @@ def main():
         id='PERTHNEURO_CRAM',
         external_id='PERTHNEURO_CRAM',
     )
-    s.alignment_input = benchmark.perth_neuro_cram
+    s.alignment_input_by_seq_type[SequencingType.GENOME] = benchmark.perth_neuro_cram
 
     pipeline.set_stages(
         [

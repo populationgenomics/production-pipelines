@@ -41,6 +41,7 @@ def main():  # pylint: disable=missing-function-docstring
             output_html_path=prefix / f'{sample_name}.html',
             output_zip_path=prefix / f'{sample_name}.zip',
             alignment_input=inp,
+            images=pipe.images,
             refs=pipe.refs,
         )
 

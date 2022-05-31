@@ -2,13 +2,14 @@
 Jobs to run FastQC
 """
 from os.path import basename
+from typing import cast
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
 from cpg_pipes.providers.images import Images
-from cpg_pipes.types import AlignmentInput, CramPath, FastqPath
+from cpg_pipes.types import AlignmentInput, CramPath, FastqPath, FastqPairs
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.providers.refdata import RefData
@@ -82,10 +83,11 @@ def fastqc(
 
     jobs = []
     if isinstance(alignment_input, CramPath):
-        j = _fastqc_one('FastQC', alignment_input)
+        j = _fastqc_one('FastQC', cast(CramPath, alignment_input))
         jobs.append(j)
         return jobs
     else:
+        assert isinstance(alignment_input, FastqPairs)
         for lane_i, pair in enumerate(alignment_input):
             jname = f'FastQC R1'
             if len(alignment_input) > 1:

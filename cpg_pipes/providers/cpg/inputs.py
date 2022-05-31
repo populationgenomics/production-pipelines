@@ -162,15 +162,15 @@ class SmdbInputProvider(InputProvider):
             for d in found_seqs_by_sid.get(sample.id, []):
                 seq = SmSequence.parse(d, self.check_files)
                 if seq.alignment_input:
-                    seq_type = seq.alignment_input.sequencing_type
-                    if seq_type in sample.alignment_input_by_seq_type:
+                    if seq.sequencing_type in sample.alignment_input_by_seq_type:
                         raise InputProviderError(
                             f'{sample}: found more than 1 alignment input with '
-                            f'sequencing type: {seq_type.value}. Check your input '
-                            f'provider to make sure there is only one data source of '
-                            f'sequencing type per sample.'
+                            f'sequencing type: {seq.sequencing_type.value}. Check your '
+                            f'input provider to make sure there is only one data source '
+                            f'of sequencing type per sample.'
                         )
-                    sample.alignment_input_by_seq_type[seq_type] = seq.alignment_input
+                    sample.alignment_input_by_seq_type[seq.sequencing_type] = \
+                        seq.alignment_input
 
     def populate_analysis(self, cohort: Cohort) -> None:
         """

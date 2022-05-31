@@ -2,7 +2,7 @@ namespace: main
 analysis_dataset: seqr
 #skip_datasets: ['ohmr3-mendelian', 'ohmr4-epilepsy', 'mito-disease', 'flinders-ophthal']
 skip_samples: [CPG11783,CPG12310,CPG199679,CPG13326]  # acute-care,acute-care,acute-care,perth-neuro
-datasets: ['ohmr3-mendelian', 'ohmr4-epilepsy']  # ['heartkids', 'ravenscroft-rdstudy']  # ['circa', 'acute-care', 'perth-neuro', 'heartkids', 'ravenscroft-rdstudy']
+datasets: [perth-neuro]  # ['circa', 'acute-care', 'perth-neuro', 'heartkids', 'ravenscroft-rdstudy', 'ohmr3-mendelian', 'ohmr4-epilepsy']
 check_inputs: true
 keep_scratch: true
 skip_samples_with_missing_input: false

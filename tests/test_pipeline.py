@@ -122,7 +122,8 @@ class TestPipeline(unittest.TestCase):
         for ds in self.datasets:
             for s_id in self.sample_ids:
                 s = ds.add_sample(s_id, s_id)
-                s.alignment_input = CramPath(utils.TOY_CRAM_BY_SID[s.id])
+                s.alignment_input_by_seq_type[utils.SEQ_TYPE] = \
+                    CramPath(utils.TOY_CRAM_BY_SID[s.id])
         return pipeline
 
     def test_dry(self):
@@ -155,7 +156,7 @@ class TestPipeline(unittest.TestCase):
             return len([line for line in lines if line.strip().startswith(item)])
 
         self.assertEqual(
-            _cnt('bazam'), len(self.sample_ids) * self.realignment_shards_num
+            _cnt('dragen-os'), len(self.sample_ids) * self.realignment_shards_num
         )
         self.assertEqual(
             _cnt('HaplotypeCaller'), len(self.sample_ids) * self.hc_intervals_num
