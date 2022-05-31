@@ -20,8 +20,8 @@ class TestPedigree(unittest.TestCase):
             somalier_pairs_fpath=str(data_dir / 'output_pairs_good.tsv'),
         )
         for expected_line in [
-            'Sex inferred for 28/28 samples, matching in all samples.',
-            'Inferred pedigree matches for all 28 samples.',
+            'Sex inferred for 28/28 samples, matching for all samples',
+            'Inferred pedigree matches for all 28 samples',
         ]:
             self.assertTrue(any(expected_line in msg for msg in result.messages))
 
@@ -35,7 +35,7 @@ class TestPedigree(unittest.TestCase):
             '1/27 PED samples with mismatching sex',
             '2/27 samples with missing provided sex',
             '2/27 samples with failed inferred sex',
-            'Sex inferred for 25/27 samples, matching in 24 samples',
+            'Sex inferred for 25/27 samples, matching for 24 samples',
             '1 sample pair(s) with mismatched relatedness',
         ]:
             self.assertTrue(any(expected_line in msg for msg in result.messages))
