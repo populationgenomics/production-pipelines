@@ -21,11 +21,12 @@ class JobAttributes(TypedDict, total=False):
 
     sample: str
     dataset: str
-    samples: str
+    samples: list[str]
     part: str
     label: str
     stage: str
     tool: str
+    reuse: bool
 
 
 class RegisteringBatch(hb.Batch):
@@ -35,7 +36,7 @@ class RegisteringBatch(hb.Batch):
     """
 
     def __init__(
-        self, name, backend, *args, use_private_pool=False, **kwargs
+        self, name, backend, *args, pool_label=None, **kwargs
     ):
         super().__init__(name, backend, *args, **kwargs)
         # Job stats registry:
@@ -43,13 +44,13 @@ class RegisteringBatch(hb.Batch):
         self.job_by_stage = dict()
         self.job_by_tool = dict()
         self.total_job_num = 0
-        self.use_private_pool = use_private_pool
+        self.pool_label = pool_label
 
     def _process_attributes(
         self,
         name: str | None = None,
         attributes: JobAttributes | None = None,
-    ) -> str:
+    ) -> tuple[str, dict[str, str]]:
         """
         Use job attributes to make the job name more descriptibe, and add
         labels for Batch pre-submission stats.
@@ -63,18 +64,16 @@ class RegisteringBatch(hb.Batch):
         stage = attributes.get('stage')
         dataset = attributes.get('dataset')
         sample = attributes.get('sample')
-        sample_list = attributes.get('samples')
+        samples = attributes.get('samples') or []
+        samples = set(samples + ([sample] if sample else []))
         part = attributes.get('part')
         label = attributes.get('label', name)
         tool = attributes.get('tool')
+        reuse = attributes.get('reuse')
+        if not tool:
+            tool = '[reuse]'
 
-        name = make_job_name(name, sample, dataset, part)
-
-        samples = []
-        if sample_list:
-            samples = sample_list.split(',')
-        elif sample:
-            samples = [sample]
+        name = make_job_name(name, sample, dataset, part, reuse)
 
         if label not in self.job_by_label:
             self.job_by_label[label] = {'job_n': 0, 'samples': set()}
@@ -91,7 +90,11 @@ class RegisteringBatch(hb.Batch):
         self.job_by_tool[tool]['job_n'] += 1
         self.job_by_tool[tool]['samples'] |= set(samples)
         
-        return name
+        fixed_attrs = dict(attributes)
+        if samples:
+            fixed_attrs['samples'] = ','.join(samples)
+        fixed_attrs['reuse'] = str(reuse)
+        return name, fixed_attrs
 
     def new_python_job(
         self,
@@ -101,8 +104,11 @@ class RegisteringBatch(hb.Batch):
         """
         Wrapper around `new_python_job()` that processes job attributes.
         """
-        name = self._process_attributes(name, attributes)
-        return super().new_python_job(name, attributes=attributes)
+        name, fixed_attrs = self._process_attributes(name, attributes)
+        j = super().new_python_job(name, attributes=fixed_attrs)
+        if self.pool_label:
+            j._pool_label = self.pool_label
+        return j
 
     def new_job(
         self,
@@ -115,33 +121,36 @@ class RegisteringBatch(hb.Batch):
         """
         name = self._process_attributes(name, attributes)
         j = super().new_job(name, attributes=attributes)
-        if self.use_private_pool:
-            j.attributes['use_private_pool'] = 'TRUE'
+        if self.pool_label:
+            j._pool_label = self.pool_label
         return j
 
     def run(self, **kwargs):
         """
         Execute a batch. Overridden to print pre-submission statistics.
         """
-        logger.info(f'Will submit {self.total_job_num} jobs. Split by stage:')
-        for stage, stat in self.job_by_stage.items():
-            logger.info(
-                f'  {stage or "<not in stage>"}: '
-                f'{stat["job_n"]} jobs for {len(stat["samples"])} samples'
-            )
+        logger.info(f'Will submit {self.total_job_num} jobs')
 
-        logger.info(f'Split by label:')
-        for label, stat in self.job_by_label.items():
-            logger.info(
-                f'  {label}: {stat["job_n"]} jobs for {len(stat["samples"])} samples'
-            )
+        def _print_stat(_d: dict, default_label: str | None = None):
+            for label, stat in _d.items():
+                label = label or default_label
+                msg = f'{stat["job_n"]} job'
+                if stat['job_n'] > 1:
+                    msg += 's'
+                if len(stat['samples']) > 0:
+                    msg += f' for {len(stat["samples"])} sample'
+                    if len(stat['samples']) > 1:
+                        msg += 's'
+                logger.info(f'  {label}: {msg}')
+
+        logger.info('Split by stage:')
+        _print_stat(self.job_by_stage, default_label='<not in stage>')
+            
+        logger.info('Split by label:')
+        _print_stat(self.job_by_stage, default_label='<no label>')
 
         logger.info(f'Split by tool:')
-        for tool, stat in self.job_by_tool.items():
-            logger.info(
-                f'  {tool or "<tool is not defined>"}: '
-                f'{stat["job_n"]} jobs for {len(stat["samples"])} samples'
-            )
+        _print_stat(self.job_by_tool, default_label='<tool is not defined>')
 
         return super().run(**kwargs)
 
@@ -150,7 +159,7 @@ def setup_batch(
     description: str,
     billing_project: str | None = None,
     hail_bucket: Path | None = None,
-    use_private_pool: bool = False,
+    pool_label: str | None = None,
 ) -> RegisteringBatch:
     """
     Wrapper around the initialization of a Hail Batch object.
@@ -159,7 +168,7 @@ def setup_batch(
     @param description: descriptive name of the Batch (will be displayed in the GUI)
     @param billing_project: Hail billing project name
     @param hail_bucket: bucket for Hail Batch intermediate files.
-    @param use_private_pool: submit jobs to the private pool
+    @param pool_label: submit jobs to the private pool with this label
     """
     billing_project = get_billing_project(billing_project)
     hail_bucket = get_hail_bucket(hail_bucket)
@@ -176,7 +185,7 @@ def setup_batch(
     return RegisteringBatch(
         name=description, 
         backend=backend, 
-        use_private_pool=use_private_pool
+        pool_label=pool_label
     )
 
 
@@ -213,6 +222,7 @@ def make_job_name(
     sample: str | None = None,
     dataset: str | None = None,
     part: str | None = None,
+    reuse: bool = False,
 ) -> str:
     """
     Extend the descriptive job name to reflect job attributes.
@@ -223,6 +233,8 @@ def make_job_name(
         name = f'{dataset}: {name}'
     if part:
         name += f', {part}'
+    if reuse:
+        name += ' [reuse]'
     return name
 
 
