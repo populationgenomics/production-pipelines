@@ -10,6 +10,9 @@ Problems with the currentl publicly shared somalier sites VCF:
 """
 
 import logging
+
+from cpg_utils.hail_batch import reference_path, image_path
+
 from cpg_pipes import Namespace
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.pipeline import create_pipeline
@@ -24,11 +27,11 @@ pipe = create_pipeline(
     keep_scratch=True,
 )
 
-results_vcf = pipe.refs.somalier_sites
+results_vcf = reference_path('somalier_sites')
 
 
 concat_j = pipe.b.new_job('Make somalier sites')
-concat_j.image(pipe.images.get('bcftools'))
+concat_j.image(image_path('bcftools'))
 concat_j.storage('1000G')
 concat_j.cpu(4)
 gnomad_vcf_paths = [
@@ -47,7 +50,7 @@ bcftools concat {" ".join(gnomad_vcfs)} -Oz -o {concat_j.gnomad_vcf}
 )
 
 make_sites_j = pipe.b.new_job('Make somalier sites')
-make_sites_j.image(pipe.images.get('somalier'))
+make_sites_j.image(image_path('somalier'))
 make_sites_j.storage('6T')
 make_sites_j.cpu(4)
 make_sites_j.command(

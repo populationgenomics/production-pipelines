@@ -11,8 +11,6 @@ from unittest.mock import patch, Mock
 
 from cpg_pipes import Namespace, Path, to_path
 from cpg_pipes.pipeline.pipeline import Pipeline, Stage
-from cpg_pipes.providers.cpg.images import CpgImages
-from cpg_pipes.providers.cpg.refdata import CpgRefData
 from cpg_pipes.stages.genotype_sample import GenotypeSample
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
@@ -26,26 +24,6 @@ try:
     import utils
 except ModuleNotFoundError:
     from . import utils
-
-
-"""
-Align and GenotypeSample stages write cram and gvcf into the datasets
-main bucket, without versioning. We need to override this behaviour to
-support writing into the test output directory.
-"""
-def unitest_dataset_path(
-    self,
-    dataset: str,
-    namespace: Namespace,
-    suffix: str = None,
-) -> Path:
-    """
-    Overiding main bucket name
-    """
-    path = self.test_output_bucket
-    if suffix:
-        path /= suffix
-    return path
 
 
 class TestPipeline(unittest.TestCase):
@@ -99,16 +77,12 @@ class TestPipeline(unittest.TestCase):
             first_stage=first_stage,
             last_stage=last_stage,
             version=self.timestamp,
-            refs=CpgRefData(),
-            images=CpgImages(),
-            config=dict(
-                realignment_shards_num=realignment_shards_num
-                or self.realignment_shards_num,
-                hc_intervals_num=hc_intervals_num or self.hc_intervals_num,
-                jc_intervals_num=jc_intervals_num or self.jc_intervals_num,
-                vep_intervals_num=vep_intervals_num or self.vep_intervals_num,
-                intervals_path=intervals_path,
-            ),
+            realignment_shards_num=realignment_shards_num
+            or self.realignment_shards_num,
+            hc_intervals_num=hc_intervals_num or self.hc_intervals_num,
+            jc_intervals_num=jc_intervals_num or self.jc_intervals_num,
+            vep_intervals_num=vep_intervals_num or self.vep_intervals_num,
+            intervals_path=intervals_path,
         )
         self.datasets = [pipeline.create_dataset(utils.DATASET)]
         for ds in self.datasets:

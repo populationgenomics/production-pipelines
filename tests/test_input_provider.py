@@ -10,7 +10,6 @@ from unittest import skip
 from cpg_pipes import Namespace
 from cpg_pipes.providers.cpg.inputs import SmdbInputProvider
 from cpg_pipes.providers.cpg.smdb import SMDB
-from cpg_pipes.providers.cpg.storage import CpgStorageProvider
 from cpg_pipes.targets import Cohort, Sex
 from cpg_pipes.providers.inputs import CsvInputProvider
 from cpg_pipes.types import SequencingType, CramPath
@@ -51,7 +50,6 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
             name='test',
             analysis_dataset_name=dataset,
             namespace=Namespace.TEST,
-            storage_provider=CpgStorageProvider(),
         )
         provider.populate_cohort(
             cohort,
@@ -87,7 +85,6 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
             cohort=Cohort(
                 analysis_dataset_name=dataset,
                 namespace=Namespace.TEST,
-                storage_provider=CpgStorageProvider(),
             ),
             dataset_names=[dataset],
         )

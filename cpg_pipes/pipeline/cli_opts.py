@@ -17,6 +17,7 @@ from cpg_utils.hail_batch import Namespace
 from .exceptions import PipelineError
 from .pipeline import Pipeline
 from .. import to_path, get_package_path
+from ..jobs import haplotype_caller, joint_genotyping, vep, align
 from ..providers import (
     StatusReporterType,
     InputProviderType,
@@ -323,24 +324,24 @@ class Options:
         help='Template to build HTTP URLs matching the dataset_path of category '
              '"web". Should be parametrised by namespace and dataset in Jinja format',
     )
-    realignment_shards: int = option(
-        '--realignment-shards',
-        default=10,
+    realignment_shards_num: int = option(
+        '--realignment-shards-num',
+        default=align.DEFAULT_REALIGNMENT_SHARD_NUM,
         help='Number of shards to partition input CRAM/BAM for realignment'
     )
-    genotype_sample_shards: int = option(
-        '--genotype-sample-shards',
-        default=50,
+    hc_intervals_num: int = option(
+        '--hc-intervals-num',
+        default=haplotype_caller.DEFAULT_INTERVALS_NUM,
         help='Number of intervals to partition sample genotype calling',
     )
-    joint_calling_shards: int = option(
-        '--joint-calling-shards',
-        default=50,
+    jc_intervals_num: int = option(
+        '--jc-intervals-num',
+        default=joint_genotyping.DEFAULT_INTERVALS_NUM,
         help='Number of intervals to partition joint calling and VQSR',
     )
-    vep_shards: int = option(
-        '--vep-shards',
-        default=50,
+    vep_intervals_num: int = option(
+        '--vep-intervals-num',
+        default=vep.DEFAULT_INTERVALS_NUM,
         help='Number of intervals to partition VEP annotation',
     )
 
@@ -445,6 +446,10 @@ def create_pipeline(**config) -> 'Pipeline':
         keep_scratch=options.keep_scratch,
         skip_samples_stages=options.skip_samples_stages,
         hail_pool_label=options.hail_pool_label,
+        realignment_shards_num=options.realignment_shards_num,
+        hc_intervals_num=options.hc_intervals_num,
+        jc_intervals_num=options.jc_intervals_num,
+        vep_intervals_num=options.vep_intervals_num,
         **options.remaining_kwargs,
     )
 

@@ -26,7 +26,6 @@ from cpg_pipes.pipeline import (
     CohortStage,
     DatasetStage,
 )
-from cpg_pipes.providers.refdata import RefData
 from cpg_pipes.stages.vep import Vep
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
@@ -64,7 +63,6 @@ class AnnotateCohort(CohortStage):
 
         jobs = annotate_cohort_jobs(
             b=self.b,
-            images=self.images,
             vcf_path=vcf_path,
             vep_ht_path=vep_ht_path,
             siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
@@ -101,7 +99,6 @@ class AnnotateDataset(DatasetStage):
 
         jobs = annotate_dataset_jobs(
             b=self.b,
-            images=self.images,
             mt_path=mt_path,
             sample_ids=[s.id for s in dataset.get_samples()],
             output_mt_path=self.expected_outputs(dataset),
@@ -198,34 +195,12 @@ def _read_es_password(
     help=f'Create Seqr ElasticSearch indices for these datasets.',
 )
 @click.option(
-    '--hc-intervals-num',
-    'hc_intervals_num',
-    type=click.INT,
-    default=RefData.number_of_haplotype_caller_intervals,
-    help='Number of intervals to devide the genome for sample genotyping with '
-    'gatk HaplotypeCaller',
-)
-@click.option(
-    '--realignment-shards-num',
-    'realignment_shards_num',
-    type=click.INT,
-    default=RefData.number_of_shards_for_realignment,
-    help='Number of shards to parallelise realignment',
-)
-@click.option(
     '--realign',
     '--realign-from-cram-version',
     'realign_from_cram_version',
     help='Realign CRAM whenever available, instead of using FASTQ. '
          'The parameter value should correspond to CRAM version '
          '(e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPG0123.cram)'
-)
-@click.option(
-    '--jc-intervals-num',
-    'jc_intervals_num',
-    type=click.INT,
-    default=RefData.number_of_joint_calling_intervals,
-    help='Number of intervals to devide the genome for joint genotyping with GATK',
 )
 @click.option(
     '--use-gnarly/--no-use-gnarly',

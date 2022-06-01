@@ -8,9 +8,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 import pandas as pd
-from cpg_utils.hail_batch import Namespace, dataset_path, web_url, to_path
+from cpg_utils.hail_batch import dataset_path, web_url
 
-from . import Path
+from . import Namespace, Path, to_path
 from .types import AlignmentInput, CramPath, GvcfPath, SequencingType, FastqPairs
 
 logger = logging.getLogger(__file__)

@@ -8,8 +8,9 @@ from enum import Enum
 import click
 import logging
 
+from cpg_utils.hail_batch import image_path
+
 from cpg_pipes import benchmark, Namespace
-from cpg_pipes.providers.images import Images
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
 from cpg_pipes.types import FastqPair, CramPath, SequencingType, FastqPairs
 from cpg_pipes.pipeline import (
@@ -83,9 +84,9 @@ class SubsetAlignmentInput(SampleStage):
             jobs=[j1, j2],
         )
 
-    def _subset_cram(self, cram: CramPath, sample: Sample, images: Images):
+    def _subset_cram(self, cram: CramPath, sample: Sample):
         j = self.b.new_job('Subset CRAM')
-        j.image(images.get('samtools'))
+        j.image(image_path('samtools'))
         j.storage('100G')
         reference = self.refs.fasta_res_group(self.b)
         cram_group = cram.resource_group(self.b)
@@ -160,8 +161,6 @@ class DifferentResources(SampleStage):
                         output_path=basepath
                         / f'nomarkdup/{aligner.name}_nthreads{nthreads}.bam',
                         job_attrs=sample.get_job_attrs(),
-                        refs=self.refs,
-                        images=self.images,
                         aligner=aligner,
                         markdup_tool=MarkDupTool.NO_MARKDUP,
                         extra_label=f'nomarkdup_fromfastq_{aligner.name}nthreads{nthreads}',
@@ -213,8 +212,6 @@ class DifferentAlignerSetups(SampleStage):
                         alignment_input=alignment_input,
                         sample_name=sample.id,
                         job_attrs=sample.get_job_attrs(),
-                        refs=self.refs,
-                        images=self.images,
                         output_path=basepath / f'{aligner.name}-{markdup.name}.bam',
                         aligner=aligner,
                         markdup_tool=markdup,

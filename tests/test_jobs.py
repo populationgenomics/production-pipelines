@@ -8,6 +8,7 @@ import unittest
 from typing import Dict
 from unittest import skip
 
+from cpg_utils.hail_batch import image_path, fasta_res_group
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path, to_path, Namespace
@@ -74,8 +75,6 @@ class TestJobs(unittest.TestCase):
         self.dataset = self.pipeline.create_dataset(utils.DATASET)
         sample_name = f'Test-{self.timestamp}'
         self.sample = self.dataset.add_sample(sample_name, sample_name)
-        self.refs = self.pipeline.refs
-        self.images = self.pipeline.images
 
         # Interval to take on chr20:
         self.chrom = 'chr20'
@@ -97,9 +96,9 @@ class TestJobs(unittest.TestCase):
         Add job that gets details of a CRAM file
         """
         test_j = self.pipeline.b.new_job('Parse CRAM sample name')
-        test_j.image(self.images.get('samtools'))
+        test_j.image(image_path('samtools'))
         sed = r's/.*SM:\([^\t]*\).*/\1/g'
-        fasta_reference = self.refs.fasta_res_group(self.pipeline.b)
+        fasta_reference = fasta_res_group(self.pipeline.b)
         cram = self.pipeline.b.read_input_group(
             **{
                 'cram': str(cram_path),
@@ -136,7 +135,7 @@ class TestJobs(unittest.TestCase):
         """
         vcf_input = self.pipeline.b.read_input(str(vcf_path))
         test_j = self.pipeline.b.new_job('Parse GVCF sample name')
-        test_j.image(self.images.get('bcftools'))
+        test_j.image(image_path('bcftools'))
         test_j.command(f'bcftools query -l {vcf_input} > {test_j.output}')
         test_j.depends_on(*jobs)
 
@@ -158,8 +157,6 @@ class TestJobs(unittest.TestCase):
             output_path=output_path,
             qc_bucket=qc_bucket,
             sample_name=self.sample.id,
-            refs=self.refs,
-            images=self.images,
         )
         cram_details_paths = self._job_get_cram_details(
             output_path,
@@ -201,8 +198,6 @@ class TestJobs(unittest.TestCase):
             alignment_input=cram_path,
             output_path=output_path,
             sample_name=sid,
-            refs=self.refs,
-            images=self.images,
             realignment_shards_num=4,
         )
         cram_details_paths = self._job_get_cram_details(
@@ -234,8 +229,6 @@ class TestJobs(unittest.TestCase):
         jobs = produce_gvcf(
             self.pipeline.b,
             sample_name=sid,
-            refs=self.refs,
-            images=self.images,
             cram_path=cram_path,
             scatter_count=4,
             tmp_bucket=self.tmp_bucket,
@@ -267,8 +260,6 @@ class TestJobs(unittest.TestCase):
             b=self.pipeline.b,
             out_vcf_path=out_vcf_path,
             out_siteonly_vcf_path=out_siteonly_vcf_path,
-            refs=self.refs,
-            images=self.images,
             gvcf_by_sid=utils.EXOME_1PCT_GVCF_BY_SID,
             tmp_bucket=self.tmp_bucket,
             overwrite=True,
@@ -300,8 +291,6 @@ class TestJobs(unittest.TestCase):
         jobs = make_vqsr_jobs(
             b=self.pipeline.b,
             input_vcf_or_mt_path=siteonly_vcf_path,
-            refs=self.refs,
-            images=self.images,
             tmp_bucket=tmp_vqsr_bucket,
             gvcf_count=len(utils.SAMPLES),
             scatter_count=4,
@@ -331,8 +320,6 @@ class TestJobs(unittest.TestCase):
         jobs = vep.vep_jobs(
             self.pipeline.b,
             vcf_path=siteonly_vcf_path,
-            refs=self.refs,
-            images=self.images,
             sequencing_type=self.sequencing_type,
             out_path=out_vcf_path,
             scatter_count=4,
@@ -346,7 +333,7 @@ class TestJobs(unittest.TestCase):
 
         # Add test job
         test_j = self.pipeline.b.new_job('Parse VEP VCF')
-        test_j.image(self.images.get('bcftools'))
+        test_j.image(image_path('bcftools'))
         test_j.command(
             f"""
         bcftools +split-vep {self.pipeline.b.read_input(str(out_vcf_path))} \
@@ -385,8 +372,6 @@ class TestJobs(unittest.TestCase):
         j = vep.vep_one(
             self.pipeline.b,
             vcf=siteonly_vqsr_path,
-            refs=self.refs,
-            images=self.images,
             out_path=out_path,
             out_format='json',
         )
@@ -394,7 +379,7 @@ class TestJobs(unittest.TestCase):
         # Add test job
         mane_transcript = 'NM_001009923.2'  # expected transcript on locus1
         test_j = self.pipeline.b.new_job('Parse VEP results')
-        test_j.image(self.images.get('hail'))
+        test_j.image(image_path('hail'))
         test_j.command(
             f"""
         cat {self.pipeline.b.read_input(str(out_path))} | zgrep {locus1} | \
@@ -426,7 +411,6 @@ class TestJobs(unittest.TestCase):
 
         vep.gather_vep_json_to_ht(
             b=self.pipeline.b,
-            images=self.images,
             vep_results_paths=[vep_json_list_path],
             hail_billing_project=utils.DATASET,
             hail_bucket=self.tmp_bucket,
@@ -460,7 +444,6 @@ class TestJobs(unittest.TestCase):
         out_mt_path = self.out_bucket / f'cohort-exome5pct.mt'
         annotate_cohort_jobs(
             self.pipeline.b,
-            images=self.images,
             vcf_path=vcf_path,
             siteonly_vqsr_vcf_path=siteonly_vqsr_path,
             vep_ht_path=vep_ht_path,
@@ -487,7 +470,6 @@ class TestJobs(unittest.TestCase):
         out_mt_path = self.out_bucket / f'cohort-{self.interval}.mt'
         annotate_cohort_jobs(
             self.pipeline.b,
-            images=self.images,
             vcf_path=vcf_path,
             siteonly_vqsr_vcf_path=siteonly_vqsr_path,
             vep_ht_path=vep_ht_path,
@@ -519,7 +501,6 @@ class TestJobs(unittest.TestCase):
         out_mt_path = self.out_bucket / 'seqr_loader' / f'dataset-{self.interval}.mt'
         annotate_dataset_jobs(
             b=self.pipeline.b,
-            images=self.images,
             mt_path=mt_path,
             sample_ids=utils.SAMPLES[:3],
             tmp_bucket=self.tmp_bucket,
@@ -546,7 +527,6 @@ class TestJobs(unittest.TestCase):
         inputs_bucket = utils.BASE_BUCKET / 'inputs' / 'check_pedigree'
         check_pedigree_job(
             self.pipeline.b,
-            images=self.images,
             samples_file=self.pipeline.b.read_input(
                 str(inputs_bucket / 'somalier-samples.tsv')
             ),

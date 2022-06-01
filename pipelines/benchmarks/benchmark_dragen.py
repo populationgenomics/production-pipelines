@@ -4,7 +4,6 @@
 Benchmarking DRAGMAP alignment and GATK-DRAGEN variant calling.
 """
 
-from os.path import join
 import click
 import logging
 
@@ -23,6 +22,9 @@ NAMESPACE = Namespace.MAIN
 
 @click.command()
 def main():
+    """
+    Benchmarking DRAGMAP alignment and GATK-DRAGEN variant calling.
+    """
     pipe = create_pipeline(
         analysis_dataset='fewgenomes',
         name='benchmark_dragen',
@@ -41,7 +43,6 @@ def main():
             output_path=cram_path,
             sample_name=sample_name,
             aligner=Aligner.DRAGMAP,
-            refs=pipe.refs,
         )
         hc_jobs = produce_gvcf(
             pipe.b,
@@ -52,7 +53,6 @@ def main():
             scatter_count=10,
             tmp_bucket=benchmark.BENCHMARK_BUCKET / 'tmp',
             dragen_mode=True,
-            refs=pipe.refs,
             sequencing_type=SequencingType.GENOME,
         )
         for j in hc_jobs:
