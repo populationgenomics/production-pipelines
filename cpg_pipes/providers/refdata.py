@@ -1,8 +1,8 @@
 """
-Reference files and indices used in bionformatics pipelines.
+Bioinformatics reference files, indices and constants.
 """
 
-from cpg_pipes.providers.storage import Path
+from .. import Path
 from cpg_pipes.types import SequencingType
 
 

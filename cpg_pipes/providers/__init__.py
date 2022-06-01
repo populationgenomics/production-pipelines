@@ -8,7 +8,7 @@ from enum import Enum
 class InputProviderType(Enum):
     """Available types of input providers"""
 
-    SMDB = 'smdb'
+    CPG = 'cpg'
     CSV = 'csv'
 
 

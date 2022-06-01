@@ -30,10 +30,10 @@ from .. import Path, to_path, Namespace
 from ..hb.batch import setup_batch, get_billing_project
 from ..providers.images import Images
 from ..providers.inputs import InputProvider
-from ..providers.storage import StorageProvider
 from ..targets import Target, Dataset, Sample, Cohort
 from ..providers.status import StatusReporter
 from cpg_pipes.providers.refdata import RefData
+from ..types import SequencingType
 from ..utils import exists
 
 logger = logging.getLogger(__file__)
@@ -559,9 +559,9 @@ class Stage(Generic[TargetT], ABC):
         Add "reuse" job. Target doesn't have to be specific for a stage here,
         this using abstract class Target instead of generic parameter TargetT.
         """
-        attrs = dict(stage=self.name, tool='[reuse]')
+        attrs = dict(stage=self.name, reuse=True)
         attrs |= target.get_job_attrs()
-        return self.b.new_job(f'{self.name} [reuse]', attrs)
+        return self.b.new_job(self.name, attrs)
 
     def _get_action(self, target: TargetT) -> Action:
         """
@@ -777,12 +777,12 @@ class Pipeline:
         namespace: Namespace,
         name: str,
         analysis_dataset_name: str,
-        storage_provider: StorageProvider,
         refs: RefData,
         images: Images,
         description: str | None = None,
         stages: list[StageDecorator] | None = None,
         input_provider: InputProvider | None = None,
+        sequencing_type: SequencingType | None = None,
         status_reporter: StatusReporter | None = None,
         datasets: list[str] | None = None,
         skip_datasets: list[str] | None = None,
@@ -797,18 +797,18 @@ class Pipeline:
         check_expected_outputs: bool = True,
         skip_samples_with_missing_input: bool = False,
         skip_samples_stages: dict[str, list[str]] | None = None,
-        config: dict | None = None,
         local_dir: Path | None = None,
         dry_run: bool = False,
         keep_scratch: bool = True,
-        use_private_pool: bool = False,
+        hail_pool_label: str | None = None,
+        **kwargs,
     ):
-        self.storage_provider = storage_provider
+        self.name = name.replace(' ', '_')
+        self.namespace = namespace
         self.cohort = Cohort(
             analysis_dataset_name=analysis_dataset_name,
-            namespace=namespace,
-            name=name,
-            storage_provider=storage_provider,
+            namespace=self.namespace,
+            name=self.name,
         )
         if datasets and input_provider:
             input_provider.populate_cohort(
@@ -817,23 +817,20 @@ class Pipeline:
                 skip_samples=skip_samples,
                 only_samples=only_samples,
                 skip_datasets=skip_datasets,
+                sequencing_type=sequencing_type,
             )
         self.refs = refs
         self.images = images
 
         self.force_samples = force_samples
 
-        self.name = name
-        self.version = version or time.strftime('%Y%m%d-%H%M%S')
-        self.namespace = namespace
         self.hail_billing_project = get_billing_project(
             self.cohort.analysis_dataset.stack
         )
-        self.tmp_bucket = to_path(
-            self.cohort.analysis_dataset.storage_tmp_path(
-                version=(name + (f'/{version}' if version else ''))
-            )
-        )
+        self.tmp_bucket = self.cohort.analysis_dataset.tmp_path()
+        if version:
+            self.tmp_bucket /= version
+        self.version = version or time.strftime('%Y%m%d-%H%M%S')
         self.hail_bucket = self.tmp_bucket / 'hail'
         if not description:
             description = name
@@ -845,7 +842,7 @@ class Pipeline:
             description=description,
             billing_project=self.hail_billing_project,
             hail_bucket=self.hail_bucket,
-            use_private_pool=use_private_pool,
+            pool_label=hail_pool_label,
         )
         self.status_reporter = status_reporter
 
@@ -866,7 +863,7 @@ class Pipeline:
         else:
             self.local_dir = self.local_tmp_dir = to_path(tempfile.mkdtemp())
 
-        self.config = config or {}
+        self.config = kwargs or {}
 
         # Will be populated by set_stages() in submit_batch()
         self._stages_dict: dict[str, Stage] = dict()

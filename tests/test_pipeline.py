@@ -13,7 +13,6 @@ from cpg_pipes import Namespace, Path, to_path
 from cpg_pipes.pipeline.pipeline import Pipeline, Stage
 from cpg_pipes.providers.cpg.images import CpgImages
 from cpg_pipes.providers.cpg.refdata import CpgRefData
-from cpg_pipes.providers.cpg.storage import CpgStorageProvider
 from cpg_pipes.stages.genotype_sample import GenotypeSample
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
@@ -29,30 +28,24 @@ except ModuleNotFoundError:
     from . import utils
 
 
-class UnittestStorageProvider(CpgStorageProvider):
+"""
+Align and GenotypeSample stages write cram and gvcf into the datasets
+main bucket, without versioning. We need to override this behaviour to
+support writing into the test output directory.
+"""
+def unitest_dataset_path(
+    self,
+    dataset: str,
+    namespace: Namespace,
+    suffix: str = None,
+) -> Path:
     """
-    Align and GenotypeSample stages write cram and gvcf into the datasets
-    main bucket, without versioning. We need to override this behaviour to
-    support writing into the test output directory.
+    Overiding main bucket name
     """
-
-    def __init__(self, test_output_bucket: Path):
-        super().__init__()
-        self.test_output_bucket = test_output_bucket
-
-    def _dataset_bucket(
-        self,
-        dataset: str,
-        namespace: Namespace,
-        suffix: str = None,
-    ) -> Path:
-        """
-        Overiding main bucket name
-        """
-        path = self.test_output_bucket
-        if suffix:
-            path /= suffix
-        return path
+    path = self.test_output_bucket
+    if suffix:
+        path /= suffix
+    return path
 
 
 class TestPipeline(unittest.TestCase):
@@ -103,7 +96,6 @@ class TestPipeline(unittest.TestCase):
             analysis_dataset_name=utils.DATASET,
             check_intermediates=False,
             check_expected_outputs=False,
-            storage_provider=UnittestStorageProvider(self.out_bucket),
             first_stage=first_stage,
             last_stage=last_stage,
             version=self.timestamp,

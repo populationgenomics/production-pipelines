@@ -11,7 +11,7 @@ import time
 import click
 import yaml
 
-from cpg_pipes.pipeline.cli_opts import choice_from_enum, val_to_enum
+from cpg_pipes.pipeline.cli import choice_from_enum, val_to_enum, create_pipeline
 from cpg_pipes.types import SequencingType
 from google.cloud import secretmanager
 
@@ -19,9 +19,8 @@ from cpg_pipes import Path
 from cpg_pipes import utils
 from cpg_pipes.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jobs
 from cpg_pipes.pipeline import (
-    pipeline_click_options,
+    pipeline_options,
     stage,
-    create_pipeline,
     StageInput,
     StageOutput,
     CohortStage,
@@ -259,21 +258,13 @@ def _read_es_password(
     'sequencing_type',
     type=choice_from_enum(SequencingType),
     callback=val_to_enum(SequencingType),
-    help='Use data with this sequencing type',
-    default=SequencingType.GENOME,
+    help='Limit to data with this sequencing type',
+    default=SequencingType.GENOME.value,
 )
-@pipeline_click_options
+@pipeline_options
 def main(
     datasets: list[str],
     create_es_index_for_datasets: list[str],
-    hc_intervals_num: int,
-    jc_intervals_num: int,
-    realignment_shards_num: int,
-    realign_from_cram_version: str,
-    use_gnarly: bool,
-    use_as_vqsr: bool,
-    exome_bed: str,
-    cram_qc: bool,
     sequencing_type: SequencingType,
     **kwargs,
 ):
@@ -296,8 +287,8 @@ def main(
     description = 'Seqr Loader'
     if v := kwargs.get('version'):
         description += f', {v}'
-    input_datasets = set(datasets) - set(kwargs.get('skip_datasets', []))
-    description += f': [{", ".join(sorted(input_datasets))}]'
+    active_datasets = set(datasets) - set(kwargs.get('skip_datasets', []))
+    description += f': [{", ".join(sorted(active_datasets))}]'
     if create_es_index_for_datasets:
         description += f' → [{", ".join(sorted(create_es_index_for_datasets))}]'
 
@@ -308,34 +299,12 @@ def main(
         )
 
     kwargs['analysis_dataset'] = kwargs.get('analysis_dataset', 'seqr')
-    pipeline = create_pipeline(
-        name='Seqr Loader',
-        description=description,
-        datasets=datasets,
-        config=dict(
-            create_es_index_for_datasets=create_es_index_for_datasets,
-            hc_intervals_num=hc_intervals_num,
-            jc_intervals_num=jc_intervals_num,
-            realignment_shards_num=realignment_shards_num,
-            realign_from_cram_version=realign_from_cram_version,
-            use_gnarly=use_gnarly,
-            use_as_vqsr=use_as_vqsr,
-            exome_bed=exome_bed,
-            cram_qc=cram_qc,
-            sequencing_type=sequencing_type,
-        ),
-        **kwargs,
-    )
-
-    # Filtering to the samples with only requested sequencing types
-    for s in pipeline.cohort.get_samples():
-        if sequencing_type not in s.alignment_input_by_seq_type:
-            logger.warning(
-                f'{s}: skipping because of unsupported data type '
-                f'{s.sequencing_type.value}. Supported types: '
-                f'{[st.value for st in SUPPORTED_SEQUENCING_TYPES]} '
-            )
-            s.active = False
+    kwargs['name'] = kwargs.get('name') or 'Seqr Loader'
+    kwargs['description'] = description
+    kwargs['datasets'] = kwargs.get('datasets') or datasets
+    kwargs['create_es_index_for_datasets'] = create_es_index_for_datasets
+    kwargs['sequencing_type'] = sequencing_type
+    pipeline = create_pipeline(**kwargs)
     pipeline.run()
 
 

@@ -18,7 +18,6 @@ from ...utils import exists
 
 ANALYSIS_RUNNER_PROJECT_ID = 'analysis-runner'
 
-DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:7f41eeb90c8bec8836a1cd20ad1911b5989a5893-hail-db65c33c29100c64405c39ebace90a7c463b4bec'
 IMAGE_REGISTRY_PREFIX = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
 REFERENCE_PREFIX = 'gs://cpg-reference'
 WEB_URL_TEMPLATE = f'https://{{namespace}}-web.populationgenomics.org.au/{{dataset}}'
@@ -47,36 +46,41 @@ def get_stack_sa_email(stack: str, access_level: str) -> str:
     return data[f'datasets:hail_service_account_{access_level}']
 
 
-def analysis_runner_environment(
-    local_tmp_dir: Path | None = None,
-    dataset: str | None = None,
+def set_config(config: dict, local_tmp_dir: Path | None = None):
+    """
+    Writes and sets cpg-utils config.
+    """
+    local_tmp_dir = local_tmp_dir or to_path(tempfile.mkdtemp())
+    config_path = local_tmp_dir / (str(uuid.uuid4()) + '.toml')
+    with config_path.open('w') as f:
+        toml.dump(config, f)
+    set_config_path(config_path)
+
+
+def build_infra_config(
+    dataset: str,
     namespace: Namespace | None = None,
-):
+    gcp_project: str | None = None,
+    image_registry_prefix: str = IMAGE_REGISTRY_PREFIX,
+    reference_prefix: str = REFERENCE_PREFIX,
+    web_url_template: str = WEB_URL_TEMPLATE,
+) -> dict[str, dict[str, str]]:
     """
-    Simulate the analysis-runner environment. Requires only the CPG_DATASET environment 
-    variable or `dataset` parameter set. Optionally, SERVICE_ACCOUNT_KEY can be set
-    to run as a specific user. In this case, GOOGLE_APPLICATION_CREDENTIALS should be
-    set with permissions to pull Hail tokens secret.
+    Set up the infrastructure config.
     
-    Writes a config to gs://cpg-config and sets CPG_CONFIG_PATH, the only required
-    environment variable for cpg-utils. Also sets HAIL_TOKEN.
+    Note for CPG: if typical analysis-runner configuration is not included, this 
+    function would somulate the analysis-runner environment. 
+    It requires only the `dataset` parameter, however optionally SERVICE_ACCOUNT_KEY 
+    can be set to impersonate specific service account. In this case, 
+    GOOGLE_APPLICATION_CREDENTIALS should also initially be set to the analysis-runner 
+    service account to allow read permissions to the secret with Hail tokens.
     """
-    if not local_tmp_dir:
-        local_tmp_dir = to_path(tempfile.mkdtemp())
-    assert local_tmp_dir
-
-    dataset = os.getenv('CPG_DATASET', dataset)
-    if not dataset:
-        raise ValueError(
-            'CPG_DATASET environment variable or dataset parameter must be set'
-        )
-
     stack, namespace = parse_stack(dataset, namespace)
     access_level = 'test' if namespace == Namespace.TEST else 'full'
 
     # Parse server config to get Hail token and the GCP project name
     hail_token = os.getenv('HAIL_TOKEN')
-    gcp_project = os.getenv('CPG_DATASET_GCP_PROJECT')
+    gcp_project = gcp_project or os.getenv('CPG_DATASET_GCP_PROJECT')
     if not hail_token or not gcp_project:
         server_config = get_server_config()
         hail_token = server_config[stack][f'{access_level}Token']
@@ -94,7 +98,7 @@ def analysis_runner_environment(
             raise ValueError(f'Service account key does not exist: {sa_key_path}')
         os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = sa_key_path
 
-    config = {
+    return {
         'hail': {
             'billing_project': dataset,
             'bucket': f'cpg-{stack}-hail',
@@ -103,16 +107,9 @@ def analysis_runner_environment(
             'access_level': access_level,
             'dataset': stack,
             'dataset_gcp_project': gcp_project,
-            'driver_image': DRIVER_IMAGE,
-            'image_registry_prefix': IMAGE_REGISTRY_PREFIX,
-            'reference_prefix': REFERENCE_PREFIX,
+            'image_registry_prefix': image_registry_prefix or IMAGE_REGISTRY_PREFIX,
+            'reference_prefix': reference_prefix or REFERENCE_PREFIX,
+            'web_url_template': web_url_template or WEB_URL_TEMPLATE,
             'output_prefix': 'cpg-pipes',
-            'web_url_template': WEB_URL_TEMPLATE,
         },
     }
-
-    config_path = local_tmp_dir / (str(uuid.uuid4()) + '.toml')
-    with config_path.open('w') as f:
-        toml.dump(config, f)
-
-    set_config_path(config_path)

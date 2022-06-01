@@ -111,7 +111,7 @@ class MultiQC(DatasetStage):
         j = multiqc(
             self.b,
             images=self.images,
-            tmp_bucket=dataset.storage_tmp_path(),
+            tmp_bucket=dataset.tmp_path(),
             paths=paths,
             ending_to_trim=ending_to_trim,
             modules_to_trim_endings=modules_to_trim_endings,
