@@ -478,8 +478,9 @@ def pipeline_options(function: Callable) -> Callable:
     # Applying decorators. Doing that in reverse order, because Click actually
     # inverts the order of shown options, assuming the decorators order of
     # application which is bottom to top.
-    for opt in list(Options.__annotations__.values())[::-1]:
-        function = opt(function)
+    for k, opt in list(Options.__dict__.items())[::-1]:
+        if not k.startswith('__'):
+            function = opt(function)
 
     # Adding a special option to read defaults from a user-provided configuration file. 
     # Adding it last, so we are able to compare parameters in the file with the "normal" 

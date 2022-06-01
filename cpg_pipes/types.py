@@ -81,7 +81,11 @@ class CramPath(AlignmentInput):
     and a corresponding fingerprint path.
     """
 
-    def __init__(self, path: str | Path, index_path: Path | str | None = None):
+    def __init__(
+        self, 
+        path: str | Path, 
+        index_path: Path | str | None = None,
+    ):
         self.path = to_path(path)
         self.is_bam = self.path.suffix == '.bam'
         self.ext = 'cram' if not self.is_bam else 'bam'
@@ -101,19 +105,17 @@ class CramPath(AlignmentInput):
         """
         return self.path.exists()
     
-    def indexed(self) -> bool:
+    def index_exists(self) -> bool:
         """
         CRAI/BAI index exists
         """
-        return self._index_path is not None
+        return self.index_path.exists()
 
     @property
     def index_path(self) -> Path:
         """
         Path to the corresponding CRAI/BAI index
         """
-        if not self.indexed():
-            raise ValueError(f'{self} is unindexed')
         return (
             to_path(self._index_path)
             if self._index_path
@@ -127,7 +129,7 @@ class CramPath(AlignmentInput):
         d = {
             self.ext: str(self.path),
         } 
-        if self.indexed():
+        if self.index_exists():
             d[f'{self.ext}.{self.index_ext}'] = str(self.index_path)
 
         return b.read_input_group(**d)

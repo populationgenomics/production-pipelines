@@ -308,7 +308,7 @@ def _align_one(
             shard_param = ''
             
         # BAZAM requires indexed input.
-        if not alignment_input.indexed():
+        if not alignment_input.index_exists():
             index_cmd = f'samtools index {cram[alignment_input.ext]}'
 
         bazam_cmd = dedent(f"""\
