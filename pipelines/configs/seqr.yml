@@ -1,7 +1,6 @@
 namespace: main
 analysis_dataset: seqr
-# skip_datasets: ['flinders-ophthal']
-datasets: ['ohmr4-epilepsy']
+skip_datasets: ['flinders-ophthal']
 skip_samples: [
   CPG11783,   # acute-care, no FASTQ data
 #  CPG12310,   # acute-care

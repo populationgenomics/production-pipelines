@@ -4,7 +4,7 @@ Stage that runs FastQC on alignment inputs.
 
 import logging
 
-from .. import Path, types
+from .. import Path
 from ..jobs import fastqc
 from ..jobs.align import process_alignment_input
 from ..targets import Sample
@@ -57,8 +57,6 @@ class FastQC(SampleStage):
             output_html_path=self.expected_outputs(sample)['html'],
             output_zip_path=self.expected_outputs(sample)['zip'],
             alignment_input=alignment_input,
-            refs=self.refs,
-            images=self.images,
             job_attrs=self.get_job_attrs(sample),
             subsample=False,
         )

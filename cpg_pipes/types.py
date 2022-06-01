@@ -100,12 +100,20 @@ class CramPath(AlignmentInput):
         CRAM file exists.
         """
         return self.path.exists()
+    
+    def indexed(self) -> bool:
+        """
+        CRAI/BAI index exists
+        """
+        return self._index_path is not None
 
     @property
     def index_path(self) -> Path:
         """
-        Path to the corresponding index
+        Path to the corresponding CRAI/BAI index
         """
+        if not self.indexed():
+            raise ValueError(f'{self} is unindexed')
         return (
             to_path(self._index_path)
             if self._index_path
@@ -116,12 +124,13 @@ class CramPath(AlignmentInput):
         """
         Create a Hail Batch resource group
         """
-        return b.read_input_group(
-            **{
-                self.ext: str(self.path),
-                f'{self.ext}.{self.index_ext}': str(self.index_path),
-            }
-        )
+        d = {
+            self.ext: str(self.path),
+        } 
+        if self.indexed():
+            d[f'{self.ext}.{self.index_ext}'] = str(self.index_path)
+
+        return b.read_input_group(**d)
     
     def path_glob(self) -> str:
         """

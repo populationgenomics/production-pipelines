@@ -40,6 +40,7 @@ class SmdbInputProvider(InputProvider):
         skip_samples: list[str] | None = None,
         only_samples: list[str] | None = None,
         skip_datasets: list[str] | None = None,
+        sequencing_type: SequencingType | None = None,
         ped_files: list[Path] | None = None,
     ) -> Cohort:
         """
@@ -55,6 +56,7 @@ class SmdbInputProvider(InputProvider):
             skip_samples=skip_samples,
             only_samples=only_samples,
             skip_datasets=skip_datasets,
+            sequencing_type=sequencing_type,
             ped_files=ped_files,
         )
 

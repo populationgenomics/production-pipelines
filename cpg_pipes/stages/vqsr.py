@@ -6,7 +6,7 @@ import logging
 
 from .. import Path
 from ..pipeline import stage, CohortStage, StageInput, StageOutput
-from ..jobs.vqsr import make_vqsr_jobs
+from ..jobs import vqsr
 from ..targets import Cohort
 from .joint_genotyping import JointGenotyping
 
@@ -33,17 +33,17 @@ class Vqsr(CohortStage):
         siteonly_vcf_path = inputs.as_path(
             stage=JointGenotyping, target=cohort, id='siteonly'
         )
-        jobs = make_vqsr_jobs(
+        jobs = vqsr.make_vqsr_jobs(
             b=self.b,
-            refs=self.refs,
-            images=self.images,
             input_vcf_or_mt_path=siteonly_vcf_path,
             tmp_bucket=self.tmp_bucket,
             gvcf_count=len(cohort.get_samples()),
             output_vcf_path=self.expected_outputs(cohort),
             use_as_annotations=self.pipeline_config.get('use_as_vqsr', True),
             overwrite=not self.check_intermediates,
-            scatter_count=self.pipeline_config.get('jc_intervals_num'),
+            scatter_count=self.pipeline_config.get(
+                'jc_intervals_num', vqsr.DEFAULT_INTERVALS_NUM
+            ),
             sequencing_type=cohort.get_sequencing_type(),
             intervals_path=self.pipeline_config.get('intervals_path'),
             job_attrs=self.get_job_attrs(),

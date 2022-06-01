@@ -5,14 +5,13 @@ from os.path import basename
 from typing import cast
 
 import hailtop.batch as hb
+from cpg_utils.hail_batch import image_path, fasta_res_group
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
-from cpg_pipes.providers.images import Images
 from cpg_pipes.types import AlignmentInput, CramPath, FastqPath, FastqPairs
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.providers.refdata import RefData
 
 
 def fastqc(
@@ -20,8 +19,6 @@ def fastqc(
     output_html_path: Path,
     output_zip_path: Path,
     alignment_input: AlignmentInput,
-    refs: RefData,
-    images: Images,
     subsample: bool = True,
     job_attrs: dict | None = None,
 ) -> list[Job]:
@@ -31,7 +28,7 @@ def fastqc(
 
     def _fastqc_one(jname_, input_path: CramPath | FastqPath):
         j = b.new_job(jname_, job_attrs)
-        j.image(images.get('fastqc'))
+        j.image(image_path('fastqc'))
         threads = STANDARD.set_resources(j, ncpu=16).get_nthreads()
 
         cmd = ''
@@ -41,7 +38,7 @@ def fastqc(
             # FastQC doesn't support CRAMs, converting CRAM->BAM
             cmd += f"""\
             samtools view \\
-            -T {refs.fasta_res_group(b).base} \\
+            -T {fasta_res_group(b).base} \\
             -@{threads - 1} \\
             -b {input_file} \\
             {"--subsample 0.01" if subsample else ''} \\

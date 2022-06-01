@@ -8,6 +8,7 @@ from enum import Enum
 
 import pandas as pd
 import hailtop.batch as hb
+from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
@@ -16,10 +17,8 @@ from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
-from cpg_pipes.providers.images import Images
 from cpg_pipes.targets import Sample
 from cpg_pipes.types import GvcfPath, SequencingType
-from cpg_pipes.providers.refdata import RefData
 
 logger = logging.getLogger(__file__)
 
@@ -34,21 +33,22 @@ class JointGenotyperTool(Enum):
     GnarlyGenotyper = 2
 
 
+DEFAULT_INTERVALS_NUM = 50
+
+
 def make_joint_genotyping_jobs(
     b: hb.Batch,
     gvcf_by_sid: dict[str, GvcfPath],
     out_vcf_path: Path,
     out_siteonly_vcf_path: Path,
     tmp_bucket: Path,
-    refs: RefData,
-    images: Images,
     overwrite: bool = False,
     # Default to GenotypeGVCFs because Gnarly is a bit weird, e.g. it adds <NON_REF>
     # variants with AC_adj annotations (other variants have AC):
     # bcftools view gs://cpg-fewgenomes-test/unittest/inputs/chr20/gnarly/joint-called-siteonly.vcf.gz | zgrep 7105364
     tool: JointGenotyperTool = JointGenotyperTool.GenotypeGVCFs,
     do_filter_excesshet: bool = True,
-    scatter_count: int | None = RefData.number_of_joint_calling_intervals,
+    scatter_count: int = DEFAULT_INTERVALS_NUM,
     sequencing_type: SequencingType = SequencingType.GENOME,
     intervals_path: Path | None = None,
     job_attrs: dict | None = None,
@@ -58,7 +58,7 @@ def make_joint_genotyping_jobs(
     Outputs a multi-sample VCF under `output_vcf_path`.
     """
     if utils.can_reuse([out_vcf_path, out_siteonly_vcf_path], overwrite):
-        job_attrs['reuse'] = True
+        job_attrs = (job_attrs or {}) | dict(reuse=True)
         return [b.new_job('Joint genotyping', job_attrs)]
 
     if len(gvcf_by_sid) == 0:
@@ -68,13 +68,10 @@ def make_joint_genotyping_jobs(
         )
 
     logger.info(f'Submitting joint-calling jobs')
-    scatter_count = scatter_count or RefData.number_of_joint_calling_intervals
     jobs: list[Job] = []
 
     intervals_j, intervals = split_intervals.get_intervals(
         b=b,
-        refs=refs,
-        images=images,
         sequencing_type=sequencing_type,
         intervals_path=intervals_path,
         scatter_count=scatter_count,
@@ -90,7 +87,6 @@ def make_joint_genotyping_jobs(
     # and use the version of function that passes a tarball around (`genomicsdb()`):
     import_gvcfs_jobs, genomicsdb_paths = genomicsdb(
         b=b,
-        images=images,
         tmp_bucket=tmp_bucket,
         gvcf_by_sid=gvcf_by_sid,
         intervals=intervals,
@@ -119,8 +115,6 @@ def make_joint_genotyping_jobs(
             genomicsdb_path=genomicsdb_path,
             overwrite=overwrite,
             number_of_samples=len(gvcf_by_sid),
-            refs=refs,
-            images=images,
             scatter_count=scatter_count,
             interval=interval,
             tool=tool,
@@ -136,7 +130,6 @@ def make_joint_genotyping_jobs(
             logger.info(f'Queueing exccess het filter job')
             exccess_filter_j, exccess_filter_jc_vcf = _add_exccess_het_filter(
                 b,
-                images=images,
                 input_vcf=jc_vcf,
                 interval=interval,
                 overwrite=overwrite,
@@ -148,7 +141,6 @@ def make_joint_genotyping_jobs(
 
         siteonly_j, siteonly_vcf = _add_make_sitesonly_job(
             b=b,
-            images=images,
             input_vcf=jc_vcf['vcf.gz'],
             overwrite=overwrite,
             output_vcf_path=siteonly_jc_vcf_path,
@@ -160,7 +152,6 @@ def make_joint_genotyping_jobs(
     logger.info(f'Queueing gather VCFs job')
     gather_j, _ = gather_vcfs(
         b,
-        images=images,
         input_vcfs=vcfs,
         overwrite=overwrite,
         out_vcf_path=out_vcf_path,
@@ -173,7 +164,6 @@ def make_joint_genotyping_jobs(
     logger.info(f'Queueing gather site-only VCFs job')
     gather_siteonly_j, _ = gather_vcfs(
         b,
-        images=images,
         input_vcfs=siteonly_vcfs,
         overwrite=overwrite,
         out_vcf_path=out_siteonly_vcf_path,
@@ -187,11 +177,10 @@ def make_joint_genotyping_jobs(
 
 def genomicsdb(
     b: hb.Batch,
-    images: Images,
     tmp_bucket: Path,
     gvcf_by_sid: dict[str, GvcfPath],
     intervals: list[hb.Resource],
-    scatter_count: int = RefData.number_of_joint_calling_intervals,
+    scatter_count: int = DEFAULT_INTERVALS_NUM,
     overwrite: bool = False,
     job_attrs: dict | None = None,
 ) -> tuple[list[Job], list[Path]]:
@@ -227,7 +216,7 @@ def genomicsdb(
             j.name += ' [reuse]'
             continue
 
-        j.image(images.get('gatk'))
+        j.image(image_path('gatk'))
 
         sample_map = b.read_input(str(sample_map_bucket_path))
 
@@ -283,13 +272,12 @@ def genomicsdb(
 
 def genomicsdb_cloud(
     b: hb.Batch,
-    images: Images,
     samples: list[Sample],
     genomicsdb_bucket: Path,
     tmp_bucket: Path,
     gvcf_by_sid: dict[str, GvcfPath],
     intervals: list[hb.Resource],
-    scatter_count: int = RefData.number_of_joint_calling_intervals,
+    scatter_count: int = DEFAULT_INTERVALS_NUM,
     depends_on: list[Job] | None = None,
     job_attrs: dict | None = None,
 ) -> tuple[dict[int, Job], dict[int, Path]]:
@@ -323,7 +311,6 @@ def genomicsdb_cloud(
         for idx in range(scatter_count):
             import_gvcfs_job, _ = _genomicsdb_import_cloud(
                 b=b,
-                images=images,
                 genomicsdb_gcs_path=genomicsdb_path_per_interval[idx],
                 sample_names_to_add=sample_names_to_add,
                 sample_names_to_skip=sample_names_already_added,
@@ -428,7 +415,6 @@ def _genomicsdb_import_cloud(
     sample_names_will_be_in_db: set[str],
     updating_existing_db: bool,
     sample_map_bucket_path: Path,
-    images: Images,
     intervals: hb.Resource,
     depends_on: list[Job] | None = None,
     overwrite: bool = False,
@@ -467,7 +453,7 @@ def _genomicsdb_import_cloud(
     sample_map = b.read_input(str(sample_map_bucket_path))
 
     j = b.new_job(job_name, job_attrs)
-    j.image(images.get('gatk'))
+    j.image(image_path('gatk'))
 
     if depends_on:
         j.depends_on(*depends_on)
@@ -530,9 +516,7 @@ def _add_joint_genotyper_job(
     genomicsdb_path: Path,
     overwrite: bool,
     number_of_samples: int,
-    refs: RefData,
-    images: Images,
-    scatter_count: int = RefData.number_of_joint_calling_intervals,
+    scatter_count: int = DEFAULT_INTERVALS_NUM,
     interval: hb.Resource | None = None,
     output_vcf_path: Path | None = None,
     tool: JointGenotyperTool = JointGenotyperTool.GnarlyGenotyper,
@@ -565,7 +549,7 @@ def _add_joint_genotyper_job(
             }
         )
 
-    j.image(images.get('gatk'))
+    j.image(image_path('gatk'))
 
     xms_gb = 8
     xmx_gb = 25
@@ -581,7 +565,7 @@ def _add_joint_genotyper_job(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
 
-    reference = refs.fasta_res_group(b)
+    reference = fasta_res_group(b)
 
     if str(genomicsdb_path).endswith('.tar'):
         # can't use directly from cloud, need to copy and uncompress:
@@ -602,7 +586,7 @@ def _add_joint_genotyper_job(
     {tool.name} \\
     -R {reference.base} \\
     -O {j.output_vcf['vcf.gz']} \\
-    -D {refs.dbsnp_vcf} \\
+    -D {reference_path('dbsnp_vcf', section='broad')} \\
     -V $WORKSPACE \\
     {f'-L {interval} ' if interval else ''} \\
     --only-output-calls-starting-in-intervals \\
@@ -629,7 +613,6 @@ def _add_joint_genotyper_job(
 
 def _add_exccess_het_filter(
     b: hb.Batch,
-    images: Images,
     input_vcf: hb.ResourceGroup,
     overwrite: bool,
     disk_size: int = 32,
@@ -664,7 +647,7 @@ def _add_exccess_het_filter(
             }
         )
 
-    j.image(images.get('gatk'))
+    j.image(image_path('gatk'))
     j.memory('8G')
     j.storage(f'{disk_size}G')
     j.declare_resource_group(
@@ -695,7 +678,6 @@ def _add_exccess_het_filter(
 
 def _add_make_sitesonly_job(
     b: hb.Batch,
-    images: Images,
     input_vcf: hb.ResourceFile,
     overwrite: bool,
     disk_size: int = 32,
@@ -719,7 +701,7 @@ def _add_make_sitesonly_job(
             }
         )
 
-    j.image(images.get('gatk'))
+    j.image(image_path('gatk'))
     j.memory('8G')
     j.storage(f'{disk_size}G')
     j.declare_resource_group(

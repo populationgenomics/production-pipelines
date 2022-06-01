@@ -5,18 +5,20 @@ Create Hail Batch jobs for variant calling in individual samples.
 import logging
 
 import hailtop.batch as hb
+from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
-from cpg_pipes.providers.images import Images
 from cpg_pipes.types import CramPath, GvcfPath, SequencingType
 from cpg_pipes import utils
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs import split_intervals
-from cpg_pipes.providers.refdata import RefData
 
 logger = logging.getLogger(__file__)
+
+
+DEFAULT_INTERVALS_NUM = 50
 
 
 def produce_gvcf(
@@ -24,11 +26,9 @@ def produce_gvcf(
     sample_name: str,
     tmp_bucket: Path,
     cram_path: CramPath,
-    refs: RefData,
-    images: Images,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
-    scatter_count: int | None = RefData.number_of_haplotype_caller_intervals,
+    scatter_count: int = DEFAULT_INTERVALS_NUM,
     intervals: list[hb.Resource] | None = None,
     sequencing_type: SequencingType = SequencingType.GENOME,
     intervals_path: Path | None = None,
@@ -46,13 +46,10 @@ def produce_gvcf(
         return [b.new_job('Make GVCF [reuse]', job_attrs)]
 
     hc_gvcf_path = tmp_bucket / 'haplotypecaller' / f'{sample_name}.g.vcf.gz'
-    scatter_count = scatter_count or RefData.number_of_haplotype_caller_intervals
 
     jobs = haplotype_caller(
         b=b,
         sample_name=sample_name,
-        refs=refs,
-        images=images,
         job_attrs=job_attrs,
         output_path=hc_gvcf_path,
         cram_path=cram_path,
@@ -67,8 +64,6 @@ def produce_gvcf(
         b=b,
         gvcf_path=GvcfPath(hc_gvcf_path),
         sample_name=sample_name,
-        refs=refs,
-        images=images,
         job_attrs=job_attrs,
         output_path=output_path,
         overwrite=overwrite,
@@ -81,11 +76,9 @@ def haplotype_caller(
     b: hb.Batch,
     sample_name: str,
     cram_path: CramPath,
-    refs: RefData,
-    images: Images,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
-    scatter_count: int | None = RefData.number_of_haplotype_caller_intervals,
+    scatter_count: int = DEFAULT_INTERVALS_NUM,
     intervals: list[hb.Resource] | None = None,
     sequencing_type: SequencingType = SequencingType.GENOME,
     intervals_path: Path | None = None,
@@ -99,14 +92,11 @@ def haplotype_caller(
     if utils.can_reuse(output_path, overwrite):
         return [b.new_job('HaplotypeCaller [reuse]', job_attrs)]
 
-    scatter_count = scatter_count or RefData.number_of_haplotype_caller_intervals
     jobs: list[Job] = []
     if scatter_count > 1:
         if intervals is None:
             intervals_j, intervals = split_intervals.get_intervals(
                 b=b,
-                refs=refs,
-                images=images,
                 intervals_path=intervals_path,
                 sequencing_type=sequencing_type,
                 scatter_count=scatter_count,
@@ -122,8 +112,6 @@ def haplotype_caller(
                 b,
                 sample_name=sample_name,
                 cram_path=cram_path,
-                refs=refs,
-                images=images,
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
                 interval=intervals[idx],
                 dragen_mode=dragen_mode,
@@ -135,7 +123,6 @@ def haplotype_caller(
             b=b,
             sample_name=sample_name,
             gvcfs=[j.output_gvcf for j in hc_jobs],
-            images=images,
             job_attrs=job_attrs,
             out_gvcf_path=output_path,
             overwrite=overwrite,
@@ -145,8 +132,6 @@ def haplotype_caller(
         hc_j = _haplotype_caller_one(
             b,
             sample_name=sample_name,
-            refs=refs,
-            images=images,
             job_attrs=job_attrs,
             cram_path=cram_path,
             out_gvcf_path=output_path,
@@ -161,8 +146,6 @@ def _haplotype_caller_one(
     b: hb.Batch,
     sample_name: str,
     cram_path: CramPath,
-    refs: RefData,
-    images: Images, 
     job_attrs: dict | None = None,
     interval: hb.Resource | None = None,
     out_gvcf_path: Path | None = None,
@@ -178,7 +161,7 @@ def _haplotype_caller_one(
         j.name += ' [reuse]'
         return j
 
-    j.image(images.get('gatk'))
+    j.image(image_path('gatk'))
 
     # Enough storage to localize CRAMs (can't pass GCS URL to CRAM to gatk directly
     # because we will hit GCP egress bandwidth limit:
@@ -195,7 +178,7 @@ def _haplotype_caller_one(
         }
     )
 
-    reference = refs.fasta_res_group(b)
+    reference = fasta_res_group(b)
 
     cmd = f"""\
     CRAM=/io/batch/{sample_name}.cram
@@ -237,7 +220,6 @@ def merge_gvcfs_job(
     b: hb.Batch,
     sample_name: str,
     gvcfs: list[hb.ResourceGroup],
-    images: Images,
     job_attrs: dict | None = None,
     out_gvcf_path: Path | None = None,
     overwrite: bool = True,
@@ -251,7 +233,7 @@ def merge_gvcfs_job(
         j.name += ' [reuse]'
         return j
 
-    j.image(images.get('picard'))
+    j.image(image_path('picard'))
     j.cpu(2)
     java_mem = 7
     j.memory('standard')  # ~ 4G/core ~ 7.5G
@@ -278,8 +260,6 @@ def postproc_gvcf(
     b: hb.Batch,
     gvcf_path: GvcfPath,
     sample_name: str,
-    refs: RefData,
-    images: Images,
     job_attrs: dict | None = None,
     overwrite: bool = True,
     output_path: Path | None = None,
@@ -300,7 +280,7 @@ def postproc_gvcf(
     logger.info(f'Adding GVCF postproc job for sample {sample_name}, gvcf {gvcf_path}')
 
     j = b.new_job(jname, (job_attrs or {}) | dict(tool='gatk_ReblockGVCF'))
-    j.image(images.get('gatk'))
+    j.image(image_path('gatk'))
 
     # Enough to fit a pre-reblocked GVCF, which can be as big as 10G,
     # the reblocked result (1G), and ref data (5G).
@@ -315,8 +295,8 @@ def postproc_gvcf(
         }
     )
 
-    reference = refs.fasta_res_group(b)
-    noalt_regions = b.read_input(str(refs.noalt_regions))
+    reference = fasta_res_group(b)
+    noalt_regions = b.read_input(str(reference_path('noalt_bed', section='broad')))
     gvcf = b.read_input(str(gvcf_path.path))
 
     cmd = f"""\

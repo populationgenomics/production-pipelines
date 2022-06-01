@@ -1,25 +1,29 @@
 #!/usr/bin/env python3
 
 """
-Batch pipeline to run QC on all CRAMs. Outputs MultiQC reports for each dataset, 
-and pedigree checks.
+Batch pipeline to generate GVCF for all samples CRAMs.
 """
 
 import logging
-
 import click
 
-from cpg_pipes.pipeline import (
-    pipeline_options,
-    create_pipeline,
-)
-from cpg_pipes.stages.multiqc import MultiQC
+from cpg_pipes.pipeline import pipeline_options, create_pipeline
+from cpg_pipes.providers.refdata import RefData
+from cpg_pipes.stages.genotype_sample import GenotypeSample
 from cpg_pipes.utils import exists
 
 logger = logging.getLogger(__file__)
 
 
 @click.command()
+@click.option(
+    '--hc-intervals-num',
+    'hc_intervals_num',
+    type=click.INT,
+    default=RefData.number_of_haplotype_caller_intervals,
+    help='Number of intervals to devide the genome for sample genotyping with '
+    'gatk HaplotypeCaller',
+)
 @pipeline_options
 def main(
     **kwargs,
@@ -27,9 +31,9 @@ def main(
     """
     Entry point, decorated by pipeline click options.
     """
-    kwargs['name'] = kwargs.get('name', 'cram_qc')
+    kwargs['name'] = kwargs.get('name', 'gvcf')
     pipeline = create_pipeline(
-        stages=[MultiQC],
+        stages=[GenotypeSample],
         **kwargs,
     )
     if pipeline.skip_samples_with_missing_input:
@@ -38,7 +42,7 @@ def main(
                 logger.warning(f'Could not find CRAM, skipping sample {sample.id}')
                 sample.active = False
 
-    pipeline.run(force_all_implicit_stages=True)
+    pipeline.run()
 
 
 if __name__ == '__main__':

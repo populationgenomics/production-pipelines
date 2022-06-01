@@ -7,6 +7,7 @@ import logging
 from typing import Literal
 
 import hailtop.batch as hb
+from cpg_utils.hail_batch import image_path, genome_build, reference_path
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
@@ -15,26 +16,25 @@ from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.hb.command import wrap_command, python_command
 from cpg_pipes.jobs import split_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs, subset_vcf
-from cpg_pipes.providers.images import Images
 from cpg_pipes.query import vep as vep_module
-from cpg_pipes.providers.refdata import RefData
 from cpg_pipes.types import SequencingType
 
 
 logger = logging.getLogger(__file__)
 
 
+DEFAULT_INTERVALS_NUM = 50
+
+
 def vep_jobs(
     b: Batch,
     vcf_path: Path,
-    refs: RefData,
-    images: Images,
     hail_billing_project: str,
     hail_bucket: Path,
     tmp_bucket: Path,
     out_path: Path | None = None,
     overwrite: bool = False,
-    scatter_count: int | None = RefData.number_of_vep_intervals,
+    scatter_count: int = DEFAULT_INTERVALS_NUM,
     sequencing_type: SequencingType = SequencingType.GENOME,
     intervals_path: Path | None = None,
     job_attrs: dict | None = None,
@@ -50,12 +50,9 @@ def vep_jobs(
     if out_path and utils.can_reuse(out_path, overwrite):
         return [b.new_job('VEP [reuse]', job_attrs)]
 
-    scatter_count = scatter_count or RefData.number_of_vep_intervals
     jobs: list[Job] = []
     intervals_j, intervals = split_intervals.get_intervals(
         b=b,
-        refs=refs,
-        images=images,
         sequencing_type=sequencing_type,
         intervals_path=intervals_path,
         scatter_count=scatter_count,
@@ -75,8 +72,6 @@ def vep_jobs(
             b,
             vcf=vcf,
             interval=intervals[idx],
-            refs=refs,
-            images=images,
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
         jobs.append(subset_j)
@@ -90,8 +85,6 @@ def vep_jobs(
             vcf=subset_j.output_vcf['vcf.gz'],
             out_format='json' if to_hail_table else 'vcf',
             out_path=part_path,
-            refs=refs,
-            images=images,
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             overwrite=overwrite,
         )
@@ -104,7 +97,6 @@ def vep_jobs(
     if to_hail_table:
         gather_j = gather_vep_json_to_ht(
             b=b,
-            images=images,
             vep_results_paths=part_files,
             hail_billing_project=hail_billing_project,
             hail_bucket=hail_bucket,
@@ -115,7 +107,6 @@ def vep_jobs(
         assert len(part_files) == scatter_count
         gather_j, gather_vcf = gather_vcfs(
             b=b,
-            images=images,
             input_vcfs=part_files,
             out_vcf_path=out_path,
         )
@@ -126,7 +117,6 @@ def vep_jobs(
 
 def gather_vep_json_to_ht(
     b: Batch,
-    images: Images,
     vep_results_paths: list[Path],
     hail_billing_project: str,
     hail_bucket: Path,
@@ -138,7 +128,7 @@ def gather_vep_json_to_ht(
     and write into a Hail Table using a Batch job.
     """
     j = b.new_job('VEP json to Hail table', job_attrs)
-    j.image(images.get('hail'))
+    j.image(image_path('hail'))
     cmd = python_command(
         vep_module,
         vep_module.vep_json_to_ht.__name__,
@@ -147,7 +137,7 @@ def gather_vep_json_to_ht(
         setup_gcp=True,
         hail_billing_project=hail_billing_project,
         hail_bucket=str(hail_bucket),
-        default_reference=RefData.genome_build,
+        default_reference=genome_build(),
     )
     j.command(cmd)
     return j
@@ -156,8 +146,6 @@ def gather_vep_json_to_ht(
 def vep_one(
     b: Batch,
     vcf: Path | hb.Resource,
-    refs: RefData,
-    images: Images,
     out_path: Path | None = None,
     out_format: Literal['vcf', 'json'] = 'vcf',
     job_attrs: dict | None = None,
@@ -171,7 +159,7 @@ def vep_one(
         j.name += ' [reuse]'
         return j
 
-    j.image(images.get('vep'))
+    j.image(image_path('vep'))
     STANDARD.set_resources(j, storage_gb=50, mem_gb=50, ncpu=16)
 
     if not isinstance(vcf, hb.Resource):
@@ -186,7 +174,7 @@ def vep_one(
         output = j.output
 
     # gcsfuse works only with the root bucket, without prefix:
-    base_bucket_name = refs.vep_mount.drive
+    base_bucket_name = reference_path('vep_mount').drive
     data_mount = to_path(f'/{base_bucket_name}')
     j.cloudfuse(base_bucket_name, str(data_mount), read_only=True)
     vep_dir = data_mount / 'vep' / 'GRCh38'

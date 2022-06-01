@@ -5,28 +5,24 @@ Create a pipeline from command line options.
 import logging
 import os
 import tempfile
-import uuid
 from enum import Enum
 from typing import Callable, Type, TypeVar, Any
 
 import click
-import toml
 import yaml  # type: ignore
 from click import option
-from cpg_utils.config import set_config_path
-from cpg_utils.hail_batch import Namespace, Path
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import Namespace
 
 from .exceptions import PipelineError
 from .pipeline import Pipeline
-from .. import to_path
+from .. import to_path, get_package_path
 from ..providers import (
     StatusReporterType,
     InputProviderType,
 )
 from ..providers.cpg import build_infra_config, set_config
-from ..providers.cpg.images import CpgImages
 from ..providers.cpg.inputs import SmdbInputProvider
-from ..providers.cpg.refdata import CpgRefData
 from ..providers.cpg.smdb import SMDB
 from ..providers.cpg.status import CpgStatusReporter
 from ..providers.inputs import InputProvider, CsvInputProvider
@@ -56,6 +52,7 @@ def val_to_enum(cls: Type[T]) -> Callable:
     Callback to parse a value into an Enum item.
     """
 
+    # noinspection PyUnusedLocal
     def _callback(ctx, param, val: str) -> T | None:
         if val is None:
             return None
@@ -112,7 +109,7 @@ def file_validation_callback(
 
 class Options:
     """List of Click options, to allow access from attributes."""
-    namespace: option(
+    namespace: Namespace = option(
         '-n',
         '--namespace',
         type=choice_from_enum(Namespace),
@@ -120,82 +117,82 @@ class Options:
         required=True,
         help='The bucket namespace to write the results to',
     )
-    analysis_dataset: option(
+    analysis_dataset: str = option(
         '--analysis-dataset',
         required=True,
         help='Dataset name to write cohort and pipeline level intermediate files',
     )
-    datasets: option(
+    datasets: list[str] = option(
         '--dataset', 
         'datasets',
         multiple=True,
         help='Only read samples that belong to the given dataset(s). '
         'Can be set multiple times.',
     )
-    first_stage: option(
+    first_stage: str = option(
         '--first-stage',
         help='Skip previous stages and pick their expected results if further '
         'stages depend on them',
     )
-    last_stage: option(
+    last_stage: str = option(
         '--last-stage',
         help='Finish the pipeline after this stage',
     )
-    skip_datasets: option(
+    skip_datasets: list[str] = option(
         '--skip-dataset',
         'skip_datasets',
         multiple=True,
         help='Don\'t process specified datasets. Can be set multiple times.',
     )
-    skip_samples: option(
+    skip_samples: list[str] = option(
         '--skip-sample',
         '-S',
         'skip_samples',
         multiple=True,
         help='Don\'t process specified samples. Can be set multiple times.',
     )
-    only_samples: option(
+    only_samples: list[str] = option(
         '--only-sample',
         '-s',
         'only_samples',
         multiple=True,
         help='Only process these samples (can be set multiple times)',
     )
-    force_samples: option(
+    force_samples: list[str] = option(
         '--force-sample',
         'force_samples',
         multiple=True,
         help='Force reprocessing these samples. Can be set multiple times.',
     )
-    sequencing_type: option(
+    sequencing_type: SequencingType = option(
         '--sequencing-type',
         type=choice_from_enum(SequencingType),
         callback=val_to_enum(SequencingType),
         help='Limit to data with this sequencing type',
         default=SequencingType.GENOME.value,
     )
-    name: option(
+    name: str = option(
         '--name',
         help='Name of the pipeline (to prefix output paths)'
     )
-    description: option(
+    description: str = option(
         '--description',
         help='Description of the pipeline (to appear in the Batch GUI)'
     )
-    version: option(
+    version: str = option(
         '--version',
         '--output-version',
         'version',
         type=str,
         help='Pipeline version. Default is a timestamp',
     )
-    status_reporter: option(
+    status_reporter: StatusReporterType = option(
         '--status-reporter',
         type=choice_from_enum(StatusReporterType),
         callback=val_to_enum(StatusReporterType),
         help='Report jobs statuses and results',
     )
-    input_provider: option(
+    input_provider: InputProviderType = option(
         '--input-provider',
         type=choice_from_enum(InputProviderType),
         callback=val_to_enum(InputProviderType),
@@ -204,24 +201,24 @@ class Options:
         f'For "--input-source={InputProviderType.CSV.value}", '
         f'use --input-csv to specify a CSV file location',
     )
-    input_csv: option(
+    input_csv: str = option(
         '--input-csv',
         callback=file_validation_callback(ext='csv', must_exist=True),
         help=f'CSV file to provide with --input-provider={InputProviderType.CSV.value}',
     )
-    keep_scratch: option(
+    keep_scratch: bool = option(
         '--keep-scratch/--remove-scratch',
         'keep_scratch',
         default=False,
         is_flag=True,
     )
-    dry_run: option(
+    dry_run: bool = option(
         '--dry-run', 
         is_flag=True, 
         help='Do not actually submit Batch, but only print jobs commands to '
              'stdout. Essencially just tell to call `batch.run(..., dry_run=True)`'
     )
-    skip_samples_with_missing_input: option(
+    skip_samples_with_missing_input: bool = option(
         '--skip-samples-with-missing-input',
         default=False,
         is_flag=True,
@@ -231,7 +228,7 @@ class Options:
         'remove this sample, instead of failing. In order words, ignore samples '
         'that are missing results from skipped stages.',
     )
-    check_intermediates: option(
+    check_intermediates: bool = option(
         '--check-intermediates/--no-check-intermediates',
         'check_intermediates',
         default=False,
@@ -239,7 +236,7 @@ class Options:
         help='Within jobs, check all in-job intermediate files for possible reuse. '
         'If set to False, will overwrite all intermediates.',
     )
-    check_inputs: option(
+    check_inputs: bool = option(
         '--check-inputs/--no-check-inputs',
         'check_inputs',
         default=False,
@@ -248,7 +245,7 @@ class Options:
         'the --skip-samples-with-missing-input option controls whether such '
         'should be ignored, or raise an error.',
     )
-    check_expected_outputs: option(
+    check_expected_outputs: bool = option(
         '--check-expected-outputs/--no-check-expected-outputs',
         'check_expected_outputs',
         default=True,
@@ -257,12 +254,12 @@ class Options:
         'If it exists, submit a [reuse] job instead. '
         'Works nicely with --previous-batch-tsv/--previous-batch-id options.',
     )
-    hail_pool_label: option(
+    hail_pool_label: str = option(
         '--hail-pool-label',
         help='Private pool label. Would submit batches to a Hail Batch private '
              'pool with this label'
     )
-    local_tmp_dir: option(
+    local_tmp_dir: str = option(
         '--local-dir',
         'local_tmp_dir',
         default=tempfile.mkdtemp(),
@@ -270,53 +267,81 @@ class Options:
         help='Local directory for temporary files. Usually takes a few kB. '
         'If not provided, a temp folder will be created',
     )
-    slack_channel: option(
+    slack_channel: str = option(
         '--slack-channel',
         help='Slack channel to send status reports with CPG status reporter.',
     )
-    smdb_errors_are_fatal: option(
+    smdb_errors_are_fatal: bool = option(
         '--smdb-errors-are-fatal/--no-smdb-errors-are-fatal',
         'smdb_errors_are_fatal',
         default=True,
         help='When the sample-metadata database API returns an error from the '
              'database, only show the error and continue, instead of crashing',
     )
-    skip_samples_stages: option(
+    skip_samples_stages: dict[str, list[str]] = option(
         '--skip-samples-stages',
         type=dict,
         help='Map of stages to lists of samples, to skip for specific stages.',
     )
-    image_registry_prefix: option(
+    image_registry_prefix: str = option(
         '--image-registry-prefix',
         help='Prefix to find docker images referenced in `image_config_yaml_path`',
     )
-    image_config: option(
-        '--image-config',
-        'image_config_yaml_path',
-        help='Path to a YAML file containing - for each image name used in the '
-             'pipelines - a URL of a corresponding docker image, optionally '
-             'relative to the prefix specified by `image_registry_prefix`.',
+    images_config_yaml_path: str = option(
+        '--images-config',
+        'images_config_yaml_path',
+        help='Path to a YAML file containing a URL of a corresponding docker '
+             'image for each image name used in the pipelines, optionally '
+             'relative to the prefix specified by `image_registry_prefix`. '
+             f'Overrides defaults in {get_package_path() / "images.yml"}',
     )
-    reference_prefix: option(
+    reference_prefix: str = option(
         '--reference-prefix',
-        help='Prefix to find reference files',
+        help='Prefix to find reference files referenced in `refdata_yaml_path`'
     )
-    gcp_project: option(
+    references_config_yaml_path: str = option(
+        '--references-config',
+        'references_config_yaml_path',
+        help='Path to a YAML file specifying locations of reference files '
+             'optionally relative to the prefix specified by `reference_prefix`. '
+             f'Overrides defaults in {get_package_path() / "references.yml"}',
+    )
+    gcp_project: str = option(
         '--gcp-project',
         help='GCP project',
     )
-    hail_billing_project: option(
+    hail_billing_project: str = option(
         '--hail-billing-project',
         help='Hail billing project',
     )
-    hail_bucket: option(
+    hail_bucket: str = option(
         '--hail-bucket',
         help='Hail bucket',
     )
-    web_url_template: option(
+    web_url_template: str = option(
         '--web-url-template',
         help='Template to build HTTP URLs matching the dataset_path of category '
              '"web". Should be parametrised by namespace and dataset in Jinja format',
+    )
+    realignment_shards: int = option(
+        '--realignment-shards',
+        default=10,
+        help='Number of shards to partition input CRAM/BAM for realignment'
+    )
+    genotype_sample_shards: int = option(
+        '--genotype-sample-shards',
+        default=50,
+        help='Number of intervals to partition sample genotype calling',
+    )
+    joint_calling_shards: int = option(
+        '--joint-calling-shards',
+        default=50,
+        help='Number of intervals to partition joint calling and VQSR',
+    )
+    vep_shards: int = option(
+        '--vep-shards',
+        default=50,
+        help='Number of intervals to partition VEP annotation',
     )
 
     def __init__(self, kwargs: dict):
@@ -327,15 +352,18 @@ class Options:
                 del self.remaining_kwargs[k]
 
 
-def create_pipeline(**kwargs) -> 'Pipeline':
+def create_pipeline(**config) -> 'Pipeline':
     """
     Create a Pipeline instance. All options correspond to command line parameters
     described in `pipeline_click_options` in the `cli_opts` module
     """
-    options = Options(kwargs)
+    options = Options(config)
 
-    if not os.getenv('CPG_CONFIG_PATH'):
-        infra_config = build_infra_config(
+    # Loading analysis-runner infrastructure config
+    if os.getenv('CPG_CONFIG_PATH'):
+        config |= get_config()
+    else:
+        config |= build_infra_config(
             dataset=options.analysis_dataset, 
             namespace=options.namespace,
             gcp_project=options.gcp_project,
@@ -343,10 +371,22 @@ def create_pipeline(**kwargs) -> 'Pipeline':
             reference_prefix=options.reference_prefix,
             web_url_template=options.web_url_template,
         )
-        set_config(infra_config, to_path(options.local_tmp_dir))
+    
+    # Loading images and references into the config
+    with (get_package_path() / 'images.yml').open() as f:
+        config['images'] = yaml.safe_load(f)
+    if options.images_config_yaml_path:
+        with to_path(options.images_config_yaml_path).open() as f:
+            config['images'] |= yaml.safe_load(f)
 
-    refs = CpgRefData()
-    images = CpgImages()
+    with (get_package_path() / 'references.yml').open() as f:
+        config['references'] = yaml.safe_load(f)
+    if options.references_config_yaml_path:
+        with to_path(options.references_config_yaml_path).open() as f:
+            config['references'] |= yaml.safe_load(f)
+
+    set_config(config, to_path(options.local_tmp_dir))
+
     status_reporter: StatusReporter | None = None
     input_provider: InputProvider | None = None
     
@@ -363,7 +403,6 @@ def create_pipeline(**kwargs) -> 'Pipeline':
         if options.status_reporter == StatusReporterType.CPG:
             status_reporter = CpgStatusReporter(
                 smdb=smdb,
-                images=images,
                 slack_channel=options.slack_channel,
             )
         if options.input_provider == InputProviderType.CPG:
@@ -386,8 +425,6 @@ def create_pipeline(**kwargs) -> 'Pipeline':
         name=options.name or analysis_dataset.name,
         description=options.description,
         analysis_dataset_name=options.analysis_dataset,
-        refs=refs,
-        images=images,
         input_provider=input_provider,
         sequencing_type=options.sequencing_type,
         status_reporter=status_reporter,
@@ -403,7 +440,7 @@ def create_pipeline(**kwargs) -> 'Pipeline':
         check_intermediates=options.check_intermediates,
         check_expected_outputs=options.check_expected_outputs,
         skip_samples_with_missing_input=options.skip_samples_with_missing_input,
-        local_dir=options.local_tmp_dir,
+        local_tmp_dir=to_path(options.local_tmp_dir),
         dry_run=options.dry_run,
         keep_scratch=options.keep_scratch,
         skip_samples_stages=options.skip_samples_stages,

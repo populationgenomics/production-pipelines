@@ -29,14 +29,14 @@ class Vep(CohortStage):
         jobs = vep.vep_jobs(
             self.b,
             vcf_path=inputs.as_path(cohort, stage=Vqsr),
-            refs=self.refs,
-            images=self.images,
             hail_billing_project=self.hail_billing_project,
             hail_bucket=self.hail_bucket,
             out_path=self.expected_outputs(cohort),
             tmp_bucket=self.tmp_bucket,
             overwrite=not self.check_intermediates,
-            scatter_count=self.pipeline_config.get('vep_intervals_num'),
+            scatter_count=self.pipeline_config.get(
+                'vep_intervals_num', vep.DEFAULT_INTERVALS_NUM
+            ),
             sequencing_type=cohort.get_sequencing_type(),
             intervals_path=self.pipeline_config.get('intervals_path'),
             job_attrs=self.get_job_attrs(),

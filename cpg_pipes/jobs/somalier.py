@@ -6,6 +6,7 @@ from os.path import basename
 from textwrap import dedent
 
 import pandas as pd
+from cpg_utils.hail_batch import image_path, reference_path, fasta_res_group
 from hailtop.batch.job import Job
 from hailtop.batch import Batch, ResourceFile
 
@@ -13,11 +14,9 @@ from cpg_pipes import Path, to_path
 from cpg_pipes import utils
 from cpg_pipes.hb.command import wrap_command, seds_to_extend_sample_ids
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.providers.images import Images
 from cpg_pipes.providers.status import StatusReporter
 from cpg_pipes.types import CramPath, GvcfPath
 from cpg_pipes.targets import Dataset, Sample
-from cpg_pipes.providers.refdata import RefData
 from cpg_pipes.jobs.scripts import check_pedigree
 
 logger = logging.getLogger(__file__)
@@ -27,8 +26,6 @@ def pedigree(
     b,
     dataset: Dataset,
     input_path_by_sid: dict[str, Path | str],
-    refs: RefData,
-    images: Images,
     overwrite: bool,
     out_samples_path: Path | None = None,
     out_pairs_path: Path | None = None,
@@ -56,8 +53,6 @@ def pedigree(
     extract_jobs, somalier_file_by_sample = _prep_somalier_files(
         b=b,
         samples=dataset.get_samples(),
-        refs=refs,
-        images=images,
         input_path_by_sid=input_path_by_sid,
         overwrite=overwrite,
         label=label,
@@ -67,7 +62,6 @@ def pedigree(
 
     relate_j = _relate(
         b=b,
-        images=images,
         somalier_file_by_sid=somalier_file_by_sample,
         sample_ids=dataset.get_sample_ids(),
         external_id_map={s.id: s.participant_id for s in dataset.get_samples()},
@@ -87,7 +81,6 @@ def pedigree(
 
     check_j = check_pedigree_job(
         b=b,
-        images=images,
         samples_file=relate_j.output_samples,
         pairs_file=relate_j.output_pairs,
         external_id_map={s.id: s.participant_id for s in dataset.get_samples()},
@@ -119,8 +112,6 @@ def _make_sample_map(dataset: Dataset):
 def ancestry(
     b,
     dataset: Dataset,
-    refs: RefData,
-    images: Images,
     input_path_by_sid: dict[str, Path | str],
     out_tsv_path: Path,
     out_html_path: Path,
@@ -137,8 +128,6 @@ def ancestry(
     extract_jobs, somalier_file_by_sample = _prep_somalier_files(
         b=b,
         samples=dataset.get_samples(),
-        refs=refs,
-        images=images,
         input_path_by_sid=input_path_by_sid,
         overwrite=overwrite,
         label=label,
@@ -150,8 +139,6 @@ def ancestry(
         somalier_file_by_sample=somalier_file_by_sample,
         sample_ids=dataset.get_sample_ids(),
         external_id_map={s.id: s.participant_id for s in dataset.get_samples()},
-        refs=refs,
-        images=images,
         label=label,
         extract_jobs=extract_jobs,
         out_tsv_path=out_tsv_path,
@@ -173,8 +160,6 @@ def _prep_somalier_files(
     b,
     samples: list[Sample],
     input_path_by_sid: dict[str, Path | str],
-    refs: RefData,
-    images: Images,
     overwrite: bool,
     label: str | None = None,
     ignore_missing: bool = False,
@@ -206,8 +191,6 @@ def _prep_somalier_files(
             gvcf_or_cram_or_bam_path = GvcfPath(input_path)
         j = extact_job(
             b=b,
-            refs=refs,
-            images=images,
             gvcf_or_cram_or_bam_path=gvcf_or_cram_or_bam_path,
             overwrite=overwrite,
             label=label,
@@ -231,7 +214,6 @@ def _prep_somalier_files(
 
 def check_pedigree_job(
     b: Batch,
-    images: Images,
     samples_file: ResourceFile,
     pairs_file: ResourceFile,
     external_id_map: dict[str, str] | None = None,
@@ -250,7 +232,7 @@ def check_pedigree_job(
         job_attrs,
     )
     STANDARD.set_resources(check_j, ncpu=2)
-    check_j.image(images.get('peddy'))
+    check_j.image(image_path('peddy'))
 
     script_path = to_path(check_pedigree.__file__)
     script_name = script_path.name
@@ -282,11 +264,9 @@ def check_pedigree_job(
 
 def _ancestry(
     b: Batch,
-    images: Images,
     somalier_file_by_sample: dict[str, Path],
     sample_ids: list[str],
     external_id_map: dict[str, str],
-    refs: RefData,
     label: str | None,
     extract_jobs: list[Job],
     out_tsv_path: Path,
@@ -295,7 +275,7 @@ def _ancestry(
     job_attrs: dict | None = None,
 ) -> Job:
     j = b.new_job('Somalier ancestry' + (f' {label}' if label else ''), job_attrs)
-    j.image(images.get('somalier'))
+    j.image(image_path('somalier'))
     # Size of one somalier file is 212K, so we add another G only if the number of
     # samples is >4k
     STANDARD.set_resources(j, storage_gb=1 + len(sample_ids) // 4000 * 1)
@@ -303,7 +283,7 @@ def _ancestry(
 
     cmd = f"""\
     mkdir /io/batch/1kg
-    mv {b.read_input(str(refs.somalier_1kg_targz))} /io/batch/1kg
+    mv {b.read_input(str(reference_path('somalier_1kg_targz')))} /io/batch/1kg
     (cd /io/batch/1kg && tar -xzf *.tar.gz)
 
     mkdir /io/batch/somaliers
@@ -315,7 +295,7 @@ def _ancestry(
 
     cmd += f"""\
     somalier ancestry \\
-    --labels {b.read_input(str(refs.somalier_1kg_labels))} \\
+    --labels {b.read_input(str(reference_path('somalier_1kg_labels')))} \\
     /io/batch/1kg/1kg-somalier/*.somalier ++ \\
     /io/batch/somaliers/*.somalier \\
     -o ancestry
@@ -334,7 +314,6 @@ def _ancestry(
 
 def _relate(
     b: Batch,
-    images: Images,
     somalier_file_by_sid: dict[str, Path],
     sample_ids: list[str],
     external_id_map: dict[str, str],
@@ -348,7 +327,7 @@ def _relate(
     job_attrs: dict | None = None,
 ) -> Job:
     j = b.new_job('Somalier relate' + (f' {label}' if label else ''), job_attrs)
-    j.image(images.get('somalier'))
+    j.image(image_path('somalier'))
     # Size of one somalier file is 212K, so we add another G only if the number of
     # samples is >4k
     STANDARD.set_resources(j, storage_gb=1 + len(sample_ids) // 4000 * 1)
@@ -386,8 +365,6 @@ def _relate(
 def extact_job(
     b,
     gvcf_or_cram_or_bam_path: CramPath | GvcfPath,
-    refs: RefData,
-    images: Images,
     overwrite: bool = True,
     label: str | None = None,
     out_fpath: Path | None = None,
@@ -406,7 +383,7 @@ def extact_job(
         j.name += ' [reuse]'
         return j
 
-    j.image(images.get('somalier'))
+    j.image(image_path('somalier'))
     if isinstance(gvcf_or_cram_or_bam_path, CramPath):
         STANDARD.set_resources(
             j, ncpu=4, storage_gb=200 if gvcf_or_cram_or_bam_path.is_bam else 50
@@ -422,12 +399,12 @@ def extact_job(
             index=str(gvcf_or_cram_or_bam_path.tbi_path),
         )
 
-    ref = refs.fasta_res_group(b)
-    sites = b.read_input(str(refs.somalier_sites))
+    ref = fasta_res_group(b)
+    sites = b.read_input(str(reference_path('somalier_sites')))
 
     cmd = f"""\
-    SITES=/io/batch/sites/{refs.somalier_sites.name}
-    retry gsutil cp {refs.somalier_sites} $SITES
+    SITES=/io/batch/sites/{reference_path('somalier_sites').name}
+    retry gsutil cp {reference_path('somalier_sites')} $SITES
 
     somalier extract -d extracted/ --sites {sites} -f {ref.base} \\
     {input_file['base']}

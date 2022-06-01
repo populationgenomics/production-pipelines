@@ -13,7 +13,6 @@ from cpg_pipes import Path, Namespace, to_path
 from cpg_pipes.pipeline.cli_opts import choice_from_enum, val_to_enum
 from cpg_pipes.providers.cpg.inputs import SmdbInputProvider
 from cpg_pipes.providers.cpg.smdb import SMDB
-from cpg_pipes.providers.cpg.storage import CpgStorageProvider
 from cpg_pipes.targets import Dataset, Cohort
 
 logger = logging.getLogger(__file__)
@@ -50,7 +49,6 @@ def main(
         cohort=Cohort(
             analysis_dataset_name='seqr',
             namespace=namespace,
-            storage_provider=CpgStorageProvider(),
         ),
         dataset_names=datasets,
     )

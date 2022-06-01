@@ -3,7 +3,7 @@ Helpers to set up Job's command.
 """
 import inspect
 import logging
-from typing import List, Union, Callable
+from typing import List, Union
 import textwrap
 
 from hailtop.batch import ResourceFile

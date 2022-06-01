@@ -5,11 +5,11 @@ CPG implementation of status reporter.
 import os
 from textwrap import dedent
 
+from cpg_utils.hail_batch import image_path
 from google.cloud import secretmanager
 from hailtop.batch.job import Job
 from hailtop.batch import Batch, Resource
 
-from ..images import Images
 from ... import Path
 from ...hb.command import wrap_command
 from ...targets import Target
@@ -34,12 +34,10 @@ class CpgStatusReporter(StatusReporter):
     def __init__(
         self, 
         smdb: SMDB, 
-        images: Images, 
         slack_channel: str | None = None,
     ):
         super().__init__()
         self.smdb = smdb
-        self.images = images
         self.slack_channel = slack_channel or os.environ.get('CPG_SLACK_CHANNEL')
         self.slack_token = os.environ.get('CPG_SLACK_TOKEN')
         if self.slack_channel and not self.slack_token:
@@ -94,7 +92,6 @@ class CpgStatusReporter(StatusReporter):
         # 2. Queue a job that updates the status to "in-progress"
         in_progress_j = self.add_status_updater_job(
             b,
-            images=self.images,
             analysis_id=aid,
             status=AnalysisStatus.IN_PROGRESS,
             analysis_type=analysis_type,
@@ -103,7 +100,6 @@ class CpgStatusReporter(StatusReporter):
         # 2. Queue a job that updates the status to "completed"
         completed_j = self.add_status_updater_job(
             b,
-            images=self.images,
             analysis_id=aid,
             status=AnalysisStatus.COMPLETED,
             analysis_type=analysis_type,
@@ -118,7 +114,6 @@ class CpgStatusReporter(StatusReporter):
     @staticmethod
     def add_status_updater_job(
         b: Batch,
-        images: Images,
         analysis_id: int,
         status: AnalysisStatus,
         analysis_type: str,
@@ -137,7 +132,7 @@ class CpgStatusReporter(StatusReporter):
             job_name += f' (for {analysis_type})'
 
         j = b.new_job(job_name, job_attrs)
-        j.image(images.get('sm-api'))
+        j.image(image_path('sm-api'))
         cmd = dedent(
             f"""\
         cat <<EOT >> update.py

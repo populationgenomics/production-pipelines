@@ -35,8 +35,6 @@ class SamtoolsStats(SampleStage):
             b=self.b,
             cram_path=cram_path,
             output_path=self.expected_outputs(sample),
-            refs=self.refs,
-            images=self.images,
             job_attrs=self.get_job_attrs(sample),
         )
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])
@@ -68,8 +66,6 @@ class PicardWgsMetrics(SampleStage):
             b=self.b,
             cram_path=cram_path,
             output_path=self.expected_outputs(sample),
-            refs=self.refs,
-            images=self.images,
             job_attrs=self.get_job_attrs(sample),
         )
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])
@@ -99,8 +95,6 @@ class VerifyBamId(SampleStage):
             b=self.b,
             cram_path=cram_path,
             output_path=self.expected_outputs(sample),
-            refs=self.refs,
-            images=self.images,
             job_attrs=self.get_job_attrs(sample),
         )
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])
