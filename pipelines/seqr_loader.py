@@ -11,7 +11,7 @@ import time
 import click
 import yaml
 
-from cpg_pipes.pipeline.cli import choice_from_enum, val_to_enum, create_pipeline
+from cpg_pipes.pipeline.cli_opts import choice_from_enum, val_to_enum, create_pipeline
 from cpg_pipes.types import SequencingType
 from google.cloud import secretmanager
 

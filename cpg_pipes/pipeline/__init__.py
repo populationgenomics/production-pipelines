@@ -4,7 +4,7 @@ from .pipeline import (
     StageInput,
     StageOutput,
 )
-from .cli import pipeline_options, create_pipeline
+from .cli_opts import pipeline_options, create_pipeline
 from .exceptions import PipelineError
 from .stage_subclasses import (
     SampleStage,
