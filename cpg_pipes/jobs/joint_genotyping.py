@@ -58,7 +58,8 @@ def make_joint_genotyping_jobs(
     Outputs a multi-sample VCF under `output_vcf_path`.
     """
     if utils.can_reuse([out_vcf_path, out_siteonly_vcf_path], overwrite):
-        return [b.new_job('Joint genotyping [reuse]', job_attrs)]
+        job_attrs['reuse'] = True
+        return [b.new_job('Joint genotyping', job_attrs)]
 
     if len(gvcf_by_sid) == 0:
         raise ValueError(
