@@ -8,7 +8,7 @@ from enum import Enum
 import click
 import logging
 
-from cpg_utils.hail_batch import image_path
+from cpg_utils.hail_batch import image_path, fasta_res_group
 
 from cpg_pipes import benchmark, Namespace
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
@@ -88,7 +88,7 @@ class SubsetAlignmentInput(SampleStage):
         j = self.b.new_job('Subset CRAM')
         j.image(image_path('samtools'))
         j.storage('100G')
-        reference = self.refs.fasta_res_group(self.b)
+        reference = fasta_res_group(self.b)
         cram_group = cram.resource_group(self.b)
 
         j.declare_resource_group(
