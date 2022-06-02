@@ -11,7 +11,7 @@ from typing import Callable, Type, TypeVar, Any
 import click
 import yaml  # type: ignore
 from click import option
-from cpg_utils.config import get_config
+from cpg_utils.config import get_config, update_dict
 from cpg_utils.hail_batch import Namespace
 
 from .exceptions import PipelineError
@@ -288,24 +288,22 @@ class Options:
         '--image-registry-prefix',
         help='Prefix to find docker images referenced in `image_config_yaml_path`',
     )
-    images_config_yaml_path: str = option(
+    images_config_path: str = option(
         '--images-config',
-        'images_config_yaml_path',
+        'images_config_path',
         help='Path to a YAML file containing a URL of a corresponding docker '
-             'image for each image name used in the pipelines, optionally '
-             'relative to the prefix specified by `image_registry_prefix`. '
-             f'Overrides defaults in {get_package_path() / "images.yml"}',
+             'image for containers used in the pipelines, optionally '
+             'relative to the prefix specified by `image_registry_prefix`'
     )
     reference_prefix: str = option(
         '--reference-prefix',
         help='Prefix to find reference files referenced in `refdata_yaml_path`'
     )
-    references_config_yaml_path: str = option(
+    references_config_path: str = option(
         '--references-config',
-        'references_config_yaml_path',
-        help='Path to a YAML file specifying locations of reference files '
-             'optionally relative to the prefix specified by `reference_prefix`. '
-             f'Overrides defaults in {get_package_path() / "references.yml"}',
+        'references_config_path',
+        help='Path to a YAML file specifying locations of reference files, '
+             'optionally relative to the prefix specified by `reference_prefix`'
     )
     gcp_project: str = option(
         '--gcp-project',
@@ -353,39 +351,28 @@ class Options:
                 del self.remaining_kwargs[k]
 
 
-def create_pipeline(**config) -> 'Pipeline':
+def create_pipeline(**kwargs) -> 'Pipeline':
     """
     Create a Pipeline instance. All options correspond to command line parameters
     described in `pipeline_click_options` in the `cli_opts` module
     """
-    options = Options(config)
+    options = Options(kwargs)
+
+    config = {'workflow': kwargs}
 
     # Loading analysis-runner infrastructure config
     if os.getenv('CPG_CONFIG_PATH'):
-        config |= get_config()
+        update_dict(config, get_config())
     else:
-        config |= build_infra_config(
+        update_dict(config, build_infra_config(
             dataset=options.analysis_dataset, 
             namespace=options.namespace,
             gcp_project=options.gcp_project,
             image_registry_prefix=options.image_registry_prefix,
             reference_prefix=options.reference_prefix,
             web_url_template=options.web_url_template,
-        )
+        ))
     
-    # Loading images and references into the config
-    with (get_package_path() / 'images.yml').open() as f:
-        config['images'] = yaml.safe_load(f)
-    if options.images_config_yaml_path:
-        with to_path(options.images_config_yaml_path).open() as f:
-            config['images'] |= yaml.safe_load(f)
-
-    with (get_package_path() / 'references.yml').open() as f:
-        config['references'] = yaml.safe_load(f)
-    if options.references_config_yaml_path:
-        with to_path(options.references_config_yaml_path).open() as f:
-            config['references'] |= yaml.safe_load(f)
-
     set_config(config, to_path(options.local_tmp_dir))
 
     status_reporter: StatusReporter | None = None
