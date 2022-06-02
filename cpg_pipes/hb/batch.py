@@ -64,13 +64,14 @@ class RegisteringBatch(hb.Batch):
         stage = attributes.get('stage')
         dataset = attributes.get('dataset')
         sample = attributes.get('sample')
-        samples = attributes.get('samples') or []
-        samples = set(samples + ([sample] if sample else []))
+        samples: set[str] = set(attributes.get('samples') or [])
+        if sample:
+            samples.add(sample)
         part = attributes.get('part')
         label = attributes.get('label', name)
         tool = attributes.get('tool')
-        reuse = attributes.get('reuse')
-        if not tool:
+        reuse = attributes.get('reuse', False)
+        if reuse and not tool:
             tool = '[reuse]'
 
         name = make_job_name(name, sample, dataset, part, reuse)
@@ -78,22 +79,20 @@ class RegisteringBatch(hb.Batch):
         if label not in self.job_by_label:
             self.job_by_label[label] = {'job_n': 0, 'samples': set()}
         self.job_by_label[label]['job_n'] += 1
-        self.job_by_label[label]['samples'] |= set(samples)
+        self.job_by_label[label]['samples'] |= samples
 
         if stage not in self.job_by_stage:
             self.job_by_stage[stage] = {'job_n': 0, 'samples': set()}
         self.job_by_stage[stage]['job_n'] += 1
-        self.job_by_stage[stage]['samples'] |= set(samples)
+        self.job_by_stage[stage]['samples'] |= samples
         
         if tool not in self.job_by_tool:
             self.job_by_tool[tool] = {'job_n': 0, 'samples': set()}
         self.job_by_tool[tool]['job_n'] += 1
-        self.job_by_tool[tool]['samples'] |= set(samples)
-        
-        fixed_attrs = dict(attributes)
-        if samples:
-            fixed_attrs['samples'] = ','.join(samples)
-        fixed_attrs['reuse'] = str(reuse)
+        self.job_by_tool[tool]['samples'] |= samples
+
+        attributes['samples'] = list(sorted(list(samples)))
+        fixed_attrs = {k: str(v) for k, v in attributes.items()}
         return name, fixed_attrs
 
     def new_python_job(
@@ -104,8 +103,8 @@ class RegisteringBatch(hb.Batch):
         """
         Wrapper around `new_python_job()` that processes job attributes.
         """
-        name, fixed_attrs = self._process_attributes(name, attributes)
-        j = super().new_python_job(name, attributes=fixed_attrs)
+        name, fixed_attributes = self._process_attributes(name, attributes)
+        j = super().new_python_job(name, attributes=fixed_attributes)
         if self.pool_label:
             j._pool_label = self.pool_label
         return j
@@ -119,8 +118,8 @@ class RegisteringBatch(hb.Batch):
         """
         Wrapper around `new_job()` that processes job attributes.
         """
-        name = self._process_attributes(name, attributes)
-        j = super().new_job(name, attributes=attributes)
+        name, fixed_attributes = self._process_attributes(name, attributes)
+        j = super().new_job(name, attributes=fixed_attributes)
         if self.pool_label:
             j._pool_label = self.pool_label
         return j
