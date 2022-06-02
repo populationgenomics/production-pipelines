@@ -57,7 +57,7 @@ def create_pipeline(
     slack_channel: str | None = None,
     smdb_errors_are_fatal: bool = True,
     skip_samples_stages: dict[str, list[str]] | None = None,
-    use_private_pool: bool = False,
+    hail_pool_label: str | None = None,
 ) -> 'Pipeline':
     """
     Create a Pipeline instance. All options correspond to command line parameters
@@ -135,5 +135,5 @@ def create_pipeline(
         dry_run=dry_run,
         keep_scratch=keep_scratch,
         skip_samples_stages=skip_samples_stages,
-        use_private_pool=use_private_pool,
+        hail_pool_label=hail_pool_label,
     )
