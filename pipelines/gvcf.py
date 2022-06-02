@@ -7,8 +7,8 @@ Batch pipeline to generate GVCF for all samples CRAMs.
 import logging
 import click
 
+from cpg_pipes.jobs import haplotype_caller
 from cpg_pipes.pipeline import pipeline_options, create_pipeline
-from cpg_pipes.providers.refdata import RefData
 from cpg_pipes.stages.genotype_sample import GenotypeSample
 from cpg_pipes.utils import exists
 
@@ -20,7 +20,7 @@ logger = logging.getLogger(__file__)
     '--hc-intervals-num',
     'hc_intervals_num',
     type=click.INT,
-    default=RefData.number_of_haplotype_caller_intervals,
+    default=haplotype_caller.DEFAULT_INTERVALS_NUM,
     help='Number of intervals to devide the genome for sample genotyping with '
     'gatk HaplotypeCaller',
 )

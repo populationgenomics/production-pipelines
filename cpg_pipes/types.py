@@ -164,7 +164,7 @@ class GvcfPath:
         GVCF file exists.
         """
         return self.path.exists()
-
+    
     @property
     def tbi_path(self) -> Path:
         """
