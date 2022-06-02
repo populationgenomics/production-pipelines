@@ -560,9 +560,9 @@ class Stage(Generic[TargetT], ABC):
         Add "reuse" job. Target doesn't have to be specific for a stage here,
         this using abstract class Target instead of generic parameter TargetT.
         """
-        attrs = dict(stage=self.name, tool='[reuse]')
+        attrs = dict(stage=self.name, reuse=True)
         attrs |= target.get_job_attrs()
-        return self.b.new_job(f'{self.name} [reuse]', attrs)
+        return self.b.new_job(self.name, attrs)
 
     def _get_action(self, target: TargetT) -> Action:
         """

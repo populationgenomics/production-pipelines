@@ -210,11 +210,11 @@ class Cohort(Target):
         self._datasets_by_name[ds.name] = ds
         return ds
 
-    def get_job_attrs(self) -> dict[str, str]:
+    def get_job_attrs(self) -> dict:
         """
         Attributes for Hail Batch job.
         """
-        return {'samples': ','.join(self.get_sample_ids())}
+        return {'samples': self.get_sample_ids()}
 
     def get_job_prefix(self) -> str:
         """
@@ -277,9 +277,7 @@ class Dataset(Target):
     ):
         super().__init__()
         self._storage_provider = storage_provider
-
         self._sample_by_id: dict[str, Sample] = {}
-
         self.stack, self.namespace = parse_stack(name, namespace)
 
     @staticmethod
@@ -420,11 +418,11 @@ class Dataset(Target):
             s for sid, s in self._sample_by_id.items() if (s.active or not only_active)
         ]
 
-    def get_job_attrs(self) -> dict[str, str]:
+    def get_job_attrs(self) -> dict:
         """
         Attributes for Hail Batch job.
         """
-        return {'dataset': self.name, 'samples': ','.join(self.get_sample_ids())}
+        return {'dataset': self.name, 'samples': self.get_sample_ids()}
 
     def get_job_prefix(self) -> str:
         """
@@ -604,7 +602,7 @@ class Sample(Target):
             return []
         return [self]
 
-    def get_job_attrs(self) -> dict[str, str]:
+    def get_job_attrs(self) -> dict:
         """
         Attributes for Hail Batch job.
         """
