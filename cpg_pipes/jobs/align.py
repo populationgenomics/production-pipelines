@@ -290,7 +290,11 @@ def _align_one(
     j = b.new_job(job_name, job_attrs)
     nthreads = STANDARD.set_resources(
         j, nthreads=requested_nthreads, 
-        storage_gb=(None if isinstance(alignment_input, CramPath) else 400)
+        storage_gb=(
+            None  # not attaching disk for realignments from CRAM
+            if isinstance(alignment_input, CramPath) and not alignment_input.is_bam
+            else 400  # for FASTQ or BAM inputs, need more disk
+        )
     ).get_nthreads()
 
     fasta = fasta_res_group(b)
