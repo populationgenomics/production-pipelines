@@ -48,6 +48,7 @@ class AnalysisType(Enum):
     GVCF = 'gvcf'
     CRAM = 'cram'
     CUSTOM = 'custom'
+    ES_INDEX = 'es-index'
 
     @staticmethod
     def parse(val: str) -> 'AnalysisType':

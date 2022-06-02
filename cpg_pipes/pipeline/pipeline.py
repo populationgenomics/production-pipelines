@@ -639,7 +639,7 @@ class Stage(Generic[TargetT], ABC):
             jobs=[self.b.new_job(f'{self.name} [reuse]', target.get_job_attrs())],
         )
 
-    def get_job_attrs(self, target: TargetT | None = None) -> dict[str, str]:
+    def get_job_attrs(self, target: TargetT | None = None) -> dict:
         """
         Create Hail Batch Job attributes dictionary
         """

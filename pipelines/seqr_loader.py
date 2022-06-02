@@ -155,17 +155,17 @@ class LoadToEs(DatasetStage):
             job_name=f'{dataset.name}: create ES index',
             depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
+            attributes=self.get_job_attrs(dataset) | dict(tool='query'),
         )
         jobs = [j]
         if self.status_reporter:
             jobs = self.status_reporter.add_updaters_jobs(
                 self.b,
                 output=index_name,
-                analysis_type='seqr_index',
+                analysis_type='es-index',
                 target=dataset,
                 jobs=jobs,
             )
-        j.attributes = self.get_job_attrs(dataset)
         return self.make_outputs(dataset, jobs=jobs)
 
 
