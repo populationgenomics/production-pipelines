@@ -38,8 +38,8 @@ class InputProvider(ABC):
         skip_samples: list[str] | None = None,
         only_samples: list[str] | None = None,
         skip_datasets: list[str] | None = None,
-        sequencing_type: SequencingType | None = None,
         ped_files: list[Path] | None = None,
+        sequencing_type: SequencingType | None = None,
     ) -> Cohort:
         """
         Add datasets in the cohort. There exists only one cohort for

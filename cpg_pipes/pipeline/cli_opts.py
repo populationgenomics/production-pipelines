@@ -23,7 +23,7 @@ from ..providers import (
     InputProviderType,
 )
 from ..providers.cpg import build_infra_config, set_config
-from ..providers.cpg.inputs import SmdbInputProvider
+from ..providers.cpg.inputs import CpgInputProvider
 from ..providers.cpg.smdb import SMDB
 from ..providers.cpg.status import CpgStatusReporter
 from ..providers.inputs import InputProvider, CsvInputProvider
@@ -394,7 +394,7 @@ def create_pipeline(**kwargs) -> 'Pipeline':
                 slack_channel=options.slack_channel,
             )
         if options.input_provider == InputProviderType.CPG:
-            input_provider = SmdbInputProvider(
+            input_provider = CpgInputProvider(
                 smdb,
                 smdb_errors_are_fatal=options.smdb_errors_are_fatal,
             )

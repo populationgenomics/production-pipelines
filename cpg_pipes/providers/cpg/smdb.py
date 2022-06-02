@@ -483,6 +483,7 @@ class SmSequence:
                         f'{sample_id}: ERROR: index file does not exist: {index_path}'
                     )
                     return None
+
             return CramPath(bam_path, index_path=index_path)
 
         else:

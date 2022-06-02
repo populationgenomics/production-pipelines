@@ -11,7 +11,7 @@ import pandas as pd
 
 from cpg_pipes import Path, Namespace, to_path
 from cpg_pipes.pipeline.cli_opts import choice_from_enum, val_to_enum
-from cpg_pipes.providers.cpg.inputs import SmdbInputProvider
+from cpg_pipes.providers.cpg.inputs import CpgInputProvider
 from cpg_pipes.providers.cpg.smdb import SMDB
 from cpg_pipes.targets import Dataset, Cohort
 
@@ -44,7 +44,7 @@ def main(
     """
     Generate sample map to upload a dataset to Seqr
     """
-    input_provider = SmdbInputProvider(SMDB())
+    input_provider = CpgInputProvider(SMDB())
     cohort = input_provider.populate_cohort(
         cohort=Cohort(
             analysis_dataset_name='seqr',

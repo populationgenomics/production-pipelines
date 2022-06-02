@@ -306,7 +306,7 @@ def _align_one(
             shard_param = f' -s {shard_number + 1},{number_of_shards_for_realignment}'
         else:
             shard_param = ''
-            
+
         # BAZAM requires indexed input.
         if not alignment_input.index_exists():
             index_cmd = f'samtools index {cram[alignment_input.ext]}'
@@ -402,6 +402,10 @@ def extract_fastq(
     j.storage('700G')
 
     reference = fasta_res_group(b)
+    index_cmd = ''
+    index_ext = 'crai' if ext == 'cram' else 'bai'
+    if not index_ext not in cram:
+        index_cmd = f'samtools index {cram[ext]}'
     index_cmd = ''
     index_ext = 'crai' if ext == 'cram' else 'bai'
     if not index_ext not in cram:

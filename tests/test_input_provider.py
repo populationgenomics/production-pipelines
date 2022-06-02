@@ -8,7 +8,7 @@ from typing import cast
 from unittest import skip
 
 from cpg_pipes import Namespace
-from cpg_pipes.providers.cpg.inputs import SmdbInputProvider
+from cpg_pipes.providers.cpg.inputs import CpgInputProvider
 from cpg_pipes.providers.cpg.smdb import SMDB
 from cpg_pipes.targets import Cohort, Sex
 from cpg_pipes.providers.inputs import CsvInputProvider
@@ -80,7 +80,7 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
         """
         dataset = 'acute-care'
 
-        input_provider = SmdbInputProvider(SMDB())
+        input_provider = CpgInputProvider(SMDB())
         cohort = input_provider.populate_cohort(
             cohort=Cohort(
                 analysis_dataset_name=dataset,
