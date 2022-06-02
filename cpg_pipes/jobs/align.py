@@ -299,6 +299,7 @@ def _align_one(
 
     fasta = refs.fasta_res_group(b)
 
+    index_cmd = ''
     if isinstance(alignment_input, CramPath):
         use_bazam = True
         cram = alignment_input.resource_group(b)
@@ -309,9 +310,14 @@ def _align_one(
             shard_param = f' -s {shard_number + 1},{number_of_shards_for_realignment}'
         else:
             shard_param = ''
+
+        # BAZAM requires indexed input.
+        if not alignment_input.index_exists():
+            index_cmd = f'samtools index {cram[alignment_input.ext]}'
+
         bazam_cmd = dedent(f"""\
         bazam -Xmx16g -Dsamjdk.reference_fasta={fasta.base} \
-        -n{min(nthreads, 6)} -bam {cram.cram}{shard_param} \
+        -n{min(nthreads, 6)} -bam {cram[alignment_input.ext]}{shard_param} \
         """)
         r1_param = f'<({bazam_cmd})'
         r2_param = ''
@@ -374,7 +380,10 @@ def _align_one(
     else:
         raise ValueError(f'Unsupported aligner: {aligner.value}')
     
-    return j, dedent(cmd).strip()
+    cmd = dedent(cmd).strip()
+    if index_cmd:
+        cmd = dedent(index_cmd) + '\n' + cmd
+    return j, cmd
 
 
 def extract_fastq(
@@ -398,7 +407,12 @@ def extract_fastq(
     j.storage('700G')
 
     reference = refs.fasta_res_group(b)
-    cmd = f"""\
+    index_cmd = ''
+    index_ext = 'crai' if ext == 'cram' else 'bai'
+    if not index_ext not in cram:
+        index_cmd = f'samtools index {cram[ext]}'
+    cmd = f"""
+    {index_cmd}
     bazam -Xmx16g -Dsamjdk.reference_fasta={reference.base} \
     -n{nthreads} -bam {cram[ext]} -r1 {j.fq1} -r2 {j.fq2}
     """

@@ -81,7 +81,11 @@ class CramPath(AlignmentInput):
     and a corresponding fingerprint path.
     """
 
-    def __init__(self, path: str | Path, index_path: Path | str | None = None):
+    def __init__(
+        self, 
+        path: str | Path, 
+        index_path: Path | str | None = None,
+    ):
         self.path = to_path(path)
         self.is_bam = self.path.suffix == '.bam'
         self.ext = 'cram' if not self.is_bam else 'bam'
@@ -101,10 +105,16 @@ class CramPath(AlignmentInput):
         """
         return self.path.exists()
 
+    def index_exists(self) -> bool:
+        """
+        CRAI/BAI index exists
+        """
+        return self.index_path.exists()
+
     @property
     def index_path(self) -> Path:
         """
-        Path to the corresponding index
+        Path to the corresponding CRAI/BAI index
         """
         return (
             to_path(self._index_path)
@@ -116,12 +126,13 @@ class CramPath(AlignmentInput):
         """
         Create a Hail Batch resource group
         """
-        return b.read_input_group(
-            **{
-                self.ext: str(self.path),
-                f'{self.ext}.{self.index_ext}': str(self.index_path),
-            }
-        )
+        d = {
+            self.ext: str(self.path),
+        } 
+        if self.index_exists():
+            d[f'{self.ext}.{self.index_ext}'] = str(self.index_path)
+
+        return b.read_input_group(**d)
     
     def path_glob(self) -> str:
         """
