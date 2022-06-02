@@ -158,7 +158,7 @@ def pipeline_click_options(function: Callable) -> Callable:
             'input_provider_type',
             type=choice_from_enum(InputProviderType),
             callback=val_to_enum(InputProviderType),
-            default=InputProviderType.SMDB.value,
+            default=InputProviderType.CPG.value,
             help=f'Source of inputs. '
             f'For "--input-source={InputProviderType.CSV.value}", '
             f'use --input-csv to specify a CSV file location',

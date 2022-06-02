@@ -18,7 +18,7 @@ from ...types import SequencingType
 logger = logging.getLogger(__file__)
 
 
-class SmdbInputProvider(InputProvider):
+class CpgInputProvider(InputProvider):
     """
     InputProvider implementation that pulls data from the sample-metadata database.
     """
@@ -41,6 +41,7 @@ class SmdbInputProvider(InputProvider):
         only_samples: list[str] | None = None,
         skip_datasets: list[str] | None = None,
         ped_files: list[Path] | None = None,
+        sequencing_type: SequencingType | None = None,
     ) -> Cohort:
         """
         Overriding the superclass method.
@@ -56,6 +57,7 @@ class SmdbInputProvider(InputProvider):
             only_samples=only_samples,
             skip_datasets=skip_datasets,
             ped_files=ped_files,
+            sequencing_type=sequencing_type,
         )
 
     def get_entries(

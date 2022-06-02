@@ -39,6 +39,7 @@ class InputProvider(ABC):
         only_samples: list[str] | None = None,
         skip_datasets: list[str] | None = None,
         ped_files: list[Path] | None = None,
+        sequencing_type: SequencingType | None = None,
     ) -> Cohort:
         """
         Add datasets in the cohort. There exists only one cohort for
@@ -80,8 +81,10 @@ class InputProvider(ABC):
             if skip_samples or only_samples or skip_datasets:
                 msg += ' (after skipping/picking samples)'
             raise InputProviderError(msg)
-
+        
         self.populate_alignment_inputs(cohort)
+        if sequencing_type:
+            self.filter_sequencing_type(cohort, sequencing_type)
         self.populate_analysis(cohort)
         self.populate_participants(cohort)
         self.populate_pedigree(cohort)
@@ -141,6 +144,23 @@ class InputProvider(ABC):
         """
         Get sequencing type. Can be also set later.
         """
+
+    @staticmethod    
+    def filter_sequencing_type(cohort: Cohort, sequencing_type: SequencingType):
+        """
+        Filtering to the samples with only requested sequencing types.
+        """
+        for s in cohort.get_samples():
+            if not s.alignment_input_by_seq_type:
+                logger.warning(f'{s}: skipping, because no sequencing inputs found')
+                s.active = False
+            elif sequencing_type not in s.alignment_input_by_seq_type:
+                logger.warning(
+                    f'{s}: skipping because no inputs with data type '
+                    f'"{sequencing_type.value}" found in '
+                    f'{list(s.alignment_input_by_seq_type.keys())}'
+                )
+                s.active = False
 
     @abstractmethod
     def populate_alignment_inputs(self, cohort: Cohort) -> None:

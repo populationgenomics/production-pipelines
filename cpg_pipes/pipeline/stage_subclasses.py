@@ -5,6 +5,7 @@ Subclasses of Stage class specific for a Target subclass.
 import logging
 from abc import ABC, abstractmethod
 
+from . import PipelineError
 from .pipeline import Stage, ExpectedResultT, StageInput, StageOutput, Action
 from ..targets import Sample, Cohort, Dataset
 
@@ -41,8 +42,13 @@ class SampleStage(Stage[Sample], ABC):
 
         for ds_i, dataset in enumerate(datasets):
             if not dataset.get_samples():
-                raise ValueError(
-                    f'No active samples are found to run in the dataset {dataset}'
+                raise PipelineError(
+                    f'{dataset}: '
+                    f'{dataset.get_samples()}/{dataset.get_samples(only_active=False)} '
+                    f'usable (active=True) samples found. Check logs above for '
+                    f'possible reasons samples were skipped (e.g. all samples ignored '
+                    f'with --skip-sample option, or they all missing alignment inputs '
+                    f'and --skip-samples-with-missing-input flag is set)'
                 )
 
             # Checking if all samples can be reused, queuing only one job per target:

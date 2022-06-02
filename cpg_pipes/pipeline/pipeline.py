@@ -33,7 +33,8 @@ from ..providers.inputs import InputProvider
 from ..providers.storage import StorageProvider
 from ..targets import Target, Dataset, Sample, Cohort
 from ..providers.status import StatusReporter
-from cpg_pipes.providers.refdata import RefData
+from ..providers.refdata import RefData
+from ..types import SequencingType
 from ..utils import exists
 
 logger = logging.getLogger(__file__)
@@ -783,6 +784,7 @@ class Pipeline:
         description: str | None = None,
         stages: list[StageDecorator] | None = None,
         input_provider: InputProvider | None = None,
+        sequencing_type: SequencingType | None = None,
         status_reporter: StatusReporter | None = None,
         datasets: list[str] | None = None,
         skip_datasets: list[str] | None = None,
@@ -817,6 +819,7 @@ class Pipeline:
                 skip_samples=skip_samples,
                 only_samples=only_samples,
                 skip_datasets=skip_datasets,
+                sequencing_type=sequencing_type,
             )
         self.refs = refs
         self.images = images

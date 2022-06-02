@@ -17,7 +17,7 @@ from ..providers.cpg import analysis_runner_environment
 from ..providers.cpg.images import CpgImages
 from ..providers.cpg.refdata import CpgRefData
 from ..providers.storage import Namespace
-from ..providers.cpg.inputs import SmdbInputProvider
+from ..providers.cpg.inputs import CpgInputProvider
 from ..providers.cpg.storage import CpgStorageProvider
 from ..providers.cpg.status import CpgStatusReporter
 from ..providers.cpg.smdb import SMDB
@@ -35,7 +35,7 @@ def create_pipeline(
     description: str | None = None,
     storage_policy_type: StoragePolicyType = StoragePolicyType.CPG,
     status_reporter_type: StatusReporterType = None,
-    input_provider_type: InputProviderType = InputProviderType.SMDB,
+    input_provider_type: InputProviderType = InputProviderType.CPG,
     input_csv: str | None = None,
     stages: list[Callable[..., Stage]] | None = None,
     dry_run: bool = False,
@@ -64,7 +64,7 @@ def create_pipeline(
     described in `pipeline_click_options` in the `cli_opts` module
     """
     if any([
-        input_provider_type == InputProviderType.SMDB,
+        input_provider_type == InputProviderType.CPG,
         storage_policy_type == StoragePolicyType.CPG,
         status_reporter_type == StatusReporterType.CPG,
     ]):
@@ -81,7 +81,7 @@ def create_pipeline(
     status_reporter: StatusReporter | None = None
     input_provider: InputProvider | None = None
     if (
-        input_provider_type == InputProviderType.SMDB
+        input_provider_type == InputProviderType.CPG
         or status_reporter_type == StatusReporterType.CPG
     ):
         sm_proj = Dataset(analysis_dataset, namespace=namespace).name
@@ -92,8 +92,8 @@ def create_pipeline(
                 images=images,
                 slack_channel=slack_channel,
             )
-        if input_provider_type == InputProviderType.SMDB:
-            input_provider = SmdbInputProvider(
+        if input_provider_type == InputProviderType.CPG:
+            input_provider = CpgInputProvider(
                 smdb,
                 smdb_errors_are_fatal=smdb_errors_are_fatal,
             )

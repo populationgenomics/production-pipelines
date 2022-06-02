@@ -465,28 +465,24 @@ class SmSequence:
                 return None
 
             # Index:
-            if not reads_data[0].get('secondaryFiles'):
-                logger.error(
-                    f'{sample_id}: ERROR: bam/cram input is expected to have '
-                    f'a non-empty list field "secondaryFile" section with indices'
-                )
-                return None
-            index_path = reads_data[0]['secondaryFiles'][0]['location']
-            if (
-                bam_path.endswith('.cram')
-                and not index_path.endswith('.crai')
-                or bam_path.endswith('.bai')
-                and not index_path.endswith('.bai')
-            ):
-                logger.error(
-                    f'{sample_id}: ERROR: expected the index file to have an extension '
-                    f'.crai or .bai, got: {index_path}'
-                )
-            if check_existence and not utils.exists(index_path):
-                logger.error(
-                    f'{sample_id}: ERROR: index file does not exist: {index_path}'
-                )
-                return None
+            index_path = None
+            if reads_data[0].get('secondaryFiles'):
+                index_path = reads_data[0]['secondaryFiles'][0]['location']
+                if (
+                    bam_path.endswith('.cram')
+                    and not index_path.endswith('.crai')
+                    or bam_path.endswith('.bai')
+                    and not index_path.endswith('.bai')
+                ):
+                    logger.error(
+                        f'{sample_id}: ERROR: expected the index file to have an extension '
+                        f'.crai or .bai, got: {index_path}'
+                    )
+                if check_existence and not utils.exists(index_path):
+                    logger.error(
+                        f'{sample_id}: ERROR: index file does not exist: {index_path}'
+                    )
+                    return None
 
             return CramPath(bam_path, index_path=index_path)
 

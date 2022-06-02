@@ -154,7 +154,7 @@ from cpg_pipes.pipeline import create_pipeline
 pipeline = create_pipeline(
     ...,
     datasets=['hgdp'],
-    input_provider_type=InputProviderType.SMDB,
+    input_provider_type=InputProviderType.CPG,
 )
 ```
 
