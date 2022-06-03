@@ -760,7 +760,7 @@ class Pipeline:
         access_level = get_config()['workflow'].get('access_level', 'standard')
         self.cohort = Cohort(
             analysis_dataset_name=analysis_dataset,
-            namespace=Namespace.parse(access_level),
+            namespace=Namespace.from_access_level(access_level),
             name=self.name,
         )
         

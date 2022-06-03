@@ -70,7 +70,7 @@ def complete_infra_config(config: dict) -> dict:
     access_level = config['workflow'].get('access_level', 'standard')
     dataset_gcp_project = config['workflow'].get('dataset_gcp_project')
     
-    stack, namespace = parse_stack(dataset, Namespace.parse(access_level))
+    stack, namespace = parse_stack(dataset, Namespace.from_access_level(access_level))
     if not access_level:
         access_level = 'test' if namespace == Namespace.TEST else 'full'
         config['workflow'].setdefault('access_level', access_level)

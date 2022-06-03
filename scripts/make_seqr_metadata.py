@@ -44,7 +44,7 @@ def main(
     cohort = input_provider.populate_cohort(
         cohort=Cohort(
             analysis_dataset_name='seqr',
-            namespace=Namespace.parse(namespace),
+            namespace=Namespace.from_access_level(namespace),
         ),
         dataset_names=datasets,
     )
