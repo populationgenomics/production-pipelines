@@ -9,6 +9,8 @@ import unittest
 from unittest import skip
 from unittest.mock import patch, Mock
 
+from cpg_utils.config import get_config, update_dict
+
 from cpg_pipes import Namespace, Path, to_path
 from cpg_pipes.pipeline.pipeline import Pipeline, Stage
 from cpg_pipes.stages.genotype_sample import GenotypeSample
@@ -67,9 +69,9 @@ class TestPipeline(unittest.TestCase):
 
         # Mocking elastic search password for the full dry run test:
         seqr_loader._read_es_password = Mock(return_value='TEST')
-
-        pipeline = Pipeline(
-            namespace=Namespace.TEST,
+        
+        update_dict(get_config()['workflow'], dict(
+            access_level=utils.ACCESS_LEVEL,
             name=self._testMethodName,
             analysis_dataset_name=utils.DATASET,
             check_intermediates=False,
@@ -83,7 +85,8 @@ class TestPipeline(unittest.TestCase):
             jc_intervals_num=jc_intervals_num or self.jc_intervals_num,
             vep_intervals_num=vep_intervals_num or self.vep_intervals_num,
             intervals_path=intervals_path,
-        )
+        ))
+        pipeline = Pipeline()
         self.datasets = [pipeline.create_dataset(utils.DATASET)]
         for ds in self.datasets:
             for s_id in self.sample_ids:

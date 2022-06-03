@@ -4,34 +4,16 @@ Create a pipeline from command line options.
 import functools
 import logging
 import os
-import sys
-import tempfile
-from enum import Enum
-from typing import Callable, Type, TypeVar, Any, Optional, Union
+from typing import Callable, Any, Optional
 
 import click
 import toml
 import yaml  # type: ignore
-from cpg_utils.config import get_config, update_dict, set_config_path
-from cpg_utils.hail_batch import Namespace
-from slugify import slugify
+from cpg_utils.config import get_config, update_dict
 
-from .exceptions import PipelineError
-from .pipeline import Pipeline, StageDecorator
+from .pipeline import Pipeline
 from .. import to_path, get_package_path
-from ..jobs import haplotype_caller, joint_genotyping, vep, align
-from ..providers import (
-    StatusReporterType,
-    InputProviderType,
-)
 from ..providers.cpg import complete_infra_config, overwrite_config
-from ..providers.cpg.inputs import CpgInputProvider
-from ..providers.cpg.smdb import SMDB
-from ..providers.cpg.status import CpgStatusReporter
-from ..providers.inputs import InputProvider, CsvInputProvider
-from ..providers.status import StatusReporter
-from ..targets import Dataset
-from ..types import SequencingType
 from ..utils import exists
 
 logger = logging.getLogger(__file__)
