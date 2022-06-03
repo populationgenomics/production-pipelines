@@ -230,7 +230,15 @@ def align(
         )
         merge_j.image(image_path('bwa'))
         nthreads = STANDARD.set_resources(
-            merge_j, nthreads=requested_nthreads
+            merge_j, 
+            nthreads=requested_nthreads,
+            # for FASTQ or BAM inputs, requesting more disk (400G). Example when 
+            # default is not enough: https://batch.hail.populationgenomics.org.au/batches/73892/jobs/56            
+            storage_gb=(
+                None  # not attaching disk for realignments from CRAM
+                if isinstance(alignment_input, CramPath) and not alignment_input.is_bam
+                else 400  
+            )
         ).get_nthreads()
 
         align_cmd = f"""\
