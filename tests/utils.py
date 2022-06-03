@@ -2,17 +2,19 @@
 Common test utilities.
 """
 
-import os
 import string
 import time
 from random import choices
 
+from cpg_utils.config import get_config
+
 from cpg_pipes import to_path, Namespace
-from cpg_pipes.providers.cpg import set_config, build_infra_config
+from cpg_pipes.providers.cpg import overwrite_config, complete_infra_config
 from cpg_pipes.types import GvcfPath, FastqPair, SequencingType
 
 DATASET = 'fewgenomes'
-NAMESPACE = Namespace.TEST
+ACCESS_LEVEL = 'test'
+Namespace = Namespace.TEST
 BASE_BUCKET = to_path('gs://cpg-fewgenomes-test/unittest')
 
 # Samples for joint calling
@@ -70,14 +72,14 @@ def timestamp():
 
 def setup_env(
     dataset: str = DATASET, 
-    namespace: Namespace = NAMESPACE,
+    access_level: str = ACCESS_LEVEL,
 ):
     """
     Set up environment.
     """
-    infra_config = build_infra_config(
-        dataset=dataset, 
-        namespace=namespace.value,
-        gcp_project=dataset,
-    )
-    set_config(infra_config)
+    config = get_config()
+    config['workflow']['dataset'] = dataset
+    config['workflow']['acccess_level'] = access_level
+    config['workflow']['dataset_gcp_project'] = dataset
+    config = complete_infra_config(config)
+    overwrite_config(config)

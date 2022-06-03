@@ -18,7 +18,7 @@ from cpg_utils.hail_batch import genome_build
 
 from cpg_pipes.hailquery import init_hail
 from cpg_pipes import version
-from cpg_pipes.pipeline.cli_opts import file_validation_callback
+from cpg_pipes.pipeline.entry import file_validation_callback
 
 logger = logging.getLogger(__name__)
 

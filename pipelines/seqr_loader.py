@@ -10,22 +10,22 @@ import time
 
 import click
 import yaml
-
-from cpg_pipes.pipeline.cli_opts import choice_from_enum, val_to_enum, create_pipeline
-from cpg_pipes.types import SequencingType
 from google.cloud import secretmanager
+
+from cpg_utils.config import get_config
 
 from cpg_pipes import Path
 from cpg_pipes import utils
 from cpg_pipes.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jobs
 from cpg_pipes.pipeline import (
-    pipeline_options,
+    pipeline_entry_point,
     stage,
     StageInput,
     StageOutput,
     CohortStage,
     DatasetStage,
 )
+from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes.stages.vep import Vep
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
@@ -33,9 +33,7 @@ from cpg_pipes.targets import Cohort, Dataset
 
 logger = logging.getLogger(__file__)
 
-SUPPORTED_SEQUENCING_TYPES = [
-    SequencingType.GENOME,
-]
+SUPPORTED_SEQUENCING_TYPES = ['genome']
 
 
 @stage(required_stages=[JointGenotyping, Vep, Vqsr])
@@ -71,7 +69,7 @@ class AnnotateCohort(CohortStage):
             sequencing_type=cohort.get_sequencing_type(),
             hail_billing_project=self.hail_billing_project,
             hail_bucket=self.hail_bucket,
-            overwrite=not self.check_intermediates,
+            overwrite=not get_config()['workflow'].get('self.check_intermediates'),
             job_attrs=self.get_job_attrs(),
         )
         return self.make_outputs(cohort, data=mt_path, jobs=jobs)
@@ -106,7 +104,7 @@ class AnnotateDataset(DatasetStage):
             hail_billing_project=self.hail_billing_project,
             hail_bucket=self.hail_bucket,
             job_attrs=self.get_job_attrs(dataset),
-            overwrite=not self.check_intermediates,
+            overwrite=not get_config()['workflow'].get('self.check_intermediates'),
         )
         return self.make_outputs(
             dataset, data=self.expected_outputs(dataset), jobs=jobs
@@ -130,7 +128,7 @@ class LoadToEs(DatasetStage):
         Uses analysis-runner's dataproc helper to run a hail query script
         """
         if (
-            es_datasets := self.pipeline_config.get('create_es_index_for_datasets')
+            es_datasets := get_config()['workflow'].get('create_es_index_for_datasets')
         ) and dataset.name not in es_datasets:
             # Skipping dataset that wasn't explicitly requested to upload to ES:
             return self.make_outputs(dataset)
@@ -187,99 +185,17 @@ def _read_es_password(
     return response.payload.data.decode('UTF-8')
 
 
-@click.command()
-@click.option(
-    '--es-dataset',
-    'create_es_index_for_datasets',
-    multiple=True,
-    help=f'Create Seqr ElasticSearch indices for these datasets.',
-)
-@click.option(
-    '--realign',
-    '--realign-from-cram-version',
-    'realign_from_cram_version',
-    help='Realign CRAM whenever available, instead of using FASTQ. '
-         'The parameter value should correspond to CRAM version '
-         '(e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPG0123.cram)'
-)
-@click.option(
-    '--use-gnarly/--no-use-gnarly',
-    'use_gnarly',
-    default=False,
-    is_flag=True,
-    help='Use GnarlyGenotyper instead of GenotypeGVCFs',
-)
-@click.option(
-    '--use-as-vqsr/--no-use-as-vqsr',
-    'use_as_vqsr',
-    default=True,
-    is_flag=True,
-    help='Use allele-specific annotations for VQSR',
-)
-@click.option(
-    '--cram-qc/--no-cram-qc',
-    'cram_qc',
-    default=True,
-    is_flag=True,
-    help='Run CRAM QC and PED checks',
-)
-@click.option(
-    '--exome-bed',
-    'exome_bed',
-    help=f'BED file with exome regions',
-)
-@click.option(
-    '--sequencing-type',
-    'sequencing_type',
-    type=choice_from_enum(SequencingType),
-    callback=val_to_enum(SequencingType),
-    help='Limit to data with this sequencing type',
-    default=SequencingType.GENOME.value,
-)
-@pipeline_options
-def main(
-    datasets: list[str],
-    create_es_index_for_datasets: list[str],
-    sequencing_type: SequencingType,
-    **kwargs,
-):
+@pipeline_entry_point(name='Seqr Loader')
+def main(pipeline: Pipeline):
     """
     Seqr loading pipeline: FASTQ -> ElasticSearch index.
     """
-    if not datasets:
-        # Parsing dataset names from the analysis-runner Seqr stack:
-        from urllib import request
-
-        seqr_stack_url = (
-            'https://raw.githubusercontent.com/populationgenomics/analysis-runner/main'
-            '/stack/Pulumi.seqr.yaml'
-        )
-        with request.urlopen(seqr_stack_url) as f:
-            value = yaml.safe_load(f)['config']['datasets:depends_on']
-            datasets = [d.strip('"') for d in value.strip('[] ').split(', ')]
-            logger.info(f'Found Seqr datasets: {datasets}')
-
-    description = 'Seqr Loader'
-    if v := kwargs.get('version'):
-        description += f', {v}'
-    active_datasets = set(datasets) - set(kwargs.get('skip_datasets', []))
-    description += f': [{", ".join(sorted(active_datasets))}]'
-    if create_es_index_for_datasets:
-        description += f' → [{", ".join(sorted(create_es_index_for_datasets))}]'
-
-    if sequencing_type not in SUPPORTED_SEQUENCING_TYPES:
-        raise click.BadParameter(
-            f'Unsupported sequencing data type {sequencing_type.value}. '
-            f'Supported types: {[st.value for st in SUPPORTED_SEQUENCING_TYPES]} '
-        )
-
-    kwargs['analysis_dataset'] = kwargs.get('analysis_dataset', 'seqr')
-    kwargs['name'] = kwargs.get('name') or 'Seqr Loader'
-    kwargs['description'] = description
-    kwargs['datasets'] = kwargs.get('datasets') or datasets
-    kwargs['create_es_index_for_datasets'] = create_es_index_for_datasets
-    kwargs['sequencing_type'] = sequencing_type
-    pipeline = create_pipeline(**kwargs)
+    if seq_type := get_config()['workflow'].get('sequencing_type'):
+        if seq_type not in SUPPORTED_SEQUENCING_TYPES:
+            raise click.BadParameter(
+                f'Unsupported sequencing data type {seq_type.value}. '
+                f'Supported types: {[st for st in SUPPORTED_SEQUENCING_TYPES]} '
+            )
     pipeline.run()
 
 

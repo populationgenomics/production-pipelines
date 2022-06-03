@@ -19,7 +19,7 @@ logger = logging.getLogger(__file__)
 def get_intervals(
     b: hb.Batch,
     scatter_count: int,
-    intervals_path: Path | None = None,
+    intervals_path: Path | str | None = None,
     sequencing_type: SequencingType = SequencingType.GENOME,
     job_attrs: dict | None = None,
 ) -> tuple[Job, list[hb.Resource]]:

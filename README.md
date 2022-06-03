@@ -314,11 +314,11 @@ The `cpg_pipes/pipeline/cli_opts.py` module provides CLI options for Click that 
 
 ```python
 import click
-from cpg_pipes.pipeline import create_pipeline, pipeline_options
+from cpg_pipes.pipeline import create_pipeline, pipeline_entry_point
 
 
 @click.command()
-@pipeline_options
+@pipeline_entry_point
 def main(**kwargs):
     pipeline = create_pipeline(
         name='my_pipeline',
@@ -333,11 +333,11 @@ You can add more custom options like this:
 
 ```python
 import click
-from cpg_pipes.pipeline import pipeline_options, create_pipeline
+from cpg_pipes.pipeline import pipeline_entry_point, create_pipeline
 
 
 @click.command()
-@pipeline_options
+@pipeline_entry_point
 @click.option('--custom-option')
 def main(**kwargs):
     custom_option = kwargs.pop('custom_option')

@@ -41,7 +41,7 @@ class CpgInputProvider(InputProvider):
         only_samples: list[str] | None = None,
         skip_datasets: list[str] | None = None,
         ped_files: list[Path] | None = None,
-        sequencing_type: SequencingType | None = None,
+        sequencing_type: str | None = None,
     ) -> Cohort:
         """
         Overriding the superclass method.

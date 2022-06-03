@@ -10,17 +10,13 @@ from urllib import request
 import toml
 import yaml
 from cpg_utils.cloud import read_secret
-from cpg_utils.config import set_config_path
+from cpg_utils.config import set_config_path, update_dict, get_config
 
 from ... import Namespace, to_path, Path
 from ...targets import parse_stack
 from ...utils import exists
 
 ANALYSIS_RUNNER_PROJECT_ID = 'analysis-runner'
-
-IMAGE_REGISTRY_PREFIX = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
-REFERENCE_PREFIX = 'gs://cpg-reference'
-WEB_URL_TEMPLATE = f'https://{{namespace}}-web.populationgenomics.org.au/{{dataset}}'
 
 
 def get_server_config() -> dict:
@@ -46,7 +42,7 @@ def get_stack_sa_email(stack: str, access_level: str) -> str:
     return data[f'datasets:hail_service_account_{access_level}']
 
 
-def set_config(config: dict, local_tmp_dir: Path | None = None):
+def overwrite_config(config: dict, local_tmp_dir: Path | None = None) -> dict:
     """
     Writes and sets cpg-utils config.
     """
@@ -55,19 +51,14 @@ def set_config(config: dict, local_tmp_dir: Path | None = None):
     with config_path.open('w') as f:
         toml.dump(config, f)
     set_config_path(config_path)
+    return get_config()
 
 
-def build_infra_config(
-    dataset: str,
-    namespace: Namespace | None = None,
-    gcp_project: str | None = None,
-    image_registry_prefix: str = IMAGE_REGISTRY_PREFIX,
-    reference_prefix: str = REFERENCE_PREFIX,
-    web_url_template: str = WEB_URL_TEMPLATE,
-) -> dict[str, dict[str, str]]:
+def complete_infra_config(config: dict) -> dict:
     """
-    Set up the infrastructure config.
-    
+    Set up the infrastructure config parameters, unless they are already set
+    by analysis-runner.
+
     Note for CPG: if typical analysis-runner configuration is not included, this 
     function would somulate the analysis-runner environment. 
     It requires only the `dataset` parameter, however optionally SERVICE_ACCOUNT_KEY 
@@ -75,18 +66,25 @@ def build_infra_config(
     GOOGLE_APPLICATION_CREDENTIALS should also initially be set to the analysis-runner 
     service account to allow read permissions to the secret with Hail tokens.
     """
-    stack, namespace = parse_stack(dataset, namespace)
-    access_level = 'test' if namespace == Namespace.TEST else 'full'
+    dataset = config['workflow']['dataset']
+    access_level = config['workflow'].get('access_level', 'standard')
+    dataset_gcp_project = config['workflow'].get('dataset_gcp_project')
+    
+    stack, namespace = parse_stack(dataset, Namespace.parse(access_level))
+    if not access_level:
+        access_level = 'test' if namespace == Namespace.TEST else 'full'
+        config['workflow'].setdefault('access_level', access_level)
 
     # Parse server config to get Hail token and the GCP project name
     hail_token = os.getenv('HAIL_TOKEN')
-    gcp_project = gcp_project or os.getenv('CPG_DATASET_GCP_PROJECT')
-    if not hail_token or not gcp_project:
+    if not hail_token or not dataset_gcp_project:
         server_config = get_server_config()
         hail_token = server_config[stack][f'{access_level}Token']
-        gcp_project = server_config[stack]['projectId']
+        dataset_gcp_project = server_config[stack]['projectId']
+        config['workflow'].setdefault('dataset_gcp_project', dataset_gcp_project)
+
     assert hail_token
-    assert gcp_project
+    assert dataset_gcp_project
     os.environ['HAIL_TOKEN'] = hail_token
     
     # Active dataset service account
@@ -97,19 +95,9 @@ def build_infra_config(
         if not exists(sa_key_path):
             raise ValueError(f'Service account key does not exist: {sa_key_path}')
         os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = sa_key_path
-
-    return {
-        'hail': {
-            'billing_project': dataset,
-            'bucket': f'cpg-{stack}-hail',
-        },
-        'workflow': {
-            'access_level': access_level,
-            'dataset': stack,
-            'dataset_gcp_project': gcp_project,
-            'image_registry_prefix': image_registry_prefix or IMAGE_REGISTRY_PREFIX,
-            'reference_prefix': reference_prefix or REFERENCE_PREFIX,
-            'web_url_template': web_url_template or WEB_URL_TEMPLATE,
-            'output_prefix': 'cpg-pipes',
-        },
-    }
+    
+    config['workflow'].setdefault('dataset', stack)
+    config['workflow'].setdefault('output_prefix', 'cpg-pipes')
+    config['hail'].setdefault('billing_project', stack)
+    config['hail'].setdefault('bucket', f'cpg-{stack}-hail')
+    return config

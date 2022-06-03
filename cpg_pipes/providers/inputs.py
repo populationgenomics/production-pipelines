@@ -39,7 +39,7 @@ class InputProvider(ABC):
         only_samples: list[str] | None = None,
         skip_datasets: list[str] | None = None,
         ped_files: list[Path] | None = None,
-        sequencing_type: SequencingType | None = None,
+        sequencing_type: str | None = None,
     ) -> Cohort:
         """
         Add datasets in the cohort. There exists only one cohort for
@@ -82,7 +82,7 @@ class InputProvider(ABC):
         
         self.populate_alignment_inputs(cohort)
         if sequencing_type:
-            self.filter_sequencing_type(cohort, sequencing_type)
+            self.filter_sequencing_type(cohort, SequencingType.parse(sequencing_type))
         self.populate_analysis(cohort)
         self.populate_participants(cohort)
         self.populate_pedigree(cohort)

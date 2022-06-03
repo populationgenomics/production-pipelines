@@ -24,14 +24,18 @@ from cloudpathlib import CloudPath
 import hailtop.batch as hb
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
+from cpg_utils.config import get_config
+from slugify import slugify
 
 from .exceptions import PipelineError, StageInputNotFound
 from .. import Path, to_path, Namespace
 from ..hb.batch import setup_batch, get_billing_project
-from ..providers.inputs import InputProvider
+from ..providers.cpg.inputs import CpgInputProvider
+from ..providers.cpg.smdb import SMDB
+from ..providers.cpg.status import CpgStatusReporter
+from ..providers.inputs import InputProvider, CsvInputProvider
 from ..targets import Target, Dataset, Sample, Cohort
 from ..providers.status import StatusReporter
-from ..types import SequencingType
 from ..utils import exists
 
 logger = logging.getLogger(__file__)
@@ -216,7 +220,7 @@ class StageInput:
                 + (
                     'Check the logs if all samples were missing inputs from previous '
                     'stages, and consider changing --first-stage'
-                    if self.stage.skip_samples_with_missing_input
+                    if get_config()['workflow'].get('skip_samples_with_missing_input')
                     else ''
                 )
             )
@@ -376,23 +380,11 @@ class Stage(Generic[TargetT], ABC):
         skipped: bool = False,
         assume_outputs_exist: bool = False,
         forced: bool = False,
-        check_inputs: bool = False,
-        check_intermediates: bool = False,
-        check_expected_outputs: bool = False,
-        skip_samples_with_missing_input: bool = False,
-        skip_samples_stages: dict[str, list[str]] | None = None,
         status_reporter: StatusReporter | None = None,
-        pipeline_config: dict[str, Any] | None = None,
     ):
         self._name = name
         self.b = batch
         self.cohort = cohort
-
-        self.check_inputs = check_inputs
-        self.check_intermediates = check_intermediates
-        self.check_expected_outputs = check_expected_outputs
-        self.skip_samples_with_missing_input = skip_samples_with_missing_input
-        self.skip_samples_stages = skip_samples_stages
 
         self.required_stages_classes: list[StageDecorator] = []
         if required_stages:
@@ -417,8 +409,6 @@ class Stage(Generic[TargetT], ABC):
         self.skipped = skipped
         self.forced = forced
         self.assume_outputs_exist = assume_outputs_exist
-
-        self.pipeline_config = pipeline_config or {}
 
         self.hail_billing_project = hail_billing_project
         self.hail_bucket = hail_bucket
@@ -562,8 +552,8 @@ class Stage(Generic[TargetT], ABC):
         Based on stage parameters and expected outputs existence, determines what
         to do with the target: queue, skip or reuse, etc..
         """
-        if self.skip_samples_stages and self.name in self.skip_samples_stages:
-            skip_targets = self.skip_samples_stages[self.name]
+        if (d := get_config()['workflow'].get('skip_samples_stages')) and self.name in d:
+            skip_targets = d[self.name]
             if target.target_id in skip_targets:
                 logger.info(f'{self.name}: requested to skip {target}')
                 return Action.SKIP
@@ -574,7 +564,7 @@ class Stage(Generic[TargetT], ABC):
         if self.skipped:
             if reusable:
                 return Action.REUSE
-            if self.skip_samples_with_missing_input:
+            if get_config()['workflow'].get('skip_samples_with_missing_input'):
                 logger.warning(
                     f'Skipping {target}: stage {self.name} is required, '
                     f'but is skipped, and expected outputs for the target do not '
@@ -619,7 +609,7 @@ class Stage(Generic[TargetT], ABC):
         """
         if not expected_out:
             reusable = False
-        elif not self.check_expected_outputs:
+        elif not get_config()['workflow'].get('check_expected_outputs'):
             if self.assume_outputs_exist or self.skipped:
                 # Do not check the files' existence, trust they exist.
                 # note that for skipped stages, we automatically assume outputs exist
@@ -700,12 +690,6 @@ def stage(
                 skipped=skipped,
                 assume_outputs_exist=assume_outputs_exist,
                 forced=forced,
-                check_inputs=pipeline.check_inputs,
-                check_intermediates=pipeline.check_intermediates,
-                check_expected_outputs=pipeline.check_expected_outputs,
-                skip_samples_with_missing_input=pipeline.skip_samples_with_missing_input,
-                skip_samples_stages=pipeline.skip_samples_stages,
-                pipeline_config=pipeline.config,
             )
 
         _ALL_DECLARED_STAGES.append(wrapper_stage)
@@ -765,97 +749,87 @@ class Pipeline:
     and a cohort of datasets of samples.
     """
 
-    def __init__(
-        self,
-        namespace: Namespace,
-        name: str,
-        analysis_dataset_name: str,
-        description: str | None = None,
-        stages: list[StageDecorator] | None = None,
-        input_provider: InputProvider | None = None,
-        sequencing_type: SequencingType | None = None,
-        status_reporter: StatusReporter | None = None,
-        datasets: list[str] | None = None,
-        skip_datasets: list[str] | None = None,
-        skip_samples: list[str] | None = None,
-        only_samples: list[str] | None = None,
-        force_samples: list[str] | None = None,
-        first_stage: str | None = None,
-        last_stage: str | None = None,
-        version: str | None = None,
-        check_inputs: bool = False,
-        check_intermediates: bool = False,
-        check_expected_outputs: bool = True,
-        skip_samples_with_missing_input: bool = False,
-        skip_samples_stages: dict[str, list[str]] | None = None,
-        local_tmp_dir: Path | None = None,
-        dry_run: bool = False,
-        keep_scratch: bool = True,
-        hail_pool_label: str | None = None,
-        **kwargs,
-    ):
-        self.name = name.replace(' ', '_')
-        self.namespace = namespace
+    def __init__(self, name: str | None = None, description: str | None = None):
+        analysis_dataset = get_config()['workflow']['dataset']
+        name = get_config()['workflow'].get('name') or name
+        description = get_config()['workflow'].get('description') or description
+        name = name or description or analysis_dataset
+        self.description = description or name
+        self.name = slugify(name)
+
+        access_level = get_config()['workflow'].get('access_level', 'standard')
         self.cohort = Cohort(
-            analysis_dataset_name=analysis_dataset_name,
-            namespace=self.namespace,
+            analysis_dataset_name=analysis_dataset,
+            namespace=Namespace.parse(access_level),
             name=self.name,
         )
-        if datasets and input_provider:
+        
+        smdb: Optional[SMDB] = None
+        input_provider: InputProvider | None = None
+        if (get_config()['workflow'].get('datasets') and 
+                get_config()['workflow'].get('input_provider') == 'smdb'):
+            smdb = smdb or SMDB(self.cohort.analysis_dataset.name)
+            input_provider = CpgInputProvider(
+                smdb, 
+                smdb_errors_are_fatal=get_config()['workflow'].get('smdb_errors_are_fatal'),
+            )
+        if get_config()['workflow'].get('input_provider') == 'csv':
+            if not (csv_path := get_config()['workflow'].get('input_csv')):
+                raise PipelineError(
+                    f'workflow.input_csv should be provided '
+                    f'with workflow.input_provider = "csv"'
+                )
+            input_provider = CsvInputProvider(to_path(csv_path).open())
+
+        if input_provider is not None:
             input_provider.populate_cohort(
                 cohort=self.cohort,
-                dataset_names=datasets,
-                skip_samples=skip_samples,
-                only_samples=only_samples,
-                skip_datasets=skip_datasets,
-                sequencing_type=sequencing_type,
+                dataset_names=get_config()['workflow'].get('datasets'),
+                skip_samples=get_config()['workflow'].get('skip_samples'),
+                only_samples=get_config()['workflow'].get('only_samples'),
+                skip_datasets=get_config()['workflow'].get('skip_datasets'),
+                sequencing_type=get_config()['workflow'].get('sequencing_type'),
             )
-
-        self.force_samples = force_samples
 
         self.hail_billing_project = get_billing_project(
             self.cohort.analysis_dataset.stack
         )
         self.tmp_bucket = self.cohort.analysis_dataset.tmp_path()
-        if version:
+        if version := get_config()['workflow'].get('version'):
             self.tmp_bucket /= version
         self.version = version or time.strftime('%Y%m%d-%H%M%S')
         self.hail_bucket = self.tmp_bucket / 'hail'
-        if not description:
-            description = name
+
+        if not get_config()['workflow'].get('description'):
             if version:
-                description += f' {version}'
+                self.description += f' {version}'
             if ds_set := set(d.name for d in self.cohort.get_datasets()):
-                description += ': ' + ', '.join(sorted(ds_set))
+                self.description += ': ' + ', '.join(sorted(ds_set))
+
         self.b: Batch = setup_batch(
-            description=description,
+            description=self.description,
             billing_project=self.hail_billing_project,
             hail_bucket=self.hail_bucket,
-            pool_label=hail_pool_label,
+            pool_label=get_config()['hail'].get('hail_pool_label'),
         )
-        self.status_reporter = status_reporter
 
-        self.dry_run = dry_run
-        self.keep_scratch = keep_scratch
+        self.status_reporter = None
+        if get_config()['workflow'].get('status_reporter') == 'smdb':
+            smdb = smdb or SMDB(self.cohort.analysis_dataset.name)
+            self.status_reporter = CpgStatusReporter(
+                smdb=smdb,
+                slack_channel=get_config()['workflow'].get('slack_channel'),
+            )
 
-        self.check_inputs = check_inputs
-        self.check_intermediates = check_intermediates
-        self.check_expected_outputs = check_expected_outputs
-        self.skip_samples_with_missing_input = skip_samples_with_missing_input
-        self.skip_samples_stages = skip_samples_stages
-        self.first_stage = first_stage
-        self.last_stage = last_stage
-
-        self.local_tmp_dir = to_path(local_tmp_dir or tempfile.mkdtemp())
-
-        self.config = kwargs or {}
+        self.local_tmp_dir = \
+            to_path(get_config()['workflow'].get('local_tmp_dir') or tempfile.mkdtemp())
 
         # Will be populated by set_stages() in submit_batch()
         self._stages_dict: dict[str, Stage] = dict()
-        self._stages_in_order = stages or _ALL_DECLARED_STAGES
 
     def run(
         self,
+        stages: list[StageDecorator] | None = None,
         dry_run: bool | None = None,
         keep_scratch: bool | None = None,
         wait: bool | None = False,
@@ -867,11 +841,12 @@ class Pipeline:
         explicitly would still be executed.
         """
         if dry_run is None:
-            dry_run = self.dry_run
+            dry_run = get_config()['hail'].get('dry_run')
         if keep_scratch is None:
-            keep_scratch = self.keep_scratch
+            keep_scratch = get_config()['hail'].get('keep_scratch')
 
-        self.set_stages(self._stages_in_order, force_all_implicit_stages)
+        _stages_in_order = stages or _ALL_DECLARED_STAGES
+        self.set_stages(_stages_in_order, force_all_implicit_stages)
 
         result = None
         if self.b:
@@ -890,21 +865,21 @@ class Pipeline:
         stage_names = list(self._stages_dict.keys())
         lower_stage_names = [s.lower() for s in stage_names]
         first_stage_num = None
-        if self.first_stage:
-            if self.first_stage.lower() not in lower_stage_names:
+        if first_stage := get_config()['workflow'].get('first_stage'):
+            if first_stage.lower() not in lower_stage_names:
                 logger.critical(
-                    f'Value for --first-stage {self.first_stage} '
+                    f'Value for --first-stage {first_stage} '
                     f'not found in available stages: {", ".join(stage_names)}'
                 )
-            first_stage_num = lower_stage_names.index(self.first_stage.lower())
+            first_stage_num = lower_stage_names.index(first_stage.lower())
         last_stage_num = None
-        if self.last_stage:
-            if self.last_stage.lower() not in lower_stage_names:
+        if last_stage := get_config()['workflow'].get('last_stage'):
+            if last_stage.lower() not in lower_stage_names:
                 logger.critical(
-                    f'Value for --last-stage {self.last_stage} '
+                    f'Value for --last-stage {last_stage} '
                     f'not found in available stages: {", ".join(stage_names)}'
                 )
-            last_stage_num = lower_stage_names.index(self.last_stage.lower())
+            last_stage_num = lower_stage_names.index(last_stage.lower())
         return first_stage_num, last_stage_num
 
     def set_stages(

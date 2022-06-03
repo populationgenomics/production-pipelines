@@ -4,6 +4,8 @@ Stage that runs FastQC on alignment inputs.
 
 import logging
 
+from cpg_utils.config import get_config
+
 from .. import Path
 from ..jobs import fastqc
 from ..jobs.align import process_alignment_input
@@ -36,14 +38,14 @@ class FastQC(SampleStage):
         """
         seq_type, alignment_input = process_alignment_input(
             sample, 
-            seq_type=self.pipeline_config.get('sequencing_type'),
-            realign_cram_ver=self.pipeline_config.get('realign_from_cram_version'),
+            seq_type=get_config()['workflow'].get('sequencing_type'),
+            realign_cram_ver=get_config()['workflow'].get('realign_from_cram_version'),
         )
 
         if alignment_input is None or (
-            self.check_inputs and not alignment_input.exists()
+            get_config()['workflow'].get('check_inputs') and not alignment_input.exists()
         ):
-            if self.skip_samples_with_missing_input:
+            if get_config()['workflow'].get('skip_samples_with_missing_input'):
                 logger.error(f'No alignment inputs, skipping sample {sample.id}')
                 sample.active = False
                 return self.make_outputs(sample)  # return empty output

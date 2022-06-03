@@ -1,0 +1,23 @@
+[workflow]
+access_level = 'full'
+dataset = 'seqr'
+datasets = ['acute-care']
+skip_datasets = ['flinders-ophthal']
+skip_samples = [
+  'CPG11783',   # acute-care, no FASTQ data
+  'CPG13326',   # perth-neuro, no FASTQ data: https://github.com/populationgenomics/seqr-private/issues/2
+  'CPG200014',  # perth-neuro, https://centrepopgen.slack.com/archives/C01R7CKJGHM/p1654038000773069
+]
+check_inputs = true
+skip_samples_with_missing_input = true
+keep_scratch = true
+#status_reporter = 'cpg'
+#slack_channel: 'seqr-loader'
+#skip_samples_stages:
+#  VerifyBamId: [CPG13409]  # https://batch.hail.populationgenomics.org.au/batches/56236/jobs/372
+
+[genomics]
+sequencing_type = 'genome'
+
+[hail]
+hail_pool_label = 'seqr'

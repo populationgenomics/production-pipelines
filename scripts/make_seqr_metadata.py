@@ -10,7 +10,6 @@ import click
 import pandas as pd
 
 from cpg_pipes import Path, Namespace, to_path
-from cpg_pipes.pipeline.cli_opts import choice_from_enum, val_to_enum
 from cpg_pipes.providers.cpg.inputs import CpgInputProvider
 from cpg_pipes.providers.cpg.smdb import SMDB
 from cpg_pipes.targets import Dataset, Cohort
@@ -25,9 +24,6 @@ logger.setLevel(logging.INFO)
 @click.option(
     '-n',
     '--namespace',
-    'namespace',
-    type=choice_from_enum(Namespace),
-    callback=val_to_enum(Namespace),
     help='The bucket namespace to write the results to',
 )
 @click.option(
@@ -38,7 +34,7 @@ logger.setLevel(logging.INFO)
 )
 def main(
     datasets: list[str],
-    namespace: Namespace,
+    namespace: str,
     use_external_id: bool = False,
 ):
     """
@@ -48,7 +44,7 @@ def main(
     cohort = input_provider.populate_cohort(
         cohort=Cohort(
             analysis_dataset_name='seqr',
-            namespace=namespace,
+            namespace=Namespace.parse(namespace),
         ),
         dataset_names=datasets,
     )

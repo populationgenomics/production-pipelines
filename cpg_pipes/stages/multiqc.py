@@ -15,8 +15,8 @@ from cpg_pipes.pipeline import (
 from cpg_pipes.pipeline.exceptions import StageInputNotFound
 from cpg_pipes.stages.cram_qc import SamtoolsStats, PicardWgsMetrics, VerifyBamId
 from cpg_pipes.stages.fastqc import FastQC
+from cpg_pipes.stages.somalier import CramSomalierPedigree
 from cpg_pipes.targets import Dataset
-from pipelines.somalier import CramSomalierPedigree
 
 logger = logging.getLogger(__file__)
 

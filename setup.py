@@ -36,6 +36,7 @@ setuptools.setup(
         'cloudpathlib[all]',
         'coloredlogs',
         'types-PyYAML',  # https://mypy.readthedocs.io/en/stable/getting_started.html#library-stubs-and-typeshed
+        'python-slugify',
     ],
     keywords='bioinformatics',
     classifiers=[

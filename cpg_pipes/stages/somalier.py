@@ -6,6 +6,8 @@ Stages to run somalier tools.
 
 import logging
 
+from cpg_utils.config import get_config
+
 from .. import Path
 from ..targets import Dataset, Sample
 from ..pipeline import stage, SampleStage, DatasetStage, StageInput, StageOutput
@@ -37,7 +39,7 @@ class CramSomalier(SampleStage):
             b=self.b,
             gvcf_or_cram_or_bam_path=cram_path,
             out_fpath=expected_path,
-            overwrite=not self.check_intermediates,
+            overwrite=not get_config()['workflow'].get('check_intermediates'),
             job_attrs=self.get_job_attrs(sample),
         )
         return self.make_outputs(sample, data=expected_path, jobs=[j])
@@ -86,7 +88,7 @@ class CramSomalierPedigree(DatasetStage):
             self.b,
             dataset,
             input_path_by_sid=fp_by_sid,
-            overwrite=not self.check_intermediates,
+            overwrite=not not get_config()['workflow'].get('check_intermediates'),
             out_samples_path=self.expected_outputs(dataset)['samples'],
             out_pairs_path=self.expected_outputs(dataset)['pairs'],
             out_html_path=html_path,
@@ -140,7 +142,7 @@ class CramSomalierAncestry(DatasetStage):
             self.b,
             dataset,
             input_path_by_sid=fp_by_sid,
-            overwrite=not self.check_intermediates,
+            overwrite=not get_config()['workflow'].get('check_intermediates'),
             out_tsv_path=self.expected_outputs(dataset)['tsv'],
             out_html_path=html_path,
             out_html_url=html_url,
