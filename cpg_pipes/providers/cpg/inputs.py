@@ -242,7 +242,7 @@ class CpgInputProvider(InputProvider):
     def requested_dataset_names(self) -> list[str] | None:
         """
         List of dataset names to process. Provides defaults for the
-        populate_cohort(datsets=[]) parameter.
+        populate_cohort(datasets=[]) parameter.
         """
         # Parsing dataset names from the analysis-runner Seqr stack:
         from urllib import request
