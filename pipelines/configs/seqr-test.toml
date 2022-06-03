@@ -1,0 +1,10 @@
+[workflow]
+access_level = 'test'
+dataset = 'seqr-test'
+datasets = ['acute-care']
+create_es_index_for_datasets = ['acute-care']
+keep_scratch = true
+skip_samples_with_missing_input = true
+
+[hail]
+hail_pool_label = 'seqr'
