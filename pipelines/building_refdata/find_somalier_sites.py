@@ -11,21 +11,23 @@ Problems with the currentl publicly shared somalier sites VCF:
 
 import logging
 
+from cpg_utils.config import get_config, update_dict
 from cpg_utils.hail_batch import reference_path, image_path
 
-from cpg_pipes import Namespace
 from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.pipeline import create_pipeline
+from cpg_pipes.pipeline.pipeline import Pipeline
 
 logger = logging.getLogger(__file__)
 
-pipe = create_pipeline(
-    analysis_dataset='fewgenomes',
-    name='find-somalier-sites',
-    description='find 65k somalier sites',
-    namespace=Namespace.MAIN,
-    keep_scratch=True,
-)
+
+update_dict(get_config()['workflow'], {
+    'name': 'find-somalier-sites',
+    'description': 'find 65k somalier sites',
+    'dataset': 'fewgenomes',
+    'access_level': 'full',
+    'keep_scratch': True,
+})
+pipe = Pipeline()
 
 results_vcf = reference_path('somalier_sites')
 

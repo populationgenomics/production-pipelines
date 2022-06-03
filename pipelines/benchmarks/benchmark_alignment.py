@@ -8,14 +8,15 @@ from enum import Enum
 import click
 import logging
 
+from cpg_utils.config import update_dict, get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group
 
 from cpg_pipes import benchmark, Namespace
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
+from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes.types import FastqPair, CramPath, SequencingType, FastqPairs
 from cpg_pipes.pipeline import (
     stage,
-    create_pipeline,
     SampleStage,
     StageInput,
     StageOutput,
@@ -229,13 +230,12 @@ def main():
     """
     Entry point.
     """
-    pipeline = create_pipeline(
-        name='benchmark_alignment',
-        description='Benchmark alignment',
-        analysis_dataset=DATASET,
-        namespace=NAMESPACE,
-        keep_scratch=True,
-    )
+    update_dict(get_config()['workflow'], {
+        'name': 'Benchmark alignment',
+        'dataset': DATASET,
+        'access_level': 'full',
+    })
+    pipeline = Pipeline()
 
     p = pipeline.create_dataset('fewgenomes')
     s = p.add_sample(

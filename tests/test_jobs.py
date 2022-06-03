@@ -8,6 +8,7 @@ import unittest
 from typing import Dict
 from unittest import skip
 
+from cpg_utils.config import get_config, update_dict
 from cpg_utils.hail_batch import image_path, fasta_res_group
 from hailtop.batch.job import Job
 
@@ -24,7 +25,7 @@ from cpg_pipes.jobs.joint_genotyping import (
 from cpg_pipes.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jobs
 from cpg_pipes.jobs.somalier import check_pedigree_job
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
-from cpg_pipes.pipeline import create_pipeline
+from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes.types import CramPath, SequencingType
 
 try:
@@ -64,12 +65,14 @@ class TestJobs(unittest.TestCase):
         self.timestamp = utils.timestamp()
         logger.info(f'Timestamp: {self.timestamp}')
         self.local_tmp_dir = tempfile.mkdtemp()
-
-        self.pipeline = create_pipeline(
+        
+        update_dict(get_config()['workflow'], dict(
+            analysis_dataset=utils.DATASET,
+            access_level='test',
+        ))
+        self.pipeline = Pipeline(
             name=self.name,
             description=self.name,
-            analysis_dataset=utils.DATASET,
-            namespace=Namespace.TEST,
         )
         self.sequencing_type = SequencingType.GENOME
         self.dataset = self.pipeline.create_dataset(utils.DATASET)

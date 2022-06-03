@@ -7,9 +7,10 @@ Benchmarking VCF combiner.
 import logging
 import pandas as pd
 from analysis_runner import dataproc
+from cpg_utils.config import update_dict, get_config
 
 from cpg_pipes import utils, Namespace, to_path
-from cpg_pipes.pipeline import create_pipeline
+from cpg_pipes.pipeline.pipeline import Pipeline
 
 logger = logging.getLogger(__file__)
 
@@ -20,13 +21,13 @@ BENCHMARK_BUCKET = to_path(
     f'gs://cpg-{INPUT_DATASET}-{NAMESPACE}-tmp/benchmark_combiner'
 )
 
-
-pipeline = create_pipeline(
-    analysis_dataset=INPUT_DATASET,
-    name='benchmark_combiner',
-    namespace=NAMESPACE,
-    datasets=[INPUT_DATASET],
-)
+update_dict(get_config()['workflow'], {
+    'name': 'benchmark_combiner',
+    'dataset': INPUT_DATASET,
+    'access_level': 'full',
+    'datasets': [INPUT_DATASET],
+})
+pipeline = Pipeline()
 
 df = pd.DataFrame(
     [

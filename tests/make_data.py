@@ -12,7 +12,6 @@ from hailtop.batch.job import Job
 from cpg_pipes import Namespace, Path
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs.align import extract_fastq
-from cpg_pipes.pipeline import create_pipeline
 from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes.types import SequencingType, CramPath
 
@@ -24,11 +23,9 @@ def main():
     Generate data for unit tests
     """
     utils.setup_env()
-    pipeline = create_pipeline(
+    pipeline = Pipeline(
         name='make_test_data',
         description='Make test data',
-        analysis_dataset=utils.DATASET,
-        namespace=Namespace.TEST,
     )
     # make_subset_crams(pipeline)
     # make_gvcfs_for_joint_calling(pipeline)
