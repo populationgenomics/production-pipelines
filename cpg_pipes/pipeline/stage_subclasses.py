@@ -36,7 +36,11 @@ class SampleStage(Stage[Sample], ABC):
         """
         datasets = cohort.get_datasets()
         if not datasets:
-            raise ValueError('No active datasets are found to run')
+            raise ValueError(
+                'No usable (active=True) datasets are found. Consider specifying '
+                'datasets with the `datasets` config options, or pass datasets '
+                'explicitly to the Pipeline() constructor.'
+            )
 
         output_by_target: dict[str, StageOutput | None] = dict()
 
@@ -118,7 +122,11 @@ class DatasetStage(Stage, ABC):
         output_by_target = dict()
         datasets = cohort.get_datasets()
         if not datasets:
-            raise ValueError('No active datasets are found to run')
+            raise ValueError(
+                'No usable (active=True) datasets are found. Consider specifying '
+                'datasets with the `datasets` config options, or pass datasets '
+                'explicitly to the Pipeline() constructor.'
+            )
         for _, dataset in enumerate(datasets):
             output_by_target[dataset.target_id] = self._queue_jobs_with_checks(dataset)
         return output_by_target

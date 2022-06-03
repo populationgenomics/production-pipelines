@@ -7,6 +7,7 @@ import traceback
 from collections import defaultdict
 from itertools import groupby
 
+import yaml
 from sample_metadata import ApiException
 
 from .smdb import SMDB, SmSequence
@@ -46,10 +47,6 @@ class CpgInputProvider(InputProvider):
         """
         Overriding the superclass method.
         """
-        if not dataset_names:
-            raise InputProviderError(
-                'Dataset must be provided for SmdbInputProvider.populate_cohort()'
-            )
         return super().populate_cohort(
             cohort=cohort,
             dataset_names=dataset_names,
@@ -241,3 +238,21 @@ class CpgInputProvider(InputProvider):
                 f'{dataset.name}: found pedigree info for {len(samples_with_ped)} '
                 f'samples out of {len(dataset.get_samples())}'
             )
+
+    def requested_dataset_names(self) -> list[str] | None:
+        """
+        List of dataset names to process. Provides defaults for the
+        populate_cohort(datsets=[]) parameter.
+        """
+        # Parsing dataset names from the analysis-runner Seqr stack:
+        from urllib import request
+
+        seqr_stack_url = (
+            'https://raw.githubusercontent.com/populationgenomics/analysis-runner/main'
+            '/stack/Pulumi.seqr.yaml'
+        )
+        with request.urlopen(seqr_stack_url) as f:
+            value = yaml.safe_load(f)['config']['datasets:depends_on']
+            datasets = [d.strip('"') for d in value.strip('[] ').split(', ')]
+            logger.info(f'Found Seqr datasets: {datasets}')
+        return datasets

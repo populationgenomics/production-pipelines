@@ -45,6 +45,9 @@ class InputProvider(ABC):
         Add datasets in the cohort. There exists only one cohort for
         the pipeline run.
         """
+        if not dataset_names:
+            dataset_names = self.requested_dataset_names()
+
         if dataset_names:
             # Specific datasets requested, so initialising them in advance.
             for ds_name in dataset_names:
@@ -156,7 +159,7 @@ class InputProvider(ABC):
                 logger.warning(
                     f'{s}: skipping because no inputs with data type '
                     f'"{sequencing_type.value}" found in '
-                    f'{list(s.alignment_input_by_seq_type.keys())}'
+                    f'{list(k.value for k in s.alignment_input_by_seq_type.keys())}'
                 )
                 s.active = False
 
@@ -212,6 +215,14 @@ class InputProvider(ABC):
                         sex=Sex.parse(sex),
                         phenotype=phenotype or '0',
                     )
+
+    # noinspection PyMethodMayBeStatic
+    def requested_dataset_names(self) -> list[str] | None:
+        """
+        List of dataset names to process. Provides defaults for the
+        populate_cohort(datsets=[]) parameter.
+        """
+        return None
 
     def _get_entries(
         self,
@@ -402,7 +413,7 @@ class CsvInputProvider(InputProvider):
         Populate pedigree data.
         """
         pass
-
+    
     def populate_alignment_inputs(self, cohort: Cohort) -> None:
         """
         Populate sequencing inputs for samples.

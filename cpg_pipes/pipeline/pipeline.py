@@ -766,8 +766,7 @@ class Pipeline:
         
         smdb: Optional[SMDB] = None
         input_provider: InputProvider | None = None
-        if (get_config()['workflow'].get('datasets') and 
-                get_config()['workflow'].get('input_provider') == 'smdb'):
+        if get_config()['workflow'].get('input_provider') == 'smdb':
             smdb = smdb or SMDB(self.cohort.analysis_dataset.name)
             input_provider = CpgInputProvider(
                 smdb, 
