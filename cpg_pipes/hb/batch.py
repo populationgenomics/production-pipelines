@@ -4,9 +4,14 @@ Extending the Hail's `Batch` class.
 
 import logging
 import os
+import uuid
 from typing import TypedDict
 
 import hailtop.batch as hb
+import toml
+from cpg_utils import to_path
+from cpg_utils.config import get_config, set_config_path
+from cpg_utils.hail_batch import copy_common_env
 from hailtop.batch.job import Job, PythonJob, BashJob
 
 from .. import Path
@@ -95,6 +100,17 @@ class RegisteringBatch(hb.Batch):
         fixed_attrs = {k: str(v) for k, v in attributes.items()}
         return name, fixed_attrs
 
+    @staticmethod
+    def save_config():
+        """
+        Save config to a cloud location.
+        """
+        path = to_path(get_config()['hail']['bucket'])
+        config_path = path / str(uuid.uuid4()) + '.toml'
+        with config_path.open('w') as f:
+            toml.dump(get_config(), f)
+        set_config_path(config_path)
+        
     def new_python_job(
         self,
         name: str | None = None,
@@ -107,6 +123,8 @@ class RegisteringBatch(hb.Batch):
         j = super().new_python_job(name, attributes=fixed_attributes)
         if self.pool_label:
             j._pool_label = self.pool_label
+        self.save_config()
+        copy_common_env(j)
         return j
 
     def new_job(
@@ -122,6 +140,7 @@ class RegisteringBatch(hb.Batch):
         j = super().new_job(name, attributes=fixed_attributes)
         if self.pool_label:
             j._pool_label = self.pool_label
+        copy_common_env(j)
         return j
 
     def run(self, **kwargs):
@@ -154,31 +173,24 @@ class RegisteringBatch(hb.Batch):
         return super().run(**kwargs)
 
 
-def setup_batch(
-    description: str,
-    billing_project: str | None = None,
-    hail_bucket: Path | None = None,
-    pool_label: str | None = None,
-) -> RegisteringBatch:
+def setup_batch(description: str) -> RegisteringBatch:
     """
-    Wrapper around the initialization of a Hail Batch object.
-    Handles setting the temporary bucket and the billing project.
+    Wrapper around the initialisation of a Hail Batch object.
 
     @param description: descriptive name of the Batch (will be displayed in the GUI)
-    @param billing_project: Hail billing project name
-    @param hail_bucket: bucket for Hail Batch intermediate files.
-    @param pool_label: submit jobs to the private pool with this label
     """
-    billing_project = get_billing_project(billing_project)
-    hail_bucket = get_hail_bucket(hail_bucket)
+    billing_project = get_config()['hail']['billing_project']
+    remote_tmpdir = get_config()['hail']['bucket']
+    pool_label = get_config()['hail'].get('hail_pool_label')
 
     logger.info(
-        f'Starting Hail Batch with the project {billing_project}, '
-        f'bucket {hail_bucket}'
+        f'Starting Hail Batch with the project {billing_project}'
+        f', bucket {remote_tmpdir}' +
+        (f', pool label {pool_label}' if pool_label else '')
     )
     backend = hb.ServiceBackend(
         billing_project=billing_project,
-        remote_tmpdir=hail_bucket,
+        remote_tmpdir=remote_tmpdir,
         token=os.environ.get('HAIL_TOKEN'),
     )
     return RegisteringBatch(

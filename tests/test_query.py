@@ -9,6 +9,7 @@ from pprint import pprint
 from unittest import skip
 
 import hail as hl
+from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build
 
 from cpg_pipes import to_path, Namespace

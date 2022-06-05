@@ -41,7 +41,7 @@ class TestPipeline(unittest.TestCase):
         self.timestamp = utils.timestamp()
         self.out_bucket = utils.BASE_BUCKET / self.name / self.timestamp
         self.tmp_bucket = self.out_bucket / 'tmp'
-        self.local_tmp_dir = to_path(tempfile.mkdtemp())
+        self.local_tmp_dir = tempfile.mkdtemp()
         self.sample_ids = utils.SAMPLES[:3]
 
         self.realignment_shards_num = 4

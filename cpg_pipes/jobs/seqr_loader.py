@@ -24,8 +24,6 @@ def annotate_cohort_jobs(
     output_mt_path: Path,
     checkpoints_bucket: Path,
     sequencing_type: SequencingType,
-    hail_billing_project: str,
-    hail_bucket: Path | None = None,
     job_attrs: dict | None = None,
     overwrite: bool = False,
 ) -> list[Job]:
@@ -47,9 +45,7 @@ def annotate_cohort_jobs(
             sequencing_type.value.upper(),
             str(checkpoints_bucket),
             setup_gcp=True,
-            hail_billing_project=hail_billing_project,
-            hail_bucket=str(hail_bucket),
-            default_reference=genome_build(),
+            setup_hail=True,
             packages=['cpg_gnomad', 'seqr_loader'],
         )
     )
@@ -62,8 +58,6 @@ def annotate_dataset_jobs(
     sample_ids: list[str],
     output_mt_path: Path,
     tmp_bucket: Path,
-    hail_billing_project: str,
-    hail_bucket: Path | None = None,
     job_attrs: dict | None = None,
     overwrite: bool = False,
 ) -> list[Job]:
@@ -82,9 +76,7 @@ def annotate_dataset_jobs(
             sample_ids,
             str(subset_mt_path),
             setup_gcp=True,
-            hail_billing_project=hail_billing_project,
-            hail_bucket=str(hail_bucket),
-            default_reference=genome_build(),
+            setup_hail=True,
         )
     )
 
@@ -99,9 +91,7 @@ def annotate_dataset_jobs(
             str(tmp_bucket),
             overwrite,
             setup_gcp=True,
-            hail_billing_project=hail_billing_project,
-            hail_bucket=str(hail_bucket),
-            default_reference=genome_build(),
+            setup_hail=True,
         )
     )
     annotate_j.depends_on(subset_j)

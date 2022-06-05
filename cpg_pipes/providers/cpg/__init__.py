@@ -42,11 +42,12 @@ def get_stack_sa_email(stack: str, access_level: str) -> str:
     return data[f'datasets:hail_service_account_{access_level}']
 
 
-def overwrite_config(config: dict, local_tmp_dir: Path | None = None) -> dict:
+def overwrite_config(config: dict) -> dict:
     """
     Writes and sets cpg-utils config.
     """
-    local_tmp_dir = local_tmp_dir or to_path(tempfile.mkdtemp())
+    get_config()['workflow'].setdefault('local_tmp_dir', tempfile.mkdtemp())
+    local_tmp_dir = to_path(get_config()['workflow']['local_tmp_dir'])
     config_path = local_tmp_dir / (str(uuid.uuid4()) + '.toml')
     with config_path.open('w') as f:
         toml.dump(config, f)

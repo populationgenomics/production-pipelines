@@ -31,8 +31,6 @@ class Vep(CohortStage):
         jobs = vep.vep_jobs(
             self.b,
             vcf_path=inputs.as_path(cohort, stage=Vqsr),
-            hail_billing_project=self.hail_billing_project,
-            hail_bucket=self.hail_bucket,
             out_path=self.expected_outputs(cohort),
             tmp_bucket=self.tmp_bucket,
             overwrite=not get_config()['workflow'].get('self.check_intermediates'),

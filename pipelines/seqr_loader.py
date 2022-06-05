@@ -67,8 +67,6 @@ class AnnotateCohort(CohortStage):
             output_mt_path=mt_path,
             checkpoints_bucket=self.tmp_bucket / 'checkpoints',
             sequencing_type=cohort.get_sequencing_type(),
-            hail_billing_project=self.hail_billing_project,
-            hail_bucket=self.hail_bucket,
             overwrite=not get_config()['workflow'].get('self.check_intermediates'),
             job_attrs=self.get_job_attrs(),
         )
@@ -101,8 +99,6 @@ class AnnotateDataset(DatasetStage):
             sample_ids=[s.id for s in dataset.get_samples()],
             output_mt_path=self.expected_outputs(dataset),
             tmp_bucket=self.tmp_bucket / 'checkpoints' / dataset.name,
-            hail_billing_project=self.hail_billing_project,
-            hail_bucket=self.hail_bucket,
             job_attrs=self.get_job_attrs(dataset),
             overwrite=not get_config()['workflow'].get('self.check_intermediates'),
         )

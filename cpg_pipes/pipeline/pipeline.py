@@ -12,8 +12,6 @@ Examples of pipelines can be found in the `pipelines/` folder in the repository 
 import functools
 import logging
 import pathlib
-import shutil
-import tempfile
 import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -373,8 +371,6 @@ class Stage(Generic[TargetT], ABC):
         batch: Batch,
         cohort: Cohort,
         pipeline_tmp_bucket: Path,
-        hail_billing_project: str,
-        hail_bucket: Path | None = None,
         required_stages: list[StageDecorator] | StageDecorator | None = None,
         analysis_type: str | None = None,
         skipped: bool = False,
@@ -409,9 +405,6 @@ class Stage(Generic[TargetT], ABC):
         self.skipped = skipped
         self.forced = forced
         self.assume_outputs_exist = assume_outputs_exist
-
-        self.hail_billing_project = hail_billing_project
-        self.hail_bucket = hail_bucket
 
     def __str__(self):
         res = f'{self._name}'
@@ -682,8 +675,6 @@ def stage(
                 batch=pipeline.b,
                 cohort=pipeline.cohort,
                 pipeline_tmp_bucket=pipeline.tmp_bucket,
-                hail_billing_project=pipeline.hail_billing_project,
-                hail_bucket=pipeline.hail_bucket,
                 required_stages=required_stages,
                 analysis_type=analysis_type,
                 status_reporter=pipeline.status_reporter,
@@ -754,7 +745,7 @@ class Pipeline:
         name = get_config()['workflow'].get('name') or name
         description = get_config()['workflow'].get('description') or description
         name = name or description or analysis_dataset
-        self.description = description or name
+        description = description or name
         self.name = slugify(name)
 
         access_level = get_config()['workflow'].get('access_level', 'standard')
@@ -797,21 +788,15 @@ class Pipeline:
         self.tmp_bucket = self.cohort.analysis_dataset.tmp_path()
         if version := get_config()['workflow'].get('version'):
             self.tmp_bucket /= version
-        self.version = version or time.strftime('%Y%m%d-%H%M%S')
-        self.hail_bucket = self.tmp_bucket / 'hail'
 
+        self.version = version or time.strftime('%Y%m%d-%H%M%S')
         if not get_config()['workflow'].get('description'):
             if version:
-                self.description += f' {version}'
+                description += f' {version}'
             if ds_set := set(d.name for d in self.cohort.get_datasets()):
-                self.description += ': ' + ', '.join(sorted(ds_set))
-
-        self.b: Batch = setup_batch(
-            description=self.description,
-            billing_project=self.hail_billing_project,
-            hail_bucket=self.hail_bucket,
-            pool_label=get_config()['hail'].get('hail_pool_label'),
-        )
+                description += ': ' + ', '.join(sorted(ds_set))
+            get_config()['workflow']['description'] = description
+        self.b: Batch = setup_batch(description=get_config()['workflow']['description'])
 
         self.status_reporter = None
         if get_config()['workflow'].get('status_reporter') == 'smdb':
@@ -820,9 +805,6 @@ class Pipeline:
                 smdb=smdb,
                 slack_channel=get_config()['workflow'].get('slack_channel'),
             )
-
-        self.local_tmp_dir = \
-            to_path(get_config()['workflow'].get('local_tmp_dir') or tempfile.mkdtemp())
 
         # Will be populated by set_stages() in submit_batch()
         self._stages_dict: dict[str, Stage] = dict()
@@ -855,7 +837,6 @@ class Pipeline:
                 delete_scratch_on_exit=not keep_scratch,
                 wait=wait,
             )
-        shutil.rmtree(self.local_tmp_dir)
         return result
 
     def _validate_first_last_stage(self) -> tuple[int | None, int | None]:

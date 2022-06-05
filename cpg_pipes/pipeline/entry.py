@@ -89,21 +89,17 @@ def pipeline_entry_point(
     >>>     pipeline.run(stages=[...])
     """
     def _decorator(_main_fun: MainFunType) -> WrappedMainFunType:
-        @click.command()
-        @click.option(
-            '--config',
-            'config_paths',
-            multiple=True,
-            callback=file_validation_callback(ext='toml', must_exist=True),
-            help='Read configuration from a TOML files. Can be set multiple times.',
-        )
         @functools.wraps(_main_fun)
-        def _wrappped_main(config_paths: list[str]) -> None:
+        def _wrappped_main() -> None:
             with to_path(get_package_path() / 'config-template.toml').open() as f:
                 config = toml.load(f)
-            if os.environ.get('CPG_CONFIG_PATH'):
-                update_dict(config, get_config())
-            for path in config_paths:
+            if not (cpg_conf_path := os.environ.get('CPG_CONFIG_PATH')):
+                raise ValueError(
+                    'Please, provide configuration TOML file(s) via CPG_CONFIG_PATH. '
+                    'Multiple files can be specified comma-separated, files '
+                    'specified last will take precedence.'
+                )
+            for path in cpg_conf_path.split(','):
                 with to_path(path).open() as f:
                     update_dict(config, toml.load(f)) 
             config = complete_infra_config(config)

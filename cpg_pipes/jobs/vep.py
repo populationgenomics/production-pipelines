@@ -29,8 +29,6 @@ DEFAULT_INTERVALS_NUM = 50
 def vep_jobs(
     b: Batch,
     vcf_path: Path,
-    hail_billing_project: str,
-    hail_bucket: Path,
     tmp_bucket: Path,
     out_path: Path | None = None,
     overwrite: bool = False,
@@ -98,8 +96,6 @@ def vep_jobs(
         gather_j = gather_vep_json_to_ht(
             b=b,
             vep_results_paths=part_files,
-            hail_billing_project=hail_billing_project,
-            hail_bucket=hail_bucket,
             out_path=out_path,
             job_attrs=job_attrs,
         )
@@ -118,8 +114,6 @@ def vep_jobs(
 def gather_vep_json_to_ht(
     b: Batch,
     vep_results_paths: list[Path],
-    hail_billing_project: str,
-    hail_bucket: Path,
     out_path: Path,
     job_attrs: dict | None = None,
 ):
@@ -135,9 +129,7 @@ def gather_vep_json_to_ht(
         [str(p) for p in vep_results_paths],
         str(out_path),
         setup_gcp=True,
-        hail_billing_project=hail_billing_project,
-        hail_bucket=str(hail_bucket),
-        default_reference=genome_build(),
+        setup_hail=True,
     )
     j.command(cmd)
     return j
