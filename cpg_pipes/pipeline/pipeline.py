@@ -280,9 +280,13 @@ class StageInput:
         stage: StageDecorator,
     ):
         if not self._outputs_by_target_by_stage.get(stage.__name__):
-            raise StageInputNotFound()
+            raise StageInputNotFound(
+                f'Not found output from stage {stage.__name__}'
+            )
         if not self._outputs_by_target_by_stage[stage.__name__].get(target.target_id):
-            raise StageInputNotFound()
+            raise StageInputNotFound(
+                f'Not found output for {target} from stage {stage.__name__}'
+            )
         return self._outputs_by_target_by_stage[stage.__name__][target.target_id]
 
     def as_path(
@@ -744,9 +748,10 @@ class Pipeline:
         self, 
         name: str | None = None, 
         description: str | None = None,
-        first_stage: str | None = None,
-        last_stage: str | None = None,
+        stages: list[StageDecorator] | None = None,
     ):
+        self._stages = stages
+
         analysis_dataset = get_config()['workflow']['dataset']
         name = get_config()['workflow'].get('name') or name
         description = get_config()['workflow'].get('description') or description
@@ -814,9 +819,6 @@ class Pipeline:
 
         # Will be populated by set_stages() in submit_batch()
         self._stages_dict: dict[str, Stage] = dict()
-        
-        self.first_stage = first_stage or get_config()['workflow'].get('first_stage')
-        self.last_stage = last_stage or get_config()['workflow'].get('last_stage')
 
     def run(
         self,
@@ -836,7 +838,7 @@ class Pipeline:
         if keep_scratch is None:
             keep_scratch = get_config()['hail'].get('keep_scratch')
 
-        _stages_in_order = stages or _ALL_DECLARED_STAGES
+        _stages_in_order = stages or self._stages or _ALL_DECLARED_STAGES
         self.set_stages(_stages_in_order, force_all_implicit_stages)
 
         result = None
@@ -852,24 +854,27 @@ class Pipeline:
         """
         Validating the first_stage and the last_stage parameters.
         """
+        first_stage = get_config()['workflow'].get('first_stage')
+        last_stage = get_config()['workflow'].get('last_stage')
+
         stage_names = list(self._stages_dict.keys())
         lower_stage_names = [s.lower() for s in stage_names]
         first_stage_num = None
-        if self.first_stage:
-            if self.first_stage.lower() not in lower_stage_names:
+        if first_stage:
+            if first_stage.lower() not in lower_stage_names:
                 logger.critical(
-                    f'Value for --first-stage {self.first_stage} '
+                    f'Value for --first-stage {first_stage} '
                     f'not found in available stages: {", ".join(stage_names)}'
                 )
-            first_stage_num = lower_stage_names.index(self.first_stage.lower())
+            first_stage_num = lower_stage_names.index(first_stage.lower())
         last_stage_num = None
-        if self.last_stage:
-            if self.last_stage.lower() not in lower_stage_names:
+        if last_stage:
+            if last_stage.lower() not in lower_stage_names:
                 logger.critical(
-                    f'Value for --last-stage {self.last_stage} '
+                    f'Value for --last-stage {last_stage} '
                     f'not found in available stages: {", ".join(stage_names)}'
                 )
-            last_stage_num = lower_stage_names.index(self.last_stage.lower())
+            last_stage_num = lower_stage_names.index(last_stage.lower())
         return first_stage_num, last_stage_num
 
     def set_stages(

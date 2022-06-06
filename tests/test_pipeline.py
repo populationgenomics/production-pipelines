@@ -1,27 +1,23 @@
 """
 Test building and running pipelines.
 """
-import os
 import shutil
 import sys
 import tempfile
 import unittest
 from unittest import skip
-from unittest.mock import patch, Mock
+from unittest.mock import patch
 
 import toml
-from cpg_utils.config import get_config, update_dict, set_config_paths
+from cpg_utils.config import get_config, set_config_paths
 
-from cpg_pipes import Path, to_path, get_package_path
-from cpg_pipes.pipeline.pipeline import Pipeline, Stage
+from cpg_pipes import to_path, get_package_path
+from cpg_pipes.pipeline.pipeline import Pipeline, Stage, StageDecorator
 from cpg_pipes.stages.genotype_sample import GenotypeSample
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
 from cpg_pipes.types import CramPath
-
-# Importing `seqr_loader` will make pipeline use all its stages by default.
-from pipelines import seqr_loader
-from pipelines.seqr_loader import AnnotateDataset
+from cpg_pipes.stages.seqr_loader import AnnotateDataset, LoadToEs
 
 try:
     import utils
@@ -48,6 +44,9 @@ class TestPipeline(unittest.TestCase):
         self.config_path = self.tmp_bucket / 'config.toml'
         
     def setup_env(self, intervals_path: str | None = None):
+        """
+        Mock analysis-runner environment.
+        """
         config = {
             'workflow': {
                 'dataset': utils.DATASET,
@@ -82,17 +81,9 @@ class TestPipeline(unittest.TestCase):
         """
         shutil.rmtree(self.local_tmp_dir)
 
-    def _setup_pipeline(
-        self,
-        first_stage=None,
-        last_stage=None,
-    ):
+    def _setup_pipeline(self, stages: list[StageDecorator]):
         # Mocking elastic search password for the full dry run test:
-        pipeline = Pipeline(
-            name=self._testMethodName, 
-            first_stage=first_stage, 
-            last_stage=last_stage,
-        )
+        pipeline = Pipeline(name=self._testMethodName, stages=stages)
         self.datasets = [pipeline.create_dataset(utils.DATASET)]
         for ds in self.datasets:
             for s_id in self.sample_ids:
@@ -108,18 +99,17 @@ class TestPipeline(unittest.TestCase):
         With dry_run, Hail Batch prints all code with a single print() call.
         Thus, we capture `builtins.print`, and verify that it has the expected
         job commands passed to it.
-
         """
         self.setup_env()
-        pipeline = self._setup_pipeline()
-        
+        pipeline = self._setup_pipeline(stages=[LoadToEs])
+
         with patch('builtins.print') as mock_print:
             with patch.object(Stage, '_outputs_are_reusable') as mock_reusable:
                 mock_reusable.return_value = False
-                pipeline.run(dry_run=True)
+                pipeline.run(dry_run=True, force_all_implicit_stages=True)
 
             # print() should be called only once:
-            self.assertEqual(1, mock_print.call_count)
+            self.assertEqual(mock_print.call_count, 1)
 
             # all job commands would be contained in this one print call:
             out = mock_print.call_args_list[0][0][0]
@@ -163,8 +153,7 @@ class TestPipeline(unittest.TestCase):
             / 'inputs/exome1pct/calling_regions.interval_list',
         )
         pipeline = self._setup_pipeline(
-            first_stage=GenotypeSample.__name__,
-            last_stage=JointGenotyping.__name__,
+            stages=[GenotypeSample.__name__, JointGenotyping.__name__],
         )
         result = pipeline.run(dry_run=False, wait=True)
         self.assertEqual('success', result.status()['state'])
@@ -179,8 +168,7 @@ class TestPipeline(unittest.TestCase):
             / 'inputs/exome5pct/calling_regions.interval_list',
         )
         pipeline = self._setup_pipeline(
-            first_stage=Vqsr.__name__,
-            last_stage=AnnotateDataset.__name__,
+            stages=[Vqsr.__name__, AnnotateDataset.__name__],
         )
         # Mocking joint-calling outputs. Toy CRAM/GVCF don't produce enough variant
         # data for AS-VQSR to work properly: gatk would throw a "Bad input: Values for
