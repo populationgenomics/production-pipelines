@@ -560,8 +560,8 @@ class Stage(Generic[TargetT], ABC):
             if get_config()['workflow'].get('skip_samples_with_missing_input'):
                 logger.warning(
                     f'Skipping {target}: stage {self.name} is required, '
-                    f'but is skipped, and expected outputs for the target do not '
-                    f'exist: {expected_out}'
+                    f'but is marked as skipped, and expected outputs for the target '
+                    f'do not exist: {expected_out}'
                 )
                 # self.skip_samples_with_missing_input means that we can ignore 
                 # samples/datasets that have missing results from skipped stages. 

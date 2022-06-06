@@ -5,13 +5,9 @@ Seqr loading pipeline: FASTQ -> ElasticSearch index.
 """
 
 import logging
-import os
 import time
 
 import click
-import yaml
-from google.cloud import secretmanager
-
 from cpg_utils.config import get_config
 
 from cpg_pipes import Path
@@ -25,8 +21,8 @@ from cpg_pipes.pipeline import (
     DatasetStage,
 )
 from cpg_pipes.pipeline.pipeline import Pipeline
-from cpg_pipes.stages.vep import Vep
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
+from cpg_pipes.stages.vep import Vep
 from cpg_pipes.stages.vqsr import Vqsr
 from cpg_pipes.targets import Cohort, Dataset
 
@@ -159,19 +155,11 @@ class LoadToEs(DatasetStage):
         return self.make_outputs(dataset, jobs=jobs)
 
 
-def main():
-    """
-    Seqr loading pipeline: FASTQ -> ElasticSearch index.
-    """
-    if seq_type := get_config()['workflow'].get('sequencing_type'):
-        if seq_type not in SUPPORTED_SEQUENCING_TYPES:
-            raise click.BadParameter(
-                f'Unsupported sequencing data type {seq_type.value}. '
-                f'Supported types: {[st for st in SUPPORTED_SEQUENCING_TYPES]} '
-            )
-    pipeline = Pipeline(name='Seqr Loader')
-    pipeline.run()
-
-
-if __name__ == '__main__':
-    main()  # pylint: disable=E1120
+if seq_type := get_config()['workflow'].get('sequencing_type'):
+    if seq_type not in SUPPORTED_SEQUENCING_TYPES:
+        raise click.BadParameter(
+            f'Unsupported sequencing data type {seq_type.value}. '
+            f'Supported types: {[st for st in SUPPORTED_SEQUENCING_TYPES]} '
+        )
+pipeline = Pipeline(name='Seqr Loader')
+pipeline.run()
