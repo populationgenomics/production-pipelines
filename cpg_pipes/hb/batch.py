@@ -4,13 +4,10 @@ Extending the Hail's `Batch` class.
 
 import logging
 import os
-import uuid
 from typing import TypedDict
 
 import hailtop.batch as hb
-import toml
-from cpg_utils import to_path
-from cpg_utils.config import get_config, set_config_path
+from cpg_utils.config import get_config
 from cpg_utils.hail_batch import copy_common_env
 from hailtop.batch.job import Job, PythonJob, BashJob
 
@@ -100,17 +97,6 @@ class RegisteringBatch(hb.Batch):
         fixed_attrs = {k: str(v) for k, v in attributes.items()}
         return name, fixed_attrs
 
-    @staticmethod
-    def save_config():
-        """
-        Save config to a cloud location.
-        """
-        path = to_path(get_config()['hail']['bucket'])
-        config_path = path / str(uuid.uuid4()) + '.toml'
-        with config_path.open('w') as f:
-            toml.dump(get_config(), f)
-        set_config_path(config_path)
-        
     def new_python_job(
         self,
         name: str | None = None,
@@ -123,7 +109,6 @@ class RegisteringBatch(hb.Batch):
         j = super().new_python_job(name, attributes=fixed_attributes)
         if self.pool_label:
             j._pool_label = self.pool_label
-        self.save_config()
         copy_common_env(j)
         return j
 

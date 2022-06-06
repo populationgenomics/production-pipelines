@@ -18,7 +18,6 @@ from cpg_pipes import Path
 from cpg_pipes import utils
 from cpg_pipes.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jobs
 from cpg_pipes.pipeline import (
-    pipeline_entry_point,
     stage,
     StageInput,
     StageOutput,
@@ -132,18 +131,13 @@ class LoadToEs(DatasetStage):
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset)
         version = time.strftime('%Y%m%d-%H%M%S')
         index_name = f'{dataset.name}-{version}'
-        
+
         from analysis_runner import dataproc
         j = dataproc.hail_dataproc_job(
             self.b,
             f'cpg_pipes/dataproc_scripts/seqr/mt_to_es.py '
             f'--mt-path {dataset_mt_path} '
-            f'--es-host elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com '
-            f'--es-port 9243 '
-            f'--es-username seqr '
-            f'--es-password {_read_es_password()} '
             f'--es-index {index_name} '
-            f'--es-index-min-num-shards 1 '
             f'--use-spark ',  # es export doesn't work with the service backend
             max_age='16h',
             packages=utils.DATAPROC_PACKAGES,
@@ -165,24 +159,7 @@ class LoadToEs(DatasetStage):
         return self.make_outputs(dataset, jobs=jobs)
 
 
-def _read_es_password(
-    project_id='seqr-308602',
-    secret_id='seqr-es-password',
-) -> str:
-    """
-    Read a GCP secret storing the ES password
-    """
-    if password := os.environ.get('SEQR_ES_PASSWORD'):
-        return password
-    client = secretmanager.SecretManagerServiceClient()
-    secret_path = client.secret_version_path(project_id, secret_id, 'latest')
-    # noinspection PyTypeChecker
-    response = client.access_secret_version(request={'name': secret_path})
-    return response.payload.data.decode('UTF-8')
-
-
-@pipeline_entry_point(name='Seqr Loader')
-def main(pipeline: Pipeline):
+def main():
     """
     Seqr loading pipeline: FASTQ -> ElasticSearch index.
     """
@@ -192,6 +169,7 @@ def main(pipeline: Pipeline):
                 f'Unsupported sequencing data type {seq_type.value}. '
                 f'Supported types: {[st for st in SUPPORTED_SEQUENCING_TYPES]} '
             )
+    pipeline = Pipeline(name='Seqr Loader')
     pipeline.run()
 
 

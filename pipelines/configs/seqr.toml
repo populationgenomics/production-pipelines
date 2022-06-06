@@ -15,6 +15,8 @@ keep_scratch = true
 #slack_channel: 'seqr-loader'
 #skip_samples_stages:
 #  VerifyBamId: [CPG13409]  # https://batch.hail.populationgenomics.org.au/batches/56236/jobs/372
+es_password_secret_id = 'seqr-es-password'
+es_password_project_id = 'seqr-308602'
 
 [genomics]
 sequencing_type = 'genome'

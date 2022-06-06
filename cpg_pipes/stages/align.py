@@ -11,6 +11,7 @@ from ..jobs.align import Aligner, MarkDupTool, process_alignment_input
 from ..targets import Sample
 from ..pipeline import stage, SampleStage, StageInput, StageOutput
 from ..jobs import align
+from ..types import SequencingType
 
 logger = logging.getLogger(__file__)
 
@@ -35,7 +36,7 @@ class Align(SampleStage):
         """
         seq_type, alignment_input = process_alignment_input(
             sample, 
-            seq_type=get_config()['workflow'].get('sequencing_type'),
+            seq_type=SequencingType.parse(get_config()['workflow'].get('sequencing_type')),
             realign_cram_ver=get_config()['workflow'].get('realign_from_cram_version'),
         )
 
@@ -48,7 +49,7 @@ class Align(SampleStage):
                 return self.make_outputs(sample)  # return empty output
             else:
                 return self.make_outputs(
-                    target=sample, error_msg=f'No alignment input found for {sample.id}'
+                    target=sample, error_msg=f'No alignment input found'
                 )
         assert alignment_input
         

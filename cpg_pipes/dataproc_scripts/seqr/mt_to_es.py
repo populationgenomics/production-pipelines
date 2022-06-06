@@ -3,15 +3,17 @@
 """
 Hail script to submit on a dataproc cluster. 
 
-Loads the matrix table into ES.
+Loads the matrix table into an ElasticSearch index.
 """
 
 import os
 import logging
 import math
-import subprocess
 import click
 import hail as hl
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import genome_build
+from google.cloud import secretmanager
 from hail_scripts.elasticsearch.hail_elasticsearch_client import HailElasticsearchClient
 
 logger = logging.getLogger(__file__)
@@ -24,30 +26,11 @@ logger = logging.getLogger(__file__)
     required=True,
 )
 @click.option(
-    '--es-host',
-    'es_host',
-    help='Elasticsearch host',
-)
-@click.option('--es-port', 'es_port', type=click.STRING, help='Elasticsearch port')
-@click.option(
-    '--es-username', 'es_username', type=click.STRING, help='Elasticsearch username'
-)
-@click.option(
-    '--es-password', 'es_password', type=click.STRING, help='Elasticsearch password'
-)
-@click.option(
     '--es-index',
     'es_index',
     type=click.STRING,
     help='Elasticsearch index. Usually the dataset name. Will be lowercased',
     required=True,
-)
-@click.option(
-    '--es-index-min-num-shards',
-    'es_index_min_num_shards',
-    default=1,
-    help='Number of shards for the index will be the greater of this value '
-    'and a calculated value based on the matrix.',
 )
 @click.option(
     '--use-spark',
@@ -57,48 +40,35 @@ logger = logging.getLogger(__file__)
 )
 def main(
     mt_path: str,
-    es_host: str,
-    es_port: str,
-    es_username: str,
-    es_password: str,
     es_index: str,
-    es_index_min_num_shards: int,
     use_spark: bool,
 ):
     """
     Entry point.
     """
     if use_spark:
-        hl.init(default_reference='GRCh38')
+        hl.init(default_reference=genome_build())
     else:
-        from cpg_utils.hail import init_query_service
-
-        init_query_service()
-
-    if not all([es_host, es_port, es_username, es_password]):
-        if any([es_host, es_port, es_username, es_password]):
-            raise click.BadParameter(
-                f'Either none, or all ES configuration parameters '
-                f'must be specified: --es-host, --es-port, --es-username, --es-password. '
-                f'If none are specified, defaults for the CPG are used'
-            )
-        es_host = 'elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com'
-        es_port = '9243'
-        es_username = 'seqr'
-        es_password = read_es_password()
+        from cpg_utils.hail_batch import init_batch
+        init_batch()
+        
+    host = get_config()['elasticsearch']['host']
+    port = str(get_config()['elasticsearch']['port'])
+    username = get_config()['elasticsearch']['host']
+    password = _read_es_password()
 
     es = HailElasticsearchClient(
-        host=es_host,
-        port=str(es_port),
-        es_username=es_username,
-        es_password=es_password,
-        es_use_ssl=(es_host != 'localhost'),
+        host=host,
+        port=port,
+        es_username=username,
+        es_password=password,
+        es_use_ssl=(host != 'localhost'),
     )
 
     mt = hl.read_matrix_table(mt_path)
     logger.info('Getting rows and exporting to the ES')
     row_table = elasticsearch_row(mt)
-    es_shards = _mt_num_shards(mt, es_index_min_num_shards)
+    es_shards = _mt_num_shards(mt)
 
     es.export_table_to_elasticsearch(
         row_table,
@@ -130,14 +100,13 @@ def elasticsearch_row(mt: hl.MatrixTable):
     return table
 
 
-def _mt_num_shards(mt, es_index_min_num_shards):
+def _mt_num_shards(mt):
     """
-    The greater of the user specified min shards and calculated based on the variants
-    and samples
+    Calculate number of shareds from the number of variants and samples.
     """
     denominator = 1.4 * 10**9
     calculated_num_shards = math.ceil((mt.count_rows() * mt.count_cols()) / denominator)
-    return max(es_index_min_num_shards, calculated_num_shards)
+    return calculated_num_shards
 
 
 def _cleanup(es, es_index, es_shards):
@@ -146,20 +115,25 @@ def _cleanup(es, es_index, es_shards):
         es.wait_for_shard_transfer(es_index)
 
 
-def read_es_password(
-    project_id='seqr-308602',
-    secret_id='seqr-es-password',
-    version_id='latest',
-) -> str:
+def _read_es_password() -> str:
     """
     Read a GCP secret storing the ES password
     """
-    password = os.environ.get('SEQR_ES_PASSWORD')
-    if password:
+    if password := os.environ.get('SEQR_ES_PASSWORD'):
         return password
-    cmd = f'gcloud secrets versions access {version_id} --secret {secret_id} --project {project_id}'
-    logger.info(cmd)
-    return subprocess.check_output(cmd, shell=True).decode()
+
+    if password := get_config()['elasticsearch'].get('password'):
+        return password
+    
+    # Read from a secret.
+    secret_id = get_config()['elasticsearch']['password_secret_id']
+    project_id = get_config()['elasticsearch']['password_project_id']
+
+    client = secretmanager.SecretManagerServiceClient()
+    secret_path = client.secret_version_path(project_id, secret_id, 'latest')
+    # noinspection PyTypeChecker
+    response = client.access_secret_version(request={'name': secret_path})
+    return response.payload.data.decode('UTF-8')
 
 
 if __name__ == '__main__':

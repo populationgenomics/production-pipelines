@@ -740,7 +740,13 @@ class Pipeline:
     and a cohort of datasets of samples.
     """
 
-    def __init__(self, name: str | None = None, description: str | None = None):
+    def __init__(
+        self, 
+        name: str | None = None, 
+        description: str | None = None,
+        first_stage: str | None = None,
+        last_stage: str | None = None,
+    ):
         analysis_dataset = get_config()['workflow']['dataset']
         name = get_config()['workflow'].get('name') or name
         description = get_config()['workflow'].get('description') or description
@@ -748,7 +754,7 @@ class Pipeline:
         description = description or name
         self.name = slugify(name)
 
-        access_level = get_config()['workflow'].get('access_level', 'standard')
+        access_level = get_config()['workflow']['access_level']
         self.cohort = Cohort(
             analysis_dataset_name=analysis_dataset,
             namespace=Namespace.from_access_level(access_level),
@@ -808,6 +814,9 @@ class Pipeline:
 
         # Will be populated by set_stages() in submit_batch()
         self._stages_dict: dict[str, Stage] = dict()
+        
+        self.first_stage = first_stage or get_config()['workflow'].get('first_stage')
+        self.last_stage = last_stage or get_config()['workflow'].get('last_stage')
 
     def run(
         self,
@@ -846,21 +855,21 @@ class Pipeline:
         stage_names = list(self._stages_dict.keys())
         lower_stage_names = [s.lower() for s in stage_names]
         first_stage_num = None
-        if first_stage := get_config()['workflow'].get('first_stage'):
-            if first_stage.lower() not in lower_stage_names:
+        if self.first_stage:
+            if self.first_stage.lower() not in lower_stage_names:
                 logger.critical(
-                    f'Value for --first-stage {first_stage} '
+                    f'Value for --first-stage {self.first_stage} '
                     f'not found in available stages: {", ".join(stage_names)}'
                 )
-            first_stage_num = lower_stage_names.index(first_stage.lower())
+            first_stage_num = lower_stage_names.index(self.first_stage.lower())
         last_stage_num = None
-        if last_stage := get_config()['workflow'].get('last_stage'):
-            if last_stage.lower() not in lower_stage_names:
+        if self.last_stage:
+            if self.last_stage.lower() not in lower_stage_names:
                 logger.critical(
-                    f'Value for --last-stage {last_stage} '
+                    f'Value for --last-stage {self.last_stage} '
                     f'not found in available stages: {", ".join(stage_names)}'
                 )
-            last_stage_num = lower_stage_names.index(last_stage.lower())
+            last_stage_num = lower_stage_names.index(self.last_stage.lower())
         return first_stage_num, last_stage_num
 
     def set_stages(

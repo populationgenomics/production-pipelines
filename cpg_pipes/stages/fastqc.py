@@ -51,7 +51,7 @@ class FastQC(SampleStage):
                 return self.make_outputs(sample)  # return empty output
             else:
                 return self.make_outputs(
-                    target=sample, error_msg=f'No alignment input found for {sample.id}'
+                    target=sample, error_msg=f'No alignment input found'
                 )
 
         jobs = fastqc.fastqc(

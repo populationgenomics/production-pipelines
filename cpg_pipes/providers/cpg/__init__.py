@@ -7,15 +7,14 @@ import os
 import tempfile
 import uuid
 from contextlib import contextmanager
-from copy import deepcopy
 from urllib import request
 
 import toml
 import yaml
+from cloudpathlib import AnyPath
 from cpg_utils.cloud import read_secret
-from cpg_utils.config import set_config_path, get_config, write_config
+from cpg_utils.config import set_config_paths, get_config
 
-from ... import to_path
 from ...utils import exists
 
 ANALYSIS_RUNNER_PROJECT_ID = 'analysis-runner'
@@ -60,7 +59,7 @@ def analysis_runner_env():
             set_analysis_runner_env(sa_key_path)
         yield
     finally:  # Revert the environment back to the original
-        set_config_path(original_config_path)
+        set_config_paths([original_config_path])
         os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = original_sa_key_path
 
 
@@ -120,3 +119,22 @@ def set_analysis_runner_env(sa_key_path: str):
     get_config()['hail'].setdefault('bucket', f'cpg-{dataset}-hail')
     tmp_dir = get_config()['workflow'].setdefault('local_tmp_dir', tempfile.mkdtemp())
     write_config(get_config(), tmp_dir)
+
+
+def write_config(config: dict, prefix: str, path: str | None = None) -> None:
+    """Writes config to a file, and sets the path to that file as a new config path.
+
+    Parameters
+    ----------
+    config: dict
+        Config object
+    prefix: str
+        Path prefix (directory) where the TOML file will be written
+    path: str, optional
+        Path to write the config, takes precedence over prefix
+    """
+    if not path:
+        path = os.path.join(prefix, f'{uuid.uuid4()}.toml')
+    with AnyPath(path).open('w') as f:
+        toml.dump(config, f)
+    set_config_paths([path])

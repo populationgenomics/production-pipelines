@@ -4,7 +4,12 @@ import importlib.metadata
 from cpg_utils.hail_batch import Path, to_path, Namespace
 
 __all__ = [
-    'Path', 'to_path', 'Namespace'
+    'Path', 
+    'to_path', 
+    'Namespace', 
+    'get_package_name', 
+    'get_package_path', 
+    'get_version'
 ]
 
 

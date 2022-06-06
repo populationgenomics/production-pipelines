@@ -4,7 +4,6 @@ from .pipeline import (
     StageInput,
     StageOutput,
 )
-from .entry import pipeline_entry_point
 from .exceptions import PipelineError
 from .stage_subclasses import (
     SampleStage,
@@ -17,7 +16,6 @@ __all__ = [
     'skip',
     'StageInput',
     'StageOutput',
-    'pipeline_entry_point',
     'PipelineError',
     'SampleStage',
     'DatasetStage',

@@ -399,11 +399,13 @@ class SmSequence:
             raise ValueError(f'Cannot parse SMDB Sequence {data}')
 
         sample_id = data['sample_id']
+        st = SequencingType.parse(data['type'])
+        assert st, data
         sm_seq = SmSequence(
             id=data['id'],
             sample_id=sample_id,
             meta=data['meta'],
-            sequencing_type=SequencingType.parse(data['type']),
+            sequencing_type=st,
         )
         if data['meta'].get('reads'):
             if alignment_input := SmSequence._parse_reads(

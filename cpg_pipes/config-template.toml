@@ -127,24 +127,28 @@ use_as_vqsr = true
 # Run CRAM QC and PED checks
 cram_qc = true
 
-[seqr_loader]
+# Calling intervals (defauls to whole genome intervals)
+#intervals_path = 
+
 # Create Seqr ElasticSearch indices for these datasets. If not specified, will
 # create indices for all input datasets.
 #create_es_index_for_datasets = 
 
+[elasticsearch]
+# Configure access to ElasticSearch server
+es_port = 9243
+es_host = 'elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com'
+es_username = 'seqr'
+#es_password = 
+# Load ElasticSearch password from a secret, unless SEQR_ES_PASSWORD is set
+es_password_secret_id = 'seqr-es-password'
+es_password_project_id = 'seqr-308602'
+
 [hail]
-# Private pool label. Would submit batches to a Hail Batch private
-# pool with this label:
-hail_pool_label = 'seqr'
-
-# Billing project:
 #hail_billing_project = 
-
-# Keep Hail Batch scratch
+#hail_bucket = 
+hail_pool_label = 'seqr'
 keep_scratch = true
-
-# Do not actually submit Batch, but only print jobs commands to
-# stdout. Essencially just tell to call `batch.run(..., dry_run=True)
 dry_run = false
 
 [images]
