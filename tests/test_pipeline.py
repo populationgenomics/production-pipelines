@@ -105,19 +105,18 @@ class TestPipeline(unittest.TestCase):
         job commands passed to it.
 
         """
-        with analysis_runner_env():
-            pipeline = self._setup_pipeline()
-            
-            with patch('builtins.print') as mock_print:
-                with patch.object(Stage, '_outputs_are_reusable') as mock_reusable:
-                    mock_reusable.return_value = False
-                    pipeline.run(dry_run=True)
-    
-                # print() should be called only once:
-                self.assertEqual(1, mock_print.call_count)
-    
-                # all job commands would be contained in this one print call:
-                out = mock_print.call_args_list[0][0][0]
+        pipeline = self._setup_pipeline()
+        
+        with patch('builtins.print') as mock_print:
+            with patch.object(Stage, '_outputs_are_reusable') as mock_reusable:
+                mock_reusable.return_value = False
+                pipeline.run(dry_run=True)
+
+            # print() should be called only once:
+            self.assertEqual(1, mock_print.call_count)
+
+            # all job commands would be contained in this one print call:
+            out = mock_print.call_args_list[0][0][0]
 
         sys.stdout.write(out)
         lines = out.split('\n')

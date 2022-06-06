@@ -10,7 +10,7 @@ from random import choices
 from cpg_utils.config import get_config, write_config
 
 from cpg_pipes import to_path, Namespace
-from cpg_pipes.providers.cpg import analysis_runner_env
+from cpg_pipes.providers.cpg import analysis_runner_env, set_analysis_runner_env
 from cpg_pipes.types import GvcfPath, FastqPair, SequencingType
 
 DATASET = 'fewgenomes'
@@ -82,3 +82,6 @@ def setup_env(
     config['workflow']['dataset'] = dataset
     config['workflow']['acccess_level'] = access_level
     config['workflow']['dataset_gcp_project'] = dataset
+    if sa_key_path := os.getenv('SERVICE_ACCOUNT_KEY'):
+        set_analysis_runner_env(sa_key_path)
+    
