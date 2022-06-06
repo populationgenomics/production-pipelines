@@ -1,15 +1,16 @@
 """
 Common test utilities.
 """
-
+import os
 import string
+import tempfile
 import time
 from random import choices
 
-from cpg_utils.config import get_config
+from cpg_utils.config import get_config, write_config
 
 from cpg_pipes import to_path, Namespace
-from cpg_pipes.providers.cpg import overwrite_config, complete_infra_config
+from cpg_pipes.providers.cpg import analysis_runner_env
 from cpg_pipes.types import GvcfPath, FastqPair, SequencingType
 
 DATASET = 'fewgenomes'
@@ -81,5 +82,3 @@ def setup_env(
     config['workflow']['dataset'] = dataset
     config['workflow']['acccess_level'] = access_level
     config['workflow']['dataset_gcp_project'] = dataset
-    config = complete_infra_config(config)
-    overwrite_config(config)

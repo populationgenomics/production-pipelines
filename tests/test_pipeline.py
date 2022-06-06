@@ -13,6 +13,7 @@ from cpg_utils.config import get_config, update_dict
 
 from cpg_pipes import Namespace, Path, to_path
 from cpg_pipes.pipeline.pipeline import Pipeline, Stage
+from cpg_pipes.providers.cpg import analysis_runner_env
 from cpg_pipes.stages.genotype_sample import GenotypeSample
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
@@ -104,18 +105,19 @@ class TestPipeline(unittest.TestCase):
         job commands passed to it.
 
         """
-        pipeline = self._setup_pipeline()
-        
-        with patch('builtins.print') as mock_print:
-            with patch.object(Stage, '_outputs_are_reusable') as mock_reusable:
-                mock_reusable.return_value = False
-                pipeline.run(dry_run=True)
-
-            # print() should be called only once:
-            self.assertEqual(1, mock_print.call_count)
-
-            # all job commands would be contained in this one print call:
-            out = mock_print.call_args_list[0][0][0]
+        with analysis_runner_env():
+            pipeline = self._setup_pipeline()
+            
+            with patch('builtins.print') as mock_print:
+                with patch.object(Stage, '_outputs_are_reusable') as mock_reusable:
+                    mock_reusable.return_value = False
+                    pipeline.run(dry_run=True)
+    
+                # print() should be called only once:
+                self.assertEqual(1, mock_print.call_count)
+    
+                # all job commands would be contained in this one print call:
+                out = mock_print.call_args_list[0][0][0]
 
         sys.stdout.write(out)
         lines = out.split('\n')

@@ -26,6 +26,7 @@ from cpg_pipes.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jo
 from cpg_pipes.jobs.somalier import check_pedigree_job
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.pipeline.pipeline import Pipeline
+from cpg_pipes.providers.cpg import analysis_runner_env
 from cpg_pipes.types import CramPath, SequencingType
 
 try:
@@ -154,19 +155,20 @@ class TestJobs(unittest.TestCase):
         output_path = self.out_bucket / 'align_fastq' / 'result.cram'
         qc_bucket = self.out_bucket / 'align_fastq' / 'qc'
 
-        jobs = align(
-            b=self.pipeline.b,
-            alignment_input=benchmark.tiny_fq,
-            output_path=output_path,
-            qc_bucket=qc_bucket,
-            sample_name=self.sample.id,
-        )
-        cram_details_paths = self._job_get_cram_details(
-            output_path,
-            out_bucket=self.out_bucket / 'align_fastq',
-            jobs=jobs,
-        )
-        self.pipeline.run(wait=True)
+        with analysis_runner_env():
+            jobs = align(
+                b=self.pipeline.b,
+                alignment_input=benchmark.tiny_fq,
+                output_path=output_path,
+                qc_bucket=qc_bucket,
+                sample_name=self.sample.id,
+            )
+            cram_details_paths = self._job_get_cram_details(
+                output_path,
+                out_bucket=self.out_bucket / 'align_fastq',
+                jobs=jobs,
+            )
+            self.pipeline.run(wait=True)
 
         self.assertTrue(
             (

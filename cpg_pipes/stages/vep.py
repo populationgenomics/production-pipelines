@@ -1,7 +1,6 @@
 """
 VEP stage.
 """
-from cpg_utils import to_path
 from cpg_utils.config import get_config
 
 from cpg_pipes import Path

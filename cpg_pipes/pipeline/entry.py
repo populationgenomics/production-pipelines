@@ -4,16 +4,17 @@ Create a pipeline from command line options.
 import functools
 import logging
 import os
+import tempfile
 from typing import Callable, Any, Optional
 
 import click
 import toml
 import yaml  # type: ignore
-from cpg_utils.config import get_config, update_dict
+from cpg_utils.config import update_dict, write_config, get_config
 
 from .pipeline import Pipeline
 from .. import to_path, get_package_path
-from ..providers.cpg import complete_infra_config, overwrite_config
+from ..providers.cpg import analysis_runner_env
 from ..utils import exists
 
 logger = logging.getLogger(__file__)
@@ -91,23 +92,17 @@ def pipeline_entry_point(
     def _decorator(_main_fun: MainFunType) -> WrappedMainFunType:
         @functools.wraps(_main_fun)
         def _wrappped_main() -> None:
+            # Load and puts the default config underneath the user provided config set 
+            # by CPG_CONFIG_PATH.
             with to_path(get_package_path() / 'config-template.toml').open() as f:
                 config = toml.load(f)
-            if not (cpg_conf_path := os.environ.get('CPG_CONFIG_PATH')):
-                raise ValueError(
-                    'Please, provide configuration TOML file(s) via CPG_CONFIG_PATH. '
-                    'Multiple files can be specified comma-separated, files '
-                    'specified last will take precedence.'
-                )
-            for path in cpg_conf_path.split(','):
-                with to_path(path).open() as f:
-                    update_dict(config, toml.load(f)) 
-            config = complete_infra_config(config)
-            # Add contents of CPG_CONFIG_PATH on top, write the result 
-            # and reset CPG_CONFIG_PATH:
-            overwrite_config(config)
-            pipeline = Pipeline(name=name, description=description)
-            return _main_fun(pipeline)
+            update_dict(config, get_config())
+            tmp_dir = config['workflow'].setdefault('local_tmp_dir', tempfile.mkdtemp())
+            write_config(config, tmp_dir)
+
+            # Add analysis-runner environment for the dataset if needed.
+            with analysis_runner_env():
+                return _main_fun(Pipeline(name, description))
 
         return _wrappped_main
 

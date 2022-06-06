@@ -2,21 +2,25 @@
 CPG implementations of providers.
 """
 import json
+import logging
 import os
 import tempfile
 import uuid
+from contextlib import contextmanager
+from copy import deepcopy
 from urllib import request
 
 import toml
 import yaml
 from cpg_utils.cloud import read_secret
-from cpg_utils.config import set_config_path, update_dict, get_config
+from cpg_utils.config import set_config_path, get_config, write_config
 
-from ... import Namespace, to_path, Path
-from ...targets import parse_stack
+from ... import to_path
 from ...utils import exists
 
 ANALYSIS_RUNNER_PROJECT_ID = 'analysis-runner'
+
+logger = logging.getLogger(__file__)
 
 
 def get_server_config() -> dict:
@@ -42,63 +46,74 @@ def get_stack_sa_email(stack: str, access_level: str) -> str:
     return data[f'datasets:hail_service_account_{access_level}']
 
 
-def overwrite_config(config: dict) -> dict:
+@contextmanager
+def analysis_runner_env():
     """
-    Writes and sets cpg-utils config.
-    """
-    get_config()['workflow'].setdefault('local_tmp_dir', tempfile.mkdtemp())
-    local_tmp_dir = to_path(get_config()['workflow']['local_tmp_dir'])
-    config_path = local_tmp_dir / (str(uuid.uuid4()) + '.toml')
-    with config_path.open('w') as f:
-        toml.dump(config, f)
-    set_config_path(config_path)
-    return get_config()
+    If SERVICE_ACCOUNT_KEY environment variable is set, would set up the infrastructure 
+    config parameters. Requires GOOGLE_APPLICATION_CREDENTIALS to be set to 
+    the analysis-runner service account to allow read permissions to the secret 
+    with Hail tokens (unless HAIL_TOKEN and `workflow.dataset_gcp_project` are set).
 
+    Required config fields:
+     - `workflow.dataset`.
+     - `workflow.access_level``
 
-def complete_infra_config(config: dict) -> dict:
-    """
-    Set up the infrastructure config parameters, unless they are already set
-    by analysis-runner.
+    SERVICE_ACCOUNT_KEY is the path to the dataset service account, can be parametrised
+    by service account name in curly braces, e.g. "/path/to/{name}_key.json".
 
-    Note for CPG: if typical analysis-runner configuration is not included, this 
-    function would somulate the analysis-runner environment. 
-    It requires only the `dataset` parameter, however optionally SERVICE_ACCOUNT_KEY 
-    can be set to impersonate specific service account. In this case, 
-    GOOGLE_APPLICATION_CREDENTIALS should also initially be set to the analysis-runner 
-    service account to allow read permissions to the secret with Hail tokens.
+    Sets the following config parameters:
+    - `workflow.output_prefix`
+    - `workflow.dataset_gcp_project`
+    - `workflow.access_level`
+    - `hail.billing_project`
+    - `hail.bucket`
+    Also sets the `HAIL_TOKEN` environment variable.
+
+    Works as a context manager, i.e. will revert the config back after existing.
     """
-    dataset = config['workflow']['dataset']
-    access_level = config['workflow'].get('access_level', 'standard')
-    dataset_gcp_project = config['workflow'].get('dataset_gcp_project')
-    
-    stack, namespace = parse_stack(dataset, Namespace.from_access_level(access_level))
-    if not access_level:
-        access_level = 'test' if namespace == Namespace.TEST else 'full'
-        config['workflow'].setdefault('access_level', access_level)
+    sa_key_path = os.getenv('SERVICE_ACCOUNT_KEY')
+
+    if not sa_key_path:
+        # Not modifying the environment.
+        yield
+
+    # Keeping the original environment to revert later.
+    original_config_path = os.getenv('CPG_CONFIG_PATH')
+    original_sa_key_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+    if not original_sa_key_path:
+        raise ValueError(
+            'GOOGLE_APPLICATION_CREDENTIALS must be set. It should point to the '
+            'analysis-runner service account'
+        )
+
+    dataset = get_config()['workflow']['dataset']
+    access_level = get_config()['workflow']['access_level']
 
     # Parse server config to get Hail token and the GCP project name
     hail_token = os.getenv('HAIL_TOKEN')
+    dataset_gcp_project = get_config()['workflow'].get('dataset_gcp_project')
     if not hail_token or not dataset_gcp_project:
         server_config = get_server_config()
-        hail_token = server_config[stack][f'{access_level}Token']
-        dataset_gcp_project = server_config[stack]['projectId']
-        config['workflow'].setdefault('dataset_gcp_project', dataset_gcp_project)
+        hail_token = server_config[dataset][f'{access_level}Token']
+        dataset_gcp_project = server_config[dataset]['projectId']
+        get_config()['workflow'].setdefault('dataset_gcp_project', dataset_gcp_project)
+        os.environ.setdefault('HAIL_TOKEN', hail_token)
 
-    assert hail_token
-    assert dataset_gcp_project
-    os.environ['HAIL_TOKEN'] = hail_token
-    
-    # Active dataset service account
-    if sa_key_path := os.getenv('SERVICE_ACCOUNT_KEY'):
-        if '{name}' in sa_key_path:
-            sa_email = get_stack_sa_email(stack, access_level)
-            sa_key_path = sa_key_path.format(name=sa_email.split('@')[0])
-        if not exists(sa_key_path):
-            raise ValueError(f'Service account key does not exist: {sa_key_path}')
-        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = sa_key_path
-    
-    config['workflow'].setdefault('dataset', stack)
-    config['workflow'].setdefault('output_prefix', 'cpg-pipes')
-    config['hail'].setdefault('billing_project', stack)
-    config['hail'].setdefault('bucket', f'cpg-{stack}-hail')
-    return config
+    # Activate dataset service account
+    if '{name}' in sa_key_path:  # Path can be parametrised by a SA name.
+        sa_email = get_stack_sa_email(dataset, access_level)
+        sa_key_path = sa_key_path.format(name=sa_email.split('@')[0])
+    if not exists(sa_key_path):
+        raise ValueError(f'Service account key does not exist: {sa_key_path}')
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = sa_key_path
+
+    get_config()['workflow'].setdefault('output_prefix', 'cpg-pipes')
+    get_config()['hail'].setdefault('billing_project', dataset)
+    get_config()['hail'].setdefault('bucket', f'cpg-{dataset}-hail')
+    tmp_dir = get_config()['workflow'].setdefault('local_tmp_dir', tempfile.mkdtemp())
+    write_config(get_config(), tmp_dir)
+    try:
+        yield
+    finally:  # Revert the environment back to the original
+        set_config_path(original_config_path)
+        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = original_sa_key_path

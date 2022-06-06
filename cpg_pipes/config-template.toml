@@ -1,6 +1,7 @@
 [workflow]
-# The storage and inputs namespace (test or main):
-access_level = 'test'
+# Access level (test, standard, full). Translates into the storage and inputs 
+# namespace (test or main):
+access_level = 'standard'
 
 # Dataset name to write intermediate files and use as hail billing project,
 # (unless specified in hail.hail_billing_project):
