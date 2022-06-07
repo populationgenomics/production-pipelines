@@ -319,6 +319,7 @@ class Dataset(Target):
         The primary storage path.
         """
         return to_path(dataset_path(
+            '',
             dataset=self.stack,
             **kwargs,
         ))
@@ -328,6 +329,7 @@ class Dataset(Target):
         Storage path for temporary files.
         """
         return to_path(dataset_path(
+            '',
             dataset=self.stack,
             category='tmp',
             **kwargs,
@@ -339,6 +341,7 @@ class Dataset(Target):
         self.web_url() URLs.
         """
         return to_path(dataset_path(
+            '',
             dataset=self.stack,
             category='web',
             **kwargs,
@@ -349,6 +352,7 @@ class Dataset(Target):
         URLs matching self.storage_web_path() files serverd by an HTTP server. 
         """
         return web_url(
+            '',
             dataset=self.stack,
             **kwargs,
         )
