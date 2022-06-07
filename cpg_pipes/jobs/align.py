@@ -406,10 +406,6 @@ def extract_fastq(
     index_ext = 'crai' if ext == 'cram' else 'bai'
     if not index_ext not in cram:
         index_cmd = f'samtools index {cram[ext]}'
-    index_cmd = ''
-    index_ext = 'crai' if ext == 'cram' else 'bai'
-    if not index_ext not in cram:
-        index_cmd = f'samtools index {cram[ext]}'
     cmd = f"""
     {index_cmd}
     bazam -Xmx16g -Dsamjdk.reference_fasta={reference.base} \
