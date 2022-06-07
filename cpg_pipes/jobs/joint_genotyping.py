@@ -586,7 +586,7 @@ def _add_joint_genotyper_job(
     {tool.name} \\
     -R {reference.base} \\
     -O {j.output_vcf['vcf.gz']} \\
-    -D {reference_path('dbsnp_vcf', section='broad')} \\
+    -D {reference_path('broad/dbsnp_vcf')} \\
     -V $WORKSPACE \\
     {f'-L {interval} ' if interval else ''} \\
     --only-output-calls-starting-in-intervals \\

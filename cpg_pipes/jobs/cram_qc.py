@@ -73,9 +73,9 @@ def verify_bamid(
     STANDARD.set_resources(j, storage_gb=60)
     cram = cram_path.resource_group(b)
     reference = fasta_res_group(b)
-    contam_ud = reference_path('contam_ud', section='broad')
-    contam_bed = reference_path('contam_bed', section='broad')
-    contam_mu = reference_path('contam_mu', section='broad')
+    contam_ud = reference_path('broad/contam_ud')
+    contam_bed = reference_path('broad/contam_bed')
+    contam_mu = reference_path('broad/contam_mu')
 
     cmd = f"""\
     # creates a *.selfSM file, a TSV file with 2 rows, 19 columns.
@@ -124,7 +124,7 @@ def picard_wgs_metrics(
     cram = cram_path.resource_group(b)
     reference = fasta_res_group(b)
     interval_file = b.read_input(
-        str(reference_path('genome_coverage_interval_list', section='broad'))
+        str(reference_path('broad/genome_coverage_interval_list'))
     )
 
     cmd = f"""\

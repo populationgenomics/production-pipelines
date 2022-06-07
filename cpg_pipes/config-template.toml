@@ -15,11 +15,7 @@ access_level = 'standard'
 #skip_datasets = []
 
 # Samples to skip:
-skip_samples = [
-  'CPG11783',   # acute-care, no FASTQ data
-  'CPG13326',   # perth-neuro, no FASTQ data: https://github.com/populationgenomics/seqr-private/issues/2
-  'CPG200014',  # perth-neuro, https://centrepopgen.slack.com/archives/C01R7CKJGHM/p1654038000773069
-]
+#skip_samples = []
 
 # Only process the following samples:
 #only_samples = []
@@ -139,15 +135,14 @@ cram_qc = true
 es_port = 9243
 es_host = 'elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com'
 es_username = 'seqr'
-#es_password = 
 # Load ElasticSearch password from a secret, unless SEQR_ES_PASSWORD is set
 es_password_secret_id = 'seqr-es-password'
 es_password_project_id = 'seqr-308602'
 
 [hail]
-#hail_billing_project = 
-#hail_bucket = 
-hail_pool_label = 'seqr'
+#billing_project = 
+#bucket = 
+pool_label = 'seqr'
 keep_scratch = true
 dry_run = false
 

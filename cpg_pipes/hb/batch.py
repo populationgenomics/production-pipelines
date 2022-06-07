@@ -166,7 +166,7 @@ def setup_batch(description: str) -> RegisteringBatch:
     """
     billing_project = get_config()['hail']['billing_project']
     remote_tmpdir = get_config()['hail']['bucket']
-    pool_label = get_config()['hail'].get('hail_pool_label')
+    pool_label = get_config()['hail'].get('pool_label')
 
     logger.info(
         f'Starting Hail Batch with the project {billing_project}'

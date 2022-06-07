@@ -58,7 +58,7 @@ def make_subset_crams(pipeline: Pipeline):
 
     intervals_j = pipeline.b.new_job('Make toy intervals: 1% of exome')
     in_intervals = b.read_input(
-        str(reference_path('exome_calling_interval_lists', 'broad'))
+        str(reference_path('broad/exome_calling_interval_lists'))
     )
     intervals_j.command(
         f"""
@@ -182,7 +182,7 @@ def jointcalling_vcf_to_sub_exome(pipeline, fraction=0.05):
 
     intervals_j = pipeline.b.new_job(f'Make toy intervals: {fraction} of exome')
     in_intervals = b.read_input(
-        str(reference_path('exome_calling_interval_lists', 'broad'))
+        str(reference_path('broad/exome_calling_interval_lists'))
     )
     intervals_j.command(
         f"""

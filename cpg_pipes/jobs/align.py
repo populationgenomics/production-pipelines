@@ -361,7 +361,7 @@ def _align_one(
         dragmap_index = b.read_input_group(
             **{
                 k.replace('.', '_'): 
-                    str(reference_path('dragmap_prefix', section='broad') / k)
+                    str(reference_path('broad/dragmap_prefix') / k)
                 for k in DRAGMAP_INDEX_FILES
             }
         )

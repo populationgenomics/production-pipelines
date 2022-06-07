@@ -11,6 +11,7 @@ import logging
 import math
 import click
 import hail as hl
+from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build
 from google.cloud import secretmanager
@@ -55,7 +56,10 @@ def main(
     host = get_config()['elasticsearch']['host']
     port = str(get_config()['elasticsearch']['port'])
     username = get_config()['elasticsearch']['host']
-    password = _read_es_password()
+    password = read_secret(
+        project_id=get_config()['elasticsearch']['password_project_id'],
+        secret_name=get_config()['elasticsearch']['password_secret_id'],
+    )
 
     es = HailElasticsearchClient(
         host=host,
@@ -113,27 +117,6 @@ def _cleanup(es, es_index, es_shards):
     # Current disk configuration requires the previous index to be deleted prior to large indices, ~1TB, transferring off loading nodes
     if es_shards < 25:
         es.wait_for_shard_transfer(es_index)
-
-
-def _read_es_password() -> str:
-    """
-    Read a GCP secret storing the ES password
-    """
-    if password := os.environ.get('SEQR_ES_PASSWORD'):
-        return password
-
-    if password := get_config()['elasticsearch'].get('password'):
-        return password
-    
-    # Read from a secret.
-    secret_id = get_config()['elasticsearch']['password_secret_id']
-    project_id = get_config()['elasticsearch']['password_project_id']
-
-    client = secretmanager.SecretManagerServiceClient()
-    secret_path = client.secret_version_path(project_id, secret_id, 'latest')
-    # noinspection PyTypeChecker
-    response = client.access_secret_version(request={'name': secret_path})
-    return response.payload.data.decode('UTF-8')
 
 
 if __name__ == '__main__':

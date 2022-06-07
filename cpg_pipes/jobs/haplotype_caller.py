@@ -296,7 +296,7 @@ def postproc_gvcf(
     )
 
     reference = fasta_res_group(b)
-    noalt_regions = b.read_input(str(reference_path('noalt_bed', section='broad')))
+    noalt_regions = b.read_input(str(reference_path('broad/noalt_bed')))
     gvcf = b.read_input(str(gvcf_path.path))
 
     cmd = f"""\

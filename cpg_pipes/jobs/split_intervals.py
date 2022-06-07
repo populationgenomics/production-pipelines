@@ -59,8 +59,7 @@ def get_intervals(
             ]
         # Taking intervals file for the sequencing_type.
         intervals_path = reference_path(
-            f'{sequencing_type.value}_calling_interval_lists',
-            section='broad'
+            f'broad/{sequencing_type.value}_calling_interval_lists',
         )
 
     j.image(image_path('picard'))
