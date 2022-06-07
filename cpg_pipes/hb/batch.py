@@ -122,7 +122,7 @@ class RegisteringBatch(hb.Batch):
         Wrapper around `new_job()` that processes job attributes.
         """
         name, fixed_attributes = self._process_attributes(name, attributes)
-        j = super().new_job(name, attributes=fixed_attributes)
+        j = super().new_job(name, attributes=fixed_attributes, **kwargs)
         if self.pool_label:
             j._pool_label = self.pool_label
         copy_common_env(j)
