@@ -72,8 +72,7 @@ class TestPipeline(unittest.TestCase):
             config['workflow']['intervals_path'] = intervals_path
         with self.config_path.open('w') as f:
             toml.dump(config, f)
-        config_paths = [get_package_path() / 'config-template.toml', self.config_path]
-        set_config_paths([str(path) for path in config_paths])
+        set_config_paths([str(self.config_path)])
 
     def tearDown(self) -> None:
         """
