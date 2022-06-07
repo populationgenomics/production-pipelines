@@ -23,7 +23,7 @@ setuptools.setup(
         if fname.endswith('.py')
     ],
     install_requires=[
-        'click',
+        'cpg-utils',
         'pandas',
         'hail>=0.2.91',
         'cpg-gnomad',  # github.com/populationgenomics/gnomad_methods
