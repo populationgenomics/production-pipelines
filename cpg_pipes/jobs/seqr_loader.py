@@ -3,15 +3,14 @@ Jobs specific for seqr-loader.
 """
 import logging
 
+from cpg_utils.hail_batch import image_path, genome_build
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
 from cpg_pipes import Path, to_path
 from cpg_pipes.hb.batch import hail_query_env
 from cpg_pipes.hb.command import wrap_command, python_command
-from cpg_pipes.providers.images import Images
 from cpg_pipes.query import seqr_loader
-from cpg_pipes.providers.refdata import RefData
 from cpg_pipes.types import SequencingType
 
 logger = logging.getLogger(__file__)
@@ -19,15 +18,12 @@ logger = logging.getLogger(__file__)
 
 def annotate_cohort_jobs(
     b: Batch,
-    images: Images,
     vcf_path: Path,
     siteonly_vqsr_vcf_path: Path,
     vep_ht_path: Path,
     output_mt_path: Path,
     checkpoints_bucket: Path,
     sequencing_type: SequencingType,
-    hail_billing_project: str,
-    hail_bucket: Path | None = None,
     job_attrs: dict | None = None,
     overwrite: bool = False,
 ) -> list[Job]:
@@ -35,7 +31,7 @@ def annotate_cohort_jobs(
     Annotate cohort for seqr loader.
     """
     j = b.new_job(f'annotate cohort', job_attrs)
-    j.image(images.get('hail'))
+    j.image(image_path('hail'))
     j.command(
         python_command(
             seqr_loader,
@@ -45,13 +41,11 @@ def annotate_cohort_jobs(
             str(vep_ht_path),
             str(output_mt_path),
             overwrite,
-            RefData.genome_build,
+            genome_build(),
             sequencing_type.value.upper(),
             str(checkpoints_bucket),
             setup_gcp=True,
-            hail_billing_project=hail_billing_project,
-            hail_bucket=str(hail_bucket),
-            default_reference=RefData.genome_build,
+            setup_hail=True,
             packages=['cpg_gnomad', 'seqr_loader'],
         )
     )
@@ -60,13 +54,10 @@ def annotate_cohort_jobs(
 
 def annotate_dataset_jobs(
     b: Batch,
-    images: Images,
     mt_path: Path,
     sample_ids: list[str],
     output_mt_path: Path,
     tmp_bucket: Path,
-    hail_billing_project: str,
-    hail_bucket: Path | None = None,
     job_attrs: dict | None = None,
     overwrite: bool = False,
 ) -> list[Job]:
@@ -76,7 +67,7 @@ def annotate_dataset_jobs(
     """
     subset_mt_path = tmp_bucket / 'cohort-subset.mt'
     subset_j = b.new_job(f'subset cohort to dataset', job_attrs)
-    subset_j.image(images.get('hail'))
+    subset_j.image(image_path('hail'))
     subset_j.command(
         python_command(
             seqr_loader,
@@ -85,14 +76,12 @@ def annotate_dataset_jobs(
             sample_ids,
             str(subset_mt_path),
             setup_gcp=True,
-            hail_billing_project=hail_billing_project,
-            hail_bucket=str(hail_bucket),
-            default_reference=RefData.genome_build,
+            setup_hail=True,
         )
     )
 
     annotate_j = b.new_job(f'annotate dataset', job_attrs)
-    annotate_j.image(images.get('hail'))
+    annotate_j.image(image_path('hail'))
     annotate_j.command(
         python_command(
             seqr_loader,
@@ -102,9 +91,7 @@ def annotate_dataset_jobs(
             str(tmp_bucket),
             overwrite,
             setup_gcp=True,
-            hail_billing_project=hail_billing_project,
-            hail_bucket=str(hail_bucket),
-            default_reference=RefData.genome_build,
+            setup_hail=True,
         )
     )
     annotate_j.depends_on(subset_j)
@@ -113,7 +100,6 @@ def annotate_dataset_jobs(
 
 def load_to_es(
     b: Batch,
-    images: Images,
     mt_path: Path,
     es_host: str,
     es_port: int,
@@ -129,7 +115,7 @@ def load_to_es(
     """
     # Make a list of dataset samples to subset from the entire matrix table
     j = b.new_job(f'create ES index', job_attrs)
-    j.image(images.get('hail'))
+    j.image(image_path('hail'))
     hail_query_env(j, hail_billing_project, hail_bucket)
     cmd = f"""\
     pip3 install click cpg_utils hail seqr_loader elasticsearch

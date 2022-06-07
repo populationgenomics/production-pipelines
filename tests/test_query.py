@@ -9,11 +9,11 @@ from pprint import pprint
 from unittest import skip
 
 import hail as hl
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import genome_build
 
 from cpg_pipes import to_path, Namespace
 from cpg_pipes import hailquery
-from cpg_pipes.providers.cpg.refdata import CpgRefData
-from cpg_pipes.providers.cpg.storage import CpgStorageProvider
 from cpg_pipes.query.seqr_loader import (
     annotate_cohort,
     subset_mt_to_samples,
@@ -21,7 +21,6 @@ from cpg_pipes.query.seqr_loader import (
     load_vqsr,
 )
 from cpg_pipes.query.vep import vep_json_to_ht
-from cpg_pipes.providers.refdata import RefData
 from cpg_pipes.types import SequencingType, logger
 
 try:
@@ -51,7 +50,6 @@ class TestQuery(unittest.TestCase):
         self.timestamp = utils.timestamp()
         self.local_tmp_dir = tempfile.mkdtemp()
         self.sequencing_type = SequencingType.GENOME
-        self.refs = CpgRefData()
         hailquery.init_batch(utils.DATASET, self.tmp_bucket)
         # Interval to take on chr20:
         self.chrom = 'chr20'
@@ -171,7 +169,6 @@ class TestQuery(unittest.TestCase):
         dataset = Cohort(
             analysis_dataset_name=utils.DATASET,
             namespace=Namespace.TEST,
-            storage_provider=CpgStorageProvider(),
         ).create_dataset(utils.DATASET)
         for sid in utils.SAMPLES:
             dataset.add_sample(sid)
@@ -182,7 +179,7 @@ class TestQuery(unittest.TestCase):
             [str(s.get_gvcf_path().path) for s in dataset.get_samples()],
             sample_names=[s.id for s in dataset.get_samples()],
             out_file=str(out_mt_path),
-            reference_genome=RefData.genome_build,
+            reference_genome=genome_build(),
             use_genome_default_intervals=True,
             tmp_path=self.tmp_bucket,
             overwrite=True,

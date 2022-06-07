@@ -6,7 +6,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Union
+from typing import Union, Optional
 
 from hailtop.batch import ResourceGroup, ResourceFile, Batch
 
@@ -28,7 +28,7 @@ class SequencingType(Enum):
     ONT = 'ont'
 
     @staticmethod
-    def parse(str_val: str) -> 'SequencingType':
+    def parse(str_val: str | None) -> Optional['SequencingType']:
         """
         Parse a string into a SequencingType object.
         
@@ -37,6 +37,8 @@ class SequencingType(Enum):
         >>> SequencingType.parse('wes')
         SequencingType.EXOME
         """
+        if str_val is None:
+            return None
         str_to_val: dict[str, SequencingType] = {} 
         for val, str_vals in {
             SequencingType.GENOME: ['genome', 'wgs'],
@@ -104,7 +106,7 @@ class CramPath(AlignmentInput):
         CRAM file exists.
         """
         return self.path.exists()
-
+    
     def index_exists(self) -> bool:
         """
         CRAI/BAI index exists

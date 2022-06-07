@@ -23,7 +23,7 @@ setuptools.setup(
         if fname.endswith('.py')
     ],
     install_requires=[
-        'click',
+        'cpg-utils',
         'pandas',
         'hail>=0.2.91',
         'cpg-gnomad',  # github.com/populationgenomics/gnomad_methods
@@ -36,6 +36,7 @@ setuptools.setup(
         'cloudpathlib[all]',
         'coloredlogs',
         'types-PyYAML',  # https://mypy.readthedocs.io/en/stable/getting_started.html#library-stubs-and-typeshed
+        'python-slugify',
     ],
     keywords='bioinformatics',
     classifiers=[

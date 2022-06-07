@@ -3,9 +3,11 @@ Helpers to set up Job's command.
 """
 import inspect
 import logging
-from typing import List, Union, Callable
+from typing import List, Union
 import textwrap
 
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import genome_build
 from hailtop.batch import ResourceFile
 
 from cpg_pipes import Path
@@ -73,9 +75,7 @@ def python_command(
     func_name: str,
     *func_args,
     setup_gcp: bool = False,
-    hail_billing_project: str | None = None,
-    hail_bucket: str | None = None,
-    default_reference: str = 'GRCh38',
+    setup_hail: bool = False,
     packages: list[str] | None = None,
 ):
     """
@@ -88,16 +88,15 @@ logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 """
-    if hail_billing_project:
-        assert hail_bucket
+    if setup_hail:
         python_cmd += f"""
 import asyncio
 import hail as hl
 asyncio.get_event_loop().run_until_complete(
     hl.init_batch(
-        default_reference='{default_reference}',
-        billing_project='{hail_billing_project}',
-        remote_tmpdir='{hail_bucket}',
+        default_reference='{genome_build()}',
+        billing_project='{get_config()['hail']['billing_project']}',
+        remote_tmpdir='{get_config()['hail']['bucket']}',
     )
 )
 """

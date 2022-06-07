@@ -1,18 +1,16 @@
 """
 Common test utilities.
 """
-
-import os
 import string
 import time
 from random import choices
 
 from cpg_pipes import to_path, Namespace
-from cpg_pipes.providers.cpg import analysis_runner_environment
 from cpg_pipes.types import GvcfPath, FastqPair, SequencingType
 
 DATASET = 'fewgenomes'
-NAMESPACE = Namespace.TEST
+ACCESS_LEVEL = 'test'
+Namespace = Namespace.TEST
 BASE_BUCKET = to_path('gs://cpg-fewgenomes-test/unittest')
 
 # Samples for joint calling
@@ -66,17 +64,3 @@ def timestamp():
     """
     rand_bit = ''.join(choices(string.ascii_uppercase + string.digits, k=3))
     return time.strftime('%Y-%m%d-%H%M') + rand_bit
-
-
-def setup_env(dataset: str = DATASET, namespace: Namespace = NAMESPACE):
-    """
-    Make sure that setup_env() is called before importing cpg_pipes, because
-    cpg_pipes imports analysis_runner.dataproc, which in turns requires
-    DATASET_GCP_PROJECT to be set on import time. Also, unittest doesn't pick
-    exported environment variables with EnvFile, so have to do it here.
-    """
-    os.environ['CPG_DATASET'] = dataset
-    os.environ['CPG_DATASET_GCP_PROJECT'] = dataset
-    os.environ['CPG_ACCESS_LEVEL'] = namespace.value
-    os.environ['CPG_OUTPUT_PREFIX'] = 'unittests'
-    analysis_runner_environment()

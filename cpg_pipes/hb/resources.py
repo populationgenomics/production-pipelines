@@ -129,7 +129,7 @@ class MachineType:
     def fraction_to_ncpu(self, fraction: float) -> int:
         """
         Converts fraction to the number of CPU (e.g. fraction=1.0 to take the entire
-        machine, fraction=0.5 to take half of it, etc).
+        machine, fraction=0.5 to take half of it, etc.).
         """
         ncpu = int(math.ceil(self.max_ncpu * fraction))
         return self.adjust_ncpu(ncpu)
@@ -145,7 +145,7 @@ class MachineType:
         """
         Converts storage requirement to the number of CPU requirement.
 
-        We want to avoid attaching disks (attaching a disk to an existing instance
+        We want to avoid attaching disks: attaching a disk to an existing instance
         might fail with `mkfs.ext4 ...` error, see:
         https://batch.hail.populationgenomics.org.au/batches/7488/jobs/12
         So this function will calculate the number of CPU to request so your jobs

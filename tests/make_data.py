@@ -5,15 +5,14 @@ Generate data for unit tests
 """
 from typing import cast
 
+from cpg_utils.hail_batch import reference_path, image_path, fasta_res_group
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
 from cpg_pipes import Namespace, Path
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs.align import extract_fastq
-from cpg_pipes.pipeline import create_pipeline
 from cpg_pipes.pipeline.pipeline import Pipeline
-from cpg_pipes.providers.images import Images
 from cpg_pipes.types import SequencingType, CramPath
 
 import utils
@@ -24,11 +23,9 @@ def main():
     Generate data for unit tests
     """
     utils.setup_env()
-    pipeline = create_pipeline(
+    pipeline = Pipeline(
         name='make_test_data',
         description='Make test data',
-        analysis_dataset=utils.DATASET,
-        namespace=Namespace.TEST,
     )
     # make_subset_crams(pipeline)
     # make_gvcfs_for_joint_calling(pipeline)
@@ -59,10 +56,10 @@ def make_subset_crams(pipeline: Pipeline):
         for sid in utils.SAMPLES
     ]
 
-    refs = pipeline.refs
-
     intervals_j = pipeline.b.new_job('Make toy intervals: 1% of exome')
-    in_intervals = b.read_input(str(refs.calling_interval_lists[SequencingType.EXOME]))
+    in_intervals = b.read_input(
+        str(reference_path('broad/exome_calling_interval_lists'))
+    )
     intervals_j.command(
         f"""
     grep ^@ {in_intervals} > {intervals_j.out}
@@ -72,11 +69,11 @@ def make_subset_crams(pipeline: Pipeline):
     """
     )
 
-    fasta = refs.fasta_res_group(b)
+    fasta = fasta_res_group(b)
     for s in samples:
         cram_j = b.new_job('Subset CRAM', s.get_job_attrs())
         cram_j.depends_on(intervals_j)
-        cram_j.image(pipeline.images.get('samtools'))
+        cram_j.image(image_path('samtools'))
         nthreads = STANDARD.set_resources(cram_j, fraction=0.5).get_nthreads()
         cram = cast(
             CramPath, s.alignment_input_by_seq_type[utils.SEQ_TYPE]
@@ -109,8 +106,6 @@ def make_subset_crams(pipeline: Pipeline):
             b=b,
             cram=cram_j.output_cram,
             ext='cram',
-            refs=refs,
-            images=pipeline.images,
             job_attrs=s.get_job_attrs(),
             output_fq1=utils.TOY_FQ_BY_SID[s.id].r1,
             output_fq2=utils.TOY_FQ_BY_SID[s.id].r2,
@@ -148,7 +143,6 @@ def make_gvcfs_for_joint_calling(pipeline, pct=1):
     for s in samples:
         _subset_vcf(
             b,
-            pipeline.images,
             utils.FULL_GVCF_BY_SID[s.id],
             out_intervals_path,
             utils.EXOME_1PCT_GVCF_BY_SID[s.id],
@@ -167,14 +161,12 @@ def jointcalling_vcf_to_exome(pipeline):
     # Subsetting full to exomes
     _subset_vcf(
         b,
-        pipeline.images,
         utils.BASE_BUCKET / 'inputs/full/9samples-joint-called.vcf.gz',
         refs.calling_interval_lists[SequencingType.EXOME],
         utils.BASE_BUCKET / 'inputs/exome/9samples-joint-called.vcf.gz',
     )
     _subset_vcf(
         b,
-        pipeline.images,
         utils.BASE_BUCKET / 'inputs/full/9samples-joint-called-siteonly.vcf.gz',
         refs.calling_interval_lists[SequencingType.EXOME],
         utils.BASE_BUCKET / 'inputs/exome/9samples-joint-called-siteonly.vcf.gz',
@@ -187,10 +179,11 @@ def jointcalling_vcf_to_sub_exome(pipeline, fraction=0.05):
     Subset joint-calling VCF to a fraction of exome.
     """
     b = pipeline.b
-    refs = pipeline.refs
 
     intervals_j = pipeline.b.new_job(f'Make toy intervals: {fraction} of exome')
-    in_intervals = b.read_input(str(refs.calling_interval_lists[SequencingType.EXOME]))
+    in_intervals = b.read_input(
+        str(reference_path('broad/exome_calling_interval_lists'))
+    )
     intervals_j.command(
         f"""
     grep ^@ {in_intervals} > {intervals_j.out}
@@ -207,14 +200,12 @@ def jointcalling_vcf_to_sub_exome(pipeline, fraction=0.05):
 
     _subset_vcf(
         b,
-        pipeline.images,
         utils.BASE_BUCKET / 'inputs/exome/9samples-joint-called.vcf.gz',
         out_intervals_path,
         utils.BASE_BUCKET / f'inputs/exome{pct}pct/9samples-joint-called.vcf.gz',
     )
     _subset_vcf(
         b,
-        pipeline.images,
         utils.BASE_BUCKET / 'inputs/exome/9samples-joint-called-siteonly.vcf.gz',
         out_intervals_path,
         utils.BASE_BUCKET
@@ -225,7 +216,6 @@ def jointcalling_vcf_to_sub_exome(pipeline, fraction=0.05):
 
 def _subset_vcf(
     b: Batch,
-    images: Images,
     vcf_path: Path,
     intervals_path: Path,
     out_path: Path,
@@ -236,7 +226,7 @@ def _subset_vcf(
     intervals = b.read_input(str(intervals_path))
 
     j = b.new_job(f'Subset VCF {vcf_path} -> {out_path}')
-    j.image(images.get('bcftools'))
+    j.image(image_path('bcftools'))
 
     vcf = b.read_input_group(
         **{

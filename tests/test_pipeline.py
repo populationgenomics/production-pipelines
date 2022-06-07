@@ -1,58 +1,28 @@
 """
 Test building and running pipelines.
 """
-
 import shutil
 import sys
 import tempfile
 import unittest
 from unittest import skip
-from unittest.mock import patch, Mock
+from unittest.mock import patch
 
-from cpg_pipes import Namespace, Path, to_path
-from cpg_pipes.pipeline.pipeline import Pipeline, Stage
-from cpg_pipes.providers.cpg.images import CpgImages
-from cpg_pipes.providers.cpg.refdata import CpgRefData
-from cpg_pipes.providers.cpg.storage import CpgStorageProvider
+import toml
+from cpg_utils.config import get_config, set_config_paths
+
+from cpg_pipes import to_path, get_package_path
+from cpg_pipes.pipeline.pipeline import Pipeline, Stage, StageDecorator
 from cpg_pipes.stages.genotype_sample import GenotypeSample
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
 from cpg_pipes.types import CramPath
-
-# Importing `seqr_loader` will make pipeline use all its stages by default.
-from pipelines import seqr_loader
-from pipelines.seqr_loader import AnnotateDataset
+from cpg_pipes.stages.seqr_loader import AnnotateDataset, LoadToEs
 
 try:
     import utils
 except ModuleNotFoundError:
     from . import utils
-
-
-class UnittestStorageProvider(CpgStorageProvider):
-    """
-    Align and GenotypeSample stages write cram and gvcf into the datasets
-    main bucket, without versioning. We need to override this behaviour to
-    support writing into the test output directory.
-    """
-
-    def __init__(self, test_output_bucket: Path):
-        super().__init__()
-        self.test_output_bucket = test_output_bucket
-
-    def _dataset_bucket(
-        self,
-        dataset: str,
-        namespace: Namespace,
-        suffix: str = None,
-    ) -> Path:
-        """
-        Overiding main bucket name
-        """
-        path = self.test_output_bucket
-        if suffix:
-            path /= suffix
-        return path
 
 
 class TestPipeline(unittest.TestCase):
@@ -68,13 +38,41 @@ class TestPipeline(unittest.TestCase):
         self.timestamp = utils.timestamp()
         self.out_bucket = utils.BASE_BUCKET / self.name / self.timestamp
         self.tmp_bucket = self.out_bucket / 'tmp'
-        self.local_tmp_dir = to_path(tempfile.mkdtemp())
+        self.local_tmp_dir = tempfile.mkdtemp()
         self.sample_ids = utils.SAMPLES[:3]
-
-        self.realignment_shards_num = 4
-        self.hc_intervals_num = 4
-        self.jc_intervals_num = 4
-        self.vep_intervals_num = 4
+        
+        self.config_path = self.tmp_bucket / 'config.toml'
+        
+    def setup_env(self, intervals_path: str | None = None):
+        """
+        Mock analysis-runner environment.
+        """
+        config = {
+            'workflow': {
+                'dataset': utils.DATASET,
+                'dataset_gcp_project': utils.DATASET,
+                'check_intermediates': False,
+                'check_expected_outputs': False,
+                'access_level': 'test',
+                'realignment_shards_num': 4,
+                'hc_intervals_num': 4,
+                'jc_intervals_num': 4,
+                'vep_intervals_num': 4,
+                'version': self.timestamp,
+            },
+            'hail': {
+                'billing_project': utils.DATASET,
+                'bucket': str(self.tmp_bucket),
+            },
+            'elasticsearch': {
+                'password': 'TEST',
+            }
+        }
+        if intervals_path:
+            config['workflow']['intervals_path'] = intervals_path
+        with self.config_path.open('w') as f:
+            toml.dump(config, f)
+        set_config_paths([str(self.config_path)])
 
     def tearDown(self) -> None:
         """
@@ -82,42 +80,9 @@ class TestPipeline(unittest.TestCase):
         """
         shutil.rmtree(self.local_tmp_dir)
 
-    def _setup_pipeline(
-        self,
-        first_stage: str | None = None,
-        last_stage: str | None = None,
-        realignment_shards_num: int = None,
-        intervals_path: Path | None = None,
-        hc_intervals_num: int = None,
-        jc_intervals_num: int = None,
-        vep_intervals_num: int = None,
-    ):
-        utils.setup_env()
-
+    def _setup_pipeline(self, stages: list[StageDecorator]):
         # Mocking elastic search password for the full dry run test:
-        seqr_loader._read_es_password = Mock(return_value='TEST')
-
-        pipeline = Pipeline(
-            namespace=Namespace.TEST,
-            name=self._testMethodName,
-            analysis_dataset_name=utils.DATASET,
-            check_intermediates=False,
-            check_expected_outputs=False,
-            storage_provider=UnittestStorageProvider(self.out_bucket),
-            first_stage=first_stage,
-            last_stage=last_stage,
-            version=self.timestamp,
-            refs=CpgRefData(),
-            images=CpgImages(),
-            config=dict(
-                realignment_shards_num=realignment_shards_num
-                or self.realignment_shards_num,
-                hc_intervals_num=hc_intervals_num or self.hc_intervals_num,
-                jc_intervals_num=jc_intervals_num or self.jc_intervals_num,
-                vep_intervals_num=vep_intervals_num or self.vep_intervals_num,
-                intervals_path=intervals_path,
-            ),
-        )
+        pipeline = Pipeline(name=self._testMethodName, stages=stages)
         self.datasets = [pipeline.create_dataset(utils.DATASET)]
         for ds in self.datasets:
             for s_id in self.sample_ids:
@@ -133,17 +98,17 @@ class TestPipeline(unittest.TestCase):
         With dry_run, Hail Batch prints all code with a single print() call.
         Thus, we capture `builtins.print`, and verify that it has the expected
         job commands passed to it.
-
         """
-        pipeline = self._setup_pipeline()
-        
+        self.setup_env()
+        pipeline = self._setup_pipeline(stages=[LoadToEs])
+
         with patch('builtins.print') as mock_print:
             with patch.object(Stage, '_outputs_are_reusable') as mock_reusable:
                 mock_reusable.return_value = False
-                pipeline.run(dry_run=True)
+                pipeline.run(dry_run=True, force_all_implicit_stages=True)
 
             # print() should be called only once:
-            self.assertEqual(1, mock_print.call_count)
+            self.assertEqual(mock_print.call_count, 1)
 
             # all job commands would be contained in this one print call:
             out = mock_print.call_args_list[0][0][0]
@@ -156,22 +121,22 @@ class TestPipeline(unittest.TestCase):
             return len([line for line in lines if line.strip().startswith(item)])
 
         self.assertEqual(
-            _cnt('dragen-os'), len(self.sample_ids) * self.realignment_shards_num
+            _cnt('dragen-os'), len(self.sample_ids) * get_config()['workflow']['realignment_shards_num']
         )
         self.assertEqual(
-            _cnt('HaplotypeCaller'), len(self.sample_ids) * self.hc_intervals_num
+            _cnt('HaplotypeCaller'), len(self.sample_ids) * get_config()['workflow']['hc_intervals_num']
         )
         self.assertEqual(_cnt('ReblockGVCF'), len(self.sample_ids))
-        self.assertEqual(_cnt('GenotypeGVCFs'), self.jc_intervals_num)
-        self.assertEqual(_cnt('GenomicsDBImport'), self.jc_intervals_num)
-        self.assertEqual(_cnt('MakeSitesOnlyVcf'), self.jc_intervals_num)
+        self.assertEqual(_cnt('GenotypeGVCFs'), get_config()['workflow']['jc_intervals_num'])
+        self.assertEqual(_cnt('GenomicsDBImport'), get_config()['workflow']['jc_intervals_num'])
+        self.assertEqual(_cnt('MakeSitesOnlyVcf'), get_config()['workflow']['jc_intervals_num'])
         # Indel + SNP create model + SNP scattered
-        self.assertEqual(_cnt('VariantRecalibrator'), 2 + self.jc_intervals_num)
+        self.assertEqual(_cnt('VariantRecalibrator'), 2 + get_config()['workflow']['jc_intervals_num'])
         # Twice to each interva: apply indels, apply SNPs
-        self.assertEqual(_cnt('ApplyVQSR'), 2 * self.jc_intervals_num)
+        self.assertEqual(_cnt('ApplyVQSR'), 2 * get_config()['workflow']['jc_intervals_num'])
         # Gather JC, gather siteonly JC, gather VQSR
         self.assertEqual(_cnt('GatherVcfsCloud'), 3)
-        self.assertEqual(_cnt('vep '), self.vep_intervals_num)
+        self.assertEqual(_cnt('vep '), get_config()['workflow']['vep_intervals_num'])
         self.assertEqual(_cnt('vep_json_to_ht('), 1)
         self.assertEqual(_cnt('annotate_cohort('), 1)
         self.assertEqual(_cnt('annotate_dataset_mt('), len(self.datasets))
@@ -182,11 +147,12 @@ class TestPipeline(unittest.TestCase):
         """
         Stages up to joint calling.
         """
-        pipeline = self._setup_pipeline(
-            first_stage=GenotypeSample.__name__,
-            last_stage=JointGenotyping.__name__,
+        self.setup_env(
             intervals_path=utils.BASE_BUCKET
             / 'inputs/exome1pct/calling_regions.interval_list',
+        )
+        pipeline = self._setup_pipeline(
+            stages=[GenotypeSample.__name__, JointGenotyping.__name__],
         )
         result = pipeline.run(dry_run=False, wait=True)
         self.assertEqual('success', result.status()['state'])
@@ -196,11 +162,12 @@ class TestPipeline(unittest.TestCase):
         """
         VQSR needs more inputs than provided by toy regions.
         """
-        pipeline = self._setup_pipeline(
-            first_stage=Vqsr.__name__,
-            last_stage=AnnotateDataset.__name__,
+        self.setup_env(
             intervals_path=utils.BASE_BUCKET
             / 'inputs/exome5pct/calling_regions.interval_list',
+        )
+        pipeline = self._setup_pipeline(
+            stages=[Vqsr.__name__, AnnotateDataset.__name__],
         )
         # Mocking joint-calling outputs. Toy CRAM/GVCF don't produce enough variant
         # data for AS-VQSR to work properly: gatk would throw a "Bad input: Values for

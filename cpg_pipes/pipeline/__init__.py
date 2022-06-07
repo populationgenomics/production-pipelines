@@ -4,8 +4,6 @@ from .pipeline import (
     StageInput,
     StageOutput,
 )
-from .create_pipeline import create_pipeline
-from .cli_opts import pipeline_click_options
 from .exceptions import PipelineError
 from .stage_subclasses import (
     SampleStage,
@@ -14,12 +12,10 @@ from .stage_subclasses import (
 )
 
 __all__ = [
-    'create_pipeline',
     'stage',
     'skip',
     'StageInput',
     'StageOutput',
-    'pipeline_click_options',
     'PipelineError',
     'SampleStage',
     'DatasetStage',

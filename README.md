@@ -202,7 +202,7 @@ class HaplotypeCaller(SampleStage):
             cram_path=CramPath(cram_path),
             output_path=expected_path,
             scatter_count=50,
-            tmp_bucket=sample.dataset.storage_tmp_path(),
+            tmp_bucket=sample.dataset.tmp_path(),
             refs=self.refs,
             sequencing_type=sample.sequencing_type,
         )
@@ -226,7 +226,7 @@ class JointCalling(CohortStage):
             gvcf_by_sid=gvcf_by_sid,
             refs=self.refs,
             sequencing_type=cohort.get_sequencing_type(),
-            tmp_bucket=cohort.analysis_dataset.storage_tmp_path(),
+            tmp_bucket=cohort.analysis_dataset.tmp_path(),
         )
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
 ```
@@ -291,7 +291,7 @@ j = vqsr.make_vqsr_jobs(
     output_vcf_path=...,
     refs=...,
     sequencing_type=cohort.get_sequencing_type(),
-    tmp_bucket=cohort.storage_tmp_path(),
+    tmp_bucket=cohort.tmp_path(),
     use_as_annotations=True,
 )
 ```
@@ -314,10 +314,11 @@ The `cpg_pipes/pipeline/cli_opts.py` module provides CLI options for Click that 
 
 ```python
 import click
-from cpg_pipes.pipeline import create_pipeline, pipeline_click_options
+from cpg_pipes.pipeline import create_pipeline, pipeline_entry_point
+
 
 @click.command()
-@pipeline_click_options
+@pipeline_entry_point
 def main(**kwargs):
     pipeline = create_pipeline(
         name='my_pipeline',
@@ -332,11 +333,11 @@ You can add more custom options like this:
 
 ```python
 import click
-from cpg_pipes.pipeline import pipeline_click_options, create_pipeline
+from cpg_pipes.pipeline import pipeline_entry_point, create_pipeline
 
 
 @click.command()
-@pipeline_click_options
+@pipeline_entry_point
 @click.option('--custom-option')
 def main(**kwargs):
     custom_option = kwargs.pop('custom_option')

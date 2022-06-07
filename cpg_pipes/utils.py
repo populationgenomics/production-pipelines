@@ -3,13 +3,11 @@ Utility functions and constants.
 """
 
 import logging
-import os
 import sys
 import traceback
 from functools import lru_cache
 
-import click
-from typing import Any, Callable, cast
+from typing import cast
 
 from . import Path, to_path
 
@@ -29,48 +27,6 @@ DATAPROC_PACKAGES = [
     'gcloud',
     'selenium',
 ]
-
-
-def get_validation_callback(
-    ext: str = None,
-    must_exist: bool = False,
-    accompanying_metadata_suffix: str = None,
-) -> Callable:
-    """
-    Get callback for Click parameters validation
-    @param ext: check that the path has the expected extension
-    @param must_exist: check that the input file/object/directory exists
-    @param accompanying_metadata_suffix: checks that a file at the same location but
-    with a different suffix also exists (e.g. genomes.mt and genomes.metadata.ht)
-    @return: a callback suitable for Click parameter initialization
-    """
-
-    def _callback(_: click.Context, param: click.Option, value: Any):
-        if value is None:
-            return value
-        if ext:
-            assert isinstance(value, str), value
-            value = value.rstrip('/')
-            if not value.endswith(f'.{ext}'):
-                raise click.BadParameter(
-                    f'The argument {param.name} is expected to have '
-                    f'an extension .{ext}, got: {value}'
-                )
-        if must_exist:
-            if not exists(value):
-                raise click.BadParameter(f"{value} doesn't exist or incomplete")
-            if accompanying_metadata_suffix:
-                accompanying_metadata_fpath = (
-                    os.path.splitext(value)[0] + accompanying_metadata_suffix
-                )
-                if not exists(accompanying_metadata_fpath):
-                    raise click.BadParameter(
-                        f"An accompanying file {accompanying_metadata_fpath} doesn't "
-                        f'exist'
-                    )
-        return value
-
-    return _callback
 
 
 @lru_cache

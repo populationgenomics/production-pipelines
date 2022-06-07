@@ -14,11 +14,11 @@ from pathlib import Path
 import pandas as pd
 import click
 import hail as hl
+from cpg_utils.hail_batch import genome_build
 
 from cpg_pipes.hailquery import init_hail
-from cpg_pipes.providers.refdata import RefData
-from cpg_pipes.utils import get_validation_callback
 from cpg_pipes import version
+from cpg_pipes.pipeline.entry import file_validation_callback
 
 logger = logging.getLogger(__name__)
 
@@ -29,14 +29,14 @@ logger = logging.getLogger(__name__)
     '--meta-csv',
     'meta_csv_path',
     required=True,
-    callback=get_validation_callback(ext='csv', must_exist=True),
+    callback=file_validation_callback(ext='csv', must_exist=True),
     help='Sample data CSV path',
 )
 @click.option(
     '--out-mt',
     'out_mt_path',
     required=True,
-    callback=get_validation_callback(ext='mt'),
+    callback=file_validation_callback(ext='mt'),
     help='path to write the combined MatrixTable',
 )
 @click.option(
@@ -72,7 +72,7 @@ def main(
         list(samples_df.gvcf_path),
         sample_names=list(samples_df.s),  # pylint: disable=no-member
         out_file=out_mt_path,
-        reference_genome=RefData.genome_build,
+        reference_genome=genome_build(),
         use_genome_default_intervals=True,
         tmp_path=os.path.join(work_bucket, 'tmp'),
         overwrite=True,

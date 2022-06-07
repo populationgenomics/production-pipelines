@@ -15,8 +15,8 @@ from cpg_pipes.pipeline import (
 from cpg_pipes.pipeline.exceptions import StageInputNotFound
 from cpg_pipes.stages.cram_qc import SamtoolsStats, PicardWgsMetrics, VerifyBamId
 from cpg_pipes.stages.fastqc import FastQC
+from cpg_pipes.stages.somalier import CramSomalierPedigree
 from cpg_pipes.targets import Dataset
-from pipelines.somalier import CramSomalierPedigree
 
 logger = logging.getLogger(__file__)
 
@@ -110,8 +110,7 @@ class MultiQC(DatasetStage):
 
         j = multiqc(
             self.b,
-            images=self.images,
-            tmp_bucket=dataset.storage_tmp_path(),
+            tmp_bucket=dataset.tmp_path(),
             paths=paths,
             ending_to_trim=ending_to_trim,
             modules_to_trim_endings=modules_to_trim_endings,

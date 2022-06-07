@@ -4,18 +4,20 @@ Test how Hail Batch attaches disks to instances
 
 from typing import Optional
 
+from cpg_utils.config import update_dict, get_config
+
 from cpg_pipes import Namespace
-from cpg_pipes.pipeline import create_pipeline
+from cpg_pipes.pipeline.pipeline import Pipeline
 
 
 def main():  # pylint: disable=missing-function-docstring
-    pipeline = create_pipeline(
-        analysis_dataset='fewgenomes',
-        name='test_attach_disk',
-        description='test_attach_disk',
-        version='v0',
-        namespace=Namespace.TEST,
-    )
+    update_dict(get_config()['workflow'], {
+        'name': 'test_attach_disk',
+        'dataset': 'fewgenomes',
+        'access_level': 'test',
+        'datasets': ['fewgenomes'],
+    })
+    pipeline = Pipeline()
     b = pipeline.b
 
     def add_storage_job(

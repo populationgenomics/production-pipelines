@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 import pandas as pd
+from cpg_utils.hail_batch import dataset_path, web_url
 
-from . import Path
+from . import Namespace, Path, to_path
 from .types import AlignmentInput, CramPath, GvcfPath, SequencingType, FastqPairs
-from .providers.storage import StorageProvider, Namespace
 
 logger = logging.getLogger(__file__)
 
@@ -81,7 +81,7 @@ class Target:
         """
         raise NotImplementedError
 
-    def get_job_attrs(self) -> dict[str, str]:
+    def get_job_attrs(self) -> dict:
         """
         Attributes for Hail Batch job.
         """
@@ -120,16 +120,13 @@ class Cohort(Target):
         analysis_dataset_name: str,
         namespace: Namespace,
         name: str | None = None,
-        storage_provider: StorageProvider | None = None,
     ):
         super().__init__()
         self.name = name or analysis_dataset_name
         self.namespace = namespace
-        self.storage_provider = storage_provider
         self.analysis_dataset = Dataset(
             name=analysis_dataset_name,
             namespace=namespace,
-            storage_provider=self.storage_provider,
         )
         self._datasets_by_name: dict[str, Dataset] = {}
 
@@ -186,7 +183,6 @@ class Cohort(Target):
         self,
         name: str,
         namespace: Namespace | None = None,
-        storage_provider: StorageProvider | None = None,
     ) -> 'Dataset':
         """
         Create a dataset and add it to the cohort.
@@ -204,7 +200,6 @@ class Cohort(Target):
             ds = Dataset(
                 name=name,
                 namespace=namespace,
-                storage_provider=storage_provider or self.storage_provider,
             )
 
         self._datasets_by_name[ds.name] = ds
@@ -273,10 +268,8 @@ class Dataset(Target):
         self,
         name: str,
         namespace: Namespace | None = None,
-        storage_provider: StorageProvider | None = None,
     ):
         super().__init__()
-        self._storage_provider = storage_provider
         self._sample_by_id: dict[str, Sample] = {}
         self.stack, self.namespace = parse_stack(name, namespace)
 
@@ -284,7 +277,6 @@ class Dataset(Target):
     def create(
         name: str,
         namespace: Namespace,
-        storage_provider: StorageProvider | None = None,
     ) -> 'Dataset':
         """
         Create a dataset.
@@ -294,7 +286,6 @@ class Dataset(Target):
         return Dataset(
             name=name,
             namespace=namespace,
-            storage_provider=storage_provider,
         )
 
     @property
@@ -323,59 +314,43 @@ class Dataset(Target):
     def __str__(self):
         return f'{self.name} ({len(self.get_samples())} samples)'
 
-    @property
-    def storage_provider(self) -> StorageProvider:
-        """
-        Storage provider object responsible for dataset file paths.
-        """
-        if not self._storage_provider:
-            raise ValueError(
-                '_storage_provider is not set. storage_provider must be passed to the '
-                'Dataset() constructor before calling Dataset.get_bucket()'
-            )
-        return self._storage_provider
-
     def path(self, **kwargs) -> Path:
         """
         The primary storage path.
         """
-        return self.storage_provider.path(
+        return to_path(dataset_path(
             dataset=self.stack,
-            namespace=self.namespace,
             **kwargs,
-        )
+        ))
 
-    def storage_tmp_path(self, **kwargs) -> Path:
+    def tmp_path(self, **kwargs) -> Path:
         """
         Storage path for temporary files.
         """
-        return self.storage_provider.path(
-            dataset=self.stack, 
-            namespace=self.namespace,
+        return to_path(dataset_path(
+            dataset=self.stack,
             category='tmp',
             **kwargs,
-        )
+        ))
 
     def web_path(self, **kwargs) -> Path:
         """
         Path for files served by an HTTP server Matches corresponding URLs returns by
         self.web_url() URLs.
         """
-        return self.storage_provider.path(
-            dataset=self.stack, 
-            namespace=self.namespace,
+        return to_path(dataset_path(
+            dataset=self.stack,
             category='web',
-            **kwargs
-        )
+            **kwargs,
+        ))
 
     def web_url(self, **kwargs) -> str | None:
         """
         URLs matching self.storage_web_path() files serverd by an HTTP server. 
         """
-        return self.storage_provider.web_url(
-            dataset=self.stack, 
-            namespace=self.namespace, 
-            **kwargs
+        return web_url(
+            dataset=self.stack,
+            **kwargs,
         )
 
     def add_sample(
@@ -440,7 +415,7 @@ class Dataset(Target):
                 datas.append(sample.pedigree.get_ped_dict())
         df = pd.DataFrame(datas)
 
-        ped_path = (tmp_bucket or self.storage_tmp_path()) / f'{self.name}.ped'
+        ped_path = (tmp_bucket or self.tmp_path()) / f'{self.name}.ped'
         with ped_path.open('w') as fp:
             df.to_csv(fp, sep='\t', index=False)
 

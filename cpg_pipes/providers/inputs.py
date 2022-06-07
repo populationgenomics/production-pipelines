@@ -39,7 +39,7 @@ class InputProvider(ABC):
         only_samples: list[str] | None = None,
         skip_datasets: list[str] | None = None,
         ped_files: list[Path] | None = None,
-        sequencing_type: SequencingType | None = None,
+        sequencing_type: str | None = None,
     ) -> Cohort:
         """
         Add datasets in the cohort. There exists only one cohort for
@@ -51,9 +51,7 @@ class InputProvider(ABC):
                 if skip_datasets and ds_name in skip_datasets:
                     logger.info(f'Requested to skipping dataset {ds_name}')
                     continue
-                dataset = Dataset.create(
-                    ds_name, cohort.namespace, cohort.storage_provider
-                )
+                dataset = Dataset.create(ds_name, cohort.namespace)
                 entries = self._get_entries(
                     dataset,
                     skip_samples=skip_samples,
@@ -83,8 +81,7 @@ class InputProvider(ABC):
             raise InputProviderError(msg)
         
         self.populate_alignment_inputs(cohort)
-        if sequencing_type:
-            self.filter_sequencing_type(cohort, sequencing_type)
+        self.filter_sequencing_type(cohort, SequencingType.parse(sequencing_type))
         self.populate_analysis(cohort)
         self.populate_participants(cohort)
         self.populate_pedigree(cohort)
@@ -146,10 +143,12 @@ class InputProvider(ABC):
         """
 
     @staticmethod    
-    def filter_sequencing_type(cohort: Cohort, sequencing_type: SequencingType):
+    def filter_sequencing_type(cohort: Cohort, sequencing_type: SequencingType | None):
         """
         Filtering to the samples with only requested sequencing types.
         """
+        if not sequencing_type:
+            return
         for s in cohort.get_samples():
             if not s.alignment_input_by_seq_type:
                 logger.warning(f'{s}: skipping, because no sequencing inputs found')
@@ -385,7 +384,9 @@ class CsvInputProvider(InputProvider):
         """
         Get sequencing type.
         """
-        return SequencingType.parse(entry[FieldMap.sequencing_type.value])
+        result = SequencingType.parse(entry[FieldMap.sequencing_type.value])
+        assert result
+        return result
 
     def populate_analysis(self, cohort: Cohort) -> None:
         """
@@ -443,8 +444,9 @@ class CsvInputProvider(InputProvider):
                 if existing_pairs:
                     if not isinstance(existing_pairs, FastqPairs):
                         raise InputProviderError(
-                            f'Mixed sequencing inputs for sample {id}, type '
-                            f'{seq_type.value}: existing {existing_pairs}, new {pairs}'
+                            f'Mixed sequencing inputs for sample {id}, '
+                            f'type {seq_type.value}: existing: {existing_pairs}, '
+                            f'new: {pairs}'
                         )
                     existing_pairs += pairs
                 else:
@@ -457,7 +459,7 @@ class CsvInputProvider(InputProvider):
                 if (sid, seq_type) in data:
                     raise InputProviderError(
                         f'Cannot have multiple CRAM/BAM sequencing inputs of the same'
-                        f'type for one sample. Sample: {id}, existing {seq_type.value}'
+                        f'type for one sample. Sample: {id}, type {seq_type.value}, '
                         f'data: {data[(sid, seq_type)]}, new data: {cram}'
                     )
                 data[(sid, seq_type)] = CramPath(cram)

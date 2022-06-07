@@ -4,10 +4,10 @@ Stage that generates a GVCF file.
 
 import logging
 import hailtop.batch as hb
+from cpg_utils.config import get_config
 
 from .. import Path
 from ..jobs import split_intervals, haplotype_caller
-from cpg_pipes.providers.refdata import RefData
 from ..targets import Sample
 from ..pipeline import stage, SampleStage, StageInput, StageOutput
 from .align import Align
@@ -34,17 +34,15 @@ class GenotypeSample(SampleStage):
         """
         Use function from the jobs module
         """
-        scatter_count = self.pipeline_config.get(
+        scatter_count = get_config()['workflow'].get(
             'hc_intervals_num',
-            RefData.number_of_haplotype_caller_intervals,
+            haplotype_caller.DEFAULT_INTERVALS_NUM,
         )
         jobs = []
         if GenotypeSample.hc_intervals is None and scatter_count > 1:
             intervals_j, intervals = split_intervals.get_intervals(
                 b=self.b,
-                refs=self.refs,
-                images=self.images,
-                intervals_path=self.pipeline_config.get('intervals_path'),
+                intervals_path=get_config()['workflow'].get('intervals_path'),
                 sequencing_type=sample.sequencing_type,
                 scatter_count=scatter_count,
                 job_attrs=self.get_job_attrs(),
@@ -58,10 +56,8 @@ class GenotypeSample(SampleStage):
                 sample_name=sample.id,
                 cram_path=sample.get_cram_path(),
                 intervals=GenotypeSample.hc_intervals,
-                refs=self.refs,
-                images=self.images,
                 tmp_bucket=self.tmp_bucket / sample.id,
-                overwrite=not self.check_intermediates,
+                overwrite=not get_config()['workflow'].get('self.check_intermediates'),
                 job_attrs=self.get_job_attrs(sample),
             )
         )

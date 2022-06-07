@@ -2,16 +2,15 @@
 Create Hail Batch jobs for alignment QC.
 """
 import logging
+
+from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
 from cpg_pipes import utils
-from cpg_pipes.providers.images import Images
 from cpg_pipes.types import CramPath
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-
-from cpg_pipes.providers.refdata import RefData
 
 logger = logging.getLogger(__file__)
 
@@ -19,8 +18,6 @@ logger = logging.getLogger(__file__)
 def samtools_stats(
     b,
     cram_path: CramPath,
-    refs: RefData,
-    images: Images,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     overwrite: bool = False,
@@ -36,10 +33,10 @@ def samtools_stats(
         j.name += ' [reuse]'
         return j
 
-    j.image(images.get('samtools'))
+    j.image(image_path('samtools'))
     job_resource = STANDARD.set_resources(j, storage_gb=60)
     cram = cram_path.resource_group(b)
-    reference = refs.fasta_res_group(b)
+    reference = fasta_res_group(b)
 
     cmd = f"""\
     samtools stats \\
@@ -56,8 +53,6 @@ def samtools_stats(
 def verify_bamid(
     b,
     cram_path: CramPath,
-    refs: RefData,
-    images: Images,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     overwrite: bool = False,
@@ -74,12 +69,13 @@ def verify_bamid(
         j.name += ' [reuse]'
         return j
 
-    j.image(images.get('verify-bam-id'))
+    j.image(image_path('verify-bam-id'))
     STANDARD.set_resources(j, storage_gb=60)
     cram = cram_path.resource_group(b)
-    reference = refs.fasta_res_group(b)
-    cont_ref_d = refs.cont_ref_d
-    res_group = b.read_input_group(**{k: str(v) for k, v in cont_ref_d.items()})
+    reference = fasta_res_group(b)
+    contam_ud = reference_path('broad/contam_ud')
+    contam_bed = reference_path('broad/contam_bed')
+    contam_mu = reference_path('broad/contam_mu')
 
     cmd = f"""\
     # creates a *.selfSM file, a TSV file with 2 rows, 19 columns.
@@ -90,11 +86,11 @@ def verify_bamid(
     --Output OUTPUT \
     --BamFile {cram.cram} \
     --Reference {reference.base} \
-    --UDPath {res_group.ud} \
-    --MeanPath {res_group.mu} \
-    --BedPath {res_group.bed} \
+    --UDPath {b.read_input(contam_ud)} \
+    --MeanPath {b.read_input(contam_mu)} \
+    --BedPath {b.read_input(contam_bed)} \
     1>/dev/null
-    
+
     cp OUTPUT.selfSM {j.out_selfsm}
     """
 
@@ -106,8 +102,6 @@ def verify_bamid(
 def picard_wgs_metrics(
     b,
     cram_path: CramPath,
-    refs: RefData,
-    images: Images,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     overwrite: bool = False,
@@ -125,11 +119,13 @@ def picard_wgs_metrics(
         j.name += ' [reuse]'
         return j
 
-    j.image(images.get('picard'))
+    j.image(image_path('picard'))
     res = STANDARD.set_resources(j, storage_gb=60)
     cram = cram_path.resource_group(b)
-    reference = refs.fasta_res_group(b)
-    interval_file = b.read_input(str(refs.wgs_coverage_interval_list))
+    reference = fasta_res_group(b)
+    interval_file = b.read_input(
+        str(reference_path('broad/genome_coverage_interval_list'))
+    )
 
     cmd = f"""\
     picard -Xms2000m -Xmx{res.get_java_mem_mb()}m \

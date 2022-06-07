@@ -4,9 +4,11 @@ Stage that performs joint genotyping of GVCFs using GATK.
 
 import logging
 
+from cpg_utils.config import get_config
+
 from .. import Path
 from ..types import GvcfPath
-from ..jobs.joint_genotyping import make_joint_genotyping_jobs, JointGenotyperTool
+from ..jobs import joint_genotyping
 from ..targets import Cohort
 from ..pipeline import stage, CohortStage, StageInput, StageOutput, PipelineError
 from .genotype_sample import GenotypeSample
@@ -51,21 +53,21 @@ class JointGenotyping(CohortStage):
                 f'GVCFs, exiting'
             )
 
-        jobs = make_joint_genotyping_jobs(
+        jobs = joint_genotyping.make_joint_genotyping_jobs(
             b=self.b,
             out_vcf_path=self.expected_outputs(cohort)['vcf'],
             out_siteonly_vcf_path=self.expected_outputs(cohort)['siteonly'],
             tmp_bucket=self.tmp_bucket,
             gvcf_by_sid=gvcf_by_sid,
-            refs=self.refs,
-            images=self.images,
-            overwrite=not self.check_intermediates,
-            tool=JointGenotyperTool.GnarlyGenotyper
-            if self.pipeline_config.get('use_gnarly', False)
-            else JointGenotyperTool.GenotypeGVCFs,
-            scatter_count=self.pipeline_config.get('jc_intervals_num'),
+            overwrite=not get_config()['workflow'].get('self.check_intermediates'),
+            tool=joint_genotyping.JointGenotyperTool.GnarlyGenotyper
+            if get_config()['workflow'].get('use_gnarly', False)
+            else joint_genotyping.JointGenotyperTool.GenotypeGVCFs,
+            scatter_count=get_config()['workflow'].get(
+                'jc_intervals_num', joint_genotyping.DEFAULT_INTERVALS_NUM
+            ),
             sequencing_type=cohort.get_sequencing_type(),
-            intervals_path=self.pipeline_config.get('intervals_path'),
+            intervals_path=get_config()['workflow'].get('intervals_path'),
             job_attrs=self.get_job_attrs(),
         )
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)

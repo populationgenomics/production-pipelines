@@ -5,13 +5,12 @@ Create Hail Batch jobs to split genomics intervals for parallel variant calling.
 import logging
 
 import hailtop.batch as hb
+from cpg_utils.hail_batch import reference_path, image_path
 from hailtop.batch.job import Job
 
 from cpg_pipes import utils, Path
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.providers.images import Images
 from cpg_pipes.types import SequencingType
-from cpg_pipes.providers.refdata import RefData
 from cpg_pipes.hb.command import wrap_command
 
 logger = logging.getLogger(__file__)
@@ -19,10 +18,8 @@ logger = logging.getLogger(__file__)
 
 def get_intervals(
     b: hb.Batch,
-    refs: RefData,
-    images: Images,
     scatter_count: int,
-    intervals_path: Path | None = None,
+    intervals_path: Path | str | None = None,
     sequencing_type: SequencingType = SequencingType.GENOME,
     job_attrs: dict | None = None,
 ) -> tuple[Job, list[hb.Resource]]:
@@ -45,7 +42,7 @@ def get_intervals(
     job_attrs = (job_attrs or {}) | dict(tool='picard_IntervalListTools')
     j = b.new_job(f'Make {scatter_count} intervals', job_attrs)
     cache_bucket = (
-        refs.intervals_prefix / sequencing_type.value / f'{scatter_count}intervals'
+        reference_path('intervals_prefix') / sequencing_type.value / f'{scatter_count}intervals'
     )
 
     if intervals_path:
@@ -61,9 +58,11 @@ def get_intervals(
                 for idx in range(scatter_count)
             ]
         # Taking intervals file for the sequencing_type.
-        intervals_path = refs.calling_interval_lists[sequencing_type]
+        intervals_path = reference_path(
+            f'broad/{sequencing_type.value}_calling_interval_lists',
+        )
 
-    j.image(images.get('picard'))
+    j.image(image_path('picard'))
     STANDARD.set_resources(j, storage_gb=16, mem_gb=2)
 
     break_bands_at_multiples_of = {
