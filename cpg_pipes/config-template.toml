@@ -247,3 +247,8 @@ hapmap_ht = 'hapmap/hapmap_3.3.hg38.ht'
 kgp_omni_ht = 'kgp/1000G_omni2.5.hg38.ht'
 kgp_hc_ht = 'kgp/1000G_phase1.snps.high_confidence.hg38.ht'
 mills_ht = 'mills/Mills_and_1000G_gold_standard.indels.hg38.ht'
+
+[references.seqr]
+prefix = 'seqr/v0-1'
+combined_reference = 'combined_reference_data_grch38-2.0.4.ht'
+clinvar = 'clinvar.GRCh38.ht'
