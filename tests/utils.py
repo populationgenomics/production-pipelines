@@ -5,6 +5,10 @@ import string
 import time
 from random import choices
 
+import toml
+from cpg_utils import Path
+from cpg_utils.config import set_config_paths
+
 from cpg_pipes import to_path, Namespace
 from cpg_pipes.types import GvcfPath, FastqPair, SequencingType
 
@@ -64,3 +68,32 @@ def timestamp():
     """
     rand_bit = ''.join(choices(string.ascii_uppercase + string.digits, k=3))
     return time.strftime('%Y-%m%d-%H%M') + rand_bit
+
+
+def setup_env(timestamp_: str, tmp_bucket: Path):
+    """Create config for tests"""
+    conf = {
+        'workflow': {
+            'dataset': DATASET,
+            'dataset_gcp_project': DATASET,
+            'check_intermediates': False,
+            'check_expected_outputs': False,
+            'access_level': 'test',
+            'realignment_shards_num': 4,
+            'hc_intervals_num': 4,
+            'jc_intervals_num': 4,
+            'vep_intervals_num': 4,
+            'version': timestamp_,
+        },
+        'hail': {
+            'billing_project': DATASET,
+            'bucket': str(tmp_bucket),
+        },
+        'elasticsearch': {
+            'password': 'TEST',
+        }
+    }
+    config_path = tmp_bucket / 'config.toml'
+    with config_path.open('w') as f:
+        toml.dump(conf, f)
+    set_config_paths([str(config_path)])

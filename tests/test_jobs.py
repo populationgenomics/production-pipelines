@@ -8,12 +8,11 @@ import unittest
 from typing import Dict
 from unittest import skip
 
-from hailtop.batch.job import Job
-
 from cpg_utils.config import get_config, update_dict
 from cpg_utils.hail_batch import image_path, fasta_res_group
+from hailtop.batch.job import Job
 
-from cpg_pipes import Path, to_path, Namespace
+from cpg_pipes import Path, to_path
 from cpg_pipes import benchmark
 from cpg_pipes.hailquery import init_batch
 from cpg_pipes.jobs import vep
@@ -60,8 +59,6 @@ class TestJobs(unittest.TestCase):
 
     def setUp(self):
         """Set up test environment"""
-        utils.setup_env()
-
         self.name = self._testMethodName
         self.timestamp = utils.timestamp()
         logger.info(f'Timestamp: {self.timestamp}')
@@ -328,8 +325,6 @@ class TestJobs(unittest.TestCase):
             out_path=out_vcf_path,
             scatter_count=4,
             overwrite=False,
-            hail_billing_project=utils.DATASET,
-            hail_bucket=self.tmp_bucket,
             tmp_bucket=self.tmp_bucket,
             intervals_path=utils.BASE_BUCKET
             / 'inputs/exome1pct/calling_regions.interval_list',
@@ -416,8 +411,6 @@ class TestJobs(unittest.TestCase):
         vep.gather_vep_json_to_ht(
             b=self.pipeline.b,
             vep_results_paths=[vep_json_list_path],
-            hail_billing_project=utils.DATASET,
-            hail_bucket=self.tmp_bucket,
             out_path=out_path,
         )
         self.pipeline.run(wait=True)
@@ -454,8 +447,6 @@ class TestJobs(unittest.TestCase):
             output_mt_path=out_mt_path,
             checkpoints_bucket=self.tmp_bucket / 'checkpoints',
             sequencing_type=self.sequencing_type,
-            hail_billing_project=utils.DATASET,
-            hail_bucket=self.tmp_bucket,
         )
         self.pipeline.run(wait=True)
 
@@ -480,8 +471,6 @@ class TestJobs(unittest.TestCase):
             output_mt_path=out_mt_path,
             checkpoints_bucket=self.tmp_bucket / 'checkpoints',
             sequencing_type=self.sequencing_type,
-            hail_billing_project=utils.DATASET,
-            hail_bucket=self.tmp_bucket,
         )
         self.pipeline.run(wait=True)
 
@@ -509,8 +498,6 @@ class TestJobs(unittest.TestCase):
             sample_ids=utils.SAMPLES[:3],
             tmp_bucket=self.tmp_bucket,
             output_mt_path=out_mt_path,
-            hail_billing_project=utils.DATASET,
-            hail_bucket=self.tmp_bucket,
         )
         self.pipeline.run(wait=True)
 

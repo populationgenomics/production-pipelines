@@ -42,32 +42,12 @@ class TestPipeline(unittest.TestCase):
         self.sample_ids = utils.SAMPLES[:3]
         
         self.config_path = self.tmp_bucket / 'config.toml'
-        
+
     def setup_env(self, intervals_path: str | None = None):
         """
         Mock analysis-runner environment.
         """
-        config = {
-            'workflow': {
-                'dataset': utils.DATASET,
-                'dataset_gcp_project': utils.DATASET,
-                'check_intermediates': False,
-                'check_expected_outputs': False,
-                'access_level': 'test',
-                'realignment_shards_num': 4,
-                'hc_intervals_num': 4,
-                'jc_intervals_num': 4,
-                'vep_intervals_num': 4,
-                'version': self.timestamp,
-            },
-            'hail': {
-                'billing_project': utils.DATASET,
-                'bucket': str(self.tmp_bucket),
-            },
-            'elasticsearch': {
-                'password': 'TEST',
-            }
-        }
+        config = utils.setup_env(self.timestamp, self.tmp_bucket)
         if intervals_path:
             config['workflow']['intervals_path'] = intervals_path
         with self.config_path.open('w') as f:

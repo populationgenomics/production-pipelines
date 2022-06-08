@@ -22,7 +22,7 @@ def main():
     """
     Generate data for unit tests
     """
-    utils.setup_env()
+    utils.config()
     pipeline = Pipeline(
         name='make_test_data',
         description='Make test data',
