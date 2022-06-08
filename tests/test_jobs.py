@@ -227,22 +227,6 @@ class TestJobs(unittest.TestCase):
         )
         self.batch.run(wait=False)
 
-    def test_fastqc_cram(self):
-        """
-        Test fastqc from CRAM input
-        """
-        sid = 'CPG196519'
-        cram_path = CramPath(utils.BASE_BUCKET / f'inputs/toy/cram/{sid}.cram')
-        output_html_path = self.out_bucket / 'result.html'
-        output_zip_path = self.out_bucket / 'result.zip'
-        fastqc(
-            self.batch,
-            alignment_input=cram_path,
-            output_html_path=output_html_path,
-            output_zip_path=output_zip_path,
-        )
-        self.batch.run(wait=False)
-
     def test_genotype_sample(self):
         """
         Test individual sample haplotype calling.

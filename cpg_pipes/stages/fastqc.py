@@ -11,6 +11,7 @@ from ..jobs import fastqc
 from ..jobs.align import process_alignment_input
 from ..targets import Sample
 from ..pipeline import stage, SampleStage, StageInput, StageOutput
+from ..types import CramPath
 
 logger = logging.getLogger(__file__)
 
@@ -41,14 +42,21 @@ class FastQC(SampleStage):
             seq_type=get_config()['workflow'].get('sequencing_type'),
             realign_cram_ver=get_config()['workflow'].get('realign_from_cram_version'),
         )
+        if isinstance(alignment_input, CramPath) and alignment_input.is_bam:
+            logger.info(
+                f'FastQC input {sample} has CRAM inputs {alignment_input} '
+                f'for type {seq_type.value}, skipping FASTQC'
+            )
+            return self.make_outputs(sample, skipped=True)
 
         if alignment_input is None or (
-            get_config()['workflow'].get('check_inputs') and not alignment_input.exists()
+            get_config()['workflow'].get('check_inputs') 
+            and not alignment_input.exists()
         ):
             if get_config()['workflow'].get('skip_samples_with_missing_input'):
                 logger.error(f'No alignment inputs, skipping sample {sample.id}')
                 sample.active = False
-                return self.make_outputs(sample)  # return empty output
+                return self.make_outputs(sample, skipped=True)  # return empty output
             else:
                 return self.make_outputs(
                     target=sample, error_msg=f'No alignment input found'

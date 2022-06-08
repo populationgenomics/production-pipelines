@@ -70,6 +70,7 @@ class StageOutput:
         data: StageOutputData | str | dict[str, str] | None = None,
         jobs: list[Job] | Job | None = None,
         reusable: bool = False,
+        skipped: bool = False,
         error_msg: str | None = None,
         stage: Optional['Stage'] = None,
     ):
@@ -86,6 +87,7 @@ class StageOutput:
         self.target = target
         self.jobs: list[Job] = [jobs] if isinstance(jobs, Job) else (jobs or [])
         self.reusable = reusable
+        self.skipped = skipped
         self.error_msg = error_msg
 
     def __repr__(self) -> str:
@@ -94,6 +96,7 @@ class StageOutput:
             f' target={self.target}'
             f' stage={self.stage}'
             + (f' [reusable]' if self.reusable else '')
+            + (f' [skipped]' if self.skipped else '')
             + (f' [error: {self.error_msg}]' if self.error_msg else '')
             + f')'
         )
@@ -473,6 +476,7 @@ class Stage(Generic[TargetT], ABC):
         data: StageOutputData | str | dict[str, str] | None = None,
         jobs: list[Job] | Job | None = None,
         reusable: bool = False,
+        skipped: bool = False,
         error_msg: str | None = None,
     ) -> StageOutput:
         """
@@ -483,6 +487,7 @@ class Stage(Generic[TargetT], ABC):
             data=data,
             jobs=jobs,
             reusable=reusable,
+            skipped=skipped,
             error_msg=error_msg,
             stage=self,
         )
@@ -839,6 +844,8 @@ class Pipeline:
             keep_scratch = get_config()['hail'].get('keep_scratch')
 
         _stages_in_order = stages or self._stages or _ALL_DECLARED_STAGES
+        if not _stages_in_order:
+            raise PipelineError('No stages added')
         self.set_stages(_stages_in_order, force_all_implicit_stages)
 
         result = None

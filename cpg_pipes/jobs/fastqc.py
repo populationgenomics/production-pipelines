@@ -5,11 +5,11 @@ from os.path import basename
 from typing import cast
 
 import hailtop.batch as hb
-from cpg_utils.hail_batch import image_path, fasta_res_group
+from cpg_utils.hail_batch import image_path
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
-from cpg_pipes.types import AlignmentInput, CramPath, FastqPath, FastqPairs
+from cpg_pipes.types import AlignmentInput, CramPath, FastqPath, FastqPairs, FastqPair
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 
@@ -25,6 +25,8 @@ def fastqc(
     """
     Adds FastQC jobs. If the input is a set of fqs, runs FastQC on each fq file.
     """
+    if isinstance(alignment_input, CramPath) and alignment_input.is_bam:
+        raise NotImplementedError('FastQC does not support CRAM input')
 
     def _fastqc_one(jname_, input_path: CramPath | FastqPath):
         j = b.new_job(jname_, job_attrs)
@@ -33,35 +35,21 @@ def fastqc(
 
         cmd = ''
         input_file = b.read_input(str(input_path))
-        if isinstance(input_path, CramPath) and not input_path.is_bam:
-            new_file = f'/io/batch/{basename(str(input_path))}'
-            # FastQC doesn't support CRAMs, converting CRAM->BAM
-            cmd += f"""\
-            samtools view \\
-            -T {fasta_res_group(b).base} \\
-            -@{threads - 1} \\
-            -b {input_file} \\
-            {"--subsample 0.01" if subsample else ''} \\
-            -O {new_file}
-            rm {input_file} 
-            """
-            input_file = new_file
-
         fname = basename(str(input_path))
-        if not str(input_path).endswith('.gz'):
-            cmd += f"""\
-            mv {input_file} {input_file}.gz
-            """
-            input_file = f'{input_file}.gz'
-            fname += '.gz'
-
-        if subsample and not isinstance(input_path, CramPath):
-            n = 10_000_000
-            new_file = f'/io/batch/{fname}'
-            cmd += f"""\
-            gunzip -c {input_file} | head -n{n * 4} | gzip -c > {new_file}
-            """
-            input_file = new_file
+        if isinstance(input_path, FastqPair):
+            if not str(input_path).endswith('.gz'):
+                cmd += f"""\
+                mv {input_file} {input_file}.gz
+                """
+                input_file = f'{input_file}.gz'
+                fname += '.gz'
+            if subsample:
+                n = 10_000_000
+                new_file = f'/io/batch/{fname}'
+                cmd += f"""\
+                gunzip -c {input_file} | head -n{n * 4} | gzip -c > {new_file}
+                """
+                input_file = new_file
 
         cmd += f"""\
         mkdir -p /io/batch/outdir
