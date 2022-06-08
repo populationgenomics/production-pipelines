@@ -37,7 +37,6 @@ def multiqc(
     """
     Run MultiQC for the files in `qc_paths`
     @param b: batch object
-    @param images: Images object
     @param tmp_bucket: bucket for tmp files
     @param paths: file bucket paths to pass into MultiQC
     @param dataset_name: dataset name

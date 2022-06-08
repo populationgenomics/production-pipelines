@@ -1,8 +1,19 @@
 [workflow]
 access_level = 'full'
 dataset = 'seqr'
-datasets = ['acute-care']
-skip_datasets = ['flinders-ophthal']
+datasets = [
+    'acute-care', 
+    'perth-neuro', 
+    'ravenscroft-rdstudy', 
+    'circa', 
+    'heartkids', 
+    'ohmr3-mendelian', 
+    'ohmr4-epilepsy',
+    'rdnow',
+    'mito-disease',
+    'ravenscroft-arch',
+    'hereditary-neuro',
+]
 skip_samples = [
   'CPG11783',   # acute-care, no FASTQ data
   'CPG13326',   # perth-neuro, no FASTQ data: https://github.com/populationgenomics/seqr-private/issues/2
@@ -11,15 +22,18 @@ skip_samples = [
 check_inputs = true
 skip_samples_with_missing_input = true
 keep_scratch = true
-#status_reporter = 'cpg'
+status_reporter = 'smdb'
 #slack_channel: 'seqr-loader'
 #skip_samples_stages:
 #  VerifyBamId: [CPG13409]  # https://batch.hail.populationgenomics.org.au/batches/56236/jobs/372
-es_password_secret_id = 'seqr-es-password'
-es_password_project_id = 'seqr-308602'
-
-[genomics]
 sequencing_type = 'genome'
+dataset_gcp_project = 'seqr-308602'
+
+[seqr]
+password_secret_id = 'seqr-es-password'
+password_project_id = 'seqr-308602'
 
 [hail]
-hail_pool_label = 'seqr'
+pool_label = 'seqr'
+billing_project = 'seqr'
+bucket = 'gs://cpg-seqr-hail'

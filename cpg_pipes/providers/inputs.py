@@ -154,10 +154,11 @@ class InputProvider(ABC):
                 logger.warning(f'{s}: skipping, because no sequencing inputs found')
                 s.active = False
             elif sequencing_type not in s.alignment_input_by_seq_type:
+                avail_types = s.alignment_input_by_seq_type.keys()
                 logger.warning(
                     f'{s}: skipping because no inputs with data type '
                     f'"{sequencing_type.value}" found in '
-                    f'{list(s.alignment_input_by_seq_type.keys())}'
+                    f'{[k.value for k in avail_types]}'
                 )
                 s.active = False
 
