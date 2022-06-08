@@ -73,7 +73,7 @@ class StatusReporter(ABC):
         analysis_status: str,
         target: Target,
         meta: dict | None = None,        
-    ) -> int:
+    ) -> int | None:
         """Record analysis entry"""
 
     def slack_env(self, j: Job):

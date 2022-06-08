@@ -80,14 +80,13 @@ class CpgStatusReporter(StatusReporter):
             return []
         # Interacting with the sample metadata server:
         # 1. Create a "queued" analysis
-        aid = self.create_analysis(
+        if (aid := self.create_analysis(
             output=str(output),
             analysis_type=analysis_type,
             analysis_status='queued',
             target=target,
             meta=meta,
-        )
-        if aid is None:
+        )) is None:
             raise StatusReporterError(
                 'SmdbStatusReporter error: failed to create analysis'
             )
@@ -121,14 +120,14 @@ class CpgStatusReporter(StatusReporter):
         analysis_status: str,
         target: Target,
         meta: dict | None = None,        
-    ) -> int:
+    ) -> int | None:
         """Record analysis entry"""
         return self.smdb.create_analysis(
             output=output,
             type_=analysis_type,
             status=analysis_status,
             sample_ids=target.get_sample_ids(),
-            meta=meta | dict(
+            meta=(meta or {}) | dict(
                 sample_num=len(target.get_samples()),
                 samples=target.get_sample_ids(),
             ),
