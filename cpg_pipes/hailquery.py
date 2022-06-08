@@ -13,10 +13,8 @@ import time
 from pathlib import Path
 from typing import List, Optional, Union
 import hail as hl
+from cpg_utils.hail_batch import genome_build, reference_path
 from hail.utils.java import Env
-
-from cpg_pipes.providers.refdata import RefData
-
 
 logger = logging.getLogger(__file__)
 
@@ -30,7 +28,7 @@ def init_batch(billing_project: str, hail_bucket: Path | str):
         return
     asyncio.get_event_loop().run_until_complete(
         hl.init_batch(
-            default_reference=RefData.genome_build,
+            default_reference=genome_build(),
             billing_project=billing_project,
             remote_tmpdir=str(hail_bucket),
             token=os.environ['HAIL_TOKEN'],
@@ -52,13 +50,12 @@ def init_hail(name: str, local_tmp_dir: Path = None):
     timestamp = time.strftime('%Y-%m%d-%H%M') + rand_bit
     local_tmp_dir.mkdir(parents=True)
     hl_log = local_tmp_dir / f'{name}-{timestamp}.log'
-    hl.init(default_reference=RefData.genome_build, log=str(hl_log))
+    hl.init(default_reference=genome_build(), log=str(hl_log))
     return local_tmp_dir
 
 
 def filter_low_conf_regions(
     mt: Union[hl.MatrixTable, hl.Table],
-    refs: RefData,
     filter_lcr: bool = True,
     filter_segdup: bool = True,
     filter_telomeres_and_centromeres: bool = False,
@@ -77,15 +74,15 @@ def filter_low_conf_regions(
     """
     criteria = []
     if filter_lcr:
-        lcr = hl.read_table(refs.lcr_intervals_ht)
+        lcr = hl.read_table(str(reference_path('gnomad/lcr_intervals_ht')))
         criteria.append(hl.is_missing(lcr[mt.locus]))
 
     if filter_segdup:
-        segdup = hl.read_table(refs.seg_dup_intervals_ht)
+        segdup = hl.read_table(str(reference_path('gnomad/seg_dup_intervals_ht')))
         criteria.append(hl.is_missing(segdup[mt.locus]))
 
     if filter_telomeres_and_centromeres:
-        telomeres_and_centromeres = hl.read_table(refs.tel_and_cent_ht)
+        telomeres_and_centromeres = hl.read_table(str(reference_path('gnomad/tel_and_cent_ht')))
         criteria.append(hl.is_missing(telomeres_and_centromeres[mt.locus]))
 
     if high_conf_regions is not None:
@@ -103,7 +100,7 @@ def filter_low_conf_regions(
     return mt
 
 
-def get_truth_ht(refs: RefData) -> hl.Table:
+def get_truth_ht() -> hl.Table:
     """
     Return a table with annotations from the latest version of the corresponding truth data.
 
@@ -116,11 +113,11 @@ def get_truth_ht(refs: RefData) -> hl.Table:
     @return: A table with the latest version of popular truth data annotations
     """
     return (
-        hl.read_table(refs.hapmap_ht)
+        hl.read_table(str(reference_path('gnomad/hapmap_ht')))
         .select(hapmap=True)
-        .join(hl.read_table(refs.kgp_omni_ht).select(omni=True), how='outer')
-        .join(hl.read_table(refs.kgp_hc_ht).select(kgp_phase1_hc=True), how='outer')
-        .join(hl.read_table(refs.mills_ht).select(mills=True), how='outer')
+        .join(hl.read_table(str(reference_path('gnomad/kgp_omni_ht'))).select(omni=True), how='outer')
+        .join(hl.read_table(str(reference_path('gnomad/kgp_hc_ht'))).select(kgp_phase1_hc=True), how='outer')
+        .join(hl.read_table(str(reference_path('gnomad/mills_ht'))).select(mills=True), how='outer')
         .repartition(200, shuffle=False)
         .persist()
     )
