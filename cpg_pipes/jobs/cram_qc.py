@@ -86,9 +86,9 @@ def verify_bamid(
     --Output OUTPUT \
     --BamFile {cram.cram} \
     --Reference {reference.base} \
-    --UDPath {b.read_input(contam_ud)} \
-    --MeanPath {b.read_input(contam_mu)} \
-    --BedPath {b.read_input(contam_bed)} \
+    --UDPath {b.read_input(str(contam_ud))} \
+    --MeanPath {b.read_input(str(contam_mu))} \
+    --BedPath {b.read_input(str(contam_bed))} \
     1>/dev/null
 
     cp OUTPUT.selfSM {j.out_selfsm}
