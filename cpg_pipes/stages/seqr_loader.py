@@ -101,17 +101,19 @@ class AnnotateDataset(DatasetStage):
         )
 
 
-@stage(required_stages=[AnnotateDataset])
+@stage(required_stages=[AnnotateDataset], analysis_type='es-index')
 class LoadToEs(DatasetStage):
     """
     Create a Seqr index.
     """
 
-    def expected_outputs(self, dataset: Dataset) -> None:
+    def expected_outputs(self, dataset: Dataset) -> str:
         """
         Expected to generate a Seqr index, which is not a file
         """
-        return None
+        version = time.strftime('%Y%m%d-%H%M%S')
+        index_name = f'{dataset.name}-{version}'
+        return index_name
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
@@ -124,8 +126,7 @@ class LoadToEs(DatasetStage):
             return self.make_outputs(dataset)
 
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset)
-        version = time.strftime('%Y%m%d-%H%M%S')
-        index_name = f'{dataset.name}-{version}'
+        index_name = self.expected_outputs(dataset)
 
         from analysis_runner import dataproc
         j = dataproc.hail_dataproc_job(
@@ -143,12 +144,4 @@ class LoadToEs(DatasetStage):
             attributes=self.get_job_attrs(dataset) | dict(tool='query'),
         )
         jobs = [j]
-        if self.status_reporter:
-            jobs = self.status_reporter.add_updaters_jobs(
-                self.b,
-                output=index_name,
-                analysis_type='es-index',
-                target=dataset,
-                jobs=jobs,
-            )
-        return self.make_outputs(dataset, jobs=jobs)
+        return self.make_outputs(dataset, data=index_name, jobs=jobs)

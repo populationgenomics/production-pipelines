@@ -59,10 +59,22 @@ class StatusReporter(ABC):
         target: Target,
         jobs: list[Job] | None = None,
         prev_jobs: list[Job] | None = None,
+        meta: dict | None = None,
     ) -> list[Job]:
         """
         Add Hail Batch jobs that update the analysis status.
         """
+
+    @abstractmethod
+    def create_analysis(
+        self,
+        output: str,
+        analysis_type: str,
+        analysis_status: str,
+        target: Target,
+        meta: dict | None = None,        
+    ) -> int:
+        """Record analysis entry"""
 
     def slack_env(self, j: Job):
         """

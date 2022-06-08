@@ -24,6 +24,7 @@ class JobAttributes(TypedDict, total=False):
     sample: str
     dataset: str
     samples: list[str]
+    datasets: list[str]
     part: str
     label: str
     stage: str
