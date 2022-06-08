@@ -664,7 +664,7 @@ class Stage(Generic[TargetT], ABC):
         """
         seq_type = SequencingType.parse(get_config()['workflow']['sequencing_type'])
         job_attrs = dict(
-            seq_type=seq_type.value, 
+            seq_type=seq_type.value,
             stage=self.name,
         )
         if target:
