@@ -47,12 +47,10 @@ class TestPipeline(unittest.TestCase):
         """
         Mock analysis-runner environment.
         """
-        config = utils.setup_env(self.timestamp, self.tmp_bucket)
+        conf = {'workflow': {'version': self.timestamp}}
         if intervals_path:
-            config['workflow']['intervals_path'] = intervals_path
-        with self.config_path.open('w') as f:
-            toml.dump(config, f)
-        set_config_paths([str(self.config_path)])
+            conf['workflow']['intervals_path'] = intervals_path
+        utils.setup_env(self.tmp_bucket, conf)
 
     def tearDown(self) -> None:
         """

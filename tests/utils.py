@@ -7,7 +7,7 @@ from random import choices
 
 import toml
 from cpg_utils import Path
-from cpg_utils.config import set_config_paths
+from cpg_utils.config import set_config_paths, update_dict
 
 from cpg_pipes import to_path, Namespace
 from cpg_pipes.types import GvcfPath, FastqPair, SequencingType
@@ -70,7 +70,7 @@ def timestamp():
     return time.strftime('%Y-%m%d-%H%M') + rand_bit
 
 
-def setup_env(timestamp_: str, tmp_bucket: Path):
+def setup_env(tmp_bucket: Path, extraconf: dict | None = None):
     """Create config for tests"""
     conf = {
         'workflow': {
@@ -83,7 +83,6 @@ def setup_env(timestamp_: str, tmp_bucket: Path):
             'hc_intervals_num': 4,
             'jc_intervals_num': 4,
             'vep_intervals_num': 4,
-            'version': timestamp_,
         },
         'hail': {
             'billing_project': DATASET,
@@ -93,6 +92,7 @@ def setup_env(timestamp_: str, tmp_bucket: Path):
             'password': 'TEST',
         }
     }
+    update_dict(conf, extraconf or {})
     config_path = tmp_bucket / 'config.toml'
     with config_path.open('w') as f:
         toml.dump(conf, f)
