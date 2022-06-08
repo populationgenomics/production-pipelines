@@ -797,10 +797,7 @@ class Pipeline:
         if (get_config()['workflow'].get('datasets') and 
                 get_config()['workflow'].get('input_provider') == 'smdb'):
             smdb = smdb or SMDB(self.cohort.analysis_dataset.name)
-            input_provider = CpgInputProvider(
-                smdb, 
-                smdb_errors_are_fatal=get_config()['workflow'].get('smdb_errors_are_fatal'),
-            )
+            input_provider = CpgInputProvider(smdb)
         if get_config()['workflow'].get('input_provider') == 'csv':
             if not (csv_path := get_config()['workflow'].get('input_csv')):
                 raise PipelineError(
@@ -810,16 +807,16 @@ class Pipeline:
             input_provider = CsvInputProvider(to_path(csv_path).open())
 
         if input_provider is not None:
-            seq_type = None
+            only_seq_type = None
             if val := get_config()['workflow'].get('sequencing_type'):
-                seq_type = SequencingType.parse(val)
+                only_seq_type = SequencingType.parse(val)
             input_provider.populate_cohort(
                 cohort=self.cohort,
                 dataset_names=get_config()['workflow'].get('datasets'),
                 skip_samples=get_config()['workflow'].get('skip_samples'),
                 only_samples=get_config()['workflow'].get('only_samples'),
                 skip_datasets=get_config()['workflow'].get('skip_datasets'),
-                sequencing_type=seq_type,
+                only_seq_type=only_seq_type,
             )
 
         self.hail_billing_project = get_billing_project(

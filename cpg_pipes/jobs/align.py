@@ -76,44 +76,6 @@ def bwamem2(*args, **kwargs):
     return align(*args, **kwargs)
 
 
-def process_alignment_input(
-    sample: Sample, 
-    seq_type: SequencingType | None = None,
-    realign_cram_ver: str | None = None,
-) -> Tuple[SequencingType | None, AlignmentInput | None]:
-    """
-    Checks alignment_data of a Sample object and prepares it for alignment.
-    """
-    # No alignment inputs for sample:
-    if not sample.alignment_input_by_seq_type:
-        return seq_type, None
-
-    # Multiple alignment inputs for sample:
-    avail_seq_types = set(
-        st.value for st in sample.alignment_input_by_seq_type.keys()
-    )
-    if len(avail_seq_types) > 1 and not seq_type:
-        raise ValueError(
-            f'{sample}: found alignment inputs with more than one sequencing '
-            f'type: {", ".join(avail_seq_types)}. Consider option '
-            f'--sequencing-type to limit data to a specific sequencing type.'
-        )
-    if seq_type:
-        alignment_input = sample.alignment_input_by_seq_type.get(seq_type)
-    else:
-        seq_type, alignment_input = list(sample.alignment_input_by_seq_type.items())[0]
-
-    # Check CRAM for realignment:
-    if realign_cram_ver:
-        older_cram = (
-            sample.dataset.path() / 'cram' / realign_cram_ver / f'{sample.id}.cram'
-        )
-        if older_cram.exists():
-            logger.info(f'Realigning from {realign_cram_ver} CRAM {older_cram}')
-            alignment_input = CramPath(older_cram)
-    return seq_type, alignment_input
-
-
 def align(
     b,
     alignment_input: AlignmentInput,

@@ -92,6 +92,7 @@ class CramPath(AlignmentInput):
         self.index_ext = 'crai' if not self.is_bam else 'bai'
         self._index_path = index_path
         self.somalier_path = to_path(f'{self.path}.somalier')
+        self.sequencing_type: Optional[SequencingType] = None
 
     def __str__(self) -> str:
         return str(self.path)

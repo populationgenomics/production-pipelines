@@ -8,7 +8,6 @@ from cpg_utils.config import get_config
 
 from .. import Path
 from ..jobs import fastqc
-from ..jobs.align import process_alignment_input
 from ..targets import Sample
 from ..pipeline import stage, SampleStage, StageInput, StageOutput
 from ..types import CramPath, SequencingType
@@ -37,11 +36,9 @@ class FastQC(SampleStage):
         """
         Only running FastQC if sequencing inputs are available.
         """
-        seq_type, alignment_input = process_alignment_input(
-            sample, 
-            seq_type=SequencingType.parse(get_config()['workflow'].get('sequencing_type')),
-            realign_cram_ver=get_config()['workflow'].get('realign_from_cram_version'),
-        )
+        seq_type = SequencingType.parse(get_config()['workflow']['sequencing_type'])
+        alignment_input = sample.alignment_input_by_seq_type.get(seq_type)
+
         if isinstance(alignment_input, CramPath) and alignment_input.is_bam:
             logger.info(
                 f'FastQC input {sample} has CRAM inputs {alignment_input} '

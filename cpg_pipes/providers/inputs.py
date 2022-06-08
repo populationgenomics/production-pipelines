@@ -39,7 +39,7 @@ class InputProvider(ABC):
         only_samples: list[str] | None = None,
         skip_datasets: list[str] | None = None,
         ped_files: list[Path] | None = None,
-        sequencing_type: SequencingType | None = None,
+        only_seq_type: SequencingType | None = None,
     ) -> Cohort:
         """
         Add datasets in the cohort. There exists only one cohort for
@@ -81,8 +81,8 @@ class InputProvider(ABC):
             raise InputProviderError(msg)
         
         self.populate_alignment_inputs(cohort)
-        if sequencing_type:
-            self.filter_sequencing_type(cohort, sequencing_type)
+        if only_seq_type:
+            self.filter_sequencing_type(cohort, only_seq_type)
         self.populate_analysis(cohort)
         self.populate_participants(cohort)
         self.populate_pedigree(cohort)
@@ -152,7 +152,7 @@ class InputProvider(ABC):
             return
         for s in cohort.get_samples():
             if not s.alignment_input_by_seq_type:
-                logger.warning(f'{s}: skipping, because no sequencing inputs found')
+                logger.warning(f'{s}: skipping because no sequencing inputs found')
                 s.active = False
             elif sequencing_type not in s.alignment_input_by_seq_type:
                 avail_types = s.alignment_input_by_seq_type.keys()
@@ -277,7 +277,6 @@ class InputProvider(ABC):
             external_id=str(self.get_external_id(entry)),
             participant_id=self.get_participant_id(entry),
             sex=self.get_participant_sex(entry),
-            sequencing_type=self.get_sequencing_type(entry),
             meta=self.get_sample_meta(entry),
         )
 

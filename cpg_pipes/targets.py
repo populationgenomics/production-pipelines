@@ -93,20 +93,6 @@ class Target:
         """
         raise NotImplementedError
 
-    def get_sequencing_type(self) -> SequencingType:
-        """
-        Sequencing type of samples. Will throw an error if more than
-        one sequencing type is found.
-        """
-        sequencing_types = set(s.sequencing_type for s in self.get_samples())
-        if len(sequencing_types) > 1:
-            raise ValueError(
-                f'Samples of more than one sequencing type used for joint calling: '
-                f'{sequencing_types}. Joint calling can be only performed on samples '
-                f'of the same type.'
-            )
-        return list(sequencing_types)[0]
-
 
 class Cohort(Target):
     """
@@ -365,7 +351,6 @@ class Dataset(Target):
         id: str,  # pylint: disable=redefined-builtin
         external_id: str | None = None,
         participant_id: str | None = None,
-        sequencing_type: SequencingType | None = None,
         meta: dict | None = None,
         sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
@@ -382,7 +367,6 @@ class Dataset(Target):
             id=id,
             dataset=self,
             external_id=external_id,
-            sequencing_type=sequencing_type,
             participant_id=participant_id,
             meta=meta,
             sex=sex,
@@ -470,7 +454,6 @@ class Sample(Target):
         id: str,  # pylint: disable=redefined-builtin
         dataset: 'Dataset',  # type: ignore  # noqa: F821
         external_id: str | None = None,
-        sequencing_type: SequencingType | None = None,
         participant_id: str | None = None,
         meta: dict | None = None,
         sex: Sex | None = None,
@@ -481,7 +464,6 @@ class Sample(Target):
         self.id = id
         self._external_id = external_id
         self.dataset = dataset
-        self.sequencing_type = sequencing_type or SequencingType.GENOME
         self._participant_id = participant_id
         self.meta: dict = meta or dict()
         self.pedigree: PedigreeInfo | None = pedigree

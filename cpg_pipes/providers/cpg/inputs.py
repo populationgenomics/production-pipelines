@@ -7,6 +7,7 @@ import traceback
 from collections import defaultdict
 from itertools import groupby
 
+from cpg_utils.config import get_config
 from sample_metadata import ApiException
 
 from .smdb import SMDB, SmSequence
@@ -27,11 +28,9 @@ class CpgInputProvider(InputProvider):
         self,
         db: SMDB,
         check_files: bool = False,
-        smdb_errors_are_fatal: bool = True,
     ):
         super().__init__(check_files=check_files)
         self.db = db
-        self.smdb_errors_are_fatal = smdb_errors_are_fatal
 
     def populate_cohort(
         self,
@@ -41,14 +40,14 @@ class CpgInputProvider(InputProvider):
         only_samples: list[str] | None = None,
         skip_datasets: list[str] | None = None,
         ped_files: list[Path] | None = None,
-        sequencing_type: SequencingType | None = None,
+        only_seq_type: SequencingType | None = None,
     ) -> Cohort:
         """
         Overriding the superclass method.
         """
         if not dataset_names:
             raise InputProviderError(
-                'Dataset must be provided for SmdbInputProvider.populate_cohort()'
+                'Datasets must be provided explicitly for the CPG input provider'
             )
         return super().populate_cohort(
             cohort=cohort,
@@ -57,7 +56,7 @@ class CpgInputProvider(InputProvider):
             only_samples=only_samples,
             skip_datasets=skip_datasets,
             ped_files=ped_files,
-            sequencing_type=sequencing_type,
+            only_seq_type=only_seq_type,
         )
 
     def get_entries(
@@ -130,7 +129,7 @@ class CpgInputProvider(InputProvider):
                 cohort.get_sample_ids()
             )
         except ApiException:
-            if self.smdb_errors_are_fatal:
+            if get_config()['workflow'].get('smdb_errors_are_fatal', True):
                 raise
             else:
                 logger.error(
@@ -154,7 +153,7 @@ class CpgInputProvider(InputProvider):
                     f'\t{ds}, {len(list(samples))} samples: '
                     f'{", ".join([s.id for s in samples])}\n'
                 )
-            if self.smdb_errors_are_fatal:
+            if get_config()['workflow'].get('smdb_errors_are_fatal', True):
                 raise InputProviderError(msg)
             else:
                 msg += '\nContinuing without sequencing data because lenient=true'
