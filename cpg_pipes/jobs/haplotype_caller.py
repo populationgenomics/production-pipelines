@@ -166,10 +166,14 @@ def _haplotype_caller_one(
     # Enough storage to localize CRAMs (can't pass GCS URL to CRAM to gatk directly
     # because we will hit GCP egress bandwidth limit:
     # https://batch.hail.populationgenomics.org.au/batches/7493/jobs/2)
-    # 45 should be enough to fit a CRAM (30G), GVCF (1G), and ref data (5G),
-    # and we can squeeze 4 jobs on a 32-core machine (185G/4=46.25G) or
-    # 5 jobs on a 16-core machine (265G/4=53G)
-    job_res = STANDARD.set_resources(j, storage_gb=45)
+    # CRAMs can be as big as 80G:
+    # https://batch.hail.populationgenomics.org.au/batches/74042/jobs/3346
+    # plus we need enough space to fit output GVCF (1G) and reference data (5G).
+    # HaplotypeCaller is not parallelised, so we request 4 cores only to just have
+    # enough memory. But a 4-core request would only give us 185G/4 = 46.25G on
+    # a 32-core machine, or 265G/4 = 66.25G on a 16-core machine. That's not enough,
+    # so we need to explicitly request more storage.
+    job_res = STANDARD.set_resources(j, ncpu=4, storage_gb=100)
 
     j.declare_resource_group(
         output_gvcf={
