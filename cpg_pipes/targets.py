@@ -449,6 +449,9 @@ class Sex(Enum):
                 return Sex.UNKNOWN
             raise ValueError(f'Unrecognised sex value {sex}')
         return Sex.UNKNOWN
+    
+    def __str__(self):
+        return self.name
 
 
 class Sample(Target):

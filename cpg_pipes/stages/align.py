@@ -44,7 +44,7 @@ class Align(SampleStage):
             get_config()['workflow'].get('check_inputs') and not alignment_input.exists()
         ):
             if get_config()['workflow'].get('skip_samples_with_missing_input'):
-                logger.error(f'No alignment inputs, skipping sample {sample.id}')
+                logger.error(f'No alignment inputs, skipping sample {sample}')
                 sample.active = False
                 return self.make_outputs(sample)  # return empty output
             else:

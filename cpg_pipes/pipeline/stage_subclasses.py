@@ -44,7 +44,8 @@ class SampleStage(Stage[Sample], ABC):
             if not dataset.get_samples():
                 raise PipelineError(
                     f'{dataset}: '
-                    f'{dataset.get_samples()}/{dataset.get_samples(only_active=False)} '
+                    f'{len(dataset.get_samples())}/'
+                    f'{len(dataset.get_samples(only_active=False))} '
                     f'usable (active=True) samples found. Check logs above for '
                     f'possible reasons samples were skipped (e.g. all samples ignored '
                     f'with --skip-sample option, or they all missing alignment inputs '
