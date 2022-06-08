@@ -27,7 +27,7 @@ input_provider.populate_cohort(
     skip_samples=get_config()['workflow'].get('skip_samples'),
     only_samples=get_config()['workflow'].get('only_samples'),
     skip_datasets=get_config()['workflow'].get('skip_datasets'),
-    only_seq_type=seq_type,
+    sequencing_type=seq_type,
 )
 
 status = CpgStatusReporter(smdb)
