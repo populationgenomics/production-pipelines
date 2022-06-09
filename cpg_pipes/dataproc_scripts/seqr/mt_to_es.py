@@ -59,6 +59,7 @@ def main(
         secret_name=get_config()['elasticsearch']['password_secret_id'],
         fail_gracefully=False,
     )
+    assert password
 
     es = HailElasticsearchClient(
         host=host,
