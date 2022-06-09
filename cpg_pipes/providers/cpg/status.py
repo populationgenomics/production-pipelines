@@ -66,19 +66,9 @@ class CpgStatusReporter(StatusReporter):
         """
         Create "queued" analysis and insert "in_progress" and "completed" updater jobs.
         """
-        if isinstance(output, dict):
-            raise StatusReporterError(
-                'SmdbStatusReporter only supports a single Path as output data.'
-            )
-        if isinstance(output, Resource):
-            raise StatusReporterError(
-                'Cannot use hail.batch.Resource objects with status reporter. '
-                'Only supported single Path objects'
-            )
-        
         if not jobs:
             return []
-        # Interacting with the sample metadata server:
+        
         # 1. Create a "queued" analysis
         if (aid := self.create_analysis(
             output=str(output),
@@ -105,7 +95,7 @@ class CpgStatusReporter(StatusReporter):
             status=AnalysisStatus.COMPLETED,
             analysis_type=analysis_type,
             job_attrs=target.get_job_attrs(),
-            output=output if isinstance(output, Path) else None,
+            output_path=output if isinstance(output, Path) else None,
         )
 
         if prev_jobs:
@@ -137,7 +127,7 @@ class CpgStatusReporter(StatusReporter):
         status: AnalysisStatus,
         analysis_type: str,
         job_attrs: dict | None = None,
-        output: Path | None = None,
+        output_path: Path | None = None,
     ) -> Job:
         """
         Create a Hail Batch job that updates status of analysis. For status=COMPLETED,
@@ -156,10 +146,10 @@ class CpgStatusReporter(StatusReporter):
         j.image(image_path('sm-api'))
 
         calc_size_cmd = None
-        if output:
+        if output_path:
             calc_size_cmd = f"""
         from cloudpathlib import CloudPath
-        meta['size'] = CloudPath('{str(output)}').stat().st_size
+        meta['size'] = CloudPath('{str(output_path)}').stat().st_size
         """
         cmd = dedent(
             f"""\
