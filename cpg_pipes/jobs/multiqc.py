@@ -16,6 +16,7 @@ from cpg_pipes import Path
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.providers.status import StatusReporter
+from cpg_pipes.slack import slack_message_cmd
 
 logger = logging.getLogger(__file__)
 
@@ -98,9 +99,10 @@ def multiqc(
         cmd += '\n' + f'echo "HTML URL: {out_html_url}"'
 
     if out_html_url and status_reporter:
-        status_reporter.slack_env(j)
-        text = f'*[{dataset_name}]* <{out_html_url}|MultiQC report>'
-        cmd += '\n' + status_reporter.slack_message_cmd(text=text)
+        slack_message_cmd(
+            j, 
+            text=f'*[{dataset_name}]* <{out_html_url}|MultiQC report>'
+        )
 
     j.command(wrap_command(cmd, setup_gcp=True))
     b.write_output(j.html, str(out_html_path))

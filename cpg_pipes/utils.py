@@ -6,8 +6,8 @@ import logging
 import sys
 import traceback
 from functools import lru_cache
-
 from typing import cast
+from google.cloud import secretmanager
 
 from . import Path, to_path
 

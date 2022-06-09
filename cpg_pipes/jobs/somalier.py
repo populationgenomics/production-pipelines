@@ -3,21 +3,21 @@ Adding jobs for fingerprinting and pedigree checks. Mostly using Somalier.
 """
 import logging
 from os.path import basename
-from textwrap import dedent
 
 import pandas as pd
 from cpg_utils.hail_batch import image_path, reference_path, fasta_res_group
-from hailtop.batch.job import Job
 from hailtop.batch import Batch, ResourceFile
+from hailtop.batch.job import Job
 
 from cpg_pipes import Path, to_path
 from cpg_pipes import utils
 from cpg_pipes.hb.command import wrap_command, seds_to_extend_sample_ids
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.providers.status import StatusReporter
-from cpg_pipes.types import CramPath, GvcfPath
-from cpg_pipes.targets import Dataset, Sample
 from cpg_pipes.jobs.scripts import check_pedigree
+from cpg_pipes.providers.status import StatusReporter
+from cpg_pipes.slack import slack_message_cmd, slack_env
+from cpg_pipes.targets import Dataset, Sample
+from cpg_pipes.types import CramPath, GvcfPath
 
 logger = logging.getLogger(__file__)
 
@@ -75,9 +75,10 @@ def pedigree(
         job_attrs=job_attrs,
     )
     if out_html_url and status_reporter:
-        status_reporter.slack_env(relate_j)
-        text = f'*[{dataset.name}]* <{out_html_url}|somalier report>'
-        relate_j.command(dedent(status_reporter.slack_message_cmd(text=text)))
+        slack_message_cmd(
+            relate_j, 
+            text=f'*[{dataset.name}]* <{out_html_url}|somalier report>'
+        )
 
     check_j = check_pedigree_job(
         b=b,
@@ -89,8 +90,6 @@ def pedigree(
         out_checks_path=out_checks_path,
         job_attrs=job_attrs,
     )
-    if status_reporter:
-        status_reporter.slack_env(check_j)
     check_j.depends_on(relate_j)
 
     return extract_jobs + [relate_j, check_j]
@@ -147,12 +146,10 @@ def ancestry(
         job_attrs=job_attrs,
     )
     if out_html_url and status_reporter:
-        status_reporter.slack_env(j)
-        text = (
+        slack_message_cmd(j, text=(
             f'*[{dataset.name}]* ancestry report: '
             f'<{out_html_url}|{basename(out_html_url)}>'
-        )
-        j.command(dedent(status_reporter.slack_message_cmd(text=text)))
+        ))
     return j
 
 
@@ -249,6 +246,7 @@ def check_pedigree_job(
     if somalier_html_url:
         cmd += '\n' + f'echo "HTML URL: {somalier_html_url}"'
 
+    slack_env(check_j)
     check_j.command(
         wrap_command(
             cmd,
