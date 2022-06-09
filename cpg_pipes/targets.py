@@ -26,7 +26,16 @@ class Target:
         # Whether to process even if outputs exist:
         self.forced: bool = False
         # If not set, exclude from the pipeline:
-        self.active: bool = True
+        self._active: bool = True
+
+    @property
+    def active(self) -> bool:
+        """Is active (usable in the pipeline)"""
+        return self._active
+
+    @active.setter
+    def active(self, val: bool):
+        self._active = val
 
     def get_samples(self, only_active: bool = True) -> list['Sample']:
         """
@@ -117,6 +126,15 @@ class Cohort(Target):
         )
         self.sequencing_type = sequencing_type
         self._datasets_by_name: dict[str, Dataset] = {}
+
+    @property
+    def active(self):
+        """Is active (usable in the pipeline)"""
+        return super().active and all(s.active for s in self.get_samples())
+
+    @active.setter
+    def active(self, val: bool):
+        self._active = val
 
     def __repr__(self):
         return f'Cohort("{self.name}", {len(self.get_datasets())} datasets)'
@@ -263,6 +281,15 @@ class Dataset(Target):
         super().__init__()
         self._sample_by_id: dict[str, Sample] = {}
         self.stack, self.namespace = parse_stack(name, namespace)
+
+    @property
+    def active(self):
+        """Is active (usable in the pipeline)"""
+        return super().active and all(s.active for s in self.get_samples())
+
+    @active.setter
+    def active(self, val: bool):
+        self._active = val
 
     @staticmethod
     def create(

@@ -9,9 +9,8 @@ from typing import TypedDict
 import hailtop.batch as hb
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import copy_common_env
-from hailtop.batch.job import Job, PythonJob, BashJob
+from hailtop.batch.job import PythonJob, BashJob
 
-from .. import Path
 
 logger = logging.getLogger(__file__)
 
@@ -186,34 +185,6 @@ def setup_batch(description: str) -> RegisteringBatch:
     )
 
 
-def get_hail_bucket(hail_bucket: str | Path | None = None) -> str:
-    """
-    Get Hail bucket.
-    """
-    if not hail_bucket:
-        hail_bucket = os.getenv('HAIL_BUCKET')
-        if not hail_bucket:
-            raise ValueError(
-                'Either the hail_bucket parameter, or the HAIL_BUCKET '
-                'environment variable must be set'
-            )
-    return str(hail_bucket)
-
-
-def get_billing_project(billing_project: str | None = None) -> str:
-    """
-    Get Hail billing project.
-    """
-
-    billing_project = billing_project or os.getenv('HAIL_BILLING_PROJECT')
-    if not billing_project:
-        raise ValueError(
-            'Either the billing_project parameter, or the HAIL_BILLING_PROJECT '
-            'environment variable must be set'
-        )
-    return billing_project
-
-
 def make_job_name(
     name: str,
     sample: str | None = None,
@@ -233,13 +204,3 @@ def make_job_name(
     if reuse:
         name += ' [reuse]'
     return name
-
-
-def hail_query_env(
-    j: Job, hail_billing_project: str, hail_bucket: str | Path | None = None
-):
-    """
-    Setup environment to run Hail Query Service backend script.
-    """
-    j.env('HAIL_BILLING_PROJECT', hail_billing_project)
-    j.env('HAIL_BUCKET', get_hail_bucket(hail_bucket))

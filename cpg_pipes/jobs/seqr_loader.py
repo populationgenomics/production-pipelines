@@ -3,12 +3,11 @@ Jobs specific for seqr-loader.
 """
 import logging
 
-from cpg_utils.hail_batch import image_path, genome_build
+from cpg_utils.hail_batch import image_path, genome_build, copy_common_env
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
 from cpg_pipes import Path, to_path
-from cpg_pipes.hb.batch import hail_query_env
 from cpg_pipes.hb.command import wrap_command, python_command
 from cpg_pipes.query import seqr_loader
 from cpg_pipes.types import SequencingType
@@ -101,13 +100,7 @@ def annotate_dataset_jobs(
 def load_to_es(
     b: Batch,
     mt_path: Path,
-    es_host: str,
-    es_port: int,
-    es_username: str,
-    es_password: str,
     es_index: str,
-    hail_billing_project: str,
-    hail_bucket: Path | None = None,
     job_attrs: dict | None = None,
 ) -> Job:
     """
@@ -116,15 +109,11 @@ def load_to_es(
     # Make a list of dataset samples to subset from the entire matrix table
     j = b.new_job(f'create ES index', job_attrs)
     j.image(image_path('hail'))
-    hail_query_env(j, hail_billing_project, hail_bucket)
+    copy_common_env(j)
     cmd = f"""\
     pip3 install click cpg_utils hail seqr_loader elasticsearch
     python3 mt_to_es.py \\
     --mt-path {mt_path} \\
-    --es-host {es_host} \\
-    --es-port {es_port} \\
-    --es-username {es_username} \\
-    --es-password {es_password} \\
     --es-index {es_index}
     """
     j.command(

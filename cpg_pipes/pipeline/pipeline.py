@@ -27,7 +27,7 @@ from slugify import slugify
 
 from .exceptions import PipelineError, StageInputNotFound
 from .. import Path, to_path, Namespace
-from ..hb.batch import setup_batch, get_billing_project
+from ..hb.batch import setup_batch
 from ..providers.cpg.inputs import CpgInputProvider
 from ..providers.cpg.smdb import SMDB
 from ..providers.cpg.status import CpgStatusReporter
@@ -818,21 +818,16 @@ class Pipeline:
                 skip_datasets=get_config()['workflow'].get('skip_datasets'),
             )
 
-        self.hail_billing_project = get_billing_project(
-            self.cohort.analysis_dataset.stack
-        )
         self.tmp_bucket = self.cohort.analysis_dataset.tmp_path()
         if version := get_config()['workflow'].get('version'):
             self.tmp_bucket /= version
 
-        self.version = version or time.strftime('%Y%m%d-%H%M%S')
-        if not get_config()['workflow'].get('description'):
-            if version:
-                description += f' {version}'
-            if ds_set := set(d.name for d in self.cohort.get_datasets()):
-                description += ': ' + ', '.join(sorted(ds_set))
-            get_config()['workflow']['description'] = description
-        self.b: Batch = setup_batch(description=get_config()['workflow']['description'])
+        if version:
+            description += f' {version}'
+        description += f': [{self.cohort.sequencing_type.value}]'
+        if ds_set := set(d.name for d in self.cohort.get_datasets()):
+            description += ' ' + ', '.join(sorted(ds_set))
+        self.b: Batch = setup_batch(description=description)
 
         self.status_reporter = None
         if get_config()['workflow'].get('status_reporter') == 'smdb':

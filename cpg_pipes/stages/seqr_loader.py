@@ -108,7 +108,8 @@ class LoadToEs(DatasetStage):
         """
         Expected to generate a Seqr index, which is not a file
         """
-        version = time.strftime('%Y%m%d-%H%M%S')
+        version = get_config()['workflow'].get('version')
+        version = version or time.strftime('%Y%m%d-%H%M%S')
         index_name = f'{dataset.name}-{version}'
         return index_name
 
