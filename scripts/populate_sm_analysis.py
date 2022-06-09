@@ -1,6 +1,7 @@
 """
 Script to just populate analysis entries with status=completed in the 
-sample-metadata DB.
+sample-metadata DB. For back-populating old data; for new data, it should be
+populated automatically with `workflow/status_provider="smdb"` set in config.
 """
 
 from cpg_utils.config import get_config
