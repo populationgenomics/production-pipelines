@@ -141,7 +141,7 @@ class DatasetStage(Stage, ABC):
         """
         Plug in stage into the pipeline.
         """
-        output_by_target = dict()
+        output_by_target: dict[str, StageOutput | None] = dict()
         if not (datasets := cohort.get_datasets()):
             logger.warning(
                 f'{len(cohort.get_datasets())}/'
