@@ -56,7 +56,7 @@ class AnnotateCohort(CohortStage):
             vep_ht_path=vep_ht_path,
             siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
             output_mt_path=mt_path,
-            checkpoints_bucket=self.tmp_bucket / 'checkpoints',
+            checkpoints_bucket=self.tmp_prefix / 'checkpoints',
             sequencing_type=self.cohort.sequencing_type,
             overwrite=not get_config()['workflow'].get('self.check_intermediates'),
             job_attrs=self.get_job_attrs(),
@@ -76,7 +76,7 @@ class AnnotateDataset(DatasetStage):
         Expected to generate a matrix table
         """
         h = self.cohort.alignment_inputs_hash()
-        return self.tmp_bucket / f'{h}-{dataset.name}.mt'
+        return self.tmp_prefix / f'{h}-{dataset.name}.mt'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
@@ -89,7 +89,7 @@ class AnnotateDataset(DatasetStage):
             mt_path=mt_path,
             sample_ids=[s.id for s in dataset.get_samples()],
             output_mt_path=self.expected_outputs(dataset),
-            tmp_bucket=self.tmp_bucket / 'checkpoints' / dataset.name,
+            tmp_bucket=self.tmp_prefix / 'checkpoints' / dataset.name,
             job_attrs=self.get_job_attrs(dataset),
             overwrite=not get_config()['workflow'].get('self.check_intermediates'),
         )

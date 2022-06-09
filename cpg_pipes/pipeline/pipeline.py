@@ -400,7 +400,7 @@ class Stage(Generic[TargetT], ABC):
             else:
                 self.required_stages_classes.append(required_stages)
 
-        self.tmp_bucket = pipeline_tmp_bucket / name
+        self.tmp_prefix = pipeline_tmp_bucket / name
 
         # Dependencies. Populated in pipeline.run(), after we know all stages.
         self.required_stages: list[Stage] = []

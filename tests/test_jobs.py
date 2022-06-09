@@ -241,7 +241,7 @@ class TestJobs(unittest.TestCase):
             sample_name=sid,
             cram_path=cram_path,
             scatter_count=4,
-            tmp_bucket=self.tmp_bucket,
+            tmp_prefix=self.tmp_bucket,
             dragen_mode=True,
             output_path=out_gvcf_path,
             sequencing_type=self.sequencing_type,
@@ -301,7 +301,7 @@ class TestJobs(unittest.TestCase):
         jobs = make_vqsr_jobs(
             b=self.batch,
             input_vcf_or_mt_path=siteonly_vcf_path,
-            tmp_bucket=tmp_vqsr_bucket,
+            tmp_prefix=tmp_vqsr_bucket,
             gvcf_count=len(utils.SAMPLES),
             scatter_count=4,
             output_vcf_path=out_vcf_path,
@@ -334,7 +334,7 @@ class TestJobs(unittest.TestCase):
             out_path=out_vcf_path,
             scatter_count=4,
             overwrite=False,
-            tmp_bucket=self.tmp_bucket,
+            tmp_prefix=self.tmp_bucket,
             intervals_path=utils.BASE_BUCKET
             / 'inputs/exome1pct/calling_regions.interval_list',
         )

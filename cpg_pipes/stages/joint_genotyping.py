@@ -29,8 +29,8 @@ class JointGenotyping(CohortStage):
         """
         h = cohort.alignment_inputs_hash()
         return {
-            'vcf': self.tmp_bucket / f'{h}.vcf.gz',
-            'siteonly': self.tmp_bucket / f'{h}-siteonly.vcf.gz',
+            'vcf': self.tmp_prefix / f'{h}.vcf.gz',
+            'siteonly': self.tmp_prefix / f'{h}-siteonly.vcf.gz',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -57,7 +57,7 @@ class JointGenotyping(CohortStage):
             b=self.b,
             out_vcf_path=self.expected_outputs(cohort)['vcf'],
             out_siteonly_vcf_path=self.expected_outputs(cohort)['siteonly'],
-            tmp_bucket=self.tmp_bucket,
+            tmp_bucket=self.tmp_prefix,
             gvcf_by_sid=gvcf_by_sid,
             overwrite=not get_config()['workflow'].get('self.check_intermediates'),
             tool=joint_genotyping.JointGenotyperTool.GnarlyGenotyper

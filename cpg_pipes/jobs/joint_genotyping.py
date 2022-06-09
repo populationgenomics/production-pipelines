@@ -76,6 +76,7 @@ def make_joint_genotyping_jobs(
         intervals_path=intervals_path,
         scatter_count=scatter_count,
         job_attrs=job_attrs,
+        output_prefix=tmp_bucket / 'intervals',
     )
     jobs.append(intervals_j)
 

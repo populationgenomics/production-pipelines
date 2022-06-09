@@ -46,6 +46,7 @@ class GenotypeSample(SampleStage):
                 sequencing_type=self.cohort.sequencing_type,
                 scatter_count=scatter_count,
                 job_attrs=self.get_job_attrs(),
+                output_prefix=self.tmp_prefix / 'intervals',
             )
             jobs.append(intervals_j)
             GenotypeSample.hc_intervals = intervals
@@ -56,7 +57,7 @@ class GenotypeSample(SampleStage):
                 sample_name=sample.id,
                 cram_path=sample.get_cram_path(),
                 intervals=GenotypeSample.hc_intervals,
-                tmp_bucket=self.tmp_bucket / sample.id,
+                tmp_prefix=self.tmp_prefix / sample.id,
                 overwrite=not get_config()['workflow'].get('self.check_intermediates'),
                 job_attrs=self.get_job_attrs(sample),
             )

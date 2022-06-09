@@ -22,6 +22,7 @@ def get_intervals(
     intervals_path: Path | str | None = None,
     sequencing_type: SequencingType = SequencingType.GENOME,
     job_attrs: dict | None = None,
+    output_prefix: Path | None = None,
 ) -> tuple[Job, list[hb.Resource]]:
     """
     Add a job that split genome into intervals to parallelise variant calling.
@@ -40,17 +41,24 @@ def get_intervals(
     files.
     """
     job_attrs = (job_attrs or {}) | dict(tool='picard_IntervalListTools')
-    j = b.new_job(f'Make {scatter_count} intervals', job_attrs)
-    cache_bucket = (
-        reference_path('intervals_prefix') / sequencing_type.value / f'{scatter_count}intervals'
-    )
+    job_name = f'Make {scatter_count} intervals for {sequencing_type.value}'
+    
+    if output_prefix and utils.exists(output_prefix / '1.interval_list'):
+        job_attrs['reuse'] = True
+        return b.new_job(job_name, job_attrs), [
+            b.read_input(str(output_prefix / f'{idx + 1}.interval_list'))
+            for idx in range(scatter_count)
+        ]
 
-    if intervals_path:
-        # For custom interval lists, we are not caching
-        cache = False
-    else:
-        cache = True
-        # Checking previously cached split intervals.
+    j = b.new_job(job_name, job_attrs)
+
+    if not intervals_path:
+        # Did we cache split intervals for this sequencing_type?
+        cache_bucket = (
+            reference_path('intervals_prefix') / 
+            sequencing_type.value / 
+            f'{scatter_count}intervals'
+        )
         if utils.exists(cache_bucket / '1.interval_list'):
             j.name += ' [use cached]'
             return j, [
@@ -92,10 +100,10 @@ def get_intervals(
         """
 
     j.command(wrap_command(cmd))
-    if cache:
+    if output_prefix:
         for idx in range(scatter_count):
             b.write_output(
                 j[f'{idx + 1}.interval_list'],
-                str(cache_bucket / f'{idx + 1}.interval_list'),
+                str(output_prefix / f'{idx + 1}.interval_list'),
             )
     return j, [j[f'{idx + 1}.interval_list'] for idx in range(scatter_count)]

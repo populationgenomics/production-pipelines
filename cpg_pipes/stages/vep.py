@@ -21,7 +21,7 @@ class Vep(CohortStage):
         Expected to write a hail table.
         """
         h = cohort.alignment_inputs_hash()
-        return self.tmp_bucket / f'{h}.ht'
+        return self.tmp_prefix / f'{h}.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
@@ -31,7 +31,7 @@ class Vep(CohortStage):
             self.b,
             vcf_path=inputs.as_path(cohort, stage=Vqsr),
             out_path=self.expected_outputs(cohort),
-            tmp_bucket=self.tmp_bucket,
+            tmp_prefix=self.tmp_prefix,
             overwrite=not get_config()['workflow'].get('self.check_intermediates'),
             scatter_count=get_config()['workflow'].get('vep_intervals_num', vep.DEFAULT_INTERVALS_NUM),
             sequencing_type=cohort.sequencing_type,

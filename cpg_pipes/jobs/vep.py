@@ -29,7 +29,7 @@ DEFAULT_INTERVALS_NUM = 50
 def vep_jobs(
     b: Batch,
     vcf_path: Path,
-    tmp_bucket: Path,
+    tmp_prefix: Path,
     out_path: Path | None = None,
     overwrite: bool = False,
     scatter_count: int = DEFAULT_INTERVALS_NUM,
@@ -54,6 +54,7 @@ def vep_jobs(
         sequencing_type=sequencing_type,
         intervals_path=intervals_path,
         scatter_count=scatter_count,
+        output_prefix=tmp_prefix,
     )
     jobs.append(intervals_j)
 
@@ -61,7 +62,7 @@ def vep_jobs(
         **{'vcf.gz': str(vcf_path), 'vcf.gz.tbi': str(vcf_path) + '.tbi'}
     )
 
-    parts_bucket = tmp_bucket / 'vep' / 'parts'
+    parts_bucket = tmp_prefix / 'vep' / 'parts'
     part_files = []
 
     # Splitting variant calling by intervals

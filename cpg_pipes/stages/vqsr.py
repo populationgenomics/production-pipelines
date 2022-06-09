@@ -26,7 +26,7 @@ class Vqsr(CohortStage):
         Expects to generate one site-only VCF.
         """
         h = cohort.alignment_inputs_hash()
-        return self.tmp_bucket / f'{h}-siteonly.vcf.gz'
+        return self.tmp_prefix / f'{h}-siteonly.vcf.gz'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
@@ -38,7 +38,7 @@ class Vqsr(CohortStage):
         jobs = vqsr.make_vqsr_jobs(
             b=self.b,
             input_vcf_or_mt_path=siteonly_vcf_path,
-            tmp_bucket=self.tmp_bucket,
+            tmp_prefix=self.tmp_prefix,
             gvcf_count=len(cohort.get_samples()),
             output_vcf_path=self.expected_outputs(cohort),
             use_as_annotations=get_config()['workflow'].get('use_as_vqsr', True),

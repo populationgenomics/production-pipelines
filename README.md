@@ -202,7 +202,7 @@ class HaplotypeCaller(SampleStage):
             cram_path=CramPath(cram_path),
             output_path=expected_path,
             scatter_count=50,
-            tmp_bucket=sample.dataset.tmp_path(),
+            tmp_prefix=sample.dataset.tmp_path(),
             refs=self.refs,
             sequencing_type=sample.sequencing_type,
         )
@@ -291,7 +291,7 @@ j = vqsr.make_vqsr_jobs(
     output_vcf_path=...,
     refs=...,
     sequencing_type=cohort.get_sequencing_type(),
-    tmp_bucket=cohort.tmp_path(),
+    tmp_prefix=cohort.tmp_path(),
     use_as_annotations=True,
 )
 ```

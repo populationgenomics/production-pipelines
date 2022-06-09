@@ -24,7 +24,7 @@ DEFAULT_INTERVALS_NUM = 50
 def produce_gvcf(
     b: hb.Batch,
     sample_name: str,
-    tmp_bucket: Path,
+    tmp_prefix: Path,
     cram_path: CramPath,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
@@ -45,7 +45,7 @@ def produce_gvcf(
     if utils.can_reuse(output_path, overwrite):
         return [b.new_job('Make GVCF [reuse]', job_attrs)]
 
-    hc_gvcf_path = tmp_bucket / 'haplotypecaller' / f'{sample_name}.g.vcf.gz'
+    hc_gvcf_path = tmp_prefix / 'haplotypecaller' / f'{sample_name}.g.vcf.gz'
 
     jobs = haplotype_caller(
         b=b,
@@ -53,6 +53,7 @@ def produce_gvcf(
         job_attrs=job_attrs,
         output_path=hc_gvcf_path,
         cram_path=cram_path,
+        tmp_prefix=tmp_prefix,
         scatter_count=scatter_count,
         intervals=intervals,
         sequencing_type=sequencing_type,
@@ -76,6 +77,7 @@ def haplotype_caller(
     b: hb.Batch,
     sample_name: str,
     cram_path: CramPath,
+    tmp_prefix: Path,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     scatter_count: int = DEFAULT_INTERVALS_NUM,
@@ -100,6 +102,7 @@ def haplotype_caller(
                 intervals_path=intervals_path,
                 sequencing_type=sequencing_type,
                 scatter_count=scatter_count,
+                output_prefix=tmp_prefix / 'intervals',
             )
             jobs.append(intervals_j)
         else:

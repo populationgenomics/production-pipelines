@@ -89,7 +89,7 @@ DEFAULT_INTERVALS_NUM = 50
 def make_vqsr_jobs(
     b: hb.Batch,
     input_vcf_or_mt_path: Path,
-    tmp_bucket: Path,
+    tmp_prefix: Path,
     gvcf_count: int,
     meta_ht_path: Path | None = None,
     hard_filter_ht_path: Path | None = None,
@@ -111,7 +111,7 @@ def make_vqsr_jobs(
            to filter out samples flagged as `meta.related`
     @param hard_filter_ht_path: if input_vcf_or_mt_path is a matrix table, this table
            will be used as a list of samples to hard filter out
-    @param tmp_bucket: bucket for intermediate files
+    @param tmp_prefix: bucket for intermediate files
     @param gvcf_count: number of input samples. Can't read from combined_mt_path as it
            might not be yet genereated the point of Batch job submission
     @param scatter_count: number of intervals to parallelise SNP model creation
@@ -158,6 +158,7 @@ def make_vqsr_jobs(
         scatter_count=scatter_count,
         intervals_path=intervals_path,
         job_attrs=job_attrs,
+        output_prefix=tmp_prefix,
     )
     jobs.append(intervals_j)
 
@@ -168,7 +169,7 @@ def make_vqsr_jobs(
         assert meta_ht_path
         assert hard_filter_ht_path
         job_name = 'VQSR: MT to site-only VCF'
-        combined_vcf_path = tmp_bucket / 'input.vcf.gz'
+        combined_vcf_path = tmp_prefix / 'input.vcf.gz'
         if not utils.can_reuse(combined_vcf_path, overwrite):
             mt_to_vcf_job = dataproc.hail_dataproc_job(
                 b,
