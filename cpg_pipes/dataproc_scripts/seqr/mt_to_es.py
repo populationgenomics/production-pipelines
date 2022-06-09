@@ -6,16 +6,14 @@ Hail script to submit on a dataproc cluster.
 Loads the matrix table into an ElasticSearch index.
 """
 
-import os
 import logging
 import math
 import click
 import hail as hl
+from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build
 from hail_scripts.elasticsearch.hail_elasticsearch_client import HailElasticsearchClient
-
-from cpg_pipes.utils import read_secret
 
 logger = logging.getLogger(__file__)
 
@@ -59,6 +57,7 @@ def main(
     password = read_secret(
         project_id=get_config()['elasticsearch']['password_project_id'],
         secret_name=get_config()['elasticsearch']['password_secret_id'],
+        fail_gracefully=False,
     )
 
     es = HailElasticsearchClient(

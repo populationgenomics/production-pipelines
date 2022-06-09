@@ -9,12 +9,12 @@ configuration values are set.
 """
 
 from textwrap import dedent
-from hailtop.batch.job import Job
 
+from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import copy_common_env
 
-from cpg_pipes.utils import read_secret
+from hailtop.batch.job import Job
 
 
 def get_token() -> str:
@@ -31,6 +31,7 @@ def get_token() -> str:
     token = read_secret(
         project_id=token_project_id,
         secret_name=token_secret_id,
+        fail_gracefully=False,
     )
     assert token
     return token
