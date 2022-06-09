@@ -641,7 +641,8 @@ class Stage(Generic[TargetT], ABC):
                 if isinstance(val, dict):
                     for el in val.values():
                         _find_paths(el)
-    
+            
+            _find_paths(paths)
             reusable = all(exists(path) for path in paths)
         return reusable
 

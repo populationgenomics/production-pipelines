@@ -75,7 +75,7 @@ class CpgStatusReporter(StatusReporter):
                 'Cannot use hail.batch.Resource objects with status reporter. '
                 'Only supported single Path objects'
             )
-
+        
         if not jobs:
             return []
         # Interacting with the sample metadata server:
@@ -105,7 +105,7 @@ class CpgStatusReporter(StatusReporter):
             status=AnalysisStatus.COMPLETED,
             analysis_type=analysis_type,
             job_attrs=target.get_job_attrs(),
-            output=str(output),
+            output=output if isinstance(output, Path) else None,
         )
 
         if prev_jobs:
@@ -127,10 +127,7 @@ class CpgStatusReporter(StatusReporter):
             type_=analysis_type,
             status=analysis_status,
             sample_ids=target.get_sample_ids(),
-            meta=(meta or {}) | dict(
-                sample_num=len(target.get_samples()),
-                samples=target.get_sample_ids(),
-            ),
+            meta=meta,
         )
 
     @staticmethod
@@ -140,7 +137,7 @@ class CpgStatusReporter(StatusReporter):
         status: AnalysisStatus,
         analysis_type: str,
         job_attrs: dict | None = None,
-        output: str | None = None,
+        output: Path | None = None,
     ) -> Job:
         """
         Create a Hail Batch job that updates status of analysis. For status=COMPLETED,
@@ -162,7 +159,7 @@ class CpgStatusReporter(StatusReporter):
         if output:
             calc_size_cmd = f"""
         from cloudpathlib import CloudPath
-        meta['size'] = CloudPath({output}).stat().st_size
+        meta['size'] = CloudPath('{str(output)}').stat().st_size
         """
         cmd = dedent(
             f"""\
