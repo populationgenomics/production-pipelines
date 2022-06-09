@@ -11,7 +11,6 @@ from cpg_pipes.providers.cpg.inputs import CpgInputProvider
 from cpg_pipes.providers.cpg.smdb import SMDB
 from cpg_pipes.providers.cpg.status import CpgStatusReporter
 from cpg_pipes.targets import Cohort
-from cpg_pipes.types import SequencingType
 from cpg_pipes.utils import exists
 
 access_level = get_config()['workflow']['access_level']
