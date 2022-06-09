@@ -138,7 +138,6 @@ class LoadToEs(DatasetStage):
             job_name=f'{dataset.name}: create ES index',
             depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
-            attributes=self.get_job_attrs(dataset) | dict(tool='query'),
         )
         jobs = [j]
         return self.make_outputs(dataset, data=index_name, jobs=jobs)
