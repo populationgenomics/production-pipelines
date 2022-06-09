@@ -1,29 +1,30 @@
 [workflow]
 access_level = 'full'
 dataset = 'seqr'
-datasets = [
-    'acute-care', 
-    'perth-neuro', 
-    'ravenscroft-rdstudy', 
-    'circa', 
-    'heartkids',
-    'ohmr3-mendelian', 
-    'ohmr4-epilepsy',
-    'rdnow',
-    'mito-disease',
-    'ravenscroft-arch',
-    'hereditary-neuro',
-]
+datasets = ['perth-neuro']
+#datasets = [
+#    'acute-care', 
+#    'perth-neuro', 
+#    'ravenscroft-rdstudy', 
+#    'circa', 
+#    'heartkids',
+#    'ohmr3-mendelian', 
+#    'ohmr4-epilepsy',
+#    'rdnow',
+#    'mito-disease',
+#    'ravenscroft-arch',
+#    'hereditary-neuro',
+#]
+only_samples = ['CPG13409']
 skip_samples = [
   'CPG11783',   # acute-care, no FASTQ data
   'CPG13326',   # perth-neuro, no FASTQ data: https://github.com/populationgenomics/seqr-private/issues/2
 #  'CPG200014',  # heartkids, https://centrepopgen.slack.com/archives/C01R7CKJGHM/p1654038000773069
 ]
 check_inputs = true
-skip_samples_with_missing_input = false
+skip_samples_with_missing_input = true
 keep_scratch = true
-#status_reporter = 'smdb'
-#slack_channel: 'seqr-loader'
+status_reporter = 'smdb'
 #skip_samples_stages:
 #  VerifyBamId: [CPG13409]  # https://batch.hail.populationgenomics.org.au/batches/56236/jobs/372
 sequencing_type = 'genome'
@@ -37,3 +38,8 @@ password_project_id = 'seqr-308602'
 pool_label = 'seqr'
 billing_project = 'seqr'
 bucket = 'gs://cpg-seqr-hail'
+
+[slack]
+channel = 'seqr-loader-test'
+token_secret_id = 'slack-seqr-loader-token'
+token_project_id = 'seqr-308602'

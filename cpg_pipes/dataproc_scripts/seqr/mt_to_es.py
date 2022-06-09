@@ -11,11 +11,11 @@ import logging
 import math
 import click
 import hail as hl
-from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build
-from google.cloud import secretmanager
 from hail_scripts.elasticsearch.hail_elasticsearch_client import HailElasticsearchClient
+
+from cpg_pipes.utils import read_secret
 
 logger = logging.getLogger(__file__)
 

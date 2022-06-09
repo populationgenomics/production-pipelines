@@ -6,8 +6,8 @@ import logging
 import sys
 import traceback
 from functools import lru_cache
-
 from typing import cast
+from google.cloud import secretmanager
 
 from . import Path, to_path
 
@@ -97,3 +97,16 @@ def can_reuse(
 
     logger.debug(f'Reusing existing {path}. Use --overwrite to overwrite')
     return True
+
+
+def read_secret(project_id: str, secret_name: str) -> str:
+    """Reads the latest version of a GCP Secret Manager secret.
+
+    Unlike cpg_utils.cloud, raises an exception if the secret can not be read"""
+
+    secret_manager = secretmanager.SecretManagerServiceClient()
+    secret_path = secret_manager.secret_version_path(project_id, secret_name, 'latest')
+
+    # noinspection PyTypeChecker
+    response = secret_manager.access_secret_version(request={'name': secret_path})
+    return response.payload.data.decode('UTF-8')

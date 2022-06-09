@@ -56,8 +56,8 @@ def main(
         pedlog=pedlog,
     )
 
-    slack_token = os.environ.get('SLACK_TOKEN')
     slack_channel = os.environ.get('SLACK_CHANNEL')
+    slack_token = os.environ.get('SLACK_TOKEN')
     if slack_token and slack_channel:
         from slack_sdk.errors import SlackApiError
         from slack_sdk import WebClient
