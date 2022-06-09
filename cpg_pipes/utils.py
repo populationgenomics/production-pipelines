@@ -100,9 +100,11 @@ def can_reuse(
 
 
 def read_secret(project_id: str, secret_name: str) -> str:
-    """Reads the latest version of a GCP Secret Manager secret.
+    """
+    Reads the latest version of a GCP Secret Manager secret.
 
-    Unlike cpg_utils.cloud, raises an exception if the secret can not be read"""
+    Unlike cpg_utils.cloud.read_secret, crashes if the secret can not be read.
+    """
 
     secret_manager = secretmanager.SecretManagerServiceClient()
     secret_path = secret_manager.secret_version_path(project_id, secret_name, 'latest')
