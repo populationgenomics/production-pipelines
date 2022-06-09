@@ -51,7 +51,7 @@ class FastQC(SampleStage):
             get_config()['workflow'].get('check_inputs') 
             and not alignment_input.exists()
         ):
-            if self.skip_samples_with_missing_input:
+            if get_config()['workflow'].get('skip_samples_with_missing_input'):
                 logger.error(f'No alignment inputs, skipping sample {sample}')
                 return self.make_outputs(sample, skipped=True)  # return empty output
             else:

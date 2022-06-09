@@ -9,7 +9,7 @@ from cpg_pipes.pipeline.pipeline import Pipeline
 from cpg_pipes.stages.multiqc import MultiQC
 
 
-pipeline = Pipeline('CRAM QC', skip_samples_with_missing_input=True)
+pipeline = Pipeline('CRAM QC')
 pipeline.run(
     stages=[MultiQC],
     force_all_implicit_stages=True,
