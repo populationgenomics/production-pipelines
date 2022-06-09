@@ -60,7 +60,7 @@ class AnnotateCohort(CohortStage):
             siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
             output_mt_path=mt_path,
             checkpoints_bucket=self.tmp_bucket / 'checkpoints',
-            sequencing_type=cohort.get_sequencing_type(),
+            sequencing_type=get_config()['workflow']['sequencing_type'],
             overwrite=not get_config()['workflow'].get('self.check_intermediates'),
             job_attrs=self.get_job_attrs(),
         )
