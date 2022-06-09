@@ -224,8 +224,8 @@ class StageInput:
                 'after skipping targets with missing inputs. '
                 + (
                     'Check the logs if all samples were missing inputs from previous '
-                    'stages, and consider changing --first-stage'
-                    if get_config()['workflow'].get('skip_samples_with_missing_input')
+                    'stages, and consider changing `workflow/first_stage`'
+                    if self.stage.skip_samples_with_missing_input
                     else ''
                 )
             )
@@ -388,6 +388,7 @@ class Stage(Generic[TargetT], ABC):
         assume_outputs_exist: bool = False,
         forced: bool = False,
         status_reporter: StatusReporter | None = None,
+        skip_samples_with_missing_input: bool = True,
     ):
         self._name = name
         self.b = batch
@@ -416,6 +417,7 @@ class Stage(Generic[TargetT], ABC):
         self.skipped = skipped
         self.forced = forced
         self.assume_outputs_exist = assume_outputs_exist
+        self.skip_samples_with_missing_input = skip_samples_with_missing_input
 
     def __str__(self):
         res = f'{self._name}'
@@ -575,7 +577,7 @@ class Stage(Generic[TargetT], ABC):
         if self.skipped:
             if reusable:
                 return Action.REUSE
-            if get_config()['workflow'].get('skip_samples_with_missing_input'):
+            if self.skip_samples_with_missing_input:
                 logger.warning(
                     f'Skipping {target}: stage {self.name} is required, '
                     f'but is marked as skipped, and expected outputs for the target '
@@ -710,6 +712,7 @@ def stage(
                 status_reporter=pipeline.status_reporter,
                 skipped=skipped,
                 assume_outputs_exist=assume_outputs_exist,
+                skip_samples_with_missing_input=pipeline.skip_samples_with_missing_input,
                 forced=forced,
             )
 
@@ -775,6 +778,7 @@ class Pipeline:
         name: str | None = None, 
         description: str | None = None,
         stages: list[StageDecorator] | None = None,
+        skip_samples_with_missing_input: bool | None = None,
     ):
         self._stages = stages
 
@@ -794,6 +798,12 @@ class Pipeline:
                 get_config()['workflow']['sequencing_type']
             )
         )
+        
+        if skip_samples_with_missing_input is None:
+            skip_samples_with_missing_input = get_config()['workflow'].get(
+                'skip_samples_with_missing_input', False
+            )
+        self.skip_samples_with_missing_input = skip_samples_with_missing_input
 
         smdb: Optional[SMDB] = None
         input_provider: InputProvider | None = None
