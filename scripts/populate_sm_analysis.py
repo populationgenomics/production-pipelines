@@ -21,14 +21,12 @@ cohort = Cohort(
 )
 smdb = SMDB(cohort.analysis_dataset.name)
 input_provider = CpgInputProvider(smdb)
-seq_type = SequencingType.parse(get_config()['workflow']['sequencing_type'])
 input_provider.populate_cohort(
     cohort=cohort,
     dataset_names=get_config()['workflow'].get('datasets'),
     skip_samples=get_config()['workflow'].get('skip_samples'),
     only_samples=get_config()['workflow'].get('only_samples'),
     skip_datasets=get_config()['workflow'].get('skip_datasets'),
-    only_seq_type=seq_type,
 )
 
 status = CpgStatusReporter(smdb)
@@ -42,7 +40,7 @@ for sample in cohort.get_samples():
             target=sample,
             meta=sample.get_job_attrs() | dict(
                 size=path.stat().st_size,
-                sequencing_type=seq_type.value,
+                sequencing_type=cohort.sequencing_type.value,
             ),
         )
     if (path := sample.get_gvcf_path().path).exist():
@@ -53,7 +51,7 @@ for sample in cohort.get_samples():
             target=sample,
             meta=sample.get_job_attrs() | dict(
                 size=path.stat().st_size,
-                sequencing_type=seq_type.value,
+                sequencing_type=cohort.sequencing_type.value,
             ),
         )
 
@@ -66,6 +64,6 @@ if exists(path):
         analysis_status='completed',
         target=cohort,
         meta=cohort.get_job_attrs() | dict(
-            sequencing_type=seq_type.value,
+            sequencing_type=cohort.sequencing_type.value,
         ),
     )
