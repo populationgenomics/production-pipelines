@@ -106,6 +106,7 @@ class Cohort(Target):
         analysis_dataset_name: str,
         namespace: Namespace,
         name: str | None = None,
+        sequencing_type: SequencingType = SequencingType.GENOME,
     ):
         super().__init__()
         self.name = name or analysis_dataset_name
@@ -114,6 +115,7 @@ class Cohort(Target):
             name=analysis_dataset_name,
             namespace=namespace,
         )
+        self.sequencing_type = sequencing_type
         self._datasets_by_name: dict[str, Dataset] = {}
 
     def __repr__(self):

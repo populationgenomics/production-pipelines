@@ -11,7 +11,7 @@ from ..jobs.align import Aligner, MarkDupTool
 from ..targets import Sample
 from ..pipeline import stage, SampleStage, StageInput, StageOutput
 from ..jobs import align
-from ..types import SequencingType, CramPath
+from ..types import CramPath
 
 logger = logging.getLogger(__file__)
 
@@ -34,8 +34,9 @@ class Align(SampleStage):
         Checks the `realign_from_cram_version` pipeline config argument, and 
         prioritises realignment from CRAM vs alignment from FASTQ if it's set.
         """
-        seq_type = SequencingType.parse(get_config()['workflow']['sequencing_type'])
-        alignment_input = sample.alignment_input_by_seq_type.get(seq_type)
+        alignment_input = sample.alignment_input_by_seq_type.get(
+            self.cohort.sequencing_type
+        )
         if realign_cram_ver := get_config()['workflow'].get('realign_from_cram_version'):
             if (path := (
                 sample.dataset.path() / 'cram' / realign_cram_ver / f'{sample.id}.cram'

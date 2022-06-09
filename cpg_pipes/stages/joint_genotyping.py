@@ -66,7 +66,7 @@ class JointGenotyping(CohortStage):
             scatter_count=get_config()['workflow'].get(
                 'jc_intervals_num', joint_genotyping.DEFAULT_INTERVALS_NUM
             ),
-            sequencing_type=get_config()['workflow']['sequencing_type'],
+            sequencing_type=self.cohort.sequencing_type,
             intervals_path=get_config()['workflow'].get('intervals_path'),
             job_attrs=self.get_job_attrs(),
         )

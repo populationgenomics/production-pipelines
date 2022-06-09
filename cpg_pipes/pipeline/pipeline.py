@@ -662,9 +662,8 @@ class Stage(Generic[TargetT], ABC):
         """
         Create Hail Batch Job attributes dictionary
         """
-        seq_type = SequencingType.parse(get_config()['workflow']['sequencing_type'])
         job_attrs = dict(
-            seq_type=seq_type.value,
+            seq_type=self.cohort.sequencing_type.value,
             stage=self.name,
         )
         if target:
@@ -790,8 +789,11 @@ class Pipeline:
             analysis_dataset_name=analysis_dataset,
             namespace=Namespace.from_access_level(access_level),
             name=self.name,
+            sequencing_type=SequencingType.parse(
+                get_config()['workflow']['sequencing_type']
+            )
         )
-        
+
         smdb: Optional[SMDB] = None
         input_provider: InputProvider | None = None
         if (get_config()['workflow'].get('datasets') and 
@@ -807,16 +809,12 @@ class Pipeline:
             input_provider = CsvInputProvider(to_path(csv_path).open())
 
         if input_provider is not None:
-            only_seq_type = None
-            if val := get_config()['workflow'].get('sequencing_type'):
-                only_seq_type = SequencingType.parse(val)
             input_provider.populate_cohort(
                 cohort=self.cohort,
                 dataset_names=get_config()['workflow'].get('datasets'),
                 skip_samples=get_config()['workflow'].get('skip_samples'),
                 only_samples=get_config()['workflow'].get('only_samples'),
                 skip_datasets=get_config()['workflow'].get('skip_datasets'),
-                only_seq_type=only_seq_type,
             )
 
         self.hail_billing_project = get_billing_project(

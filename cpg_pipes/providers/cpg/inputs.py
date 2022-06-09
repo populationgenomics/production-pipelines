@@ -40,7 +40,6 @@ class CpgInputProvider(InputProvider):
         only_samples: list[str] | None = None,
         skip_datasets: list[str] | None = None,
         ped_files: list[Path] | None = None,
-        only_seq_type: SequencingType | None = None,
     ) -> Cohort:
         """
         Overriding the superclass method.
@@ -56,7 +55,6 @@ class CpgInputProvider(InputProvider):
             only_samples=only_samples,
             skip_datasets=skip_datasets,
             ped_files=ped_files,
-            only_seq_type=only_seq_type,
         )
 
     def get_entries(

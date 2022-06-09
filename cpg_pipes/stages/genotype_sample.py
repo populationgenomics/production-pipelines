@@ -43,7 +43,7 @@ class GenotypeSample(SampleStage):
             intervals_j, intervals = split_intervals.get_intervals(
                 b=self.b,
                 intervals_path=get_config()['workflow'].get('intervals_path'),
-                sequencing_type=get_config()['workflow']['sequencing_type'],
+                sequencing_type=self.cohort.sequencing_type,
                 scatter_count=scatter_count,
                 job_attrs=self.get_job_attrs(),
             )

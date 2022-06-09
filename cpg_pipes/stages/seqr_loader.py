@@ -27,9 +27,6 @@ from cpg_pipes.targets import Cohort, Dataset
 logger = logging.getLogger(__file__)
 
 
-SUPPORTED_SEQUENCING_TYPES = ['genome']
-
-
 @stage(required_stages=[JointGenotyping, Vqsr, Vep])
 class AnnotateCohort(CohortStage):
     """
@@ -60,7 +57,7 @@ class AnnotateCohort(CohortStage):
             siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
             output_mt_path=mt_path,
             checkpoints_bucket=self.tmp_bucket / 'checkpoints',
-            sequencing_type=get_config()['workflow']['sequencing_type'],
+            sequencing_type=self.cohort.sequencing_type,
             overwrite=not get_config()['workflow'].get('self.check_intermediates'),
             job_attrs=self.get_job_attrs(),
         )

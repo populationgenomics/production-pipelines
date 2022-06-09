@@ -10,7 +10,7 @@ from .. import Path
 from ..jobs import fastqc
 from ..targets import Sample
 from ..pipeline import stage, SampleStage, StageInput, StageOutput
-from ..types import CramPath, SequencingType
+from ..types import CramPath
 
 logger = logging.getLogger(__file__)
 
@@ -36,13 +36,14 @@ class FastQC(SampleStage):
         """
         Only running FastQC if sequencing inputs are available.
         """
-        seq_type = SequencingType.parse(get_config()['workflow']['sequencing_type'])
-        alignment_input = sample.alignment_input_by_seq_type.get(seq_type)
+        alignment_input = sample.alignment_input_by_seq_type.get(
+            self.cohort.sequencing_type
+        )
 
         if isinstance(alignment_input, CramPath) and alignment_input.is_bam:
             logger.info(
                 f'FastQC input {sample} has CRAM inputs {alignment_input} '
-                f'for type {seq_type}, skipping FASTQC'
+                f'for type {self.cohort.sequencing_type.value}, skipping FASTQC'
             )
             return self.make_outputs(sample, skipped=True)
 
