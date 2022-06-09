@@ -4,6 +4,8 @@ Stages that perform alignment QC on CRAM files.
 
 import logging
 
+from cpg_utils import Path
+
 from ..jobs.cram_qc import samtools_stats, verify_bamid, picard_wgs_metrics
 from ..pipeline import stage, SampleStage, StageInput, StageOutput
 from ..targets import Sample
@@ -17,7 +19,7 @@ class SamtoolsStats(SampleStage):
     Alignment QC using samtools stats.
     """
 
-    def expected_outputs(self, sample: Sample):
+    def expected_outputs(self, sample: Sample) -> Path:
         """
         Expected to generate one QC file to be parsed with MultiQC:
         * Samtools stats file found by contents, so file name can be any:
@@ -46,7 +48,7 @@ class PicardWgsMetrics(SampleStage):
     Alignment QC using picard tools wgs_metrics.
     """
 
-    def expected_outputs(self, sample: Sample):
+    def expected_outputs(self, sample: Sample) -> Path:
         """
         Expected to generate one QC file to be parsed with MultiQC.
         * Picard file found by contents, so file name can be any:
@@ -77,7 +79,7 @@ class VerifyBamId(SampleStage):
     Check for contamination using VerifyBAMID SelfSM.
     """
 
-    def expected_outputs(self, sample: Sample):
+    def expected_outputs(self, sample: Sample) -> Path:
         """
         Expected to generate one QC file to be parsed with MultiQC.
         * VerifyBAMID file has to have *.selfSM ending:

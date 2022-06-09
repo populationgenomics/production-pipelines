@@ -633,6 +633,7 @@ class Stage(Generic[TargetT], ABC):
             paths: list[Path] = []
 
             def _find_paths(val):
+                """Recursively find every Path object"""
                 if isinstance(val, Path):
                     paths.append(val)
                 if isinstance(val, list):
@@ -641,8 +642,8 @@ class Stage(Generic[TargetT], ABC):
                 if isinstance(val, dict):
                     for el in val.values():
                         _find_paths(el)
-            
-            _find_paths(paths)
+    
+            _find_paths(expected_out)
             reusable = all(exists(path) for path in paths)
         return reusable
 
@@ -836,10 +837,7 @@ class Pipeline:
         self.status_reporter = None
         if get_config()['workflow'].get('status_reporter') == 'smdb':
             smdb = smdb or SMDB(self.cohort.analysis_dataset.name)
-            self.status_reporter = CpgStatusReporter(
-                smdb=smdb,
-                slack_channel=get_config()['workflow'].get('slack_channel'),
-            )
+            self.status_reporter = CpgStatusReporter(smdb=smdb)
 
         # Will be populated by set_stages() in submit_batch()
         self._stages_dict: dict[str, Stage] = dict()
@@ -995,7 +993,7 @@ class Pipeline:
             stage_.output_by_target = stage_.queue_for_cohort(self.cohort)
             if errors := self._process_stage_errors(stage_.output_by_target):
                 raise PipelineError(
-                    f'Stage {stage} failed to queue jobs with errors: '
+                    f'Stage {stage.__name__} failed to queue jobs with errors: '
                     + '\n'.join(errors)
                 )
 

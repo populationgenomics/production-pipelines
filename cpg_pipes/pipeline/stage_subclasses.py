@@ -5,7 +5,6 @@ Subclasses of Stage class specific for a Target subclass.
 import logging
 from abc import ABC, abstractmethod
 
-from . import PipelineError
 from .pipeline import Stage, ExpectedResultT, StageInput, StageOutput, Action
 from ..targets import Sample, Cohort, Dataset
 
@@ -34,23 +33,40 @@ class SampleStage(Stage[Sample], ABC):
         """
         Plug in stage into the pipeline.
         """
-        datasets = cohort.get_datasets()
-        if not datasets:
-            raise ValueError('No active datasets are found to run')
-
         output_by_target: dict[str, StageOutput | None] = dict()
+
+        if not (datasets := cohort.get_datasets()):
+            logger.warning(
+                f'{len(cohort.get_datasets())}/'
+                f'{len(cohort.get_datasets(only_active=False))} '
+                f'usable (active=True) datasets found in the cohort. Check that '
+                f'`workflow.datasets` is provided, and not all datasets are skipped '
+                f'via workflow.skip_datasets`'
+            )
+            return output_by_target
+        if not cohort.get_samples():
+            logger.warning(
+                f'{len(cohort.get_samples())}/'
+                f'{len(cohort.get_samples(only_active=False))} '
+                f'usable (active=True) samples found. Check logs above for '
+                f'possible reasons samples were skipped (e.g. all samples ignored '
+                f'via `workflow.skip_samples` in config, or they all missing stage '
+                f'inputs and `workflow.skip_samples_with_missing_input=true` is set)'
+            )
+            return output_by_target
 
         for ds_i, dataset in enumerate(datasets):
             if not dataset.get_samples():
-                raise PipelineError(
+                logger.warning(
                     f'{dataset}: '
                     f'{len(dataset.get_samples())}/'
                     f'{len(dataset.get_samples(only_active=False))} '
                     f'usable (active=True) samples found. Check logs above for '
                     f'possible reasons samples were skipped (e.g. all samples ignored '
-                    f'with --skip-sample option, or they all missing alignment inputs '
-                    f'and --skip-samples-with-missing-input flag is set)'
+                    f'via `workflow.skip_samples` in config, or they all missing stage '
+                    f'inputs and `workflow.skip_samples_with_missing_input=true` is set)'
                 )
+                continue
 
             # Checking if all samples can be reused, queuing only one job per target:
             action_by_sid = dict()
@@ -126,9 +142,15 @@ class DatasetStage(Stage, ABC):
         Plug in stage into the pipeline.
         """
         output_by_target = dict()
-        datasets = cohort.get_datasets()
-        if not datasets:
-            raise ValueError('No active datasets are found to run')
+        if not (datasets := cohort.get_datasets()):
+            logger.warning(
+                f'{len(cohort.get_datasets())}/'
+                f'{len(cohort.get_datasets(only_active=False))} '
+                f'usable (active=True) datasets found in the cohort. Check that '
+                f'`workflow.datasets` is provided, and not all datasets are skipped '
+                f'via workflow.skip_datasets`'
+            )
+            return output_by_target
         for _, dataset in enumerate(datasets):
             output_by_target[dataset.target_id] = self._queue_jobs_with_checks(dataset)
         return output_by_target
