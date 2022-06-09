@@ -61,31 +61,22 @@ class CpgStatusReporter(StatusReporter):
         target: Target,
         jobs: list[Job] | None = None,
         prev_jobs: list[Job] | None = None,
+        meta: dict | None = None,
     ) -> list[Job]:
         """
         Create "queued" analysis and insert "in_progress" and "completed" updater jobs.
         """
-        if isinstance(output, dict):
-            raise StatusReporterError(
-                'SmdbStatusReporter only supports a single Path as output data.'
-            )
-        if isinstance(output, Resource):
-            raise StatusReporterError(
-                'Cannot use hail.batch.Resource objects with status reporter. '
-                'Only supported single Path objects'
-            )
-
         if not jobs:
             return []
-        # Interacting with the sample metadata server:
+        
         # 1. Create a "queued" analysis
-        aid = self.smdb.create_analysis(
+        if (aid := self.create_analysis(
             output=str(output),
-            type_=analysis_type,
-            status='queued',
-            sample_ids=[s.id for s in target.get_samples()],
-        )
-        if aid is None:
+            analysis_type=analysis_type,
+            analysis_status='queued',
+            target=target,
+            meta=meta,
+        )) is None:
             raise StatusReporterError(
                 'SmdbStatusReporter error: failed to create analysis'
             )
@@ -104,12 +95,30 @@ class CpgStatusReporter(StatusReporter):
             status=AnalysisStatus.COMPLETED,
             analysis_type=analysis_type,
             job_attrs=target.get_job_attrs(),
+            output_path=output if isinstance(output, Path) else None,
         )
 
         if prev_jobs:
             in_progress_j.depends_on(*prev_jobs)
         completed_j.depends_on(*jobs)
         return [in_progress_j, *jobs, completed_j]
+    
+    def create_analysis(
+        self,
+        output: str,
+        analysis_type: str,
+        analysis_status: str,
+        target: Target,
+        meta: dict | None = None,        
+    ) -> int | None:
+        """Record analysis entry"""
+        return self.smdb.create_analysis(
+            output=output,
+            type_=analysis_type,
+            status=analysis_status,
+            sample_ids=target.get_sample_ids(),
+            meta=meta,
+        )
 
     @staticmethod
     def add_status_updater_job(
@@ -118,9 +127,11 @@ class CpgStatusReporter(StatusReporter):
         status: AnalysisStatus,
         analysis_type: str,
         job_attrs: dict | None = None,
+        output_path: Path | None = None,
     ) -> Job:
         """
-        Create a Hail Batch job that updates status of analysis.
+        Create a Hail Batch job that updates status of analysis. For status=COMPLETED,
+        adds the size of `output` into `meta.size` if provided.
         """
         try:
             analysis_id_int = int(analysis_id)
@@ -133,6 +144,13 @@ class CpgStatusReporter(StatusReporter):
 
         j = b.new_job(job_name, job_attrs)
         j.image(image_path('sm-api'))
+
+        calc_size_cmd = None
+        if output_path:
+            calc_size_cmd = f"""
+        from cloudpathlib import CloudPath
+        meta['size'] = CloudPath('{str(output_path)}').stat().st_size
+        """
         cmd = dedent(
             f"""\
         cat <<EOT >> update.py
@@ -140,12 +158,17 @@ class CpgStatusReporter(StatusReporter):
         from sample_metadata.models import AnalysisUpdateModel, AnalysisStatus
         from sample_metadata import exceptions
         import traceback
+        
+        meta = dict()
+        {calc_size_cmd}
+        
         aapi = AnalysisApi()
         try:
             aapi.update_analysis_status(
                 analysis_id={analysis_id_int},
                 analysis_update_model=AnalysisUpdateModel(
-                    status=AnalysisStatus('{status.value}')
+                    status=AnalysisStatus('{status.value}'),
+                    meta=meta,
                 ),
             )
         except exceptions.ApiException:

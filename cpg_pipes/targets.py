@@ -209,7 +209,10 @@ class Cohort(Target):
         """
         Attributes for Hail Batch job.
         """
-        return {'samples': self.get_sample_ids()}
+        return {
+            'samples': self.get_sample_ids(),
+            'datasets': [d.name for d in self.get_datasets()], 
+        }
 
     def get_job_prefix(self) -> str:
         """
@@ -401,7 +404,10 @@ class Dataset(Target):
         """
         Attributes for Hail Batch job.
         """
-        return {'dataset': self.name, 'samples': self.get_sample_ids()}
+        return {
+            'dataset': self.name, 
+            'samples': self.get_sample_ids(),
+        }
 
     def get_job_prefix(self) -> str:
         """
@@ -588,7 +594,10 @@ class Sample(Target):
         """
         Attributes for Hail Batch job.
         """
-        return {'dataset': self.dataset.name, 'sample': self.id}
+        return {
+            'dataset': self.dataset.name, 
+            'sample': self.id,
+        }
 
     def get_job_prefix(self) -> str:
         """

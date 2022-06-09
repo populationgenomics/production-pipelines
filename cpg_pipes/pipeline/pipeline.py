@@ -34,6 +34,7 @@ from ..providers.cpg.status import CpgStatusReporter
 from ..providers.inputs import InputProvider, CsvInputProvider
 from ..targets import Target, Dataset, Sample, Cohort
 from ..providers.status import StatusReporter
+from ..types import SequencingType
 from ..utils import exists
 
 logger = logging.getLogger(__file__)
@@ -69,6 +70,7 @@ class StageOutput:
         target: 'Target',
         data: StageOutputData | str | dict[str, str] | None = None,
         jobs: list[Job] | Job | None = None,
+        meta: dict | None = None,
         reusable: bool = False,
         skipped: bool = False,
         error_msg: str | None = None,
@@ -86,6 +88,7 @@ class StageOutput:
         self.stage = stage
         self.target = target
         self.jobs: list[Job] = [jobs] if isinstance(jobs, Job) else (jobs or [])
+        self.meta: dict = meta or {}
         self.reusable = reusable
         self.skipped = skipped
         self.error_msg = error_msg
@@ -98,6 +101,7 @@ class StageOutput:
             + (f' [reusable]' if self.reusable else '')
             + (f' [skipped]' if self.skipped else '')
             + (f' [error: {self.error_msg}]' if self.error_msg else '')
+            + f' meta={self.meta}'
             + f')'
         )
         return res
@@ -475,6 +479,7 @@ class Stage(Generic[TargetT], ABC):
         target: 'Target',
         data: StageOutputData | str | dict[str, str] | None = None,
         jobs: list[Job] | Job | None = None,
+        meta: dict | None = None,
         reusable: bool = False,
         skipped: bool = False,
         error_msg: str | None = None,
@@ -486,6 +491,7 @@ class Stage(Generic[TargetT], ABC):
             target=target,
             data=data,
             jobs=jobs,
+            meta=meta,
             reusable=reusable,
             skipped=skipped,
             error_msg=error_msg,
@@ -522,6 +528,8 @@ class Stage(Generic[TargetT], ABC):
             return None
 
         outputs.stage = self
+        outputs.meta |= self.get_job_attrs(target)
+
         for j in outputs.jobs:
             j.depends_on(*inputs.get_jobs(target))
 
@@ -537,6 +545,7 @@ class Stage(Generic[TargetT], ABC):
                 target=target,
                 jobs=outputs.jobs,
                 prev_jobs=inputs.get_jobs(target),
+                meta=outputs.meta,
             )
         return outputs
 
@@ -620,12 +629,20 @@ class Stage(Generic[TargetT], ABC):
                 # Do not check the files' existence, assume they don't exist:
                 reusable = False
         else:
-            # Checking that expected output exists:
-            paths: list[Path]
-            if isinstance(expected_out, dict):
-                paths = [v for k, v in expected_out.items()]
-            else:
-                paths = [expected_out]
+            # Checking that all paths in the expected output exists:
+            paths: list[Path] = []
+
+            def _find_paths(val):
+                if isinstance(val, Path):
+                    paths.append(val)
+                if isinstance(val, list):
+                    for el in val:
+                        _find_paths(el)
+                if isinstance(val, dict):
+                    for el in val.values():
+                        _find_paths(el)
+            
+            _find_paths(paths)
             reusable = all(exists(path) for path in paths)
         return reusable
 
@@ -645,7 +662,11 @@ class Stage(Generic[TargetT], ABC):
         """
         Create Hail Batch Job attributes dictionary
         """
-        job_attrs = dict(stage=self.name)
+        seq_type = SequencingType.parse(get_config()['workflow']['sequencing_type'])
+        job_attrs = dict(
+            seq_type=seq_type.value,
+            stage=self.name,
+        )
         if target:
             job_attrs |= target.get_job_attrs()
         return job_attrs
@@ -789,13 +810,16 @@ class Pipeline:
             input_provider = CsvInputProvider(to_path(csv_path).open())
 
         if input_provider is not None:
+            seq_type = None
+            if val := get_config()['workflow'].get('sequencing_type'):
+                seq_type = SequencingType.parse(val)
             input_provider.populate_cohort(
                 cohort=self.cohort,
                 dataset_names=get_config()['workflow'].get('datasets'),
                 skip_samples=get_config()['workflow'].get('skip_samples'),
                 only_samples=get_config()['workflow'].get('only_samples'),
                 skip_datasets=get_config()['workflow'].get('skip_datasets'),
-                sequencing_type=get_config()['workflow'].get('sequencing_type'),
+                sequencing_type=seq_type,
             )
 
         self.hail_billing_project = get_billing_project(

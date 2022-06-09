@@ -232,6 +232,7 @@ class SMDB:
         status: str | AnalysisStatus,
         sample_ids: list[str],
         project_name: str | None = None,
+        meta: dict | None = None,
     ) -> int | None:
         """
         Tries to create an Analysis entry, returns its id if successful.
@@ -248,6 +249,7 @@ class SMDB:
             status=models.AnalysisStatus(status),
             output=str(output),
             sample_ids=list(sample_ids),
+            meta=meta or {},
         )
         try:
             aid = self.aapi.create_new_analysis(project=project_name, analysis_model=am)

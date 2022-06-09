@@ -28,7 +28,7 @@ class SequencingType(Enum):
     ONT = 'ont'
 
     @staticmethod
-    def parse(str_val: str | None) -> Optional['SequencingType']:
+    def parse(str_val: str) -> 'SequencingType':
         """
         Parse a string into a SequencingType object.
         
@@ -37,8 +37,6 @@ class SequencingType(Enum):
         >>> SequencingType.parse('wes')
         SequencingType.EXOME
         """
-        if str_val is None:
-            return None
         str_to_val: dict[str, SequencingType] = {} 
         for val, str_vals in {
             SequencingType.GENOME: ['genome', 'wgs'],

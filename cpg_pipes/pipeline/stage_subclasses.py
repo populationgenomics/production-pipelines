@@ -58,6 +58,15 @@ class SampleStage(Stage[Sample], ABC):
                 logger.info(f'{self.name}: #{sample_i + 1}/{sample}')
                 action = self._get_action(sample)
                 action_by_sid[sample.id] = action
+                if action == Action.REUSE:
+                    if self.analysis_type and self.status_reporter:
+                        self.status_reporter.create_analysis(
+                            output=str(self.expected_outputs(sample)),
+                            analysis_type=self.analysis_type,
+                            analysis_status='completed',
+                            target=sample,
+                            meta=sample.get_job_attrs(),
+                        )
 
             if len(set(action_by_sid.values())) == 1:
                 action = list(action_by_sid.values())[0]
