@@ -406,7 +406,6 @@ class Dataset(Target):
         """
         return {
             'dataset': self.name, 
-            'datasets': [self.name], 
             'samples': self.get_sample_ids(),
         }
 
@@ -597,9 +596,7 @@ class Sample(Target):
         """
         return {
             'dataset': self.dataset.name, 
-            'datasets': [self.dataset.name], 
             'sample': self.id,
-            'samples': [self.id],
         }
 
     def get_job_prefix(self) -> str:
