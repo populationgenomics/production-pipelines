@@ -38,6 +38,7 @@ class SamtoolsStats(SampleStage):
             cram_path=cram_path,
             output_path=self.expected_outputs(sample),
             job_attrs=self.get_job_attrs(sample),
+            sequencing_type=self.cohort.sequencing_type,
         )
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])
 
@@ -69,6 +70,7 @@ class PicardWgsMetrics(SampleStage):
             cram_path=cram_path,
             output_path=self.expected_outputs(sample),
             job_attrs=self.get_job_attrs(sample),
+            sequencing_type=self.cohort.sequencing_type,
         )
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])
 
@@ -98,5 +100,6 @@ class VerifyBamId(SampleStage):
             cram_path=cram_path,
             output_path=self.expected_outputs(sample),
             job_attrs=self.get_job_attrs(sample),
+            sequencing_type=self.cohort.sequencing_type,
         )
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])

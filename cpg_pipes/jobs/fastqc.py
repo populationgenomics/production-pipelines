@@ -25,7 +25,7 @@ def fastqc(
     """
     Adds FastQC jobs. If the input is a set of fqs, runs FastQC on each fq file.
     """
-    if isinstance(alignment_input, CramPath) and alignment_input.is_bam:
+    if isinstance(alignment_input, CramPath) and not alignment_input.is_bam:
         raise NotImplementedError('FastQC does not support CRAM input')
 
     def _fastqc_one(jname_, input_path: CramPath | FastqPath):

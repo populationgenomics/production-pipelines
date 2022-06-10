@@ -154,6 +154,7 @@ def _haplotype_caller_one(
     out_gvcf_path: Path | None = None,
     overwrite: bool = True,
     dragen_mode: bool = True,
+    sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> Job:
     """
     Add one HaplotypeCaller job on an interval
@@ -174,9 +175,12 @@ def _haplotype_caller_one(
     # plus we need enough space to fit output GVCF (1G) and reference data (5G).
     # HaplotypeCaller is not parallelised, so we request 4 cores only to just have
     # enough memory. But a 4-core request would only give us 185G/4 = 46.25G on
-    # a 32-core machine, or 265G/4 = 66.25G on a 16-core machine. That's not enough,
-    # so we need to explicitly request more storage.
-    job_res = STANDARD.set_resources(j, ncpu=4, storage_gb=100)
+    # a 32-core machine, or 265G/4 = 66.25G on a 16-core machine. That's not enough
+    # for WGS sometimes, so we need to explicitly request more storage.
+    storage_gb = None  # avoid extra disk by default
+    if sequencing_type == SequencingType.GENOME:
+        storage_gb = 100
+    job_res = STANDARD.set_resources(j, ncpu=4, storage_gb=storage_gb)
 
     j.declare_resource_group(
         output_gvcf={

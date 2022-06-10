@@ -21,15 +21,12 @@ skip_samples = [
 check_inputs = true
 skip_samples_with_missing_input = false
 keep_scratch = true
-status_reporter = 'smdb'
-#skip_samples_stages:
-#  VerifyBamId: [CPG13409]  # https://batch.hail.populationgenomics.org.au/batches/56236/jobs/372
+#status_reporter = 'smdb'
+[workflow.skip_samples_stages]
+VerifyBamId = ['CPG13409']  # https://batch.hail.populationgenomics.org.au/batches/56236/jobs/372
+
 sequencing_type = 'genome'
 dataset_gcp_project = 'seqr-308602'
-
-[seqr]
-password_secret_id = 'seqr-es-password'
-password_project_id = 'seqr-308602'
 
 [hail]
 pool_label = 'seqr'

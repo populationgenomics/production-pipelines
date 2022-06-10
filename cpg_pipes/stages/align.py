@@ -69,5 +69,6 @@ class Align(SampleStage):
             ),
             aligner=Aligner.DRAGMAP,
             markdup_tool=MarkDupTool.PICARD,
+            sequencing_type=self.cohort.sequencing_type,
         )
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)

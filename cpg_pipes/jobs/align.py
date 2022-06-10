@@ -89,6 +89,7 @@ def align(
     overwrite: bool = False,
     requested_nthreads: int | None = None,
     realignment_shards_num: int = DEFAULT_REALIGNMENT_SHARD_NUM,
+    sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> list[Job]:
     """
     - if the input is 1 fastq pair, submits one alignment job.
@@ -136,6 +137,7 @@ def align(
             sample_name=sample_name,
             job_attrs=job_attrs,
             aligner=aligner,
+            sequencing_type=sequencing_type,
         )
         stdout_is_sorted = False
         output_fmt = 'sam'
@@ -158,6 +160,7 @@ def align(
                     sample_name=sample_name,
                     job_attrs=job_attrs,
                     aligner=aligner,
+                    sequencing_type=sequencing_type,
                 )
                 # Sorting with samtools, but not adding deduplication yet, because we
                 # need to merge first.
@@ -179,6 +182,7 @@ def align(
                     requested_nthreads=requested_nthreads,
                     number_of_shards_for_realignment=realignment_shards_num,
                     shard_number=shard_number,
+                    sequencing_type=sequencing_type,
                 )
                 # Sorting with samtools, but not adding deduplication yet, because we
                 # need to merge first.
@@ -191,16 +195,13 @@ def align(
             'Merge BAMs', (job_attrs or {}) | dict(tool='samtools_merge')
         )
         merge_j.image(image_path('bwa'))
+        
         nthreads = STANDARD.set_resources(
             merge_j, 
             nthreads=requested_nthreads,
             # for FASTQ or BAM inputs, requesting more disk (400G). Example when 
             # default is not enough: https://batch.hail.populationgenomics.org.au/batches/73892/jobs/56
-            storage_gb=(
-                None  # not attaching disk for realignments from CRAM
-                if isinstance(alignment_input, CramPath) and not alignment_input.is_bam
-                else 400  
-            ),
+            storage_gb=storage_for_cram_job(sequencing_type, alignment_input),
         ).get_nthreads()
 
         align_cmd = f"""\
@@ -231,6 +232,18 @@ def align(
     return jobs
 
 
+def storage_for_cram_job(alignment_input, sequencing_type) -> int | None:
+    """Get storage for a job that processes CRAM"""
+    storage_gb = None  # avoid attaching extra disk by default
+    if sequencing_type == SequencingType.GENOME:
+        if (
+            isinstance(alignment_input, FastqPairs) or 
+            isinstance(alignment_input, CramPath) and alignment_input.is_bam
+        ):
+            storage_gb = 400  # for WGS FASTQ or BAM inputs, need more disk
+    return storage_gb
+
+
 def _align_one(
     b,
     job_name: str,
@@ -241,6 +254,7 @@ def _align_one(
     aligner: Aligner = Aligner.BWA,
     number_of_shards_for_realignment: int | None = None,
     shard_number: int | None = None,
+    sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> tuple[Job, str]:
     """
     Creates a job that (re)aligns reads to hg38. Returns the job object and a command 
@@ -258,14 +272,11 @@ def _align_one(
         )
     job_name = f'{job_name} {alignment_input.path_glob()}'
     j = b.new_job(job_name, job_attrs)
+
     nthreads = STANDARD.set_resources(
         j, 
         nthreads=requested_nthreads, 
-        storage_gb=(
-            None  # not attaching disk for realignments from CRAM
-            if isinstance(alignment_input, CramPath) and not alignment_input.is_bam
-            else 400  # for FASTQ or BAM inputs, need more disk
-        ),
+        storage_gb=storage_for_cram_job(sequencing_type, alignment_input),
     ).get_nthreads()
 
     fasta = fasta_res_group(b)
@@ -365,6 +376,7 @@ def extract_fastq(
     job_attrs: dict | None = None,
     output_fq1: str | Path | None = None,
     output_fq2: str | Path | None = None,
+    sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> Job:
     """
     Job that converts a BAM or a CRAM file to an interleaved compressed fastq file.
@@ -374,7 +386,8 @@ def extract_fastq(
     nthreads = ncpu * 2  # multithreading
     j.cpu(ncpu)
     j.image(image_path('dragmap'))
-    j.storage('700G')
+    if sequencing_type == SequencingType.GENOME:
+        j.storage('700G')
 
     reference = fasta_res_group(b)
     index_cmd = ''

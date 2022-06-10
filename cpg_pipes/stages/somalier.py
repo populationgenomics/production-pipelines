@@ -41,6 +41,7 @@ class CramSomalier(SampleStage):
             out_fpath=expected_path,
             overwrite=not get_config()['workflow'].get('check_intermediates'),
             job_attrs=self.get_job_attrs(sample),
+            sequencing_type=self.cohort.sequencing_type,
         )
         return self.make_outputs(sample, data=expected_path, jobs=[j])
 
@@ -96,6 +97,7 @@ class CramSomalierPedigree(DatasetStage):
             out_checks_path=self.expected_outputs(dataset)['checks'],
             job_attrs=self.get_job_attrs(dataset),
             status_reporter=self.status_reporter,
+            sequencing_type=self.cohort.sequencing_type,
         )
         return self.make_outputs(
             dataset, data=self.expected_outputs(dataset), jobs=jobs
@@ -148,5 +150,6 @@ class CramSomalierAncestry(DatasetStage):
             out_html_url=html_url,
             job_attrs=self.get_job_attrs(dataset),
             status_reporter=self.status_reporter,
+            sequencing_type=self.cohort.sequencing_type,
         )
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])
