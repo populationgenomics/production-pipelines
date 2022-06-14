@@ -518,7 +518,6 @@ class Stage(Generic[TargetT], ABC):
             outputs = self.make_outputs(
                 target=target,
                 data=expected_out,
-                jobs=self.new_reuse_job(target),
                 reusable=True,
             )
         else:  # Action.SKIP
