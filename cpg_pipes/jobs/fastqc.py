@@ -21,6 +21,7 @@ def fastqc(
     alignment_input: AlignmentInput,
     subsample: bool = True,
     job_attrs: dict | None = None,
+    all_lanes: bool = False,
 ) -> list[Job]:
     """
     Adds FastQC jobs. If the input is a set of fqs, runs FastQC on each fq file.
@@ -73,6 +74,8 @@ def fastqc(
         return jobs
     else:
         assert isinstance(alignment_input, FastqPairs)
+        if not all_lanes:
+            alignment_input = FastqPairs([alignment_input[0]])
         for lane_i, pair in enumerate(alignment_input):
             jname = f'FastQC R1'
             if len(alignment_input) > 1:
