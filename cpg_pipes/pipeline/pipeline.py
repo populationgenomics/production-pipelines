@@ -197,7 +197,7 @@ class StageInput:
         assert output.stage is not None, output
         if not output.target.active:
             return
-        if not output.data or not output.jobs:
+        if not output.data and not output.jobs:
             return
         stage_name = output.stage.name
         target_id = output.target.target_id
