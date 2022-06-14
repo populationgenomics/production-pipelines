@@ -110,7 +110,7 @@ class LoadToEs(DatasetStage):
         """
         version = get_config()['workflow'].get('version')
         version = version or time.strftime('%Y%m%d-%H%M%S')
-        index_name = f'{dataset.name}-{version}'
+        index_name = f'{dataset.name}-{self.cohort.sequencing_type.value}-{version}'
         return index_name
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
