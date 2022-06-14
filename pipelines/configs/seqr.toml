@@ -14,6 +14,7 @@ datasets = [
     'ravenscroft-arch',
     'hereditary-neuro',
 ]
+add_validation_dataset = true
 skip_samples = [
   'CPG11783',   # acute-care, no FASTQ data
   'CPG13326',   # perth-neuro, no FASTQ data: https://github.com/populationgenomics/seqr-private/issues/2
@@ -21,12 +22,13 @@ skip_samples = [
 check_inputs = true
 skip_samples_with_missing_input = false
 keep_scratch = true
-#status_reporter = 'smdb'
-[workflow.skip_samples_stages]
-VerifyBamId = ['CPG13409']  # https://batch.hail.populationgenomics.org.au/batches/56236/jobs/372
-
 sequencing_type = 'genome'
 dataset_gcp_project = 'seqr-308602'
+jc_intervals_num = 200
+#status_reporter = 'smdb'
+
+[workflow.skip_samples_stages]
+VerifyBamId = ['CPG13409']  # https://batch.hail.populationgenomics.org.au/batches/56236/jobs/372
 
 [hail]
 pool_label = 'seqr'

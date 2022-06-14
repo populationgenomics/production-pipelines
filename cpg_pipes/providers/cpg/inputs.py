@@ -14,7 +14,7 @@ from .smdb import SMDB, SmSequence
 from ..inputs import InputProvider, InputProviderError
 from ... import Path
 from ...targets import Cohort, Sex, PedigreeInfo, Dataset
-from ...types import SequencingType
+from ...types import SequencingType, FastqPairs, FastqPair, CramPath
 
 logger = logging.getLogger(__file__)
 
@@ -48,7 +48,7 @@ class CpgInputProvider(InputProvider):
             raise InputProviderError(
                 'Datasets must be provided explicitly for the CPG input provider'
             )
-        return super().populate_cohort(
+        cohort = super().populate_cohort(
             cohort=cohort,
             dataset_names=dataset_names,
             skip_samples=skip_samples,
@@ -56,6 +56,27 @@ class CpgInputProvider(InputProvider):
             skip_datasets=skip_datasets,
             ped_files=ped_files,
         )
+        if get_config()['workflow'].get('add_validation_dataset'):
+            validation_dataset = cohort.create_dataset('validation')
+            validation_dataset.add_sample(
+                'NA12878_KCCG',
+                alignment_input_by_seq_type={
+                    SequencingType.GENOME: FastqPairs([FastqPair(
+                        'gs://cpg-validation-main-upload/HCMVGDSX3_1_220405_FD07777372_Homo-sapiens_TCCGCCAATT-CAGCACGGAG_R_220405_CNTROL_DNA_M001_R1.fastq.gz',
+                        'gs://cpg-validation-main-upload/HCMVGDSX3_1_220405_FD07777372_Homo-sapiens_TCCGCCAATT-CAGCACGGAG_R_220405_CNTROL_DNA_M001_R2.fastq.gz',
+                    )])
+                }
+            )
+            validation_dataset.add_sample(
+                'SYNDIP',
+                alignment_input_by_seq_type={
+                    SequencingType.GENOME: CramPath(
+                        'gs://cpg-reference/validation/syndip/raw/CHM1_CHM13_2.bam',
+                        'gs://cpg-reference/validation/syndip/raw/CHM1_CHM13_2.bam.bai',
+                    )
+                }
+            )
+        return cohort
 
     def get_entries(
         self,
