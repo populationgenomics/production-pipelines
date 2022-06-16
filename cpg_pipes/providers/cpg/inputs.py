@@ -56,7 +56,9 @@ class CpgInputProvider(InputProvider):
             skip_datasets=skip_datasets,
             ped_files=ped_files,
         )
-        if get_config()['workflow'].get('add_validation_dataset'):
+        if cohort.sequencing_type and \
+                cohort.sequencing_type == SequencingType.GENOME and \
+                get_config()['workflow'].get('add_validation_dataset'):
             validation_dataset = cohort.create_dataset('validation')
             validation_dataset.add_sample(
                 'NA12878_KCCG',
@@ -169,7 +171,7 @@ class CpgInputProvider(InputProvider):
             for ds, samples in groupby(sample_wo_seq, key=lambda s: s.dataset.name):
                 msg += (
                     f'\t{ds}, {len(list(samples))} samples: '
-                    f'{", ".join([s.run_id for s in samples])}\n'
+                    f'{", ".join([s.id for s in samples])}\n'
                 )
             if get_config()['workflow'].get('smdb_errors_are_fatal', True):
                 raise InputProviderError(msg)

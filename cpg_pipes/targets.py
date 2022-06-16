@@ -124,6 +124,7 @@ class Cohort(Target):
         self.analysis_dataset = Dataset(
             name=analysis_dataset_name,
             namespace=namespace,
+            cohort=self,
         )
         self.sequencing_type = sequencing_type
         self._datasets_by_name: dict[str, Dataset] = {}
@@ -170,6 +171,7 @@ class Cohort(Target):
         """
         Add existing dataset into the cohort.
         """
+        dataset.cohort = self
         if dataset.name in self._datasets_by_name:
             logger.debug(f'Dataset {dataset.name} already exists in the cohort')
             return dataset
@@ -197,6 +199,7 @@ class Cohort(Target):
             ds = Dataset(
                 name=name,
                 namespace=namespace,
+                cohort=self,
             )
 
         self._datasets_by_name[ds.name] = ds
@@ -268,10 +271,12 @@ class Dataset(Target):
         self,
         name: str,
         namespace: Namespace | None = None,
+        cohort: Cohort | None = None,
     ):
         super().__init__()
         self._sample_by_id: dict[str, Sample] = {}
         self.stack, self.namespace = parse_stack(name, namespace)
+        self.cohort = cohort
 
     @staticmethod
     def create(
@@ -313,13 +318,24 @@ class Dataset(Target):
 
     def __str__(self):
         return f'{self.name} ({len(self.get_samples())} samples)'
+    
+    def _seq_type_subdir(self) -> str:
+        """
+        Subdirectory parametrised by sequencing type. For genomes, we don't 
+        prefix at all.
+        """
+        return (
+            '' 
+            if not self.cohort or self.cohort.sequencing_type == SequencingType.GENOME 
+            else self.cohort.sequencing_type.value
+        )
 
     def prefix(self, **kwargs) -> Path:
         """
         The primary storage path.
         """
         return to_path(dataset_path(
-            '',
+            self._seq_type_subdir(),
             dataset=self.stack,
             **kwargs,
         ))
@@ -329,7 +345,7 @@ class Dataset(Target):
         Storage path for temporary files.
         """
         return to_path(dataset_path(
-            '',
+            self._seq_type_subdir(),
             dataset=self.stack,
             category='tmp',
             **kwargs,
@@ -341,7 +357,7 @@ class Dataset(Target):
         self.web_url() URLs.
         """
         return to_path(dataset_path(
-            '',
+            self._seq_type_subdir(),
             dataset=self.stack,
             category='web',
             **kwargs,
@@ -352,7 +368,7 @@ class Dataset(Target):
         URLs matching self.storage_web_path() files serverd by an HTTP server. 
         """
         return web_url(
-            '',
+            self._seq_type_subdir(),
             dataset=self.stack,
             **kwargs,
         )

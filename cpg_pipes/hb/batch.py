@@ -9,7 +9,6 @@ from typing import TypedDict
 import hailtop.batch as hb
 from cpg_utils import to_path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import copy_common_env
 from hailtop.batch.job import PythonJob, BashJob
 
 
@@ -52,7 +51,7 @@ class RegisteringBatch(hb.Batch):
         for path in os.getenv('CPG_CONFIG_PATH').split(','):
             if path:
                 path = to_path(path)
-                new_path = to_path(self._backend.remote_tmpdir) / path.name
+                new_path = to_path(self._backend.remote_tmpdir) / 'config' / path.name
                 with path.open() as inp, new_path.open('w') as out:
                     out.write(inp.read())
                 self.remote_conf_paths.append(str(new_path))
@@ -134,7 +133,7 @@ class RegisteringBatch(hb.Batch):
         j = super().new_job(name, attributes=fixed_attributes, **kwargs)
         if self.pool_label:
             j._pool_label = self.pool_label
-        copy_common_env(j)
+        j.env('CPG_CONFIG_PATH', ','.join(self.remote_conf_paths))
         return j
 
     def run(self, **kwargs):

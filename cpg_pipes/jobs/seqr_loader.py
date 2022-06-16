@@ -3,7 +3,7 @@ Jobs specific for seqr-loader.
 """
 import logging
 
-from cpg_utils.hail_batch import image_path, genome_build, copy_common_env
+from cpg_utils.hail_batch import image_path, genome_build
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
@@ -67,6 +67,7 @@ def annotate_dataset_jobs(
     subset_mt_path = tmp_bucket / 'cohort-subset.mt'
     subset_j = b.new_job(f'subset cohort to dataset', job_attrs)
     subset_j.image(image_path('hail'))
+    assert sample_ids
     subset_j.command(
         python_command(
             seqr_loader,
@@ -109,7 +110,6 @@ def load_to_es(
     # Make a list of dataset samples to subset from the entire matrix table
     j = b.new_job(f'create ES index', job_attrs)
     j.image(image_path('hail'))
-    copy_common_env(j)
     cmd = f"""\
     pip3 install click cpg_utils hail seqr_loader elasticsearch
     python3 mt_to_es.py \\

@@ -181,11 +181,13 @@ def annotate_cohort(
     )
     mt = _checkpoint(mt, 'mt-vep-split-vqsr.mt')
 
-    logger.info('Adding GRCh37 coords')
-    rg37 = hl.get_reference('GRCh37')
-    rg38 = hl.get_reference('GRCh38')
-    rg38.add_liftover(str(reference_path('liftover_38_to_37')), rg37)
-    mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
+    # Not supported by service backend
+    # logger.info('Adding GRCh37 coords')
+    # rg37 = hl.get_reference('GRCh37')
+    # rg38 = hl.get_reference('GRCh38')
+    # rg38.add_liftover(str(reference_path('liftover_38_to_37')), rg37)
+    # mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
+    mt = mt.annotate_rows(rg37_locus=mt.locus)
 
     ref_ht = hl.read_table(str(reference_path('seqr/combined_reference')))
     clinvar_ht = hl.read_table(str(reference_path('seqr/clinvar')))

@@ -37,7 +37,7 @@ class AnnotateCohort(CohortStage):
         Expected to write a matrix table.
         """
         h = cohort.alignment_inputs_hash()
-        prefix = str(cohort.analysis_dataset.prefix() / 'mt' / h)
+        prefix = str(cohort.analysis_dataset.tmp_prefix() / 'mt' / h)
         return {
             'prefix': prefix,
             'mt': to_path(f'{prefix}.mt'),

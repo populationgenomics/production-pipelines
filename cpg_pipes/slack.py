@@ -12,7 +12,6 @@ from textwrap import dedent
 
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import copy_common_env
 
 from hailtop.batch.job import Job
 
@@ -43,7 +42,6 @@ def slack_env(j: Job):
     """
     if not (channel := get_config().get('slack', {}).get('channel')):
         return None
-    copy_common_env(j)
     j.env('SLACK_CHANNEL', channel)
     j.env('SLACK_TOKEN', get_token())
 
