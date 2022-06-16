@@ -91,26 +91,11 @@ class MultiQC(DatasetStage):
             'verifybamid/selfsm',
         }
         
-        # Building sample maps to MultiQC bulk rename. Only adding samples to the map
-        # if the extrenal/participant IDs are differrent:
-        external_id_map = {
-            s.id: s.external_id for s in dataset.get_samples()
-            if s.id != s.external_id
-        }
-        participant_id_map = {
-            s.id: s.participant_id 
-            for s in dataset.get_samples()
-            if s.id != s.participant_id and s.participant_id != s.external_id
-        }
-        sid_maps = dict()
-        if external_id_map:
-            sid_maps['External ID'] = external_id_map
-        if participant_id_map:
-            sid_maps['Participant ID'] = participant_id_map
-
+        # Building sample map to MultiQC bulk rename. Only extending IDs if the 
+        # extrenal/participant IDs are differrent:
         j = multiqc(
             self.b,
-            tmp_bucket=dataset.tmp_prefix(),
+            tmp_prefix=dataset.tmp_prefix(),
             paths=paths,
             ending_to_trim=ending_to_trim,
             modules_to_trim_endings=modules_to_trim_endings,
@@ -120,6 +105,6 @@ class MultiQC(DatasetStage):
             out_html_url=html_url,
             job_attrs=self.get_job_attrs(dataset),
             status_reporter=self.status_reporter,
-            sample_id_maps=sid_maps,
+            sample_id_map=dataset.external_id_map(),
         )
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])

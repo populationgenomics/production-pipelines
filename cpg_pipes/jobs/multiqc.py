@@ -5,9 +5,7 @@ Batch pipeline to run WGS QC.
 """
 
 import logging
-from collections import defaultdict
 
-import pandas as pd
 from cpg_utils.hail_batch import image_path
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
@@ -23,7 +21,7 @@ logger = logging.getLogger(__file__)
 
 def multiqc(
     b: Batch,
-    tmp_bucket: Path,
+    tmp_prefix: Path,
     paths: list[Path],
     dataset_name: str,
     out_html_path: Path,
@@ -33,12 +31,12 @@ def multiqc(
     modules_to_trim_endings: set[str] | None = None,
     job_attrs: dict | None = None,
     status_reporter: StatusReporter | None = None,
-    sample_id_maps: dict[str, dict[str, str]] | None = None,
+    sample_id_map: dict[str, str] | None = None,
 ) -> Job:
     """
     Run MultiQC for the files in `qc_paths`
     @param b: batch object
-    @param tmp_bucket: bucket for tmp files
+    @param tmp_prefix: bucket for tmp files
     @param paths: file bucket paths to pass into MultiQC
     @param dataset_name: dataset name
     @param out_json_path: where to write MultiQC-generated JSON file
@@ -48,7 +46,7 @@ def multiqc(
     @param modules_to_trim_endings: list of modules for which trim the endings
     @param job_attrs: attributes to add to Hail Batch job
     @param status_reporter: optional status reporter to send URL to final report
-    @param sample_id_maps: maps for bulk sample renaming in the MultiQC switch panel:
+    @param sample_id_map: sample ID map for bulk sample renaming:
         (https://multiqc.info/docs/#bulk-sample-renaming-in-reports)
     @return: job object
     """
@@ -56,7 +54,7 @@ def multiqc(
     j.image(image_path('multiqc'))
     STANDARD.set_resources(j, ncpu=16)
 
-    file_list_path = tmp_bucket / 'multiqc-file-list.txt'
+    file_list_path = tmp_prefix / 'multiqc-file-list.txt'
     with file_list_path.open('w') as f:
         f.writelines([f'{p}\n' for p in paths])
     file_list = b.read_input(str(file_list_path))
@@ -66,9 +64,9 @@ def multiqc(
         ', '.join(list(modules_to_trim_endings)) if modules_to_trim_endings else ''
     )
 
-    if sample_id_maps:
-        sample_map_path = tmp_bucket / 'rename-sample-map.tsv'
-        _write_sample_id_map(sample_id_maps, sample_map_path)
+    if sample_id_map:
+        sample_map_path = tmp_prefix / 'rename-sample-map.tsv'
+        _write_sample_id_map(sample_id_map, sample_map_path)
         sample_map_file = b.read_input(str(sample_map_path))
     else:
         sample_map_file = None
@@ -79,15 +77,16 @@ def multiqc(
     cat {file_list} | gsutil -m cp -I inputs/
     
     # Temporary fix for Somalier module before https://github.com/ewels/MultiQC/pull/1670
-    # is merged and released:     
+    # is merged and released:
     git clone --single-branch --branch fix-somalier https://github.com/vladsaveliev/MultiQC
     pip3 install -e MultiQC
 
     multiqc -f inputs -o output \\
-    {f"--sample-names {sample_map_file} " if sample_map_file else ''} \\
+    {f"--replace-names {sample_map_file} " if sample_map_file else ''} \\
     --title "CRAM QC report for dataset {dataset_name}" \\
     --filename {report_filename}.html \\
     --cl-config "extra_fn_clean_exts: [{endings_conf}]" \\
+    --cl-config "max_table_rows: 10000" \\
     --cl-config "use_filename_as_sample_name: [{modules_conf}]"
 
     ls output/{report_filename}_data
@@ -110,23 +109,17 @@ def multiqc(
     return j
 
 
-def _write_sample_id_map(sample_maps: dict[str, dict[str, str]], out_path: Path):
+def _write_sample_id_map(sample_map: dict[str, str], out_path: Path):
     """
-    Configuring MultiQC to support bulk sample rename. `sample_maps` is a dictionary 
-    of sample maps. Such a map doesn't have to list all samples, but can be a subset.
+    Configuring MultiQC to support bulk sample rename. `sample_map` is a dictionary 
+    of sample IDs. The map doesn't have to have records for all samples.
     Example:
     {
-        'External ID': dict('SID1': 'ExtID1'),
-        'Participant ID': dict('SID1': 'Patient1', 'SID2': 'Patient2'),
+        'SID1': 'Patient1',
+        'SID2': 'Patient2'
     }
     https://multiqc.info/docs/#bulk-sample-renaming-in-reports
     """
-    map_per_sample: dict[str, dict[str, str]] = defaultdict(dict)
-    for name, sample_map in sample_maps.items():
-        for sid, new_sid in sample_map.items():
-            map_per_sample[sid][name] = new_sid
-    
-    entries = [{'Sample ID': sid} | d for sid, d in map_per_sample.items()]
-    df = pd.DataFrame(entries)
     with out_path.open('w') as fh:
-        df.to_csv(fh, header=True, index=False, sep='\t')
+        for sid, new_sid in sample_map.items():
+            fh.write('\t'.join([sid, new_sid]) + '\n')

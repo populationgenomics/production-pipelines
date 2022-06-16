@@ -93,6 +93,16 @@ class Target:
         """
         raise NotImplementedError
 
+    def external_id_map(self) -> dict[str, str]:
+        """
+        Map if internal IDs to participant or external IDs, if the latter is provided.
+        """
+        return {
+            s.id: s.id + '|' + s.participant_id
+            for s in self.get_samples()
+            if s.participant_id != s.id
+        }
+
 
 class Cohort(Target):
     """
