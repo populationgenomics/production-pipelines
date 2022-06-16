@@ -22,6 +22,7 @@ from cpg_pipes.query.seqr_loader import (
 )
 from cpg_pipes.query.vep import vep_json_to_ht
 from cpg_pipes.types import SequencingType, logger
+from cpg_pipes.utils import timestamp
 
 try:
     import utils
@@ -47,7 +48,7 @@ class TestQuery(unittest.TestCase):
     def setUp(self):
         """Called for each test method"""
         self.name = self._testMethodName
-        self.timestamp = utils.timestamp()
+        self.timestamp = timestamp()
         self.local_tmp_dir = tempfile.mkdtemp()
         self.sequencing_type = SequencingType.GENOME
         hailquery.init_batch(utils.DATASET, self.tmp_bucket)

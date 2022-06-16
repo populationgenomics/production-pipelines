@@ -97,7 +97,7 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
         self.assertEqual(len(s1.alignment_input_by_seq_type.values()), 2)
         self.assertEqual(s1.pedigree.sex, Sex.FEMALE)
         self.assertEqual(s1.pedigree.fam_id, s2.pedigree.fam_id)
-        self.assertEqual(s1.pedigree.mom.id, s2.id)
+        self.assertEqual(s1.pedigree.mom.run_id, s2.id)
 
 
 if __name__ == '__main__':

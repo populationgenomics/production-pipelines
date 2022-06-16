@@ -101,7 +101,7 @@ def _make_sample_map(dataset: Dataset):
     """
     Creating sample map to remap internal IDs to participant IDs
     """
-    sample_map_fpath = dataset.tmp_path() / 'pedigree' / 'sample_map.tsv'
+    sample_map_fpath = dataset.tmp_prefix() / 'pedigree' / 'sample_map.tsv'
     df = pd.DataFrame(
         [{'id': s.id, 'pid': s.participant_id} for s in dataset.get_samples()]
     )

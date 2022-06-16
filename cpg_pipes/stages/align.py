@@ -39,7 +39,7 @@ class Align(SampleStage):
         )
         if realign_cram_ver := get_config()['workflow'].get('realign_from_cram_version'):
             if (path := (
-                sample.dataset.path() / 'cram' / realign_cram_ver / f'{sample.id}.cram'
+                sample.dataset.prefix() / 'cram' / realign_cram_ver / f'{sample.id}.cram'
             )).exists():
                 logger.info(f'Realigning from {realign_cram_ver} CRAM {path}')
                 alignment_input = CramPath(path)

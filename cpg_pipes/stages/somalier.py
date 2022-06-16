@@ -62,11 +62,11 @@ class CramSomalierPedigree(DatasetStage):
         .yaml#L472-L481
         """
 
-        prefix = dataset.path() / 'somalier' / dataset.alignment_inputs_hash()
+        prefix = dataset.prefix() / 'somalier' / dataset.alignment_inputs_hash()
         return {
             'samples': prefix / f'{dataset.name}.samples.tsv',
             'pairs': prefix / f'{dataset.name}.pairs.tsv',
-            'html': dataset.web_path() / 'somalier-pedigree.html',
+            'html': dataset.web_prefix() / 'somalier-pedigree.html',
             'checks': prefix / f'{dataset.name}-checks.done',
         }
 
@@ -81,7 +81,7 @@ class CramSomalierPedigree(DatasetStage):
 
         html_path = self.expected_outputs(dataset)['html']
         if base_url := dataset.web_url():
-            html_url = str(html_path).replace(str(dataset.web_path()), base_url)
+            html_url = str(html_path).replace(str(dataset.web_prefix()), base_url)
         else:
             html_url = None
 
@@ -119,10 +119,10 @@ class CramSomalierAncestry(DatasetStage):
         .yaml#L472-L481
         """
 
-        prefix = dataset.path() / 'ancestry' / dataset.alignment_inputs_hash()
+        prefix = dataset.prefix() / 'ancestry' / dataset.alignment_inputs_hash()
         return {
             'tsv': prefix / f'{dataset.name}.somalier-ancestry.tsv',
-            'html': dataset.web_path() / 'somalier-ancestry.html',
+            'html': dataset.web_prefix() / 'somalier-ancestry.html',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -136,7 +136,7 @@ class CramSomalierAncestry(DatasetStage):
 
         html_path = self.expected_outputs(dataset)['html']
         if base_url := dataset.web_url():
-            html_url = str(html_path).replace(str(dataset.web_path()), base_url)
+            html_url = str(html_path).replace(str(dataset.web_prefix()), base_url)
         else:
             html_url = None
 

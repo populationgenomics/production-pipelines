@@ -16,6 +16,8 @@ import hail as hl
 from cpg_utils.hail_batch import genome_build, reference_path
 from hail.utils.java import Env
 
+from cpg_pipes.utils import timestamp
+
 logger = logging.getLogger(__file__)
 
 
@@ -46,10 +48,8 @@ def init_hail(name: str, local_tmp_dir: Path = None):
     if not local_tmp_dir:
         local_tmp_dir = Path(tempfile.mkdtemp())
 
-    rand_bit = ''.join(random.choices(string.ascii_uppercase + string.digits, k=3))
-    timestamp = time.strftime('%Y-%m%d-%H%M') + rand_bit
     local_tmp_dir.mkdir(parents=True)
-    hl_log = local_tmp_dir / f'{name}-{timestamp}.log'
+    hl_log = local_tmp_dir / f'{name}-{timestamp()}.log'
     hl.init(default_reference=genome_build(), log=str(hl_log))
     return local_tmp_dir
 

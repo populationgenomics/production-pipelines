@@ -5,11 +5,10 @@ Seqr loading pipeline: FASTQ -> ElasticSearch index.
 """
 
 import logging
-import time
 
+from cpg_utils import to_path
 from cpg_utils.config import get_config
 
-from cpg_pipes import Path
 from cpg_pipes import utils
 from cpg_pipes.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jobs
 from cpg_pipes.pipeline import (
@@ -33,35 +32,45 @@ class AnnotateCohort(CohortStage):
     Re-annotate the entire cohort.
     """
 
-    def expected_outputs(self, cohort: Cohort) -> Path:
+    def expected_outputs(self, cohort: Cohort) :
         """
         Expected to write a matrix table.
         """
         h = cohort.alignment_inputs_hash()
-        return cohort.analysis_dataset.path() / 'mt' / f'{h}.mt'
+        prefix = str(cohort.analysis_dataset.prefix() / 'mt' / h)
+        return {
+            'prefix': prefix,
+            'mt': to_path(f'{prefix}.mt'),
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
         vcf_path = inputs.as_path(target=cohort, stage=JointGenotyping, id='vcf')
-        siteonly_vqsr_vcf_path = inputs.as_path(target=cohort, stage=Vqsr)
-        vep_ht_path = inputs.as_path(target=cohort, stage=Vep)
+        siteonly_vqsr_vcf_path = inputs.as_path(target=cohort, stage=Vqsr, id='siteonly')
+        vep_ht_path = inputs.as_path(target=cohort, stage=Vep, id='ht')
 
-        mt_path = self.expected_outputs(cohort)
+        checkpoint_prefix = to_path(
+            self.expected_outputs(cohort)['prefix']
+        ) / 'checkpoints'
 
         jobs = annotate_cohort_jobs(
             b=self.b,
             vcf_path=vcf_path,
             vep_ht_path=vep_ht_path,
             siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
-            output_mt_path=mt_path,
-            checkpoints_bucket=self.tmp_prefix / 'checkpoints',
+            output_mt_path=self.expected_outputs(cohort)['mt'],
+            checkpoint_prefix=checkpoint_prefix,
             sequencing_type=self.cohort.sequencing_type,
             overwrite=not get_config()['workflow'].get('self.check_intermediates'),
             job_attrs=self.get_job_attrs(),
         )
-        return self.make_outputs(cohort, data=mt_path, jobs=jobs)
+        return self.make_outputs(
+            cohort, 
+            data=self.expected_outputs(cohort), 
+            jobs=jobs,
+        )
 
 
 @stage(required_stages=[AnnotateCohort])
@@ -71,25 +80,37 @@ class AnnotateDataset(DatasetStage):
     that will be loaded into Seqr)
     """
 
-    def expected_outputs(self, dataset: Dataset) -> Path:
+    def expected_outputs(self, dataset: Dataset):
         """
         Expected to generate a matrix table
         """
         h = self.cohort.alignment_inputs_hash()
-        return self.tmp_prefix / f'{h}-{dataset.name}.mt'
+        tmp_prefix = str(
+            self.cohort.analysis_dataset.tmp_prefix() / 'mt' / f'{h}-{dataset.name}'
+        )
+        # We want to write the matrix table into the main bucket.
+        mt = self.cohort.analysis_dataset.prefix() / 'mt' / f'{h}-{dataset.name}.mt'
+        return {
+            'prefix': tmp_prefix,
+            'mt': mt,
+        }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        mt_path = inputs.as_path(target=self.cohort, stage=AnnotateCohort)
+        mt_path = inputs.as_path(target=self.cohort, stage=AnnotateCohort, id='mt')
+
+        checkpoint_prefix = to_path(
+            self.expected_outputs(dataset)['prefix']
+        ) / 'checkpoints'
 
         jobs = annotate_dataset_jobs(
             b=self.b,
             mt_path=mt_path,
             sample_ids=[s.id for s in dataset.get_samples()],
-            output_mt_path=self.expected_outputs(dataset),
-            tmp_bucket=self.tmp_prefix / 'checkpoints' / dataset.name,
+            output_mt_path=self.expected_outputs(dataset)['mt'],
+            tmp_bucket=checkpoint_prefix,
             job_attrs=self.get_job_attrs(dataset),
             overwrite=not get_config()['workflow'].get('self.check_intermediates'),
         )
@@ -108,9 +129,7 @@ class LoadToEs(DatasetStage):
         """
         Expected to generate a Seqr index, which is not a file
         """
-        version = get_config()['workflow'].get('version')
-        version = version or time.strftime('%Y%m%d-%H%M%S')
-        index_name = f'{dataset.name}-{self.cohort.sequencing_type.value}-{version}'
+        index_name = f'{dataset.name}-{self.cohort.sequencing_type.value}-{self.run_id}'
         return index_name
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -123,7 +142,7 @@ class LoadToEs(DatasetStage):
             # Skipping dataset that wasn't explicitly requested to upload to ES:
             return self.make_outputs(dataset)
 
-        dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset)
+        dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset, id='mt')
         index_name = self.expected_outputs(dataset)
 
         from analysis_runner import dataproc

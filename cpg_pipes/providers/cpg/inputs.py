@@ -40,15 +40,15 @@ class CpgInputProvider(InputProvider):
         only_samples: list[str] | None = None,
         skip_datasets: list[str] | None = None,
         ped_files: list[Path] | None = None,
-    ) -> Cohort:
+    ):
         """
         Overriding the superclass method.
         """
-        if not dataset_names:
+        if dataset_names is None:
             raise InputProviderError(
                 'Datasets must be provided explicitly for the CPG input provider'
             )
-        cohort = super().populate_cohort(
+        super().populate_cohort(
             cohort=cohort,
             dataset_names=dataset_names,
             skip_samples=skip_samples,
@@ -76,7 +76,6 @@ class CpgInputProvider(InputProvider):
                     )
                 }
             )
-        return cohort
 
     def get_entries(
         self,
@@ -170,7 +169,7 @@ class CpgInputProvider(InputProvider):
             for ds, samples in groupby(sample_wo_seq, key=lambda s: s.dataset.name):
                 msg += (
                     f'\t{ds}, {len(list(samples))} samples: '
-                    f'{", ".join([s.id for s in samples])}\n'
+                    f'{", ".join([s.run_id for s in samples])}\n'
                 )
             if get_config()['workflow'].get('smdb_errors_are_fatal', True):
                 raise InputProviderError(msg)

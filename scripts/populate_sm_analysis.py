@@ -55,7 +55,7 @@ for sample in cohort.get_samples():
         )
 
 h = cohort.alignment_inputs_hash()
-path = cohort.analysis_dataset.path() / 'mt' / f'{h}.mt'
+path = cohort.analysis_dataset.prefix() / 'mt' / f'{h}.mt'
 if exists(path):
     status.create_analysis(
         str(path),

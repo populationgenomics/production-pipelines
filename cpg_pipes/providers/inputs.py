@@ -39,12 +39,12 @@ class InputProvider(ABC):
         only_samples: list[str] | None = None,
         skip_datasets: list[str] | None = None,
         ped_files: list[Path] | None = None,
-    ) -> Cohort:
+    ):
         """
         Add datasets in the cohort. There exists only one cohort for
         the pipeline run.
         """
-        if dataset_names:
+        if dataset_names is not None:
             # Specific datasets requested, so initialising them in advance.
             for ds_name in dataset_names:
                 if skip_datasets and ds_name in skip_datasets:
@@ -73,12 +73,14 @@ class InputProvider(ABC):
                 ds_name = self.get_dataset_name(entry) or cohort.analysis_dataset.name
                 dataset = cohort.create_dataset(ds_name)
                 self._add_sample(dataset, entry)
+
         if not cohort.get_datasets():
             msg = 'No active datasets populated'
             if skip_samples or only_samples or skip_datasets:
                 msg += ' (after skipping/picking samples)'
-            raise InputProviderError(msg)
-        
+            logger.warning(msg)
+            return
+
         self.populate_alignment_inputs(cohort)
         if cohort.sequencing_type:
             self.filter_sequencing_type(cohort, cohort.sequencing_type)
@@ -87,8 +89,6 @@ class InputProvider(ABC):
         self.populate_pedigree(cohort)
         if ped_files:
             self.populate_pedigree_from_ped_files(cohort, ped_files)
-
-        return cohort
 
     @abstractmethod
     def get_entries(

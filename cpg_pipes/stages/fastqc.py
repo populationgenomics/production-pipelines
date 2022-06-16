@@ -26,7 +26,7 @@ class FastQC(SampleStage):
         Stage is expected to generate a FastQC HTML report, and a zip file for
         parsing with MuiltiQC.
         """
-        folder = sample.dataset.path() / 'qc'
+        folder = sample.dataset.prefix() / 'qc'
         return {
             'html': folder / (sample.id + '_fastqc.html'),
             'zip': folder / (sample.id + '_fastqc.zip'),

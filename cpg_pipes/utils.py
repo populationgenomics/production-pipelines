@@ -3,9 +3,12 @@ Utility functions and constants.
 """
 
 import logging
+import string
 import sys
+import time
 import traceback
 from functools import lru_cache
+from random import choices
 from typing import cast
 from google.cloud import secretmanager
 
@@ -97,3 +100,17 @@ def can_reuse(
 
     logger.debug(f'Reusing existing {path}. Use --overwrite to overwrite')
     return True
+
+
+def timestamp(rand_suffix_len: int = 5) -> str:
+    """
+    Generate a timestamp string. If `rand_suffix_len` is set, adds a short random 
+    string of this length for uniqueness.
+    """
+    result = time.strftime('%Y_%m%d_%H%M')
+    if rand_suffix_len:
+        rand_bit = ''.join(choices(
+            string.ascii_uppercase + string.digits, k=rand_suffix_len)
+        )
+        result += f'_{rand_bit}' 
+    return result

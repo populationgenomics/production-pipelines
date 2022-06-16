@@ -53,7 +53,7 @@ def main(
     for dataset in cohort.get_datasets():
         _make_seqr_metadata_files(
             dataset=dataset,
-            bucket=cohort.analysis_dataset.path(),
+            bucket=cohort.analysis_dataset.prefix(),
             local_dir=tmp_dir,
             use_external_id=use_external_id,
         )

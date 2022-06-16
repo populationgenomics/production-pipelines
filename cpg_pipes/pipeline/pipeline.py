@@ -12,7 +12,6 @@ Examples of pipelines can be found in the `pipelines/` folder in the repository 
 import functools
 import logging
 import pathlib
-import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from enum import Enum
@@ -35,7 +34,7 @@ from ..providers.inputs import InputProvider, CsvInputProvider
 from ..targets import Target, Dataset, Sample, Cohort
 from ..providers.status import StatusReporter
 from ..types import SequencingType
-from ..utils import exists
+from ..utils import exists, timestamp
 
 logger = logging.getLogger(__file__)
 
@@ -197,6 +196,8 @@ class StageInput:
         assert output.stage is not None, output
         if not output.target.active:
             return
+        if not output.target.get_samples():
+            return
         if not output.data and not output.jobs:
             return
         stage_name = output.stage.name
@@ -349,10 +350,10 @@ class StageInput:
         Get list of jobs that the next stage would depend on.
         """
         all_jobs: list[Job] = []
+        these_samples = target.get_sample_ids()
         for _, outputs_by_target in self._outputs_by_target_by_stage.items():
             for _, output in outputs_by_target.items():
                 if output:
-                    these_samples = target.get_sample_ids()
                     those_samples = output.target.get_sample_ids()
                     samples_intersect = set(these_samples) & set(those_samples)
                     if samples_intersect:
@@ -381,7 +382,8 @@ class Stage(Generic[TargetT], ABC):
         name: str,
         batch: Batch,
         cohort: Cohort,
-        pipeline_tmp_bucket: Path,
+        pipeline_tmp_prefix: Path,
+        run_id: str,
         required_stages: list[StageDecorator] | StageDecorator | None = None,
         analysis_type: str | None = None,
         skipped: bool = False,
@@ -400,7 +402,8 @@ class Stage(Generic[TargetT], ABC):
             else:
                 self.required_stages_classes.append(required_stages)
 
-        self.tmp_prefix = pipeline_tmp_bucket / name
+        self.tmp_prefix = pipeline_tmp_prefix / name
+        self.run_id = run_id
 
         # Dependencies. Populated in pipeline.run(), after we know all stages.
         self.required_stages: list[Stage] = []
@@ -703,7 +706,8 @@ def stage(
                 name=_cls.__name__,
                 batch=pipeline.b,
                 cohort=pipeline.cohort,
-                pipeline_tmp_bucket=pipeline.tmp_bucket,
+                pipeline_tmp_prefix=pipeline.tmp_prefix,
+                run_id=pipeline.run_id,
                 required_stages=required_stages,
                 analysis_type=analysis_type,
                 status_reporter=pipeline.status_reporter,
@@ -776,13 +780,15 @@ class Pipeline:
         stages: list[StageDecorator] | None = None,
     ):
         self._stages = stages
+        self.run_id = get_config()['workflow'].get('run_id', timestamp())
 
         analysis_dataset = get_config()['workflow']['dataset']
         name = get_config()['workflow'].get('name') or name
         description = get_config()['workflow'].get('description') or description
         name = name or description or analysis_dataset
-        description = description or name
         self.name = slugify(name)
+        description = description or name
+        description += f': run_id={self.run_id}'
 
         access_level = get_config()['workflow']['access_level']
         self.cohort = Cohort(
@@ -796,7 +802,7 @@ class Pipeline:
         
         smdb: Optional[SMDB] = None
         input_provider: InputProvider | None = None
-        if (get_config()['workflow'].get('datasets') and 
+        if (get_config()['workflow'].get('datasets') is not None and 
                 get_config()['workflow'].get('input_provider') == 'smdb'):
             smdb = smdb or SMDB(self.cohort.analysis_dataset.name)
             input_provider = CpgInputProvider(smdb)
@@ -817,13 +823,8 @@ class Pipeline:
                 skip_datasets=get_config()['workflow'].get('skip_datasets'),
             )
 
-        self.tmp_bucket = self.cohort.analysis_dataset.tmp_path()
-        if version := get_config()['workflow'].get('version'):
-            self.tmp_bucket /= version
-
-        if version:
-            description += f' {version}'
-        description += f': [{self.cohort.sequencing_type.value}]'
+        self.tmp_prefix = self.cohort.analysis_dataset.tmp_prefix() / self.run_id
+        description += f' [{self.cohort.sequencing_type.value}]'
         if ds_set := set(d.name for d in self.cohort.get_datasets()):
             description += ' ' + ', '.join(sorted(ds_set))
         self.b: Batch = setup_batch(description=description)

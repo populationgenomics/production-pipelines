@@ -41,8 +41,8 @@ class MultiQC(DatasetStage):
         Expected to produce an HTML and a corresponding JSON file.
         """
         return {
-            'html': dataset.web_path() / 'qc' / 'multiqc.html',
-            'json': dataset.path() / 'qc' / 'multiqc_data.json',
+            'html': dataset.web_prefix() / 'qc' / 'multiqc.html',
+            'json': dataset.prefix() / 'qc' / 'multiqc_data.json',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -56,7 +56,7 @@ class MultiQC(DatasetStage):
         json_path = self.expected_outputs(dataset)['json']
         html_path = self.expected_outputs(dataset)['html']
         if base_url := dataset.web_url():
-            html_url = str(html_path).replace(str(dataset.web_path()), base_url)
+            html_url = str(html_path).replace(str(dataset.web_prefix()), base_url)
         else:
             html_url = None
 
@@ -110,7 +110,7 @@ class MultiQC(DatasetStage):
 
         j = multiqc(
             self.b,
-            tmp_bucket=dataset.tmp_path(),
+            tmp_bucket=dataset.tmp_prefix(),
             paths=paths,
             ending_to_trim=ending_to_trim,
             modules_to_trim_endings=modules_to_trim_endings,
