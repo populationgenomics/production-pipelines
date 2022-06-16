@@ -7,6 +7,7 @@ import os
 from typing import TypedDict
 
 import hailtop.batch as hb
+from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import copy_common_env
 from hailtop.batch.job import PythonJob, BashJob
@@ -47,6 +48,14 @@ class RegisteringBatch(hb.Batch):
         self.job_by_tool = dict()
         self.total_job_num = 0
         self.pool_label = pool_label
+        self.remote_conf_paths: list[str] = []
+        for path in os.getenv('CPG_CONFIG_PATH').split(','):
+            if path:
+                path = to_path(path)
+                new_path = to_path(self._backend.remote_tmpdir) / path.name
+                with path.open() as inp, new_path.open('w') as out:
+                    out.write(inp.read())
+                self.remote_conf_paths.append(str(new_path))
 
     def _process_attributes(
         self,
@@ -109,7 +118,7 @@ class RegisteringBatch(hb.Batch):
         j = super().new_python_job(name, attributes=fixed_attributes)
         if self.pool_label:
             j._pool_label = self.pool_label
-        copy_common_env(j)
+        j.env('CPG_CONFIG_PATH', ','.join(self.remote_conf_paths))
         return j
 
     def new_job(
@@ -181,7 +190,7 @@ def setup_batch(description: str) -> RegisteringBatch:
     return RegisteringBatch(
         name=description, 
         backend=backend, 
-        pool_label=pool_label
+        pool_label=pool_label,
     )
 
 
