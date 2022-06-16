@@ -63,7 +63,7 @@ class Align(SampleStage):
             output_path=self.expected_outputs(sample),
             sample_name=sample.id,
             job_attrs=self.get_job_attrs(sample),
-            overwrite=not get_config()['workflow'].get('self.check_intermediates'),
+            overwrite=not get_config()['workflow'].get('check_intermediates'),
             realignment_shards_num=get_config()['workflow'].get(
                 'realignment_shards_num', align.DEFAULT_REALIGNMENT_SHARD_NUM
             ),

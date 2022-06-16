@@ -61,7 +61,7 @@ class JointGenotyping(CohortStage):
             out_siteonly_vcf_path=self.expected_outputs(cohort)['siteonly'],
             tmp_bucket=to_path(self.expected_outputs(cohort)['prefix']),
             gvcf_by_sid=gvcf_by_sid,
-            overwrite=not get_config()['workflow'].get('self.check_intermediates'),
+            overwrite=not get_config()['workflow'].get('check_intermediates'),
             tool=joint_genotyping.JointGenotyperTool.GnarlyGenotyper
             if get_config()['workflow'].get('use_gnarly', False)
             else joint_genotyping.JointGenotyperTool.GenotypeGVCFs,
