@@ -4,6 +4,7 @@ Hail Query functions for seqr loader.
 
 import logging
 import hail as hl
+from cpg_utils.hail_batch import reference_path
 
 logger = logging.getLogger(__file__)
 
@@ -181,22 +182,13 @@ def annotate_cohort(
     mt = _checkpoint(mt, 'mt-vep-split-vqsr.mt')
 
     logger.info('Adding GRCh37 coords')
-    # Add GRCh37 coordinates [is not supported by Batch Backend, so inserting dummy
-    # locuses]
-    # rg37 = hl.get_reference('GRCh37')
-    # rg38 = hl.get_reference('GRCh38')
-    # rg38.add_liftover('gs://cpg-reference/liftover/grch38_to_grch37.over.chain.gz',
-    # rg37)
-    mt = mt.annotate_rows(rg37_locus=mt.locus)
+    rg37 = hl.get_reference('GRCh37')
+    rg38 = hl.get_reference('GRCh38')
+    rg38.add_liftover(str(reference_path('liftover_38_to_37')), rg37)
+    mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
 
-    seqr_ref_bucket = 'gs://cpg-seqr-reference-data'
-    ref_ht = hl.read_table(
-        f'{seqr_ref_bucket}/GRCh38/all_reference_data/v2'
-        f'/combined_reference_data_grch38-2.0.3.ht'
-    )
-    clinvar_ht = hl.read_table(
-        f'{seqr_ref_bucket}/GRCh38/clinvar/clinvar.GRCh38.2020-06-15.ht'
-    )
+    ref_ht = hl.read_table(str(reference_path('seqr/combined_reference')))
+    clinvar_ht = hl.read_table(str(reference_path('seqr/clinvar')))
 
     from hail_scripts.computed_fields import vep, variant_id
 
