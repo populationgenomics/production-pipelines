@@ -7,7 +7,7 @@ import setuptools
 
 setuptools.setup(
     name='cpg-pipes',
-    version='0.3.3',
+    version='0.3.4',
     description='Hail Batch bioinformatics pipelines',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
