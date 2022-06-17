@@ -10,7 +10,6 @@ import traceback
 from functools import lru_cache
 from random import choices
 from typing import cast
-from google.cloud import secretmanager
 
 from . import Path, to_path
 
@@ -18,7 +17,8 @@ logger = logging.getLogger(__file__)
 
 # Packages to install on a dataproc cluster, to use with the dataproc wrapper.
 DATAPROC_PACKAGES = [
-    'cpg_pipes==0.3.0',
+    'cpg_utils==4.3.6.1',
+    'cpg_pipes',
     'cpg_gnomad',  # github.com/populationgenomics/gnomad_methods
     'seqr_loader==1.2.5',  # hail-elasticsearch-pipelines
     'elasticsearch==8.1.1',
