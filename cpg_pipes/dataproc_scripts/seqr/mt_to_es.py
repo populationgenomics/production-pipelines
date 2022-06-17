@@ -12,7 +12,6 @@ import click
 import hail as hl
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build, reference_path
 from hail_scripts.elasticsearch.hail_elasticsearch_client import HailElasticsearchClient
 
 logger = logging.getLogger(__file__)
@@ -37,16 +36,23 @@ logger = logging.getLogger(__file__)
     is_flag=True,
     default=False,
 )
+@click.option(
+    '--liftover-path',
+    'liftover_path',
+    help='Path to liftover chain',
+    required=True,
+)
 def main(
     mt_path: str,
     es_index: str,
     use_spark: bool,
+    liftover_path: str,
 ):
     """
     Entry point.
     """
     if use_spark:
-        hl.init(default_reference=genome_build())
+        hl.init(default_reference='GRCh38')
     else:
         from cpg_utils.hail_batch import init_batch
         init_batch()
@@ -70,6 +76,12 @@ def main(
     )
 
     mt = hl.read_matrix_table(mt_path)
+    logger.info('Adding GRCh37 coords')
+    rg37 = hl.get_reference('GRCh37')
+    rg38 = hl.get_reference('GRCh38')
+    rg38.add_liftover(liftover_path, rg37)
+    mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
+
     logger.info('Getting rows and exporting to the ES')
     row_table = elasticsearch_row(mt)
     es_shards = _mt_num_shards(mt)
@@ -92,12 +104,6 @@ def elasticsearch_row(mt: hl.MatrixTable):
     Borrowed from:
     https://github.com/broadinstitute/hail-elasticsearch-pipelines/blob/495f0d1b4d49542557ca5cccf98a23fc627260bf/luigi_pipeline/lib/model/seqr_mt_schema.py
     """
-    logger.info('Adding GRCh37 coords')
-    rg37 = hl.get_reference('GRCh37')
-    rg38 = hl.get_reference('GRCh38')
-    rg38.add_liftover(str(reference_path('liftover_38_to_37')), rg37)
-    mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
-    
     # Converts a mt to the row equivalent.
     ht = mt.rows()
     # Converts nested structs into one field, e.g. {a: {b: 1}} => a.b: 1

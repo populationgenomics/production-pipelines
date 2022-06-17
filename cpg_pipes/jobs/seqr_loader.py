@@ -3,7 +3,7 @@ Jobs specific for seqr-loader.
 """
 import logging
 
-from cpg_utils.hail_batch import image_path, genome_build
+from cpg_utils.hail_batch import image_path, genome_build, reference_path
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
@@ -114,7 +114,8 @@ def load_to_es(
     pip3 install click cpg_utils hail seqr_loader elasticsearch
     python3 mt_to_es.py \\
     --mt-path {mt_path} \\
-    --es-index {es_index}
+    --es-index {es_index} \\
+    --liftover-path {reference_path('liftover_38_to_37')}
     """
     j.command(
         wrap_command(
