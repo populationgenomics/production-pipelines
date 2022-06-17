@@ -64,7 +64,7 @@ def main(
         
     host = get_config()['elasticsearch']['host']
     port = str(get_config()['elasticsearch']['port'])
-    username = get_config()['elasticsearch']['host']
+    username = get_config()['elasticsearch']['username']
     password = password or read_secret(
         project_id=get_config()['elasticsearch']['password_project_id'],
         secret_name=get_config()['elasticsearch']['password_secret_id'],
