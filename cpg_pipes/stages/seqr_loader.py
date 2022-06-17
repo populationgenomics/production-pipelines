@@ -7,6 +7,7 @@ Seqr loading pipeline: FASTQ -> ElasticSearch index.
 import logging
 
 from cpg_utils import to_path
+from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
 
 from cpg_pipes import utils
@@ -22,6 +23,7 @@ from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vep import Vep
 from cpg_pipes.stages.vqsr import Vqsr
 from cpg_pipes.targets import Cohort, Dataset
+from cpg_utils.hail_batch import reference_path
 
 logger = logging.getLogger(__file__)
 
@@ -140,12 +142,19 @@ class LoadToEs(DatasetStage):
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset, id='mt')
         index_name = self.expected_outputs(dataset)
 
+        es_password = read_secret(
+            project_id=get_config()['elasticsearch']['password_project_id'],
+            secret_name=get_config()['elasticsearch']['password_secret_id'],
+            fail_gracefully=False,
+        )
         from analysis_runner import dataproc
         j = dataproc.hail_dataproc_job(
             self.b,
             f'cpg_pipes/dataproc_scripts/seqr/mt_to_es.py '
             f'--mt-path {dataset_mt_path} '
             f'--es-index {index_name} '
+            f'--es-password {es_password} '
+            f'--liftover-path {reference_path("liftover_38_to_37")} '
             f'--use-spark ',  # es export doesn't work with the service backend
             max_age='16h',
             packages=utils.DATAPROC_PACKAGES,

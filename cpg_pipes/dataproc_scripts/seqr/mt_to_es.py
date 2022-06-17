@@ -42,11 +42,16 @@ logger = logging.getLogger(__file__)
     help='Path to liftover chain',
     required=True,
 )
+@click.option(
+    '--es-password',
+    'password',
+)
 def main(
     mt_path: str,
     es_index: str,
     use_spark: bool,
     liftover_path: str,
+    password: str = None,
 ):
     """
     Entry point.
@@ -60,7 +65,7 @@ def main(
     host = get_config()['elasticsearch']['host']
     port = str(get_config()['elasticsearch']['port'])
     username = get_config()['elasticsearch']['host']
-    password = read_secret(
+    password = password or read_secret(
         project_id=get_config()['elasticsearch']['password_project_id'],
         secret_name=get_config()['elasticsearch']['password_secret_id'],
         fail_gracefully=False,
