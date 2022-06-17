@@ -619,35 +619,35 @@ class Stage(Generic[TargetT], ABC):
         """
         Returns outputs that can be reused for the stage for the target,
         or None of none can be reused
-        """
-        if not expected_out:
-            reusable = False
-        elif not get_config()['workflow'].get('check_expected_outputs'):
-            if self.assume_outputs_exist or self.skipped:
-                # Do not check the files' existence, trust they exist.
-                # note that for skipped stages, we automatically assume outputs exist
-                reusable = True
-            else:
-                # Do not check the files' existence, assume they don't exist:
-                reusable = False
-        else:
-            # Checking that all paths in the expected output exists:
-            paths: list[Path] = []
+        """        
+        if self.assume_outputs_exist:
+            return True
 
-            def _find_paths(val):
-                """Recursively find every Path object"""
-                if isinstance(val, Path):
-                    paths.append(val)
-                if isinstance(val, list):
-                    for el in val:
-                        _find_paths(el)
-                if isinstance(val, dict):
-                    for el in val.values():
-                        _find_paths(el)
-    
-            _find_paths(expected_out)
-            reusable = all(exists(path) for path in paths)
-        return reusable
+        paths: list[Path] = []
+
+        def _find_paths(val):
+            """Recursively find every Path object"""
+            if isinstance(val, Path):
+                paths.append(val)
+            if isinstance(val, list):
+                for el in val:
+                    _find_paths(el)
+            if isinstance(val, dict):
+                for el in val.values():
+                    _find_paths(el)
+
+        _find_paths(expected_out)
+
+        if paths and get_config()['workflow'].get('check_expected_outputs'):
+            # Checking that all paths in the expected output exist:
+            return all(exists(path) for path in paths)
+
+        if self.skipped:
+            # Do not check the files' existence, trust they exist.
+            # note that for skipped stages, we automatically assume outputs exist
+            return True
+        # Do not check the files' existence, assume they don't exist:
+        return False
 
     def _queue_reuse_job(
         self, target: TargetT, found_paths: Path | dict[str, Path]
@@ -925,7 +925,9 @@ class Pipeline:
         # implicit_stages_d: dict[str, Stage] = dict()  # If there are required
         # dependency stages that are not requested explicitly, we are putting them
         # into this dict as `skipped`.
+        depth = 0
         while True:  # Might need several rounds to resolve dependencies recursively.
+            depth += 1
             newly_implicitly_added_d = dict()
             for stage_ in self._stages_dict.values():
                 for reqcls in stage_.required_stages_classes:  # check dependencies
@@ -938,10 +940,18 @@ class Pipeline:
                         # Stage is not declared or requested implicitly, so setting
                         # it as skipped:
                         reqstage.skipped = True
-                        logger.info(
-                            f'Stage {reqstage.name} is skipped, '
-                            f'but the output will be required for the stage {stage_.name}'
-                        )
+                        # Only checking outputs of immediately required stages
+                        if depth > 1:
+                            reqstage.assume_outputs_exist = True
+                            logger.info(
+                                f'Stage {reqstage.name} is skipped'
+                            )
+                        else:
+                            logger.info(
+                                f'Stage {reqstage.name} is skipped, but the output '
+                                f'will be required for the stage {stage_.name}'
+                            )
+
             if newly_implicitly_added_d:
                 logger.info(
                     f'Additional implicit stages: '
@@ -965,10 +975,14 @@ class Pipeline:
         for i, (stage_name, stage_) in enumerate(self._stages_dict.items()):
             if first_stage_num is not None and i < first_stage_num:
                 stage_.skipped = True
+                if i < first_stage_num - 1:
+                    # Not checking expected outputs of stages before that
+                    stage_.assume_outputs_exist = True
                 logger.info(f'Skipping stage {stage_name}')
                 continue
             if last_stage_num is not None and i > last_stage_num:
                 stage_.skipped = True
+                stage_.assume_outputs_exist = True
                 continue
 
         logger.info(

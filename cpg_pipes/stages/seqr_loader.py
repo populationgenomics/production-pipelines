@@ -37,10 +37,9 @@ class AnnotateCohort(CohortStage):
         Expected to write a matrix table.
         """
         h = cohort.alignment_inputs_hash()
-        prefix = str(cohort.analysis_dataset.tmp_prefix() / 'mt' / h)
         return {
-            'prefix': prefix,
-            'mt': to_path(f'{prefix}.mt'),
+            'prefix': str(self.tmp_prefix / 'mt' / h),
+            'mt': cohort.analysis_dataset.tmp_prefix() / 'mt' / f'{h}.mt',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -63,7 +62,7 @@ class AnnotateCohort(CohortStage):
             output_mt_path=self.expected_outputs(cohort)['mt'],
             checkpoint_prefix=checkpoint_prefix,
             sequencing_type=self.cohort.sequencing_type,
-            overwrite=not get_config()['workflow'].get('self.check_intermediates'),
+            overwrite=not get_config()['workflow'].get('check_intermediates'),
             job_attrs=self.get_job_attrs(),
         )
         return self.make_outputs(
@@ -85,14 +84,10 @@ class AnnotateDataset(DatasetStage):
         Expected to generate a matrix table
         """
         h = self.cohort.alignment_inputs_hash()
-        tmp_prefix = str(
-            self.cohort.analysis_dataset.tmp_prefix() / 'mt' / f'{h}-{dataset.name}'
-        )
-        # We want to write the matrix table into the main bucket.
-        mt = self.cohort.analysis_dataset.prefix() / 'mt' / f'{h}-{dataset.name}.mt'
         return {
-            'prefix': tmp_prefix,
-            'mt': mt,
+            'prefix': str(self.tmp_prefix / 'mt' / f'{h}-{dataset.name}'),
+            # We want to write the matrix table into the main bucket.
+            'mt': self.cohort.analysis_dataset.prefix() / 'mt' / f'{h}-{dataset.name}.mt'
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -112,7 +107,7 @@ class AnnotateDataset(DatasetStage):
             output_mt_path=self.expected_outputs(dataset)['mt'],
             tmp_bucket=checkpoint_prefix,
             job_attrs=self.get_job_attrs(dataset),
-            overwrite=not get_config()['workflow'].get('self.check_intermediates'),
+            overwrite=not get_config()['workflow'].get('check_intermediates'),
         )
         return self.make_outputs(
             dataset, data=self.expected_outputs(dataset), jobs=jobs

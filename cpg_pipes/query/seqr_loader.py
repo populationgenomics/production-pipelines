@@ -4,6 +4,7 @@ Hail Query functions for seqr loader.
 
 import logging
 import hail as hl
+from cpg_utils import to_path
 from cpg_utils.hail_batch import reference_path
 
 logger = logging.getLogger(__file__)
@@ -132,13 +133,24 @@ def annotate_cohort(
     """
     Convert VCF to mt, annotate for seqr loader, add VEP annotations.
     """
+    def _read(path):
+        if path.strip('/').endswith('.ht'):
+            t = hl.read_table(str(path))
+        else:
+            assert path.strip('/').endswith('.mt')
+            t = hl.read_matrix_table(str(path))
+        logger.info(f'Read checkpoint {path}')  
+        return t
 
     def _checkpoint(t, fname):
-        if checkpoints_bucket:
-            t = t.checkpoint(
-                f'{checkpoints_bucket}/{fname}', _read_if_exists=not overwrite
-            )
-            logger.info(f'Wrote {checkpoints_bucket}/{fname}')
+        if checkpoints_bucket: 
+            path = to_path(checkpoints_bucket) / fname
+            if not overwrite and (path / '_SUCCESS').exists():
+                t = _read(str(path))
+            else:
+                t.write(str(path), overwrite=True)
+                logger.info(f'Wrote checkpoint {path}')
+                t = _read(str(path))
         return t
 
     mt = hl.import_vcf(
