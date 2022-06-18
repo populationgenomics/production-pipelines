@@ -56,6 +56,8 @@ def main(
     """
     Entry point.
     """
+    es_index = es_index.lower()
+    
     if use_spark:
         hl.init(default_reference='GRCh38')
     else:
@@ -93,7 +95,7 @@ def main(
 
     es.export_table_to_elasticsearch(
         row_table,
-        index_name=es_index.lower(),
+        index_name=es_index,
         num_shards=es_shards,
         write_null_values=True,
     )

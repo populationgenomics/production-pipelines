@@ -140,7 +140,7 @@ class LoadToEs(DatasetStage):
             return self.make_outputs(dataset)
 
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset, id='mt')
-        index_name = self.expected_outputs(dataset)
+        index_name = self.expected_outputs(dataset).lower()
 
         es_password = read_secret(
             project_id=get_config()['elasticsearch']['password_project_id'],
