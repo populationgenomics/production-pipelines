@@ -83,12 +83,16 @@ def main(
     )
 
     mt = hl.read_matrix_table(mt_path)
+    # Annotate GRCh37 coordinates here, as they are not supported by Batch Backend
     logger.info('Adding GRCh37 coords')
     rg37 = hl.get_reference('GRCh37')
     rg38 = hl.get_reference('GRCh38')
     rg38.add_liftover(liftover_path, rg37)
     mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
 
+    # TODO: remote this. Fixing sequencing type
+    mt = mt.annotate_globals(sampleType='WGS')
+        
     logger.info('Getting rows and exporting to the ES')
     row_table = elasticsearch_row(mt)
     es_shards = _mt_num_shards(mt)

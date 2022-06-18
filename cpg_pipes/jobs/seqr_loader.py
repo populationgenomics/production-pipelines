@@ -41,7 +41,7 @@ def annotate_cohort_jobs(
             str(output_mt_path),
             overwrite,
             genome_build(),
-            sequencing_type.value.upper(),
+            sequencing_type.seqr_value(),
             str(checkpoint_prefix),
             setup_gcp=True,
             setup_hail=True,

@@ -41,11 +41,12 @@ def main(
     Generate sample map to upload a dataset to Seqr
     """
     input_provider = CpgInputProvider(SMDB())
-    cohort = input_provider.populate_cohort(
-        cohort=Cohort(
-            analysis_dataset_name='seqr',
-            namespace=Namespace.from_access_level(namespace),
-        ),
+    cohort = Cohort(
+        analysis_dataset_name='seqr',
+        namespace=Namespace.from_access_level(namespace),
+    )
+    input_provider.populate_cohort(
+        cohort=cohort,
         dataset_names=datasets,
     )
 

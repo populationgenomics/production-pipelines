@@ -127,7 +127,7 @@ def annotate_cohort(
     out_mt_path,
     overwrite=False,
     genome_build='GRCh38',
-    sequencing_type='WGS',
+    sequencing_type='',
     checkpoints_bucket=None,
 ):
     """
@@ -281,9 +281,13 @@ def annotate_cohort(
     mt = mt.annotate_globals(
         sourceFilePath=vcf_path,
         genomeVersion=genome_build.replace('GRCh', ''),
-        sampleType=sequencing_type,
         hail_version=hl.version(),
     )
+    if sequencing_type:
+        mt = mt.annotate_globals(
+            sampleType=sequencing_type,
+        )
+    
     logger.info('Done:')
     mt.describe()
     mt.write(str(out_mt_path), overwrite=overwrite)
