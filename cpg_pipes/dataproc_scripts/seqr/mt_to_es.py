@@ -12,7 +12,6 @@ import click
 import hail as hl
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build
 from hail_scripts.elasticsearch.hail_elasticsearch_client import HailElasticsearchClient
 
 logger = logging.getLogger(__file__)
@@ -37,24 +36,38 @@ logger = logging.getLogger(__file__)
     is_flag=True,
     default=False,
 )
+@click.option(
+    '--liftover-path',
+    'liftover_path',
+    help='Path to liftover chain',
+    required=True,
+)
+@click.option(
+    '--es-password',
+    'password',
+)
 def main(
     mt_path: str,
     es_index: str,
     use_spark: bool,
+    liftover_path: str,
+    password: str = None,
 ):
     """
     Entry point.
     """
+    es_index = es_index.lower()
+    
     if use_spark:
-        hl.init(default_reference=genome_build())
+        hl.init(default_reference='GRCh38')
     else:
         from cpg_utils.hail_batch import init_batch
         init_batch()
         
     host = get_config()['elasticsearch']['host']
     port = str(get_config()['elasticsearch']['port'])
-    username = get_config()['elasticsearch']['host']
-    password = read_secret(
+    username = get_config()['elasticsearch']['username']
+    password = password or read_secret(
         project_id=get_config()['elasticsearch']['password_project_id'],
         secret_name=get_config()['elasticsearch']['password_secret_id'],
         fail_gracefully=False,
@@ -70,13 +83,23 @@ def main(
     )
 
     mt = hl.read_matrix_table(mt_path)
+    # Annotate GRCh37 coordinates here, as they are not supported by Batch Backend
+    logger.info('Adding GRCh37 coords')
+    rg37 = hl.get_reference('GRCh37')
+    rg38 = hl.get_reference('GRCh38')
+    rg38.add_liftover(liftover_path, rg37)
+    mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
+
+    # TODO: remote this. Fixing sequencing type
+    mt = mt.annotate_globals(sampleType='WGS')
+        
     logger.info('Getting rows and exporting to the ES')
     row_table = elasticsearch_row(mt)
     es_shards = _mt_num_shards(mt)
 
     es.export_table_to_elasticsearch(
         row_table,
-        index_name=es_index.lower(),
+        index_name=es_index,
         num_shards=es_shards,
         write_null_values=True,
     )

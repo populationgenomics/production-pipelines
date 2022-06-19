@@ -2,11 +2,16 @@
 access_level = 'full'
 dataset = 'prophecy'
 datasets = ['prophecy']
-keep_scratch = true
+check_inputs = true
 skip_samples_with_missing_input = true
 check_expected_outputs = true
+keep_scratch = true
+skip_samples = [
+  'CPG216275',  # https://batch.hail.populationgenomics.org.au/batches/74382
+  'CPG216010',  # https://batch.hail.populationgenomics.org.au/batches/74382
+]
 
 [hail]
-hail_pool_label = 'large-cohort'
-billing_project= 'prophecy'
-bucket ='gs://cpg-prophecy-main'
+pool_label = 'large-cohort'
+billing_project = 'prophecy'
+bucket = 'gs://cpg-prophecy-hail'

@@ -254,18 +254,30 @@ def genomicsdb(
 
         cmd = f"""\
         WORKSPACE={out_path.with_suffix('').name}
-        
+
+        # Multiple GenomicsDBImport read same GVCFs in parallel, which could lead to 
+        # some of the jobs failing reading a GVCF, e.g.:
+        # https://batch.hail.populationgenomics.org.au/batches/74388/jobs/45 
+        # So wrapping the command in a "retry" call, which would attempt it multiple 
+        # times after a timeout using.
+        # --overwrite-existing-genomicsdb-workspace is to make sure the $WORKSPACE 
+        # directory from a previous attempt is not in the way of a new attempt.
+        function run {{
         gatk --java-options "-Xms{xms_gb}g -Xmx{xmx_gb}g" \\
         GenomicsDBImport \\
         --genomicsdb-workspace-path $WORKSPACE \\
         -L {intervals[idx]} \\
         --sample-name-map {sample_map} \\
         --reader-threads {nthreads} \\
-        {" ".join(params)}
-    
+        --overwrite-existing-genomicsdb-workspace \\
+        {" ".join(params)} && \\
         tar -cf {j.db_tar} $WORKSPACE
+        }}
+        retry run
         """
-        j.command(wrap_command(cmd, monitor_space=True, setup_gcp=True))
+        j.command(wrap_command(
+            cmd, monitor_space=True, setup_gcp=True, define_retry_function=True
+        ))
         b.write_output(j.db_tar, str(out_path))
 
     return jobs, out_paths

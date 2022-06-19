@@ -34,16 +34,14 @@ function retry {
   local n_attempts=10
   local delay=30
   local n=1
-  while true; do
-    "$@" && break || {
-      if [[ $n -lt $n_attempts ]]; then
-        ((n++))
-        echo "Command failed. Attempt $n/$n_attempts:"
-        sleep $delay;
-      else
-        fail "The command has failed after $n attempts."
-      fi
-    }
+  while ! eval "$@"; do
+    if [[ $n -lt $n_attempts ]]; then
+      ((n++))
+      echo "Command failed. Attempt $n/$n_attempts after ${delay}s..."
+      sleep $delay;
+    else
+      fail "The command has failed after $n attempts."
+    fi
   done
 }
 

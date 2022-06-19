@@ -28,6 +28,7 @@ from cpg_pipes.jobs.somalier import check_pedigree_job
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.targets import Dataset
 from cpg_pipes.types import CramPath, SequencingType
+from cpg_pipes.utils import timestamp
 
 try:
     import utils
@@ -61,7 +62,7 @@ class TestJobs(unittest.TestCase):
     def setUp(self):
         """Set up test environment"""
         self.name = self._testMethodName
-        self.timestamp = utils.timestamp()
+        self.timestamp = timestamp()
         logger.info(f'Timestamp: {self.timestamp}')
         self.local_tmp_dir = tempfile.mkdtemp()
         utils.setup_env(self.tmp_bucket)        
@@ -304,7 +305,7 @@ class TestJobs(unittest.TestCase):
             tmp_prefix=tmp_vqsr_bucket,
             gvcf_count=len(utils.SAMPLES),
             scatter_count=4,
-            output_vcf_path=out_vcf_path,
+            out_path=out_vcf_path,
             use_as_annotations=True,
             overwrite=True,
             sequencing_type=self.sequencing_type,
@@ -454,7 +455,7 @@ class TestJobs(unittest.TestCase):
             siteonly_vqsr_vcf_path=siteonly_vqsr_path,
             vep_ht_path=vep_ht_path,
             output_mt_path=out_mt_path,
-            checkpoints_bucket=self.tmp_bucket / 'checkpoints',
+            checkpoint_prefix=self.tmp_bucket / 'checkpoints',
             sequencing_type=self.sequencing_type,
         )
         self.batch.run(wait=True)
@@ -478,7 +479,7 @@ class TestJobs(unittest.TestCase):
             siteonly_vqsr_vcf_path=siteonly_vqsr_path,
             vep_ht_path=vep_ht_path,
             output_mt_path=out_mt_path,
-            checkpoints_bucket=self.tmp_bucket / 'checkpoints',
+            checkpoint_prefix=self.tmp_bucket / 'checkpoints',
             sequencing_type=self.sequencing_type,
         )
         self.batch.run(wait=True)

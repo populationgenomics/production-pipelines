@@ -7,13 +7,15 @@ datasets = [
     'ravenscroft-rdstudy', 
     'circa', 
     'heartkids',
-    'ohmr3-mendelian', 
+    'ohmr3-mendelian',
     'ohmr4-epilepsy',
     'rdnow',
     'mito-disease',
     'ravenscroft-arch',
     'hereditary-neuro',
 ]
+add_validation_dataset = true
+#status_reporter = 'smdb'
 skip_samples = [
   'CPG11783',   # acute-care, no FASTQ data
   'CPG13326',   # perth-neuro, no FASTQ data: https://github.com/populationgenomics/seqr-private/issues/2
@@ -21,15 +23,13 @@ skip_samples = [
 check_inputs = true
 skip_samples_with_missing_input = false
 keep_scratch = true
-status_reporter = 'smdb'
-#skip_samples_stages:
-#  VerifyBamId: [CPG13409]  # https://batch.hail.populationgenomics.org.au/batches/56236/jobs/372
 sequencing_type = 'genome'
 dataset_gcp_project = 'seqr-308602'
+jc_intervals_num = 200
+check_intermediates = true
 
-[seqr]
-password_secret_id = 'seqr-es-password'
-password_project_id = 'seqr-308602'
+[workflow.skip_samples_stages]
+VerifyBamId = ['CPG13409']  # https://batch.hail.populationgenomics.org.au/batches/56236/jobs/372
 
 [hail]
 pool_label = 'seqr'
@@ -40,3 +40,10 @@ bucket = 'gs://cpg-seqr-hail'
 channel = 'seqr-loader-test'
 token_secret_id = 'slack-seqr-loader-token'
 token_project_id = 'seqr-308602'
+
+[references]
+liftover_38_to_37 = 'liftover/grch38_to_grch37.over.chain.gz'
+
+[images]
+hail = 'driver:4225655198684124178417573ffc6ed714cf0c04-hail-d4bd6a2fd606634057b0277fce06cedce5b764a6'
+sm-api = 'driver:4225655198684124178417573ffc6ed714cf0c04-hail-d4bd6a2fd606634057b0277fce06cedce5b764a6'

@@ -10,7 +10,7 @@ from hailtop.batch import Batch, Resource
 
 from ... import Path
 from ...hb.command import wrap_command
-from ...targets import Target
+from ...targets import Target, Sample
 from ..status import (
     AnalysisStatus,
     StatusReporterError,
@@ -45,6 +45,9 @@ class CpgStatusReporter(StatusReporter):
         if not jobs:
             return []
         
+        if isinstance(target, Sample) and target.dataset.name == 'validation':
+            return []
+
         # 1. Create a "queued" analysis
         if (aid := self.create_analysis(
             output=str(output),

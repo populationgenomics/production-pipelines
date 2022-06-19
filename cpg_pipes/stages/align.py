@@ -39,7 +39,7 @@ class Align(SampleStage):
         )
         if realign_cram_ver := get_config()['workflow'].get('realign_from_cram_version'):
             if (path := (
-                sample.dataset.path() / 'cram' / realign_cram_ver / f'{sample.id}.cram'
+                sample.dataset.prefix() / 'cram' / realign_cram_ver / f'{sample.id}.cram'
             )).exists():
                 logger.info(f'Realigning from {realign_cram_ver} CRAM {path}')
                 alignment_input = CramPath(path)
@@ -63,11 +63,12 @@ class Align(SampleStage):
             output_path=self.expected_outputs(sample),
             sample_name=sample.id,
             job_attrs=self.get_job_attrs(sample),
-            overwrite=not get_config()['workflow'].get('self.check_intermediates'),
+            overwrite=not get_config()['workflow'].get('check_intermediates'),
             realignment_shards_num=get_config()['workflow'].get(
                 'realignment_shards_num', align.DEFAULT_REALIGNMENT_SHARD_NUM
             ),
             aligner=Aligner.DRAGMAP,
             markdup_tool=MarkDupTool.PICARD,
+            sequencing_type=self.cohort.sequencing_type,
         )
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)

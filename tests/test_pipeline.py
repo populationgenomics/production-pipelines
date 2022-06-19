@@ -18,6 +18,7 @@ from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
 from cpg_pipes.types import CramPath
 from cpg_pipes.stages.seqr_loader import AnnotateDataset, LoadToEs
+from cpg_pipes.utils import timestamp
 
 try:
     import utils
@@ -35,7 +36,7 @@ class TestPipeline(unittest.TestCase):
         Setting parameters, creating local tmp dir.
         """
         self.name = self._testMethodName
-        self.timestamp = utils.timestamp()
+        self.timestamp = timestamp()
         self.out_bucket = utils.BASE_BUCKET / self.name / self.timestamp
         self.tmp_bucket = self.out_bucket / 'tmp'
         self.local_tmp_dir = tempfile.mkdtemp()

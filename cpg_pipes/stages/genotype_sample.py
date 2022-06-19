@@ -58,7 +58,7 @@ class GenotypeSample(SampleStage):
                 cram_path=sample.get_cram_path(),
                 intervals=GenotypeSample.hc_intervals,
                 tmp_prefix=self.tmp_prefix / sample.id,
-                overwrite=not get_config()['workflow'].get('self.check_intermediates'),
+                overwrite=not get_config()['workflow'].get('check_intermediates'),
                 job_attrs=self.get_job_attrs(sample),
             )
         )

@@ -4,6 +4,7 @@ Stage that performs joint genotyping of GVCFs using GATK.
 
 import logging
 
+from cpg_utils import to_path
 from cpg_utils.config import get_config
 
 from .. import Path
@@ -22,15 +23,16 @@ class JointGenotyping(CohortStage):
     Joint-calling of GVCFs together.
     """
 
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+    def expected_outputs(self, cohort: Cohort):
         """
-        Generate a pVCF and a site-only VCF. Returns 2 outputs, thus not checking
-        the SMDB, because the Analysis entry supports only single output.
+        Generate a pVCF and a site-only VCF.
         """
         h = cohort.alignment_inputs_hash()
+        prefix = str(cohort.analysis_dataset.tmp_prefix() / self.name / h)
         return {
-            'vcf': self.tmp_prefix / f'{h}.vcf.gz',
-            'siteonly': self.tmp_prefix / f'{h}-siteonly.vcf.gz',
+            'prefix': prefix,
+            'vcf': to_path(f'{prefix}.vcf.gz'),
+            'siteonly': to_path(f'{prefix}-siteonly.vcf.gz'),
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -57,9 +59,9 @@ class JointGenotyping(CohortStage):
             b=self.b,
             out_vcf_path=self.expected_outputs(cohort)['vcf'],
             out_siteonly_vcf_path=self.expected_outputs(cohort)['siteonly'],
-            tmp_bucket=self.tmp_prefix,
+            tmp_bucket=to_path(self.expected_outputs(cohort)['prefix']),
             gvcf_by_sid=gvcf_by_sid,
-            overwrite=not get_config()['workflow'].get('self.check_intermediates'),
+            overwrite=not get_config()['workflow'].get('check_intermediates'),
             tool=joint_genotyping.JointGenotyperTool.GnarlyGenotyper
             if get_config()['workflow'].get('use_gnarly', False)
             else joint_genotyping.JointGenotyperTool.GenotypeGVCFs,

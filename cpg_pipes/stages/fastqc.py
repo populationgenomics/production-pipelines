@@ -26,7 +26,7 @@ class FastQC(SampleStage):
         Stage is expected to generate a FastQC HTML report, and a zip file for
         parsing with MuiltiQC.
         """
-        folder = sample.dataset.path() / 'qc'
+        folder = sample.dataset.prefix() / 'qc'
         return {
             'html': folder / (sample.id + '_fastqc.html'),
             'zip': folder / (sample.id + '_fastqc.zip'),
@@ -40,7 +40,7 @@ class FastQC(SampleStage):
             self.cohort.sequencing_type
         )
 
-        if isinstance(alignment_input, CramPath) and alignment_input.is_bam:
+        if isinstance(alignment_input, CramPath) and not alignment_input.is_bam:
             logger.info(
                 f'FastQC input {sample} has CRAM inputs {alignment_input} '
                 f'for type {self.cohort.sequencing_type.value}, skipping FASTQC'

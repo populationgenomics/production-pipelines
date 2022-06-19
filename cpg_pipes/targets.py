@@ -26,16 +26,7 @@ class Target:
         # Whether to process even if outputs exist:
         self.forced: bool = False
         # If not set, exclude from the pipeline:
-        self._active: bool = True
-
-    @property
-    def active(self) -> bool:
-        """Is active (usable in the pipeline)"""
-        return self._active
-
-    @active.setter
-    def active(self, val: bool):
-        self._active = val
+        self.active: bool = True
 
     def get_samples(self, only_active: bool = True) -> list['Sample']:
         """
@@ -102,6 +93,16 @@ class Target:
         """
         raise NotImplementedError
 
+    def external_id_map(self) -> dict[str, str]:
+        """
+        Map if internal IDs to participant or external IDs, if the latter is provided.
+        """
+        return {
+            s.id: s.id + '|' + s.participant_id
+            for s in self.get_samples()
+            if s.participant_id != s.id
+        }
+
 
 class Cohort(Target):
     """
@@ -123,18 +124,10 @@ class Cohort(Target):
         self.analysis_dataset = Dataset(
             name=analysis_dataset_name,
             namespace=namespace,
+            cohort=self,
         )
         self.sequencing_type = sequencing_type
         self._datasets_by_name: dict[str, Dataset] = {}
-
-    @property
-    def active(self):
-        """Is active (usable in the pipeline)"""
-        return super().active and all(s.active for s in self.get_samples())
-
-    @active.setter
-    def active(self, val: bool):
-        self._active = val
 
     def __repr__(self):
         return f'Cohort("{self.name}", {len(self.get_datasets())} datasets)'
@@ -149,11 +142,10 @@ class Cohort(Target):
         Gets list of all datasets.
         Include only "active" datasets (unless only_active is False)
         """
-        return [
-            ds
-            for k, ds in self._datasets_by_name.items()
-            if (ds.active or not only_active)
-        ]
+        datasets = [ds for k, ds in self._datasets_by_name.items()]
+        if only_active:
+            datasets = [ds for ds in datasets if ds.active and ds.get_samples()]
+        return datasets
 
     def get_dataset_by_name(
         self, name: str, only_active: bool = True
@@ -171,14 +163,15 @@ class Cohort(Target):
         Include only "active" samples (unless only_active is False)
         """
         all_samples = []
-        for proj in self.get_datasets(only_active=only_active):
-            all_samples.extend(proj.get_samples(only_active))
+        for ds in self.get_datasets(only_active=False):
+            all_samples.extend(ds.get_samples(only_active=only_active))
         return all_samples
 
     def add_dataset(self, dataset: 'Dataset') -> 'Dataset':
         """
         Add existing dataset into the cohort.
         """
+        dataset.cohort = self
         if dataset.name in self._datasets_by_name:
             logger.debug(f'Dataset {dataset.name} already exists in the cohort')
             return dataset
@@ -206,6 +199,7 @@ class Cohort(Target):
             ds = Dataset(
                 name=name,
                 namespace=namespace,
+                cohort=self,
             )
 
         self._datasets_by_name[ds.name] = ds
@@ -277,19 +271,12 @@ class Dataset(Target):
         self,
         name: str,
         namespace: Namespace | None = None,
+        cohort: Cohort | None = None,
     ):
         super().__init__()
         self._sample_by_id: dict[str, Sample] = {}
         self.stack, self.namespace = parse_stack(name, namespace)
-
-    @property
-    def active(self):
-        """Is active (usable in the pipeline)"""
-        return super().active and all(s.active for s in self.get_samples())
-
-    @active.setter
-    def active(self, val: bool):
-        self._active = val
+        self.cohort = cohort
 
     @staticmethod
     def create(
@@ -331,35 +318,46 @@ class Dataset(Target):
 
     def __str__(self):
         return f'{self.name} ({len(self.get_samples())} samples)'
+    
+    def _seq_type_subdir(self) -> str:
+        """
+        Subdirectory parametrised by sequencing type. For genomes, we don't 
+        prefix at all.
+        """
+        return (
+            '' 
+            if not self.cohort or self.cohort.sequencing_type == SequencingType.GENOME 
+            else self.cohort.sequencing_type.value
+        )
 
-    def path(self, **kwargs) -> Path:
+    def prefix(self, **kwargs) -> Path:
         """
         The primary storage path.
         """
         return to_path(dataset_path(
-            '',
+            self._seq_type_subdir(),
             dataset=self.stack,
             **kwargs,
         ))
 
-    def tmp_path(self, **kwargs) -> Path:
+    def tmp_prefix(self, **kwargs) -> Path:
         """
         Storage path for temporary files.
         """
         return to_path(dataset_path(
-            '',
+            self._seq_type_subdir(),
             dataset=self.stack,
             category='tmp',
             **kwargs,
         ))
 
-    def web_path(self, **kwargs) -> Path:
+    def web_prefix(self, **kwargs) -> Path:
         """
         Path for files served by an HTTP server Matches corresponding URLs returns by
         self.web_url() URLs.
         """
         return to_path(dataset_path(
-            '',
+            self._seq_type_subdir(),
             dataset=self.stack,
             category='web',
             **kwargs,
@@ -370,7 +368,7 @@ class Dataset(Target):
         URLs matching self.storage_web_path() files serverd by an HTTP server. 
         """
         return web_url(
-            '',
+            self._seq_type_subdir(),
             dataset=self.stack,
             **kwargs,
         )
@@ -410,7 +408,8 @@ class Dataset(Target):
         Get dataset's samples. Include only "active" samples, unless only_active=False
         """
         return [
-            s for sid, s in self._sample_by_id.items() if (s.active or not only_active)
+            s for sid, s in self._sample_by_id.items() if 
+            (s.active or not only_active)
         ]
 
     def get_job_attrs(self) -> dict:
@@ -438,7 +437,7 @@ class Dataset(Target):
                 datas.append(sample.pedigree.get_ped_dict())
         df = pd.DataFrame(datas)
 
-        ped_path = (tmp_bucket or self.tmp_path()) / f'{self.name}.ped'
+        ped_path = (tmp_bucket or self.tmp_prefix()) / f'{self.name}.ped'
         with ped_path.open('w') as fp:
             df.to_csv(fp, sep='\t', index=False)
 
@@ -580,13 +579,13 @@ class Sample(Target):
         """
         Path to a CRAM file. Not checking its existence here.
         """
-        return CramPath(self.dataset.path() / 'cram' / f'{self.id}.cram')
+        return CramPath(self.dataset.prefix() / 'cram' / f'{self.id}.cram')
 
     def get_gvcf_path(self) -> GvcfPath:
         """
         Path to a GVCF file. Not checking its existence here.
         """
-        return GvcfPath(self.dataset.path() / 'gvcf' / f'{self.id}.g.vcf.gz')
+        return GvcfPath(self.dataset.prefix() / 'gvcf' / f'{self.id}.g.vcf.gz')
 
     @property
     def target_id(self) -> str:

@@ -69,7 +69,7 @@ class SubsetAlignmentInput(SampleStage):
         # lines from each file)
         lines = self.NA12878_read_pairs * self.FQ_LINES_PER_READ / self.SUBSET_FRACTION
 
-        j1 = self.b.new_job('Subset FQ1', dict(sample=sample.id))
+        j1 = self.b.new_job('Subset FQ1', dict(sample=sample.run_id))
         j1.storage('100G')
         j1.command(f'gunzip -c {fqs1[0]} | head -n{lines} | gzip -c > {j1.out_fq}')
         self.b.write_output(j1.out_fq, str(self.expected_outputs(sample)['r1']))
