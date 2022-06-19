@@ -133,7 +133,7 @@ class SMDB:
 
         logger.debug(f'Finding samples for dataset {project_name}...')
         sample_entries = self.sapi.get_samples(
-            body_get_samples_by_criteria_api_v1_sample_post={
+            body_get_samples={
                 'project_ids': [project_name],
                 'active': active,
             }
