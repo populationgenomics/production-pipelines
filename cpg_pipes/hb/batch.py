@@ -7,6 +7,9 @@ import os
 from typing import TypedDict
 
 import hailtop.batch as hb
+from cloudpathlib import CloudPath
+from cpg_utils import to_path
+from cpg_utils import config
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import copy_common_env
 from hailtop.batch.job import PythonJob, BashJob
@@ -47,6 +50,24 @@ class RegisteringBatch(hb.Batch):
         self.job_by_tool = dict()
         self.total_job_num = 0
         self.pool_label = pool_label
+        self._copy_configs_to_remote()
+
+    def _copy_configs_to_remote(self):
+        """If configs are local files, copy them to remote"""
+        remote_dir = to_path(self._backend.remote_tmpdir) / 'config'
+        remote_paths = []
+        # noinspection PyProtectedMember
+        for path in config._config_paths:
+            path = to_path(path)
+            if isinstance(path, CloudPath):
+                remote_paths.append(str(path))
+            else:
+                remote_path = remote_dir / path.name
+                with path.open() as inp, remote_path.open('w') as out:
+                    out.write(inp.read())
+                remote_paths.append(str(remote_path))
+        config.set_config_paths(remote_paths)
+        os.environ['CPG_CONFIG_PATH'] = ','.join(remote_paths)
 
     def _process_attributes(
         self,
@@ -97,21 +118,6 @@ class RegisteringBatch(hb.Batch):
         fixed_attrs = {k: str(v) for k, v in attributes.items()}
         return name, fixed_attrs
 
-    def new_python_job(
-        self,
-        name: str | None = None,
-        attributes: JobAttributes | None = None,
-    ) -> PythonJob:
-        """
-        Wrapper around `new_python_job()` that processes job attributes.
-        """
-        name, fixed_attributes = self._process_attributes(name, attributes)
-        j = super().new_python_job(name, attributes=fixed_attributes)
-        if self.pool_label:
-            j._pool_label = self.pool_label
-        copy_common_env(j)
-        return j
-
     def new_job(
         self,
         name: str | None = None,
@@ -123,6 +129,21 @@ class RegisteringBatch(hb.Batch):
         """
         name, fixed_attributes = self._process_attributes(name, attributes)
         j = super().new_job(name, attributes=fixed_attributes, **kwargs)
+        if self.pool_label:
+            j._pool_label = self.pool_label
+        copy_common_env(j)
+        return j
+
+    def new_python_job(
+        self,
+        name: str | None = None,
+        attributes: JobAttributes | None = None,
+    ) -> PythonJob:
+        """
+        Wrapper around `new_python_job()` that processes job attributes.
+        """
+        name, fixed_attributes = self._process_attributes(name, attributes)
+        j = super().new_python_job(name, attributes=fixed_attributes)
         if self.pool_label:
             j._pool_label = self.pool_label
         copy_common_env(j)
@@ -181,7 +202,7 @@ def setup_batch(description: str) -> RegisteringBatch:
     return RegisteringBatch(
         name=description, 
         backend=backend, 
-        pool_label=pool_label
+        pool_label=pool_label,
     )
 
 

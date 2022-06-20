@@ -62,14 +62,6 @@ CHR20_GVCF_BY_SID = {
 SEQ_TYPE = SequencingType.GENOME
 
 
-def timestamp():
-    """
-    Generate a timestamp plus a short random string for guaranteed uniqueness.
-    """
-    rand_bit = ''.join(choices(string.ascii_uppercase + string.digits, k=3))
-    return time.strftime('%Y-%m%d-%H%M') + rand_bit
-
-
 def setup_env(tmp_bucket: Path, extraconf: dict | None = None):
     """Create config for tests"""
     conf = {

@@ -99,7 +99,7 @@ def make_subset_crams(pipeline: Pipeline):
         """
         )
         b.write_output(
-            cram_j.output_cram, str(utils.TOY_CRAM_BY_SID[s.id]).replace('.cram', '')
+            cram_j.output_cram, str(utils.TOY_CRAM_BY_SID[s.run_id]).replace('.cram', '')
         )
 
         fastq_j = extract_fastq(
@@ -107,8 +107,8 @@ def make_subset_crams(pipeline: Pipeline):
             cram=cram_j.output_cram,
             ext='cram',
             job_attrs=s.get_job_attrs(),
-            output_fq1=utils.TOY_FQ_BY_SID[s.id].r1,
-            output_fq2=utils.TOY_FQ_BY_SID[s.id].r2,
+            output_fq1=utils.TOY_FQ_BY_SID[s.run_id].r1,
+            output_fq2=utils.TOY_FQ_BY_SID[s.run_id].r2,
         )
         fastq_j.depends_on(cram_j)
 
@@ -143,9 +143,9 @@ def make_gvcfs_for_joint_calling(pipeline, pct=1):
     for s in samples:
         _subset_vcf(
             b,
-            utils.FULL_GVCF_BY_SID[s.id],
+            utils.FULL_GVCF_BY_SID[s.run_id],
             out_intervals_path,
-            utils.EXOME_1PCT_GVCF_BY_SID[s.id],
+            utils.EXOME_1PCT_GVCF_BY_SID[s.run_id],
         )
 
     pipeline.run(wait=True)

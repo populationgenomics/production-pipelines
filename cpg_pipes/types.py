@@ -26,6 +26,17 @@ class SequencingType(Enum):
     SINGLE_CELL = 'single_cell'
     MTSEQ = 'mtseq'
     ONT = 'ont'
+    
+    def seqr_value(self) -> str:
+        """
+        Map to Seqr-style string
+        https://github.com/broadinstitute/seqr/blob/e0c179c36c0f68c892017de5eab2e4c1b9ffdc92/seqr/models.py#L592-L594
+        """
+        return {
+            self.GENOME: 'WGS',
+            self.EXOME: 'WES',
+            self.SINGLE_CELL: 'RNA',
+        }.get(self, '')
 
     @staticmethod
     def parse(str_val: str) -> 'SequencingType':

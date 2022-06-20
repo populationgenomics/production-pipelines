@@ -12,7 +12,6 @@ Examples of pipelines can be found in the `pipelines/` folder in the repository 
 import functools
 import logging
 import pathlib
-import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from enum import Enum
@@ -35,7 +34,7 @@ from ..providers.inputs import InputProvider, CsvInputProvider
 from ..targets import Target, Dataset, Sample, Cohort
 from ..providers.status import StatusReporter
 from ..types import SequencingType
-from ..utils import exists
+from ..utils import exists, timestamp
 
 logger = logging.getLogger(__file__)
 
@@ -197,7 +196,9 @@ class StageInput:
         assert output.stage is not None, output
         if not output.target.active:
             return
-        if not output.data or not output.jobs:
+        if not output.target.get_samples():
+            return
+        if not output.data and not output.jobs:
             return
         stage_name = output.stage.name
         target_id = output.target.target_id
@@ -349,10 +350,10 @@ class StageInput:
         Get list of jobs that the next stage would depend on.
         """
         all_jobs: list[Job] = []
+        these_samples = target.get_sample_ids()
         for _, outputs_by_target in self._outputs_by_target_by_stage.items():
             for _, output in outputs_by_target.items():
                 if output:
-                    these_samples = target.get_sample_ids()
                     those_samples = output.target.get_sample_ids()
                     samples_intersect = set(these_samples) & set(those_samples)
                     if samples_intersect:
@@ -381,7 +382,8 @@ class Stage(Generic[TargetT], ABC):
         name: str,
         batch: Batch,
         cohort: Cohort,
-        pipeline_tmp_bucket: Path,
+        pipeline_tmp_prefix: Path,
+        run_id: str,
         required_stages: list[StageDecorator] | StageDecorator | None = None,
         analysis_type: str | None = None,
         skipped: bool = False,
@@ -400,7 +402,8 @@ class Stage(Generic[TargetT], ABC):
             else:
                 self.required_stages_classes.append(required_stages)
 
-        self.tmp_prefix = pipeline_tmp_bucket / name
+        self.tmp_prefix = pipeline_tmp_prefix / name
+        self.run_id = run_id
 
         # Dependencies. Populated in pipeline.run(), after we know all stages.
         self.required_stages: list[Stage] = []
@@ -518,7 +521,6 @@ class Stage(Generic[TargetT], ABC):
             outputs = self.make_outputs(
                 target=target,
                 data=expected_out,
-                jobs=self.new_reuse_job(target),
                 reusable=True,
             )
         else:  # Action.SKIP
@@ -617,35 +619,35 @@ class Stage(Generic[TargetT], ABC):
         """
         Returns outputs that can be reused for the stage for the target,
         or None of none can be reused
-        """
-        if not expected_out:
-            reusable = False
-        elif not get_config()['workflow'].get('check_expected_outputs'):
-            if self.assume_outputs_exist or self.skipped:
-                # Do not check the files' existence, trust they exist.
-                # note that for skipped stages, we automatically assume outputs exist
-                reusable = True
-            else:
-                # Do not check the files' existence, assume they don't exist:
-                reusable = False
-        else:
-            # Checking that all paths in the expected output exists:
-            paths: list[Path] = []
+        """        
+        if self.assume_outputs_exist:
+            return True
 
-            def _find_paths(val):
-                """Recursively find every Path object"""
-                if isinstance(val, Path):
-                    paths.append(val)
-                if isinstance(val, list):
-                    for el in val:
-                        _find_paths(el)
-                if isinstance(val, dict):
-                    for el in val.values():
-                        _find_paths(el)
-    
-            _find_paths(expected_out)
-            reusable = all(exists(path) for path in paths)
-        return reusable
+        paths: list[Path] = []
+
+        def _find_paths(val):
+            """Recursively find every Path object"""
+            if isinstance(val, Path):
+                paths.append(val)
+            if isinstance(val, list):
+                for el in val:
+                    _find_paths(el)
+            if isinstance(val, dict):
+                for el in val.values():
+                    _find_paths(el)
+
+        _find_paths(expected_out)
+
+        if paths and get_config()['workflow'].get('check_expected_outputs'):
+            # Checking that all paths in the expected output exist:
+            return all(exists(path) for path in paths)
+
+        if self.skipped:
+            # Do not check the files' existence, trust they exist.
+            # note that for skipped stages, we automatically assume outputs exist
+            return True
+        # Do not check the files' existence, assume they don't exist:
+        return False
 
     def _queue_reuse_job(
         self, target: TargetT, found_paths: Path | dict[str, Path]
@@ -704,7 +706,8 @@ def stage(
                 name=_cls.__name__,
                 batch=pipeline.b,
                 cohort=pipeline.cohort,
-                pipeline_tmp_bucket=pipeline.tmp_bucket,
+                pipeline_tmp_prefix=pipeline.tmp_prefix,
+                run_id=pipeline.run_id,
                 required_stages=required_stages,
                 analysis_type=analysis_type,
                 status_reporter=pipeline.status_reporter,
@@ -777,13 +780,15 @@ class Pipeline:
         stages: list[StageDecorator] | None = None,
     ):
         self._stages = stages
+        self.run_id = get_config()['workflow'].get('run_id', timestamp())
 
         analysis_dataset = get_config()['workflow']['dataset']
         name = get_config()['workflow'].get('name') or name
         description = get_config()['workflow'].get('description') or description
         name = name or description or analysis_dataset
-        description = description or name
         self.name = slugify(name)
+        description = description or name
+        description += f': run_id={self.run_id}'
 
         access_level = get_config()['workflow']['access_level']
         self.cohort = Cohort(
@@ -797,7 +802,7 @@ class Pipeline:
         
         smdb: Optional[SMDB] = None
         input_provider: InputProvider | None = None
-        if (get_config()['workflow'].get('datasets') and 
+        if (get_config()['workflow'].get('datasets') is not None and 
                 get_config()['workflow'].get('input_provider') == 'smdb'):
             smdb = smdb or SMDB(self.cohort.analysis_dataset.name)
             input_provider = CpgInputProvider(smdb)
@@ -826,13 +831,8 @@ class Pipeline:
                 skip_datasets=get_config()['workflow'].get('skip_datasets'),
             )
 
-        self.tmp_bucket = self.cohort.analysis_dataset.tmp_path()
-        if version := get_config()['workflow'].get('version'):
-            self.tmp_bucket /= version
-
-        if version:
-            description += f' {version}'
-        description += f': [{self.cohort.sequencing_type.value}]'
+        self.tmp_prefix = self.cohort.analysis_dataset.tmp_prefix() / self.run_id
+        description += f' [{self.cohort.sequencing_type.value}]'
         if ds_set := set(d.name for d in self.cohort.get_datasets()):
             description += ' ' + ', '.join(sorted(ds_set))
         self.b: Batch = setup_batch(description=description)
@@ -933,7 +933,9 @@ class Pipeline:
         # implicit_stages_d: dict[str, Stage] = dict()  # If there are required
         # dependency stages that are not requested explicitly, we are putting them
         # into this dict as `skipped`.
+        depth = 0
         while True:  # Might need several rounds to resolve dependencies recursively.
+            depth += 1
             newly_implicitly_added_d = dict()
             for stage_ in self._stages_dict.values():
                 for reqcls in stage_.required_stages_classes:  # check dependencies
@@ -946,10 +948,18 @@ class Pipeline:
                         # Stage is not declared or requested implicitly, so setting
                         # it as skipped:
                         reqstage.skipped = True
-                        logger.info(
-                            f'Stage {reqstage.name} is skipped, '
-                            f'but the output will be required for the stage {stage_.name}'
-                        )
+                        # Only checking outputs of immediately required stages
+                        if depth > 1:
+                            reqstage.assume_outputs_exist = True
+                            logger.info(
+                                f'Stage {reqstage.name} is skipped'
+                            )
+                        else:
+                            logger.info(
+                                f'Stage {reqstage.name} is skipped, but the output '
+                                f'will be required for the stage {stage_.name}'
+                            )
+
             if newly_implicitly_added_d:
                 logger.info(
                     f'Additional implicit stages: '
@@ -973,10 +983,14 @@ class Pipeline:
         for i, (stage_name, stage_) in enumerate(self._stages_dict.items()):
             if first_stage_num is not None and i < first_stage_num:
                 stage_.skipped = True
+                if i < first_stage_num - 1:
+                    # Not checking expected outputs of stages before that
+                    stage_.assume_outputs_exist = True
                 logger.info(f'Skipping stage {stage_name}')
                 continue
             if last_stage_num is not None and i > last_stage_num:
                 stage_.skipped = True
+                stage_.assume_outputs_exist = True
                 continue
 
         logger.info(

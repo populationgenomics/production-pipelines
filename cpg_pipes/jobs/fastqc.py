@@ -21,11 +21,12 @@ def fastqc(
     alignment_input: AlignmentInput,
     subsample: bool = True,
     job_attrs: dict | None = None,
+    all_lanes: bool = False,
 ) -> list[Job]:
     """
     Adds FastQC jobs. If the input is a set of fqs, runs FastQC on each fq file.
     """
-    if isinstance(alignment_input, CramPath) and alignment_input.is_bam:
+    if isinstance(alignment_input, CramPath) and not alignment_input.is_bam:
         raise NotImplementedError('FastQC does not support CRAM input')
 
     def _fastqc_one(jname_, input_path: CramPath | FastqPath):
@@ -73,6 +74,8 @@ def fastqc(
         return jobs
     else:
         assert isinstance(alignment_input, FastqPairs)
+        if not all_lanes:
+            alignment_input = FastqPairs([alignment_input[0]])
         for lane_i, pair in enumerate(alignment_input):
             jname = f'FastQC R1'
             if len(alignment_input) > 1:

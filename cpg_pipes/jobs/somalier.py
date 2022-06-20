@@ -17,7 +17,7 @@ from cpg_pipes.jobs.scripts import check_pedigree
 from cpg_pipes.providers.status import StatusReporter
 from cpg_pipes.slack import slack_message_cmd, slack_env
 from cpg_pipes.targets import Dataset, Sample
-from cpg_pipes.types import CramPath, GvcfPath
+from cpg_pipes.types import CramPath, GvcfPath, SequencingType
 
 logger = logging.getLogger(__file__)
 
@@ -37,6 +37,7 @@ def pedigree(
     job_attrs: dict | None = None,
     status_reporter: StatusReporter | None = None,
     tmp_bucket: Path | None = None,
+    sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> list[Job]:
     """
     Add somalier and peddy based jobs that infer relatedness and sex, compare that
@@ -58,13 +59,14 @@ def pedigree(
         label=label,
         ignore_missing=ignore_missing,
         job_attrs=job_attrs,
+        sequencing_type=sequencing_type,
     )
 
     relate_j = _relate(
         b=b,
         somalier_file_by_sid=somalier_file_by_sample,
         sample_ids=dataset.get_sample_ids(),
-        external_id_map={s.id: s.participant_id for s in dataset.get_samples()},
+        external_id_map=dataset.external_id_map(),
         ped_path=dataset.make_ped_file(tmp_bucket=tmp_bucket),
         label=label,
         extract_jobs=extract_jobs,
@@ -84,7 +86,7 @@ def pedigree(
         b=b,
         samples_file=relate_j.output_samples,
         pairs_file=relate_j.output_pairs,
-        external_id_map={s.id: s.participant_id for s in dataset.get_samples()},
+        external_id_map=dataset.external_id_map(),
         label=label,
         dataset_name=dataset.name,
         out_checks_path=out_checks_path,
@@ -99,7 +101,7 @@ def _make_sample_map(dataset: Dataset):
     """
     Creating sample map to remap internal IDs to participant IDs
     """
-    sample_map_fpath = dataset.tmp_path() / 'pedigree' / 'sample_map.tsv'
+    sample_map_fpath = dataset.tmp_prefix() / 'pedigree' / 'sample_map.tsv'
     df = pd.DataFrame(
         [{'id': s.id, 'pid': s.participant_id} for s in dataset.get_samples()]
     )
@@ -120,6 +122,7 @@ def ancestry(
     ignore_missing: bool = False,
     job_attrs: dict | None = None,
     status_reporter: StatusReporter | None = None,
+    sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> Job:
     """
     Run somalier ancestry https://github.com/brentp/somalier/wiki/ancestry
@@ -132,12 +135,13 @@ def ancestry(
         label=label,
         ignore_missing=ignore_missing,
         job_attrs=job_attrs,
+        sequencing_type=sequencing_type,
     )
     j = _ancestry(
         b=b,
         somalier_file_by_sample=somalier_file_by_sample,
         sample_ids=dataset.get_sample_ids(),
-        external_id_map={s.id: s.participant_id for s in dataset.get_samples()},
+        external_id_map=dataset.external_id_map(),
         label=label,
         extract_jobs=extract_jobs,
         out_tsv_path=out_tsv_path,
@@ -161,6 +165,7 @@ def _prep_somalier_files(
     label: str | None = None,
     ignore_missing: bool = False,
     job_attrs: dict | None = None,
+    sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> tuple[list[Job], dict[str, Path]]:
     """
     Generate .somalier file for each input.
@@ -193,6 +198,7 @@ def _prep_somalier_files(
             label=label,
             out_fpath=gvcf_or_cram_or_bam_path.somalier_path,
             job_attrs=(job_attrs or {}) | sample.get_job_attrs(),
+            sequencing_type=sequencing_type,
         )
         somalier_file_by_sample[sample.id] = gvcf_or_cram_or_bam_path.somalier_path
         extract_jobs.append(j)
@@ -367,6 +373,7 @@ def extact_job(
     label: str | None = None,
     out_fpath: Path | None = None,
     job_attrs: dict | None = None,
+    sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> Job:
     """
     Run "somalier extract" to generate a fingerprint for a `sample`
@@ -383,9 +390,12 @@ def extact_job(
 
     j.image(image_path('somalier'))
     if isinstance(gvcf_or_cram_or_bam_path, CramPath):
-        STANDARD.set_resources(
-            j, ncpu=4, storage_gb=200 if gvcf_or_cram_or_bam_path.is_bam else 50
-        )
+        storage_gb = None  # avoid extra disk by default
+        if sequencing_type == SequencingType.GENOME:
+            storage_gb = 100
+            if gvcf_or_cram_or_bam_path.is_bam:
+                storage_gb = 200
+        STANDARD.set_resources(j, ncpu=4, storage_gb=storage_gb)
         input_file = b.read_input_group(
             base=str(gvcf_or_cram_or_bam_path),
             index=str(gvcf_or_cram_or_bam_path.index_path),

@@ -202,7 +202,7 @@ class HaplotypeCaller(SampleStage):
             cram_path=CramPath(cram_path),
             output_path=expected_path,
             scatter_count=50,
-            tmp_prefix=sample.dataset.tmp_path(),
+            tmp_prefix=sample.dataset.tmp_prefix(),
             refs=self.refs,
             sequencing_type=sample.sequencing_type,
         )
@@ -226,7 +226,7 @@ class JointCalling(CohortStage):
             gvcf_by_sid=gvcf_by_sid,
             refs=self.refs,
             sequencing_type=cohort.get_sequencing_type(),
-            tmp_bucket=cohort.analysis_dataset.tmp_path(),
+            tmp_bucket=cohort.analysis_dataset.tmp_prefix(),
         )
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
 ```
@@ -288,10 +288,10 @@ j = vqsr.make_vqsr_jobs(
     b=...,
     input_vcf_or_mt_path=...,
     gvcf_count=len(cohort.get_samples()),
-    output_vcf_path=...,
+    out_path=...,
     refs=...,
     sequencing_type=cohort.get_sequencing_type(),
-    tmp_prefix=cohort.tmp_path(),
+    tmp_prefix=cohort.tmp_prefix(),
     use_as_annotations=True,
 )
 ```

@@ -8,11 +8,21 @@ from hailtop.batch.job import Job
 
 from cpg_pipes import Path
 from cpg_pipes import utils
-from cpg_pipes.types import CramPath
+from cpg_pipes.types import CramPath, SequencingType
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 
 logger = logging.getLogger(__file__)
+
+
+def _cram_storage_gb(sequencing_type) -> int | None:
+    """
+    Get storage request for a CRAM processing job
+    """
+    storage_gb = None  # avoid extra disk by default
+    if sequencing_type == SequencingType.GENOME:
+        storage_gb = 100
+    return storage_gb
 
 
 def samtools_stats(
@@ -21,6 +31,7 @@ def samtools_stats(
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     overwrite: bool = False,
+    sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> Job:
     """
     Run `samtools stats` for alignment QC.
@@ -34,13 +45,13 @@ def samtools_stats(
         return j
 
     j.image(image_path('samtools'))
-    job_resource = STANDARD.set_resources(j, storage_gb=60)
+    res = STANDARD.set_resources(j, storage_gb=_cram_storage_gb(sequencing_type))
     cram = cram_path.resource_group(b)
     reference = fasta_res_group(b)
 
     cmd = f"""\
     samtools stats \\
-    -@{job_resource.get_nthreads() - 1} \\
+    -@{res.get_nthreads() - 1} \\
     --reference {reference.base} \\
     {cram.cram} > {j.output_stats}
     """
@@ -56,6 +67,7 @@ def verify_bamid(
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     overwrite: bool = False,
+    sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> Job:
     """
     Run `VerifyBamID` contamination checks.
@@ -70,7 +82,7 @@ def verify_bamid(
         return j
 
     j.image(image_path('verify-bam-id'))
-    STANDARD.set_resources(j, storage_gb=60)
+    STANDARD.set_resources(j, storage_gb=_cram_storage_gb(sequencing_type))
     cram = cram_path.resource_group(b)
     reference = fasta_res_group(b)
     contam_ud = reference_path('broad/contam_ud')
@@ -106,6 +118,7 @@ def picard_wgs_metrics(
     output_path: Path | None = None,
     overwrite: bool = False,
     read_length: int = 250,
+    sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> Job:
     """
     Run PicardTools CollectWgsMetrics metrics.
@@ -120,7 +133,7 @@ def picard_wgs_metrics(
         return j
 
     j.image(image_path('picard'))
-    res = STANDARD.set_resources(j, storage_gb=60)
+    res = STANDARD.set_resources(j, storage_gb=_cram_storage_gb(sequencing_type))
     cram = cram_path.resource_group(b)
     reference = fasta_res_group(b)
     interval_file = b.read_input(

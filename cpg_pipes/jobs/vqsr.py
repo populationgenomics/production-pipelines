@@ -93,7 +93,7 @@ def make_vqsr_jobs(
     gvcf_count: int,
     meta_ht_path: Path | None = None,
     hard_filter_ht_path: Path | None = None,
-    output_vcf_path: Path | None = None,
+    out_path: Path | None = None,
     use_as_annotations: bool = True,
     overwrite: bool = False,
     scatter_count: int = DEFAULT_INTERVALS_NUM,
@@ -117,7 +117,7 @@ def make_vqsr_jobs(
     @param scatter_count: number of intervals to parallelise SNP model creation
     @param sequencing_type: type of sequencing experiments
     @param intervals_path: path to specific interval list
-    @param output_vcf_path: path to write final recalibrated VCF to
+    @param out_path: path to write final recalibrated VCF to
     @param use_as_annotations: use allele-specific annotation for VQSR
     @param overwrite: whether to not reuse intermediate files
     @param job_attrs: default job attributes
@@ -293,7 +293,7 @@ def make_vqsr_jobs(
             b=b,
             input_vcfs=[v['vcf.gz'] for v in scattered_vcfs],
             overwrite=overwrite,
-            out_vcf_path=output_vcf_path,
+            out_vcf_path=out_path,
             site_only=True,
             gvcf_count=gvcf_count,
             job_attrs=job_attrs,
@@ -331,7 +331,7 @@ def make_vqsr_jobs(
             use_as_annotations=use_as_annotations,
             indel_filter_level=SNP_HARD_FILTER_LEVEL,
             snp_filter_level=INDEL_HARD_FILTER_LEVEL,
-            output_vcf_path=output_vcf_path,
+            output_vcf_path=out_path,
             job_attrs=job_attrs,
         )
         jobs.append(recalibrated_gathered_vcf_j)
