@@ -203,8 +203,6 @@ class CpgInputProvider(InputProvider):
                         )
                     sample.alignment_input_by_seq_type[seq.sequencing_type] = \
                         seq.alignment_input
-                else:
-                    print('No alignment input for sequence')
 
     def populate_analysis(self, cohort: Cohort) -> None:
         """
