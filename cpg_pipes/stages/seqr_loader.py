@@ -156,9 +156,9 @@ class LoadToEs(DatasetStage):
             f'--es-password {es_password} '
             f'--liftover-path {reference_path("liftover_38_to_37")} '
             f'--use-spark ',  # es export doesn't work with the service backend
-            max_age='16h',
+            max_age='24h',
             packages=utils.DATAPROC_PACKAGES,
-            num_secondary_workers=2,
+            num_secondary_workers=4,
             job_name=f'{dataset.name}: create ES index',
             depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
