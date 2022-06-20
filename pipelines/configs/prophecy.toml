@@ -1,10 +1,13 @@
 [workflow]
 access_level = 'full'
-datset = 'prophecy'
-datasets = ['prophecy']
+dataset = 'prophecy'
 keep_scratch = true
 skip_samples_with_missing_input = true
 check_expected_outputs = true
+sequence_filters.batches = ['2']
+
 
 [hail]
-hail_pool_label = 'large-cohort'
+pool_label = 'large-cohort'
+billing_project = 'prophecy'
+bucket = 'gs://cpg-prophecy-hail'

@@ -810,11 +810,19 @@ class Pipeline:
             input_provider = CsvInputProvider(to_path(csv_path).open())
 
         if input_provider is not None:
+            # Pulls a set of samples to include based on a dict of filters. 
+            filters = get_config()['workflow'].get('sequence_filters')
+            filtered_samples = input_provider.get_sample_ids_filtered(filters)
+
+            only_samples = get_config()['workflow'].get('only_samples') 
+            if only_samples and filtered_samples:
+                only_samples += filtered_samples
+
             input_provider.populate_cohort(
                 cohort=self.cohort,
                 dataset_names=get_config()['workflow'].get('datasets'),
                 skip_samples=get_config()['workflow'].get('skip_samples'),
-                only_samples=get_config()['workflow'].get('only_samples'),
+                only_samples=only_samples,
                 skip_datasets=get_config()['workflow'].get('skip_datasets'),
             )
 

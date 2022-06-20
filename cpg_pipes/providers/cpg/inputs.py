@@ -57,6 +57,17 @@ class CpgInputProvider(InputProvider):
             ped_files=ped_files,
         )
 
+    def get_sample_ids_filtered(
+        self,
+        filters: dict[str, str] | None = None,
+    ) -> list[str]:
+        """
+        Return a list of samples after applying a dict of filters.
+        """
+        filtered_samples : list[str] = [] 
+        # TODO, write the logic here to call db and return appropriate IDs. 
+        return filtered_samples
+
     def get_entries(
         self,
         dataset: Dataset | None = None,
@@ -170,6 +181,8 @@ class CpgInputProvider(InputProvider):
                         )
                     sample.alignment_input_by_seq_type[seq.sequencing_type] = \
                         seq.alignment_input
+                else:
+                    print('No alignment input for sequence')
 
     def populate_analysis(self, cohort: Cohort) -> None:
         """

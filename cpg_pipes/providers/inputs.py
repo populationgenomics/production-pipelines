@@ -90,6 +90,14 @@ class InputProvider(ABC):
 
         return cohort
 
+    def get_sample_ids_filtered(
+        self,
+        filters: dict[str, str] | None = None,
+    ) -> list[str]:
+        """
+        Override this method to get a list of samples after applying a dict of filters.
+        """
+    
     @abstractmethod
     def get_entries(
         self,
