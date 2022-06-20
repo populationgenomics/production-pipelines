@@ -8,6 +8,7 @@ import tempfile
 
 import click
 import pandas as pd
+from cpg_utils.config import get_config
 
 from cpg_pipes import Path, Namespace, to_path
 from cpg_pipes.providers.cpg.inputs import CpgInputProvider
@@ -20,12 +21,6 @@ logger.setLevel(logging.INFO)
 
 
 @click.command()
-@click.option('--dataset', 'datasets', multiple=True)
-@click.option(
-    '-n',
-    '--namespace',
-    help='The bucket namespace to write the results to',
-)
 @click.option(
     '--use-participant-id/--use-external-id',
     'use_external_id',
@@ -33,8 +28,6 @@ logger.setLevel(logging.INFO)
     is_flag=True,
 )
 def main(
-    datasets: list[str],
-    namespace: str,
     use_external_id: bool = False,
 ):
     """
@@ -43,11 +36,11 @@ def main(
     input_provider = CpgInputProvider(SMDB())
     cohort = Cohort(
         analysis_dataset_name='seqr',
-        namespace=Namespace.from_access_level(namespace),
+        namespace=Namespace.from_access_level(get_config()['workflow']['access_level']),
     )
     input_provider.populate_cohort(
         cohort=cohort,
-        dataset_names=datasets,
+        dataset_names=get_config()['workflow']['datasets'],
     )
 
     tmp_dir = to_path(tempfile.mkdtemp())
