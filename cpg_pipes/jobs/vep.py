@@ -49,21 +49,46 @@ def vep_jobs(
         return [b.new_job('VEP [reuse]', job_attrs)]
 
     jobs: list[Job] = []
-    intervals_j, intervals = split_intervals.get_intervals(
-        b=b,
-        sequencing_type=sequencing_type,
-        intervals_path=intervals_path,
-        scatter_count=scatter_count,
-        output_prefix=tmp_prefix,
-    )
-    jobs.append(intervals_j)
-
     vcf = b.read_input_group(
         **{'vcf.gz': str(vcf_path), 'vcf.gz.tbi': str(vcf_path) + '.tbi'}
     )
+    
+    if scatter_count == 1:
+        # special case for not splitting by interval
+        vep_out_path = tmp_prefix / 'vep.jsonl' if to_hail_table else out_path
+        # noinspection PyTypeChecker
+        vep_j = vep_one(
+            b,
+            vcf=vcf['vcf.gz'],
+            out_format='json' if to_hail_table else 'vcf',
+            out_path=vep_out_path,
+            job_attrs=job_attrs or {},
+            overwrite=overwrite,
+        )
+        jobs.append(vep_j)
+        if to_hail_table:
+            to_hail_j = gather_vep_json_to_ht(
+                b=b,
+                vep_results_paths=[vep_out_path],
+                out_path=out_path,
+                job_attrs=job_attrs,
+            )
+            to_hail_j.depends_on(vep_j)
+            jobs.append(to_hail_j)
+        return jobs
 
     parts_bucket = tmp_prefix / 'vep' / 'parts'
     part_files = []
+    intervals = []
+    if scatter_count > 1:
+        intervals_j, intervals = split_intervals.get_intervals(
+            b=b,
+            sequencing_type=sequencing_type,
+            intervals_path=intervals_path,
+            scatter_count=scatter_count,
+            output_prefix=tmp_prefix,
+        )
+        jobs.append(intervals_j)
 
     # Splitting variant calling by intervals
     for idx in range(scatter_count):
@@ -75,9 +100,10 @@ def vep_jobs(
         )
         jobs.append(subset_j)
         if to_hail_table:
-            part_path = parts_bucket / f'part{idx + 1}.json_list'
+            part_path = parts_bucket / f'part{idx + 1}.jsonl'
         else:
             part_path = None
+
         # noinspection PyTypeChecker
         j = vep_one(
             b,
@@ -88,11 +114,8 @@ def vep_jobs(
             overwrite=overwrite,
         )
         jobs.append(j)
-        if to_hail_table:
-            part_files.append(part_path)
-        else:
-            part_files.append(j.output['vcf.gz'])
-
+        part_files.append(part_path or j.output['vcf.gz'])
+    
     if to_hail_table:
         gather_j = gather_vep_json_to_ht(
             b=b,
@@ -138,7 +161,7 @@ def gather_vep_json_to_ht(
 
 def vep_one(
     b: Batch,
-    vcf: Path | hb.Resource,
+    vcf: Path | hb.ResourceFile,
     out_path: Path | None = None,
     out_format: Literal['vcf', 'json'] = 'vcf',
     job_attrs: dict | None = None,
@@ -155,7 +178,7 @@ def vep_one(
     j.image(image_path('vep'))
     STANDARD.set_resources(j, storage_gb=50, mem_gb=50, ncpu=16)
 
-    if not isinstance(vcf, hb.Resource):
+    if isinstance(vcf, Path):
         vcf = b.read_input(str(vcf))
 
     if out_format == 'vcf':

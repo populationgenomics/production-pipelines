@@ -152,15 +152,6 @@ def make_vqsr_jobs(
     huge_disk = 200 if is_small_callset else (500 if not is_huge_callset else 2000)
 
     jobs: list[Job] = []
-    intervals_j, intervals = split_intervals.get_intervals(
-        b=b,
-        sequencing_type=sequencing_type,
-        scatter_count=scatter_count,
-        intervals_path=intervals_path,
-        job_attrs=job_attrs,
-        output_prefix=tmp_prefix,
-    )
-    jobs.append(intervals_j)
 
     if input_vcf_or_mt_path.name.endswith('.mt'):
         # Importing dynamically to make sure $CPG_DATASET_GCP_PROJECT is set.
@@ -229,6 +220,16 @@ def make_vqsr_jobs(
         snp_max_gaussians = 8
 
     if scatter_count > 1:
+        intervals_j, intervals = split_intervals.get_intervals(
+            b=b,
+            sequencing_type=sequencing_type,
+            scatter_count=scatter_count,
+            intervals_path=intervals_path,
+            job_attrs=job_attrs,
+            output_prefix=tmp_prefix,
+        )
+        jobs.append(intervals_j)
+
         # Run SNP recalibrator in a scattered mode
         model_j = add_snps_variant_recalibrator_create_model_step(
             b,

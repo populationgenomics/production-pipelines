@@ -40,6 +40,11 @@ def get_intervals(
     that, but Hail Batch is not dynamic and have to expect certain number of output
     files.
     """
+    if scatter_count <= 1:
+        raise ValueError(
+            f'Split intervals: scatter_count must be > 1, got: {scatter_count}'
+        )
+        
     job_attrs = (job_attrs or {}) | dict(tool='picard_IntervalListTools')
     job_name = f'Make {scatter_count} intervals for {sequencing_type.value}'
     
