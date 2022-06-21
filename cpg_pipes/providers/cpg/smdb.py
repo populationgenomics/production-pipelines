@@ -16,7 +16,7 @@ from sample_metadata.apis import (
     ParticipantApi,
     FamilyApi,
 )
-from sample_metadata.exceptions import ApiException
+from sample_metadata.exceptions import ApiException, ApiTypeError
 
 from ... import Path, to_path
 from ... import utils
@@ -132,12 +132,15 @@ class SMDB:
         project_name = project_name or self.project_name
 
         logger.debug(f'Finding samples for dataset {project_name}...')
-        sample_entries = self.sapi.get_samples(
-            body_get_samples={
-                'project_ids': [project_name],
-                'active': active,
-            }
-        )
+        body = {
+            'project_ids': [project_name],
+            'active': active,
+        }
+        try:
+            sample_entries = self.sapi.get_samples(body_get_samples=body)
+        except ApiTypeError:
+            sample_entries = self.sapi.get_samples(body_get_samples_by_criteria_api_v1_sample_post=body
+)
         logger.info(
             f'Finding samples for project {project_name}: '
             f'found {len(sample_entries)}'
