@@ -79,6 +79,17 @@ class CpgInputProvider(InputProvider):
                 }
             )
 
+    def get_sample_ids_filtered(
+        self,
+        filters: dict[str, str] | None = None,
+    ) -> list[str]:
+        """
+        Return a list of samples after applying a dict of filters.
+        """
+        filtered_samples : list[str] = [] 
+        # TODO, write the logic here to call db and return appropriate IDs. 
+        return filtered_samples
+
     def get_entries(
         self,
         dataset: Dataset | None = None,
