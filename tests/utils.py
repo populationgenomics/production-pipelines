@@ -1,10 +1,6 @@
 """
 Common test utilities.
 """
-import string
-import time
-from random import choices
-
 import toml
 from cpg_utils import Path
 from cpg_utils.config import set_config_paths, update_dict
@@ -78,10 +74,10 @@ def setup_env(tmp_bucket: Path, extraconf: dict | None = None):
         },
         'hail': {
             'billing_project': DATASET,
-            'bucket': str(tmp_bucket),
         },
         'elasticsearch': {
-            'password': 'TEST',
+            'password_project_id': 'TEST',
+            'password_secret_id': 'TEST',
         }
     }
     update_dict(conf, extraconf or {})
