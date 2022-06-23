@@ -11,7 +11,7 @@ from cloudpathlib import CloudPath
 from cpg_utils import to_path
 from cpg_utils import config
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import copy_common_env
+from cpg_utils.hail_batch import copy_common_env, remote_tmpdir
 from hailtop.batch.job import PythonJob, BashJob
 
 
@@ -186,7 +186,7 @@ def setup_batch(description: str) -> RegisteringBatch:
     @param description: descriptive name of the Batch (will be displayed in the GUI)
     """
     billing_project = get_config()['hail']['billing_project']
-    remote_tmpdir = get_config()['hail']['bucket']
+    dataset = get_config()['workflow']['dataset']
     pool_label = get_config()['hail'].get('pool_label')
 
     logger.info(
@@ -196,7 +196,7 @@ def setup_batch(description: str) -> RegisteringBatch:
     )
     backend = hb.ServiceBackend(
         billing_project=billing_project,
-        remote_tmpdir=remote_tmpdir,
+        remote_tmpdir=remote_tmpdir(f'cpg-{dataset}-hail'),
         token=os.environ.get('HAIL_TOKEN'),
     )
     return RegisteringBatch(
