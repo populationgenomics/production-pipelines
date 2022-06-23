@@ -1,5 +1,5 @@
 [workflow]
-first_stage = 'LoadToES'
+first_stage = 'JointGenotyping'
 access_level = 'full'
 dataset = 'seqr'
 datasets = [
@@ -15,9 +15,10 @@ datasets = [
     'ravenscroft-arch',
     'hereditary-neuro',
     'validation',
+    'schr-neuro',
 ]
-create_es_index_for_datasets = ['acute-care']
-status_reporter = 'smdb'
+create_es_index_for_datasets = ['schr-neuro']
+#status_reporter = 'smdb'
 skip_samples = [
   'CPG11783',   # acute-care, no FASTQ data
   'CPG13326',   # perth-neuro, no FASTQ data: https://github.com/populationgenomics/seqr-private/issues/2

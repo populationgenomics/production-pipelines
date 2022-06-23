@@ -1,6 +1,22 @@
 [workflow]
 first_stage = 'Vep'
+last_stage = 'LoadToES'
 sequencing_type = 'exome'
 hc_intervals_num = 1
 jc_intervals_num = 1
 vep_intervals_num = 100
+datasets = [
+    'acute-care', 
+    'perth-neuro', 
+    'ravenscroft-rdstudy', 
+    'circa', 
+    'heartkids',
+    'ohmr3-mendelian',
+    'ohmr4-epilepsy',
+    'rdnow',
+    'mito-disease',
+    'ravenscroft-arch',
+    'hereditary-neuro',
+    'validation',
+    'schr-neuro',
+]
