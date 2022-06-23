@@ -116,6 +116,18 @@ class AnnotateDataset(DatasetStage):
         )
 
 
+def es_password() -> str:
+    """
+    Get ElasticSearch password. Moved into a separate method to simplify 
+    mocking in tests.
+    """
+    return read_secret(
+        project_id=get_config()['elasticsearch']['password_project_id'],
+        secret_name=get_config()['elasticsearch']['password_secret_id'],
+        fail_gracefully=False,
+    )
+
+
 @stage(required_stages=[AnnotateDataset], analysis_type='es-index')
 class LoadToEs(DatasetStage):
     """
@@ -142,18 +154,13 @@ class LoadToEs(DatasetStage):
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset, id='mt')
         index_name = self.expected_outputs(dataset).lower()
 
-        es_password = read_secret(
-            project_id=get_config()['elasticsearch']['password_project_id'],
-            secret_name=get_config()['elasticsearch']['password_secret_id'],
-            fail_gracefully=False,
-        )
         from analysis_runner import dataproc
         j = dataproc.hail_dataproc_job(
             self.b,
             f'cpg_pipes/dataproc_scripts/seqr/mt_to_es.py '
             f'--mt-path {dataset_mt_path} '
             f'--es-index {index_name} '
-            f'--es-password {es_password} '
+            f'--es-password {es_password()} '
             f'--liftover-path {reference_path("liftover_38_to_37")} '
             f'--use-spark ',  # es export doesn't work with the service backend
             max_age='24h',

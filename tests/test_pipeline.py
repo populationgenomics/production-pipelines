@@ -6,9 +6,8 @@ import sys
 import tempfile
 import unittest
 from unittest import skip
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
-import toml
 from cpg_utils.config import get_config, set_config_paths
 
 from cpg_pipes import to_path, get_package_path
@@ -17,7 +16,7 @@ from cpg_pipes.stages.genotype_sample import GenotypeSample
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
 from cpg_pipes.types import CramPath
-from cpg_pipes.stages.seqr_loader import AnnotateDataset, LoadToEs
+from cpg_pipes.stages import seqr_loader
 from cpg_pipes.utils import timestamp
 
 try:
@@ -61,6 +60,7 @@ class TestPipeline(unittest.TestCase):
 
     def _setup_pipeline(self, stages: list[StageDecorator]):
         # Mocking elastic search password for the full dry run test:
+        seqr_loader.es_password = Mock(return_value='TEST')
         pipeline = Pipeline(name=self._testMethodName, stages=stages)
         self.datasets = [pipeline.create_dataset(utils.DATASET)]
         for ds in self.datasets:
@@ -79,7 +79,7 @@ class TestPipeline(unittest.TestCase):
         job commands passed to it.
         """
         self.setup_env()
-        pipeline = self._setup_pipeline(stages=[LoadToEs])
+        pipeline = self._setup_pipeline(stages=[seqr_loader.LoadToEs])
 
         with patch('builtins.print') as mock_print:
             with patch.object(Stage, '_outputs_are_reusable') as mock_reusable:
@@ -146,7 +146,7 @@ class TestPipeline(unittest.TestCase):
             / 'inputs/exome5pct/calling_regions.interval_list',
         )
         pipeline = self._setup_pipeline(
-            stages=[Vqsr.__name__, AnnotateDataset.__name__],
+            stages=[Vqsr.__name__, seqr_loader.AnnotateDataset.__name__],
         )
         # Mocking joint-calling outputs. Toy CRAM/GVCF don't produce enough variant
         # data for AS-VQSR to work properly: gatk would throw a "Bad input: Values for
