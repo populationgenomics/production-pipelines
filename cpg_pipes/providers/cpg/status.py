@@ -153,7 +153,7 @@ class CpgStatusReporter(StatusReporter):
         except exceptions.ApiException:
             traceback.print_exc()
         EOT
-        python update.py
+        python3 update.py
         """
         )
         j.command(wrap_command(cmd, rm_leading_space=False, setup_gcp=True))
