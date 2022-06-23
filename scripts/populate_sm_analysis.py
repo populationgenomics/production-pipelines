@@ -96,12 +96,7 @@ def _populate_qc_analysis_entries(multiqc_json_path: Path):
             target=sample,
             meta=sample.get_job_attrs() | dict(
                 sequencing_type=cohort.sequencing_type.value,
-                freemix=metrics_d['FREEMIX'],
-                percent_duplication=metrics_d['percent_duplicates'],
-                average_insert_size=metrics_d['insert_size_average'],
-                median_coverage=metrics_d['MEDIAN_COVERAGE'],
-                pct_30x=metrics_d['PCT_30X'],
-                r_aligned_in_pairs=metrics_d['percentage_of_properly_paired_reads_(%)'],
+                metrics=metrics_d,
             ),
         )
 
