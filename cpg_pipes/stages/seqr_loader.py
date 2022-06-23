@@ -89,7 +89,7 @@ class AnnotateDataset(DatasetStage):
         return {
             'prefix': str(self.tmp_prefix / 'mt' / f'{h}-{dataset.name}'),
             # We want to write the matrix table into the main bucket.
-            'mt': self.dataset.prefix() / 'mt' / f'{h}-{dataset.name}.mt'
+            'mt': dataset.prefix() / 'mt' / f'{h}-{dataset.name}.mt'
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
