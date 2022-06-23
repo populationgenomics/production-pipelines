@@ -188,15 +188,16 @@ def setup_batch(description: str) -> RegisteringBatch:
     billing_project = get_config()['hail']['billing_project']
     dataset = get_config()['workflow']['dataset']
     pool_label = get_config()['hail'].get('pool_label')
+    bucket = remote_tmpdir(f'cpg-{dataset}-hail')
 
     logger.info(
         f'Starting Hail Batch with the project {billing_project}'
-        f', bucket {remote_tmpdir}' +
+        f', bucket {bucket}' +
         (f', pool label {pool_label}' if pool_label else '')
     )
     backend = hb.ServiceBackend(
         billing_project=billing_project,
-        remote_tmpdir=remote_tmpdir(f'cpg-{dataset}-hail'),
+        remote_tmpdir=bucket,
         token=os.environ.get('HAIL_TOKEN'),
     )
     return RegisteringBatch(
