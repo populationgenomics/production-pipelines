@@ -92,13 +92,13 @@ class Target:
         Prefix job names.
         """
         raise NotImplementedError
-
-    def external_id_map(self) -> dict[str, str]:
+    
+    def rich_id_map(self) -> dict[str, str]:
         """
         Map if internal IDs to participant or external IDs, if the latter is provided.
         """
         return {
-            s.id: s.id + '|' + s.participant_id
+            s.id: s.rich_id
             for s in self.get_samples()
             if s.participant_id != s.id
         }
@@ -558,6 +558,14 @@ class Sample(Target):
         Get external sample ID, or substitute it with the internal ID.
         """
         return self._external_id or self.id
+
+    @property
+    def rich_id(self) -> str:
+        """
+        ID for reporting purposes: composed of internal as well as external 
+        or participant IDs.
+        """
+        return self.id + '|' + self.participant_id
 
     def get_ped_dict(self, use_participant_id: bool = False) -> dict[str, str]:
         """

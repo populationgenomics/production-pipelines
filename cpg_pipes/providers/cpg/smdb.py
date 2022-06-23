@@ -136,11 +136,7 @@ class SMDB:
             'project_ids': [project_name],
             'active': active,
         }
-        try:
-            sample_entries = self.sapi.get_samples(body_get_samples=body)
-        except ApiTypeError:
-            sample_entries = self.sapi.get_samples(body_get_samples_by_criteria_api_v1_sample_post=body
-)
+        sample_entries = self.sapi.get_samples(body_get_samples=body)
         logger.info(
             f'Finding samples for project {project_name}: '
             f'found {len(sample_entries)}'
@@ -261,7 +257,8 @@ class SMDB:
             return None
         else:
             logger.info(
-                f'Created analysis of type={type_}, status={status} with ID: {aid}'
+                f'Created Analysis(id={aid}, type={type_}, status={status}, '
+                f'output={str(output)}) in project {project_name}'
             )
             return aid
 
