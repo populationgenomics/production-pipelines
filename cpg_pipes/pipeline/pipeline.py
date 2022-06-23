@@ -985,9 +985,9 @@ class Pipeline:
                 stage_.assume_outputs_exist = True
                 continue
 
-        logger.info(
-            f'Setting stages: {[s.name for s in stages if not s.skipped]}'
-        )
+        if not (final_set_of_stages := [s.name for s in stages if not s.skipped]):
+            raise PipelineError('No stages to run')
+        logger.info(f'Setting stages: {final_set_of_stages}')
         required_skipped_stages = [s for s in stages if s.skipped]
         if required_skipped_stages:
             logger.info(

@@ -7,7 +7,7 @@ from typing import List, Union
 import textwrap
 
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build
+from cpg_utils.hail_batch import genome_build, remote_tmpdir
 from hailtop.batch import ResourceFile
 
 from cpg_pipes import Path
@@ -80,6 +80,10 @@ def python_command(
     Construct a command for a Job that runs a python function.
     If hail_billing_project is provided, Hail Query will be also initialised.
     """
+    billing_project = get_config()['hail']['billing_project']
+    dataset = get_config()['workflow']['dataset']
+    bucket = remote_tmpdir(f'cpg-{dataset}-hail')
+
     python_cmd = f"""
 import logging
 logger = logging.getLogger(__file__)
@@ -93,8 +97,8 @@ import hail as hl
 asyncio.get_event_loop().run_until_complete(
     hl.init_batch(
         default_reference='{genome_build()}',
-        billing_project='{get_config()['hail']['billing_project']}',
-        remote_tmpdir='{get_config()['hail']['bucket']}',
+        billing_project='{billing_project}',
+        remote_tmpdir='{bucket}',
     )
 )
 """
