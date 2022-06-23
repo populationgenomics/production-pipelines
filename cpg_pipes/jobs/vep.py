@@ -79,7 +79,7 @@ def vep_jobs(
 
     parts_bucket = tmp_prefix / 'vep' / 'parts'
     part_files = []
-    intervals = []
+    intervals: list[hb.Resource] = []
     if scatter_count > 1:
         intervals_j, intervals = split_intervals.get_intervals(
             b=b,

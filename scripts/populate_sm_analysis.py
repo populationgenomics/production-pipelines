@@ -41,7 +41,6 @@ POPULATE_JOINT_CALL = False
 POPULATE_ES_INDEX = False
 
 
-
 if POPULATE_SAMPLES:
     for i, sample in enumerate(cohort.get_samples()):
         if (path := sample.get_cram_path().path).exists():
@@ -69,6 +68,7 @@ if POPULATE_SAMPLES:
                 ),
             )
 
+
 def _populate_qc_analysis_entries(multiqc_json_path: Path):
     """
     Add Analysis SMDB entries of type="qc" from a MultiQC JSON data.
@@ -76,7 +76,7 @@ def _populate_qc_analysis_entries(multiqc_json_path: Path):
     with multiqc_json_path.open() as f:
         data = json.load(f)
     
-    metrics_by_sample = defaultdict()
+    metrics_by_sample: defaultdict[str, dict] = defaultdict()
     for sample_d in data['report_general_stats_data']:
         for sid, metrics_d in sample_d.items():
             if sid not in metrics_by_sample:

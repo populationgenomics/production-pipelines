@@ -9,7 +9,7 @@ from cpg_utils.hail_batch import reference_path, image_path, fasta_res_group
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
-from cpg_pipes import Namespace, Path
+from cpg_pipes import Path
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs.align import extract_fastq
 from cpg_pipes.pipeline.pipeline import Pipeline
@@ -22,7 +22,6 @@ def main():
     """
     Generate data for unit tests
     """
-    utils.config()
     pipeline = Pipeline(
         name='make_test_data',
         description='Make test data',
@@ -99,7 +98,7 @@ def make_subset_crams(pipeline: Pipeline):
         """
         )
         b.write_output(
-            cram_j.output_cram, str(utils.TOY_CRAM_BY_SID[s.run_id]).replace('.cram', '')
+            cram_j.output_cram, str(utils.TOY_CRAM_BY_SID[s.id]).replace('.cram', '')
         )
 
         fastq_j = extract_fastq(
@@ -107,8 +106,8 @@ def make_subset_crams(pipeline: Pipeline):
             cram=cram_j.output_cram,
             ext='cram',
             job_attrs=s.get_job_attrs(),
-            output_fq1=utils.TOY_FQ_BY_SID[s.run_id].r1,
-            output_fq2=utils.TOY_FQ_BY_SID[s.run_id].r2,
+            output_fq1=utils.TOY_FQ_BY_SID[s.id].r1,
+            output_fq2=utils.TOY_FQ_BY_SID[s.id].r2,
         )
         fastq_j.depends_on(cram_j)
 
