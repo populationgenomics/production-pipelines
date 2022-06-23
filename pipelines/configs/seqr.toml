@@ -17,7 +17,7 @@ datasets = [
     'validation',
 ]
 create_es_index_for_datasets = ['acute-care']
-#status_reporter = 'smdb'
+status_reporter = 'smdb'
 skip_samples = [
   'CPG11783',   # acute-care, no FASTQ data
   'CPG13326',   # perth-neuro, no FASTQ data: https://github.com/populationgenomics/seqr-private/issues/2
@@ -37,7 +37,7 @@ VerifyBamId = ['CPG13409']  # https://batch.hail.populationgenomics.org.au/batch
 [hail]
 pool_label = 'seqr'
 billing_project = 'seqr'
-bucket = 'gs://cpg-seqr-hail'
+bucket = 'cpg-seqr-test-tmp'
 
 [slack]
 channel = 'seqr-loader-test'

@@ -11,12 +11,14 @@ from cpg_pipes.providers.cpg.inputs import CpgInputProvider
 from cpg_pipes.providers.cpg.smdb import SMDB
 from cpg_pipes.providers.cpg.status import CpgStatusReporter
 from cpg_pipes.targets import Cohort
+from cpg_pipes.types import SequencingType
 from cpg_pipes.utils import exists
 
 access_level = get_config()['workflow']['access_level']
 cohort = Cohort(
     analysis_dataset_name=get_config()['workflow']['dataset'],
     namespace=Namespace.from_access_level(access_level),
+    sequencing_type=SequencingType.parse(get_config()['workflow']['sequencing_type'])
 )
 smdb = SMDB(cohort.analysis_dataset.name)
 input_provider = CpgInputProvider(smdb)
@@ -36,8 +38,9 @@ POPULATE_ES_INDEX = False
 
 
 if POPULATE_SAMPLES:
-    for sample in cohort.get_samples():
+    for i, sample in enumerate(cohort.get_samples()):
         if (path := sample.get_cram_path().path).exists():
+            print(f'#{i+1} {sample} {path}')
             status.create_analysis(
                 str(path),
                 analysis_type='cram',
@@ -49,6 +52,7 @@ if POPULATE_SAMPLES:
                 ),
             )
         if (path := sample.get_gvcf_path().path).exists():
+            print(f'#{i+1} {sample} {path}')
             status.create_analysis(
                 str(path),
                 analysis_type='gvcf',

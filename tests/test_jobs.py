@@ -427,7 +427,7 @@ class TestJobs(unittest.TestCase):
 
         import hail as hl
 
-        init_batch(utils.DATASET, self.tmp_bucket)
+        init_batch()
         ht = hl.read_table(str(out_path))
         interval = hl.parse_locus_interval(
             f'{self.chrom}:{self.locus1}-{int(self.locus1) + 1}'
@@ -487,7 +487,7 @@ class TestJobs(unittest.TestCase):
         # Testing
         import hail as hl
 
-        init_batch(utils.DATASET, self.tmp_bucket)
+        init_batch()
         mt = hl.read_matrix_table(str(out_mt_path))
         mt.rows().show()
         self.assertListEqual(mt.topmed.AC.collect(), [20555, 359, 20187])
@@ -515,7 +515,7 @@ class TestJobs(unittest.TestCase):
         self.assertTrue(out_mt_path.exists())
         import hail as hl
 
-        init_batch(utils.DATASET, self.tmp_bucket)
+        init_batch()
         mt = hl.read_matrix_table(str(out_mt_path))
         mt.rows().show()
         self.assertListEqual(mt.s.collect(), utils.SAMPLES[:3])

@@ -1,41 +1,28 @@
 """
 Hail tables and matrix tables used as reference data.
 """
-import asyncio
 import functools
 import logging
 import operator
 import os
-import random
-import string
 import tempfile
-import time
 from pathlib import Path
 from typing import List, Optional, Union
+
 import hail as hl
+from cpg_utils import hail_batch
 from cpg_utils.hail_batch import genome_build, reference_path
-from hail.utils.java import Env
 
 from cpg_pipes.utils import timestamp
 
 logger = logging.getLogger(__file__)
 
 
-def init_batch(billing_project: str, hail_bucket: Path | str):
+def init_batch():
     """
     Init Hail with Batch backend.
     """
-    # noinspection PyProtectedMember
-    if Env._hc:  # already initialised
-        return
-    asyncio.get_event_loop().run_until_complete(
-        hl.init_batch(
-            default_reference=genome_build(),
-            billing_project=billing_project,
-            remote_tmpdir=str(hail_bucket),
-            token=os.environ['HAIL_TOKEN'],
-        )
-    )
+    return hail_batch.init_batch(token=os.environ.get('HAIL_TOKEN'))
 
 
 def init_hail(name: str, local_tmp_dir: Path = None):

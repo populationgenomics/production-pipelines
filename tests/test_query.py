@@ -51,7 +51,7 @@ class TestQuery(unittest.TestCase):
         self.timestamp = timestamp()
         self.local_tmp_dir = tempfile.mkdtemp()
         self.sequencing_type = SequencingType.GENOME
-        hailquery.init_batch(utils.DATASET, self.tmp_bucket)
+        hailquery.init_batch()
         # Interval to take on chr20:
         self.chrom = 'chr20'
         self.locus1 = '5111495'
