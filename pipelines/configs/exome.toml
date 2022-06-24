@@ -1,5 +1,5 @@
 [workflow]
-first_stage = 'Vep'
+first_stage = 'LoadToES'
 last_stage = 'LoadToES'
 sequencing_type = 'exome'
 hc_intervals_num = 1

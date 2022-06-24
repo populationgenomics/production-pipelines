@@ -89,6 +89,9 @@ def main(
     rg38 = hl.get_reference('GRCh38')
     rg38.add_liftover(liftover_path, rg37)
     mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
+    mt = mt.annotate_globals(
+        sampleType='WES',
+    )
 
     logger.info('Getting rows and exporting to the ES')
     row_table = elasticsearch_row(mt)
