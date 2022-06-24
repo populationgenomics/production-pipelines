@@ -153,6 +153,10 @@ class RegisteringBatch(hb.Batch):
         """
         Execute a batch. Overridden to print pre-submission statistics.
         """
+        if self.total_job_num == 0:
+            logger.error('No jobs to submit')
+            return
+
         logger.info(f'Will submit {self.total_job_num} jobs')
 
         def _print_stat(_d: dict, default_label: str | None = None):

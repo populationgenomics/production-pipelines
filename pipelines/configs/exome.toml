@@ -20,3 +20,4 @@ datasets = [
     'validation',
     'schr-neuro',
 ]
+create_es_index_for_datasets = ['acute-care', 'hereditary-neuro', 'mito-disease']
