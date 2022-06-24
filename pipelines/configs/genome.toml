@@ -1,0 +1,20 @@
+[workflow]
+first_stage = 'JointGenotyping'
+last_stage = 'LoadToEs'
+sequencing_type = 'genome'
+datasets = [
+    'acute-care', 
+    'perth-neuro', 
+    'ravenscroft-rdstudy', 
+    'circa', 
+    'heartkids',
+    'ohmr3-mendelian',
+    'ohmr4-epilepsy',
+    'rdnow',
+    'mito-disease',
+    'ravenscroft-arch',
+    'hereditary-neuro',
+    'validation',
+    'schr-neuro',
+]
+create_es_index_for_datasets = ['schr-neuro']
