@@ -437,6 +437,8 @@ class SmSequence:
         """
         reads_data = meta.get('reads')
         reads_type = meta.get('reads_type')
+        reference_assembly = meta.get('reference_assembly')
+
         if not reads_data:
             logger.error(f'{sample_id}: no "meta/reads" field in meta')
             return None
@@ -489,7 +491,9 @@ class SmSequence:
                     )
                     return None
 
-            return CramPath(bam_path, index_path=index_path)
+            return CramPath(
+                bam_path, index_path=index_path, reference_assembly=reference_assembly
+            )
 
         else:
             fastq_pairs = FastqPairs()

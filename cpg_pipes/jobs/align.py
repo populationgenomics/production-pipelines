@@ -293,14 +293,20 @@ def _align_one(
         else:
             shard_param = ''
 
+        reference_inp = fasta.base
+        if alignment_input.reference_assembly:
+            reference_inp = alignment_input.reference_assembly
+
         # BAZAM requires indexed input.
         if not alignment_input.index_exists():
             index_cmd = f'samtools index {cram[alignment_input.ext]}'
 
-        bazam_cmd = dedent(f"""\
-        bazam -Xmx16g -Dsamjdk.reference_fasta={fasta.base} \
+        bazam_cmd = dedent(
+            f"""\
+        bazam -Xmx16g -Dsamjdk.reference_fasta={reference_inp} \
         -n{min(nthreads, 6)} -bam {cram[alignment_input.ext]}{shard_param} \
-        """)
+        """
+        )
         r1_param = f'<({bazam_cmd})'
         r2_param = ''
 

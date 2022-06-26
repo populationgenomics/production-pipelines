@@ -93,9 +93,11 @@ class CramPath(AlignmentInput):
     """
 
     def __init__(
-        self, 
-        path: str | Path, 
+        self,
+        path: str | Path,
         index_path: Path | str | None = None,
+        # TODO: should this be required?
+        reference_assembly: str | None = None,
     ):
         self.path = to_path(path)
         self.is_bam = self.path.suffix == '.bam'
@@ -104,6 +106,7 @@ class CramPath(AlignmentInput):
         self._index_path = index_path
         self.somalier_path = to_path(f'{self.path}.somalier')
         self.sequencing_type: Optional[SequencingType] = None
+        self.reference_assembly = reference_assembly
 
     def __str__(self) -> str:
         return str(self.path)
