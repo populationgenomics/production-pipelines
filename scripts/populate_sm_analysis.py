@@ -35,15 +35,32 @@ input_provider.populate_cohort(
 
 status = CpgStatusReporter(smdb)
 
-POPULATE_SAMPLES = False
-POPULATE_QC = True
+POPULATE_SAMPLES = True
+POPULATE_QC = False
 POPULATE_JOINT_CALL = False
 POPULATE_ES_INDEX = False
 
 
 if POPULATE_SAMPLES:
+    from sample_metadata.apis import AnalysisApi
+    from sample_metadata.models import AnalysisQueryModel, AnalysisStatus
+
+    analyses = AnalysisApi().query_analyses(
+        AnalysisQueryModel(
+            projects=[d.name for d in cohort.get_datasets()],
+            status=AnalysisStatus('completed'),
+        )
+    )
+    apaths = set(a['output'] for a in analyses)
+
     for i, sample in enumerate(cohort.get_samples()):
-        if (path := sample.get_cram_path().path).exists():
+        if path := sample.get_cram_path().path:
+            if str(path) in apaths:
+                continue
+
+            if not path.exists():
+                continue
+
             print(f'#{i+1} {sample} {path}')
             status.create_analysis(
                 str(path),
