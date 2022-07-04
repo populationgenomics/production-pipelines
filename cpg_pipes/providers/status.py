@@ -68,6 +68,7 @@ class StatusReporter(ABC):
         analysis_type: str,
         analysis_status: str,
         target: Target,
-        meta: dict | None = None,        
+        meta: dict | None = None,
+        project_name: str = None,
     ) -> int | None:
         """Record analysis entry"""
