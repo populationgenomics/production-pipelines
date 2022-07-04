@@ -89,7 +89,7 @@ class CpgStatusReporter(StatusReporter):
         analysis_status: str,
         target: Target,
         meta: dict | None = None,
-        project_name: str=None,
+        project_name: str = None,
     ) -> int | None:
         """Record analysis entry"""
         return self.smdb.create_analysis(
