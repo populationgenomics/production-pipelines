@@ -279,32 +279,42 @@ def _align_one(
         storage_gb=storage_for_cram_job(sequencing_type, alignment_input),
     ).get_nthreads()
 
-    fasta = fasta_res_group(b)
-
     index_cmd = ''
     if isinstance(alignment_input, CramPath):
         use_bazam = True
-        cram = alignment_input.resource_group(b)
         if number_of_shards_for_realignment and number_of_shards_for_realignment > 1:
             assert shard_number is not None and shard_number >= 0, (
-                shard_number, sample_name,
+                shard_number,
+                sample_name,
             )
             shard_param = f' -s {shard_number + 1},{number_of_shards_for_realignment}'
         else:
             shard_param = ''
 
-        reference_inp = fasta.base
-        if alignment_input.reference_assembly:
-            reference_inp = alignment_input.reference_assembly
+        reference_inp = alignment_input.reference_assembly
+        assert (
+            reference_inp
+        ), f'The reference input for the alignment input "{alignment_input.path}" was not set'
+
+        should_stream = True
+        if should_stream:
+            cram_file = str(align.path)
+        else:
+            cram = alignment_input.resource_group(b)
+            cram_file = cram[alignment_input.ext]
+            reference_inp = b.read_input_group(
+                base=str(reference_inp),
+                fai=str(reference_inp) + '.fai',
+            )
 
         # BAZAM requires indexed input.
         if not alignment_input.index_exists():
-            index_cmd = f'samtools index {cram[alignment_input.ext]}'
+            index_cmd = f'samtools index {cram_file}'
 
         bazam_cmd = dedent(
             f"""\
         bazam -Xmx16g -Dsamjdk.reference_fasta={reference_inp} \
-        -n{min(nthreads, 6)} -bam {cram[alignment_input.ext]}{shard_param} \
+        -n{min(nthreads, 6)} -bam {cram_file}{shard_param} \
         """
         )
         r1_param = f'<({bazam_cmd})'

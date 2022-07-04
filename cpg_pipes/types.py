@@ -95,6 +95,7 @@ class CramPath(AlignmentInput):
     def __init__(
         self,
         path: str | Path,
+        reference_assembly: str=None,
         index_path: Path | str | None = None,
         # TODO: should this be required?
         reference_assembly: str | None = None,
