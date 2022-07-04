@@ -21,7 +21,7 @@ access_level = get_config()['workflow']['access_level']
 cohort = Cohort(
     analysis_dataset_name=get_config()['workflow']['dataset'],
     namespace=Namespace.from_access_level(access_level),
-    sequencing_type=SequencingType.parse(get_config()['workflow']['sequencing_type'])
+    sequencing_type=SequencingType.parse(get_config()['workflow']['sequencing_type']),
 )
 smdb = SMDB(cohort.analysis_dataset.name)
 input_provider = CpgInputProvider(smdb)
@@ -50,22 +50,28 @@ if POPULATE_SAMPLES:
                 analysis_type='cram',
                 analysis_status='completed',
                 target=sample,
-                meta=sample.get_job_attrs() | dict(
+                meta=sample.get_job_attrs()
+                | dict(
                     size=path.stat().st_size,
                     sequencing_type=cohort.sequencing_type.value,
                 ),
+                project_name=sample.dataset.name,
             )
         if (path := sample.get_gvcf_path().path).exists():
             print(f'#{i+1} {sample} {path}')
+            if str(path) in apaths:
+                continue
             status.create_analysis(
                 str(path),
                 analysis_type='gvcf',
                 analysis_status='completed',
                 target=sample,
-                meta=sample.get_job_attrs() | dict(
+                meta=sample.get_job_attrs()
+                | dict(
                     size=path.stat().st_size,
                     sequencing_type=cohort.sequencing_type.value,
                 ),
+                project_name=sample.dataset.name,
             )
 
 
@@ -75,7 +81,7 @@ def _populate_qc_analysis_entries(multiqc_json_path: Path):
     """
     with multiqc_json_path.open() as f:
         data = json.load(f)
-    
+
     metrics_by_sample: defaultdict[str, dict] = defaultdict()
     for sample_d in data['report_general_stats_data']:
         for sid, metrics_d in sample_d.items():
@@ -94,10 +100,12 @@ def _populate_qc_analysis_entries(multiqc_json_path: Path):
             analysis_type='qc',
             analysis_status='completed',
             target=sample,
-            meta=sample.get_job_attrs() | dict(
+            meta=sample.get_job_attrs()
+            | dict(
                 sequencing_type=cohort.sequencing_type.value,
                 metrics=metrics_d,
             ),
+            project_name=sample.dataset.name,
         )
 
 
@@ -116,9 +124,11 @@ if POPULATE_JOINT_CALL:
             analysis_type='joint-calling',
             analysis_status='completed',
             target=cohort,
-            meta=cohort.get_job_attrs() | dict(
+            meta=cohort.get_job_attrs()
+            | dict(
                 sequencing_type=cohort.sequencing_type.value,
             ),
+            project_name='seqr',
         )
 
 if POPULATE_ES_INDEX:
@@ -143,7 +153,9 @@ if POPULATE_ES_INDEX:
             analysis_type='es-index',
             analysis_status='completed',
             target=dataset,
-            meta=dataset.get_job_attrs() | dict(
+            meta=dataset.get_job_attrs()
+            | dict(
                 sequencing_type=cohort.sequencing_type.value,
             ),
+            project_name=ds_name
         )
