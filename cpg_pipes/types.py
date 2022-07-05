@@ -26,7 +26,7 @@ class SequencingType(Enum):
     SINGLE_CELL = 'single_cell'
     MTSEQ = 'mtseq'
     ONT = 'ont'
-    
+
     def seqr_value(self) -> str:
         """
         Map to Seqr-style string
@@ -42,18 +42,18 @@ class SequencingType(Enum):
     def parse(str_val: str) -> 'SequencingType':
         """
         Parse a string into a SequencingType object.
-        
+
         >>> SequencingType.parse('genome')
         SequencingType.GENOME
         >>> SequencingType.parse('wes')
         SequencingType.EXOME
         """
-        str_to_val: dict[str, SequencingType] = {} 
+        str_to_val: dict[str, SequencingType] = {}
         for val, str_vals in {
             SequencingType.GENOME: ['genome', 'wgs'],
             SequencingType.EXOME: ['exome', 'wts', 'wes'],
             SequencingType.SINGLE_CELL: ['single_cell', 'single_cell_rna'],
-            SequencingType.MTSEQ: ['mtseq']
+            SequencingType.MTSEQ: ['mtseq'],
         }.items():
             for str_v in str_vals:
                 str_v = str_v.lower()
@@ -72,6 +72,7 @@ class AlignmentInput(ABC):
     """
     Data that works as input for alignment or realignment.
     """
+
     @abstractmethod
     def exists(self) -> bool:
         """
@@ -81,7 +82,7 @@ class AlignmentInput(ABC):
     @abstractmethod
     def path_glob(self) -> str:
         """
-        Compact representation of file paths. 
+        Compact representation of file paths.
         """
 
 
@@ -93,8 +94,9 @@ class CramPath(AlignmentInput):
     """
 
     def __init__(
-        self, 
-        path: str | Path, 
+        self,
+        path: str | Path,
+        reference_assembly: str = None,
         index_path: Path | str | None = None,
     ):
         self.path = to_path(path)
@@ -104,6 +106,7 @@ class CramPath(AlignmentInput):
         self._index_path = index_path
         self.somalier_path = to_path(f'{self.path}.somalier')
         self.sequencing_type: Optional[SequencingType] = None
+        self.reference_assembly = reference_assembly
 
     def __str__(self) -> str:
         return str(self.path)
@@ -116,7 +119,7 @@ class CramPath(AlignmentInput):
         CRAM file exists.
         """
         return self.path.exists()
-    
+
     def index_exists(self) -> bool:
         """
         CRAI/BAI index exists
@@ -140,15 +143,15 @@ class CramPath(AlignmentInput):
         """
         d = {
             self.ext: str(self.path),
-        } 
+        }
         if self.index_exists():
             d[f'{self.ext}.{self.index_ext}'] = str(self.index_path)
 
         return b.read_input_group(**d)
-    
+
     def path_glob(self) -> str:
         """
-        Compact representation of file paths. 
+        Compact representation of file paths.
         For a CRAM, it's just the CRAM file path.
         """
         return str(self.path)
@@ -176,7 +179,7 @@ class GvcfPath:
         GVCF file exists.
         """
         return self.path.exists()
-    
+
     @property
     def tbi_path(self) -> Path:
         """
@@ -216,12 +219,14 @@ class FastqPair:
         """
         Makes a pair of ResourceFile objects for r1 and r2.
         """
-        return FastqPair(*[
-            self[i] 
-            if isinstance(self[i], ResourceFile) 
-            else b.read_input(str(self[i]))
-            for i in [0, 1]
-        ])
+        return FastqPair(
+            *[
+                self[i]
+                if isinstance(self[i], ResourceFile)
+                else b.read_input(str(self[i]))
+                for i in [0, 1]
+            ]
+        )
 
     def __str__(self):
         return f'{self.r1}|{self.r2}'
@@ -229,21 +234,19 @@ class FastqPair:
 
 class FastqPairs(list[FastqPair], AlignmentInput):
     """
-    Multiple FASTQ file pairs belonging to the same sample 
+    Multiple FASTQ file pairs belonging to the same sample
     (e.g. multiple lanes or top-ups).
     """
+
     def exists(self) -> bool:
         """
         Check if each FASTQ file in each pair exist.
         """
-        return all(
-            utils.exists(pair.r1) and utils.exists(pair.r2) 
-            for pair in self
-        )
+        return all(utils.exists(pair.r1) and utils.exists(pair.r2) for pair in self)
 
     def path_glob(self) -> str:
         """
-        Compact representation of file paths. 
+        Compact representation of file paths.
         For FASTQ pairs, it's glob string to find all FASTQ files.
 
         >>> FastqPairs([
@@ -251,7 +254,7 @@ class FastqPairs(list[FastqPair], AlignmentInput):
         >>> ]).path_glob()
         'gs://sample_R{2,1}.fq.gz'
         >>> FastqPairs([
-        >>>     FastqPair('gs://sample_L1_R1.fq.gz', 'gs://sample_L1_R2.fq.gz'), 
+        >>>     FastqPair('gs://sample_L1_R1.fq.gz', 'gs://sample_L1_R2.fq.gz'),
         >>>     FastqPair('gs://sample_L2_R1.fq.gz', 'gs://sample_L2_R2.fq.gz'),
         >>> ]).path_glob()
         'gs://sample_L{2,1}_R{2,1}.fq.gz'
@@ -260,7 +263,9 @@ class FastqPairs(list[FastqPair], AlignmentInput):
         for pair in self:
             all_fastq_paths.extend([pair.r1, pair.r2])
         # Triple braces are intentional: they are resolved to single ones.
-        return ''.join([
-            f'{{{",".join(set(chars))}}}' if len(set(chars)) > 1 else chars[0] 
-            for chars in zip(*map(str, all_fastq_paths))
-        ])
+        return ''.join(
+            [
+                f'{{{",".join(set(chars))}}}' if len(set(chars)) > 1 else chars[0]
+                for chars in zip(*map(str, all_fastq_paths))
+            ]
+        )
