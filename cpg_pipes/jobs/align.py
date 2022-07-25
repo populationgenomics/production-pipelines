@@ -127,7 +127,7 @@ def align(
     sharded = sharded_fq or sharded_bazam
 
     jobs = []
-    
+
     if not sharded:  # Just running one alignment job
         align_j, align_cmd = _align_one(
             b=b,
@@ -195,11 +195,11 @@ def align(
             'Merge BAMs', (job_attrs or {}) | dict(tool='samtools_merge')
         )
         merge_j.image(image_path('bwa'))
-        
+
         nthreads = STANDARD.set_resources(
-            merge_j, 
+            merge_j,
             nthreads=requested_nthreads,
-            # for FASTQ or BAM inputs, requesting more disk (400G). Example when 
+            # for FASTQ or BAM inputs, requesting more disk (400G). Example when
             # default is not enough: https://batch.hail.populationgenomics.org.au/batches/73892/jobs/56
             storage_gb=storage_for_cram_job(sequencing_type, alignment_input),
         ).get_nthreads()
@@ -237,8 +237,9 @@ def storage_for_cram_job(alignment_input, sequencing_type) -> int | None:
     storage_gb = None  # avoid attaching extra disk by default
     if sequencing_type == SequencingType.GENOME:
         if (
-            isinstance(alignment_input, FastqPairs) or 
-            isinstance(alignment_input, CramPath) and alignment_input.is_bam
+            isinstance(alignment_input, FastqPairs)
+            or isinstance(alignment_input, CramPath)
+            and alignment_input.is_bam
         ):
             storage_gb = 400  # for WGS FASTQ or BAM inputs, need more disk
     return storage_gb
@@ -257,27 +258,32 @@ def _align_one(
     sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> tuple[Job, str]:
     """
-    Creates a job that (re)aligns reads to hg38. Returns the job object and a command 
-    separately, and doesn't add the command to the Job object, so stream-sorting 
+    Creates a job that (re)aligns reads to hg38. Returns the job object and a command
+    separately, and doesn't add the command to the Job object, so stream-sorting
     and/or deduplication can be appended to the command later.
     """
+
     if number_of_shards_for_realignment is not None:
         assert number_of_shards_for_realignment > 1, number_of_shards_for_realignment
 
     job_attrs = (job_attrs or {}) | dict(label=job_name, tool=aligner.name)
     if shard_number is not None and number_of_shards_for_realignment is not None:
         job_name = (
-            f'{job_name} '
-            f'{shard_number + 1}/{number_of_shards_for_realignment} '
+            f'{job_name} ' f'{shard_number + 1}/{number_of_shards_for_realignment} '
         )
     job_name = f'{job_name} {alignment_input.path_glob()}'
     j = b.new_job(job_name, job_attrs)
 
     nthreads = STANDARD.set_resources(
-        j, 
-        nthreads=requested_nthreads, 
+        j,
+        nthreads=requested_nthreads,
         storage_gb=storage_for_cram_job(sequencing_type, alignment_input),
     ).get_nthreads()
+
+    # 2022-07-22 mfranklin:
+    #   Replace process substitution with named-pipes (FIFO)
+    #   This is named-pipe name -> command to populate it
+    fifo_commands: dict[str, str] = {}
 
     index_cmd = ''
     if isinstance(alignment_input, CramPath):
@@ -313,20 +319,21 @@ def _align_one(
         -n{min(nthreads, 6)} -bam {cram_file}{shard_param} \
         """
         )
-        r1_param = f'<({bazam_cmd})'
+        r1_param = 'r1'
         r2_param = ''
+        fifo_commands[r1_param] = bazam_cmd
 
     else:
         assert isinstance(alignment_input, FastqPairs)
         use_bazam = False
-        fastq_pairs = [
-            p.as_resources(b) for p in alignment_input
-        ]
+        fastq_pairs = [p.as_resources(b) for p in alignment_input]
         files1 = [pair[0] for pair in fastq_pairs]
         files2 = [pair[1] for pair in fastq_pairs]
         if len(fastq_pairs) > 1:
-            r1_param = f'<(cat {" ".join(files1)})'
-            r2_param = f'<(cat {" ".join(files2)})'
+            r1_param = 'r1'
+            r2_param = 'r2'
+            fifo_commands[r1_param] = f'cat {" ".join(files1)}'
+            fifo_commands[r2_param] = f'cat {" ".join(files2)}'
         else:
             r1_param = files1[0]
             r2_param = files2[0]
@@ -358,8 +365,7 @@ def _align_one(
         j.image(image_path('dragmap'))
         dragmap_index = b.read_input_group(
             **{
-                k.replace('.', '_'): 
-                    str(reference_path('broad/dragmap_prefix') / k)
+                k.replace('.', '_'): str(reference_path('broad/dragmap_prefix') / k)
                 for k in DRAGMAP_INDEX_FILES
             }
         )
@@ -374,8 +380,32 @@ def _align_one(
 
     else:
         raise ValueError(f'Unsupported aligner: {aligner.value}')
-    
-    cmd = dedent(cmd).strip()
+
+    if fifo_commands:
+
+        fifo_pre = [dedent(f"""
+            mkfifo {fname}
+            {command} > {fname} &
+            pid_{fname}=$!
+        """.strip()) for fname, command in fifo_commands.items()]
+
+        _fifo_waits = " && ".join(f"wait $pid_{fname}" for fname in fifo_commands.keys())
+        fifo_post = dedent(f"""
+            if {_fifo_waits}
+            then
+                echo -e "Background processes finished successfully"
+            else
+                # Background processes failed
+                trap 'error1' ERR
+            fi
+        """.strip())
+
+        # Now prepare command
+        cmd = "\n".join([fifo_pre, dedent(cmd).strip(), fifo_post])
+
+    else:
+
+        cmd = dedent(cmd).strip()
     if index_cmd:
         cmd = dedent(index_cmd) + '\n' + cmd
     return j, cmd
