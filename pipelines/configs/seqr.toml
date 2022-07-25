@@ -1,27 +1,29 @@
 [workflow]
-first_stage = 'JointGenotyping'
+# first_stage = 'Align'
+last_stage = 'GenotypeSample'
 access_level = 'full'
 dataset = 'seqr'
 datasets = [
-    'acute-care', 
-    'perth-neuro', 
-    'ravenscroft-rdstudy', 
-    'circa', 
-    'heartkids',
-    'ohmr3-mendelian',
-    'ohmr4-epilepsy',
-    'rdnow',
-    'mito-disease',
-    'ravenscroft-arch',
-    'hereditary-neuro',
-    'validation',
-    'schr-neuro',
+#     'acute-care',
+#     'perth-neuro',
+#     'ravenscroft-rdstudy',
+#     'circa',
+#     'heartkids',
+#     'ohmr3-mendelian',
+#     'ohmr4-epilepsy',
+#     'rdnow',
+#     'mito-disease',
+#     'ravenscroft-arch',
+#     'hereditary-neuro',
+#     'validation',
+#     'schr-neuro',
+    'ibmdx',
 ]
-create_es_index_for_datasets = ['schr-neuro']
+# create_es_index_for_datasets = ['schr-neuro']
 #status_reporter = 'smdb'
 skip_samples = [
   'CPG11783',   # acute-care, no FASTQ data
-  'CPG13326',   # perth-neuro, no FASTQ data: https://github.com/populationgenomics/seqr-private/issues/2
+#   'CPG13326',   # perth-neuro, no FASTQ data: https://github.com/populationgenomics/seqr-private/issues/2
 ]
 check_inputs = true
 skip_samples_with_missing_input = false
@@ -48,5 +50,5 @@ token_project_id = 'seqr-308602'
 liftover_38_to_37 = 'liftover/grch38_to_grch37.over.chain.gz'
 
 [images]
-hail = 'driver:4225655198684124178417573ffc6ed714cf0c04-hail-d4bd6a2fd606634057b0277fce06cedce5b764a6'
-sm-api = 'driver:4225655198684124178417573ffc6ed714cf0c04-hail-d4bd6a2fd606634057b0277fce06cedce5b764a6'
+hail = 'driver:18a44866a0c70017f8ab6880f94572e22b2a5b36-hail-51b96aef4671a9985d2c7f69eb370de83738ff6e'
+sm-api = 'driver:18a44866a0c70017f8ab6880f94572e22b2a5b36-hail-51b96aef4671a9985d2c7f69eb370de83738ff6e'
