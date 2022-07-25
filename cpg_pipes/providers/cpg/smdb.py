@@ -412,8 +412,8 @@ class SmSequence:
         )
         if data['meta'].get('reads'):
             if alignment_input := SmSequence._parse_reads(
-                sample_id=sample_id, 
-                meta=data['meta'], 
+                sample_id=sample_id,
+                meta=data['meta'],
                 check_existence=check_existence,
             ):
                 sm_seq.alignment_input = alignment_input
@@ -437,7 +437,7 @@ class SmSequence:
         """
         reads_data = meta.get('reads')
         reads_type = meta.get('reads_type')
-        reference_assembly = meta.get('reference_assembly')
+        reference_assembly = meta.get('reference_assembly', {}).get('location')
 
         if not reads_data:
             logger.error(f'{sample_id}: no "meta/reads" field in meta')
