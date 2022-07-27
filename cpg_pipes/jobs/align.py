@@ -389,7 +389,7 @@ def _align_one(
             pid_{fname}=$!
         """).strip() for fname, command in fifo_commands.items()]
 
-        _fifo_waits = " && ".join(f"wait $pid_{fname}" for fname in fifo_commands.keys())
+        _fifo_waits = ' && '.join(f'wait $pid_{fname}' for fname in fifo_commands.keys())
         fifo_post = dedent(f"""
             if {_fifo_waits}
             then
@@ -401,7 +401,7 @@ def _align_one(
         """).strip()
 
         # Now prepare command
-        cmd = "\n".join([*fifo_pre, dedent(cmd).strip(), fifo_post])
+        cmd = '\n'.join([*fifo_pre, dedent(cmd).strip(), fifo_post])
 
     else:
         cmd = dedent(cmd).strip()
