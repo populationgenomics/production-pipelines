@@ -372,30 +372,52 @@ def annotate_dataset_mt(mt_path, out_mt_path, checkpoints_bucket, overwrite=Fals
         # Filter on the genotypes.
         return hl.set(mt.genotypes.filter(fn).map(lambda g: g.sample_id))
 
+    # 2022-07-28 mfranklin: Initially the code looked like:
+    #           {**_genotype_filter_samples(lambda g: g.num_alt == i) for i in ...}
+    #   except the lambda definition doesn't bind the loop variable i in this scope
+    #   instead let's define the filters as functions, and wrap them in a decorator
+    #   that captures the value of i.
+
+    # top level - decorator
+    def _capture_i_decorator(func):
+        # call the returned_function(i) which locks in the value of i
+        def _inner_filter(i):
+            # the _genotype_filter_samples will call this _func with g
+            def _func(g):
+                return func(i, g)
+            return _func
+        return _inner_filter
+
+    @_capture_i_decorator
+    def _filter_num_alt(i, g):
+        return i == g.num_alt
+
+    @_capture_i_decorator
+    def _filter_samples_gq(i, g):
+        return (g.gq >= i) & (g.gq < i + 5)
+
+    @_capture_i_decorator
+    def _filter_samples_ab(i, g):
+        return (g.num_alt == 1) & ((g.ab * 100) >= i) & ((g.ab * 100) < i + 5)
+
     mt = mt.annotate_rows(
         samples_no_call=_genotype_filter_samples(lambda g: g.num_alt == -1),
         samples_num_alt=hl.struct(
             **{
-                ('%i' % i): _genotype_filter_samples(lambda g: g.num_alt == i)
+                ('%i' % i): _genotype_filter_samples(_filter_num_alt(i))
                 for i in range(1, 3, 1)
             }
         ),
         samples_gq=hl.struct(
             **{
-                ('%i_to_%i' % (i, i + 5)): _genotype_filter_samples(
-                    lambda g: ((g.gq >= i) & (g.gq < i + 5))
-                )
+                ('%i_to_%i' % (i, i + 5)): _genotype_filter_samples(_filter_samples_gq(i))
                 for i in range(0, 95, 5)
             }
         ),
         samples_ab=hl.struct(
             **{
                 '%i_to_%i'
-                % (i, i + 5): _genotype_filter_samples(
-                    lambda g: (
-                        (g.num_alt == 1) & ((g.ab * 100) >= i) & ((g.ab * 100) < i + 5)
-                    )
-                )
+                % (i, i + 5): _genotype_filter_samples(_filter_samples_ab(i))
                 for i in range(0, 45, 5)
             }
         ),
