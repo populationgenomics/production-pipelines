@@ -50,6 +50,7 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
             name='test',
             analysis_dataset_name=dataset,
             namespace=Namespace.TEST,
+            sequencing_type=SequencingType.EXOME
         )
         provider.populate_cohort(
             cohort,
@@ -58,18 +59,21 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
         self.assertEqual(len(cohort.get_datasets()), 1)
         ds = cohort.get_datasets()[0]
         self.assertEqual(ds.name, f'{dataset}-test')
-        self.assertEqual(len(ds.get_samples()), 2)
+
+        # 2022-07-27 mfranklin: I've filtered sequences for samples to
+        #       ONLY the requested type (EXOME, so no second sample)
+        self.assertEqual(len(ds.get_samples()), 1)
         s1 = ds.get_samples()[0]
-        self.assertEqual(s1.external_id, extid1)
+        self.assertEqual(s1.external_id, extid2)
         self.assertEqual(len(s1.alignment_input_by_seq_type.values()), 1)
-        self.assertEqual(s1.pedigree.sex, Sex.MALE)
-        s2 = ds.get_samples()[1]
-        self.assertEqual(s2.external_id, extid2)
-        self.assertEqual(len(s2.alignment_input_by_seq_type.values()), 2)
-        cram = s2.alignment_input_by_seq_type[SequencingType.EXOME]
-        self.assertTrue(isinstance(cram, CramPath))
-        self.assertTrue(cast(CramPath, cram).ext == 'cram')
-        self.assertEqual(s2.pedigree.sex, Sex.UNKNOWN)
+        self.assertEqual(s1.pedigree.sex, Sex.UNKNOWN)
+        # s2 = ds.get_samples()[1]
+        # self.assertEqual(s2.external_id, extid2)
+        # self.assertEqual(len(s2.alignment_input_by_seq_type.values()), 1)
+        # cram = s2.alignment_input_by_seq_type[SequencingType.EXOME]
+        # self.assertTrue(isinstance(cram, CramPath))
+        # self.assertTrue(cast(CramPath, cram).ext == 'cram')
+        # self.assertEqual(s2.pedigree.sex, Sex.UNKNOWN)
 
     @skip('Figure out SMDB permissions from GitHub workflows')
     def test_smdb_provider(self):
@@ -83,8 +87,10 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
             cohort=Cohort(
                 analysis_dataset_name=dataset,
                 namespace=Namespace.TEST,
+                sequencing_type=SequencingType.GENOME,
             ),
             dataset_names=[dataset],
+
         )
 
         self.assertEqual(len(cohort.get_datasets()), 1)
