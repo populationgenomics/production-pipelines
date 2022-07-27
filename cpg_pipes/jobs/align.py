@@ -387,7 +387,7 @@ def _align_one(
             mkfifo {fname}
             {command} > {fname} &
             pid_{fname}=$!
-        """.strip()) for fname, command in fifo_commands.items()]
+        """).strip() for fname, command in fifo_commands.items()]
 
         _fifo_waits = " && ".join(f"wait $pid_{fname}" for fname in fifo_commands.keys())
         fifo_post = dedent(f"""
@@ -398,13 +398,12 @@ def _align_one(
                 # Background processes failed
                 trap 'error1' ERR
             fi
-        """.strip())
+        """).strip()
 
         # Now prepare command
-        cmd = "\n".join([fifo_pre, dedent(cmd).strip(), fifo_post])
+        cmd = "\n".join([*fifo_pre, dedent(cmd).strip(), fifo_post])
 
     else:
-
         cmd = dedent(cmd).strip()
     if index_cmd:
         cmd = dedent(index_cmd) + '\n' + cmd
