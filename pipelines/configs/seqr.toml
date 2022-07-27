@@ -1,29 +1,33 @@
 [workflow]
-# first_stage = 'Align'
+ first_stage = 'Align'
 last_stage = 'GenotypeSample'
 access_level = 'full'
 dataset = 'seqr'
 datasets = [
-#     'acute-care',
-#     'perth-neuro',
-#     'ravenscroft-rdstudy',
-#     'circa',
-#     'heartkids',
-#     'ohmr3-mendelian',
-#     'ohmr4-epilepsy',
-#     'rdnow',
-#     'mito-disease',
-#     'ravenscroft-arch',
-#     'hereditary-neuro',
-#     'validation',
-#     'schr-neuro',
-    'ibmdx',
+#    'acute-care',
+    'perth-neuro',
+#    'ravenscroft-rdstudy',
+#    'circa',
+#    'heartkids',
+#    'ohmr3-mendelian',
+#    'ohmr4-epilepsy',
+#    'rdnow',
+#    'mito-disease',
+#    'ravenscroft-arch',
+#    'hereditary-neuro',
+#    'validation',
+#    'schr-neuro',
+#    'ibmdx',
+#    'mcri-lrp',
+#    'kidgen',
+#    'ag-hidden'
 ]
 # create_es_index_for_datasets = ['schr-neuro']
 #status_reporter = 'smdb'
 skip_samples = [
-  'CPG11783',   # acute-care, no FASTQ data
-#   'CPG13326',   # perth-neuro, no FASTQ data: https://github.com/populationgenomics/seqr-private/issues/2
+    'CPG11783',   # acute-care, no FASTQ data
+#    'CPG13326',   # perth-neuro, no FASTQ data: https://github.com/populationgenomics/seqr-private/issues/2
+    'CPG253328', # temporary, to avoid out-of-disk errors: https://batch.hail.populationgenomics.org.au/batches/88042/jobs/51
 ]
 check_inputs = true
 skip_samples_with_missing_input = false

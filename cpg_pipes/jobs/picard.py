@@ -43,7 +43,7 @@ def markdup(
     fasta_reference = fasta_res_group(b)
 
     cmd = f"""
-    picard MarkDuplicates -Xms13G \\
+    picard MarkDuplicates -Xms27G \\
     I={sorted_bam} O=/dev/stdout M={j.duplicate_metrics} \\
     TMP_DIR=$(dirname {j.output_cram.cram})/picard-tmp \\
     ASSUME_SORT_ORDER=coordinate \\
