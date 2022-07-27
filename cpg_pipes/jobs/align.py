@@ -375,7 +375,7 @@ def _align_one(
             input_cmd = f'-1 {r1_param} -2 {r2_param}'
         cmd = f"""\
         dragen-os -r {dragmap_index} {input_cmd} \\
-        --RGID {sample_name} --RGSM {sample_name}
+            --RGID {sample_name} --RGSM {sample_name}
         """
 
     else:
