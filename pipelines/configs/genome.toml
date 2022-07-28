@@ -1,22 +1,20 @@
 [workflow]
-first_stage = 'Align'
-last_stage = 'Align'
+first_stage = 'JointGenotyping'
+last_stage = 'LoadToEs'
 sequencing_type = 'genome'
 datasets = [
-#    'acute-care', 
-    'perth-neuro', 
-#    'ravenscroft-rdstudy', 
-#    'circa', 
-#    'heartkids',
-#    'ohmr3-mendelian',
-#    'ohmr4-epilepsy',
-#    'rdnow',
-#    'mito-disease',
-#    'ravenscroft-arch',
-#    'hereditary-neuro',
-#    'validation',
-#    'schr-neuro',
+    'acute-care',
+    'perth-neuro',
+    'ravenscroft-rdstudy', 
+    'circa', 
+    'heartkids',
+    'ohmr3-mendelian',
+    'ohmr4-epilepsy',
+    'rdnow',
+    'mito-disease',
+    'ravenscroft-arch',
+    'hereditary-neuro',
+    'validation',
+    'schr-neuro',
 ]
-only_samples = ['CPG253328']
-force_samples = ['CPG253328']
 create_es_index_for_datasets = ['schr-neuro']
