@@ -20,13 +20,16 @@ from cpg_pipes.pipeline.pipeline import Pipeline
 logger = logging.getLogger(__file__)
 
 
-update_dict(get_config()['workflow'], {
-    'name': 'find-somalier-sites',
-    'description': 'find 65k somalier sites',
-    'dataset': 'fewgenomes',
-    'access_level': 'full',
-    'keep_scratch': True,
-})
+update_dict(
+    get_config()['workflow'],
+    {
+        'name': 'find-somalier-sites',
+        'description': 'find 65k somalier sites',
+        'dataset': 'fewgenomes',
+        'access_level': 'full',
+        'keep_scratch': True,
+    },
+)
 pipe = Pipeline()
 
 results_vcf = reference_path('somalier_sites')

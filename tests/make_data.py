@@ -46,11 +46,11 @@ def make_subset_crams(pipeline: Pipeline):
     d = pipeline.cohort.create_dataset(utils.DATASET)
     samples = [
         d.add_sample(
-            sid, 
-            external_id=sid, 
+            sid,
+            external_id=sid,
             alignment_input_by_seq_type={
                 utils.SEQ_TYPE: CramPath(utils.FULL_CRAM_BY_SID[sid])
-            }
+            },
         )
         for sid in utils.SAMPLES
     ]

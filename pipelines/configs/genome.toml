@@ -3,8 +3,8 @@ first_stage = 'JointGenotyping'
 last_stage = 'LoadToEs'
 sequencing_type = 'genome'
 datasets = [
-    'acute-care', 
-    'perth-neuro', 
+    'acute-care',
+    'perth-neuro',
     'ravenscroft-rdstudy', 
     'circa', 
     'heartkids',

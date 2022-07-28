@@ -61,6 +61,7 @@ def main(
     if slack_token and slack_channel:
         from slack_sdk.errors import SlackApiError
         from slack_sdk import WebClient
+
         slack_client = WebClient(token=slack_token)
         try:
             slack_client.api_call(  # pylint: disable=duplicate-code

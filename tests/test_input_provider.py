@@ -50,7 +50,7 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
             name='test',
             analysis_dataset_name=dataset,
             namespace=Namespace.TEST,
-            sequencing_type=SequencingType.EXOME
+            sequencing_type=SequencingType.EXOME,
         )
         provider.populate_cohort(
             cohort,
@@ -90,7 +90,6 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
                 sequencing_type=SequencingType.GENOME,
             ),
             dataset_names=[dataset],
-
         )
 
         self.assertEqual(len(cohort.get_datasets()), 1)

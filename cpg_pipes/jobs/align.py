@@ -396,14 +396,22 @@ def _align_one(
 
     if fifo_commands:
 
-        fifo_pre = [dedent(f"""
+        fifo_pre = [
+            dedent(
+                f"""
             mkfifo {fname}
             {command} > {fname} &
             pid_{fname}=$!
-        """).strip() for fname, command in fifo_commands.items()]
+        """
+            ).strip()
+            for fname, command in fifo_commands.items()
+        ]
 
-        _fifo_waits = ' && '.join(f'wait $pid_{fname}' for fname in fifo_commands.keys())
-        fifo_post = dedent(f"""
+        _fifo_waits = ' && '.join(
+            f'wait $pid_{fname}' for fname in fifo_commands.keys()
+        )
+        fifo_post = dedent(
+            f"""
             if {_fifo_waits}
             then
                 echo -e "Background processes finished successfully"
@@ -411,7 +419,8 @@ def _align_one(
                 # Background processes failed
                 trap 'error1' ERR
             fi
-        """).strip()
+        """
+        ).strip()
 
         # Now prepare command
         cmd = '\n'.join([*fifo_pre, dedent(cmd).strip(), fifo_post])

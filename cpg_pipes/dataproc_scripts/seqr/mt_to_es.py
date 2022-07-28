@@ -57,13 +57,14 @@ def main(
     Entry point.
     """
     es_index = es_index.lower()
-    
+
     if use_spark:
         hl.init(default_reference='GRCh38')
     else:
         from cpg_utils.hail_batch import init_batch
+
         init_batch()
-        
+
     host = get_config()['elasticsearch']['host']
     port = str(get_config()['elasticsearch']['port'])
     username = get_config()['elasticsearch']['username']

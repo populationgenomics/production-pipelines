@@ -275,9 +275,11 @@ def genomicsdb(
         }}
         retry run
         """
-        j.command(wrap_command(
-            cmd, monitor_space=True, setup_gcp=True, define_retry_function=True
-        ))
+        j.command(
+            wrap_command(
+                cmd, monitor_space=True, setup_gcp=True, define_retry_function=True
+            )
+        )
         b.write_output(j.db_tar, str(out_path))
 
     return jobs, out_paths

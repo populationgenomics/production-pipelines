@@ -288,9 +288,7 @@ class StageInput:
         stage: StageDecorator,
     ):
         if not self._outputs_by_target_by_stage.get(stage.__name__):
-            raise StageInputNotFound(
-                f'Not found output from stage {stage.__name__}'
-            )
+            raise StageInputNotFound(f'Not found output from stage {stage.__name__}')
         if not self._outputs_by_target_by_stage[stage.__name__].get(target.target_id):
             raise StageInputNotFound(
                 f'Not found output for {target} from stage {stage.__name__}'
@@ -309,7 +307,7 @@ class StageInput:
         """
         res = self._get(target=target, stage=stage)
         return res.as_path(id)
-    
+
     def as_resource(
         self,
         target: 'Target',
@@ -565,7 +563,9 @@ class Stage(Generic[TargetT], ABC):
         Based on stage parameters and expected outputs existence, determines what
         to do with the target: queue, skip or reuse, etc..
         """
-        if (d := get_config()['workflow'].get('skip_samples_stages')) and self.name in d:
+        if (
+            d := get_config()['workflow'].get('skip_samples_stages')
+        ) and self.name in d:
             skip_targets = d[self.name]
             if target.target_id in skip_targets:
                 logger.info(f'{self.name}: requested to skip {target}')
@@ -583,10 +583,10 @@ class Stage(Generic[TargetT], ABC):
                     f'but is marked as skipped, and expected outputs for the target '
                     f'do not exist: {expected_out}'
                 )
-                # `workflow/skip_samples_with_missing_input` means that we can ignore 
-                # samples/datasets that have missing results from skipped stages. 
-                # This is our case, so indicating that this sample/dataset should 
-                # be ignored: 
+                # `workflow/skip_samples_with_missing_input` means that we can ignore
+                # samples/datasets that have missing results from skipped stages.
+                # This is our case, so indicating that this sample/dataset should
+                # be ignored:
                 target.active = False
                 return Action.SKIP
             raise ValueError(
@@ -594,7 +594,7 @@ class Stage(Generic[TargetT], ABC):
                 f'expected outputs for target {target} do not exist: '
                 f'{expected_out}'
             )
-        
+
         if reusable:
             if target.forced:
                 logger.info(
@@ -619,7 +619,7 @@ class Stage(Generic[TargetT], ABC):
         """
         Returns outputs that can be reused for the stage for the target,
         or None of none can be reused
-        """        
+        """
         if self.assume_outputs_exist:
             return True
 
@@ -774,8 +774,8 @@ class Pipeline:
     """
 
     def __init__(
-        self, 
-        name: str | None = None, 
+        self,
+        name: str | None = None,
         description: str | None = None,
         stages: list[StageDecorator] | None = None,
     ):
@@ -797,13 +797,15 @@ class Pipeline:
             name=self.name,
             sequencing_type=SequencingType.parse(
                 get_config()['workflow']['sequencing_type']
-            )
+            ),
         )
-        
+
         smdb: Optional[SMDB] = None
         input_provider: InputProvider | None = None
-        if (get_config()['workflow'].get('datasets') is not None and 
-                get_config()['workflow'].get('input_provider') == 'smdb'):
+        if (
+            get_config()['workflow'].get('datasets') is not None
+            and get_config()['workflow'].get('input_provider') == 'smdb'
+        ):
             smdb = smdb or SMDB(self.cohort.analysis_dataset.name)
             input_provider = CpgInputProvider(smdb)
         if get_config()['workflow'].get('input_provider') == 'csv':
@@ -943,9 +945,7 @@ class Pipeline:
                         # Only checking outputs of immediately required stages
                         if depth > 1:
                             reqstage.assume_outputs_exist = True
-                            logger.info(
-                                f'Stage {reqstage.name} is skipped'
-                            )
+                            logger.info(f'Stage {reqstage.name} is skipped')
                         else:
                             logger.info(
                                 f'Stage {reqstage.name} is skipped, but the output '
@@ -985,16 +985,17 @@ class Pipeline:
                 stage_.assume_outputs_exist = True
                 continue
 
-        if not (final_set_of_stages := [
-            s.name for s in self._stages_dict.values() if not s.skipped
-        ]):
+        if not (
+            final_set_of_stages := [
+                s.name for s in self._stages_dict.values() if not s.skipped
+            ]
+        ):
             raise PipelineError('No stages to run')
         logger.info(f'Setting stages: {final_set_of_stages}')
         required_skipped_stages = [s for s in self._stages_dict.values() if s.skipped]
         if required_skipped_stages:
             logger.info(
-                f'Skipped stages: '
-                f'{[s.name for s in required_skipped_stages]}'
+                f'Skipped stages: ' f'{[s.name for s in required_skipped_stages]}'
             )
 
         # Second round - actually adding jobs from the stages.
@@ -1014,7 +1015,9 @@ class Pipeline:
                 break
 
     @staticmethod
-    def _process_stage_errors(output_by_target: dict[str, StageOutput | None]) -> list[str]:
+    def _process_stage_errors(
+        output_by_target: dict[str, StageOutput | None]
+    ) -> list[str]:
         targets_by_error = defaultdict(list)
         for target, output in output_by_target.items():
             if output and output.error_msg:
