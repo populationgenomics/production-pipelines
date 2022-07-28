@@ -35,6 +35,7 @@ dataset_gcp_project = 'seqr-308602'
 jc_intervals_num = 200
 vep_intervals_num = 200
 check_intermediates = true
+dry_run = false
 
 [workflow.skip_samples_stages]
 VerifyBamId = ['CPG13409']  # https://batch.hail.populationgenomics.org.au/batches/56236/jobs/372

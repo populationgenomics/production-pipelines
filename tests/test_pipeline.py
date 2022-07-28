@@ -8,7 +8,7 @@ import unittest
 from unittest import skip
 from unittest.mock import patch, Mock
 
-from cpg_utils.config import get_config, set_config_paths
+from cpg_utils.config import get_config, set_config_paths, update_dict
 
 from cpg_pipes import to_path, get_package_path
 from cpg_pipes.pipeline.pipeline import Pipeline, Stage, StageDecorator
@@ -43,11 +43,17 @@ class TestPipeline(unittest.TestCase):
 
         self.config_path = self.tmp_bucket / 'config.toml'
 
-    def setup_env(self, intervals_path: str | None = None):
+    def setup_env(
+        self,
+        intervals_path: str | None = None,
+        extra_conf: dict | None = None,
+    ):
         """
         Mock analysis-runner environment.
         """
         conf = {'workflow': {'version': self.timestamp}}
+        if extra_conf:
+            update_dict(conf, extra_conf)
         if intervals_path:
             conf['workflow']['intervals_path'] = intervals_path
         utils.setup_env(self.tmp_bucket, conf)
@@ -76,17 +82,17 @@ class TestPipeline(unittest.TestCase):
         """
         Constucting a pipeline and submitting it to Hail Batch with dry_run.
 
-        With dry_run, Hail Batch prints all code with a single print() call.
+        With hail.dry_run, Hail Batch prints all code with a single print() call.
         Thus, we capture `builtins.print`, and verify that it has the expected
         job commands passed to it.
         """
-        self.setup_env()
+        self.setup_env(extra_conf={'hail': {'dry_run': True}})
         pipeline = self._setup_pipeline(stages=[seqr_loader.LoadToEs])
 
         with patch('builtins.print') as mock_print:
             with patch.object(Stage, '_outputs_are_reusable') as mock_reusable:
                 mock_reusable.return_value = False
-                pipeline.run(dry_run=True, force_all_implicit_stages=True)
+                pipeline.run(force_all_implicit_stages=True)
 
             # print() should be called only once:
             self.assertEqual(mock_print.call_count, 1)
@@ -148,7 +154,7 @@ class TestPipeline(unittest.TestCase):
         pipeline = self._setup_pipeline(
             stages=[GenotypeSample.__name__, JointGenotyping.__name__],
         )
-        result = pipeline.run(dry_run=False, wait=True)
+        result = pipeline.run(wait=True)
         self.assertEqual('success', result.status()['state'])
 
     @skip('Running only dry tests in ths module. VEP takes too long')
@@ -182,7 +188,7 @@ class TestPipeline(unittest.TestCase):
             str(expected_output['siteonly']) + '.tbi', force_overwrite_to_cloud=True
         )
 
-        result = pipeline.run(dry_run=False, wait=True)
+        result = pipeline.run(wait=True)
 
         self.assertEqual('success', result.status()['state'])
 

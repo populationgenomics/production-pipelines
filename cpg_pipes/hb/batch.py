@@ -178,7 +178,14 @@ class RegisteringBatch(hb.Batch):
         logger.info(f'Split by tool:')
         _print_stat(self.job_by_tool, default_label='<tool is not defined>')
 
-        return super().run(**kwargs)
+        if get_config().get('dry_run', False):
+            return
+
+        return super().run(
+            dry_run=get_config()['hail'].get('dry_run', False),
+            delete_scratch_on_exit=not get_config()['hail'].get('keep_scratch', True),
+            **kwargs,
+        )
 
 
 def setup_batch(description: str) -> RegisteringBatch:

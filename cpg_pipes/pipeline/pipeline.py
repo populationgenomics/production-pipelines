@@ -842,8 +842,6 @@ class Pipeline:
     def run(
         self,
         stages: list[StageDecorator] | None = None,
-        dry_run: bool | None = None,
-        keep_scratch: bool | None = None,
         wait: bool | None = False,
         force_all_implicit_stages: bool = False,
     ) -> Any | None:
@@ -852,11 +850,6 @@ class Pipeline:
         When `run_all_implicit_stages` is set, all required stages that were not defined
         explicitly would still be executed.
         """
-        if dry_run is None:
-            dry_run = get_config()['hail'].get('dry_run')
-        if keep_scratch is None:
-            keep_scratch = get_config()['hail'].get('keep_scratch')
-
         _stages_in_order = stages or self._stages or _ALL_DECLARED_STAGES
         if not _stages_in_order:
             raise PipelineError('No stages added')
@@ -864,11 +857,7 @@ class Pipeline:
 
         result = None
         if self.b:
-            result = self.b.run(
-                dry_run=dry_run,
-                delete_scratch_on_exit=not keep_scratch,
-                wait=wait,
-            )
+            result = self.b.run(wait=wait)
         return result
 
     def _validate_first_last_stage(self) -> tuple[int | None, int | None]:
