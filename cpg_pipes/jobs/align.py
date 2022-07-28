@@ -324,7 +324,9 @@ def _align_one(
         if not alignment_input.index_exists():
             index_cmd = f'samtools index {cram_file}'
 
-        _reference_command_inp = f'-Dsamjdk.reference_fasta={reference_inp}' if reference_inp else ''
+        _reference_command_inp = (
+            f'-Dsamjdk.reference_fasta={reference_inp}' if reference_inp else ''
+        )
 
         bazam_cmd = dedent(
             f"""\
