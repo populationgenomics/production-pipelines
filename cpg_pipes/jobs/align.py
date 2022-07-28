@@ -306,25 +306,29 @@ def _align_one(
         else:
             shard_param = ''
 
-        assert (
-            alignment_input.reference_assembly
-        ), f'The reference input for the alignment input "{alignment_input.path}" was not set'
+        # if is cram
+        reference_inp = None
+        if not alignment_input.is_bam:
+            assert (
+                alignment_input.reference_assembly
+            ), f'The reference input for the alignment input "{alignment_input.path}" was not set'
+            reference_inp = b.read_input_group(
+                base=str(alignment_input.reference_assembly),
+                fai=str(alignment_input.reference_assembly) + '.fai',
+            ).base
 
         cram = alignment_input.resource_group(b)
         cram_file = cram[alignment_input.ext]
-
-        reference_inp = b.read_input_group(
-            base=str(alignment_input.reference_assembly),
-            fai=str(alignment_input.reference_assembly) + '.fai',
-        )
 
         # BAZAM requires indexed input.
         if not alignment_input.index_exists():
             index_cmd = f'samtools index {cram_file}'
 
+        _reference_command_inp = f'-Dsamjdk.reference_fasta={reference_inp}' if reference_inp else ''
+
         bazam_cmd = dedent(
             f"""\
-        bazam -Xmx16g -Dsamjdk.reference_fasta={reference_inp.base} \
+        bazam -Xmx16g {_reference_command_inp} \
         -n{min(nthreads, 6)} -bam {cram_file}{shard_param} \
         """
         )
