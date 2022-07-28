@@ -174,5 +174,5 @@ if POPULATE_ES_INDEX:
             | dict(
                 sequencing_type=cohort.sequencing_type.value,
             ),
-            project_name=ds_name
+            project_name=ds_name,
         )

@@ -52,7 +52,7 @@ def vep_jobs(
     vcf = b.read_input_group(
         **{'vcf.gz': str(vcf_path), 'vcf.gz.tbi': str(vcf_path) + '.tbi'}
     )
-    
+
     if scatter_count == 1:
         # special case for not splitting by interval
         vep_out_path = tmp_prefix / 'vep.jsonl' if to_hail_table else out_path
@@ -115,7 +115,7 @@ def vep_jobs(
         )
         jobs.append(j)
         part_files.append(part_path or j.output['vcf.gz'])
-    
+
     if to_hail_table:
         gather_j = gather_vep_json_to_ht(
             b=b,

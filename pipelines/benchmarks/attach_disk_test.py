@@ -11,12 +11,15 @@ from cpg_pipes.pipeline.pipeline import Pipeline
 
 
 def main():  # pylint: disable=missing-function-docstring
-    update_dict(get_config()['workflow'], {
-        'name': 'test_attach_disk',
-        'dataset': 'fewgenomes',
-        'access_level': 'test',
-        'datasets': ['fewgenomes'],
-    })
+    update_dict(
+        get_config()['workflow'],
+        {
+            'name': 'test_attach_disk',
+            'dataset': 'fewgenomes',
+            'access_level': 'test',
+            'datasets': ['fewgenomes'],
+        },
+    )
     pipeline = Pipeline()
     b = pipeline.b
 

@@ -65,7 +65,7 @@ class TestJobs(unittest.TestCase):
         self.timestamp = timestamp()
         logger.info(f'Timestamp: {self.timestamp}')
         self.local_tmp_dir = tempfile.mkdtemp()
-        utils.setup_env(self.tmp_bucket)        
+        utils.setup_env(self.tmp_bucket)
 
         self.batch = setup_batch(self.name)
         self.sequencing_type = SequencingType.GENOME
@@ -531,8 +531,6 @@ class TestJobs(unittest.TestCase):
             samples_file=self.batch.read_input(
                 str(inputs_bucket / 'somalier-samples.tsv')
             ),
-            pairs_file=self.batch.read_input(
-                str(inputs_bucket / 'somalier-pairs.tsv')
-            ),
+            pairs_file=self.batch.read_input(str(inputs_bucket / 'somalier-pairs.tsv')),
         )
         self.batch.run(wait=True)

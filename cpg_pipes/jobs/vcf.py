@@ -86,7 +86,7 @@ def gather_vcfs(
         STANDARD.set_resources(j, fraction=1, storage_gb=storage_gb)
     else:
         STANDARD.set_resources(j, fraction=1)
-        
+
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )

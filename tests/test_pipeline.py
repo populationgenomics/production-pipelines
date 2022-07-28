@@ -40,7 +40,7 @@ class TestPipeline(unittest.TestCase):
         self.tmp_bucket = self.out_bucket / 'tmp'
         self.local_tmp_dir = tempfile.mkdtemp()
         self.sample_ids = utils.SAMPLES[:3]
-        
+
         self.config_path = self.tmp_bucket / 'config.toml'
 
     def setup_env(self, intervals_path: str | None = None):
@@ -66,11 +66,10 @@ class TestPipeline(unittest.TestCase):
         for ds in self.datasets:
             for s_id in self.sample_ids:
                 s = ds.add_sample(s_id, s_id)
-                s.alignment_input_by_seq_type[utils.SEQ_TYPE] = \
-                    CramPath(
-                        utils.TOY_CRAM_BY_SID[s.id],
-                        reference_assembly='gs://path/to/reference.fasta'
-                    )
+                s.alignment_input_by_seq_type[utils.SEQ_TYPE] = CramPath(
+                    utils.TOY_CRAM_BY_SID[s.id],
+                    reference_assembly='gs://path/to/reference.fasta',
+                )
         return pipeline
 
     def test_dry(self):
@@ -103,19 +102,32 @@ class TestPipeline(unittest.TestCase):
             return len([line for line in lines if line.strip().startswith(item)])
 
         self.assertEqual(
-            _cnt('dragen-os'), len(self.sample_ids) * get_config()['workflow']['realignment_shards_num']
+            _cnt('dragen-os'),
+            len(self.sample_ids) * get_config()['workflow']['realignment_shards_num'],
         )
         self.assertEqual(
-            _cnt('HaplotypeCaller'), len(self.sample_ids) * get_config()['workflow']['hc_intervals_num']
+            _cnt('HaplotypeCaller'),
+            len(self.sample_ids) * get_config()['workflow']['hc_intervals_num'],
         )
         self.assertEqual(_cnt('ReblockGVCF'), len(self.sample_ids))
-        self.assertEqual(_cnt('GenotypeGVCFs'), get_config()['workflow']['jc_intervals_num'])
-        self.assertEqual(_cnt('GenomicsDBImport'), get_config()['workflow']['jc_intervals_num'])
-        self.assertEqual(_cnt('MakeSitesOnlyVcf'), get_config()['workflow']['jc_intervals_num'])
+        self.assertEqual(
+            _cnt('GenotypeGVCFs'), get_config()['workflow']['jc_intervals_num']
+        )
+        self.assertEqual(
+            _cnt('GenomicsDBImport'), get_config()['workflow']['jc_intervals_num']
+        )
+        self.assertEqual(
+            _cnt('MakeSitesOnlyVcf'), get_config()['workflow']['jc_intervals_num']
+        )
         # Indel + SNP create model + SNP scattered
-        self.assertEqual(_cnt('VariantRecalibrator'), 2 + get_config()['workflow']['jc_intervals_num'])
+        self.assertEqual(
+            _cnt('VariantRecalibrator'),
+            2 + get_config()['workflow']['jc_intervals_num'],
+        )
         # Twice to each interva: apply indels, apply SNPs
-        self.assertEqual(_cnt('ApplyVQSR'), 2 * get_config()['workflow']['jc_intervals_num'])
+        self.assertEqual(
+            _cnt('ApplyVQSR'), 2 * get_config()['workflow']['jc_intervals_num']
+        )
         # Gather JC, gather siteonly JC, gather VQSR
         self.assertEqual(_cnt('GatherVcfsCloud'), 3)
         self.assertEqual(_cnt('vep '), get_config()['workflow']['vep_intervals_num'])

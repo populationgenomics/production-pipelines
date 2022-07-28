@@ -78,8 +78,7 @@ def pedigree(
     )
     if out_html_url and status_reporter:
         slack_message_cmd(
-            relate_j, 
-            text=f'*[{dataset.name}]* <{out_html_url}|somalier report>'
+            relate_j, text=f'*[{dataset.name}]* <{out_html_url}|somalier report>'
         )
 
     check_j = check_pedigree_job(
@@ -150,10 +149,13 @@ def ancestry(
         job_attrs=job_attrs,
     )
     if out_html_url and status_reporter:
-        slack_message_cmd(j, text=(
-            f'*[{dataset.name}]* ancestry report: '
-            f'<{out_html_url}|{basename(out_html_url)}>'
-        ))
+        slack_message_cmd(
+            j,
+            text=(
+                f'*[{dataset.name}]* ancestry report: '
+                f'<{out_html_url}|{basename(out_html_url)}>'
+            ),
+        )
     return j
 
 
@@ -205,8 +207,7 @@ def _prep_somalier_files(
 
     if len(missing_input) > 0:
         msg = (
-            f'Could not find input for '
-            f'{len(missing_input)}/{len(samples)} samples'
+            f'Could not find input for ' f'{len(missing_input)}/{len(samples)} samples'
         )
         if ignore_missing:
             logger.warning(msg)

@@ -55,9 +55,7 @@ class PicardWgsMetrics(SampleStage):
         * Picard file found by contents, so file name can be any:
           https://github.com/ewels/MultiQC/blob/master/multiqc/utils/search_patterns.yaml#L539-L541
         """
-        return (
-            sample.dataset.prefix() / 'qc' / (sample.id + '_picard_wgs_metrics.csv')
-        )
+        return sample.dataset.prefix() / 'qc' / (sample.id + '_picard_wgs_metrics.csv')
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """

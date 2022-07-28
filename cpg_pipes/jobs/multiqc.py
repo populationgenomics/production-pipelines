@@ -98,10 +98,7 @@ def multiqc(
         cmd += '\n' + f'echo "HTML URL: {out_html_url}"'
 
     if out_html_url and status_reporter:
-        slack_message_cmd(
-            j, 
-            text=f'*[{dataset_name}]* <{out_html_url}|MultiQC report>'
-        )
+        slack_message_cmd(j, text=f'*[{dataset_name}]* <{out_html_url}|MultiQC report>')
 
     j.command(wrap_command(cmd, setup_gcp=True))
     b.write_output(j.html, str(out_html_path))
@@ -111,7 +108,7 @@ def multiqc(
 
 def _write_sample_id_map(sample_map: dict[str, str], out_path: Path):
     """
-    Configuring MultiQC to support bulk sample rename. `sample_map` is a dictionary 
+    Configuring MultiQC to support bulk sample rename. `sample_map` is a dictionary
     of sample IDs. The map doesn't have to have records for all samples.
     Example:
     {
