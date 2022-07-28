@@ -201,7 +201,10 @@ def align(
             nthreads=requested_nthreads,
             # for FASTQ or BAM inputs, requesting more disk (400G). Example when 
             # default is not enough: https://batch.hail.populationgenomics.org.au/batches/73892/jobs/56
-            storage_gb=storage_for_cram_job(sequencing_type, alignment_input),
+            storage_gb=storage_for_cram_job(
+                alignment_input=alignment_input,
+                sequencing_type=sequencing_type,
+            ),
         ).get_nthreads()
 
         align_cmd = f"""\
@@ -232,7 +235,10 @@ def align(
     return jobs
 
 
-def storage_for_cram_job(alignment_input, sequencing_type) -> int | None:
+def storage_for_cram_job(
+    alignment_input: AlignmentInput, 
+    sequencing_type: SequencingType,
+) -> int | None:
     """Get storage for a job that processes CRAM"""
     storage_gb = None  # avoid attaching extra disk by default
     if sequencing_type == SequencingType.GENOME:
@@ -276,7 +282,10 @@ def _align_one(
     nthreads = STANDARD.set_resources(
         j, 
         nthreads=requested_nthreads, 
-        storage_gb=storage_for_cram_job(sequencing_type, alignment_input),
+        storage_gb=storage_for_cram_job(
+            alignment_input=alignment_input,
+            sequencing_type=sequencing_type,
+        ),
     ).get_nthreads()
 
     fasta = fasta_res_group(b)
