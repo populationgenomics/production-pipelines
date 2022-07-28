@@ -88,7 +88,8 @@ class CpgStatusReporter(StatusReporter):
         analysis_type: str,
         analysis_status: str,
         target: Target,
-        meta: dict | None = None,        
+        meta: dict | None = None,
+        project_name: str = None,
     ) -> int | None:
         """Record analysis entry"""
         return self.smdb.create_analysis(
@@ -97,6 +98,7 @@ class CpgStatusReporter(StatusReporter):
             status=analysis_status,
             sample_ids=target.get_sample_ids(),
             meta=meta,
+            project_name=project_name
         )
 
     @staticmethod
