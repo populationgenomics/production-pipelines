@@ -90,8 +90,8 @@ class MultiQC(DatasetStage):
             'picard/wgs_metrics',
             'verifybamid/selfsm',
         }
-        
-        # Building sample map to MultiQC bulk rename. Only extending IDs if the 
+
+        # Building sample map to MultiQC bulk rename. Only extending IDs if the
         # extrenal/participant IDs are differrent:
         j = multiqc(
             self.b,

@@ -78,7 +78,7 @@ def setup_env(tmp_bucket: Path, extraconf: dict | None = None):
         'elasticsearch': {
             'password_project_id': 'TEST',
             'password_secret_id': 'TEST',
-        }
+        },
     }
     update_dict(conf, extraconf or {})
     config_path = tmp_bucket / 'config.toml'

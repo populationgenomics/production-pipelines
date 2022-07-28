@@ -40,9 +40,7 @@ class RegisteringBatch(hb.Batch):
     created jobs, in order to print statistics before submitting the Batch.
     """
 
-    def __init__(
-        self, name, backend, *args, pool_label=None, **kwargs
-    ):
+    def __init__(self, name, backend, *args, pool_label=None, **kwargs):
         super().__init__(name, backend, *args, **kwargs)
         # Job stats registry:
         self.job_by_label = dict()
@@ -108,7 +106,7 @@ class RegisteringBatch(hb.Batch):
             self.job_by_stage[stage] = {'job_n': 0, 'samples': set()}
         self.job_by_stage[stage]['job_n'] += 1
         self.job_by_stage[stage]['samples'] |= samples
-        
+
         if tool not in self.job_by_tool:
             self.job_by_tool[tool] = {'job_n': 0, 'samples': set()}
         self.job_by_tool[tool]['job_n'] += 1
@@ -173,7 +171,7 @@ class RegisteringBatch(hb.Batch):
 
         logger.info('Split by stage:')
         _print_stat(self.job_by_stage, default_label='<not in stage>')
-            
+
         logger.info('Split by label:')
         _print_stat(self.job_by_stage, default_label='<no label>')
 
@@ -196,8 +194,7 @@ def setup_batch(description: str) -> RegisteringBatch:
 
     logger.info(
         f'Starting Hail Batch with the project {billing_project}'
-        f', bucket {bucket}' +
-        (f', pool label {pool_label}' if pool_label else '')
+        f', bucket {bucket}' + (f', pool label {pool_label}' if pool_label else '')
     )
     backend = hb.ServiceBackend(
         billing_project=billing_project,
@@ -205,8 +202,8 @@ def setup_batch(description: str) -> RegisteringBatch:
         token=os.environ.get('HAIL_TOKEN'),
     )
     return RegisteringBatch(
-        name=description, 
-        backend=backend, 
+        name=description,
+        backend=backend,
         pool_label=pool_label,
     )
 

@@ -133,17 +133,18 @@ def annotate_cohort(
     """
     Convert VCF to mt, annotate for seqr loader, add VEP annotations.
     """
+
     def _read(path):
         if path.strip('/').endswith('.ht'):
             t = hl.read_table(str(path))
         else:
             assert path.strip('/').endswith('.mt')
             t = hl.read_matrix_table(str(path))
-        logger.info(f'Read checkpoint {path}')  
+        logger.info(f'Read checkpoint {path}')
         return t
 
     def _checkpoint(t, fname):
-        if checkpoints_bucket: 
+        if checkpoints_bucket:
             path = to_path(checkpoints_bucket) / fname
             if not overwrite and (path / '_SUCCESS').exists():
                 t = _read(str(path))
@@ -287,7 +288,7 @@ def annotate_cohort(
         mt = mt.annotate_globals(
             sampleType=sequencing_type,
         )
-    
+
     logger.info('Done:')
     mt.describe()
     mt.write(str(out_mt_path), overwrite=overwrite)
@@ -385,7 +386,9 @@ def annotate_dataset_mt(mt_path, out_mt_path, checkpoints_bucket, overwrite=Fals
             # the _genotype_filter_samples will call this _func with g
             def _func(g):
                 return func(i, g)
+
             return _func
+
         return _inner_filter
 
     @_capture_i_decorator
@@ -410,14 +413,15 @@ def annotate_dataset_mt(mt_path, out_mt_path, checkpoints_bucket, overwrite=Fals
         ),
         samples_gq=hl.struct(
             **{
-                ('%i_to_%i' % (i, i + 5)): _genotype_filter_samples(_filter_samples_gq(i))
+                ('%i_to_%i' % (i, i + 5)): _genotype_filter_samples(
+                    _filter_samples_gq(i)
+                )
                 for i in range(0, 95, 5)
             }
         ),
         samples_ab=hl.struct(
             **{
-                '%i_to_%i'
-                % (i, i + 5): _genotype_filter_samples(_filter_samples_ab(i))
+                '%i_to_%i' % (i, i + 5): _genotype_filter_samples(_filter_samples_ab(i))
                 for i in range(0, 45, 5)
             }
         ),
