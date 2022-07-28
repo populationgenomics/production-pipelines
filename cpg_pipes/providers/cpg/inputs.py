@@ -229,24 +229,26 @@ class CpgInputProvider(InputProvider):
 
         for dataset in cohort.get_datasets():
             ped_entries = self.db.get_ped_entries(project_name=dataset.name)
+            ped_entry_by_participant_id = {}
             for ped_entry in ped_entries:
                 part_id = str(ped_entry['individual_id'])
-                if part_id not in sample_by_participant_id.keys():
-                    logger.info(
-                        f'Participant {part_id} is not found in populated samples '
-                        f'and will be skipped'
-                    )
-                    continue
+                ped_entry_by_participant_id[part_id] = ped_entry
 
-                s = sample_by_participant_id[part_id]
+            for sample in dataset.get_samples():
+                if sample.participant_id not in ped_entry_by_participant_id:
+                    logger.warning(
+                        f'No pedigree data for participant {sample.participant_id}'
+                    )
+
+                ped_entry = ped_entry_by_participant_id[sample.participant_id]
                 maternal_sample = sample_by_participant_id.get(
                     str(ped_entry['maternal_id'])
                 )
                 paternal_sample = sample_by_participant_id.get(
                     str(ped_entry['paternal_id'])
                 )
-                s.pedigree = PedigreeInfo(
-                    sample=s,
+                sample.pedigree = PedigreeInfo(
+                    sample=sample,
                     fam_id=ped_entry['family_id'],
                     mom=maternal_sample,
                     dad=paternal_sample,
