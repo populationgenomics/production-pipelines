@@ -13,7 +13,8 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     url='https://github.com/populationgenomics/production-pipelines',
     license='MIT',
-    packages=['cpg_pipes'],
+    packages=['cpg_pipes']
+    + ['cpg_pipes.' + p for p in sorted(setuptools.find_packages('./cpg_pipes'))],
     package_data={'cpg_pipes': ['filter_cutoffs.yaml']},
     include_package_data=True,
     zip_safe=False,

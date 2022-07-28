@@ -115,8 +115,8 @@ class Cohort(Target):
         self,
         analysis_dataset_name: str,
         namespace: Namespace,
+        sequencing_type: SequencingType,
         name: str | None = None,
-        sequencing_type: SequencingType = SequencingType.GENOME,
     ):
         super().__init__()
         self.name = name or analysis_dataset_name

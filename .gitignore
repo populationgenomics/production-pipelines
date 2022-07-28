@@ -134,4 +134,5 @@ dmypy.json
 playground
 dockers/cpg_pipes
 
+.vscode/
 notebooks

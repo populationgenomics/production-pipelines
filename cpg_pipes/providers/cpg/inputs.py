@@ -146,8 +146,10 @@ class CpgInputProvider(InputProvider):
         assert cohort.get_sample_ids()
         try:
             found_seqs: list[dict] = self.db.seqapi.get_sequences_by_sample_ids(
-                cohort.get_sample_ids()
+                cohort.get_sample_ids(), get_latest_sequence_only=False
             )
+            if cohort.sequencing_type:
+                found_seqs = [seq for seq in found_seqs if str(seq['type']) == str(cohort.sequencing_type.value)]
         except ApiException:
             if get_config()['workflow'].get('smdb_errors_are_fatal', True):
                 raise
@@ -162,22 +164,20 @@ class CpgInputProvider(InputProvider):
         found_seqs_by_sid = defaultdict(list)
         for found_seq in found_seqs:
             found_seqs_by_sid[found_seq['sample_id']].append(found_seq)
-        
-        # Checking missing sequences
+
+        # Log sequences without samples, this is a pretty common thing,
+        # but useful to log to easier track down samples not processed
         if sample_wo_seq := [
             s for s in cohort.get_samples() if s.id not in found_seqs_by_sid
         ]:
-            msg = f'No sequencing data found for samples:\n'
+            msg = f'No {cohort.sequencing_type.value} sequencing data found for samples:\n'
+            ds_sample_count = {ds_name: len(list(ds_samples)) for ds_name, ds_samples in groupby(cohort.get_samples(), key=lambda s: s.dataset.name)}
             for ds, samples in groupby(sample_wo_seq, key=lambda s: s.dataset.name):
                 msg += (
-                    f'\t{ds}, {len(list(samples))} samples: '
+                    f'\t{ds}, {len(list(samples))}/{ds_sample_count.get(ds)} samples: '
                     f'{", ".join([s.id for s in samples])}\n'
                 )
-            if get_config()['workflow'].get('smdb_errors_are_fatal', True):
-                raise InputProviderError(msg)
-            else:
-                msg += '\nContinuing without sequencing data because lenient=true'
-                logger.warning(msg)
+            logger.info(msg)
 
         for sample in cohort.get_samples():
             for d in found_seqs_by_sid.get(sample.id, []):

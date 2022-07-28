@@ -67,7 +67,10 @@ class TestPipeline(unittest.TestCase):
             for s_id in self.sample_ids:
                 s = ds.add_sample(s_id, s_id)
                 s.alignment_input_by_seq_type[utils.SEQ_TYPE] = \
-                    CramPath(utils.TOY_CRAM_BY_SID[s.id])
+                    CramPath(
+                        utils.TOY_CRAM_BY_SID[s.id],
+                        reference_assembly='gs://path/to/reference.fasta'
+                    )
         return pipeline
 
     def test_dry(self):

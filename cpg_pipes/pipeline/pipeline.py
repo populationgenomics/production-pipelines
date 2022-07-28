@@ -990,7 +990,7 @@ class Pipeline:
         ]):
             raise PipelineError('No stages to run')
         logger.info(f'Setting stages: {final_set_of_stages}')
-        required_skipped_stages = [s for s in stages if s.skipped]
+        required_skipped_stages = [s for s in self._stages_dict.values() if s.skipped]
         if required_skipped_stages:
             logger.info(
                 f'Skipped stages: '
