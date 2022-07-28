@@ -67,13 +67,6 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
         self.assertEqual(s1.external_id, extid2)
         self.assertEqual(len(s1.alignment_input_by_seq_type.values()), 1)
         self.assertEqual(s1.pedigree.sex, Sex.UNKNOWN)
-        # s2 = ds.get_samples()[1]
-        # self.assertEqual(s2.external_id, extid2)
-        # self.assertEqual(len(s2.alignment_input_by_seq_type.values()), 1)
-        # cram = s2.alignment_input_by_seq_type[SequencingType.EXOME]
-        # self.assertTrue(isinstance(cram, CramPath))
-        # self.assertTrue(cast(CramPath, cram).ext == 'cram')
-        # self.assertEqual(s2.pedigree.sex, Sex.UNKNOWN)
 
     @skip('Figure out SMDB permissions from GitHub workflows')
     def test_smdb_provider(self):
