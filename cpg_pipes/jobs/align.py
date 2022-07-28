@@ -235,7 +235,10 @@ def align(
     return jobs
 
 
-def storage_for_cram_job(alignment_input, sequencing_type) -> int | None:
+def storage_for_cram_job(
+    alignment_input: AlignmentInput, 
+    sequencing_type: SequencingType,
+) -> int | None:
     """Get storage for a job that processes CRAM"""
     storage_gb = None  # avoid attaching extra disk by default
     if sequencing_type == SequencingType.GENOME:
