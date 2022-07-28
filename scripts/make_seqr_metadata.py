@@ -38,7 +38,7 @@ def main(
     cohort = Cohort(
         analysis_dataset_name='seqr',
         namespace=Namespace.from_access_level(get_config()['workflow']['access_level']),
-        sequencing_type=SequencingType.GENOME,
+        sequencing_type=SequencingType.GENOME
     )
     input_provider.populate_cohort(
         cohort=cohort,

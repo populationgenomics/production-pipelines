@@ -35,9 +35,9 @@ DATAPROC_PACKAGES = [
 @lru_cache
 def exists(path: Path | str, verbose: bool = True) -> bool:
     """
-    Caching version of the existence check.
-    The python code runtime happens entirely during the pipeline submittion,
-    without waiting for it to finish, so there is no expectation that object
+    Caching version of the existence check. 
+    The python code runtime happens entirely during the pipeline submittion, 
+    without waiting for it to finish, so there is no expectation that object 
     existence status would change during the runtime. This, this function uses
     `@lru_cache` to make sure that object existence is checked only once.
     """
@@ -104,13 +104,13 @@ def can_reuse(
 
 def timestamp(rand_suffix_len: int = 5) -> str:
     """
-    Generate a timestamp string. If `rand_suffix_len` is set, adds a short random
+    Generate a timestamp string. If `rand_suffix_len` is set, adds a short random 
     string of this length for uniqueness.
     """
     result = time.strftime('%Y_%m%d_%H%M')
     if rand_suffix_len:
-        rand_bit = ''.join(
-            choices(string.ascii_uppercase + string.digits, k=rand_suffix_len)
+        rand_bit = ''.join(choices(
+            string.ascii_uppercase + string.digits, k=rand_suffix_len)
         )
-        result += f'_{rand_bit}'
+        result += f'_{rand_bit}' 
     return result

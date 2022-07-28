@@ -56,24 +56,18 @@ class CpgInputProvider(InputProvider):
             skip_datasets=skip_datasets,
             ped_files=ped_files,
         )
-        if (
-            cohort.sequencing_type
-            and cohort.sequencing_type == SequencingType.GENOME
-            and get_config()['workflow'].get('add_validation_dataset')
-        ):
+        if cohort.sequencing_type and \
+                cohort.sequencing_type == SequencingType.GENOME and \
+                get_config()['workflow'].get('add_validation_dataset'):
             validation_dataset = cohort.create_dataset('validation')
             validation_dataset.add_sample(
                 'NA12878_KCCG',
                 alignment_input_by_seq_type={
-                    SequencingType.GENOME: FastqPairs(
-                        [
-                            FastqPair(
-                                'gs://cpg-validation-main-upload/HCMVGDSX3_1_220405_FD07777372_Homo-sapiens_TCCGCCAATT-CAGCACGGAG_R_220405_CNTROL_DNA_M001_R1.fastq.gz',
-                                'gs://cpg-validation-main-upload/HCMVGDSX3_1_220405_FD07777372_Homo-sapiens_TCCGCCAATT-CAGCACGGAG_R_220405_CNTROL_DNA_M001_R2.fastq.gz',
-                            )
-                        ]
-                    )
-                },
+                    SequencingType.GENOME: FastqPairs([FastqPair(
+                        'gs://cpg-validation-main-upload/HCMVGDSX3_1_220405_FD07777372_Homo-sapiens_TCCGCCAATT-CAGCACGGAG_R_220405_CNTROL_DNA_M001_R1.fastq.gz',
+                        'gs://cpg-validation-main-upload/HCMVGDSX3_1_220405_FD07777372_Homo-sapiens_TCCGCCAATT-CAGCACGGAG_R_220405_CNTROL_DNA_M001_R2.fastq.gz',
+                    )])
+                }
             )
             validation_dataset.add_sample(
                 'SYNDIP',
@@ -82,7 +76,7 @@ class CpgInputProvider(InputProvider):
                         'gs://cpg-reference/validation/syndip/raw/CHM1_CHM13_2.bam',
                         'gs://cpg-reference/validation/syndip/raw/CHM1_CHM13_2.bam.bai',
                     )
-                },
+                }
             )
 
     def get_entries(
@@ -155,11 +149,7 @@ class CpgInputProvider(InputProvider):
                 cohort.get_sample_ids(), get_latest_sequence_only=False
             )
             if cohort.sequencing_type:
-                found_seqs = [
-                    seq
-                    for seq in found_seqs
-                    if str(seq['type']) == str(cohort.sequencing_type.value)
-                ]
+                found_seqs = [seq for seq in found_seqs if str(seq['type']) == str(cohort.sequencing_type.value)]
         except ApiException:
             if get_config()['workflow'].get('smdb_errors_are_fatal', True):
                 raise
@@ -181,12 +171,7 @@ class CpgInputProvider(InputProvider):
             s for s in cohort.get_samples() if s.id not in found_seqs_by_sid
         ]:
             msg = f'No {cohort.sequencing_type.value} sequencing data found for samples:\n'
-            ds_sample_count = {
-                ds_name: len(list(ds_samples))
-                for ds_name, ds_samples in groupby(
-                    cohort.get_samples(), key=lambda s: s.dataset.name
-                )
-            }
+            ds_sample_count = {ds_name: len(list(ds_samples)) for ds_name, ds_samples in groupby(cohort.get_samples(), key=lambda s: s.dataset.name)}
             for ds, samples in groupby(sample_wo_seq, key=lambda s: s.dataset.name):
                 msg += (
                     f'\t{ds}, {len(list(samples))}/{ds_sample_count.get(ds)} samples: '
@@ -205,9 +190,8 @@ class CpgInputProvider(InputProvider):
                             f'input provider to make sure there is only one data source '
                             f'of sequencing type per sample.'
                         )
-                    sample.alignment_input_by_seq_type[
-                        seq.sequencing_type
-                    ] = seq.alignment_input
+                    sample.alignment_input_by_seq_type[seq.sequencing_type] = \
+                        seq.alignment_input
 
     def populate_analysis(self, cohort: Cohort) -> None:
         """

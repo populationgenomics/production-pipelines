@@ -34,7 +34,6 @@ class InputsType(Enum):
     """
     Scope of benchmark
     """
-
     TOY = 'toy'
     FULL = 'full'
     FULL_SUBSET = 'full_subset'
@@ -48,7 +47,6 @@ class SubsetAlignmentInput(SampleStage):
     """
     Subset FASTQ to target number of reads
     """
-
     def expected_outputs(self, sample: Sample):
         """
         Expected to generate a pair of FASTQs
@@ -133,7 +131,6 @@ class DifferentResources(SampleStage):
     """
     Benchmark different resources
     """
-
     def expected_outputs(self, sample: 'Sample'):
         """
         Not exptected to produce anything
@@ -183,7 +180,6 @@ class DifferentAlignerSetups(SampleStage):
     """
     Try different setups of tools (alingners and deduplicators)
     """
-
     def expected_outputs(self, sample: 'Sample'):
         """
         Not exptected to produce anything
@@ -234,14 +230,11 @@ def main():
     """
     Entry point.
     """
-    update_dict(
-        get_config()['workflow'],
-        {
-            'name': 'Benchmark alignment',
-            'dataset': DATASET,
-            'access_level': 'full',
-        },
-    )
+    update_dict(get_config()['workflow'], {
+        'name': 'Benchmark alignment',
+        'dataset': DATASET,
+        'access_level': 'full',
+    })
     pipeline = Pipeline()
 
     p = pipeline.create_dataset('fewgenomes')

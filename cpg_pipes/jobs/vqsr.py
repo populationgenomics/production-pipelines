@@ -156,7 +156,7 @@ def make_vqsr_jobs(
     if input_vcf_or_mt_path.name.endswith('.mt'):
         # Importing dynamically to make sure $CPG_DATASET_GCP_PROJECT is set.
         from analysis_runner import dataproc
-
+        
         assert meta_ht_path
         assert hard_filter_ht_path
         job_name = 'VQSR: MT to site-only VCF'
@@ -480,9 +480,7 @@ def add_indels_variant_recalibrator_job(
     # however, for smaller datasets we take a standard instance, and for larger
     # ones we take a highmem instance
     if is_small_callset:
-        res = STANDARD.set_resources(
-            j, fraction=instance_fraction, storage_gb=disk_size
-        )
+        res = STANDARD.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
     else:
         res = HIGHMEM.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
 
@@ -566,9 +564,7 @@ def add_snps_variant_recalibrator_create_model_step(
     # however, for smaller datasets we take a standard instance, and for larger
     # ones we take a highmem instance
     if is_small_callset:
-        res = STANDARD.set_resources(
-            j, fraction=instance_fraction, storage_gb=disk_size
-        )
+        res = STANDARD.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
     else:
         res = HIGHMEM.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
 
@@ -716,9 +712,7 @@ def add_snps_variant_recalibrator_step(
     # however, for smaller datasets we take a standard instance, and for larger
     # ones we take a highmem instance
     if is_small_callset:
-        res = STANDARD.set_resources(
-            j, fraction=instance_fraction, storage_gb=disk_size
-        )
+        res = STANDARD.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
     else:
         res = HIGHMEM.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
 

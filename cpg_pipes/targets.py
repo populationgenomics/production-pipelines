@@ -48,12 +48,10 @@ class Target:
         s = ' '.join(
             sorted(
                 [
-                    ' '.join(
-                        sorted(
-                            str(alignment_input)
-                            for alignment_input in s.alignment_input_by_seq_type.values()
-                        )
-                    )
+                    ' '.join(sorted(
+                        str(alignment_input)
+                        for alignment_input in s.alignment_input_by_seq_type.values()
+                    ))
                     for s in self.get_samples()
                     if s.alignment_input_by_seq_type
                 ]
@@ -94,12 +92,16 @@ class Target:
         Prefix job names.
         """
         raise NotImplementedError
-
+    
     def rich_id_map(self) -> dict[str, str]:
         """
         Map if internal IDs to participant or external IDs, if the latter is provided.
         """
-        return {s.id: s.rich_id for s in self.get_samples() if s.participant_id != s.id}
+        return {
+            s.id: s.rich_id
+            for s in self.get_samples()
+            if s.participant_id != s.id
+        }
 
 
 class Cohort(Target):
@@ -209,7 +211,7 @@ class Cohort(Target):
         """
         return {
             'samples': self.get_sample_ids(),
-            'datasets': [d.name for d in self.get_datasets()],
+            'datasets': [d.name for d in self.get_datasets()], 
         }
 
     def get_job_prefix(self) -> str:
@@ -316,15 +318,15 @@ class Dataset(Target):
 
     def __str__(self):
         return f'{self.name} ({len(self.get_samples())} samples)'
-
+    
     def _seq_type_subdir(self) -> str:
         """
-        Subdirectory parametrised by sequencing type. For genomes, we don't
+        Subdirectory parametrised by sequencing type. For genomes, we don't 
         prefix at all.
         """
         return (
-            ''
-            if not self.cohort or self.cohort.sequencing_type == SequencingType.GENOME
+            '' 
+            if not self.cohort or self.cohort.sequencing_type == SequencingType.GENOME 
             else self.cohort.sequencing_type.value
         )
 
@@ -332,44 +334,38 @@ class Dataset(Target):
         """
         The primary storage path.
         """
-        return to_path(
-            dataset_path(
-                self._seq_type_subdir(),
-                dataset=self.stack,
-                **kwargs,
-            )
-        )
+        return to_path(dataset_path(
+            self._seq_type_subdir(),
+            dataset=self.stack,
+            **kwargs,
+        ))
 
     def tmp_prefix(self, **kwargs) -> Path:
         """
         Storage path for temporary files.
         """
-        return to_path(
-            dataset_path(
-                self._seq_type_subdir(),
-                dataset=self.stack,
-                category='tmp',
-                **kwargs,
-            )
-        )
+        return to_path(dataset_path(
+            self._seq_type_subdir(),
+            dataset=self.stack,
+            category='tmp',
+            **kwargs,
+        ))
 
     def web_prefix(self, **kwargs) -> Path:
         """
         Path for files served by an HTTP server Matches corresponding URLs returns by
         self.web_url() URLs.
         """
-        return to_path(
-            dataset_path(
-                self._seq_type_subdir(),
-                dataset=self.stack,
-                category='web',
-                **kwargs,
-            )
-        )
+        return to_path(dataset_path(
+            self._seq_type_subdir(),
+            dataset=self.stack,
+            category='web',
+            **kwargs,
+        ))
 
     def web_url(self, **kwargs) -> str | None:
         """
-        URLs matching self.storage_web_path() files serverd by an HTTP server.
+        URLs matching self.storage_web_path() files serverd by an HTTP server. 
         """
         return web_url(
             self._seq_type_subdir(),
@@ -412,7 +408,8 @@ class Dataset(Target):
         Get dataset's samples. Include only "active" samples, unless only_active=False
         """
         return [
-            s for sid, s in self._sample_by_id.items() if (s.active or not only_active)
+            s for sid, s in self._sample_by_id.items() if 
+            (s.active or not only_active)
         ]
 
     def get_job_attrs(self) -> dict:
@@ -420,7 +417,7 @@ class Dataset(Target):
         Attributes for Hail Batch job.
         """
         return {
-            'dataset': self.name,
+            'dataset': self.name, 
             'samples': self.get_sample_ids(),
         }
 
@@ -470,7 +467,7 @@ class Sex(Enum):
                 return Sex.UNKNOWN
             raise ValueError(f'Unrecognised sex value {sex}')
         return Sex.UNKNOWN
-
+    
     def __str__(self):
         return self.name
 
@@ -504,9 +501,8 @@ class Sample(Target):
                 fam_id=self.participant_id,
                 sex=sex,
             )
-        self.alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] = (
+        self.alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] = \
             alignment_input_by_seq_type or dict()
-        )
 
     def __repr__(self):
         values = {
@@ -514,12 +510,10 @@ class Sample(Target):
             'forced': str(self.forced),
             'active': str(self.active),
             'meta': str(self.meta),
-            'alignment_inputs': ','.join(
-                [
-                    f'{seq_t.value}: {al_inp}'
-                    for seq_t, al_inp in self.alignment_input_by_seq_type.items()
-                ]
-            ),
+            'alignment_inputs': ','.join([
+                f'{seq_t.value}: {al_inp}' 
+                for seq_t, al_inp in self.alignment_input_by_seq_type.items()
+            ]),
             'pedigree': self.pedigree if self.pedigree else '',
         }
         retval = f'Sample({self.dataset.name}/{self.id}'
@@ -568,7 +562,7 @@ class Sample(Target):
     @property
     def rich_id(self) -> str:
         """
-        ID for reporting purposes: composed of internal as well as external
+        ID for reporting purposes: composed of internal as well as external 
         or participant IDs.
         """
         return self.id + '|' + self.participant_id
@@ -619,7 +613,7 @@ class Sample(Target):
         Attributes for Hail Batch job.
         """
         return {
-            'dataset': self.dataset.name,
+            'dataset': self.dataset.name, 
             'sample': self.id,
         }
 

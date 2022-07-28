@@ -21,15 +21,12 @@ BENCHMARK_BUCKET = to_path(
     f'gs://cpg-{INPUT_DATASET}-{NAMESPACE}-tmp/benchmark_combiner'
 )
 
-update_dict(
-    get_config()['workflow'],
-    {
-        'name': 'benchmark_combiner',
-        'dataset': INPUT_DATASET,
-        'access_level': 'full',
-        'datasets': [INPUT_DATASET],
-    },
-)
+update_dict(get_config()['workflow'], {
+    'name': 'benchmark_combiner',
+    'dataset': INPUT_DATASET,
+    'access_level': 'full',
+    'datasets': [INPUT_DATASET],
+})
 pipeline = Pipeline()
 
 df = pd.DataFrame(

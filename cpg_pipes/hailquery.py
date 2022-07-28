@@ -69,9 +69,7 @@ def filter_low_conf_regions(
         criteria.append(hl.is_missing(segdup[mt.locus]))
 
     if filter_telomeres_and_centromeres:
-        telomeres_and_centromeres = hl.read_table(
-            str(reference_path('gnomad/tel_and_cent_ht'))
-        )
+        telomeres_and_centromeres = hl.read_table(str(reference_path('gnomad/tel_and_cent_ht')))
         criteria.append(hl.is_missing(telomeres_and_centromeres[mt.locus]))
 
     if high_conf_regions is not None:
@@ -104,20 +102,9 @@ def get_truth_ht() -> hl.Table:
     return (
         hl.read_table(str(reference_path('gnomad/hapmap_ht')))
         .select(hapmap=True)
-        .join(
-            hl.read_table(str(reference_path('gnomad/kgp_omni_ht'))).select(omni=True),
-            how='outer',
-        )
-        .join(
-            hl.read_table(str(reference_path('gnomad/kgp_hc_ht'))).select(
-                kgp_phase1_hc=True
-            ),
-            how='outer',
-        )
-        .join(
-            hl.read_table(str(reference_path('gnomad/mills_ht'))).select(mills=True),
-            how='outer',
-        )
+        .join(hl.read_table(str(reference_path('gnomad/kgp_omni_ht'))).select(omni=True), how='outer')
+        .join(hl.read_table(str(reference_path('gnomad/kgp_hc_ht'))).select(kgp_phase1_hc=True), how='outer')
+        .join(hl.read_table(str(reference_path('gnomad/mills_ht'))).select(mills=True), how='outer')
         .repartition(200, shuffle=False)
         .persist()
     )

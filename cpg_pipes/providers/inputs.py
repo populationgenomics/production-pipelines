@@ -142,7 +142,7 @@ class InputProvider(ABC):
         Get sequencing type. Can be also set later.
         """
 
-    @staticmethod
+    @staticmethod    
     def filter_sequencing_type(cohort: Cohort, sequencing_type: SequencingType | None):
         """
         Filtering to the samples with only requested sequencing types.
@@ -156,11 +156,7 @@ class InputProvider(ABC):
                 continue
 
             avail_types = list(s.alignment_input_by_seq_type.keys())
-            s.alignment_input_by_seq_type = {
-                k: v
-                for k, v in s.alignment_input_by_seq_type.items()
-                if k == sequencing_type
-            }
+            s.alignment_input_by_seq_type = {k: v for k, v in s.alignment_input_by_seq_type.items() if k == sequencing_type}
             if not bool(s.alignment_input_by_seq_type):
                 logger.warning(
                     f'{s}: skipping because no inputs with data type '
@@ -443,7 +439,7 @@ class CsvInputProvider(InputProvider):
                     missing_fastqs = [fq for fq in (fqs1 + fqs2) if not exists(fq)]
                     if missing_fastqs:
                         raise InputProviderError(f'FQs {missing_fastqs} does not exist')
-
+                    
                 pairs = FastqPairs(
                     [FastqPair(fq1, fq2) for fq1, fq2 in zip(fqs1, fqs2)]
                 )
@@ -458,7 +454,7 @@ class CsvInputProvider(InputProvider):
                     existing_pairs += pairs
                 else:
                     data[(sid, seq_type)] = pairs
-
+                
             elif cram:
                 if self.check_files:
                     if not exists(cram):

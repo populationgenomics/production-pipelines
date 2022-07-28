@@ -44,20 +44,18 @@ class CpgStatusReporter(StatusReporter):
         """
         if not jobs:
             return []
-
+        
         if isinstance(target, Sample) and target.dataset.name == 'validation':
             return []
 
         # 1. Create a "queued" analysis
-        if (
-            aid := self.create_analysis(
-                output=str(output),
-                analysis_type=analysis_type,
-                analysis_status='queued',
-                target=target,
-                meta=meta,
-            )
-        ) is None:
+        if (aid := self.create_analysis(
+            output=str(output),
+            analysis_type=analysis_type,
+            analysis_status='queued',
+            target=target,
+            meta=meta,
+        )) is None:
             raise StatusReporterError(
                 'SmdbStatusReporter error: failed to create analysis'
             )
@@ -83,7 +81,7 @@ class CpgStatusReporter(StatusReporter):
             in_progress_j.depends_on(*prev_jobs)
         completed_j.depends_on(*jobs)
         return [in_progress_j, *jobs, completed_j]
-
+    
     def create_analysis(
         self,
         output: str,
@@ -100,7 +98,7 @@ class CpgStatusReporter(StatusReporter):
             status=analysis_status,
             sample_ids=target.get_sample_ids(),
             meta=meta,
-            project_name=project_name,
+            project_name=project_name
         )
 
     @staticmethod

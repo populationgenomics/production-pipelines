@@ -34,7 +34,7 @@ class AnnotateCohort(CohortStage):
     Re-annotate the entire cohort.
     """
 
-    def expected_outputs(self, cohort: Cohort):
+    def expected_outputs(self, cohort: Cohort) :
         """
         Expected to write a matrix table.
         """
@@ -49,14 +49,12 @@ class AnnotateCohort(CohortStage):
         Uses analysis-runner's dataproc helper to run a hail query script
         """
         vcf_path = inputs.as_path(target=cohort, stage=JointGenotyping, id='vcf')
-        siteonly_vqsr_vcf_path = inputs.as_path(
-            target=cohort, stage=Vqsr, id='siteonly'
-        )
+        siteonly_vqsr_vcf_path = inputs.as_path(target=cohort, stage=Vqsr, id='siteonly')
         vep_ht_path = inputs.as_path(target=cohort, stage=Vep, id='ht')
 
-        checkpoint_prefix = (
-            to_path(self.expected_outputs(cohort)['prefix']) / 'checkpoints'
-        )
+        checkpoint_prefix = to_path(
+            self.expected_outputs(cohort)['prefix']
+        ) / 'checkpoints'
 
         jobs = annotate_cohort_jobs(
             b=self.b,
@@ -70,8 +68,8 @@ class AnnotateCohort(CohortStage):
             job_attrs=self.get_job_attrs(),
         )
         return self.make_outputs(
-            cohort,
-            data=self.expected_outputs(cohort),
+            cohort, 
+            data=self.expected_outputs(cohort), 
             jobs=jobs,
         )
 
@@ -91,7 +89,7 @@ class AnnotateDataset(DatasetStage):
         return {
             'prefix': str(self.tmp_prefix / 'mt' / f'{h}-{dataset.name}'),
             # We want to write the matrix table into the main bucket.
-            'mt': dataset.prefix() / 'mt' / f'{h}-{dataset.name}.mt',
+            'mt': dataset.prefix() / 'mt' / f'{h}-{dataset.name}.mt'
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -100,9 +98,9 @@ class AnnotateDataset(DatasetStage):
         """
         mt_path = inputs.as_path(target=self.cohort, stage=AnnotateCohort, id='mt')
 
-        checkpoint_prefix = (
-            to_path(self.expected_outputs(dataset)['prefix']) / 'checkpoints'
-        )
+        checkpoint_prefix = to_path(
+            self.expected_outputs(dataset)['prefix']
+        ) / 'checkpoints'
 
         jobs = annotate_dataset_jobs(
             b=self.b,
@@ -120,7 +118,7 @@ class AnnotateDataset(DatasetStage):
 
 def es_password() -> str:
     """
-    Get ElasticSearch password. Moved into a separate method to simplify
+    Get ElasticSearch password. Moved into a separate method to simplify 
     mocking in tests.
     """
     return read_secret(
@@ -157,7 +155,6 @@ class LoadToEs(DatasetStage):
         index_name = self.expected_outputs(dataset).lower()
 
         from analysis_runner import dataproc
-
         j = dataproc.hail_dataproc_job(
             self.b,
             f'cpg_pipes/dataproc_scripts/seqr/mt_to_es.py '

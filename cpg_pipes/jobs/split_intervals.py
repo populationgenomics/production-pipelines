@@ -44,10 +44,10 @@ def get_intervals(
         raise ValueError(
             f'Split intervals: scatter_count must be > 1, got: {scatter_count}'
         )
-
+        
     job_attrs = (job_attrs or {}) | dict(tool='picard_IntervalListTools')
     job_name = f'Make {scatter_count} intervals for {sequencing_type.value}'
-
+    
     if output_prefix and utils.exists(output_prefix / '1.interval_list'):
         job_attrs['reuse'] = True
         return b.new_job(job_name, job_attrs), [
@@ -60,9 +60,9 @@ def get_intervals(
     if not intervals_path:
         # Did we cache split intervals for this sequencing_type?
         cache_bucket = (
-            reference_path('intervals_prefix')
-            / sequencing_type.value
-            / f'{scatter_count}intervals'
+            reference_path('intervals_prefix') / 
+            sequencing_type.value / 
+            f'{scatter_count}intervals'
         )
         if utils.exists(cache_bucket / '1.interval_list'):
             j.name += ' [use cached]'

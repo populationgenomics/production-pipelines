@@ -53,11 +53,11 @@ def slack_message_cmd(
 ):
     """
     Make a bash command that prepares and sends a Slack message.
-    Message can be constructed from a dict `data`, or can be passed directly
-    as text (`text`). In either case, strings can use Slack `mrkdwn`
+    Message can be constructed from a dict `data`, or can be passed directly 
+    as text (`text`). In either case, strings can use Slack `mrkdwn` 
     for formatting: https://api.slack.com/reference/surfaces/formatting
-
-    Assumes `workflow/slack_channel` configuration parameter is set, as well as
+    
+    Assumes `workflow/slack_channel` configuration parameter is set, as well as 
     CPG_SLACK_TOKEN environment variable.
     """
     if not (channel := get_config()['slack'].get('channel')):
@@ -70,14 +70,10 @@ def slack_message_cmd(
     if not msg:
         return ''
     slack_env(j)
-    j.command(
-        dedent(
-            f"""
+    j.command(dedent(f"""
     curl -X POST \
     -H "Authorization: Bearer {get_token()}" \
     -H "Content-type: application/json" \
     -d '{{"channel": "'{channel}'", "text": "{msg}"}}' \
     https://slack.com/api/chat.postMessage
-    """
-        )
-    )
+    """))

@@ -31,29 +31,21 @@ class Align(SampleStage):
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
         Using the "align" function implemented in the `jobs` module.
-        Checks the `realign_from_cram_version` pipeline config argument, and
+        Checks the `realign_from_cram_version` pipeline config argument, and 
         prioritises realignment from CRAM vs alignment from FASTQ if it's set.
         """
         alignment_input = sample.alignment_input_by_seq_type.get(
             self.cohort.sequencing_type
         )
-        if realign_cram_ver := get_config()['workflow'].get(
-            'realign_from_cram_version'
-        ):
-            if (
-                path := (
-                    sample.dataset.prefix()
-                    / 'cram'
-                    / realign_cram_ver
-                    / f'{sample.id}.cram'
-                )
-            ).exists():
+        if realign_cram_ver := get_config()['workflow'].get('realign_from_cram_version'):
+            if (path := (
+                sample.dataset.prefix() / 'cram' / realign_cram_ver / f'{sample.id}.cram'
+            )).exists():
                 logger.info(f'Realigning from {realign_cram_ver} CRAM {path}')
                 alignment_input = CramPath(path)
 
         if alignment_input is None or (
-            get_config()['workflow'].get('check_inputs')
-            and not alignment_input.exists()
+            get_config()['workflow'].get('check_inputs') and not alignment_input.exists()
         ):
             if get_config()['workflow'].get('skip_samples_with_missing_input'):
                 logger.error(f'No alignment inputs, skipping sample {sample}')
@@ -64,7 +56,7 @@ class Align(SampleStage):
                     target=sample, error_msg=f'No alignment input found'
                 )
         assert alignment_input
-
+        
         jobs = align.align(
             b=self.b,
             alignment_input=alignment_input,
