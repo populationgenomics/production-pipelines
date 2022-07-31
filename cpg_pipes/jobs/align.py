@@ -138,6 +138,7 @@ def align(
             job_attrs=job_attrs,
             aligner=aligner,
             sequencing_type=sequencing_type,
+            should_sort=False,
         )
         stdout_is_sorted = False
         output_fmt = 'sam'
@@ -161,10 +162,8 @@ def align(
                     job_attrs=job_attrs,
                     aligner=aligner,
                     sequencing_type=sequencing_type,
+                    should_sort=True
                 )
-                # Sorting with samtools, but not adding deduplication yet, because we
-                # need to merge first.
-                cmd += ' ' + sort_cmd(requested_nthreads) + f' -o {j.sorted_bam}'
                 j.command(wrap_command(cmd, monitor_space=True))
                 sorted_bams.append(j.sorted_bam)
                 align_jobs.append(j)
@@ -183,10 +182,10 @@ def align(
                     number_of_shards_for_realignment=realignment_shards_num,
                     shard_number=shard_number,
                     sequencing_type=sequencing_type,
+                    should_sort=True,
                 )
                 # Sorting with samtools, but not adding deduplication yet, because we
                 # need to merge first.
-                cmd += ' ' + sort_cmd(requested_nthreads) + f' -o {j.sorted_bam}'
                 j.command(wrap_command(cmd, monitor_space=True))
                 sorted_bams.append(j.sorted_bam)
                 align_jobs.append(j)
@@ -262,6 +261,7 @@ def _align_one(
     number_of_shards_for_realignment: int | None = None,
     shard_number: int | None = None,
     sequencing_type: SequencingType = SequencingType.GENOME,
+    should_sort: bool = False,
 ) -> tuple[Job, str]:
     """
     Creates a job that (re)aligns reads to hg38. Returns the job object and a command
@@ -396,6 +396,11 @@ def _align_one(
     else:
         raise ValueError(f'Unsupported aligner: {aligner.value}')
 
+    # prepare command for adding sort on the end
+    cmd = dedent(cmd).strip()
+    if should_sort:
+        cmd += ' ' + sort_cmd(requested_nthreads) + f' -o {j.sorted_bam}'
+
     if fifo_commands:
 
         fifo_pre = [
@@ -425,10 +430,8 @@ def _align_one(
         ).strip()
 
         # Now prepare command
-        cmd = '\n'.join([*fifo_pre, dedent(cmd).strip(), fifo_post])
+        cmd = '\n'.join([*fifo_pre, cmd, fifo_post])
 
-    else:
-        cmd = dedent(cmd).strip()
     if index_cmd:
         cmd = dedent(index_cmd) + '\n' + cmd
     return j, cmd
