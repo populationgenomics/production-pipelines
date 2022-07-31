@@ -28,6 +28,23 @@ class Align(SampleStage):
         """
         return sample.get_cram_path().path
 
+    def _get_cram_reference_from_version(self, cram_version):
+        """
+        Get the reference used for the specific cram_version,
+        so that bazam is able to correctly decompress the reads
+        """
+        cram_version_map = {
+            # how do I define this in the portable way?
+            'bwamem': 'gs://cpg-reference/hg38/v0/Homo_sapiens_assembly38.fasta',
+            'dragen': 'gs://cpg-reference/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta',
+        }
+        if cram_version in cram_version_map:
+            return cram_version_map[cram_version]
+
+        raise ValueError(
+            f'Unrecognised cram_version: "{cram_version}", expected one of: {", ".join(cram_version_map.keys())}'
+        )
+
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
         Using the "align" function implemented in the `jobs` module.
@@ -49,7 +66,12 @@ class Align(SampleStage):
                 )
             ).exists():
                 logger.info(f'Realigning from {realign_cram_ver} CRAM {path}')
-                alignment_input = CramPath(path)
+                alignment_input = CramPath(
+                    path,
+                    reference_assembly=self._get_cram_reference_from_version(
+                        realign_cram_ver
+                    ),
+                )
 
         if alignment_input is None or (
             get_config()['workflow'].get('check_inputs')
