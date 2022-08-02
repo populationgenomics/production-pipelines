@@ -563,6 +563,9 @@ class Stage(Generic[TargetT], ABC):
         Based on stage parameters and expected outputs existence, determines what
         to do with the target: queue, skip or reuse, etc..
         """
+        if target.forced:
+            return Action.QUEUE
+
         if (
             d := get_config()['workflow'].get('skip_samples_stages')
         ) and self.name in d:
