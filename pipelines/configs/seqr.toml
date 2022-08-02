@@ -4,8 +4,8 @@ last_stage = 'GenotypeSample'
 access_level = 'full'
 dataset = 'seqr'
 datasets = [
-#    'acute-care',
-    'perth-neuro',
+    'acute-care',
+#    'perth-neuro',
 #    'ravenscroft-rdstudy',
 #    'circa',
 #    'heartkids',
@@ -22,6 +22,7 @@ datasets = [
 #    'kidgen',
 #    'ag-hidden'
 ]
+only_samples = ['CPG12310']
 #create_es_index_for_datasets = ['schr-neuro']
 #status_reporter = 'smdb'
 skip_samples = [
@@ -36,6 +37,10 @@ jc_intervals_num = 200
 vep_intervals_num = 200
 check_intermediates = true
 dry_run = false
+realign_from_cram_version = 'bwamem'
+
+[workflow.cram_version_reference]
+bwamem = 'gs://cpg-reference/hg38/v0/Homo_sapiens_assembly38.fasta'
 
 [workflow.skip_samples_stages]
 VerifyBamId = ['CPG13409']  # https://batch.hail.populationgenomics.org.au/batches/56236/jobs/372
