@@ -8,6 +8,7 @@ from typing import cast, Tuple
 import logging
 
 import hailtop.batch as hb
+from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from hailtop.batch.job import Job
 
@@ -241,6 +242,15 @@ def storage_for_cram_job(
 ) -> int | None:
     """Get storage for a job that processes CRAM"""
     storage_gb = None  # avoid attaching extra disk by default
+
+    try:
+        storage_gb = get_config()['workflow']['resources']['Align']['storage_gb']
+    except KeyError:
+        pass
+    else:
+        assert isinstance(storage_gb, int), storage_gb
+        return storage_gb
+
     if sequencing_type == SequencingType.GENOME:
         if (
             isinstance(alignment_input, FastqPairs)
