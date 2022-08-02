@@ -5,6 +5,7 @@ Stages that perform alignment QC on CRAM files.
 import logging
 
 from cpg_utils import Path
+from cpg_utils.config import get_config
 
 from ..jobs.cram_qc import samtools_stats, verify_bamid, picard_wgs_metrics
 from ..pipeline import stage, SampleStage, StageInput, StageOutput
@@ -32,6 +33,12 @@ class SamtoolsStats(SampleStage):
         Call a function from the `jobs` module.
         """
         cram_path = sample.get_cram_path()
+        if get_config()['workflow'].get('check_inputs') and not cram_path.exists():
+            if get_config()['workflow'].get('skip_samples_with_missing_input'):
+                logger.warning(f'No CRAM found, skipping sample {sample}')
+                return self.make_outputs(sample, skipped=True)
+            else:
+                return self.make_outputs(sample, error_msg=f'No CRAM found')
 
         j = samtools_stats(
             b=self.b,
@@ -62,6 +69,12 @@ class PicardWgsMetrics(SampleStage):
         Call a function from the `jobs` module.
         """
         cram_path = sample.get_cram_path()
+        if get_config()['workflow'].get('check_inputs') and not cram_path.exists():
+            if get_config()['workflow'].get('skip_samples_with_missing_input'):
+                logger.warning(f'No CRAM found, skipping sample {sample}')
+                return self.make_outputs(sample, skipped=True)
+            else:
+                return self.make_outputs(sample, error_msg=f'No CRAM found')
 
         j = picard_wgs_metrics(
             b=self.b,
@@ -92,6 +105,12 @@ class VerifyBamId(SampleStage):
         Call a function from the `jobs` module.
         """
         cram_path = sample.get_cram_path()
+        if get_config()['workflow'].get('check_inputs') and not cram_path.exists():
+            if get_config()['workflow'].get('skip_samples_with_missing_input'):
+                logger.warning(f'No CRAM found, skipping sample {sample}')
+                return self.make_outputs(sample, skipped=True)
+            else:
+                return self.make_outputs(sample, error_msg=f'No CRAM found')
 
         j = verify_bamid(
             b=self.b,
