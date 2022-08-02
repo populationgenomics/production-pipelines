@@ -26,7 +26,7 @@ from slugify import slugify
 
 from .exceptions import PipelineError, StageInputNotFound
 from .. import Path, to_path, Namespace
-from ..hb.batch import setup_batch
+from ..hb.batch import setup_batch, RegisteringBatch
 from ..providers.cpg.inputs import CpgInputProvider
 from ..providers.cpg.smdb import SMDB
 from ..providers.cpg.status import CpgStatusReporter
@@ -829,7 +829,7 @@ class Pipeline:
         description += f' [{self.cohort.sequencing_type.value}]'
         if ds_set := set(d.name for d in self.cohort.get_datasets()):
             description += ' ' + ', '.join(sorted(ds_set))
-        self.b: Batch = setup_batch(description=description)
+        self.b: RegisteringBatch = setup_batch(description=description)
 
         self.status_reporter = None
         if get_config()['workflow'].get('status_reporter') == 'smdb':
@@ -857,7 +857,12 @@ class Pipeline:
 
         result = None
         if self.b:
-            result = self.b.run(wait=wait)
+            # Checking total_job_num here instead in b.run() because otherwise
+            # the Backend class will produce error.
+            if self.b.total_job_num == 0:
+                logger.error('No jobs to submit')
+            else:
+                result = self.b.run(wait=wait)
         return result
 
     def _validate_first_last_stage(self) -> tuple[int | None, int | None]:
