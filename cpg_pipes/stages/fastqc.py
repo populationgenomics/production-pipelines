@@ -53,11 +53,9 @@ class FastQC(SampleStage):
         ):
             if get_config()['workflow'].get('skip_samples_with_missing_input'):
                 logger.error(f'No alignment inputs, skipping sample {sample}')
-                return self.make_outputs(sample, skipped=True)  # return empty output
+                return self.make_outputs(sample, skipped=True)
             else:
-                return self.make_outputs(
-                    target=sample, error_msg=f'No alignment input found'
-                )
+                return self.make_outputs(sample, error_msg=f'No FASTQ/BAM input found')
 
         jobs = fastqc.fastqc(
             b=self.b,

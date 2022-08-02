@@ -33,6 +33,12 @@ class CramSomalier(SampleStage):
         Using a function from the `jobs` module.
         """
         cram_path = sample.get_cram_path()
+        if get_config()['workflow'].get('check_inputs') and not cram_path.exists():
+            if get_config()['workflow'].get('skip_samples_with_missing_input'):
+                logger.warning(f'No CRAM found, skipping sample {sample}')
+                return self.make_outputs(sample, skipped=True)
+            else:
+                return self.make_outputs(sample, error_msg=f'No CRAM found')
 
         expected_path = self.expected_outputs(sample)
         j = somalier.extact_job(

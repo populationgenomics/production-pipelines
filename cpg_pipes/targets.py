@@ -9,6 +9,7 @@ from enum import Enum
 from typing import Optional
 import pandas as pd
 from cpg_utils.hail_batch import dataset_path, web_url
+from cpg_utils.config import get_config
 
 from . import Namespace, Path, to_path
 from .types import AlignmentInput, CramPath, GvcfPath, SequencingType, FastqPairs
@@ -394,6 +395,13 @@ class Dataset(Target):
             logger.debug(f'Sample {id} already exists in the dataset {self.name}')
             return self._sample_by_id[id]
 
+        force_samples = get_config()['workflow'].get('force_samples', set())
+        forced = (
+            id in force_samples
+            or external_id in force_samples
+            or participant_id in force_samples
+        )
+
         s = Sample(
             id=id,
             dataset=self,
@@ -403,6 +411,7 @@ class Dataset(Target):
             sex=sex,
             pedigree=pedigree,
             alignment_input_by_seq_type=alignment_input_by_seq_type,
+            forced=forced,
         )
         self._sample_by_id[id] = s
         return s
@@ -490,6 +499,7 @@ class Sample(Target):
         sex: Sex | None = None,
         pedigree: Optional['PedigreeInfo'] = None,
         alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] | None = None,
+        forced: bool = False,
     ):
         super().__init__()
         self.id = id
@@ -507,6 +517,7 @@ class Sample(Target):
         self.alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] = (
             alignment_input_by_seq_type or dict()
         )
+        self.forced = forced
 
     def __repr__(self):
         values = {

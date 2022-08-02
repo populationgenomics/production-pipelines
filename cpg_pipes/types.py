@@ -12,6 +12,7 @@ from hailtop.batch import ResourceGroup, ResourceFile, Batch
 
 from . import Path, to_path
 from . import utils
+from .utils import exists
 
 logger = logging.getLogger(__file__)
 
@@ -118,13 +119,13 @@ class CramPath(AlignmentInput):
         """
         CRAM file exists.
         """
-        return self.path.exists()
+        return exists(self.path)
 
     def index_exists(self) -> bool:
         """
         CRAI/BAI index exists
         """
-        return self.index_path.exists()
+        return exists(self.index_path)
 
     @property
     def index_path(self) -> Path:

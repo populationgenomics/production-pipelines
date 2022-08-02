@@ -255,6 +255,7 @@ class CpgInputProvider(InputProvider):
                     logger.warning(
                         f'No pedigree data for participant {sample.participant_id}'
                     )
+                    continue
 
                 ped_entry = ped_entry_by_participant_id[sample.participant_id]
                 maternal_sample = sample_by_participant_id.get(

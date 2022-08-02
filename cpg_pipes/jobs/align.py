@@ -8,6 +8,7 @@ from typing import cast, Tuple
 import logging
 
 import hailtop.batch as hb
+from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from hailtop.batch.job import Job
 
@@ -116,9 +117,6 @@ def align(
     if extra_label:
         base_jname += f' {extra_label}'
 
-    if output_path and utils.can_reuse(output_path, overwrite):
-        return [b.new_job(f'{base_jname} [reuse]', job_attrs)]
-
     # if number of threads is not requested, using whole instance
     requested_nthreads = requested_nthreads or STANDARD.max_threads()
 
@@ -127,6 +125,9 @@ def align(
     sharded = sharded_fq or sharded_bazam
 
     jobs = []
+    sharded_align_jobs = []
+    sorted_bams = []
+    merge_or_align_j = None
 
     if not sharded:  # Just running one alignment job
         align_j, align_cmd = _align_one(
@@ -143,11 +144,9 @@ def align(
         stdout_is_sorted = False
         output_fmt = 'sam'
         jobs.append(align_j)
+        merge_or_align_j = align_j
 
     else:  # Aligning in parallel and merging afterwards
-        align_jobs = []
-        sorted_bams = []
-
         if sharded_fq:  # Aligning each lane separately, merging after
             # running alignment for each fastq pair in parallel
             fastq_pairs = cast(FastqPairs, alignment_input)
@@ -166,7 +165,7 @@ def align(
                 )
                 j.command(wrap_command(cmd, monitor_space=True))
                 sorted_bams.append(j.sorted_bam)
-                align_jobs.append(j)
+                sharded_align_jobs.append(j)
 
         elif sharded_bazam:  # Using BAZAM to shard CRAM
             assert realignment_shards_num, realignment_shards_num
@@ -188,7 +187,7 @@ def align(
                 # need to merge first.
                 j.command(wrap_command(cmd, monitor_space=True))
                 sorted_bams.append(j.sorted_bam)
-                align_jobs.append(j)
+                sharded_align_jobs.append(j)
 
         merge_j = b.new_job(
             'Merge BAMs', (job_attrs or {}) | dict(tool='samtools_merge')
@@ -210,15 +209,16 @@ def align(
         samtools merge -@{nthreads - 1} - {' '.join(sorted_bams)}
         """.strip()
         output_fmt = 'bam'
-        align_j = merge_j
+        jobs.extend(sharded_align_jobs)
+        jobs.append(merge_j)
+        merge_or_align_j = merge_j
         stdout_is_sorted = True
-        jobs.extend(align_jobs + [merge_j])
 
     md_j = finalise_alignment(
         b=b,
         align_cmd=align_cmd,
         stdout_is_sorted=stdout_is_sorted,
-        j=align_j,
+        j=merge_or_align_j,
         sample_name=sample_name,
         job_attrs=job_attrs,
         requested_nthreads=requested_nthreads,
@@ -228,7 +228,7 @@ def align(
         overwrite=overwrite,
         align_cmd_out_fmt=output_fmt,
     )
-    if md_j != align_j:
+    if md_j != merge_or_align_j:
         jobs.append(md_j)
 
     return jobs
@@ -240,6 +240,15 @@ def storage_for_cram_job(
 ) -> int | None:
     """Get storage for a job that processes CRAM"""
     storage_gb = None  # avoid attaching extra disk by default
+
+    try:
+        storage_gb = get_config()['workflow']['resources']['Align']['storage_gb']
+    except KeyError:
+        pass
+    else:
+        assert isinstance(storage_gb, int), storage_gb
+        return storage_gb
+
     if sequencing_type == SequencingType.GENOME:
         if (
             isinstance(alignment_input, FastqPairs)
