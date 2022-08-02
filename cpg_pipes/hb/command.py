@@ -102,7 +102,7 @@ asyncio.get_event_loop().run_until_complete(
     )
 )
 """
-        python_cmd += f"""
+    python_cmd += f"""
 {textwrap.dedent(inspect.getsource(module))}
 {func_name}{func_args}
 """
