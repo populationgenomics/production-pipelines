@@ -53,5 +53,5 @@ token_project_id = 'seqr-308602'
 liftover_38_to_37 = 'liftover/grch38_to_grch37.over.chain.gz'
 
 [images]
-hail = 'driver:18a44866a0c70017f8ab6880f94572e22b2a5b36-hail-51b96aef4671a9985d2c7f69eb370de83738ff6e'
-sm-api = 'driver:18a44866a0c70017f8ab6880f94572e22b2a5b36-hail-51b96aef4671a9985d2c7f69eb370de83738ff6e'
+hail = 'driver:5d04b6d6bb411ea4b8750f40cf39fd0b701ea288-hail-c4eb2b16220d9872f417412ea565902f78739124'
+sm-api = 'driver:5d04b6d6bb411ea4b8750f40cf39fd0b701ea288-hail-c4eb2b16220d9872f417412ea565902f78739124'
