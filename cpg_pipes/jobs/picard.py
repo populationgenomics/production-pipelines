@@ -9,7 +9,7 @@ from hailtop.batch.job import Job
 from cpg_pipes import Path
 from cpg_pipes import utils
 from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.hb.resources import HIGHMEM
 
 
 def markdup(
@@ -31,9 +31,10 @@ def markdup(
         return j
 
     j.image(image_path('picard_samtools'))
-    resource = STANDARD.set_resources(
-        j, storage_gb=175
-    )  # enough for input BAM and output CRAM
+    resource = HIGHMEM.request_resources(ncpu=2)
+    # enough for input BAM and output CRAM
+    resource.attach_disk_storage_gb = 140
+    resource.set_to_job(j)
     j.declare_resource_group(
         output_cram={
             'cram': '{root}.cram',
@@ -43,7 +44,7 @@ def markdup(
     fasta_reference = fasta_res_group(b)
 
     cmd = f"""
-    picard MarkDuplicates -Xms27G \\
+    picard MarkDuplicates -Xms{resource.get_java_mem_mb()}M \\
     I={sorted_bam} O=/dev/stdout M={j.duplicate_metrics} \\
     TMP_DIR=$(dirname {j.output_cram.cram})/picard-tmp \\
     ASSUME_SORT_ORDER=coordinate \\
