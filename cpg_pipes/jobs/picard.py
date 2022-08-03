@@ -33,7 +33,7 @@ def markdup(
     j.image(image_path('picard_samtools'))
     resource = HIGHMEM.request_resources(ncpu=2)
     # enough for input BAM and output CRAM
-    resource.attach_disk_storage_gb = 140
+    resource.attach_disk_storage_gb = 250
     resource.set_to_job(j)
     j.declare_resource_group(
         output_cram={
