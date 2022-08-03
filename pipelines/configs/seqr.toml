@@ -38,7 +38,7 @@ dataset_gcp_project = 'seqr-308602'
 jc_intervals_num = 200
 vep_intervals_num = 200
 check_intermediates = true
-dry_run = true
+dry_run = false
 realign_from_cram_version = 'bwamem'
 
 [workflow.cram_version_reference]
