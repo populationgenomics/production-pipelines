@@ -12,7 +12,7 @@ from cpg_pipes import Path
 from cpg_pipes.types import CramPath, GvcfPath, SequencingType
 from cpg_pipes import utils
 from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.hb.resources import STANDARD, HIGHMEM
 from cpg_pipes.jobs import split_intervals
 
 logger = logging.getLogger(__file__)
@@ -180,7 +180,10 @@ def _haplotype_caller_one(
     storage_gb = None  # avoid extra disk by default
     if sequencing_type == SequencingType.GENOME:
         storage_gb = 100
-    job_res = STANDARD.set_resources(j, ncpu=4, storage_gb=storage_gb)
+    job_res = HIGHMEM.request_resources(ncpu=2)
+    # enough for input CRAM and output GVCF
+    job_res.attach_disk_storage_gb = storage_gb
+    job_res.set_to_job(j)
 
     j.declare_resource_group(
         output_gvcf={
@@ -293,11 +296,11 @@ def postproc_gvcf(
     j = b.new_job(jname, (job_attrs or {}) | dict(tool='gatk_ReblockGVCF'))
     j.image(image_path('gatk'))
 
-    # Enough to fit a pre-reblocked GVCF, which can be as big as 10G,
-    # the reblocked result (1G), and ref data (5G).
     # We need at least 2 CPU, so on 16-core instance it would be 8 jobs,
     # meaning we have more than enough disk (265/8=33.125G).
-    job_res = STANDARD.set_resources(j, storage_gb=20)
+    # Enough to fit a pre-reblocked GVCF, which can be as big as 10G,
+    # the reblocked result (1G), and ref data (5G).
+    job_res = STANDARD.set_resources(j, ncpu=2, storage_gb=20)
 
     j.declare_resource_group(
         output_gvcf={
