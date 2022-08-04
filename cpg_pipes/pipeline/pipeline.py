@@ -288,10 +288,14 @@ class StageInput:
         stage: StageDecorator,
     ):
         if not self._outputs_by_target_by_stage.get(stage.__name__):
-            raise StageInputNotFound(f'Not found output from stage {stage.__name__}')
+            raise StageInputNotFound(
+                f'Not found output from stage {stage.__name__}, required for stage '
+                f'{self.stage.name}'
+            )
         if not self._outputs_by_target_by_stage[stage.__name__].get(target.target_id):
             raise StageInputNotFound(
-                f'Not found output for {target} from stage {stage.__name__}'
+                f'Not found output for {target} from stage {stage.__name__}, required '
+                f'for stage {self.stage.name}'
             )
         return self._outputs_by_target_by_stage[stage.__name__][target.target_id]
 
@@ -563,7 +567,7 @@ class Stage(Generic[TargetT], ABC):
         Based on stage parameters and expected outputs existence, determines what
         to do with the target: queue, skip or reuse, etc..
         """
-        if target.forced:
+        if target.forced and not self.skipped:
             return Action.QUEUE
 
         if (
@@ -935,6 +939,11 @@ class Pipeline:
                     # Initialising and adding as explicit.
                     reqstage = reqcls(self)
                     newly_implicitly_added_d[reqstage.name] = reqstage
+                    if reqcls.__name__ in get_config()['workflow'].get(
+                        'skip_stages', []
+                    ):
+                        reqstage.skipped = True
+                        continue
                     if not force_all_implicit_stages:
                         # Stage is not declared or requested implicitly, so setting
                         # it as skipped:
@@ -1002,7 +1011,7 @@ class Pipeline:
             stage_.output_by_target = stage_.queue_for_cohort(self.cohort)
             if errors := self._process_stage_errors(stage_.output_by_target):
                 raise PipelineError(
-                    f'Stage {stage.__name__} failed to queue jobs with errors: '
+                    f'Stage {stage_} failed to queue jobs with errors: '
                     + '\n'.join(errors)
                 )
 

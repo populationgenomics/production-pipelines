@@ -1,2 +1,4 @@
 [workflow]
+skip_stages = ['FastQC']
 skip_samples_with_missing_input = true
+check_expected_outputs = false

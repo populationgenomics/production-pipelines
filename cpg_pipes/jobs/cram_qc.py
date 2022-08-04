@@ -40,9 +40,6 @@ def samtools_stats(
     j = b.new_job(jname, job_attrs)
     if not output_path:
         output_path = cram_path.path.with_suffix('.stats')
-    if utils.can_reuse(output_path, overwrite):
-        j.name += ' [reuse]'
-        return j
 
     j.image(image_path('samtools'))
     res = STANDARD.set_resources(j, storage_gb=_cram_storage_gb(sequencing_type))
@@ -77,9 +74,6 @@ def verify_bamid(
     j = b.new_job(jname, job_attrs)
     if not output_path:
         output_path = cram_path.path.with_suffix('.selfSM')
-    if utils.can_reuse(output_path, overwrite):
-        j.name += ' [reuse]'
-        return j
 
     j.image(image_path('verify-bam-id'))
     STANDARD.set_resources(j, storage_gb=_cram_storage_gb(sequencing_type))
@@ -128,9 +122,6 @@ def picard_wgs_metrics(
     j = b.new_job(jname, job_attrs)
     if not output_path:
         output_path = cram_path.path.with_suffix('.csv')
-    if utils.can_reuse(output_path, overwrite):
-        j.name += ' [reuse]'
-        return j
 
     j.image(image_path('picard'))
     res = STANDARD.set_resources(j, storage_gb=_cram_storage_gb(sequencing_type))

@@ -1,4 +1,6 @@
 [workflow]
+first_stage = 'GenotypeSample'
+last_stage = 'GenotypeSample'
 sequencing_type = 'genome'
 
 [workflow.resources.Align]

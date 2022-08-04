@@ -42,9 +42,6 @@ def produce_gvcf(
     HaplotypeCaller is run in an interval-based sharded way, with per-interval
     HaplotypeCaller jobs defined in a nested loop.
     """
-    if utils.can_reuse(output_path, overwrite):
-        return [b.new_job('Make GVCF [reuse]', job_attrs)]
-
     hc_gvcf_path = tmp_prefix / 'haplotypecaller' / f'{sample_name}.g.vcf.gz'
 
     jobs = haplotype_caller(
@@ -91,9 +88,6 @@ def haplotype_caller(
     Run haplotype caller in parallel sharded by intervals.
     Returns jobs and path to the output GVCF file.
     """
-    if utils.can_reuse(output_path, overwrite):
-        return [b.new_job('HaplotypeCaller [reuse]', job_attrs)]
-
     jobs: list[Job] = []
     if scatter_count > 1:
         if intervals is None:
@@ -161,9 +155,6 @@ def _haplotype_caller_one(
     """
     job_name = 'HaplotypeCaller'
     j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk_HaplotypeCaller'))
-    if utils.can_reuse(out_gvcf_path, overwrite):
-        j.name += ' [reuse]'
-        return j
 
     j.image(image_path('gatk'))
 
@@ -243,9 +234,6 @@ def merge_gvcfs_job(
     """
     job_name = f'Merge {len(gvcfs)} GVCFs'
     j = b.new_job(job_name, (job_attrs or {}) | dict(tool='picard_MergeVcfs'))
-    if utils.can_reuse(out_gvcf_path, overwrite):
-        j.name += ' [reuse]'
-        return j
 
     j.image(image_path('picard'))
     j.cpu(2)
@@ -287,13 +275,8 @@ def postproc_gvcf(
        from Hail about mismatched INFO annotations
     4. Renames the GVCF sample name to use CPG ID.
     """
-    jname = 'Postproc GVCF'
-    if utils.can_reuse(output_path, overwrite):
-        return b.new_job(jname + ' [reuse]', job_attrs)
-
     logger.info(f'Adding GVCF postproc job for sample {sample_name}, gvcf {gvcf_path}')
-
-    j = b.new_job(jname, (job_attrs or {}) | dict(tool='gatk_ReblockGVCF'))
+    j = b.new_job('Postproc GVCF', (job_attrs or {}) | dict(tool='gatk_ReblockGVCF'))
     j.image(image_path('gatk'))
 
     # We need at least 2 CPU, so on 16-core instance it would be 8 jobs,

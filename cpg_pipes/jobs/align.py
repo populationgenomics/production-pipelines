@@ -161,7 +161,7 @@ def align(
                     job_attrs=job_attrs,
                     aligner=aligner,
                     sequencing_type=sequencing_type,
-                    should_sort=True
+                    should_sort=True,
                 )
                 j.command(wrap_command(cmd, monitor_space=True))
                 sorted_bams.append(j.sorted_bam)

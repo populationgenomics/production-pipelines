@@ -1,6 +1,4 @@
 [workflow]
-first_stage = 'Align'
-last_stage = 'Align' # 'GenotypeSample'
 access_level = 'full'
 dataset = 'seqr'
 datasets = [
@@ -27,11 +25,10 @@ datasets = [
 #status_reporter = 'smdb'
 skip_samples = [
     'CPG11783',   # acute-care, no FASTQ data
-    'CPG246587', 'CPG246645', 'CPG246678', # ag-hidden, DRAGEN issues: https://batch.hail.populationgenomics.org.au/batches/97645/jobs/428
+    'CPG246645',  # ag-hidden, eof issue  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/440
+    'CPG246678',  # ag-hidden, diff fastq size  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/446
 ]
-#only_samples = ['CPG12310']
 check_inputs = true
-skip_samples_with_missing_input = false
 keep_scratch = true
 sequencing_type = 'genome'
 dataset_gcp_project = 'seqr-308602'

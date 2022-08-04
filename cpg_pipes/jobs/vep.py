@@ -45,9 +45,6 @@ def vep_jobs(
     if not to_hail_table:
         assert str(out_path).endswith('.vcf.gz'), out_path
 
-    if out_path and utils.can_reuse(out_path, overwrite):
-        return [b.new_job('VEP [reuse]', job_attrs)]
-
     jobs: list[Job] = []
     vcf = b.read_input_group(
         **{'vcf.gz': str(vcf_path), 'vcf.gz.tbi': str(vcf_path) + '.tbi'}

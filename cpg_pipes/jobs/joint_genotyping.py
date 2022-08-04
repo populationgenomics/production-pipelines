@@ -57,10 +57,6 @@ def make_joint_genotyping_jobs(
     Adds samples to the GenomicsDB and runs joint genotyping on them.
     Outputs a multi-sample VCF under `output_vcf_path`.
     """
-    if utils.can_reuse([out_vcf_path, out_siteonly_vcf_path], overwrite):
-        job_attrs = (job_attrs or {}) | dict(reuse=True)
-        return [b.new_job('Joint genotyping', job_attrs)]
-
     if len(gvcf_by_sid) == 0:
         raise ValueError(
             'Provided samples collection for joint calling should contain '
@@ -212,10 +208,6 @@ def genomicsdb(
             ),
         )
         jobs.append(j)
-
-        if utils.can_reuse(out_path, overwrite):
-            j.name += ' [reuse]'
-            continue
 
         j.image(image_path('gatk'))
 
