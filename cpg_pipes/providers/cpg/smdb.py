@@ -16,7 +16,7 @@ from sample_metadata.apis import (
     ParticipantApi,
     FamilyApi,
 )
-from sample_metadata.exceptions import ApiException, ApiTypeError
+from sample_metadata.exceptions import ApiException
 
 from ... import Path, to_path
 from ... import utils
