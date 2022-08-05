@@ -28,7 +28,7 @@ def markdup(
     j = b.new_job('MarkDuplicates', job_attrs)
 
     j.image(image_path('picard_samtools'))
-    resource = HIGHMEM.request_resources(ncpu=2)
+    resource = HIGHMEM.request_resources(ncpu=4)
     # enough for input BAM and output CRAM
     resource.attach_disk_storage_gb = 250
     resource.set_to_job(j)
