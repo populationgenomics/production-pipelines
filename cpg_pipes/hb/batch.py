@@ -168,9 +168,6 @@ class RegisteringBatch(hb.Batch):
         logger.info('Split by stage:')
         _print_stat(self.job_by_stage, default_label='<not in stage>')
 
-        logger.info('Split by label:')
-        _print_stat(self.job_by_stage, default_label='<no label>')
-
         logger.info(f'Split by tool:')
         _print_stat(self.job_by_tool, default_label='<tool is not defined>')
 

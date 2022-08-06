@@ -1,5 +1,5 @@
 [workflow]
-first_stage = 'GenotypeSample'
+first_stage = 'Align'
 last_stage = 'GenotypeSample'
 sequencing_type = 'genome'
 
