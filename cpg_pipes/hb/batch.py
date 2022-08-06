@@ -70,7 +70,7 @@ class RegisteringBatch(hb.Batch):
     def _process_attributes(
         self,
         name: str | None = None,
-        attributes: JobAttributes | None = None,
+        attributes: JobAttributes | dict | None = None,
     ) -> tuple[str, dict[str, str]]:
         """
         Use job attributes to make the job name more descriptive, and add
@@ -119,7 +119,7 @@ class RegisteringBatch(hb.Batch):
     def new_job(
         self,
         name: str | None = None,
-        attributes: JobAttributes | None = None,
+        attributes: JobAttributes | dict | None = None,
         **kwargs,
     ) -> BashJob:
         """
