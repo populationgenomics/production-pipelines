@@ -85,7 +85,7 @@ def pedigree(
         b=b,
         samples_file=relate_j.output_samples,
         pairs_file=relate_j.output_pairs,
-        original_ped=b.read_input(ped_path),
+        expected_ped=b.read_input(str(ped_path)),
         rich_id_map=dataset.rich_id_map(),
         label=label,
         dataset_name=dataset.name,
@@ -221,7 +221,7 @@ def check_pedigree_job(
     b: Batch,
     samples_file: ResourceFile,
     pairs_file: ResourceFile,
-    original_ped: ResourceFile,
+    expected_ped: ResourceFile,
     rich_id_map: dict[str, str] | None = None,
     label: str | None = None,
     dataset_name: str | None = None,
@@ -248,7 +248,7 @@ def check_pedigree_job(
     python3 {script_name} \\
     --somalier-samples {samples_file} \\
     --somalier-pairs {pairs_file} \\
-    --original-ped {original_ped} \\
+    --expected-ped {expected_ped} \\
     {('--dataset ' + dataset_name) if dataset_name else ''} \\
 
     touch {check_j.output}

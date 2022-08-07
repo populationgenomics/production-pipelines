@@ -14,7 +14,6 @@ a channel with:
 import contextlib
 import logging
 import os
-from io import StringIO
 from typing import Optional, Tuple, List
 
 import click
