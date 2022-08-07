@@ -70,7 +70,7 @@ class RegisteringBatch(hb.Batch):
     def _process_attributes(
         self,
         name: str | None = None,
-        attributes: JobAttributes | None = None,
+        attributes: JobAttributes | dict | None = None,
     ) -> tuple[str, dict[str, str]]:
         """
         Use job attributes to make the job name more descriptive, and add
@@ -119,7 +119,7 @@ class RegisteringBatch(hb.Batch):
     def new_job(
         self,
         name: str | None = None,
-        attributes: JobAttributes | None = None,
+        attributes: JobAttributes | dict | None = None,
         **kwargs,
     ) -> BashJob:
         """
@@ -168,14 +168,8 @@ class RegisteringBatch(hb.Batch):
         logger.info('Split by stage:')
         _print_stat(self.job_by_stage, default_label='<not in stage>')
 
-        logger.info('Split by label:')
-        _print_stat(self.job_by_stage, default_label='<no label>')
-
         logger.info(f'Split by tool:')
         _print_stat(self.job_by_tool, default_label='<tool is not defined>')
-
-        if get_config().get('dry_run', False):
-            return
 
         return super().run(
             dry_run=get_config()['hail'].get('dry_run', False),

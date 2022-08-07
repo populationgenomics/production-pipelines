@@ -385,10 +385,6 @@ def extact_job(
     if not out_fpath:
         out_fpath = gvcf_or_cram_or_bam_path.somalier_path
 
-    if utils.can_reuse(out_fpath, overwrite):
-        j.name += ' [reuse]'
-        return j
-
     j.image(image_path('somalier'))
     if isinstance(gvcf_or_cram_or_bam_path, CramPath):
         storage_gb = None  # avoid extra disk by default

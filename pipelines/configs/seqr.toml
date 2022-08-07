@@ -1,34 +1,34 @@
 [workflow]
-first_stage = 'Align'
-last_stage = 'GenotypeSample'
 access_level = 'full'
 dataset = 'seqr'
 datasets = [
-#    'acute-care',
+    'acute-care',
     'perth-neuro',
-#    'ravenscroft-rdstudy',
-#    'circa',
-#    'heartkids',
-#    'ohmr3-mendelian',
-#    'ohmr4-epilepsy',
-#    'rdnow',
-#    'mito-disease',
-#    'ravenscroft-arch',
-#    'hereditary-neuro',
-#    'validation',
-#    'schr-neuro',
-#    'ibmdx',
-#    'mcri-lrp',
-#    'kidgen',
-#    'ag-hidden'
+    'ravenscroft-rdstudy',
+    'circa',
+    'heartkids',
+    'ohmr3-mendelian',
+    'ohmr4-epilepsy',
+    'rdnow',
+    'mito-disease',
+    'ravenscroft-arch',
+    'hereditary-neuro',
+    'validation',
+    'schr-neuro',
+    'ibmdx',
+    'mcri-lrp',
+    'kidgen',
+    'ag-hidden',
+    'flinders-ophthal',
 ]
 #create_es_index_for_datasets = ['schr-neuro']
 #status_reporter = 'smdb'
 skip_samples = [
     'CPG11783',   # acute-care, no FASTQ data
+    'CPG246645',  # ag-hidden, eof issue  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/440
+    'CPG246678',  # ag-hidden, diff fastq size  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/446
 ]
 check_inputs = true
-skip_samples_with_missing_input = false
 keep_scratch = true
 sequencing_type = 'genome'
 dataset_gcp_project = 'seqr-308602'
@@ -36,6 +36,10 @@ jc_intervals_num = 200
 vep_intervals_num = 200
 check_intermediates = true
 dry_run = false
+realign_from_cram_version = 'bwamem'
+
+[workflow.cram_version_reference]
+bwamem = 'gs://cpg-reference/hg38/v0/Homo_sapiens_assembly38.fasta'
 
 [workflow.skip_samples_stages]
 VerifyBamId = ['CPG13409']  # https://batch.hail.populationgenomics.org.au/batches/56236/jobs/372

@@ -354,9 +354,6 @@ def _add_make_sites_only_job(
     Returns: a Job object with a single output j.sites_only_vcf of type ResourceGroup
     """
     job_name = 'VQSR: MakeSitesOnlyVcf'
-    if utils.can_reuse(output_vcf_path, overwrite):
-        return b.new_job(job_name + ' [reuse]')
-
     j = b.new_job(job_name)
     j.image(image_path('gatk'))
     res = STANDARD.set_resources(j, mem_gb=8, storage_gb=disk_size)

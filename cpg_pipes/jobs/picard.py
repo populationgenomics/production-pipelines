@@ -26,14 +26,11 @@ def markdup(
     """
     job_attrs = (job_attrs or {}) | dict(tool='picard_MarkDuplicates')
     j = b.new_job('MarkDuplicates', job_attrs)
-    if utils.can_reuse(output_path, overwrite):
-        j.name += ' [reuse]'
-        return j
 
     j.image(image_path('picard_samtools'))
-    resource = HIGHMEM.request_resources(ncpu=2)
+    resource = HIGHMEM.request_resources(ncpu=4)
     # enough for input BAM and output CRAM
-    resource.attach_disk_storage_gb = 140
+    resource.attach_disk_storage_gb = 250
     resource.set_to_job(j)
     j.declare_resource_group(
         output_cram={
