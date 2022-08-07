@@ -10,7 +10,6 @@ from hailtop.batch import Batch, ResourceFile
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path, to_path
-from cpg_pipes import utils
 from cpg_pipes.hb.command import wrap_command, seds_to_extend_sample_ids
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs.scripts import check_pedigree
@@ -62,12 +61,13 @@ def pedigree(
         sequencing_type=sequencing_type,
     )
 
+    ped_path = dataset.make_ped_file(tmp_bucket=tmp_bucket)
     relate_j = _relate(
         b=b,
         somalier_file_by_sid=somalier_file_by_sample,
         sample_ids=dataset.get_sample_ids(),
         external_id_map=dataset.rich_id_map(),
-        ped_path=dataset.make_ped_file(tmp_bucket=tmp_bucket),
+        ped_path=ped_path,
         label=label,
         extract_jobs=extract_jobs,
         out_samples_path=out_samples_path,
@@ -85,7 +85,8 @@ def pedigree(
         b=b,
         samples_file=relate_j.output_samples,
         pairs_file=relate_j.output_pairs,
-        external_id_map=dataset.rich_id_map(),
+        original_ped=b.read_input(ped_path),
+        rich_id_map=dataset.rich_id_map(),
         label=label,
         dataset_name=dataset.name,
         out_checks_path=out_checks_path,
@@ -220,7 +221,8 @@ def check_pedigree_job(
     b: Batch,
     samples_file: ResourceFile,
     pairs_file: ResourceFile,
-    external_id_map: dict[str, str] | None = None,
+    original_ped: ResourceFile,
+    rich_id_map: dict[str, str] | None = None,
     label: str | None = None,
     dataset_name: str | None = None,
     somalier_html_url: str | None = None,
@@ -241,11 +243,12 @@ def check_pedigree_job(
     script_path = to_path(check_pedigree.__file__)
     script_name = script_path.name
     cmd = f"""\
-    {seds_to_extend_sample_ids(external_id_map, [samples_file, pairs_file])
-    if external_id_map else ''}
+    {seds_to_extend_sample_ids(rich_id_map, [samples_file, pairs_file])
+    if rich_id_map else ''}
     python3 {script_name} \\
     --somalier-samples {samples_file} \\
     --somalier-pairs {pairs_file} \\
+    --original-ped {original_ped} \\
     {('--dataset ' + dataset_name) if dataset_name else ''} \\
 
     touch {check_j.output}

@@ -19,6 +19,7 @@ from typing import Optional, Tuple, List
 
 import click
 import pandas as pd
+from cpg_utils import to_path
 from peddy import Ped
 
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -39,10 +40,17 @@ logger.setLevel(logging.INFO)
     required=True,
     help='Path to somalier {prefix}.pairs.tsv output file',
 )
+@click.option(
+    '--expected-ped',
+    'expected_ped_fpath',
+    required=True,
+    help='Path to PED file with expected pedigree',
+)
 @click.option('--dataset', 'dataset', help='Dataset name')
 def main(
     somalier_samples_fpath: str,
     somalier_pairs_fpath: str,
+    expected_ped_fpath: str,
     dataset: Optional[str] = None,
 ):
     """
@@ -52,6 +60,7 @@ def main(
     check_pedigree(
         somalier_samples_fpath,
         somalier_pairs_fpath,
+        expected_ped_fpath,
         dataset=dataset,
         pedlog=pedlog,
     )
@@ -110,6 +119,7 @@ class PedigreeLogger:
 def check_pedigree(
     somalier_samples_fpath: str,
     somalier_pairs_fpath: str,
+    expected_ped_fpath: str,
     dataset: Optional[str] = None,
     pedlog: Optional[PedigreeLogger] = None,
 ) -> PedigreeLogger:
@@ -120,9 +130,8 @@ def check_pedigree(
     print(somalier_samples_fpath)
     df = pd.read_csv(somalier_samples_fpath, delimiter='\t')
     pairs_df = pd.read_csv(somalier_pairs_fpath, delimiter='\t')
-    fp = StringIO()
-    df.to_csv(fp, sep='\t', index=False)
-    ped = Ped(StringIO(fp.getvalue()))
+    with to_path(expected_ped_fpath).open() as f:
+        expected_ped = Ped(f)
 
     pedlog = pedlog or PedigreeLogger()
 
@@ -157,7 +166,7 @@ def check_pedigree(
     def _print_stats(df_filter):
         for _, row_ in df[df_filter].iterrows():
             pedlog.info(
-                f'\t{row_.sample_id} ('
+                f' {row_.sample_id} ('
                 f'provided: {row_.original_pedigree_sex}, '
                 f'inferred: {row_.sex}, '
                 f'mean depth: {row_.gt_depth_mean})'
@@ -187,10 +196,11 @@ def check_pedigree(
     pedlog.info('')
 
     pedlog.info(f'*[{dataset}] relatedness:*')
-    sample_by_id = {s.sample_id: s for s in ped.samples()}
+    ped_sample_by_id = {s.sample_id: s for s in expected_ped.samples()}
 
-    pairs_provided_as_unrelated_but_inferred_related = []
-    other_mismatching_pairs = []
+    mismatching_unrelated_to_related = []
+    mismatching_unrelated_to_closely_related = []
+    mismatching_related_to_unrelated = []
 
     for idx, row in pairs_df.iterrows():
         s1 = row['#sample_a']
@@ -203,7 +213,9 @@ def check_pedigree(
         )
         # Supressing all logging output from peddy, otherwise it would clutter the logs
         with contextlib.redirect_stderr(None), contextlib.redirect_stdout(None):
-            peddy_rel = ped.relation(sample_by_id[s1], sample_by_id[s2])
+            peddy_rel = expected_ped.relation(
+                ped_sample_by_id[s1], ped_sample_by_id[s2]
+            )
 
         def _match_peddy_with_inferred(peddy_rel_):
             return {
@@ -220,41 +232,63 @@ def check_pedigree(
                 'unknown': 'unknown',
             }.get(peddy_rel_)
 
+        def _repr_cur_pair() -> str:
+            fam1 = expected_ped.get(sample_id=s1).family_id
+            fam2 = expected_ped.get(sample_id=s2).family_id
+            line = ''
+            if fam1 == fam2:
+                line += f'{fam1}: {s1} - {s2}'
+            else:
+                line += s2 + (f' ({fam1})' if fam1 != s1 else '')
+                line += ' - '
+                line += s2 + (f' ({fam2})' if fam2 != s2 else '')
+            return line + (
+                f', provided: "{peddy_rel}", inferred: "{inferred_rel}" ({reason})'
+            )
+
         if (
             _match_peddy_with_inferred(peddy_rel) == 'unknown'
             and inferred_rel != 'unknown'
             or _match_peddy_with_inferred(peddy_rel) == 'unrelated'
             and inferred_rel != 'unrelated'
         ):
-            pairs_provided_as_unrelated_but_inferred_related.append(
-                f'"{s1}" and "{s2}", '
-                f'provided: "{peddy_rel}", '
-                f'inferred: "{inferred_rel}" ({reason})'
-            )
+            mismatching_unrelated_to_related.append(_repr_cur_pair())
+            if is_close(row['relatedness']):
+                mismatching_unrelated_to_closely_related.append(_repr_cur_pair())
+
         elif inferred_rel != _match_peddy_with_inferred(peddy_rel):
-            other_mismatching_pairs.append(
-                f'"{s1}" and "{s2}", '
-                f'provided: "{peddy_rel}", '
-                f'inferred: "{inferred_rel}" ({reason})'
-            )
+            mismatching_related_to_unrelated.append(_repr_cur_pair())
+
         pairs_df.loc[idx, 'provided_rel'] = peddy_rel
         pairs_df.loc[idx, 'inferred_rel'] = inferred_rel
 
-    if pairs_provided_as_unrelated_but_inferred_related:
+    if mismatching_unrelated_to_related:
         pedlog.info(
-            f'{len(pairs_provided_as_unrelated_but_inferred_related)} sample pair(s) '
-            f'that are provided as unrelated, but inferred as related:'
+            f'Found {len(mismatching_unrelated_to_related)} sample '
+            f'pair(s) that are provided as unrelated, but inferred as related.'
         )
-        for i, pair in enumerate(pairs_provided_as_unrelated_but_inferred_related):
-            pedlog.info(f'#{i + 1} {pair}')
-    if other_mismatching_pairs:
+
+    if mismatching_unrelated_to_closely_related:
         pedlog.info(
-            f'{len(other_mismatching_pairs)} sample pair(s) with mismatched relatedness:'
+            f'Found {len(mismatching_unrelated_to_closely_related)} '
+            f'sample pair(s) that are provided as unrelated, are inferred as '
+            f'first-degree related, twins or identical:'
         )
-        for i, pair in enumerate(other_mismatching_pairs):
-            pedlog.info(f'#{i + 1} {pair}')
-    else:
-        pedlog.info(f'Inferred pedigree matches for all {len(df)} samples.')
+        for i, pair in enumerate(mismatching_unrelated_to_closely_related):
+            pedlog.info(f' {i + 1}. {pair}')
+    if mismatching_related_to_unrelated:
+        pedlog.info(
+            f'Found {len(mismatching_related_to_unrelated)} sample pair(s) '
+            f'that are provided as related, but inferred as unrelated:'
+        )
+        for i, pair in enumerate(mismatching_related_to_unrelated):
+            pedlog.info(f' {i + 1}. {pair}')
+    if (
+        not mismatching_unrelated_to_related
+        and not mismatching_related_to_unrelated
+        and not mismatching_related_to_unrelated
+    ):
+        pedlog.info(f'Inferred pedigree matches for all provided related pairs.')
     pedlog.info('')
 
     print_contents(
@@ -265,7 +299,7 @@ def check_pedigree(
     )
 
     pedlog.mismatching_sex = mismatching_sex.any()
-    pedlog.mismatching_relationships = other_mismatching_pairs
+    pedlog.mismatching_relationships = mismatching_related_to_unrelated
     return pedlog
 
 
@@ -305,6 +339,11 @@ def infer_relationship(kin: float, ibs0: float, ibs2: float) -> Tuple[str, str]:
         assert kin >= 0.8
         result = ('duplicate_or_twins', f'kin={kin:.3f} >= 0.8')
     return result
+
+
+def is_close(kin: float) -> bool:
+    """First degree, duplicate or twin"""
+    return kin > 0.62
 
 
 def print_contents(

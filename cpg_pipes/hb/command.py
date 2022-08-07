@@ -192,7 +192,7 @@ def wrap_command(
 
 
 def seds_to_extend_sample_ids(
-    id_map: dict[str, str],
+    rich_id_map: dict[str, str],
     fnames: list[str | ResourceFile],
 ) -> str:
     """
@@ -200,23 +200,13 @@ def seds_to_extend_sample_ids(
     in each file in `fnames` with an external ID, only if external ID is
     different from the original.
 
-    Examples:
-
-    id_map {'CPG1': 'MYID'}
-    Result: 'CPG1|MYID'
-
-    id_map {'CPG1': 'CPG1'}
-    Result: 'CPG1'
-
-    @param id_map: replace according to this map,
-    @param fnames: file names where to replace IDs.
-    @return:
+    @param rich_id_map: map used to replace samples, e.g. {'CPG1': 'CPG1|MYID'}
+    @param fnames: file names and Hail Batch Resource files where to replace IDs
+    @return: bash command that does replacement
     """
     cmd = ''
-    for sid, new_sid in id_map.items():
-        if sid != new_sid:
-            new_id = f'{sid}|{new_sid}'
-            for fname in fnames:
-                cmd += f'sed -iBAK \'s/{sid}/{new_id}/g\' {fname}'
-                cmd += '\n'
+    for sid, rich_sid in rich_id_map.items():
+        for fname in fnames:
+            cmd += f'sed -iBAK \'s/{sid}/{rich_sid}/g\' {fname}'
+            cmd += '\n'
     return cmd
