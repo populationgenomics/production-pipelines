@@ -34,9 +34,9 @@ def pedigree(
     label: str | None = None,
     ignore_missing: bool = False,
     job_attrs: dict | None = None,
-    status_reporter: StatusReporter | None = None,
     tmp_bucket: Path | None = None,
     sequencing_type: SequencingType = SequencingType.GENOME,
+    send_to_slack: bool = True,
 ) -> list[Job]:
     """
     Add somalier and peddy based jobs that infer relatedness and sex, compare that
@@ -76,7 +76,7 @@ def pedigree(
         out_html_url=out_html_url,
         job_attrs=job_attrs,
     )
-    if out_html_url and status_reporter:
+    if out_html_url:
         slack_message_cmd(
             relate_j, text=f'*[{dataset.name}]* <{out_html_url}|somalier report>'
         )
@@ -91,6 +91,7 @@ def pedigree(
         dataset_name=dataset.name,
         out_checks_path=out_checks_path,
         job_attrs=job_attrs,
+        send_to_slack=send_to_slack,
     )
     check_j.depends_on(relate_j)
 
@@ -121,7 +122,6 @@ def ancestry(
     label: str | None = None,
     ignore_missing: bool = False,
     job_attrs: dict | None = None,
-    status_reporter: StatusReporter | None = None,
     sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> Job:
     """
@@ -149,7 +149,7 @@ def ancestry(
         out_html_url=out_html_url,
         job_attrs=job_attrs,
     )
-    if out_html_url and status_reporter:
+    if out_html_url:
         slack_message_cmd(
             j,
             text=(
@@ -228,6 +228,7 @@ def check_pedigree_job(
     somalier_html_url: str | None = None,
     out_checks_path: Path | None = None,
     job_attrs: dict | None = None,
+    send_to_slack: bool = True,
 ) -> Job:
     """
     Run job that checks pedigree and batch correctness. The job will fail in case
@@ -250,6 +251,7 @@ def check_pedigree_job(
     --somalier-pairs {pairs_file} \\
     --expected-ped {expected_ped} \\
     {('--dataset ' + dataset_name) if dataset_name else ''} \\
+    --{"no-" if send_to_slack else ""}send-to-slack \\
 
     touch {check_j.output}
     """

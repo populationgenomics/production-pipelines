@@ -46,11 +46,17 @@ logger.setLevel(logging.INFO)
     help='Path to PED file with expected pedigree',
 )
 @click.option('--dataset', 'dataset', help='Dataset name')
+@click.option(
+    '--send-to-slack/--no-send-to-slack',
+    'send_to_slack',
+    help='Send log to Slack message, according to environment variables SLACK_CHANNEL and SLACK_TOKEN',
+)
 def main(
     somalier_samples_fpath: str,
     somalier_pairs_fpath: str,
     expected_ped_fpath: str,
     dataset: Optional[str] = None,
+    send_to_slack: bool = True,
 ):
     """
     Report pedigree inconsistencies, given somalier outputs.
@@ -66,7 +72,7 @@ def main(
 
     slack_channel = os.environ.get('SLACK_CHANNEL')
     slack_token = os.environ.get('SLACK_TOKEN')
-    if slack_token and slack_channel:
+    if send_to_slack and slack_token and slack_channel:
         from slack_sdk.errors import SlackApiError
         from slack_sdk import WebClient
 
