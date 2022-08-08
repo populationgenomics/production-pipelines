@@ -196,6 +196,7 @@ class GvcfMultiQC(DatasetStage):
             out_html_url=html_url,
             job_attrs=self.get_job_attrs(dataset),
             sample_id_map=dataset.rich_id_map(),
+            extra_config={'table_columns_visible': {'Picard': True}},
         )
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])
 

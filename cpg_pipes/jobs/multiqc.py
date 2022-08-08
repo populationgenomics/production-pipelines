@@ -31,6 +31,7 @@ def multiqc(
     modules_to_trim_endings: set[str] | None = None,
     job_attrs: dict | None = None,
     sample_id_map: dict[str, str] | None = None,
+    extra_config: dict | None = None,
 ) -> Job:
     """
     Run MultiQC for the files in `qc_paths`
@@ -46,6 +47,7 @@ def multiqc(
     @param job_attrs: attributes to add to Hail Batch job
     @param sample_id_map: sample ID map for bulk sample renaming:
         (https://multiqc.info/docs/#bulk-sample-renaming-in-reports)
+    @param extra_config: extra config to pass to MultiQC
     @return: job object
     """
     j = b.new_job('Run MultiQC', job_attrs)
@@ -69,6 +71,15 @@ def multiqc(
     else:
         sample_map_file = None
 
+    if extra_config:
+        serialised = ", ".join(
+            f"{k}: {str(v).replace('}', '}}').replace('{', '{{')}"
+            for k, v in extra_config.items()
+        )
+        extra_config_param = f'--cl-config "{serialised}"'
+    else:
+        extra_config_param = ''
+
     report_filename = 'report'
     cmd = f"""\
     mkdir inputs
@@ -86,7 +97,7 @@ def multiqc(
     --cl-config "extra_fn_clean_exts: [{endings_conf}]" \\
     --cl-config "max_table_rows: 10000" \\
     --cl-config "use_filename_as_sample_name: [{modules_conf}]" \\
-    --cl-config "table_columns_visible: {{ Picard: True }}"
+    {extra_config_param}
 
     ls output/{report_filename}_data
 
