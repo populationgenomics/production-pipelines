@@ -66,7 +66,7 @@ def pedigree(
         b=b,
         somalier_file_by_sid=somalier_file_by_sample,
         sample_ids=dataset.get_sample_ids(),
-        external_id_map=dataset.rich_id_map(),
+        rich_id_map=dataset.rich_id_map(),
         ped_path=ped_path,
         label=label,
         extract_jobs=extract_jobs,
@@ -243,7 +243,7 @@ def check_pedigree_job(
     script_path = to_path(check_pedigree.__file__)
     script_name = script_path.name
     cmd = f"""\
-    {seds_to_extend_sample_ids(rich_id_map, [samples_file, pairs_file])
+    {seds_to_extend_sample_ids(rich_id_map, [samples_file, pairs_file, expected_ped])
     if rich_id_map else ''}
     python3 {script_name} \\
     --somalier-samples {samples_file} \\
@@ -324,7 +324,7 @@ def _relate(
     b: Batch,
     somalier_file_by_sid: dict[str, Path],
     sample_ids: list[str],
-    external_id_map: dict[str, str],
+    rich_id_map: dict[str, str],
     ped_path: Path,
     label: str | None,
     extract_jobs: list[Job],
@@ -346,17 +346,17 @@ def _relate(
         somalier_file = b.read_input(str(somalier_file_by_sid[sample_id]))
         input_files_lines += f'{somalier_file} \\\n'
     cmd = f"""\
-    cat {b.read_input(str(ped_path))} | grep -v Family.ID > /io/samples.ped 
+    cat {b.read_input(str(ped_path))} | grep -v Family.ID > expected.ped 
     
     somalier relate \\
     {input_files_lines} \\
-    --ped /io/samples.ped \\
+    --ped expected.ped \\
     -o related \\
     --infer
     ls
     mv related.pairs.tsv {j.output_pairs}
     mv related.samples.tsv {j.output_samples}
-    {seds_to_extend_sample_ids(external_id_map, ['related.html'])}
+    {seds_to_extend_sample_ids(rich_id_map, ['related.html'])}
     mv related.html {j.output_html}
     """
     if out_html_url:
