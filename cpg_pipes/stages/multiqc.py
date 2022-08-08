@@ -113,7 +113,6 @@ class CramMultiQC(DatasetStage):
             out_html_path=html_path,
             out_html_url=html_url,
             job_attrs=self.get_job_attrs(dataset),
-            status_reporter=self.status_reporter,
             sample_id_map=dataset.rich_id_map(),
         )
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])
@@ -196,7 +195,6 @@ class GvcfMultiQC(DatasetStage):
             out_html_path=html_path,
             out_html_url=html_url,
             job_attrs=self.get_job_attrs(dataset),
-            status_reporter=self.status_reporter,
             sample_id_map=dataset.rich_id_map(),
         )
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])
@@ -255,7 +253,6 @@ class JointVcfMultiQC(CohortStage):
             out_html_path=html_path,
             out_html_url=html_url,
             job_attrs=self.get_job_attrs(cohort),
-            status_reporter=self.status_reporter,
             sample_id_map=cohort.rich_id_map(),
         )
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
