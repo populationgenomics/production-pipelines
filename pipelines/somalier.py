@@ -12,6 +12,5 @@ pipeline = Pipeline('Somalier')
 pipeline.run(
     stages=[
         CramSomalierPedigree,
-        CramSomalierAncestry,
     ],
 )
