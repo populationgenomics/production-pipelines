@@ -155,7 +155,7 @@ def make_joint_genotyping_jobs(
         site_only=False,
         gvcf_count=len(gvcf_by_sid),
     )
-    gather_j.name = 'Joint genotyping: ' + gather_j.name
+    gather_j.name = f'Joint genotyping: {gather_j.name}'
     jobs.append(gather_j)
 
     logger.info(f'Queueing gather site-only VCFs job')
@@ -167,7 +167,7 @@ def make_joint_genotyping_jobs(
         site_only=True,
         job_attrs=job_attrs,
     )
-    gather_siteonly_j.name = 'Joint genotyping: ' + gather_siteonly_j.name
+    gather_siteonly_j.name = f'Joint genotyping: {gather_siteonly_j.name}'
     jobs.append(gather_siteonly_j)
     return jobs
 
@@ -548,7 +548,7 @@ def _add_joint_genotyper_job(
     job_name = f'Joint genotyping: {tool.name}'
     j = b.new_job(job_name, job_attrs)
     if utils.can_reuse(output_vcf_path, overwrite):
-        j.name += ' [reuse]'
+        j.name = f'{job_name} [reuse]'
         return j, b.read_input_group(
             **{
                 'vcf.gz': str(output_vcf_path),
@@ -557,16 +557,10 @@ def _add_joint_genotyper_job(
         )
 
     j.image(image_path('gatk'))
-
-    xms_gb = 8
-    xmx_gb = 25
-
-    STANDARD.set_resources(
-        j,
-        mem_gb=xmx_gb + 1,
-        # 4G (fasta+fai+dict) + 4G per sample divided by the number of intervals:
-        storage_gb=4 + number_of_samples * 4 // scatter_count,
-    )
+    res = STANDARD.request_resources(ncpu=4)
+    # 4G (fasta+fai+dict) + 4G per sample divided by the number of intervals:
+    res.attach_disk_storage_gb = 4 + number_of_samples * 4 // scatter_count
+    res.set_to_job(j)
 
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
@@ -589,7 +583,7 @@ def _add_joint_genotyper_job(
     cmd = f"""\
     {input_cmd}
     
-    gatk --java-options "-Xms{xms_gb}g -Xmx{xmx_gb}g" \\
+    gatk --java-options "-Xmx{res.get_java_mem_mb()}m" \\
     {tool.name} \\
     -R {reference.base} \\
     -O {j.output_vcf['vcf.gz']} \\
@@ -646,7 +640,7 @@ def _add_exccess_het_filter(
     job_name = 'Joint genotyping: ExcessHet filter'
     j = b.new_job(job_name, job_attrs)
     if utils.can_reuse(output_vcf_path, overwrite):
-        j.name += ' [reuse]'
+        j.name = f'{j.name} [reuse]'
         return j, b.read_input_group(
             **{
                 'vcf.gz': str(output_vcf_path),
@@ -700,7 +694,7 @@ def _add_make_sitesonly_job(
     job_name = 'Joint genotyping: MakeSitesOnlyVcf'
     j = b.new_job(job_name, job_attrs)
     if output_vcf_path and utils.can_reuse(output_vcf_path, overwrite):
-        j.name += ' [reuse]'
+        j.name = f'{j.name} [reuse]'
         return j, b.read_input_group(
             **{
                 'vcf.gz': str(output_vcf_path),
