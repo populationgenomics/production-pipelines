@@ -7,7 +7,6 @@ import logging
 from cpg_utils import to_path
 from cpg_utils.config import get_config
 
-from .. import Path
 from ..types import GvcfPath
 from ..jobs import joint_genotyping
 from ..targets import Cohort
