@@ -85,6 +85,7 @@ class RegisteringBatch(hb.Batch):
         stage = attributes.get('stage')
         dataset = attributes.get('dataset')
         sample = attributes.get('sample')
+        participant_id = attributes.get('participant_id')
         samples: set[str] = set(attributes.get('samples') or [])
         if sample:
             samples.add(sample)
@@ -95,7 +96,14 @@ class RegisteringBatch(hb.Batch):
         if reuse and not tool:
             tool = '[reuse]'
 
-        name = make_job_name(name, sample, dataset, part, reuse)
+        name = make_job_name(
+            name=name,
+            sample=sample,
+            participant_id=participant_id,
+            dataset=dataset,
+            part=part,
+            reuse=reuse,
+        )
 
         if label not in self.job_by_label:
             self.job_by_label[label] = {'job_n': 0, 'samples': set()}
@@ -208,6 +216,7 @@ def setup_batch(description: str) -> RegisteringBatch:
 def make_job_name(
     name: str,
     sample: str | None = None,
+    participant_id: str | None = None,
     dataset: str | None = None,
     part: str | None = None,
     reuse: bool = False,
@@ -215,6 +224,8 @@ def make_job_name(
     """
     Extend the descriptive job name to reflect job attributes.
     """
+    if sample and participant_id:
+        sample = f'{sample}/{participant_id}'
     if sample and dataset:
         name = f'{dataset}/{sample}: {name}'
     elif dataset:

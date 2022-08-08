@@ -629,10 +629,13 @@ class Sample(Target):
         """
         Attributes for Hail Batch job.
         """
-        return {
+        res = {
             'dataset': self.dataset.name,
             'sample': self.id,
         }
+        if self._participant_id or self._external_id:
+            res['participant_id'] = self._participant_id or self._external_id
+        return res
 
     def get_job_prefix(self) -> str:
         """
