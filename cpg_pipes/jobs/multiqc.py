@@ -30,7 +30,6 @@ def multiqc(
     ending_to_trim: set[str] | None = None,
     modules_to_trim_endings: set[str] | None = None,
     job_attrs: dict | None = None,
-    status_reporter: StatusReporter | None = None,
     sample_id_map: dict[str, str] | None = None,
 ) -> Job:
     """
@@ -45,7 +44,6 @@ def multiqc(
     @param ending_to_trim: trim these endings from input files to get sample names
     @param modules_to_trim_endings: list of modules for which trim the endings
     @param job_attrs: attributes to add to Hail Batch job
-    @param status_reporter: optional status reporter to send URL to final report
     @param sample_id_map: sample ID map for bulk sample renaming:
         (https://multiqc.info/docs/#bulk-sample-renaming-in-reports)
     @return: job object
@@ -87,7 +85,8 @@ def multiqc(
     --filename {report_filename}.html \\
     --cl-config "extra_fn_clean_exts: [{endings_conf}]" \\
     --cl-config "max_table_rows: 10000" \\
-    --cl-config "use_filename_as_sample_name: [{modules_conf}]"
+    --cl-config "use_filename_as_sample_name: [{modules_conf}]" \\
+    --cl-config "table_columns_visible: {{ Picard: True }}"
 
     ls output/{report_filename}_data
 
@@ -97,7 +96,7 @@ def multiqc(
     if out_html_url:
         cmd += '\n' + f'echo "HTML URL: {out_html_url}"'
 
-    if out_html_url and status_reporter:
+    if out_html_url:
         slack_message_cmd(j, text=f'*[{dataset_name}]* <{out_html_url}|MultiQC report>')
 
     j.command(wrap_command(cmd, setup_gcp=True))
