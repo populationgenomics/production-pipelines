@@ -210,14 +210,14 @@ def check_pedigree(
         inferred_rel, reason = infer_relationship(
             row['relatedness'], row['ibs0'], row['ibs2']
         )
-        # Supressing all logging output from peddy, otherwise it would clutter the logs
-        with contextlib.redirect_stderr(None), contextlib.redirect_stdout(None):
-            peddy_rel = expected_ped.relation(
-                ped_sample_by_id[s1], ped_sample_by_id[s2]
-            )
 
-        def _match_peddy_with_inferred(peddy_rel_):
-            return {
+        ped_s1 = ped_sample_by_id.get('s1')
+        ped_s2 = ped_sample_by_id.get('s2')
+        if ped_s1 and ped_s2:
+            # Supressing all logging output from peddy, otherwise it would clutter the logs
+            with contextlib.redirect_stderr(None), contextlib.redirect_stdout(None):
+                peddy_rel = expected_ped.relation(ped_s1, ped_s2)
+            matched_peddy_rel = {
                 'unrelated': 'unrelated',
                 'related at unknown level': 'unrelated',
                 'mom-dad': 'unrelated',
@@ -229,7 +229,9 @@ def check_pedigree(
                 'full siblings': 'siblings',
                 'siblings': 'siblings',
                 'unknown': 'unknown',
-            }.get(peddy_rel_)
+            }.get(peddy_rel)
+        else:
+            matched_peddy_rel = 'unknown'
 
         def _repr_cur_pair() -> str:
             fam1 = expected_ped.get(sample_id=s1).family_id
@@ -246,16 +248,16 @@ def check_pedigree(
             )
 
         if (
-            _match_peddy_with_inferred(peddy_rel) == 'unknown'
+            matched_peddy_rel == 'unknown'
             and inferred_rel != 'unknown'
-            or _match_peddy_with_inferred(peddy_rel) == 'unrelated'
+            or matched_peddy_rel == 'unrelated'
             and inferred_rel != 'unrelated'
         ):
             mismatching_unrelated_to_related.append(_repr_cur_pair())
             if is_close(row['relatedness']):
                 mismatching_unrelated_to_closely_related.append(_repr_cur_pair())
 
-        elif inferred_rel != _match_peddy_with_inferred(peddy_rel):
+        elif inferred_rel != matched_peddy_rel:
             mismatching_related_to_unrelated.append(_repr_cur_pair())
 
         pairs_df.loc[idx, 'provided_rel'] = peddy_rel
