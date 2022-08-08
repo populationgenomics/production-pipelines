@@ -223,21 +223,21 @@ def check_pedigree(
             # Supressing all logging output from peddy, otherwise it would clutter the logs
             with contextlib.redirect_stderr(None), contextlib.redirect_stdout(None):
                 peddy_rel = expected_ped.relation(ped_s1, ped_s2)
-            matched_peddy_rel = {
-                'unrelated': 'unrelated',
-                'related at unknown level': 'unrelated',
-                'mom-dad': 'unrelated',
-                'parent-child': 'parent-child',
-                'grandchild': 'below_first_degree',
-                'niece/nephew': 'below_first_degree',
-                'great-grandchild': 'below_first_degree',
-                'cousins': 'below_first_degree',
-                'full siblings': 'siblings',
-                'siblings': 'siblings',
-                'unknown': 'unknown',
-            }.get(peddy_rel)
         else:
-            matched_peddy_rel = 'unknown'
+            peddy_rel = 'unknown'
+        matched_peddy_rel = {
+            'unrelated': 'unrelated',
+            'related at unknown level': 'unrelated',
+            'mom-dad': 'unrelated',
+            'parent-child': 'parent-child',
+            'grandchild': 'below_first_degree',
+            'niece/nephew': 'below_first_degree',
+            'great-grandchild': 'below_first_degree',
+            'cousins': 'below_first_degree',
+            'full siblings': 'siblings',
+            'siblings': 'siblings',
+            'unknown': 'unknown',
+        }.get(peddy_rel)
 
         def _repr_cur_pair() -> str:
             fam1 = expected_ped.get(sample_id=s1).family_id
