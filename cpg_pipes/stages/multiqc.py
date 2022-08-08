@@ -13,6 +13,7 @@ from cpg_pipes.pipeline import (
     DatasetStage,
 )
 from cpg_pipes.pipeline.exceptions import StageInputNotFound
+from cpg_pipes.stages.align import Align
 from cpg_pipes.stages.cram_qc import SamtoolsStats, PicardWgsMetrics, VerifyBamId
 from cpg_pipes.stages.fastqc import FastQC
 from cpg_pipes.stages.somalier import CramSomalierPedigree
@@ -23,6 +24,7 @@ logger = logging.getLogger(__file__)
 
 @stage(
     required_stages=[
+        Align,
         FastQC,
         SamtoolsStats,
         PicardWgsMetrics,
@@ -67,10 +69,11 @@ class MultiQC(DatasetStage):
         ending_to_trim = set()  # endings to trim to get sample names
         for sample in dataset.get_samples():
             for st, key in [
+                (FastQC, 'zip'),
+                (Align, 'markduplicates_metrics'),
                 (SamtoolsStats, None),
                 (PicardWgsMetrics, None),
                 (VerifyBamId, None),
-                (FastQC, 'zip'),
             ]:
                 try:
                     path = inputs.as_path(sample, st, key)
@@ -86,6 +89,7 @@ class MultiQC(DatasetStage):
         assert ending_to_trim
         modules_to_trim_endings = {
             'fastqc/zip',
+            'picard/markdups',
             'samtools',
             'picard/wgs_metrics',
             'verifybamid/selfsm',

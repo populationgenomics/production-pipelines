@@ -7,7 +7,6 @@ from cpg_utils.hail_batch import image_path, fasta_res_group
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
-from cpg_pipes import utils
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import HIGHMEM
 
@@ -15,11 +14,9 @@ from cpg_pipes.hb.resources import HIGHMEM
 def markdup(
     b: hb.Batch,
     sorted_bam: hb.ResourceFile,
-    sample_name: str,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
-    qc_bucket: Path | None = None,
-    overwrite: bool = False,
+    out_markdup_metrics_path: Path | None = None,
 ) -> Job:
     """
     Make job that runs Picard MarkDuplicates and converts the result to CRAM.
@@ -42,7 +39,7 @@ def markdup(
 
     cmd = f"""
     picard MarkDuplicates -Xms{resource.get_java_mem_mb()}M \\
-    I={sorted_bam} O=/dev/stdout M={j.duplicate_metrics} \\
+    I={sorted_bam} O=/dev/stdout M={j.markdup_metrics} \\
     TMP_DIR=$(dirname {j.output_cram.cram})/picard-tmp \\
     ASSUME_SORT_ORDER=coordinate \\
     | samtools view -@{resource.get_nthreads() - 1} -T {fasta_reference.base} -O cram -o {j.output_cram.cram}
@@ -52,15 +49,11 @@ def markdup(
     j.command(wrap_command(cmd, monitor_space=True))
 
     if output_path:
-        if not qc_bucket:
-            qc_bucket = output_path.parent
-
         b.write_output(j.output_cram, str(output_path.with_suffix('')))
-        b.write_output(
-            j.duplicate_metrics,
-            str(
-                qc_bucket / 'duplicate-metrics' / f'{sample_name}-duplicate-metrics.csv'
-            ),
-        )
+        if out_markdup_metrics_path:
+            b.write_output(
+                j.markdup_metrics,
+                str(out_markdup_metrics_path),
+            )
 
     return j

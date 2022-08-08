@@ -22,11 +22,17 @@ class Align(SampleStage):
     Align or re-align input data to produce a CRAM file
     """
 
-    def expected_outputs(self, sample: Sample) -> Path:
+    def expected_outputs(self, sample: Sample) -> dict[str, Path]:
         """
         Stage is expected to generate a CRAM file and a corresponding index.
         """
-        return sample.get_cram_path().path
+        return {
+            'cram': sample.get_cram_path().path,
+            'markduplicates_metrics': sample.dataset.prefix()
+            / 'qc'
+            / 'markduplicates_metrics'
+            / (sample.id + '.markduplicates-metrics'),
+        }
 
     @staticmethod
     def _get_cram_reference_from_version(cram_version) -> str:
@@ -86,7 +92,10 @@ class Align(SampleStage):
         jobs = align.align(
             b=self.b,
             alignment_input=alignment_input,
-            output_path=self.expected_outputs(sample),
+            output_path=self.expected_outputs(sample)['cram'],
+            out_markdup_metrics_path=self.expected_outputs(sample)[
+                'markduplicates_metrics'
+            ],
             sample_name=sample.id,
             job_attrs=self.get_job_attrs(sample),
             overwrite=not get_config()['workflow'].get('check_intermediates'),

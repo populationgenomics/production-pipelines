@@ -83,7 +83,7 @@ def align(
     sample_name: str,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
-    qc_bucket: Path | None = None,
+    out_markdup_metrics_path: Path | None = None,
     aligner: Aligner = Aligner.DRAGMAP,
     markdup_tool: MarkDupTool = MarkDupTool.PICARD,
     extra_label: str | None = None,
@@ -219,13 +219,11 @@ def align(
         align_cmd=align_cmd,
         stdout_is_sorted=stdout_is_sorted,
         j=merge_or_align_j,
-        sample_name=sample_name,
         job_attrs=job_attrs,
         requested_nthreads=requested_nthreads,
         markdup_tool=markdup_tool,
         output_path=output_path,
-        qc_bucket=qc_bucket,
-        overwrite=overwrite,
+        out_markdup_metrics_path=out_markdup_metrics_path,
         align_cmd_out_fmt=output_fmt,
     )
     if md_j != merge_or_align_j:
@@ -502,12 +500,10 @@ def finalise_alignment(
     stdout_is_sorted: bool,
     j: Job,
     requested_nthreads: int,
-    sample_name: str,
     markdup_tool: MarkDupTool,
     job_attrs: dict | None = None,
     output_path: Path | None = None,
-    qc_bucket: Path | None = None,
-    overwrite: bool = True,
+    out_markdup_metrics_path: Path | None = None,
     align_cmd_out_fmt: str = 'sam',
 ) -> Job | None:
     """
@@ -530,7 +526,7 @@ def finalise_alignment(
         align_cmd = f"""\
         {align_cmd.strip()} \\
         | bamsormadup inputformat={align_cmd_out_fmt} threads={min(nthreads, 6)} \\
-        SO=coordinate M={j.duplicate_metrics} outputformat=sam \\
+        SO=coordinate M={j.markdup_metrics} outputformat=sam \\
         tmpfile=$(dirname {j.output_cram.cram})/bamsormadup-tmp \\
         | samtools view -@{min(nthreads, 6) - 1} -T {reference.base} \\
         -Ocram -o {j.output_cram.cram}       
@@ -551,25 +547,17 @@ def finalise_alignment(
         md_j = picard.markdup(
             b,
             j.sorted_bam,
-            sample_name=sample_name,
             job_attrs=job_attrs,
-            overwrite=overwrite,
         )
 
     if output_path:
-        if not qc_bucket:
-            qc_bucket = output_path.parent
-
         if md_j is not None:
             b.write_output(md_j.output_cram, str(output_path.with_suffix('')))
-            b.write_output(
-                md_j.duplicate_metrics,
-                str(
-                    qc_bucket
-                    / 'duplicate-metrics'
-                    / f'{sample_name}-duplicate-metrics.csv'
-                ),
-            )
+            if out_markdup_metrics_path:
+                b.write_output(
+                    md_j.markdup_metrics,
+                    str(out_markdup_metrics_path),
+                )
         else:
             b.write_output(j.sorted_bam, str(output_path.with_suffix('')))
 
