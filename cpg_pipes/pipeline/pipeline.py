@@ -382,7 +382,7 @@ class Stage(Generic[TargetT], ABC):
     def __init__(
         self,
         name: str,
-        batch: Batch,
+        batch: RegisteringBatch,
         cohort: Cohort,
         pipeline_tmp_prefix: Path,
         run_id: str,
@@ -939,6 +939,10 @@ class Pipeline:
                     # Initialising and adding as explicit.
                     reqstage = reqcls(self)
                     newly_implicitly_added_d[reqstage.name] = reqstage
+                    if reqcls.__name__ in get_config()['workflow'].get(
+                        'assume_outputs_exist_for_stages', []
+                    ):
+                        reqstage.assume_outputs_exist = True
                     if reqcls.__name__ in get_config()['workflow'].get(
                         'skip_stages', []
                     ):
