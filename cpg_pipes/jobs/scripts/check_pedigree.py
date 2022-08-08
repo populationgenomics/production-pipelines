@@ -264,7 +264,8 @@ def check_pedigree(
     if mismatching_unrelated_to_related:
         pedlog.info(
             f'Found {len(mismatching_unrelated_to_related)} sample '
-            f'pair(s) that are provided as unrelated, but inferred as related.'
+            f'pair(s) that are provided as unrelated, but inferred as related '
+            f'below first degree'
         )
 
     if mismatching_unrelated_to_closely_related:
