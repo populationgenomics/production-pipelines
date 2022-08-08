@@ -11,4 +11,4 @@ RUN apt-get update && apt-get install -y git wget bash bzip2 zip curl && \
     micromamba install -y --prefix $MAMBA_ROOT_PREFIX -c bioconda -c conda-forge \
     google-cloud-sdk && \
     rm -r /root/micromamba/pkgs && \
-    pip3 install peddy slack_sdk
+    pip3 install peddy slack_sdk cpg_utils
