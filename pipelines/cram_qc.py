@@ -6,11 +6,11 @@ and pedigree checks.
 """
 
 from cpg_pipes.pipeline.pipeline import Pipeline
-from cpg_pipes.stages.multiqc import MultiQC
+from cpg_pipes.stages.multiqc import CramMultiQC
 
 
 pipeline = Pipeline('CRAM QC')
 pipeline.run(
-    stages=[MultiQC],
+    stages=[CramMultiQC],
     force_all_implicit_stages=True,
 )
