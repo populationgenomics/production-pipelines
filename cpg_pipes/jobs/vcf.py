@@ -82,9 +82,9 @@ def gather_vcfs(
 
     if gvcf_count:
         storage_gb = (1 if site_only else 2) * gvcf_count
-        STANDARD.set_resources(j, fraction=1, storage_gb=storage_gb)
+        res = STANDARD.set_resources(j, fraction=1, storage_gb=storage_gb)
     else:
-        STANDARD.set_resources(j, fraction=1)
+        res = STANDARD.set_resources(j, fraction=1)
 
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
@@ -96,13 +96,13 @@ def gather_vcfs(
     # our invocation. This argument disables expensive checks that the file headers 
     # contain the same set of genotyped samples and that files are in order 
     # by position of first record.
-    gatk --java-options -Xms25g \\
+    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
     GatherVcfsCloud \\
     --ignore-safety-checks \\
     --gather-type BLOCK \\
-    --create-output-variant-index \\
     {input_cmdl} \\
     --output {j.output_vcf['vcf.gz']}
+    tabix -p vcf {j.output_vcf['vcf.gz']}
     """
     j.command(wrap_command(cmd, monitor_space=True))
     if out_vcf_path:
