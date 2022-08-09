@@ -290,7 +290,7 @@ def make_vqsr_jobs(
             ).output_vcf
             for idx in range(scatter_count)
         ]
-        recalibrated_gathered_vcf_j, recalibrated_gathered_vcf = gather_vcfs(
+        recalibrated_gathered_vcf_jobs, recalibrated_gathered_vcf = gather_vcfs(
             b=b,
             input_vcfs=[v['vcf.gz'] for v in scattered_vcfs],
             overwrite=overwrite,
@@ -299,8 +299,9 @@ def make_vqsr_jobs(
             gvcf_count=gvcf_count,
             job_attrs=job_attrs,
         )
-        recalibrated_gathered_vcf_j.name = f'VQSR: {recalibrated_gathered_vcf_j.name}'
-        jobs.append(recalibrated_gathered_vcf_j)
+        for j in recalibrated_gathered_vcf_jobs:
+            j.name = f'VQSR: {j.name}'
+        jobs.extend(recalibrated_gathered_vcf_jobs)
 
     else:
         snps_recalibrator_job = add_snps_variant_recalibrator_step(
@@ -354,6 +355,9 @@ def _add_make_sites_only_job(
     Returns: a Job object with a single output j.sites_only_vcf of type ResourceGroup
     """
     job_name = 'VQSR: MakeSitesOnlyVcf'
+    if utils.can_reuse(output_vcf_path, overwrite):
+        return b.new_job(job_name + ' [reuse]')
+
     j = b.new_job(job_name)
     j.image(image_path('gatk'))
     res = STANDARD.set_resources(j, mem_gb=8, storage_gb=disk_size)

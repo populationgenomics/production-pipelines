@@ -9,6 +9,7 @@ from hailtop.batch.job import Job
 from cpg_pipes import Path
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import HIGHMEM, STANDARD
+from cpg_pipes.utils import can_reuse
 
 
 def markdup(
@@ -17,12 +18,16 @@ def markdup(
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     out_markdup_metrics_path: Path | None = None,
+    overwrite: bool = False,
 ) -> Job:
     """
     Make job that runs Picard MarkDuplicates and converts the result to CRAM.
     """
     job_attrs = (job_attrs or {}) | dict(tool='picard_MarkDuplicates')
     j = b.new_job('MarkDuplicates', job_attrs)
+    if can_reuse(output_path, overwrite):
+        j.name = f'{j.name} [reuse]'
+        return j
 
     j.image(image_path('picard_samtools'))
     resource = HIGHMEM.request_resources(ncpu=4)

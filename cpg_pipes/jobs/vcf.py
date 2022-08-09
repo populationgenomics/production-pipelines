@@ -63,23 +63,22 @@ def gather_vcfs(
     site_only: bool = False,
     gvcf_count: int | None = None,
     job_attrs: dict | None = None,
-) -> Tuple[Job, hb.ResourceGroup]:
+) -> tuple[list[Job], hb.ResourceGroup]:
     """
     Combines per-interval scattered VCFs into a single VCF.
     Saves the output VCF to a bucket `output_vcf_path`
     """
-    job_name = f'Gather {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
-    j = b.new_job(job_name, job_attrs)
-    j.image(image_path('gatk'))
-
     if out_vcf_path and utils.can_reuse(out_vcf_path, overwrite):
-        j.name += ' [reuse]'
-        return j, b.read_input_group(
+        return [], b.read_input_group(
             **{
                 'vcf.gz': str(out_vcf_path),
                 'vcf.gz.tbi': f'{out_vcf_path}.tbi',
             }
         )
+
+    job_name = f'Gather {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
+    j = b.new_job(job_name, job_attrs)
+    j.image(image_path('gatk'))
 
     if gvcf_count:
         storage_gb = (1 if site_only else 2) * gvcf_count
@@ -101,12 +100,11 @@ def gather_vcfs(
     GatherVcfsCloud \\
     --ignore-safety-checks \\
     --gather-type BLOCK \\
+    --create-output-variant-index \\
     {input_cmdl} \\
     --output {j.output_vcf['vcf.gz']}
-
-    tabix {j.output_vcf['vcf.gz']}
     """
     j.command(wrap_command(cmd, monitor_space=True))
     if out_vcf_path:
         b.write_output(j.output_vcf, str(out_vcf_path).replace('.vcf.gz', ''))
-    return j, j.output_vcf
+    return [j], j.output_vcf

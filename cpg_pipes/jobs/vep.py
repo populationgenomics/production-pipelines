@@ -45,6 +45,9 @@ def vep_jobs(
     if not to_hail_table:
         assert str(out_path).endswith('.vcf.gz'), out_path
 
+    if out_path and utils.can_reuse(out_path, overwrite):
+        return [b.new_job('VEP [reuse]', job_attrs)]
+
     jobs: list[Job] = []
     vcf = b.read_input_group(
         **{'vcf.gz': str(vcf_path), 'vcf.gz.tbi': str(vcf_path) + '.tbi'}
@@ -114,7 +117,7 @@ def vep_jobs(
         part_files.append(part_path or j.output['vcf.gz'])
 
     if to_hail_table:
-        gather_j = gather_vep_json_to_ht(
+        gather_jobs = gather_vep_json_to_ht(
             b=b,
             vep_results_paths=part_files,
             out_path=out_path,
@@ -122,13 +125,13 @@ def vep_jobs(
         )
     else:
         assert len(part_files) == scatter_count
-        gather_j, gather_vcf = gather_vcfs(
+        gather_jobs, gather_vcf = gather_vcfs(
             b=b,
             input_vcfs=part_files,
             out_vcf_path=out_path,
         )
-    gather_j.depends_on(*jobs)
-    jobs.append(gather_j)
+    [j.depends_on(*jobs) for j in gather_jobs]
+    jobs.extend(gather_jobs)
     return jobs
 
 
@@ -137,7 +140,7 @@ def gather_vep_json_to_ht(
     vep_results_paths: list[Path],
     out_path: Path,
     job_attrs: dict | None = None,
-):
+) -> list[Job]:
     """
     Parse results from VEP with annotations formatted in JSON,
     and write into a Hail Table using a Batch job.
@@ -153,7 +156,7 @@ def gather_vep_json_to_ht(
         setup_hail=True,
     )
     j.command(cmd)
-    return j
+    return [j]
 
 
 def vep_one(

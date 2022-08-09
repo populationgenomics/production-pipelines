@@ -4,7 +4,7 @@ Create Hail Batch jobs for alignment.
 
 from enum import Enum
 from textwrap import dedent
-from typing import cast, Tuple
+from typing import cast
 import logging
 
 import hailtop.batch as hb
@@ -13,8 +13,6 @@ from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
-from cpg_pipes import utils
-from cpg_pipes.targets import Sample
 from cpg_pipes.types import AlignmentInput, FastqPairs, CramPath, SequencingType
 from cpg_pipes.jobs import picard
 from cpg_pipes.hb.command import wrap_command
@@ -225,6 +223,7 @@ def align(
         output_path=output_path,
         out_markdup_metrics_path=out_markdup_metrics_path,
         align_cmd_out_fmt=output_fmt,
+        overwrite=overwrite,
     )
     if md_j != merge_or_align_j:
         jobs.append(md_j)
@@ -505,6 +504,7 @@ def finalise_alignment(
     output_path: Path | None = None,
     out_markdup_metrics_path: Path | None = None,
     align_cmd_out_fmt: str = 'sam',
+    overwrite: bool = False,
 ) -> Job | None:
     """
     For `MarkDupTool.BIOBAMBAM`, adds bamsormadup command piped to the existing job.
@@ -548,6 +548,7 @@ def finalise_alignment(
             b,
             j.sorted_bam,
             job_attrs=job_attrs,
+            overwrite=overwrite,
         )
 
     if output_path:

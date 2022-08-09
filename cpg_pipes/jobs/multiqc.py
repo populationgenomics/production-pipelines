@@ -13,7 +13,6 @@ from hailtop.batch import Batch
 from cpg_pipes import Path
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.providers.status import StatusReporter
 from cpg_pipes.slack import slack_message_cmd
 
 logger = logging.getLogger(__file__)
