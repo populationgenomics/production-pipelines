@@ -68,13 +68,17 @@ def main(
     host = get_config()['elasticsearch']['host']
     port = str(get_config()['elasticsearch']['port'])
     username = get_config()['elasticsearch']['username']
+    project_id = get_config()['elasticsearch']['password_project_id']
+    secret_name = get_config()['elasticsearch']['password_secret_id']
     password = password or read_secret(
-        project_id=get_config()['elasticsearch']['password_project_id'],
-        secret_name=get_config()['elasticsearch']['password_secret_id'],
+        project_id=project_id,
+        secret_name=secret_name,
         fail_gracefully=False,
     )
     assert password
 
+    logger.info(f'Connecting to ElasticSearch: host={host}:{port}, user={username}')
+    logger.info(f'Read passport from secret {secret_name} in project {project_id}')
     es = HailElasticsearchClient(
         host=host,
         port=port,
