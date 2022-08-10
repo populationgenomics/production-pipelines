@@ -77,8 +77,8 @@ def main(
     )
     assert password
 
-    logger.info(f'Connecting to ElasticSearch: host={host}:{port}, user={username}')
-    logger.info(f'Read passport from secret {secret_name} in project {project_id}')
+    print(f'Connecting to ElasticSearch: host={host}:{port}, user={username}')
+    print(f'Reading passport from secret {secret_name} in project {project_id}')
     es = HailElasticsearchClient(
         host=host,
         port=port,
