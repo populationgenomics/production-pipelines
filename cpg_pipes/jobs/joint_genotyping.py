@@ -94,7 +94,7 @@ def make_joint_genotyping_jobs(
         overwrite=overwrite,
         job_attrs=job_attrs,
     )
-    for idx, import_gvcfs_j in import_gvcfs_job_by_idx.items():
+    for _, import_gvcfs_j in import_gvcfs_job_by_idx.items():
         jobs.append(import_gvcfs_j)
 
     vcfs: list[hb.ResourceFile] = []

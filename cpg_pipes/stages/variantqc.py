@@ -70,7 +70,7 @@ class JointVcfQc(CohortStage):
         https://github.com/ewels/MultiQC/blob/master/multiqc/utils/search_patterns.yaml#L534-L538
         """
         h = self.cohort.alignment_inputs_hash()
-        prefix = self.cohort.analysis_dataset.prefix() / 'qc' / 'jc' / 'picard'
+        prefix = self.cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / 'picard'
         return {
             'summary': to_path(f'{prefix}.variant_calling_summary_metrics'),
             'detail': to_path(f'{prefix}.variant_calling_detail_metrics'),

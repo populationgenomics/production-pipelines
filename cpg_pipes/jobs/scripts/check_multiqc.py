@@ -62,8 +62,8 @@ def main(
 
     with to_path(multiqc_json_path).open() as f:
         d = json.load(f)
-        d = d["report_general_stats_data"]
-        print(f'report_general_stats_data: {pprint.pformat(d)}')
+        sections = d['report_general_stats_data']
+        print(f'report_general_stats_data: {pprint.pformat(sections)}')
 
     bad_lines_by_sample = defaultdict(list)
     for config_key, fail_sign, good_sign, is_fail in [
@@ -83,7 +83,7 @@ def main(
         threshold_d = (
             get_config()['qc_thresholds'].get(seq_type, {}).get(config_key, {})
         )
-        for i, section in enumerate(d):
+        for section in sections:
             for sample, val_by_metric in section.items():
                 for metric, threshold in threshold_d.items():
                     if metric in val_by_metric:

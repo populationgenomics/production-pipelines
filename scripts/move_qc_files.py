@@ -47,8 +47,9 @@ if MOVE_DUPLICATE_METRICS:
             / (sample.id + '.markduplicates-metrics')
         )
         if not current_path.exists():
-            print(f'Warning: {current_path} does not exist')
+            print(f'{i} Warning: {current_path} does not exist')
         else:
+            print(f'{i} cp {current_path}->{new_path}')
             current_path.copy(new_path)
 
 if MOVE_CRAM_QC:
@@ -73,9 +74,9 @@ if MOVE_CRAM_QC:
             old_path = old_path_d[key]
             new_path = new_path_d[key]
             if not old_path.exists():
-                print(f'Warning: {old_path} does not exist')
+                print(f'{i} Warning: {old_path} does not exist')
             else:
-                print(f'Copy from {old_path} to {new_path}')
+                print(f'{i} Copy from {old_path} to {new_path}')
                 if not DRY_RUN:
                     try:
                         old_path.copy(new_path)

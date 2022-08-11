@@ -239,17 +239,18 @@ def check_pedigree(
             else:
                 inferred_rel = 'unknown'
 
-        def _repr_cur_pair() -> str:
-            fam1 = expected_ped_s1.family_id if expected_ped_s1 else None
-            fam2 = expected_ped_s2.family_id if expected_ped_s2 else None
+        if inferred_rel != expected_rel:
+            # Constructing a line for a report:
             line = ''
-            if fam1 == fam2:
+            if (fam1 := expected_ped_s1.family_id if expected_ped_s1 else None) == (
+                fam2 := expected_ped_s2.family_id if expected_ped_s2 else None
+            ):
                 line += f'{fam1}: {s1} - {s2}'
             else:
                 line += s1 + (f' ({fam1})' if fam1 and fam1 != s1 else '')
                 line += ' - '
                 line += s2 + (f' ({fam2})' if fam2 and fam2 != s2 else '')
-            return (
+            line = (
                 f'{line}, '
                 f'provided: "{expected_rel}", '
                 f'inferred: "{inferred_rel}", '
@@ -258,18 +259,17 @@ def check_pedigree(
                 f'ibs2={row["ibs2"]}'
             )
 
-        if inferred_rel != expected_rel:
             if (
                 expected_rel == 'unknown'
                 and inferred_rel != 'unknown'
                 or expected_rel == 'unrelated'
                 and inferred_rel != 'unrelated'
             ):
-                mismatching_unrelated_to_related.append(_repr_cur_pair())
+                mismatching_unrelated_to_related.append(line)
             # elif inferred_rel in ['related at unknown level', 'unknown']:
             #     pass
             else:
-                mismatching_related_to_unrelated.append(_repr_cur_pair())
+                mismatching_related_to_unrelated.append(line)
 
         pairs_df.loc[idx, 'provided_rel'] = expected_rel
         pairs_df.loc[idx, 'inferred_rel'] = inferred_rel
