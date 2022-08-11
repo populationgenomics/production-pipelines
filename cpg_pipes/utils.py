@@ -3,10 +3,12 @@ Utility functions and constants.
 """
 
 import logging
+import re
 import string
 import sys
 import time
 import traceback
+import unicodedata
 from functools import lru_cache
 from random import choices
 from typing import cast
@@ -114,3 +116,25 @@ def timestamp(rand_suffix_len: int = 5) -> str:
         )
         result += f'_{rand_bit}'
     return result
+
+
+def slugify(line: str):
+    """
+    Slugify a string.
+
+    Example:
+    >>> slugify(u"Héllø Wörld")
+    u"hello-world"
+    """
+
+    return re.sub(
+        r'[-\s]+',
+        '-',
+        re.sub(
+            r'[^\w\s-]',
+            '',
+            unicodedata.normalize('NFKD', line).encode('ascii', 'ignore').decode(),
+        )
+        .strip()
+        .lower(),
+    )

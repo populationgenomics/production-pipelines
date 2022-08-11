@@ -19,10 +19,8 @@ from typing import cast, Callable, Union, TypeVar, Generic, Any, Optional, Type
 
 from cloudpathlib import CloudPath
 import hailtop.batch as hb
-from hailtop.batch import Batch
 from hailtop.batch.job import Job
 from cpg_utils.config import get_config
-from slugify import slugify
 
 from .exceptions import PipelineError, StageInputNotFound
 from .. import Path, to_path, Namespace
@@ -34,7 +32,7 @@ from ..providers.inputs import InputProvider, CsvInputProvider
 from ..targets import Target, Dataset, Sample, Cohort
 from ..providers.status import StatusReporter
 from ..types import SequencingType
-from ..utils import exists, timestamp
+from ..utils import exists, timestamp, slugify
 
 logger = logging.getLogger(__file__)
 
@@ -633,9 +631,7 @@ class Stage(Generic[TargetT], ABC):
         if self.assume_outputs_exist:
             return expected_out, None
 
-        def _filter_obj(
-            item: ExpectedResultT, pred: Callable[[ExpectedResultT], bool]
-        ) -> ExpectedResultT:
+        def _filter_obj(item: ExpectedResultT, pred: Callable) -> ExpectedResultT:
             """
             Recursively filter every value in a dict or a list using predicate `pred`
             """
@@ -644,6 +640,7 @@ class Stage(Generic[TargetT], ABC):
                     return item
             if isinstance(item, dict):
                 return {k: v for k, v in item.items() if pred(v)}
+            return item
 
         if get_config()['workflow'].get('check_expected_outputs'):
             reusable_out = _filter_obj(expected_out, exists)

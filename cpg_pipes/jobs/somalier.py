@@ -11,14 +11,14 @@ from cpg_utils.hail_batch import (
     fasta_res_group,
     copy_common_env,
 )
-from hailtop.batch import Batch, ResourceFile
+from hailtop.batch import Batch, Resource
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path, to_path
 from cpg_pipes.hb.command import wrap_command, seds_to_extend_sample_ids
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs.scripts import check_pedigree
-from cpg_pipes.slack import slack_message_cmd, slack_env
+from cpg_pipes.slack import slack_message_cmd
 from cpg_pipes.targets import Dataset, Sample
 from cpg_pipes.types import CramPath, GvcfPath, SequencingType
 from cpg_pipes.utils import can_reuse
@@ -39,7 +39,7 @@ def pedigree(
     out_samples_path: Path,
     out_pairs_path: Path,
     out_html_path: Path,
-    out_html_url: str,
+    out_html_url: str | None = None,
     out_checks_path: Path | None = None,
     verifybamid_by_sid: dict[str, Path | str] | None = None,
     label: str | None = None,
@@ -180,7 +180,7 @@ def _prep_somalier_files(
     """
     Generate .somalier file for each input.
     """
-    extract_jobs = []
+    extract_jobs: list[Job] = []
     missing_input = []
     somalier_file_by_sample = dict()
     for sample in samples:
@@ -211,7 +211,8 @@ def _prep_somalier_files(
             sequencing_type=sequencing_type,
         )
         somalier_file_by_sample[sample.id] = gvcf_or_cram_or_bam_path.somalier_path
-        extract_jobs.append(j)
+        if j is not None:
+            extract_jobs.append(j)
 
     if len(missing_input) > 0:
         msg = (
@@ -226,11 +227,11 @@ def _prep_somalier_files(
 
 def check_pedigree_job(
     b: Batch,
-    samples_file: ResourceFile,
-    pairs_file: ResourceFile,
-    expected_ped: ResourceFile,
-    somalier_html_url: str,
+    samples_file: Resource,
+    pairs_file: Resource,
+    expected_ped: Resource,
     dataset_name: str,
+    somalier_html_url: str | None = None,
     rich_id_map: dict[str, str] | None = None,
     label: str | None = None,
     out_checks_path: Path | None = None,
@@ -245,28 +246,28 @@ def check_pedigree_job(
     if label:
         title += f' [{label}]'
 
-    check_j = b.new_job(title, job_attrs)
-    check_j.attributes['tool'] = 'python'
+    check_j = b.new_job(title, (job_attrs or {}) | dict(tool='python'))
     STANDARD.set_resources(check_j, ncpu=2)
     check_j.image(image_path('peddy'))
 
     script_path = to_path(check_pedigree.__file__)
     script_name = script_path.name
     cmd = f"""\
-    {seds_to_extend_sample_ids(rich_id_map, [samples_file, pairs_file, expected_ped])
+    {seds_to_extend_sample_ids(rich_id_map, [str(samples_file), str(pairs_file), str(expected_ped)])
     if rich_id_map else ''}
     python3 {script_name} \\
     --somalier-samples {samples_file} \\
     --somalier-pairs {pairs_file} \\
     --expected-ped {expected_ped} \\
-    --html-url {somalier_html_url} \\
+    {"--html-url {somalier_html_url}" if somalier_html_url else ""} \\
     --dataset {dataset_name} \\
     --title "{title}" \\
     --{"no-" if not send_to_slack else ""}send-to-slack
 
     touch {check_j.output}
-    echo "HTML URL: {somalier_html_url}"
     """
+    if somalier_html_url:
+        cmd += f'echo "HTML URL: {somalier_html_url}"'
 
     copy_common_env(check_j)
     check_j.command(
@@ -350,8 +351,7 @@ def _relate(
     if label:
         title += f' [{label}]'
 
-    j = b.new_job(title, job_attrs)
-    j.attributes['tool'] = 'somalier'
+    j = b.new_job(title, (job_attrs or {}) | dict(tool='somalier'))
     j.image(image_path('somalier'))
     # Size of one somalier file is 212K, so we add another G only if the number of
     # samples is >4k

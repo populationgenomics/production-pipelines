@@ -439,7 +439,7 @@ class Dataset(Target):
         """
         return f'{self.name}: '
 
-    def write_ped_file(self, out_path: Path | None = None) -> Path:
+    def write_ped_file(self, out_path: Path) -> Path:
         """
         Create a PED file for all samples
         """
@@ -449,7 +449,6 @@ class Dataset(Target):
                 datas.append(sample.pedigree.get_ped_dict())
         df = pd.DataFrame(datas)
 
-        # ped_path = (tmp_bucket or self.tmp_prefix()) / f'{self.name}.ped'
         with out_path.open('w') as fp:
             df.to_csv(fp, sep='\t', index=False)
         return out_path
@@ -628,13 +627,14 @@ class Sample(Target):
         """
         Attributes for Hail Batch job.
         """
-        res = {
+        attrs = {
             'dataset': self.dataset.name,
             'sample': self.id,
         }
-        if self._participant_id or self._external_id:
-            res['participant_id'] = self._participant_id or self._external_id
-        return res
+        _part_id: str | None = self._participant_id or self._external_id
+        if _part_id:
+            attrs['participant_id'] = _part_id
+        return attrs
 
     def get_job_prefix(self) -> str:
         """

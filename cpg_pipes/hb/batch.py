@@ -12,26 +12,9 @@ from cpg_utils import to_path
 from cpg_utils import config
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import copy_common_env, remote_tmpdir
-from hailtop.batch.job import PythonJob, BashJob
 
 
 logger = logging.getLogger(__file__)
-
-
-class JobAttributes(TypedDict, total=False):
-    """
-    Job attributes specification.
-    """
-
-    sample: str
-    dataset: str
-    samples: list[str]
-    datasets: list[str]
-    part: str
-    label: str
-    stage: str
-    tool: str
-    reuse: bool
 
 
 class RegisteringBatch(hb.Batch):
@@ -70,7 +53,7 @@ class RegisteringBatch(hb.Batch):
     def _process_attributes(
         self,
         name: str | None = None,
-        attributes: JobAttributes | dict | None = None,
+        attributes: dict | None = None,
     ) -> tuple[str, dict[str, str]]:
         """
         Use job attributes to make the job name more descriptive, and add
@@ -81,7 +64,7 @@ class RegisteringBatch(hb.Batch):
 
         self.total_job_num += 1
 
-        attributes = attributes or JobAttributes()
+        attributes = attributes or {}
         stage = attributes.get('stage')
         dataset = attributes.get('dataset')
         sample = attributes.get('sample')
@@ -95,6 +78,14 @@ class RegisteringBatch(hb.Batch):
         reuse = attributes.get('reuse', False)
         if reuse and not tool:
             tool = '[reuse]'
+
+        assert isinstance(stage, str)
+        assert isinstance(dataset, str)
+        assert isinstance(sample, str)
+        assert isinstance(participant_id, str)
+        assert isinstance(part, str)
+        assert isinstance(label, str)
+        assert isinstance(reuse, bool)
 
         name = make_job_name(
             name=name,

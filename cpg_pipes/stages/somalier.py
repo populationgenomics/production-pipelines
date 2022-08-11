@@ -4,7 +4,6 @@
 Stages to run somalier tools.
 """
 
-import pandas as pd
 import logging
 
 from cpg_utils.config import get_config
@@ -232,6 +231,7 @@ class GvcfSomalierPedigree(DatasetStage):
         prefix = dataset.prefix() / 'somalier' / 'gvcf' / h
         return {
             'samples': prefix / f'{dataset.name}.samples.tsv',
+            'expected_ped': prefix / f'{dataset.name}.expected.ped',
             'pairs': prefix / f'{dataset.name}.pairs.tsv',
             'html': dataset.web_prefix() / 'gvcf-somalier-pedigree.html',
             'checks': prefix / f'{dataset.name}-checks.done',
@@ -252,9 +252,13 @@ class GvcfSomalierPedigree(DatasetStage):
         else:
             html_url = None
 
+        expected_ped_path = dataset.write_ped_file(
+            self.expected_outputs(dataset)['expected_ped']
+        )
         jobs = somalier.pedigree(
             self.b,
             dataset,
+            expected_ped_path=expected_ped_path,
             input_path_by_sid=fp_by_sid,
             overwrite=not not get_config()['workflow'].get('check_intermediates'),
             out_samples_path=self.expected_outputs(dataset)['samples'],
@@ -317,7 +321,6 @@ class CramSomalierAncestry(DatasetStage):
             out_html_path=html_path,
             out_html_url=html_url,
             job_attrs=self.get_job_attrs(dataset),
-            status_reporter=self.status_reporter,
             sequencing_type=self.cohort.sequencing_type,
         )
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])

@@ -102,7 +102,6 @@ def align(
     jobs = []
     sharded_align_jobs = []
     sorted_bams = []
-    merge_or_align_j: Job | None = None
 
     if not sharded:  # Just running one alignment job
         align_j, align_cmd = _align_one(
@@ -161,7 +160,7 @@ def align(
                 # Sorting with samtools, but not adding deduplication yet, because we
                 # need to merge first.
                 j.command(wrap_command(cmd, monitor_space=True))
-                sorted_bams.append(j.sorted_bam)
+                sorted_bams.append(str(j.sorted_bam))
                 sharded_align_jobs.append(j)
 
         merge_j = b.new_job(
@@ -289,9 +288,8 @@ def _align_one(
         else:
             shard_param = ''
 
-        # if is cram
         reference_inp = None
-        if not alignment_input.is_bam:
+        if not alignment_input.is_bam:  # if is CRAM
             assert (
                 alignment_input.reference_assembly
             ), f'The reference input for the alignment input "{alignment_input.path}" was not set'
@@ -325,8 +323,8 @@ def _align_one(
         assert isinstance(alignment_input, FastqPairs)
         use_bazam = False
         fastq_pairs = [p.as_resources(b) for p in alignment_input]
-        files1 = [pair[0] for pair in fastq_pairs]
-        files2 = [pair[1] for pair in fastq_pairs]
+        files1 = [str(pair[0]) for pair in fastq_pairs]
+        files2 = [str(pair[1]) for pair in fastq_pairs]
         if len(fastq_pairs) > 1:
             r1_param = 'r1'
             r2_param = 'r2'

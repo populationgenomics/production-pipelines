@@ -119,8 +119,8 @@ class Align(SampleStage):
             'picard_wgs_metrics': picard_wgs_metrics,
             'verify_bamid': verify_bamid,
             'somalier': somalier.extact_job,
-        }:
-            j = qc_func(
+        }.items():
+            j = qc_func(  # type: ignore
                 self.b,
                 sample.get_cram_path(),
                 job_attrs=self.get_job_attrs(sample),

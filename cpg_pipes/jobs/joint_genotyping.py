@@ -205,11 +205,11 @@ def genomicsdb(
     with sample_map_bucket_path.open('w') as fp:
         df.to_csv(fp, index=False, header=False, sep='\t')
 
-    out_paths_by_idx = dict()
-    job_by_idx = dict()
+    out_path_by_idx: dict[int, Path] = dict()
+    job_by_idx: dict[int, Job | None] = dict()
     for idx in range(scatter_count):
         out_path = genomicsdb_bucket / f'interval_{idx + 1}_outof_{scatter_count}.tar'
-        out_paths_by_idx[idx] = out_path
+        out_path_by_idx[idx] = out_path
         if utils.can_reuse(out_path, overwrite):
             job_by_idx[idx] = None
             continue
@@ -290,7 +290,7 @@ def genomicsdb(
         )
         b.write_output(j.db_tar, str(out_path))
 
-    return job_by_idx, out_paths_by_idx
+    return job_by_idx, out_path_by_idx
 
 
 def genomicsdb_cloud(
