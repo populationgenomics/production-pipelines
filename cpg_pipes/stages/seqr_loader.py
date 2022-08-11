@@ -173,5 +173,6 @@ class LoadToEs(DatasetStage):
             depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
         )
+        j.attributes = self.get_job_attrs(dataset) | {'tool': 'hail dataproc'}
         jobs = [j]
         return self.make_outputs(dataset, data=index_name, jobs=jobs)

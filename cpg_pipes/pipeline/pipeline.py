@@ -535,7 +535,8 @@ class Stage(Generic[TargetT], ABC):
         outputs.meta |= self.get_job_attrs(target)
 
         for j in outputs.jobs:
-            j.depends_on(*inputs.get_jobs(target))
+            if j:
+                j.depends_on(*inputs.get_jobs(target))
 
         if outputs.error_msg:
             return outputs
@@ -864,12 +865,7 @@ class Pipeline:
 
         result = None
         if self.b:
-            # Checking total_job_num here instead in b.run() because otherwise
-            # the Backend class will produce error.
-            if self.b.total_job_num == 0:
-                logger.error('No jobs to submit')
-            else:
-                result = self.b.run(wait=wait)
+            result = self.b.run(wait=wait)
         return result
 
     def _validate_first_last_stage(self) -> tuple[int | None, int | None]:

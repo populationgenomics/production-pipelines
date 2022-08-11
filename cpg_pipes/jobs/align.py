@@ -17,6 +17,7 @@ from cpg_pipes.types import AlignmentInput, FastqPairs, CramPath, SequencingType
 from cpg_pipes.jobs import picard
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.utils import can_reuse
 
 logger = logging.getLogger(__file__)
 
@@ -48,39 +49,12 @@ class MarkDupTool(Enum):
     NO_MARKDUP = 'no_markdup'
 
 
-def dragmap(*args, **kwargs):
-    """
-    Runs DRAGMAP to (re)align reads to hg38, and outputs sorted CRAM with
-    marked duplicates
-    """
-    kwargs['aligner'] = Aligner.DRAGMAP
-    return align(*args, **kwargs)
-
-
-def bwa(*args, **kwargs):
-    """
-    Runs BWA to (re)align reads to hg38, and outputs sorted CRAM with
-    marked duplicates
-    """
-    kwargs['aligner'] = Aligner.BWA
-    return align(*args, **kwargs)
-
-
-def bwamem2(*args, **kwargs):
-    """
-    Runs BWA-MEM2 to (re)align reads to hg38, and outputs sorted CRAM with
-    marked duplicates
-    """
-    kwargs['aligner'] = Aligner.BWAMEM2
-    return align(*args, **kwargs)
-
-
 def align(
     b,
     alignment_input: AlignmentInput,
     sample_name: str,
     job_attrs: dict | None = None,
-    output_path: Path | None = None,
+    output_path: CramPath | None = None,
     out_markdup_metrics_path: Path | None = None,
     aligner: Aligner = Aligner.DRAGMAP,
     markdup_tool: MarkDupTool = MarkDupTool.PICARD,
@@ -111,6 +85,9 @@ def align(
     - nthreads can be set for smaller test runs on toy instance, so the job
       doesn't take entire 32-cpu/64-threaded instance.
     """
+    if output_path and can_reuse(output_path.path, overwrite):
+        return []
+
     base_jname = 'Align'
     if extra_label:
         base_jname += f' {extra_label}'
@@ -125,7 +102,7 @@ def align(
     jobs = []
     sharded_align_jobs = []
     sorted_bams = []
-    merge_or_align_j = None
+    merge_or_align_j: Job | None = None
 
     if not sharded:  # Just running one alignment job
         align_j, align_cmd = _align_one(
@@ -501,7 +478,7 @@ def finalise_alignment(
     requested_nthreads: int,
     markdup_tool: MarkDupTool,
     job_attrs: dict | None = None,
-    output_path: Path | None = None,
+    output_path: CramPath | None = None,
     out_markdup_metrics_path: Path | None = None,
     align_cmd_out_fmt: str = 'sam',
     overwrite: bool = False,
@@ -553,13 +530,13 @@ def finalise_alignment(
 
     if output_path:
         if md_j is not None:
-            b.write_output(md_j.output_cram, str(output_path.with_suffix('')))
+            b.write_output(md_j.output_cram, str(output_path.path.with_suffix('')))
             if out_markdup_metrics_path:
                 b.write_output(
                     md_j.markdup_metrics,
                     str(out_markdup_metrics_path),
                 )
         else:
-            b.write_output(j.sorted_bam, str(output_path.with_suffix('')))
+            b.write_output(j.sorted_bam, str(output_path.path.with_suffix('')))
 
     return md_j

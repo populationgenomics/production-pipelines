@@ -256,7 +256,7 @@ def check_pedigree_job(
     --expected-ped {expected_ped} \\
     --html-url {somalier_html_url} \\
     --dataset {dataset_name} \\
-    --title {title} \\
+    --title "{title}" \\
     --{"no-" if not send_to_slack else ""}send-to-slack
 
     touch {check_j.output}

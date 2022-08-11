@@ -21,7 +21,7 @@ DATAPROC_PACKAGES = [
     'cpg_pipes',
     'cpg_gnomad',  # github.com/populationgenomics/gnomad_methods
     'seqr_loader==1.2.5',  # hail-elasticsearch-pipelines
-    'elasticsearch==8.1.1',
+    'elasticsearch==7.*',
     'cpg_utils',
     'click',
     'google',

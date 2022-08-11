@@ -3,6 +3,7 @@ Script to just populate analysis entries with status=completed in the
 sample-metadata DB. For back-populating old data; for new data, it should be
 populated automatically with `workflow/status_provider="smdb"` set in config.
 """
+from cloudpathlib.exceptions import OverwriteNewerCloudError
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import Namespace
 
@@ -27,7 +28,9 @@ input_provider.populate_cohort(
     skip_datasets=get_config()['workflow'].get('skip_datasets'),
 )
 
-MOVE_DUPLICATE_METRICS = True
+MOVE_DUPLICATE_METRICS = False
+MOVE_CRAM_QC = True
+DRY_RUN = False
 
 
 if MOVE_DUPLICATE_METRICS:
@@ -47,3 +50,34 @@ if MOVE_DUPLICATE_METRICS:
             print(f'Warning: {current_path} does not exist')
         else:
             current_path.copy(new_path)
+
+if MOVE_CRAM_QC:
+    for i, sample in enumerate(cohort.get_samples()):
+        old_path_d = {
+            key: sample.dataset.prefix() / 'qc' / f'{sample.id}{suf}'
+            for key, suf in {
+                'samtools_stats': '_samtools_stats.txt',
+                'picard_wgs_metrics': '_picard_wgs_metrics.csv',
+                'verify_bamid': '_verify_bamid.selfSM',
+            }.items()
+        }
+        new_path_d = {
+            key: sample.dataset.prefix() / 'qc' / key / f'{sample.id}{suf}'
+            for key, suf in {
+                'samtools_stats': '_samtools_stats.txt',
+                'picard_wgs_metrics': '_picard_wgs_metrics.csv',
+                'verify_bamid': '_verify_bamid.selfSM',
+            }.items()
+        }
+        for key in old_path_d.keys():
+            old_path = old_path_d[key]
+            new_path = new_path_d[key]
+            if not old_path.exists():
+                print(f'Warning: {old_path} does not exist')
+            else:
+                print(f'Copy from {old_path} to {new_path}')
+                if not DRY_RUN:
+                    try:
+                        old_path.copy(new_path)
+                    except OverwriteNewerCloudError:
+                        pass

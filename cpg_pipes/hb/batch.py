@@ -124,60 +124,40 @@ class RegisteringBatch(hb.Batch):
         fixed_attrs = {k: str(v) for k, v in attributes.items()}
         return name, fixed_attrs
 
-    def new_job(
-        self,
-        name: str | None = None,
-        attributes: JobAttributes | dict | None = None,
-        **kwargs,
-    ) -> BashJob:
-        """
-        Wrapper around `new_job()` that processes job attributes.
-        """
-        name, fixed_attributes = self._process_attributes(name, attributes)
-        j = super().new_job(name, attributes=fixed_attributes, **kwargs)
-        if self.pool_label:
-            j._pool_label = self.pool_label
-        copy_common_env(j)
-        return j
-
-    def new_python_job(
-        self,
-        name: str | None = None,
-        attributes: JobAttributes | None = None,
-    ) -> PythonJob:
-        """
-        Wrapper around `new_python_job()` that processes job attributes.
-        """
-        name, fixed_attributes = self._process_attributes(name, attributes)
-        j = super().new_python_job(name, attributes=fixed_attributes)
-        if self.pool_label:
-            j._pool_label = self.pool_label
-        copy_common_env(j)
-        return j
-
     def run(self, **kwargs):
         """
         Execute a batch. Overridden to print pre-submission statistics.
         """
-        logger.info(f'Will submit {self.total_job_num} jobs')
+        if not self._jobs:
+            logger.error('No jobs to submit')
+        else:
+            for job in self._jobs:
+                job.name, job.attributes = self._process_attributes(
+                    job.name, job.attributes
+                )
+                if self.pool_label:
+                    job._pool_label = self.pool_label
+                copy_common_env(job)
 
-        def _print_stat(_d: dict, default_label: str | None = None):
-            for label, stat in _d.items():
-                label = label or default_label
-                msg = f'{stat["job_n"]} job'
-                if stat['job_n'] > 1:
-                    msg += 's'
-                if len(stat['samples']) > 0:
-                    msg += f' for {len(stat["samples"])} sample'
-                    if len(stat['samples']) > 1:
+            logger.info(f'Will submit {self.total_job_num} jobs')
+
+            def _print_stat(_d: dict, default_label: str | None = None):
+                for label, stat in _d.items():
+                    label = label or default_label
+                    msg = f'{stat["job_n"]} job'
+                    if stat['job_n'] > 1:
                         msg += 's'
-                logger.info(f'  {label}: {msg}')
+                    if len(stat['samples']) > 0:
+                        msg += f' for {len(stat["samples"])} sample'
+                        if len(stat['samples']) > 1:
+                            msg += 's'
+                    logger.info(f'  {label}: {msg}')
 
-        logger.info('Split by stage:')
-        _print_stat(self.job_by_stage, default_label='<not in stage>')
+            logger.info('Split by stage:')
+            _print_stat(self.job_by_stage, default_label='<not in stage>')
 
-        logger.info(f'Split by tool:')
-        _print_stat(self.job_by_tool, default_label='<tool is not defined>')
+            logger.info(f'Split by tool:')
+            _print_stat(self.job_by_tool, default_label='<tool is not defined>')
 
         return super().run(
             dry_run=get_config()['hail'].get('dry_run', False),

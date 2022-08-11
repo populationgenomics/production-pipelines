@@ -439,7 +439,7 @@ class Dataset(Target):
         """
         return f'{self.name}: '
 
-    def make_ped_file(self, tmp_bucket: Path | None = None) -> Path:
+    def write_ped_file(self, out_path: Path | None = None) -> Path:
         """
         Create a PED file for all samples
         """
@@ -449,11 +449,10 @@ class Dataset(Target):
                 datas.append(sample.pedigree.get_ped_dict())
         df = pd.DataFrame(datas)
 
-        ped_path = (tmp_bucket or self.tmp_prefix()) / f'{self.name}.ped'
-        with ped_path.open('w') as fp:
+        # ped_path = (tmp_bucket or self.tmp_prefix()) / f'{self.name}.ped'
+        with out_path.open('w') as fp:
             df.to_csv(fp, sep='\t', index=False)
-
-        return ped_path
+        return out_path
 
 
 class Sex(Enum):

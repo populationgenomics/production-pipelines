@@ -532,5 +532,8 @@ class TestJobs(unittest.TestCase):
                 str(inputs_bucket / 'somalier-samples.tsv')
             ),
             pairs_file=self.batch.read_input(str(inputs_bucket / 'somalier-pairs.tsv')),
+            expected_ped=self.batch.read_input(
+                str(inputs_bucket / 'somalier-samples.tsv')
+            ),
         )
         self.batch.run(wait=True)

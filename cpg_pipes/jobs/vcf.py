@@ -3,7 +3,6 @@ Helper Hail Batch jobs useful for both individual and joint variant calling.
 """
 
 import logging
-from typing import Tuple
 
 import hailtop.batch as hb
 from cpg_utils.hail_batch import image_path, fasta_res_group

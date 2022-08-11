@@ -57,8 +57,8 @@ def slack_message_cmd(
     as text (`text`). In either case, strings can use Slack `mrkdwn`
     for formatting: https://api.slack.com/reference/surfaces/formatting
 
-    Assumes `workflow/slack_channel` configuration parameter is set, as well as
-    CPG_SLACK_TOKEN environment variable.
+    Assumes `slack/channel` configuration parameter is set, as well as
+    SLACK_TOKEN environment variable.
     """
     if not (channel := get_config()['slack'].get('channel')):
         return ''

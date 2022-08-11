@@ -22,7 +22,7 @@ from cpg_utils.config import get_config
 
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger = logging.getLogger(__file__)
-logger.setLevel(logging.INFO)
+logger.setLevel(get_config()['workflow'].get('log_level', 'INFO'))
 
 
 @click.command()
@@ -65,10 +65,12 @@ def main(
         d = json.load(f)
     lines = []
     for tool_d in d['report_general_stats_data']:
-        for sample, failed_val_by_metric in tool_d.items():
+        logger.debug(f'Tool data: {tool_d}')
+        for sample, val_by_metric in tool_d.items():
             for metric, min_value in min_thresholds_d.items():
-                if metric in failed_val_by_metric:
-                    val = failed_val_by_metric[metric]
+                if metric in val_by_metric:
+                    val = val_by_metric[metric]
+                    logger.debug(f'{metric}={val}')
                     if val < min_value:
                         val = float(val)
                         if isinstance(val, float):
@@ -78,8 +80,9 @@ def main(
                         lines.append(f'{sample}: {metric}={val_str} (< {min_value})')
 
             for metric, min_value in max_thresholds_d.items():
-                if metric in failed_val_by_metric:
-                    val = failed_val_by_metric[metric]
+                if metric in val_by_metric:
+                    val = val_by_metric[metric]
+                    logger.debug(f'{metric}={val}')
                     if val > min_value:
                         if isinstance(val, float):
                             val_str = f'{0:.2g}'.format(val)

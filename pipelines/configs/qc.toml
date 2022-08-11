@@ -2,23 +2,7 @@
 skip_stages = ['Align']
 skip_samples_with_missing_input = true
 check_expected_outputs = true
-assume_outputs_exist_for_stages = ['Align']
 
-# Map internally used validation sample external_id to truth sample names 
-[validation.genome]
-HG001_NA12878 = 'HG001'
-SYNDIP = 'syndip'
-
-[references.validation]
-prefix = 'validation'
-
-[references.validation.genome.syndip]
-truth = 'syndip/truth/full.38.20180222.vcf.gz'
-regions = 'syndip/regions/syndip.b38_20180222.bed'
-
-[references.validation.genome.HG001]
-truth = 'giab/truth/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_PGandRTGphasetransfer.vcf.gz'
-regions = 'giab/regions/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed'
-
-[hail]
-pool_label = 'large-cohort'
+log_level = 'DEBUG'
+datasets = ['validation']
+skip_samples = []

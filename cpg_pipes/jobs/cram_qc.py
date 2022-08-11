@@ -11,6 +11,7 @@ from cpg_pipes import utils
 from cpg_pipes.types import CramPath, SequencingType
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.utils import can_reuse
 
 logger = logging.getLogger(__file__)
 
@@ -32,12 +33,15 @@ def samtools_stats(
     output_path: Path | None = None,
     overwrite: bool = False,
     sequencing_type: SequencingType = SequencingType.GENOME,
-) -> Job:
+) -> Job | None:
     """
     Run `samtools stats` for alignment QC.
     """
-    jname = 'samtools stats'
-    j = b.new_job(jname, job_attrs)
+    if can_reuse(output_path, overwrite):
+        return None
+
+    job_attrs = (job_attrs or {}) | {'tool': 'samtools'}
+    j = b.new_job('samtools stats', job_attrs)
     if not output_path:
         output_path = cram_path.path.with_suffix('.stats')
 
@@ -65,13 +69,16 @@ def verify_bamid(
     output_path: Path | None = None,
     overwrite: bool = False,
     sequencing_type: SequencingType = SequencingType.GENOME,
-) -> Job:
+) -> Job | None:
     """
     Run `VerifyBamID` contamination checks.
     Based on https://github.com/broadinstitute/warp/blob/57edec5591182d120b7d288b4b409e92a6539871/tasks/broad/BamProcessing.wdl#L395
     """
-    jname = 'VerifyBamID'
-    j = b.new_job(jname, job_attrs)
+    if can_reuse(output_path, overwrite):
+        return None
+
+    job_attrs = (job_attrs or {}) | {'tool': 'VerifyBamID'}
+    j = b.new_job('VerifyBamID', job_attrs)
     if not output_path:
         output_path = cram_path.path.with_suffix('.selfSM')
 
@@ -113,13 +120,16 @@ def picard_wgs_metrics(
     overwrite: bool = False,
     read_length: int = 250,
     sequencing_type: SequencingType = SequencingType.GENOME,
-) -> Job:
+) -> Job | None:
     """
     Run PicardTools CollectWgsMetrics metrics.
     Based on https://github.com/broadinstitute/warp/blob/e1ac6718efd7475ca373b7988f81e54efab608b4/tasks/broad/Qc.wdl#L444
     """
-    jname = 'Picard CollectWgsMetrics'
-    j = b.new_job(jname, job_attrs)
+    if can_reuse(output_path, overwrite):
+        return None
+
+    job_attrs = (job_attrs or {}) | {'tool': 'picard'}
+    j = b.new_job('Picard CollectWgsMetrics', job_attrs)
     if not output_path:
         output_path = cram_path.path.with_suffix('.csv')
 

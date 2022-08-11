@@ -8,9 +8,10 @@ from cpg_utils.config import get_config
 
 from .. import Path
 from ..jobs.align import Aligner, MarkDupTool
+from ..jobs.cram_qc import samtools_stats, picard_wgs_metrics, verify_bamid
 from ..targets import Sample
 from ..pipeline import stage, SampleStage, StageInput, StageOutput
-from ..jobs import align
+from ..jobs import align, somalier
 from ..types import CramPath
 
 logger = logging.getLogger(__file__)
@@ -26,13 +27,19 @@ class Align(SampleStage):
         """
         Stage is expected to generate a CRAM file and a corresponding index.
         """
+        qc_dict = {
+            key: sample.dataset.prefix() / 'qc' / key / f'{sample.id}{suf}'
+            for key, suf in {
+                'markduplicates_metrics': '.markduplicates-metrics',
+                'samtools_stats': '_samtools_stats.txt',
+                'picard_wgs_metrics': '_picard_wgs_metrics.csv',
+                'verify_bamid': '_verify_bamid.selfSM',
+            }.items()
+        }
         return {
             'cram': sample.get_cram_path().path,
-            'markduplicates_metrics': sample.dataset.prefix()
-            / 'qc'
-            / 'markduplicates_metrics'
-            / (sample.id + '.markduplicates-metrics'),
-        }
+            'somalier': sample.get_cram_path().somalier_path,
+        } | qc_dict
 
     @staticmethod
     def _get_cram_reference_from_version(cram_version) -> str:
@@ -92,7 +99,7 @@ class Align(SampleStage):
         jobs = align.align(
             b=self.b,
             alignment_input=alignment_input,
-            output_path=self.expected_outputs(sample)['cram'],
+            output_path=sample.get_cram_path(),
             out_markdup_metrics_path=self.expected_outputs(sample)[
                 'markduplicates_metrics'
             ],
@@ -106,4 +113,22 @@ class Align(SampleStage):
             markdup_tool=MarkDupTool.PICARD,
             sequencing_type=self.cohort.sequencing_type,
         )
+
+        for key, qc_func in {
+            'samtools_stats': samtools_stats,
+            'picard_wgs_metrics': picard_wgs_metrics,
+            'verify_bamid': verify_bamid,
+            'somalier': somalier.extact_job,
+        }:
+            j = qc_func(
+                self.b,
+                sample.get_cram_path(),
+                job_attrs=self.get_job_attrs(sample),
+                output_path=self.expected_outputs(sample)[key],
+                sequencing_type=self.cohort.sequencing_type,
+                overwrite=not get_config()['workflow'].get('check_intermediates'),
+            )
+            if j:
+                jobs.append(j)
+
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)

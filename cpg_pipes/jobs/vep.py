@@ -7,7 +7,7 @@ import logging
 from typing import Literal
 
 import hailtop.batch as hb
-from cpg_utils.hail_batch import image_path, genome_build, reference_path
+from cpg_utils.hail_batch import image_path, reference_path
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
@@ -57,7 +57,7 @@ def vep_jobs(
         # special case for not splitting by interval
         vep_out_path = tmp_prefix / 'vep.jsonl' if to_hail_table else out_path
         # noinspection PyTypeChecker
-        vep_j = vep_one(
+        vep_one_jobs = vep_one(
             b,
             vcf=vcf['vcf.gz'],
             out_format='json' if to_hail_table else 'vcf',
@@ -65,16 +65,16 @@ def vep_jobs(
             job_attrs=job_attrs or {},
             overwrite=overwrite,
         )
-        jobs.append(vep_j)
+        jobs.extend(vep_one_jobs)
         if to_hail_table:
-            to_hail_j = gather_vep_json_to_ht(
+            to_hail_jobs = gather_vep_json_to_ht(
                 b=b,
                 vep_results_paths=[vep_out_path],
                 out_path=out_path,
                 job_attrs=job_attrs,
             )
-            to_hail_j.depends_on(vep_j)
-            jobs.append(to_hail_j)
+            [j.depends_on(*vep_one_jobs) for j in to_hail_jobs]
+            jobs.extend(to_hail_jobs)
         return jobs
 
     parts_bucket = tmp_prefix / 'vep' / 'parts'
@@ -102,10 +102,11 @@ def vep_jobs(
         if to_hail_table:
             part_path = parts_bucket / f'part{idx + 1}.jsonl'
         else:
-            part_path = None
+            part_path = parts_bucket / f'part{idx + 1}.vcf.gz'
+        part_files.append(part_path)
 
         # noinspection PyTypeChecker
-        j = vep_one(
+        vep_one_jobs = vep_one(
             b,
             vcf=subset_j.output_vcf['vcf.gz'],
             out_format='json' if to_hail_table else 'vcf',
@@ -113,8 +114,7 @@ def vep_jobs(
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             overwrite=overwrite,
         )
-        jobs.append(j)
-        part_files.append(part_path or j.output['vcf.gz'])
+        jobs.extend(vep_one_jobs)
 
     if to_hail_table:
         gather_jobs = gather_vep_json_to_ht(
@@ -166,15 +166,14 @@ def vep_one(
     out_format: Literal['vcf', 'json'] = 'vcf',
     job_attrs: dict | None = None,
     overwrite: bool = False,
-) -> Job:
+) -> list[Job]:
     """
     Run a single VEP job.
     """
-    j = b.new_job('VEP', job_attrs)
     if out_path and utils.can_reuse(out_path, overwrite):
-        j.name += ' [reuse]'
-        return j
+        return []
 
+    j = b.new_job('VEP', job_attrs)
     j.image(image_path('vep'))
     STANDARD.set_resources(j, storage_gb=50, mem_gb=50, ncpu=16)
 
@@ -234,4 +233,4 @@ def vep_one(
     )
     if out_path:
         b.write_output(j.output, str(out_path).replace('.vcf.gz', ''))
-    return j
+    return [j]
