@@ -90,8 +90,8 @@ class TestPipeline(unittest.TestCase):
         pipeline = self._setup_pipeline(stages=[seqr_loader.LoadToEs])
 
         with patch('builtins.print') as mock_print:
-            with patch.object(Stage, '_outputs_are_reusable') as mock_reusable:
-                mock_reusable.return_value = False
+            with patch.object(Stage, '_find_reusable_outputs') as mock_reusable:
+                mock_reusable.return_value = [], []
                 pipeline.run(force_all_implicit_stages=True)
 
             # print() should be called only once:

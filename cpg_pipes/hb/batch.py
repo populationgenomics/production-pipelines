@@ -79,12 +79,12 @@ class RegisteringBatch(hb.Batch):
         if reuse and not tool:
             tool = '[reuse]'
 
-        assert isinstance(stage, str)
-        assert isinstance(dataset, str)
-        assert isinstance(sample, str)
-        assert isinstance(participant_id, str)
-        assert isinstance(part, str)
-        assert isinstance(label, str)
+        assert isinstance(stage, str | None)
+        assert isinstance(dataset, str | None)
+        assert isinstance(sample, str | None)
+        assert isinstance(participant_id, str | None)
+        assert isinstance(part, str | None)
+        assert isinstance(label, str | None)
         assert isinstance(reuse, bool)
 
         name = make_job_name(
