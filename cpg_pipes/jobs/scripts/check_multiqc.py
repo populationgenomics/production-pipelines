@@ -10,11 +10,13 @@ a channel with:
 
 /invite @Seqr Loader
 """
-
+import dataclasses
 import logging
 import json
+import pprint
 import os
-from typing import Optional
+from collections import defaultdict
+from typing import Optional, Literal
 
 import click
 from cpg_utils import to_path
@@ -56,41 +58,56 @@ def main(
     Check metrics in MultiQC json and send info about failed samples
     as a Slack message.
     """
-    sequencing_type = get_config()['workflow']['sequencing_type']
-    thresholds_d = get_config()['qc_thresholds'].get(sequencing_type)
-    min_thresholds_d = thresholds_d.get('min')
-    max_thresholds_d = thresholds_d.get('max')
+    seq_type = get_config()['workflow']['sequencing_type']
 
     with to_path(multiqc_json_path).open() as f:
         d = json.load(f)
+        d = d["report_general_stats_data"]
+        print(f'report_general_stats_data: {pprint.pformat(d)}')
+
+    bad_lines_by_sample = defaultdict(list)
+    for config_key, fail_sign, good_sign, is_fail in [
+        (
+            'min',
+            '<',
+            '≥',
+            lambda val_, thresh_: val_ < thresh_,
+        ),
+        (
+            'max',
+            '>',
+            '≤',
+            lambda val_, thresh_: val_ > thresh_,
+        ),
+    ]:
+        threshold_d = (
+            get_config()['qc_thresholds'].get(seq_type, {}).get(config_key, {})
+        )
+        for i, section in enumerate(d):
+            for sample, val_by_metric in section.items():
+                for metric, threshold in threshold_d.items():
+                    if metric in val_by_metric:
+                        val = val_by_metric[metric]
+                        if is_fail(val, threshold):
+                            line = f'{metric}={val:0.2f}{fail_sign}{threshold:0.2f}'
+                            bad_lines_by_sample[sample].append(line)
+                            logger.debug(f'⭕ {sample}: {line}')
+                        else:
+                            line = f'{metric}={val:0.2f}{good_sign}{threshold:0.2f}'
+                            logger.debug(f'✅ {sample}: {line}')
+
+    # Constructing Slack message
+    title = f'*[{dataset}]* <{html_url}|{title or "MutliQC report"}>'
     lines = []
-    for tool_d in d['report_general_stats_data']:
-        logger.debug(f'Tool data: {tool_d}')
-        for sample, val_by_metric in tool_d.items():
-            for metric, min_value in min_thresholds_d.items():
-                if metric in val_by_metric:
-                    val = val_by_metric[metric]
-                    logger.debug(f'{metric}={val}')
-                    if val < min_value:
-                        val = float(val)
-                        if isinstance(val, float):
-                            val_str = f'{0:.2g}'.format(val)
-                        else:
-                            val_str = str(val)
-                        lines.append(f'{sample}: {metric}={val_str} (< {min_value})')
+    if bad_lines_by_sample:
+        lines.append(f'{title}')
+        for sample, bad_lines in bad_lines_by_sample.items():
+            lines.append(f'⭕ {sample}: ' + ', '.join(bad_lines))
+    else:
+        lines.append(f'✅ {title}')
+    message = '\n'.join(lines)
 
-            for metric, min_value in max_thresholds_d.items():
-                if metric in val_by_metric:
-                    val = val_by_metric[metric]
-                    logger.debug(f'{metric}={val}')
-                    if val > min_value:
-                        if isinstance(val, float):
-                            val_str = f'{0:.2g}'.format(val)
-                        else:
-                            val_str = str(val)
-                        lines.append(f'{sample}: {metric}={val_str} (> {min_value})')
-
-    slack_channel = os.environ.get('SLACK_CHANNEL')
+    slack_channel = get_config().get('slack', {}).get('channel')
     slack_token = os.environ.get('SLACK_TOKEN')
     if send_to_slack and slack_token and slack_channel:
         from slack_sdk.errors import SlackApiError
@@ -98,19 +115,17 @@ def main(
 
         slack_client = WebClient(token=slack_token)
         try:
-            title = title or 'MutliQC report'
-            text = f'*[{dataset}]* <{html_url}|{title}>\n'
-            text += '\n'.join(lines)
-
             slack_client.api_call(  # pylint: disable=duplicate-code
                 'chat.postMessage',
                 json={
                     'channel': slack_channel,
-                    'text': text,
+                    'text': message,
                 },
             )
         except SlackApiError as err:
             logging.error(f'Error posting to Slack: {err}')
+    else:
+        print(message)
 
 
 if __name__ == '__main__':

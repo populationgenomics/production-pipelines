@@ -7,7 +7,7 @@ Batch pipeline to run WGS QC.
 import logging
 
 from cpg_utils import to_path
-from cpg_utils.hail_batch import image_path
+from cpg_utils.hail_batch import image_path, copy_common_env
 from hailtop.batch.job import Job
 from hailtop.batch import Batch, ResourceFile
 
@@ -150,8 +150,7 @@ def check_report_job(
     title = 'MultiQC'
     if label:
         title += f' [{label}]'
-    title += ' check'
-    check_j = b.new_job(title, job_attrs)
+    check_j = b.new_job(f'{title} check', job_attrs)
     check_j.attributes['tool'] = 'python'
     STANDARD.set_resources(check_j, ncpu=2)
     check_j.image(image_path('cpg-pipes'))
@@ -172,7 +171,7 @@ def check_report_job(
     echo "HTML URL: {multiqc_html_url}"
     """
 
-    slack_env(check_j)
+    copy_common_env(check_j)
     check_j.command(
         wrap_command(
             cmd,

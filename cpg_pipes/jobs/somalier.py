@@ -5,7 +5,12 @@ import logging
 from os.path import basename
 
 import pandas as pd
-from cpg_utils.hail_batch import image_path, reference_path, fasta_res_group
+from cpg_utils.hail_batch import (
+    image_path,
+    reference_path,
+    fasta_res_group,
+    copy_common_env,
+)
 from hailtop.batch import Batch, ResourceFile
 from hailtop.batch.job import Job
 
@@ -263,7 +268,7 @@ def check_pedigree_job(
     echo "HTML URL: {somalier_html_url}"
     """
 
-    slack_env(check_j)
+    copy_common_env(check_j)
     check_j.command(
         wrap_command(
             cmd,

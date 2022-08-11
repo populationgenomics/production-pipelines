@@ -580,16 +580,16 @@ class Stage(Generic[TargetT], ABC):
                 return Action.SKIP
 
         expected_out = self.expected_outputs(target)
-        reusable = self._outputs_are_reusable(expected_out)
+        reusable, missing = self._find_reusable_outputs(expected_out)
 
         if self.skipped:
-            if reusable:
+            if reusable and not missing:
                 return Action.REUSE
             if get_config()['workflow'].get('skip_samples_with_missing_input'):
                 logger.warning(
                     f'Skipping {target}: stage {self.name} is required, '
                     f'but is marked as skipped, and expected outputs for the target '
-                    f'do not exist: {expected_out}'
+                    f'do not exist: {missing}'
                 )
                 # `workflow/skip_samples_with_missing_input` means that we can ignore
                 # samples/datasets that have missing results from skipped stages.
@@ -599,11 +599,11 @@ class Stage(Generic[TargetT], ABC):
                 return Action.SKIP
             raise ValueError(
                 f'Stage {self.name} is required, but is skipped, and '
-                f'expected outputs for target {target} do not exist: '
-                f'{expected_out}'
+                f'the following expected outputs for target {target} do not exist: '
+                f'{missing}'
             )
 
-        if reusable:
+        if reusable and not missing:
             if target.forced:
                 logger.info(
                     f'{self.name}: can reuse, but forcing the target '
@@ -623,39 +623,39 @@ class Stage(Generic[TargetT], ABC):
         logger.info(f'{self.name}: running queue_jobs(target={target})')
         return Action.QUEUE
 
-    def _outputs_are_reusable(self, expected_out: ExpectedResultT) -> bool:
+    def _find_reusable_outputs(
+        self, expected_out: ExpectedResultT
+    ) -> tuple[ExpectedResultT, ExpectedResultT]:
         """
-        Returns outputs that can be reused for the stage for the target,
-        or None of none can be reused
+        Splits outputs into reusable (for the stage for the target),
+        and missing.
         """
         if self.assume_outputs_exist:
-            return True
+            return expected_out, None
 
-        paths: list[Path] = []
+        def _filter_obj(
+            item: ExpectedResultT, pred: Callable[[ExpectedResultT], bool]
+        ) -> ExpectedResultT:
+            """
+            Recursively filter every value in a dict or a list using predicate `pred`
+            """
+            if isinstance(item, Path):
+                if pred(item):
+                    return item
+            if isinstance(item, dict):
+                return {k: v for k, v in item.items() if pred(v)}
 
-        def _find_paths(val):
-            """Recursively find every Path object"""
-            if isinstance(val, Path):
-                paths.append(val)
-            if isinstance(val, list):
-                for el in val:
-                    _find_paths(el)
-            if isinstance(val, dict):
-                for el in val.values():
-                    _find_paths(el)
-
-        _find_paths(expected_out)
-
-        if paths and get_config()['workflow'].get('check_expected_outputs'):
-            # Checking that all paths in the expected output exist:
-            return all(exists(path) for path in paths)
-
-        if self.skipped:
-            # Do not check the files' existence, trust they exist.
-            # note that for skipped stages, we automatically assume outputs exist
-            return True
-        # Do not check the files' existence, assume they don't exist:
-        return False
+        if get_config()['workflow'].get('check_expected_outputs'):
+            reusable_out = _filter_obj(expected_out, exists)
+            missing_out = _filter_obj(expected_out, lambda val: not exists(val))
+            return reusable_out, missing_out
+        else:
+            if self.skipped:
+                # Do not check the files' existence, trust they exist.
+                # note that for skipped stages, we automatically assume outputs exist
+                return expected_out, None
+            # Do not check the files' existence, assume they don't exist:
+            return None, expected_out
 
     def _queue_reuse_job(
         self, target: TargetT, found_paths: Path | dict[str, Path]

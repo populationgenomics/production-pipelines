@@ -1,8 +1,3 @@
 [workflow]
 skip_stages = ['Align']
-skip_samples_with_missing_input = true
 check_expected_outputs = true
-
-log_level = 'DEBUG'
-datasets = ['validation']
-skip_samples = []
