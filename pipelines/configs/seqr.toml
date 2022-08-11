@@ -25,23 +25,20 @@ datasets = [
 #status_reporter = 'smdb'
 skip_samples = [
     'CPG11783',   # acute-care, no FASTQ data
-    'CPG246645',  # ag-hidden, eof issue  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/440
-    'CPG246678',  # ag-hidden, diff fastq size  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/446
-    'CPG243717',  # validation, NA12878_KCCG low coverage https://main-web.populationgenomics.org.au/validation/qc/cram/multiqc.html,
+    'CPG255232',  # perth-neuro: new
+    'CPG255240',  # perth-neuro: new
     'CPG253328',  # perth-neuro, contamination rate 32%
     'CPG13409',   # perth-neuro, coverage ~0x
+    'CPG243717',  # validation, NA12878_KCCG low coverage https://main-web.populationgenomics.org.au/validation/qc/cram/multiqc.html,
+    'CPG246645',  # ag-hidden, eof issue  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/440
+    'CPG246678',  # ag-hidden, diff fastq size  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/446
     'CPG246561',  # ag-hidden, coverage ~0x https://main-web.populationgenomics.org.au/ag-hidden/qc/cram/multiqc.html
 ]
-# Not used now, but would indicate samples to flag in seqr. 
+# This option is not used here now, but would indicate samples to flag in seqr. 
 # Should be automated in the future.
 fail_qc_samples = [
-    # perth-neuro: https://main-web.populationgenomics.org.au/perth-neuro/qc/cram/multiqc.html
-    'CPG253328',  # contamination rate 32% 
-    'CPG13334',   # coverage 11x
-    'CPG13409',   # coverage ~0x
-    'CPG13243',   # mapped rate 78%
-    # ag-hidden
-    'CPG246561',  # coverage ~0x
+    'CPG13334',   # perth-neuro: coverage 11x
+    'CPG13243',   # perth-neuro: mapped rate 78%
 ]
 check_inputs = true
 keep_scratch = true
