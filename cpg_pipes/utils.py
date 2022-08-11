@@ -20,7 +20,7 @@ logger = logging.getLogger(__file__)
 # Packages to install on a dataproc cluster, to use with the dataproc wrapper.
 DATAPROC_PACKAGES = [
     'cpg_utils==4.3.6.2',
-    'cpg_pipes==0.3.7',
+    'cpg_pipes==0.3.8',
     'cpg_gnomad',  # github.com/populationgenomics/gnomad_methods
     'seqr_loader==1.2.5',  # hail-elasticsearch-pipelines
     'elasticsearch==7.9.1',

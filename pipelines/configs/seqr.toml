@@ -90,4 +90,4 @@ regions = 'giab/regions/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SO
 [images]
 hail = 'driver:5d04b6d6bb411ea4b8750f40cf39fd0b701ea288-hail-c4eb2b16220d9872f417412ea565902f78739124'
 sm-api = 'driver:5d04b6d6bb411ea4b8750f40cf39fd0b701ea288-hail-c4eb2b16220d9872f417412ea565902f78739124'
-cpg-pipes = 'cpg-pipes:0.3.7'
+cpg-pipes = 'cpg-pipes:0.3.8'
