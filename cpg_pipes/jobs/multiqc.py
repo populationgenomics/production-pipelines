@@ -6,52 +6,64 @@ Batch pipeline to run WGS QC.
 
 import logging
 
+from cpg_utils import to_path
 from cpg_utils.hail_batch import image_path
 from hailtop.batch.job import Job
-from hailtop.batch import Batch
+from hailtop.batch import Batch, ResourceFile
 
 from cpg_pipes import Path
-from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.hb.command import wrap_command, seds_to_extend_sample_ids
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.slack import slack_message_cmd
+from cpg_pipes.jobs.scripts import check_multiqc
+from cpg_pipes.slack import slack_env
+from cpg_pipes.targets import Dataset
 
 logger = logging.getLogger(__file__)
 
 
 def multiqc(
     b: Batch,
+    dataset: Dataset,
     tmp_prefix: Path,
     paths: list[Path],
-    dataset_name: str,
-    out_html_path: Path,
     out_json_path: Path,
+    out_html_path: Path,
     out_html_url: str | None = None,
+    out_checks_path: Path | None = None,
+    label: str | None = None,
     ending_to_trim: set[str] | None = None,
     modules_to_trim_endings: set[str] | None = None,
     job_attrs: dict | None = None,
     sample_id_map: dict[str, str] | None = None,
     extra_config: dict | None = None,
-) -> Job:
+) -> list[Job]:
     """
     Run MultiQC for the files in `qc_paths`
     @param b: batch object
     @param tmp_prefix: bucket for tmp files
     @param paths: file bucket paths to pass into MultiQC
-    @param dataset_name: dataset name
+    @param dataset: Dataset object
     @param out_json_path: where to write MultiQC-generated JSON file
     @param out_html_path: where to write the HTML report
     @param out_html_url: URL corresponding to the HTML report
+    @param out_checks_path: flag indicating that QC checks were done
+    @param label: To add to the report's, Batch job's, and Slack message's titles
     @param ending_to_trim: trim these endings from input files to get sample names
     @param modules_to_trim_endings: list of modules for which trim the endings
     @param job_attrs: attributes to add to Hail Batch job
     @param sample_id_map: sample ID map for bulk sample renaming:
         (https://multiqc.info/docs/#bulk-sample-renaming-in-reports)
     @param extra_config: extra config to pass to MultiQC
-    @return: job object
+    @return: job objects
     """
-    j = b.new_job('Run MultiQC', job_attrs)
-    j.image(image_path('multiqc'))
-    STANDARD.set_resources(j, ncpu=16)
+    title = 'MultiQC'
+    if label:
+        title += f' [{label}]'
+
+    mqc_j = b.new_job(title, job_attrs)
+    mqc_j.attributes['tool'] = 'MultiQC'
+    mqc_j.image(image_path('multiqc'))
+    STANDARD.set_resources(mqc_j, ncpu=16)
 
     file_list_path = tmp_prefix / 'multiqc-file-list.txt'
     with file_list_path.open('w') as f:
@@ -88,7 +100,7 @@ def multiqc(
 
     multiqc -f inputs -o output \\
     {f"--replace-names {sample_map_file} " if sample_map_file else ''} \\
-    --title "CRAM QC report for dataset {dataset_name}" \\
+    --title "{title} for dataset <b>{dataset.name}</b>" \\
     --filename {report_filename}.html \\
     --cl-config "extra_fn_clean_exts: [{endings_conf}]" \\
     --cl-config "max_table_rows: 10000" \\
@@ -96,20 +108,81 @@ def multiqc(
     {extra_config_param}
 
     ls output/{report_filename}_data
-
-    cp output/{report_filename}.html {j.html}
-    cp output/{report_filename}_data/multiqc_data.json {j.json}
+    cp output/{report_filename}.html {mqc_j.html}
+    cp output/{report_filename}_data/multiqc_data.json {mqc_j.json}
     """
     if out_html_url:
         cmd += '\n' + f'echo "HTML URL: {out_html_url}"'
 
-    if out_html_url:
-        slack_message_cmd(j, text=f'*[{dataset_name}]* <{out_html_url}|MultiQC report>')
+    mqc_j.command(wrap_command(cmd, setup_gcp=True))
+    b.write_output(mqc_j.html, str(out_html_path))
+    b.write_output(mqc_j.json, str(out_json_path))
 
-    j.command(wrap_command(cmd, setup_gcp=True))
-    b.write_output(j.html, str(out_html_path))
-    b.write_output(j.json, str(out_json_path))
-    return j
+    check_j = check_report_job(
+        b=b,
+        multiqc_json_file=mqc_j.json,
+        multiqc_html_url=out_html_url,
+        rich_id_map=dataset.rich_id_map(),
+        dataset_name=dataset.name,
+        label=label,
+        out_checks_path=out_checks_path,
+        job_attrs=job_attrs,
+    )
+    check_j.depends_on(mqc_j)
+    return [mqc_j, check_j]
+
+
+def check_report_job(
+    b: Batch,
+    multiqc_json_file: ResourceFile,
+    dataset_name: str,
+    multiqc_html_url: str | None = None,
+    label: str | None = None,
+    rich_id_map: dict[str, str] | None = None,
+    out_checks_path: Path | None = None,
+    job_attrs: dict | None = None,
+    send_to_slack: bool = True,
+) -> Job:
+    """
+    Run job that checks MultiQC JSON result and sends a Slack notification
+    about failed sampels.
+    """
+    title = 'MultiQC'
+    if label:
+        title += f' [{label}]'
+    title += ' check'
+    check_j = b.new_job(title, job_attrs)
+    check_j.attributes['tool'] = 'python'
+    STANDARD.set_resources(check_j, ncpu=2)
+    check_j.image(image_path('cpg-pipes'))
+
+    script_path = to_path(check_multiqc.__file__)
+    script_name = script_path.name
+    cmd = f"""\
+    {seds_to_extend_sample_ids(rich_id_map, [multiqc_json_file])
+    if rich_id_map else ''}
+    python3 {script_name} \\
+    --multiqc-json {multiqc_json_file} \\
+    --html-url {multiqc_html_url} \\
+    --dataset {dataset_name} \\
+    --title {title} \\
+    --{"no-" if not send_to_slack else ""}send-to-slack
+
+    touch {check_j.output}
+    echo "HTML URL: {multiqc_html_url}"
+    """
+
+    slack_env(check_j)
+    check_j.command(
+        wrap_command(
+            cmd,
+            python_script_path=script_path,
+            setup_gcp=True,
+        )
+    )
+    if out_checks_path:
+        b.write_output(check_j.output, str(out_checks_path))
+    return check_j
 
 
 def _write_sample_id_map(sample_map: dict[str, str], out_path: Path):

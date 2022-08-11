@@ -14,12 +14,13 @@ a channel with:
 import contextlib
 import logging
 import os
-from typing import Optional, Tuple, List
+from typing import Optional, List
 
 import click
 import pandas as pd
-from cpg_utils import to_path
 from peddy import Ped
+
+from cpg_utils import to_path
 
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger = logging.getLogger(__file__)
@@ -45,7 +46,9 @@ logger.setLevel(logging.INFO)
     required=True,
     help='Path to PED file with expected pedigree',
 )
+@click.option('--html-url', 'html_url', required=True, help='Somalier HTML URL')
 @click.option('--dataset', 'dataset', help='Dataset name')
+@click.option('--title', 'title', help='Report title')
 @click.option(
     '--send-to-slack/--no-send-to-slack',
     'send_to_slack',
@@ -55,7 +58,9 @@ def main(
     somalier_samples_fpath: str,
     somalier_pairs_fpath: str,
     expected_ped_fpath: str,
-    dataset: Optional[str] = None,
+    html_url: str,
+    dataset: str,
+    title: Optional[str] = None,
     send_to_slack: bool = True,
 ):
     """
@@ -66,7 +71,6 @@ def main(
         somalier_samples_fpath,
         somalier_pairs_fpath,
         expected_ped_fpath,
-        dataset=dataset,
         pedlog=pedlog,
     )
 
@@ -78,11 +82,14 @@ def main(
 
         slack_client = WebClient(token=slack_token)
         try:
+            title = title or 'Somalier pedigree report'
+            text = f'*[{dataset}]* <{html_url}|{title}>\n'
+            text += '\n'.join(pedlog.messages)
             slack_client.api_call(  # pylint: disable=duplicate-code
                 'chat.postMessage',
                 json={
                     'channel': slack_channel,
-                    'text': '\n'.join(pedlog.messages),
+                    'text': text,
                 },
             )
         except SlackApiError as err:
@@ -125,7 +132,6 @@ def check_pedigree(
     somalier_samples_fpath: str,
     somalier_pairs_fpath: str,
     expected_ped_fpath: str,
-    dataset: Optional[str] = None,
     pedlog: Optional[PedigreeLogger] = None,
 ) -> PedigreeLogger:
     """
@@ -145,14 +151,14 @@ def check_pedigree(
     bad = df.gt_depth_mean == 0.0
     if bad.any():
         pedlog.warning(
-            f'*[{dataset}]* excluded {len(df[bad])}/{len(df)} samples with zero '
+            f'Excluded {len(df[bad])}/{len(df)} samples with zero '
             f'mean GT depth from pedigree/sex checks: {", ".join(df[bad].sample_id)}'
         )
         pedlog.info('')
     bad_ids = list(df[bad].sample_id)  # for checking in pairs_df
     df = df[~bad]
 
-    pedlog.info(f'*[{dataset}] inferred vs. reported sex:*')
+    pedlog.info(f'*Inferred vs. reported sex:*')
     # Rename Ped sex to human-readable tags
     df.sex = df.sex.apply(lambda x: {1: 'male', 2: 'female'}.get(x, 'unknown'))
     df.original_pedigree_sex = df.original_pedigree_sex.apply(
@@ -202,7 +208,7 @@ def check_pedigree(
     )
     pedlog.info('')
 
-    pedlog.info(f'*[{dataset}] relatedness:*')
+    pedlog.info(f'*Relatedness:*')
     expected_ped_sample_by_id = {s.sample_id: s for s in expected_ped.samples()}
     inferred_ped_sample_by_id = {s.sample_id: s for s in inferred_ped.samples()}
 
@@ -214,6 +220,9 @@ def check_pedigree(
         s2 = row['sample_b']
         if s1 in bad_ids or s2 in bad_ids:
             continue
+
+        if s1 == 'CPG68692' and s2 == 'CPG13052':
+            pass
 
         expected_ped_s1 = expected_ped_sample_by_id.get(s1)
         expected_ped_s2 = expected_ped_sample_by_id.get(s2)
@@ -231,16 +240,23 @@ def check_pedigree(
                 inferred_rel = 'unknown'
 
         def _repr_cur_pair() -> str:
-            fam1 = expected_ped.get(sample_id=s1).family_id
-            fam2 = expected_ped.get(sample_id=s2).family_id
+            fam1 = expected_ped_s1.family_id if expected_ped_s1 else None
+            fam2 = expected_ped_s2.family_id if expected_ped_s2 else None
             line = ''
             if fam1 == fam2:
                 line += f'{fam1}: {s1} - {s2}'
             else:
-                line += s1 + (f' ({fam1})' if fam1 != s1 else '')
+                line += s1 + (f' ({fam1})' if fam1 and fam1 != s1 else '')
                 line += ' - '
-                line += s2 + (f' ({fam2})' if fam2 != s2 else '')
-            return line + f', provided: "{expected_rel}", inferred: "{inferred_rel}"'
+                line += s2 + (f' ({fam2})' if fam2 and fam2 != s2 else '')
+            return (
+                f'{line}, '
+                f'provided: "{expected_rel}", '
+                f'inferred: "{inferred_rel}", '
+                f'kin={row["relatedness"]}, '
+                f'ibs0={row["ibs0"]}, '
+                f'ibs2={row["ibs2"]}'
+            )
 
         if inferred_rel != expected_rel:
             if (
@@ -250,6 +266,8 @@ def check_pedigree(
                 and inferred_rel != 'unrelated'
             ):
                 mismatching_unrelated_to_related.append(_repr_cur_pair())
+            # elif inferred_rel in ['related at unknown level', 'unknown']:
+            #     pass
             else:
                 mismatching_related_to_unrelated.append(_repr_cur_pair())
 
@@ -285,44 +303,6 @@ def check_pedigree(
     pedlog.mismatching_sex = mismatching_sex.any()
     pedlog.mismatching_relationships = mismatching_related_to_unrelated
     return pedlog
-
-
-def infer_relationship(kin: float, ibs0: float, ibs2: float) -> Tuple[str, str]:
-    """
-    Inferres relashionship labels based on the kin coefficient
-    and ibs0 and ibs2 values. Returns relashionship label and reason.
-    """
-    if kin < 0.1:
-        result = ('unrelated', f'kin={kin:.3f} < 0.1')
-    elif kin < 0.38:
-        result = ('below_first_degree', f'kin={kin:.3f} < 0.38')
-    elif kin <= 0.62:
-        reason = f'kin={kin:.3f} < 0.62'
-        if (ibs0 / ibs2) < 0.005:
-            result = (
-                'parent-child',
-                reason + f', ibs0/ibs2={(ibs0 / ibs2):.4f} < 0.005',
-            )
-        elif 0.015 < (ibs0 / ibs2) < 0.052:
-            result = (
-                'siblings',
-                reason + f', 0.015 < ibs0/ibs2={(ibs0 / ibs2):.4f} < 0.052',
-            )
-        else:
-            result = (
-                'first_degree',
-                reason
-                + (
-                    f', not parent-child (ibs0/ibs2={(ibs0 / ibs2):.4f} > 0.005)'
-                    f', not sibling (0.015 < ibs0/ibs2={(ibs0 / ibs2):.4f} < 0.052)'
-                ),
-            )
-    elif kin < 0.8:
-        result = ('first_degree_or_duplicate_or_twins', f'kin={kin:.3f} < 0.8')
-    else:
-        assert kin >= 0.8
-        result = ('duplicate_or_twins', f'kin={kin:.3f} >= 0.8')
-    return result
 
 
 def print_contents(

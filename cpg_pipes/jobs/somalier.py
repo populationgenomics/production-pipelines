@@ -13,28 +13,33 @@ from cpg_pipes import Path, to_path
 from cpg_pipes.hb.command import wrap_command, seds_to_extend_sample_ids
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs.scripts import check_pedigree
-from cpg_pipes.providers.status import StatusReporter
 from cpg_pipes.slack import slack_message_cmd, slack_env
 from cpg_pipes.targets import Dataset, Sample
 from cpg_pipes.types import CramPath, GvcfPath, SequencingType
+from cpg_pipes.utils import can_reuse
 
 logger = logging.getLogger(__file__)
+
+
+# We exclude contaminated samples from relatedness checks
+MIN_FREEMIX = 0.04
 
 
 def pedigree(
     b,
     dataset: Dataset,
+    expected_ped_path: Path,
     input_path_by_sid: dict[str, Path | str],
     overwrite: bool,
-    out_samples_path: Path | None = None,
-    out_pairs_path: Path | None = None,
-    out_html_path: Path | None = None,
-    out_html_url: str | None = None,
+    out_samples_path: Path,
+    out_pairs_path: Path,
+    out_html_path: Path,
+    out_html_url: str,
     out_checks_path: Path | None = None,
+    verifybamid_by_sid: dict[str, Path | str] | None = None,
     label: str | None = None,
     ignore_missing: bool = False,
     job_attrs: dict | None = None,
-    tmp_bucket: Path | None = None,
     sequencing_type: SequencingType = SequencingType.GENOME,
     send_to_slack: bool = True,
 ) -> list[Job]:
@@ -61,13 +66,13 @@ def pedigree(
         sequencing_type=sequencing_type,
     )
 
-    ped_path = dataset.make_ped_file(tmp_bucket=tmp_bucket)
     relate_j = _relate(
         b=b,
         somalier_file_by_sid=somalier_file_by_sample,
+        verifybamid_by_sid=verifybamid_by_sid,
         sample_ids=dataset.get_sample_ids(),
         rich_id_map=dataset.rich_id_map(),
-        ped_path=ped_path,
+        expected_ped_path=expected_ped_path,
         label=label,
         extract_jobs=extract_jobs,
         out_samples_path=out_samples_path,
@@ -76,19 +81,16 @@ def pedigree(
         out_html_url=out_html_url,
         job_attrs=job_attrs,
     )
-    if out_html_url:
-        slack_message_cmd(
-            relate_j, text=f'*[{dataset.name}]* <{out_html_url}|somalier report>'
-        )
 
     check_j = check_pedigree_job(
         b=b,
         samples_file=relate_j.output_samples,
         pairs_file=relate_j.output_pairs,
-        expected_ped=b.read_input(str(ped_path)),
+        expected_ped=b.read_input(str(expected_ped_path)),
+        somalier_html_url=out_html_url,
         rich_id_map=dataset.rich_id_map(),
-        label=label,
         dataset_name=dataset.name,
+        label=label,
         out_checks_path=out_checks_path,
         job_attrs=job_attrs,
         send_to_slack=send_to_slack,
@@ -199,7 +201,7 @@ def _prep_somalier_files(
             gvcf_or_cram_or_bam_path=gvcf_or_cram_or_bam_path,
             overwrite=overwrite,
             label=label,
-            out_fpath=gvcf_or_cram_or_bam_path.somalier_path,
+            output_path=gvcf_or_cram_or_bam_path.somalier_path,
             job_attrs=(job_attrs or {}) | sample.get_job_attrs(),
             sequencing_type=sequencing_type,
         )
@@ -222,22 +224,24 @@ def check_pedigree_job(
     samples_file: ResourceFile,
     pairs_file: ResourceFile,
     expected_ped: ResourceFile,
+    somalier_html_url: str,
+    dataset_name: str,
     rich_id_map: dict[str, str] | None = None,
     label: str | None = None,
-    dataset_name: str | None = None,
-    somalier_html_url: str | None = None,
     out_checks_path: Path | None = None,
     job_attrs: dict | None = None,
     send_to_slack: bool = True,
 ) -> Job:
     """
-    Run job that checks pedigree and batch correctness. The job will fail in case
-    of any mismatches.
+    Run job that checks pedigree and batch correctness. The job will send a Slack
+    message about any mismatches.
     """
-    check_j = b.new_job(
-        'Check relatedness and sex' + (f' {label}' if label else ''),
-        job_attrs,
-    )
+    title = 'Pedigree check'
+    if label:
+        title += f' [{label}]'
+
+    check_j = b.new_job(title, job_attrs)
+    check_j.attributes['tool'] = 'python'
     STANDARD.set_resources(check_j, ncpu=2)
     check_j.image(image_path('peddy'))
 
@@ -250,13 +254,14 @@ def check_pedigree_job(
     --somalier-samples {samples_file} \\
     --somalier-pairs {pairs_file} \\
     --expected-ped {expected_ped} \\
-    {('--dataset ' + dataset_name) if dataset_name else ''} \\
-    --{"no-" if send_to_slack else ""}send-to-slack \\
+    --html-url {somalier_html_url} \\
+    --dataset {dataset_name} \\
+    --title {title} \\
+    --{"no-" if not send_to_slack else ""}send-to-slack
 
     touch {check_j.output}
+    echo "HTML URL: {somalier_html_url}"
     """
-    if somalier_html_url:
-        cmd += '\n' + f'echo "HTML URL: {somalier_html_url}"'
 
     slack_env(check_j)
     check_j.command(
@@ -266,7 +271,6 @@ def check_pedigree_job(
             setup_gcp=True,
         )
     )
-
     if out_checks_path:
         b.write_output(check_j.output, str(out_checks_path))
     return check_j
@@ -327,31 +331,60 @@ def _relate(
     somalier_file_by_sid: dict[str, Path],
     sample_ids: list[str],
     rich_id_map: dict[str, str],
-    ped_path: Path,
+    expected_ped_path: Path,
     label: str | None,
     extract_jobs: list[Job],
-    out_samples_path: Path | None = None,
-    out_pairs_path: Path | None = None,
-    out_html_path: Path | None = None,
+    out_samples_path: Path,
+    out_pairs_path: Path,
+    out_html_path: Path,
     out_html_url: str | None = None,
+    verifybamid_by_sid: dict[str, Path] | None = None,
     job_attrs: dict | None = None,
 ) -> Job:
-    j = b.new_job('Somalier relate' + (f' {label}' if label else ''), job_attrs)
+    title = 'Somalier relate'
+    if label:
+        title += f' [{label}]'
+
+    j = b.new_job(title, job_attrs)
+    j.attributes['tool'] = 'somalier'
     j.image(image_path('somalier'))
     # Size of one somalier file is 212K, so we add another G only if the number of
     # samples is >4k
     STANDARD.set_resources(j, storage_gb=1 + len(sample_ids) // 4000 * 1)
     j.depends_on(*extract_jobs)
 
-    input_files_lines = ''
+    cmd = ''
+    input_files_file = '/io/input_files.list'
+    samples_ids_file = '/io/sample_ids.list'
+    cmd += f'touch {input_files_file}'
+    cmd += f'touch {samples_ids_file}'
     for sample_id in sample_ids:
-        somalier_file = b.read_input(str(somalier_file_by_sid[sample_id]))
-        input_files_lines += f'{somalier_file} \\\n'
-    cmd = f"""\
-    cat {b.read_input(str(ped_path))} | grep -v Family.ID > expected.ped 
-    
+        if verifybamid_by_sid:
+            if sample_id not in verifybamid_by_sid:
+                continue
+            somalier_file = b.read_input(str(somalier_file_by_sid[sample_id]))
+            cmd += f"""
+            FREEMIX=$(cat {b.read_input(str(verifybamid_by_sid[sample_id]))} | tail -n1 | cut -f7)
+            if [[ $(echo "$FREEMIX > {MIN_FREEMIX}" | bc) -eq 0 ]]; \
+            then echo "{somalier_file}" >> {input_files_file}; \
+            echo "{sample_id}" >> {samples_ids_file}; fi
+            """
+        else:
+            somalier_file = b.read_input(str(somalier_file_by_sid[sample_id]))
+            cmd += f"""
+            echo "{somalier_file}" >> {input_files_file}
+            echo "{sample_id}" >> {samples_ids_file}
+            """
+
+    cmd += f"""
+    cat {b.read_input(str(expected_ped_path))} | \
+    grep -v Family.ID | \
+    grep -f {samples_ids_file} > expected.ped 
+    """
+
+    cmd += f"""
     somalier relate \\
-    {input_files_lines} \\
+    $(cat {input_files_file}) \\
     --ped expected.ped \\
     -o related \\
     --infer
@@ -363,12 +396,12 @@ def _relate(
     """
     if out_html_url:
         cmd += '\n' + f'echo "HTML URL: {out_html_url}"'
+
     j.command(wrap_command(cmd))
     # Copy somalier outputs to final destination.
     b.write_output(j.output_samples, str(out_samples_path))
     b.write_output(j.output_pairs, str(out_pairs_path))
-    if out_html_path:
-        b.write_output(j.output_html, str(out_html_path))
+    b.write_output(j.output_html, str(out_html_path))
     return j
 
 
@@ -377,18 +410,22 @@ def extact_job(
     gvcf_or_cram_or_bam_path: CramPath | GvcfPath,
     overwrite: bool = True,
     label: str | None = None,
-    out_fpath: Path | None = None,
+    output_path: Path | None = None,
     job_attrs: dict | None = None,
     sequencing_type: SequencingType = SequencingType.GENOME,
-) -> Job:
+) -> Job | None:
     """
     Run "somalier extract" to generate a fingerprint for a `sample`
     from `fpath` (which can be a GVCF, a CRAM or a BAM)
     """
+    if can_reuse(output_path, overwrite):
+        return None
+
+    job_attrs = (job_attrs or {}) | {'tool': 'somalier'}
     j = b.new_job('Somalier extract' + (f' {label}' if label else ''), job_attrs)
 
-    if not out_fpath:
-        out_fpath = gvcf_or_cram_or_bam_path.somalier_path
+    if not output_path:
+        output_path = gvcf_or_cram_or_bam_path.somalier_path
 
     j.image(image_path('somalier'))
     if isinstance(gvcf_or_cram_or_bam_path, CramPath):
@@ -422,5 +459,5 @@ def extact_job(
     mv extracted/*.somalier {j.output_file}
     """
     j.command(wrap_command(cmd, setup_gcp=True, define_retry_function=True))
-    b.write_output(j.output_file, str(out_fpath))
+    b.write_output(j.output_file, str(output_path))
     return j

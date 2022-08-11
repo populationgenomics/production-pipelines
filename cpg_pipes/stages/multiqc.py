@@ -1,8 +1,9 @@
 """
 Stage that summarises QC.
 """
-
 import logging
+
+from cpg_utils.config import get_config
 
 from cpg_pipes import Path
 from cpg_pipes.jobs.multiqc import multiqc
@@ -17,11 +18,11 @@ from cpg_pipes.pipeline.exceptions import StageInputNotFound
 from cpg_pipes.stages.align import Align
 from cpg_pipes.stages.cram_qc import SamtoolsStats, PicardWgsMetrics, VerifyBamId
 from cpg_pipes.stages.fastqc import FastQC
-from cpg_pipes.stages.variantqc import GvcfQc, JointVcfQc, GvcfHappy, JointVcfHappy
 from cpg_pipes.stages.somalier import (
     CramSomalierPedigree,
     GvcfSomalierPedigree,
 )
+from cpg_pipes.stages.variantqc import GvcfQc, JointVcfQc, GvcfHappy, JointVcfHappy
 from cpg_pipes.targets import Dataset, Cohort
 
 logger = logging.getLogger(__file__)
@@ -31,9 +32,6 @@ logger = logging.getLogger(__file__)
     required_stages=[
         Align,
         FastQC,
-        SamtoolsStats,
-        PicardWgsMetrics,
-        VerifyBamId,
         CramSomalierPedigree,
     ],
     forced=True,
@@ -45,11 +43,15 @@ class CramMultiQC(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         """
-        Expected to produce an HTML and a corresponding JSON file.
+        Expected to produce an HTML and a corresponding JSON file. We write both to final
+        "latest" location, and to a location parametrised by inputs hash, in order
+        to enable reruns/reuses.
         """
+        h = dataset.alignment_inputs_hash()
         return {
             'html': dataset.web_prefix() / 'qc' / 'cram' / 'multiqc.html',
-            'json': dataset.prefix() / 'qc' / 'cram' / 'multiqc_data.json',
+            'json': dataset.prefix() / 'qc' / 'cram' / h / 'multiqc_data.json',
+            'checks': dataset.prefix() / 'qc' / 'cram' / h / '.checks',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -62,6 +64,7 @@ class CramMultiQC(DatasetStage):
 
         json_path = self.expected_outputs(dataset)['json']
         html_path = self.expected_outputs(dataset)['html']
+        checks_path = self.expected_outputs(dataset)['checks']
         if base_url := dataset.web_url():
             html_url = str(html_path).replace(str(dataset.web_prefix()), base_url)
         else:
@@ -76,9 +79,9 @@ class CramMultiQC(DatasetStage):
             for st, key in [
                 (FastQC, 'zip'),
                 (Align, 'markduplicates_metrics'),
-                (SamtoolsStats, None),
-                (PicardWgsMetrics, None),
-                (VerifyBamId, None),
+                (Align, 'samtools_stats'),
+                (Align, 'picard_wgs_metrics'),
+                (Align, 'verify_bamid'),
             ]:
                 try:
                     path = inputs.as_path(sample, st, key)
@@ -102,20 +105,24 @@ class CramMultiQC(DatasetStage):
 
         # Building sample map to MultiQC bulk rename. Only extending IDs if the
         # extrenal/participant IDs are differrent:
-        j = multiqc(
+        jobs = multiqc(
             self.b,
             tmp_prefix=dataset.tmp_prefix(),
             paths=paths,
             ending_to_trim=ending_to_trim,
             modules_to_trim_endings=modules_to_trim_endings,
-            dataset_name=dataset.name,
+            dataset=dataset,
             out_json_path=json_path,
             out_html_path=html_path,
             out_html_url=html_url,
+            out_checks_path=checks_path,
             job_attrs=self.get_job_attrs(dataset),
             sample_id_map=dataset.rich_id_map(),
+            label='CRAM',
         )
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])
+        return self.make_outputs(
+            dataset, data=self.expected_outputs(dataset), jobs=jobs
+        )
 
 
 @stage(
@@ -184,7 +191,7 @@ class GvcfMultiQC(DatasetStage):
 
         # Building sample map to MultiQC bulk rename. Only extending IDs if the
         # extrenal/participant IDs are differrent:
-        j = multiqc(
+        jobs = multiqc(
             self.b,
             tmp_prefix=dataset.tmp_prefix(),
             paths=paths,
@@ -197,8 +204,11 @@ class GvcfMultiQC(DatasetStage):
             job_attrs=self.get_job_attrs(dataset),
             sample_id_map=dataset.rich_id_map(),
             extra_config={'table_columns_visible': {'Picard': True}},
+            name='GVCF QC report',
         )
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])
+        return self.make_outputs(
+            dataset, data=self.expected_outputs(dataset), jobs=jobs
+        )
 
 
 @stage(
@@ -245,7 +255,7 @@ class JointVcfMultiQC(CohortStage):
 
         # Building sample map to MultiQC bulk rename. Only extending IDs if the
         # extrenal/participant IDs are differrent:
-        j = multiqc(
+        jobs = multiqc(
             self.b,
             tmp_prefix=self.tmp_prefix(),
             paths=paths,
@@ -255,5 +265,6 @@ class JointVcfMultiQC(CohortStage):
             out_html_url=html_url,
             job_attrs=self.get_job_attrs(cohort),
             sample_id_map=cohort.rich_id_map(),
+            name='Joint VCF QC report',
         )
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
