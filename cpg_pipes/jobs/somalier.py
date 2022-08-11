@@ -5,6 +5,7 @@ import logging
 from os.path import basename
 
 import pandas as pd
+from cpg_utils.config import get_config
 from cpg_utils.hail_batch import (
     image_path,
     reference_path,
@@ -20,7 +21,7 @@ from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs.scripts import check_pedigree
 from cpg_pipes.slack import slack_message_cmd
 from cpg_pipes.targets import Dataset, Sample
-from cpg_pipes.types import CramPath, GvcfPath, SequencingType
+from cpg_pipes.types import CramPath, GvcfPath
 from cpg_pipes.utils import can_reuse
 
 logger = logging.getLogger(__file__)
@@ -45,7 +46,6 @@ def pedigree(
     label: str | None = None,
     ignore_missing: bool = False,
     job_attrs: dict | None = None,
-    sequencing_type: SequencingType = SequencingType.GENOME,
     send_to_slack: bool = True,
 ) -> list[Job]:
     """
@@ -68,7 +68,6 @@ def pedigree(
         label=label,
         ignore_missing=ignore_missing,
         job_attrs=job_attrs,
-        sequencing_type=sequencing_type,
     )
 
     relate_j = _relate(
@@ -129,7 +128,6 @@ def ancestry(
     label: str | None = None,
     ignore_missing: bool = False,
     job_attrs: dict | None = None,
-    sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> Job:
     """
     Run somalier ancestry https://github.com/brentp/somalier/wiki/ancestry
@@ -142,7 +140,6 @@ def ancestry(
         label=label,
         ignore_missing=ignore_missing,
         job_attrs=job_attrs,
-        sequencing_type=sequencing_type,
     )
     j = _ancestry(
         b=b,
@@ -175,7 +172,6 @@ def _prep_somalier_files(
     label: str | None = None,
     ignore_missing: bool = False,
     job_attrs: dict | None = None,
-    sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> tuple[list[Job], dict[str, Path]]:
     """
     Generate .somalier file for each input.
@@ -206,9 +202,8 @@ def _prep_somalier_files(
             gvcf_or_cram_or_bam_path=gvcf_or_cram_or_bam_path,
             overwrite=overwrite,
             label=label,
-            output_path=gvcf_or_cram_or_bam_path.somalier_path,
+            out_somalier_path=gvcf_or_cram_or_bam_path.somalier_path,
             job_attrs=(job_attrs or {}) | sample.get_job_attrs(),
-            sequencing_type=sequencing_type,
         )
         somalier_file_by_sample[sample.id] = gvcf_or_cram_or_bam_path.somalier_path
         if j is not None:
@@ -413,29 +408,28 @@ def _relate(
 def extact_job(
     b,
     gvcf_or_cram_or_bam_path: CramPath | GvcfPath,
+    out_somalier_path: Path | None = None,
+    job_attrs: dict | None = None,
     overwrite: bool = True,
     label: str | None = None,
-    output_path: Path | None = None,
-    job_attrs: dict | None = None,
-    sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> Job | None:
     """
     Run "somalier extract" to generate a fingerprint for a `sample`
     from `fpath` (which can be a GVCF, a CRAM or a BAM)
     """
-    if can_reuse(output_path, overwrite):
+    if can_reuse(out_somalier_path, overwrite):
         return None
 
     job_attrs = (job_attrs or {}) | {'tool': 'somalier'}
     j = b.new_job('Somalier extract' + (f' {label}' if label else ''), job_attrs)
 
-    if not output_path:
-        output_path = gvcf_or_cram_or_bam_path.somalier_path
+    if not out_somalier_path:
+        out_somalier_path = gvcf_or_cram_or_bam_path.somalier_path
 
     j.image(image_path('somalier'))
     if isinstance(gvcf_or_cram_or_bam_path, CramPath):
         storage_gb = None  # avoid extra disk by default
-        if sequencing_type == SequencingType.GENOME:
+        if get_config()['workflow']['sequencing_type'] == 'genome':
             storage_gb = 100
             if gvcf_or_cram_or_bam_path.is_bam:
                 storage_gb = 200
@@ -464,5 +458,5 @@ def extact_job(
     mv extracted/*.somalier {j.output_file}
     """
     j.command(wrap_command(cmd, setup_gcp=True, define_retry_function=True))
-    b.write_output(j.output_file, str(output_path))
+    b.write_output(j.output_file, str(out_somalier_path))
     return j

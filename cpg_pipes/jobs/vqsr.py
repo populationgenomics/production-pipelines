@@ -12,10 +12,9 @@ from hailtop.batch.job import Job
 
 from cpg_pipes import Path
 from cpg_pipes import utils
-from cpg_pipes.jobs import split_intervals
+from cpg_pipes.jobs.picard import get_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.types import SequencingType
 
 logger = logging.getLogger(__file__)
 
@@ -97,7 +96,6 @@ def make_vqsr_jobs(
     use_as_annotations: bool = True,
     overwrite: bool = False,
     scatter_count: int = DEFAULT_INTERVALS_NUM,
-    sequencing_type: SequencingType = SequencingType.GENOME,
     intervals_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:
@@ -115,7 +113,6 @@ def make_vqsr_jobs(
     @param gvcf_count: number of input samples. Can't read from combined_mt_path as it
            might not be yet genereated the point of Batch job submission
     @param scatter_count: number of intervals to parallelise SNP model creation
-    @param sequencing_type: type of sequencing experiments
     @param intervals_path: path to specific interval list
     @param out_path: path to write final recalibrated VCF to
     @param use_as_annotations: use allele-specific annotation for VQSR
@@ -220,9 +217,8 @@ def make_vqsr_jobs(
         snp_max_gaussians = 8
 
     if scatter_count > 1:
-        intervals_j, intervals = split_intervals.get_intervals(
+        intervals_j, intervals = get_intervals(
             b=b,
-            sequencing_type=sequencing_type,
             scatter_count=scatter_count,
             intervals_path=intervals_path,
             job_attrs=job_attrs,

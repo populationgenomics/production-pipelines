@@ -14,10 +14,9 @@ from hailtop.batch import Batch
 from cpg_pipes import utils, Path, to_path
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.hb.command import wrap_command, python_command
-from cpg_pipes.jobs import split_intervals
+from cpg_pipes.jobs.picard import get_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs, subset_vcf
 from cpg_pipes.query import vep as vep_module
-from cpg_pipes.types import SequencingType
 
 
 logger = logging.getLogger(__file__)
@@ -33,7 +32,6 @@ def vep_jobs(
     out_path: Path | None = None,
     overwrite: bool = False,
     scatter_count: int = DEFAULT_INTERVALS_NUM,
-    sequencing_type: SequencingType = SequencingType.GENOME,
     intervals_path: Path | str | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:
@@ -81,9 +79,8 @@ def vep_jobs(
     part_files = []
     intervals: list[hb.Resource] = []
     if scatter_count > 1:
-        intervals_j, intervals = split_intervals.get_intervals(
+        intervals_j, intervals = get_intervals(
             b=b,
-            sequencing_type=sequencing_type,
             intervals_path=intervals_path,
             scatter_count=scatter_count,
             output_prefix=tmp_prefix,

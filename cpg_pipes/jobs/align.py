@@ -13,11 +13,12 @@ from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
-from cpg_pipes.types import AlignmentInput, FastqPairs, CramPath, SequencingType
+from cpg_pipes.targets import Sample
+from cpg_pipes.types import AlignmentInput, FastqPairs, CramPath
 from cpg_pipes.jobs import picard
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.utils import can_reuse
+from cpg_pipes.utils import can_reuse, exists
 
 logger = logging.getLogger(__file__)
 
@@ -49,10 +50,54 @@ class MarkDupTool(Enum):
     NO_MARKDUP = 'no_markdup'
 
 
+def _get_cram_reference_from_version(cram_version) -> str:
+    """
+    Get the reference used for the specific cram_version,
+    so that bazam is able to correctly decompress the reads
+    """
+    cram_version_map = get_config()['workflow'].get('cram_version_reference', {})
+    if cram_version in cram_version_map:
+        return cram_version_map[cram_version]
+    raise ValueError(
+        f'Unrecognised cram_version: "{cram_version}", expected one of: {", ".join(cram_version_map.keys())}'
+    )
+
+
+class MissingAlignmentInputException(Exception):
+    """Raise if alignment input is missing"""
+
+    pass
+
+
+def _get_alignment_input(sample: Sample) -> AlignmentInput:
+    sequencing_type = get_config()['workflow']['sequencing_type']
+    alignment_input = sample.alignment_input_by_seq_type.get(sequencing_type)
+    if realign_cram_ver := get_config()['workflow'].get('realign_from_cram_version'):
+        if (
+            path := (
+                sample.dataset.prefix()
+                / 'cram'
+                / realign_cram_ver
+                / f'{sample.id}.cram'
+            )
+        ).exists():
+            logger.info(f'Realigning from {realign_cram_ver} CRAM {path}')
+            alignment_input = CramPath(
+                path,
+                reference_assembly=_get_cram_reference_from_version(realign_cram_ver),
+            )
+
+    if alignment_input is None or not alignment_input.exists():
+        raise MissingAlignmentInputException(
+            f'No alignment inputs found for sample {sample}'
+            + (f': {alignment_input}' if alignment_input else '')
+        )
+    return alignment_input
+
+
 def align(
     b,
-    alignment_input: AlignmentInput,
-    sample_name: str,
+    sample: Sample,
     job_attrs: dict | None = None,
     output_path: CramPath | None = None,
     out_markdup_metrics_path: Path | None = None,
@@ -62,7 +107,6 @@ def align(
     overwrite: bool = False,
     requested_nthreads: int | None = None,
     realignment_shards_num: int = DEFAULT_REALIGNMENT_SHARD_NUM,
-    sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> list[Job]:
     """
     - if the input is 1 fastq pair, submits one alignment job.
@@ -88,6 +132,8 @@ def align(
     if output_path and can_reuse(output_path.path, overwrite):
         return []
 
+    alignment_input = _get_alignment_input(sample)
+
     base_jname = 'Align'
     if extra_label:
         base_jname += f' {extra_label}'
@@ -109,10 +155,9 @@ def align(
             job_name=base_jname,
             alignment_input=alignment_input,
             requested_nthreads=requested_nthreads,
-            sample_name=sample_name,
+            sample_name=sample.id,
             job_attrs=job_attrs,
             aligner=aligner,
-            sequencing_type=sequencing_type,
             should_sort=False,
         )
         stdout_is_sorted = False
@@ -131,10 +176,9 @@ def align(
                     job_name=base_jname,
                     alignment_input=FastqPairs([pair]),
                     requested_nthreads=requested_nthreads,
-                    sample_name=sample_name,
+                    sample_name=sample.id,
                     job_attrs=job_attrs,
                     aligner=aligner,
-                    sequencing_type=sequencing_type,
                     should_sort=True,
                 )
                 j.command(wrap_command(cmd, monitor_space=True))
@@ -148,13 +192,12 @@ def align(
                     b=b,
                     job_name=base_jname,
                     alignment_input=alignment_input,
-                    sample_name=sample_name,
+                    sample_name=sample.id,
                     job_attrs=job_attrs,
                     aligner=aligner,
                     requested_nthreads=requested_nthreads,
                     number_of_shards_for_realignment=realignment_shards_num,
                     shard_number=shard_number,
-                    sequencing_type=sequencing_type,
                     should_sort=True,
                 )
                 # Sorting with samtools, but not adding deduplication yet, because we
@@ -173,9 +216,8 @@ def align(
             nthreads=requested_nthreads,
             # for FASTQ or BAM inputs, requesting more disk (400G). Example when
             # default is not enough: https://batch.hail.populationgenomics.org.au/batches/73892/jobs/56
-            storage_gb=storage_for_cram_job(
+            storage_gb=storage_for_align_job(
                 alignment_input=alignment_input,
-                sequencing_type=sequencing_type,
             ),
         ).get_nthreads()
 
@@ -207,11 +249,10 @@ def align(
     return jobs
 
 
-def storage_for_cram_job(
-    alignment_input: AlignmentInput,
-    sequencing_type: SequencingType,
-) -> int | None:
-    """Get storage for a job that processes CRAM"""
+def storage_for_align_job(alignment_input: AlignmentInput) -> int | None:
+    """
+    Get storage for an alignment job, gb
+    """
     storage_gb = None  # avoid attaching extra disk by default
 
     try:
@@ -222,13 +263,27 @@ def storage_for_cram_job(
         assert isinstance(storage_gb, int), storage_gb
         return storage_gb
 
-    if sequencing_type == SequencingType.GENOME:
+    sequencing_type = get_config()['workflow']['sequencing_type']
+    if sequencing_type == 'genome':
         if (
             isinstance(alignment_input, FastqPairs)
             or isinstance(alignment_input, CramPath)
             and alignment_input.is_bam
         ):
             storage_gb = 400  # for WGS FASTQ or BAM inputs, need more disk
+    return storage_gb
+
+
+def storage_for_cram_qc_job() -> int | None:
+    """
+    Get storage request for a CRAM QC processing job, gb
+    """
+    sequencing_type = get_config()['workflow']['sequencing_type']
+    storage_gb = None  # avoid extra disk by default
+    if sequencing_type == 'genome':
+        storage_gb = 100
+    if sequencing_type == 'exome':
+        storage_gb = 20
     return storage_gb
 
 
@@ -242,7 +297,6 @@ def _align_one(
     aligner: Aligner = Aligner.BWA,
     number_of_shards_for_realignment: int | None = None,
     shard_number: int | None = None,
-    sequencing_type: SequencingType = SequencingType.GENOME,
     should_sort: bool = False,
 ) -> tuple[Job, str]:
     """
@@ -265,10 +319,7 @@ def _align_one(
     nthreads = STANDARD.set_resources(
         j,
         nthreads=requested_nthreads,
-        storage_gb=storage_for_cram_job(
-            alignment_input=alignment_input,
-            sequencing_type=sequencing_type,
-        ),
+        storage_gb=storage_for_align_job(alignment_input=alignment_input),
     ).get_nthreads()
 
     # 2022-07-22 mfranklin:
@@ -302,7 +353,7 @@ def _align_one(
         cram_file = cram[alignment_input.ext]
 
         # BAZAM requires indexed input.
-        if not alignment_input.index_exists():
+        if not exists(alignment_input.index_path):
             index_cmd = f'samtools index {cram_file}'
 
         _reference_command_inp = (
@@ -425,7 +476,6 @@ def extract_fastq(
     job_attrs: dict | None = None,
     output_fq1: str | Path | None = None,
     output_fq2: str | Path | None = None,
-    sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> Job:
     """
     Job that converts a BAM or a CRAM file to an interleaved compressed fastq file.
@@ -435,7 +485,8 @@ def extract_fastq(
     nthreads = ncpu * 2  # multithreading
     j.cpu(ncpu)
     j.image(image_path('dragmap'))
-    if sequencing_type == SequencingType.GENOME:
+    sequencing_type = get_config()['workflow']['sequencing_type']
+    if sequencing_type == 'genome':
         j.storage('700G')
 
     reference = fasta_res_group(b)

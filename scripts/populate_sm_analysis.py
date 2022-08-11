@@ -14,14 +14,13 @@ from cpg_pipes.providers.cpg.inputs import CpgInputProvider
 from cpg_pipes.providers.cpg.smdb import SMDB
 from cpg_pipes.providers.cpg.status import CpgStatusReporter
 from cpg_pipes.targets import Cohort
-from cpg_pipes.types import SequencingType
 from cpg_pipes.utils import exists
 
+sequencing_type = get_config()['workflow']['sequencing_type']
 access_level = get_config()['workflow']['access_level']
 cohort = Cohort(
     analysis_dataset_name=get_config()['workflow']['dataset'],
     namespace=Namespace.from_access_level(access_level),
-    sequencing_type=SequencingType.parse(get_config()['workflow']['sequencing_type']),
 )
 smdb = SMDB(cohort.analysis_dataset.name)
 input_provider = CpgInputProvider(smdb)
@@ -70,7 +69,7 @@ if POPULATE_SAMPLES:
                 meta=sample.get_job_attrs()
                 | dict(
                     size=path.stat().st_size,
-                    sequencing_type=cohort.sequencing_type.value,
+                    sequencing_type=sequencing_type,
                 ),
                 project_name=sample.dataset.name,
             )
@@ -86,7 +85,7 @@ if POPULATE_SAMPLES:
                 meta=sample.get_job_attrs()
                 | dict(
                     size=path.stat().st_size,
-                    sequencing_type=cohort.sequencing_type.value,
+                    sequencing_type=sequencing_type,
                 ),
                 project_name=sample.dataset.name,
             )
@@ -119,7 +118,7 @@ def _populate_qc_analysis_entries(multiqc_json_path: Path):
             target=sample,
             meta=sample.get_job_attrs()
             | dict(
-                sequencing_type=cohort.sequencing_type.value,
+                sequencing_type=sequencing_type,
                 metrics=metrics_d,
             ),
             project_name=sample.dataset.name,
@@ -143,7 +142,7 @@ if POPULATE_JOINT_CALL:
             target=cohort,
             meta=cohort.get_job_attrs()
             | dict(
-                sequencing_type=cohort.sequencing_type.value,
+                sequencing_type=sequencing_type,
             ),
             project_name='seqr',
         )
@@ -172,7 +171,7 @@ if POPULATE_ES_INDEX:
             target=dataset,
             meta=dataset.get_job_attrs()
             | dict(
-                sequencing_type=cohort.sequencing_type.value,
+                sequencing_type=sequencing_type,
             ),
             project_name=ds_name,
         )

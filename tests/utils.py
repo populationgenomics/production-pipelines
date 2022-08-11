@@ -6,7 +6,7 @@ from cpg_utils import Path
 from cpg_utils.config import set_config_paths, update_dict
 
 from cpg_pipes import to_path, Namespace
-from cpg_pipes.types import GvcfPath, FastqPair, SequencingType
+from cpg_pipes.types import GvcfPath, FastqPair
 
 DATASET = 'fewgenomes'
 ACCESS_LEVEL = 'test'
@@ -55,7 +55,7 @@ CHR20_GVCF_BY_SID = {
     s: GvcfPath(BASE_BUCKET / f'inputs/chr20/gvcf/{s}.g.vcf.gz') for s in SAMPLES
 }
 
-SEQ_TYPE = SequencingType.GENOME
+SEQ_TYPE = 'genome'
 
 
 def setup_env(tmp_bucket: Path, extraconf: dict | None = None):

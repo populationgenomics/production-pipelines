@@ -14,7 +14,6 @@ from cpg_pipes import Path, Namespace, to_path
 from cpg_pipes.providers.cpg.inputs import CpgInputProvider
 from cpg_pipes.providers.cpg.smdb import SMDB
 from cpg_pipes.targets import Dataset, Cohort
-from cpg_pipes.types import SequencingType
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -38,11 +37,13 @@ def main(
     cohort = Cohort(
         analysis_dataset_name='seqr',
         namespace=Namespace.from_access_level(get_config()['workflow']['access_level']),
-        sequencing_type=SequencingType.GENOME,
     )
     input_provider.populate_cohort(
         cohort=cohort,
-        dataset_names=get_config()['workflow']['datasets'],
+        dataset_names=get_config()['workflow'].get('datasets'),
+        skip_samples=get_config()['workflow'].get('skip_samples'),
+        only_samples=get_config()['workflow'].get('only_samples'),
+        skip_datasets=get_config()['workflow'].get('skip_datasets'),
     )
 
     tmp_dir = to_path(tempfile.mkdtemp())

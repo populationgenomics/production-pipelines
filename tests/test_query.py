@@ -21,7 +21,7 @@ from cpg_pipes.query.seqr_loader import (
     load_vqsr,
 )
 from cpg_pipes.query.vep import vep_json_to_ht
-from cpg_pipes.types import SequencingType, logger
+from cpg_pipes.types import logger
 from cpg_pipes.utils import timestamp
 
 try:
@@ -50,7 +50,7 @@ class TestQuery(unittest.TestCase):
         self.name = self._testMethodName
         self.timestamp = timestamp()
         self.local_tmp_dir = tempfile.mkdtemp()
-        self.sequencing_type = SequencingType.GENOME
+        self.sequencing_type = 'genome'
         hailquery.init_batch()
         # Interval to take on chr20:
         self.chrom = 'chr20'
@@ -131,7 +131,7 @@ class TestQuery(unittest.TestCase):
             vep_ht_path=str(vep_ht_path),
             out_mt_path=str(out_mt_path),
             checkpoints_bucket=str(self.tmp_bucket / 'seqr_loader' / 'checkpoints'),
-            sequencing_type=self.sequencing_type.value.upper(),
+            sequencing_type=self.sequencing_type.upper(),
         )
         # Testing
         mt = hl.read_matrix_table(str(out_mt_path))

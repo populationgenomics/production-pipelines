@@ -4,19 +4,18 @@ sample-metadata DB. For back-populating old data; for new data, it should be
 populated automatically with `workflow/status_provider="smdb"` set in config.
 """
 from cloudpathlib.exceptions import OverwriteNewerCloudError
+from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import Namespace
 
 from cpg_pipes.providers.cpg.inputs import CpgInputProvider
 from cpg_pipes.providers.cpg.smdb import SMDB
 from cpg_pipes.targets import Cohort
-from cpg_pipes.types import SequencingType
 
 access_level = get_config()['workflow']['access_level']
 cohort = Cohort(
     analysis_dataset_name=get_config()['workflow']['dataset'],
     namespace=Namespace.from_access_level(access_level),
-    sequencing_type=SequencingType.parse(get_config()['workflow']['sequencing_type']),
 )
 smdb = SMDB(cohort.analysis_dataset.name)
 input_provider = CpgInputProvider(smdb)
@@ -29,9 +28,20 @@ input_provider.populate_cohort(
 )
 
 MOVE_DUPLICATE_METRICS = False
-MOVE_CRAM_QC = True
+MOVE_CRAM_QC = False
 DRY_RUN = False
+REMOVE_METRICS = True
 
+if REMOVE_METRICS:
+    for dataset in cohort.get_datasets():
+        for i, sample in enumerate(cohort.get_samples()):
+            path = to_path(
+                f'gs://cpg-{dataset.name}-main/exome/qc/verify_bamid/{sample.id}_verify_bamid.selfSM'
+            )
+            if path.exists():
+                print(f'{i} removing {path}')
+                path.unlink()
+                assert not path.exists()
 
 if MOVE_DUPLICATE_METRICS:
     for i, sample in enumerate(cohort.get_samples()):

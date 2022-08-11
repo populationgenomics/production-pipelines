@@ -12,7 +12,6 @@ from hailtop.batch import ResourceGroup
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.targets import Sample
-from cpg_pipes.types import SequencingType
 
 logger = logging.getLogger(__file__)
 
@@ -22,7 +21,6 @@ def happy(
     sample: Sample,
     vcf_or_gvcf: ResourceGroup,
     is_gvcf: bool,
-    seqtype: SequencingType,
     job_attrs: dict,
     output_path: Path | None = None,
 ):
@@ -35,9 +33,10 @@ def happy(
         )
         return
 
-    if seqtype.value not in get_config()['workflow']['validation']:
+    sequencing_type = get_config()['workflow']['sequencing_type']
+    if sequencing_type not in get_config()['workflow']['validation']:
         logger.warning(
-            f'workflow/validation/{seqtype.value} section is not defined in config, skip running hap.py'
+            f'workflow/validation/{sequencing_type} section is not defined in config, skip running hap.py'
         )
         return
 
@@ -46,10 +45,10 @@ def happy(
         return
 
     truth_vcf_path = reference_path(
-        f'validation/{seqtype.value}/{truth_sample_id}/truth'
+        f'validation/{sequencing_type}/{truth_sample_id}/truth'
     )
     truth_bed_path = reference_path(
-        f'validation/{seqtype.value}/{truth_sample_id}/regions'
+        f'validation/{sequencing_type}/{truth_sample_id}/regions'
     )
     input_file: str
 

@@ -1,23 +1,10 @@
 [workflow]
-first_stage = 'LoadToES'
-last_stage = 'LoadToES'
+first_stage = 'Align'
+last_stage = 'Align'
 sequencing_type = 'exome'
 hc_intervals_num = 1
 jc_intervals_num = 1
 vep_intervals_num = 100
-datasets = [
-    'acute-care', 
-    'perth-neuro', 
-    'ravenscroft-rdstudy', 
-    'circa', 
-    'heartkids',
-    'ohmr3-mendelian',
-    'ohmr4-epilepsy',
-    'rdnow',
-    'mito-disease',
-    'ravenscroft-arch',
-    'hereditary-neuro',
-    'validation',
-    'schr-neuro',
-]
-create_es_index_for_datasets = ['acute-care', 'hereditary-neuro', 'mito-disease']
+
+datasets = ['mito-disease']
+only_samples = ['CPG211417']

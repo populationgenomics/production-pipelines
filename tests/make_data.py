@@ -13,7 +13,7 @@ from cpg_pipes import Path
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs.align import extract_fastq
 from cpg_pipes.pipeline.pipeline import Pipeline
-from cpg_pipes.types import SequencingType, CramPath
+from cpg_pipes.types import CramPath
 
 import utils
 
@@ -123,7 +123,7 @@ def make_gvcfs_for_joint_calling(pipeline, pct=1):
     refs = pipeline.refs
 
     intervals_j = pipeline.b.new_job(f'Make toy intervals: {pct}% of exome')
-    in_intervals = b.read_input(str(refs.calling_interval_lists[SequencingType.EXOME]))
+    in_intervals = b.read_input(str(refs.calling_interval_lists['exome']))
     intervals_j.command(
         f"""
     grep ^@ {in_intervals} > {intervals_j.out}
@@ -161,13 +161,13 @@ def jointcalling_vcf_to_exome(pipeline):
     _subset_vcf(
         b,
         utils.BASE_BUCKET / 'inputs/full/9samples-joint-called.vcf.gz',
-        refs.calling_interval_lists[SequencingType.EXOME],
+        refs.calling_interval_lists['exome'],
         utils.BASE_BUCKET / 'inputs/exome/9samples-joint-called.vcf.gz',
     )
     _subset_vcf(
         b,
         utils.BASE_BUCKET / 'inputs/full/9samples-joint-called-siteonly.vcf.gz',
-        refs.calling_interval_lists[SequencingType.EXOME],
+        refs.calling_interval_lists['exome'],
         utils.BASE_BUCKET / 'inputs/exome/9samples-joint-called-siteonly.vcf.gz',
     )
     pipeline.run(wait=True)

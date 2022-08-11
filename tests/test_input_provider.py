@@ -11,7 +11,6 @@ from cpg_pipes.providers.cpg.inputs import CpgInputProvider
 from cpg_pipes.providers.cpg.smdb import SMDB
 from cpg_pipes.targets import Cohort, Sex
 from cpg_pipes.providers.inputs import CsvInputProvider
-from cpg_pipes.types import SequencingType
 
 
 class TestInputProvider(unittest.TestCase):
@@ -49,7 +48,6 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
             name='test',
             analysis_dataset_name=dataset,
             namespace=Namespace.TEST,
-            sequencing_type=SequencingType.EXOME,
         )
         provider.populate_cohort(
             cohort,
@@ -79,7 +77,6 @@ dataset,sample,external_id,fqs_r1,fqs_r2,cram,sex,seq_type
             cohort=Cohort(
                 analysis_dataset_name=dataset,
                 namespace=Namespace.TEST,
-                sequencing_type=SequencingType.GENOME,
             ),
             dataset_names=[dataset],
         )

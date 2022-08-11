@@ -27,7 +27,7 @@ from cpg_pipes.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jo
 from cpg_pipes.jobs.somalier import check_pedigree_job
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.targets import Dataset
-from cpg_pipes.types import CramPath, SequencingType
+from cpg_pipes.types import CramPath
 from cpg_pipes.utils import timestamp
 
 try:
@@ -68,7 +68,6 @@ class TestJobs(unittest.TestCase):
         utils.setup_env(self.tmp_bucket)
 
         self.batch = setup_batch(self.name)
-        self.sequencing_type = SequencingType.GENOME
         self.dataset = Dataset(utils.DATASET, namespace=utils.Namespace)
         sample_name = f'Test-{self.timestamp}'
         self.sample = self.dataset.add_sample(sample_name, sample_name)
@@ -245,7 +244,6 @@ class TestJobs(unittest.TestCase):
             tmp_prefix=self.tmp_bucket,
             dragen_mode=True,
             output_path=out_gvcf_path,
-            sequencing_type=self.sequencing_type,
             intervals_path=utils.BASE_BUCKET
             / 'inputs/exome1pct/calling_regions.interval_list',
         )
@@ -276,7 +274,6 @@ class TestJobs(unittest.TestCase):
             overwrite=True,
             scatter_count=4,
             tool=JointGenotyperTool.GenotypeGVCFs,
-            sequencing_type=self.sequencing_type,
             intervals_path=utils.BASE_BUCKET
             / 'inputs/exome1pct/calling_regions.interval_list',
         )
@@ -308,7 +305,6 @@ class TestJobs(unittest.TestCase):
             out_path=out_vcf_path,
             use_as_annotations=True,
             overwrite=True,
-            sequencing_type=self.sequencing_type,
             intervals_path=utils.BASE_BUCKET
             / 'inputs/exome5pct/calling_regions.interval_list',
         )
@@ -331,7 +327,6 @@ class TestJobs(unittest.TestCase):
         jobs = vep.vep_jobs(
             self.batch,
             vcf_path=siteonly_vcf_path,
-            sequencing_type=self.sequencing_type,
             out_path=out_vcf_path,
             scatter_count=4,
             overwrite=False,
@@ -456,7 +451,6 @@ class TestJobs(unittest.TestCase):
             vep_ht_path=vep_ht_path,
             output_mt_path=out_mt_path,
             checkpoint_prefix=self.tmp_bucket / 'checkpoints',
-            sequencing_type=self.sequencing_type,
         )
         self.batch.run(wait=True)
 
@@ -480,7 +474,6 @@ class TestJobs(unittest.TestCase):
             vep_ht_path=vep_ht_path,
             output_mt_path=out_mt_path,
             checkpoint_prefix=self.tmp_bucket / 'checkpoints',
-            sequencing_type=self.sequencing_type,
         )
         self.batch.run(wait=True)
 

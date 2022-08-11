@@ -7,9 +7,11 @@ import logging
 from abc import ABC, abstractmethod
 from enum import Enum
 
+from cpg_utils.config import get_config
+
 from ..utils import exists
 from ..types import FastqPair, CramPath, AlignmentInput, FastqPairs
-from ..targets import Cohort, Dataset, Sex, SequencingType, PedigreeInfo
+from ..targets import Cohort, Dataset, Sex, PedigreeInfo
 from .. import Path
 
 logger = logging.getLogger(__file__)
@@ -82,8 +84,7 @@ class InputProvider(ABC):
             return
 
         self.populate_alignment_inputs(cohort)
-        if cohort.sequencing_type:
-            self.filter_sequencing_type(cohort, cohort.sequencing_type)
+        self.filter_sequencing_type(cohort)
         self.populate_analysis(cohort)
         self.populate_participants(cohort)
         self.populate_pedigree(cohort)
@@ -136,19 +137,12 @@ class InputProvider(ABC):
         Get sample metadata. Can be also set later.
         """
 
-    @abstractmethod
-    def get_sequencing_type(self, entry: dict) -> SequencingType | None:
-        """
-        Get sequencing type. Can be also set later.
-        """
-
     @staticmethod
-    def filter_sequencing_type(cohort: Cohort, sequencing_type: SequencingType | None):
+    def filter_sequencing_type(cohort: Cohort | None):
         """
         Filtering to the samples with only requested sequencing types.
         """
-        if not sequencing_type:
-            return
+        sequencing_type = get_config()['workflow']['sequencing_type']
         for s in cohort.get_samples():
             if not s.alignment_input_by_seq_type:
                 logger.warning(f'{s}: skipping because no sequencing inputs found')
@@ -164,7 +158,7 @@ class InputProvider(ABC):
             if not bool(s.alignment_input_by_seq_type):
                 logger.warning(
                     f'{s}: skipping because no inputs with data type '
-                    f'"{sequencing_type.value}" found in '
+                    f'"{sequencing_type}" found in '
                     f'{[k.value for k in avail_types]}'
                 )
                 s.active = False
@@ -300,7 +294,6 @@ class FieldMap(Enum):
     fqs_r2 = 'fqs_r2'
     cram = 'cram'
     sex = 'sex'
-    sequencing_type = 'seq_type'
 
 
 class CsvInputProvider(InputProvider):
@@ -387,14 +380,6 @@ class CsvInputProvider(InputProvider):
         reserved_fields = [f.value for f in FieldMap]
         return {k: v for k, v in entry.items() if k not in reserved_fields}
 
-    def get_sequencing_type(self, entry: dict) -> SequencingType:
-        """
-        Get sequencing type.
-        """
-        result = SequencingType.parse(entry[FieldMap.sequencing_type.value])
-        assert result
-        return result
-
     def populate_analysis(self, cohort: Cohort) -> None:
         """
         Populate Analysis entries.
@@ -417,11 +402,11 @@ class CsvInputProvider(InputProvider):
         """
         Populate sequencing inputs for samples.
         """
-        data: dict[tuple[str, SequencingType], AlignmentInput] = {}
+        data: dict[tuple[str, str], AlignmentInput] = {}
 
         for entry in self.get_entries():
             sid = self.get_sample_id(entry)
-            seq_type = self.get_sequencing_type(entry)
+            seq_type = get_config()['workflow']['sequencing_type']
             fqs1 = [
                 f.strip()
                 for f in entry.get(FieldMap.fqs_r1.value, '').split('|')

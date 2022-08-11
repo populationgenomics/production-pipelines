@@ -10,7 +10,6 @@ from hailtop.batch import Batch
 from cpg_pipes import Path, to_path
 from cpg_pipes.hb.command import wrap_command, python_command
 from cpg_pipes.query import seqr_loader
-from cpg_pipes.types import SequencingType
 
 logger = logging.getLogger(__file__)
 
@@ -22,7 +21,7 @@ def annotate_cohort_jobs(
     vep_ht_path: Path,
     output_mt_path: Path,
     checkpoint_prefix: Path,
-    sequencing_type: SequencingType,
+    sequencing_type: str,
     job_attrs: dict | None = None,
     overwrite: bool = False,
 ) -> list[Job]:
@@ -41,7 +40,7 @@ def annotate_cohort_jobs(
             str(output_mt_path),
             overwrite,
             genome_build(),
-            sequencing_type.seqr_value(),
+            sequencing_type,
             str(checkpoint_prefix),
             setup_gcp=True,
             setup_hail=True,

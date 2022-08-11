@@ -31,7 +31,6 @@ from ..providers.cpg.status import CpgStatusReporter
 from ..providers.inputs import InputProvider, CsvInputProvider
 from ..targets import Target, Dataset, Sample, Cohort
 from ..providers.status import StatusReporter
-from ..types import SequencingType
 from ..utils import exists, timestamp, slugify
 
 logger = logging.getLogger(__file__)
@@ -578,16 +577,16 @@ class Stage(Generic[TargetT], ABC):
                 return Action.SKIP
 
         expected_out = self.expected_outputs(target)
-        reusable, missing = self._find_reusable_outputs(expected_out)
+        reusable, first_missing_path = self._is_reusable(expected_out)
 
         if self.skipped:
-            if reusable and not missing:
+            if reusable and not first_missing_path:
                 return Action.REUSE
             if get_config()['workflow'].get('skip_samples_with_missing_input'):
                 logger.warning(
                     f'Skipping {target}: stage {self.name} is required, '
-                    f'but is marked as skipped, and expected outputs for the target '
-                    f'do not exist: {missing}'
+                    f'but is marked as skipped, and some expected outputs for the '
+                    f'target do not exist: {first_missing_path}'
                 )
                 # `workflow/skip_samples_with_missing_input` means that we can ignore
                 # samples/datasets that have missing results from skipped stages.
@@ -598,10 +597,10 @@ class Stage(Generic[TargetT], ABC):
             raise ValueError(
                 f'Stage {self.name} is required, but is skipped, and '
                 f'the following expected outputs for target {target} do not exist: '
-                f'{missing}'
+                f'{first_missing_path}'
             )
 
-        if reusable and not missing:
+        if reusable and not first_missing_path:
             if target.forced:
                 logger.info(
                     f'{self.name}: can reuse, but forcing the target '
@@ -621,38 +620,33 @@ class Stage(Generic[TargetT], ABC):
         logger.info(f'{self.name}: running queue_jobs(target={target})')
         return Action.QUEUE
 
-    def _find_reusable_outputs(
-        self, expected_out: ExpectedResultT
-    ) -> tuple[ExpectedResultT, ExpectedResultT]:
-        """
-        Splits outputs into reusable (for the stage for the target),
-        and missing.
-        """
+    def _is_reusable(self, expected_out: ExpectedResultT) -> tuple[bool, Path | None]:
         if self.assume_outputs_exist:
-            return expected_out, None
-
-        def _filter_obj(item: ExpectedResultT, pred: Callable) -> ExpectedResultT:
-            """
-            Recursively filter every value in a dict or a list using predicate `pred`
-            """
-            if isinstance(item, Path):
-                if pred(item):
-                    return item
-            if isinstance(item, dict):
-                return {k: v for k, v in item.items() if pred(v)}
-            return item
+            return True, None
 
         if get_config()['workflow'].get('check_expected_outputs'):
-            reusable_out = _filter_obj(expected_out, exists)
-            missing_out = _filter_obj(expected_out, lambda val: not exists(val))
-            return reusable_out, missing_out
+            if not expected_out:
+                return True, None
+
+            if isinstance(expected_out, Path):
+                if exists(expected_out):
+                    return True, None
+                else:
+                    return False, expected_out
+
+            assert isinstance(expected_out, dict)
+
+            for k, v in expected_out.items():
+                if isinstance(v, Path) and not exists(v):
+                    return False, v
+            return True, None
         else:
             if self.skipped:
                 # Do not check the files' existence, trust they exist.
                 # note that for skipped stages, we automatically assume outputs exist
-                return expected_out, None
+                return True, None
             # Do not check the files' existence, assume they don't exist:
-            return None, expected_out
+            return False, None
 
     def _queue_reuse_job(
         self, target: TargetT, found_paths: Path | dict[str, Path]
@@ -671,7 +665,7 @@ class Stage(Generic[TargetT], ABC):
         Create Hail Batch Job attributes dictionary
         """
         job_attrs = dict(
-            seq_type=self.cohort.sequencing_type.value,
+            seq_type=get_config()['workflow']['sequencing_type'],
             stage=self.name,
         )
         if target:
@@ -800,9 +794,6 @@ class Pipeline:
             analysis_dataset_name=analysis_dataset,
             namespace=Namespace.from_access_level(access_level),
             name=self.name,
-            sequencing_type=SequencingType.parse(
-                get_config()['workflow']['sequencing_type']
-            ),
         )
 
         smdb: Optional[SMDB] = None
@@ -831,7 +822,7 @@ class Pipeline:
             )
 
         self.tmp_prefix = self.cohort.analysis_dataset.tmp_prefix() / self.run_id
-        description += f' [{self.cohort.sequencing_type.value}]'
+        description += f' [{get_config()["workflow"]["sequencing_type"]}]'
         if ds_set := set(d.name for d in self.cohort.get_datasets()):
             description += ' ' + ', '.join(sorted(ds_set))
         self.b: RegisteringBatch = setup_batch(description=description)

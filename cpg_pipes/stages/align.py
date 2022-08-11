@@ -1,20 +1,59 @@
 """
 Stage that generates a CRAM file.
 """
-
+import dataclasses
 import logging
+from typing import Callable, Optional
 
 from cpg_utils.config import get_config
+from cpg_utils import Path
 
-from .. import Path
-from ..jobs.align import Aligner, MarkDupTool
-from ..jobs.cram_qc import samtools_stats, picard_wgs_metrics, verify_bamid
+from ..jobs.align import Aligner, MarkDupTool, MissingAlignmentInputException
+from ..jobs.samtools import samtools_stats
+from ..jobs.verifybamid import verifybamid
+from ..jobs.picard import picard_genome_metrics, picard_exome_metrics, picard_hs_metrics
 from ..targets import Sample
 from ..pipeline import stage, SampleStage, StageInput, StageOutput
 from ..jobs import align, somalier
-from ..types import CramPath
 
 logger = logging.getLogger(__file__)
+
+
+@dataclasses.dataclass
+class Qc:
+    """QC function definition and corresponding output extentions"""
+
+    func: Optional[Callable]
+    out_ext_by_key: dict[str, str | None]
+
+
+def qc_functions() -> list[Qc]:
+    """QC functions and their outputs for a sequencing type"""
+    qcs = [
+        Qc(None, {'markduplicates_metrics': '.markduplicates-metrics'}),
+        Qc(samtools_stats, {'samtools_stats': '.samtools-stats'}),
+        Qc(verifybamid, {'verify_bamid': '.verify-bamid.selfSM'}),
+        Qc(somalier.extact_job, {'somalier': None}),
+    ]
+
+    sequencing_type = get_config()['workflow']['sequencing_type']
+    if sequencing_type == 'genome':
+        qcs.append(
+            Qc(picard_genome_metrics, {'picard_wgs_metrics': '.picard-wgs-metrics'})
+        )
+    elif sequencing_type == 'exome':
+        qcs.append(
+            Qc(
+                picard_exome_metrics,
+                {
+                    'gc_bias_detail_metrics': '.gc-bias-detail-metrics',
+                    'gc_bias_summary_metrics': '.gc-bias-summary-metrics',
+                    'insert_size_metrics': '.insert-size-metrics',
+                },
+            )
+        )
+        qcs.append(Qc(picard_hs_metrics, {'hs_metrics': '.hs-metrics'}))
+    return qcs
 
 
 @stage(analysis_type='cram')
@@ -27,32 +66,17 @@ class Align(SampleStage):
         """
         Stage is expected to generate a CRAM file and a corresponding index.
         """
-        qc_dict = {
-            key: sample.dataset.prefix() / 'qc' / key / f'{sample.id}{suf}'
-            for key, suf in {
-                'markduplicates_metrics': '.markduplicates-metrics',
-                'samtools_stats': '_samtools_stats.txt',
-                'picard_wgs_metrics': '_picard_wgs_metrics.csv',
-                'verify_bamid': '_verify_bamid.selfSM',
-            }.items()
-        }
+        qc_outs: dict[str, Path] = dict()
+        for qc in qc_functions():
+            for key, suf in qc.out_ext_by_key.items():
+                if key == 'somalier':
+                    path = sample.get_cram_path().somalier_path
+                else:
+                    path = sample.dataset.prefix() / 'qc' / key / f'{sample.id}{suf}'
+                qc_outs[key] = path
         return {
             'cram': sample.get_cram_path().path,
-            'somalier': sample.get_cram_path().somalier_path,
-        } | qc_dict
-
-    @staticmethod
-    def _get_cram_reference_from_version(cram_version) -> str:
-        """
-        Get the reference used for the specific cram_version,
-        so that bazam is able to correctly decompress the reads
-        """
-        cram_version_map = get_config()['workflow'].get('cram_version_reference', {})
-        if cram_version in cram_version_map:
-            return cram_version_map[cram_version]
-        raise ValueError(
-            f'Unrecognised cram_version: "{cram_version}", expected one of: {", ".join(cram_version_map.keys())}'
-        )
+        } | qc_outs
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
@@ -60,32 +84,24 @@ class Align(SampleStage):
         Checks the `realign_from_cram_version` pipeline config argument, and
         prioritises realignment from CRAM vs alignment from FASTQ if it's set.
         """
-        alignment_input = sample.alignment_input_by_seq_type.get(
-            self.cohort.sequencing_type
-        )
-        if realign_cram_ver := get_config()['workflow'].get(
-            'realign_from_cram_version'
-        ):
-            if (
-                path := (
-                    sample.dataset.prefix()
-                    / 'cram'
-                    / realign_cram_ver
-                    / f'{sample.id}.cram'
-                )
-            ).exists():
-                logger.info(f'Realigning from {realign_cram_ver} CRAM {path}')
-                alignment_input = CramPath(
-                    path,
-                    reference_assembly=self._get_cram_reference_from_version(
-                        realign_cram_ver
-                    ),
-                )
-
-        if alignment_input is None or (
-            get_config()['workflow'].get('check_inputs')
-            and not alignment_input.exists()
-        ):
+        jobs = []
+        try:
+            align_jobs = align.align(
+                b=self.b,
+                sample=sample,
+                output_path=sample.get_cram_path(),
+                out_markdup_metrics_path=self.expected_outputs(sample)[
+                    'markduplicates_metrics'
+                ],
+                job_attrs=self.get_job_attrs(sample),
+                overwrite=not get_config()['workflow'].get('check_intermediates'),
+                realignment_shards_num=get_config()['workflow'].get(
+                    'realignment_shards_num', align.DEFAULT_REALIGNMENT_SHARD_NUM
+                ),
+                aligner=Aligner.DRAGMAP,
+                markdup_tool=MarkDupTool.PICARD,
+            )
+        except MissingAlignmentInputException as e:
             if get_config()['workflow'].get('skip_samples_with_missing_input'):
                 logger.error(f'No alignment inputs, skipping sample {sample}')
                 sample.active = False
@@ -94,41 +110,25 @@ class Align(SampleStage):
                 return self.make_outputs(
                     target=sample, error_msg=f'No alignment input found'
                 )
-        assert alignment_input
+        else:
+            jobs.extend(align_jobs)
 
-        jobs = align.align(
-            b=self.b,
-            alignment_input=alignment_input,
-            output_path=sample.get_cram_path(),
-            out_markdup_metrics_path=self.expected_outputs(sample)[
-                'markduplicates_metrics'
-            ],
-            sample_name=sample.id,
-            job_attrs=self.get_job_attrs(sample),
-            overwrite=not get_config()['workflow'].get('check_intermediates'),
-            realignment_shards_num=get_config()['workflow'].get(
-                'realignment_shards_num', align.DEFAULT_REALIGNMENT_SHARD_NUM
-            ),
-            aligner=Aligner.DRAGMAP,
-            markdup_tool=MarkDupTool.PICARD,
-            sequencing_type=self.cohort.sequencing_type,
-        )
-
-        for key, qc_func in {
-            'samtools_stats': samtools_stats,
-            'picard_wgs_metrics': picard_wgs_metrics,
-            'verify_bamid': verify_bamid,
-            'somalier': somalier.extact_job,
-        }.items():
-            j = qc_func(  # type: ignore
-                self.b,
-                sample.get_cram_path(),
-                job_attrs=self.get_job_attrs(sample),
-                output_path=self.expected_outputs(sample)[key],
-                sequencing_type=self.cohort.sequencing_type,
-                overwrite=not get_config()['workflow'].get('check_intermediates'),
-            )
-            if j:
-                jobs.append(j)
+        for qc in qc_functions():
+            out_path_kwargs = {
+                f'out_{key}_path': self.expected_outputs(sample)[key]
+                for key in qc.out_ext_by_key.keys()
+            }
+            if qc.func:
+                j = qc.func(  # type: ignore
+                    self.b,
+                    sample.get_cram_path(),
+                    job_attrs=self.get_job_attrs(sample),
+                    overwrite=not get_config()['workflow'].get('check_intermediates'),
+                    **out_path_kwargs,
+                )
+                if j:
+                    if align_jobs:
+                        j.depends_on(*align_jobs)
+                    jobs.append(j)
 
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)

@@ -5,15 +5,16 @@ Create Hail Batch jobs for variant calling in individual samples.
 import logging
 
 import hailtop.batch as hb
+from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
-from cpg_pipes.types import CramPath, GvcfPath, SequencingType
+from cpg_pipes.jobs.picard import get_intervals
+from cpg_pipes.types import CramPath, GvcfPath
 from cpg_pipes import utils
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD, HIGHMEM
-from cpg_pipes.jobs import split_intervals
 
 logger = logging.getLogger(__file__)
 
@@ -30,7 +31,6 @@ def produce_gvcf(
     output_path: Path | None = None,
     scatter_count: int = DEFAULT_INTERVALS_NUM,
     intervals: list[hb.Resource] | None = None,
-    sequencing_type: SequencingType = SequencingType.GENOME,
     intervals_path: Path | None = None,
     overwrite: bool = False,
     dragen_mode: bool = True,
@@ -55,7 +55,6 @@ def produce_gvcf(
         tmp_prefix=tmp_prefix,
         scatter_count=scatter_count,
         intervals=intervals,
-        sequencing_type=sequencing_type,
         intervals_path=intervals_path,
         overwrite=overwrite,
         dragen_mode=dragen_mode,
@@ -81,7 +80,6 @@ def haplotype_caller(
     output_path: Path | None = None,
     scatter_count: int = DEFAULT_INTERVALS_NUM,
     intervals: list[hb.Resource] | None = None,
-    sequencing_type: SequencingType = SequencingType.GENOME,
     intervals_path: Path | None = None,
     overwrite: bool = True,
     dragen_mode: bool = True,
@@ -96,10 +94,9 @@ def haplotype_caller(
     jobs: list[Job] = []
     if scatter_count > 1:
         if intervals is None:
-            intervals_j, intervals = split_intervals.get_intervals(
+            intervals_j, intervals = get_intervals(
                 b=b,
                 intervals_path=intervals_path,
-                sequencing_type=sequencing_type,
                 scatter_count=scatter_count,
                 output_prefix=tmp_prefix / 'intervals',
             )
@@ -153,7 +150,6 @@ def _haplotype_caller_one(
     out_gvcf_path: Path | None = None,
     overwrite: bool = True,
     dragen_mode: bool = True,
-    sequencing_type: SequencingType = SequencingType.GENOME,
 ) -> Job:
     """
     Add one HaplotypeCaller job on an interval
@@ -177,7 +173,7 @@ def _haplotype_caller_one(
     # a 32-core machine, or 265G/4 = 66.25G on a 16-core machine. That's not enough
     # for WGS sometimes, so we need to explicitly request more storage.
     storage_gb = None  # avoid extra disk by default
-    if sequencing_type == SequencingType.GENOME:
+    if get_config()['workflow']['sequencing_type'] == 'genome':
         storage_gb = 100
     job_res = HIGHMEM.request_resources(ncpu=2)
     # enough for input CRAM and output GVCF

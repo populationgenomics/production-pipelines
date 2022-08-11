@@ -14,7 +14,6 @@ from .smdb import SMDB, SmSequence
 from ..inputs import InputProvider, InputProviderError
 from ... import Path
 from ...targets import Cohort, Sex, PedigreeInfo, Dataset
-from ...types import SequencingType, FastqPairs, FastqPair, CramPath
 
 logger = logging.getLogger(__file__)
 
@@ -56,34 +55,6 @@ class CpgInputProvider(InputProvider):
             skip_datasets=skip_datasets,
             ped_files=ped_files,
         )
-        if (
-            cohort.sequencing_type
-            and cohort.sequencing_type == SequencingType.GENOME
-            and get_config()['workflow'].get('add_validation_dataset')
-        ):
-            validation_dataset = cohort.create_dataset('validation')
-            validation_dataset.add_sample(
-                'NA12878_KCCG',
-                alignment_input_by_seq_type={
-                    SequencingType.GENOME: FastqPairs(
-                        [
-                            FastqPair(
-                                'gs://cpg-validation-main-upload/HCMVGDSX3_1_220405_FD07777372_Homo-sapiens_TCCGCCAATT-CAGCACGGAG_R_220405_CNTROL_DNA_M001_R1.fastq.gz',
-                                'gs://cpg-validation-main-upload/HCMVGDSX3_1_220405_FD07777372_Homo-sapiens_TCCGCCAATT-CAGCACGGAG_R_220405_CNTROL_DNA_M001_R2.fastq.gz',
-                            )
-                        ]
-                    )
-                },
-            )
-            validation_dataset.add_sample(
-                'SYNDIP',
-                alignment_input_by_seq_type={
-                    SequencingType.GENOME: CramPath(
-                        'gs://cpg-reference/validation/syndip/raw/CHM1_CHM13_2.bam',
-                        'gs://cpg-reference/validation/syndip/raw/CHM1_CHM13_2.bam.bai',
-                    )
-                },
-            )
 
     def get_entries(
         self,
@@ -139,27 +110,23 @@ class CpgInputProvider(InputProvider):
         """
         return entry.get('meta', {})
 
-    def get_sequencing_type(self, entry: dict) -> SequencingType | None:
+    def get_sequencing_type(self, entry: dict | None) -> str | None:
         """
         Get sequencing type.
         """
-        return None  # Unknown before all samples are loaded
+        return get_config()['workflow']['sequencing_type']
 
     def populate_alignment_inputs(self, cohort: Cohort) -> None:
         """
         Populate sequencing inputs for samples.
         """
         assert cohort.get_sample_ids()
+        seq_type = get_config()['workflow']['sequencing_type']
         try:
             found_seqs: list[dict] = self.db.seqapi.get_sequences_by_sample_ids(
                 cohort.get_sample_ids(), get_latest_sequence_only=False
             )
-            if cohort.sequencing_type:
-                found_seqs = [
-                    seq
-                    for seq in found_seqs
-                    if str(seq['type']) == str(cohort.sequencing_type.value)
-                ]
+            found_seqs = [seq for seq in found_seqs if str(seq['type']) == seq_type]
         except ApiException:
             if get_config()['workflow'].get('smdb_errors_are_fatal', True):
                 raise
@@ -180,7 +147,7 @@ class CpgInputProvider(InputProvider):
         if sample_wo_seq := [
             s for s in cohort.get_samples() if s.id not in found_seqs_by_sid
         ]:
-            msg = f'No {cohort.sequencing_type.value} sequencing data found for samples:\n'
+            msg = f'No {seq_type} sequencing data found for samples:\n'
             ds_sample_count = {
                 ds_name: len(list(ds_samples))
                 for ds_name, ds_samples in groupby(
@@ -201,7 +168,7 @@ class CpgInputProvider(InputProvider):
                     if seq.sequencing_type in sample.alignment_input_by_seq_type:
                         raise InputProviderError(
                             f'{sample}: found more than 1 alignment input with '
-                            f'sequencing type: {seq.sequencing_type.value}. Check your '
+                            f'sequencing type: {seq.sequencing_type}. Check your '
                             f'input provider to make sure there is only one data source '
                             f'of sequencing type per sample.'
                         )

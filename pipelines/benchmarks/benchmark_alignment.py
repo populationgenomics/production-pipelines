@@ -14,7 +14,7 @@ from cpg_utils.hail_batch import image_path, fasta_res_group
 from cpg_pipes import benchmark, Namespace
 from cpg_pipes.jobs.align import Aligner, MarkDupTool, align
 from cpg_pipes.pipeline.pipeline import Pipeline
-from cpg_pipes.types import FastqPair, CramPath, SequencingType, FastqPairs
+from cpg_pipes.types import FastqPair, CramPath, FastqPairs
 from cpg_pipes.pipeline import (
     stage,
     SampleStage,
@@ -249,7 +249,7 @@ def main():
         id='PERTHNEURO_CRAM',
         external_id='PERTHNEURO_CRAM',
     )
-    s.alignment_input_by_seq_type[SequencingType.GENOME] = benchmark.perth_neuro_cram
+    s.alignment_input_by_seq_type['genome'] = benchmark.perth_neuro_cram
 
     pipeline.set_stages(
         [

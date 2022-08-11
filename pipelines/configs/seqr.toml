@@ -47,7 +47,6 @@ vep_intervals_num = 200
 check_intermediates = true
 check_expected_outputs = true
 dry_run = false
-realign_from_cram_version = 'bwamem'
 
 [workflow.cram_version_reference]
 bwamem = 'gs://cpg-reference/hg38/v0/Homo_sapiens_assembly38.fasta'
@@ -86,6 +85,14 @@ regions = 'syndip/regions/syndip.b38_20180222.bed'
 [references.validation.genome.HG001]
 truth = 'giab/truth/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_PGandRTGphasetransfer.vcf.gz'
 regions = 'giab/regions/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed'
+
+[references.broad]
+genome_contam_ud =  'contamination-resources/1000g/1000g.phase3.100k.b38.vcf.gz.dat.UD'
+genome_contam_bed = 'contamination-resources/1000g/1000g.phase3.100k.b38.vcf.gz.dat.bed'
+genome_contam_mu =  'contamination-resources/1000g/1000g.phase3.100k.b38.vcf.gz.dat.mu'
+exome_contam_ud =  'contamination-resources/1000g/whole_exome_illumina_coding_v1.Homo_sapiens_assembly38.1000g.contam.UD'
+exome_contam_bed = 'contamination-resources/1000g/whole_exome_illumina_coding_v1.Homo_sapiens_assembly38.1000g.contam.bed'
+exome_contam_mu =  'contamination-resources/1000g/whole_exome_illumina_coding_v1.Homo_sapiens_assembly38.1000g.contam.mu'
 
 [images]
 hail = 'driver:5d04b6d6bb411ea4b8750f40cf39fd0b701ea288-hail-c4eb2b16220d9872f417412ea565902f78739124'

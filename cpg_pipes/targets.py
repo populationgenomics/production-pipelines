@@ -12,7 +12,7 @@ from cpg_utils.hail_batch import dataset_path, web_url
 from cpg_utils.config import get_config
 
 from . import Namespace, Path, to_path
-from .types import AlignmentInput, CramPath, GvcfPath, SequencingType, FastqPairs
+from .types import AlignmentInput, CramPath, GvcfPath, FastqPairs
 
 logger = logging.getLogger(__file__)
 
@@ -114,7 +114,6 @@ class Cohort(Target):
         self,
         analysis_dataset_name: str,
         namespace: Namespace,
-        sequencing_type: SequencingType,
         name: str | None = None,
     ):
         super().__init__()
@@ -125,7 +124,6 @@ class Cohort(Target):
             namespace=namespace,
             cohort=self,
         )
-        self.sequencing_type = sequencing_type
         self._datasets_by_name: dict[str, Dataset] = {}
 
     def __repr__(self):
@@ -323,11 +321,8 @@ class Dataset(Target):
         Subdirectory parametrised by sequencing type. For genomes, we don't
         prefix at all.
         """
-        return (
-            ''
-            if not self.cohort or self.cohort.sequencing_type == SequencingType.GENOME
-            else self.cohort.sequencing_type.value
-        )
+        seq_type = get_config()['workflow']['sequencing_type']
+        return '' if not self.cohort or seq_type == 'genome' else seq_type
 
     def prefix(self, **kwargs) -> Path:
         """
@@ -386,7 +381,7 @@ class Dataset(Target):
         meta: dict | None = None,
         sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
-        alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] | None = None,
+        alignment_input_by_seq_type: dict[str, AlignmentInput] | None = None,
     ) -> 'Sample':
         """
         Create a new sample and add it to the dataset.
@@ -496,7 +491,7 @@ class Sample(Target):
         meta: dict | None = None,
         sex: Sex | None = None,
         pedigree: Optional['PedigreeInfo'] = None,
-        alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] | None = None,
+        alignment_input_by_seq_type: dict[str, AlignmentInput] | None = None,
         forced: bool = False,
     ):
         super().__init__()
@@ -512,7 +507,7 @@ class Sample(Target):
                 fam_id=self.participant_id,
                 sex=sex,
             )
-        self.alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] = (
+        self.alignment_input_by_seq_type: dict[str, AlignmentInput] = (
             alignment_input_by_seq_type or dict()
         )
         self.forced = forced
@@ -525,7 +520,7 @@ class Sample(Target):
             'meta': str(self.meta),
             'alignment_inputs': ','.join(
                 [
-                    f'{seq_t.value}: {al_inp}'
+                    f'{seq_t}: {al_inp}'
                     for seq_t, al_inp in self.alignment_input_by_seq_type.items()
                 ]
             ),
@@ -539,7 +534,7 @@ class Sample(Target):
     def __str__(self):
         ai_tag = ''
         for seq_type, alignment_input in self.alignment_input_by_seq_type.items():
-            ai_tag += f'|SEQ={seq_type.value}:'
+            ai_tag += f'|SEQ={seq_type}:'
             if isinstance(alignment_input, CramPath):
                 if alignment_input.is_bam:
                     ai_tag += 'CRAM'

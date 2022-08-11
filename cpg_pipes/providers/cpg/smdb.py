@@ -20,7 +20,7 @@ from sample_metadata.exceptions import ApiException
 
 from ... import Path, to_path
 from ... import utils
-from ...types import FastqPair, CramPath, AlignmentInput, SequencingType, FastqPairs
+from ...types import FastqPair, CramPath, AlignmentInput, FastqPairs
 from ..status import AnalysisStatus
 
 logger = logging.getLogger(__file__)
@@ -386,7 +386,7 @@ class SmSequence:
     id: str
     sample_id: str
     meta: dict
-    sequencing_type: SequencingType
+    sequencing_type: str
     alignment_input: AlignmentInput | None = None
 
     @staticmethod
@@ -402,13 +402,13 @@ class SmSequence:
             raise ValueError(f'Cannot parse SMDB Sequence {data}')
 
         sample_id = data['sample_id']
-        st = SequencingType.parse(data['type'])
-        assert st, data
+        sequencing_type = data['type']
+        assert sequencing_type, data
         sm_seq = SmSequence(
             id=data['id'],
             sample_id=sample_id,
             meta=data['meta'],
-            sequencing_type=st,
+            sequencing_type=sequencing_type,
         )
         if data['meta'].get('reads'):
             if alignment_input := SmSequence._parse_reads(

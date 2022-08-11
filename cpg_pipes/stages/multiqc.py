@@ -13,13 +13,15 @@ from cpg_pipes.pipeline import (
     CohortStage,
 )
 from cpg_pipes.pipeline.exceptions import StageInputNotFound
-from cpg_pipes.stages.align import Align
+from cpg_pipes.stages.align import Align, qc_functions
 from cpg_pipes.stages.fastqc import FastQC
+from cpg_pipes.stages.genotype_sample import GenotypeSample
+from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.somalier import (
     CramSomalierPedigree,
     GvcfSomalierPedigree,
 )
-from cpg_pipes.stages.variantqc import GvcfQc, JointVcfQc, GvcfHappy, JointVcfHappy
+from cpg_pipes.stages.variantqc import GvcfHappy, JointVcfHappy
 from cpg_pipes.targets import Dataset, Cohort
 
 logger = logging.getLogger(__file__)
@@ -73,13 +75,11 @@ class CramMultiQC(DatasetStage):
         ]
         ending_to_trim = set()  # endings to trim to get sample names
         for sample in dataset.get_samples():
-            for st, key in [
-                (FastQC, 'zip'),
-                (Align, 'markduplicates_metrics'),
-                (Align, 'samtools_stats'),
-                (Align, 'picard_wgs_metrics'),
-                (Align, 'verify_bamid'),
-            ]:
+            stages_keys = [(FastQC, 'zip')]
+            for qc in qc_functions():
+                for key in qc.out_ext_by_key.keys():
+                    stages_keys.append((Align, key))
+            for st, key in stages_keys:
                 try:
                     path = inputs.as_path(sample, st, key)
                 except StageInputNotFound:  # allow missing inputs
@@ -124,7 +124,7 @@ class CramMultiQC(DatasetStage):
 
 @stage(
     required_stages=[
-        GvcfQc,
+        GenotypeSample,
         GvcfSomalierPedigree,
         GvcfHappy,
     ],
@@ -168,7 +168,7 @@ class GvcfMultiQC(DatasetStage):
         ending_to_trim = set()  # endings to trim to get sample names
         for sample in dataset.get_samples():
             for st, key in [
-                (GvcfQc, 'detail'),
+                (GenotypeSample, 'qc_detail'),
                 (GvcfHappy, None),
             ]:
                 try:
@@ -214,7 +214,7 @@ class GvcfMultiQC(DatasetStage):
 
 @stage(
     required_stages=[
-        JointVcfQc,
+        JointGenotyping,
         JointVcfHappy,
     ],
     forced=True,
@@ -255,7 +255,7 @@ class JointVcfMultiQC(CohortStage):
             html_url = None
 
         paths = [
-            inputs.as_path(cohort, JointVcfQc, 'detail'),
+            inputs.as_path(cohort, JointGenotyping, 'qc_detail'),
             inputs.as_path(cohort, JointVcfHappy),
         ]
 
