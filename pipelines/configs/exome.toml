@@ -1,6 +1,4 @@
 [workflow]
-first_stage = 'Align'
-last_stage = 'Align'
 sequencing_type = 'exome'
 hc_intervals_num = 1
 jc_intervals_num = 1

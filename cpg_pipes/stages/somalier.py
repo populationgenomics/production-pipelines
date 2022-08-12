@@ -185,27 +185,30 @@ class CramSomalierPedigree(DatasetStage):
         else:
             html_url = None
 
-        expected_ped_path = dataset.write_ped_file(
-            self.expected_outputs(dataset)['expected_ped']
-        )
-        jobs = somalier.pedigree(
-            self.b,
-            dataset,
-            expected_ped_path=expected_ped_path,
-            input_path_by_sid=somalier_by_sid,
-            verifybamid_by_sid=verifybamid_by_sid,
-            overwrite=not not get_config()['workflow'].get('check_intermediates'),
-            out_samples_path=self.expected_outputs(dataset)['samples'],
-            out_pairs_path=self.expected_outputs(dataset)['pairs'],
-            out_html_path=html_path,
-            out_html_url=html_url,
-            out_checks_path=self.expected_outputs(dataset)['checks'],
-            job_attrs=self.get_job_attrs(dataset),
-            send_to_slack=True,
-        )
-        return self.make_outputs(
-            dataset, data=self.expected_outputs(dataset), jobs=jobs
-        )
+        if any(s.pedigree for s in self.get_samples()):
+            expected_ped_path = dataset.write_ped_file(
+                self.expected_outputs(dataset)['expected_ped']
+            )
+            jobs = somalier.pedigree(
+                self.b,
+                dataset,
+                expected_ped_path=expected_ped_path,
+                input_path_by_sid=somalier_by_sid,
+                verifybamid_by_sid=verifybamid_by_sid,
+                overwrite=not not get_config()['workflow'].get('check_intermediates'),
+                out_samples_path=self.expected_outputs(dataset)['samples'],
+                out_pairs_path=self.expected_outputs(dataset)['pairs'],
+                out_html_path=html_path,
+                out_html_url=html_url,
+                out_checks_path=self.expected_outputs(dataset)['checks'],
+                job_attrs=self.get_job_attrs(dataset),
+                send_to_slack=True,
+            )
+            return self.make_outputs(
+                dataset, data=self.expected_outputs(dataset), jobs=jobs
+            )
+        else:
+            return self.make_outputs(dataset, skipped=True)
 
 
 @stage(required_stages=GvcfSomalier)

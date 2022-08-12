@@ -6,6 +6,7 @@ import logging
 import math
 from dataclasses import dataclass
 
+from cpg_utils.config import get_config
 from hailtop.batch.job import Job
 
 logger = logging.getLogger(__file__)
@@ -296,3 +297,16 @@ class JobResource:
 
         # Returning self to allow command chaining.
         return self
+
+
+def storage_for_cram_qc_job() -> int | None:
+    """
+    Get storage request for a CRAM QC processing job, gb
+    """
+    sequencing_type = get_config()['workflow']['sequencing_type']
+    storage_gb = None  # avoid extra disk by default
+    if sequencing_type == 'genome':
+        storage_gb = 100
+    if sequencing_type == 'exome':
+        storage_gb = 20
+    return storage_gb

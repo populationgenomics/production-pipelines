@@ -274,19 +274,6 @@ def storage_for_align_job(alignment_input: AlignmentInput) -> int | None:
     return storage_gb
 
 
-def storage_for_cram_qc_job() -> int | None:
-    """
-    Get storage request for a CRAM QC processing job, gb
-    """
-    sequencing_type = get_config()['workflow']['sequencing_type']
-    storage_gb = None  # avoid extra disk by default
-    if sequencing_type == 'genome':
-        storage_gb = 100
-    if sequencing_type == 'exome':
-        storage_gb = 20
-    return storage_gb
-
-
 def _align_one(
     b,
     job_name: str,

@@ -21,17 +21,15 @@ from cloudpathlib import CloudPath
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 from cpg_utils.config import get_config
+from cpg_utils import Path, to_path
 
+from cpg_pipes.hb.batch import setup_batch, RegisteringBatch
+from cpg_pipes.providers.status import MetamistStatusReporter
+from cpg_pipes.targets import Target, Dataset, Sample, Cohort
+from cpg_pipes.providers.status import StatusReporter
+from cpg_pipes.utils import exists, timestamp, slugify
 from .exceptions import PipelineError, StageInputNotFound
-from .. import Path, to_path, Namespace
-from ..hb.batch import setup_batch, RegisteringBatch
-from ..providers.cpg.inputs import CpgInputProvider
-from ..providers.cpg.smdb import SMDB
-from ..providers.cpg.status import CpgStatusReporter
-from ..providers.inputs import InputProvider, CsvInputProvider
-from ..targets import Target, Dataset, Sample, Cohort
-from ..providers.status import StatusReporter
-from ..utils import exists, timestamp, slugify
+from ..providers.inputs import populate_cohort
 
 logger = logging.getLogger(__file__)
 
@@ -594,11 +592,16 @@ class Stage(Generic[TargetT], ABC):
                 # be ignored:
                 target.active = False
                 return Action.SKIP
-            raise ValueError(
-                f'Stage {self.name} is required, but is skipped, and '
-                f'the following expected outputs for target {target} do not exist: '
-                f'{first_missing_path}'
-            )
+            if self.name in get_config()['workflow'].get(
+                'allow_missing_outputs_for_stages', []
+            ):
+                return Action.REUSE
+            else:
+                raise ValueError(
+                    f'Stage {self.name} is required, but is skipped, and '
+                    f'the following expected outputs for target {target} do not exist: '
+                    f'{first_missing_path}'
+                )
 
         if reusable and not first_missing_path:
             if target.forced:
@@ -789,37 +792,11 @@ class Pipeline:
         description = description or name
         description += f': run_id={self.run_id}'
 
-        access_level = get_config()['workflow']['access_level']
         self.cohort = Cohort(
             analysis_dataset_name=analysis_dataset,
-            namespace=Namespace.from_access_level(access_level),
             name=self.name,
         )
-
-        smdb: Optional[SMDB] = None
-        input_provider: InputProvider | None = None
-        if (
-            get_config()['workflow'].get('datasets') is not None
-            and get_config()['workflow'].get('input_provider') == 'smdb'
-        ):
-            smdb = smdb or SMDB(self.cohort.analysis_dataset.name)
-            input_provider = CpgInputProvider(smdb)
-        if get_config()['workflow'].get('input_provider') == 'csv':
-            if not (csv_path := get_config()['workflow'].get('input_csv')):
-                raise PipelineError(
-                    f'workflow.input_csv should be provided '
-                    f'with workflow.input_provider = "csv"'
-                )
-            input_provider = CsvInputProvider(to_path(csv_path).open())
-
-        if input_provider is not None:
-            input_provider.populate_cohort(
-                cohort=self.cohort,
-                dataset_names=get_config()['workflow'].get('datasets'),
-                skip_samples=get_config()['workflow'].get('skip_samples'),
-                only_samples=get_config()['workflow'].get('only_samples'),
-                skip_datasets=get_config()['workflow'].get('skip_datasets'),
-            )
+        populate_cohort(cohort=self.cohort)
 
         self.tmp_prefix = self.cohort.analysis_dataset.tmp_prefix() / self.run_id
         description += f' [{get_config()["workflow"]["sequencing_type"]}]'
@@ -828,9 +805,8 @@ class Pipeline:
         self.b: RegisteringBatch = setup_batch(description=description)
 
         self.status_reporter = None
-        if get_config()['workflow'].get('status_reporter') == 'smdb':
-            smdb = smdb or SMDB(self.cohort.analysis_dataset.name)
-            self.status_reporter = CpgStatusReporter(smdb=smdb)
+        if get_config()['workflow'].get('status_reporter') == 'metamist':
+            self.status_reporter = MetamistStatusReporter()
 
         # Will be populated by set_stages() in submit_batch()
         self._stages_dict: dict[str, Stage] = dict()

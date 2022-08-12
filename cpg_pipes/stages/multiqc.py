@@ -23,6 +23,7 @@ from cpg_pipes.stages.somalier import (
     GvcfSomalierPedigree,
 )
 from cpg_pipes.targets import Dataset, Cohort
+from cpg_pipes.utils import exists
 
 logger = logging.getLogger(__file__)
 
@@ -88,8 +89,14 @@ class CramMultiQC(DatasetStage):
                         f'skipping'
                     )
                 else:
-                    paths.append(path)
-                    ending_to_trim.add(path.name.replace(sample.id, ''))
+                    if not exists(path):
+                        logger.warning(
+                            f'Output for stage {st.__name__} for {sample} '
+                            f'does not exist: {path}'
+                        )
+                    else:
+                        paths.append(path)
+                        ending_to_trim.add(path.name.replace(sample.id, ''))
 
         assert ending_to_trim
         modules_to_trim_endings = {

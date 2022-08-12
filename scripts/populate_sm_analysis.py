@@ -12,7 +12,7 @@ from cpg_utils.hail_batch import Namespace
 
 from cpg_pipes.providers.cpg.inputs import CpgInputProvider
 from cpg_pipes.providers.cpg.smdb import SMDB
-from cpg_pipes.providers.cpg.status import CpgStatusReporter
+from cpg_pipes.providers.status import MetamistStatusReporter
 from cpg_pipes.targets import Cohort
 from cpg_pipes.utils import exists
 
@@ -32,7 +32,7 @@ input_provider.populate_cohort(
     skip_datasets=get_config()['workflow'].get('skip_datasets'),
 )
 
-status = CpgStatusReporter(smdb)
+status = MetamistStatusReporter(smdb)
 
 POPULATE_SAMPLES = True
 POPULATE_QC = False

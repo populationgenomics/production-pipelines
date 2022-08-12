@@ -8,6 +8,8 @@ import traceback
 from dataclasses import dataclass
 from enum import Enum
 
+from cpg_utils.config import get_config
+
 from sample_metadata import models
 from sample_metadata.apis import (
     SampleApi,
@@ -18,18 +20,37 @@ from sample_metadata.apis import (
 )
 from sample_metadata.exceptions import ApiException
 
-from ... import Path, to_path
-from ... import utils
-from ...types import FastqPair, CramPath, AlignmentInput, FastqPairs
-from ..status import AnalysisStatus
+from cpg_pipes import Path, to_path
+from cpg_pipes import utils
+from cpg_pipes.types import FastqPair, CramPath, AlignmentInput, FastqPairs
 
 logger = logging.getLogger(__file__)
 
 
-class SmdbError(Exception):
+class MetamistError(Exception):
     """
-    Raised for problems interacting with sample-metadata database.
+    Raised for problems interacting with metamist.
     """
+
+
+class AnalysisStatus(Enum):
+    """
+    Corresponds to SMDB Analysis statuses:
+    https://github.com/populationgenomics/sample-metadata/blob/dev/models/enums/analysis.py#L14-L21
+    """
+
+    QUEUED = 'queued'
+    IN_PROGRESS = 'in-progress'
+    FAILED = 'failed'
+    COMPLETED = 'completed'
+    UNKNOWN = 'unknown'
+
+    @staticmethod
+    def parse(name: str) -> 'AnalysisStatus':
+        """
+        Parse str and create a AnalysisStatus object
+        """
+        return {v.value: v for v in AnalysisStatus}[name.lower()]
 
 
 class AnalysisType(Enum):
@@ -57,7 +78,7 @@ class AnalysisType(Enum):
         """
         d = {v.value: v for v in AnalysisType}
         if val not in d:
-            raise SmdbError(
+            raise MetamistError(
                 f'Unrecognised analysis type {val}. Available: {list(d.keys())}'
             )
         return d[val.lower()]
@@ -77,6 +98,7 @@ class Analysis:
     status: AnalysisStatus
     sample_ids: set[str]
     output: Path | None
+    meta: dict
 
     @staticmethod
     def parse(data: dict) -> 'Analysis':
@@ -100,46 +122,42 @@ class Analysis:
             status=AnalysisStatus.parse(data['status']),
             sample_ids=set(data.get('sample_ids', [])),
             output=output,
+            meta=data.get('meta') or {},
         )
         return a
 
 
-class SMDB:
+class Metamist:
     """
-    Communication with the SampleMetadata database.
+    Communication with metamist.
     """
 
-    def __init__(self, project_name: str | None = None):
-        """
-        @param project_name: default SMDB project name.
-        """
+    def __init__(self):
+        self.default_dataset: str = get_config()['workflow']['dataset']
         self.sapi = SampleApi()
         self.aapi = AnalysisApi()
         self.seqapi = SequenceApi()
         self.seqapi = SequenceApi()
         self.papi = ParticipantApi()
         self.fapi = FamilyApi()
-        self.project_name = project_name
 
     def get_sample_entries(
         self,
-        project_name: str | None = None,
+        dataset: str | None = None,
         active: bool = True,
     ) -> list[dict]:
         """
         Get samples in the project as a list of dictionaries.
         """
-        project_name = project_name or self.project_name
-
-        logger.debug(f'Finding samples for dataset {project_name}...')
+        dataset = dataset or self.default_dataset
+        logger.debug(f'Finding samples for dataset {dataset}...')
         body = {
-            'project_ids': [project_name],
+            'project_ids': [dataset],
             'active': active,
         }
         sample_entries = self.sapi.get_samples(body_get_samples=body)
         logger.info(
-            f'Finding samples for project {project_name}: '
-            f'found {len(sample_entries)}'
+            f'Finding samples for project {dataset}: ' f'found {len(sample_entries)}'
         )
         return sample_entries
 
@@ -159,14 +177,14 @@ class SMDB:
     def find_joint_calling_analysis(
         self,
         sample_ids: list[str],
-        project_name: str | None = None,
+        dataset: str | None = None,
     ) -> Analysis | None:
         """
         Query the DB to find the last completed joint-calling analysis for the samples.
         """
         try:
             data = self.aapi.get_latest_complete_analysis_for_type(
-                project=project_name or self.project_name,
+                project=dataset or self.default_dataset,
                 analysis_type=models.AnalysisType('joint-calling'),
             )
         except ApiException:
@@ -186,23 +204,23 @@ class SMDB:
         analysis_type: AnalysisType,
         analysis_status: AnalysisStatus = AnalysisStatus.COMPLETED,
         meta: dict | None = None,
-        project_name: str | None = None,
+        dataset: str | None = None,
     ) -> dict[str, Analysis]:
         """
         Query the DB to find the last completed analysis for the type and samples,
         one Analysis object per sample. Assumes the analysis is defined for a single
         sample (e.g. cram, gvcf).
         """
-        project_name = project_name or self.project_name
+        dataset = dataset or self.default_dataset
 
         analysis_per_sid: dict[str, Analysis] = dict()
 
         logger.info(
-            f'Querying {analysis_type} analysis entries for dataset {project_name}...'
+            f'Querying {analysis_type} analysis entries for dataset {dataset}...'
         )
         datas = self.aapi.query_analyses(
             models.AnalysisQueryModel(
-                projects=[project_name],
+                projects=[dataset],
                 sample_ids=sample_ids,
                 type=models.AnalysisType(analysis_type.value),
                 status=models.AnalysisStatus(analysis_status.value),
@@ -219,7 +237,7 @@ class SMDB:
             assert len(a.sample_ids) == 1, data
             analysis_per_sid[list(a.sample_ids)[0]] = a
         logger.info(
-            f'Querying {analysis_type} analysis entries for dataset {project_name}: '
+            f'Querying {analysis_type} analysis entries for dataset {dataset}: '
             f'found {len(analysis_per_sid)}'
         )
         return analysis_per_sid
@@ -230,13 +248,13 @@ class SMDB:
         type_: str | AnalysisType,
         status: str | AnalysisStatus,
         sample_ids: list[str],
-        project_name: str | None = None,
+        dataset: str | None = None,
         meta: dict | None = None,
     ) -> int | None:
         """
         Tries to create an Analysis entry, returns its id if successful.
         """
-        project_name = project_name or self.project_name
+        dataset = dataset or self.default_dataset
 
         if isinstance(type_, AnalysisType):
             type_ = type_.value
@@ -251,14 +269,14 @@ class SMDB:
             meta=meta or {},
         )
         try:
-            aid = self.aapi.create_new_analysis(project=project_name, analysis_model=am)
+            aid = self.aapi.create_new_analysis(project=dataset, analysis_model=am)
         except ApiException:
             traceback.print_exc()
             return None
         else:
             logger.info(
                 f'Created Analysis(id={aid}, type={type_}, status={status}, '
-                f'output={str(output)}) in project {project_name}'
+                f'output={str(output)}) in project {dataset}'
             )
             return aid
 
@@ -268,7 +286,7 @@ class SMDB:
         completed_analysis: Analysis | None,
         analysis_type: str,
         expected_output_fpath: Path,
-        project_name: str | None = None,
+        dataset: str | None = None,
     ) -> Path | None:
         """
         Checks whether existing analysis exists, and output matches the expected output
@@ -283,7 +301,7 @@ class SMDB:
         @param analysis_type: cram, gvcf, joint_calling
         @param expected_output_fpath: where the pipeline expects the analysis output
         file to sit on the bucket (will invalidate the analysis when it doesn't match)
-        @param project_name: the name of the project where to create a new analysis
+        @param dataset: the name of the project where to create a new analysis
         @return: path to the output if it can be reused, otherwise None
         """
         label = f'type={analysis_type}'
@@ -344,7 +362,7 @@ class SMDB:
                 output=expected_output_fpath,
                 status='completed',
                 sample_ids=sample_ids,
-                project_name=project_name or self.project_name,
+                dataset=dataset or self.default_dataset,
             )
             return expected_output_fpath
 
@@ -356,18 +374,18 @@ class SMDB:
             )
             return None
 
-    def get_ped_entries(self, project_name: str | None = None) -> list[dict[str, str]]:
+    def get_ped_entries(self, dataset: str | None = None) -> list[dict[str, str]]:
         """
         Retrieve PED lines for a specified SM project, with external participant IDs.
         """
-        project_name = project_name or self.project_name
+        dataset = dataset or self.default_dataset
 
-        families = self.fapi.get_families(project_name)
+        families = self.fapi.get_families(dataset)
         family_ids = [family['id'] for family in families]
         ped_entries = self.fapi.get_pedigree(
             internal_family_ids=family_ids,
             response_type='json',
-            project=project_name,
+            project=dataset,
             replace_with_participant_external_ids=True,
         )
 
@@ -375,11 +393,11 @@ class SMDB:
 
 
 @dataclass
-class SmSequence:
+class MmSequence:
     """
-    Sample-metadata DB "Sequence" entry.
+    Metamist "Sequence" entry.
 
-    See sample-metadata for more details:
+    See metamist for more details:
     https://github.com/populationgenomics/sample-metadata
     """
 
@@ -390,7 +408,7 @@ class SmSequence:
     alignment_input: AlignmentInput | None = None
 
     @staticmethod
-    def parse(data: dict, check_existence: bool) -> 'SmSequence':
+    def parse(data: dict, check_existence: bool = False) -> 'MmSequence':
         """
         Parse dictionary to create a SmSequence object.
         """
@@ -404,14 +422,14 @@ class SmSequence:
         sample_id = data['sample_id']
         sequencing_type = data['type']
         assert sequencing_type, data
-        sm_seq = SmSequence(
+        sm_seq = MmSequence(
             id=data['id'],
             sample_id=sample_id,
             meta=data['meta'],
             sequencing_type=sequencing_type,
         )
         if data['meta'].get('reads'):
-            if alignment_input := SmSequence._parse_reads(
+            if alignment_input := MmSequence._parse_reads(
                 sample_id=sample_id,
                 meta=data['meta'],
                 check_existence=check_existence,
@@ -526,3 +544,6 @@ class SmSequence:
                 )
 
             return fastq_pairs
+
+
+metamist: Metamist = Metamist()

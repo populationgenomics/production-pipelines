@@ -3,14 +3,12 @@ Create Hail Batch jobs for samtools.
 """
 import logging
 
-from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.jobs.align import storage_for_cram_qc_job
 from cpg_pipes.types import CramPath
 from cpg_pipes.utils import can_reuse
 

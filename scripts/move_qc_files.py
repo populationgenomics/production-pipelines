@@ -1,36 +1,25 @@
 """
 Script to just populate analysis entries with status=completed in the 
 sample-metadata DB. For back-populating old data; for new data, it should be
-populated automatically with `workflow/status_provider="smdb"` set in config.
+populated automatically with `workflow/status_provider="metamist"` set in config.
 """
 from cloudpathlib.exceptions import OverwriteNewerCloudError
 from cpg_utils import to_path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import Namespace
 
-from cpg_pipes.providers.cpg.inputs import CpgInputProvider
-from cpg_pipes.providers.cpg.smdb import SMDB
+from cpg_pipes.providers.inputs import populate_cohort
 from cpg_pipes.targets import Cohort
 
 access_level = get_config()['workflow']['access_level']
 cohort = Cohort(
     analysis_dataset_name=get_config()['workflow']['dataset'],
-    namespace=Namespace.from_access_level(access_level),
 )
-smdb = SMDB(cohort.analysis_dataset.name)
-input_provider = CpgInputProvider(smdb)
-input_provider.populate_cohort(
-    cohort=cohort,
-    dataset_names=get_config()['workflow'].get('datasets'),
-    skip_samples=get_config()['workflow'].get('skip_samples'),
-    only_samples=get_config()['workflow'].get('only_samples'),
-    skip_datasets=get_config()['workflow'].get('skip_datasets'),
-)
+populate_cohort(cohort)
 
-MOVE_DUPLICATE_METRICS = False
+MOVE_DUPLICATE_METRICS = True
 MOVE_CRAM_QC = False
 DRY_RUN = False
-REMOVE_METRICS = True
+REMOVE_METRICS = False
 
 if REMOVE_METRICS:
     for dataset in cohort.get_datasets():
