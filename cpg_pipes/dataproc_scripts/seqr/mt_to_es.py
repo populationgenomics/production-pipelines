@@ -670,7 +670,7 @@ def elasticsearch_schema_for_table(
     return properties
 
 
-def encode_field_name(name: str):
+def encode_field_name(name: str) -> str:
     """Encodes arbitrary string into an elasticsearch field name
 
     See:
@@ -692,7 +692,7 @@ def encode_field_name(name: str):
     if any(field_name_str.startswith(c) for c in ES_FIELD_NAME_BAD_LEADING_CHARS):
         return ES_FIELD_NAME_ESCAPE_CHAR + field_name_str
     else:
-        return field_name
+        return field_name_str
 
 
 if __name__ == '__main__':
