@@ -11,7 +11,7 @@ from cpg_utils import Path
 from ..jobs.align import Aligner, MarkDupTool, MissingAlignmentInputException
 from ..jobs.samtools import samtools_stats
 from ..jobs.verifybamid import verifybamid
-from ..jobs.picard import picard_genome_metrics, picard_exome_metrics, picard_hs_metrics
+from ..jobs.picard import picard_wgs_metrics, picard_collect_metrics
 from ..targets import Sample
 from ..pipeline import stage, SampleStage, StageInput, StageOutput
 from ..jobs import align, somalier
@@ -34,25 +34,23 @@ def qc_functions() -> list[Qc]:
         Qc(samtools_stats, {'samtools_stats': '.samtools-stats'}),
         Qc(verifybamid, {'verify_bamid': '.verify-bamid.selfSM'}),
         Qc(somalier.extact_job, {'somalier': None}),
+        Qc(
+            picard_collect_metrics,
+            {
+                'alignment_summary_metrics': '.alignment_summary_metrics',
+                'base_distribution_by_cycle_metrics': '.base_distribution_by_cycle_metrics',
+                'insert_size_metrics': '.insert_size_metrics',
+                'quality_by_cycle_metrics': '.quality_by_cycle_metrics',
+                'quality_yield_metrics': '.quality_yield_metrics',
+            },
+        ),
     ]
 
     sequencing_type = get_config()['workflow']['sequencing_type']
     if sequencing_type == 'genome':
         qcs.append(
-            Qc(picard_genome_metrics, {'picard_wgs_metrics': '.picard-wgs-metrics'})
+            Qc(picard_wgs_metrics, {'picard_wgs_metrics': '.picard-wgs-metrics'})
         )
-    elif sequencing_type == 'exome':
-        qcs.append(
-            Qc(
-                picard_exome_metrics,
-                {
-                    'gc_bias_detail_metrics': '.gc-bias-detail-metrics',
-                    'gc_bias_summary_metrics': '.gc-bias-summary-metrics',
-                    'insert_size_metrics': '.insert-size-metrics',
-                },
-            )
-        )
-        qcs.append(Qc(picard_hs_metrics, {'hs_metrics': '.hs-metrics'}))
     return qcs
 
 
@@ -101,7 +99,7 @@ class Align(SampleStage):
                 aligner=Aligner.DRAGMAP,
                 markdup_tool=MarkDupTool.PICARD,
             )
-        except MissingAlignmentInputException as e:
+        except MissingAlignmentInputException:
             if get_config()['workflow'].get('skip_samples_with_missing_input'):
                 logger.error(f'No alignment inputs, skipping sample {sample}')
                 sample.active = False

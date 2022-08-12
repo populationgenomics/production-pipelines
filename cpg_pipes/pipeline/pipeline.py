@@ -636,7 +636,7 @@ class Stage(Generic[TargetT], ABC):
 
             assert isinstance(expected_out, dict)
 
-            for k, v in expected_out.items():
+            for _, v in expected_out.items():
                 if isinstance(v, Path) and not exists(v):
                     return False, v
             return True, None

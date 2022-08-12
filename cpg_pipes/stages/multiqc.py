@@ -13,15 +13,15 @@ from cpg_pipes.pipeline import (
     CohortStage,
 )
 from cpg_pipes.pipeline.exceptions import StageInputNotFound
+from cpg_pipes.pipeline.pipeline import StageDecorator
 from cpg_pipes.stages.align import Align, qc_functions
 from cpg_pipes.stages.fastqc import FastQC
-from cpg_pipes.stages.genotype_sample import GenotypeSample
-from cpg_pipes.stages.joint_genotyping import JointGenotyping
+from cpg_pipes.stages.genotype_sample import GenotypeSample, GvcfHappy
+from cpg_pipes.stages.joint_genotyping import JointGenotyping, JointVcfHappy
 from cpg_pipes.stages.somalier import (
     CramSomalierPedigree,
     GvcfSomalierPedigree,
 )
-from cpg_pipes.stages.variantqc import GvcfHappy, JointVcfHappy
 from cpg_pipes.targets import Dataset, Cohort
 
 logger = logging.getLogger(__file__)
@@ -75,11 +75,11 @@ class CramMultiQC(DatasetStage):
         ]
         ending_to_trim = set()  # endings to trim to get sample names
         for sample in dataset.get_samples():
-            stages_keys = [(FastQC, 'zip')]
+            keys_d: dict[str, StageDecorator] = {'zip': FastQC}
             for qc in qc_functions():
                 for key in qc.out_ext_by_key.keys():
-                    stages_keys.append((Align, key))
-            for st, key in stages_keys:
+                    keys_d[key] = Align
+            for key, st in keys_d.items():
                 try:
                     path = inputs.as_path(sample, st, key)
                 except StageInputNotFound:  # allow missing inputs

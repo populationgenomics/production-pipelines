@@ -156,10 +156,10 @@ def _cleanup(es, es_index, es_shards):
 
 # Elastic search write operations.
 # See https://www.elastic.co/guide/en/elasticsearch/hadoop/current/configuration.html#_operation
-ELASTICSEARCH_INDEX = "index"
-ELASTICSEARCH_CREATE = "create"
-ELASTICSEARCH_UPDATE = "update"
-ELASTICSEARCH_UPSERT = "upsert"
+ELASTICSEARCH_INDEX = 'index'
+ELASTICSEARCH_CREATE = 'create'
+ELASTICSEARCH_UPDATE = 'update'
+ELASTICSEARCH_UPSERT = 'upsert'
 ELASTICSEARCH_WRITE_OPERATIONS = {
     ELASTICSEARCH_INDEX,
     ELASTICSEARCH_CREATE,
@@ -184,14 +184,14 @@ ES_FIELD_NAME_SPECIAL_CHAR_MAP = {
 }
 
 HAIL_TYPE_TO_ES_TYPE_MAPPING = {
-    hl.tint: "integer",
-    hl.tint32: "integer",
-    hl.tint64: "long",
-    hl.tfloat: "double",
-    hl.tfloat32: "float",
-    hl.tfloat64: "double",
-    hl.tstr: "keyword",
-    hl.tbool: "boolean",
+    hl.tint: 'integer',
+    hl.tint32: 'integer',
+    hl.tint64: 'long',
+    hl.tfloat: 'double',
+    hl.tfloat32: 'float',
+    hl.tfloat64: 'double',
+    hl.tstr: 'keyword',
+    hl.tbool: 'boolean',
 }
 
 LOADING_NODES_NAME = 'elasticsearch-es-data-loading*'
@@ -250,7 +250,7 @@ class HailElasticsearchClient:
 
         Args:
             index_name (str): elasticsearch index mapping
-            elasticsearch_schema (dict): elasticsearch mapping "properties" dictionary
+            elasticsearch_schema (dict): elasticsearch mapping 'properties' dictionary
             num_shards (int): how many shards the index will contain
             _meta (dict): optional _meta info for this index
                 (see https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-meta-field.html)
@@ -276,7 +276,7 @@ class HailElasticsearchClient:
 
         Args:
             index_name (str): elasticsearch index mapping
-            elasticsearch_schema (dict): elasticsearch mapping "properties" dictionary
+            elasticsearch_schema (dict): elasticsearch mapping 'properties' dictionary
             num_shards (int): how many shards the index will contain
             _meta (dict): optional _meta info for this index
                 (see https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-meta-field.html)
@@ -351,7 +351,7 @@ class HailElasticsearchClient:
 
         self.es.indices.put_settings(index=index_name, body=body)
 
-    def get_index_meta(self, index_name):
+    def _get_index_meta(self, index_name):
         mappings = self.es.indices.get_mapping(index=index_name)
         return mappings.get(index_name, {}).get('mappings', {}).get('_meta', {})
 
@@ -359,14 +359,14 @@ class HailElasticsearchClient:
         """
         Wait for shards to move off of the loading nodes before connecting to seqr
         """
-        for i in range(num_attempts):
+        for _ in range(num_attempts):
             shards = self.es.cat.shards(index=index_name)
             if LOADING_NODES_NAME not in shards:
-                logger.warning("Shards are on {}".format(shards))
+                logger.warning('Shards are on {}'.format(shards))
                 return
             logger.warning(
-                "Waiting for {} shards to transfer off the es-data-loading nodes: \n{}".format(
-                    len(shards.strip().split("\n")), shards
+                'Waiting for {} shards to transfer off the es-data-loading nodes: \n{}'.format(
+                    len(shards.strip().split('\n')), shards
                 )
             )
             time.sleep(5)
@@ -376,7 +376,7 @@ class HailElasticsearchClient:
     def export_table_to_elasticsearch(
         self,
         table: hl.Table,
-        index_name: str = "data",
+        index_name: str = 'data',
         block_size: int = 5000,
         num_shards: int = 10,
         delete_index_before_exporting: bool = True,
@@ -386,7 +386,7 @@ class HailElasticsearchClient:
         field_name_to_elasticsearch_type_map=None,
         disable_doc_values_for_fields=(),
         disable_index_for_fields=(),
-        field_names_replace_dot_with="_",
+        field_names_replace_dot_with='_',
         func_to_run_after_index_exists=None,
         export_globals_to_index_meta=True,
         verbose=True,
@@ -410,7 +410,7 @@ class HailElasticsearchClient:
                 See https://www.elastic.co/guide/en/elasticsearch/hadoop/current/configuration.html#_operation
             ignore_elasticsearch_write_errors (bool): If True, elasticsearch errors will be logged, but won't cause
                 the bulk write call to throw an error. This is useful when, for example,
-                elasticsearch_write_operation="update", and the desired behavior is to update all documents that exist,
+                elasticsearch_write_operation='update', and the desired behavior is to update all documents that exist,
                 but to ignore errors for documents that don't exist.
             elasticsearch_mapping_id (str): if specified, sets the es.mapping.id which is the column name to use as the document ID
                 See https://www.elastic.co/guide/en/elasticsearch/hadoop/current/configuration.html#cfg-mapping
@@ -429,11 +429,11 @@ class HailElasticsearchClient:
             disable_index_for_fields (tuple): (optional) list of field names (the way they will be
                 named in the elasticsearch index) that shouldn't be indexed
                 (see https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-params.html)
-            field_names_replace_dot_with (string): since "." chars in field names are interpreted in
-                special ways by elasticsearch, set this arg to first go through and replace "." with
+            field_names_replace_dot_with (string): since '.' chars in field names are interpreted in
+                special ways by elasticsearch, set this arg to first go through and replace '.' with
                 this string in all field names. This replacement is not reversible (or atleast not
                 unambiguously in the general case) Set this to None to disable replacement, and fall back
-                on an encoding that's uglier, but reversible (eg. "." will be converted to "_$dot$_")
+                on an encoding that's uglier, but reversible (eg. '.' will be converted to '_$dot$_')
             func_to_run_after_index_exists (function): optional function to run after creating the index, but before exporting any data.
             export_globals_to_index_meta (bool): whether to add table.globals object to the index _meta field:
                 (see https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-meta-field.html)
@@ -448,12 +448,12 @@ class HailElasticsearchClient:
             and elasticsearch_write_operation not in ELASTICSEARCH_WRITE_OPERATIONS
         ):
             raise ValueError(
-                "Unexpected value for elasticsearch_write_operation arg: "
+                'Unexpected value for elasticsearch_write_operation arg: '
                 + str(elasticsearch_write_operation)
             )
 
         if elasticsearch_write_operation is not None:
-            elasticsearch_config["es.write.operation"] = elasticsearch_write_operation
+            elasticsearch_config['es.write.operation'] = elasticsearch_write_operation
 
         if (
             elasticsearch_write_operation
@@ -461,19 +461,19 @@ class HailElasticsearchClient:
             or write_null_values
         ):
             # see https://www.elastic.co/guide/en/elasticsearch/hadoop/master/spark.html#spark-sql-write
-            # "By default, elasticsearch-hadoop will ignore null values in favor of not writing any field at all.
+            # 'By default, elasticsearch-hadoop will ignore null values in favor of not writing any field at all.
             # If updating/upserting, then existing field values may need to be overwritten with nulls
-            elasticsearch_config["es.spark.dataframe.write.null"] = "true"
+            elasticsearch_config['es.spark.dataframe.write.null'] = 'true'
 
         if elasticsearch_mapping_id is not None:
-            elasticsearch_config["es.mapping.id"] = elasticsearch_mapping_id
+            elasticsearch_config['es.mapping.id'] = elasticsearch_mapping_id
 
         if ignore_elasticsearch_write_errors:
             # see docs in https://www.elastic.co/guide/en/elasticsearch/hadoop/current/errorhandlers.html
-            elasticsearch_config["es.write.rest.error.handlers"] = "log"
+            elasticsearch_config['es.write.rest.error.handlers'] = 'log'
             elasticsearch_config[
-                "es.write.rest.error.handler.log.logger.name"
-            ] = "BulkErrors"
+                'es.write.rest.error.handler.log.logger.name'
+            ] = 'BulkErrors'
 
         if self._es_password:
             elasticsearch_config.update(
@@ -496,7 +496,7 @@ class HailElasticsearchClient:
 
             # optionally replace . with _ in a non-reversible way
             if field_names_replace_dot_with is not None:
-                encoded_name = encoded_name.replace(".", field_names_replace_dot_with)
+                encoded_name = encoded_name.replace('.', field_names_replace_dot_with)
 
             # replace all other special chars with an encoding that's uglier, but reversible
             encoded_name = encode_field_name(encoded_name)
@@ -505,7 +505,7 @@ class HailElasticsearchClient:
                 rename_dict[field_name] = encoded_name
 
         for original_name, encoded_name in rename_dict.items():
-            logger.info("Encoding column name %s to %s", original_name, encoded_name)
+            logger.info('Encoding column name %s to %s', original_name, encoded_name)
 
         table = table.rename(rename_dict)
 
@@ -532,7 +532,7 @@ class HailElasticsearchClient:
                         modified_elasticsearch_schema[key] = elasticsearch_field_spec
                         match_count += 1
 
-                logger.info("%d columns matched '%s'", match_count, field_name_regexp)
+                logger.info(f'{match_count} columns matched "{field_name_regexp}"')
 
             elasticsearch_schema = modified_elasticsearch_schema
 
@@ -552,7 +552,7 @@ class HailElasticsearchClient:
             func_to_run_after_index_exists()
 
         logger.info(
-            "==> exporting data to elasticsearch. Write mode: %s, blocksize: %d",
+            '==> exporting data to elasticsearch. Write mode: %s, blocksize: %d',
             elasticsearch_write_operation,
             block_size,
         )
@@ -588,7 +588,7 @@ class HailElasticsearchClient:
 def _elasticsearch_mapping_for_type(dtype):
     if isinstance(dtype, hl.tstruct):
         return {
-            "properties": {
+            'properties': {
                 field: _elasticsearch_mapping_for_type(dtype[field])
                 for field in dtype.fields
             }
@@ -596,18 +596,18 @@ def _elasticsearch_mapping_for_type(dtype):
     if isinstance(dtype, (hl.tarray, hl.tset)):
         element_mapping = _elasticsearch_mapping_for_type(dtype.element_type)
         if isinstance(dtype.element_type, hl.tstruct):
-            element_mapping["type"] = "nested"
+            element_mapping['type'] = 'nested'
         return element_mapping
     if isinstance(dtype, hl.tlocus):
         return {
-            "type": "object",
-            "properties": {
-                "contig": {"type": "keyword"},
-                "position": {"type": "integer"},
+            'type': 'object',
+            'properties': {
+                'contig': {'type': 'keyword'},
+                'position': {'type': 'integer'},
             },
         }
     if dtype in HAIL_TYPE_TO_ES_TYPE_MAPPING:
-        return {"type": HAIL_TYPE_TO_ES_TYPE_MAPPING[dtype]}
+        return {'type': HAIL_TYPE_TO_ES_TYPE_MAPPING[dtype]}
 
     # tdict, ttuple, tlocus, tinterval, tcall
     raise NotImplementedError
@@ -617,7 +617,7 @@ def elasticsearch_schema_for_table(
     table, disable_doc_values_for_fields=(), disable_index_for_fields=()
 ):
     """
-    Converts the type of a table's row values into a dictionary that can be plugged in to
+    Converts the type of table's row values into a dictionary that can be plugged in to
     an elasticsearch mapping definition.
 
     Args:
@@ -629,29 +629,28 @@ def elasticsearch_schema_for_table(
             named in the elasticsearch index) that shouldn't be indexed
             (see https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-params.html)
     Returns:
-        A dict that can be plugged in to an elasticsearch mapping as the value for "properties".
+        A dict that can be plugged in to an elasticsearch mapping as the value for 'properties'.
         (see https://www.elastic.co/guide/en/elasticsearch/guide/current/root-object.html)
     """
     properties = _elasticsearch_mapping_for_type(table.key_by().row_value.dtype)[
-        "properties"
+        'properties'
     ]
 
     if disable_doc_values_for_fields:
         logger.info(
-            "==> will disable doc values for %s",
-            ", ".join(disable_doc_values_for_fields),
+            '==> will disable doc values for %s',
+            ', '.join(disable_doc_values_for_fields),
         )
         for es_field_name in disable_doc_values_for_fields:
             if es_field_name not in properties:
                 raise ValueError(
-                    "'%s' in disable_doc_values_for_fields arg is not in the elasticsearch schema: %s"
-                    % (es_field_name, properties)
+                    f'"{es_field_name}" in disable_doc_values_for_fields arg is not in the elasticsearch schema: {properties}'
                 )
-            properties[es_field_name]["doc_values"] = False
+            properties[es_field_name]['doc_values'] = False
 
     if disable_index_for_fields:
         logger.info(
-            "==> will disable index fields for %s", ", ".join(disable_index_for_fields)
+            '==> will disable index fields for %s', ', '.join(disable_index_for_fields)
         )
         for es_field_name in disable_index_for_fields:
             if es_field_name not in properties:
@@ -660,19 +659,18 @@ def elasticsearch_schema_for_table(
                 ]
                 if flattened_fields:
                     for flattened_es_field_name in flattened_fields:
-                        properties[flattened_es_field_name]["index"] = False
+                        properties[flattened_es_field_name]['index'] = False
                 else:
                     raise ValueError(
-                        "'%s' in disable_index_for_fields arg is not in the elasticsearch schema: %s"
-                        % (es_field_name, properties)
+                        f'"{es_field_name}" in disable_index_for_fields arg is not in the elasticsearch schema: {properties}'
                     )
             else:
-                properties[es_field_name]["index"] = False
+                properties[es_field_name]['index'] = False
 
     return properties
 
 
-def encode_field_name(s):
+def encode_field_name(name: str):
     """Encodes arbitrary string into an elasticsearch field name
 
     See:
@@ -680,7 +678,7 @@ def encode_field_name(s):
     https://discuss.elastic.co/t/illegal-characters-in-elasticsearch-field-names/17196/2
     """
     field_name = StringIO()
-    for i, c in enumerate(s):
+    for _, c in enumerate(name):
         if c == ES_FIELD_NAME_ESCAPE_CHAR:
             field_name.write(2 * ES_FIELD_NAME_ESCAPE_CHAR)
         elif c in ES_FIELD_NAME_SPECIAL_CHAR_MAP:
@@ -688,11 +686,11 @@ def encode_field_name(s):
         else:
             field_name.write(c)  # write out the char as is
 
-    field_name = field_name.getvalue()
+    field_name_str = field_name.getvalue()
 
     # escape 1st char if necessary
-    if any(field_name.startswith(c) for c in ES_FIELD_NAME_BAD_LEADING_CHARS):
-        return ES_FIELD_NAME_ESCAPE_CHAR + field_name
+    if any(field_name_str.startswith(c) for c in ES_FIELD_NAME_BAD_LEADING_CHARS):
+        return ES_FIELD_NAME_ESCAPE_CHAR + field_name_str
     else:
         return field_name
 

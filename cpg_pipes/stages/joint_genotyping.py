@@ -4,14 +4,22 @@ Stage that performs joint genotyping of GVCFs using GATK.
 
 import logging
 
-from cpg_utils import to_path
+from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
 
+from ..jobs.happy import happy
 from ..jobs.picard import vcf_qc
 from ..types import GvcfPath
 from ..jobs import joint_genotyping
-from ..targets import Cohort
-from ..pipeline import stage, CohortStage, StageInput, StageOutput, PipelineError
+from ..targets import Cohort, Sample
+from ..pipeline import (
+    stage,
+    CohortStage,
+    StageInput,
+    StageOutput,
+    PipelineError,
+    SampleStage,
+)
 from .genotype_sample import GenotypeSample
 
 logger = logging.getLogger(__file__)
@@ -75,7 +83,6 @@ class JointGenotyping(CohortStage):
             scatter_count=get_config()['workflow'].get(
                 'jc_intervals_num', joint_genotyping.DEFAULT_INTERVALS_NUM
             ),
-            sequencing_type=self.cohort.sequencing_type,
             intervals_path=get_config()['workflow'].get('intervals_path'),
             job_attrs=self.get_job_attrs(),
         )
@@ -99,3 +106,41 @@ class JointGenotyping(CohortStage):
             jobs.append(qc_j)
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
+
+
+@stage(required_stages=JointGenotyping)
+class JointVcfHappy(SampleStage):
+    """
+    Run Happy to validate validation samples in joint VCF
+    """
+
+    def expected_outputs(self, sample: Sample) -> Path:
+        """
+        Parsed by MultiQC: '*.summary.csv'
+        https://multiqc.info/docs/#hap.py
+        """
+        h = self.cohort.alignment_inputs_hash()
+        prefix = self.cohort.analysis_dataset.prefix() / 'qc' / 'jc' / 'happy'
+        return prefix / f'{h}-{sample.id}.summary.csv'
+
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+        """Queue jobs"""
+        vcf_path = inputs.as_path(target=self.cohort, stage=JointGenotyping, id='vcf')
+
+        jobs = happy(
+            b=self.b,
+            sample=sample,
+            vcf_or_gvcf=self.b.read_input_group(
+                **{
+                    'vcf': str(vcf_path),
+                    'vcf.tbi': str(vcf_path) + '.tbi',
+                }
+            ),
+            is_gvcf=False,
+            job_attrs=self.get_job_attrs(sample),
+            output_path=self.expected_outputs(sample),
+        )
+        if not jobs:
+            return self.make_outputs(sample)
+        else:
+            return self.make_outputs(sample, self.expected_outputs(sample), jobs)

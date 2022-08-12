@@ -4,10 +4,11 @@ Stage that generates a GVCF file.
 
 import logging
 import hailtop.batch as hb
-from cpg_utils import to_path
+from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
 
 from ..jobs import haplotype_caller
+from ..jobs.happy import happy
 from ..jobs.picard import vcf_qc, get_intervals
 from ..targets import Sample
 from ..pipeline import stage, SampleStage, StageInput, StageOutput
@@ -49,7 +50,6 @@ class GenotypeSample(SampleStage):
             intervals_j, intervals = get_intervals(
                 b=self.b,
                 intervals_path=get_config()['workflow'].get('intervals_path'),
-                sequencing_type=self.cohort.sequencing_type,
                 scatter_count=scatter_count,
                 job_attrs=self.get_job_attrs(),
                 output_prefix=self.tmp_prefix / 'intervals',
@@ -83,3 +83,41 @@ class GenotypeSample(SampleStage):
             jobs.append(qc_j)
 
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
+
+
+@stage
+class GvcfHappy(SampleStage):
+    """
+    Run Happy to validate GCVF of validation samples
+    """
+
+    def expected_outputs(self, sample: Sample) -> Path:
+        """
+        Parsed by MultiQC: '*.summary.csv'
+        https://multiqc.info/docs/#hap.py
+        """
+        return sample.dataset.prefix() / 'qc' / f'{sample.id}.summary.csv'
+
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+        """Queue jobs"""
+        gvcf_path = sample.get_gvcf_path()
+        if get_config()['workflow'].get('check_inputs') and not gvcf_path.exists():
+            if get_config()['workflow'].get('skip_samples_with_missing_input'):
+                logger.warning(f'No GVCF found, skipping sample {sample}')
+                return self.make_outputs(sample, skipped=True)
+            else:
+                return self.make_outputs(sample, error_msg=f'No GVCF found')
+
+        jobs = happy(
+            b=self.b,
+            sample=sample,
+            vcf_or_gvcf=sample.get_gvcf_path().resource_group(self.b),
+            is_gvcf=True,
+            job_attrs=self.get_job_attrs(sample),
+            output_path=self.expected_outputs(sample),
+        )
+
+        if not jobs:
+            return self.make_outputs(sample)
+        else:
+            return self.make_outputs(sample, self.expected_outputs(sample), jobs)

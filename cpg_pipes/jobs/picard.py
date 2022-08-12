@@ -187,9 +187,11 @@ def vcf_qc(
         base=str(reference_path('broad/dbsnp_vcf')),
         index=str(reference_path('broad/dbsnp_vcf_index')),
     )
+    sequencing_type = get_config()['workflow']['sequencing_type']
     intervals_file = b.read_input(
-        str(reference_path('broad/genome_evaluation_interval_lists'))
+        str(reference_path(f'broad/{sequencing_type}_evaluation_interval_lists'))
     )
+
     if is_gvcf:
         input_file = vcf_or_gvcf['g.vcf.gz']
     else:
@@ -218,24 +220,28 @@ def vcf_qc(
     return j
 
 
-def picard_exome_metrics(
+def picard_collect_metrics(
     b,
     cram_path: CramPath,
+    out_alignment_summary_metrics_path: Path,
+    out_base_distribution_by_cycle_metrics_path: Path,
+    out_insert_size_metrics_path: Path,
+    out_quality_by_cycle_metrics_path: Path,
+    out_quality_yield_metrics_path: Path,
     job_attrs: dict | None = None,
-    out_gc_bias_detail_metrics_path: Path | None = None,
-    out_gc_bias_summary_metrics_path: Path | None = None,
-    out_insert_size_metrics_path: Path | None = None,
     overwrite: bool = False,
 ) -> Job | None:
     """
-    Run PicardTools CollectWgsMetrics metrics.
-    Based on https://github.com/broadinstitute/warp/blob/e1ac6718efd7475ca373b7988f81e54efab608b4/tasks/broad/Qc.wdl#L444
+    Run picard CollectMultipleMetrics metrics for sample QC.
+    Based on https://github.com/broadinstitute/warp/blob/master/tasks/broad/Qc.wdl#L141
     """
     if can_reuse(
         [
-            out_gc_bias_detail_metrics_path,
-            out_gc_bias_summary_metrics_path,
+            out_alignment_summary_metrics_path,
+            out_base_distribution_by_cycle_metrics_path,
             out_insert_size_metrics_path,
+            out_quality_by_cycle_metrics_path,
+            out_quality_yield_metrics_path,
         ],
         overwrite,
     ):
@@ -262,21 +268,33 @@ def picard_exome_metrics(
       PROGRAM=null \
       PROGRAM=CollectAlignmentSummaryMetrics \
       PROGRAM=CollectInsertSizeMetrics \
-      PROGRAM=CollectSequencingArtifactMetrics \
-      PROGRAM=QualityScoreDistribution \
+      PROGRAM=MeanQualityByCycle \
+      PROGRAM=CollectBaseDistributionByCycle \
+      PROGRAM=CollectQualityYieldMetrics \
       METRIC_ACCUMULATION_LEVEL=null \
-      METRIC_ACCUMULATION_LEVEL=SAMPLE \
-      METRIC_ACCUMULATION_LEVEL=LIBRARY
+      METRIC_ACCUMULATION_LEVEL=SAMPLE
       
-    cp /io/prefix.gc_bias.detail_metrics {j.out_gc_bias_detail_metrics}
-    cp /io/prefix.gc_bias.summary_metrics {j.out_gc_bias_summary_metrics}
-    cp /io/prefix.gc_bias.insert_size_metrics {j.out_insert_size_metrics}
+    ls /io/
+    cp /io/prefix.alignment_summary_metrics {j.out_alignment_summary_metrics}
+    cp /io/prefix.base_distribution_by_cycle_metrics {j.out_base_distribution_by_cycle_metrics}
+    cp /io/prefix.insert_size_metrics {j.out_insert_size_metrics}
+    cp /io/prefix.quality_by_cycle_metrics {j.out_quality_by_cycle_metrics}
+    cp /io/prefix.quality_yield_metrics {j.out_quality_yield_metrics}
     """
 
     j.command(wrap_command(cmd))
-    b.write_output(j.out_gc_bias_detail_metrics, str(out_gc_bias_detail_metrics_path))
-    b.write_output(j.out_gc_bias_summary_metrics, str(out_gc_bias_summary_metrics_path))
+    b.write_output(
+        j.out_alignment_summary_metrics, str(out_alignment_summary_metrics_path)
+    )
     b.write_output(j.out_insert_size_metrics, str(out_insert_size_metrics_path))
+    b.write_output(
+        j.out_quality_by_cycle_metrics, str(out_quality_by_cycle_metrics_path)
+    )
+    b.write_output(
+        j.out_base_distribution_by_cycle_metrics,
+        str(out_base_distribution_by_cycle_metrics_path),
+    )
+    b.write_output(j.out_quality_yield_metrics, str(out_quality_yield_metrics_path))
     return j
 
 
@@ -288,8 +306,8 @@ def picard_hs_metrics(
     overwrite: bool = False,
 ) -> Job | None:
     """
-    Run PicardTools CollectWgsMetrics metrics.
-    Based on https://github.com/broadinstitute/warp/blob/e1ac6718efd7475ca373b7988f81e54efab608b4/tasks/broad/Qc.wdl#L444
+    Run picard CollectHsMetrics metrics.
+    Based on https://github.com/broadinstitute/warp/blob/master/tasks/broad/Qc.wdl#L528
     """
     if can_reuse(out_hs_metrics_path, overwrite):
         return None
@@ -304,17 +322,23 @@ def picard_hs_metrics(
     res.set_to_job(j)
     cram = cram_path.resource_group(b)
     reference = fasta_res_group(b)
-    interval_file = b.read_input(
-        str(reference_path('broad/exome_evaluation_interval_lists'))
+    targets_interval_file = b.read_input(
+        str(reference_path('broad/exome_targets_interval_list'))
+    )
+    bait_interval_file = b.read_input(
+        str(reference_path('broad/exome_bait_interval_list'))
     )
 
     cmd = f"""\
+    grep -v 
+    
     picard -Xms5g -Xmx{res.get_java_mem_mb()}m \
       CollectHsMetrics \
       INPUT={cram.cram} \
       REFERENCE_SEQUENCE={reference.base} \
       VALIDATION_STRINGENCY=SILENT \
-      TARGET_INTERVALS={interval_file} \
+      TARGET_INTERVALS={targets_interval_file} \
+      BAIT_INTERVALS={bait_interval_file} \
       METRIC_ACCUMULATION_LEVEL=null \
       METRIC_ACCUMULATION_LEVEL=SAMPLE \
       METRIC_ACCUMULATION_LEVEL=LIBRARY \
@@ -326,7 +350,7 @@ def picard_hs_metrics(
     return j
 
 
-def picard_genome_metrics(
+def picard_wgs_metrics(
     b,
     cram_path: CramPath,
     out_picard_wgs_metrics_path: Path,
@@ -335,7 +359,7 @@ def picard_genome_metrics(
     read_length: int = 250,
 ) -> Job | None:
     """
-    Run PicardTools CollectWgsMetrics metrics.
+    Run picard CollectWgsMetrics metrics.
     Based on https://github.com/broadinstitute/warp/blob/e1ac6718efd7475ca373b7988f81e54efab608b4/tasks/broad/Qc.wdl#L444
     """
     if can_reuse(out_picard_wgs_metrics_path, overwrite):

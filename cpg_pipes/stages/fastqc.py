@@ -36,14 +36,13 @@ class FastQC(SampleStage):
         """
         Only running FastQC if sequencing inputs are available.
         """
-        alignment_input = sample.alignment_input_by_seq_type.get(
-            self.cohort.sequencing_type
-        )
+        sequencing_type = get_config()['workflow']['sequencing_type']
+        alignment_input = sample.alignment_input_by_seq_type.get(sequencing_type)
 
         if isinstance(alignment_input, CramPath) and not alignment_input.is_bam:
             logger.info(
                 f'FastQC input {sample} has CRAM inputs {alignment_input} '
-                f'for type {self.cohort.sequencing_type.value}, skipping FASTQC'
+                f'for type {sequencing_type}, skipping FASTQC'
             )
             return self.make_outputs(sample, skipped=True)
 

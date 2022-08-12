@@ -36,8 +36,8 @@ status = CpgStatusReporter(smdb)
 
 POPULATE_SAMPLES = True
 POPULATE_QC = False
-POPULATE_JOINT_CALL = False
-POPULATE_ES_INDEX = False
+POPULATE_JOINT_CALL = True
+POPULATE_ES_INDEX = True
 
 
 if POPULATE_SAMPLES:
@@ -147,19 +147,20 @@ if POPULATE_JOINT_CALL:
             project_name='seqr',
         )
 
+
 if POPULATE_ES_INDEX:
     for name in [
-        'acute-care-genome-2022_0620_1843_l4h8u',
-        'ravenscroft-arch-genome-2022_0618_1137_4qfyn',
-        'circa-genome-2022_0618_1137_4qfyn',
-        'ohmr3-mendelian-genome-2022_0618_1137_4qfyn',
-        'validation-genome-2022_0618_1137_4qfyn',
-        'mito-disease-genome-2022_0618_1137_4qfyn',
-        'perth-neuro-genome-2022_0618_1137_4qfyn',
-        'ohmr4-epilepsy-genome-2022_0618_1137_4qfyn',
-        'hereditary-neuro-genome-2022_0618_1137_4qfyn',
-        'ravenscroft-rdstudy-genome-2022_0618_1137_4qfyn',
-        'heartkids-genome-2022_0618_1137_4qfyn',
+        'validation-genome-2022_0810_2358_474tt',
+        # 'acute-care-genome-2022_0620_1843_l4h8u',
+        # 'ravenscroft-arch-genome-2022_0618_1137_4qfyn',
+        # 'circa-genome-2022_0618_1137_4qfyn',
+        # 'ohmr3-mendelian-genome-2022_0618_1137_4qfyn',
+        # 'mito-disease-genome-2022_0618_1137_4qfyn',
+        # 'perth-neuro-genome-2022_0618_1137_4qfyn',
+        # 'ohmr4-epilepsy-genome-2022_0618_1137_4qfyn',
+        # 'hereditary-neuro-genome-2022_0618_1137_4qfyn',
+        # 'ravenscroft-rdstudy-genome-2022_0618_1137_4qfyn',
+        # 'heartkids-genome-2022_0618_1137_4qfyn',
     ]:
         ds_name = name.split('-genome-')[0]
         print(f'Adding {ds_name}')

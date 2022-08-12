@@ -40,7 +40,6 @@ class Vep(CohortStage):
             scatter_count=get_config()['workflow'].get(
                 'vep_intervals_num', vep.DEFAULT_INTERVALS_NUM
             ),
-            sequencing_type=cohort.sequencing_type,
             intervals_path=get_config()['workflow'].get('intervals_path'),
             job_attrs=self.get_job_attrs(),
         )

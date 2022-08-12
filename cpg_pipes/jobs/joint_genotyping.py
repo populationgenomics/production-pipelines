@@ -205,8 +205,8 @@ def make_joint_genotyping_jobs(
 def genomicsdb(
     b: hb.Batch,
     sample_map_bucket_path: Path,
+    output_path: Path,
     interval: Resource | None = None,
-    output_path: Path | None = None,
     overwrite: bool = False,
     job_attrs: dict | None = None,
 ) -> Job | None:

@@ -138,7 +138,7 @@ class InputProvider(ABC):
         """
 
     @staticmethod
-    def filter_sequencing_type(cohort: Cohort | None):
+    def filter_sequencing_type(cohort: Cohort):
         """
         Filtering to the samples with only requested sequencing types.
         """
@@ -158,8 +158,7 @@ class InputProvider(ABC):
             if not bool(s.alignment_input_by_seq_type):
                 logger.warning(
                     f'{s}: skipping because no inputs with data type '
-                    f'"{sequencing_type}" found in '
-                    f'{[k.value for k in avail_types]}'
+                    f'"{sequencing_type}" found in {avail_types}'
                 )
                 s.active = False
 

@@ -65,7 +65,7 @@ class AnnotateCohort(CohortStage):
             siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
             output_mt_path=self.expected_outputs(cohort)['mt'],
             checkpoint_prefix=checkpoint_prefix,
-            sequencing_type=self.cohort.sequencing_type,
+            sequencing_type=get_config()['workflow']['sequencing_type'],
             overwrite=not get_config()['workflow'].get('check_intermediates'),
             job_attrs=self.get_job_attrs(),
         )
@@ -140,7 +140,8 @@ class LoadToEs(DatasetStage):
         """
         Expected to generate a Seqr index, which is not a file
         """
-        index_name = f'{dataset.name}-{self.cohort.sequencing_type.value}-{self.run_id}'
+        sequencing_type = (get_config()['workflow']['sequencing_type'],)
+        index_name = f'{dataset.name}-{sequencing_type}-{self.run_id}'
         return index_name
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:

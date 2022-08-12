@@ -46,10 +46,9 @@ class CramSomalier(SampleStage):
         j = somalier.extact_job(
             b=self.b,
             gvcf_or_cram_or_bam_path=cram_path,
-            output_path=expected_path,
+            out_somalier_path=expected_path,
             overwrite=not get_config()['workflow'].get('check_intermediates'),
             job_attrs=self.get_job_attrs(sample),
-            sequencing_type=self.cohort.sequencing_type,
         )
         return self.make_outputs(sample, data=expected_path, jobs=[j])
 
@@ -82,10 +81,9 @@ class GvcfSomalier(SampleStage):
         j = somalier.extact_job(
             b=self.b,
             gvcf_or_cram_or_bam_path=gvcf_path,
-            output_path=expected_path,
+            out_somalier_path=expected_path,
             overwrite=not get_config()['workflow'].get('check_intermediates'),
             job_attrs=self.get_job_attrs(sample),
-            sequencing_type=self.cohort.sequencing_type,
         )
         return self.make_outputs(sample, data=expected_path, jobs=[j])
 
@@ -203,7 +201,6 @@ class CramSomalierPedigree(DatasetStage):
             out_html_url=html_url,
             out_checks_path=self.expected_outputs(dataset)['checks'],
             job_attrs=self.get_job_attrs(dataset),
-            sequencing_type=self.cohort.sequencing_type,
             send_to_slack=True,
         )
         return self.make_outputs(
@@ -267,7 +264,6 @@ class GvcfSomalierPedigree(DatasetStage):
             out_html_url=html_url,
             out_checks_path=self.expected_outputs(dataset)['checks'],
             job_attrs=self.get_job_attrs(dataset),
-            sequencing_type=self.cohort.sequencing_type,
             send_to_slack=False,
         )
         return self.make_outputs(
@@ -321,6 +317,5 @@ class CramSomalierAncestry(DatasetStage):
             out_html_path=html_path,
             out_html_url=html_url,
             job_attrs=self.get_job_attrs(dataset),
-            sequencing_type=self.cohort.sequencing_type,
         )
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])
