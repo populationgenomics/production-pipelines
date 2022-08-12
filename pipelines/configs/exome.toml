@@ -1,11 +1,9 @@
 [workflow]
-first_stage = 'GenotypeSample'
-last_stage = 'GenotypeSample'
-
 sequencing_type = 'exome'
 hc_intervals_num = 1
 jc_intervals_num = 1
 vep_intervals_num = 100
 
+first_stage = 'JointGenotyping'
 #datasets = ['acute-care']
 #only_samples = ['CPG226712']

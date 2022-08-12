@@ -59,8 +59,7 @@ def multiqc(
     if label:
         title += f' [{label}]'
 
-    mqc_j = b.new_job(title, job_attrs)
-    mqc_j.attributes['tool'] = 'MultiQC'
+    mqc_j = b.new_job(title, (job_attrs or {}) | dict(tool='MultiQC'))
     mqc_j.image(image_path('multiqc'))
     STANDARD.set_resources(mqc_j, ncpu=16)
 

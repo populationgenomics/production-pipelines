@@ -41,9 +41,7 @@ class CramMultiQC(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         """
-        Expected to produce an HTML and a corresponding JSON file. We write both to final
-        "latest" location, and to a location parametrised by inputs hash, in order
-        to enable reruns/reuses.
+        Expected to produce an HTML and a corresponding JSON file.
         """
         h = dataset.alignment_inputs_hash()
         return {
@@ -160,9 +158,6 @@ class GvcfMultiQC(DatasetStage):
         """
         Collect QC.
         """
-        somalier_samples = inputs.as_path(dataset, GvcfSomalierPedigree, id='samples')
-        somalier_pairs = inputs.as_path(dataset, GvcfSomalierPedigree, id='pairs')
-
         json_path = self.expected_outputs(dataset)['json']
         html_path = self.expected_outputs(dataset)['html']
         checks_path = self.expected_outputs(dataset)['checks']
@@ -171,11 +166,22 @@ class GvcfMultiQC(DatasetStage):
         else:
             html_url = None
 
-        paths = [
-            somalier_samples,
-            somalier_pairs,
-        ]
+        paths = []
+        try:
+            somalier_samples = inputs.as_path(
+                dataset, CramSomalierPedigree, id='samples'
+            )
+            somalier_pairs = inputs.as_path(dataset, CramSomalierPedigree, id='pairs')
+        except StageInputNotFound:
+            pass
+        else:
+            paths = [
+                somalier_samples,
+                somalier_pairs,
+            ]
+
         ending_to_trim = set()  # endings to trim to get sample names
+
         for sample in dataset.get_samples():
             for st, key in [
                 (GenotypeSample, 'qc_detail'),
