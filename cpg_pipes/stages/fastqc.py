@@ -5,12 +5,12 @@ Stage that runs FastQC on alignment inputs.
 import logging
 
 from cpg_utils.config import get_config
+from cpg_utils import Path
 
-from .. import Path
-from ..jobs import fastqc
-from ..targets import Sample
-from ..pipeline import stage, SampleStage, StageInput, StageOutput
-from ..types import CramPath
+from cpg_pipes.jobs import fastqc
+from cpg_pipes.targets import Sample
+from cpg_pipes.pipeline import stage, SampleStage, StageInput, StageOutput
+from cpg_pipes.filetypes import CramPath
 
 logger = logging.getLogger(__file__)
 

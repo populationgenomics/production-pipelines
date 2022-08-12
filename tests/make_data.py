@@ -13,7 +13,7 @@ from cpg_pipes import Path
 from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs.align import extract_fastq
 from cpg_pipes.pipeline.pipeline import Pipeline
-from cpg_pipes.types import CramPath
+from cpg_pipes.filetypes import CramPath
 
 import utils
 

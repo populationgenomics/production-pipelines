@@ -21,7 +21,7 @@ from cpg_pipes.query.seqr_loader import (
     load_vqsr,
 )
 from cpg_pipes.query.vep import vep_json_to_ht
-from cpg_pipes.types import logger
+from cpg_pipes.filetypes import logger
 from cpg_pipes.utils import timestamp
 
 try:
@@ -177,7 +177,7 @@ class TestQuery(unittest.TestCase):
         out_mt_path = self.out_bucket / 'combined.mt'
 
         hl.experimental.run_combiner(
-            [str(s.get_gvcf_path().path) for s in dataset.get_samples()],
+            [str(s.make_gvcf_path().path) for s in dataset.get_samples()],
             sample_names=[s.id for s in dataset.get_samples()],
             out_file=str(out_mt_path),
             reference_genome=genome_build(),

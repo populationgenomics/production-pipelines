@@ -21,7 +21,7 @@ from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs.scripts import check_pedigree
 from cpg_pipes.slack import slack_message_cmd
 from cpg_pipes.targets import Dataset, Sample
-from cpg_pipes.types import CramPath, GvcfPath
+from cpg_pipes.filetypes import CramPath, GvcfPath
 from cpg_pipes.utils import can_reuse
 
 logger = logging.getLogger(__file__)

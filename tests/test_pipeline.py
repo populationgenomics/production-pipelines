@@ -15,7 +15,7 @@ from cpg_pipes.pipeline.pipeline import Pipeline, Stage, StageDecorator
 from cpg_pipes.stages.genotype_sample import GenotypeSample
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
-from cpg_pipes.types import CramPath
+from cpg_pipes.filetypes import CramPath
 from cpg_pipes.stages import seqr_loader
 from cpg_pipes.utils import timestamp
 

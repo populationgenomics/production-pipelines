@@ -15,7 +15,6 @@ from cpg_pipes.pipeline import (
 from cpg_pipes.pipeline.exceptions import StageInputNotFound
 from cpg_pipes.pipeline.pipeline import StageDecorator
 from cpg_pipes.stages.align import Align, qc_functions
-from cpg_pipes.stages.fastqc import FastQC
 from cpg_pipes.stages.genotype_sample import GenotypeSample, GvcfHappy
 from cpg_pipes.stages.joint_genotyping import JointGenotyping, JointVcfHappy
 from cpg_pipes.stages.somalier import (
@@ -31,7 +30,6 @@ logger = logging.getLogger(__file__)
 @stage(
     required_stages=[
         Align,
-        FastQC,
         CramSomalierPedigree,
     ],
     forced=True,
@@ -59,9 +57,6 @@ class CramMultiQC(DatasetStage):
         Call a function from the `jobs` module using inputs from `cramqc`
         and `somalier` stages.
         """
-        somalier_samples = inputs.as_path(dataset, CramSomalierPedigree, id='samples')
-        somalier_pairs = inputs.as_path(dataset, CramSomalierPedigree, id='pairs')
-
         json_path = self.expected_outputs(dataset)['json']
         html_path = self.expected_outputs(dataset)['html']
         checks_path = self.expected_outputs(dataset)['checks']
@@ -70,17 +65,32 @@ class CramMultiQC(DatasetStage):
         else:
             html_url = None
 
-        paths = [
-            somalier_samples,
-            somalier_pairs,
-        ]
+        paths = []
+        try:
+            somalier_samples = inputs.as_path(
+                dataset, CramSomalierPedigree, id='samples'
+            )
+            somalier_pairs = inputs.as_path(dataset, CramSomalierPedigree, id='pairs')
+        except StageInputNotFound:
+            pass
+        else:
+            paths = [
+                somalier_samples,
+                somalier_pairs,
+            ]
+
         ending_to_trim = set()  # endings to trim to get sample names
+        modules_to_trim_endings = set()
+
         for sample in dataset.get_samples():
-            keys_d: dict[str, StageDecorator] = {'zip': FastQC}
+            stage_by_key: dict[str, StageDecorator] = {}
             for qc in qc_functions():
-                for key in qc.out_ext_by_key.keys():
-                    keys_d[key] = Align
-            for key, st in keys_d.items():
+                for key, out in qc.outs.items():
+                    if out:
+                        stage_by_key[key] = Align
+                        modules_to_trim_endings.add(out.multiqc_key)
+
+            for key, st in stage_by_key.items():
                 try:
                     path = inputs.as_path(sample, st, key)
                 except StageInputNotFound:  # allow missing inputs
@@ -99,13 +109,6 @@ class CramMultiQC(DatasetStage):
                         ending_to_trim.add(path.name.replace(sample.id, ''))
 
         assert ending_to_trim
-        modules_to_trim_endings = {
-            'fastqc/zip',
-            'picard/markdups',
-            'samtools',
-            'picard/wgs_metrics',
-            'verifybamid/selfsm',
-        }
 
         # Building sample map to MultiQC bulk rename. Only extending IDs if the
         # extrenal/participant IDs are differrent:

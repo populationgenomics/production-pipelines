@@ -83,11 +83,11 @@ def _make_seqr_metadata_files(
     df = pd.DataFrame(
         {
             'individual_id': s.external_id if use_external_id else s.participant_id,
-            'cram_path': s.get_cram_path(),
+            'cram_path': s.make_cram_path(),
             'cram_sample_id': s.id,
         }
         for s in dataset.get_samples()
-        if s.get_cram_path()
+        if s.make_cram_path()
     )
     with igv_paths_path.open('w') as fh:
         df.to_csv(fh, sep='\t', index=False, header=False)

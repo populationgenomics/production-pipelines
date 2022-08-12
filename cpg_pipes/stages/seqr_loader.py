@@ -140,7 +140,7 @@ class LoadToEs(DatasetStage):
         """
         Expected to generate a Seqr index, which is not a file
         """
-        sequencing_type = (get_config()['workflow']['sequencing_type'],)
+        sequencing_type = get_config()['workflow']['sequencing_type']
         index_name = f'{dataset.name}-{sequencing_type}-{self.run_id}'
         return index_name
 

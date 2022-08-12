@@ -34,9 +34,9 @@ pipeline = Pipeline()
 
 df = pd.DataFrame(
     [
-        {'s': s.id, 'gvcf': s.get_gvcf_path()}
+        {'s': s.id, 'gvcf': s.make_gvcf_path()}
         for s in pipeline.get_all_samples()
-        if s.get_gvcf_path().exists()
+        if s.make_gvcf_path().exists()
     ]
 )
 logger.info(

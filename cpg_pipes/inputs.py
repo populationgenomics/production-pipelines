@@ -10,13 +10,13 @@ from itertools import groupby
 from cpg_utils.config import get_config
 from sample_metadata import ApiException
 
-from cpg_pipes.providers.metamist import metamist, MmSequence
+from cpg_pipes.metamist import get_metamist, MmSequence
 from cpg_pipes.targets import Cohort, Sex, PedigreeInfo
 
 logger = logging.getLogger(__file__)
 
 
-class InputProviderError(Exception):
+class InputError(Exception):
     """
     Exception thrown when there is something wrong while parsing inputs.
     """
@@ -24,21 +24,34 @@ class InputProviderError(Exception):
     pass
 
 
-def populate_cohort(cohort: Cohort):
+_cohort: Cohort | None = None
+
+
+def get_cohort() -> Cohort:
+    """Return the cohort object, whic is a signleton"""
+    global _cohort
+    if not _cohort:
+        _cohort = _create_cohort()
+    return _cohort
+
+
+def _create_cohort() -> Cohort:
     """
     Add datasets in the cohort. There exists only one cohort for
     the pipeline run.
     """
-    skip_samples = get_config()['workflow'].get('skip_samples', [])
-    only_samples = get_config()['workflow'].get('only_samples', [])
+    analysis_dataset_name = get_config()['workflow']['dataset']
+    dataset_names = get_config()['workflow'].get('datasets', [analysis_dataset_name])
     skip_datasets = get_config()['workflow'].get('skip_datasets', [])
-
-    dataset_names = get_config()['workflow']['datasets']
     dataset_names = [d for d in dataset_names if d not in skip_datasets]
 
+    skip_samples = get_config()['workflow'].get('skip_samples', [])
+    only_samples = get_config()['workflow'].get('only_samples', [])
+
+    cohort = Cohort()
     for dataset_name in dataset_names:
         dataset = cohort.create_dataset(dataset_name)
-        sample_entries = metamist.sapi.get_samples(
+        sample_entries = get_metamist().sapi.get_samples(
             body_get_samples={'project_ids': [dataset_name]}
         )
         sample_entries = _filter_samples(
@@ -59,16 +72,17 @@ def populate_cohort(cohort: Cohort):
         if skip_samples or only_samples or skip_datasets:
             msg += ' (after skipping/picking samples)'
         logger.warning(msg)
-        return
+        return cohort
 
-    populate_alignment_inputs(cohort)
-    filter_sequencing_type(cohort)
-    populate_analysis(cohort)
-    populate_participants(cohort)
-    populate_pedigree(cohort)
+    _populate_alignment_inputs(cohort)
+    _filter_sequencing_type(cohort)
+    _populate_analysis(cohort)
+    _populate_participants(cohort)
+    _populate_pedigree(cohort)
+    return cohort
 
 
-def filter_sequencing_type(cohort: Cohort):
+def _filter_sequencing_type(cohort: Cohort):
     """
     Filtering to the samples with only requested sequencing types.
     """
@@ -120,14 +134,17 @@ def _filter_samples(
     return filtered_entries
 
 
-def populate_alignment_inputs(cohort: Cohort, check_existence: bool = False) -> None:
+def _populate_alignment_inputs(
+    cohort: Cohort,
+    check_existence: bool = False,
+) -> None:
     """
     Populate sequencing inputs for samples.
     """
     assert cohort.get_sample_ids()
     seq_type = get_config()['workflow']['sequencing_type']
     try:
-        found_seqs: list[dict] = metamist.seqapi.get_sequences_by_sample_ids(
+        found_seqs: list[dict] = get_metamist().seqapi.get_sequences_by_sample_ids(
             cohort.get_sample_ids(), get_latest_sequence_only=False
         )
         found_seqs = [seq for seq in found_seqs if str(seq['type']) == seq_type]
@@ -170,7 +187,7 @@ def populate_alignment_inputs(cohort: Cohort, check_existence: bool = False) -> 
             seq = MmSequence.parse(d, check_existence=check_existence)
             if seq.alignment_input:
                 if seq.sequencing_type in sample.alignment_input_by_seq_type:
-                    raise InputProviderError(
+                    raise InputError(
                         f'{sample}: found more than 1 alignment input with '
                         f'sequencing type: {seq.sequencing_type}. Check your '
                         f'input provider to make sure there is only one data source '
@@ -181,20 +198,22 @@ def populate_alignment_inputs(cohort: Cohort, check_existence: bool = False) -> 
                 ] = seq.alignment_input
 
 
-def populate_analysis(cohort: Cohort) -> None:
+def _populate_analysis(cohort: Cohort) -> None:
     """
     Populate Analysis entries.
     """
     pass
 
 
-def populate_participants(cohort: Cohort) -> None:
+def _populate_participants(cohort: Cohort) -> None:
     """
     Populate Participant entries.
     """
     for dataset in cohort.get_datasets():
-        pid_sid_multi = metamist.papi.get_external_participant_id_to_internal_sample_id(
-            dataset.name
+        pid_sid_multi = (
+            get_metamist().papi.get_external_participant_id_to_internal_sample_id(
+                dataset.name
+            )
         )
         participant_by_sid = {}
         for group in pid_sid_multi:
@@ -207,7 +226,7 @@ def populate_participants(cohort: Cohort) -> None:
                 sample.participant_id = pid
 
 
-def populate_pedigree(cohort: Cohort) -> None:
+def _populate_pedigree(cohort: Cohort) -> None:
     """
     Populate pedigree data for samples.
     """
@@ -216,7 +235,7 @@ def populate_pedigree(cohort: Cohort) -> None:
         sample_by_participant_id[s.participant_id] = s
 
     for dataset in cohort.get_datasets():
-        ped_entries = metamist.get_ped_entries(dataset=dataset.name)
+        ped_entries = get_metamist().get_ped_entries(dataset=dataset.name)
         ped_entry_by_participant_id = {}
         for ped_entry in ped_entries:
             part_id = str(ped_entry['individual_id'])

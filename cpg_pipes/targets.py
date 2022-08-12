@@ -13,7 +13,7 @@ from cpg_utils.hail_batch import dataset_path, web_url
 from cpg_utils.config import get_config
 from cpg_utils import Path, to_path
 
-from cpg_pipes.types import (
+from cpg_pipes.filetypes import (
     AlignmentInput,
     CramPath,
     GvcfPath,
@@ -116,14 +116,10 @@ class Cohort(Target):
     cohort.
     """
 
-    def __init__(
-        self,
-        analysis_dataset_name: str,
-        name: str | None = None,
-    ):
+    def __init__(self):
         super().__init__()
-        self.name = name or analysis_dataset_name
-        self.analysis_dataset = Dataset(name=analysis_dataset_name, cohort=self)
+        self.name = get_config()['workflow']['dataset']
+        self.analysis_dataset = Dataset(name=self.name, cohort=self)
         self._datasets_by_name: dict[str, Dataset] = {}
 
     def __repr__(self):
@@ -551,7 +547,7 @@ class Sample(Target):
             'Phenotype': '0',
         }
 
-    def get_cram_path(self) -> CramPath:
+    def make_cram_path(self) -> CramPath:
         """
         Path to a CRAM file. Not checking its existence here.
         """
@@ -588,9 +584,9 @@ class Sample(Target):
             'dataset': self.dataset.name,
             'sample': self.id,
         }
-        _part_id: str | None = self._participant_id or self._external_id
-        if _part_id:
-            attrs['participant_id'] = _part_id
+        _participant_id: str | None = self._participant_id or self._external_id
+        if _participant_id:
+            attrs['participant_id'] = _participant_id
         return attrs
 
     def get_job_prefix(self) -> str:

@@ -28,13 +28,13 @@ class CramSomalier(SampleStage):
         """
         Expected to generate the fingerprints file
         """
-        return sample.get_cram_path().somalier_path
+        return sample.make_cram_path().somalier_path
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
         Using a function from the `jobs` module.
         """
-        cram_path = sample.get_cram_path()
+        cram_path = sample.make_cram_path()
         if get_config()['workflow'].get('check_inputs') and not cram_path.exists():
             if get_config()['workflow'].get('skip_samples_with_missing_input'):
                 logger.warning(f'No CRAM found, skipping sample {sample}')
@@ -63,13 +63,13 @@ class GvcfSomalier(SampleStage):
         """
         Expected to generate the fingerprints file
         """
-        return sample.get_gvcf_path().somalier_path
+        return sample.make_gvcf_path().somalier_path
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
         Using a function from the `jobs` module.
         """
-        gvcf_path = sample.get_gvcf_path()
+        gvcf_path = sample.make_gvcf_path()
         if get_config()['workflow'].get('check_inputs') and not gvcf_path.exists():
             if get_config()['workflow'].get('skip_samples_with_missing_input'):
                 logger.warning(f'No GVCF found, skipping sample {sample}')
@@ -98,13 +98,13 @@ class GvcfSomalier(SampleStage):
 #         """
 #         Expected to generate the fingerprints file
 #         """
-#         return sample.get_gvcf_path().somalier_path
+#         return sample.make_gvcf_path().somalier_path
 #
 #     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
 #         """
 #         Using a function from the `jobs` module.
 #         """
-#         gvcf_path = sample.get_gvcf_path()
+#         gvcf_path = sample.make_gvcf_path()
 #         if get_config()['workflow'].get('check_inputs') and not gvcf_path.exists():
 #             if get_config()['workflow'].get('skip_samples_with_missing_input'):
 #                 logger.warning(f'No GVCF found, skipping sample {sample}')
@@ -185,7 +185,7 @@ class CramSomalierPedigree(DatasetStage):
         else:
             html_url = None
 
-        if any(s.pedigree for s in self.get_samples()):
+        if any(s.pedigree for s in dataset.get_samples()):
             expected_ped_path = dataset.write_ped_file(
                 self.expected_outputs(dataset)['expected_ped']
             )

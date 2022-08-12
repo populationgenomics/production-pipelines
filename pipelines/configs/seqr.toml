@@ -34,7 +34,6 @@ skip_samples = [
 ]
 check_inputs = true
 keep_scratch = true
-sequencing_type = 'genome'
 dataset_gcp_project = 'seqr-308602'
 jc_intervals_num = 200
 vep_intervals_num = 200
@@ -47,7 +46,7 @@ bwamem = 'gs://cpg-reference/hg38/v0/Homo_sapiens_assembly38.fasta'
 
 [qc_thresholds.genome.min]
 "MEDIAN_COVERAGE" = 10
-"reads_properly_paired_percent" = 80
+"PCT_PF_READS_ALIGNED" = 80
 [qc_thresholds.genome.max]
 "FREEMIX" = 0.04
 "PERCENT_DUPLICATION" = 25

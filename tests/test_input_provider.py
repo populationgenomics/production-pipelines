@@ -10,7 +10,7 @@ from cpg_pipes import Namespace
 from cpg_pipes.providers.cpg.inputs import CpgInputProvider
 from cpg_pipes.providers.cpg.smdb import SMDB
 from cpg_pipes.targets import Cohort, Sex
-from cpg_pipes.providers.inputs import CsvInputProvider
+from cpg_pipes.inputs import CsvInputProvider
 
 
 class TestInputProvider(unittest.TestCase):

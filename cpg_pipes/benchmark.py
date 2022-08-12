@@ -1,8 +1,8 @@
 """
 Utilities and resources for running benchmarking
 """
-from . import to_path
-from .types import FastqPair, CramPath, FastqPairs
+from cpg_utils import to_path
+from cpg_pipes.filetypes import FastqPair, CramPath, FastqPairs
 
 BENCHMARK_BUCKET = to_path('gs://cpg-fewgenomes-test/benchmark')
 TOY_INPUTS_BUCKET = BENCHMARK_BUCKET / 'inputs/toy'

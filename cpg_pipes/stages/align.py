@@ -20,28 +20,58 @@ logger = logging.getLogger(__file__)
 
 
 @dataclasses.dataclass
+class QcOut:
+    """QC output file"""
+
+    suf: str
+    multiqc_key: str
+
+
+@dataclasses.dataclass
 class Qc:
-    """QC function definition and corresponding output extentions"""
+    """QC function definition, and corresponding outputs"""
 
     func: Optional[Callable]
-    out_ext_by_key: dict[str, str | None]
+    outs: dict[str, QcOut | None]
 
 
 def qc_functions() -> list[Qc]:
-    """QC functions and their outputs for a sequencing type"""
+    """
+    QC functions and their outputs for MultiQC aggregation
+    """
     qcs = [
-        Qc(None, {'markduplicates_metrics': '.markduplicates-metrics'}),
-        Qc(samtools_stats, {'samtools_stats': '.samtools-stats'}),
-        Qc(verifybamid, {'verify_bamid': '.verify-bamid.selfSM'}),
-        Qc(somalier.extact_job, {'somalier': None}),
         Qc(
-            picard_collect_metrics,
-            {
-                'alignment_summary_metrics': '.alignment_summary_metrics',
-                'base_distribution_by_cycle_metrics': '.base_distribution_by_cycle_metrics',
-                'insert_size_metrics': '.insert_size_metrics',
-                'quality_by_cycle_metrics': '.quality_by_cycle_metrics',
-                'quality_yield_metrics': '.quality_yield_metrics',
+            func=None,
+            outs={
+                'markduplicates_metrics': QcOut(
+                    '.markduplicates-metrics', 'picard/markdups'
+                )
+            },
+        ),
+        Qc(
+            func=verifybamid,
+            outs={'verify_bamid': QcOut('.verify-bamid.selfSM', 'verifybamid/selfsm')},
+        ),
+        Qc(func=somalier.extact_job, outs={'somalier': None}),
+        Qc(
+            func=picard_collect_metrics,
+            outs={
+                'alignment_summary_metrics': QcOut(
+                    '.alignment_summary_metrics', 'picard/alignment_metrics'
+                ),
+                'base_distribution_by_cycle_metrics': QcOut(
+                    '.base_distribution_by_cycle_metrics',
+                    'picard/basedistributionbycycle',
+                ),
+                'insert_size_metrics': QcOut(
+                    '.insert_size_metrics', 'picard/insertsize'
+                ),
+                'quality_by_cycle_metrics': QcOut(
+                    '.quality_by_cycle_metrics', 'picard/quality_by_cycle'
+                ),
+                'quality_yield_metrics': QcOut(
+                    '.quality_yield_metrics', 'picard/quality_yield_metrics'
+                ),
             },
         ),
     ]
@@ -49,7 +79,14 @@ def qc_functions() -> list[Qc]:
     sequencing_type = get_config()['workflow']['sequencing_type']
     if sequencing_type == 'genome':
         qcs.append(
-            Qc(picard_wgs_metrics, {'picard_wgs_metrics': '.picard-wgs-metrics'})
+            Qc(
+                func=picard_wgs_metrics,
+                outs={
+                    'picard_wgs_metrics': QcOut(
+                        '.picard-wgs-metrics', 'picard/wgs_metrics'
+                    )
+                },
+            )
         )
     return qcs
 
@@ -66,14 +103,16 @@ class Align(SampleStage):
         """
         qc_outs: dict[str, Path] = dict()
         for qc in qc_functions():
-            for key, suf in qc.out_ext_by_key.items():
+            for key, out in qc.outs.items():
                 if key == 'somalier':
-                    path = sample.get_cram_path().somalier_path
+                    path = sample.make_cram_path().somalier_path
                 else:
-                    path = sample.dataset.prefix() / 'qc' / key / f'{sample.id}{suf}'
+                    path = (
+                        sample.dataset.prefix() / 'qc' / key / f'{sample.id}{out.suf}'
+                    )
                 qc_outs[key] = path
         return {
-            'cram': sample.get_cram_path().path,
+            'cram': sample.make_cram_path().path,
         } | qc_outs
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
@@ -87,7 +126,7 @@ class Align(SampleStage):
             align_jobs = align.align(
                 b=self.b,
                 sample=sample,
-                output_path=sample.get_cram_path(),
+                output_path=sample.make_cram_path(),
                 out_markdup_metrics_path=self.expected_outputs(sample)[
                     'markduplicates_metrics'
                 ],
@@ -114,12 +153,12 @@ class Align(SampleStage):
         for qc in qc_functions():
             out_path_kwargs = {
                 f'out_{key}_path': self.expected_outputs(sample)[key]
-                for key in qc.out_ext_by_key.keys()
+                for key in qc.outs.keys()
             }
             if qc.func:
                 j = qc.func(  # type: ignore
                     self.b,
-                    sample.get_cram_path(),
+                    sample.make_cram_path(),
                     job_attrs=self.get_job_attrs(sample),
                     overwrite=not get_config()['workflow'].get('check_intermediates'),
                     **out_path_kwargs,

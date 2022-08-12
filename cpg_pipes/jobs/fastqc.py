@@ -9,7 +9,13 @@ from cpg_utils.hail_batch import image_path
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
-from cpg_pipes.types import AlignmentInput, CramPath, FastqPath, FastqPairs, FastqPair
+from cpg_pipes.filetypes import (
+    AlignmentInput,
+    CramPath,
+    FastqPath,
+    FastqPairs,
+    FastqPair,
+)
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
 

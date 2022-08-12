@@ -14,7 +14,7 @@ from hailtop.batch.job import Job
 
 from cpg_pipes import Path
 from cpg_pipes.targets import Sample
-from cpg_pipes.types import AlignmentInput, FastqPairs, CramPath
+from cpg_pipes.filetypes import AlignmentInput, FastqPairs, CramPath
 from cpg_pipes.jobs import picard
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD

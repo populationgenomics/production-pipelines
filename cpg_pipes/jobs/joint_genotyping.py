@@ -19,7 +19,7 @@ from cpg_pipes.hb.resources import STANDARD
 from cpg_pipes.jobs.picard import get_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.targets import Sample
-from cpg_pipes.types import GvcfPath
+from cpg_pipes.filetypes import GvcfPath
 
 logger = logging.getLogger(__file__)
 

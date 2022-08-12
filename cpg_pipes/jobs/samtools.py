@@ -9,7 +9,7 @@ from hailtop.batch.job import Job
 from cpg_pipes import Path
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.types import CramPath
+from cpg_pipes.filetypes import CramPath
 from cpg_pipes.utils import can_reuse
 
 logger = logging.getLogger(__file__)

@@ -7,6 +7,7 @@ import pprint
 import traceback
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 
 from cpg_utils.config import get_config
 
@@ -22,7 +23,7 @@ from sample_metadata.exceptions import ApiException
 
 from cpg_pipes import Path, to_path
 from cpg_pipes import utils
-from cpg_pipes.types import FastqPair, CramPath, AlignmentInput, FastqPairs
+from cpg_pipes.filetypes import FastqPair, CramPath, AlignmentInput, FastqPairs
 
 logger = logging.getLogger(__file__)
 
@@ -31,6 +32,17 @@ class MetamistError(Exception):
     """
     Raised for problems interacting with metamist.
     """
+
+
+_metamist: Optional['Metamist'] = None
+
+
+def get_metamist() -> 'Metamist':
+    """Return the cohort object, which is a signleton"""
+    global _metamist
+    if not _metamist:
+        _metamist = Metamist()
+    return _metamist
 
 
 class AnalysisStatus(Enum):
@@ -544,6 +556,3 @@ class MmSequence:
                 )
 
             return fastq_pairs
-
-
-metamist: Metamist = Metamist()

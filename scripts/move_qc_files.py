@@ -7,7 +7,7 @@ from cloudpathlib.exceptions import OverwriteNewerCloudError
 from cpg_utils import to_path
 from cpg_utils.config import get_config
 
-from cpg_pipes.providers.inputs import populate_cohort
+from cpg_pipes.inputs import populate_cohort
 from cpg_pipes.targets import Cohort
 
 access_level = get_config()['workflow']['access_level']
@@ -35,7 +35,7 @@ if REMOVE_METRICS:
 if MOVE_DUPLICATE_METRICS:
     for i, sample in enumerate(cohort.get_samples()):
         current_path = (
-            sample.get_cram_path().path.parent
+            sample.make_cram_path().path.parent
             / 'duplicate-metrics'
             / f'{sample.id}-duplicate-metrics.csv'
         )

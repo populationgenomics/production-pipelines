@@ -24,12 +24,12 @@ from cpg_utils.config import get_config
 from cpg_utils import Path, to_path
 
 from cpg_pipes.hb.batch import setup_batch, RegisteringBatch
-from cpg_pipes.providers.status import MetamistStatusReporter
+from cpg_pipes.status import MetamistStatusReporter
 from cpg_pipes.targets import Target, Dataset, Sample, Cohort
-from cpg_pipes.providers.status import StatusReporter
+from cpg_pipes.status import StatusReporter
 from cpg_pipes.utils import exists, timestamp, slugify
+from cpg_pipes.inputs import get_cohort
 from .exceptions import PipelineError, StageInputNotFound
-from ..providers.inputs import populate_cohort
 
 logger = logging.getLogger(__file__)
 
@@ -628,20 +628,18 @@ class Stage(Generic[TargetT], ABC):
             return True, None
 
         if get_config()['workflow'].get('check_expected_outputs'):
-            if not expected_out:
-                return True, None
-
+            paths = []
             if isinstance(expected_out, Path):
-                if exists(expected_out):
-                    return True, None
-                else:
-                    return False, expected_out
-
-            assert isinstance(expected_out, dict)
-
-            for _, v in expected_out.items():
-                if isinstance(v, Path) and not exists(v):
-                    return False, v
+                paths.append(expected_out)
+            if isinstance(expected_out, dict):
+                for _, v in expected_out.items():
+                    if isinstance(v, Path):
+                        paths.append(v)
+            first_missing_path = next((p for p in paths if not exists(p)), None)
+            if not paths:
+                return False, None
+            if first_missing_path:
+                return False, first_missing_path
             return True, None
         else:
             if self.skipped:
@@ -792,12 +790,7 @@ class Pipeline:
         description = description or name
         description += f': run_id={self.run_id}'
 
-        self.cohort = Cohort(
-            analysis_dataset_name=analysis_dataset,
-            name=self.name,
-        )
-        populate_cohort(cohort=self.cohort)
-
+        self.cohort = get_cohort()
         self.tmp_prefix = self.cohort.analysis_dataset.tmp_prefix() / self.run_id
         description += f' [{get_config()["workflow"]["sequencing_type"]}]'
         if ds_set := set(d.name for d in self.cohort.get_datasets()):

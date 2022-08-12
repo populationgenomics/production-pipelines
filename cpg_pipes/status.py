@@ -12,7 +12,7 @@ from hailtop.batch import Batch, Resource
 
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.targets import Target, Sample
-from .metamist import metamist, MetamistError, AnalysisStatus
+from .metamist import get_metamist, MetamistError, AnalysisStatus
 
 
 class StatusReporterError(Exception):
@@ -128,7 +128,7 @@ class MetamistStatusReporter(StatusReporter):
         project_name: str = None,
     ) -> int | None:
         """Record analysis entry"""
-        return metamist.create_analysis(
+        return get_metamist().create_analysis(
             output=output,
             type_=analysis_type,
             status=analysis_status,

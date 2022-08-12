@@ -11,7 +11,7 @@ from hailtop.batch.job import Job
 
 from cpg_pipes import Path
 from cpg_pipes.jobs.picard import get_intervals
-from cpg_pipes.types import CramPath, GvcfPath
+from cpg_pipes.filetypes import CramPath, GvcfPath
 from cpg_pipes import utils
 from cpg_pipes.hb.command import wrap_command
 from cpg_pipes.hb.resources import STANDARD, HIGHMEM

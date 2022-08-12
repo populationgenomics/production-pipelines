@@ -185,7 +185,7 @@ The `cpg_pipes.jobs` module defines functions that create Hail Batch Jobs for di
 from cpg_pipes.pipeline import stage, SampleStage, CohortStage, StageInput, StageOutput
 from cpg_pipes.targets import Sample, Cohort
 from cpg_pipes.jobs import haplotype_caller, joint_genotyping
-from cpg_pipes.types import CramPath, GvcfPath
+from cpg_pipes.filetypes import CramPath, GvcfPath
 
 
 @stage

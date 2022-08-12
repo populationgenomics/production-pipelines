@@ -7,12 +7,12 @@ import logging
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
 
-from ..jobs.happy import happy
-from ..jobs.picard import vcf_qc
-from ..types import GvcfPath
-from ..jobs import joint_genotyping
-from ..targets import Cohort, Sample
-from ..pipeline import (
+from cpg_pipes.jobs.happy import happy
+from cpg_pipes.jobs.picard import vcf_qc
+from cpg_pipes.filetypes import GvcfPath
+from cpg_pipes.jobs import joint_genotyping
+from cpg_pipes.targets import Cohort, Sample
+from cpg_pipes.pipeline import (
     stage,
     CohortStage,
     StageInput,

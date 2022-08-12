@@ -12,7 +12,7 @@ from cpg_utils.hail_batch import Namespace
 
 from cpg_pipes.providers.cpg.inputs import CpgInputProvider
 from cpg_pipes.providers.cpg.smdb import SMDB
-from cpg_pipes.providers.status import MetamistStatusReporter
+from cpg_pipes.status import MetamistStatusReporter
 from cpg_pipes.targets import Cohort
 from cpg_pipes.utils import exists
 
@@ -53,7 +53,7 @@ if POPULATE_SAMPLES:
     apaths = set(a['output'] for a in analyses)
 
     for i, sample in enumerate(cohort.get_samples()):
-        if path := sample.get_cram_path().path:
+        if path := sample.make_cram_path().path:
             if str(path) in apaths:
                 continue
 
@@ -73,7 +73,7 @@ if POPULATE_SAMPLES:
                 ),
                 project_name=sample.dataset.name,
             )
-        if (path := sample.get_gvcf_path().path).exists():
+        if (path := sample.make_gvcf_path().path).exists():
             print(f'#{i+1} {sample} {path}')
             if str(path) in apaths:
                 continue

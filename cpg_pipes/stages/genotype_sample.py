@@ -7,6 +7,7 @@ import hailtop.batch as hb
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
 
+from ..filetypes import GvcfPath
 from ..jobs import haplotype_caller
 from ..jobs.happy import happy
 from ..jobs.picard import vcf_qc, get_intervals
@@ -32,7 +33,7 @@ class GenotypeSample(SampleStage):
         """
         qc_prefix = sample.dataset.prefix() / 'qc' / sample.id
         return {
-            'gvcf': sample.get_gvcf_path().path,
+            'gvcf': sample.make_gvcf_path().path,
             'qc_summary': to_path(f'{qc_prefix}.variant_calling_summary_metrics'),
             'qc_detail': to_path(f'{qc_prefix}.variant_calling_detail_metrics'),
         }
@@ -61,7 +62,7 @@ class GenotypeSample(SampleStage):
             b=self.b,
             output_path=gvcf_path,
             sample_name=sample.id,
-            cram_path=sample.get_cram_path(),
+            cram_path=sample.make_cram_path(),
             intervals=GenotypeSample.hc_intervals,
             tmp_prefix=self.tmp_prefix / sample.id,
             overwrite=not get_config()['workflow'].get('check_intermediates'),
@@ -70,11 +71,11 @@ class GenotypeSample(SampleStage):
         jobs.extend(gvcf_jobs)
         qc_j = vcf_qc(
             b=self.b,
-            vcf_or_gvcf=gvcf_path.resource_group(self.b),
+            vcf_or_gvcf=GvcfPath(gvcf_path).resource_group(self.b),
             is_gvcf=True,
             job_attrs=self.get_job_attrs(sample),
-            output_summary_path=self.expected_outputs(sample)['summary'],
-            output_detail_path=self.expected_outputs(sample)['detail'],
+            output_summary_path=self.expected_outputs(sample)['qc_summary'],
+            output_detail_path=self.expected_outputs(sample)['qc_detail'],
             overwrite=not get_config()['workflow'].get('check_intermediates'),
         )
         if qc_j:
@@ -100,7 +101,7 @@ class GvcfHappy(SampleStage):
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """Queue jobs"""
-        gvcf_path = sample.get_gvcf_path()
+        gvcf_path = sample.make_gvcf_path()
         if get_config()['workflow'].get('check_inputs') and not gvcf_path.exists():
             if get_config()['workflow'].get('skip_samples_with_missing_input'):
                 logger.warning(f'No GVCF found, skipping sample {sample}')
@@ -111,7 +112,7 @@ class GvcfHappy(SampleStage):
         jobs = happy(
             b=self.b,
             sample=sample,
-            vcf_or_gvcf=sample.get_gvcf_path().resource_group(self.b),
+            vcf_or_gvcf=sample.make_gvcf_path().resource_group(self.b),
             is_gvcf=True,
             job_attrs=self.get_job_attrs(sample),
             output_path=self.expected_outputs(sample),

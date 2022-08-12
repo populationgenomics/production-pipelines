@@ -121,6 +121,8 @@ class RegisteringBatch(hb.Batch):
         """
         if not self._jobs:
             logger.error('No jobs to submit')
+            return
+
         else:
             for job in self._jobs:
                 job.name, job.attributes = self._process_attributes(

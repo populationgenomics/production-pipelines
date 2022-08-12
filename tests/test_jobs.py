@@ -27,7 +27,7 @@ from cpg_pipes.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jo
 from cpg_pipes.jobs.somalier import check_pedigree_job
 from cpg_pipes.jobs.vqsr import make_vqsr_jobs
 from cpg_pipes.targets import Dataset
-from cpg_pipes.types import CramPath
+from cpg_pipes.filetypes import CramPath
 from cpg_pipes.utils import timestamp
 
 try:

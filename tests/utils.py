@@ -6,7 +6,7 @@ from cpg_utils import Path
 from cpg_utils.config import set_config_paths, update_dict
 
 from cpg_pipes import to_path, Namespace
-from cpg_pipes.types import GvcfPath, FastqPair
+from cpg_pipes.filetypes import GvcfPath, FastqPair
 
 DATASET = 'fewgenomes'
 ACCESS_LEVEL = 'test'
