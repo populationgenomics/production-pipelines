@@ -85,7 +85,9 @@ class TestPipeline(unittest.TestCase):
         job commands passed to it.
         """
         self.setup_env(extra_conf={'hail': {'dry_run': True}})
-        set_config_paths(['pipelines/configs/seqr.toml'])
+        set_config_paths(
+            ['pipelines/configs/seqr.toml', 'pipelines/configs/validation-dry.toml']
+        )
         pipeline = self._setup_pipeline(stages=[seqr_loader.LoadToEs])
 
         with patch('builtins.print') as mock_print:
@@ -100,46 +102,6 @@ class TestPipeline(unittest.TestCase):
             out = mock_print.call_args_list[0][0][0]
 
         sys.stdout.write(out)
-        lines = out.split('\n')
-
-        def _cnt(item: str) -> int:
-            """Number of lines that start with item"""
-            return len([line for line in lines if line.strip().startswith(item)])
-
-        self.assertEqual(
-            _cnt('dragen-os'),
-            len(self.sample_ids) * get_config()['workflow']['realignment_shards_num'],
-        )
-        self.assertEqual(
-            _cnt('HaplotypeCaller'),
-            len(self.sample_ids) * get_config()['workflow']['hc_intervals_num'],
-        )
-        self.assertEqual(_cnt('ReblockGVCF'), len(self.sample_ids))
-        self.assertEqual(
-            _cnt('GenotypeGVCFs'), get_config()['workflow']['jc_intervals_num']
-        )
-        self.assertEqual(
-            _cnt('GenomicsDBImport'), get_config()['workflow']['jc_intervals_num']
-        )
-        self.assertEqual(
-            _cnt('MakeSitesOnlyVcf'), get_config()['workflow']['jc_intervals_num']
-        )
-        # Indel + SNP create model + SNP scattered
-        self.assertEqual(
-            _cnt('VariantRecalibrator'),
-            2 + get_config()['workflow']['jc_intervals_num'],
-        )
-        # Twice to each interva: apply indels, apply SNPs
-        self.assertEqual(
-            _cnt('ApplyVQSR'), 2 * get_config()['workflow']['jc_intervals_num']
-        )
-        # Gather JC, gather siteonly JC, gather VQSR
-        self.assertEqual(_cnt('GatherVcfsCloud'), 3)
-        self.assertEqual(_cnt('vep '), get_config()['workflow']['vep_intervals_num'])
-        self.assertEqual(_cnt('vep_json_to_ht('), 1)
-        self.assertEqual(_cnt('annotate_cohort('), 1)
-        self.assertEqual(_cnt('annotate_dataset_mt('), len(self.datasets))
-        self.assertEqual(_cnt('hailctl dataproc submit'), 1)
 
     @skip('Running only dry tests in ths module')
     def test_joint_calling(self):

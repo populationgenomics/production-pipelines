@@ -250,7 +250,6 @@ def picard_collect_metrics(
     j = b.new_job('Picard CollectMultipleMetrics', job_attrs)
     j.image(image_path('picard'))
     sequencing_type = get_config()['workflow']['sequencing_type']
-    assert sequencing_type == 'exome'
     res = STANDARD.request_resources(mem_gb=7)
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)

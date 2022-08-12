@@ -68,7 +68,7 @@ class TestJobs(unittest.TestCase):
         utils.setup_env(self.tmp_bucket)
 
         self.batch = setup_batch(self.name)
-        self.dataset = Dataset(utils.DATASET, namespace=utils.Namespace)
+        self.dataset = Dataset(utils.DATASET)
         sample_name = f'Test-{self.timestamp}'
         self.sample = self.dataset.add_sample(sample_name, sample_name)
 
@@ -261,7 +261,7 @@ class TestJobs(unittest.TestCase):
             str(out_vcf_path).replace('.vcf.gz', '-siteonly.vcf.gz')
         )
 
-        ds = Dataset(utils.DATASET, utils.Namespace)
+        ds = Dataset(utils.DATASET)
         for sid in utils.SAMPLES:
             ds.add_sample(sid, sid)
 

@@ -51,7 +51,9 @@ class JointGenotyping(CohortStage):
         Submit jobs.
         """
         gvcf_by_sid = {
-            sample.id: GvcfPath(inputs.as_path(target=sample, stage=GenotypeSample))
+            sample.id: GvcfPath(
+                inputs.as_path(target=sample, stage=GenotypeSample, id='gvcf')
+            )
             for sample in cohort.get_samples()
         }
 
@@ -92,8 +94,8 @@ class JointGenotyping(CohortStage):
             b=self.b,
             vcf_or_gvcf=self.b.read_input_group(
                 **{
-                    'vcf': str(vcf_path),
-                    'vcf.tbi': str(vcf_path) + '.tbi',
+                    'vcf.gz': str(vcf_path),
+                    'vcf.gz.tbi': str(vcf_path) + '.tbi',
                 }
             ),
             is_gvcf=False,

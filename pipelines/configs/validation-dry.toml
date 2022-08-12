@@ -1,0 +1,11 @@
+[workflow]
+access_level = 'test'
+datasets = ['validation']
+only_samples = ['CPG243725', 'CPG255190']
+
+check_inputs = false
+jc_intervals_num = 2
+vep_intervals_num = 2
+check_intermediates = false
+check_expected_outputs = false
+dry_run = true
