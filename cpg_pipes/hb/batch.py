@@ -4,7 +4,6 @@ Extending the Hail's `Batch` class.
 
 import logging
 import os
-from typing import TypedDict
 
 import hailtop.batch as hb
 from cloudpathlib import CloudPath

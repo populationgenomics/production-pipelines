@@ -10,13 +10,13 @@ from unittest.mock import patch, Mock
 
 from cpg_utils.config import get_config, set_config_paths, update_dict
 
-from cpg_pipes import to_path, get_package_path
+from cpg_pipes import to_path
+from cpg_pipes.filetypes import CramPath
 from cpg_pipes.pipeline.pipeline import Pipeline, Stage, StageDecorator
+from cpg_pipes.stages import seqr_loader
 from cpg_pipes.stages.genotype_sample import GenotypeSample
 from cpg_pipes.stages.joint_genotyping import JointGenotyping
 from cpg_pipes.stages.vqsr import Vqsr
-from cpg_pipes.filetypes import CramPath
-from cpg_pipes.stages import seqr_loader
 from cpg_pipes.utils import timestamp
 
 try:
@@ -40,8 +40,6 @@ class TestPipeline(unittest.TestCase):
         self.tmp_bucket = self.out_bucket / 'tmp'
         self.local_tmp_dir = tempfile.mkdtemp()
         self.sample_ids = utils.SAMPLES[:3]
-
-        self.config_path = self.tmp_bucket / 'config.toml'
 
     def setup_env(
         self,
@@ -87,10 +85,11 @@ class TestPipeline(unittest.TestCase):
         job commands passed to it.
         """
         self.setup_env(extra_conf={'hail': {'dry_run': True}})
+        set_config_paths(['pipelines/configs/seqr.toml'])
         pipeline = self._setup_pipeline(stages=[seqr_loader.LoadToEs])
 
         with patch('builtins.print') as mock_print:
-            with patch.object(Stage, '_find_reusable_outputs') as mock_reusable:
+            with patch.object(Stage, '_is_reusable') as mock_reusable:
                 mock_reusable.return_value = [], []
                 pipeline.run(force_all_implicit_stages=True)
 
