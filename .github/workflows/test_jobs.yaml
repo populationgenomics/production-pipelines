@@ -1,5 +1,4 @@
 name: Test individual jobs
-# TODO: re-enamble for push when https://github.com/hail-is/hail/pull/11747 is merged
 on: [workflow_dispatch]
 jobs:
   test_jobs:

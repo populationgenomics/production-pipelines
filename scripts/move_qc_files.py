@@ -5,16 +5,11 @@ populated automatically with `workflow/status_provider="metamist"` set in config
 """
 from cloudpathlib.exceptions import OverwriteNewerCloudError
 from cpg_utils import to_path
-from cpg_utils.config import get_config
 
-from cpg_pipes.inputs import populate_cohort
-from cpg_pipes.targets import Cohort
+from cpg_pipes.inputs import get_cohort
 
-access_level = get_config()['workflow']['access_level']
-cohort = Cohort(
-    analysis_dataset_name=get_config()['workflow']['dataset'],
-)
-populate_cohort(cohort)
+
+cohort = get_cohort()
 
 MOVE_DUPLICATE_METRICS = True
 MOVE_CRAM_QC = False

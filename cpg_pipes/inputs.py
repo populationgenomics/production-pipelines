@@ -112,7 +112,7 @@ def _filter_samples(
     dataset_name: str,
     skip_samples: list[str] | None = None,
     only_samples: list[str] | None = None,
-) -> list[dict[str, str | dict]]:
+) -> list[dict]:
     """
     Apply the only_samples and skip_samples filters.
     """

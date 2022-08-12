@@ -105,12 +105,11 @@ class Align(SampleStage):
         for qc in qc_functions():
             for key, out in qc.outs.items():
                 if key == 'somalier':
-                    path = sample.make_cram_path().somalier_path
-                else:
-                    path = (
+                    qc_outs[key] = sample.make_cram_path().somalier_path
+                elif out:
+                    qc_outs[key] = (
                         sample.dataset.prefix() / 'qc' / key / f'{sample.id}{out.suf}'
                     )
-                qc_outs[key] = path
         return {
             'cram': sample.make_cram_path().path,
         } | qc_outs

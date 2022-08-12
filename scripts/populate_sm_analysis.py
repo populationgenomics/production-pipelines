@@ -8,31 +8,15 @@ from collections import defaultdict
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import Namespace
 
-from cpg_pipes.providers.cpg.inputs import CpgInputProvider
-from cpg_pipes.providers.cpg.smdb import SMDB
+from cpg_pipes.inputs import get_cohort
 from cpg_pipes.status import MetamistStatusReporter
-from cpg_pipes.targets import Cohort
 from cpg_pipes.utils import exists
 
 sequencing_type = get_config()['workflow']['sequencing_type']
 access_level = get_config()['workflow']['access_level']
-cohort = Cohort(
-    analysis_dataset_name=get_config()['workflow']['dataset'],
-    namespace=Namespace.from_access_level(access_level),
-)
-smdb = SMDB(cohort.analysis_dataset.name)
-input_provider = CpgInputProvider(smdb)
-input_provider.populate_cohort(
-    cohort=cohort,
-    dataset_names=get_config()['workflow'].get('datasets'),
-    skip_samples=get_config()['workflow'].get('skip_samples'),
-    only_samples=get_config()['workflow'].get('only_samples'),
-    skip_datasets=get_config()['workflow'].get('skip_datasets'),
-)
-
-status = MetamistStatusReporter(smdb)
+cohort = get_cohort()
+status = MetamistStatusReporter()
 
 POPULATE_SAMPLES = True
 POPULATE_QC = False
