@@ -1,6 +1,7 @@
 [workflow]
 access_level = 'full'
 dataset = 'seqr'
+create_es_index_for_datasets = ['validation']
 datasets = [
     'acute-care',
     'perth-neuro',

@@ -166,8 +166,12 @@ def setup_batch(description: str) -> RegisteringBatch:
     """
     billing_project = get_config()['hail']['billing_project']
     dataset = get_config()['workflow']['dataset']
+    access_level = get_config()['workflow']['access_level']
     pool_label = get_config()['hail'].get('pool_label')
+
     bucket = remote_tmpdir(f'cpg-{dataset}-hail')
+    if access_level == 'test':
+        bucket = remote_tmpdir(f'cpg-{dataset}-hail/test')
 
     logger.info(
         f'Starting Hail Batch with the project {billing_project}'
