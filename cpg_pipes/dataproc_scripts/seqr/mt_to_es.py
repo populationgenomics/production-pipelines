@@ -234,13 +234,13 @@ class HailElasticsearchClient:
         self._es_password = es_password
         self._es_use_ssl = es_use_ssl
 
-        http_auth = (
-            (self._es_username, self._es_password) if self._es_password else None
-        )
+        auth = (self._es_username, self._es_password) if self._es_password else None
 
-        self.es = elasticsearch.Elasticsearch(
-            host, port=port, http_auth=http_auth, use_ssl=es_use_ssl
-        )
+        if not host.startswith('http://') or not host.startswith('https://'):
+            scheme = 'https' if es_use_ssl else 'http'
+            host = f'{scheme}://{host}'
+        _host = f'{host}:{port}'
+        self.es = elasticsearch.Elasticsearch(_host, basic_auth=auth)
 
         # check connection
         logger.info(pformat(self.es.info()))
