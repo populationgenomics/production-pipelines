@@ -38,7 +38,7 @@ setuptools.setup(
         'coloredlogs',
         'types-PyYAML',  # https://mypy.readthedocs.io/en/stable/getting_started.html#library-stubs-and-typeshed
         'slack_sdk',
-        'elasticsearch==7.9.1',
+        'elasticsearch==8.*',
     ],
     keywords='bioinformatics',
     classifiers=[
