@@ -3,12 +3,12 @@ Jobs specific for seqr-loader.
 """
 import logging
 
-from cpg_utils.hail_batch import image_path, genome_build, reference_path
+from cpg_utils.hail_batch import image_path, genome_build
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
-from cpg_pipes import Path, to_path
-from cpg_pipes.hb.command import wrap_command, python_command
+from cpg_pipes import Path
+from cpg_pipes.hb.command import python_command
 from cpg_pipes.query import seqr_loader
 
 logger = logging.getLogger(__file__)
@@ -99,35 +99,3 @@ def annotate_dataset_jobs(
     )
     annotate_j.depends_on(subset_j)
     return [subset_j, annotate_j]
-
-
-def load_to_es(
-    b: Batch,
-    mt_path: Path,
-    es_index: str,
-    job_attrs: dict | None = None,
-) -> Job:
-    """
-    Create a Seqr index for an annotated matrix table.
-    """
-    # Make a list of dataset samples to subset from the entire matrix table
-    j = b.new_job(f'create ES index', (job_attrs or {}) | {'tool': 'hail query'})
-    j.image(image_path('hail'))
-    cmd = f"""\
-    pip3 install click cpg_utils hail seqr_loader elasticsearch
-    python3 mt_to_es.py \\
-    --mt-path {mt_path} \\
-    --es-index {es_index} \\
-    --liftover-path {reference_path('liftover_38_to_37')}
-    """
-    j.command(
-        wrap_command(
-            cmd,
-            python_script_path=to_path(__file__).parent.parent
-            / 'dataproc_scripts'
-            / 'seqr'
-            / 'mt_to_es.py',
-            setup_gcp=True,
-        )
-    )
-    return j

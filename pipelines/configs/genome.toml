@@ -4,5 +4,3 @@ sequencing_type = 'genome'
 
 [workflow.resources.Align]
 storage_gb = 500
-
-datasets = ['validation']
