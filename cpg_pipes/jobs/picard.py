@@ -37,11 +37,31 @@ def get_intervals(
     that, but Hail Batch is not dynamic and have to expect certain number of output
     files.
     """
-    if scatter_count <= 1:
-        return None, [None] * scatter_count
+    assert scatter_count > 0
+
+    sequencing_type = get_config()['workflow']['sequencing_type']
+
+    if not intervals_path:
+        # Did we cache split intervals for this sequencing_type?
+        cache_bucket = (
+            reference_path('intervals_prefix')
+            / sequencing_type
+            / f'{scatter_count}intervals'
+        )
+        if exists(cache_bucket / '1.interval_list'):
+            return None, [
+                b.read_input(str(cache_bucket / f'{idx + 1}.interval_list'))
+                for idx in range(scatter_count)
+            ]
+        # Taking intervals file for the sequencing_type.
+        intervals_path = reference_path(
+            f'broad/{sequencing_type}_calling_interval_lists',
+        )
+
+    if scatter_count == 1:
+        return None, [b.read_input(str(intervals_path))]
 
     job_attrs = (job_attrs or {}) | dict(tool='picard_IntervalListTools')
-    sequencing_type = get_config()['workflow']['sequencing_type']
     job_name = f'Make {scatter_count} intervals for {sequencing_type}'
 
     if output_prefix and exists(output_prefix / '1.interval_list'):
@@ -52,25 +72,6 @@ def get_intervals(
         ]
 
     j = b.new_job(job_name, job_attrs)
-
-    if not intervals_path:
-        # Did we cache split intervals for this sequencing_type?
-        cache_bucket = (
-            reference_path('intervals_prefix')
-            / sequencing_type
-            / f'{scatter_count}intervals'
-        )
-        if exists(cache_bucket / '1.interval_list'):
-            j.name += ' [use cached]'
-            return j, [
-                b.read_input(str(cache_bucket / f'{idx + 1}.interval_list'))
-                for idx in range(scatter_count)
-            ]
-        # Taking intervals file for the sequencing_type.
-        intervals_path = reference_path(
-            f'broad/{sequencing_type}_calling_interval_lists',
-        )
-
     j.image(image_path('picard'))
     STANDARD.set_resources(j, storage_gb=16, mem_gb=2)
 
@@ -249,7 +250,6 @@ def picard_collect_metrics(
     job_attrs = (job_attrs or {}) | {'tool': 'picard'}
     j = b.new_job('Picard CollectMultipleMetrics', job_attrs)
     j.image(image_path('picard'))
-    sequencing_type = get_config()['workflow']['sequencing_type']
     res = STANDARD.request_resources(mem_gb=7)
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
