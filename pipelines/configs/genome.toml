@@ -1,6 +1,7 @@
 [workflow]
 first_stage = 'LoadToEs'
 sequencing_type = 'genome'
+create_es_index_for_datasets = ['acute-care']
 
 [workflow.resources.Align]
 storage_gb = 500

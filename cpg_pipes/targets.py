@@ -19,6 +19,7 @@ from cpg_pipes.filetypes import (
     GvcfPath,
     FastqPairs,
 )
+from cpg_pipes.metamist import MmSequence
 
 logger = logging.getLogger(__file__)
 
@@ -209,6 +210,7 @@ class Cohort(Target):
         """
         Export to a parsable TSV file
         """
+        assert self.get_samples()
         tsv_path = self.analysis_dataset.tmp_prefix() / 'samples.tsv'
         df = pd.DataFrame(
             {
@@ -442,6 +444,7 @@ class Sample(Target):
         sex: Sex | None = None,
         pedigree: Optional['PedigreeInfo'] = None,
         alignment_input_by_seq_type: dict[str, AlignmentInput] | None = None,
+        seq_by_type: dict[str, MmSequence] | None = None,
         forced: bool = False,
     ):
         super().__init__()
@@ -460,6 +463,7 @@ class Sample(Target):
         self.alignment_input_by_seq_type: dict[str, AlignmentInput] = (
             alignment_input_by_seq_type or dict()
         )
+        self.seq_by_type: dict[str, MmSequence] = seq_by_type or dict()
         self.forced = forced
         self.active = True
         # Only set if the file exists / found in Metamist:

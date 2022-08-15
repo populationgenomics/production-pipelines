@@ -10,7 +10,8 @@ from itertools import groupby
 from cpg_utils.config import get_config
 from sample_metadata import ApiException
 
-from cpg_pipes.metamist import get_metamist, MmSequence
+from cpg_pipes.filetypes import GvcfPath, CramPath
+from cpg_pipes.metamist import get_metamist, MmSequence, AnalysisType
 from cpg_pipes.targets import Cohort, Sex, PedigreeInfo
 
 logger = logging.getLogger(__file__)
@@ -88,23 +89,24 @@ def _filter_sequencing_type(cohort: Cohort):
     """
     sequencing_type = get_config()['workflow']['sequencing_type']
     for s in cohort.get_samples():
-        if not s.alignment_input_by_seq_type:
+        if not s.seq_by_type:
             logger.warning(f'{s}: skipping because no sequencing inputs found')
             s.active = False
             continue
 
-        avail_types = list(s.alignment_input_by_seq_type.keys())
-        s.alignment_input_by_seq_type = {
-            k: v
-            for k, v in s.alignment_input_by_seq_type.items()
-            if k == sequencing_type
-        }
-        if not bool(s.alignment_input_by_seq_type):
-            logger.warning(
-                f'{s}: skipping because no inputs with data type '
-                f'"{sequencing_type}" found in {avail_types}'
-            )
-            s.active = False
+        if s.alignment_input_by_seq_type:
+            avail_types = list(s.seq_by_type.keys())
+            s.alignment_input_by_seq_type = {
+                k: v
+                for k, v in s.alignment_input_by_seq_type.items()
+                if k == sequencing_type
+            }
+            if not bool(s.alignment_input_by_seq_type):
+                logger.warning(
+                    f'{s}: skipping because no inputs with data type '
+                    f'"{sequencing_type}" found in {avail_types}'
+                )
+                s.active = False
 
 
 def _filter_samples(
@@ -185,6 +187,7 @@ def _populate_alignment_inputs(
     for sample in cohort.get_samples():
         for d in found_seqs_by_sid.get(sample.id, []):
             seq = MmSequence.parse(d, check_existence=check_existence)
+            sample.seq_by_type[seq.sequencing_type] = seq
             if seq.alignment_input:
                 if seq.sequencing_type in sample.alignment_input_by_seq_type:
                     raise InputError(
@@ -202,7 +205,24 @@ def _populate_analysis(cohort: Cohort) -> None:
     """
     Populate Analysis entries.
     """
-    pass
+    for dataset in cohort.get_datasets():
+        gvcf_by_sid = get_metamist().find_analyses_by_sid(
+            dataset.get_sample_ids(),
+            analysis_type=AnalysisType.GVCF,
+            dataset=dataset.name,
+        )
+        cram_by_sid = get_metamist().find_analyses_by_sid(
+            dataset.get_sample_ids(),
+            analysis_type=AnalysisType.CRAM,
+            dataset=dataset.name,
+        )
+        for sample in dataset.get_samples():
+            if an := gvcf_by_sid.get(sample.id):
+                if an.output:
+                    sample.gvcf = GvcfPath(an.output)
+            if an := cram_by_sid.get(sample.id):
+                if an.output:
+                    sample.cram = CramPath(an.output)
 
 
 def _populate_participants(cohort: Cohort) -> None:
