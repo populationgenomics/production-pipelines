@@ -169,11 +169,13 @@ class LoadToEs(DatasetStage):
             f'--use-spark ',  # es export doesn't work with the service backend
             max_age='24h',
             packages=utils.DATAPROC_PACKAGES,
-            num_secondary_workers=2,
+            num_workers=2,
+            num_secondary_workers=0,
             job_name=f'{dataset.name}: create ES index',
             depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
         )
+        j._preemptible = False
         j.attributes = self.get_job_attrs(dataset) | {'tool': 'hail dataproc'}
         jobs = [j]
         return self.make_outputs(dataset, data=index_name, jobs=jobs)
