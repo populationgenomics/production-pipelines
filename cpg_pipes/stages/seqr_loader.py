@@ -169,7 +169,7 @@ class LoadToEs(DatasetStage):
             f'--use-spark ',  # es export doesn't work with the service backend
             max_age='24h',
             packages=utils.DATAPROC_PACKAGES,
-            num_secondary_workers=4,
+            num_secondary_workers=2,
             job_name=f'{dataset.name}: create ES index',
             depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
