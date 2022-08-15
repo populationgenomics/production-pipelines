@@ -36,6 +36,7 @@ check_inputs = true
 keep_scratch = true
 dataset_gcp_project = 'seqr-308602'
 jc_intervals_num = 200
+vqsr_intervals_num = 200
 vep_intervals_num = 200
 check_intermediates = true
 check_expected_outputs = true

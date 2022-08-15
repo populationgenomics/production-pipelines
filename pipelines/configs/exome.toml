@@ -1,7 +1,8 @@
 [workflow]
 sequencing_type = 'exome'
 hc_intervals_num = 1
-jc_intervals_num = 1
+jc_intervals_num = 50
+vqsr_intervals_num = 1
 vep_intervals_num = 100
 
 first_stage = 'JointGenotyping'

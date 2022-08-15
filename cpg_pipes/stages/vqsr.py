@@ -48,7 +48,7 @@ class Vqsr(CohortStage):
             use_as_annotations=get_config()['workflow'].get('use_as_vqsr', True),
             overwrite=not get_config()['workflow'].get('check_intermediates'),
             scatter_count=get_config()['workflow'].get(
-                'jc_intervals_num', vqsr.DEFAULT_INTERVALS_NUM
+                'vqsr_intervals_num', vqsr.DEFAULT_INTERVALS_NUM
             ),
             intervals_path=get_config()['workflow'].get('intervals_path'),
             job_attrs=self.get_job_attrs(),

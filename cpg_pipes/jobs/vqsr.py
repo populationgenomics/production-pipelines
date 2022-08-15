@@ -257,7 +257,7 @@ def make_vqsr_jobs(
                 use_as_annotations=use_as_annotations,
                 max_gaussians=snp_max_gaussians,
                 is_small_callset=is_small_callset,
-                job_attrs=job_attrs,
+                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             )
             for idx in range(scatter_count)
         ]
@@ -282,7 +282,7 @@ def make_vqsr_jobs(
                 use_as_annotations=use_as_annotations,
                 snp_filter_level=SNP_HARD_FILTER_LEVEL,
                 indel_filter_level=INDEL_HARD_FILTER_LEVEL,
-                job_attrs=job_attrs,
+                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             ).output_vcf
             for idx in range(scatter_count)
         ]
@@ -829,7 +829,7 @@ def add_apply_recalibration_step(
     Returns: a Job object with one ResourceGroup output j.output_vcf, corresponding
     to a VCF with tranche annotated in the FILTER field
     """
-    j = b.new_job('VQSR: ApplyRecalibration', job_attrs)
+    j = b.new_job('VQSR: ApplyVQSR', job_attrs)
     j.image(image_path('gatk'))
     res = STANDARD.set_resources(j, ncpu=2, storage_gb=disk_size)
 
@@ -867,7 +867,7 @@ def add_apply_recalibration_step(
 
     df -h; pwd; du -sh $(dirname {j.output_vcf['vcf.gz']})
 
-    gatk --java-options -Xms5g \\
+    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
       ApplyVQSR \\
       -O {j.output_vcf['vcf.gz']} \\
       -V $TMP_INDEL_RECALIBRATED \\
