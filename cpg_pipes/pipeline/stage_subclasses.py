@@ -33,17 +33,40 @@ class SampleStage(Stage[Sample], ABC):
         """
         Plug in stage into the pipeline.
         """
-        datasets = cohort.get_datasets()
-        if not datasets:
-            raise ValueError('No active datasets are found to run')
-
         output_by_target: dict[str, StageOutput | None] = dict()
+
+        if not (datasets := cohort.get_datasets()):
+            logger.warning(
+                f'{len(cohort.get_datasets())}/'
+                f'{len(cohort.get_datasets(only_active=False))} '
+                f'usable (active=True) datasets found in the cohort. Check that '
+                f'`workflow.datasets` is provided, and not all datasets are skipped '
+                f'via workflow.skip_datasets`'
+            )
+            return output_by_target
+        if not cohort.get_samples():
+            logger.warning(
+                f'{len(cohort.get_samples())}/'
+                f'{len(cohort.get_samples(only_active=False))} '
+                f'usable (active=True) samples found. Check logs above for '
+                f'possible reasons samples were skipped (e.g. all samples ignored '
+                f'via `workflow.skip_samples` in config, or they all missing stage '
+                f'inputs and `workflow.skip_samples_with_missing_input=true` is set)'
+            )
+            return output_by_target
 
         for ds_i, dataset in enumerate(datasets):
             if not dataset.get_samples():
-                raise ValueError(
-                    f'No active samples are found to run in the dataset {dataset}'
+                logger.warning(
+                    f'{dataset}: '
+                    f'{len(dataset.get_samples())}/'
+                    f'{len(dataset.get_samples(only_active=False))} '
+                    f'usable (active=True) samples found. Check logs above for '
+                    f'possible reasons samples were skipped (e.g. all samples ignored '
+                    f'via `workflow.skip_samples` in config, or they all missing stage '
+                    f'inputs and `workflow.skip_samples_with_missing_input=true` is set)'
                 )
+                continue
 
             # Checking if all samples can be reused, queuing only one job per target:
             action_by_sid = dict()
@@ -51,26 +74,24 @@ class SampleStage(Stage[Sample], ABC):
                 logger.info(f'{self.name}: #{sample_i + 1}/{sample}')
                 action = self._get_action(sample)
                 action_by_sid[sample.id] = action
+                if action == Action.REUSE:
+                    if self.analysis_type and self.status_reporter:
+                        self.status_reporter.create_analysis(
+                            output=str(self.expected_outputs(sample)),
+                            analysis_type=self.analysis_type,
+                            analysis_status='completed',
+                            target=sample,
+                            meta=sample.get_job_attrs(),
+                        )
 
             if len(set(action_by_sid.values())) == 1:
                 action = list(action_by_sid.values())[0]
                 if action == Action.REUSE:
-                    # All stages to be reused, but adding only one reuse job
-                    # (for whole dataset):
-                    j = self.b.new_job(
-                        f'{self.name} [reuse {len(dataset.get_samples())} samples]', 
-                        dataset.get_job_attrs()
-                    )
-                    inputs = self._make_inputs()
                     for _, sample in enumerate(dataset.get_samples()):
-                        outputs = self.make_outputs(
+                        output_by_target[sample.target_id] = self.make_outputs(
                             target=sample,
                             data=self.expected_outputs(sample),
-                            jobs=[j],
                         )
-                        for j in outputs.jobs:
-                            j.depends_on(*inputs.get_jobs(sample))
-                        output_by_target[sample.target_id] = outputs
                     continue
 
             # Some samples can't be reused, queuing each sample:
@@ -78,7 +99,7 @@ class SampleStage(Stage[Sample], ABC):
             for sample_i, sample in enumerate(dataset.get_samples()):
                 logger.info(f'{self.name}: #{sample_i + 1}/{sample}')
                 output_by_target[sample.target_id] = self._queue_jobs_with_checks(
-                    sample
+                    sample, action=action_by_sid[sample.id]
                 )
             logger.info('-#-#-#-')
 
@@ -107,10 +128,16 @@ class DatasetStage(Stage, ABC):
         """
         Plug in stage into the pipeline.
         """
-        output_by_target = dict()
-        datasets = cohort.get_datasets()
-        if not datasets:
-            raise ValueError('No active datasets are found to run')
+        output_by_target: dict[str, StageOutput | None] = dict()
+        if not (datasets := cohort.get_datasets()):
+            logger.warning(
+                f'{len(cohort.get_datasets())}/'
+                f'{len(cohort.get_datasets(only_active=False))} '
+                f'usable (active=True) datasets found in the cohort. Check that '
+                f'`workflow.datasets` is provided, and not all datasets are skipped '
+                f'via workflow.skip_datasets`'
+            )
+            return output_by_target
         for _, dataset in enumerate(datasets):
             output_by_target[dataset.target_id] = self._queue_jobs_with_checks(dataset)
         return output_by_target

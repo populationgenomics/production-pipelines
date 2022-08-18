@@ -48,6 +48,7 @@ class AnalysisType(Enum):
     GVCF = 'gvcf'
     CRAM = 'cram'
     CUSTOM = 'custom'
+    ES_INDEX = 'es-index'
 
     @staticmethod
     def parse(val: str) -> 'AnalysisType':
@@ -131,12 +132,11 @@ class SMDB:
         project_name = project_name or self.project_name
 
         logger.debug(f'Finding samples for dataset {project_name}...')
-        sample_entries = self.sapi.get_samples(
-            body_get_samples_by_criteria_api_v1_sample_post={
-                'project_ids': [project_name],
-                'active': active,
-            }
-        )
+        body = {
+            'project_ids': [project_name],
+            'active': active,
+        }
+        sample_entries = self.sapi.get_samples(body_get_samples=body)
         logger.info(
             f'Finding samples for project {project_name}: '
             f'found {len(sample_entries)}'
@@ -231,6 +231,7 @@ class SMDB:
         status: str | AnalysisStatus,
         sample_ids: list[str],
         project_name: str | None = None,
+        meta: dict | None = None,
     ) -> int | None:
         """
         Tries to create an Analysis entry, returns its id if successful.
@@ -247,6 +248,7 @@ class SMDB:
             status=models.AnalysisStatus(status),
             output=str(output),
             sample_ids=list(sample_ids),
+            meta=meta or {},
         )
         try:
             aid = self.aapi.create_new_analysis(project=project_name, analysis_model=am)
@@ -255,7 +257,8 @@ class SMDB:
             return None
         else:
             logger.info(
-                f'Created analysis of type={type_}, status={status} with ID: {aid}'
+                f'Created Analysis(id={aid}, type={type_}, status={status}, '
+                f'output={str(output)}) in project {project_name}'
             )
             return aid
 
@@ -399,16 +402,18 @@ class SmSequence:
             raise ValueError(f'Cannot parse SMDB Sequence {data}')
 
         sample_id = data['sample_id']
+        st = SequencingType.parse(data['type'])
+        assert st, data
         sm_seq = SmSequence(
             id=data['id'],
             sample_id=sample_id,
             meta=data['meta'],
-            sequencing_type=SequencingType.parse(data['type']),
+            sequencing_type=st,
         )
         if data['meta'].get('reads'):
             if alignment_input := SmSequence._parse_reads(
-                sample_id=sample_id, 
-                meta=data['meta'], 
+                sample_id=sample_id,
+                meta=data['meta'],
                 check_existence=check_existence,
             ):
                 sm_seq.alignment_input = alignment_input
@@ -432,6 +437,8 @@ class SmSequence:
         """
         reads_data = meta.get('reads')
         reads_type = meta.get('reads_type')
+        reference_assembly = meta.get('reference_assembly', {}).get('location')
+
         if not reads_data:
             logger.error(f'{sample_id}: no "meta/reads" field in meta')
             return None
@@ -465,30 +472,28 @@ class SmSequence:
                 return None
 
             # Index:
-            if not reads_data[0].get('secondaryFiles'):
-                logger.error(
-                    f'{sample_id}: ERROR: bam/cram input is expected to have '
-                    f'a non-empty list field "secondaryFile" section with indices'
-                )
-                return None
-            index_path = reads_data[0]['secondaryFiles'][0]['location']
-            if (
-                bam_path.endswith('.cram')
-                and not index_path.endswith('.crai')
-                or bam_path.endswith('.bai')
-                and not index_path.endswith('.bai')
-            ):
-                logger.error(
-                    f'{sample_id}: ERROR: expected the index file to have an extension '
-                    f'.crai or .bai, got: {index_path}'
-                )
-            if check_existence and not utils.exists(index_path):
-                logger.error(
-                    f'{sample_id}: ERROR: index file does not exist: {index_path}'
-                )
-                return None
+            index_path = None
+            if reads_data[0].get('secondaryFiles'):
+                index_path = reads_data[0]['secondaryFiles'][0]['location']
+                if (
+                    bam_path.endswith('.cram')
+                    and not index_path.endswith('.crai')
+                    or bam_path.endswith('.bai')
+                    and not index_path.endswith('.bai')
+                ):
+                    logger.error(
+                        f'{sample_id}: ERROR: expected the index file to have an extension '
+                        f'.crai or .bai, got: {index_path}'
+                    )
+                if check_existence and not utils.exists(index_path):
+                    logger.error(
+                        f'{sample_id}: ERROR: index file does not exist: {index_path}'
+                    )
+                    return None
 
-            return CramPath(bam_path, index_path=index_path)
+            return CramPath(
+                bam_path, index_path=index_path, reference_assembly=reference_assembly
+            )
 
         else:
             fastq_pairs = FastqPairs()

@@ -39,20 +39,18 @@ class InputProvider(ABC):
         only_samples: list[str] | None = None,
         skip_datasets: list[str] | None = None,
         ped_files: list[Path] | None = None,
-    ) -> Cohort:
+    ):
         """
         Add datasets in the cohort. There exists only one cohort for
         the pipeline run.
         """
-        if dataset_names:
+        if dataset_names is not None:
             # Specific datasets requested, so initialising them in advance.
             for ds_name in dataset_names:
                 if skip_datasets and ds_name in skip_datasets:
                     logger.info(f'Requested to skipping dataset {ds_name}')
                     continue
-                dataset = Dataset.create(
-                    ds_name, cohort.namespace, cohort.storage_provider
-                )
+                dataset = Dataset.create(ds_name, cohort.namespace)
                 entries = self._get_entries(
                     dataset,
                     skip_samples=skip_samples,
@@ -75,20 +73,22 @@ class InputProvider(ABC):
                 ds_name = self.get_dataset_name(entry) or cohort.analysis_dataset.name
                 dataset = cohort.create_dataset(ds_name)
                 self._add_sample(dataset, entry)
+
         if not cohort.get_datasets():
             msg = 'No active datasets populated'
             if skip_samples or only_samples or skip_datasets:
                 msg += ' (after skipping/picking samples)'
-            raise InputProviderError(msg)
+            logger.warning(msg)
+            return
 
         self.populate_alignment_inputs(cohort)
+        if cohort.sequencing_type:
+            self.filter_sequencing_type(cohort, cohort.sequencing_type)
         self.populate_analysis(cohort)
         self.populate_participants(cohort)
         self.populate_pedigree(cohort)
         if ped_files:
             self.populate_pedigree_from_ped_files(cohort, ped_files)
-
-        return cohort
 
     @abstractmethod
     def get_entries(
@@ -141,6 +141,33 @@ class InputProvider(ABC):
         """
         Get sequencing type. Can be also set later.
         """
+
+    @staticmethod
+    def filter_sequencing_type(cohort: Cohort, sequencing_type: SequencingType | None):
+        """
+        Filtering to the samples with only requested sequencing types.
+        """
+        if not sequencing_type:
+            return
+        for s in cohort.get_samples():
+            if not s.alignment_input_by_seq_type:
+                logger.warning(f'{s}: skipping because no sequencing inputs found')
+                s.active = False
+                continue
+
+            avail_types = list(s.alignment_input_by_seq_type.keys())
+            s.alignment_input_by_seq_type = {
+                k: v
+                for k, v in s.alignment_input_by_seq_type.items()
+                if k == sequencing_type
+            }
+            if not bool(s.alignment_input_by_seq_type):
+                logger.warning(
+                    f'{s}: skipping because no inputs with data type '
+                    f'"{sequencing_type.value}" found in '
+                    f'{[k.value for k in avail_types]}'
+                )
+                s.active = False
 
     @abstractmethod
     def populate_alignment_inputs(self, cohort: Cohort) -> None:
@@ -256,7 +283,6 @@ class InputProvider(ABC):
             external_id=str(self.get_external_id(entry)),
             participant_id=self.get_participant_id(entry),
             sex=self.get_participant_sex(entry),
-            sequencing_type=self.get_sequencing_type(entry),
             meta=self.get_sample_meta(entry),
         )
 
@@ -365,7 +391,9 @@ class CsvInputProvider(InputProvider):
         """
         Get sequencing type.
         """
-        return SequencingType.parse(entry[FieldMap.sequencing_type.value])
+        result = SequencingType.parse(entry[FieldMap.sequencing_type.value])
+        assert result
+        return result
 
     def populate_analysis(self, cohort: Cohort) -> None:
         """
@@ -415,7 +443,7 @@ class CsvInputProvider(InputProvider):
                     missing_fastqs = [fq for fq in (fqs1 + fqs2) if not exists(fq)]
                     if missing_fastqs:
                         raise InputProviderError(f'FQs {missing_fastqs} does not exist')
-                    
+
                 pairs = FastqPairs(
                     [FastqPair(fq1, fq2) for fq1, fq2 in zip(fqs1, fqs2)]
                 )
@@ -423,13 +451,14 @@ class CsvInputProvider(InputProvider):
                 if existing_pairs:
                     if not isinstance(existing_pairs, FastqPairs):
                         raise InputProviderError(
-                            f'Mixed sequencing inputs for sample {id}, type '
-                            f'{seq_type.value}: existing {existing_pairs}, new {pairs}'
+                            f'Mixed sequencing inputs for sample {id}, '
+                            f'type {seq_type.value}: existing: {existing_pairs}, '
+                            f'new: {pairs}'
                         )
                     existing_pairs += pairs
                 else:
                     data[(sid, seq_type)] = pairs
-                
+
             elif cram:
                 if self.check_files:
                     if not exists(cram):
@@ -437,7 +466,7 @@ class CsvInputProvider(InputProvider):
                 if (sid, seq_type) in data:
                     raise InputProviderError(
                         f'Cannot have multiple CRAM/BAM sequencing inputs of the same'
-                        f'type for one sample. Sample: {id}, existing {seq_type.value}'
+                        f'type for one sample. Sample: {id}, type {seq_type.value}, '
                         f'data: {data[(sid, seq_type)]}, new data: {cram}'
                     )
                 data[(sid, seq_type)] = CramPath(cram)

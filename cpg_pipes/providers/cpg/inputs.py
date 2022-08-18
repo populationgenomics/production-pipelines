@@ -7,18 +7,19 @@ import traceback
 from collections import defaultdict
 from itertools import groupby
 
+from cpg_utils.config import get_config
 from sample_metadata import ApiException
 
 from .smdb import SMDB, SmSequence
 from ..inputs import InputProvider, InputProviderError
 from ... import Path
 from ...targets import Cohort, Sex, PedigreeInfo, Dataset
-from ...types import SequencingType
+from ...types import SequencingType, FastqPairs, FastqPair, CramPath
 
 logger = logging.getLogger(__file__)
 
 
-class SmdbInputProvider(InputProvider):
+class CpgInputProvider(InputProvider):
     """
     InputProvider implementation that pulls data from the sample-metadata database.
     """
@@ -27,11 +28,9 @@ class SmdbInputProvider(InputProvider):
         self,
         db: SMDB,
         check_files: bool = False,
-        smdb_errors_are_fatal: bool = True,
     ):
         super().__init__(check_files=check_files)
         self.db = db
-        self.smdb_errors_are_fatal = smdb_errors_are_fatal
 
     def populate_cohort(
         self,
@@ -41,15 +40,15 @@ class SmdbInputProvider(InputProvider):
         only_samples: list[str] | None = None,
         skip_datasets: list[str] | None = None,
         ped_files: list[Path] | None = None,
-    ) -> Cohort:
+    ):
         """
         Overriding the superclass method.
         """
-        if not dataset_names:
+        if dataset_names is None:
             raise InputProviderError(
-                'Dataset must be provided for SmdbInputProvider.populate_cohort()'
+                'Datasets must be provided explicitly for the CPG input provider'
             )
-        return super().populate_cohort(
+        super().populate_cohort(
             cohort=cohort,
             dataset_names=dataset_names,
             skip_samples=skip_samples,
@@ -125,10 +124,16 @@ class SmdbInputProvider(InputProvider):
         assert cohort.get_sample_ids()
         try:
             found_seqs: list[dict] = self.db.seqapi.get_sequences_by_sample_ids(
-                cohort.get_sample_ids()
+                cohort.get_sample_ids(), get_latest_sequence_only=False
             )
+            if cohort.sequencing_type:
+                found_seqs = [
+                    seq
+                    for seq in found_seqs
+                    if str(seq['type']) == str(cohort.sequencing_type.value)
+                ]
         except ApiException:
-            if self.smdb_errors_are_fatal:
+            if get_config()['workflow'].get('smdb_errors_are_fatal', True):
                 raise
             else:
                 logger.error(
@@ -141,22 +146,25 @@ class SmdbInputProvider(InputProvider):
         found_seqs_by_sid = defaultdict(list)
         for found_seq in found_seqs:
             found_seqs_by_sid[found_seq['sample_id']].append(found_seq)
-        
-        # Checking missing sequences
+
+        # Log sequences without samples, this is a pretty common thing,
+        # but useful to log to easier track down samples not processed
         if sample_wo_seq := [
             s for s in cohort.get_samples() if s.id not in found_seqs_by_sid
         ]:
-            msg = f'No sequencing data found for samples:\n'
+            msg = f'No {cohort.sequencing_type.value} sequencing data found for samples:\n'
+            ds_sample_count = {
+                ds_name: len(list(ds_samples))
+                for ds_name, ds_samples in groupby(
+                    cohort.get_samples(), key=lambda s: s.dataset.name
+                )
+            }
             for ds, samples in groupby(sample_wo_seq, key=lambda s: s.dataset.name):
                 msg += (
-                    f'\t{ds}, {len(list(samples))} samples: '
+                    f'\t{ds}, {len(list(samples))}/{ds_sample_count.get(ds)} samples: '
                     f'{", ".join([s.id for s in samples])}\n'
                 )
-            if self.smdb_errors_are_fatal:
-                raise InputProviderError(msg)
-            else:
-                msg += '\nContinuing without sequencing data because lenient=true'
-                logger.warning(msg)
+            logger.info(msg)
 
         for sample in cohort.get_samples():
             for d in found_seqs_by_sid.get(sample.id, []):
@@ -169,8 +177,9 @@ class SmdbInputProvider(InputProvider):
                             f'input provider to make sure there is only one data source '
                             f'of sequencing type per sample.'
                         )
-                    sample.alignment_input_by_seq_type[seq.sequencing_type] = \
-                        seq.alignment_input
+                    sample.alignment_input_by_seq_type[
+                        seq.sequencing_type
+                    ] = seq.alignment_input
 
     def populate_analysis(self, cohort: Cohort) -> None:
         """
@@ -208,24 +217,26 @@ class SmdbInputProvider(InputProvider):
 
         for dataset in cohort.get_datasets():
             ped_entries = self.db.get_ped_entries(project_name=dataset.name)
+            ped_entry_by_participant_id = {}
             for ped_entry in ped_entries:
                 part_id = str(ped_entry['individual_id'])
-                if part_id not in sample_by_participant_id.keys():
-                    logger.info(
-                        f'Participant {part_id} is not found in populated samples '
-                        f'and will be skipped'
-                    )
-                    continue
+                ped_entry_by_participant_id[part_id] = ped_entry
 
-                s = sample_by_participant_id[part_id]
+            for sample in dataset.get_samples():
+                if sample.participant_id not in ped_entry_by_participant_id:
+                    logger.warning(
+                        f'No pedigree data for participant {sample.participant_id}'
+                    )
+
+                ped_entry = ped_entry_by_participant_id[sample.participant_id]
                 maternal_sample = sample_by_participant_id.get(
                     str(ped_entry['maternal_id'])
                 )
                 paternal_sample = sample_by_participant_id.get(
                     str(ped_entry['paternal_id'])
                 )
-                s.pedigree = PedigreeInfo(
-                    sample=s,
+                sample.pedigree = PedigreeInfo(
+                    sample=sample,
                     fam_id=ped_entry['family_id'],
                     mom=maternal_sample,
                     dad=paternal_sample,

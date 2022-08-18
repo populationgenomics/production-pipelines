@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 import pandas as pd
+from cpg_utils.hail_batch import dataset_path, web_url
 
-from . import Path
+from . import Namespace, Path, to_path
 from .types import AlignmentInput, CramPath, GvcfPath, SequencingType, FastqPairs
-from .providers.storage import StorageProvider, Namespace
 
 logger = logging.getLogger(__file__)
 
@@ -48,10 +48,12 @@ class Target:
         s = ' '.join(
             sorted(
                 [
-                    ' '.join(sorted(
-                        str(alignment_input)
-                        for alignment_input in s.alignment_input_by_seq_type.values()
-                    ))
+                    ' '.join(
+                        sorted(
+                            str(alignment_input)
+                            for alignment_input in s.alignment_input_by_seq_type.values()
+                        )
+                    )
                     for s in self.get_samples()
                     if s.alignment_input_by_seq_type
                 ]
@@ -81,7 +83,7 @@ class Target:
         """
         raise NotImplementedError
 
-    def get_job_attrs(self) -> dict[str, str]:
+    def get_job_attrs(self) -> dict:
         """
         Attributes for Hail Batch job.
         """
@@ -93,19 +95,11 @@ class Target:
         """
         raise NotImplementedError
 
-    def get_sequencing_type(self) -> SequencingType:
+    def rich_id_map(self) -> dict[str, str]:
         """
-        Sequencing type of samples. Will throw an error if more than
-        one sequencing type is found.
+        Map if internal IDs to participant or external IDs, if the latter is provided.
         """
-        sequencing_types = set(s.sequencing_type for s in self.get_samples())
-        if len(sequencing_types) > 1:
-            raise ValueError(
-                f'Samples of more than one sequencing type used for joint calling: '
-                f'{sequencing_types}. Joint calling can be only performed on samples '
-                f'of the same type.'
-            )
-        return list(sequencing_types)[0]
+        return {s.id: s.rich_id for s in self.get_samples() if s.participant_id != s.id}
 
 
 class Cohort(Target):
@@ -119,18 +113,18 @@ class Cohort(Target):
         self,
         analysis_dataset_name: str,
         namespace: Namespace,
+        sequencing_type: SequencingType,
         name: str | None = None,
-        storage_provider: StorageProvider | None = None,
     ):
         super().__init__()
         self.name = name or analysis_dataset_name
         self.namespace = namespace
-        self.storage_provider = storage_provider
         self.analysis_dataset = Dataset(
             name=analysis_dataset_name,
             namespace=namespace,
-            storage_provider=self.storage_provider,
+            cohort=self,
         )
+        self.sequencing_type = sequencing_type
         self._datasets_by_name: dict[str, Dataset] = {}
 
     def __repr__(self):
@@ -146,11 +140,10 @@ class Cohort(Target):
         Gets list of all datasets.
         Include only "active" datasets (unless only_active is False)
         """
-        return [
-            ds
-            for k, ds in self._datasets_by_name.items()
-            if (ds.active or not only_active)
-        ]
+        datasets = [ds for k, ds in self._datasets_by_name.items()]
+        if only_active:
+            datasets = [ds for ds in datasets if ds.active and ds.get_samples()]
+        return datasets
 
     def get_dataset_by_name(
         self, name: str, only_active: bool = True
@@ -168,14 +161,15 @@ class Cohort(Target):
         Include only "active" samples (unless only_active is False)
         """
         all_samples = []
-        for proj in self.get_datasets(only_active=only_active):
-            all_samples.extend(proj.get_samples(only_active))
+        for ds in self.get_datasets(only_active=False):
+            all_samples.extend(ds.get_samples(only_active=only_active))
         return all_samples
 
     def add_dataset(self, dataset: 'Dataset') -> 'Dataset':
         """
         Add existing dataset into the cohort.
         """
+        dataset.cohort = self
         if dataset.name in self._datasets_by_name:
             logger.debug(f'Dataset {dataset.name} already exists in the cohort')
             return dataset
@@ -186,7 +180,6 @@ class Cohort(Target):
         self,
         name: str,
         namespace: Namespace | None = None,
-        storage_provider: StorageProvider | None = None,
     ) -> 'Dataset':
         """
         Create a dataset and add it to the cohort.
@@ -204,17 +197,20 @@ class Cohort(Target):
             ds = Dataset(
                 name=name,
                 namespace=namespace,
-                storage_provider=storage_provider or self.storage_provider,
+                cohort=self,
             )
 
         self._datasets_by_name[ds.name] = ds
         return ds
 
-    def get_job_attrs(self) -> dict[str, str]:
+    def get_job_attrs(self) -> dict:
         """
         Attributes for Hail Batch job.
         """
-        return {'samples': ','.join(self.get_sample_ids())}
+        return {
+            'samples': self.get_sample_ids(),
+            'datasets': [d.name for d in self.get_datasets()],
+        }
 
     def get_job_prefix(self) -> str:
         """
@@ -273,20 +269,17 @@ class Dataset(Target):
         self,
         name: str,
         namespace: Namespace | None = None,
-        storage_provider: StorageProvider | None = None,
+        cohort: Cohort | None = None,
     ):
         super().__init__()
-        self._storage_provider = storage_provider
-
         self._sample_by_id: dict[str, Sample] = {}
-
         self.stack, self.namespace = parse_stack(name, namespace)
+        self.cohort = cohort
 
     @staticmethod
     def create(
         name: str,
         namespace: Namespace,
-        storage_provider: StorageProvider | None = None,
     ) -> 'Dataset':
         """
         Create a dataset.
@@ -296,7 +289,6 @@ class Dataset(Target):
         return Dataset(
             name=name,
             namespace=namespace,
-            storage_provider=storage_provider,
         )
 
     @property
@@ -325,59 +317,64 @@ class Dataset(Target):
     def __str__(self):
         return f'{self.name} ({len(self.get_samples())} samples)'
 
-    @property
-    def storage_provider(self) -> StorageProvider:
+    def _seq_type_subdir(self) -> str:
         """
-        Storage provider object responsible for dataset file paths.
+        Subdirectory parametrised by sequencing type. For genomes, we don't
+        prefix at all.
         """
-        if not self._storage_provider:
-            raise ValueError(
-                '_storage_provider is not set. storage_provider must be passed to the '
-                'Dataset() constructor before calling Dataset.get_bucket()'
-            )
-        return self._storage_provider
+        return (
+            ''
+            if not self.cohort or self.cohort.sequencing_type == SequencingType.GENOME
+            else self.cohort.sequencing_type.value
+        )
 
-    def path(self, **kwargs) -> Path:
+    def prefix(self, **kwargs) -> Path:
         """
         The primary storage path.
         """
-        return self.storage_provider.path(
-            dataset=self.stack,
-            namespace=self.namespace,
-            **kwargs,
+        return to_path(
+            dataset_path(
+                self._seq_type_subdir(),
+                dataset=self.stack,
+                **kwargs,
+            )
         )
 
-    def storage_tmp_path(self, **kwargs) -> Path:
+    def tmp_prefix(self, **kwargs) -> Path:
         """
         Storage path for temporary files.
         """
-        return self.storage_provider.path(
-            dataset=self.stack, 
-            namespace=self.namespace,
-            category='tmp',
-            **kwargs,
+        return to_path(
+            dataset_path(
+                self._seq_type_subdir(),
+                dataset=self.stack,
+                category='tmp',
+                **kwargs,
+            )
         )
 
-    def web_path(self, **kwargs) -> Path:
+    def web_prefix(self, **kwargs) -> Path:
         """
         Path for files served by an HTTP server Matches corresponding URLs returns by
         self.web_url() URLs.
         """
-        return self.storage_provider.path(
-            dataset=self.stack, 
-            namespace=self.namespace,
-            category='web',
-            **kwargs
+        return to_path(
+            dataset_path(
+                self._seq_type_subdir(),
+                dataset=self.stack,
+                category='web',
+                **kwargs,
+            )
         )
 
     def web_url(self, **kwargs) -> str | None:
         """
-        URLs matching self.storage_web_path() files serverd by an HTTP server. 
+        URLs matching self.storage_web_path() files serverd by an HTTP server.
         """
-        return self.storage_provider.web_url(
-            dataset=self.stack, 
-            namespace=self.namespace, 
-            **kwargs
+        return web_url(
+            self._seq_type_subdir(),
+            dataset=self.stack,
+            **kwargs,
         )
 
     def add_sample(
@@ -385,7 +382,6 @@ class Dataset(Target):
         id: str,  # pylint: disable=redefined-builtin
         external_id: str | None = None,
         participant_id: str | None = None,
-        sequencing_type: SequencingType | None = None,
         meta: dict | None = None,
         sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
@@ -402,7 +398,6 @@ class Dataset(Target):
             id=id,
             dataset=self,
             external_id=external_id,
-            sequencing_type=sequencing_type,
             participant_id=participant_id,
             meta=meta,
             sex=sex,
@@ -420,11 +415,14 @@ class Dataset(Target):
             s for sid, s in self._sample_by_id.items() if (s.active or not only_active)
         ]
 
-    def get_job_attrs(self) -> dict[str, str]:
+    def get_job_attrs(self) -> dict:
         """
         Attributes for Hail Batch job.
         """
-        return {'dataset': self.name, 'samples': ','.join(self.get_sample_ids())}
+        return {
+            'dataset': self.name,
+            'samples': self.get_sample_ids(),
+        }
 
     def get_job_prefix(self) -> str:
         """
@@ -442,7 +440,7 @@ class Dataset(Target):
                 datas.append(sample.pedigree.get_ped_dict())
         df = pd.DataFrame(datas)
 
-        ped_path = (tmp_bucket or self.storage_tmp_path()) / f'{self.name}.ped'
+        ped_path = (tmp_bucket or self.tmp_prefix()) / f'{self.name}.ped'
         with ped_path.open('w') as fp:
             df.to_csv(fp, sep='\t', index=False)
 
@@ -473,6 +471,9 @@ class Sex(Enum):
             raise ValueError(f'Unrecognised sex value {sex}')
         return Sex.UNKNOWN
 
+    def __str__(self):
+        return self.name
+
 
 class Sample(Target):
     """
@@ -484,7 +485,6 @@ class Sample(Target):
         id: str,  # pylint: disable=redefined-builtin
         dataset: 'Dataset',  # type: ignore  # noqa: F821
         external_id: str | None = None,
-        sequencing_type: SequencingType | None = None,
         participant_id: str | None = None,
         meta: dict | None = None,
         sex: Sex | None = None,
@@ -495,7 +495,6 @@ class Sample(Target):
         self.id = id
         self._external_id = external_id
         self.dataset = dataset
-        self.sequencing_type = sequencing_type or SequencingType.GENOME
         self._participant_id = participant_id
         self.meta: dict = meta or dict()
         self.pedigree: PedigreeInfo | None = pedigree
@@ -505,8 +504,9 @@ class Sample(Target):
                 fam_id=self.participant_id,
                 sex=sex,
             )
-        self.alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] = \
+        self.alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] = (
             alignment_input_by_seq_type or dict()
+        )
 
     def __repr__(self):
         values = {
@@ -514,10 +514,12 @@ class Sample(Target):
             'forced': str(self.forced),
             'active': str(self.active),
             'meta': str(self.meta),
-            'alignment_inputs': ','.join([
-                f'{seq_t.value}: {al_inp}' 
-                for seq_t, al_inp in self.alignment_input_by_seq_type.items()
-            ]),
+            'alignment_inputs': ','.join(
+                [
+                    f'{seq_t.value}: {al_inp}'
+                    for seq_t, al_inp in self.alignment_input_by_seq_type.items()
+                ]
+            ),
             'pedigree': self.pedigree if self.pedigree else '',
         }
         retval = f'Sample({self.dataset.name}/{self.id}'
@@ -563,6 +565,14 @@ class Sample(Target):
         """
         return self._external_id or self.id
 
+    @property
+    def rich_id(self) -> str:
+        """
+        ID for reporting purposes: composed of internal as well as external
+        or participant IDs.
+        """
+        return self.id + '|' + self.participant_id
+
     def get_ped_dict(self, use_participant_id: bool = False) -> dict[str, str]:
         """
         Returns a dictionary of pedigree fields for this sample, corresponding
@@ -583,13 +593,13 @@ class Sample(Target):
         """
         Path to a CRAM file. Not checking its existence here.
         """
-        return CramPath(self.dataset.path() / 'cram' / f'{self.id}.cram')
+        return CramPath(self.dataset.prefix() / 'cram' / f'{self.id}.cram')
 
     def get_gvcf_path(self) -> GvcfPath:
         """
         Path to a GVCF file. Not checking its existence here.
         """
-        return GvcfPath(self.dataset.path() / 'gvcf' / f'{self.id}.g.vcf.gz')
+        return GvcfPath(self.dataset.prefix() / 'gvcf' / f'{self.id}.g.vcf.gz')
 
     @property
     def target_id(self) -> str:
@@ -604,11 +614,14 @@ class Sample(Target):
             return []
         return [self]
 
-    def get_job_attrs(self) -> dict[str, str]:
+    def get_job_attrs(self) -> dict:
         """
         Attributes for Hail Batch job.
         """
-        return {'dataset': self.dataset.name, 'sample': self.id}
+        return {
+            'dataset': self.dataset.name,
+            'sample': self.id,
+        }
 
     def get_job_prefix(self) -> str:
         """
