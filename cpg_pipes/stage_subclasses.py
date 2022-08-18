@@ -6,7 +6,7 @@ import logging
 from abc import ABC, abstractmethod
 
 from .pipeline import Stage, ExpectedResultT, StageInput, StageOutput, Action
-from ..targets import Sample, Cohort, Dataset
+from .targets import Sample, Cohort, Dataset
 
 logger = logging.getLogger(__file__)
 

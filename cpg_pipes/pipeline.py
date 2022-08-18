@@ -19,22 +19,17 @@ from typing import cast, Callable, Union, TypeVar, Generic, Any, Optional, Type
 
 from cloudpathlib import CloudPath
 import hailtop.batch as hb
-from hailtop.batch import Batch
 from hailtop.batch.job import Job
 from cpg_utils.config import get_config
-from slugify import slugify
+from cpg_utils import Path, to_path
 
-from .exceptions import PipelineError, StageInputNotFound
-from .. import Path, to_path, Namespace
-from ..hb.batch import setup_batch
-from ..providers.cpg.inputs import CpgInputProvider
-from ..providers.cpg.smdb import SMDB
-from ..providers.cpg.status import CpgStatusReporter
-from ..providers.inputs import InputProvider, CsvInputProvider
-from ..targets import Target, Dataset, Sample, Cohort
-from ..providers.status import StatusReporter
-from ..types import SequencingType
-from ..utils import exists, timestamp
+from cpg_pipes.hb.batch import setup_batch, Batch
+from cpg_pipes.status import MetamistStatusReporter
+from cpg_pipes.targets import Target, Dataset, Sample, Cohort
+from cpg_pipes.status import StatusReporter
+from cpg_pipes.utils import exists, timestamp, slugify
+from cpg_pipes.inputs import get_cohort
+from cpg_pipes.exceptions import PipelineError, StageInputNotFoundError
 
 logger = logging.getLogger(__file__)
 
@@ -288,10 +283,14 @@ class StageInput:
         stage: StageDecorator,
     ):
         if not self._outputs_by_target_by_stage.get(stage.__name__):
-            raise StageInputNotFound(f'Not found output from stage {stage.__name__}')
+            raise StageInputNotFoundError(
+                f'Not found output from stage {stage.__name__}, required for stage '
+                f'{self.stage.name}'
+            )
         if not self._outputs_by_target_by_stage[stage.__name__].get(target.target_id):
-            raise StageInputNotFound(
-                f'Not found output for {target} from stage {stage.__name__}'
+            raise StageInputNotFoundError(
+                f'Not found output for {target} from stage {stage.__name__}, required '
+                f'for stage {self.stage.name}'
             )
         return self._outputs_by_target_by_stage[stage.__name__][target.target_id]
 
@@ -349,12 +348,16 @@ class StageInput:
         """
         all_jobs: list[Job] = []
         these_samples = target.get_sample_ids()
-        for _, outputs_by_target in self._outputs_by_target_by_stage.items():
-            for _, output in outputs_by_target.items():
+        for stage_, outputs_by_target in self._outputs_by_target_by_stage.items():
+            for target_, output in outputs_by_target.items():
                 if output:
                     those_samples = output.target.get_sample_ids()
                     samples_intersect = set(these_samples) & set(those_samples)
                     if samples_intersect:
+                        for j in output.jobs:
+                            assert (
+                                j
+                            ), f'Stage: {stage_}, target: {stage_}, output: {output}'
                         all_jobs.extend(output.jobs)
         return all_jobs
 
@@ -530,8 +533,13 @@ class Stage(Generic[TargetT], ABC):
         outputs.stage = self
         outputs.meta |= self.get_job_attrs(target)
 
-        for j in outputs.jobs:
-            j.depends_on(*inputs.get_jobs(target))
+        for output_job in outputs.jobs:
+            if output_job:
+                for input_job in inputs.get_jobs(target):
+                    assert (
+                        input_job
+                    ), f'Input dependency job for stage: {self}, target: {target}'
+                    output_job.depends_on(input_job)
 
         if outputs.error_msg:
             return outputs
@@ -563,6 +571,9 @@ class Stage(Generic[TargetT], ABC):
         Based on stage parameters and expected outputs existence, determines what
         to do with the target: queue, skip or reuse, etc..
         """
+        if target.forced and not self.skipped:
+            return Action.QUEUE
+
         if (
             d := get_config()['workflow'].get('skip_samples_stages')
         ) and self.name in d:
@@ -572,16 +583,16 @@ class Stage(Generic[TargetT], ABC):
                 return Action.SKIP
 
         expected_out = self.expected_outputs(target)
-        reusable = self._outputs_are_reusable(expected_out)
+        reusable, first_missing_path = self._is_reusable(expected_out)
 
         if self.skipped:
-            if reusable:
+            if reusable and not first_missing_path:
                 return Action.REUSE
             if get_config()['workflow'].get('skip_samples_with_missing_input'):
                 logger.warning(
                     f'Skipping {target}: stage {self.name} is required, '
-                    f'but is marked as skipped, and expected outputs for the target '
-                    f'do not exist: {expected_out}'
+                    f'but is marked as skipped, and some expected outputs for the '
+                    f'target do not exist: {first_missing_path}'
                 )
                 # `workflow/skip_samples_with_missing_input` means that we can ignore
                 # samples/datasets that have missing results from skipped stages.
@@ -589,13 +600,18 @@ class Stage(Generic[TargetT], ABC):
                 # be ignored:
                 target.active = False
                 return Action.SKIP
-            raise ValueError(
-                f'Stage {self.name} is required, but is skipped, and '
-                f'expected outputs for target {target} do not exist: '
-                f'{expected_out}'
-            )
+            if self.name in get_config()['workflow'].get(
+                'allow_missing_outputs_for_stages', []
+            ):
+                return Action.REUSE
+            else:
+                raise ValueError(
+                    f'Stage {self.name} is required, but is skipped, and '
+                    f'the following expected outputs for target {target} do not exist: '
+                    f'{first_missing_path}'
+                )
 
-        if reusable:
+        if reusable and not first_missing_path:
             if target.forced:
                 logger.info(
                     f'{self.name}: can reuse, but forcing the target '
@@ -615,39 +631,31 @@ class Stage(Generic[TargetT], ABC):
         logger.info(f'{self.name}: running queue_jobs(target={target})')
         return Action.QUEUE
 
-    def _outputs_are_reusable(self, expected_out: ExpectedResultT) -> bool:
-        """
-        Returns outputs that can be reused for the stage for the target,
-        or None of none can be reused
-        """
+    def _is_reusable(self, expected_out: ExpectedResultT) -> tuple[bool, Path | None]:
         if self.assume_outputs_exist:
-            return True
+            return True, None
 
-        paths: list[Path] = []
-
-        def _find_paths(val):
-            """Recursively find every Path object"""
-            if isinstance(val, Path):
-                paths.append(val)
-            if isinstance(val, list):
-                for el in val:
-                    _find_paths(el)
-            if isinstance(val, dict):
-                for el in val.values():
-                    _find_paths(el)
-
-        _find_paths(expected_out)
-
-        if paths and get_config()['workflow'].get('check_expected_outputs'):
-            # Checking that all paths in the expected output exist:
-            return all(exists(path) for path in paths)
-
-        if self.skipped:
-            # Do not check the files' existence, trust they exist.
-            # note that for skipped stages, we automatically assume outputs exist
-            return True
-        # Do not check the files' existence, assume they don't exist:
-        return False
+        if get_config()['workflow'].get('check_expected_outputs'):
+            paths = []
+            if isinstance(expected_out, Path):
+                paths.append(expected_out)
+            if isinstance(expected_out, dict):
+                for _, v in expected_out.items():
+                    if isinstance(v, Path):
+                        paths.append(v)
+            first_missing_path = next((p for p in paths if not exists(p)), None)
+            if not paths:
+                return False, None
+            if first_missing_path:
+                return False, first_missing_path
+            return True, None
+        else:
+            if self.skipped:
+                # Do not check the files' existence, trust they exist.
+                # note that for skipped stages, we automatically assume outputs exist
+                return True, None
+            # Do not check the files' existence, assume they don't exist:
+            return False, None
 
     def _queue_reuse_job(
         self, target: TargetT, found_paths: Path | dict[str, Path]
@@ -666,7 +674,7 @@ class Stage(Generic[TargetT], ABC):
         Create Hail Batch Job attributes dictionary
         """
         job_attrs = dict(
-            seq_type=self.cohort.sequencing_type.value,
+            seq_type=get_config()['workflow']['sequencing_type'],
             stage=self.name,
         )
         if target:
@@ -790,51 +798,16 @@ class Pipeline:
         description = description or name
         description += f': run_id={self.run_id}'
 
-        access_level = get_config()['workflow']['access_level']
-        self.cohort = Cohort(
-            analysis_dataset_name=analysis_dataset,
-            namespace=Namespace.from_access_level(access_level),
-            name=self.name,
-            sequencing_type=SequencingType.parse(
-                get_config()['workflow']['sequencing_type']
-            ),
-        )
-
-        smdb: Optional[SMDB] = None
-        input_provider: InputProvider | None = None
-        if (
-            get_config()['workflow'].get('datasets') is not None
-            and get_config()['workflow'].get('input_provider') == 'smdb'
-        ):
-            smdb = smdb or SMDB(self.cohort.analysis_dataset.name)
-            input_provider = CpgInputProvider(smdb)
-        if get_config()['workflow'].get('input_provider') == 'csv':
-            if not (csv_path := get_config()['workflow'].get('input_csv')):
-                raise PipelineError(
-                    f'workflow.input_csv should be provided '
-                    f'with workflow.input_provider = "csv"'
-                )
-            input_provider = CsvInputProvider(to_path(csv_path).open())
-
-        if input_provider is not None:
-            input_provider.populate_cohort(
-                cohort=self.cohort,
-                dataset_names=get_config()['workflow'].get('datasets'),
-                skip_samples=get_config()['workflow'].get('skip_samples'),
-                only_samples=get_config()['workflow'].get('only_samples'),
-                skip_datasets=get_config()['workflow'].get('skip_datasets'),
-            )
-
+        self.cohort = get_cohort()
         self.tmp_prefix = self.cohort.analysis_dataset.tmp_prefix() / self.run_id
-        description += f' [{self.cohort.sequencing_type.value}]'
+        description += f' [{get_config()["workflow"]["sequencing_type"]}]'
         if ds_set := set(d.name for d in self.cohort.get_datasets()):
             description += ' ' + ', '.join(sorted(ds_set))
         self.b: Batch = setup_batch(description=description)
 
         self.status_reporter = None
-        if get_config()['workflow'].get('status_reporter') == 'smdb':
-            smdb = smdb or SMDB(self.cohort.analysis_dataset.name)
-            self.status_reporter = CpgStatusReporter(smdb=smdb)
+        if get_config()['workflow'].get('status_reporter') == 'metamist':
+            self.status_reporter = MetamistStatusReporter()
 
         # Will be populated by set_stages() in submit_batch()
         self._stages_dict: dict[str, Stage] = dict()
@@ -927,6 +900,15 @@ class Pipeline:
                     # Initialising and adding as explicit.
                     reqstage = reqcls(self)
                     newly_implicitly_added_d[reqstage.name] = reqstage
+                    if reqcls.__name__ in get_config()['workflow'].get(
+                        'assume_outputs_exist_for_stages', []
+                    ):
+                        reqstage.assume_outputs_exist = True
+                    if reqcls.__name__ in get_config()['workflow'].get(
+                        'skip_stages', []
+                    ):
+                        reqstage.skipped = True
+                        continue
                     if not force_all_implicit_stages:
                         # Stage is not declared or requested implicitly, so setting
                         # it as skipped:
@@ -994,7 +976,7 @@ class Pipeline:
             stage_.output_by_target = stage_.queue_for_cohort(self.cohort)
             if errors := self._process_stage_errors(stage_.output_by_target):
                 raise PipelineError(
-                    f'Stage {stage.__name__} failed to queue jobs with errors: '
+                    f'Stage {stage_} failed to queue jobs with errors: '
                     + '\n'.join(errors)
                 )
 

@@ -3,25 +3,26 @@ Utility functions and constants.
 """
 
 import logging
+import re
 import string
 import sys
 import time
 import traceback
+import unicodedata
 from functools import lru_cache
 from random import choices
 from typing import cast
 
-from . import Path, to_path
+from cpg_utils import Path, to_path
 
 logger = logging.getLogger(__file__)
 
 # Packages to install on a dataproc cluster, to use with the dataproc wrapper.
 DATAPROC_PACKAGES = [
-    'cpg_utils==4.3.6.2',
-    'cpg_pipes',
+    'cpg_pipes==0.3.10',
+    'cpg_utils',
     'cpg_gnomad',  # github.com/populationgenomics/gnomad_methods
-    'seqr_loader==1.2.5',  # hail-elasticsearch-pipelines
-    'elasticsearch==8.1.1',
+    'elasticsearch==8.3.3',
     'cpg_utils',
     'click',
     'google',
@@ -114,3 +115,25 @@ def timestamp(rand_suffix_len: int = 5) -> str:
         )
         result += f'_{rand_bit}'
     return result
+
+
+def slugify(line: str):
+    """
+    Slugify a string.
+
+    Example:
+    >>> slugify(u"Héllø Wörld")
+    u"hello-world"
+    """
+
+    return re.sub(
+        r'[-\s]+',
+        '-',
+        re.sub(
+            r'[^\w\s-]',
+            '',
+            unicodedata.normalize('NFKD', line).encode('ascii', 'ignore').decode(),
+        )
+        .strip()
+        .lower(),
+    )

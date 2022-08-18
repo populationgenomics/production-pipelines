@@ -8,10 +8,18 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 import pandas as pd
-from cpg_utils.hail_batch import dataset_path, web_url
 
-from . import Namespace, Path, to_path
-from .types import AlignmentInput, CramPath, GvcfPath, SequencingType, FastqPairs
+from cpg_utils.hail_batch import dataset_path, web_url
+from cpg_utils.config import get_config
+from cpg_utils import Path, to_path
+
+from .filetypes import (
+    AlignmentInput,
+    CramPath,
+    GvcfPath,
+    FastqPairs,
+)
+from .metamist import MmSequence
 
 logger = logging.getLogger(__file__)
 
@@ -109,22 +117,10 @@ class Cohort(Target):
     cohort.
     """
 
-    def __init__(
-        self,
-        analysis_dataset_name: str,
-        namespace: Namespace,
-        sequencing_type: SequencingType,
-        name: str | None = None,
-    ):
+    def __init__(self):
         super().__init__()
-        self.name = name or analysis_dataset_name
-        self.namespace = namespace
-        self.analysis_dataset = Dataset(
-            name=analysis_dataset_name,
-            namespace=namespace,
-            cohort=self,
-        )
-        self.sequencing_type = sequencing_type
+        self.name = get_config()['workflow']['dataset']
+        self.analysis_dataset = Dataset(name=self.name, cohort=self)
         self._datasets_by_name: dict[str, Dataset] = {}
 
     def __repr__(self):
@@ -179,14 +175,10 @@ class Cohort(Target):
     def create_dataset(
         self,
         name: str,
-        namespace: Namespace | None = None,
     ) -> 'Dataset':
         """
         Create a dataset and add it to the cohort.
         """
-        namespace = namespace or self.analysis_dataset.namespace
-        # Normalising the dataset's name:
-        name = build_dataset_name(*parse_stack(name, namespace))
         if name in self._datasets_by_name:
             logger.debug(f'Dataset {name} already exists in the cohort')
             return self._datasets_by_name[name]
@@ -194,11 +186,7 @@ class Cohort(Target):
         if name == self.analysis_dataset.name:
             ds = self.analysis_dataset
         else:
-            ds = Dataset(
-                name=name,
-                namespace=namespace,
-                cohort=self,
-            )
+            ds = Dataset(name=name, cohort=self)
 
         self._datasets_by_name[ds.name] = ds
         return ds
@@ -218,93 +206,54 @@ class Cohort(Target):
         """
         return ''
 
-
-def parse_stack(name: str, namespace: Namespace | None = None) -> tuple[str, Namespace]:
-    """
-    Input `name` can be either e.g. "seqr" or "seqr-test". The latter will be
-    resolved to stack="seqr" and is_test=True, unless `namespace` is provided
-    explicitly.
-
-    Returns the stack id and a corrected namespace.
-    """
-    namespace = namespace or Namespace.MAIN
-    if name.endswith('-test'):
-        stack = name[: -len('-test')]
-        namespace = Namespace.TEST
-    else:
-        stack = name
-    return stack, namespace
-
-
-def build_dataset_name(stack: str, namespace: Namespace) -> str:
-    """
-    Dataset name is suffixed with "-test" for a test dataset (matching the
-    corresponding sample-metadata project).
-    """
-    is_test = namespace != Namespace.MAIN
-    return stack + ('-test' if is_test else '')
+    def to_tsv(self) -> str:
+        """
+        Export to a parsable TSV file
+        """
+        assert self.get_samples()
+        tsv_path = self.analysis_dataset.tmp_prefix() / 'samples.tsv'
+        df = pd.DataFrame(
+            {
+                's': s.id,
+                'gvcf': s.gvcf or '-',
+                'sex': s.meta.get('sex') or '-',
+                'continental_pop': s.meta.get('continental_pop') or '-',
+                'subcontinental_pop': s.meta.get('subcontinental_pop') or '-',
+            }
+            for s in self.get_samples()
+        ).set_index('s', drop=False)
+        with to_path(tsv_path).open('w') as f:
+            df.to_csv(f, index=False, sep='\t', na_rep='NA')
+        return tsv_path
 
 
 class Dataset(Target):
     """
-    Represents a CPG dataset in a particular namespace: main or test.
+    Represents a CPG dataset.
 
     Each `dataset` at the CPG corresponds to
-    * one GCP project: https://github.com/populationgenomics/team-docs/tree/main/storage_policies
-    * one Pulumi stack: https://github.com/populationgenomics/analysis-runner/tree/main/stack
-    * two sample metadata projects: main and test (the latter has a `-test` ending).
-
-    An object of this class is parametrised by a dataset name and a namespace,
-    meaning that it matches exactly one GCP project, exactly one stack, and exactly
-    one sample metadata project.
-
-    An object has two ID-like fields: `stack` and `name`:
-    * `stack` is the name of the dataset (matches names of a GCP project or
-       a Pulumi stack), e.g. "seqr", "hgdp".
-    * `name` is the name of the namespace-specific sample-metadata project,
-       e.g. "seqr", "seqr-test", "hgdp", "hgdp-test".
+    * a GCP project: https://github.com/populationgenomics/team-docs/tree/main/storage_policies
+    * a Pulumi stack: https://github.com/populationgenomics/analysis-runner/tree/main/stack
+    * a metamist project
     """
 
     def __init__(
         self,
         name: str,
-        namespace: Namespace | None = None,
         cohort: Cohort | None = None,
     ):
         super().__init__()
         self._sample_by_id: dict[str, Sample] = {}
-        self.stack, self.namespace = parse_stack(name, namespace)
+        self.name = name
         self.cohort = cohort
+        self.active = True
 
     @staticmethod
-    def create(
-        name: str,
-        namespace: Namespace,
-    ) -> 'Dataset':
+    def create(name: str) -> 'Dataset':
         """
         Create a dataset.
         """
-        # Normalising the dataset's name:
-        name = build_dataset_name(*parse_stack(name, namespace))
-        return Dataset(
-            name=name,
-            namespace=namespace,
-        )
-
-    @property
-    def is_test(self) -> bool:
-        """
-        If it's a test dataset.
-        """
-        return self.namespace != Namespace.MAIN
-
-    @property
-    def name(self) -> str:
-        """
-        Name is suffixed with "-test" for a test dataset (matching the
-        corresponding sample-metadata project).
-        """
-        return build_dataset_name(self.stack, self.namespace)
+        return Dataset(name=name)
 
     @property
     def target_id(self) -> str:
@@ -322,11 +271,8 @@ class Dataset(Target):
         Subdirectory parametrised by sequencing type. For genomes, we don't
         prefix at all.
         """
-        return (
-            ''
-            if not self.cohort or self.cohort.sequencing_type == SequencingType.GENOME
-            else self.cohort.sequencing_type.value
-        )
+        seq_type = get_config()['workflow']['sequencing_type']
+        return '' if not self.cohort or seq_type == 'genome' else seq_type
 
     def prefix(self, **kwargs) -> Path:
         """
@@ -335,7 +281,7 @@ class Dataset(Target):
         return to_path(
             dataset_path(
                 self._seq_type_subdir(),
-                dataset=self.stack,
+                dataset=self.name,
                 **kwargs,
             )
         )
@@ -347,7 +293,7 @@ class Dataset(Target):
         return to_path(
             dataset_path(
                 self._seq_type_subdir(),
-                dataset=self.stack,
+                dataset=self.name,
                 category='tmp',
                 **kwargs,
             )
@@ -361,7 +307,7 @@ class Dataset(Target):
         return to_path(
             dataset_path(
                 self._seq_type_subdir(),
-                dataset=self.stack,
+                dataset=self.name,
                 category='web',
                 **kwargs,
             )
@@ -373,7 +319,7 @@ class Dataset(Target):
         """
         return web_url(
             self._seq_type_subdir(),
-            dataset=self.stack,
+            dataset=self.name,
             **kwargs,
         )
 
@@ -385,7 +331,7 @@ class Dataset(Target):
         meta: dict | None = None,
         sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
-        alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] | None = None,
+        alignment_input_by_seq_type: dict[str, AlignmentInput] | None = None,
     ) -> 'Sample':
         """
         Create a new sample and add it to the dataset.
@@ -393,6 +339,13 @@ class Dataset(Target):
         if id in self._sample_by_id:
             logger.debug(f'Sample {id} already exists in the dataset {self.name}')
             return self._sample_by_id[id]
+
+        force_samples = get_config()['workflow'].get('force_samples', set())
+        forced = (
+            id in force_samples
+            or external_id in force_samples
+            or participant_id in force_samples
+        )
 
         s = Sample(
             id=id,
@@ -403,6 +356,7 @@ class Dataset(Target):
             sex=sex,
             pedigree=pedigree,
             alignment_input_by_seq_type=alignment_input_by_seq_type,
+            forced=forced,
         )
         self._sample_by_id[id] = s
         return s
@@ -430,7 +384,7 @@ class Dataset(Target):
         """
         return f'{self.name}: '
 
-    def make_ped_file(self, tmp_bucket: Path | None = None) -> Path:
+    def write_ped_file(self, out_path: Path) -> Path:
         """
         Create a PED file for all samples
         """
@@ -438,13 +392,13 @@ class Dataset(Target):
         for sample in self.get_samples():
             if sample.pedigree:
                 datas.append(sample.pedigree.get_ped_dict())
+        if not datas:
+            raise ValueError(f'No pedigree data found for {self.name}')
         df = pd.DataFrame(datas)
 
-        ped_path = (tmp_bucket or self.tmp_prefix()) / f'{self.name}.ped'
-        with ped_path.open('w') as fp:
+        with out_path.open('w') as fp:
             df.to_csv(fp, sep='\t', index=False)
-
-        return ped_path
+        return out_path
 
 
 class Sex(Enum):
@@ -489,7 +443,9 @@ class Sample(Target):
         meta: dict | None = None,
         sex: Sex | None = None,
         pedigree: Optional['PedigreeInfo'] = None,
-        alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] | None = None,
+        alignment_input_by_seq_type: dict[str, AlignmentInput] | None = None,
+        seq_by_type: dict[str, MmSequence] | None = None,
+        forced: bool = False,
     ):
         super().__init__()
         self.id = id
@@ -504,9 +460,15 @@ class Sample(Target):
                 fam_id=self.participant_id,
                 sex=sex,
             )
-        self.alignment_input_by_seq_type: dict[SequencingType, AlignmentInput] = (
+        self.alignment_input_by_seq_type: dict[str, AlignmentInput] = (
             alignment_input_by_seq_type or dict()
         )
+        self.seq_by_type: dict[str, MmSequence] = seq_by_type or dict()
+        self.forced = forced
+        self.active = True
+        # Only set if the file exists / found in Metamist:
+        self.gvcf: GvcfPath | None = None
+        self.cram: CramPath | None = None
 
     def __repr__(self):
         values = {
@@ -516,7 +478,7 @@ class Sample(Target):
             'meta': str(self.meta),
             'alignment_inputs': ','.join(
                 [
-                    f'{seq_t.value}: {al_inp}'
+                    f'{seq_t}: {al_inp}'
                     for seq_t, al_inp in self.alignment_input_by_seq_type.items()
                 ]
             ),
@@ -530,7 +492,7 @@ class Sample(Target):
     def __str__(self):
         ai_tag = ''
         for seq_type, alignment_input in self.alignment_input_by_seq_type.items():
-            ai_tag += f'|SEQ={seq_type.value}:'
+            ai_tag += f'|SEQ={seq_type}:'
             if isinstance(alignment_input, CramPath):
                 if alignment_input.is_bam:
                     ai_tag += 'CRAM'
@@ -589,17 +551,21 @@ class Sample(Target):
             'Phenotype': '0',
         }
 
-    def get_cram_path(self) -> CramPath:
+    def make_cram_path(self) -> CramPath:
         """
         Path to a CRAM file. Not checking its existence here.
         """
         return CramPath(self.dataset.prefix() / 'cram' / f'{self.id}.cram')
 
-    def get_gvcf_path(self) -> GvcfPath:
+    def make_gvcf_path(self, access_level: str | None = None) -> GvcfPath:
         """
         Path to a GVCF file. Not checking its existence here.
         """
-        return GvcfPath(self.dataset.prefix() / 'gvcf' / f'{self.id}.g.vcf.gz')
+        return GvcfPath(
+            self.dataset.prefix(access_level=access_level)
+            / 'gvcf'
+            / f'{self.id}.g.vcf.gz'
+        )
 
     @property
     def target_id(self) -> str:
@@ -618,10 +584,14 @@ class Sample(Target):
         """
         Attributes for Hail Batch job.
         """
-        return {
+        attrs = {
             'dataset': self.dataset.name,
             'sample': self.id,
         }
+        _participant_id: str | None = self._participant_id or self._external_id
+        if _participant_id:
+            attrs['participant_id'] = _participant_id
+        return attrs
 
     def get_job_prefix(self) -> str:
         """

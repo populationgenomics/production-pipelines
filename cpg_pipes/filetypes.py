@@ -5,67 +5,14 @@ Wrappers for bioinformatics file types (CRAM, GVCF, FASTQ, etc).
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
-from typing import Union, Optional
+from typing import Union
 
 from hailtop.batch import ResourceGroup, ResourceFile, Batch
 
-from . import Path, to_path
-from . import utils
+from cpg_utils import Path, to_path
+from cpg_pipes import utils
 
 logger = logging.getLogger(__file__)
-
-
-class SequencingType(Enum):
-    """
-    Type (scope) of a sequencing experiment.
-    """
-
-    GENOME = 'genome'
-    EXOME = 'exome'
-    SINGLE_CELL = 'single_cell'
-    MTSEQ = 'mtseq'
-    ONT = 'ont'
-
-    def seqr_value(self) -> str:
-        """
-        Map to Seqr-style string
-        https://github.com/broadinstitute/seqr/blob/e0c179c36c0f68c892017de5eab2e4c1b9ffdc92/seqr/models.py#L592-L594
-        """
-        return {
-            SequencingType.GENOME: 'WGS',
-            SequencingType.EXOME: 'WES',
-            SequencingType.SINGLE_CELL: 'RNA',
-        }.get(self, '')
-
-    @staticmethod
-    def parse(str_val: str) -> 'SequencingType':
-        """
-        Parse a string into a SequencingType object.
-
-        >>> SequencingType.parse('genome')
-        SequencingType.GENOME
-        >>> SequencingType.parse('wes')
-        SequencingType.EXOME
-        """
-        str_to_val: dict[str, SequencingType] = {}
-        for val, str_vals in {
-            SequencingType.GENOME: ['genome', 'wgs'],
-            SequencingType.EXOME: ['exome', 'wts', 'wes'],
-            SequencingType.SINGLE_CELL: ['single_cell', 'single_cell_rna'],
-            SequencingType.MTSEQ: ['mtseq'],
-        }.items():
-            for str_v in str_vals:
-                str_v = str_v.lower()
-                assert str_v not in str_to_val, (str_v, str_to_val)
-                str_to_val[str_v] = val
-        str_val = str_val.lower()
-        if str_val not in str_to_val:
-            raise ValueError(
-                f'Unrecognised sequence type {str_val}. '
-                f'Available: {list(str_to_val.keys())}'
-            )
-        return str_to_val[str_val]
 
 
 class AlignmentInput(ABC):
@@ -96,16 +43,21 @@ class CramPath(AlignmentInput):
     def __init__(
         self,
         path: str | Path,
+        index_path: str | Path | None = None,
         reference_assembly: str = None,
-        index_path: Path | str | None = None,
     ):
         self.path = to_path(path)
         self.is_bam = self.path.suffix == '.bam'
         self.ext = 'cram' if not self.is_bam else 'bam'
-        self.index_ext = 'crai' if not self.is_bam else 'bai'
-        self._index_path = index_path
+        self.index_ext = 'bai' if self.is_bam else 'crai'
+        if not index_path:
+            self.full_index_ext = f'{self.ext}.{self.index_ext}'
+            self.index_path = self.path.with_suffix(f'.{self.full_index_ext}')
+        else:
+            assert str(index_path).endswith(self.index_ext)
+            self.index_path = to_path(index_path)
+            self.full_index_ext = str(self.index_path).replace(self.path.stem, '')
         self.somalier_path = to_path(f'{self.path}.somalier')
-        self.sequencing_type: Optional[SequencingType] = None
         self.reference_assembly = reference_assembly
 
     def __str__(self) -> str:
@@ -118,36 +70,18 @@ class CramPath(AlignmentInput):
         """
         CRAM file exists.
         """
-        return self.path.exists()
-
-    def index_exists(self) -> bool:
-        """
-        CRAI/BAI index exists
-        """
-        return self.index_path.exists()
-
-    @property
-    def index_path(self) -> Path:
-        """
-        Path to the corresponding CRAI/BAI index
-        """
-        return (
-            to_path(self._index_path)
-            if self._index_path
-            else to_path(f'{self.path}.{self.index_ext}')
-        )
+        return utils.exists(self.path)
 
     def resource_group(self, b: Batch) -> ResourceGroup:
         """
         Create a Hail Batch resource group
         """
-        d = {
-            self.ext: str(self.path),
-        }
-        if self.index_exists():
-            d[f'{self.ext}.{self.index_ext}'] = str(self.index_path)
-
-        return b.read_input_group(**d)
+        return b.read_input_group(
+            **{
+                self.ext: str(self.path),
+                self.full_index_ext: str(self.index_path),
+            }
+        )
 
     def path_glob(self) -> str:
         """
