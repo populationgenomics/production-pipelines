@@ -123,7 +123,7 @@ def haplotype_caller(
         merge_j = merge_gvcfs_job(
             b=b,
             sample_name=sample_name,
-            gvcfs=[j.output_gvcf for j in hc_jobs],
+            gvcf_groups=[j.output_gvcf for j in hc_jobs],
             job_attrs=job_attrs,
             out_gvcf_path=output_path,
             overwrite=overwrite,
@@ -191,6 +191,8 @@ def _haplotype_caller_one(
 
     reference = fasta_res_group(b)
 
+    assert isinstance(j.output_gvcf, hb.ResourceGroup)
+
     cmd = f"""\
     CRAM=/io/batch/{sample_name}.cram
     CRAI=/io/batch/{sample_name}.cram.crai
@@ -230,7 +232,7 @@ def _haplotype_caller_one(
 def merge_gvcfs_job(
     b: hb.Batch,
     sample_name: str,
-    gvcfs: list[hb.ResourceGroup],
+    gvcf_groups: list[hb.Resource],
     job_attrs: dict | None = None,
     out_gvcf_path: Path | None = None,
     overwrite: bool = True,
@@ -238,7 +240,7 @@ def merge_gvcfs_job(
     """
     Combine by-interval GVCFs into a single sample GVCF file
     """
-    job_name = f'Merge {len(gvcfs)} GVCFs'
+    job_name = f'Merge {len(gvcf_groups)} GVCFs'
     j = b.new_job(job_name, (job_attrs or {}) | dict(tool='picard_MergeVcfs'))
     if utils.can_reuse(out_gvcf_path, overwrite):
         j.name = f'{j.name} [reuse]'
@@ -248,7 +250,7 @@ def merge_gvcfs_job(
     j.cpu(2)
     java_mem = 7
     j.memory('standard')  # ~ 4G/core ~ 7.5G
-    j.storage(f'{len(gvcfs) * 1.5 + 2}G')
+    j.storage(f'{len(gvcf_groups) * 1.5 + 2}G')
     j.declare_resource_group(
         output_gvcf={
             'g.vcf.gz': '{root}-' + sample_name + '.g.vcf.gz',
@@ -256,7 +258,12 @@ def merge_gvcfs_job(
         }
     )
 
-    input_cmd = ' '.join(f'INPUT={g["g.vcf.gz"]}' for g in gvcfs)
+    input_cmd = ''
+    for gvcf_group in gvcf_groups:
+        assert isinstance(gvcf_group, hb.ResourceGroup)
+        input_cmd += f'INPUT={gvcf_group["g.vcf.gz"]} '
+
+    assert isinstance(j.output_gvcf, hb.ResourceGroup)
     cmd = f"""
     picard -Xms{java_mem}g \
     MergeVcfs {input_cmd} OUTPUT={j.output_gvcf['g.vcf.gz']}
@@ -308,6 +315,8 @@ def postproc_gvcf(
     reference = fasta_res_group(b)
     noalt_regions = b.read_input(str(reference_path('broad/noalt_bed')))
     gvcf = b.read_input(str(gvcf_path.path))
+
+    assert isinstance(j.output_gvcf, hb.ResourceGroup)
 
     cmd = f"""\
     GVCF={gvcf}
