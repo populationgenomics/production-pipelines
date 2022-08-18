@@ -47,7 +47,7 @@ StageDecorator = Callable[..., 'Stage']
 # have to be able to work on any Target subclass).
 TargetT = TypeVar('TargetT', bound=Target)
 
-ExpectedResultT = Union[Path, dict[str, Path], None]
+ExpectedResultT = Union[Path, dict[str, Path], dict[str, str], str, None]
 
 StageOutputData = Union[Path, hb.Resource, dict[str, Path], dict[str, hb.Resource]]
 
@@ -637,12 +637,14 @@ class Stage(Generic[TargetT], ABC):
 
         if get_config()['workflow'].get('check_expected_outputs'):
             paths = []
-            if isinstance(expected_out, Path):
-                paths.append(expected_out)
             if isinstance(expected_out, dict):
                 for _, v in expected_out.items():
-                    if isinstance(v, Path):
+                    if not isinstance(v, str):
                         paths.append(v)
+            elif isinstance(expected_out, str):
+                pass
+            else:
+                paths.append(expected_out)
             first_missing_path = next((p for p in paths if not exists(p)), None)
             if not paths:
                 return False, None
