@@ -348,12 +348,16 @@ class StageInput:
         """
         all_jobs: list[Job] = []
         these_samples = target.get_sample_ids()
-        for _, outputs_by_target in self._outputs_by_target_by_stage.items():
-            for _, output in outputs_by_target.items():
+        for stage_, outputs_by_target in self._outputs_by_target_by_stage.items():
+            for target_, output in outputs_by_target.items():
                 if output:
                     those_samples = output.target.get_sample_ids()
                     samples_intersect = set(these_samples) & set(those_samples)
                     if samples_intersect:
+                        for j in output.jobs:
+                            assert (
+                                j
+                            ), f'Stage: {stage_}, target: {stage_}, output: {output}'
                         all_jobs.extend(output.jobs)
         return all_jobs
 
@@ -529,9 +533,13 @@ class Stage(Generic[TargetT], ABC):
         outputs.stage = self
         outputs.meta |= self.get_job_attrs(target)
 
-        for j in outputs.jobs:
-            if j:
-                j.depends_on(*inputs.get_jobs(target))
+        for output_job in outputs.jobs:
+            if output_job:
+                for input_job in inputs.get_jobs(target):
+                    assert (
+                        input_job
+                    ), f'Input dependency job for stage: {self}, target: {target}'
+                    output_job.depends_on(input_job)
 
         if outputs.error_msg:
             return outputs

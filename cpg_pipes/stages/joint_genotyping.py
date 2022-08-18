@@ -109,6 +109,8 @@ class JointGenotyping(CohortStage):
             qc_j.depends_on(*jc_jobs)
             jobs.append(qc_j)
 
+        for job in jobs:
+            assert job
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
 
 

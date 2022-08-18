@@ -57,7 +57,8 @@ class GenotypeSample(SampleStage):
                 job_attrs=self.get_job_attrs(),
                 output_prefix=self.tmp_prefix / 'intervals',
             )
-            jobs.append(intervals_j)
+            if intervals_j:
+                jobs.append(intervals_j)
             GenotypeSample.hc_interval_lists = interval_lists
         gvcf_path = self.expected_outputs(sample)['gvcf']
         gvcf_jobs = haplotype_caller.produce_gvcf(
