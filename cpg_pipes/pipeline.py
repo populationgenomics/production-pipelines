@@ -357,7 +357,7 @@ class StageInput:
                         for j in output.jobs:
                             assert (
                                 j
-                            ), f'Stage: {stage_}, target: {stage_}, output: {output}'
+                            ), f'Stage: {stage_}, target: {target_}, output: {output}'
                         all_jobs.extend(output.jobs)
         return all_jobs
 
