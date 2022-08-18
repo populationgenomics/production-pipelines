@@ -1,0 +1,1 @@
+gcloud builds submit --timeout=8h --tag=australia-southeast1-docker.pkg.dev/cpg-common/images/dragmap-debug:1.3.0

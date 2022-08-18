@@ -20,7 +20,7 @@ Finally, we copy the initialization script and the config to the CPG reference b
 gsutil cp vep-GRCh38.sh vep105-GRCh38-loftee-gcloud.json gs://cpg-reference/vep/
 ```
 
-Then you can start a cluster passing the initialisation script explicitly with `init`, instead of using the `vep` parameter:
+Then you can start a cluster passing the initialization script explicitly with `init`, instead of using the `vep` parameter:
 
 ```python
 from analysis_runner import dataproc

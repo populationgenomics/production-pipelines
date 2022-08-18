@@ -30,7 +30,7 @@ def produce_gvcf(
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     scatter_count: int = DEFAULT_INTERVALS_NUM,
-    intervals: list[hb.Resource] | None = None,
+    intervals: list[hb.Resource | None] | None = None,
     intervals_path: Path | None = None,
     overwrite: bool = False,
     dragen_mode: bool = True,
@@ -79,7 +79,7 @@ def haplotype_caller(
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     scatter_count: int = DEFAULT_INTERVALS_NUM,
-    intervals: list[hb.Resource] | None = None,
+    intervals: list[hb.Resource | None] | None = None,
     intervals_path: Path | None = None,
     overwrite: bool = True,
     dragen_mode: bool = True,
@@ -100,13 +100,15 @@ def haplotype_caller(
                 scatter_count=scatter_count,
                 output_prefix=tmp_prefix / 'intervals',
             )
-            jobs.append(intervals_j)
+            if intervals_j:
+                jobs.append(intervals_j)
         else:
             scatter_count = len(intervals)
 
         hc_jobs = []
         # Splitting variant calling by intervals
         for idx in range(scatter_count):
+            assert intervals[idx], intervals
             j = _haplotype_caller_one(
                 b,
                 sample_name=sample_name,
@@ -211,7 +213,7 @@ def _haplotype_caller_one(
     {"--dragen-mode " if dragen_mode else ""} \\
     -O {j.output_gvcf['g.vcf.gz']} \\
     -G AS_StandardAnnotation \\
-    -GQB 20 \\
+    -GQB 10 -GQB 20 -GQB 30 -GQB 40 -GQB 50 -GQB 60 -GQB 70 -GQB 80 -GQB 90 \\
     -ERC GVCF \\
     --create-output-variant-index
     """
@@ -333,6 +335,7 @@ def postproc_gvcf(
     --reference {reference.base} \\
     -V $GVCF_NODP \\
     -do-qual-approx \\
+    --floor-blocks -GQB 20 -GQB 30 -GQB 40 \\
     -O $REBLOCKED \\
     --create-output-variant-index true
 

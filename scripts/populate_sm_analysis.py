@@ -18,9 +18,9 @@ access_level = get_config()['workflow']['access_level']
 cohort = get_cohort()
 status = MetamistStatusReporter()
 
-POPULATE_SAMPLES = True
+POPULATE_SAMPLES = False
 POPULATE_QC = False
-POPULATE_JOINT_CALL = True
+POPULATE_JOINT_CALL = False
 POPULATE_ES_INDEX = True
 
 
@@ -134,19 +134,23 @@ if POPULATE_JOINT_CALL:
 
 if POPULATE_ES_INDEX:
     for name in [
+        'acute-care-genome-2022_0815_1644_xkhvx',
         'validation-genome-2022_0810_2358_474tt',
-        # 'acute-care-genome-2022_0620_1843_l4h8u',
-        # 'ravenscroft-arch-genome-2022_0618_1137_4qfyn',
-        # 'circa-genome-2022_0618_1137_4qfyn',
-        # 'ohmr3-mendelian-genome-2022_0618_1137_4qfyn',
-        # 'mito-disease-genome-2022_0618_1137_4qfyn',
-        # 'perth-neuro-genome-2022_0618_1137_4qfyn',
-        # 'ohmr4-epilepsy-genome-2022_0618_1137_4qfyn',
-        # 'hereditary-neuro-genome-2022_0618_1137_4qfyn',
-        # 'ravenscroft-rdstudy-genome-2022_0618_1137_4qfyn',
-        # 'heartkids-genome-2022_0618_1137_4qfyn',
+        'ravenscroft-arch-genome-2022_0618_1137_4qfyn',
+        'circa-genome-2022_0618_1137_4qfyn',
+        'ohmr3-mendelian-genome-2022_0618_1137_4qfyn',
+        'mito-disease-genome-2022_0618_1137_4qfyn',
+        'perth-neuro-genome-2022_0618_1137_4qfyn',
+        'ohmr4-epilepsy-genome-2022_0618_1137_4qfyn',
+        'hereditary-neuro-genome-2022_0618_1137_4qfyn',
+        'ravenscroft-rdstudy-genome-2022_0618_1137_4qfyn',
+        'heartkids-genome-2022_0618_1137_4qfyn',
+        # 'acute-care-exome-2022_0815_2246_h2pb9',
+        # 'mito-disease-exome-2022_0815_2246_h2pb9',
+        # 'hereditary-neuro-exome-2022_0815_2246_h2pb9',
+        # 'kidgen-exome-2022_0815_2246_h2pb9',
     ]:
-        ds_name = name.split('-genome-')[0]
+        ds_name = name.split(f'-{sequencing_type}-')[0]
         print(f'Adding {ds_name}')
         dataset = cohort.create_dataset(ds_name)
         status.create_analysis(

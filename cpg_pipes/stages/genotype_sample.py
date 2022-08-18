@@ -7,12 +7,12 @@ import hailtop.batch as hb
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
 
-from ..filetypes import GvcfPath
-from ..jobs import haplotype_caller
-from ..jobs.happy import happy
-from ..jobs.picard import vcf_qc, get_intervals
-from ..targets import Sample
-from ..pipeline import stage, SampleStage, StageInput, StageOutput
+from cpg_pipes.filetypes import GvcfPath
+from cpg_pipes.jobs import haplotype_caller
+from cpg_pipes.jobs.happy import happy
+from cpg_pipes.jobs.picard import vcf_qc, get_intervals
+from cpg_pipes.targets import Sample
+from cpg_pipes.pipeline import stage, SampleStage, StageInput, StageOutput
 from .align import Align
 
 
@@ -25,7 +25,7 @@ class GenotypeSample(SampleStage):
     Use HaplotypeCaller to genotype individual samples (i.e. CRAM -> GVCF).
     """
 
-    hc_intervals: list[hb.Resource] | None = None
+    hc_interval_lists: list[hb.Resource | None] | None = None
 
     def expected_outputs(self, sample: Sample) -> dict:
         """
@@ -47,8 +47,8 @@ class GenotypeSample(SampleStage):
             haplotype_caller.DEFAULT_INTERVALS_NUM,
         )
         jobs = []
-        if GenotypeSample.hc_intervals is None and scatter_count > 1:
-            intervals_j, intervals = get_intervals(
+        if GenotypeSample.hc_interval_lists is None and scatter_count > 1:
+            intervals_j, interval_lists = get_intervals(
                 b=self.b,
                 intervals_path=get_config()['workflow'].get('intervals_path'),
                 scatter_count=scatter_count,
@@ -56,14 +56,14 @@ class GenotypeSample(SampleStage):
                 output_prefix=self.tmp_prefix / 'intervals',
             )
             jobs.append(intervals_j)
-            GenotypeSample.hc_intervals = intervals
+            GenotypeSample.hc_interval_lists = interval_lists
         gvcf_path = self.expected_outputs(sample)['gvcf']
         gvcf_jobs = haplotype_caller.produce_gvcf(
             b=self.b,
             output_path=gvcf_path,
             sample_name=sample.id,
             cram_path=sample.make_cram_path(),
-            intervals=GenotypeSample.hc_intervals,
+            intervals=GenotypeSample.hc_interval_lists,
             tmp_prefix=self.tmp_prefix / sample.id,
             overwrite=not get_config()['workflow'].get('check_intermediates'),
             job_attrs=self.get_job_attrs(sample),
