@@ -7,8 +7,7 @@ import logging
 from cpg_utils import to_path
 from cpg_utils.config import get_config
 
-from cpg_pipes.stage_subclasses import CohortStage
-from cpg_pipes.pipeline import stage, StageInput, StageOutput
+from cpg_pipes.pipeline import stage, StageInput, StageOutput, CohortStage
 from cpg_pipes.jobs import vqsr
 from cpg_pipes.targets import Cohort
 from .joint_genotyping import JointGenotyping

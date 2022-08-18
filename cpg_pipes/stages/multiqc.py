@@ -5,12 +5,7 @@ import logging
 
 from cpg_pipes import Path
 from cpg_pipes.jobs.multiqc import multiqc
-from cpg_pipes.pipeline import (
-    stage,
-    StageInput,
-    StageOutput,
-)
-from cpg_pipes.stage_subclasses import DatasetStage, CohortStage
+from cpg_pipes.pipeline import stage, StageInput, StageOutput, DatasetStage, CohortStage
 from cpg_pipes.exceptions import StageInputNotFoundError
 from cpg_pipes.pipeline import StageDecorator
 from cpg_pipes.stages.align import Align, qc_functions

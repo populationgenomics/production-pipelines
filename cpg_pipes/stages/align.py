@@ -12,8 +12,7 @@ from cpg_pipes.jobs.align import Aligner, MarkDupTool, MissingAlignmentInputExce
 from cpg_pipes.jobs.verifybamid import verifybamid
 from cpg_pipes.jobs.picard import picard_wgs_metrics, picard_collect_metrics
 from cpg_pipes.targets import Sample
-from cpg_pipes.stage_subclasses import SampleStage
-from cpg_pipes.pipeline import stage, StageInput, StageOutput
+from cpg_pipes.pipeline import stage, StageInput, StageOutput, SampleStage
 from cpg_pipes.jobs import align, somalier
 
 logger = logging.getLogger(__file__)

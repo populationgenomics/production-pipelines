@@ -11,8 +11,7 @@ from cpg_utils import Path
 
 from .align import Align
 from cpg_pipes.targets import Dataset, Sample
-from cpg_pipes.pipeline import stage, StageInput, StageOutput
-from cpg_pipes.stage_subclasses import SampleStage, DatasetStage
+from cpg_pipes.pipeline import stage, StageInput, StageOutput, SampleStage, DatasetStage
 from cpg_pipes.jobs import somalier
 from cpg_pipes.utils import exists
 
