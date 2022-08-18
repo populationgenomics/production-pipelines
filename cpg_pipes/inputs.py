@@ -7,22 +7,15 @@ import traceback
 from collections import defaultdict
 from itertools import groupby
 
-from cpg_utils.config import get_config
 from sample_metadata import ApiException
+from cpg_utils.config import get_config
 
+from cpg_pipes.exceptions import MetamistError
 from cpg_pipes.filetypes import GvcfPath, CramPath
 from cpg_pipes.metamist import get_metamist, MmSequence, AnalysisType
 from cpg_pipes.targets import Cohort, Sex, PedigreeInfo
 
 logger = logging.getLogger(__file__)
-
-
-class InputError(Exception):
-    """
-    Exception thrown when there is something wrong while parsing inputs.
-    """
-
-    pass
 
 
 _cohort: Cohort | None = None
@@ -190,7 +183,7 @@ def _populate_alignment_inputs(
             sample.seq_by_type[seq.sequencing_type] = seq
             if seq.alignment_input:
                 if seq.sequencing_type in sample.alignment_input_by_seq_type:
-                    raise InputError(
+                    raise MetamistError(
                         f'{sample}: found more than 1 alignment input with '
                         f'sequencing type: {seq.sequencing_type}. Check your '
                         f'input provider to make sure there is only one data source '

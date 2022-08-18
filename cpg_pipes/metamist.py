@@ -10,6 +10,7 @@ from enum import Enum
 from typing import Optional
 
 from cpg_utils.config import get_config
+from cpg_utils import Path, to_path
 
 from sample_metadata import models
 from sample_metadata.apis import (
@@ -21,17 +22,11 @@ from sample_metadata.apis import (
 )
 from sample_metadata.exceptions import ApiException
 
-from cpg_pipes import Path, to_path
+from cpg_pipes.exceptions import MetamistError
 from cpg_pipes import utils
 from cpg_pipes.filetypes import FastqPair, CramPath, AlignmentInput, FastqPairs
 
 logger = logging.getLogger(__file__)
-
-
-class MetamistError(Exception):
-    """
-    Raised for problems interacting with metamist.
-    """
 
 
 _metamist: Optional['Metamist'] = None

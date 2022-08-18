@@ -12,7 +12,9 @@ from cpg_pipes.jobs import haplotype_caller
 from cpg_pipes.jobs.happy import happy
 from cpg_pipes.jobs.picard import vcf_qc, get_intervals
 from cpg_pipes.targets import Sample
-from cpg_pipes.pipeline import stage, SampleStage, StageInput, StageOutput
+from cpg_pipes.pipeline import stage, StageInput, StageOutput
+from cpg_pipes.stage_subclasses import SampleStage
+
 from .align import Align
 
 

@@ -16,7 +16,7 @@ from cpg_utils.hail_batch import copy_common_env, remote_tmpdir
 logger = logging.getLogger(__file__)
 
 
-class RegisteringBatch(hb.Batch):
+class Batch(hb.Batch):
     """
     Thin subclass of the Hail `Batch` class. The aim is to be able to register
     created jobs, in order to print statistics before submitting the Batch.
@@ -158,7 +158,7 @@ class RegisteringBatch(hb.Batch):
         )
 
 
-def setup_batch(description: str) -> RegisteringBatch:
+def setup_batch(description: str) -> Batch:
     """
     Wrapper around the initialisation of a Hail Batch object.
 
@@ -182,7 +182,7 @@ def setup_batch(description: str) -> RegisteringBatch:
         remote_tmpdir=bucket,
         token=os.environ.get('HAIL_TOKEN'),
     )
-    return RegisteringBatch(
+    return Batch(
         name=description,
         backend=backend,
         pool_label=pool_label,

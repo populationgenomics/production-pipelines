@@ -16,6 +16,8 @@ from cpg_pipes.pipeline import (
     stage,
     StageInput,
     StageOutput,
+)
+from cpg_pipes.stage_subclasses import (
     CohortStage,
     DatasetStage,
 )

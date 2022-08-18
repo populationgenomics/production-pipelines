@@ -12,7 +12,7 @@ from cpg_utils.config import get_config, set_config_paths, update_dict
 
 from cpg_pipes import to_path
 from cpg_pipes.filetypes import CramPath
-from cpg_pipes.pipeline.pipeline import Pipeline, Stage, StageDecorator
+from cpg_pipes.pipeline import Pipeline, Stage, StageDecorator
 from cpg_pipes.stages import seqr_loader
 from cpg_pipes.stages.genotype_sample import GenotypeSample
 from cpg_pipes.stages.joint_genotyping import JointGenotyping

@@ -12,13 +12,15 @@ from cpg_pipes.jobs.picard import vcf_qc
 from cpg_pipes.filetypes import GvcfPath
 from cpg_pipes.jobs import joint_genotyping
 from cpg_pipes.targets import Cohort, Sample
+from cpg_pipes.exceptions import PipelineError
 from cpg_pipes.pipeline import (
     stage,
-    CohortStage,
     StageInput,
     StageOutput,
-    PipelineError,
+)
+from cpg_pipes.stage_subclasses import (
     SampleStage,
+    CohortStage,
 )
 from .genotype_sample import GenotypeSample
 

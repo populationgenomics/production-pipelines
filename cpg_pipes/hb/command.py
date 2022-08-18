@@ -6,11 +6,10 @@ import logging
 from typing import List, Union
 import textwrap
 
+from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build, remote_tmpdir
 from hailtop.batch import ResourceFile
-
-from cpg_pipes import Path
 
 logger = logging.getLogger(__file__)
 

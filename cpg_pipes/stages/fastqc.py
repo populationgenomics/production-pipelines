@@ -9,8 +9,9 @@ from cpg_utils import Path
 
 from cpg_pipes.jobs import fastqc
 from cpg_pipes.targets import Sample
-from cpg_pipes.pipeline import stage, SampleStage, StageInput, StageOutput
+from cpg_pipes.pipeline import stage, StageInput, StageOutput
 from cpg_pipes.filetypes import CramPath
+from cpg_pipes.stage_subclasses import SampleStage
 
 logger = logging.getLogger(__file__)
 

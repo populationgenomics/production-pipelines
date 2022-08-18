@@ -10,15 +10,10 @@ from cpg_utils.hail_batch import image_path
 from hailtop.batch.job import Job
 from hailtop.batch import Batch, Resource
 
-from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.targets import Target, Sample
-from .metamist import get_metamist, MetamistError, AnalysisStatus
-
-
-class StatusReporterError(Exception):
-    """
-    Raised for problems reporting status
-    """
+from .hb.command import wrap_command
+from .targets import Target, Sample
+from .metamist import get_metamist, AnalysisStatus
+from .exceptions import MetamistError
 
 
 class StatusReporter(ABC):
@@ -92,9 +87,8 @@ class MetamistStatusReporter(StatusReporter):
                 meta=meta,
             )
         ) is None:
-            raise StatusReporterError(
-                'SmdbStatusReporter error: failed to create analysis'
-            )
+            raise MetamistError('Failed to create analysis')
+
         # 2. Queue a job that updates the status to "in-progress"
         in_progress_j = self.add_status_updater_job(
             b,

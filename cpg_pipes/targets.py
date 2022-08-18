@@ -13,13 +13,13 @@ from cpg_utils.hail_batch import dataset_path, web_url
 from cpg_utils.config import get_config
 from cpg_utils import Path, to_path
 
-from cpg_pipes.filetypes import (
+from .filetypes import (
     AlignmentInput,
     CramPath,
     GvcfPath,
     FastqPairs,
 )
-from cpg_pipes.metamist import MmSequence
+from .metamist import MmSequence
 
 logger = logging.getLogger(__file__)
 

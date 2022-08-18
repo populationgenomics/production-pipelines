@@ -7,13 +7,14 @@ Stages to run somalier tools.
 import logging
 
 from cpg_utils.config import get_config
+from cpg_utils import Path
 
 from .align import Align
-from .. import Path
-from ..targets import Dataset, Sample
-from ..pipeline import stage, SampleStage, DatasetStage, StageInput, StageOutput
-from ..jobs import somalier
-from ..utils import exists
+from cpg_pipes.targets import Dataset, Sample
+from cpg_pipes.pipeline import stage, StageInput, StageOutput
+from cpg_pipes.stage_subclasses import SampleStage, DatasetStage
+from cpg_pipes.jobs import somalier
+from cpg_pipes.utils import exists
 
 logger = logging.getLogger(__file__)
 

@@ -8,13 +8,13 @@ from typing import Callable, Optional
 from cpg_utils.config import get_config
 from cpg_utils import Path
 
-from ..jobs.align import Aligner, MarkDupTool, MissingAlignmentInputException
-from ..jobs.samtools import samtools_stats
-from ..jobs.verifybamid import verifybamid
-from ..jobs.picard import picard_wgs_metrics, picard_collect_metrics
-from ..targets import Sample
-from ..pipeline import stage, SampleStage, StageInput, StageOutput
-from ..jobs import align, somalier
+from cpg_pipes.jobs.align import Aligner, MarkDupTool, MissingAlignmentInputException
+from cpg_pipes.jobs.verifybamid import verifybamid
+from cpg_pipes.jobs.picard import picard_wgs_metrics, picard_collect_metrics
+from cpg_pipes.targets import Sample
+from cpg_pipes.stage_subclasses import SampleStage
+from cpg_pipes.pipeline import stage, StageInput, StageOutput
+from cpg_pipes.jobs import align, somalier
 
 logger = logging.getLogger(__file__)
 

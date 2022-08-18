@@ -52,7 +52,6 @@ def filter_low_conf_regions(
     Filter low-confidence regions.
 
     @param mt: MatrixTable or Table to filter
-    @param refs: reference data
     @param filter_lcr: Whether to filter LCR regions
     @param filter_segdup: Whether to filter Segdup regions
     @param filter_telomeres_and_centromeres: Whether to filter telomeres and centromeres

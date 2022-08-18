@@ -5,14 +5,12 @@ Wrappers for bioinformatics file types (CRAM, GVCF, FASTQ, etc).
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
-from typing import Union, Optional
+from typing import Union
 
 from hailtop.batch import ResourceGroup, ResourceFile, Batch
 
-from . import Path, to_path
-from . import utils
-from .utils import exists
+from cpg_utils import Path, to_path
+from cpg_pipes import utils
 
 logger = logging.getLogger(__file__)
 
@@ -72,7 +70,7 @@ class CramPath(AlignmentInput):
         """
         CRAM file exists.
         """
-        return exists(self.path)
+        return utils.exists(self.path)
 
     def resource_group(self, b: Batch) -> ResourceGroup:
         """

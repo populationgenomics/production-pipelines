@@ -13,7 +13,7 @@ from functools import lru_cache
 from random import choices
 from typing import cast
 
-from . import Path, to_path
+from cpg_utils import Path, to_path
 
 logger = logging.getLogger(__file__)
 

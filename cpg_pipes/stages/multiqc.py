@@ -9,11 +9,10 @@ from cpg_pipes.pipeline import (
     stage,
     StageInput,
     StageOutput,
-    DatasetStage,
-    CohortStage,
 )
-from cpg_pipes.pipeline.exceptions import StageInputNotFound
-from cpg_pipes.pipeline.pipeline import StageDecorator
+from cpg_pipes.stage_subclasses import DatasetStage, CohortStage
+from cpg_pipes.exceptions import StageInputNotFoundError
+from cpg_pipes.pipeline import StageDecorator
 from cpg_pipes.stages.align import Align, qc_functions
 from cpg_pipes.stages.genotype_sample import GenotypeSample, GvcfHappy
 from cpg_pipes.stages.joint_genotyping import JointGenotyping, JointVcfHappy
@@ -69,7 +68,7 @@ class CramMultiQC(DatasetStage):
                 dataset, CramSomalierPedigree, id='samples'
             )
             somalier_pairs = inputs.as_path(dataset, CramSomalierPedigree, id='pairs')
-        except StageInputNotFound:
+        except StageInputNotFoundError:
             pass
         else:
             paths = [
@@ -91,7 +90,7 @@ class CramMultiQC(DatasetStage):
             for key, st in stage_by_key.items():
                 try:
                     path = inputs.as_path(sample, st, key)
-                except StageInputNotFound:  # allow missing inputs
+                except StageInputNotFoundError:  # allow missing inputs
                     logger.warning(
                         f'Output for stage {st.__name__} not found for {sample}, '
                         f'skipping'
@@ -172,7 +171,7 @@ class GvcfMultiQC(DatasetStage):
                 dataset, CramSomalierPedigree, id='samples'
             )
             somalier_pairs = inputs.as_path(dataset, CramSomalierPedigree, id='pairs')
-        except StageInputNotFound:
+        except StageInputNotFoundError:
             pass
         else:
             paths = [
@@ -189,7 +188,7 @@ class GvcfMultiQC(DatasetStage):
             ]:
                 try:
                     path = inputs.as_path(sample, st, key)
-                except StageInputNotFound:  # allow missing inputs
+                except StageInputNotFoundError:  # allow missing inputs
                     if st != GvcfHappy:
                         logger.warning(
                             f'Output for stage {st.__name__} not found for {sample}, '

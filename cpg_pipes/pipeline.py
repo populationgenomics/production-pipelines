@@ -23,13 +23,13 @@ from hailtop.batch.job import Job
 from cpg_utils.config import get_config
 from cpg_utils import Path, to_path
 
-from cpg_pipes.hb.batch import setup_batch, RegisteringBatch
+from cpg_pipes.hb.batch import setup_batch, Batch
 from cpg_pipes.status import MetamistStatusReporter
 from cpg_pipes.targets import Target, Dataset, Sample, Cohort
 from cpg_pipes.status import StatusReporter
 from cpg_pipes.utils import exists, timestamp, slugify
 from cpg_pipes.inputs import get_cohort
-from .exceptions import PipelineError, StageInputNotFound
+from cpg_pipes.exceptions import PipelineError, StageInputNotFoundError
 
 logger = logging.getLogger(__file__)
 
@@ -283,12 +283,12 @@ class StageInput:
         stage: StageDecorator,
     ):
         if not self._outputs_by_target_by_stage.get(stage.__name__):
-            raise StageInputNotFound(
+            raise StageInputNotFoundError(
                 f'Not found output from stage {stage.__name__}, required for stage '
                 f'{self.stage.name}'
             )
         if not self._outputs_by_target_by_stage[stage.__name__].get(target.target_id):
-            raise StageInputNotFound(
+            raise StageInputNotFoundError(
                 f'Not found output for {target} from stage {stage.__name__}, required '
                 f'for stage {self.stage.name}'
             )
@@ -377,7 +377,7 @@ class Stage(Generic[TargetT], ABC):
     def __init__(
         self,
         name: str,
-        batch: RegisteringBatch,
+        batch: Batch,
         cohort: Cohort,
         pipeline_tmp_prefix: Path,
         run_id: str,
@@ -795,7 +795,7 @@ class Pipeline:
         description += f' [{get_config()["workflow"]["sequencing_type"]}]'
         if ds_set := set(d.name for d in self.cohort.get_datasets()):
             description += ' ' + ', '.join(sorted(ds_set))
-        self.b: RegisteringBatch = setup_batch(description=description)
+        self.b: Batch = setup_batch(description=description)
 
         self.status_reporter = None
         if get_config()['workflow'].get('status_reporter') == 'metamist':

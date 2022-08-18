@@ -5,7 +5,8 @@ from cpg_utils import to_path
 from cpg_utils.config import get_config
 
 from cpg_pipes.jobs import vep
-from cpg_pipes.pipeline import stage, StageInput, StageOutput, CohortStage
+from cpg_pipes.pipeline import stage, StageInput, StageOutput
+from cpg_pipes.stage_subclasses import CohortStage
 from cpg_pipes.stages.vqsr import Vqsr
 from cpg_pipes.targets import Cohort
 
