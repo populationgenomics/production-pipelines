@@ -9,8 +9,8 @@ from hailtop.batch.job import Job
 
 from cpg_pipes.providers.cpg.images import CpgImages
 from cpg_pipes.providers.images import Images
-from cpg_pipes.hb.batch import setup_batch
-from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.batch import setup_batch
+from cpg_pipes.command import wrap_command
 from cpg_pipes.providers.cpg.refdata import CpgRefData
 from cpg_pipes.providers.refdata import RefData
 

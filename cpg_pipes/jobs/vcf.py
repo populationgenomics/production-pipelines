@@ -10,8 +10,8 @@ from hailtop.batch.job import Job
 
 from cpg_pipes import Path
 from cpg_pipes import utils
-from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.command import wrap_command
+from cpg_pipes.resources import STANDARD
 
 logger = logging.getLogger(__file__)
 

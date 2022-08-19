@@ -14,7 +14,7 @@ import logging
 from cpg_utils.config import get_config, update_dict
 from cpg_utils.hail_batch import reference_path, image_path
 
-from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.command import wrap_command
 from cpg_pipes.pipeline.pipeline import Pipeline
 
 logger = logging.getLogger(__file__)

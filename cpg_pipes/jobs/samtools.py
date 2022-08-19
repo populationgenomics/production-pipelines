@@ -7,8 +7,8 @@ from cpg_utils.hail_batch import image_path, fasta_res_group
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
-from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.command import wrap_command
+from cpg_pipes.resources import STANDARD
 from cpg_pipes.filetypes import CramPath
 from cpg_pipes.utils import can_reuse
 

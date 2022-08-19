@@ -353,7 +353,7 @@ def main(**kwargs):
 The `cpg_pipes.hb.batch` module provides a helper function `setup_batch` to set up Hail Batch in the CPG context:
 
 ```python
-from cpg_pipes.hb.batch import setup_batch
+from cpg_pipes.batch import setup_batch
 b = setup_batch('My batch')
 ```
 
@@ -380,14 +380,16 @@ fewgenomes/CPG196535: My job
 `cpg_pipes.hb.command` provides a helper to set up a command that can be used to add monitoring of disk space, or authenticate with GCP to make `gsutil` work:
 
 ```python
-from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.command import wrap_command
 b = ...
 j = b.new_job('My job')
-j.command(wrap_command(
-    'sleep 600',
-    monitor_space=True,
-    setup_gcp=True,
-))
+j.command(
+    wrap_command(
+        'sleep 600',
+        monitor_space=True,
+        setup_gcp=True,
+    )
+)
 ```
 
 This will wrap the command as follows:

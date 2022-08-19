@@ -9,8 +9,8 @@ from hailtop.batch.job import Job
 
 from cpg_pipes import Path
 from cpg_pipes.filetypes import CramPath
-from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.hb.resources import STANDARD, storage_for_cram_qc_job
+from cpg_pipes.command import wrap_command
+from cpg_pipes.resources import STANDARD, storage_for_cram_qc_job
 from cpg_pipes.utils import can_reuse
 
 logger = logging.getLogger(__file__)

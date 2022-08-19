@@ -16,8 +16,8 @@ from cpg_pipes.filetypes import (
     FastqPairs,
     FastqPair,
 )
-from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.command import wrap_command
+from cpg_pipes.resources import STANDARD
 
 
 def fastqc(

@@ -14,8 +14,8 @@ from hailtop.batch.job import Job
 
 from cpg_pipes import Path
 from cpg_pipes import utils
-from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.command import wrap_command
+from cpg_pipes.resources import STANDARD
 from cpg_pipes.jobs.picard import get_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
 from cpg_pipes.targets import Sample

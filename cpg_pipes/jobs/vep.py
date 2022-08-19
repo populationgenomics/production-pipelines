@@ -12,8 +12,8 @@ from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
 from cpg_pipes import utils, Path, to_path
-from cpg_pipes.hb.resources import STANDARD
-from cpg_pipes.hb.command import wrap_command, python_command
+from cpg_pipes.resources import STANDARD
+from cpg_pipes.command import wrap_command, python_command
 from cpg_pipes.jobs.picard import get_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs, subset_vcf
 from cpg_pipes.query import vep as vep_module

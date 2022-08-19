@@ -10,7 +10,7 @@ from cpg_utils.hail_batch import image_path
 from hailtop.batch.job import Job
 from hailtop.batch import Batch, Resource
 
-from .hb.command import wrap_command
+from cpg_pipes.command import wrap_command
 from .targets import Target, Sample
 from .metamist import get_metamist, AnalysisStatus
 from .exceptions import MetamistError

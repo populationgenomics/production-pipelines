@@ -13,8 +13,8 @@ from cpg_pipes import Path
 from cpg_pipes.jobs.picard import get_intervals
 from cpg_pipes.filetypes import CramPath, GvcfPath
 from cpg_pipes import utils
-from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.hb.resources import STANDARD, HIGHMEM
+from cpg_pipes.command import wrap_command
+from cpg_pipes.resources import STANDARD, HIGHMEM
 
 logger = logging.getLogger(__file__)
 

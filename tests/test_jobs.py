@@ -14,7 +14,7 @@ from hailtop.batch.job import Job
 from cpg_pipes import Path, to_path
 from cpg_pipes import benchmark
 from cpg_pipes.hailquery import init_batch
-from cpg_pipes.hb.batch import setup_batch
+from cpg_pipes.batch import setup_batch
 from cpg_pipes.jobs import vep
 from cpg_pipes.jobs.align import align
 from cpg_pipes.jobs.fastqc import fastqc

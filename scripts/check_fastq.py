@@ -1,7 +1,7 @@
 from cpg_utils.hail_batch import image_path
 
-from cpg_pipes.hb.batch import setup_batch
-from cpg_pipes.hb.command import python_command, GCLOUD_CMD
+from cpg_pipes.batch import setup_batch
+from cpg_pipes.command import python_command, GCLOUD_CMD
 
 from cpg_pipes.query import check_fastq
 

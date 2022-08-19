@@ -8,7 +8,7 @@ from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
 from cpg_pipes import Path
-from cpg_pipes.hb.command import python_command
+from cpg_pipes.command import python_command
 from cpg_pipes.query import seqr_loader
 
 logger = logging.getLogger(__file__)

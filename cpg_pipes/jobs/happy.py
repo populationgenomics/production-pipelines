@@ -9,8 +9,8 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import reference_path, image_path, fasta_res_group
 from hailtop.batch import ResourceGroup
 
-from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.command import wrap_command
+from cpg_pipes.resources import STANDARD
 from cpg_pipes.targets import Sample
 
 logger = logging.getLogger(__file__)

@@ -6,8 +6,8 @@ import hailtop.batch as hb
 from cpg_utils.hail_batch import image_path, reference_path
 
 from cpg_pipes import to_path
-from cpg_pipes.hb.batch import setup_batch
-from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.batch import setup_batch
+from cpg_pipes.command import wrap_command
 
 
 MAKE_VEP_CACHE_TAR = False

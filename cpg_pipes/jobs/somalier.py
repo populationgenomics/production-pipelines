@@ -16,8 +16,8 @@ from hailtop.batch import Batch, Resource
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path, to_path
-from cpg_pipes.hb.command import wrap_command, seds_to_extend_sample_ids
-from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.command import wrap_command, seds_to_extend_sample_ids
+from cpg_pipes.resources import STANDARD
 from cpg_pipes.jobs.scripts import check_pedigree
 from cpg_pipes.slack import slack_message_cmd
 from cpg_pipes.targets import Dataset, Sample

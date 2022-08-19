@@ -12,8 +12,8 @@ from hailtop.batch.job import Job
 from hailtop.batch import Batch, ResourceFile
 
 from cpg_pipes import Path
-from cpg_pipes.hb.command import wrap_command, seds_to_extend_sample_ids
-from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.command import wrap_command, seds_to_extend_sample_ids
+from cpg_pipes.resources import STANDARD
 from cpg_pipes.jobs.scripts import check_multiqc
 from cpg_pipes.targets import Dataset
 

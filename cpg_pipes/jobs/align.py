@@ -16,8 +16,8 @@ from cpg_pipes import Path
 from cpg_pipes.targets import Sample
 from cpg_pipes.filetypes import AlignmentInput, FastqPairs, CramPath
 from cpg_pipes.jobs import picard
-from cpg_pipes.hb.command import wrap_command
-from cpg_pipes.hb.resources import STANDARD
+from cpg_pipes.command import wrap_command
+from cpg_pipes.resources import STANDARD
 from cpg_pipes.utils import can_reuse, exists
 
 logger = logging.getLogger(__file__)

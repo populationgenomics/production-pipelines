@@ -7,14 +7,14 @@ import logging
 import hailtop.batch as hb
 from cpg_utils.hail_batch import reference_path, image_path
 
-from cpg_pipes.hb.resources import STANDARD, HIGHMEM
+from cpg_pipes.resources import STANDARD, HIGHMEM
 from hailtop.batch.job import Job
 
 from cpg_pipes import Path
 from cpg_pipes import utils
 from cpg_pipes.jobs.picard import get_intervals
 from cpg_pipes.jobs.vcf import gather_vcfs
-from cpg_pipes.hb.command import wrap_command
+from cpg_pipes.command import wrap_command
 
 logger = logging.getLogger(__file__)
 
