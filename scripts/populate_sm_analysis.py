@@ -9,9 +9,9 @@ from collections import defaultdict
 from cpg_utils import Path
 from cpg_utils.config import get_config
 
-from cpg_pipes.inputs import get_cohort
-from cpg_pipes.status import MetamistStatusReporter
-from cpg_pipes.utils import exists
+from workflows.inputs import get_cohort
+from workflows.status import MetamistStatusReporter
+from workflows.utils import exists
 
 sequencing_type = get_config()['workflow']['sequencing_type']
 access_level = get_config()['workflow']['access_level']

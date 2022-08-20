@@ -9,20 +9,19 @@ from pprint import pprint
 from unittest import skip
 
 import hail as hl
-from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build
 
-from cpg_pipes import to_path, Namespace
-from cpg_pipes import hailquery
-from cpg_pipes.query.seqr_loader import (
+from cpg_utils import to_path
+from cpg_utils.workflow import hailquery
+from jobs.query_scripts import (
     annotate_cohort,
     subset_mt_to_samples,
     annotate_dataset_mt,
     load_vqsr,
 )
-from cpg_pipes.query.vep import vep_json_to_ht
-from cpg_pipes.filetypes import logger
-from cpg_pipes.utils import timestamp
+from jobs.query_scripts.vep import vep_json_to_ht
+from workflows.filetypes import logger
+from workflows.utils import timestamp
 
 try:
     import utils
@@ -165,7 +164,7 @@ class TestQuery(unittest.TestCase):
 
     @skip('Not implemented in Batch backend')
     def test_vcf_combiner(self):
-        from cpg_pipes.targets import Cohort
+        from workflows.targets import Cohort
 
         dataset = Cohort(
             analysis_dataset_name=utils.DATASET,

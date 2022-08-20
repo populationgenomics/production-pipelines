@@ -9,9 +9,9 @@ import tempfile
 import click
 import pandas as pd
 
-from cpg_pipes import Path, to_path
-from cpg_pipes.inputs import get_cohort
-from cpg_pipes.targets import Dataset
+from workflows import Path, to_path
+from workflows.inputs import get_cohort
+from workflows.targets import Dataset
 
 logger = logging.getLogger(__file__)
 

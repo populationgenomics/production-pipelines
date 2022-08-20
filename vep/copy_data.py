@@ -3,11 +3,9 @@ Use Hail Batch to transfer VEP reference data cpg-reference bucket.
 """
 
 import hailtop.batch as hb
-from cpg_utils.hail_batch import image_path, reference_path
-
-from cpg_pipes import to_path
-from cpg_pipes.batch import setup_batch
-from cpg_pipes.command import wrap_command
+from cpg_utils import to_path
+from cpg_utils.flows.batch import setup_batch
+from cpg_utils.hail_batch import image_path, reference_path, command
 
 
 MAKE_VEP_CACHE_TAR = False
@@ -43,7 +41,7 @@ def _test(b: hb.Batch):
     ls {vep_dir}/vep
     cat {vep_dir}/vep/homo_sapiens/105_GRCh38/info.txt
     """
-    j.command(wrap_command(cmd))
+    j.command(command(cmd))
 
 
 def _uncompress(b: hb.Batch):
@@ -73,7 +71,7 @@ def _uncompress(b: hb.Batch):
 
     gsutil cp -r * {str(reference_path('vep_mount'))}/
     """
-    j.command(wrap_command(cmd, setup_gcp=True))
+    j.command(command(cmd, setup_gcp=True))
     return j
 
 
@@ -95,7 +93,7 @@ def _vep_cache(b: hb.Batch):
     vep_install -a cf -s homo_sapiens -y GRCh38 -c vep --CONVERT
     tar -cvf {j.tar} vep
     """
-    j.command(wrap_command(cmd))
+    j.command(command(cmd))
     b.write_output(j.tar, str(reference_path('vep_cache')))
     return j
 
@@ -128,7 +126,7 @@ def _loftee(b: hb.Batch):
 
     tar -cvf {j.tar} .
     """
-    j.command(wrap_command(cmd))
+    j.command(command(cmd))
     b.write_output(j.tar, str(reference_path('vep_loftee')))
 
 

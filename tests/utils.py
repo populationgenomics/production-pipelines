@@ -2,15 +2,12 @@
 Common test utilities.
 """
 import toml
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import set_config_paths, update_dict
-
-from cpg_pipes import to_path, Namespace
-from cpg_pipes.filetypes import GvcfPath, FastqPair
+from cpg_utils.flows.filetypes import GvcfPath, FastqPair
 
 DATASET = 'fewgenomes'
 ACCESS_LEVEL = 'test'
-Namespace = Namespace.TEST
 BASE_BUCKET = to_path('gs://cpg-fewgenomes-test/unittest')
 
 # Samples for joint calling

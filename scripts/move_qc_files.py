@@ -6,7 +6,7 @@ populated automatically with `workflow/status_provider="metamist"` set in config
 from cloudpathlib.exceptions import OverwriteNewerCloudError
 from cpg_utils import to_path
 
-from cpg_pipes.inputs import get_cohort
+from workflows.inputs import get_cohort
 
 
 cohort = get_cohort()

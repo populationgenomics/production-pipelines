@@ -31,9 +31,9 @@ Overall classes and object relationships look as follows:
 To declare a stage, derive a class from `SampleStage`, `ProjectStage`, or `CohortStage`, implement the abstract methods, and wrap the class with a `@stage` decorator:
 
 ```python
-from cpg_pipes.pipeline import stage, StageInput, StageOutput, SampleStage
-from cpg_pipes.targets import Sample
-from cpg_pipes import Path, to_path
+from workflows.pipeline import stage, StageInput, StageOutput, SampleStage
+from workflows.targets import Sample
+from workflows import Path, to_path
 
 
 @stage
@@ -62,8 +62,8 @@ The `queue_jobs` method is expected to return an output of type `StageOutput`: y
 Stages can depend on each other. Use the `required_stages` parameter to `@stage` to set dependencies, and use the `inputs` parameter in `queue_jobs` to get the output of a previous stage:
 
 ```python
-from cpg_pipes.pipeline import stage, StageInput, StageOutput, SampleStage
-from cpg_pipes.targets import Sample
+from workflows.pipeline import stage, StageInput, StageOutput, SampleStage
+from workflows.targets import Sample
 
 
 @stage(required_stages=[Align])
@@ -79,9 +79,9 @@ class ReadCramFile(SampleStage):
 Stage of differnet levels can depend on each other, and `cpg_pipes` will resolve that correctly. E.g. joint-calling taking GVCF outputs to produce a cohort-level VCF:
 
 ```python
-from cpg_pipes.pipeline import stage, StageInput, StageOutput, SampleStage,
-    CohortStage
-from cpg_pipes.targets import Sample, Cohort
+from workflows.pipeline import stage, StageInput, StageOutput, SampleStage,
+CohortStage
+from workflows.targets import Sample, Cohort
 
 
 @stage
@@ -111,8 +111,8 @@ class JointCalling(CohortStage):
 To submit the constructed pipeline to Hail Batch, create a pipeline with `create_pipeline`, and call `submit_batch()`. You need to pass a name, a description, a version of a run, the namespace according to the storage policies (`test` / `main` / `tmp`), and the `analysis_dataset` name that would be used to communicate with the sample metadata DB.
 
 ```python
-from cpg_pipes.pipeline import create_pipeline
-from cpg_pipes import Namespace
+from workflows.pipeline import create_pipeline
+from workflows import Namespace
 
 pipeline = create_pipeline(
     name='my_pipeline',
@@ -135,8 +135,8 @@ hgdp,NA12879,NA12879,NA12879_R1.fq.gz|NA12879_R2.fq.gz,,M
 ```
 
 ```python
-from cpg_pipes.providers import InputProviderType
-from cpg_pipes.pipeline import create_pipeline
+from workflows.providers import InputProviderType
+from workflows.pipeline import create_pipeline
 
 pipeline = create_pipeline(
     ...,
@@ -148,8 +148,8 @@ pipeline = create_pipeline(
 `SmdbInputProvider` allows to pull input data from the CPG [sample metadata database](https://github.com/populationgenomics/sample-metadata):
 
 ```python
-from cpg_pipes.providers import InputProviderType
-from cpg_pipes.pipeline import create_pipeline
+from workflows.providers import InputProviderType
+from workflows.pipeline import create_pipeline
 
 pipeline = create_pipeline(
     ...,
@@ -182,10 +182,10 @@ Outputs are written according to provided storage policy. Class `cpg_pipes.provi
 The `cpg_pipes.jobs` module defines functions that create Hail Batch Jobs for different bioinformatics purposes: alignment, fastqc, deduplication, variant calling, VQSR, etc. E.g. to implement the joint calling stage above, you can use:
 
 ```python
-from cpg_pipes.pipeline import stage, SampleStage, CohortStage, StageInput, StageOutput
-from cpg_pipes.targets import Sample, Cohort
-from cpg_pipes.jobs import haplotype_caller, joint_genotyping
-from cpg_pipes.filetypes import CramPath, GvcfPath
+from workflows.pipeline import stage, SampleStage, CohortStage, StageInput, StageOutput
+from workflows.targets import Sample, Cohort
+from jobs import joint_genotyping, haplotype_caller
+from workflows.filetypes import CramPath, GvcfPath
 
 
 @stage
@@ -234,7 +234,8 @@ class JointCalling(CohortStage):
 Available jobs include alignment:
 
 ```python
-from cpg_pipes.jobs import align
+
+from jobs import align
 
 sample = ...
 j = align.align(
@@ -248,14 +249,15 @@ j = align.align(
 Getting intervals for sharding variant calling:
 
 ```python
-from cpg_pipes.jobs import split_intervals
+from workflows.jobs import split_intervals
 j, intervals = split_intervals.get_intervals(b=..., scatter_count=20)
 ```
 
 Generate somalier pedigree fingerprints:
 
 ```python
-from cpg_pipes.jobs import somalier
+
+from jobs import somalier
 fingerprint_job, fingerprint_path = somalier.extact_job(
     b=...,
     gvcf_or_cram_or_bam_path=...,
@@ -266,7 +268,8 @@ fingerprint_job, fingerprint_path = somalier.extact_job(
 Infer pedigree relashionships and sex of samples in a dataset, and check with a probided PED file:
 
 ```python
-from cpg_pipes.jobs import somalier
+
+from jobs import somalier
 dataset = ...
 j, somalier_samples_path, somalier_pairs_path = somalier.ancestry(
     b=...,
@@ -282,7 +285,8 @@ j, somalier_samples_path, somalier_pairs_path = somalier.ancestry(
 VQSR (from a site-only VCF or a Hail matrix table):
 
 ```python
-from cpg_pipes.jobs import vqsr
+
+from jobs import vqsr
 cohort = ...
 j = vqsr.make_vqsr_jobs(
     b=...,
@@ -314,7 +318,7 @@ The `cpg_pipes/pipeline/cli_opts.py` module provides CLI options for Click that 
 
 ```python
 import click
-from cpg_pipes.pipeline import create_pipeline, pipeline_entry_point
+from workflows.pipeline import create_pipeline, pipeline_entry_point
 
 
 @click.command()
@@ -333,7 +337,7 @@ You can add more custom options like this:
 
 ```python
 import click
-from cpg_pipes.pipeline import pipeline_entry_point, create_pipeline
+from workflows.pipeline import pipeline_entry_point, create_pipeline
 
 
 @click.command()
@@ -353,7 +357,7 @@ def main(**kwargs):
 The `cpg_pipes.hb.batch` module provides a helper function `setup_batch` to set up Hail Batch in the CPG context:
 
 ```python
-from cpg_pipes.batch import setup_batch
+from workflows.batch import setup_batch
 b = setup_batch('My batch')
 ```
 
@@ -380,7 +384,7 @@ fewgenomes/CPG196535: My job
 `cpg_pipes.hb.command` provides a helper to set up a command that can be used to add monitoring of disk space, or authenticate with GCP to make `gsutil` work:
 
 ```python
-from cpg_pipes.command import wrap_command
+from workflows.command import wrap_command
 b = ...
 j = b.new_job('My job')
 j.command(
@@ -416,7 +420,8 @@ You can also start from a specific stage with `--first-stage`, or finish on spec
 You can use `@skip` decorator to force skipping a stage:
 
 ```python
-from cpg_pipes.pipeline import stage, skip, SampleStage
+from workflows.pipeline import stage, skip, SampleStage
+
 
 @skip(reason='Stage is not needed')
 @stage
@@ -427,7 +432,8 @@ class MyStage1(SampleStage):
 `assume_outputs_exist=True` would also tell the code that the expected results of that stage exist, and there is no need to check bucket objects for existence:
 
 ```python
-from cpg_pipes.pipeline import stage, skip, SampleStage
+from workflows.pipeline import stage, skip, SampleStage
+
 
 @skip
 @stage(assume_outputs_exist=True)

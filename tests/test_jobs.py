@@ -11,24 +11,24 @@ from unittest import skip
 from cpg_utils.hail_batch import image_path, fasta_res_group
 from hailtop.batch.job import Job
 
-from cpg_pipes import Path, to_path
-from cpg_pipes import benchmark
-from cpg_pipes.hailquery import init_batch
-from cpg_pipes.batch import setup_batch
-from cpg_pipes.jobs import vep
-from cpg_pipes.jobs.align import align
-from cpg_pipes.jobs.fastqc import fastqc
-from cpg_pipes.jobs.haplotype_caller import produce_gvcf
-from cpg_pipes.jobs.joint_genotyping import (
+from workflows import Path, to_path
+from workflows import benchmark
+from jobs.utils.hailquery import init_batch
+from workflows.batch import setup_batch
+from workflows.jobs import vep
+from jobs.align import align
+from workflows.jobs.fastqc import fastqc
+from jobs.haplotype_caller import produce_gvcf
+from jobs.joint_genotyping import (
     make_joint_genotyping_jobs,
     JointGenotyperTool,
 )
-from cpg_pipes.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jobs
-from cpg_pipes.jobs.somalier import check_pedigree_job
-from cpg_pipes.jobs.vqsr import make_vqsr_jobs
-from cpg_pipes.targets import Dataset
-from cpg_pipes.filetypes import CramPath
-from cpg_pipes.utils import timestamp
+from workflows.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jobs
+from jobs.somalier import check_pedigree_job
+from jobs.vqsr import make_vqsr_jobs
+from workflows.targets import Dataset
+from workflows.filetypes import CramPath
+from workflows.utils import timestamp
 
 try:
     import utils

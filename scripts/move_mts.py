@@ -2,7 +2,7 @@
 Copy dataset mts from seqr bucket to dataset buckets.
 """
 
-from cpg_pipes.hailquery import init_batch
+from cpg_utils.hail_batch import init_batch
 import hail as hl
 
 init_batch()

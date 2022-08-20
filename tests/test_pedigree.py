@@ -4,8 +4,8 @@ Testing pedigree checks.
 
 import unittest
 
-from cpg_pipes import to_path
-from cpg_pipes.jobs.scripts import check_pedigree
+from workflows import to_path
+from workflows.jobs.scripts import check_pedigree
 
 
 class TestPedigree(unittest.TestCase):

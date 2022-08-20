@@ -8,16 +8,14 @@ import unittest
 from unittest import skip
 from unittest.mock import patch, Mock
 
-from cpg_utils.config import get_config, set_config_paths, update_dict
+from cpg_utils.config import set_config_paths, update_dict
 
-from cpg_pipes import to_path
-from cpg_pipes.filetypes import CramPath
-from cpg_pipes.pipeline import Pipeline, Stage, StageDecorator
-from cpg_pipes.stages import seqr_loader
-from cpg_pipes.stages.genotype_sample import GenotypeSample
-from cpg_pipes.stages.joint_genotyping import JointGenotyping
-from cpg_pipes.stages.vqsr import Vqsr
-from cpg_pipes.utils import timestamp
+from cpg_utils import to_path
+from cpg_utils.flows.filetypes import CramPath
+from cpg_utils.flows.workflow import Workflow, StageDecorator, timestamp
+from cpg_utils.flows.workflow import Stage
+
+from stages import seqr_loader, genotype, joint_genotyping, vqsr
 
 try:
     import utils
@@ -65,7 +63,7 @@ class TestPipeline(unittest.TestCase):
     def _setup_pipeline(self, stages: list[StageDecorator]):
         # Mocking elastic search password for the full dry run test:
         seqr_loader.es_password = Mock(return_value='TEST')
-        pipeline = Pipeline(name=self._testMethodName, stages=stages)
+        pipeline = Workflow(stages=stages)
         self.datasets = [pipeline.create_dataset(utils.DATASET)]
         for ds in self.datasets:
             for s_id in self.sample_ids:
@@ -113,7 +111,10 @@ class TestPipeline(unittest.TestCase):
             / 'inputs/exome1pct/calling_regions.interval_list',
         )
         pipeline = self._setup_pipeline(
-            stages=[GenotypeSample.__name__, JointGenotyping.__name__],
+            stages=[
+                genotype.Genotype.__name__,
+                joint_genotyping.JointGenotyping.__name__,
+            ],
         )
         result = pipeline.run(wait=True)
         self.assertEqual('success', result.status()['state'])
@@ -128,7 +129,7 @@ class TestPipeline(unittest.TestCase):
             / 'inputs/exome5pct/calling_regions.interval_list',
         )
         pipeline = self._setup_pipeline(
-            stages=[Vqsr.__name__, seqr_loader.AnnotateDataset.__name__],
+            stages=[vqsr.Vqsr.__name__, seqr_loader.AnnotateDataset.__name__],
         )
         # Mocking joint-calling outputs. Toy CRAM/GVCF don't produce enough variant
         # data for AS-VQSR to work properly: gatk would throw a "Bad input: Values for
@@ -139,7 +140,9 @@ class TestPipeline(unittest.TestCase):
         jc_vcf = utils.BASE_BUCKET / 'inputs/exome5pct/9samples-joint-called.vcf.gz'
 
         siteonly_vcf = to_path(str(jc_vcf).replace('.vcf.gz', '-siteonly.vcf.gz'))
-        expected_output = JointGenotyping(pipeline).expected_outputs(pipeline.cohort)
+        expected_output = joint_genotyping.JointGenotyping(pipeline).expected_outputs(
+            pipeline.cohort
+        )
         jc_vcf.copy(expected_output['vcf'], force_overwrite_to_cloud=True)
         to_path(str(jc_vcf) + '.tbi').copy(
             str(expected_output['vcf']) + '.tbi', force_overwrite_to_cloud=True

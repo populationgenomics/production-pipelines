@@ -1,9 +1,9 @@
 from cpg_utils.hail_batch import image_path
 
-from cpg_pipes.batch import setup_batch
-from cpg_pipes.command import python_command, GCLOUD_CMD
+from workflows.batch import setup_batch
+from workflows.command import python_command, GCLOUD_CMD
 
-from cpg_pipes.query import check_fastq
+from jobs.query_scripts import check_fastq
 
 if __name__ == '__main__':
     b = setup_batch('Test FASTQs')

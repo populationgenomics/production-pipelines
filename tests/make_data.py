@@ -9,11 +9,11 @@ from cpg_utils.hail_batch import reference_path, image_path, fasta_res_group
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
-from cpg_pipes import Path
-from cpg_pipes.resources import STANDARD
-from cpg_pipes.jobs.align import extract_fastq
-from cpg_pipes.pipeline.pipeline import Pipeline
-from cpg_pipes.filetypes import CramPath
+from workflows import Path
+from workflows.resources import STANDARD
+from jobs.align import extract_fastq
+from workflows.pipeline.pipeline import Pipeline
+from workflows.filetypes import CramPath
 
 import utils
 
