@@ -83,9 +83,7 @@ class TestPipeline(unittest.TestCase):
         job commands passed to it.
         """
         self.setup_env(extra_conf={'hail': {'dry_run': True}})
-        set_config_paths(
-            ['pipelines/configs/seqr.toml', 'pipelines/configs/validation-dry.toml']
-        )
+        set_config_paths(['configs/seqr.toml', 'configs/validation-dry.toml'])
         pipeline = self._setup_pipeline(stages=[seqr_loader.LoadToEs])
 
         with patch('builtins.print') as mock_print:
