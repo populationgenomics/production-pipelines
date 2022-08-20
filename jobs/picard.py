@@ -141,6 +141,7 @@ def markdup(
     )
     fasta_reference = fasta_res_group(b)
 
+    assert isinstance(j.output_cram, hb.ResourceGroup)
     cmd = f"""
     picard MarkDuplicates -Xms{resource.get_java_mem_mb()}M \\
     I={sorted_bam} O=/dev/stdout M={j.markdup_metrics} \\

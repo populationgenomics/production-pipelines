@@ -147,7 +147,7 @@ def align(
     sharded_bazam = isinstance(alignment_input, CramPath) and realignment_shards_num > 1
     sharded = sharded_fq or sharded_bazam
 
-    jobs = []
+    jobs: list[Job] = []
     sharded_align_jobs = []
     sorted_bams = []
 
@@ -183,7 +183,8 @@ def align(
                     aligner=aligner,
                     should_sort=True,
                 )
-                j.command(command(cmd, monitor_space=True))
+                assert isinstance(j, Job)
+                j.command(command(cmd, monitor_space=True))  # type: ignore
                 sorted_bams.append(j.sorted_bam)
                 sharded_align_jobs.append(j)
 
@@ -204,8 +205,8 @@ def align(
                 )
                 # Sorting with samtools, but not adding deduplication yet, because we
                 # need to merge first.
-                j.command(command(cmd, monitor_space=True))
-                sorted_bams.append(str(j.sorted_bam))
+                j.command(command(cmd, monitor_space=True))  # type: ignore
+                sorted_bams.append(j.sorted_bam)
                 sharded_align_jobs.append(j)
 
         merge_j = b.new_job(
@@ -224,7 +225,7 @@ def align(
         ).get_nthreads()
 
         align_cmd = f"""\
-        samtools merge -@{nthreads - 1} - {' '.join(sorted_bams)}
+        samtools merge -@{nthreads - 1} - {' '.join(map(str, sorted_bams))}
         """.strip()
         output_fmt = 'bam'
         jobs.extend(sharded_align_jobs)
@@ -245,7 +246,7 @@ def align(
         align_cmd_out_fmt=output_fmt,
         overwrite=overwrite,
     )
-    if md_j != merge_or_align_j:
+    if md_j and md_j != merge_or_align_j:
         jobs.append(md_j)
 
     return jobs
@@ -428,11 +429,11 @@ def _align_one(
             dedent(
                 f"""
             mkfifo {fname}
-            {command} > {fname} &
+            {cmd} > {fname} &
             pid_{fname}=$!
         """
             ).strip()
-            for fname, command in fifo_commands.items()
+            for fname, cmd in fifo_commands.items()
         ]
 
         _fifo_waits = ' && '.join(
@@ -479,12 +480,7 @@ def extract_fastq(
         j.storage('700G')
 
     reference = fasta_res_group(b)
-    index_cmd = ''
-    index_ext = 'crai' if ext == 'cram' else 'bai'
-    if not index_ext not in cram:
-        index_cmd = f'samtools index {cram[ext]}'
     cmd = f"""
-    {index_cmd}
     bazam -Xmx16g -Dsamjdk.reference_fasta={reference.base} \
     -n{nthreads} -bam {cram[ext]} -r1 {j.fq1} -r2 {j.fq2}
     """
@@ -532,12 +528,13 @@ def finalise_alignment(
 
     md_j = None
     if markdup_tool == MarkDupTool.BIOBAMBAM:
-        j.declare_resource_group(
+        j.declare_resource_group(  # type: ignore
             output_cram={
                 'cram': '{root}.cram',
                 'cram.crai': '{root}.cram.crai',
             }
         )
+        assert isinstance(j.output_cram, hb.ResourceGroup)
         align_cmd = f"""\
         {align_cmd.strip()} \\
         | bamsormadup inputformat={align_cmd_out_fmt} threads={min(nthreads, 6)} \\
@@ -556,8 +553,9 @@ def finalise_alignment(
             align_cmd += f' {sort_cmd(nthreads)}'
         align_cmd += f' > {j.sorted_bam}'
 
-    j.command(command(align_cmd, monitor_space=True))
+    j.command(command(align_cmd, monitor_space=True))  # type: ignore
 
+    assert isinstance(j.sorted_bam, hb.ResourceFile)
     if markdup_tool == MarkDupTool.PICARD:
         md_j = picard.markdup(
             b,

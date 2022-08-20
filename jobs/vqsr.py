@@ -252,7 +252,7 @@ def make_vqsr_jobs(
             job_attrs=job_attrs,
         )
         jobs.append(model_j)
-        assert isinstance(model_j.model_file, hb.ResourceGroup)
+        assert isinstance(model_j.model_file, hb.ResourceFile)
 
         snps_recalibrator_jobs = [
             add_snps_variant_recalibrator_scattered_step(
@@ -631,7 +631,7 @@ def add_snps_variant_recalibrator_create_model_step(
 def add_snps_variant_recalibrator_scattered_step(
     b: hb.Batch,
     sites_only_vcf: hb.ResourceGroup,
-    model_file: hb.ResourceGroup,
+    model_file: hb.ResourceFile,
     hapmap_resource_vcf: hb.ResourceGroup,
     omni_resource_vcf: hb.ResourceGroup,
     one_thousand_genomes_resource_vcf: hb.ResourceGroup,

@@ -8,6 +8,7 @@ from enum import Enum
 
 import pandas as pd
 import hailtop.batch as hb
+from cpg_utils.flows.utils import can_reuse, exists
 from hailtop.batch import Resource
 from hailtop.batch.job import Job
 
@@ -57,7 +58,7 @@ def make_joint_genotyping_jobs(
     Adds samples to the GenomicsDB and runs joint genotyping on them.
     Outputs a multi-sample VCF under `output_vcf_path`.
     """
-    if utils.can_reuse([out_vcf_path, out_siteonly_vcf_path], overwrite):
+    if can_reuse([out_vcf_path, out_siteonly_vcf_path], overwrite):
         return []
     if len(gvcf_by_sid) == 0:
         raise ValueError(
@@ -213,7 +214,7 @@ def genomicsdb(
     """
     Create GenomicDBs for an interval.
     """
-    if utils.can_reuse(output_path, overwrite):
+    if can_reuse(output_path, overwrite):
         return None
 
     job_name = 'Joint genotyping: creating GenomicsDB'
@@ -351,7 +352,7 @@ def _samples_to_add_to_db(
     tmp_bucket: Path,
     gvcf_by_sid: dict[str, GvcfPath],
 ) -> tuple[set[str], set[str], set[str], bool, Path]:
-    if utils.exists(genomicsdb_gcs_path / 'callset.json'):
+    if exists(genomicsdb_gcs_path / 'callset.json'):
         # Checking if samples exists in the DB already
         with (genomicsdb_gcs_path / 'callset.json').open() as f:
             db_metadata = json.load(f)
@@ -557,7 +558,7 @@ def _add_joint_genotyper_job(
     ReblockGVCF must be run to add all the annotations necessary for VQSR:
     QUALapprox, VarDP, RAW_MQandDP.
     """
-    if utils.can_reuse(output_vcf_path, overwrite):
+    if can_reuse(output_vcf_path, overwrite):
         return None, b.read_input_group(
             **{
                 'vcf.gz': str(output_vcf_path),
@@ -590,6 +591,7 @@ def _add_joint_genotyper_job(
         WORKSPACE=gendb.{genomicsdb_path}
         """
 
+    assert isinstance(j.output_vcf, hb.ResourceGroup)
     cmd = f"""\
     {input_cmd}
     
@@ -645,7 +647,7 @@ def _add_exccess_het_filter(
 
     Returns: a Job object with a single output j.output_vcf of type ResourceGroup
     """
-    if utils.can_reuse(output_vcf_path, overwrite):
+    if can_reuse(output_vcf_path, overwrite):
         return None, b.read_input_group(
             **{
                 'vcf.gz': str(output_vcf_path),
@@ -662,6 +664,7 @@ def _add_exccess_het_filter(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
 
+    assert isinstance(j.output_vcf, hb.ResourceGroup)
     j.command(
         command(
             f"""
@@ -698,7 +701,7 @@ def _add_make_sitesonly_job(
 
     Returns: a Job object with a single output j.sites_only_vcf of type ResourceGroup
     """
-    if output_vcf_path and utils.can_reuse(output_vcf_path, overwrite):
+    if output_vcf_path and can_reuse(output_vcf_path, overwrite):
         return None, b.read_input_group(
             **{
                 'vcf.gz': str(output_vcf_path),
@@ -715,6 +718,7 @@ def _add_make_sitesonly_job(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
 
+    assert isinstance(j.output_vcf, hb.ResourceGroup)
     j.command(
         command(
             f"""

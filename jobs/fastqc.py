@@ -4,20 +4,20 @@ Jobs to run FastQC
 from os.path import basename
 from typing import cast
 
-import hailtop.batch as hb
+from cpg_utils import Path
 from cpg_utils.hail_batch import image_path
+import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from workflows import Path
-from workflows.filetypes import (
+from cpg_utils.flows.filetypes import (
     AlignmentInput,
     CramPath,
     FastqPath,
     FastqPairs,
     FastqPair,
 )
-from workflows.command import wrap_command
-from workflows.resources import STANDARD
+from cpg_utils.hail_batch import command
+from cpg_utils.flows.resources import STANDARD
 
 
 def fastqc(
@@ -36,12 +36,12 @@ def fastqc(
         raise NotImplementedError('FastQC does not support CRAM input')
 
     def _fastqc_one(jname_, input_path: CramPath | FastqPath):
-        j = b.new_job(jname_, job_attrs)
-        j.image(image_path('fastqc'))
-        threads = STANDARD.set_resources(j, ncpu=16).get_nthreads()
+        j_ = b.new_job(jname_, job_attrs)
+        j_.image(image_path('fastqc'))
+        threads = STANDARD.set_resources(j_, ncpu=16).get_nthreads()
 
         cmd = ''
-        input_file = b.read_input(str(input_path))
+        input_file: str | hb.ResourceFile = b.read_input(str(input_path))
         fname = basename(str(input_path))
         if isinstance(input_path, FastqPair):
             if not str(input_path).endswith('.gz'):
@@ -63,15 +63,15 @@ def fastqc(
         fastqc -t{threads} {input_file} \\
         --outdir /io/batch/outdir
         ls /io/batch/outdir
-        ln /io/batch/outdir/*_fastqc.html {j.out_html}
-        ln /io/batch/outdir/*_fastqc.zip {j.out_zip}
+        ln /io/batch/outdir/*_fastqc.html {j_.out_html}
+        ln /io/batch/outdir/*_fastqc.zip {j_.out_zip}
         unzip /io/batch/outdir/*_fastqc.zip
         """
-        j.command(wrap_command(cmd, monitor_space=True))
+        j_.command(command(cmd, monitor_space=True))
 
-        b.write_output(j.out_html, str(output_html_path))
-        b.write_output(j.out_zip, str(output_zip_path))
-        return j
+        b.write_output(j_.out_html, str(output_html_path))
+        b.write_output(j_.out_zip, str(output_zip_path))
+        return j_
 
     jobs = []
     if isinstance(alignment_input, CramPath):

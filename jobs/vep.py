@@ -7,11 +7,12 @@ import logging
 from typing import Literal
 
 import hailtop.batch as hb
+from cpg_utils.flows.utils import can_reuse
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import image_path, reference_path, command
+from cpg_utils.hail_batch import image_path, reference_path, command, python_command
 from cpg_utils.flows.resources import STANDARD
 
 from .picard import get_intervals
@@ -43,7 +44,7 @@ def vep_jobs(
     if not to_hail_table:
         assert str(out_path).endswith('.vcf.gz'), out_path
 
-    if out_path and utils.can_reuse(out_path, overwrite):
+    if out_path and can_reuse(out_path, overwrite):
         return [b.new_job('VEP [reuse]', job_attrs)]
 
     jobs: list[Job] = []
@@ -167,7 +168,7 @@ def vep_one(
     """
     Run a single VEP job.
     """
-    if out_path and utils.can_reuse(out_path, overwrite):
+    if out_path and can_reuse(out_path, overwrite):
         return []
 
     j = b.new_job('VEP', job_attrs)
@@ -222,7 +223,7 @@ def vep_one(
         cmd += f'tabix -p vcf {output}'
 
     j.command(
-        wrap_command(
+        command(
             cmd,
             setup_gcp=True,
             monitor_space=True,
