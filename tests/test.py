@@ -8,7 +8,7 @@ import pytest
 import toml
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config, set_config_paths, update_dict
-from cpg_utils.flows.batch import setup_batch
+from cpg_utils.flows.batch import get_batch
 from cpg_utils.flows.utils import timestamp
 from cpg_utils.hail_batch import dataset_path, init_batch
 
@@ -40,35 +40,24 @@ def tmp_dir() -> Path:
     shutil.rmtree(dir_path)
 
 
-LOCAL_CONF_D = {
-    'workflow': {
-        'path_scheme': 'local', 
-        'local_dir': tmp_dir,
-    },
-    'hail': {'backend': 'local'},
-}
+def _local_backend_config(dir_path: Path):
+    _set_config(dir_path, {
+        'workflow': {
+            'path_scheme': 'local', 
+            'local_dir': str(dir_path),
+        },
+        'hail': {'backend': 'local'},
+    })
 
 
 def _set_config(dir_path: Path, extra_conf: dict | None = None):
     d = toml.loads(DEFAULT_CONF)
-    update_dict(d, extra_conf)
+    if extra_conf:
+        update_dict(d, extra_conf)
     config_path = dir_path / 'config.toml'
     with config_path.open('w') as f:
         toml.dump(d, f)
     set_config_paths([str(config_path)])
-
-
-@pytest.fixture()
-def config_local(config: dict) -> dict:
-    config['workflow']['path_scheme'] = 'local'
-    config['workflow']['local_dir'] = tmp_dir
-    config['hail']['backend'] = 'local'
-    return config
-
-
-@pytest.fixture
-def batch():
-    return setup_batch('Test batch job')
 
 
 def test_workflow_dry(tmp_dir: Path):
@@ -90,12 +79,12 @@ def test_workflow_dry(tmp_dir: Path):
         }
     })
     import main
-    workflow = main.main()
-    assert len(workflow.b.job_by_tool['gatk_HaplotypeCaller']) == len(sample_ids) * intervals_num
-    assert len(workflow.b.job_by_tool['picard_MergeVcfs']) == len(sample_ids)
-    assert len(workflow.b.job_by_tool['gatk_ReblockGVCF']) == len(sample_ids)
-    assert len(workflow.b.job_by_tool['picard_CollectVariantCallingMetrics']) == len(sample_ids)
-    assert len(workflow.b.job_by_tool['gatk_GenomicsDBImport']) == intervals_num
+    main.main()
+    assert get_batch().job_by_tool['gatk_HaplotypeCaller']['job_n'] == len(sample_ids) * intervals_num
+    assert get_batch().job_by_tool['picard_MergeVcfs']['job_n'] == len(sample_ids)
+    assert get_batch().job_by_tool['gatk_ReblockGVCF']['job_n'] == len(sample_ids)
+    assert get_batch().job_by_tool['picard_CollectVariantCallingMetrics']['job_n'] == len(sample_ids) + 1
+    assert get_batch().job_by_tool['gatk_GenomicsDBImport']['job_n'] == intervals_num
 
 
 def test_annotate_cohort():
@@ -123,7 +112,7 @@ def test_annotate_cohort():
 
     from jobs.seqr_loader import annotate_cohort_jobs
     j = annotate_cohort_jobs(
-        b,
+        get_batch('test_annotate_cohort'),
         vcf_path=vcf_path,
         siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
         vep_ht_path=vep_ht_path,
@@ -131,7 +120,7 @@ def test_annotate_cohort():
         sequencing_type='genome',
         checkpoint_prefix=out_prefix / 'checkpoints',
     )
-    b.run(wait=True)
+    get_batch().run(wait=True)
 
     # Testing
     init_batch()
