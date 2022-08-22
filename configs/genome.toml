@@ -1,0 +1,9 @@
+[workflow]
+sequencing_type = 'genome'
+
+jc_intervals_num = 200
+vqsr_intervals_num = 200
+vep_intervals_num = 200
+
+[workflow.resources.Align]
+storage_gb = 500

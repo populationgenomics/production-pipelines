@@ -1,33 +1,35 @@
 #!/usr/bin/env python
 
-import os
-from os.path import join
 import setuptools
 
 
 setuptools.setup(
-    name='cpg-pipes',
-    version='0.3.5',
+    name='cpg-workflows',
+    version='0.3.10',
     description='Hail Batch bioinformatics pipelines',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     url='https://github.com/populationgenomics/production-pipelines',
     license='MIT',
-    packages=['cpg_pipes']
-    + ['cpg_pipes.' + p for p in sorted(setuptools.find_packages('./cpg_pipes'))],
-    package_data={'cpg_pipes': ['filter_cutoffs.yaml']},
+    packages=['jobs', 'stages']
+    + ['jobs.' + p for p in sorted(setuptools.find_packages('./jobs'))]
+    + ['stages.' + p for p in sorted(setuptools.find_packages('./stages'))],
     include_package_data=True,
     zip_safe=False,
-    scripts=[
-        join('scripts', fname)
-        for fname in os.listdir('scripts')
-        if fname.endswith('.py')
-    ],
+    entry_points={
+        'console_scripts': ['main=main'],
+        'stages': [
+            "MtToEs = stages.seqr_loader:MtToEs",
+            "CramMultiQC = stages.multiqc:CramMultiQC",
+            "GvcfMultiQC = stages.multiqc:GvcfMultiQC",
+        ],
+    },
     install_requires=[
         'cpg-utils',
+        'pytest',
         'pandas',
         'hail>=0.2.91',
-        'cpg-gnomad',  # github.com/populationgenomics/gnomad_methods
+        'cpg-gnomad',  # https://github.com/populationgenomics/gnomad_methods
         'peddy',
         'google-cloud-storage',
         'google-cloud-secret-manager',
@@ -37,7 +39,8 @@ setuptools.setup(
         'cloudpathlib[all]',
         'coloredlogs',
         'types-PyYAML',  # https://mypy.readthedocs.io/en/stable/getting_started.html#library-stubs-and-typeshed
-        'python-slugify',
+        'slack_sdk',
+        'elasticsearch==8.*',
     ],
     keywords='bioinformatics',
     classifiers=[

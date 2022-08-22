@@ -1,0 +1,4 @@
+[workflow]
+skip_stages = ['Align', 'GenotypeSample', 'JointGenotyping']
+check_expected_outputs = true
+allow_missing_outputs_for_stages = ['Align', 'GenotypeSample', 'JointGenotyping', 'CramSomalierPedigree']

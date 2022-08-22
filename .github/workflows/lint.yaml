@@ -17,13 +17,10 @@ jobs:
 
     - name: Install packages
       run: |
-        pip install .
-        pip install -r requirements-dev.txt
+        pip install pre-commit pylint
 
     - name: Install pre-commit
-      run: |
-        # Installing hooks
-        pre-commit install --install-hooks
+      run: pre-commit install --install-hooks
 
     - name: pre-commit
       run: pre-commit run --all-files
