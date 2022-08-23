@@ -19,9 +19,9 @@ setuptools.setup(
     entry_points={
         'console_scripts': ['main=main'],
         'stages': [
-            "MtToEs = stages.seqr_loader:MtToEs",
-            "CramMultiQC = stages.multiqc:CramMultiQC",
-            "GvcfMultiQC = stages.multiqc:GvcfMultiQC",
+            'MtToEs = stages.seqr_loader:MtToEs',
+            'CramMultiQC = stages.multiqc:CramMultiQC',
+            'GvcfMultiQC = stages.multiqc:GvcfMultiQC',
         ],
     },
     install_requires=[

@@ -30,7 +30,7 @@ def main():
     
     avail_stage_by_name = dict()
     for entry_point in pkg_resources.iter_entry_points('stages'):
-        class_name = str(entry_point).split("=")[0].strip()
+        class_name = str(entry_point).split('=')[0].strip()
         avail_stage_by_name[class_name] = entry_point
     
     # Check that we were able to find some stages.
