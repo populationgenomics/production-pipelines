@@ -6,8 +6,8 @@ import logging
 
 from cpg_utils.config import get_config
 from cpg_utils import Path
-from cpg_utils.flows.filetypes import CramPath
-from cpg_utils.flows.workflow import Sample, stage, StageInput, StageOutput, SampleStage
+from cpg_utils.workflows.filetypes import CramPath
+from cpg_utils.workflows.workflow import Sample, stage, StageInput, StageOutput, SampleStage
 
 from jobs import fastqc
 

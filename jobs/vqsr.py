@@ -6,10 +6,10 @@ from typing import List, Optional
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_utils.flows.utils import can_reuse
+from cpg_utils.workflows.utils import can_reuse
 from cpg_utils import Path
 from cpg_utils.hail_batch import reference_path, image_path, command
-from cpg_utils.flows.resources import STANDARD, HIGHMEM
+from cpg_utils.workflows.resources import STANDARD, HIGHMEM
 
 from jobs.picard import get_intervals
 from jobs.vcf import gather_vcfs

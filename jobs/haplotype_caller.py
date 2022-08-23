@@ -12,9 +12,9 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path, command
 
 from jobs.picard import get_intervals
-from cpg_utils.flows.filetypes import CramPath, GvcfPath
-from cpg_utils.flows import utils
-from cpg_utils.flows.resources import STANDARD, HIGHMEM
+from cpg_utils.workflows.filetypes import CramPath, GvcfPath
+from cpg_utils.workflows import utils
+from cpg_utils.workflows.resources import STANDARD, HIGHMEM
 
 
 DEFAULT_INTERVALS_NUM = 50

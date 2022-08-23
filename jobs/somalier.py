@@ -17,11 +17,11 @@ from cpg_utils.hail_batch import (
     copy_common_env,
     command,
 )
-from cpg_utils.flows.resources import STANDARD
-from cpg_utils.flows.slack import slack_message_cmd
-from cpg_utils.flows.targets import Dataset, Sample
-from cpg_utils.flows.filetypes import CramPath, GvcfPath
-from cpg_utils.flows.utils import can_reuse, rich_sample_id_seds
+from cpg_utils.workflows.resources import STANDARD
+from cpg_utils.workflows.slack import slack_message_cmd
+from cpg_utils.workflows.targets import Dataset, Sample
+from cpg_utils.workflows.filetypes import CramPath, GvcfPath
+from cpg_utils.workflows.utils import can_reuse, rich_sample_id_seds
 
 from .python_scripts import check_pedigree
 

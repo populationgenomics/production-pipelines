@@ -7,7 +7,7 @@ import coloredlogs
 import pkg_resources
 
 from cpg_utils.config import get_config
-from cpg_utils.flows.workflow import WorkflowError, Workflow
+from cpg_utils.workflows.workflow import WorkflowError, Workflow
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
 coloredlogs.install(level='DEBUG', fmt=fmt)

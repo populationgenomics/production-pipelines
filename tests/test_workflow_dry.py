@@ -8,8 +8,8 @@ import pytest
 import toml
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config, set_config_paths, update_dict
-from cpg_utils.flows.batch import get_batch
-from cpg_utils.flows.utils import timestamp
+from cpg_utils.workflows.batch import get_batch
+from cpg_utils.workflows.utils import timestamp
 from cpg_utils.hail_batch import dataset_path, init_batch
 
 

@@ -15,10 +15,10 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from cpg_utils.hail_batch import command
 
-from cpg_utils.flows.targets import Sample
-from cpg_utils.flows.filetypes import AlignmentInput, FastqPairs, CramPath
-from cpg_utils.flows.resources import STANDARD
-from cpg_utils.flows.utils import can_reuse, exists
+from cpg_utils.workflows.targets import Sample
+from cpg_utils.workflows.filetypes import AlignmentInput, FastqPairs, CramPath
+from cpg_utils.workflows.resources import STANDARD
+from cpg_utils.workflows.utils import can_reuse, exists
 
 from jobs import picard
 

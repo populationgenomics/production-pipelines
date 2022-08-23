@@ -9,7 +9,7 @@ from cpg_utils.hail_batch import image_path
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_utils.flows.filetypes import (
+from cpg_utils.workflows.filetypes import (
     AlignmentInput,
     CramPath,
     FastqPath,
@@ -17,7 +17,7 @@ from cpg_utils.flows.filetypes import (
     FastqPair,
 )
 from cpg_utils.hail_batch import command
-from cpg_utils.flows.resources import STANDARD
+from cpg_utils.workflows.resources import STANDARD
 
 
 def fastqc(

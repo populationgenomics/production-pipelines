@@ -6,8 +6,8 @@ import logging
 import hailtop.batch as hb
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
-from cpg_utils.flows.filetypes import GvcfPath
-from cpg_utils.flows.workflow import Sample, stage, StageInput, StageOutput, SampleStage
+from cpg_utils.workflows.filetypes import GvcfPath
+from cpg_utils.workflows.workflow import Sample, stage, StageInput, StageOutput, SampleStage
 
 from jobs import haplotype_caller
 from jobs.happy import happy

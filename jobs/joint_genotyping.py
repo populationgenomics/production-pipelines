@@ -8,16 +8,16 @@ from enum import Enum
 
 import pandas as pd
 import hailtop.batch as hb
-from cpg_utils.flows.utils import can_reuse, exists
+from cpg_utils.workflows.utils import can_reuse, exists
 from hailtop.batch import Resource
 from hailtop.batch.job import Job
 
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path, command
 from cpg_utils import Path
 
-from cpg_utils.flows.resources import STANDARD
-from cpg_utils.flows.targets import Sample
-from cpg_utils.flows.filetypes import GvcfPath
+from cpg_utils.workflows.resources import STANDARD
+from cpg_utils.workflows.targets import Sample
+from cpg_utils.workflows.filetypes import GvcfPath
 
 from .vcf import gather_vcfs
 from .picard import get_intervals

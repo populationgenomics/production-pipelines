@@ -5,9 +5,9 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path
 from cpg_utils.hail_batch import image_path, fasta_res_group, command
-from cpg_utils.flows.resources import STANDARD
-from cpg_utils.flows.filetypes import CramPath
-from cpg_utils.flows.utils import can_reuse
+from cpg_utils.workflows.resources import STANDARD
+from cpg_utils.workflows.filetypes import CramPath
+from cpg_utils.workflows.utils import can_reuse
 
 
 def samtools_stats(

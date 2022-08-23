@@ -3,12 +3,12 @@ Helper Hail Batch jobs useful for both individual and joint variant calling.
 """
 
 import hailtop.batch as hb
-from cpg_utils.flows.utils import can_reuse
+from cpg_utils.workflows.utils import can_reuse
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
 from cpg_utils.hail_batch import image_path, fasta_res_group, command
-from cpg_utils.flows.resources import STANDARD
+from cpg_utils.workflows.resources import STANDARD
 
 
 def subset_vcf(

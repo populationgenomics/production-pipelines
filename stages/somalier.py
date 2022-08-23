@@ -8,7 +8,7 @@ import logging
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.flows.workflow import (
+from cpg_utils.workflows.workflow import (
     stage,
     StageInput,
     StageOutput,

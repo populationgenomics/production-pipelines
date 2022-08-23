@@ -7,13 +7,13 @@ Creates a Hail Batch job to run the command line VEP tool.
 from typing import Literal
 
 import hailtop.batch as hb
-from cpg_utils.flows.utils import can_reuse
+from cpg_utils.workflows.utils import can_reuse
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
 from cpg_utils import Path, to_path
 from cpg_utils.hail_batch import image_path, reference_path, command, query_command
-from cpg_utils.flows.resources import STANDARD
+from cpg_utils.workflows.resources import STANDARD
 
 from .picard import get_intervals
 from .vcf import gather_vcfs, subset_vcf
