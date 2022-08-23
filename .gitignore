@@ -1,5 +1,5 @@
 # Byte-compiled / optimized / DLL files
-__pycache__/
+__pycache__
 *.py[cod]
 *$py.class
 
@@ -128,14 +128,15 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# IDEs
 .idea
+.vscode
+
+# MacOS
 .DS_Store
 
 playground
-dockers/cpg_pipes
-
-.vscode/
 notebooks
 
 tests/results
-__pycache__
+tests/data

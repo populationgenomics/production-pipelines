@@ -1,0 +1,37 @@
+name: Test Query functions
+on: [workflow_dispatch]
+jobs:
+  test_jobs:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+    env:
+      GSA_KEY: ${{ secrets.GCP_SA_KEY }}
+      HAIL_TOKEN: ${{ secrets.HAIL_TOKEN }}
+      SEQR_ES_PASSWORD: ${{ secrets.SEQR_ES_PASSWORD }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+
+      - name: gcloud auth
+        uses: google-github-actions/auth@v0
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      # Install gcloud, `setup-gcloud` automatically picks up authentication from `auth`
+      - name: install gcloud
+        uses: google-github-actions/setup-gcloud@main
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+
+      - name: Build wheel
+        run: python setup.py sdist
+
+      - name: Install
+        run: pip install dist/*
+   
+      - name: Test
+        run: python -m unittest tests.test_query
