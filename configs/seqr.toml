@@ -34,7 +34,6 @@ skip_samples = [
     'CPG246561',  # ag-hidden, coverage ~0x https://main-web.populationgenomics.org.au/ag-hidden/qc/cram/multiqc.html
 ]
 stages = ['LoadToEs']
-force_all_implicit_stages = true
 
 check_inputs = true
 check_intermediates = true
@@ -48,11 +47,11 @@ vep_intervals_num = 200
 bwamem = 'gs://cpg-reference/hg38/v0/Homo_sapiens_assembly38.fasta'
 
 [qc_thresholds.genome.min]
-"MEDIAN_COVERAGE" = 10
-"PCT_PF_READS_ALIGNED" = 80
+MEDIAN_COVERAGE = 10
+PCT_PF_READS_ALIGNED = 80
 [qc_thresholds.genome.max]
-"FREEMIX" = 0.04
-"PERCENT_DUPLICATION" = 25
+FREEMIX = 0.04
+PERCENT_DUPLICATION = 25
 
 [hail]
 pool_label = 'seqr'
@@ -70,28 +69,3 @@ SYNDIP = 'syndip'
 
 [references]
 liftover_38_to_37 = 'liftover/grch38_to_grch37.over.chain.gz'
-
-[references.broad]
-# Genome contamination check
-genome_contam_ud =  'contamination-resources/1000g/1000g.phase3.100k.b38.vcf.gz.dat.UD'
-genome_contam_bed = 'contamination-resources/1000g/1000g.phase3.100k.b38.vcf.gz.dat.bed'
-genome_contam_mu =  'contamination-resources/1000g/1000g.phase3.100k.b38.vcf.gz.dat.mu'
-# Exome contamination check
-exome_contam_ud = 'contamination-resources/1000g/whole_exome_illumina_coding_v1.Homo_sapiens_assembly38.1000g.contam.UD'
-exome_contam_bed = 'contamination-resources/1000g/whole_exome_illumina_coding_v1.Homo_sapiens_assembly38.1000g.contam.bed'
-exome_contam_mu = 'contamination-resources/1000g/whole_exome_illumina_coding_v1.Homo_sapiens_assembly38.1000g.contam.mu'
-
-[references.validation]
-prefix = 'validation'
-[references.validation.genome.syndip]
-truth = 'syndip/truth/full.38.20180222.vcf.gz'
-regions = 'syndip/regions/syndip.b38_20180222.bed'
-[references.validation.genome.HG001]
-truth = 'giab/truth/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_PGandRTGphasetransfer.vcf.gz'
-regions = 'giab/regions/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed'
-
-[images]
-hail = 'driver:5d04b6d6bb411ea4b8750f40cf39fd0b701ea288-hail-c4eb2b16220d9872f417412ea565902f78739124'
-sm-api = 'driver:5d04b6d6bb411ea4b8750f40cf39fd0b701ea288-hail-c4eb2b16220d9872f417412ea565902f78739124'
-cpg-pipes = 'cpg-pipes:0.3.10'
-verifybamid = 'verifybamid:2.0.1'
