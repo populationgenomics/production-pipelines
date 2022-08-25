@@ -1,7 +1,6 @@
 """
 Create Hail Batch jobs to run Picard tools (marking duplicates, QC).
 """
-from functools import lru_cache
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
@@ -67,7 +66,7 @@ def get_intervals(
     job_name = f'Make {scatter_count} intervals for {sequencing_type}'
 
     if output_prefix and exists(output_prefix / '1.interval_list'):
-        job_attrs['reuse'] = True
+        job_attrs['reuse'] = 'true'
         return b.new_job(job_name, job_attrs), [
             b.read_input(str(output_prefix / f'{idx + 1}.interval_list'))
             for idx in range(scatter_count)
@@ -110,7 +109,13 @@ def get_intervals(
                 j[f'{idx + 1}.interval_list'],
                 str(output_prefix / f'{idx + 1}.interval_list'),
             )
-    return j, [j[f'{idx + 1}.interval_list'] for idx in range(scatter_count)]
+
+    intervals: list[hb.ResourceFile | None] = []
+    for idx in range(scatter_count):
+        interval = j[f'{idx + 1}.interval_list']
+        assert isinstance(interval, hb.ResourceFile)
+        intervals.append(interval)
+    return j, intervals
 
 
 def markdup(
