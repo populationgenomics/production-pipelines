@@ -4,9 +4,9 @@ import setuptools
 
 
 setuptools.setup(
-    name='cpg-workflows',
+    name='cpg-seqr-loader',
     version='0.3.10',
-    description='Hail Batch bioinformatics pipelines',
+    description='CPG Seqr loading pipeline',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     url='https://github.com/populationgenomics/production-pipelines',
@@ -26,19 +26,18 @@ setuptools.setup(
     },
     install_requires=[
         'cpg-utils',
+        'sample-metadata',
+        'analysis-runner',
+        'cpg-gnomad',  # https://github.com/populationgenomics/gnomad_methods
         'pytest',
         'pandas',
-        'hail>=0.2.91',
-        'cpg-gnomad',  # https://github.com/populationgenomics/gnomad_methods
+        'hail',
         'peddy',
         'google-cloud-storage',
         'google-cloud-secret-manager',
         'fsspec',
-        'sample-metadata',
-        'analysis-runner',
         'cloudpathlib[all]',
         'coloredlogs',
-        'types-PyYAML',  # https://mypy.readthedocs.io/en/stable/getting_started.html#library-stubs-and-typeshed
         'slack_sdk',
         'elasticsearch==8.*',
     ],

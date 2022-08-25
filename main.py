@@ -10,18 +10,21 @@ import coloredlogs
 import pkg_resources
 
 from cpg_utils.config import get_config
-from cpg_utils.workflows.workflow import WorkflowError, Workflow
+from cpg_utils.workflows.workflow import WorkflowError, Workflow, StageDecorator
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
 coloredlogs.install(level='DEBUG', fmt=fmt)
 
 
-def main():
+def _load_available_stage() -> list[StageDecorator]:
+    """
+    Read stage names from the config.
+    """
     if 'stages' not in get_config()['workflow']:
         raise WorkflowError(
             'Please list stages to run with a workflow/stages config parameter'
         )
-    
+
     req_stage_names = get_config()['workflow']['stages']
     if isinstance(req_stage_names, str):
         req_stage_names = [req_stage_names]
@@ -48,6 +51,7 @@ def main():
     
     # Get the list of stages we want to run, in the order that we want them.
     run_stage_names = [stg for stg in req_stage_names if stg in avail_stage_by_name.keys()]
+
     if not run_stage_names:
         logging.error(
             f'No known stages requested. Requested: {", ".join(req_stage_names)}, '
@@ -56,6 +60,11 @@ def main():
     
     logging.debug(f'Running stages: {", ".join(run_stage_names)}')
     stage_classes = [avail_stage_by_name[name].load() for name in run_stage_names]
+    return stage_classes
+
+
+def main():
+    stage_classes = _load_available_stage()
     workflow = Workflow(stages=stage_classes)
     workflow.run()
     return workflow
