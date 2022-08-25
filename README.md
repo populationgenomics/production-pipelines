@@ -6,32 +6,15 @@ A [Hail Batch](https://hail.is/docs/batch/service.html) and [metamist](https://g
 
 ## Usage
 
-Set up a configuration TOML file, e.g. `configs/acute-care-test.toml`, and specify the datasets you want as inputs, sequencing type (genome or exome), and final stages you want to trigger, along with optional parameters:
-
-```toml
-[workflow]
-datasets = ['acute-care', 'perth-neuro', 'validation']
-# skip_samples = ['CPG11783', 'CPG255232', 'CPG255240']
-sequencing_type = 'genome'
-stages = ['MtToEs']
-```
-
-Set this file to `CPG_CONFIG_PATH` and run the analysis runner:
+Prepare a configuration TOML file, e.g. `configs/seqr-test.toml` or `configs/seqr.toml`, where you can specify the datasets you want as inputs, sequencing type (genome or exome), and configure target stages of the pipeline. You can use multiple configs.
 
 ```bash
-CPG_CONFIG_PATH=configs/acute-care-test.toml
 analysis-runner \
   --dataset acute-care \
   --access-level test \
-  -o seqr-loader \
+  --output-dir "seqr-loader" \
   --description "test seqr loader" \
+  --config configs/seqr-test.toml \
+  --config configs/genome.toml \
   main.py
-```
-
-### Installation
-
-Requires Python 3.10. Clone the repository, and run:
-
-```bash
-pip install .
 ```
