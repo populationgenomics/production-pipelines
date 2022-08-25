@@ -174,7 +174,7 @@ def annotate_cohort(
     logging.info(f'Adding VEP annotations into the Matrix Table from {vep_ht_path}')
     mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
 
-    # Splitting multi-allellics. We do not handle AS info fields here - we handle
+    # Splitting multi-allelics. We do not handle AS info fields here - we handle
     # them when loading VQSR instead, and populate entrie "info" from VQSR.
     mt = hl.split_multi_hts(
         mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
@@ -194,14 +194,6 @@ def annotate_cohort(
         ),
     )
     mt = _checkpoint(mt, 'mt-vep-split-vqsr.mt')
-
-    # Not supported by service backend
-    # logging.info('Adding GRCh37 coords')
-    # rg37 = hl.get_reference('GRCh37')
-    # rg38 = hl.get_reference('GRCh38')
-    # rg38.add_liftover(str(reference_path('liftover_38_to_37')), rg37)
-    # mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
-    mt = mt.annotate_rows(rg37_locus=mt.locus)
 
     ref_ht = hl.read_table(str(reference_path('seqr/combined_reference')))
     clinvar_ht = hl.read_table(str(reference_path('seqr/clinvar')))
@@ -231,7 +223,6 @@ def annotate_cohort(
         xpos=variant_id.get_expr_for_xpos(mt.locus),
         xstart=variant_id.get_expr_for_xpos(mt.locus),
         xstop=variant_id.get_expr_for_xpos(mt.locus) + hl.len(mt.alleles[0]) - 1,
-        rg37_locus=mt.rg37_locus,
         clinvar_data=clinvar_ht[mt.row_key],
         ref_data=ref_ht[mt.row_key],
     )
