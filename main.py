@@ -1,6 +1,9 @@
+#!/usr/bin/env python3
+
 """
-Entry point.
+Entry point to run a pipeline.
 """
+
 import logging
 import sys
 import coloredlogs
