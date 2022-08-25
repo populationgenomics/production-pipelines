@@ -8,6 +8,7 @@ from enum import Enum
 
 import pandas as pd
 import hailtop.batch as hb
+from cpg_utils.config import get_config
 from cpg_utils.workflows.utils import can_reuse, exists
 from hailtop.batch import Resource
 from hailtop.batch.job import Job
@@ -33,9 +34,6 @@ class JointGenotyperTool(Enum):
     GnarlyGenotyper = 2
 
 
-DEFAULT_INTERVALS_NUM = 50
-
-
 def make_joint_genotyping_jobs(
     b: hb.Batch,
     gvcf_by_sid: dict[str, GvcfPath],
@@ -48,7 +46,6 @@ def make_joint_genotyping_jobs(
     # bcftools view gs://cpg-fewgenomes-test/unittest/inputs/chr20/gnarly/joint-called-siteonly.vcf.gz | zgrep 7105364
     tool: JointGenotyperTool = JointGenotyperTool.GenotypeGVCFs,
     do_filter_excesshet: bool = True,
-    scatter_count: int = DEFAULT_INTERVALS_NUM,
     intervals_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:
@@ -64,6 +61,12 @@ def make_joint_genotyping_jobs(
             'at least one active sample'
         )
     logging.info(f'Submitting joint-calling jobs')
+
+    if get_config()['workflow']['sequencing_type'] == 'genome':
+        scatter_count = min(2, len(gvcf_by_sid) // 10)
+    else:
+        assert get_config()['workflow']['sequencing_type'] == 'exome'
+        scatter_count = min(2, len(gvcf_by_sid) // 1000)
 
     jobs: list[Job] = []
     intervals_j, intervals = get_intervals(
@@ -94,7 +97,7 @@ def make_joint_genotyping_jobs(
         genomicsdb_path = (
             genomicsdb_bucket / f'interval_{idx + 1}_outof_{scatter_count}.tar'
         )
-        # There are some problems with using GenomcsDB in cloud (`genomicsdb_cloud()`):
+        # There are some problems with using GenomicsDB in cloud (`genomicsdb_cloud()`):
         # Using cloud + --consolidate on larger datasets causes a TileDB error:
         # https://github.com/broadinstitute/gatk/issues/7653
         # Also, disabling --consolidate decreases performance of reading, causing
@@ -144,7 +147,7 @@ def make_joint_genotyping_jobs(
         # For small callsets, we don't apply the ExcessHet filtering anyway
         if len(gvcf_by_sid) >= 1000 and do_filter_excesshet:
             logging.info(f'Queueing exccess het filter job')
-            exccess_filter_j, exccess_filter_jc_vcf = _add_exccess_het_filter(
+            exccess_filter_j, exccess_filter_jc_vcf = _add_excess_het_filter(
                 b,
                 input_vcf=jc_vcf,
                 interval=interval,
@@ -295,7 +298,7 @@ def genomicsdb_cloud(
     tmp_bucket: Path,
     gvcf_by_sid: dict[str, GvcfPath],
     intervals: list[hb.Resource],
-    scatter_count: int = DEFAULT_INTERVALS_NUM,
+    scatter_count: int,
     depends_on: list[Job] | None = None,
     job_attrs: dict | None = None,
 ) -> tuple[dict[int, Job], dict[int, Path]]:
@@ -534,7 +537,7 @@ def _add_joint_genotyper_job(
     genomicsdb_path: Path,
     overwrite: bool,
     number_of_samples: int,
-    scatter_count: int = DEFAULT_INTERVALS_NUM,
+    scatter_count: int,
     interval: hb.Resource | None = None,
     output_vcf_path: Path | None = None,
     tool: JointGenotyperTool = JointGenotyperTool.GnarlyGenotyper,
@@ -620,7 +623,7 @@ def _add_joint_genotyper_job(
     return j, j.output_vcf
 
 
-def _add_exccess_het_filter(
+def _add_excess_het_filter(
     b: hb.Batch,
     input_vcf: hb.ResourceGroup,
     overwrite: bool,
@@ -640,7 +643,7 @@ def _add_exccess_het_filter(
     ExcessHet estimates the probability of the called samples exhibiting excess
     heterozygosity with respect to the null hypothesis that the samples are unrelated.
     The higher the score, the higher the chance that the variant is a technical artifact
-    or that there is consanguinuity among the samples. In contrast to Inbreeding
+    or that there is consanguinity among the samples. In contrast to Inbreeding
     Coefficient, there is no minimal number of samples for this annotation.
 
     Returns: a Job object with a single output j.output_vcf of type ResourceGroup
@@ -666,7 +669,7 @@ def _add_exccess_het_filter(
     j.command(
         command(
             f"""
-    # Captring stderr to avoid Batch pod from crashing with OOM from millions of
+    # Capturing stderr to avoid Batch pod from crashing with OOM from millions of
     # warning messages from VariantFiltration, e.g.:
     # > JexlEngine - ![0,9]: 'ExcessHet > 54.69;' undefined variable ExcessHet
     gatk --java-options -Xms3g \\

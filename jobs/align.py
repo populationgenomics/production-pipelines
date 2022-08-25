@@ -271,7 +271,7 @@ def storage_for_align_job(alignment_input: AlignmentInput) -> int | None:
             or isinstance(alignment_input, CramPath)
             and alignment_input.is_bam
         ):
-            storage_gb = 400  # for WGS FASTQ or BAM inputs, need more disk
+            storage_gb = 400  # for WGS FASTQ or BAM inputs, more disk is needed
     return storage_gb
 
 

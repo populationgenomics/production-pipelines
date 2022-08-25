@@ -1,6 +1,7 @@
 """
 Create Hail Batch jobs to run Picard tools (marking duplicates, QC).
 """
+from functools import lru_cache
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
@@ -18,11 +19,11 @@ def get_intervals(
     b: hb.Batch,
     scatter_count: int,
     intervals_path: Path | str | None = None,
-    job_attrs: dict | None = None,
+    job_attrs: dict[str, str] | None = None,
     output_prefix: Path | None = None,
-) -> tuple[Job | None, list[hb.Resource | None]]:
+) -> tuple[Job | None, list[hb.ResourceFile | None]]:
     """
-    Add a job that split genome into intervals to parallelise variant calling.
+    Add a job that split genome into intervals to parallelize variant calling.
 
     As input interval file, takes intervals_path if provided, otherwise checks refs
     for the intervals of provided sequencing_type.
@@ -41,6 +42,7 @@ def get_intervals(
 
     sequencing_type = get_config()['workflow']['sequencing_type']
 
+    intervals_path = intervals_path or get_config()['workflow'].get('intervals_path')
     if not intervals_path:
         # Did we cache split intervals for this sequencing_type?
         cache_bucket = (

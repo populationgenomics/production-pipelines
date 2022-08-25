@@ -14,7 +14,7 @@ from cpg_utils.workflows.resources import STANDARD
 def subset_vcf(
     b: hb.Batch,
     vcf: hb.ResourceGroup,
-    interval: hb.Resource,
+    interval: hb.ResourceFile,
     job_attrs: dict | None = None,
     output_vcf_path: Path | None = None,
 ) -> Job:
@@ -30,7 +30,7 @@ def subset_vcf(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
     reference = fasta_res_group(b)
-
+    assert isinstance(j.output_vcf, hb.ResourceGroup)
     cmd = f"""
     gatk SelectVariants \\
     -R {reference.base} \\
@@ -85,6 +85,7 @@ def gather_vcfs(
     )
 
     input_cmdl = ' '.join([f'--input {v}' for v in input_vcfs])
+    assert isinstance(j.output_vcf, hb.ResourceGroup)
     cmd = f"""
     # --ignore-safety-checks makes a big performance difference so we include it in 
     # our invocation. This argument disables expensive checks that the file headers 

@@ -7,7 +7,13 @@ import hailtop.batch as hb
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
 from cpg_utils.workflows.filetypes import GvcfPath
-from cpg_utils.workflows.workflow import Sample, stage, StageInput, StageOutput, SampleStage
+from cpg_utils.workflows.workflow import (
+    Sample,
+    stage,
+    StageInput,
+    StageOutput,
+    SampleStage,
+)
 
 from jobs import haplotype_caller
 from jobs.happy import happy
@@ -40,30 +46,13 @@ class Genotype(SampleStage):
         """
         Use function from the jobs module
         """
-        scatter_count = get_config()['workflow'].get(
-            'hc_intervals_num',
-            haplotype_caller.DEFAULT_INTERVALS_NUM,
-        )
         jobs = []
-        global hc_interval_lists
-        if hc_interval_lists is None and scatter_count > 1:
-            intervals_j, interval_lists = get_intervals(
-                b=self.b,
-                intervals_path=get_config()['workflow'].get('intervals_path'),
-                scatter_count=scatter_count,
-                job_attrs=self.get_job_attrs(),
-                output_prefix=self.tmp_prefix / 'intervals',
-            )
-            if intervals_j:
-                jobs.append(intervals_j)
-            hc_interval_lists = interval_lists
         gvcf_path = self.expected_outputs(sample)['gvcf']
         gvcf_jobs = haplotype_caller.produce_gvcf(
             b=self.b,
             output_path=gvcf_path,
             sample_name=sample.id,
             cram_path=sample.make_cram_path(),
-            intervals=hc_interval_lists,
             tmp_prefix=self.tmp_prefix / sample.id,
             overwrite=not get_config()['workflow'].get('check_intermediates'),
             job_attrs=self.get_job_attrs(sample),

@@ -4,6 +4,7 @@ Create Hail Batch jobs to create and apply a VQSR models.
 
 from typing import List, Optional
 import hailtop.batch as hb
+from cpg_utils.config import get_config
 from hailtop.batch.job import Job
 
 from cpg_utils.workflows.utils import can_reuse
@@ -38,7 +39,7 @@ ALLELE_SPECIFIC_FEATURES = [
     'AS_QD',
     'AS_FS',
     'AS_SOR',
-    # Not using depth for the following reaasons:
+    # Not using depth for the following reasons:
     # 1. The Broad pipelines don't use it;
     # 2. -G AS_StandardAnnotation flag to GenotypeGVCFs doesn't include it;
     # 3. For exomes, depth is an irrelevant feature and should be skipped.
@@ -78,8 +79,6 @@ INDEL_RECALIBRATION_TRANCHE_VALUES = [
     90.0,
 ]
 
-DEFAULT_INTERVALS_NUM = 50
-
 
 def make_vqsr_jobs(
     b: hb.Batch,
@@ -91,7 +90,6 @@ def make_vqsr_jobs(
     out_path: Path | None = None,
     use_as_annotations: bool = True,
     overwrite: bool = False,
-    scatter_count: int = DEFAULT_INTERVALS_NUM,
     intervals_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:
@@ -107,8 +105,7 @@ def make_vqsr_jobs(
            will be used as a list of samples to hard filter out
     @param tmp_prefix: bucket for intermediate files
     @param gvcf_count: number of input samples. Can't read from combined_mt_path as it
-           might not be yet genereated the point of Batch job submission
-    @param scatter_count: number of intervals to parallelise SNP model creation
+           might not be yet generated the point of Batch job submission
     @param intervals_path: path to specific interval list
     @param out_path: path to write final recalibrated VCF to
     @param use_as_annotations: use allele-specific annotation for VQSR
@@ -144,6 +141,12 @@ def make_vqsr_jobs(
     medium_disk = 100 if is_small_callset else (200 if not is_huge_callset else 500)
     huge_disk = 200 if is_small_callset else (500 if not is_huge_callset else 2000)
 
+    if get_config()['workflow']['sequencing_type'] == 'genome':
+        scatter_count = gvcf_count // 10
+    else:
+        assert get_config()['workflow']['sequencing_type'] == 'exome'
+        scatter_count = gvcf_count // 1000
+
     jobs: list[Job] = []
 
     if input_vcf_or_mt_path.name.endswith('.mt'):
@@ -157,7 +160,7 @@ def make_vqsr_jobs(
         if not can_reuse(combined_vcf_path, overwrite):
             mt_to_vcf_job = dataproc.hail_dataproc_job(
                 b,
-                f'cpg_pipes/dataproc_scripts/mt_to_siteonlyvcf.py --overwrite '
+                f'jobs/dataproc_scripts/mt_to_siteonlyvcf.py --overwrite '
                 f'--mt {input_vcf_or_mt_path} '
                 f'--meta-ht {meta_ht_path} '
                 f'--hard-filtered-samples-ht {hard_filter_ht_path} '
@@ -200,7 +203,7 @@ def make_vqsr_jobs(
             }
         )
 
-    indels_variant_recalibrator_job = add_indels_variant_recalibrator_job(
+    indel_recalibrator_j = indel_recalibrator_job(
         b=b,
         sites_only_variant_filtered_vcf=siteonly_vcf,
         mills_resource_vcf=resources['mills'],
@@ -211,10 +214,10 @@ def make_vqsr_jobs(
         is_small_callset=is_small_callset,
         job_attrs=job_attrs,
     )
-    jobs.append(indels_variant_recalibrator_job)
-
-    indels_recalibration = indels_variant_recalibrator_job.recalibration
-    indels_tranches = indels_variant_recalibrator_job.tranches
+    # To make type checkers happy:
+    assert isinstance(indel_recalibrator_j.recalibration, hb.ResourceGroup)
+    assert isinstance(indel_recalibrator_j.tranches, hb.ResourceFile)
+    jobs.append(indel_recalibrator_j)
 
     snp_max_gaussians = 6
     if is_small_callset:
@@ -274,33 +277,34 @@ def make_vqsr_jobs(
         for snps_recalibrator_j in snps_recalibrator_jobs:
             assert isinstance(snps_recalibrator_j.tranches, hb.ResourceFile)
             snps_tranches.append(snps_recalibrator_j.tranches)
-        snps_gathered_tranches = add_snps_gather_tranches_step(
+        snp_gathered_tranches = add_snps_gather_tranches_step(
             b,
             tranches=snps_tranches,
             disk_size=small_disk,
         ).out_tranches
 
-        assert isinstance(indels_recalibration, hb.ResourceGroup)
-        assert isinstance(indels_tranches, hb.ResourceFile)
-        assert all(isinstance(recal, hb.ResourceGroup) for recal in snps_recalibrations)
-        assert isinstance(snps_gathered_tranches, hb.ResourceFile)
-        scattered_vcfs = [
-            add_apply_recalibration_step(
+        assert isinstance(snp_gathered_tranches, hb.ResourceFile)
+        scattered_vcfs = []
+        for idx in range(scatter_count):
+            snp_recalibration = snps_recalibrations[idx]
+            assert isinstance(snp_recalibration, hb.ResourceGroup)
+            scattered_vcf = add_apply_recalibration_step(
                 b,
                 input_vcf=siteonly_vcf,
                 interval=intervals[idx],
-                indels_recalibration=indels_recalibration,
-                indels_tranches=indels_tranches,
-                snps_recalibration=snps_recalibrations[idx],
-                snps_tranches=snps_gathered_tranches,
+                indels_recalibration=indel_recalibrator_j.recalibration,
+                indels_tranches=indel_recalibrator_j.tranches,
+                snps_recalibration=snp_recalibration,
+                snps_tranches=snp_gathered_tranches,
                 disk_size=huge_disk,
                 use_as_annotations=use_as_annotations,
                 snp_filter_level=SNP_HARD_FILTER_LEVEL,
                 indel_filter_level=INDEL_HARD_FILTER_LEVEL,
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             ).output_vcf
-            for idx in range(scatter_count)
-        ]
+            assert isinstance(scattered_vcf, hb.ResourceGroup)
+            scattered_vcfs.append(scattered_vcf)
+
         recalibrated_gathered_vcf_jobs, recalibrated_gathered_vcf = gather_vcfs(
             b=b,
             input_vcfs=[v['vcf.gz'] for v in scattered_vcfs],
@@ -315,7 +319,7 @@ def make_vqsr_jobs(
         jobs.extend(recalibrated_gathered_vcf_jobs)
 
     else:
-        snps_recalibrator_job = add_snps_variant_recalibrator_step(
+        snps_recalibrator_job = snps_variant_recalibrator_job(
             b,
             sites_only_variant_filtered_vcf=siteonly_vcf,
             hapmap_resource_vcf=resources['hapmap'],
@@ -330,16 +334,18 @@ def make_vqsr_jobs(
         )
         jobs.append(snps_recalibrator_job)
 
-        snps_recalibration = snps_recalibrator_job.recalibration
-        snps_tranches = snps_recalibrator_job.tranches
+        assert isinstance(snps_recalibrator_job.recalibration, hb.ResourceGroup)
+        assert isinstance(snps_recalibrator_job.tranches, hb.ResourceFile)
+        assert isinstance(snps_recalibrator_job.recalibration, hb.ResourceGroup)
+        assert isinstance(snps_recalibrator_job.tranches, hb.ResourceFile)
 
         recalibrated_gathered_vcf_j = add_apply_recalibration_step(
             b,
             input_vcf=siteonly_vcf,
-            indels_recalibration=indels_recalibration,
-            indels_tranches=indels_tranches,
-            snps_recalibration=snps_recalibration,
-            snps_tranches=snps_tranches,
+            indels_recalibration=indel_recalibrator_j.recalibration,
+            indels_tranches=indel_recalibrator_j.tranches,
+            snps_recalibration=snps_recalibrator_job.recalibration,
+            snps_tranches=snps_recalibrator_job.tranches,
             disk_size=huge_disk,
             use_as_annotations=use_as_annotations,
             indel_filter_level=SNP_HARD_FILTER_LEVEL,
@@ -464,7 +470,7 @@ def add_sites_only_gather_vcf_step(
     return j
 
 
-def add_indels_variant_recalibrator_job(
+def indel_recalibrator_job(
     b: hb.Batch,
     sites_only_variant_filtered_vcf: hb.ResourceGroup,
     mills_resource_vcf: hb.ResourceGroup,
@@ -707,7 +713,7 @@ def add_snps_variant_recalibrator_scattered_step(
     return j
 
 
-def add_snps_variant_recalibrator_step(
+def snps_variant_recalibrator_job(
     b: hb.Batch,
     sites_only_variant_filtered_vcf: hb.ResourceGroup,
     hapmap_resource_vcf: hb.ResourceGroup,

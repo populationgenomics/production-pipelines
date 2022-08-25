@@ -1,16 +1,19 @@
 [workflow]
-access_level = 'full'
-dataset = 'prophecy'
+last_stage = 'Genotype'
 datasets = ['prophecy']
-check_inputs = true
-skip_samples_with_missing_input = true
-check_expected_outputs = true
 sequencing_type = 'genome'
-dataset_gcp_project = 'prophecy-339301'
 skip_samples = [
   'CPG216275',  # https://batch.hail.populationgenomics.org.au/batches/74382
   'CPG216010',  # https://batch.hail.populationgenomics.org.au/batches/74382
 ]
+
+dataset = 'prophecy'
+dataset_gcp_project = 'prophecy-339301'
+access_level = 'full'
+
+check_inputs = true
+skip_samples_with_missing_input = true
+check_expected_outputs = true
 
 [hail]
 pool_label = 'large-cohort'

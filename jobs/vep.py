@@ -20,17 +20,13 @@ from .vcf import gather_vcfs, subset_vcf
 from .query_scripts import vep as vep_module
 
 
-DEFAULT_INTERVALS_NUM = 50
-
-
 def vep_jobs(
     b: Batch,
     vcf_path: Path,
     tmp_prefix: Path,
     out_path: Path | None = None,
     overwrite: bool = False,
-    scatter_count: int = DEFAULT_INTERVALS_NUM,
-    intervals_path: Path | str | None = None,
+    scatter_count: int = 50,
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """
@@ -77,11 +73,10 @@ def vep_jobs(
 
     parts_bucket = tmp_prefix / 'vep' / 'parts'
     part_files = []
-    intervals: list[hb.Resource] = []
+    intervals: list[hb.ResourceFile | None] = []
     if scatter_count > 1:
         intervals_j, intervals = get_intervals(
             b=b,
-            intervals_path=intervals_path,
             scatter_count=scatter_count,
             output_prefix=tmp_prefix,
         )
@@ -90,13 +85,19 @@ def vep_jobs(
 
     # Splitting variant calling by intervals
     for idx in range(scatter_count):
-        subset_j = subset_vcf(
-            b,
-            vcf=vcf,
-            interval=intervals[idx],
-            job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
-        )
-        jobs.append(subset_j)
+        vcf_subset: hb.ResourceGroup | None = None
+        if intervals[idx]:
+            subset_j = subset_vcf(
+                b,
+                vcf=vcf,
+                interval=intervals[idx],
+                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
+            )
+            if subset_j:
+                jobs.append(subset_j)
+                assert isinstance(subset_j.output_vcf, hb.ResourceGroup)
+                vcf_subset = subset_j.output_vcf
+
         if to_hail_table:
             part_path = parts_bucket / f'part{idx + 1}.jsonl'
         else:
@@ -106,7 +107,7 @@ def vep_jobs(
         # noinspection PyTypeChecker
         vep_one_job = vep_one(
             b,
-            vcf=subset_j.output_vcf['vcf.gz'],
+            vcf=vcf_subset or vcf,
             out_format='json' if to_hail_table else 'vcf',
             out_path=part_path,
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),

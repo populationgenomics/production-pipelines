@@ -1,7 +1,5 @@
 [workflow]
-stages = ['MtToEs']
 dataset_gcp_project = 'seqr-308602'
-access_level = 'full'
 dataset = 'seqr'
 datasets = [
     'acute-care',

@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 
 """
-Seqr loading pipeline: FASTQ -> ElasticSearch index.
+Hail Query stages for the Seqr loader workflow.
 """
-
-import logging
 
 from cpg_utils import to_path
 from cpg_utils.cloud import read_secret

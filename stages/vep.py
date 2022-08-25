@@ -39,16 +39,19 @@ class Vep(CohortStage):
         """
         Submit jobs.
         """
+        if get_config()['workflow']['sequencing_type'] == 'genome':
+            scatter_count = min(2, len(cohort.get_samples()) // 10)
+        else:
+            assert get_config()['workflow']['sequencing_type'] == 'exome'
+            scatter_count = min(2, len(cohort.get_samples()) // 50)
+
         jobs = vep.vep_jobs(
             self.b,
             vcf_path=inputs.as_path(cohort, stage=Vqsr, id='siteonly'),
             out_path=self.expected_outputs(cohort)['ht'],
             tmp_prefix=to_path(self.expected_outputs(cohort)['prefix']),
             overwrite=not get_config()['workflow'].get('check_intermediates'),
-            scatter_count=get_config()['workflow'].get(
-                'vep_intervals_num', vep.DEFAULT_INTERVALS_NUM
-            ),
-            intervals_path=get_config()['workflow'].get('intervals_path'),
             job_attrs=self.get_job_attrs(),
+            scatter_count=scatter_count,
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), jobs)

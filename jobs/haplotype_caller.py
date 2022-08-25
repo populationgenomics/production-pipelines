@@ -10,14 +10,10 @@ from hailtop.batch.job import Job
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path, command
-
-from jobs.picard import get_intervals
 from cpg_utils.workflows.filetypes import CramPath, GvcfPath
 from cpg_utils.workflows import utils
 from cpg_utils.workflows.resources import STANDARD, HIGHMEM
-
-
-DEFAULT_INTERVALS_NUM = 50
+from jobs.picard import get_intervals
 
 
 def produce_gvcf(
@@ -25,11 +21,8 @@ def produce_gvcf(
     sample_name: str,
     tmp_prefix: Path,
     cram_path: CramPath,
-    job_attrs: dict | None = None,
+    job_attrs: dict[str, str] | None = None,
     output_path: Path | None = None,
-    scatter_count: int = DEFAULT_INTERVALS_NUM,
-    intervals: list[hb.Resource | None] | None = None,
-    intervals_path: Path | None = None,
     overwrite: bool = False,
     dragen_mode: bool = True,
 ) -> list[Job]:
@@ -44,18 +37,25 @@ def produce_gvcf(
     if utils.can_reuse(output_path, overwrite):
         return [b.new_job('Make GVCF [reuse]', job_attrs)]
 
-    jobs = haplotype_caller(
-        b=b,
-        sample_name=sample_name,
-        job_attrs=job_attrs,
-        output_path=hc_gvcf_path,
-        cram_path=cram_path,
-        tmp_prefix=tmp_prefix,
-        scatter_count=scatter_count,
-        intervals=intervals,
-        intervals_path=intervals_path,
-        overwrite=overwrite,
-        dragen_mode=dragen_mode,
+    if get_config()['workflow']['sequencing_type'] == 'genome':
+        scatter_count = 50
+    else:
+        assert get_config()['workflow']['sequencing_type'] == 'exome'
+        scatter_count = 1
+
+    jobs = []
+    jobs.extend(
+        haplotype_caller(
+            b=b,
+            sample_name=sample_name,
+            job_attrs=job_attrs,
+            output_path=hc_gvcf_path,
+            cram_path=cram_path,
+            tmp_prefix=tmp_prefix,
+            scatter_count=scatter_count,
+            overwrite=overwrite,
+            dragen_mode=dragen_mode,
+        )
     )
     postproc_j = postproc_gvcf(
         b=b,
@@ -69,16 +69,17 @@ def produce_gvcf(
     return jobs + [postproc_j]
 
 
+intervals: list[hb.ResourceFile | None] | None = None
+
+
 def haplotype_caller(
     b: hb.Batch,
     sample_name: str,
     cram_path: CramPath,
     tmp_prefix: Path,
-    job_attrs: dict | None = None,
+    scatter_count: int,
+    job_attrs: dict[str, str] | None = None,
     output_path: Path | None = None,
-    scatter_count: int = DEFAULT_INTERVALS_NUM,
-    intervals: list[hb.Resource | None] | None = None,
-    intervals_path: Path | None = None,
     overwrite: bool = True,
     dragen_mode: bool = True,
 ) -> list[Job]:
@@ -90,18 +91,19 @@ def haplotype_caller(
         return [b.new_job('HaplotypeCaller [reuse]', job_attrs)]
 
     jobs: list[Job] = []
+
     if scatter_count > 1:
+        global intervals
         if intervals is None:
             intervals_j, intervals = get_intervals(
                 b=b,
-                intervals_path=intervals_path,
+                intervals_path=get_config()['workflow'].get('intervals_path'),
                 scatter_count=scatter_count,
+                job_attrs=job_attrs,
                 output_prefix=tmp_prefix / 'intervals',
             )
             if intervals_j:
                 jobs.append(intervals_j)
-        else:
-            scatter_count = len(intervals)
 
         hc_jobs = []
         # Splitting variant calling by intervals
@@ -168,7 +170,7 @@ def _haplotype_caller_one(
     # CRAMs can be as big as 80G:
     # https://batch.hail.populationgenomics.org.au/batches/74042/jobs/3346
     # plus we need enough space to fit output GVCF (1G) and reference data (5G).
-    # HaplotypeCaller is not parallelised, so we request 4 cores only to just have
+    # HaplotypeCaller is not parallelized, so we request 4 cores only to just have
     # enough memory. But a 4-core request would only give us 185G/4 = 46.25G on
     # a 32-core machine, or 265G/4 = 66.25G on a 16-core machine. That's not enough
     # for WGS sometimes, so we need to explicitly request more storage.
@@ -288,10 +290,10 @@ def postproc_gvcf(
     4. Renames the GVCF sample name to use CPG ID.
     """
     logging.info(f'Adding GVCF postproc job for sample {sample_name}, gvcf {gvcf_path}')
-    jname = 'Postproc GVCF'
-    j = b.new_job(jname, (job_attrs or {}) | dict(tool='gatk_ReblockGVCF'))
+    job_name = 'Postproc GVCF'
+    j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk_ReblockGVCF'))
     if utils.can_reuse(output_path, overwrite):
-        return b.new_job(jname + ' [reuse]', job_attrs)
+        return b.new_job(job_name + ' [reuse]', job_attrs)
 
     j.image(image_path('gatk'))
 

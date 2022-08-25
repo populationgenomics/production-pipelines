@@ -80,9 +80,6 @@ class JointGenotyping(CohortStage):
             tool=joint_genotyping.JointGenotyperTool.GnarlyGenotyper
             if get_config()['workflow'].get('use_gnarly', False)
             else joint_genotyping.JointGenotyperTool.GenotypeGVCFs,
-            scatter_count=get_config()['workflow'].get(
-                'jc_intervals_num', joint_genotyping.DEFAULT_INTERVALS_NUM
-            ),
             intervals_path=get_config()['workflow'].get('intervals_path'),
             job_attrs=self.get_job_attrs(),
         )
