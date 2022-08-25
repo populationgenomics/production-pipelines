@@ -4,17 +4,15 @@
 Generate data for unit tests
 """
 from typing import cast
-
-from cpg_utils.hail_batch import reference_path, image_path, fasta_res_group
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
-from workflows import Path
-from workflows.resources import STANDARD
+from cpg_utils import Path
+from cpg_utils.hail_batch import reference_path, image_path, fasta_res_group
+from cpg_utils.flows.resources import STANDARD
+from cpg_utils.flows.workflow import Workflow
+from cpg_utils.flows.filetypes import CramPath
 from jobs.align import extract_fastq
-from workflows.pipeline.pipeline import Pipeline
-from workflows.filetypes import CramPath
-
 import utils
 
 

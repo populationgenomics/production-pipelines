@@ -81,7 +81,7 @@ def get_intervals(
     }.get(sequencing_type, 0)
 
     cmd = f"""
-    mkdir /io/batch/out
+    mkdir $BATCH_TMPDIR/out
     
     picard -Xms1000m -Xmx1500m \
     IntervalListTools \
@@ -91,14 +91,14 @@ def get_intervals(
     SORT=true \
     BREAK_BANDS_AT_MULTIPLES_OF={break_bands_at_multiples_of} \
     INPUT={b.read_input(str(intervals_path))} \
-    OUTPUT=/io/batch/out
-    ls /io/batch/out
-    ls /io/batch/out/*
+    OUTPUT=$BATCH_TMPDIR/out
+    ls $BATCH_TMPDIR/out
+    ls $BATCH_TMPDIR/out/*
     """
     for idx in range(scatter_count):
         name = f'temp_{str(idx + 1).zfill(4)}_of_{scatter_count}'
         cmd += f"""
-        ln /io/batch/out/{name}/scattered.interval_list {j[f'{idx + 1}.interval_list']}
+        ln $BATCH_TMPDIR/out/{name}/scattered.interval_list {j[f'{idx + 1}.interval_list']}
         """
 
     j.command(command(cmd))
@@ -202,14 +202,14 @@ def vcf_qc(
     picard -Xms2000m -Xmx{res.get_java_mem_mb()}m \
     CollectVariantCallingMetrics \
     INPUT={input_file} \
-    OUTPUT=/io/batch/prefix \
+    OUTPUT=$BATCH_TMPDIR/prefix \
     DBSNP={dbsnp_vcf['base']} \
     SEQUENCE_DICTIONARY={reference['dict']} \
     TARGET_INTERVALS={intervals_file} \
     GVCF_INPUT={"true" if is_gvcf else "false"}
     
-    cp /io/batch/prefix.variant_calling_summary_metrics {j.summary}
-    cp /io/batch/prefix.variant_calling_detail_metrics {j.detail}
+    cp $BATCH_TMPDIR/prefix.variant_calling_summary_metrics {j.summary}
+    cp $BATCH_TMPDIR/prefix.variant_calling_detail_metrics {j.detail}
     """
 
     j.command(command(cmd))
@@ -262,7 +262,7 @@ def picard_collect_metrics(
       CollectMultipleMetrics \
       INPUT={cram.cram} \
       REFERENCE_SEQUENCE={reference.base} \
-      OUTPUT=/io/prefix \
+      OUTPUT=$BATCH_TMPDIR/prefix \
       ASSUME_SORTED=true \
       PROGRAM=null \
       PROGRAM=CollectAlignmentSummaryMetrics \
@@ -273,12 +273,12 @@ def picard_collect_metrics(
       METRIC_ACCUMULATION_LEVEL=null \
       METRIC_ACCUMULATION_LEVEL=SAMPLE
       
-    ls /io/
-    cp /io/prefix.alignment_summary_metrics {j.out_alignment_summary_metrics}
-    cp /io/prefix.base_distribution_by_cycle_metrics {j.out_base_distribution_by_cycle_metrics}
-    cp /io/prefix.insert_size_metrics {j.out_insert_size_metrics}
-    cp /io/prefix.quality_by_cycle_metrics {j.out_quality_by_cycle_metrics}
-    cp /io/prefix.quality_yield_metrics {j.out_quality_yield_metrics}
+    ls $BATCH_TMPDIR/
+    cp $BATCH_TMPDIR/prefix.alignment_summary_metrics {j.out_alignment_summary_metrics}
+    cp $BATCH_TMPDIR/prefix.base_distribution_by_cycle_metrics {j.out_base_distribution_by_cycle_metrics}
+    cp $BATCH_TMPDIR/prefix.insert_size_metrics {j.out_insert_size_metrics}
+    cp $BATCH_TMPDIR/prefix.quality_by_cycle_metrics {j.out_quality_by_cycle_metrics}
+    cp $BATCH_TMPDIR/prefix.quality_yield_metrics {j.out_quality_yield_metrics}
     """
 
     j.command(command(cmd))

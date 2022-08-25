@@ -57,7 +57,7 @@ def happy(
         happy_params = '--convert-gvcf-to-vcf --filter-nonref'
         extract_sample_cmd = ''
     else:
-        input_file = f'/io/{sample.id}.vcf.gz'
+        input_file = f'$BATCH_TMPDIR/{sample.id}.vcf.gz'
         happy_params = ''
         # For multi-sample joint-called VCF, we need to extract our target sample
         extract_sample_cmd = f"""
@@ -81,18 +81,18 @@ def happy(
     --pass-only \
     {happy_params} \
     {input_file} \
-    /io/pre-processed.vcf.gz \
+    $BATCH_TMPDIR/pre-processed.vcf.gz \
     -r {reference["base"]}
     
     /opt/hap.py/bin/hap.py \
     --threads {res.get_nthreads()} \
     {b.read_input(str(truth_vcf_path))} \
-    /io/pre-processed.vcf.gz \
+    $BATCH_TMPDIR/pre-processed.vcf.gz \
     -f {b.read_input(str(truth_bed_path))} \
-    -o /io/batch/prefix \
+    -o $BATCH_TMPDIR/prefix \
     -r {reference["base"]}
     
-    cp /io/batch/prefix.summary.csv {j.summary_csv}
+    cp $BATCH_TMPDIR/prefix.summary.csv {j.summary_csv}
     """
     j.command(command(cmd))
     if output_path:

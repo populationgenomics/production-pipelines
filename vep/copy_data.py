@@ -54,8 +54,8 @@ def _uncompress(b: hb.Batch):
     j.storage(f'100G')
 
     cmd = f"""\
-    mkdir /io/batch/uncompressed
-    cd /io/batch/uncompressed
+    mkdir $BATCH_TMPDIR/uncompressed
+    cd $BATCH_TMPDIR/uncompressed
     df -h
     du -sh .
 
@@ -85,7 +85,7 @@ def _vep_cache(b: hb.Batch):
     j.cpu(16)
 
     cmd = f"""\
-    cd /io/batch
+    cd $BATCH_TMPDIR
     
     # Because we are using biocontainers VEP image which, is conda-powered, 
     # we can use this conda-provided script:
@@ -106,7 +106,7 @@ def _loftee(b: hb.Batch):
     j.image(image_path('vep'))
     j.storage(f'30G')
     cmd = f"""\
-    cd /io/batch
+    cd $BATCH_TMPDIR
     mkdir loftee
     cd loftee
     

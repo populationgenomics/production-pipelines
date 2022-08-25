@@ -2,26 +2,27 @@
 Test Hail Query functions.
 """
 
+import logging
 import shutil
 import tempfile
 import unittest
 from pprint import pprint
-from unittest import skip
 
 import hail as hl
-from cpg_utils.hail_batch import genome_build
-
 from cpg_utils import to_path
-from cpg_utils.workflow import hailquery
-from jobs.query_scripts import (
+from cpg_utils.workflows.utils import timestamp
+from cpg_utils.hail_batch import init_batch
+
+from jobs.query_scripts.seqr_loader import (
     annotate_cohort,
     subset_mt_to_samples,
     annotate_dataset_mt,
     load_vqsr,
 )
 from jobs.query_scripts.vep import vep_json_to_ht
-from workflows.filetypes import logger
-from workflows.utils import timestamp
+
+logger = logging.getLogger(__file__)
+
 
 try:
     import utils
@@ -50,7 +51,7 @@ class TestQuery(unittest.TestCase):
         self.timestamp = timestamp()
         self.local_tmp_dir = tempfile.mkdtemp()
         self.sequencing_type = 'genome'
-        hailquery.init_batch()
+        init_batch()
         # Interval to take on chr20:
         self.chrom = 'chr20'
         self.locus1 = '5111495'
@@ -161,34 +162,3 @@ class TestQuery(unittest.TestCase):
             set(mt.samples_gq['20_to_25'].collect()[0]), {'CPG196519', 'CPG196527'}
         )
         self.assertSetEqual(set(mt.samples_ab['40_to_45'].collect()[0]), {'CPG196535'})
-
-    @skip('Not implemented in Batch backend')
-    def test_vcf_combiner(self):
-        from workflows.targets import Cohort
-
-        dataset = Cohort(
-            analysis_dataset_name=utils.DATASET,
-            namespace=Namespace.TEST,
-        ).create_dataset(utils.DATASET)
-        for sid in utils.SAMPLES:
-            dataset.add_sample(sid)
-
-        out_mt_path = self.out_bucket / 'combined.mt'
-
-        hl.experimental.run_combiner(
-            [str(s.make_gvcf_path().path) for s in dataset.get_samples()],
-            sample_names=[s.id for s in dataset.get_samples()],
-            out_file=str(out_mt_path),
-            reference_genome=genome_build(),
-            use_genome_default_intervals=True,
-            tmp_path=self.tmp_bucket,
-            overwrite=True,
-            key_by_locus_and_alleles=True,
-        )
-
-        mt = hl.read_matrix_table(out_mt_path)
-        logger.info(
-            f'Written {mt.cols().count()} samples to {out_mt_path}, '
-            f'n_partitions={mt.n_partitions()}'
-        )
-        self.assertSetEqual(set(mt.s.collect()), utils.SAMPLES)

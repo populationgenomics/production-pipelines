@@ -4,6 +4,7 @@ Hail Query functions for seqr loader.
 
 import logging
 import hail as hl
+
 from cpg_utils import to_path
 from cpg_utils.hail_batch import reference_path
 

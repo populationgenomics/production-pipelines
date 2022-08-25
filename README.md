@@ -404,11 +404,11 @@ set -ex
 export GOOGLE_APPLICATION_CREDENTIALS=/gsa-key/key.json
 gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
 
-(while true; do df -h; du -sh /io; du -sh /io/batch; sleep 600; done) &
+(while true; do df -h; du -sh $BATCH_TMPDIR; sleep 600; done) &
 
 sleep 600
 
-df -h; du -sh /io; du -sh /io/batch
+df -h; du -sh $BATCH_TMPDIR
 ```
 
 ### Reusing existing results

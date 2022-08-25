@@ -499,7 +499,7 @@ def sort_cmd(requested_nthreads: int) -> str:
     nthreads = STANDARD.request_resources(nthreads=requested_nthreads).get_nthreads()
     return dedent(
         f"""\
-    | samtools sort -@{min(nthreads, 6) - 1} -T /io/batch/samtools-sort-tmp -Obam
+    | samtools sort -@{min(nthreads, 6) - 1} -T $BATCH_TMPDIR/samtools-sort-tmp -Obam
     """
     ).strip()
 

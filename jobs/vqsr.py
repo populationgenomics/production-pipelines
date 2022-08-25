@@ -867,7 +867,7 @@ def add_apply_recalibration_step(
     TMP_DIR=$(dirname {j.output_vcf['vcf.gz']})/tmp
     mkdir $TMP_DIR
 
-    TMP_INDEL_RECALIBRATED=/io/batch/tmp.indel.recalibrated.vcf.gz
+    TMP_INDEL_RECALIBRATED=$BATCH_TMPDIR/tmp.indel.recalibrated.vcf.gz
     gatk --java-options -Xms{res.get_java_mem_mb()}m \\
       ApplyVQSR \\
       --tmp-dir $TMP_DIR \\

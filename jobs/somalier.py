@@ -298,22 +298,22 @@ def _ancestry(
     j.depends_on(*extract_jobs)
 
     cmd = f"""\
-    mkdir /io/batch/1kg
-    mv {b.read_input(str(reference_path('somalier_1kg_targz')))} /io/batch/1kg
-    (cd /io/batch/1kg && tar -xzf *.tar.gz)
+    mkdir $BATCH_TMPDIR/1kg
+    mv {b.read_input(str(reference_path('somalier_1kg_targz')))} $BATCH_TMPDIR/1kg
+    (cd $BATCH_TMPDIR/1kg && tar -xzf *.tar.gz)
 
-    mkdir /io/batch/somaliers
+    mkdir $BATCH_TMPDIR/somaliers
     """
 
     for sample_id in sample_ids:
         somalier_file = b.read_input(str(somalier_file_by_sample[sample_id]))
-        cmd += f'    cp {somalier_file} /io/batch/somaliers/\n'
+        cmd += f'    cp {somalier_file} $BATCH_TMPDIR/somaliers/\n'
 
     cmd += f"""\
     somalier ancestry \\
     --labels {b.read_input(str(reference_path('somalier_1kg_labels')))} \\
-    /io/batch/1kg/1kg-somalier/*.somalier ++ \\
-    /io/batch/somaliers/*.somalier \\
+    $BATCH_TMPDIR/1kg/1kg-somalier/*.somalier ++ \\
+    $BATCH_TMPDIR/somaliers/*.somalier \\
     -o ancestry
     ls
     mv ancestry.somalier-ancestry.tsv {j.output_tsv}
@@ -355,8 +355,8 @@ def _relate(
     j.depends_on(*extract_jobs)
 
     cmd = ''
-    input_files_file = '/io/input_files.list'
-    samples_ids_file = '/io/sample_ids.list'
+    input_files_file = '$BATCH_TMPDIR/input_files.list'
+    samples_ids_file = '$BATCH_TMPDIR/sample_ids.list'
     cmd += f'touch {input_files_file}'
     cmd += f'touch {samples_ids_file}'
     for sample_id in sample_ids:
@@ -450,7 +450,7 @@ def extact_job(
     sites = b.read_input(str(reference_path('somalier_sites')))
 
     cmd = f"""\
-    SITES=/io/batch/sites/{reference_path('somalier_sites').name}
+    SITES=$BATCH_TMPDIR/sites/{reference_path('somalier_sites').name}
     retry gsutil cp {reference_path('somalier_sites')} $SITES
 
     somalier extract -d extracted/ --sites {sites} -f {ref.base} \\

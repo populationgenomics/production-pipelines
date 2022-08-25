@@ -61,7 +61,7 @@ make_sites_j.cpu(4)
 make_sites_j.command(
     wrap_command(
         f"""
-cd /io/batch
+cd $BATCH_TMPDIR
 somalier find-sites {concat_j.gnomad_vcf}
 mv sites.vcf.gz {make_sites_j.sites_vcf}
 """

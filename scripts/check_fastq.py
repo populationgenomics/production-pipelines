@@ -41,7 +41,7 @@ if __name__ == '__main__':
             j.image(image_path('hail'))
             j.storage('300G')
             j.command(GCLOUD_CMD)
-            local_path = '/io/batch/reads.fastq.gz'
+            local_path = '$BATCH_TMPDIR/reads.fastq.gz'
             j.command(f'gsutil cp {fq_path} {local_path}')
             j.command(f'cat {local_path} | gunzip -c | tail')
             j.command(f'gunzip -c {local_path} | wc -l')

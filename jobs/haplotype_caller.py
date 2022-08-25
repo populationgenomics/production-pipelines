@@ -194,8 +194,8 @@ def _haplotype_caller_one(
     assert isinstance(j.output_gvcf, hb.ResourceGroup)
 
     cmd = f"""\
-    CRAM=/io/batch/{sample_name}.cram
-    CRAI=/io/batch/{sample_name}.cram.crai
+    CRAM=$BATCH_TMPDIR/{sample_name}.cram
+    CRAI=$BATCH_TMPDIR/{sample_name}.cram.crai
 
     # Retrying copying to avoid google bandwidth limits
     retry_gs_cp {str(cram_path.path)} $CRAM
@@ -318,8 +318,8 @@ def postproc_gvcf(
 
     cmd = f"""\
     GVCF={gvcf}
-    GVCF_NODP=/io/batch/{sample_name}-nodp.g.vcf.gz
-    REBLOCKED=/io/batch/{sample_name}-reblocked.g.vcf.gz
+    GVCF_NODP=$BATCH_TMPDIR/{sample_name}-nodp.g.vcf.gz
+    REBLOCKED=$BATCH_TMPDIR/{sample_name}-reblocked.g.vcf.gz
 
     # Reindexing just to make sure the index is not corrupted
     bcftools index --tbi $GVCF

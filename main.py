@@ -54,4 +54,8 @@ if not run_stages:
 logger.debug(f'Running stages: {", ".join(run_stages)}')
 
 workflow = Workflow(stages=[stage.load() for stage in avail_stages.values()])
-workflow.run()
+workflow.run(
+    force_all_implicit_stages=get_config()['workflow'].get(
+        'force_all_implicit_stages', False
+    )
+)

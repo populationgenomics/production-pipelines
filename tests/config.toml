@@ -1,0 +1,11 @@
+[workflow]
+dataset_gcp_project = 'fewgenomes'
+access_level = 'test'
+dataset = 'fewgenomes'
+check_inputs = false
+check_intermediates = false
+check_expected_outputs = false
+
+[hail]
+billing_project = 'fewgenomes'
+delete_scratch_on_exit = false

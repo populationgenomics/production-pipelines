@@ -4,7 +4,7 @@ Jobs specific for seqr-loader.
 import logging
 
 from cpg_utils import Path
-from cpg_utils.hail_batch import image_path, genome_build, python_command
+from cpg_utils.hail_batch import image_path, genome_build, query_command
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
@@ -30,7 +30,7 @@ def annotate_cohort_jobs(
     j = b.new_job(f'annotate cohort', job_attrs)
     j.image(image_path('hail'))
     j.command(
-        python_command(
+        query_command(
             seqr_loader,
             seqr_loader.annotate_cohort.__name__,
             str(vcf_path),
@@ -69,7 +69,7 @@ def annotate_dataset_jobs(
     subset_j.image(image_path('hail'))
     assert sample_ids
     subset_j.command(
-        python_command(
+        query_command(
             seqr_loader,
             seqr_loader.subset_mt_to_samples.__name__,
             str(mt_path),

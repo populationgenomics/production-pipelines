@@ -5,7 +5,6 @@ datasets = ['prophecy']
 check_inputs = true
 skip_samples_with_missing_input = true
 check_expected_outputs = true
-keep_scratch = true
 sequencing_type = 'genome'
 dataset_gcp_project = 'prophecy-339301'
 skip_samples = [

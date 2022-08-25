@@ -8,27 +8,25 @@ import unittest
 from typing import Dict
 from unittest import skip
 
-from cpg_utils.hail_batch import image_path, fasta_res_group
+from cpg_utils.flows.utils import timestamp
 from hailtop.batch.job import Job
 
-from workflows import Path, to_path
-from workflows import benchmark
-from jobs.utils.hailquery import init_batch
-from workflows.batch import setup_batch
-from workflows.jobs import vep
+from cpg_utils import Path, to_path
+from cpg_utils.hail_batch import image_path, fasta_res_group, init_batch
+from cpg_utils.flows.batch import setup_batch
+from cpg_utils.flows.targets import Dataset
+from cpg_utils.flows.filetypes import FastqPair, CramPath, FastqPairs
+
+from jobs import vep
 from jobs.align import align
-from workflows.jobs.fastqc import fastqc
 from jobs.haplotype_caller import produce_gvcf
 from jobs.joint_genotyping import (
     make_joint_genotyping_jobs,
     JointGenotyperTool,
 )
-from workflows.jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jobs
+from jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jobs
 from jobs.somalier import check_pedigree_job
 from jobs.vqsr import make_vqsr_jobs
-from workflows.targets import Dataset
-from workflows.filetypes import CramPath
-from workflows.utils import timestamp
 
 try:
     import utils
@@ -37,6 +35,57 @@ except ModuleNotFoundError:
 
 
 logger = logging.getLogger(__file__)
+
+
+BENCHMARK_BUCKET = to_path('gs://cpg-fewgenomes-test/benchmark')
+TOY_INPUTS_BUCKET = BENCHMARK_BUCKET / 'inputs/toy'
+RESULTS_BUCKET = BENCHMARK_BUCKET / 'outputs'
+
+
+# 40k reads:
+tiny_fq = FastqPairs(
+    [
+        # This set is 50MB each:
+        FastqPair(
+            TOY_INPUTS_BUCKET / '2-699835.L001.R1.n40000.fastq.gz',
+            TOY_INPUTS_BUCKET / '2-699835.L001.R2.n40000.fastq.gz',
+        ),
+        FastqPair(
+            TOY_INPUTS_BUCKET / '2-699835.L002.R1.n40000.fastq.gz',
+            TOY_INPUTS_BUCKET / '2-699835.L002.R2.n40000.fastq.gz',
+        ),
+    ]
+)
+
+# ~300k reads:
+tiny_cram = CramPath(TOY_INPUTS_BUCKET / 'NA12878-chr21-tiny.cram')
+
+# WGS:
+giab_crams = {
+    sn: CramPath(f'gs://cpg-reference/validation/giab/cram/{sn}.cram')
+    for sn in ['NA12878', 'NA12891', 'NA12892']
+}
+na12878fq = FastqPairs(
+    [
+        FastqPair(
+            BENCHMARK_BUCKET / 'inputs/NA12878/ERR194147_1.fastq.gz',
+            BENCHMARK_BUCKET / 'inputs/NA12878/ERR194147_2.fastq.gz',
+        )
+    ]
+)
+perth_neuro_fq = FastqPairs(
+    [
+        FastqPair(
+            BENCHMARK_BUCKET
+            / 'inputs/PERTHNEURO_FQ/HNFWKCCXY_3_181017_FD07777491_Homo-sapiens__R_170503_GINRAV_DNA_M002_R1.fastq.gz',
+            BENCHMARK_BUCKET
+            / 'inputs/PERTHNEURO_FQ/HNFWKCCXY_3_181017_FD07777491_Homo-sapiens__R_170503_GINRAV_DNA_M002_R2.fastq.gz',
+        )
+    ]
+)
+perth_neuro_cram = CramPath(
+    BENCHMARK_BUCKET / 'inputs/PERTHNEURO_CRAM/CPG13045.cram',
+)
 
 
 def _read_file(path: Path) -> str:
@@ -145,14 +194,11 @@ class TestJobs(unittest.TestCase):
         (tests processing in parallel merging and merging)
         """
         output_path = self.out_bucket / 'align_fastq' / 'result.cram'
-        qc_bucket = self.out_bucket / 'align_fastq' / 'qc'
-
+        self.sample.alignment_input_by_seq_type['genome'] = tiny_fq
         jobs = align(
             b=self.batch,
-            alignment_input=benchmark.tiny_fq,
+            sample=self.sample,
             output_path=output_path,
-            qc_bucket=qc_bucket,
-            sample_name=self.sample.id,
         )
         cram_details_paths = self._job_get_cram_details(
             output_path,
@@ -160,15 +206,6 @@ class TestJobs(unittest.TestCase):
             jobs=jobs,
         )
         self.batch.run(wait=False)
-
-        self.assertTrue(
-            (
-                qc_bucket
-                / 'duplicate-metrics'
-                / f'{self.sample.id}-duplicate-metrics.csv'
-            ).exists()
-        )
-
         self.assertEqual(self.sample.id, _read_file(cram_details_paths['sample_name']))
         self.assertAlmostEqual(
             20180,
@@ -187,13 +224,12 @@ class TestJobs(unittest.TestCase):
         """
         sid = 'CPG196519'
         cram_path = CramPath(utils.BASE_BUCKET / f'inputs/toy/cram/{sid}.cram')
+        self.sample.alignment_input_by_seq_type['genome'] = cram_path
         output_path = self.out_bucket / 'result.cram'
-
         jobs = align(
             self.batch,
-            alignment_input=cram_path,
+            sample=self.sample,
             output_path=output_path,
-            sample_name=sid,
             realignment_shards_num=4,
         )
         cram_details_paths = self._job_get_cram_details(
@@ -213,21 +249,7 @@ class TestJobs(unittest.TestCase):
             delta=100,
         )
 
-    def test_fastqc_fastq(self):
-        """
-        Test fastqc from FASTQC input
-        """
-        output_html_path = self.out_bucket / 'result.html'
-        output_zip_path = self.out_bucket / 'result.zip'
-        fastqc(
-            self.batch,
-            alignment_input=benchmark.tiny_fq,
-            output_html_path=output_html_path,
-            output_zip_path=output_zip_path,
-        )
-        self.batch.run(wait=False)
-
-    def test_genotype_sample(self):
+    def test_genotype(self):
         """
         Test individual sample haplotype calling.
         """
@@ -451,6 +473,7 @@ class TestJobs(unittest.TestCase):
             vep_ht_path=vep_ht_path,
             output_mt_path=out_mt_path,
             checkpoint_prefix=self.tmp_bucket / 'checkpoints',
+            sequencing_type='genome',
         )
         self.batch.run(wait=True)
 
@@ -474,6 +497,7 @@ class TestJobs(unittest.TestCase):
             vep_ht_path=vep_ht_path,
             output_mt_path=out_mt_path,
             checkpoint_prefix=self.tmp_bucket / 'checkpoints',
+            sequencing_type='genome',
         )
         self.batch.run(wait=True)
 
@@ -528,5 +552,6 @@ class TestJobs(unittest.TestCase):
             expected_ped=self.batch.read_input(
                 str(inputs_bucket / 'somalier-samples.tsv')
             ),
+            dataset_name='fewgenomes',
         )
         self.batch.run(wait=True)

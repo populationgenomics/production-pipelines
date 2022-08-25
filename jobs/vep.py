@@ -56,7 +56,7 @@ def vep_jobs(
         # special case for not splitting by interval
         vep_out_path = tmp_prefix / 'vep.jsonl' if to_hail_table else out_path
         # noinspection PyTypeChecker
-        vep_one_jobs = vep_one(
+        vep_one_job = vep_one(
             b,
             vcf=vcf['vcf.gz'],
             out_format='json' if to_hail_table else 'vcf',
@@ -64,7 +64,8 @@ def vep_jobs(
             job_attrs=job_attrs or {},
             overwrite=overwrite,
         )
-        jobs.extend(vep_one_jobs)
+        if vep_one_job:
+            jobs.append(vep_one_job)
         if to_hail_table:
             to_hail_jobs = gather_vep_json_to_ht(
                 b=b,
@@ -72,7 +73,8 @@ def vep_jobs(
                 out_path=out_path,
                 job_attrs=job_attrs,
             )
-            [j.depends_on(*vep_one_jobs) for j in to_hail_jobs]
+            if vep_one_job:
+                [j.depends_on(vep_one_job) for j in to_hail_jobs]
             jobs.extend(to_hail_jobs)
         return jobs
 
@@ -86,7 +88,8 @@ def vep_jobs(
             scatter_count=scatter_count,
             output_prefix=tmp_prefix,
         )
-        jobs.append(intervals_j)
+        if intervals_j:
+            jobs.append(intervals_j)
 
     # Splitting variant calling by intervals
     for idx in range(scatter_count):
@@ -104,7 +107,7 @@ def vep_jobs(
         part_files.append(part_path)
 
         # noinspection PyTypeChecker
-        vep_one_jobs = vep_one(
+        vep_one_job = vep_one(
             b,
             vcf=subset_j.output_vcf['vcf.gz'],
             out_format='json' if to_hail_table else 'vcf',
@@ -112,7 +115,8 @@ def vep_jobs(
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             overwrite=overwrite,
         )
-        jobs.extend(vep_one_jobs)
+        if vep_one_job:
+            jobs.append(vep_one_job)
 
     if to_hail_table:
         gather_jobs = gather_vep_json_to_ht(
@@ -164,12 +168,12 @@ def vep_one(
     out_format: Literal['vcf', 'json'] = 'vcf',
     job_attrs: dict | None = None,
     overwrite: bool = False,
-) -> list[Job]:
+) -> Job | None:
     """
     Run a single VEP job.
     """
     if out_path and can_reuse(out_path, overwrite):
-        return []
+        return None
 
     j = b.new_job('VEP', job_attrs)
     j.image(image_path('vep'))
@@ -182,8 +186,10 @@ def vep_one(
         j.declare_resource_group(
             output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
         )
+        assert isinstance(j.output, hb.ResourceGroup)
         output = j.output['vcf.gz']
     else:
+        assert isinstance(j.output, hb.ResourceFile)
         output = j.output
 
     # gcsfuse works only with the root bucket, without prefix:
@@ -231,4 +237,4 @@ def vep_one(
     )
     if out_path:
         b.write_output(j.output, str(out_path).replace('.vcf.gz', ''))
-    return [j]
+    return j

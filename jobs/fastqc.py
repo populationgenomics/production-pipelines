@@ -52,20 +52,20 @@ def fastqc(
                 fname += '.gz'
             if subsample:
                 n = 10_000_000
-                new_file = f'/io/batch/{fname}'
+                new_file = f'$BATCH_TMPDIR/{fname}'
                 cmd += f"""\
                 gunzip -c {input_file} | head -n{n * 4} | gzip -c > {new_file}
                 """
                 input_file = new_file
 
         cmd += f"""\
-        mkdir -p /io/batch/outdir
+        mkdir -p $BATCH_TMPDIR/outdir
         fastqc -t{threads} {input_file} \\
-        --outdir /io/batch/outdir
-        ls /io/batch/outdir
-        ln /io/batch/outdir/*_fastqc.html {j_.out_html}
-        ln /io/batch/outdir/*_fastqc.zip {j_.out_zip}
-        unzip /io/batch/outdir/*_fastqc.zip
+        --outdir $BATCH_TMPDIR/outdir
+        ls $BATCH_TMPDIR/outdir
+        ln $BATCH_TMPDIR/outdir/*_fastqc.html {j_.out_html}
+        ln $BATCH_TMPDIR/outdir/*_fastqc.zip {j_.out_zip}
+        unzip $BATCH_TMPDIR/outdir/*_fastqc.zip
         """
         j_.command(command(cmd, monitor_space=True))
 
