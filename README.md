@@ -1,7 +1,8 @@
-# Seqr loader pipeline
+# Production workflows
 
-A [Hail Batch](https://hail.is/docs/batch/service.html) and [metamist](https://github.com/populationgenomics/sample-metadata) driven pipeline that loads genomics data into [Seqr](https://seqr.broadinstitute.org/).
+# Seqr loader
 
+A [Hail Batch](https://hail.is/docs/batch/service.html) and [metamist](https://github.com/populationgenomics/sample-metadata) driven workflows that loads genomics data into [Seqr](https://seqr.broadinstitute.org/).
 
 ## Usage
 
