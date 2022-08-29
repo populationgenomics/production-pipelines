@@ -23,7 +23,6 @@ def main(vep_version: str):
     b = get_batch(f'Copy VEP v{vep_version} data')
 
     assert image_path('vep').split(':')[-1] == vep_version
-    assert reference_path('vep_cache').parent.name == vep_version
     assert reference_path('vep_mount').parent.name == vep_version
 
     j1 = _make_vep_cache_tar(b)
@@ -47,7 +46,8 @@ def _make_vep_cache_tar(b: hb.Batch) -> Job | None:
     """
     Prepare a tarball with VEP cache.
     """
-    if reference_path('vep_cache').exists():
+    cache_path = reference_path('vep_mount').parent / 'cache.tar'
+    if cache_path.exists():
         return None
 
     j = b.new_job('Copy VEP cache with vep_install')
@@ -66,7 +66,7 @@ def _make_vep_cache_tar(b: hb.Batch) -> Job | None:
     tar -cvf {j.tar} vep
     """
     j.command(command(cmd))
-    b.write_output(j.tar, str(reference_path('vep_cache')))
+    b.write_output(j.tar, str(cache_path))
     return j
 
 
@@ -74,7 +74,8 @@ def _make_loftee_tar(b: hb.Batch) -> Job | None:
     """
     Prepare a tarball with LOFTEE ref data.
     """
-    if reference_path('vep_loftee').exists():
+    loftee_path = reference_path('vep_mount').parent.parent / 'loftee.tar'
+    if loftee_path.exists():
         return None
 
     j = b.new_job('Prepare LOFTEE bundle')
@@ -102,7 +103,7 @@ def _make_loftee_tar(b: hb.Batch) -> Job | None:
     tar -cvf {j.tar} .
     """
     j.command(command(cmd))
-    b.write_output(j.tar, str(reference_path('vep_loftee')))
+    b.write_output(j.tar, str(loftee_path))
     return j
 
 
@@ -114,6 +115,9 @@ def _prepare_mountable_bucket(b: hb.Batch) -> Job | None:
     if reference_path('vep_mount').exists():
         return None
 
+    cache_path = reference_path('vep_mount').parent / 'cache.tar'
+    loftee_path = reference_path('vep_mount').parent.parent / 'loftee.tar'
+
     j = b.new_job('Uncompresses bundles into a mount for cloudfuse')
     j.image(image_path('vep'))
     j.storage(f'100G')
@@ -124,12 +128,12 @@ def _prepare_mountable_bucket(b: hb.Batch) -> Job | None:
     df -h
     du -sh .
 
-    tar -xvf {b.read_input(str(reference_path('vep_cache')))}
+    tar -xvf {b.read_input(str(cache_path))}
     ls
     df -h
     du -sh .
     
-    tar -xvf {b.read_input(str(reference_path('vep_loftee')))}
+    tar -xvf {b.read_input(str(loftee_path))}
     ls
     df -h
     du -sh .

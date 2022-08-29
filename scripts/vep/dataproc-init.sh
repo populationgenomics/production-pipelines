@@ -14,9 +14,9 @@ if [[ -z "$VEP_VERSION" ]]; then
 fi
 
 export IMAGE=australia-southeast1-docker.pkg.dev/cpg-common/images/vep:${VEP_VERSION}
-export CONFIG_PATH=gs://cpg-reference/vep/${VEP_VERSION}/config.json
+export CONFIG_PATH=gs://cpg-reference/vep/${VEP_VERSION}/dataproc/config.json
 export CACHE_PATH=gs://cpg-reference/vep/${VEP_VERSION}/cache.tar
-export LOFTEE_PATH=gs://cpg-reference/vep/loftee-beta.tar
+export LOFTEE_PATH=gs://cpg-reference/vep/loftee.tar
 
 mkdir -p /vep_data/loftee/
 
