@@ -109,8 +109,6 @@ class CramMultiQC(DatasetStage):
 
         assert ending_to_trim
 
-        # Building sample map to MultiQC bulk rename. Only extending IDs if the
-        # extrenal/participant IDs are differrent:
         jobs = multiqc(
             self.b,
             tmp_prefix=dataset.tmp_prefix(),
@@ -206,8 +204,6 @@ class GvcfMultiQC(DatasetStage):
             'happy',
         }
 
-        # Building sample map to MultiQC bulk rename. Only extending IDs if the
-        # extrenal/participant IDs are differrent:
         jobs = multiqc(
             self.b,
             tmp_prefix=dataset.tmp_prefix(),
@@ -276,8 +272,6 @@ class JointVcfMultiQC(CohortStage):
             inputs.as_path(cohort, JointVcfHappy),
         ]
 
-        # Building sample map to MultiQC bulk rename. Only extending IDs if the
-        # extrenal/participant IDs are differrent:
         jobs = multiqc(
             self.b,
             tmp_prefix=self.tmp_prefix(),

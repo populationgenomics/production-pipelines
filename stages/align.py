@@ -7,12 +7,18 @@ from typing import Callable, Optional
 
 from cpg_utils.config import get_config
 from cpg_utils import Path
-from cpg_utils.workflows.workflow import Sample, stage, StageInput, StageOutput, SampleStage
+from cpg_utils.workflows.workflow import (
+    Sample,
+    stage,
+    StageInput,
+    StageOutput,
+    SampleStage,
+)
 
+from jobs import align, somalier
 from jobs.align import Aligner, MarkDupTool, MissingAlignmentInputException
 from jobs.verifybamid import verifybamid
 from jobs.picard import picard_wgs_metrics, picard_collect_metrics
-from jobs import align, somalier
 
 
 @dataclasses.dataclass
@@ -48,7 +54,7 @@ def qc_functions() -> list[Qc]:
             func=verifybamid,
             outs={'verify_bamid': QcOut('.verify-bamid.selfSM', 'verifybamid/selfsm')},
         ),
-        Qc(func=somalier.extact_job, outs={'somalier': None}),
+        Qc(func=somalier.extact, outs={'somalier': None}),
         Qc(
             func=picard_collect_metrics,
             outs={
@@ -127,9 +133,6 @@ class Align(SampleStage):
                 ],
                 job_attrs=self.get_job_attrs(sample),
                 overwrite=not get_config()['workflow'].get('check_intermediates'),
-                realignment_shards_num=get_config()['workflow'].get(
-                    'realignment_shards_num', align.DEFAULT_REALIGNMENT_SHARD_NUM
-                ),
                 aligner=Aligner.DRAGMAP,
                 markdup_tool=MarkDupTool.PICARD,
             )

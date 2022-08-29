@@ -26,7 +26,7 @@ from .align import Align
 @stage
 class CramSomalier(SampleStage):
     """
-    Genereate fingerprints from CRAMs for pedigree checks.
+    Generate fingerprints from CRAMs for pedigree checks.
     """
 
     def expected_outputs(self, sample: Sample) -> Path:
@@ -48,7 +48,7 @@ class CramSomalier(SampleStage):
                 return self.make_outputs(sample, error_msg=f'No CRAM found')
 
         expected_path = self.expected_outputs(sample)
-        j = somalier.extact_job(
+        j = somalier.extact(
             b=self.b,
             gvcf_or_cram_or_bam_path=cram_path,
             out_somalier_path=expected_path,
@@ -61,7 +61,7 @@ class CramSomalier(SampleStage):
 @stage
 class GvcfSomalier(SampleStage):
     """
-    Genereate fingerprints from GVCFs for pedigree checks.
+    Generate fingerprints from GVCFs for pedigree checks.
     """
 
     def expected_outputs(self, sample: Sample) -> Path:
@@ -83,7 +83,7 @@ class GvcfSomalier(SampleStage):
                 return self.make_outputs(sample, error_msg=f'No GVCF found')
 
         expected_path = self.expected_outputs(sample)
-        j = somalier.extact_job(
+        j = somalier.extact(
             b=self.b,
             gvcf_or_cram_or_bam_path=gvcf_path,
             out_somalier_path=expected_path,
@@ -96,7 +96,7 @@ class GvcfSomalier(SampleStage):
 # @stage
 # class JointVcfSomalier(SampleStage):
 #     """
-#     Genereate fingerprints from joint VCF for pedigree checks.
+#     Generate fingerprints from joint VCF for pedigree checks.
 #     """
 #
 #     def expected_outputs(self, cohort: Cohort) -> Path:
@@ -118,7 +118,7 @@ class GvcfSomalier(SampleStage):
 #                 return self.make_outputs(sample, error_msg=f'No GVCF found')
 #
 #         expected_path = self.expected_outputs(sample)
-#         j = somalier.extact_job(
+#         j = somalier.extract_job(
 #             b=self.b,
 #             gvcf_or_cram_or_bam_path=gvcf_path,
 #             out_fpath=expected_path,

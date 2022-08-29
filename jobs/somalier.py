@@ -196,7 +196,7 @@ def _prep_somalier_files(
             gvcf_or_cram_or_bam_path = CramPath(input_path)
         else:
             gvcf_or_cram_or_bam_path = GvcfPath(input_path)
-        j = extact_job(
+        j = extact(
             b=b,
             gvcf_or_cram_or_bam_path=gvcf_or_cram_or_bam_path,
             overwrite=overwrite,
@@ -404,7 +404,7 @@ def _relate(
     return j
 
 
-def extact_job(
+def extact(
     b,
     gvcf_or_cram_or_bam_path: CramPath | GvcfPath,
     out_somalier_path: Path | None = None,

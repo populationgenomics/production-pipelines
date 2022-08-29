@@ -14,7 +14,6 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from cpg_utils.hail_batch import command
-
 from cpg_utils.workflows.targets import Sample
 from cpg_utils.workflows.filetypes import AlignmentInput, FastqPairs, CramPath
 from cpg_utils.workflows.resources import STANDARD
@@ -26,8 +25,6 @@ from jobs import picard
 BWA_INDEX_EXTS = ['sa', 'amb', 'bwt', 'ann', 'pac', 'alt']
 BWAMEM2_INDEX_EXTS = ['0123', 'amb', 'bwt.2bit.64', 'ann', 'pac', 'alt']
 DRAGMAP_INDEX_FILES = ['hash_table.cfg.bin', 'hash_table.cmp', 'reference.bin']
-
-DEFAULT_REALIGNMENT_SHARD_NUM = 10
 
 
 class Aligner(Enum):
@@ -106,7 +103,7 @@ def align(
     extra_label: str | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
-    realignment_shards_num: int = DEFAULT_REALIGNMENT_SHARD_NUM,
+    realignment_shards_num: int = 10,
 ) -> list[Job]:
     """
     - if the input is 1 fastq pair, submits one alignment job.
@@ -140,6 +137,12 @@ def align(
 
     # if number of threads is not requested, using whole instance
     requested_nthreads = requested_nthreads or STANDARD.max_threads()
+
+    if get_config()['workflow']['sequencing_type'] == 'genome':
+        realignment_shards_num = 10
+    else:
+        assert get_config()['workflow']['sequencing_type'] == 'exome'
+        realignment_shards_num = 1
 
     sharded_fq = isinstance(alignment_input, FastqPairs) and len(alignment_input) > 1
     sharded_bazam = isinstance(alignment_input, CramPath) and realignment_shards_num > 1
