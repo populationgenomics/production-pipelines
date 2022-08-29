@@ -4,11 +4,10 @@ Jobs to run FastQC
 from os.path import basename
 from typing import cast
 
-from cpg_utils import Path
-from cpg_utils.hail_batch import image_path
 import hailtop.batch as hb
 from hailtop.batch.job import Job
-
+from cpg_utils import Path
+from cpg_utils.hail_batch import image_path
 from cpg_utils.workflows.filetypes import (
     AlignmentInput,
     CramPath,

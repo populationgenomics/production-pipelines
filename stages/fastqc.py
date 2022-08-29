@@ -21,7 +21,7 @@ class FastQC(SampleStage):
     def expected_outputs(self, sample: Sample) -> dict[str, Path]:
         """
         Stage is expected to generate a FastQC HTML report, and a zip file for
-        parsing with MuiltiQC.
+        parsing with MultiQC.
         """
         folder = sample.dataset.prefix() / 'qc'
         return {
