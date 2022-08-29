@@ -5,9 +5,9 @@ Create Hail Batch jobs to run Picard tools (marking duplicates, QC).
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
+from cpg_utils import Path
 from cpg_utils.hail_batch import command
 from cpg_utils.workflows.resources import HIGHMEM, STANDARD, storage_for_cram_qc_job
 from cpg_utils.workflows.filetypes import CramPath
@@ -168,6 +168,63 @@ def markdup(
                 str(out_markdup_metrics_path),
             )
 
+    return j
+
+
+def vcf_qc(
+    b: hb.Batch,
+    vcf_or_gvcf: hb.ResourceGroup,
+    is_gvcf: bool,
+    job_attrs: dict | None = None,
+    output_summary_path: Path | None = None,
+    output_detail_path: Path | None = None,
+    overwrite: bool = False,
+) -> Job | None:
+    """
+    Make job that runs Picard CollectVariantCallingMetrics.
+    """
+    if output_summary_path and can_reuse(output_detail_path, overwrite):
+        return None
+
+    job_attrs = (job_attrs or {}) | {'tool': 'picard_CollectVariantCallingMetrics'}
+    j = b.new_job('CollectVariantCallingMetrics', job_attrs)
+    j.image(image_path('picard'))
+    res = STANDARD.set_resources(j, storage_gb=20, mem_gb=3)
+    reference = fasta_res_group(b)
+    dbsnp_vcf = b.read_input_group(
+        base=str(reference_path('broad/dbsnp_vcf')),
+        index=str(reference_path('broad/dbsnp_vcf_index')),
+    )
+    sequencing_type = get_config()['workflow']['sequencing_type']
+    intervals_file = b.read_input(
+        str(reference_path(f'broad/{sequencing_type}_evaluation_interval_lists'))
+    )
+
+    if is_gvcf:
+        input_file = vcf_or_gvcf['g.vcf.gz']
+    else:
+        input_file = vcf_or_gvcf['vcf.gz']
+
+    cmd = f"""\
+    picard -Xms2000m -Xmx{res.get_java_mem_mb()}m \
+    CollectVariantCallingMetrics \
+    INPUT={input_file} \
+    OUTPUT=$BATCH_TMPDIR/prefix \
+    DBSNP={dbsnp_vcf['base']} \
+    SEQUENCE_DICTIONARY={reference['dict']} \
+    TARGET_INTERVALS={intervals_file} \
+    GVCF_INPUT={"true" if is_gvcf else "false"}
+    
+    cp $BATCH_TMPDIR/prefix.variant_calling_summary_metrics {j.summary}
+    cp $BATCH_TMPDIR/prefix.variant_calling_detail_metrics {j.detail}
+    """
+
+    j.command(command(cmd))
+
+    if output_summary_path:
+        b.write_output(j.summary, str(output_summary_path))
+    if output_detail_path:
+        b.write_output(j.detail, str(output_detail_path))
     return j
 
 
