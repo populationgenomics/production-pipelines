@@ -11,6 +11,44 @@ from cpg_utils.hail_batch import image_path, fasta_res_group, command
 from cpg_utils.workflows.resources import STANDARD
 
 
+def subset_vcf(
+    b: hb.Batch,
+    vcf: hb.ResourceGroup,
+    interval: hb.ResourceFile,
+    job_attrs: dict | None = None,
+    output_vcf_path: Path | None = None,
+) -> Job:
+    """
+    Subset VCF to provided intervals.
+    """
+    job_name = 'Subset VCF'
+    j = b.new_job(job_name, job_attrs)
+    j.image(image_path('gatk'))
+    STANDARD.set_resources(j, ncpu=2)
+
+    j.declare_resource_group(
+        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+    reference = fasta_res_group(b)
+    assert isinstance(j.output_vcf, hb.ResourceGroup)
+    cmd = f"""
+    gatk SelectVariants \\
+    -R {reference.base} \\
+    -V {vcf['vcf.gz']} \\
+    -L {interval} \\
+    -O {j.output_vcf['vcf.gz']}
+    """
+    j.command(
+        command(
+            cmd,
+            monitor_space=True,
+        )
+    )
+    if output_vcf_path:
+        b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
+    return j
+
+
 def gather_vcfs(
     b: hb.Batch,
     input_vcfs: list[hb.ResourceFile],
