@@ -103,11 +103,11 @@ def main(
     mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
 
     logging.info('Getting rows and exporting to the ES')
-    row_table = elasticsearch_row(mt)
+    row_ht = elasticsearch_row(mt)
     es_shards = _mt_num_shards(mt)
 
     es.export_table_to_elasticsearch(
-        row_table,
+        row_ht,
         index_name=es_index,
         num_shards=es_shards,
         write_null_values=True,
@@ -117,23 +117,22 @@ def main(
 
 def elasticsearch_row(mt: hl.MatrixTable):
     """
-    Prepares the mt to export using ElasticsearchClient V02.
+    Prepares the mt for export.
     - Flattens nested structs
     - drops locus and alleles key
-
     Borrowed from:
     https://github.com/broadinstitute/hail-elasticsearch-pipelines/blob/495f0d1b4d49542557ca5cccf98a23fc627260bf/luigi_pipeline/lib/model/seqr_mt_schema.py
     """
     # Converts a mt to the row equivalent.
     ht = mt.rows()
     # Converts nested structs into one field, e.g. {a: {b: 1}} => a.b: 1
-    table = ht.drop('vep').flatten()
+    ht = ht.drop('vep').flatten()
     # When flattening, the table is unkeyed, which causes problems because our locus
-    # and alleles should not
-    # be normal fields. We can also re-key, but I believe this is computational?
-    table = table.drop(table.locus, table.alleles)
-    table.describe()
-    return table
+    # and alleles should not be normal fields. We can also re-key, but I believe this
+    # is computational?
+    ht = ht.drop(ht.locus, ht.alleles)
+    ht.describe()
+    return ht
 
 
 def _mt_num_shards(mt):
@@ -372,7 +371,7 @@ class HailElasticsearchClient:
 
     def export_table_to_elasticsearch(
         self,
-        table: hl.Table,
+        ht: hl.Table,
         index_name: str = 'data',
         block_size: int = 5000,
         num_shards: int = 10,
@@ -393,7 +392,7 @@ class HailElasticsearchClient:
         """Create a new elasticsearch index to store the records in this table, and then export all records to it.
 
         Args:
-            table (Table): hail Table
+            ht (Table): hail Table
             index_name (string): elasticsearch index name
             block_size (int): number of records to write in one bulk insert
             num_shards (int): number of shards to use for this index
@@ -488,7 +487,7 @@ class HailElasticsearchClient:
 
         # encode any special chars in column names
         rename_dict = {}
-        for field_name in table.row_value.dtype.fields:
+        for field_name in ht.row_value.dtype.fields:
             encoded_name = field_name
 
             # optionally replace . with _ in a non-reversible way
@@ -504,14 +503,14 @@ class HailElasticsearchClient:
         for original_name, encoded_name in rename_dict.items():
             logging.info('Encoding column name %s to %s', original_name, encoded_name)
 
-        table = table.rename(rename_dict)
+        ht = ht.rename(rename_dict)
 
         if verbose:
-            logging.info(pformat(table.row_value.dtype))
+            logging.info(pformat(ht.row_value.dtype))
 
         # create elasticsearch index with fields that match the ones in the table
         elasticsearch_schema = elasticsearch_schema_for_table(
-            table,
+            ht,
             disable_doc_values_for_fields=disable_doc_values_for_fields,
             disable_index_for_fields=disable_index_for_fields,
         )
@@ -539,7 +538,7 @@ class HailElasticsearchClient:
 
         _meta = None
         if export_globals_to_index_meta:
-            _meta = struct_to_dict(hl.eval(table.globals))
+            _meta = struct_to_dict(hl.eval(ht.globals))
 
         self.create_or_update_mapping(
             index_name, elasticsearch_schema, num_shards=num_shards, _meta=_meta
@@ -555,7 +554,7 @@ class HailElasticsearchClient:
         )
 
         hl.export_elasticsearch(
-            table,
+            ht,
             self._host,
             int(self._port),
             index_name,
@@ -611,14 +610,14 @@ def _elasticsearch_mapping_for_type(dtype):
 
 
 def elasticsearch_schema_for_table(
-    table, disable_doc_values_for_fields=(), disable_index_for_fields=()
+    ht, disable_doc_values_for_fields=(), disable_index_for_fields=()
 ):
     """
     Converts the type of table's row values into a dictionary that can be plugged in to
     an elasticsearch mapping definition.
 
     Args:
-        table (hail.Table): the table to generate a schema for
+        ht (hail.Table): the table to generate a schema for
         disable_doc_values_for_fields: (optional) list of field names (the way they will be
             named in the elasticsearch index) for which to not store doc_values
             (see https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-params.html)
@@ -629,7 +628,7 @@ def elasticsearch_schema_for_table(
         A dict that can be plugged in to an elasticsearch mapping as the value for 'properties'.
         (see https://www.elastic.co/guide/en/elasticsearch/guide/current/root-object.html)
     """
-    properties = _elasticsearch_mapping_for_type(table.key_by().row_value.dtype)[
+    properties = _elasticsearch_mapping_for_type(ht.key_by().row_value.dtype)[
         'properties'
     ]
 
