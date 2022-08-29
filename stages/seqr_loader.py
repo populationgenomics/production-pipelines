@@ -167,7 +167,8 @@ class MtToEs(DatasetStage):
             max_age='24h',
             packages=[
                 'cpg_utils',
-                'elasticsearch==8.*' 'google',
+                'elasticsearch==8.*',
+                'google',
                 'fsspec',
                 'sklearn',
                 'gcloud',
