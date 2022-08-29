@@ -116,53 +116,6 @@ def _make_sample_map(dataset: Dataset):
     return sample_map_fpath
 
 
-def ancestry(
-    b,
-    dataset: Dataset,
-    input_path_by_sid: dict[str, Path | str],
-    out_tsv_path: Path,
-    out_html_path: Path,
-    overwrite: bool = True,
-    out_html_url: str | None = None,
-    label: str | None = None,
-    ignore_missing: bool = False,
-    job_attrs: dict | None = None,
-) -> Job:
-    """
-    Run somalier ancestry https://github.com/brentp/somalier/wiki/ancestry
-    """
-    extract_jobs, somalier_file_by_sample = _prep_somalier_files(
-        b=b,
-        samples=dataset.get_samples(),
-        input_path_by_sid=input_path_by_sid,
-        overwrite=overwrite,
-        label=label,
-        ignore_missing=ignore_missing,
-        job_attrs=job_attrs,
-    )
-    j = _ancestry(
-        b=b,
-        somalier_file_by_sample=somalier_file_by_sample,
-        sample_ids=dataset.get_sample_ids(),
-        external_id_map=dataset.rich_id_map(),
-        label=label,
-        extract_jobs=extract_jobs,
-        out_tsv_path=out_tsv_path,
-        out_html_path=out_html_path,
-        out_html_url=out_html_url,
-        job_attrs=job_attrs,
-    )
-    if out_html_url:
-        slack_message_cmd(
-            j,
-            text=(
-                f'*[{dataset.name}]* ancestry report: '
-                f'<{out_html_url}|{basename(out_html_url)}>'
-            ),
-        )
-    return j
-
-
 def _prep_somalier_files(
     b,
     samples: list[Sample],
@@ -274,56 +227,6 @@ def check_pedigree_job(
     if out_checks_path:
         b.write_output(check_j.output, str(out_checks_path))
     return check_j
-
-
-def _ancestry(
-    b: Batch,
-    somalier_file_by_sample: dict[str, Path],
-    sample_ids: list[str],
-    external_id_map: dict[str, str],
-    label: str | None,
-    extract_jobs: list[Job],
-    out_tsv_path: Path,
-    out_html_path: Path,
-    out_html_url: str | None = None,
-    job_attrs: dict | None = None,
-) -> Job:
-    j = b.new_job('Somalier ancestry' + (f' {label}' if label else ''), job_attrs)
-    j.image(image_path('somalier'))
-    # Size of one somalier file is 212K, so we add another G only if the number of
-    # samples is >4k
-    STANDARD.set_resources(j, storage_gb=1 + len(sample_ids) // 4000 * 1)
-    j.depends_on(*extract_jobs)
-
-    cmd = f"""\
-    mkdir $BATCH_TMPDIR/1kg
-    mv {b.read_input(str(reference_path('somalier_1kg_targz')))} $BATCH_TMPDIR/1kg
-    (cd $BATCH_TMPDIR/1kg && tar -xzf *.tar.gz)
-
-    mkdir $BATCH_TMPDIR/somaliers
-    """
-
-    for sample_id in sample_ids:
-        somalier_file = b.read_input(str(somalier_file_by_sample[sample_id]))
-        cmd += f'    cp {somalier_file} $BATCH_TMPDIR/somaliers/\n'
-
-    cmd += f"""\
-    somalier ancestry \\
-    --labels {b.read_input(str(reference_path('somalier_1kg_labels')))} \\
-    $BATCH_TMPDIR/1kg/1kg-somalier/*.somalier ++ \\
-    $BATCH_TMPDIR/somaliers/*.somalier \\
-    -o ancestry
-    ls
-    mv ancestry.somalier-ancestry.tsv {j.output_tsv}
-    {rich_sample_id_seds(external_id_map, ['ancestry.somalier-ancestry.html'])}
-    mv ancestry.somalier-ancestry.html {j.output_html}
-    """
-    if out_html_url:
-        cmd += '\n' + f'echo "HTML URL: {out_html_url}"'
-    j.command(command(cmd))
-    b.write_output(j.output_tsv, str(out_tsv_path))
-    b.write_output(j.output_html, str(out_html_path))
-    return j
 
 
 def _relate(
