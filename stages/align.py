@@ -15,7 +15,7 @@ from cpg_utils.workflows.workflow import (
     SampleStage,
 )
 
-from jobs import align
+from jobs import align, somalier
 from jobs.align import Aligner, MarkDupTool, MissingAlignmentInputException
 from jobs.verifybamid import verifybamid
 from jobs.picard import picard_wgs_metrics, picard_collect_metrics
@@ -54,6 +54,7 @@ def qc_functions() -> list[Qc]:
             func=verifybamid,
             outs={'verify_bamid': QcOut('.verify-bamid.selfSM', 'verifybamid/selfsm')},
         ),
+        Qc(func=somalier.extact, outs={'somalier': None}),
         Qc(
             func=picard_collect_metrics,
             outs={
@@ -105,7 +106,9 @@ class Align(SampleStage):
         qc_outs: dict[str, Path] = dict()
         for qc in qc_functions():
             for key, out in qc.outs.items():
-                if out:
+                if key == 'somalier':
+                    qc_outs[key] = sample.make_cram_path().somalier_path
+                elif out:
                     qc_outs[key] = (
                         sample.dataset.prefix() / 'qc' / key / f'{sample.id}{out.suf}'
                     )
