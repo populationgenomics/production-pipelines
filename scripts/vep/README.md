@@ -42,12 +42,13 @@ cat dataproc-config.json | sed "s/__VEP_VERSION__/${VEP_VERSION}/g" | gsutil cp 
 from analysis_runner import dataproc
 from cpg_utils.workflows.batch import get_batch
 vep_version = ...
+mt_path = f'gs://cpg-reference/vep/{vep_version}/dataproc/test/sample.vcf.mt'
 j = dataproc.hail_dataproc_job(
     get_batch('Run VEP'),
-    f'some-hail-query-script.py',
+    f'test/test-dataproc.py {mt_path}',
     max_age='4h',
     job_name=f'Run VEP {vep_version}',
-    init=[f'gs://cpg-reference/vep/GRCh38-{vep_version}-dataproc.sh'],
+    init=[f'gs://cpg-reference/vep/{vep_version}/dataproc/init.sh'],
     worker_machine_type='n1-highmem-8',
     worker_boot_disk_size=200,
     secondary_worker_boot_disk_size=200,

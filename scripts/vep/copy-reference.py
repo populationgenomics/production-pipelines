@@ -5,6 +5,7 @@ Use Hail Batch to transfer VEP cache bundle into the cpg-reference bucket,
 and prepare a GCP mount for cloudfuse.
 """
 
+import hail as hl
 import click
 import hailtop.batch as hb
 from hailtop.batch.job import Job
@@ -36,7 +37,6 @@ def main(vep_version: str):
     j4 = _test_mount(b)
     if j3:
         j4.depends_on(j3)
-    _test_dataproc(b, vep_version, depends_on=[j3] if j3 else [])
 
     res = b.run()
     res_status = res.status()
@@ -154,27 +154,6 @@ def _test_mount(b: hb.Batch) -> Job:
     cat {vep_dir}/vep/homo_sapiens/*/info.txt
     """
     j.command(command(cmd))
-    return j
-
-
-def _test_dataproc(b: hb.Batch, vep_version, depends_on: list[Job] | None) -> Job:
-    from analysis_runner import dataproc
-
-    mt_path = f'gs://cpg-reference/vep/{vep_version}/dataproc/test/sample.vcf.mt'
-    j = dataproc.hail_dataproc_job(
-        b,
-        f'test/test-dataproc.py {mt_path}',
-        max_age='4h',
-        job_name=f'Test VEP {vep_version}',
-        init=[f'gs://cpg-reference/vep/{vep_version}/dataproc/init.sh'],
-        worker_machine_type='n1-highmem-8',
-        worker_boot_disk_size=200,
-        secondary_worker_boot_disk_size=200,
-        num_secondary_workers=20,
-        num_workers=2,
-        depends_on=depends_on,
-    )
-
     return j
 
 
