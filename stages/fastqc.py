@@ -39,7 +39,7 @@ class FastQC(SampleStage):
         if isinstance(alignment_input, CramPath) and not alignment_input.is_bam:
             logging.info(
                 f'FastQC input {sample} has CRAM inputs {alignment_input} '
-                f'for type {sequencing_type}, skipping FASTQC'
+                f'for type {sequencing_type}, skipping FastQC'
             )
             return self.make_outputs(sample, skipped=True)
 

@@ -17,7 +17,7 @@ from cpg_utils.workflows.workflow import (
 
 from jobs import haplotype_caller
 from jobs.happy import happy
-from jobs.picard import vcf_qc, get_intervals
+from jobs.picard import vcf_qc
 
 from .align import Align
 

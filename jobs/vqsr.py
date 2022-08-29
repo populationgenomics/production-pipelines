@@ -4,9 +4,9 @@ Create Hail Batch jobs to create and apply a VQSR models.
 
 from typing import List, Optional
 import hailtop.batch as hb
-from cpg_utils.config import get_config
 from hailtop.batch.job import Job
 
+from cpg_utils.config import get_config
 from cpg_utils.workflows.utils import can_reuse
 from cpg_utils import Path
 from cpg_utils.hail_batch import reference_path, image_path, command
