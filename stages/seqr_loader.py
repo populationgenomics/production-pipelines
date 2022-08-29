@@ -113,3 +113,73 @@ class AnnotateDataset(DatasetStage):
         return self.make_outputs(
             dataset, data=self.expected_outputs(dataset), jobs=jobs
         )
+
+
+def es_password() -> str:
+    """
+    Get ElasticSearch password. Moved into a separate method to simplify
+    mocking in tests.
+    """
+    return read_secret(
+        project_id=get_config()['elasticsearch']['password_project_id'],
+        secret_name=get_config()['elasticsearch']['password_secret_id'],
+        fail_gracefully=False,
+    )
+
+
+@stage(required_stages=[AnnotateDataset], analysis_type='es-index')
+class MtToEs(DatasetStage):
+    """
+    Create a Seqr index.
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> str:
+        """
+        Expected to generate a Seqr index, which is not a file
+        """
+        sequencing_type = get_config()['workflow']['sequencing_type']
+        index_name = f'{dataset.name}-{sequencing_type}-{self.run_id}'
+        return index_name
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """
+        Uses analysis-runner's dataproc helper to run a hail query script
+        """
+        if (
+            es_datasets := get_config()['workflow'].get('create_es_index_for_datasets')
+        ) and dataset.name not in es_datasets:
+            # Skipping dataset that wasn't explicitly requested to upload to ES:
+            return self.make_outputs(dataset)
+
+        dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset, id='mt')
+        index_name = self.expected_outputs(dataset).lower()
+
+        from analysis_runner import dataproc
+
+        j = dataproc.hail_dataproc_job(
+            self.b,
+            f'jobs/dataproc_scripts/mt_to_es.py '
+            f'--mt-path {dataset_mt_path} '
+            f'--es-index {index_name} '
+            f'--es-password {es_password()} '
+            f'--liftover-path {reference_path("liftover_38_to_37")} '
+            f'--use-spark ',  # es export doesn't work with the service backend
+            max_age='24h',
+            packages=[
+                'cpg_utils',
+                'elasticsearch==8.*' 'google',
+                'fsspec',
+                'sklearn',
+                'gcloud',
+                'selenium',
+            ],
+            num_workers=2,
+            num_secondary_workers=0,
+            job_name=f'{dataset.name}: create ES index',
+            depends_on=inputs.get_jobs(dataset),
+            scopes=['cloud-platform'],
+        )
+        j._preemptible = False
+        j.attributes = self.get_job_attrs(dataset) | {'tool': 'hail dataproc'}
+        jobs = [j]
+        return self.make_outputs(dataset, data=index_name, jobs=jobs)
