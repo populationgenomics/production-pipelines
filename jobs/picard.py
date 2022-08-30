@@ -65,6 +65,7 @@ def markdup(
             )
 
     return j
+<<<<<<< HEAD
 
 
 def picard_collect_metrics(
@@ -240,3 +241,5 @@ def picard_wgs_metrics(
     j.command(command(cmd))
     b.write_output(j.out_csv, str(out_picard_wgs_metrics_path))
     return j
+=======
+>>>>>>> origin/main
