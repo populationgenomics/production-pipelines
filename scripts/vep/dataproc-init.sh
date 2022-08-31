@@ -40,16 +40,30 @@ gsutil cp ${CONFIG_PATH} /vep_data/vep-gcloud.json
 gsutil cat ${LOFTEE_PATH} | tar -xf - -C /vep_data/loftee/ &
 # Will write /vep_data/vep/homo_sapiens/${VEP_VERSION}_GRCh38:
 gsutil cat ${CACHE_PATH} | tar -xf - -C /vep_data/
+# Copy the fasta to the top level so the path doesn't depend on VEP version
+cp /vep_data/vep/homo_sapiens/*/Homo_sapiens.GRCh38.dna.toplevel.fa.gz \
+  /vep_data/Homo_sapiens.GRCh38.dna.toplevel.fa.gz
 
 gcloud -q auth configure-docker australia-southeast1-docker.pkg.dev
 docker pull ${IMAGE} &
 wait
 
-cat >/vep_docker.sh <<EOF
-#!/bin/bash
-docker run -i \
--v /vep_data:/vep_data:ro \
--v /vep_data/vep-gcloud.json:/vep_data/vep-gcloud.json:ro \
-${IMAGE} vep "\$@"
+cat >/vep.c <<EOF
+#include <unistd.h>
+#include <stdio.h>
+int
+main(int argc, char *const argv[]) {
+  if (setuid(geteuid()))
+    perror( "setuid" );
+  execv("/vep.sh", argv);
+  return 0;
+}
 EOF
-chmod +x /vep_docker.sh
+gcc -Wall -Werror -O2 /vep.c -o /vep
+chmod u+s /vep
+
+cat >/vep.sh <<EOF
+#!/bin/bash
+docker run -i -v /vep_data:/vep_data ${IMAGE} vep "\$@"
+EOF
+chmod +x /vep.sh

@@ -1,5 +1,5 @@
 {"command": [
-    "/vep_docker.sh",
+    "/vep",
     "--format", "vcf",
     "__OUTPUT_FORMAT_FLAG__",
     "--everything",
@@ -10,7 +10,7 @@
     "--assembly", "GRCh38",
     "--dir_cache", "/vep_data/vep/",
     "--dir_plugins", "/usr/local/share/ensembl-vep-__VEP_VERSION__-0/",
-    "--fasta", "/vep_data/vep/homo_sapiens/*/Homo_sapiens.GRCh38.dna.toplevel.fa.gz",
+    "--fasta", "/vep_data/Homo_sapiens.GRCh38.dna.toplevel.fa.gz",
     "--plugin", "LoF,loftee_path:/usr/local/share/ensembl-vep-__VEP_VERSION__-0/,gerp_bigwig:/vep_data/loftee/gerp_conservation_scores.homo_sapiens.GRCh38.bw,human_ancestor_fa:/vep_data/loftee/human_ancestor.fa.gz,conservation_file:/vep_data/loftee/loftee.sql",
     "-o", "STDOUT"
 ],

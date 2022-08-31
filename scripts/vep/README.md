@@ -25,7 +25,7 @@ Note that `hl.vep()` function works only with the spark backend on a Dataproc cl
 Copy the new version of script into the bucket:
 
 ```shell
-cat dataproc-init.sh | sed "s/__VEP_VERSION__/${VEP_VERSION}/g" | gsutil cp - gs://cpg-reference/vep/${VEP_VERSION}/dataproc/init.sh
+cat dataproc-init.sh | sed "s/__VEP_VERSION__/${VEP_VERSION}/g" | gsutil cp - gs://cpg-reference-main/vep/${VEP_VERSION}/dataproc/init.sh
 ```
 
 * The JSON config script for dataproc [dataproc-config.json](dataproc-config.json) is also copied from the [Hail codebase](https://github.com/hail-is/hail/blob/cc0a051740f4de08408e6a2094ffcb1c3158ee9c/hail/python/hailtop/hailctl/hdinsight/resources/vep-GRCh38.json) and modified to reflect the newer VEP versions, and has `mane_select:String,mane_plus_clinical:String`.
@@ -33,7 +33,7 @@ cat dataproc-init.sh | sed "s/__VEP_VERSION__/${VEP_VERSION}/g" | gsutil cp - gs
 The config is parametrised with `__VEP_VERSION__`, so pass it through `sed` when copying to the bucket:
 
 ```sh
-cat dataproc-config.json | sed "s/__VEP_VERSION__/${VEP_VERSION}/g" | gsutil cp - gs://cpg-reference/vep/${VEP_VERSION}/dataproc/config.json
+cat dataproc-config.json | sed "s/__VEP_VERSION__/${VEP_VERSION}/g" | gsutil cp - gs://cpg-reference-main/vep/${VEP_VERSION}/dataproc/config.json
 ```
 
 * After all set up, you can start a Dataproc cluster passing the initialization script explicitly with `init`, instead of using the `vep` parameter:
@@ -42,13 +42,13 @@ cat dataproc-config.json | sed "s/__VEP_VERSION__/${VEP_VERSION}/g" | gsutil cp 
 from analysis_runner import dataproc
 from cpg_utils.workflows.batch import get_batch
 vep_version = ...
-mt_path = f'gs://cpg-reference/vep/{vep_version}/dataproc/test/sample.vcf.mt'
+mt_path = f'gs://cpg-reference-main/vep/{vep_version}/dataproc/test/sample.vcf.mt'
 j = dataproc.hail_dataproc_job(
     get_batch('Run VEP'),
     f'test/test-dataproc.py {mt_path}',
     max_age='4h',
     job_name=f'Run VEP {vep_version}',
-    init=[f'gs://cpg-reference/vep/{vep_version}/dataproc/init.sh'],
+    init=[f'gs://cpg-reference-main/vep/{vep_version}/dataproc/init.sh'],
     worker_machine_type='n1-highmem-8',
     worker_boot_disk_size=200,
     secondary_worker_boot_disk_size=200,
@@ -66,10 +66,9 @@ import hail as hl
 mt = ...
 mt = hl.vep(
     mt, 
-    # We are not starting the cluster with --vep, instead passing custom
-    # startup script with --init gs://cpg-reference/vep/vep-GRCh38.sh,
-    # so VEP_CONFIG_URI will not be set, thus need to provide config
-    # as a function parameter here:
+    # Because we are not starting the cluster with `--vep` and instead passing custom 
+    # startup script with `--init`, Hail would not set VEP_CONFIG_URI for us. Thus, 
+    # we need to provide config as a function parameter explicitly:
     config='file:///vep_data/vep-gcloud.json'
 )
 ```
