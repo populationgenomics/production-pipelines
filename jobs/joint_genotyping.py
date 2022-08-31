@@ -27,7 +27,7 @@ from .picard import get_intervals
 class JointGenotyperTool(Enum):
     """
     Tool used for joint genotyping. GenotypeGVCFs is more stable,
-    GnarlyGenotyper is fater but more experimental.
+    GnarlyGenotyper is faster but more experimental.
     """
 
     GenotypeGVCFs = 1
