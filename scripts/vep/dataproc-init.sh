@@ -41,28 +41,15 @@ gsutil cat ${LOFTEE_PATH} | tar -xf - -C /vep_data/loftee/ &
 # Will write /vep_data/vep/homo_sapiens/${VEP_VERSION}_GRCh38:
 gsutil cat ${CACHE_PATH} | tar -xf - -C /vep_data/
 
+gcloud -q auth configure-docker australia-southeast1-docker.pkg.dev
 docker pull ${IMAGE} &
 wait
 
-cat >/vep.c <<EOF
-#include <unistd.h>
-#include <stdio.h>
-int
-main(int argc, char *const argv[]) {
-  if (setuid(geteuid()))
-    perror( "setuid" );
-  execv("/vep.sh", argv);
-  return 0;
-}
-EOF
-gcc -Wall -Werror -O2 /vep.c -o /vep
-chmod u+s /vep
-
-cat >/vep.sh <<EOF
+cat >/vep_docker.sh <<EOF
 #!/bin/bash
 docker run -i \
 -v /vep_data:/vep_data:ro \
 -v /vep_data/vep-gcloud.json:/vep_data/vep-gcloud.json:ro \
-${IMAGE} /usr/local/bin/vep "\$@"
+${IMAGE} vep "\$@"
 EOF
-chmod +x /vep.sh
+chmod +x /vep_docker.sh
