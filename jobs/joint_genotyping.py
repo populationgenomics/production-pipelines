@@ -71,7 +71,7 @@ def make_joint_genotyping_jobs(
     jobs: list[Job] = []
     intervals_j, intervals = get_intervals(
         b=b,
-        intervals_path=intervals_path,
+        source_intervals_path=intervals_path,
         scatter_count=scatter_count,
         job_attrs=job_attrs,
         output_prefix=tmp_bucket / 'intervals',
@@ -176,7 +176,7 @@ def make_joint_genotyping_jobs(
 
     if scatter_count > 1:
         logging.info(f'Queueing gather VCFs job')
-        gather_jobs, _ = gather_vcfs(
+        gather_j, _ = gather_vcfs(
             b,
             input_vcfs=vcfs,
             overwrite=overwrite,
@@ -184,12 +184,12 @@ def make_joint_genotyping_jobs(
             site_only=False,
             gvcf_count=len(gvcf_by_sid),
         )
-        for j in gather_jobs:
-            j.name = f'Joint genotyping: {j.name}'
-        jobs.extend(gather_jobs)
+        if gather_j:
+            gather_j.name = f'Joint genotyping: {gather_j.name}'
+            jobs.append(gather_j)
 
         logging.info(f'Queueing gather site-only VCFs job')
-        gather_siteonly_jobs, _ = gather_vcfs(
+        gather_siteonly_j, _ = gather_vcfs(
             b,
             input_vcfs=siteonly_vcfs,
             overwrite=overwrite,
@@ -197,9 +197,9 @@ def make_joint_genotyping_jobs(
             site_only=True,
             job_attrs=job_attrs,
         )
-        for j in gather_siteonly_jobs:
-            j.name = f'Joint genotyping: {j.name}'
-        jobs.extend(gather_siteonly_jobs)
+        if gather_siteonly_j:
+            gather_siteonly_j.name = f'Joint genotyping: {gather_siteonly_j.name}'
+            jobs.append(gather_siteonly_j)
 
     return jobs
 
