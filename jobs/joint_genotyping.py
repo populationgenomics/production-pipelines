@@ -2,7 +2,6 @@
 Create Hail Batch jobs for joint genotyping.
 """
 
-import json
 import logging
 from enum import Enum
 
@@ -10,15 +9,12 @@ import pandas as pd
 import hailtop.batch as hb
 from cpg_utils.config import get_config
 from cpg_utils.workflows.utils import can_reuse, exists
-from hailtop.batch import Resource
-from hailtop.batch.job import Job
-
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path, command
 from cpg_utils import Path
-
 from cpg_utils.workflows.resources import STANDARD
-from cpg_utils.workflows.targets import Sample
 from cpg_utils.workflows.filetypes import GvcfPath
+from hailtop.batch import Resource
+from hailtop.batch.job import Job
 
 from .vcf import gather_vcfs
 from .picard import get_intervals
