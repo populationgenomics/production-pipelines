@@ -19,8 +19,8 @@ status = MetamistStatusReporter()
 
 POPULATE_SAMPLES = False
 POPULATE_QC = False
-POPULATE_JOINT_CALL = False
-POPULATE_ES_INDEX = True
+POPULATE_JOINT_CALL = True
+POPULATE_ES_INDEX = False
 
 
 if POPULATE_SAMPLES:
@@ -117,18 +117,23 @@ if POPULATE_QC:
 if POPULATE_JOINT_CALL:
     h = cohort.alignment_inputs_hash()
     path = cohort.analysis_dataset.prefix() / 'mt' / f'{h}.mt'
-    if exists(path):
-        status.create_analysis(
-            str(path),
-            analysis_type='joint-calling',
-            analysis_status='completed',
-            target=cohort,
-            meta=cohort.get_job_attrs()
-            | dict(
-                sequencing_type=sequencing_type,
-            ),
-            project_name='seqr',
-        )
+    status.create_analysis(
+        str(path),
+        analysis_type='joint-calling',
+        analysis_status='completed',
+        target=cohort,
+        meta=cohort.get_job_attrs()
+        | dict(
+            sequencing_type=sequencing_type,
+            hash=cohort.alignment_inputs_hash(),
+            datasets=[ds.name for ds in cohort.get_datasets()],
+            dataset_mts=[
+                str(dataset.prefix() / 'mt' / f'{h}-{dataset.name}.mt')
+                for dataset in cohort.get_datasets()
+            ],
+        ),
+        project_name='seqr',
+    )
 
 
 if POPULATE_ES_INDEX:
