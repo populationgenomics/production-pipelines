@@ -1,12 +1,9 @@
 """
 Stage that generates a GVCF file.
 """
-import logging
 
 import hailtop.batch as hb
-from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
-from cpg_utils.workflows.filetypes import GvcfPath
 from cpg_utils.workflows.workflow import (
     Sample,
     stage,
@@ -15,11 +12,8 @@ from cpg_utils.workflows.workflow import (
     SampleStage,
 )
 
-from jobs import haplotype_caller
+from jobs import genotype
 from .align import Align
-
-
-hc_interval_lists: list[hb.Resource | None] | None = None
 
 
 @stage(required_stages=Align, analysis_type='gvcf')
@@ -41,9 +35,8 @@ class Genotype(SampleStage):
         """
         Use function from the jobs module
         """
-        jobs = []
         gvcf_path = self.expected_outputs(sample)['gvcf']
-        gvcf_jobs = haplotype_caller.genotype(
+        jobs = genotype.genotype(
             b=self.b,
             output_path=gvcf_path,
             sample_name=sample.id,
@@ -52,5 +45,4 @@ class Genotype(SampleStage):
             overwrite=not get_config()['workflow'].get('check_intermediates'),
             job_attrs=self.get_job_attrs(sample),
         )
-        jobs.extend(gvcf_jobs)
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
