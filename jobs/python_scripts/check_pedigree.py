@@ -217,9 +217,6 @@ def check_pedigree(
         if s1 in bad_ids or s2 in bad_ids:
             continue
 
-        if s1 == 'CPG68692' and s2 == 'CPG13052':
-            pass
-
         expected_ped_s1 = expected_ped_sample_by_id.get(s1)
         expected_ped_s2 = expected_ped_sample_by_id.get(s2)
         inferred_ped_s1 = inferred_ped_sample_by_id.get(s1)
