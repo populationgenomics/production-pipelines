@@ -43,7 +43,7 @@ class Genotype(SampleStage):
         """
         jobs = []
         gvcf_path = self.expected_outputs(sample)['gvcf']
-        gvcf_jobs = haplotype_caller.produce_gvcf(
+        gvcf_jobs = haplotype_caller.genotype(
             b=self.b,
             output_path=gvcf_path,
             sample_name=sample.id,

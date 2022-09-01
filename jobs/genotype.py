@@ -1,5 +1,5 @@
 """
-Create Hail Batch jobs for variant calling in individual samples.
+CRAM to GVCF: create Hail Batch jobs to genotype individual samples.
 """
 
 import logging
@@ -13,10 +13,11 @@ from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path, co
 from cpg_utils.workflows.filetypes import CramPath, GvcfPath
 from cpg_utils.workflows import utils
 from cpg_utils.workflows.resources import STANDARD, HIGHMEM
-from jobs.picard import get_intervals
+
+from .picard import get_intervals
 
 
-def produce_gvcf(
+def genotype(
     b: hb.Batch,
     sample_name: str,
     tmp_prefix: Path,
@@ -27,11 +28,7 @@ def produce_gvcf(
     dragen_mode: bool = True,
 ) -> list[Job]:
     """
-    Takes all samples with a 'file' of 'type'='bam' in `samples_df`,
-    and runs HaplotypeCaller on them, and sets a new 'file' of 'type'='gvcf'
-
-    HaplotypeCaller is run in an interval-based sharded way, with per-interval
-    HaplotypeCaller jobs defined in a nested loop.
+    Takes a CRAM file and runs GATK tools to make a GVCF.
     """
     hc_gvcf_path = tmp_prefix / 'haplotypecaller' / f'{sample_name}.g.vcf.gz'
     if utils.can_reuse(output_path, overwrite):
@@ -43,19 +40,16 @@ def produce_gvcf(
         assert get_config()['workflow']['sequencing_type'] == 'exome'
         scatter_count = 1
 
-    jobs = []
-    jobs.extend(
-        haplotype_caller(
-            b=b,
-            sample_name=sample_name,
-            job_attrs=job_attrs,
-            output_path=hc_gvcf_path,
-            cram_path=cram_path,
-            tmp_prefix=tmp_prefix,
-            scatter_count=scatter_count,
-            overwrite=overwrite,
-            dragen_mode=dragen_mode,
-        )
+    jobs = haplotype_caller(
+        b=b,
+        sample_name=sample_name,
+        job_attrs=job_attrs,
+        output_path=hc_gvcf_path,
+        cram_path=cram_path,
+        tmp_prefix=tmp_prefix,
+        scatter_count=scatter_count,
+        overwrite=overwrite,
+        dragen_mode=dragen_mode,
     )
     postproc_j = postproc_gvcf(
         b=b,
@@ -84,8 +78,7 @@ def haplotype_caller(
     dragen_mode: bool = True,
 ) -> list[Job]:
     """
-    Run haplotype caller in parallel sharded by intervals.
-    Returns jobs and path to the output GVCF file.
+    Run GATK Haplotype Caller in parallel, split by intervals.
     """
     if utils.can_reuse(output_path, overwrite):
         return [b.new_job('HaplotypeCaller [reuse]', job_attrs)]
@@ -154,7 +147,7 @@ def _haplotype_caller_one(
     dragen_mode: bool = True,
 ) -> Job:
     """
-    Add one HaplotypeCaller job on an interval
+    Add one GATK HaplotypeCaller job on an interval.
     """
     job_name = 'HaplotypeCaller'
     j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk_HaplotypeCaller'))
@@ -170,10 +163,10 @@ def _haplotype_caller_one(
     # CRAMs can be as big as 80G:
     # https://batch.hail.populationgenomics.org.au/batches/74042/jobs/3346
     # plus we need enough space to fit output GVCF (1G) and reference data (5G).
-    # HaplotypeCaller is not parallelized, so we request 4 cores only to just have
-    # enough memory. But a 4-core request would only give us 185G/4 = 46.25G on
-    # a 32-core machine, or 265G/4 = 66.25G on a 16-core machine. That's not enough
-    # for WGS sometimes, so we need to explicitly request more storage.
+    # HaplotypeCaller is not parallelized, so we request the minimal possible chunk
+    # of a Hail worker (2 cores), plus with the `highmem` instance that would
+    # give enough memory: 13G. That's not going to give enough disk storage, so we
+    # are explicitly requesting more storage.
     storage_gb = None  # avoid extra disk by default
     if get_config()['workflow']['sequencing_type'] == 'genome':
         storage_gb = 100
@@ -236,7 +229,7 @@ def merge_gvcfs_job(
     overwrite: bool = True,
 ) -> Job:
     """
-    Combine by-interval GVCFs into a single sample GVCF file
+    Combine by-interval GVCFs into a single sample-wide GVCF file.
     """
     job_name = f'Merge {len(gvcf_groups)} GVCFs'
     j = b.new_job(job_name, (job_attrs or {}) | dict(tool='picard_MergeVcfs'))
