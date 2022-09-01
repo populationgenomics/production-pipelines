@@ -221,7 +221,7 @@ def check_pedigree(
         expected_ped_s2 = expected_ped_sample_by_id.get(s2)
         inferred_ped_s1 = inferred_ped_sample_by_id.get(s1)
         inferred_ped_s2 = inferred_ped_sample_by_id.get(s2)
-        # Supressing all logging output from peddy, otherwise it would clutter the logs
+        # Suppressing all logging output from peddy, otherwise it would clutter the logs
         with contextlib.redirect_stderr(None), contextlib.redirect_stdout(None):
             if expected_ped_s1 and expected_ped_s2:
                 expected_rel = expected_ped.relation(expected_ped_s1, expected_ped_s2)
