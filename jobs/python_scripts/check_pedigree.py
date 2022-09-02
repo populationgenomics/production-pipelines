@@ -259,8 +259,6 @@ def check_pedigree(
                 and inferred_rel != 'unrelated'
             ):
                 mismatching_unrelated_to_related.append(line)
-            # elif inferred_rel in ['related at unknown level', 'unknown']:
-            #     pass
             else:
                 mismatching_related_to_unrelated.append(line)
 
