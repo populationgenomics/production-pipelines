@@ -48,7 +48,7 @@ class CramSomalier(SampleStage):
                 return self.make_outputs(sample, error_msg=f'No CRAM found')
 
         expected_path = self.expected_outputs(sample)
-        j = somalier.extact(
+        j = somalier.extract(
             b=self.b,
             gvcf_or_cram_or_bam_path=cram_path,
             out_somalier_path=expected_path,
@@ -83,7 +83,7 @@ class GvcfSomalier(SampleStage):
                 return self.make_outputs(sample, error_msg=f'No GVCF found')
 
         expected_path = self.expected_outputs(sample)
-        j = somalier.extact(
+        j = somalier.extract(
             b=self.b,
             gvcf_or_cram_or_bam_path=gvcf_path,
             out_somalier_path=expected_path,
