@@ -2,8 +2,6 @@
 Adding jobs for fingerprinting and pedigree checks. Mostly using Somalier.
 """
 import logging
-from os.path import basename
-
 import pandas as pd
 from hailtop.batch import Batch, Resource
 from hailtop.batch.job import Job
@@ -18,7 +16,6 @@ from cpg_utils.hail_batch import (
     command,
 )
 from cpg_utils.workflows.resources import STANDARD
-from cpg_utils.workflows.slack import slack_message_cmd
 from cpg_utils.workflows.targets import Dataset, Sample
 from cpg_utils.workflows.filetypes import CramPath, GvcfPath
 from cpg_utils.workflows.utils import can_reuse, rich_sample_id_seds
@@ -26,8 +23,10 @@ from cpg_utils.workflows.utils import can_reuse, rich_sample_id_seds
 from .python_scripts import check_pedigree
 
 
-# We exclude contaminated samples from relatedness checks
-MIN_FREEMIX = 0.04
+# We want to exclude contaminated samples from relatedness checks. Somalier is not
+# designed to work with contaminated samples, and in a presence of contamination it
+# can generate a lot of false positive families.
+MAX_FREEMIX = 0.04
 
 
 def pedigree(
@@ -85,7 +84,7 @@ def pedigree(
         job_attrs=job_attrs,
     )
 
-    check_j = check_pedigree_job(
+    check_j = _check_pedigree(
         b=b,
         samples_file=relate_j.output_samples,
         pairs_file=relate_j.output_pairs,
@@ -149,7 +148,7 @@ def _prep_somalier_files(
             gvcf_or_cram_or_bam_path = CramPath(input_path)
         else:
             gvcf_or_cram_or_bam_path = GvcfPath(input_path)
-        j = extact(
+        j = extract(
             b=b,
             gvcf_or_cram_or_bam_path=gvcf_or_cram_or_bam_path,
             overwrite=overwrite,
@@ -172,7 +171,7 @@ def _prep_somalier_files(
     return extract_jobs, somalier_file_by_sample
 
 
-def check_pedigree_job(
+def _check_pedigree(
     b: Batch,
     samples_file: Resource,
     pairs_file: Resource,
@@ -267,9 +266,10 @@ def _relate(
             somalier_file = b.read_input(str(somalier_file_by_sid[sample_id]))
             cmd += f"""
             FREEMIX=$(cat {b.read_input(str(verifybamid_by_sid[sample_id]))} | tail -n1 | cut -f7)
-            if [[ $(echo "$FREEMIX > {MIN_FREEMIX}" | bc) -eq 0 ]]; \
-            then echo "{somalier_file}" >> {input_files_file}; \
-            echo "{sample_id}" >> {samples_ids_file}; fi
+            if [[ $(echo "$FREEMIX > {MAX_FREEMIX}" | bc) -eq 0 ]]; then \
+            echo "{somalier_file}" >> {input_files_file}; \
+            echo "{sample_id}" >> {samples_ids_file}; \
+            fi
             """
         else:
             somalier_file = b.read_input(str(somalier_file_by_sid[sample_id]))
@@ -307,7 +307,7 @@ def _relate(
     return j
 
 
-def extact(
+def extract(
     b,
     gvcf_or_cram_or_bam_path: CramPath | GvcfPath,
     out_somalier_path: Path | None = None,
@@ -316,8 +316,7 @@ def extact(
     label: str | None = None,
 ) -> Job | None:
     """
-    Run "somalier extract" to generate a fingerprint for a `sample`
-    from `fpath` (which can be a GVCF, a CRAM or a BAM)
+    Run `somalier extract` to generate a fingerprint (i.e. a `*.somalier` file)
     """
     if can_reuse(out_somalier_path, overwrite):
         return None

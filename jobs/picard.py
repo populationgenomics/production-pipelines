@@ -201,14 +201,14 @@ def picard_collect_metrics(
     job_attrs = (job_attrs or {}) | {'tool': 'picard_CollectMultipleMetrics'}
     j = b.new_job('Picard CollectMultipleMetrics', job_attrs)
     j.image(image_path('picard'))
-    res = STANDARD.request_resources(mem_gb=7)
+    res = STANDARD.request_resources(ncpu=2)
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
     cram = cram_path.resource_group(b)
     reference = fasta_res_group(b)
 
     cmd = f"""\
-    picard -Xms5g -Xmx{res.get_java_mem_mb()}m \
+    picard -Xmx{res.get_java_mem_mb()}m \
       CollectMultipleMetrics \
       INPUT={cram.cram} \
       REFERENCE_SEQUENCE={reference.base} \
@@ -266,7 +266,7 @@ def picard_hs_metrics(
     j.image(image_path('picard'))
     sequencing_type = get_config()['workflow']['sequencing_type']
     assert sequencing_type == 'exome'
-    res = STANDARD.request_resources(mem_gb=7)
+    res = STANDARD.request_resources(ncpu=2)
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
     cram = cram_path.resource_group(b)
@@ -281,7 +281,7 @@ def picard_hs_metrics(
     cmd = f"""\
     grep -v 
     
-    picard -Xms5g -Xmx{res.get_java_mem_mb()}m \
+    picard -Xmx{res.get_java_mem_mb()}m \
       CollectHsMetrics \
       INPUT={cram.cram} \
       REFERENCE_SEQUENCE={reference.base} \
@@ -320,7 +320,7 @@ def picard_wgs_metrics(
     j.image(image_path('picard'))
     sequencing_type = get_config()['workflow']['sequencing_type']
     assert sequencing_type == 'genome'
-    res = STANDARD.request_resources(ncpu=4)
+    res = STANDARD.request_resources(ncpu=2)
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
     cram = cram_path.resource_group(b)
@@ -330,7 +330,7 @@ def picard_wgs_metrics(
     )
 
     cmd = f"""\
-    picard -Xms2000m -Xmx{res.get_java_mem_mb()}m \
+    picard -Xmx{res.get_java_mem_mb()}m \
       CollectWgsMetrics \
       INPUT={cram.cram} \
       VALIDATION_STRINGENCY=SILENT \
