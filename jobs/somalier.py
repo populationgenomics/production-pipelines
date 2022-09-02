@@ -319,8 +319,7 @@ def extract(
     label: str | None = None,
 ) -> Job | None:
     """
-    Run "somalier extract" to generate a fingerprint for a `sample`
-    from `fpath` (which can be a GVCF, a CRAM or a BAM)
+    Run `somalier extract` to generate a fingerprint (i.e. a `*.somalier` file)
     """
     if can_reuse(out_somalier_path, overwrite):
         return None
