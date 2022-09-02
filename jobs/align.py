@@ -1,5 +1,5 @@
 """
-Create Hail Batch jobs for alignment.
+FASTQ/BAM/CRAM -> CRAM: create Hail Batch jobs for (re-)alignment.
 """
 
 from enum import Enum
@@ -19,7 +19,7 @@ from cpg_utils.workflows.filetypes import AlignmentInput, FastqPairs, CramPath
 from cpg_utils.workflows.resources import STANDARD
 from cpg_utils.workflows.utils import can_reuse, exists
 
-from jobs import picard
+from . import picard
 
 
 BWA_INDEX_EXTS = ['sa', 'amb', 'bwt', 'ann', 'pac', 'alt']
@@ -50,7 +50,7 @@ class MarkDupTool(Enum):
 def _get_cram_reference_from_version(cram_version) -> str:
     """
     Get the reference used for the specific cram_version,
-    so that bazam is able to correctly decompress the reads
+    so that Bazam is able to correctly decompress the reads
     """
     cram_version_map = get_config()['workflow'].get('cram_version_reference', {})
     if cram_version in cram_version_map:
