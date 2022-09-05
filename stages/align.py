@@ -54,7 +54,7 @@ def qc_functions() -> list[Qc]:
             func=verifybamid,
             outs={'verify_bamid': QcOut('.verify-bamid.selfSM', 'verifybamid/selfsm')},
         ),
-        Qc(func=somalier.extact, outs={'somalier': None}),
+        Qc(func=somalier.extract, outs={'somalier': None}),
         Qc(
             func=picard_collect_metrics,
             outs={

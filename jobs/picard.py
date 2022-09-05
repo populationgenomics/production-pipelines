@@ -5,9 +5,9 @@ Create Hail Batch jobs to run Picard tools (marking duplicates, QC).
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
+from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
-from cpg_utils import Path
 from cpg_utils.hail_batch import command
 from cpg_utils.workflows.resources import HIGHMEM, STANDARD, storage_for_cram_qc_job
 from cpg_utils.workflows.filetypes import CramPath
@@ -17,17 +17,22 @@ from cpg_utils.workflows.utils import can_reuse, exists
 def get_intervals(
     b: hb.Batch,
     scatter_count: int,
-    intervals_path: Path | str | None = None,
+    source_intervals_path: Path | None = None,
     job_attrs: dict[str, str] | None = None,
     output_prefix: Path | None = None,
-) -> tuple[Job | None, list[hb.ResourceFile | None]]:
+) -> tuple[Job | None, list[hb.ResourceFile]]:
     """
-    Add a job that split genome into intervals to parallelize variant calling.
+    Add a job that splits genome/exome intervals into sub-intervals to be used to
+    parallelize variant calling.
 
-    As input interval file, takes intervals_path if provided, otherwise checks refs
-    for the intervals of provided sequencing_type.
+    @param b: Hail Batch object,
+    @param scatter_count: number of target sub-intervals,
+    @param source_intervals_path: path to source intervals to split. Would check for
+        config if not provided.
+    @param job_attrs: attributes for Hail Batch job,
+    @param output_prefix: path optionally to save split subintervals.
 
-    This job calls picard's IntervalListTools to scatter the input interval list
+    The job calls picard IntervalListTools to scatter the input interval list
     into scatter_count sub-interval lists, inspired by this WARP task :
     https://github.com/broadinstitute/warp/blob/bc90b0db0138747685b459c83ce52c8576ce03cd/tasks/broad/Utilities.wdl
 
@@ -37,42 +42,47 @@ def get_intervals(
     that, but Hail Batch is not dynamic and have to expect certain number of output
     files.
     """
-    assert scatter_count > 0
-
+    assert scatter_count > 0, scatter_count
     sequencing_type = get_config()['workflow']['sequencing_type']
-
-    intervals_path = intervals_path or get_config()['workflow'].get('intervals_path')
-    if not intervals_path:
-        # Did we cache split intervals for this sequencing_type?
-        cache_bucket = (
-            reference_path('intervals_prefix')
-            / sequencing_type
-            / f'{scatter_count}intervals'
-        )
-        if exists(cache_bucket / '1.interval_list'):
-            return None, [
-                b.read_input(str(cache_bucket / f'{idx + 1}.interval_list'))
-                for idx in range(scatter_count)
-            ]
-        # Taking intervals file for the sequencing_type.
-        intervals_path = reference_path(
-            f'broad/{sequencing_type}_calling_interval_lists',
-        )
+    source_intervals_path = source_intervals_path or reference_path(
+        f'broad/{sequencing_type}_calling_interval_lists'
+    )
 
     if scatter_count == 1:
-        return None, [b.read_input(str(intervals_path))]
+        # Special case when we don't need to split
+        return None, [b.read_input(str(source_intervals_path))]
 
-    job_attrs = (job_attrs or {}) | dict(tool='picard_IntervalListTools')
-    job_name = f'Make {scatter_count} intervals for {sequencing_type}'
-
-    if output_prefix and exists(output_prefix / '1.interval_list'):
-        job_attrs['reuse'] = 'true'
-        return b.new_job(job_name, job_attrs), [
+    if output_prefix and (output_prefix / '1.interval_list').exists():
+        return None, [
             b.read_input(str(output_prefix / f'{idx + 1}.interval_list'))
             for idx in range(scatter_count)
         ]
 
-    j = b.new_job(job_name, job_attrs)
+    if (
+        not source_intervals_path
+        and (
+            (
+                existing_split_intervals_prefix := (
+                    reference_path('intervals_prefix')
+                    / sequencing_type
+                    / f'{scatter_count}intervals'
+                )
+            )
+            / '1.interval_list'
+        ).exists()
+    ):
+        # We already have split intervals for this sequencing_type:
+        return None, [
+            b.read_input(
+                str(existing_split_intervals_prefix / f'{idx + 1}.interval_list')
+            )
+            for idx in range(scatter_count)
+        ]
+
+    j = b.new_job(
+        f'Make {scatter_count} intervals for {sequencing_type}',
+        attributes=(job_attrs or {}) | dict(tool='picard_IntervalListTools'),
+    )
     j.image(image_path('picard'))
     STANDARD.set_resources(j, storage_gb=16, mem_gb=2)
 
@@ -91,7 +101,7 @@ def get_intervals(
     UNIQUE=true \
     SORT=true \
     BREAK_BANDS_AT_MULTIPLES_OF={break_bands_at_multiples_of} \
-    INPUT={b.read_input(str(intervals_path))} \
+    INPUT={b.read_input(str(source_intervals_path))} \
     OUTPUT=$BATCH_TMPDIR/out
     ls $BATCH_TMPDIR/out
     ls $BATCH_TMPDIR/out/*
@@ -110,7 +120,7 @@ def get_intervals(
                 str(output_prefix / f'{idx + 1}.interval_list'),
             )
 
-    intervals: list[hb.ResourceFile | None] = []
+    intervals: list[hb.ResourceFile] = []
     for idx in range(scatter_count):
         interval = j[f'{idx + 1}.interval_list']
         assert isinstance(interval, hb.ResourceFile)
@@ -258,14 +268,14 @@ def picard_collect_metrics(
     job_attrs = (job_attrs or {}) | {'tool': 'picard_CollectMultipleMetrics'}
     j = b.new_job('Picard CollectMultipleMetrics', job_attrs)
     j.image(image_path('picard'))
-    res = STANDARD.request_resources(mem_gb=7)
+    res = STANDARD.request_resources(ncpu=2)
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
     cram = cram_path.resource_group(b)
     reference = fasta_res_group(b)
 
     cmd = f"""\
-    picard -Xms5g -Xmx{res.get_java_mem_mb()}m \
+    picard -Xmx{res.get_java_mem_mb()}m \
       CollectMultipleMetrics \
       INPUT={cram.cram} \
       REFERENCE_SEQUENCE={reference.base} \
@@ -323,7 +333,7 @@ def picard_hs_metrics(
     j.image(image_path('picard'))
     sequencing_type = get_config()['workflow']['sequencing_type']
     assert sequencing_type == 'exome'
-    res = STANDARD.request_resources(mem_gb=7)
+    res = STANDARD.request_resources(ncpu=2)
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
     cram = cram_path.resource_group(b)
@@ -338,7 +348,7 @@ def picard_hs_metrics(
     cmd = f"""\
     grep -v 
     
-    picard -Xms5g -Xmx{res.get_java_mem_mb()}m \
+    picard -Xmx{res.get_java_mem_mb()}m \
       CollectHsMetrics \
       INPUT={cram.cram} \
       REFERENCE_SEQUENCE={reference.base} \
@@ -377,7 +387,7 @@ def picard_wgs_metrics(
     j.image(image_path('picard'))
     sequencing_type = get_config()['workflow']['sequencing_type']
     assert sequencing_type == 'genome'
-    res = STANDARD.request_resources(ncpu=4)
+    res = STANDARD.request_resources(ncpu=2)
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
     cram = cram_path.resource_group(b)
@@ -387,7 +397,7 @@ def picard_wgs_metrics(
     )
 
     cmd = f"""\
-    picard -Xms2000m -Xmx{res.get_java_mem_mb()}m \
+    picard -Xmx{res.get_java_mem_mb()}m \
       CollectWgsMetrics \
       INPUT={cram.cram} \
       VALIDATION_STRINGENCY=SILENT \
