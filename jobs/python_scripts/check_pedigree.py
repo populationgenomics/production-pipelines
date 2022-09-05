@@ -217,14 +217,11 @@ def check_pedigree(
         if s1 in bad_ids or s2 in bad_ids:
             continue
 
-        if s1 == 'CPG68692' and s2 == 'CPG13052':
-            pass
-
         expected_ped_s1 = expected_ped_sample_by_id.get(s1)
         expected_ped_s2 = expected_ped_sample_by_id.get(s2)
         inferred_ped_s1 = inferred_ped_sample_by_id.get(s1)
         inferred_ped_s2 = inferred_ped_sample_by_id.get(s2)
-        # Supressing all logging output from peddy, otherwise it would clutter the logs
+        # Suppressing all logging output from peddy, otherwise it would clutter the logs
         with contextlib.redirect_stderr(None), contextlib.redirect_stdout(None):
             if expected_ped_s1 and expected_ped_s2:
                 expected_rel = expected_ped.relation(expected_ped_s1, expected_ped_s2)
@@ -262,8 +259,6 @@ def check_pedigree(
                 and inferred_rel != 'unrelated'
             ):
                 mismatching_unrelated_to_related.append(line)
-            # elif inferred_rel in ['related at unknown level', 'unknown']:
-            #     pass
             else:
                 mismatching_related_to_unrelated.append(line)
 
