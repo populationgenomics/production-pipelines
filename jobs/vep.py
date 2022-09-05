@@ -7,13 +7,20 @@ Creates a Hail Batch job to run the command line VEP tool.
 from typing import Literal
 
 import hailtop.batch as hb
-from cpg_utils.workflows.utils import can_reuse
+from cpg_utils.config import get_config
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import image_path, reference_path, command, query_command
+from cpg_utils.hail_batch import (
+    image_path,
+    reference_path,
+    command,
+    query_command,
+    authenticate_cloud_credentials_in_job,
+)
 from cpg_utils.workflows.resources import STANDARD
+from cpg_utils.workflows.utils import can_reuse
 
 from .picard import get_intervals
 from .vcf import gather_vcfs, subset_vcf
@@ -33,7 +40,7 @@ def vep_jobs(
     Runs VEP on provided VCF. Whites a VCF into `out_path` by default,
     unless `out_path` ends with ".ht", in which case writes a Hail table.
     """
-    to_hail_table = out_path and str(out_path).rstrip('/').endswith('.ht')
+    to_hail_table = out_path and out_path.suffix == '.ht'
     if not to_hail_table:
         assert str(out_path).endswith('.vcf.gz'), out_path
 
@@ -45,58 +52,28 @@ def vep_jobs(
         **{'vcf.gz': str(vcf_path), 'vcf.gz.tbi': str(vcf_path) + '.tbi'}
     )
 
-    if scatter_count == 1:
-        # special case for not splitting by interval
-        vep_out_path = tmp_prefix / 'vep.jsonl' if to_hail_table else out_path
-        # noinspection PyTypeChecker
-        vep_one_job = vep_one(
-            b,
-            vcf=vcf['vcf.gz'],
-            out_format='json' if to_hail_table else 'vcf',
-            out_path=vep_out_path,
-            job_attrs=job_attrs or {},
-            overwrite=overwrite,
-        )
-        if vep_one_job:
-            jobs.append(vep_one_job)
-        if to_hail_table:
-            to_hail_jobs = gather_vep_json_to_ht(
-                b=b,
-                vep_results_paths=[vep_out_path],
-                out_path=out_path,
-                job_attrs=job_attrs,
-            )
-            if vep_one_job:
-                [j.depends_on(vep_one_job) for j in to_hail_jobs]
-            jobs.extend(to_hail_jobs)
-        return jobs
-
+    scatter_count = max(scatter_count, 2)
     parts_bucket = tmp_prefix / 'vep' / 'parts'
     part_files = []
-    intervals: list[hb.ResourceFile | None] = []
-    if scatter_count > 1:
-        intervals_j, intervals = get_intervals(
-            b=b,
-            scatter_count=scatter_count,
-            output_prefix=tmp_prefix,
-        )
-        if intervals_j:
-            jobs.append(intervals_j)
+
+    intervals_j, intervals = get_intervals(
+        b=b,
+        scatter_count=scatter_count,
+        output_prefix=tmp_prefix,
+    )
+    if intervals_j:
+        jobs.append(intervals_j)
 
     # Splitting variant calling by intervals
     for idx in range(scatter_count):
-        vcf_subset: hb.ResourceGroup | None = None
-        if intervals[idx]:
-            subset_j = subset_vcf(
-                b,
-                vcf=vcf,
-                interval=intervals[idx],
-                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
-            )
-            if subset_j:
-                jobs.append(subset_j)
-                assert isinstance(subset_j.output_vcf, hb.ResourceGroup)
-                vcf_subset = subset_j.output_vcf
+        subset_j = subset_vcf(
+            b,
+            vcf=vcf,
+            interval=intervals[idx],
+            job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
+        )
+        jobs.append(subset_j)
+        assert isinstance(subset_j.output_vcf, hb.ResourceGroup)
 
         if to_hail_table:
             part_path = parts_bucket / f'part{idx + 1}.jsonl'
@@ -107,7 +84,7 @@ def vep_jobs(
         # noinspection PyTypeChecker
         vep_one_job = vep_one(
             b,
-            vcf=vcf_subset or vcf,
+            vcf=subset_j.output_vcf['vcf.gz'],
             out_format='json' if to_hail_table else 'vcf',
             out_path=part_path,
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
@@ -117,7 +94,7 @@ def vep_jobs(
             jobs.append(vep_one_job)
 
     if to_hail_table:
-        gather_jobs = gather_vep_json_to_ht(
+        gather_j = gather_vep_json_to_ht(
             b=b,
             vep_results_paths=part_files,
             out_path=out_path,
@@ -125,13 +102,14 @@ def vep_jobs(
         )
     else:
         assert len(part_files) == scatter_count
-        gather_jobs, gather_vcf = gather_vcfs(
+        gather_j, gather_vcf = gather_vcfs(
             b=b,
             input_vcfs=part_files,
             out_vcf_path=out_path,
         )
-    [j.depends_on(*jobs) for j in gather_jobs]
-    jobs.extend(gather_jobs)
+    if gather_j:
+        gather_j.depends_on(*jobs)
+        jobs.append(gather_j)
     return jobs
 
 
@@ -140,7 +118,7 @@ def gather_vep_json_to_ht(
     vep_results_paths: list[Path],
     out_path: Path,
     job_attrs: dict | None = None,
-) -> list[Job]:
+) -> Job:
     """
     Parse results from VEP with annotations formatted in JSON,
     and write into a Hail Table using a Batch job.
@@ -156,7 +134,7 @@ def gather_vep_json_to_ht(
         setup_hail=True,
     )
     j.command(cmd)
-    return [j]
+    return j
 
 
 def vep_one(
@@ -177,7 +155,7 @@ def vep_one(
     j.image(image_path('vep'))
     STANDARD.set_resources(j, storage_gb=50, mem_gb=50, ncpu=16)
 
-    if isinstance(vcf, Path):
+    if not isinstance(vcf, hb.ResourceFile):
         vcf = b.read_input(str(vcf))
 
     if out_format == 'vcf':
@@ -191,10 +169,10 @@ def vep_one(
         output = j.output
 
     # gcsfuse works only with the root bucket, without prefix:
-    base_bucket_name = reference_path('vep_mount').drive
-    data_mount = to_path(f'/{base_bucket_name}')
-    j.cloudfuse(base_bucket_name, str(data_mount), read_only=True)
-    vep_dir = data_mount / 'vep' / 'GRCh38'
+    vep_mount_path = reference_path('vep_mount')
+    data_mount = to_path(f'/{vep_mount_path.drive}')
+    j.cloudfuse(vep_mount_path.drive, str(data_mount), read_only=True)
+    vep_dir = data_mount / '/'.join(vep_mount_path.parts[2:])
     loftee_conf = {
         'loftee_path': '$LOFTEE_PLUGIN_PATH',
         'gerp_bigwig': f'{vep_dir}/gerp_conservation_scores.homo_sapiens.GRCh38.bw',
@@ -202,6 +180,7 @@ def vep_one(
         'conservation_file': f'{vep_dir}/loftee.sql',
     }
 
+    authenticate_cloud_credentials_in_job(j)
     cmd = f"""\
     ls {vep_dir}
     ls {vep_dir}/vep
