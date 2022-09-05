@@ -3,12 +3,12 @@ Helper Hail Batch jobs useful for both individual and joint variant calling.
 """
 
 import hailtop.batch as hb
-from cpg_utils.workflows.utils import can_reuse
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
 from cpg_utils.hail_batch import image_path, fasta_res_group, command
 from cpg_utils.workflows.resources import STANDARD
+from cpg_utils.workflows.utils import can_reuse
 
 
 def subset_vcf(
@@ -57,13 +57,13 @@ def gather_vcfs(
     site_only: bool = False,
     gvcf_count: int | None = None,
     job_attrs: dict | None = None,
-) -> tuple[list[Job], hb.ResourceGroup]:
+) -> tuple[Job | None, hb.ResourceGroup]:
     """
     Combines per-interval scattered VCFs into a single VCF.
     Saves the output VCF to a bucket `output_vcf_path`
     """
     if out_vcf_path and can_reuse(out_vcf_path, overwrite):
-        return [], b.read_input_group(
+        return None, b.read_input_group(
             **{
                 'vcf.gz': str(out_vcf_path),
                 'vcf.gz.tbi': f'{out_vcf_path}.tbi',
@@ -102,4 +102,4 @@ def gather_vcfs(
     j.command(command(cmd, monitor_space=True))
     if out_vcf_path:
         b.write_output(j.output_vcf, str(out_vcf_path).replace('.vcf.gz', ''))
-    return [j], j.output_vcf
+    return j, j.output_vcf
