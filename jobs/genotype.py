@@ -63,7 +63,7 @@ def genotype(
     return jobs + [postproc_j]
 
 
-intervals: list[hb.ResourceFile | None] | None = None
+intervals: list[hb.ResourceFile] | None = None
 
 
 def haplotype_caller(
@@ -90,8 +90,8 @@ def haplotype_caller(
         if intervals is None:
             intervals_j, intervals = get_intervals(
                 b=b,
-                intervals_path=get_config()['workflow'].get('intervals_path'),
                 scatter_count=scatter_count,
+                source_intervals_path=get_config()['workflow'].get('intervals_path'),
                 job_attrs=job_attrs,
                 output_prefix=tmp_prefix / 'intervals',
             )
