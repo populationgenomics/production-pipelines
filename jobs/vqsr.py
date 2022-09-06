@@ -219,12 +219,6 @@ def make_vqsr_jobs(
     assert isinstance(indel_recalibrator_j.tranches, hb.ResourceFile)
     jobs.append(indel_recalibrator_j)
 
-    snp_max_gaussians = 6
-    if is_small_callset:
-        snp_max_gaussians = 4
-    elif is_huge_callset:
-        snp_max_gaussians = 8
-
     if scatter_count > 1:
         intervals_j, intervals = get_intervals(
             b=b,
@@ -248,7 +242,6 @@ def make_vqsr_jobs(
             use_as_annotations=use_as_annotations,
             is_small_callset=is_small_callset,
             is_huge_callset=is_huge_callset,
-            max_gaussians=snp_max_gaussians,
             job_attrs=job_attrs,
         )
         jobs.append(model_j)
@@ -266,7 +259,6 @@ def make_vqsr_jobs(
                 dbsnp_resource_vcf=resources['dbsnp'],
                 disk_size=small_disk,
                 use_as_annotations=use_as_annotations,
-                max_gaussians=snp_max_gaussians,
                 is_small_callset=is_small_callset,
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             )
@@ -328,7 +320,6 @@ def make_vqsr_jobs(
             dbsnp_resource_vcf=resources['dbsnp'],
             disk_size=small_disk,
             use_as_annotations=use_as_annotations,
-            max_gaussians=snp_max_gaussians,
             is_small_callset=is_small_callset,
             job_attrs=job_attrs,
         )
@@ -555,7 +546,7 @@ def add_snps_variant_recalibrator_create_model_step(
     use_as_annotations: bool,
     is_small_callset: bool = False,
     is_huge_callset: bool = False,
-    max_gaussians: int = 4,
+    max_gaussians: int = 6,
     job_attrs: dict | None = None,
 ) -> Job:
     """
@@ -642,7 +633,7 @@ def add_snps_variant_recalibrator_scattered_step(
     disk_size: int,
     use_as_annotations: bool,
     interval: hb.Resource | None = None,
-    max_gaussians: int = 4,
+    max_gaussians: int = 6,
     is_small_callset: bool = False,
     job_attrs: dict | None = None,
 ) -> Job:
@@ -722,7 +713,7 @@ def snps_variant_recalibrator_job(
     dbsnp_resource_vcf: hb.ResourceGroup,
     disk_size: int,
     use_as_annotations: bool,
-    max_gaussians: int = 4,
+    max_gaussians: int = 6,
     is_small_callset: bool = False,
     job_attrs: dict | None = None,
 ) -> Job:
