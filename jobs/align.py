@@ -15,9 +15,9 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from cpg_utils.hail_batch import command
 from cpg_utils.workflows.targets import Sample
-from cpg_utils.workflows.filetypes import AlignmentInput, FastqPairs, CramPath
+from cpg_utils.workflows.filetypes import AlignmentInput, FastqPairs, CramPath, BamPath
 from cpg_utils.workflows.resources import STANDARD
-from cpg_utils.workflows.utils import can_reuse, exists
+from cpg_utils.workflows.utils import can_reuse
 
 from . import picard
 
@@ -103,7 +103,6 @@ def align(
     extra_label: str | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
-    realignment_shards_num: int = 10,
 ) -> list[Job]:
     """
     - if the input is 1 fastq pair, submits one alignment job.
@@ -131,9 +130,9 @@ def align(
 
     alignment_input = _get_alignment_input(sample)
 
-    base_jname = 'Align'
+    base_job_name = 'Align'
     if extra_label:
-        base_jname += f' {extra_label}'
+        base_job_name += f' {extra_label}'
 
     # if number of threads is not requested, using whole instance
     requested_nthreads = requested_nthreads or STANDARD.max_threads()
@@ -155,7 +154,7 @@ def align(
     if not sharded:  # Just running one alignment job
         align_j, align_cmd = _align_one(
             b=b,
-            job_name=base_jname,
+            job_name=base_job_name,
             alignment_input=alignment_input,
             requested_nthreads=requested_nthreads,
             sample_name=sample.id,
@@ -176,7 +175,7 @@ def align(
                 # bwa-mem or dragmap command, but without sorting and deduplication:
                 j, cmd = _align_one(
                     b=b,
-                    job_name=base_jname,
+                    job_name=base_job_name,
                     alignment_input=FastqPairs([pair]),
                     requested_nthreads=requested_nthreads,
                     sample_name=sample.id,
@@ -194,7 +193,7 @@ def align(
             for shard_number in range(realignment_shards_num):
                 j, cmd = _align_one(
                     b=b,
-                    job_name=base_jname,
+                    job_name=base_job_name,
                     alignment_input=alignment_input,
                     sample_name=sample.id,
                     job_attrs=job_attrs,
@@ -269,10 +268,8 @@ def storage_for_align_job(alignment_input: AlignmentInput) -> int | None:
 
     sequencing_type = get_config()['workflow']['sequencing_type']
     if sequencing_type == 'genome':
-        if (
-            isinstance(alignment_input, FastqPairs)
-            or isinstance(alignment_input, CramPath)
-            and alignment_input.is_bam
+        if isinstance(alignment_input, FastqPairs) or isinstance(
+            alignment_input, BamPath
         ):
             storage_gb = 400  # for WGS FASTQ or BAM inputs, more disk is needed
     return storage_gb
@@ -304,7 +301,7 @@ def _align_one(
         job_name = (
             f'{job_name} ' f'{shard_number + 1}/{number_of_shards_for_realignment} '
         )
-    job_name = f'{job_name} {alignment_input.path_glob()}'
+    job_name = f'{job_name} {alignment_input}'
     j = b.new_job(job_name, job_attrs)
 
     nthreads = STANDARD.set_resources(
@@ -319,7 +316,7 @@ def _align_one(
     fifo_commands: dict[str, str] = {}
 
     index_cmd = ''
-    if isinstance(alignment_input, CramPath):
+    if isinstance(alignment_input, CramPath) or isinstance(alignment_input, BamPath):
         use_bazam = True
         if number_of_shards_for_realignment and number_of_shards_for_realignment > 1:
             assert shard_number is not None and shard_number >= 0, (
@@ -331,7 +328,7 @@ def _align_one(
             shard_param = ''
 
         reference_inp = None
-        if not alignment_input.is_bam:  # if is CRAM
+        if isinstance(alignment_input, CramPath):
             assert (
                 alignment_input.reference_assembly
             ), f'The reference input for the alignment input "{alignment_input.path}" was not set'
@@ -340,12 +337,11 @@ def _align_one(
                 fai=str(alignment_input.reference_assembly) + '.fai',
             ).base
 
-        cram = alignment_input.resource_group(b)
-        cram_file = cram[alignment_input.ext]
+        group = alignment_input.resource_group(b)
 
         # BAZAM requires indexed input.
-        if not exists(alignment_input.index_path):
-            index_cmd = f'samtools index {cram_file}'
+        if not alignment_input.index_path:
+            index_cmd = f'samtools index {group[alignment_input.ext]}'
 
         _reference_command_inp = (
             f'-Dsamjdk.reference_fasta={reference_inp}' if reference_inp else ''
@@ -354,7 +350,7 @@ def _align_one(
         bazam_cmd = dedent(
             f"""\
         bazam -Xmx16g {_reference_command_inp} \
-        -n{min(nthreads, 6)} -bam {cram_file}{shard_param} \
+        -n{min(nthreads, 6)} -bam {group[alignment_input.ext]}{shard_param} \
         """
         )
         r1_param = 'r1'
