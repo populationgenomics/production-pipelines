@@ -82,11 +82,9 @@ INDEL_RECALIBRATION_TRANCHE_VALUES = [
 
 def make_vqsr_jobs(
     b: hb.Batch,
-    input_vcf_or_mt_path: Path,
+    input_siteonly_vcf_path: Path,
     tmp_prefix: Path,
     gvcf_count: int,
-    meta_ht_path: Path | None = None,
-    hard_filter_ht_path: Path | None = None,
     out_path: Path | None = None,
     use_as_annotations: bool = True,
     overwrite: bool = False,
@@ -97,12 +95,7 @@ def make_vqsr_jobs(
     Add jobs that perform the allele-specific VQSR variant QC
 
     @param b: Batch object to add jobs to
-    @param input_vcf_or_mt_path: path to a site-only VCF, or a matrix table
-    @param meta_ht_path: if input_vcf_or_mt_path is a matrix table, this table will
-           be used as a source of annotations for that matrix table, i.e.
-           to filter out samples flagged as `meta.related`
-    @param hard_filter_ht_path: if input_vcf_or_mt_path is a matrix table, this table
-           will be used as a list of samples to hard filter out
+    @param input_siteonly_vcf_path: path to a site-only VCF
     @param tmp_prefix: bucket for intermediate files
     @param gvcf_count: number of input samples. Can't read from combined_mt_path as it
            might not be yet generated the point of Batch job submission
@@ -138,7 +131,6 @@ def make_vqsr_jobs(
     # To fit only a site-only VCF
     small_disk = 50 if is_small_callset else (100 if not is_huge_callset else 200)
     # To fit a joint-called VCF
-    medium_disk = 100 if is_small_callset else (200 if not is_huge_callset else 500)
     huge_disk = 200 if is_small_callset else (500 if not is_huge_callset else 2000)
 
     if get_config()['workflow']['sequencing_type'] == 'genome':
@@ -149,60 +141,12 @@ def make_vqsr_jobs(
 
     jobs: list[Job] = []
 
-    if input_vcf_or_mt_path.name.endswith('.mt'):
-        # Importing dynamically to make sure $CPG_DATASET_GCP_PROJECT is set.
-        from analysis_runner import dataproc
-
-        assert meta_ht_path
-        assert hard_filter_ht_path
-        job_name = 'VQSR: MT to site-only VCF'
-        combined_vcf_path = tmp_prefix / 'input.vcf.gz'
-        if not can_reuse(combined_vcf_path, overwrite):
-            mt_to_vcf_job = dataproc.hail_dataproc_job(
-                b,
-                f'jobs/dataproc_scripts/mt_to_siteonlyvcf.py --overwrite '
-                f'--mt {input_vcf_or_mt_path} '
-                f'--meta-ht {meta_ht_path} '
-                f'--hard-filtered-samples-ht {hard_filter_ht_path} '
-                f'-o {combined_vcf_path} ',
-                max_age='8h',
-                packages=[
-                    'cpg_utils',
-                    'cpg_gnomad',  # github.com/populationgenomics/gnomad_methods
-                    'click',
-                    'google',
-                    'fsspec',
-                    'sklearn',
-                    'gcloud',
-                    'selenium',
-                ],
-                num_secondary_workers=scatter_count,
-                # hl.export_vcf() uses non-preemptible workers' disk to merge VCF files.
-                # 10 samples take 2.3G, 400 samples take 60G, which roughly matches
-                # `huge_disk` (also used in the AS-VQSR VCF-gather job)
-                worker_boot_disk_size=huge_disk,
-                job_name=job_name,
-            )
-        else:
-            mt_to_vcf_job = b.new_job(f'{job_name} [reuse]', job_attrs)
-        jobs.append(mt_to_vcf_job)
-        tabix_job = add_tabix_job(
-            b,
-            vcf_path=combined_vcf_path,
-            disk_size=medium_disk,
-            job_attrs=job_attrs,
-        )
-        tabix_job.depends_on(mt_to_vcf_job)
-        assert isinstance(tabix_job.output_vcf, hb.ResourceGroup)
-        siteonly_vcf = tabix_job.output_vcf
-    else:
-        siteonly_vcf = b.read_input_group(
-            **{
-                'vcf.gz': str(input_vcf_or_mt_path),
-                'vcf.gz.tbi': str(input_vcf_or_mt_path) + '.tbi',
-            }
-        )
-
+    siteonly_vcf = b.read_input_group(
+        **{
+            'vcf.gz': str(input_siteonly_vcf_path),
+            'vcf.gz.tbi': str(input_siteonly_vcf_path) + '.tbi',
+        }
+    )
     indel_recalibrator_j = indel_recalibrator_job(
         b=b,
         sites_only_variant_filtered_vcf=siteonly_vcf,
