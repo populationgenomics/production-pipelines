@@ -1,5 +1,11 @@
 """
-Create Hail Batch jobs to create and apply a VQSR models.
+Create Hail Batch jobs to create and apply AS-VQSR models.
+
+Parameters are borrowed from WARP:
+WGS VQSR: https://github.com/broadinstitute/warp/blob/79261cde9bd06bb6b1d4a83d75dc54f734541fec/pipelines/broad/dna_seq/germline/joint_genotyping/wgs/JointGenotyping.inputs.json#L29-L35 (there is no direct example config for WGS AS-VQSR, but adjusted correspondingly)
+Exome AS-VQSR: https://github.com/broadinstitute/warp/blob/79261cde9bd06bb6b1d4a83d75dc54f734541fec/pipelines/broad/dna_seq/germline/joint_genotyping/exome/JointGenotyping.inputs.json#L8-L11
+Note that there is no example settings config for WGS AS-VQSR, so we construct it 
+from WGS VQSR and Exome AS-VQSR settings.
 """
 
 from typing import List, Optional
@@ -16,7 +22,7 @@ from jobs.picard import get_intervals
 from jobs.vcf import gather_vcfs
 
 
-# VQSR - when applying model - targets indel_filter_level and snp_filter_level
+# When applying model, VQSR targets indel_filter_level and snp_filter_level
 # sensitivities. The tool matches them internally to a VQSLOD score cutoff
 # based on the model's estimated sensitivity to a set of true variants.
 SNP_HARD_FILTER_LEVEL = 99.7
@@ -28,7 +34,6 @@ STANDARD_FEATURES = [
     'QD',
     'FS',
     'SOR',
-    # 'DP',
 ]
 SNP_STANDARD_FEATURES = STANDARD_FEATURES + ['MQ']
 INDEL_STANDARD_FEATURES = STANDARD_FEATURES
@@ -42,8 +47,9 @@ ALLELE_SPECIFIC_FEATURES = [
     # Not using depth for the following reasons:
     # 1. The Broad pipelines don't use it;
     # 2. -G AS_StandardAnnotation flag to GenotypeGVCFs doesn't include it;
-    # 3. For exomes, depth is an irrelevant feature and should be skipped.
-    # 'AS_VarDP',
+    # 3. For exomes, depth is an irrelevant feature and should be skipped:
+    # 'AS_VarDP'
+    # Note that for consistency, we also skip it for WGS.
 ]
 SNP_ALLELE_SPECIFIC_FEATURES = ALLELE_SPECIFIC_FEATURES + ['AS_MQ']
 INDEL_ALLELE_SPECIFIC_FEATURES = ALLELE_SPECIFIC_FEATURES
@@ -82,11 +88,9 @@ INDEL_RECALIBRATION_TRANCHE_VALUES = [
 
 def make_vqsr_jobs(
     b: hb.Batch,
-    input_vcf_or_mt_path: Path,
+    input_siteonly_vcf_path: Path,
     tmp_prefix: Path,
     gvcf_count: int,
-    meta_ht_path: Path | None = None,
-    hard_filter_ht_path: Path | None = None,
     out_path: Path | None = None,
     use_as_annotations: bool = True,
     overwrite: bool = False,
@@ -97,12 +101,7 @@ def make_vqsr_jobs(
     Add jobs that perform the allele-specific VQSR variant QC
 
     @param b: Batch object to add jobs to
-    @param input_vcf_or_mt_path: path to a site-only VCF, or a matrix table
-    @param meta_ht_path: if input_vcf_or_mt_path is a matrix table, this table will
-           be used as a source of annotations for that matrix table, i.e.
-           to filter out samples flagged as `meta.related`
-    @param hard_filter_ht_path: if input_vcf_or_mt_path is a matrix table, this table
-           will be used as a list of samples to hard filter out
+    @param input_siteonly_vcf_path: path to a site-only VCF
     @param tmp_prefix: bucket for intermediate files
     @param gvcf_count: number of input samples. Can't read from combined_mt_path as it
            might not be yet generated the point of Batch job submission
@@ -138,7 +137,6 @@ def make_vqsr_jobs(
     # To fit only a site-only VCF
     small_disk = 50 if is_small_callset else (100 if not is_huge_callset else 200)
     # To fit a joint-called VCF
-    medium_disk = 100 if is_small_callset else (200 if not is_huge_callset else 500)
     huge_disk = 200 if is_small_callset else (500 if not is_huge_callset else 2000)
 
     if get_config()['workflow']['sequencing_type'] == 'genome':
@@ -149,60 +147,12 @@ def make_vqsr_jobs(
 
     jobs: list[Job] = []
 
-    if input_vcf_or_mt_path.name.endswith('.mt'):
-        # Importing dynamically to make sure $CPG_DATASET_GCP_PROJECT is set.
-        from analysis_runner import dataproc
-
-        assert meta_ht_path
-        assert hard_filter_ht_path
-        job_name = 'VQSR: MT to site-only VCF'
-        combined_vcf_path = tmp_prefix / 'input.vcf.gz'
-        if not can_reuse(combined_vcf_path, overwrite):
-            mt_to_vcf_job = dataproc.hail_dataproc_job(
-                b,
-                f'jobs/dataproc_scripts/mt_to_siteonlyvcf.py --overwrite '
-                f'--mt {input_vcf_or_mt_path} '
-                f'--meta-ht {meta_ht_path} '
-                f'--hard-filtered-samples-ht {hard_filter_ht_path} '
-                f'-o {combined_vcf_path} ',
-                max_age='8h',
-                packages=[
-                    'cpg_utils',
-                    'cpg_gnomad',  # github.com/populationgenomics/gnomad_methods
-                    'click',
-                    'google',
-                    'fsspec',
-                    'sklearn',
-                    'gcloud',
-                    'selenium',
-                ],
-                num_secondary_workers=scatter_count,
-                # hl.export_vcf() uses non-preemptible workers' disk to merge VCF files.
-                # 10 samples take 2.3G, 400 samples take 60G, which roughly matches
-                # `huge_disk` (also used in the AS-VQSR VCF-gather job)
-                worker_boot_disk_size=huge_disk,
-                job_name=job_name,
-            )
-        else:
-            mt_to_vcf_job = b.new_job(f'{job_name} [reuse]', job_attrs)
-        jobs.append(mt_to_vcf_job)
-        tabix_job = add_tabix_job(
-            b,
-            vcf_path=combined_vcf_path,
-            disk_size=medium_disk,
-            job_attrs=job_attrs,
-        )
-        tabix_job.depends_on(mt_to_vcf_job)
-        assert isinstance(tabix_job.output_vcf, hb.ResourceGroup)
-        siteonly_vcf = tabix_job.output_vcf
-    else:
-        siteonly_vcf = b.read_input_group(
-            **{
-                'vcf.gz': str(input_vcf_or_mt_path),
-                'vcf.gz.tbi': str(input_vcf_or_mt_path) + '.tbi',
-            }
-        )
-
+    siteonly_vcf = b.read_input_group(
+        **{
+            'vcf.gz': str(input_siteonly_vcf_path),
+            'vcf.gz.tbi': str(input_siteonly_vcf_path) + '.tbi',
+        }
+    )
     indel_recalibrator_j = indel_recalibrator_job(
         b=b,
         sites_only_variant_filtered_vcf=siteonly_vcf,
@@ -219,17 +169,11 @@ def make_vqsr_jobs(
     assert isinstance(indel_recalibrator_j.tranches, hb.ResourceFile)
     jobs.append(indel_recalibrator_j)
 
-    snp_max_gaussians = 6
-    if is_small_callset:
-        snp_max_gaussians = 4
-    elif is_huge_callset:
-        snp_max_gaussians = 8
-
     if scatter_count > 1:
         intervals_j, intervals = get_intervals(
             b=b,
             scatter_count=scatter_count,
-            intervals_path=intervals_path,
+            source_intervals_path=intervals_path,
             job_attrs=job_attrs,
             output_prefix=tmp_prefix,
         )
@@ -248,7 +192,6 @@ def make_vqsr_jobs(
             use_as_annotations=use_as_annotations,
             is_small_callset=is_small_callset,
             is_huge_callset=is_huge_callset,
-            max_gaussians=snp_max_gaussians,
             job_attrs=job_attrs,
         )
         jobs.append(model_j)
@@ -266,7 +209,6 @@ def make_vqsr_jobs(
                 dbsnp_resource_vcf=resources['dbsnp'],
                 disk_size=small_disk,
                 use_as_annotations=use_as_annotations,
-                max_gaussians=snp_max_gaussians,
                 is_small_callset=is_small_callset,
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             )
@@ -328,7 +270,6 @@ def make_vqsr_jobs(
             dbsnp_resource_vcf=resources['dbsnp'],
             disk_size=small_disk,
             use_as_annotations=use_as_annotations,
-            max_gaussians=snp_max_gaussians,
             is_small_callset=is_small_callset,
             job_attrs=job_attrs,
         )
@@ -555,7 +496,7 @@ def add_snps_variant_recalibrator_create_model_step(
     use_as_annotations: bool,
     is_small_callset: bool = False,
     is_huge_callset: bool = False,
-    max_gaussians: int = 4,
+    max_gaussians: int = 6,
     job_attrs: dict | None = None,
 ) -> Job:
     """
@@ -642,7 +583,7 @@ def add_snps_variant_recalibrator_scattered_step(
     disk_size: int,
     use_as_annotations: bool,
     interval: hb.Resource | None = None,
-    max_gaussians: int = 4,
+    max_gaussians: int = 6,
     is_small_callset: bool = False,
     job_attrs: dict | None = None,
 ) -> Job:
@@ -722,7 +663,7 @@ def snps_variant_recalibrator_job(
     dbsnp_resource_vcf: hb.ResourceGroup,
     disk_size: int,
     use_as_annotations: bool,
-    max_gaussians: int = 4,
+    max_gaussians: int = 6,
     is_small_callset: bool = False,
     job_attrs: dict | None = None,
 ) -> Job:
