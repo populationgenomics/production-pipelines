@@ -1,5 +1,11 @@
 """
-Create Hail Batch jobs to create and apply a VQSR models.
+Create Hail Batch jobs to create and apply AS-VQSR models.
+
+Parameters are borrowed from WARP:
+WGS VQSR: https://github.com/broadinstitute/warp/blob/79261cde9bd06bb6b1d4a83d75dc54f734541fec/pipelines/broad/dna_seq/germline/joint_genotyping/wgs/JointGenotyping.inputs.json#L29-L35 (there is no direct example config for WGS AS-VQSR, but adjusted correspondingly)
+Exome AS-VQSR: https://github.com/broadinstitute/warp/blob/79261cde9bd06bb6b1d4a83d75dc54f734541fec/pipelines/broad/dna_seq/germline/joint_genotyping/exome/JointGenotyping.inputs.json#L8-L11
+Note that there is no example settings config for WGS AS-VQSR, so we construct it 
+from WGS VQSR and Exome AS-VQSR settings.
 """
 
 from typing import List, Optional
@@ -16,7 +22,7 @@ from jobs.picard import get_intervals
 from jobs.vcf import gather_vcfs
 
 
-# VQSR - when applying model - targets indel_filter_level and snp_filter_level
+# When applying model, VQSR targets indel_filter_level and snp_filter_level
 # sensitivities. The tool matches them internally to a VQSLOD score cutoff
 # based on the model's estimated sensitivity to a set of true variants.
 SNP_HARD_FILTER_LEVEL = 99.7
@@ -28,7 +34,6 @@ STANDARD_FEATURES = [
     'QD',
     'FS',
     'SOR',
-    # 'DP',
 ]
 SNP_STANDARD_FEATURES = STANDARD_FEATURES + ['MQ']
 INDEL_STANDARD_FEATURES = STANDARD_FEATURES
@@ -42,8 +47,9 @@ ALLELE_SPECIFIC_FEATURES = [
     # Not using depth for the following reasons:
     # 1. The Broad pipelines don't use it;
     # 2. -G AS_StandardAnnotation flag to GenotypeGVCFs doesn't include it;
-    # 3. For exomes, depth is an irrelevant feature and should be skipped.
-    # 'AS_VarDP',
+    # 3. For exomes, depth is an irrelevant feature and should be skipped:
+    # 'AS_VarDP'
+    # Note that for consistency, we also skip it for WGS.
 ]
 SNP_ALLELE_SPECIFIC_FEATURES = ALLELE_SPECIFIC_FEATURES + ['AS_MQ']
 INDEL_ALLELE_SPECIFIC_FEATURES = ALLELE_SPECIFIC_FEATURES
