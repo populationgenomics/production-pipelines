@@ -76,7 +76,7 @@ if POPULATE_SAMPLES:
 
 def _populate_qc_analysis_entries(multiqc_json_path: Path):
     """
-    Add Analysis SMDB entries of type="qc" from a MultiQC JSON data.
+    Add Analysis metamist entries of type="qc" from a MultiQC JSON data.
     """
     with multiqc_json_path.open() as f:
         data = json.load(f)
