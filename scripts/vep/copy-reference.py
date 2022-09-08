@@ -5,7 +5,6 @@ Use Hail Batch to transfer VEP cache bundle into the cpg-reference bucket,
 and prepare a GCP mount for cloudfuse.
 """
 
-import hail as hl
 import click
 import hailtop.batch as hb
 from hailtop.batch.job import Job
@@ -22,8 +21,12 @@ def main(vep_version: str):
     """
     b = get_batch(f'Copy VEP v{vep_version} data')
 
-    assert image_path('vep').split(':')[-1] == vep_version
-    assert reference_path('vep_mount').parent.name == vep_version
+    assert image_path('vep').split(':')[-1] == vep_version, (
+        image_path('vep').split(':')[-1], vep_version
+    )
+    assert reference_path('vep_mount').parent.name == vep_version, (
+        reference_path('vep_mount').parent.name == vep_version
+    )
 
     j1 = _make_vep_cache_tar(b)
     j2 = _make_loftee_tar(b)

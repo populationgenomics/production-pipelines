@@ -7,6 +7,8 @@
 # * changed the bucket to gs://cpg-reference/vep
 ##############
 
+set -ex
+
 export VEP_VERSION=__VEP_VERSION__
 if [[ -z "$VEP_VERSION" ]]; then
     echo "Must provide VEP_VERSION in environment" 1>&2
@@ -67,3 +69,5 @@ cat >/vep.sh <<EOF
 docker run -i -v /vep_data:/vep_data ${IMAGE} vep "\$@"
 EOF
 chmod +x /vep.sh
+
+set +ex
