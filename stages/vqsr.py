@@ -42,7 +42,7 @@ class Vqsr(CohortStage):
         )
         jobs = vqsr.make_vqsr_jobs(
             b=self.b,
-            input_vcf_or_mt_path=siteonly_vcf_path,
+            input_siteonly_vcf_path=siteonly_vcf_path,
             gvcf_count=len(cohort.get_samples()),
             out_path=self.expected_outputs(cohort)['siteonly'],
             tmp_prefix=to_path(self.expected_outputs(cohort)['prefix']),
