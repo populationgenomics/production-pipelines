@@ -117,7 +117,7 @@ class AnnotateDataset(DatasetStage):
 
 def es_password() -> str:
     """
-    Get ElasticSearch password. Moved into a separate method to simplify
+    Get Elasticsearch password. Moved into a separate method to simplify
     mocking in tests.
     """
     return read_secret(
@@ -170,9 +170,7 @@ class MtToEs(DatasetStage):
                 'elasticsearch==8.*',
                 'google',
                 'fsspec',
-                'sklearn',
                 'gcloud',
-                'selenium',
             ],
             num_workers=2,
             num_secondary_workers=0,
