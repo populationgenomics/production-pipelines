@@ -39,7 +39,6 @@ class Vep(CohortStage):
         """
         Submit jobs.
         """
-        sequencing_type = get_config()['workflow']['sequencing_type']
         if get_config()['workflow']['sequencing_type'] == 'genome':
             scatter_count = max(2, len(cohort.get_samples()) // 10)
         else:
