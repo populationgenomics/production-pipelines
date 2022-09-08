@@ -173,7 +173,7 @@ def make_vqsr_jobs(
         intervals_j, intervals = get_intervals(
             b=b,
             scatter_count=scatter_count,
-            intervals_path=intervals_path,
+            source_intervals_path=intervals_path,
             job_attrs=job_attrs,
             output_prefix=tmp_prefix,
         )
@@ -247,7 +247,7 @@ def make_vqsr_jobs(
             assert isinstance(scattered_vcf, hb.ResourceGroup)
             scattered_vcfs.append(scattered_vcf)
 
-        recalibrated_gathered_vcf_jobs, recalibrated_gathered_vcf = gather_vcfs(
+        recal_gathered_vcf_j, recalibrated_gathered_vcf = gather_vcfs(
             b=b,
             input_vcfs=[v['vcf.gz'] for v in scattered_vcfs],
             overwrite=overwrite,
@@ -256,9 +256,9 @@ def make_vqsr_jobs(
             gvcf_count=gvcf_count,
             job_attrs=job_attrs,
         )
-        for j in recalibrated_gathered_vcf_jobs:
-            j.name = f'VQSR: {j.name}'
-        jobs.extend(recalibrated_gathered_vcf_jobs)
+        if recal_gathered_vcf_j:
+            recal_gathered_vcf_j.name = f'VQSR: {recal_gathered_vcf_j.name}'
+            jobs.append(recal_gathered_vcf_j)
 
     else:
         snps_recalibrator_job = snps_variant_recalibrator_job(
@@ -280,7 +280,7 @@ def make_vqsr_jobs(
         assert isinstance(snps_recalibrator_job.recalibration, hb.ResourceGroup)
         assert isinstance(snps_recalibrator_job.tranches, hb.ResourceFile)
 
-        recalibrated_gathered_vcf_j = add_apply_recalibration_step(
+        recal_gathered_vcf_j = add_apply_recalibration_step(
             b,
             input_vcf=siteonly_vcf,
             indels_recalibration=indel_recalibrator_j.recalibration,
@@ -294,7 +294,7 @@ def make_vqsr_jobs(
             output_vcf_path=out_path,
             job_attrs=job_attrs,
         )
-        jobs.append(recalibrated_gathered_vcf_j)
+        jobs.append(recal_gathered_vcf_j)
 
     return jobs
 

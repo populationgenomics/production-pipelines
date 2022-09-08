@@ -3,12 +3,50 @@ Helper Hail Batch jobs useful for both individual and joint variant calling.
 """
 
 import hailtop.batch as hb
-from cpg_utils.workflows.utils import can_reuse
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
 from cpg_utils.hail_batch import image_path, fasta_res_group, command
 from cpg_utils.workflows.resources import STANDARD
+from cpg_utils.workflows.utils import can_reuse
+
+
+def subset_vcf(
+    b: hb.Batch,
+    vcf: hb.ResourceGroup,
+    interval: hb.ResourceFile,
+    job_attrs: dict | None = None,
+    output_vcf_path: Path | None = None,
+) -> Job:
+    """
+    Subset VCF to provided intervals.
+    """
+    job_name = 'Subset VCF'
+    j = b.new_job(job_name, job_attrs)
+    j.image(image_path('gatk'))
+    STANDARD.set_resources(j, ncpu=2)
+
+    j.declare_resource_group(
+        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+    reference = fasta_res_group(b)
+    assert isinstance(j.output_vcf, hb.ResourceGroup)
+    cmd = f"""
+    gatk SelectVariants \\
+    -R {reference.base} \\
+    -V {vcf['vcf.gz']} \\
+    -L {interval} \\
+    -O {j.output_vcf['vcf.gz']}
+    """
+    j.command(
+        command(
+            cmd,
+            monitor_space=True,
+        )
+    )
+    if output_vcf_path:
+        b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
+    return j
 
 
 def gather_vcfs(
@@ -19,13 +57,13 @@ def gather_vcfs(
     site_only: bool = False,
     gvcf_count: int | None = None,
     job_attrs: dict | None = None,
-) -> tuple[list[Job], hb.ResourceGroup]:
+) -> tuple[Job | None, hb.ResourceGroup]:
     """
     Combines per-interval scattered VCFs into a single VCF.
     Saves the output VCF to a bucket `output_vcf_path`
     """
     if out_vcf_path and can_reuse(out_vcf_path, overwrite):
-        return [], b.read_input_group(
+        return None, b.read_input_group(
             **{
                 'vcf.gz': str(out_vcf_path),
                 'vcf.gz.tbi': f'{out_vcf_path}.tbi',
@@ -64,4 +102,4 @@ def gather_vcfs(
     j.command(command(cmd, monitor_space=True))
     if out_vcf_path:
         b.write_output(j.output_vcf, str(out_vcf_path).replace('.vcf.gz', ''))
-    return [j], j.output_vcf
+    return j, j.output_vcf
