@@ -1,4 +1,3 @@
 [workflow]
 sequencing_type = 'exome'
-
-only_samples = ['CPG257352']
+last_stage = 'Genotype'

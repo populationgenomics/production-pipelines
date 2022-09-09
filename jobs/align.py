@@ -15,7 +15,13 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from cpg_utils.hail_batch import command
 from cpg_utils.workflows.targets import Sample
-from cpg_utils.workflows.filetypes import AlignmentInput, FastqPairs, CramPath, BamPath
+from cpg_utils.workflows.filetypes import (
+    AlignmentInput,
+    FastqPairs,
+    CramPath,
+    BamPath,
+    FastqPair,
+)
 from cpg_utils.workflows.resources import STANDARD
 from cpg_utils.workflows.utils import can_reuse
 
@@ -144,7 +150,11 @@ def align(
         realignment_shards_num = 1
 
     sharded_fq = isinstance(alignment_input, FastqPairs) and len(alignment_input) > 1
-    sharded_bazam = isinstance(alignment_input, CramPath) and realignment_shards_num > 1
+    sharded_bazam = (
+        isinstance(alignment_input, CramPath | BamPath)
+        and alignment_input.index_path
+        and realignment_shards_num > 1
+    )
     sharded = sharded_fq or sharded_bazam
 
     jobs: list[Job] = []
@@ -176,7 +186,7 @@ def align(
                 j, cmd = _align_one(
                     b=b,
                     job_name=base_job_name,
-                    alignment_input=FastqPairs([pair]),
+                    alignment_input=pair,
                     requested_nthreads=requested_nthreads,
                     sample_name=sample.id,
                     job_attrs=job_attrs,
@@ -278,7 +288,7 @@ def storage_for_align_job(alignment_input: AlignmentInput) -> int | None:
 def _align_one(
     b,
     job_name: str,
-    alignment_input: AlignmentInput,
+    alignment_input: FastqPair | CramPath | BamPath,
     requested_nthreads: int,
     sample_name: str,
     job_attrs: dict | None = None,
@@ -315,8 +325,7 @@ def _align_one(
     #   This is named-pipe name -> command to populate it
     fifo_commands: dict[str, str] = {}
 
-    index_cmd = ''
-    if isinstance(alignment_input, CramPath) or isinstance(alignment_input, BamPath):
+    if isinstance(alignment_input, CramPath | BamPath) and alignment_input.index_path:
         use_bazam = True
         if number_of_shards_for_realignment and number_of_shards_for_realignment > 1:
             assert shard_number is not None and shard_number >= 0, (
@@ -339,10 +348,6 @@ def _align_one(
 
         group = alignment_input.resource_group(b)
 
-        # BAZAM requires indexed input.
-        if not alignment_input.index_path:
-            index_cmd = f'samtools index {group[alignment_input.ext]}'
-
         _reference_command_inp = (
             f'-Dsamjdk.reference_fasta={reference_inp}' if reference_inp else ''
         )
@@ -353,24 +358,33 @@ def _align_one(
         -n{min(nthreads, 6)} -bam {group[alignment_input.ext]}{shard_param} \
         """
         )
+        prepare_fastq_cmd = ''
         r1_param = 'r1'
         r2_param = ''
         fifo_commands[r1_param] = bazam_cmd
 
-    else:
-        assert isinstance(alignment_input, FastqPairs)
-        use_bazam = False
-        fastq_pairs = [p.as_resources(b) for p in alignment_input]
-        files1 = [str(pair[0]) for pair in fastq_pairs]
-        files2 = [str(pair[1]) for pair in fastq_pairs]
-        if len(fastq_pairs) > 1:
-            r1_param = 'r1'
-            r2_param = 'r2'
-            fifo_commands[r1_param] = f'cat {" ".join(files1)}'
-            fifo_commands[r2_param] = f'cat {" ".join(files2)}'
+    else:  # only for BAMs that are missing index
+        if isinstance(alignment_input, BamPath | CramPath):
+            extract_j = extract_fastq(
+                b=b,
+                bam_or_cram_group=alignment_input.resource_group(b),
+                ext=alignment_input.ext,
+                job_attrs=job_attrs,
+            )
+            fastq_pair = FastqPair(r1=extract_j.fq1, r2=extract_j.fq2)
         else:
-            r1_param = files1[0]
-            r2_param = files2[0]
+            assert isinstance(alignment_input, FastqPair)
+            fastq_pair = alignment_input.as_resources(b)
+        use_bazam = False
+        r1_param = '$BATCH_TMPDIR/R1.fq.gz'
+        r2_param = '$BATCH_TMPDIR/R2.fq.gz'
+        # Need file names to end with ".gz" for BWA to parse correctly:
+        prepare_fastq_cmd = dedent(
+            f"""\
+        mv {fastq_pair.r1} {r1_param}
+        mv {fastq_pair.r2} {r2_param}
+        """
+        )
 
     if aligner in [Aligner.BWAMEM2, Aligner.BWA]:
         if aligner == Aligner.BWAMEM2:
@@ -390,6 +404,7 @@ def _align_one(
         # -Y   use soft clipping for supplementary alignments
         # -R   read group header line such as '@RG\tID:foo\tSM:bar'
         cmd = f"""\
+        {prepare_fastq_cmd}
         {tool_name} mem -K 100000000 \\
         {'-p' if use_bazam else ''} -t{nthreads - 1} -Y -R '{rg_line}' \\
         {bwa_reference.base} {r1_param} {r2_param}
@@ -404,11 +419,12 @@ def _align_one(
             }
         )
         if use_bazam:
-            input_cmd = f'--interleaved=1 -b {r1_param}'
+            input_params = f'--interleaved=1 -b {r1_param}'
         else:
-            input_cmd = f'-1 {r1_param} -2 {r2_param}'
+            input_params = f'-1 {r1_param} -2 {r2_param}'
         cmd = f"""\
-        dragen-os -r {dragmap_index} {input_cmd} \\
+        {prepare_fastq_cmd}
+        dragen-os -r {dragmap_index} {input_params} \\
             --RGID {sample_name} --RGSM {sample_name}
         """
 
@@ -421,7 +437,6 @@ def _align_one(
         cmd += ' ' + sort_cmd(requested_nthreads) + f' -o {j.sorted_bam}'
 
     if fifo_commands:
-
         fifo_pre = [
             dedent(
                 f"""
@@ -450,36 +465,37 @@ def _align_one(
 
         # Now prepare command
         cmd = '\n'.join([*fifo_pre, cmd, fifo_post])
-
-    if index_cmd:
-        cmd = dedent(index_cmd) + '\n' + cmd
     return j, cmd
 
 
 def extract_fastq(
     b,
-    cram: hb.ResourceGroup,
+    bam_or_cram_group: hb.ResourceGroup,
     ext: str = 'cram',
     job_attrs: dict | None = None,
     output_fq1: str | Path | None = None,
     output_fq2: str | Path | None = None,
 ) -> Job:
     """
-    Job that converts a BAM or a CRAM file to an interleaved compressed fastq file.
+    Job that converts a BAM or a CRAM file to a pair of compressed fastq files.
     """
-    j = b.new_job('Extract fastq', (job_attrs or {}) | dict(tool='bazam'))
-    ncpu = 16
-    nthreads = ncpu * 2  # multithreading
-    j.cpu(ncpu)
-    j.image(image_path('dragmap'))
-    sequencing_type = get_config()['workflow']['sequencing_type']
-    if sequencing_type == 'genome':
-        j.storage('700G')
-
-    reference = fasta_res_group(b)
+    j = b.new_job('Extract fastq', (job_attrs or {}) | dict(tool='samtools'))
+    j.image(image_path('samtools'))
+    res = STANDARD.request_resources(ncpu=16)
+    if get_config()['workflow']['sequencing_type'] == 'genome':
+        res.attach_disk_storage_gb = 700
+    res.set_to_job(j)
+    tmp_prefix = '$BATCH_TMPDIR/collate'
     cmd = f"""
-    bazam -Xmx16g -Dsamjdk.reference_fasta={reference.base} \
-    -n{nthreads} -bam {cram[ext]} -r1 {j.fq1} -r2 {j.fq2}
+    samtools collate -@{res.get_nthreads() - 1} -u -O \
+    {bam_or_cram_group[ext]} {tmp_prefix} | \\
+    samtools fastq -@{res.get_nthreads() - 1} \
+    -1 $BATCH_TMPDIR/R1.fq.gz -2 $BATCH_TMPDIR/R2.fq.gz \
+    -0 /dev/null -s /dev/null -n
+    # Can't write directly to j.fq1 and j.fq2 because samtools-fastq requires the 
+    # file names to end with ".gz" in order to create compressed outputs.
+    mv $BATCH_TMPDIR/R1.fq.gz {j.fq1}
+    mv $BATCH_TMPDIR/R2.fq.gz {j.fq2}
     """
     j.command(command(cmd, monitor_space=True))
     if output_fq1 or output_fq2:
