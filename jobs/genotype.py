@@ -34,12 +34,6 @@ def genotype(
     if utils.can_reuse(output_path, overwrite):
         return [b.new_job('Make GVCF [reuse]', job_attrs)]
 
-    if get_config()['workflow']['sequencing_type'] == 'genome':
-        scatter_count = 50
-    else:
-        assert get_config()['workflow']['sequencing_type'] == 'exome'
-        scatter_count = 1
-
     jobs = haplotype_caller(
         b=b,
         sample_name=sample_name,
@@ -47,7 +41,7 @@ def genotype(
         output_path=hc_gvcf_path,
         cram_path=cram_path,
         tmp_prefix=tmp_prefix,
-        scatter_count=scatter_count,
+        scatter_count=50,
         overwrite=overwrite,
         dragen_mode=dragen_mode,
     )
