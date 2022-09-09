@@ -85,7 +85,6 @@ def main(
         f'Connecting to ElasticSearch: host="{host}", port="{port}", user="{username}"'
     )
     print(f'Reading passport from secret "{secret_name}" in project "{project_id}"')
-    # def __init__(self, host='localhost', port='9200', es_username='pipeline', es_password=None, es_use_ssl=False):
     es = HailElasticsearchClient(
         host=host,
         port=port,
@@ -95,7 +94,8 @@ def main(
     )
 
     mt = hl.read_matrix_table(mt_path)
-    # Annotate GRCh37 coordinates here, as they are not supported by Batch Backend
+    # Annotate GRCh37 coordinates here, until liftover is supported by Batch Backend
+    # and can be moved to annotate_cohort.
     logging.info('Adding GRCh37 coords')
     rg37 = hl.get_reference('GRCh37')
     rg38 = hl.get_reference('GRCh38')
