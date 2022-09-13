@@ -1,0 +1,38 @@
+[workflow]
+access_level = 'full'
+datasets = [
+    'acute-care',
+    'perth-neuro',
+    'ravenscroft-rdstudy',
+    'circa',
+    'heartkids',
+    'ohmr3-mendelian',
+    'ohmr4-epilepsy',
+    'rdnow',
+    'mito-disease',
+    'ravenscroft-arch',
+    'hereditary-neuro',
+    'validation',
+    'schr-neuro',
+    'ibmdx',
+    'mcri-lrp',
+    'kidgen',
+    'ag-hidden',
+    'flinders-ophthal',
+    'udn-aus-training',
+]
+skip_samples = [
+    'CPG11783',   # acute-care, no FASTQ data
+    'CPG255232',  # perth-neuro: new
+    'CPG255240',  # perth-neuro: new
+    'CPG253328',  # perth-neuro, contamination rate 32%
+    'CPG13409',   # perth-neuro, coverage ~0x
+    'CPG243717',  # validation, NA12878_KCCG low coverage https://main-web.populationgenomics.org.au/validation/qc/cram/multiqc.html,
+    'CPG246645',  # ag-hidden, eof issue  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/440
+    'CPG246678',  # ag-hidden, diff fastq size  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/446
+    'CPG246561',  # ag-hidden, coverage ~0x https://main-web.populationgenomics.org.au/ag-hidden/qc/cram/multiqc.html
+]
+
+check_inputs = true
+check_intermediates = true
+check_expected_outputs = true

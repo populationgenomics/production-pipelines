@@ -1,0 +1,18 @@
+[workflow]
+name = 'qc'
+description = 'MultiQC'
+
+only_stages = [
+    'CramMultiQC', 
+    'GvcfMultiQC',
+    'GvcfHappy',
+    'JointVcfHappy',
+    'JointVcfMultiQC',
+]
+check_expected_outputs = false
+allow_missing_outputs_for_stages = [
+    'Align', 
+    'Genotype', 
+    'JointGenotyping',
+    'CramSomalierPedigree'
+]

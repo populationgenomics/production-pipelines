@@ -59,10 +59,10 @@ def make_joint_genotyping_jobs(
     logging.info(f'Submitting joint-calling jobs')
 
     if get_config()['workflow']['sequencing_type'] == 'genome':
-        scatter_count = min(2, len(gvcf_by_sid) // 10)
+        scatter_count = max(2, len(gvcf_by_sid) // 10)
     else:
         assert get_config()['workflow']['sequencing_type'] == 'exome'
-        scatter_count = min(2, len(gvcf_by_sid) // 1000)
+        scatter_count = max(2, len(gvcf_by_sid) // 1000)
 
     jobs: list[Job] = []
     intervals_j, intervals = get_intervals(

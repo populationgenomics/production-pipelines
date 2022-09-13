@@ -63,7 +63,7 @@ def genotype(
     return jobs + [postproc_j]
 
 
-intervals: list[hb.ResourceFile | None] | None = None
+intervals: list[hb.ResourceFile] | None = None
 
 
 def haplotype_caller(
