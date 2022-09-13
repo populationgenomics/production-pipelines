@@ -7,7 +7,6 @@ import os
 
 import hail as hl
 
-from cpg_utils import Path, to_path
 from cpg_utils.hail_batch import reference_path
 
 
