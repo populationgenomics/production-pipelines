@@ -162,6 +162,8 @@ def align(
     sorted_bams = []
 
     if not sharded:  # Just running one alignment job
+        if isinstance(alignment_input, FastqPairs):
+            alignment_input = alignment_input[0]
         align_j, align_cmd = _align_one(
             b=b,
             job_name=base_job_name,
@@ -325,7 +327,7 @@ def _align_one(
     #   This is named-pipe name -> command to populate it
     fifo_commands: dict[str, str] = {}
 
-    if isinstance(alignment_input, CramPath | BamPath) and alignment_input.index_path:
+    if isinstance(alignment_input, CramPath | BamPath):
         use_bazam = True
         if number_of_shards_for_realignment and number_of_shards_for_realignment > 1:
             assert shard_number is not None and shard_number >= 0, (
@@ -352,8 +354,28 @@ def _align_one(
             f'-Dsamjdk.reference_fasta={reference_inp}' if reference_inp else ''
         )
 
+        index_cmd = ''
+        if not alignment_input.index_path:
+            index_cmd = dedent(
+                f"""
+            mkdir -p $BATCH_TMPDIR/sorted
+            mkdir -p $BATCH_TMPDIR/sort_tmp
+            samtools sort \
+            {group[alignment_input.ext]} \
+            -@{nthreads - 1} \
+            -T $BATCH_TMPDIR/sort_tmp \
+            > $BATCH_TMPDIR/sorted.{alignment_input.ext}
+            
+            mv $BATCH_TMPDIR/sorted.{alignment_input.ext} {group[alignment_input.ext]}
+            rm -rf $BATCH_TMPDIR/sort_tmp
+            
+            samtools index -@{nthreads - 1} {group[alignment_input.ext]}
+            """
+            )
+
         bazam_cmd = dedent(
             f"""\
+        {index_cmd}
         bazam -Xmx16g {_reference_command_inp} \
         -n{min(nthreads, 6)} -bam {group[alignment_input.ext]}{shard_param} \
         """
@@ -364,17 +386,8 @@ def _align_one(
         fifo_commands[r1_param] = bazam_cmd
 
     else:  # only for BAMs that are missing index
-        if isinstance(alignment_input, BamPath | CramPath):
-            extract_j = extract_fastq(
-                b=b,
-                bam_or_cram_group=alignment_input.resource_group(b),
-                ext=alignment_input.ext,
-                job_attrs=job_attrs,
-            )
-            fastq_pair = FastqPair(r1=extract_j.fq1, r2=extract_j.fq2)
-        else:
-            assert isinstance(alignment_input, FastqPair)
-            fastq_pair = alignment_input.as_resources(b)
+        assert isinstance(alignment_input, FastqPair)
+        fastq_pair = alignment_input.as_resources(b)
         use_bazam = False
         r1_param = '$BATCH_TMPDIR/R1.fq.gz'
         r2_param = '$BATCH_TMPDIR/R2.fq.gz'
