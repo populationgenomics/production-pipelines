@@ -196,7 +196,7 @@ def vcf_qc(
     if output_summary_path and can_reuse(output_detail_path, overwrite):
         return None
 
-    job_attrs = (job_attrs or {}) | {'tool': 'picard_CollectVariantCallingMetrics'}
+    job_attrs = (job_attrs or {}) | {'tool': 'picard CollectVariantCallingMetrics'}
     j = b.new_job('CollectVariantCallingMetrics', job_attrs)
     j.image(image_path('picard'))
     res = STANDARD.set_resources(j, storage_gb=20, mem_gb=3)

@@ -223,7 +223,7 @@ def genomicsdb(
         job_name,
         (job_attrs or {})
         | dict(
-            tool='gatk_GenomicsDBImport',
+            tool='gatk GenomicsDBImport',
         ),
     )
     j.image(image_path('gatk'))

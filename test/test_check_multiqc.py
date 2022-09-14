@@ -1,7 +1,6 @@
 """
 Test Hail Query functions.
 """
-
 import shutil
 import pytest
 import toml
@@ -9,11 +8,19 @@ from cpg_utils import to_path, Path
 from cpg_utils.config import set_config_paths, update_dict
 from cpg_utils.workflows.utils import timestamp
 
-from jobs.python_scripts import check_pedigree
+from jobs.python_scripts import check_multiqc
+
 
 DEFAULT_CONF = """
 [workflow]
 sequencing_type = 'genome'
+
+[qc_thresholds.genome.min]
+"MEDIAN_COVERAGE" = 10
+"PCT_PF_READS_ALIGNED" = 80
+[qc_thresholds.genome.max]
+"FREEMIX" = 0.04
+"PERCENT_DUPLICATION" = 25
 """
 
 
@@ -33,21 +40,14 @@ def _set_config(dir_path: Path, extra_conf: dict | None = None):
     with config_path.open('w') as f:
         toml.dump(d, f)
     set_config_paths([str(config_path)])
+    
 
-
-def test_check_pedigree(caplog, tmp_dir: Path):
+def test_check_multiqc(caplog, tmp_dir: Path):
     _set_config(tmp_dir)
-    data_dir = to_path(__file__).parent / 'data' / 'check_pedigree'
-    check_pedigree.run(
-        somalier_samples_fpath=str(data_dir / 'somalier-samples.tsv'),
-        somalier_pairs_fpath=str(data_dir / 'somalier-pairs.tsv'),
-        expected_ped_fpath=str(data_dir / 'samples.ped'),
-    )
+    data_dir = to_path(__file__).parent / 'data' / 'check_multiqc'
+    check_multiqc.run(str(data_dir / 'validation_multiqc.json'))
     for expected_line in [
-        '4/51 PED samples with mismatching sex',
-        'Sex inferred for 51/51 samples, matching for 47 samples.',
-        'Found 4 sample pair(s) that are provided as unrelated, are inferred as related:',
-        'Found 7 sample pair(s) that are provided as related, but inferred as unrelated:',
+        '⭕ CPG243717|NA12878_KCCG: MEDIAN_COVERAGE=8.00<10.00'
     ]:
         matching_lines = [expected_line in msg for msg in caplog.messages]
         assert any(matching_lines)

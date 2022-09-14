@@ -1,16 +1,11 @@
 cpg-utils
-sample-metadata
 analysis-runner
 cpg-gnomad
-pytest
 pandas
-hail
 peddy
 google-cloud-storage
 google-cloud-secret-manager
 fsspec
-cloudpathlib[all]
-coloredlogs
 slack_sdk
 elasticsearch==8.*
 click

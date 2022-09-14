@@ -2,16 +2,15 @@
 Test Hail Query functions.
 """
 import shutil
-
-import hail as hl
 import pytest
 import toml
 from cpg_utils import to_path, Path
-from cpg_utils.config import get_config, set_config_paths, update_dict
+from cpg_utils.config import update_dict
 from cpg_utils.workflows.batch import get_batch
 from cpg_utils.workflows.utils import timestamp
-from cpg_utils.hail_batch import dataset_path, init_batch
-
+from cpg_utils.workflows.workflow import get_workflow
+from cpg_utils.config import set_config_paths
+from stages.seqr_loader import MtToEs
 
 DEFAULT_CONF = """
 [workflow]
@@ -21,9 +20,7 @@ dataset = 'fewgenomes'
 check_inputs = false
 check_intermediates = false
 check_expected_outputs = false
-jc_intervals_num = 2
-vqsr_intervals_num = 2
-vep_intervals_num = 2
+assume_outputs_exist = true
 sequencing_type = 'genome'
 
 [hail]
@@ -67,34 +64,30 @@ def test_workflow_dry(tmp_dir: Path):
     """
     Run entire seqr-loader in a dry mode.
     """
-    intervals_num = 2
     sample_ids = ['CPG56564', 'CPG56572']
     _set_config(
         tmp_dir,
         extra_conf={
             'workflow': {
-                'stages': 'MtToEs',
                 'only_samples': sample_ids,
                 'skip_stages': ['Align'],
-                'hc_intervals_num': intervals_num,
-                'jc_intervals_num': intervals_num,
             },
             'hail': {
                 'dry_run': True,
             },
         },
     )
-    import main
-
-    main.main()
+    
+    get_workflow().run(stages=[MtToEs])
+    
     assert (
-        get_batch().job_by_tool['gatk_HaplotypeCaller']['job_n']
-        == len(sample_ids) * intervals_num
+        get_batch().job_by_tool['gatk HaplotypeCaller']['job_n']
+        == len(sample_ids) * 50
     )
-    assert get_batch().job_by_tool['picard_MergeVcfs']['job_n'] == len(sample_ids)
-    assert get_batch().job_by_tool['gatk_ReblockGVCF']['job_n'] == len(sample_ids)
+    assert get_batch().job_by_tool['picard MergeVcfs']['job_n'] == len(sample_ids)
+    assert get_batch().job_by_tool['gatk ReblockGVCF']['job_n'] == len(sample_ids)
     assert (
-        get_batch().job_by_tool['picard_CollectVariantCallingMetrics']['job_n']
+        get_batch().job_by_tool['picard CollectVariantCallingMetrics']['job_n']
         == len(sample_ids) + 1
     )
-    assert get_batch().job_by_tool['gatk_GenomicsDBImport']['job_n'] == intervals_num
+    assert get_batch().job_by_tool['gatk GenomicsDBImport']['job_n'] == 2

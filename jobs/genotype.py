@@ -144,7 +144,7 @@ def _haplotype_caller_one(
     Add one GATK HaplotypeCaller job on an interval.
     """
     job_name = 'HaplotypeCaller'
-    j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk_HaplotypeCaller'))
+    j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk HaplotypeCaller'))
     if utils.can_reuse(out_gvcf_path, overwrite):
         j.name = f'{j.name} [reuse]'
         return j
@@ -226,7 +226,7 @@ def merge_gvcfs_job(
     Combine by-interval GVCFs into a single sample-wide GVCF file.
     """
     job_name = f'Merge {len(gvcf_groups)} GVCFs'
-    j = b.new_job(job_name, (job_attrs or {}) | dict(tool='picard_MergeVcfs'))
+    j = b.new_job(job_name, (job_attrs or {}) | dict(tool='picard MergeVcfs'))
     if utils.can_reuse(out_gvcf_path, overwrite):
         j.name = f'{j.name} [reuse]'
         return j
@@ -278,7 +278,7 @@ def postproc_gvcf(
     """
     logging.info(f'Adding GVCF postproc job for sample {sample_name}, gvcf {gvcf_path}')
     job_name = 'Postproc GVCF'
-    j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk_ReblockGVCF'))
+    j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk ReblockGVCF'))
     if utils.can_reuse(output_path, overwrite):
         return b.new_job(job_name + ' [reuse]', job_attrs)
 
