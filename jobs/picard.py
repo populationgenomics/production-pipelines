@@ -38,9 +38,9 @@ def get_intervals(
 
     Note that we use the mode INTERVAL_SUBDIVISION instead of
     BALANCING_WITHOUT_INTERVAL_SUBDIVISION_WITH_OVERFLOW. Modes other than
-    INTERVAL_SUBDIVISION produce an unpredicted number of intervals. WDL can handle
-    that, but Hail Batch is not dynamic and have to expect certain number of output
-    files.
+    INTERVAL_SUBDIVISION produce an unpredictable number of intervals. WDL can
+    handle that, but Hail Batch is not dynamic and expects a certain number
+    of output files.
     """
     assert scatter_count > 0, scatter_count
     sequencing_type = get_config()['workflow']['sequencing_type']
