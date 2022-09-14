@@ -43,7 +43,8 @@ gsutil cat ${LOFTEE_PATH} | tar -xf - -C /vep_data/loftee/ &
 # Will write /vep_data/vep/homo_sapiens/${VEP_VERSION}_GRCh38:
 gsutil cat ${CACHE_PATH} | tar -xf - -C /vep_data/
 # Copy the fasta to the top level so the path doesn't depend on VEP version
-cp /vep_data/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz /vep_data/Homo_sapiens.GRCh38.dna.fa.gz
+gunzip -c /vep_data/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz \
+> /vep_data/Homo_sapiens.GRCh38.dna.fa
 
 gcloud -q auth configure-docker australia-southeast1-docker.pkg.dev
 docker pull ${IMAGE} &
