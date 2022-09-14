@@ -19,5 +19,8 @@ jobs:
           requirements.txt
           requirements-dev.txt
 
+    - name: Install packages
+      run: pip install -r requirements-dev.txt
+
     - name: pre-commit
       run: pre-commit run --all-files
