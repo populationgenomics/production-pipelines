@@ -5,14 +5,17 @@ Dataproc script to annotate cohort.
 """
 
 import os
+import logging
 
 import click
+import coloredlogs
 import hail as hl
 
 from cpg_utils.hail_batch import reference_path, genome_build
 from cpg_utils.config import get_config
 
-import logging
+fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
+coloredlogs.install(level='DEBUG', fmt=fmt)
 
 
 @click.command()
@@ -342,3 +345,7 @@ def annotate_cohort(
     mt.describe()
     mt.write(str(out_mt_path), overwrite=overwrite)
     logging.info(f'Written final matrix table into {out_mt_path}')
+
+
+if __name__ == '__main__':
+    main()  # pylint: disable=E1120

@@ -4,13 +4,16 @@
 Dataproc script to annotate cohort.
 """
 
+import logging
 import click
+import coloredlogs
 import hail as hl
 
 from cpg_utils import to_path
 from cpg_utils.config import get_config
 
-import logging
+fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
+coloredlogs.install(level='DEBUG', fmt=fmt)
 
 
 @click.command()
@@ -195,3 +198,7 @@ def annotate_dataset_mt(mt_path, out_mt_path, checkpoint_prefix, overwrite=False
     mt.describe()
     mt.write(out_mt_path, overwrite=True)
     logging.info(f'Written {out_mt_path}')
+
+
+if __name__ == '__main__':
+    main()  # pylint: disable=E1120

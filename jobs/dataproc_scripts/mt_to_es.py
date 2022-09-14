@@ -7,6 +7,8 @@ Loads the matrix table into an ElasticSearch index.
 """
 
 import logging
+
+import coloredlogs
 import math
 import re
 import time
@@ -20,6 +22,9 @@ import elasticsearch
 from cpg_utils import to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
+
+fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
+coloredlogs.install(level='DEBUG', fmt=fmt)
 
 
 @click.command()
