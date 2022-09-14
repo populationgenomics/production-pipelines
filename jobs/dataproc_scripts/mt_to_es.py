@@ -17,6 +17,7 @@ import click
 import hail as hl
 import elasticsearch
 
+from cpg_utils import to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
 
@@ -35,10 +36,9 @@ from cpg_utils.config import get_config
     required=True,
 )
 @click.option(
-    '--use-spark',
-    'use_spark',
-    is_flag=True,
-    default=False,
+    '--done-flag-path',
+    'done_flag_path',
+    help='File to touch in the end',
 )
 @click.option(
     '--liftover-path',
@@ -53,7 +53,7 @@ from cpg_utils.config import get_config
 def main(
     mt_path: str,
     es_index: str,
-    use_spark: bool,
+    done_flag_path: str,
     liftover_path: str,
     password: str = None,
 ):
@@ -61,13 +61,7 @@ def main(
     Entry point.
     """
     es_index = es_index.lower()
-
-    if use_spark:
-        hl.init(default_reference='GRCh38')
-    else:
-        from cpg_utils.hail_batch import init_batch
-
-        init_batch()
+    hl.init(default_reference='GRCh38')
 
     host = get_config()['elasticsearch']['host']
     port = str(get_config()['elasticsearch']['port'])
@@ -113,6 +107,8 @@ def main(
         write_null_values=True,
     )
     _cleanup(es, es_index, es_shards)
+    with to_path(done_flag_path).open('w') as f:
+        f.write('done')
 
 
 def elasticsearch_row(mt: hl.MatrixTable):
