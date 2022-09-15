@@ -59,36 +59,9 @@ def main(
         vep_ht_path=vep_ht_path,
         out_mt_path=out_mt_path,
         overwrite=not get_config()['workflow'].get('check_intermediates'),
-        genome_build=genome_build(),
         sequencing_type=get_config()['workflow']['sequencing_type'],
         checkpoint_prefix=checkpoint_prefix,
     )
-
-
-def _split_info_annotation(
-    info_expr: hl.expr.StructExpression, a_index: hl.expr.Int32Expression
-) -> hl.expr.StructExpression:
-    """
-    Split multi-allelic allele-specific info fields.
-    Borrowed from "from gnomad.utils.sparse_mt import split_info_annotation",
-    but additionally ignores AS_RAW_* fields.
-    """
-    # Index AS annotations
-    fields = [
-        f
-        for f in info_expr
-        if f.startswith('AC')
-        or (
-            f.startswith('AS_')
-            and not f == 'AS_SB_TABLE'
-            and not f.startswith('AS_RAW_')
-        )
-    ]
-    info_expr = info_expr.annotate(
-        **{f: info_expr[f][a_index - 1] for f in fields},
-        AS_SB_TABLE=info_expr.AS_SB_TABLE[0].extend(info_expr.AS_SB_TABLE[a_index]),
-    )
-    return info_expr
 
 
 def load_vqsr(site_only_vqsr_vcf_path: str, genome_build: str = 'GRCh38'):
@@ -106,38 +79,23 @@ def load_vqsr(site_only_vqsr_vcf_path: str, genome_build: str = 'GRCh38'):
         reference_genome=genome_build,
     ).rows()
 
-    # Some AS annotations are not correctly represented in the VCF to be parsed
-    # as lists by Hail, so parsing again them here. Also, some annotations are not
-    # correctly parsed as numbers, so converting them to floats here.
-    ht = ht.annotate(
-        info=ht.info.annotate(
-            AS_QUALapprox=hl.if_else(
-                ht.info.AS_QUALapprox.contains('|'),
-                ht.info.AS_QUALapprox.split(r'\|')[1:].map(hl.int),
-                ht.info.AS_QUALapprox.split(r',')[1:].map(hl.int),
-            ),
-            AS_VarDP=ht.info.AS_VarDP.split(r'\|')[1:].map(hl.int),
-            AS_SB_TABLE=ht.info.AS_SB_TABLE.split(r'\|').map(
-                lambda x: hl.if_else(
-                    x == '',
-                    hl.missing(hl.tarray(hl.tint32)),
-                    x.split(',').map(hl.int),
-                )
-            ),
-            AS_VQSLOD=ht.info.AS_VQSLOD.map(hl.float),
-            InbreedingCoeff=hl.float(ht.info.InbreedingCoeff),
-            AS_InbreedingCoeff=ht.info.AS_InbreedingCoeff.map(hl.float),
-            AC_adj=hl.missing('array<int32>'),
-        )
-    )
+    # Drop AS annotations as they are not parsed correctly by Hail.
+    as_fields = [f for f in ht.info if f.startswith('AC') or f.startswith('AS_')]
+    as_fields_to_keep = ['AS_FilterStatus', 'AS_VQSLOD']
+    as_fields_to_drop = [f for f in as_fields if f not in as_fields_to_keep]
+    ht = ht.annotate(info=ht.info.drop(*as_fields_to_drop))
+
     logging.info(f'AS-VQSR: splitting multiallelics...')
     unsplit_count = ht.count()
     ht = hl.split_multi_hts(ht)
 
+    # Fixing allele-specific INFO annotation after splitting:
     ht = ht.annotate(
-        info=ht.info.annotate(**_split_info_annotation(ht.info, ht.a_index)),
+        info=ht.info.annotate(
+            **{f: ht.info[f][ht.a_index - 1] for f in as_fields_to_keep},
+        )
     )
-    # Annotating filters separately because they depend on info
+    # Annotating filters separately because they depend on info:
     ht = ht.annotate(
         filters=ht.filters.union(hl.set([ht.info.AS_FilterStatus])).filter(
             lambda val: val != 'PASS'
@@ -167,9 +125,6 @@ def load_vqsr(site_only_vqsr_vcf_path: str, genome_build: str = 'GRCh38'):
     ht = ht.annotate(
         info=ht.info.annotate(
             AS_VQSLOD=_fix_inf(ht.info.AS_VQSLOD),
-            AS_MQ=_fix_inf(ht.info.AS_MQ),
-            InbreedingCoeff=_fix_inf(ht.info.InbreedingCoeff),
-            AS_InbreedingCoeff=_fix_inf(ht.info.AS_InbreedingCoeff),
         )
     )
     return ht
@@ -181,7 +136,6 @@ def annotate_cohort(
     vep_ht_path,
     out_mt_path,
     overwrite=False,
-    genome_build='GRCh38',
     sequencing_type='',
     checkpoint_prefix=None,
 ):
@@ -211,7 +165,7 @@ def annotate_cohort(
 
     mt = hl.import_vcf(
         str(vcf_path),
-        reference_genome=genome_build,
+        reference_genome=genome_build(),
         skip_invalid_loci=True,
         force_bgz=True,
     )
@@ -235,7 +189,7 @@ def annotate_cohort(
     )
     mt = _checkpoint(mt, 'mt-vep-split.mt')
 
-    vqsr_ht = load_vqsr(site_only_vqsr_vcf_path, genome_build)
+    vqsr_ht = load_vqsr(site_only_vqsr_vcf_path)
     vqsr_ht = _checkpoint(vqsr_ht, 'vqsr.ht')
 
     logging.info('Adding VQSR annotations into the Matrix Table')
@@ -327,7 +281,7 @@ def annotate_cohort(
     )
     mt = mt.annotate_globals(
         sourceFilePath=vcf_path,
-        genomeVersion=genome_build.replace('GRCh', ''),
+        genomeVersion=genome_build().replace('GRCh', ''),
         hail_version=hl.version(),
     )
     if sequencing_type:
