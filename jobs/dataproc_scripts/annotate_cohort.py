@@ -651,7 +651,6 @@ def annotate_cohort(
     mt = _checkpoint(mt, 'mt-vep-split.mt')
 
     vqsr_ht = load_vqsr(site_only_vqsr_vcf_path)
-    overwrite = True
     vqsr_ht = _checkpoint(vqsr_ht, 'vqsr.ht')
 
     logging.info('Adding VQSR annotations into the Matrix Table')
@@ -664,7 +663,6 @@ def annotate_cohort(
         ),
     )
     mt = _checkpoint(mt, 'mt-vep-split-vqsr.mt')
-    overwrite = False
 
     ref_ht = hl.read_table(str(reference_path('seqr/combined_reference')))
     clinvar_ht = hl.read_table(str(reference_path('seqr/clinvar')))

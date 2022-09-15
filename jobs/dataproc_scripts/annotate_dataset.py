@@ -23,8 +23,8 @@ coloredlogs.install(level='DEBUG', fmt=fmt)
     required=True,
 )
 @click.option(
-    '--sample-list',
-    'sample_list_path',
+    '--sample-ids',
+    'sample_ids_path',
     required=True,
 )
 @click.option(
@@ -39,13 +39,13 @@ coloredlogs.install(level='DEBUG', fmt=fmt)
 )
 def main(
     mt_path: str,
-    sample_list_path: str,
+    sample_ids_path: str,
     out_mt_path: str,
     checkpoint_prefix: str,
 ):
     hl.init(default_reference='GRCh38')
 
-    with to_path(sample_list_path).open() as f:
+    with to_path(sample_ids_path).open() as f:
         sample_ids = f.read().strip().split(',')
 
     subset_mt_path = to_path(checkpoint_prefix) / 'cohort-subset.mt'
