@@ -576,9 +576,8 @@ def load_vqsr(site_only_vqsr_vcf_path: str, genome_build: str = 'GRCh38'):
 
     # Dropping all INFO/AS* annotations as they are causing problems parsing by Hail.
     as_fields = [f for f in ht.info if f.startswith('AS_')]
-    as_fields_to_keep: list[str] = []
-    as_fields_to_drop = [f for f in as_fields if f not in as_fields_to_keep]
-    ht = ht.annotate(info=ht.info.drop(*as_fields_to_drop))
+    fields_to_drop = as_fields + ['InbreedingCoeff']
+    ht = ht.annotate(info=ht.info.drop(*fields_to_drop))
 
     logging.info(f'AS-VQSR: splitting multiallelics...')
     unsplit_count = ht.count()
