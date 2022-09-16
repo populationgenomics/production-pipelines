@@ -1,15 +1,12 @@
 """
 Test Hail Query functions.
 """
-import shutil
-import pytest
 import toml
 from cpg_utils import to_path, Path
 from cpg_utils.config import update_dict
 from cpg_utils.workflows.batch import get_batch
 from cpg_utils.workflows.filetypes import BamPath, FastqPair, FastqPairs
 from cpg_utils.workflows.targets import Cohort
-from cpg_utils.workflows.utils import timestamp
 from cpg_utils.workflows.workflow import get_workflow
 from cpg_utils.config import set_config_paths
 from stages.seqr_loader import MtToEs
@@ -31,12 +28,12 @@ delete_scratch_on_exit = true
 """
 
 
-@pytest.fixture()
-def tmp_dir() -> Path:
-    dir_path = to_path('results') / timestamp()
-    dir_path.mkdir(parents=True, exist_ok=True)
-    yield dir_path
-    shutil.rmtree(dir_path)
+# @pytest.fixture()
+# def tmp_dir() -> Path:
+#     dir_path = to_path('results') / timestamp()
+#     dir_path.mkdir(parents=True, exist_ok=True)
+#     yield dir_path
+#     shutil.rmtree(dir_path)
 
 
 def _set_config(dir_path: Path, extra_conf: dict | None = None):
@@ -49,12 +46,12 @@ def _set_config(dir_path: Path, extra_conf: dict | None = None):
     set_config_paths([str(config_path)])
 
 
-def test_workflow_dry(mocker, tmp_dir: Path):
+def test_workflow_dry(mocker, tmpdir):
     """
     Run entire seqr-loader in a dry mode.
     """
     _set_config(
-        tmp_dir,
+        to_path(tmpdir),
         extra_conf={
             'workflow': {
                 'dataset': 'test-analysis-dataset',
