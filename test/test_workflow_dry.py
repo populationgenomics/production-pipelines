@@ -63,7 +63,7 @@ def test_workflow_dry(mocker, tmp_dir: Path):
             },
             'hail': {
                 'dry_run': True,
-                # 'backend': 'local',  # j.cloudfuse doesn't work with local backend
+                'backend': 'local',
             },
         },
     )
@@ -86,20 +86,20 @@ def test_workflow_dry(mocker, tmp_dir: Path):
         ])
     })
     
-    def mock_exists(  # pylint: disable=unused-argument
-        *args, **kwargs
-    ) -> bool:
-        return False
-
-    # mocker.patch('cpg_utils.workflows.utils.exists', mock_exists)
-    mocker.patch('cloudpathlib.cloudpath.CloudPath.exists', mock_exists)
-
-    def mock_get_cohort(  # pylint: disable=unused-argument
-        *args, **kwargs
-    ) -> Cohort:
+    def mock_get_cohort(*args, **kwargs) -> Cohort:
         return cohort
 
+    def mock_exists(*args, **kwargs) -> bool:
+        return False
+
+    def mock_cloudfuse(*args, **kwargs):
+        return None
+
     mocker.patch('cpg_utils.workflows.inputs.create_cohort', mock_get_cohort)
+    # functions like get_intervals checks file existence
+    mocker.patch('cloudpathlib.cloudpath.CloudPath.exists', mock_exists)
+    # cloudfuse doesn't work with LocalBackend
+    mocker.patch('hailtop.batch.job.Job.cloudfuse', mock_cloudfuse)
 
     get_workflow().run(stages=[MtToEs])
     
