@@ -81,6 +81,8 @@ def test_workflow_dry(mocker, tmpdir):
     mocker.patch('hailtop.batch.job.Job.cloudfuse', do_nothing)
     # always_run (used in MtToEs -> hail_dataproc_job) doesn't work with LocalBackend
     mocker.patch('hailtop.batch.job.Job.always_run', do_nothing)
+    # can't access secrets from CI environment
+    mocker.patch('stages.seqr_loader.es_password', lambda: 'test-password')
 
     get_workflow().run(stages=[MtToEs])
     
