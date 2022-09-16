@@ -28,14 +28,6 @@ delete_scratch_on_exit = true
 """
 
 
-# @pytest.fixture()
-# def tmp_dir() -> Path:
-#     dir_path = to_path('results') / timestamp()
-#     dir_path.mkdir(parents=True, exist_ok=True)
-#     yield dir_path
-#     shutil.rmtree(dir_path)
-
-
 def _set_config(dir_path: Path, extra_conf: dict | None = None):
     d = toml.loads(DEFAULT_CONF)
     if extra_conf:
