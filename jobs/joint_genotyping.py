@@ -84,8 +84,9 @@ def make_joint_genotyping_jobs(
     df = pd.DataFrame(
         [{'id': sid, 'path': str(path)} for sid, path in gvcf_by_sid.items()]
     )
-    with sample_map_bucket_path.open('w') as fp:
-        df.to_csv(fp, index=False, header=False, sep='\t')
+    if not get_config()['hail'].get('dry_run', False):
+        with sample_map_bucket_path.open('w') as fp:
+            df.to_csv(fp, index=False, header=False, sep='\t')
 
     do_filter_excesshet = len(gvcf_by_sid) >= 1000 and do_filter_excesshet
 
@@ -223,7 +224,7 @@ def genomicsdb(
         job_name,
         (job_attrs or {})
         | dict(
-            tool='gatk_GenomicsDBImport',
+            tool='gatk GenomicsDBImport',
         ),
     )
     j.image(image_path('gatk'))
