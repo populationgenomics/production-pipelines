@@ -13,17 +13,15 @@ from stages.seqr_loader import MtToEs
 
 DEFAULT_CONF = """
 [workflow]
-dataset_gcp_project = 'fewgenomes'
-access_level = 'test'
-
+dataset_gcp_project = 'test-analysis-dataset-1234'
 dataset = 'test-analysis-dataset'
+access_level = 'test'
+sequencing_type = 'genome'
 
+skip_stages = ['Align']
 check_inputs = false
 check_intermediates = false
 check_expected_outputs = false
-
-sequencing_type = 'genome'
-skip_stages = ['Align']
 
 [hail]
 billing_project = 'test-analysis-dataset'
