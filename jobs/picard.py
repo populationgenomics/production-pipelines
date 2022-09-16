@@ -52,7 +52,7 @@ def get_intervals(
         # Special case when we don't need to split
         return None, [b.read_input(str(source_intervals_path))]
 
-    if output_prefix and (output_prefix / '1.interval_list').exists():
+    if output_prefix and exists(output_prefix / '1.interval_list'):
         return None, [
             b.read_input(str(output_prefix / f'{idx + 1}.interval_list'))
             for idx in range(scatter_count)
@@ -60,7 +60,7 @@ def get_intervals(
 
     if (
         not source_intervals_path
-        and (
+        and exists(
             (
                 existing_split_intervals_prefix := (
                     reference_path('intervals_prefix')
@@ -69,7 +69,7 @@ def get_intervals(
                 )
             )
             / '1.interval_list'
-        ).exists()
+        )
     ):
         # We already have split intervals for this sequencing_type:
         return None, [

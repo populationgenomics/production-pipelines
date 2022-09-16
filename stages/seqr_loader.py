@@ -155,6 +155,12 @@ class MtToEs(DatasetStage):
         index_name = self.expected_outputs(dataset).lower()
 
         from analysis_runner import dataproc
+        
+        if 'elasticsearch' not in get_config():
+            raise ValueError(
+                f'"elasticsearch" section is not defined in config, cannot create '
+                f'Elasticsearch index for dataset {dataset}'
+            )
 
         j = dataproc.hail_dataproc_job(
             self.b,
