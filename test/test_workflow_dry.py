@@ -15,16 +15,21 @@ DEFAULT_CONF = """
 [workflow]
 dataset_gcp_project = 'fewgenomes'
 access_level = 'test'
-dataset = 'fewgenomes'
+
+dataset = 'test-analysis-dataset'
+
 check_inputs = false
 check_intermediates = false
 check_expected_outputs = false
-assume_outputs_exist = true
+
 sequencing_type = 'genome'
+skip_stages = ['Align']
 
 [hail]
-billing_project = 'fewgenomes'
+billing_project = 'test-analysis-dataset'
 delete_scratch_on_exit = true
+dry_run = true
+backend = 'local'
 """
 
 
@@ -42,20 +47,7 @@ def test_workflow_dry(mocker, tmpdir):
     """
     Run entire seqr-loader in a dry mode.
     """
-    _set_config(
-        to_path(tmpdir),
-        extra_conf={
-            'workflow': {
-                'dataset': 'test-analysis-dataset',
-                'skip_stages': ['Align'],
-                'last_stages': ['AnnotateDataset'],
-            },
-            'hail': {
-                'dry_run': True,
-                'backend': 'local',
-            },
-        },
-    )
+    _set_config(to_path(tmpdir))
 
     cohort = Cohort()
     ds = cohort.create_dataset('test-input-dataset')
@@ -81,14 +73,16 @@ def test_workflow_dry(mocker, tmpdir):
     def mock_exists(*args, **kwargs) -> bool:
         return False
 
-    def mock_cloudfuse(*args, **kwargs):
+    def do_nothing(*args, **kwargs):
         return None
 
     mocker.patch('cpg_utils.workflows.inputs.create_cohort', mock_get_cohort)
     # functions like get_intervals checks file existence
     mocker.patch('cloudpathlib.cloudpath.CloudPath.exists', mock_exists)
-    # cloudfuse doesn't work with LocalBackend
-    mocker.patch('hailtop.batch.job.Job.cloudfuse', mock_cloudfuse)
+    # cloudfuse (used in Vep) doesn't work with LocalBackend
+    mocker.patch('hailtop.batch.job.Job.cloudfuse', do_nothing)
+    # always_run (used in MtToEs -> hail_dataproc_job) doesn't work with LocalBackend
+    mocker.patch('hailtop.batch.job.Job.always_run', do_nothing)
 
     get_workflow().run(stages=[MtToEs])
     
