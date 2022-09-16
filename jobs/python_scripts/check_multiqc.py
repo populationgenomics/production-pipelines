@@ -32,7 +32,6 @@ from cpg_utils.config import get_config
 @click.option(
     '--html-url',
     'html_url',
-    required=True,
     help='MultiQC HTML URL',
 )
 @click.option('--dataset', 'dataset', help='Dataset name')
@@ -44,8 +43,8 @@ from cpg_utils.config import get_config
 )
 def main(
     multiqc_json_path: str,
-    html_url: str,
-    dataset: str,
+    html_url: Optional[str] = None,
+    dataset: Optional[str] = None,
     title: Optional[str] = None,
     send_to_slack: bool = True,
 ):
@@ -53,12 +52,28 @@ def main(
     Check metrics in MultiQC json and send info about failed samples
     as a Slack message.
     """
+    run(
+        multiqc_json_path=multiqc_json_path,
+        html_url=html_url,
+        dataset=dataset,
+        title=title,
+        send_to_slack=send_to_slack,
+    )
+
+
+def run(
+    multiqc_json_path: str,
+    html_url: Optional[str] = None,
+    dataset: Optional[str] = None,
+    title: Optional[str] = None,
+    send_to_slack: bool = True,
+):
     seq_type = get_config()['workflow']['sequencing_type']
 
     with to_path(multiqc_json_path).open() as f:
         d = json.load(f)
         sections = d['report_general_stats_data']
-        print(f'report_general_stats_data: {pprint.pformat(sections)}')
+        logging.info(f'report_general_stats_data: {pprint.pformat(sections)}')
 
     bad_lines_by_sample = defaultdict(list)
     for config_key, fail_sign, good_sign, is_fail in [
@@ -92,15 +107,19 @@ def main(
                             logging.debug(f'✅ {sample}: {line}')
 
     # Constructing Slack message
-    title = f'*[{dataset}]* <{html_url}|{title or "MutliQC report"}>'
-    lines = []
+    if dataset and html_url:
+        title = f'*[{dataset}]* <{html_url}|{title or "MultiQC report"}>'
+    elif not title:
+        title = 'MultiQC report'
+    messages = []
     if bad_lines_by_sample:
-        lines.append(f'{title}')
+        messages.append(f'{title}')
         for sample, bad_lines in bad_lines_by_sample.items():
-            lines.append(f'⭕ {sample}: ' + ', '.join(bad_lines))
+            messages.append(f'⭕ {sample}: ' + ', '.join(bad_lines))
     else:
-        lines.append(f'✅ {title}')
-    message = '\n'.join(lines)
+        messages.append(f'✅ {title}')
+    text = '\n'.join(messages)
+    logging.info(text)
 
     slack_channel = get_config().get('slack', {}).get('channel')
     slack_token = os.environ.get('SLACK_TOKEN')
@@ -114,13 +133,11 @@ def main(
                 'chat.postMessage',
                 json={
                     'channel': slack_channel,
-                    'text': message,
+                    'text': text,
                 },
             )
         except SlackApiError as err:
             logging.error(f'Error posting to Slack: {err}')
-    else:
-        print(message)
 
 
 if __name__ == '__main__':

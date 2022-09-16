@@ -141,12 +141,7 @@ class CramSomalierPedigree(DatasetStage):
                 else:
                     verifybamid_by_sid[sample.id] = verify_bamid_path
             somalier_path = inputs.as_path(stage=Align, target=sample, id='somalier')
-            if not exists(somalier_path):
-                raise ValueError(
-                    f'Somalier file does not exist for {sample}: {somalier_path}'
-                )
-            else:
-                somalier_by_sid[sample.id] = somalier_path
+            somalier_by_sid[sample.id] = somalier_path
 
         html_path = self.expected_outputs(dataset)['html']
         if base_url := dataset.web_url():
