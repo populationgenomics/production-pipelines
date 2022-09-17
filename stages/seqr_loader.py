@@ -192,6 +192,12 @@ class MtToEs(DatasetStage):
         index_name = self.expected_outputs(dataset)['index_name']
         done_flag_path = self.expected_outputs(dataset)['done_flag']
 
+        if 'elasticsearch' not in get_config():
+            raise ValueError(
+                f'"elasticsearch" section is not defined in config, cannot create '
+                f'Elasticsearch index for dataset {dataset}'
+            )
+
         j = dataproc.hail_dataproc_job(
             self.b,
             f'dataproc_scripts/mt_to_es.py '
