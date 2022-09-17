@@ -4,7 +4,6 @@
 Hail Query stages for the Seqr loader workflow.
 """
 
-from analysis_runner import dataproc
 from cpg_utils import to_path, Path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
@@ -53,6 +52,10 @@ class AnnotateCohort(CohortStage):
         checkpoint_prefix = (
             to_path(self.expected_outputs(cohort)['prefix']) / 'checkpoints'
         )
+
+        # Importing this requires CPG_CONFIG_PATH to be already set, that's why
+        # we are not importing it on the top level.
+        from analysis_runner import dataproc
 
         j = dataproc.hail_dataproc_job(
             self.b,
@@ -119,6 +122,10 @@ class AnnotateDataset(DatasetStage):
         sample_ids_list_path = dataset.tmp_prefix() / 'sample-list.txt'
         with sample_ids_list_path.open('w') as f:
             f.write(','.join([s.id for s in dataset.get_samples()]))
+
+        # Importing this requires CPG_CONFIG_PATH to be already set, that's why
+        # we are not importing it on the top level.
+        from analysis_runner import dataproc
 
         j = dataproc.hail_dataproc_job(
             self.b,
@@ -197,6 +204,10 @@ class MtToEs(DatasetStage):
                 f'"elasticsearch" section is not defined in config, cannot create '
                 f'Elasticsearch index for dataset {dataset}'
             )
+
+        # Importing this requires CPG_CONFIG_PATH to be already set, that's why
+        # we are not importing it on the top level.
+        from analysis_runner import dataproc
 
         j = dataproc.hail_dataproc_job(
             self.b,
