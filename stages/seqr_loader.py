@@ -4,7 +4,8 @@
 Hail Query stages for the Seqr loader workflow.
 """
 
-from cpg_utils import to_path
+from analysis_runner import dataproc
+from cpg_utils import to_path, Path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import reference_path
@@ -17,8 +18,6 @@ from cpg_utils.workflows.workflow import (
     Cohort,
     Dataset,
 )
-
-from jobs.seqr_loader import annotate_dataset_jobs, annotate_cohort_jobs
 
 from .joint_genotyping import JointGenotyping
 from .vep import Vep
@@ -55,21 +54,35 @@ class AnnotateCohort(CohortStage):
             to_path(self.expected_outputs(cohort)['prefix']) / 'checkpoints'
         )
 
-        jobs = annotate_cohort_jobs(
-            b=self.b,
-            vcf_path=vcf_path,
-            vep_ht_path=vep_ht_path,
-            siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
-            out_mt_path=self.expected_outputs(cohort)['mt'],
-            checkpoint_prefix=checkpoint_prefix,
-            sequencing_type=get_config()['workflow']['sequencing_type'],
-            overwrite=not get_config()['workflow'].get('check_intermediates'),
-            job_attrs=self.get_job_attrs(),
+        j = dataproc.hail_dataproc_job(
+            self.b,
+            f'jobs/dataproc_scripts/annotate_cohort.py '
+            f'--vcf-path {vcf_path} '
+            f'--siteonly-vqsr-vcf-path {siteonly_vqsr_vcf_path} '
+            f'--vep-ht-path {vep_ht_path} '
+            f'--out-mt-path {self.expected_outputs(cohort)["mt"]} '
+            f'--checkpoint-prefix {checkpoint_prefix}',
+            max_age='24h',
+            packages=[
+                'cpg_utils',
+                'google',
+                'fsspec',
+                'gcloud',
+            ],
+            num_workers=2,
+            num_secondary_workers=20,
+            job_name=f'Annotate cohort',
+            depends_on=inputs.get_jobs(cohort),
+            scopes=['cloud-platform'],
+            env_vars={'PYTHON_PATH', 'seqr-loading-pipelines'},
+            pyfiles=['seqr-loading-pipelines/hail_scripts'],
         )
+        j.attributes = self.get_job_attrs(cohort) | {'tool': 'hail dataproc'}
+
         return self.make_outputs(
             cohort,
             data=self.expected_outputs(cohort),
-            jobs=jobs,
+            jobs=[j],
         )
 
 
@@ -101,18 +114,34 @@ class AnnotateDataset(DatasetStage):
             to_path(self.expected_outputs(dataset)['prefix']) / 'checkpoints'
         )
 
-        jobs = annotate_dataset_jobs(
-            b=self.b,
-            mt_path=mt_path,
-            sample_ids=[s.id for s in dataset.get_samples()],
-            output_mt_path=self.expected_outputs(dataset)['mt'],
-            tmp_bucket=checkpoint_prefix,
-            job_attrs=self.get_job_attrs(dataset),
-            overwrite=not get_config()['workflow'].get('check_intermediates'),
+        sample_ids_list_path = dataset.tmp_prefix() / 'sample-list.txt'
+        with sample_ids_list_path.open('w') as f:
+            f.write(','.join([s.id for s in dataset.get_samples()]))
+
+        j = dataproc.hail_dataproc_job(
+            self.b,
+            f'jobs/dataproc_scripts/annotate_dataset.py '
+            f'--mt-path {mt_path} '
+            f'--sample-ids {sample_ids_list_path} '
+            f'--out-mt-path {self.expected_outputs(dataset)["mt"]} '
+            f'--checkpoint-prefix {checkpoint_prefix}',
+            max_age='24h',
+            packages=[
+                'cpg_utils',
+                'google',
+                'fsspec',
+                'gcloud',
+            ],
+            num_workers=2,
+            num_secondary_workers=20,
+            job_name=f'Annotate dataset',
+            depends_on=inputs.get_jobs(dataset),
+            scopes=['cloud-platform'],
+            env_vars={'PYTHON_PATH', 'seqr-loading-pipelines'},
         )
-        return self.make_outputs(
-            dataset, data=self.expected_outputs(dataset), jobs=jobs
-        )
+        j.attributes = self.get_job_attrs(dataset) | {'tool': 'hail dataproc'}
+
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])
 
 
 def es_password() -> str:
@@ -133,13 +162,16 @@ class MtToEs(DatasetStage):
     Create a Seqr index.
     """
 
-    def expected_outputs(self, dataset: Dataset) -> str:
+    def expected_outputs(self, dataset: Dataset) -> dict[str, str | Path]:
         """
         Expected to generate a Seqr index, which is not a file
         """
         sequencing_type = get_config()['workflow']['sequencing_type']
-        index_name = f'{dataset.name}-{sequencing_type}-{self.run_id}'
-        return index_name
+        index_name = f'{dataset.name}-{sequencing_type}-{self.run_id}'.lower()
+        return {
+            'index_name': index_name,
+            'done_flag': dataset.prefix() / 'es' / f'{index_name}.done',
+        }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
@@ -152,24 +184,17 @@ class MtToEs(DatasetStage):
             return self.make_outputs(dataset)
 
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset, id='mt')
-        index_name = self.expected_outputs(dataset).lower()
-
-        from analysis_runner import dataproc
-        
-        if 'elasticsearch' not in get_config():
-            raise ValueError(
-                f'"elasticsearch" section is not defined in config, cannot create '
-                f'Elasticsearch index for dataset {dataset}'
-            )
+        index_name = self.expected_outputs(dataset)['index_name']
+        done_flag_path = self.expected_outputs(dataset)['done_flag']
 
         j = dataproc.hail_dataproc_job(
             self.b,
             f'jobs/dataproc_scripts/mt_to_es.py '
             f'--mt-path {dataset_mt_path} '
             f'--es-index {index_name} '
+            f'--done-flag-path {done_flag_path} '
             f'--es-password {es_password()} '
-            f'--liftover-path {reference_path("liftover_38_to_37")} '
-            f'--use-spark ',  # es export doesn't work with the service backend
+            f'--liftover-path {reference_path("liftover_38_to_37")}',
             max_age='24h',
             packages=[
                 'cpg_utils',
