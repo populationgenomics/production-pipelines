@@ -7,36 +7,11 @@ import os
 
 import hail as hl
 
-from cpg_utils.hail_batch import reference_path
+from cpg_utils.hail_batch import reference_path, genome_build
+from hail_scripts.computed_fields import vep, variant_id
 
 
-def _split_info_annotation(
-    info_expr: hl.expr.StructExpression, a_index: hl.expr.Int32Expression
-) -> hl.expr.StructExpression:
-    """
-    Split multi-allelic allele-specific info fields.
-    Borrowed from "from gnomad.utils.sparse_mt import split_info_annotation",
-    but additionally ignores AS_RAW_* fields.
-    """
-    # Index AS annotations
-    fields = [
-        f
-        for f in info_expr
-        if f.startswith('AC')
-        or (
-            f.startswith('AS_')
-            and not f == 'AS_SB_TABLE'
-            and not f.startswith('AS_RAW_')
-        )
-    ]
-    info_expr = info_expr.annotate(
-        **{f: info_expr[f][a_index - 1] for f in fields},
-        AS_SB_TABLE=info_expr.AS_SB_TABLE[0].extend(info_expr.AS_SB_TABLE[a_index]),
-    )
-    return info_expr
-
-
-def load_vqsr(site_only_vqsr_vcf_path: str, genome_build: str = 'GRCh38'):
+def load_vqsr(site_only_vqsr_vcf_path: str):
     """
     Loads the site-only VCF with applied AS-VQSR filters into a site-only hail table.
     Populates "ht.filters".
@@ -48,74 +23,29 @@ def load_vqsr(site_only_vqsr_vcf_path: str, genome_build: str = 'GRCh38'):
     ht = hl.import_vcf(
         str(site_only_vqsr_vcf_path),
         force_bgz=True,
-        reference_genome=genome_build,
+        reference_genome=genome_build(),
     ).rows()
 
-    # Some AS annotations are not correctly represented in the VCF to be parsed
-    # as lists by Hail, so parsing again them here. Also, some annotations are not
-    # correctly parsed as numbers, so converting them to floats here.
+    # Annotating FILTERS from AS_FilterStatus before dropping that latter
     ht = ht.annotate(
-        info=ht.info.annotate(
-            AS_QUALapprox=hl.if_else(
-                ht.info.AS_QUALapprox.contains('|'),
-                ht.info.AS_QUALapprox.split(r'\|')[1:].map(hl.int),
-                ht.info.AS_QUALapprox.split(r',')[1:].map(hl.int),
-            ),
-            AS_VarDP=ht.info.AS_VarDP.split(r'\|')[1:].map(hl.int),
-            AS_SB_TABLE=ht.info.AS_SB_TABLE.split(r'\|').map(
-                lambda x: hl.if_else(
-                    x == '',
-                    hl.missing(hl.tarray(hl.tint32)),
-                    x.split(',').map(hl.int),
-                )
-            ),
-            AS_VQSLOD=ht.info.AS_VQSLOD.map(hl.float),
-            InbreedingCoeff=hl.float(ht.info.InbreedingCoeff),
-            AS_InbreedingCoeff=ht.info.AS_InbreedingCoeff.map(hl.float),
-            AC_adj=hl.missing('array<int32>'),
-        )
+        filters=ht.filters.union(hl.set(ht.info.AS_FilterStatus)).filter(
+            lambda val: val != 'PASS'
+        ),
     )
+
+    # Dropping all INFO/AS* annotations as well as InbreedingCoeff, as they are
+    # causing problems splitting multiallelics after parsing by Hail.
+    as_fields = [f for f in ht.info if f.startswith('AS_')]
+    fields_to_drop = as_fields + ['InbreedingCoeff']
+    ht = ht.annotate(info=ht.info.drop(*fields_to_drop))
+
     logging.info(f'AS-VQSR: splitting multiallelics...')
     unsplit_count = ht.count()
     ht = hl.split_multi_hts(ht)
 
-    ht = ht.annotate(
-        info=ht.info.annotate(**_split_info_annotation(ht.info, ht.a_index)),
-    )
-    # Annotating filters separately because they depend on info
-    ht = ht.annotate(
-        filters=ht.filters.union(hl.set([ht.info.AS_FilterStatus])).filter(
-            lambda val: val != 'PASS'
-        ),
-    )
     split_count = ht.count()
     logging.info(
-        f'AS-VQSR: Found {unsplit_count} unsplit and {split_count} split variants '
-        f'with AS-VQSR annotations'
-    )
-
-    logging.info(f'AS-VQSR: fixing AS-* fields')
-    # Some AS annotations can be NaN or Infinite. E.g. AS_VQSLOD can be "Infinity"
-    # for indels:
-    #   AS_VQSLOD=30.0692,18.2979,Infinity,17.5854,42.2131,1.5013
-    #   gs://cpg-seqr-main-tmp/seqr_loader/v0/AnnotateCohort/seqr_loader/checkpoints/vqsr.ht
-    #   ht = hl.filter_intervals(ht, [hl.parse_locus_interval('chrX:52729395-52729396')])
-    # Hail's hl.float() correctly parses this value, however, seqr loader doesn't
-    # recognise "Inf" and "Nan" values, so we need to replace it with zero.
-    # hl.is_finite() returns False for "Inf" and "NaN".
-    # Example of NaN: https://batch.hail.populationgenomics.org
-    # .au/batches/6973/jobs/12
-
-    def _fix_inf(x):
-        return hl.if_else(hl.is_finite(x), x, 0.0)
-
-    ht = ht.annotate(
-        info=ht.info.annotate(
-            AS_VQSLOD=_fix_inf(ht.info.AS_VQSLOD),
-            AS_MQ=_fix_inf(ht.info.AS_MQ),
-            InbreedingCoeff=_fix_inf(ht.info.InbreedingCoeff),
-            AS_InbreedingCoeff=_fix_inf(ht.info.AS_InbreedingCoeff),
-        )
+        f'AS-VQSR: Found {unsplit_count} unsplit and {split_count} split variants'
     )
     return ht
 
@@ -126,7 +56,6 @@ def annotate_cohort(
     vep_ht_path,
     out_mt_path,
     overwrite=False,
-    genome_build='GRCh38',
     sequencing_type='',
     checkpoint_prefix=None,
 ):
@@ -156,7 +85,7 @@ def annotate_cohort(
 
     mt = hl.import_vcf(
         str(vcf_path),
-        reference_genome=genome_build,
+        reference_genome=genome_build(),
         skip_invalid_loci=True,
         force_bgz=True,
     )
@@ -180,7 +109,7 @@ def annotate_cohort(
     )
     mt = _checkpoint(mt, 'mt-vep-split.mt')
 
-    vqsr_ht = load_vqsr(site_only_vqsr_vcf_path, genome_build)
+    vqsr_ht = load_vqsr(site_only_vqsr_vcf_path)
     vqsr_ht = _checkpoint(vqsr_ht, 'vqsr.ht')
 
     logging.info('Adding VQSR annotations into the Matrix Table')
@@ -197,11 +126,9 @@ def annotate_cohort(
     ref_ht = hl.read_table(str(reference_path('seqr/combined_reference')))
     clinvar_ht = hl.read_table(str(reference_path('seqr/clinvar')))
 
-    from hail_scripts.computed_fields import vep, variant_id
-
     logging.info('Annotating with seqr-loader fields: round 1')
     mt = mt.annotate_rows(
-        AC=mt.info.AC,
+        AC=mt.info.AC[mt.a_index - 1],
         AF=mt.info.AF[mt.a_index - 1],
         AN=mt.info.AN,
         aIndex=mt.a_index,
@@ -272,7 +199,7 @@ def annotate_cohort(
     )
     mt = mt.annotate_globals(
         sourceFilePath=vcf_path,
-        genomeVersion=genome_build.replace('GRCh', ''),
+        genomeVersion=genome_build().replace('GRCh', ''),
         hail_version=hl.version(),
     )
     if sequencing_type:
@@ -333,7 +260,7 @@ def subset_mt_to_samples(mt_path, sample_ids, out_mt_path):
     logging.info(f'Written {out_mt_path}')
 
 
-def annotate_dataset_mt(mt_path, out_mt_path, checkpoints_bucket, overwrite=False):
+def annotate_dataset_mt(mt_path, out_mt_path, checkpoint_prefix, overwrite=False):
     """
     Add dataset-level annotations.
     """
@@ -362,9 +289,9 @@ def annotate_dataset_mt(mt_path, out_mt_path, checkpoints_bucket, overwrite=Fals
         genotypes=hl.agg.collect(hl.struct(**genotype_fields)),
     )
     mt = mt.checkpoint(
-        f'{checkpoints_bucket}/dataset-genotypes.mt', _read_if_exists=not overwrite
+        f'{checkpoint_prefix}/dataset-genotypes.mt', _read_if_exists=not overwrite
     )
-    logging.info(f'Written {checkpoints_bucket}/dataset-genotypes.mt')
+    logging.info(f'Written {checkpoint_prefix}/dataset-genotypes.mt')
 
     def _genotype_filter_samples(fn):
         # Filter on the genotypes.
