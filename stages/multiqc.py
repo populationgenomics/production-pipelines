@@ -15,7 +15,6 @@ from cpg_utils.workflows.workflow import (
     DatasetStage,
     Dataset,
     Cohort,
-    exists,
 )
 
 from jobs.multiqc import multiqc

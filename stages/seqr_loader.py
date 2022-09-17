@@ -56,7 +56,7 @@ class AnnotateCohort(CohortStage):
 
         j = dataproc.hail_dataproc_job(
             self.b,
-            f'jobs/dataproc_scripts/annotate_cohort.py '
+            f'dataproc_scripts/annotate_cohort.py '
             f'--vcf-path {vcf_path} '
             f'--siteonly-vqsr-vcf-path {siteonly_vqsr_vcf_path} '
             f'--vep-ht-path {vep_ht_path} '
@@ -74,8 +74,10 @@ class AnnotateCohort(CohortStage):
             job_name=f'Annotate cohort',
             depends_on=inputs.get_jobs(cohort),
             scopes=['cloud-platform'],
-            env_vars={'PYTHON_PATH', 'seqr-loading-pipelines'},
-            pyfiles=['seqr-loading-pipelines/hail_scripts'],
+            pyfiles=[
+                'seqr-loading-pipelines/hail_scripts',
+                'query_modules',
+            ],
         )
         j.attributes = self.get_job_attrs(cohort) | {'tool': 'hail dataproc'}
 
@@ -120,7 +122,7 @@ class AnnotateDataset(DatasetStage):
 
         j = dataproc.hail_dataproc_job(
             self.b,
-            f'jobs/dataproc_scripts/annotate_dataset.py '
+            f'dataproc_scripts/annotate_dataset.py '
             f'--mt-path {mt_path} '
             f'--sample-ids {sample_ids_list_path} '
             f'--out-mt-path {self.expected_outputs(dataset)["mt"]} '
@@ -137,7 +139,10 @@ class AnnotateDataset(DatasetStage):
             job_name=f'Annotate dataset',
             depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
-            env_vars={'PYTHON_PATH', 'seqr-loading-pipelines'},
+            pyfiles=[
+                'seqr-loading-pipelines/hail_scripts',
+                'query_modules',
+            ],
         )
         j.attributes = self.get_job_attrs(dataset) | {'tool': 'hail dataproc'}
 
@@ -189,7 +194,7 @@ class MtToEs(DatasetStage):
 
         j = dataproc.hail_dataproc_job(
             self.b,
-            f'jobs/dataproc_scripts/mt_to_es.py '
+            f'dataproc_scripts/mt_to_es.py '
             f'--mt-path {dataset_mt_path} '
             f'--es-index {index_name} '
             f'--done-flag-path {done_flag_path} '
@@ -208,6 +213,7 @@ class MtToEs(DatasetStage):
             job_name=f'{dataset.name}: create ES index',
             depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
+            pyfiles=['seqr-loading-pipelines/hail_scripts'],
         )
         j._preemptible = False
         j.attributes = self.get_job_attrs(dataset) | {'tool': 'hail dataproc'}
