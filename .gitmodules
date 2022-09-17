@@ -1,0 +1,3 @@
+[submodule "seqr-loading-pipelines"]
+	path = seqr-loading-pipelines
+	url = git@github.com:broadinstitute/seqr-loading-pipelines.git
