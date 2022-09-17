@@ -160,9 +160,7 @@ def run(
             )
 
     if mismatching_sex.any():
-        info(
-            f'{len(df[mismatching_sex])}/{len(df)} PED samples with mismatching sex:'
-        )
+        info(f'{len(df[mismatching_sex])}/{len(df)} PED samples with mismatching sex:')
         _print_stats(mismatching_sex)
     if missing_provided_sex.any():
         info(

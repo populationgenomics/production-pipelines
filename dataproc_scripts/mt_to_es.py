@@ -28,7 +28,7 @@ coloredlogs.install(level='DEBUG', fmt=fmt)
 
 class HailElasticsearchClientV8(HailElasticsearchClient):
     """
-    The Broad's seqr-loading-pipelines pins the Elasticsearch client to v7. We use v8, 
+    The Broad's seqr-loading-pipelines pins the Elasticsearch client to v7. We use v8,
     so we are overriding the class to adjust for Elasticsearch v8.
     """
 
@@ -41,7 +41,7 @@ class HailElasticsearchClientV8(HailElasticsearchClient):
         es_password: str,
     ):
         """
-        Overriding base __init__: the difference with v7 is that in v8, 
+        Overriding base __init__: the difference with v7 is that in v8,
         elasticsearch.Elasticsearch constructor takes one URL string, in contrast
         with v7 which takes "host" and "port" strings separately. Note that we are
         not calling the base init, which would fail on v8. Instead, we are completely
@@ -63,7 +63,7 @@ class HailElasticsearchClientV8(HailElasticsearchClient):
 
         # check connection
         logging.info(pformat(self.es.info()))
-        
+
     def export_table_to_elasticsearch(self, *args, **kwargs):
         """Override to adjust for ES V7."""
 
@@ -72,19 +72,21 @@ class HailElasticsearchClientV8(HailElasticsearchClient):
         # that's before elasticsearch in upstream seqr-loading-pipelines was pinned to v7.
         # Without this config, ES API errors with the following:
         # > Cannot detect ES version - typically this happens if the network/Elasticsearch
-        # cluster is not accessible or when targeting a WAN/Cloud instance without the 
+        # cluster is not accessible or when targeting a WAN/Cloud instance without the
         # proper setting 'es.nodes.wan.only'
         if self._es_use_ssl:
-            kwargs.setdefault('elasticsearch_config', {}).update({
-                'es.net.ssl': 'true',
-                # If using SSL, the instance is likely managed, in which case we
-                # can't discover nodes.
-                'es.nodes.wan.only': 'true',
-            })
-        
+            kwargs.setdefault('elasticsearch_config', {}).update(
+                {
+                    'es.net.ssl': 'true',
+                    # If using SSL, the instance is likely managed, in which case we
+                    # can't discover nodes.
+                    'es.nodes.wan.only': 'true',
+                }
+            )
+
         # deprecated in ES=V8:
         kwargs['index_type_name'] = ''
-        
+
         super().export_table_to_elasticsearch(*args, **kwargs)
 
 
