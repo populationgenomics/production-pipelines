@@ -10,6 +10,7 @@ from cpg_utils.workflows.targets import Cohort
 from cpg_utils.workflows.workflow import get_workflow
 from cpg_utils.config import set_config_paths
 from stages.seqr_loader import MtToEs
+from pytest_mock import MockFixture
 
 DEFAULT_CONF = """
 [workflow]
@@ -22,6 +23,7 @@ skip_stages = ['Align']
 check_inputs = false
 check_intermediates = false
 check_expected_outputs = false
+path_scheme = 'local'
 
 [hail]
 billing_project = 'test-analysis-dataset'
@@ -41,30 +43,45 @@ def _set_config(dir_path: Path, extra_conf: dict | None = None):
     set_config_paths([str(config_path)])
 
 
-def test_workflow_dry(mocker, tmpdir):
+def test_workflow_dry(mocker: MockFixture, tmpdir: str):
     """
     Run entire seqr-loader in a dry mode.
     """
-    _set_config(to_path(tmpdir))
+    _set_config(
+        to_path(tmpdir),
+        extra_conf={
+            'local_dir': tmpdir,
+        },
+    )
 
     cohort = Cohort()
     ds = cohort.create_dataset('test-input-dataset')
-    ds.add_sample('CPG01', 'SAMPLE1', alignment_input_by_seq_type={
-        'genome': BamPath('gs://test-input-dataset-upload/sample1.bam')
-    })
-    ds.add_sample('CPG02', 'SAMPLE2', alignment_input_by_seq_type={
-        'genome': FastqPairs([
-            FastqPair(
-                'gs://test-input-dataset-upload/sample2_L1_R1.fq.gz', 
-                'gs://test-input-dataset-upload/sample2_L1_R2.fq.gz'
-            ),
-            FastqPair(
-                'gs://test-input-dataset-upload/sample2_L2_R1.fq.gz', 
-                'gs://test-input-dataset-upload/sample2_L2_R2.fq.gz'
-            ),
-        ])
-    })
-    
+    ds.add_sample(
+        'CPG01',
+        'SAMPLE1',
+        alignment_input_by_seq_type={
+            'genome': BamPath('gs://test-input-dataset-upload/sample1.bam')
+        },
+    )
+    ds.add_sample(
+        'CPG02',
+        'SAMPLE2',
+        alignment_input_by_seq_type={
+            'genome': FastqPairs(
+                [
+                    FastqPair(
+                        'gs://test-input-dataset-upload/sample2_L1_R1.fq.gz',
+                        'gs://test-input-dataset-upload/sample2_L1_R2.fq.gz',
+                    ),
+                    FastqPair(
+                        'gs://test-input-dataset-upload/sample2_L2_R1.fq.gz',
+                        'gs://test-input-dataset-upload/sample2_L2_R2.fq.gz',
+                    ),
+                ]
+            )
+        },
+    )
+
     def mock_get_cohort(*args, **kwargs) -> Cohort:
         return cohort
 
@@ -85,13 +102,17 @@ def test_workflow_dry(mocker, tmpdir):
     mocker.patch('stages.seqr_loader.es_password', lambda: 'test-password')
 
     get_workflow().run(stages=[MtToEs])
-    
+
     assert (
         get_batch().job_by_tool['gatk HaplotypeCaller']['job_n']
         == len(cohort.get_samples()) * 50
     )
-    assert get_batch().job_by_tool['picard MergeVcfs']['job_n'] == len(cohort.get_samples())
-    assert get_batch().job_by_tool['gatk ReblockGVCF']['job_n'] == len(cohort.get_samples())
+    assert get_batch().job_by_tool['picard MergeVcfs']['job_n'] == len(
+        cohort.get_samples()
+    )
+    assert get_batch().job_by_tool['gatk ReblockGVCF']['job_n'] == len(
+        cohort.get_samples()
+    )
     assert (
         get_batch().job_by_tool['picard CollectVariantCallingMetrics']['job_n']
         == len(cohort.get_samples()) + 1
