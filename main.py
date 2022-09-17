@@ -24,7 +24,7 @@ def main(config_paths: list[str]):
     $CPG_CONFIG_PATH if specified.
     """
     if _cpg_config_path_env_var := os.environ.get('CPG_CONFIG_PATH'):
-        config_paths = _cpg_config_path_env_var.split(',') + config_paths
+        config_paths = _cpg_config_path_env_var.split(',') + list(config_paths)
     set_config_paths(list(config_paths))
     get_workflow().run(stages=[MtToEs, CramMultiQC, GvcfMultiQC])
 

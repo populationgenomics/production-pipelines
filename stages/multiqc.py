@@ -15,7 +15,6 @@ from cpg_utils.workflows.workflow import (
     DatasetStage,
     Dataset,
     Cohort,
-    exists,
 )
 
 from jobs.multiqc import multiqc
@@ -98,14 +97,8 @@ class CramMultiQC(DatasetStage):
                         f'skipping'
                     )
                 else:
-                    if not exists(path):
-                        logging.warning(
-                            f'Output for stage {st.__name__} for {sample} '
-                            f'does not exist: {path}'
-                        )
-                    else:
-                        paths.append(path)
-                        ending_to_trim.add(path.name.replace(sample.id, ''))
+                    paths.append(path)
+                    ending_to_trim.add(path.name.replace(sample.id, ''))
 
         assert ending_to_trim
 

@@ -23,7 +23,7 @@ from cpg_utils.workflows.utils import can_reuse
 
 from .picard import get_intervals
 from .vcf import gather_vcfs, subset_vcf
-from .query_scripts import vep as vep_module
+from query_modules import vep as vep_module
 
 
 def vep_jobs(
