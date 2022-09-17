@@ -120,8 +120,9 @@ class AnnotateDataset(DatasetStage):
         )
 
         sample_ids_list_path = dataset.tmp_prefix() / 'sample-list.txt'
-        with sample_ids_list_path.open('w') as f:
-            f.write(','.join([s.id for s in dataset.get_samples()]))
+        if not get_config()['hail'].get('dry_run', False):
+            with sample_ids_list_path.open('w') as f:
+                f.write(','.join([s.id for s in dataset.get_samples()]))
 
         # Importing this requires CPG_CONFIG_PATH to be already set, that's why
         # we are not importing it on the top level.
