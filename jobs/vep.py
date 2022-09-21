@@ -36,7 +36,7 @@ def vep_jobs(
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """
-    Runs VEP on provided VCF. Whites a VCF into `out_path` by default,
+    Runs VEP on provided VCF. Writes a VCF into `out_path` by default,
     unless `out_path` ends with ".ht", in which case writes a Hail table.
     """
     to_hail_table = out_path and out_path.suffix == '.ht'
