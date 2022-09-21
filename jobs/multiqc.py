@@ -14,7 +14,7 @@ from cpg_utils import Path
 from cpg_utils.workflows.resources import STANDARD
 from cpg_utils.workflows.targets import Dataset
 
-from .python_scripts import check_multiqc
+from python_scripts import check_multiqc
 
 
 def multiqc(

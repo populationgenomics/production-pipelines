@@ -1,13 +1,14 @@
 """
-Jobs specific for seqr-loader.
+Hail Query Batch-Backend jobs for seqr-loader.
 """
+
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
 from cpg_utils import Path
 from cpg_utils.hail_batch import image_path, genome_build, query_command
 
-from jobs.query_scripts import seqr_loader
+from query_modules import seqr_loader
 
 
 def annotate_cohort_jobs(
@@ -39,7 +40,6 @@ def annotate_cohort_jobs(
             sequencing_type,
             str(checkpoint_prefix),
             setup_gcp=True,
-            packages=['cpg_gnomad', 'seqr_loader'],
         )
     )
     return [j]
