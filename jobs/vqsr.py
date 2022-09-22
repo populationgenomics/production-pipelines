@@ -8,19 +8,16 @@ Note that there is no example settings config for WGS AS-VQSR, so we construct i
 from WGS VQSR and Exome AS-VQSR settings.
 """
 
-from typing import List, Optional
+from typing import List
+
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_utils.config import get_config
-from cpg_utils.workflows.utils import can_reuse
 from cpg_utils import Path
 from cpg_utils.hail_batch import reference_path, image_path, command
 from cpg_utils.workflows.resources import STANDARD, HIGHMEM
-
 from jobs.picard import get_intervals
-from jobs.vcf import gather_vcfs
-
+from jobs.vcf import gather_vcfs, subset_vcf
 
 # When applying model, VQSR targets indel_filter_level and snp_filter_level
 # sensitivities. The tool matches them internally to a VQSLOD score cutoff
@@ -139,11 +136,11 @@ def make_vqsr_jobs(
     # To fit a joint-called VCF
     huge_disk = 200 if is_small_callset else (500 if not is_huge_callset else 2000)
 
-    if get_config()['workflow']['sequencing_type'] == 'genome':
-        scatter_count = gvcf_count // 10
-    else:
-        assert get_config()['workflow']['sequencing_type'] == 'exome'
-        scatter_count = gvcf_count // 1000
+    scatter_count = 50
+    if gvcf_count > 300:
+        scatter_count = 100
+    if gvcf_count > 1000:
+        scatter_count = 200
 
     jobs: list[Job] = []
 
@@ -153,9 +150,19 @@ def make_vqsr_jobs(
             'vcf.gz.tbi': str(input_siteonly_vcf_path) + '.tbi',
         }
     )
+
+    indel_vcf_j = subset_vcf(
+        b=b,
+        vcf=siteonly_vcf,
+        variant_types=['INDEL', 'MNP', 'MIXED'],
+        job_attrs=job_attrs,
+    )
+    indel_vcf_j.name = f'VQSR: {indel_vcf_j.name}'
+    indel_vcf = indel_vcf_j.output_vcf
+    assert isinstance(indel_vcf, hb.ResourceGroup)
     indel_recalibrator_j = indel_recalibrator_job(
         b=b,
-        sites_only_variant_filtered_vcf=siteonly_vcf,
+        siteonly_vcf=indel_vcf,
         mills_resource_vcf=resources['mills'],
         axiom_poly_resource_vcf=resources['axiom_poly'],
         dbsnp_resource_vcf=resources['dbsnp'],
@@ -170,20 +177,10 @@ def make_vqsr_jobs(
     jobs.append(indel_recalibrator_j)
 
     if scatter_count > 1:
-        intervals_j, intervals = get_intervals(
-            b=b,
-            scatter_count=scatter_count,
-            source_intervals_path=intervals_path,
-            job_attrs=job_attrs,
-            output_prefix=tmp_prefix,
-        )
-        if intervals_j:
-            jobs.append(intervals_j)
-
         # Run SNP recalibrator in a scattered mode
-        model_j = add_snps_variant_recalibrator_create_model_step(
+        model_j = snps_recalibrator_create_model_job(
             b,
-            sites_only_variant_filtered_vcf=siteonly_vcf,
+            siteonly_vcf=siteonly_vcf,
             hapmap_resource_vcf=resources['hapmap'],
             omni_resource_vcf=resources['omni'],
             one_thousand_genomes_resource_vcf=resources['one_thousand_genomes'],
@@ -197,10 +194,36 @@ def make_vqsr_jobs(
         jobs.append(model_j)
         assert isinstance(model_j.model_file, hb.ResourceFile)
 
-        snps_recalibrator_jobs = [
-            add_snps_variant_recalibrator_scattered_step(
+        intervals_j, intervals = get_intervals(
+            b=b,
+            scatter_count=scatter_count,
+            source_intervals_path=intervals_path,
+            job_attrs=job_attrs,
+            output_prefix=tmp_prefix / f'intervals_{scatter_count}',
+        )
+        if intervals_j:
+            jobs.append(intervals_j)
+
+        snps_interval_vcfs = []
+        for idx in range(scatter_count):
+            snp_subset_j = subset_vcf(
+                b=b,
+                vcf=siteonly_vcf,
+                interval=intervals[idx],
+                variant_types=['SNP'],
+                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
+            )
+            snp_subset_j.name = f'VQSR: {snp_subset_j.name}'
+            snp_subset_vcf = snp_subset_j.output_vcf
+            snps_interval_vcfs.append(snp_subset_vcf)
+
+        snps_recal_jobs = []
+        for idx in range(scatter_count):
+            snps_interval_vcf = snps_interval_vcfs[idx]
+            assert isinstance(snps_interval_vcf, hb.ResourceGroup)
+            snps_recal_j = snps_recalibrator_scattered(
                 b,
-                sites_only_vcf=siteonly_vcf,
+                siteonly_vcf=snps_interval_vcf,
                 interval=intervals[idx],
                 model_file=model_j.model_file,
                 hapmap_resource_vcf=resources['hapmap'],
@@ -212,56 +235,67 @@ def make_vqsr_jobs(
                 is_small_callset=is_small_callset,
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             )
-            for idx in range(scatter_count)
-        ]
-        snps_recalibrations = [j.recalibration for j in snps_recalibrator_jobs]
+            snps_recal_jobs.append(snps_recal_j)
+
+        snps_recalibrations = [j.recalibration for j in snps_recal_jobs]
         snps_tranches = []
-        for snps_recalibrator_j in snps_recalibrator_jobs:
-            assert isinstance(snps_recalibrator_j.tranches, hb.ResourceFile)
-            snps_tranches.append(snps_recalibrator_j.tranches)
-        snp_gathered_tranches = add_snps_gather_tranches_step(
+        for snps_recal_j in snps_recal_jobs:
+            assert isinstance(snps_recal_j.tranches, hb.ResourceFile)
+            snps_tranches.append(snps_recal_j.tranches)
+        snp_gathered_tranches = snps_gather_tranches_job(
             b,
             tranches=snps_tranches,
             disk_size=small_disk,
         ).out_tranches
 
         assert isinstance(snp_gathered_tranches, hb.ResourceFile)
-        scattered_vcfs = []
+        snps_interval_snp_applied_vcfs = []
         for idx in range(scatter_count):
             snp_recalibration = snps_recalibrations[idx]
             assert isinstance(snp_recalibration, hb.ResourceGroup)
-            scattered_vcf = add_apply_recalibration_step(
+            snps_interval_vcf = snps_interval_vcfs[idx]
+            assert isinstance(snps_interval_vcf, hb.ResourceGroup)
+            applied_snps_vcf = apply_recalibration_snps(
                 b,
-                input_vcf=siteonly_vcf,
+                input_vcf=snps_interval_vcf,
                 interval=intervals[idx],
-                indels_recalibration=indel_recalibrator_j.recalibration,
-                indels_tranches=indel_recalibrator_j.tranches,
-                snps_recalibration=snp_recalibration,
-                snps_tranches=snp_gathered_tranches,
+                recalibration=snp_recalibration,
+                tranches=snp_gathered_tranches,
                 disk_size=huge_disk,
                 use_as_annotations=use_as_annotations,
-                snp_filter_level=SNP_HARD_FILTER_LEVEL,
-                indel_filter_level=INDEL_HARD_FILTER_LEVEL,
+                filter_level=SNP_HARD_FILTER_LEVEL,
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             ).output_vcf
-            assert isinstance(scattered_vcf, hb.ResourceGroup)
-            scattered_vcfs.append(scattered_vcf)
+            assert isinstance(applied_snps_vcf, hb.ResourceGroup)
+            snps_interval_snp_applied_vcfs.append(applied_snps_vcf['vcf.gz'])
 
-        recal_gathered_vcf_j, recalibrated_gathered_vcf = gather_vcfs(
+        snps_applied_gathered_j, snps_applied_gathered_vcf = gather_vcfs(
             b=b,
-            input_vcfs=[v['vcf.gz'] for v in scattered_vcfs],
+            input_vcfs=snps_interval_snp_applied_vcfs + [indel_vcf['vcf.gz']],
             overwrite=overwrite,
-            out_vcf_path=out_path,
             site_only=True,
             gvcf_count=gvcf_count,
             job_attrs=job_attrs,
         )
-        if recal_gathered_vcf_j:
-            recal_gathered_vcf_j.name = f'VQSR: {recal_gathered_vcf_j.name}'
-            jobs.append(recal_gathered_vcf_j)
+        if snps_applied_gathered_j:
+            snps_applied_gathered_j.name = f'VQSR: {snps_applied_gathered_j.name}'
+            jobs.append(snps_applied_gathered_j)
+
+        apply_indel_j = apply_recalibration_indels(
+            b,
+            input_vcf=snps_applied_gathered_vcf,
+            recalibration=indel_recalibrator_j.recalibration,
+            tranches=indel_recalibrator_j.tranches,
+            disk_size=huge_disk,
+            use_as_annotations=use_as_annotations,
+            filter_level=INDEL_HARD_FILTER_LEVEL,
+            job_attrs=job_attrs,
+        )
+        jobs.append(apply_indel_j)
+        final_vcf = apply_indel_j.output_vcf
 
     else:
-        snps_recalibrator_job = snps_variant_recalibrator_job(
+        snps_recal_j = snps_recalibrator_job(
             b,
             sites_only_variant_filtered_vcf=siteonly_vcf,
             hapmap_resource_vcf=resources['hapmap'],
@@ -273,72 +307,40 @@ def make_vqsr_jobs(
             is_small_callset=is_small_callset,
             job_attrs=job_attrs,
         )
-        jobs.append(snps_recalibrator_job)
+        jobs.append(snps_recal_j)
 
-        assert isinstance(snps_recalibrator_job.recalibration, hb.ResourceGroup)
-        assert isinstance(snps_recalibrator_job.tranches, hb.ResourceFile)
-        assert isinstance(snps_recalibrator_job.recalibration, hb.ResourceGroup)
-        assert isinstance(snps_recalibrator_job.tranches, hb.ResourceFile)
+        assert isinstance(snps_recal_j.recalibration, hb.ResourceGroup)
+        assert isinstance(snps_recal_j.tranches, hb.ResourceFile)
+        assert isinstance(snps_recal_j.recalibration, hb.ResourceGroup)
+        assert isinstance(snps_recal_j.tranches, hb.ResourceFile)
 
-        recal_gathered_vcf_j = add_apply_recalibration_step(
+        apply_recal_snps_j = apply_recalibration_snps(
             b,
             input_vcf=siteonly_vcf,
-            indels_recalibration=indel_recalibrator_j.recalibration,
-            indels_tranches=indel_recalibrator_j.tranches,
-            snps_recalibration=snps_recalibrator_job.recalibration,
-            snps_tranches=snps_recalibrator_job.tranches,
+            recalibration=snps_recal_j.recalibration,
+            tranches=snps_recal_j.tranches,
             disk_size=huge_disk,
             use_as_annotations=use_as_annotations,
-            indel_filter_level=SNP_HARD_FILTER_LEVEL,
-            snp_filter_level=INDEL_HARD_FILTER_LEVEL,
-            output_vcf_path=out_path,
+            filter_level=INDEL_HARD_FILTER_LEVEL,
             job_attrs=job_attrs,
         )
-        jobs.append(recal_gathered_vcf_j)
-
-    return jobs
-
-
-def _add_make_sites_only_job(
-    b: hb.Batch,
-    input_vcf: hb.ResourceGroup,
-    overwrite: bool,
-    disk_size: int,
-    output_vcf_path: Optional[str] = None,
-) -> Job:
-    """
-    Create sites-only VCF with only site-level annotations.
-    Speeds up the analysis in the AS-VQSR modeling step.
-
-    Returns: a Job object with a single output j.sites_only_vcf of type ResourceGroup
-    """
-    job_name = 'VQSR: MakeSitesOnlyVcf'
-    if can_reuse(output_vcf_path, overwrite):
-        return b.new_job(job_name + ' [reuse]')
-
-    j = b.new_job(job_name)
-    j.image(image_path('gatk'))
-    res = STANDARD.set_resources(j, mem_gb=8, storage_gb=disk_size)
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
-
-    assert isinstance(j.output_vcf, hb.ResourceGroup)
-    j.command(
-        command(
-            f"""\
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
-    MakeSitesOnlyVcf \\
-    -I {input_vcf['vcf.gz']} \\
-    -O {j.output_vcf['vcf.gz']} \\
-    --CREATE_INDEX
-    """
+        assert isinstance(apply_recal_snps_j.output_vcf, hb.ResourceGroup)
+        apply_indel_j = apply_recalibration_indels(
+            b,
+            input_vcf=apply_recal_snps_j.output_vcf,
+            recalibration=indel_recalibrator_j.recalibration,
+            tranches=indel_recalibrator_j.tranches,
+            disk_size=huge_disk,
+            use_as_annotations=use_as_annotations,
+            filter_level=INDEL_HARD_FILTER_LEVEL,
+            job_attrs=job_attrs,
         )
-    )
-    if output_vcf_path:
-        b.write_output(j.output_vcf, output_vcf_path.replace('.vcf.gz', ''))
+        jobs.append(apply_indel_j)
+        final_vcf = apply_indel_j.output_vcf
 
-    return j
+    if out_path:
+        b.write_output(final_vcf, str(out_path).replace('.vcf.gz', ''))
+    return jobs
 
 
 def add_tabix_job(
@@ -348,9 +350,10 @@ def add_tabix_job(
     job_attrs: dict | None = None,
 ) -> Job:
     """
-    Regzip and tabix the combined VCF (for some reason the one produced by
+    Re-gzip and tabix the combined VCF (for some reason the one produced by
     `mt_to_vcf.py` is not block-gzipped).
     """
+    job_attrs = (job_attrs or {}) | {'tool': 'tabix'}
     j = b.new_job('VQSR: Tabix', job_attrs)
     j.image(image_path('bcftools'))
     STANDARD.set_resources(j, mem_gb=8, storage_gb=disk_size)
@@ -370,50 +373,9 @@ def add_tabix_job(
     return j
 
 
-def add_sites_only_gather_vcf_step(
-    b: hb.Batch,
-    input_vcfs: list[hb.ResourceGroup],
-    disk_size: int,
-    job_attrs: dict | None = None,
-) -> Job:
-    """
-    Gathers VCF files from scattered operations into a single VCF file
-
-    Returns: a Job object with a single output j.output_vcf of type ResourceGroup
-    """
-    j = b.new_job('VQSR: SitesOnlyGatherVcf', job_attrs)
-    j.image(image_path('gatk'))
-    res = STANDARD.set_resources(j, mem_gb=8, storage_gb=disk_size)
-
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
-
-    input_cmdl = ' '.join([f'--input {v["vcf.gz"]}' for v in input_vcfs])
-    assert isinstance(j.output_vcf, hb.ResourceGroup)
-    j.command(
-        command(
-            f"""\
-    # --ignore-safety-checks makes a big performance difference so we include it in
-    # our invocation. This argument disables expensive checks that the file headers
-    # contain the same set of genotyped samples and that files are in order by position
-    # of first record.
-    gatk --java-options -Xms{res.get_java_mem_mb()}m GatherVcfsCloud \\
-    --ignore-safety-checks \\
-    --gather-type BLOCK \\
-    {input_cmdl} \\
-    --output {j.output_vcf['vcf.gz']}
-
-    tabix {j.output_vcf['vcf.gz']}
-    """
-        )
-    )
-    return j
-
-
 def indel_recalibrator_job(
     b: hb.Batch,
-    sites_only_variant_filtered_vcf: hb.ResourceGroup,
+    siteonly_vcf: hb.ResourceGroup,
     mills_resource_vcf: hb.ResourceGroup,
     axiom_poly_resource_vcf: hb.ResourceGroup,
     dbsnp_resource_vcf: hb.ResourceGroup,
@@ -434,6 +396,7 @@ def indel_recalibrator_job(
 
     Returns: a Job object with 2 outputs: j.recalibration (ResourceGroup), j.tranches.
     """
+    job_attrs = (job_attrs or {}) | {'tool': 'gatk VariantRecalibrator'}
     j = b.new_job('VQSR: IndelsVariantRecalibrator', job_attrs)
     j.image(image_path('gatk'))
 
@@ -468,7 +431,7 @@ def indel_recalibrator_job(
 
     gatk --java-options -Xms{res.get_java_mem_mb()}m \\
       VariantRecalibrator \\
-      -V {sites_only_variant_filtered_vcf['vcf.gz']} \\
+      -V {siteonly_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
       --tranches-file {j.tranches} \\
       --trust-all-polymorphic \\
@@ -485,9 +448,9 @@ def indel_recalibrator_job(
     return j
 
 
-def add_snps_variant_recalibrator_create_model_step(
+def snps_recalibrator_create_model_job(
     b: hb.Batch,
-    sites_only_variant_filtered_vcf: hb.ResourceGroup,
+    siteonly_vcf: hb.ResourceGroup,
     hapmap_resource_vcf: hb.ResourceGroup,
     omni_resource_vcf: hb.ResourceGroup,
     one_thousand_genomes_resource_vcf: hb.ResourceGroup,
@@ -503,8 +466,8 @@ def add_snps_variant_recalibrator_create_model_step(
     First step of VQSR for SNPs: run VariantRecalibrator to subsample variants
     and produce a file of the VQSR model.
 
-    To support cohorts with more than 10,000 WGS samples, the SNP recalibrartion process
-    is borken down across genomic regions for parallel processing, and done in 3 steps:
+    To support cohorts with more than 10,000 WGS samples, the SNP recalibration process
+    is broken down across genomic regions for parallel processing, and done in 3 steps:
     1. Run the recalibrator with the following additional arguments:
        --sample-every-Nth-variant <downsample_factor> --output-model <model_file>
     2. Apply the resulting model to each genomic interval with, running the recalibrator
@@ -520,6 +483,7 @@ def add_snps_variant_recalibrator_create_model_step(
     Returns: a Job object with 1 output j.model
     The latter is useful to produce the optional tranche plot.
     """
+    job_attrs = (job_attrs or {}) | {'tool': 'gatk VariantRecalibrator'}
     j = b.new_job('VQSR: SNPsVariantRecalibratorCreateModel', job_attrs)
     j.image(image_path('gatk'))
 
@@ -552,7 +516,7 @@ def add_snps_variant_recalibrator_create_model_step(
 
     gatk --java-options -Xms{res.get_java_mem_mb()}m \\
       VariantRecalibrator \\
-      -V {sites_only_variant_filtered_vcf['vcf.gz']} \\
+      -V {siteonly_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
       --tranches-file {j.tranches} \\
       --trust-all-polymorphic \\
@@ -572,9 +536,9 @@ def add_snps_variant_recalibrator_create_model_step(
     return j
 
 
-def add_snps_variant_recalibrator_scattered_step(
+def snps_recalibrator_scattered(
     b: hb.Batch,
-    sites_only_vcf: hb.ResourceGroup,
+    siteonly_vcf: hb.ResourceGroup,
     model_file: hb.ResourceFile,
     hapmap_resource_vcf: hb.ResourceGroup,
     omni_resource_vcf: hb.ResourceGroup,
@@ -591,8 +555,8 @@ def add_snps_variant_recalibrator_scattered_step(
     Second step of VQSR for SNPs: run VariantRecalibrator scattered to apply
     the VQSR model file to each genomic interval.
 
-    To support cohorts with more than 10,000 WGS samples, the SNP recalibrartion process
-    is borken down across genomic regions for parallel processing, and done in 3 steps:
+    To support cohorts with more than 10,000 WGS samples, the SNP recalibration process
+    is broken down across genomic regions for parallel processing, and done in 3 steps:
     1. Run the recalibrator with the following additional arguments:
        --sample-every-Nth-variant <downsample_factor> --output-model <model_file>
     2. Apply the resulting model to each genomic interval with, running the recalibrator
@@ -607,6 +571,7 @@ def add_snps_variant_recalibrator_scattered_step(
 
     Returns: a Job object with 2 outputs: j.recalibration (ResourceGroup) and j.tranches
     """
+    job_attrs = (job_attrs or {}) | {'tool': 'gatk VariantRecalibrator'}
     j = b.new_job('VQSR: SNPsVariantRecalibratorScattered', job_attrs)
     j.image(image_path('gatk'))
 
@@ -635,7 +600,7 @@ def add_snps_variant_recalibrator_scattered_step(
 
     gatk --java-options -Xms{res.get_java_mem_mb()}m \\
       VariantRecalibrator \\
-      -V {sites_only_vcf['vcf.gz']} \\
+      -V {siteonly_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
       --tranches-file {j.tranches} \\
       --trust-all-polymorphic \\
@@ -654,7 +619,7 @@ def add_snps_variant_recalibrator_scattered_step(
     return j
 
 
-def snps_variant_recalibrator_job(
+def snps_recalibrator_job(
     b: hb.Batch,
     sites_only_variant_filtered_vcf: hb.ResourceGroup,
     hapmap_resource_vcf: hb.ResourceGroup,
@@ -670,6 +635,7 @@ def snps_variant_recalibrator_job(
     """
     Recalibrate SNPs in one run (alternative to scatter-gather approach)
     """
+    job_attrs = (job_attrs or {}) | {'tool': 'gatk VariantRecalibrator'}
     j = b.new_job('VQSR: SNPsVariantRecalibrator', job_attrs)
     j.image(image_path('gatk'))
 
@@ -722,7 +688,7 @@ def snps_variant_recalibrator_job(
     return j
 
 
-def add_snps_gather_tranches_step(
+def snps_gather_tranches_job(
     b: hb.Batch,
     tranches: List[hb.ResourceFile],
     disk_size: int,
@@ -732,8 +698,8 @@ def add_snps_gather_tranches_step(
     Third step of VQSR for SNPs: run GatherTranches to gather scattered per-interval
     tranches outputs.
 
-    To support cohorts with more than 10,000 WGS samples, the SNP recalibrartion process
-    is borken down across genomic regions for parallel processing, and done in 3 steps:
+    To support cohorts with more than 10,000 WGS samples, the SNP recalibration process
+    is broken down across genomic regions for parallel processing, and done in 3 steps:
     1. Run the recalibrator with the following additional arguments:
        --sample-every-Nth-variant <downsample_factor> --output-model <model_file>
     2. Apply the resulting model to each genomic interval with, running the recalibrator
@@ -743,6 +709,7 @@ def add_snps_gather_tranches_step(
 
     Returns: a Job object with one output j.out_tranches
     """
+    job_attrs = (job_attrs or {}) | {'tool': 'gatk GatherTranches'}
     j = b.new_job('VQSR: SNPGatherTranches', job_attrs)
     j.image(image_path('gatk'))
     res = STANDARD.set_resources(j, ncpu=2, storage_gb=disk_size)
@@ -760,24 +727,20 @@ def add_snps_gather_tranches_step(
     return j
 
 
-def add_apply_recalibration_step(
+def apply_recalibration_snps(
     b: hb.Batch,
     input_vcf: hb.ResourceGroup,
-    indels_recalibration: hb.ResourceGroup,
-    indels_tranches: hb.ResourceFile,
-    snps_recalibration: hb.ResourceGroup,
-    snps_tranches: hb.ResourceFile,
+    recalibration: hb.ResourceGroup,
+    tranches: hb.ResourceFile,
     disk_size: int,
     use_as_annotations: bool,
-    indel_filter_level: float,
-    snp_filter_level: float,
+    filter_level: float,
     interval: hb.Resource | None = None,
     output_vcf_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> Job:
     """
     Apply a score cutoff to filter variants based on a recalibration table.
-    Runs ApplyVQSR twice to apply first indel, then SNP recalibrations.
 
     Targets indel_filter_level and snp_filter_level sensitivities. The tool matches
     them internally to a VQSLOD score cutoff based on the model's estimated sensitivity
@@ -785,7 +748,7 @@ def add_apply_recalibration_step(
 
     The filter determination is not just a pass/fail process. The tool evaluates for
     each variant which "tranche", or slice of the dataset, it falls into in terms of
-    sensitivity to the truthset. Variants in tranches that fall below the specified
+    sensitivity to the truth-set. Variants in tranches that fall below the specified
     truth sensitivity filter level have their FILTER field annotated with the
     corresponding tranche level. This results in a callset that is filtered to the
     desired level but retains the information necessary to increase sensitivity
@@ -794,181 +757,90 @@ def add_apply_recalibration_step(
     Returns: a Job object with one ResourceGroup output j.output_vcf, corresponding
     to a VCF with tranche annotated in the FILTER field
     """
-    j = b.new_job('VQSR: ApplyVQSR', job_attrs)
+    job_attrs = (job_attrs or {}) | {'tool': 'gatk ApplyVQSR'}
+    j = b.new_job('VQSR: ApplyVQSR SNPs', job_attrs)
     j.image(image_path('gatk'))
     res = STANDARD.set_resources(j, ncpu=2, storage_gb=disk_size)
 
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
-
+    j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz'})
     assert isinstance(j.output_vcf, hb.ResourceGroup)
-    j.command(
-        f"""set -euo pipefail
-
-    df -h; pwd; du -sh $(dirname {j.output_vcf['vcf.gz']})
-
-    TMP_DIR=$(dirname {j.output_vcf['vcf.gz']})/tmp
-    mkdir $TMP_DIR
-
-    TMP_INDEL_RECALIBRATED=$BATCH_TMPDIR/tmp.indel.recalibrated.vcf.gz
+    cmd = f"""
     gatk --java-options -Xms{res.get_java_mem_mb()}m \\
-      ApplyVQSR \\
-      --tmp-dir $TMP_DIR \\
-      -O $TMP_INDEL_RECALIBRATED \\
-      -V {input_vcf['vcf.gz']} \\
-      --recal-file {indels_recalibration} \\
-      --tranches-file {indels_tranches} \\
-      --truth-sensitivity-filter-level {indel_filter_level} \\
-      --create-output-variant-index true \\
-      {f'-L {interval} ' if interval else ''} \\
-      {'--use-allele-specific-annotations ' if use_as_annotations else ''} \\
-      -mode INDEL
-      
-    df -h; pwd; du -sh $(dirname {j.output_vcf['vcf.gz']})
-
-    rm {input_vcf['vcf.gz']} {indels_recalibration} {indels_tranches}
-    rm -rf $TMP_DIR
-    mkdir $TMP_DIR
-
-    df -h; pwd; du -sh $(dirname {j.output_vcf['vcf.gz']})
-
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
-      ApplyVQSR \\
-      -O {j.output_vcf['vcf.gz']} \\
-      -V $TMP_INDEL_RECALIBRATED \\
-      --recal-file {snps_recalibration} \\
-      --tranches-file {snps_tranches} \\
-      --truth-sensitivity-filter-level {snp_filter_level} \\
-      --create-output-variant-index true \\
-      {f'-L {interval} ' if interval else ''} \\
-      {'--use-allele-specific-annotations ' if use_as_annotations else ''} \\
-      -mode SNP
-
-    df -h; pwd; du -sh $(dirname {j.output_vcf['vcf.gz']})
-      """
-    )
-
+    ApplyVQSR \\
+    -O {j.output_vcf['vcf.gz']} \\
+    -V {input_vcf['vcf.gz']} \\
+    --recal-file {recalibration} \\
+    --tranches-file {tranches} \\
+    --truth-sensitivity-filter-level {filter_level} \\
+    --create-output-variant-index true \\
+    {f'-L {interval} ' if interval else ''} \\
+    {'--use-allele-specific-annotations ' if use_as_annotations else ''} \\
+    -mode SNP
+    """
+    j.command(command(cmd, monitor_space=True))
     if output_vcf_path:
         b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
     return j
 
 
-def add_collect_metrics_sharded_step(
+def apply_recalibration_indels(
     b: hb.Batch,
     input_vcf: hb.ResourceGroup,
-    dbsnp_vcf: hb.ResourceGroup,
-    interval_list: hb.ResourceFile,
-    ref_dict: hb.ResourceFile,
+    recalibration: hb.ResourceGroup,
+    tranches: hb.ResourceFile,
     disk_size: int,
-    job_attrs: dict | None = None,
-):
-    """
-    Run CollectVariantCallingMetrics for site-level evaluation.
-
-    This method produces detailed and summary metrics report files. The summary metrics
-    provide cohort-level variant metrics and the detailed metrics segment variant
-    metrics for each sample in the callset. The detail metrics give the same metrics
-    as the summary metrics for the samples plus several additional metrics.
-
-    These are explained in detail at
-    https://broadinstitute.github.io/picard/picard-metric-definitions.html.
-
-    Returns: a `Job` object with a single ResourceGroup output j.metrics, with
-    j.metrics.detail_metrics and j.metrics.summary_metrics ResourceFiles
-    """
-    j = b.new_job('VQSR: CollectMetricsSharded', job_attrs)
-    j.image(image_path('gatk'))
-    res = STANDARD.set_resources(j, ncpu=2, storage_gb=disk_size)
-    j.declare_resource_group(
-        metrics={
-            'detail_metrics': '{root}.variant_calling_detail_metrics',
-            'summary_metrics': '{root}.variant_calling_summary_metrics',
-        }
-    )
-
-    j.command(
-        f"""set -euo pipefail
-
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
-      CollectVariantCallingMetrics \\
-      --INPUT {input_vcf['vcf.gz']} \\
-      --DBSNP {dbsnp_vcf.base} \\
-      --SEQUENCE_DICTIONARY {ref_dict} \\
-      --OUTPUT {j.metrics} \\
-      --THREAD_COUNT 8 \\
-      --TARGET_INTERVALS {interval_list}"""
-    )
-    return j
-
-
-def _add_variant_eval_step(
-    b: hb.Batch,
-    input_vcf: hb.ResourceGroup,
-    ref_fasta: hb.ResourceGroup,
-    dbsnp_vcf: hb.ResourceGroup,
-    disk_size: int,
-    output_path: str = None,
+    use_as_annotations: bool,
+    filter_level: float,
+    interval: hb.Resource | None = None,
+    output_vcf_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> Job:
     """
-    Run VariantEval for site-level evaluation.
-    Saves the QC to `output_path` bucket
+    Apply a score cutoff to filter variants based on a recalibration table.
+
+    Targets indel_filter_level and snp_filter_level sensitivities. The tool matches
+    them internally to a VQSLOD score cutoff based on the model's estimated sensitivity
+    to a set of true variants.
+
+    The filter determination is not just a pass/fail process. The tool evaluates for
+    each variant which "tranche", or slice of the dataset, it falls into in terms of
+    sensitivity to the truth-set. Variants in tranches that fall below the specified
+    truth sensitivity filter level have their FILTER field annotated with the
+    corresponding tranche level. This results in a callset that is filtered to the
+    desired level but retains the information necessary to increase sensitivity
+    if needed.
+
+    Returns: a Job object with one ResourceGroup output j.output_vcf, corresponding
+    to a VCF with tranche annotated in the FILTER field
     """
-    j = b.new_job('VQSR: VariantEval', job_attrs)
+    job_attrs = (job_attrs or {}) | {'tool': 'gatk ApplyVQSR'}
+    j = b.new_job('VQSR: ApplyVQSR INDEL', job_attrs)
     j.image(image_path('gatk'))
     res = STANDARD.set_resources(j, ncpu=2, storage_gb=disk_size)
 
-    j.command(
-        f"""set -euo pipefail
-
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
-      VariantEval \\
-      --eval {input_vcf['vcf.gz']} \\
-      -R {ref_fasta.base} \\
-      -D {dbsnp_vcf.base} \\
-      --output {j.output}"""
-    )
-    if output_path:
-        b.write_output(j.output, output_path)
-    return j
-
-
-def add_gather_variant_calling_metrics_step(
-    b: hb.Batch,
-    input_details: List[hb.ResourceGroup],
-    input_summaries: List[hb.ResourceGroup],
-    disk_size: int,
-    output_path_prefix: str = None,
-    job_attrs: dict | None = None,
-) -> Job:
-    """
-    Combines metrics from multiple CollectVariantCallingMetrics runs.
-
-    Returns: a `Job` object with a single ResourceGroup output j.metrics, with
-    j.metrics.detail_metrics and j.metrics.summary_metrics ResourceFiles
-
-    Saves the QC results to a bucket with the `output_path_prefix` prefix
-    """
-    j = b.new_job('VQSR: GatherVariantCallingMetrics', job_attrs)
-    j.image(image_path('gatk'))
-    res = STANDARD.set_resources(j, ncpu=2, storage_gb=disk_size)
     j.declare_resource_group(
-        metrics={
-            'detail_metrics': '{root}.variant_calling_detail_metrics',
-            'summary_metrics': '{root}.variant_calling_summary_metrics',
+        output_vcf={
+            'vcf.gz': '{root}.vcf.gz',
+            'vcf.gz.tbi': '{root}.vcf.gz.tbi',
         }
     )
+    assert isinstance(j.output_vcf, hb.ResourceGroup)
 
-    input_cmdl = ' '.join(f'--INPUT {f} ' for f in input_details + input_summaries)
-    j.command(
-        f"""set -euo pipefail
-
+    cmd = f"""\
     gatk --java-options -Xms{res.get_java_mem_mb()}m \\
-      AccumulateVariantCallingMetrics \\
-      {input_cmdl} \\
-      --OUTPUT {j.metrics}"""
-    )
-    if output_path_prefix:
-        b.write_output(j.metrics, output_path_prefix)
+    ApplyVQSR \\
+    --tmp-dir $BATCH_TMPDIR \\
+    -O {j.output_vcf['vcf.gz']} \\
+    -V {input_vcf['vcf.gz']} \\
+    --recal-file {recalibration} \\
+    --tranches-file {tranches} \\
+    --truth-sensitivity-filter-level {filter_level} \\
+    --create-output-variant-index true \\
+    {f'-L {interval} ' if interval else ''} \\
+    {'--use-allele-specific-annotations ' if use_as_annotations else ''} \\
+    -mode INDEL
+    """
+    j.command(command(cmd, monitor_space=True))
+    if output_vcf_path:
+        b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
     return j
