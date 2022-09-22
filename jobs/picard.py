@@ -315,14 +315,14 @@ def picard_hs_metrics(
     b,
     cram_path: CramPath,
     job_attrs: dict | None = None,
-    out_hs_metrics_path: Path | None = None,
+    out_picard_hs_metrics_path: Path | None = None,
     overwrite: bool = False,
 ) -> Job | None:
     """
     Run picard CollectHsMetrics metrics.
     Based on https://github.com/broadinstitute/warp/blob/master/tasks/broad/Qc.wdl#L528
     """
-    if can_reuse(out_hs_metrics_path, overwrite):
+    if can_reuse(out_picard_hs_metrics_path, overwrite):
         return None
 
     job_attrs = (job_attrs or {}) | {'tool': 'picard_CollectHsMetrics'}
@@ -335,31 +335,39 @@ def picard_hs_metrics(
     res.set_to_job(j)
     cram = cram_path.resource_group(b)
     reference = fasta_res_group(b)
-    targets_interval_file = b.read_input(
-        str(reference_path('broad/exome_targets_interval_list'))
-    )
-    bait_interval_file = b.read_input(
-        str(reference_path('broad/exome_bait_interval_list'))
+    interval_file = b.read_input(
+        str(reference_path('broad/exome_evaluation_interval_lists'))
     )
 
     cmd = f"""\
-    grep -v 
+    # Picard is strict about the interval-list file header - contigs md5s, etc. - and 
+    # if md5s do not match the ref.dict file, picard would crash. So fixing the header 
+    # by converting the interval-list to bed (i.e. effectively dropping the header) 
+    # and back to interval-list (effectively re-adding the header from input ref-dict).
+    # VALIDATION_STRINGENCY=SILENT does not help.
+    picard IntervalListToBed \\
+    I={interval_file} \\
+    O=$BATCH_TMPDIR/intervals.bed
+    picard BedToIntervalList \\
+    I=$BATCH_TMPDIR/intervals.bed \\
+    O=$BATCH_TMPDIR/intervals.interval_list \\
+    SD={reference.dict}
     
-    picard -Xmx{res.get_java_mem_mb()}m \
-      CollectHsMetrics \
-      INPUT={cram.cram} \
-      REFERENCE_SEQUENCE={reference.base} \
-      VALIDATION_STRINGENCY=SILENT \
-      TARGET_INTERVALS={targets_interval_file} \
-      BAIT_INTERVALS={bait_interval_file} \
-      METRIC_ACCUMULATION_LEVEL=null \
-      METRIC_ACCUMULATION_LEVEL=SAMPLE \
-      METRIC_ACCUMULATION_LEVEL=LIBRARY \
+    picard -Xmx{res.get_java_mem_mb()}m \\
+      CollectHsMetrics \\
+      INPUT={cram.cram} \\
+      REFERENCE_SEQUENCE={reference.base} \\
+      VALIDATION_STRINGENCY=SILENT \\
+      TARGET_INTERVALS=$BATCH_TMPDIR/intervals.interval_list \\
+      BAIT_INTERVALS=$BATCH_TMPDIR/intervals.interval_list \\
+      METRIC_ACCUMULATION_LEVEL=null \\
+      METRIC_ACCUMULATION_LEVEL=SAMPLE \\
+      METRIC_ACCUMULATION_LEVEL=LIBRARY \\
       OUTPUT={j.out_hs_metrics}
     """
 
     j.command(command(cmd))
-    b.write_output(j.out_hs_metrics, str(out_hs_metrics_path))
+    b.write_output(j.out_hs_metrics, str(out_picard_hs_metrics_path))
     return j
 
 
