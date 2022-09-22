@@ -18,7 +18,7 @@ from cpg_utils.workflows.workflow import (
 from jobs import align, somalier
 from jobs.align import Aligner, MarkDupTool, MissingAlignmentInputException
 from jobs.verifybamid import verifybamid
-from jobs.picard import picard_wgs_metrics, picard_collect_metrics
+from jobs.picard import picard_wgs_metrics, picard_collect_metrics, picard_hs_metrics
 
 
 @dataclasses.dataclass
@@ -90,6 +90,15 @@ def qc_functions() -> list[Qc]:
                 },
             )
         )
+    if sequencing_type == 'exome':
+        qcs.append(
+            Qc(
+                func=picard_hs_metrics,
+                outs={
+                    'picard_hs_metrics': QcOut('.picard-hs-metrics', 'picard/hsmetrics')
+                },
+            )
+        )
     return qcs
 
 
@@ -133,8 +142,6 @@ class Align(SampleStage):
                 ],
                 job_attrs=self.get_job_attrs(sample),
                 overwrite=not get_config()['workflow'].get('check_intermediates'),
-                aligner=Aligner.DRAGMAP,
-                markdup_tool=MarkDupTool.PICARD,
             )
         except MissingAlignmentInputException:
             if get_config()['workflow'].get('skip_samples_with_missing_input'):
