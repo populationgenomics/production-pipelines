@@ -1,6 +1,7 @@
 """
 Helper Hail Batch jobs useful for both individual and joint variant calling.
 """
+from typing import Literal
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
@@ -14,14 +15,21 @@ from cpg_utils.workflows.utils import can_reuse
 def subset_vcf(
     b: hb.Batch,
     vcf: hb.ResourceGroup,
-    interval: hb.ResourceFile,
+    interval: hb.ResourceFile | None = None,
+    variant_types: list[Literal['INDEL', 'SNP', 'MNP', 'MIXED']] | None = None,
     job_attrs: dict | None = None,
     output_vcf_path: Path | None = None,
 ) -> Job:
     """
     Subset VCF to provided intervals.
     """
+    if not interval and not variant_types:
+        raise ValueError(
+            'Either interval or variant_types must be defined for subset_vcf'
+        )
+
     job_name = 'Subset VCF'
+    job_attrs = (job_attrs or {}) | {'tool': 'gatk SelectVariants'}
     j = b.new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
     STANDARD.set_resources(j, ncpu=2)
@@ -31,11 +39,15 @@ def subset_vcf(
     )
     reference = fasta_res_group(b)
     assert isinstance(j.output_vcf, hb.ResourceGroup)
+    variant_types_param = ' '.join(
+        f'--select-type-to-include {vt}' for vt in (variant_types or [])
+    )
     cmd = f"""
     gatk SelectVariants \\
     -R {reference.base} \\
     -V {vcf['vcf.gz']} \\
-    -L {interval} \\
+    {f"-L {interval}" if interval else ''} \
+    {variant_types_param} \\
     -O {j.output_vcf['vcf.gz']}
     """
     j.command(
@@ -60,7 +72,11 @@ def gather_vcfs(
 ) -> tuple[Job | None, hb.ResourceGroup]:
     """
     Combines per-interval scattered VCFs into a single VCF.
-    Saves the output VCF to a bucket `output_vcf_path`
+    Saves the output VCF to a bucket `output_vcf_path`.
+
+    Requires all VCFs to be strictly distinct, so doesn't work well
+    for indels SelectVariants based on intervals from IntervalListTools,
+    as ond indel might span 2 intervals and would end up in both.
     """
     if out_vcf_path and can_reuse(out_vcf_path, overwrite):
         return None, b.read_input_group(
@@ -71,6 +87,7 @@ def gather_vcfs(
         )
 
     job_name = f'Gather {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
+    job_attrs = (job_attrs or {}) | {'tool': 'gatk GatherVcfsCloud'}
     j = b.new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
 
@@ -96,7 +113,11 @@ def gather_vcfs(
     --ignore-safety-checks \\
     --gather-type BLOCK \\
     {input_cmdl} \\
-    --output {j.output_vcf['vcf.gz']}
+    --output $BATCH_TMPDIR/gathered.vcf.gz
+
+    bcftools sort $BATCH_TMPDIR/gathered.vcf.gz -Oz \
+    -o {j.output_vcf['vcf.gz']}
+    
     tabix -p vcf {j.output_vcf['vcf.gz']}
     """
     j.command(command(cmd, monitor_space=True))
