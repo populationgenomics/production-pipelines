@@ -14,13 +14,14 @@ a channel with:
 import contextlib
 import logging
 import os
-from typing import Optional, List
+from typing import Optional
 
 import click
 import pandas as pd
 from peddy import Ped
 
 from cpg_utils import to_path
+from cpg_utils.config import get_config
 
 
 @click.command()
@@ -62,79 +63,58 @@ def main(
     """
     Report pedigree inconsistencies, given somalier outputs.
     """
-    pedlog = PedigreeLogger()
-    check_pedigree(
-        somalier_samples_fpath,
-        somalier_pairs_fpath,
-        expected_ped_fpath,
-        pedlog=pedlog,
+    run(
+        somalier_samples_fpath=somalier_samples_fpath,
+        somalier_pairs_fpath=somalier_pairs_fpath,
+        expected_ped_fpath=expected_ped_fpath,
+        html_url=html_url,
+        dataset=dataset,
+        title=title,
+        send_to_slack=send_to_slack,
     )
 
-    slack_channel = os.environ.get('SLACK_CHANNEL')
-    slack_token = os.environ.get('SLACK_TOKEN')
-    if send_to_slack and slack_token and slack_channel:
-        from slack_sdk.errors import SlackApiError
-        from slack_sdk import WebClient
 
-        slack_client = WebClient(token=slack_token)
-        try:
-            title = title or 'Somalier pedigree report'
-            text = f'*[{dataset}]* <{html_url}|{title}>\n'
-            text += '\n'.join(pedlog.messages)
-            slack_client.api_call(  # pylint: disable=duplicate-code
-                'chat.postMessage',
-                json={
-                    'channel': slack_channel,
-                    'text': text,
-                },
-            )
-        except SlackApiError as err:
-            logging.error(f'Error posting to Slack: {err}')
+_messages: list[str] = []
 
 
-class PedigreeLogger:
+def info(msg):
     """
-    Recording messages to send a report to Slack.
+    Record and forward.
     """
-
-    def __init__(self):
-        self.mismatching_sex = False
-        self.mismatching_relationships = False
-        self.messages: List[str] = []
-
-    def info(self, msg):
-        """
-        Record and forward.
-        """
-        self.messages.append(msg)
-        logging.info(msg)
-
-    def warning(self, msg):
-        """
-        Record and forward.
-        """
-        self.messages.append(msg)
-        logging.info(msg)
-
-    def error(self, msg):
-        """
-        Record and forward.
-        """
-        self.messages.append(msg)
-        logging.error(msg)
+    _messages.append(msg)
+    logging.info(msg)
 
 
-def check_pedigree(
+def warning(msg):
+    """
+    Record and forward.
+    """
+    _messages.append(msg)
+    logging.info(msg)
+
+
+def error(msg):
+    """
+    Record and forward.
+    """
+    _messages.append(msg)
+    logging.error(msg)
+
+
+def run(
     somalier_samples_fpath: str,
     somalier_pairs_fpath: str,
     expected_ped_fpath: str,
-    pedlog: Optional[PedigreeLogger] = None,
-) -> PedigreeLogger:
+    html_url: Optional[str] = None,
+    dataset: Optional[str] = None,
+    title: Optional[str] = None,
+    send_to_slack: bool = True,
+):
     """
     Report pedigree inconsistencies, given somalier outputs.
     """
-    print(os.getcwd())
-    print(somalier_samples_fpath)
+    logging.info(os.getcwd())
+    logging.info(somalier_samples_fpath)
     df = pd.read_csv(somalier_samples_fpath, delimiter='\t')
     pairs_df = pd.read_csv(somalier_pairs_fpath, delimiter='\t')
     with to_path(somalier_samples_fpath).open() as f:
@@ -142,19 +122,17 @@ def check_pedigree(
     with to_path(expected_ped_fpath).open() as f:
         expected_ped = Ped(f)
 
-    pedlog = pedlog or PedigreeLogger()
-
     bad = df.gt_depth_mean == 0.0
     if bad.any():
-        pedlog.warning(
+        warning(
             f'Excluded {len(df[bad])}/{len(df)} samples with zero '
             f'mean GT depth from pedigree/sex checks: {", ".join(df[bad].sample_id)}'
         )
-        pedlog.info('')
+        info('')
     bad_ids = list(df[bad].sample_id)  # for checking in pairs_df
     df = df[~bad]
 
-    pedlog.info(f'*Inferred vs. reported sex:*')
+    info(f'*Inferred vs. reported sex:*')
     # Rename Ped sex to human-readable tags
     df.sex = df.sex.apply(lambda x: {1: 'male', 2: 'female'}.get(x, 'unknown'))
     df.original_pedigree_sex = df.original_pedigree_sex.apply(
@@ -174,7 +152,7 @@ def check_pedigree(
 
     def _print_stats(df_filter):
         for _, row_ in df[df_filter].iterrows():
-            pedlog.info(
+            info(
                 f' {row_.sample_id} ('
                 f'provided: {row_.original_pedigree_sex}, '
                 f'inferred: {row_.sex}, '
@@ -182,29 +160,27 @@ def check_pedigree(
             )
 
     if mismatching_sex.any():
-        pedlog.info(
-            f'{len(df[mismatching_sex])}/{len(df)} PED samples with mismatching sex:'
-        )
+        info(f'{len(df[mismatching_sex])}/{len(df)} PED samples with mismatching sex:')
         _print_stats(mismatching_sex)
     if missing_provided_sex.any():
-        pedlog.info(
+        info(
             f'{len(df[missing_provided_sex])}/{len(df)} samples with missing provided sex:'
         )
         _print_stats(missing_provided_sex)
     if missing_inferred_sex.any():
-        pedlog.info(
+        info(
             f'{len(df[missing_inferred_sex])}/{len(df)} samples with failed inferred sex:'
         )
         _print_stats(missing_inferred_sex)
     inferred_cnt = len(df[~missing_inferred_sex])
     matching_cnt = len(df[matching_sex])
-    pedlog.info(
+    info(
         f'Sex inferred for {inferred_cnt}/{len(df)} samples, matching '
         f'for {matching_cnt if matching_cnt != inferred_cnt else "all"} samples.'
     )
-    pedlog.info('')
+    info('')
 
-    pedlog.info(f'*Relatedness:*')
+    info(f'*Relatedness:*')
     expected_ped_sample_by_id = {s.sample_id: s for s in expected_ped.samples()}
     inferred_ped_sample_by_id = {s.sample_id: s for s in inferred_ped.samples()}
 
@@ -266,23 +242,23 @@ def check_pedigree(
         pairs_df.loc[idx, 'inferred_rel'] = inferred_rel
 
     if mismatching_unrelated_to_related:
-        pedlog.info(
+        info(
             f'Found {len(mismatching_unrelated_to_related)} '
             f'sample pair(s) that are provided as unrelated, are inferred as '
             f'related:'
         )
         for i, pair in enumerate(mismatching_unrelated_to_related):
-            pedlog.info(f' {i + 1}. {pair}')
+            info(f' {i + 1}. {pair}')
     if mismatching_related_to_unrelated:
-        pedlog.info(
+        info(
             f'Found {len(mismatching_related_to_unrelated)} sample pair(s) '
             f'that are provided as related, but inferred as unrelated:'
         )
         for i, pair in enumerate(mismatching_related_to_unrelated):
-            pedlog.info(f' {i + 1}. {pair}')
+            info(f' {i + 1}. {pair}')
     if not mismatching_unrelated_to_related and not mismatching_related_to_unrelated:
-        pedlog.info(f'Inferred pedigree matches for all provided related pairs.')
-    pedlog.info('')
+        info(f'Inferred pedigree matches for all provided related pairs.')
+    info('')
 
     print_contents(
         df,
@@ -291,9 +267,30 @@ def check_pedigree(
         somalier_pairs_fpath,
     )
 
-    pedlog.mismatching_sex = mismatching_sex.any()
-    pedlog.mismatching_relationships = mismatching_related_to_unrelated
-    return pedlog
+    # Constructing Slack message
+    if dataset and html_url:
+        title = f'*[{dataset}]* <{html_url}|{title or "Somalier pedigree report"}>'
+    elif not title:
+        title = 'Somalier pedigree report'
+    text = '\n'.join([title] + _messages)
+
+    slack_channel = get_config().get('slack', {}).get('channel')
+    slack_token = os.environ.get('SLACK_TOKEN')
+    if send_to_slack and slack_token and slack_channel:
+        from slack_sdk.errors import SlackApiError
+        from slack_sdk import WebClient
+
+        slack_client = WebClient(token=slack_token)
+        try:
+            slack_client.api_call(  # pylint: disable=duplicate-code
+                'chat.postMessage',
+                json={
+                    'channel': slack_channel,
+                    'text': text,
+                },
+            )
+        except SlackApiError as err:
+            logging.error(f'Error posting to Slack: {err}')
 
 
 def print_contents(

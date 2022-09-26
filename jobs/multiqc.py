@@ -4,8 +4,6 @@
 Batch pipeline to run WGS QC.
 """
 
-import logging
-
 from cpg_utils.workflows.utils import rich_sample_id_seds
 from hailtop.batch.job import Job
 from hailtop.batch import Batch, ResourceFile
@@ -16,7 +14,7 @@ from cpg_utils import Path
 from cpg_utils.workflows.resources import STANDARD
 from cpg_utils.workflows.targets import Dataset
 
-from .python_scripts import check_multiqc
+from python_scripts import check_multiqc
 
 
 def multiqc(
@@ -143,20 +141,22 @@ def check_report_job(
 ) -> Job:
     """
     Run job that checks MultiQC JSON result and sends a Slack notification
-    about failed sampels.
+    about failed samples.
     """
     title = 'MultiQC'
     if label:
         title += f' [{label}]'
     check_j = b.new_job(f'{title} check', (job_attrs or {}) | dict(tool='python'))
     STANDARD.set_resources(check_j, ncpu=2)
-    check_j.image(image_path('cpg-pipes'))
+    check_j.image(image_path('hail'))
 
     script_path = to_path(check_multiqc.__file__)
     script_name = script_path.name
     cmd = f"""\
     {rich_sample_id_seds(rich_id_map, [multiqc_json_file])
     if rich_id_map else ''}
+
+    pip install cpg_utils
     python3 {script_name} \\
     --multiqc-json {multiqc_json_file} \\
     --html-url {multiqc_html_url} \\

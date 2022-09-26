@@ -39,7 +39,7 @@ def get_intervals(
     Note that we use the mode INTERVAL_SUBDIVISION instead of
     BALANCING_WITHOUT_INTERVAL_SUBDIVISION_WITH_OVERFLOW. Modes other than
     INTERVAL_SUBDIVISION produce an unpredictable number of intervals. WDL can
-    handle that, but Hail Batch is not dynamic and have to expect certain number
+    handle that, but Hail Batch is not dynamic and expects a certain number
     of output files.
     """
     assert scatter_count > 0, scatter_count
@@ -52,24 +52,21 @@ def get_intervals(
         # Special case when we don't need to split
         return None, [b.read_input(str(source_intervals_path))]
 
-    if output_prefix and (output_prefix / '1.interval_list').exists():
+    if output_prefix and exists(output_prefix / '1.interval_list'):
         return None, [
             b.read_input(str(output_prefix / f'{idx + 1}.interval_list'))
             for idx in range(scatter_count)
         ]
 
-    if (
-        not source_intervals_path
-        and (
-            (
-                existing_split_intervals_prefix := (
-                    reference_path('intervals_prefix')
-                    / sequencing_type
-                    / f'{scatter_count}intervals'
-                )
+    if not source_intervals_path and exists(
+        (
+            existing_split_intervals_prefix := (
+                reference_path('intervals_prefix')
+                / sequencing_type
+                / f'{scatter_count}intervals'
             )
-            / '1.interval_list'
-        ).exists()
+        )
+        / '1.interval_list'
     ):
         # We already have split intervals for this sequencing_type:
         return None, [
@@ -196,7 +193,7 @@ def vcf_qc(
     if output_summary_path and can_reuse(output_detail_path, overwrite):
         return None
 
-    job_attrs = (job_attrs or {}) | {'tool': 'picard_CollectVariantCallingMetrics'}
+    job_attrs = (job_attrs or {}) | {'tool': 'picard CollectVariantCallingMetrics'}
     j = b.new_job('CollectVariantCallingMetrics', job_attrs)
     j.image(image_path('picard'))
     res = STANDARD.set_resources(j, storage_gb=20, mem_gb=3)

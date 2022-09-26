@@ -23,8 +23,8 @@ EXCLUDE_KEYS = [
 
 
 @click.command()
-@click.option('--docker_json_url', default=DOCKERS_URL)
-def main(docker_json_url: str):
+@click.option('--dockers-json-url', default=DOCKERS_URL)
+def main(dockers_json_url: str):
     """
     Copies each docker image
     """
@@ -33,28 +33,26 @@ def main(docker_json_url: str):
         check=True,
     )
 
-    response = urlopen(docker_json_url)
-    docker_json = json.loads(response.read())
-    docker_json.pop('name')
+    response = urlopen(dockers_json_url)
+    dockers_json = json.loads(response.read())
+    dockers_json.pop('name')
 
-    cpg_docker_dict = {}
-    for i, key in enumerate(docker_json):
-        print(f'#{i}: copying {key}: {docker_json[key]}')
+    config_section = {}
+    for i, key in enumerate(dockers_json):
+        image_name = dockers_json[key].split('/')[-1]
+        cpg_ar_path = (
+            'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/' + image_name
+        )
+        print(f'#{i}: copying {key}: {dockers_json[key]} to {cpg_ar_path}')
         if key in EXCLUDE_KEYS:
             print('excluding')
             continue
-        initial_path = 'docker://' + docker_json[key]
-        docker_image = docker_json[key].split('/')[-1]
-        cpg_ar_path = (
-            'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/' + docker_image
-        )
-        destination_path = 'docker://' + cpg_ar_path
-        cpg_docker_dict[key] = cpg_ar_path
-        subprocess.run(
-            f'skopeo copy {initial_path} {destination_path}', shell=True, check=True
-        )
+        src_path = 'docker://' + dockers_json[key]
+        dst_path = 'docker://' + cpg_ar_path
+        subprocess.run(f'skopeo copy {src_path} {dst_path}', shell=True, check=True)
+        config_section[key] = image_name
 
-    print(toml.dumps(cpg_docker_dict))
+    print(toml.dumps(config_section))
 
 
 if __name__ == '__main__':

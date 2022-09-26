@@ -1,3 +1,2 @@
 [workflow]
 sequencing_type = 'exome'
-last_stage = 'Genotype'
