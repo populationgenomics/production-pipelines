@@ -454,7 +454,25 @@ class ClusterBatch(DatasetStage):
         Clustered SV VCFs
         Clustered depth-only call VCF
         """
-        pass
+
+        d: dict[str, Path] = dict()
+        # TODO: Fill in fnames
+        fname_by_key = {
+            'clustered_depth_vcf' : '',
+            'clustered_depth_vcf_index' : '',
+            'clustered_manta_vcf' : '',
+            'clustered_manta_vcf_index' : '',
+            'clustered_wham_vcf' : '',
+            'clustered_wham_vcf_index' : '',
+            'clustered_melt_vcf' : '',
+            'clustered_melt_vcf_index' : '',
+            'clustered_scramble_vcf' : '',
+            'clustered_scramble_vcf_index' : '',
+            'metrics_file_clusterbatch' : '', 
+        }
+        for key, fname in fname_by_key.items():
+            d[key] = dataset.prefix() / 'gatk_sv' / self.name.lower() / fname
+        return d
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
@@ -462,6 +480,61 @@ class ClusterBatch(DatasetStage):
         Standardized call VCFs (GatherBatchEvidence)
         Depth-only (DEL/DUP) calls (GatherBatchEvidence)
         """
+
+        # d = inputs.as_dict_by_target(GatherBatchEvidence)
+
+        # sids = dataset.get_sample_ids()
+
+        input_dict: dict[str, Any] = {
+            'batch': dataset.name,
+            'ped_file': str(
+                dataset.write_ped_file(dataset.tmp_prefix() / 'samples.ped')
+            ),
+        }
+
+        # TODO: Define del_bed gs://gatk-sv-ref-panel-1kg/outputs/GATKSVPipelineBatch/38c65ca4-2a07-4805-86b6-214696075fef/call-GATKSVPipelinePhase1/GATKSVPipelinePhase1/acce2c71-7458-4205-ae13-624f6efc9956/call-GatherBatchEvidence/GatherBatchEvidence/366e817a-feb2-4d3c-915c-a8bd25529b81/call-MergeDepth/MergeDepth/b58e04ee-846d-4be6-bba3-6dda2f2c995e/call-MergeSet_del/cacheCopy/ref_panel_1kg.DEL.bed.gz"
+        # TODO: Define dup_bed "gs://gatk-sv-ref-panel-1kg/outputs/GATKSVPipelineBatch/38c65ca4-2a07-4805-86b6-214696075fef/call-GATKSVPipelinePhase1/GATKSVPipelinePhase1/acce2c71-7458-4205-ae13-624f6efc9956/call-GatherBatchEvidence/GatherBatchEvidence/366e817a-feb2-4d3c-915c-a8bd25529b81/call-MergeDepth/MergeDepth/b58e04ee-846d-4be6-bba3-6dda2f2c995e/call-MergeSet_dup/cacheCopy/ref_panel_1kg.DUP.bed.gz",
+
+        # TODO: Define wham_vcf_tar, manta_vcf_tar
+
+        input_dict['depth_exclude_overlap_fraction'] = 0.5
+        input_dict['depth_interval_overlap'] = 0.8
+        input_dict['depth_clustering_algorithm'] = 'SINGLE_LINKAGE'
+        input_dict['pesr_interval_overlap'] = 0.1
+        input_dict['pesr_breakend_window'] = 300
+        input_dict['pesr_clustering_algorithm'] = 'SINGLE_LINKAGE'
+
+        input_dict |= get_images(
+            [
+                'sv_base_mini_docker',
+                'sv_pipeline_docker',
+                'linux_docker',
+                'gatk_docker',
+                'sv_pipeline_base_docker'
+            ]
+        )
+
+        input_dict |= get_references(
+            [
+                'reference_fasta',  # ref_fasta
+                'reference_fasta_fai',  # reference_index 
+                'contig_list',  # primary_contigs_list
+                'reference_dict',
+                'pesr_exclude_intervals',  # pesr_exclude_list
+                'depth_exclude_intervals',  # depth_exclude_list
+                
+            ]
+        )
+
+        expected_d = self.expected_outputs(dataset)
+        output_dict, j = add_gatk_sv_job(
+            batch=self.b,
+            dataset=dataset,
+            wfl_name=self.name,
+            input_dict=input_dict,
+            expected_out_dict=expected_d,
+        )
+        return self.make_outputs(dataset, data=output_dict, jobs=[j])
 
 
 @click.command()
@@ -474,7 +547,7 @@ def main(config_paths: list[str]):
     if _cpg_config_path_env_var := os.environ.get('CPG_CONFIG_PATH'):
         config_paths = _cpg_config_path_env_var.split(',') + config_paths
     set_config_paths(list(config_paths))
-    get_workflow().run(stages=[GatherSampleEvidence])
+    get_workflow().run(stages=[GatherBatchEvidence])
 
 
 if __name__ == '__main__':
