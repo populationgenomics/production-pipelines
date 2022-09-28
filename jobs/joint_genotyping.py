@@ -296,6 +296,35 @@ def genomicsdb(
     return j
 
 
+def joint_calling_storage_gb(
+    n_samples: int, sequencing_type: str, scatter_count: int
+) -> int:
+    """
+    Calculate storage for a joint calling job, to fit a joint-called VCF
+    and a genomics db. The required storage grows with a number of samples,
+    but sublinearly.
+    >>> joint_calling_storage_gb(1, 'genome')
+    26
+    >>> joint_calling_storage_gb(50, 'genome')
+    26
+    >>> joint_calling_storage_gb(100, 'genome')
+    86
+    >>> joint_calling_storage_gb(200, 'genome')
+    226
+    >>> joint_calling_storage_gb(10000, 'genome')
+    486
+    """
+    disk_gb = 26  # Minimal disk (default for a 4-cpu standard machine)
+    if n_samples >= 50:
+        # for every 10x samples (starting from 50), add {multiplier}G
+        multiplier = {
+            'genome': 200,
+            'exome': 20,
+        }[sequencing_type]
+        disk_gb += int(multiplier * math.log(n_samples / 50, 10))
+    return min(1000, disk_gb)  # requesting 1T max
+
+
 def _add_joint_genotyper_job(
     b: hb.Batch,
     genomicsdb_path: Path,
@@ -334,8 +363,11 @@ def _add_joint_genotyper_job(
     j = b.new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
     res = STANDARD.request_resources(ncpu=4)
-    # 4G (fasta+fai+dict) + 4G per sample divided by the number of intervals:
-    res.attach_disk_storage_gb = 4 + number_of_samples * 4 // scatter_count
+    res.attach_disk_storage_gb = joint_calling_storage_gb(
+        number_of_samples,
+        get_config()['workflow']['sequencing_type'],
+        scatter_count,
+    )
     res.set_to_job(j)
 
     j.declare_resource_group(
