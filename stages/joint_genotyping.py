@@ -113,14 +113,24 @@ class JointVcfHappy(SampleStage):
     Run Happy to validate validation samples in joint VCF
     """
 
-    def expected_outputs(self, sample: Sample) -> Path:
+    def expected_outputs(self, sample: Sample) -> Path | None:
         """
         Parsed by MultiQC: '*.summary.csv'
         https://multiqc.info/docs/#hap.py
         """
+        if sample.participant_id not in get_config().get('validation', {}).get(
+            'sample_map', {}
+        ):
+            return None
+
         h = self.cohort.alignment_inputs_hash()
-        prefix = self.cohort.analysis_dataset.prefix() / 'qc' / 'jc' / 'happy'
-        return prefix / f'{h}-{sample.id}.summary.csv'
+        return (
+            self.cohort.analysis_dataset.prefix()
+            / 'qc'
+            / 'jc'
+            / 'hap.py'
+            / f'{h}-{sample.id}.summary.csv'
+        )
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """Queue jobs"""
@@ -131,8 +141,8 @@ class JointVcfHappy(SampleStage):
             sample=sample,
             vcf_or_gvcf=self.b.read_input_group(
                 **{
-                    'vcf': str(vcf_path),
-                    'vcf.tbi': str(vcf_path) + '.tbi',
+                    'vcf.gz': str(vcf_path),
+                    'vcf.gz.tbi': str(vcf_path) + '.tbi',
                 }
             ),
             is_gvcf=False,
