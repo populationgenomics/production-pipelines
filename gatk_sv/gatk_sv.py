@@ -460,17 +460,17 @@ class ClusterBatch(DatasetStage):
         d: dict[str, Path] = dict()
         # TODO: Fill in fnames
         fname_by_key = {
-            'clustered_depth_vcf' : '',
-            'clustered_depth_vcf_index' : '',
-            'clustered_manta_vcf' : '',
-            'clustered_manta_vcf_index' : '',
-            'clustered_wham_vcf' : '',
-            'clustered_wham_vcf_index' : '',
-            'clustered_melt_vcf' : '',
-            'clustered_melt_vcf_index' : '',
-            'clustered_scramble_vcf' : '',
-            'clustered_scramble_vcf_index' : '',
-            'metrics_file_clusterbatch' : '', 
+            'clustered_depth_vcf': '',
+            'clustered_depth_vcf_index': '',
+            'clustered_manta_vcf': '',
+            'clustered_manta_vcf_index': '',
+            'clustered_wham_vcf': '',
+            'clustered_wham_vcf_index': '',
+            'clustered_melt_vcf': '',
+            'clustered_melt_vcf_index': '',
+            'clustered_scramble_vcf': '',
+            'clustered_scramble_vcf_index': '',
+            'metrics_file_clusterbatch': '',
         }
         for key, fname in fname_by_key.items():
             d[key] = dataset.prefix() / 'gatk_sv' / self.name.lower() / fname
@@ -512,19 +512,18 @@ class ClusterBatch(DatasetStage):
                 'sv_pipeline_docker',
                 'linux_docker',
                 'gatk_docker',
-                'sv_pipeline_base_docker'
+                'sv_pipeline_base_docker',
             ]
         )
 
         input_dict |= get_references(
             [
                 'reference_fasta',  # ref_fasta
-                'reference_fasta_fai',  # reference_index 
+                'reference_fasta_fai',  # reference_index
                 'contig_list',  # primary_contigs_list
                 'reference_dict',
                 'pesr_exclude_intervals',  # pesr_exclude_list
                 'depth_exclude_intervals',  # depth_exclude_list
-                
             ]
         )
 
@@ -544,6 +543,7 @@ class GenerateBatchMetrics(DatasetStage):
     """
     https://github.com/broadinstitute/gatk-sv#gatherbatchmetrics
     """
+
     def expected_outputs(self, dataset: Dataset) -> ExpectedResultT:
         """
         Generates variant metrics for filtering.
@@ -559,7 +559,7 @@ class GenerateBatchMetrics(DatasetStage):
         Clustered depth-only call VCF (ClusterBatch)
         """
 
-        pass 
+        pass
 
 
 @stage(required_stages=GenerateBatchMetrics)
@@ -567,6 +567,7 @@ class FilterBatch(DatasetStage):
     """
     https://github.com/broadinstitute/gatk-sv#filterbatch
     """
+
     def expected_outputs(self, dataset: Dataset) -> ExpectedResultT:
         """
         Filtered SV (non-depth-only a.k.a. "PESR") VCF with outlier samples excluded
@@ -584,7 +585,7 @@ class FilterBatch(DatasetStage):
         Clustered SV and depth-only call VCFs (ClusterBatch)
         """
 
-        pass 
+        pass
 
 
 @stage(required_stages=FilterBatch)
@@ -592,6 +593,7 @@ class MergeBatchSites(CohortStage):
     """
     https://github.com/broadinstitute/gatk-sv#mergebatchsites
     """
+
     def expected_outputs(self, cohort: Cohort) -> ExpectedResultT:
         """
         Combined cohort PESR and depth VCFs
@@ -605,7 +607,7 @@ class MergeBatchSites(CohortStage):
         List of filtered depth VCFs (FilterBatch)
         """
 
-        pass 
+        pass
 
 
 @stage(required_stages=[GatherBatchEvidence, FilterBatch, MergeBatchSites])
@@ -613,10 +615,11 @@ class GenotypeBatch(CohortStage):
     """
     https://github.com/broadinstitute/gatk-sv#genotypebatch
     """
+
     def expected_outputs(self, cohort: Cohort) -> ExpectedResultT:
         """
         Genotypes a batch of samples across unfiltered variants combined across all batches.
-        Outputs: 
+        Outputs:
         Filtered SV (non-depth-only a.k.a. "PESR") VCF with outlier samples excluded
         Filtered depth-only call VCF with outlier samples excluded
         PED file with outlier samples excluded
@@ -634,7 +637,7 @@ class GenotypeBatch(CohortStage):
         Batch read count, PE, and SR files (GatherBatchEvidence)
         """
 
-        pass 
+        pass
 
 
 @click.command()
@@ -647,7 +650,7 @@ def main(config_paths: list[str]):
     if _cpg_config_path_env_var := os.environ.get('CPG_CONFIG_PATH'):
         config_paths = _cpg_config_path_env_var.split(',') + config_paths
     set_config_paths(list(config_paths))
-    get_workflow().run(stages=[GatherBatchEvidence])
+    get_workflow().run(stages=[EvidenceQC])
 
 
 if __name__ == '__main__':
