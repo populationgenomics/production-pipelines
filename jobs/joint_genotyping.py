@@ -3,6 +3,7 @@ Create Hail Batch jobs for joint genotyping.
 """
 
 import logging
+import math
 from enum import Enum
 
 import pandas as pd
@@ -58,11 +59,11 @@ def make_joint_genotyping_jobs(
         )
     logging.info(f'Submitting joint-calling jobs')
 
-    if get_config()['workflow']['sequencing_type'] == 'genome':
-        scatter_count = max(2, len(gvcf_by_sid) // 10)
-    else:
-        assert get_config()['workflow']['sequencing_type'] == 'exome'
-        scatter_count = max(2, len(gvcf_by_sid) // 1000)
+    scatter_count = 50
+    if len(gvcf_by_sid) > 300:
+        scatter_count = 100
+    if len(gvcf_by_sid) > 1000:
+        scatter_count = 200
 
     jobs: list[Job] = []
     intervals_j, intervals = get_intervals(
@@ -70,7 +71,7 @@ def make_joint_genotyping_jobs(
         source_intervals_path=intervals_path,
         scatter_count=scatter_count,
         job_attrs=job_attrs,
-        output_prefix=tmp_bucket / 'intervals',
+        output_prefix=tmp_bucket / f'intervals_{scatter_count}',
     )
     if intervals_j:
         jobs.append(intervals_j)
@@ -137,8 +138,8 @@ def make_joint_genotyping_jobs(
 
         # For small callsets, we don't apply the ExcessHet filtering anyway
         if len(gvcf_by_sid) >= 1000 and do_filter_excesshet:
-            logging.info(f'Queueing exccess het filter job')
-            exccess_filter_j, exccess_filter_jc_vcf = _add_excess_het_filter(
+            logging.info(f'Queueing excess het filter job')
+            excess_filter_j, excess_filter_jc_vcf = _add_excess_het_filter(
                 b,
                 input_vcf=jc_vcf,
                 interval=interval,
@@ -146,11 +147,11 @@ def make_joint_genotyping_jobs(
                 output_vcf_path=filt_jc_vcf_path,
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             )
-            if exccess_filter_j:
-                jobs.append(exccess_filter_j)
+            if excess_filter_j:
+                jobs.append(excess_filter_j)
                 if jc_vcf_j:
-                    exccess_filter_j.depends_on(jc_vcf_j)
-            vcfs.append(exccess_filter_jc_vcf['vcf.gz'])
+                    excess_filter_j.depends_on(jc_vcf_j)
+            vcfs.append(excess_filter_jc_vcf['vcf.gz'])
         else:
             vcfs.append(jc_vcf['vcf.gz'])
 
