@@ -560,6 +560,31 @@ class GenerateBatchMetrics(DatasetStage):
         pass 
 
 
+@stage(required_stages=GenerateBatchMetrics)
+class FilterBatch(DatasetStage):
+    """
+    https://github.com/broadinstitute/gatk-sv#filterbatch
+    """
+    def expected_outputs(self, dataset: Dataset) -> ExpectedResultT:
+        """
+        Filtered SV (non-depth-only a.k.a. "PESR") VCF with outlier samples excluded
+        Filtered depth-only call VCF with outlier samples excluded
+        Random forest cutoffs file
+        PED file with outlier samples excluded
+        """
+        pass
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """
+        Inputs:
+        Batch PED file
+        Metrics file (GenerateBatchMetrics)
+        Clustered SV and depth-only call VCFs (ClusterBatch)
+        """
+
+        pass 
+
+
 @click.command()
 @click.argument('config_paths', nargs=-1)
 def main(config_paths: list[str]):
