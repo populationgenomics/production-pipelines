@@ -537,6 +537,29 @@ class ClusterBatch(DatasetStage):
         return self.make_outputs(dataset, data=output_dict, jobs=[j])
 
 
+@stage(required_stages=ClusterBatch)
+class GenerateBatchMetrics(DatasetStage):
+    """
+    https://github.com/broadinstitute/gatk-sv#gatherbatchmetrics
+    """
+    def expected_outputs(self, dataset: Dataset) -> ExpectedResultT:
+        """
+        Generates variant metrics for filtering.
+        """
+        pass
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """
+        Inputs:
+        Combined read count matrix, SR, PE, and BAF files (GatherBatchEvidence)
+        Per-sample median coverage estimates (GatherBatchEvidence)
+        Clustered SV VCFs (ClusterBatch)
+        Clustered depth-only call VCF (ClusterBatch)
+        """
+
+        pass 
+
+
 @click.command()
 @click.argument('config_paths', nargs=-1)
 def main(config_paths: list[str]):
