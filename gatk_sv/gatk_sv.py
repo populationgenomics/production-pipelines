@@ -44,10 +44,12 @@ from cpg_utils.workflows.workflow import (
     SampleStage,
     StageOutput,
     DatasetStage,
+    CohortStage,
     StageInput,
     ExpectedResultT,
     Sample,
     Dataset,
+    Cohort,
     get_workflow,
 )
 
@@ -580,6 +582,56 @@ class FilterBatch(DatasetStage):
         Batch PED file
         Metrics file (GenerateBatchMetrics)
         Clustered SV and depth-only call VCFs (ClusterBatch)
+        """
+
+        pass 
+
+
+@stage(required_stages=FilterBatch)
+class MergeBatchSites(CohortStage):
+    """
+    https://github.com/broadinstitute/gatk-sv#mergebatchsites
+    """
+    def expected_outputs(self, cohort: Cohort) -> ExpectedResultT:
+        """
+        Combined cohort PESR and depth VCFs
+        """
+        pass
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        """
+        Inputs:
+        List of filtered PESR VCFs (FilterBatch)
+        List of filtered depth VCFs (FilterBatch)
+        """
+
+        pass 
+
+
+@stage(required_stages=[GatherBatchEvidence, FilterBatch, MergeBatchSites])
+class GenotypeBatch(CohortStage):
+    """
+    https://github.com/broadinstitute/gatk-sv#genotypebatch
+    """
+    def expected_outputs(self, cohort: Cohort) -> ExpectedResultT:
+        """
+        Genotypes a batch of samples across unfiltered variants combined across all batches.
+        Outputs: 
+        Filtered SV (non-depth-only a.k.a. "PESR") VCF with outlier samples excluded
+        Filtered depth-only call VCF with outlier samples excluded
+        PED file with outlier samples excluded
+        List of SR pass variants
+        List of SR fail variants
+        (Optional) Depth re-genotyping intervals list
+        """
+        pass
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        """
+        Inputs:
+        Batch PESR and depth VCFs (FilterBatch)
+        Cohort PESR and depth VCFs (MergeBatchSites)
+        Batch read count, PE, and SR files (GatherBatchEvidence)
         """
 
         pass 
