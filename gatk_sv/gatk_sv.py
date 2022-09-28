@@ -492,7 +492,9 @@ class ClusterBatch(DatasetStage):
             ),
         }
 
-        # TODO: Define del_bed, del_dup output from GatherBatchEvidence
+        # TODO: Define del_bed, del_dup  gs://gatk-sv-ref-panel-1kg/outputs/GATKSVPipelineBatch/38c65ca4-2a07-4805-86b6-214696075fef/call-GATKSVPipelinePhase1/GATKSVPipelinePhase1/acce2c71-7458-4205-ae13-624f6efc9956/call-GatherBatchEvidence/GatherBatchEvidence/366e817a-feb2-4d3c-915c-a8bd25529b81/call-MergeDepth/MergeDepth/b58e04ee-846d-4be6-bba3-6dda2f2c995e/call-MergeSet_del/cacheCopy/ref_panel_1kg.DEL.bed.gz"
+        # TODO: Define dup_bed "gs://gatk-sv-ref-panel-1kg/outputs/GATKSVPipelineBatch/38c65ca4-2a07-4805-86b6-214696075fef/call-GATKSVPipelinePhase1/GATKSVPipelinePhase1/acce2c71-7458-4205-ae13-624f6efc9956/call-GatherBatchEvidence/GatherBatchEvidence/366e817a-feb2-4d3c-915c-a8bd25529b81/call-MergeDepth/MergeDepth/b58e04ee-846d-4be6-bba3-6dda2f2c995e/call-MergeSet_dup/cacheCopy/ref_panel_1kg.DUP.bed.gz",
+
         # TODO: Define wham_vcf_tar, manta_vcf_tar
 
         input_dict['depth_exclude_overlap_fraction'] = 0.5
