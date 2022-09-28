@@ -84,10 +84,10 @@ def haplotype_caller(
         if intervals is None:
             intervals_j, intervals = get_intervals(
                 b=b,
-                source_intervals_path=get_config()['workflow'].get('intervals_path'),
                 scatter_count=scatter_count,
+                source_intervals_path=get_config()['workflow'].get('intervals_path'),
                 job_attrs=job_attrs,
-                output_prefix=tmp_prefix / 'intervals',
+                output_prefix=tmp_prefix / f'intervals_{scatter_count}',
             )
             if intervals_j:
                 jobs.append(intervals_j)
