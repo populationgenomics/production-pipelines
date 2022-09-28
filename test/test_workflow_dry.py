@@ -117,4 +117,4 @@ def test_workflow_dry(mocker: MockFixture, tmpdir: str):
         get_batch().job_by_tool['picard CollectVariantCallingMetrics']['job_n']
         == len(cohort.get_samples()) + 1
     )
-    assert get_batch().job_by_tool['gatk GenomicsDBImport']['job_n'] == 2
+    assert get_batch().job_by_tool['gatk GenomicsDBImport']['job_n'] == 50
