@@ -1,4 +1,4 @@
-cpg-utils[workflows]
+cpg-utils
 analysis-runner
 cpg-gnomad
 pandas
