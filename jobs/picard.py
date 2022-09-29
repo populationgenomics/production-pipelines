@@ -78,7 +78,7 @@ def get_intervals(
 
     j = b.new_job(
         f'Make {scatter_count} intervals for {sequencing_type}',
-        attributes=(job_attrs or {}) | dict(tool='picard_IntervalListTools'),
+        attributes=(job_attrs or {}) | dict(tool='picard IntervalListTools'),
     )
     j.image(image_path('picard'))
     STANDARD.set_resources(j, storage_gb=16, mem_gb=2)

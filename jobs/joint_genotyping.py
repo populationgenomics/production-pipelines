@@ -175,6 +175,7 @@ def make_joint_genotyping_jobs(
             out_vcf_path=out_vcf_path,
             site_only=False,
             gvcf_count=len(gvcf_by_sid),
+            job_attrs=job_attrs,
         )
         if gather_j:
             gather_j.name = f'Joint genotyping: {gather_j.name}'
@@ -360,6 +361,7 @@ def _add_joint_genotyper_job(
             }
         )
     job_name = f'Joint genotyping: {tool.name}'
+    job_attrs = (job_attrs or {}) | {'tool': f'gatk {tool.name}'}
     j = b.new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
     res = STANDARD.request_resources(ncpu=4)
@@ -507,6 +509,7 @@ def _add_make_sitesonly_job(
         )
 
     job_name = 'Joint genotyping: MakeSitesOnlyVcf'
+    job_attrs = (job_attrs or {}) | {'tool': 'gatk MakeSitesOnlyVcf'}
     j = b.new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
     j.memory('8G')

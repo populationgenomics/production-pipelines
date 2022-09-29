@@ -44,7 +44,7 @@ def vep_jobs(
         assert str(out_path).endswith('.vcf.gz'), out_path
 
     if out_path and can_reuse(out_path, overwrite):
-        return [b.new_job('VEP [reuse]', job_attrs)]
+        return []
 
     jobs: list[Job] = []
     vcf = b.read_input_group(
@@ -63,6 +63,7 @@ def vep_jobs(
     intervals_j, intervals = get_intervals(
         b=b,
         scatter_count=scatter_count,
+        job_attrs=job_attrs,
         output_prefix=tmp_prefix / f'intervals_{scatter_count}',
     )
     if intervals_j:
@@ -128,7 +129,7 @@ def gather_vep_json_to_ht(
     Parse results from VEP with annotations formatted in JSON,
     and write into a Hail Table using a Batch job.
     """
-    j = b.new_job('VEP json to Hail table', job_attrs)
+    j = b.new_job('VEP json to Hail table', (job_attrs or {}) | dict(tool='hail query'))
     j.image(image_path('hail'))
     cmd = query_command(
         vep_module,
@@ -156,7 +157,7 @@ def vep_one(
     if out_path and can_reuse(out_path, overwrite):
         return None
 
-    j = b.new_job('VEP', job_attrs)
+    j = b.new_job('VEP', (job_attrs or {}) | dict(tool='vep'))
     j.image(image_path('vep'))
     STANDARD.set_resources(j, storage_gb=50, mem_gb=50, ncpu=16)
 
