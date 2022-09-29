@@ -3,6 +3,7 @@ Create Hail Batch jobs for joint genotyping.
 """
 
 import logging
+import math
 from enum import Enum
 
 import pandas as pd
@@ -58,11 +59,11 @@ def make_joint_genotyping_jobs(
         )
     logging.info(f'Submitting joint-calling jobs')
 
-    if get_config()['workflow']['sequencing_type'] == 'genome':
-        scatter_count = max(2, len(gvcf_by_sid) // 10)
-    else:
-        assert get_config()['workflow']['sequencing_type'] == 'exome'
-        scatter_count = max(2, len(gvcf_by_sid) // 1000)
+    scatter_count = 50
+    if len(gvcf_by_sid) > 300:
+        scatter_count = 100
+    if len(gvcf_by_sid) > 1000:
+        scatter_count = 200
 
     jobs: list[Job] = []
     intervals_j, intervals = get_intervals(
@@ -70,7 +71,7 @@ def make_joint_genotyping_jobs(
         source_intervals_path=intervals_path,
         scatter_count=scatter_count,
         job_attrs=job_attrs,
-        output_prefix=tmp_bucket / 'intervals',
+        output_prefix=tmp_bucket / f'intervals_{scatter_count}',
     )
     if intervals_j:
         jobs.append(intervals_j)
@@ -137,8 +138,8 @@ def make_joint_genotyping_jobs(
 
         # For small callsets, we don't apply the ExcessHet filtering anyway
         if len(gvcf_by_sid) >= 1000 and do_filter_excesshet:
-            logging.info(f'Queueing exccess het filter job')
-            exccess_filter_j, exccess_filter_jc_vcf = _add_excess_het_filter(
+            logging.info(f'Queueing excess het filter job')
+            excess_filter_j, excess_filter_jc_vcf = _add_excess_het_filter(
                 b,
                 input_vcf=jc_vcf,
                 interval=interval,
@@ -146,11 +147,11 @@ def make_joint_genotyping_jobs(
                 output_vcf_path=filt_jc_vcf_path,
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             )
-            if exccess_filter_j:
-                jobs.append(exccess_filter_j)
+            if excess_filter_j:
+                jobs.append(excess_filter_j)
                 if jc_vcf_j:
-                    exccess_filter_j.depends_on(jc_vcf_j)
-            vcfs.append(exccess_filter_jc_vcf['vcf.gz'])
+                    excess_filter_j.depends_on(jc_vcf_j)
+            vcfs.append(excess_filter_jc_vcf['vcf.gz'])
         else:
             vcfs.append(jc_vcf['vcf.gz'])
 
@@ -295,6 +296,35 @@ def genomicsdb(
     return j
 
 
+def joint_calling_storage_gb(
+    n_samples: int, sequencing_type: str, scatter_count: int
+) -> int:
+    """
+    Calculate storage for a joint calling job, to fit a joint-called VCF
+    and a genomics db. The required storage grows with a number of samples,
+    but sublinearly.
+    >>> joint_calling_storage_gb(1, 'genome')
+    26
+    >>> joint_calling_storage_gb(50, 'genome')
+    26
+    >>> joint_calling_storage_gb(100, 'genome')
+    86
+    >>> joint_calling_storage_gb(200, 'genome')
+    226
+    >>> joint_calling_storage_gb(10000, 'genome')
+    486
+    """
+    disk_gb = 26  # Minimal disk (default for a 4-cpu standard machine)
+    if n_samples >= 50:
+        # for every 10x samples (starting from 50), add {multiplier}G
+        multiplier = {
+            'genome': 200,
+            'exome': 20,
+        }[sequencing_type]
+        disk_gb += int(multiplier * math.log(n_samples / 50, 10))
+    return min(1000, disk_gb)  # requesting 1T max
+
+
 def _add_joint_genotyper_job(
     b: hb.Batch,
     genomicsdb_path: Path,
@@ -333,8 +363,11 @@ def _add_joint_genotyper_job(
     j = b.new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
     res = STANDARD.request_resources(ncpu=4)
-    # 4G (fasta+fai+dict) + 4G per sample divided by the number of intervals:
-    res.attach_disk_storage_gb = 4 + number_of_samples * 4 // scatter_count
+    res.attach_disk_storage_gb = joint_calling_storage_gb(
+        number_of_samples,
+        get_config()['workflow']['sequencing_type'],
+        scatter_count,
+    )
     res.set_to_job(j)
 
     j.declare_resource_group(

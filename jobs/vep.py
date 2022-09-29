@@ -30,9 +30,9 @@ def vep_jobs(
     b: Batch,
     vcf_path: Path,
     tmp_prefix: Path,
+    gvcf_count: int,
     out_path: Path | None = None,
     overwrite: bool = False,
-    scatter_count: int = 50,
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """
@@ -51,14 +51,19 @@ def vep_jobs(
         **{'vcf.gz': str(vcf_path), 'vcf.gz.tbi': str(vcf_path) + '.tbi'}
     )
 
-    scatter_count = max(scatter_count, 2)
+    scatter_count = 50
+    if gvcf_count > 300:
+        scatter_count = 100
+    if gvcf_count > 1000:
+        scatter_count = 200
+
     parts_bucket = tmp_prefix / 'vep' / 'parts'
     part_files = []
 
     intervals_j, intervals = get_intervals(
         b=b,
         scatter_count=scatter_count,
-        output_prefix=tmp_prefix,
+        output_prefix=tmp_prefix / f'intervals_{scatter_count}',
     )
     if intervals_j:
         jobs.append(intervals_j)

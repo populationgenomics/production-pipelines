@@ -199,7 +199,7 @@ class GvcfMultiQC(DatasetStage):
 
         jobs = multiqc(
             self.b,
-            tmp_prefix=dataset.tmp_prefix(),
+            tmp_prefix=dataset.tmp_prefix() / 'multiqc' / 'gvcf',
             paths=paths,
             ending_to_trim=ending_to_trim,
             modules_to_trim_endings=modules_to_trim_endings,
@@ -260,15 +260,25 @@ class JointVcfMultiQC(CohortStage):
         else:
             html_url = None
 
-        paths = [
-            inputs.as_path(cohort, JointGenotyping, 'qc_detail'),
-            inputs.as_path(cohort, JointVcfHappy),
-        ]
+        paths = []
+        ending_to_trim = set()  # endings to trim to get sample names
+
+        paths.append(inputs.as_path(cohort, JointGenotyping, 'qc_detail'))
+
+        for sample in cohort.get_samples():
+            try:
+                path = inputs.as_path(sample, JointVcfHappy)
+            except StageInputNotFoundError:
+                pass
+            else:
+                paths.append(path)
+                ending_to_trim.add(path.name.replace(sample.id, ''))
 
         jobs = multiqc(
             self.b,
-            tmp_prefix=self.tmp_prefix(),
+            tmp_prefix=self.tmp_prefix,
             paths=paths,
+            ending_to_trim=ending_to_trim,
             out_json_path=json_path,
             out_html_path=html_path,
             out_html_url=html_url,

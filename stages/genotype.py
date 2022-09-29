@@ -71,18 +71,28 @@ class Genotype(SampleStage):
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
 
 
-@stage
+@stage(required_stages=Genotype)
 class GvcfHappy(SampleStage):
     """
     Run Happy to validate a GVCF for samples where a truth callset is available.
     """
 
-    def expected_outputs(self, sample: Sample) -> Path:
+    def expected_outputs(self, sample: Sample) -> Path | None:
         """
         Parsed by MultiQC: '*.summary.csv'
         https://multiqc.info/docs/#hap.py
         """
-        return sample.dataset.prefix() / 'qc' / f'{sample.id}.summary.csv'
+        if sample.participant_id not in get_config().get('validation', {}).get(
+            'sample_map', {}
+        ):
+            return None
+        return (
+            sample.dataset.prefix()
+            / 'qc'
+            / 'gvcf'
+            / 'hap.py'
+            / f'{sample.id}.summary.csv'
+        )
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """Queue jobs"""
