@@ -1,5 +1,5 @@
 """
-Test Hail Query functions.
+Test entire seqr-loader in a dry mode.
 """
 
 import toml
@@ -47,7 +47,7 @@ def _set_config(dir_path: Path, extra_conf: dict | None = None):
 
 def test_seqr_loader_dry(mocker: MockFixture, tmpdir: str):
     """
-    Run entire seqr-loader in a dry mode.
+    Test entire seqr-loader in a dry mode.
     """
     _set_config(
         to_path(tmpdir),
