@@ -1,4 +1,4 @@
-cpg-utils[workflows]
+cpg-utils [workflows]
 analysis-runner
 cpg-gnomad
 pandas
@@ -7,5 +7,8 @@ google-cloud-storage
 google-cloud-secret-manager
 fsspec
 slack_sdk
-elasticsearch==8.*
+elasticsearch == 8.*
 click
+toml
+hail
+coloredlogs
