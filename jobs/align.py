@@ -354,9 +354,9 @@ def _align_one(
             f'-Dsamjdk.reference_fasta={reference_inp}' if reference_inp else ''
         )
 
-        index_cmd = ''
+        sort_index_input_cmd = ''
         if not alignment_input.index_path:
-            index_cmd = dedent(
+            sort_index_input_cmd = dedent(
                 f"""
             mkdir -p $BATCH_TMPDIR/sorted
             mkdir -p $BATCH_TMPDIR/sort_tmp
@@ -375,7 +375,7 @@ def _align_one(
 
         bazam_cmd = dedent(
             f"""\
-        {index_cmd}
+        {sort_index_input_cmd}
         bazam -Xmx16g {_reference_command_inp} \
         -n{min(nthreads, 6)} -bam {group[alignment_input.ext]}{shard_param} \
         """
@@ -391,7 +391,7 @@ def _align_one(
         use_bazam = False
         r1_param = '$BATCH_TMPDIR/R1.fq.gz'
         r2_param = '$BATCH_TMPDIR/R2.fq.gz'
-        # Need file names to end with ".gz" for BWA to parse correctly:
+        # Need file names to end with ".gz" for BWA or DRAGMAP to parse correctly:
         prepare_fastq_cmd = dedent(
             f"""\
         mv {fastq_pair.r1} {r1_param}
