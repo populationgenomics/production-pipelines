@@ -1,6 +1,7 @@
 [workflow]
 dataset_gcp_project = 'seqr-308602'
 dataset = 'seqr'
+status_reporter = 'metamist'
 
 [qc_thresholds.genome.min]
 "MEDIAN_COVERAGE" = 10
