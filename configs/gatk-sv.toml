@@ -1,3 +1,6 @@
+[workflows]
+check_expected_outputs = true
+
 [images]
 cnmops_docker = "sv/cnmops:c96d0e4"
 scramble_docker = "sv/scramble:1.0.2"
