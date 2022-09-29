@@ -2,4 +2,4 @@
 access_level = 'test'
 check_inputs = false
 check_intermediates = false
-check_expected_outputs = false
+check_expected_outputs = true
