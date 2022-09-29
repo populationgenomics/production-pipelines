@@ -82,7 +82,7 @@ class AnnotateCohort(CohortStage):
                 'query_modules',
             ],
         )
-        j.attributes = self.get_job_attrs(cohort) | {'tool': 'hail dataproc'}
+        j.attributes = self.get_job_attrs(cohort) | {'tool': 'hailctl dataproc'}
 
         return self.make_outputs(
             cohort,
@@ -152,7 +152,7 @@ class AnnotateDataset(DatasetStage):
                 'query_modules',
             ],
         )
-        j.attributes = self.get_job_attrs(dataset) | {'tool': 'hail dataproc'}
+        j.attributes = self.get_job_attrs(dataset) | {'tool': 'hailctl dataproc'}
 
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])
 
@@ -234,6 +234,6 @@ class MtToEs(DatasetStage):
             pyfiles=['seqr-loading-pipelines/hail_scripts'],
         )
         j._preemptible = False
-        j.attributes = self.get_job_attrs(dataset) | {'tool': 'hail dataproc'}
+        j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}
         jobs = [j]
         return self.make_outputs(dataset, data=index_name, jobs=jobs)

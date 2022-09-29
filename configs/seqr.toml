@@ -1,6 +1,7 @@
 [workflow]
 dataset_gcp_project = 'seqr-308602'
 dataset = 'seqr'
+status_reporter = 'metamist'
 
 [qc_thresholds.genome.min]
 "MEDIAN_COVERAGE" = 10
@@ -17,3 +18,12 @@ billing_project = 'seqr'
 channel = 'seqr-loader-test'
 token_secret_id = 'slack-seqr-loader-token'
 token_project_id = 'seqr-308602'
+
+[elasticsearch]
+# Configure access to ElasticSearch server
+port = 9243
+host = 'elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com'
+username = 'seqr'
+# Load ElasticSearch password from a secret, unless SEQR_ES_PASSWORD is set
+password_secret_id = 'seqr-es-password'
+password_project_id = 'seqr-308602'
