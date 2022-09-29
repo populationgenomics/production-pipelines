@@ -17,7 +17,7 @@ from cpg_utils.hail_batch import (
 )
 from cpg_utils.workflows.resources import STANDARD
 from cpg_utils.workflows.targets import Dataset, Sample
-from cpg_utils.workflows.filetypes import CramPath, GvcfPath
+from cpg_utils.workflows.filetypes import CramPath, GvcfPath, BamPath
 from cpg_utils.workflows.utils import can_reuse, rich_sample_id_seds
 
 from python_scripts import check_pedigree
@@ -308,7 +308,7 @@ def _relate(
 
 def extract(
     b,
-    gvcf_or_cram_or_bam_path: CramPath | GvcfPath,
+    gvcf_or_cram_or_bam_path: CramPath | BamPath | GvcfPath,
     out_somalier_path: Path | None = None,
     job_attrs: dict | None = None,
     overwrite: bool = True,
@@ -327,11 +327,11 @@ def extract(
         out_somalier_path = gvcf_or_cram_or_bam_path.somalier_path
 
     j.image(image_path('somalier'))
-    if isinstance(gvcf_or_cram_or_bam_path, CramPath):
+    if isinstance(gvcf_or_cram_or_bam_path, CramPath | BamPath):
         storage_gb = None  # avoid extra disk by default
         if get_config()['workflow']['sequencing_type'] == 'genome':
             storage_gb = 100
-            if gvcf_or_cram_or_bam_path.is_bam:
+            if isinstance(gvcf_or_cram_or_bam_path, BamPath):
                 storage_gb = 200
         STANDARD.set_resources(j, ncpu=4, storage_gb=storage_gb)
         input_file = b.read_input_group(
