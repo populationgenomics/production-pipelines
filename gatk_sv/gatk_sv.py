@@ -72,27 +72,28 @@ def get_gcnv_models() -> dict[str, str | list[str]]:
     """
     Dict of WDL inputs with gCNV models
     """
-    res: dict[str, str | list[str]] = {}
-    res['ref_panel_samples'] = get_config()['sv_ref_panel']['ref_panel_samples']
-    res['contig_ploidy_model_tar'] = str(
-        reference_path('broad/sv/ref_panel/contig_ploidy_model_tar')
-    )
-    res['gcnv_model_tars'] = [
-        str(reference_path('broad/sv/ref_panel/model_tar_tmpl')).format(shard=i)
-        for i in range(get_config()['sv_ref_panel']['model_tar_cnt'])
-    ]
-    res['ref_panel_PE_files'] = [
-        str(reference_path('broad/sv/ref_panel/ref_panel_PE_file_tmpl')).format(
-            sample=s
-        )
-        for s in get_config()['sv_ref_panel']['ref_panel_samples']
-    ]
-    res['ref_panel_SE_files'] = [
-        str(reference_path('broad/sv/ref_panel/ref_panel_SE_file_tmpl')).format(
-            sample=s
-        )
-        for s in get_config()['sv_ref_panel']['ref_panel_samples']
-    ]
+    res: dict[str, str | list[str]] = {
+        'ref_panel_samples': get_config()['sv_ref_panel']['ref_panel_samples'],
+        'contig_ploidy_model_tar': str(
+            reference_path('broad/sv/ref_panel/contig_ploidy_model_tar')
+        ),
+        'gcnv_model_tars': [
+            str(reference_path('broad/sv/ref_panel/model_tar_tmpl')).format(shard=i)
+            for i in range(get_config()['sv_ref_panel']['model_tar_cnt'])
+        ],
+        'ref_panel_PE_files': [
+            str(reference_path('broad/sv/ref_panel/ref_panel_PE_file_tmpl')).format(
+                sample=s
+            )
+            for s in get_config()['sv_ref_panel']['ref_panel_samples']
+        ],
+        'ref_panel_SE_files': [
+            str(reference_path('broad/sv/ref_panel/ref_panel_SE_file_tmpl')).format(
+                sample=s
+            )
+            for s in get_config()['sv_ref_panel']['ref_panel_samples']
+        ],
+    }
     return res
 
 
@@ -112,13 +113,7 @@ def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str
         try:
             res[key] = str(reference_path(f'broad/sv/resources/{ref_d_key}'))
         except KeyError:
-            if key == 'ref_fasta':
-                ref_fasta = reference_path(f'broad/{ref_d_key}')
-                res['reference_fasta'] = str(ref_fasta)
-                res['reference_index'] = str(ref_fasta) + '.fai'
-                res['reference_dict'] = str(ref_fasta.with_suffix('.dict'))
-            else:
-                res[key] = str(reference_path(f'broad/{ref_d_key}'))
+            res[key] = str(reference_path(f'broad/{ref_d_key}'))
 
     return res
 
@@ -214,7 +209,6 @@ class GatherSampleEvidence(SampleStage):
             'bam_or_cram_file': str(cram_path),
             'bam_or_cram_index': str(cram_path) + '.crai',
             'sample_id': sample.id,
-            # 'revise_base_cram_to_bam': True,
         }
 
         input_dict |= get_images(
@@ -235,13 +229,17 @@ class GatherSampleEvidence(SampleStage):
             [
                 'primary_contigs_fai',
                 'primary_contigs_list',
-                'ref_fasta',
                 'preprocessed_intervals',
                 'manta_region_bed',
                 'wham_include_list_bed_file',
                 {'sd_locs_vcf': 'dbsnp_vcf'},
             ]
         )
+        input_dict |= {
+            'reference_fasta': str(ref_fasta := reference_path(f'broad/ref_fasta')),
+            'reference_index': str(ref_fasta) + '.fai',
+            'reference_dict': str(ref_fasta.with_suffix('.dict')),
+        }
         input_dict['reference_version'] = '38'
 
         expected_d = self.expected_outputs(sample)
@@ -396,11 +394,18 @@ class GatherBatchEvidence(DatasetStage):
             'PE_files': [str(d[sid]['pesr_disc']) for sid in sids],
             'SR_files': [str(d[sid]['pesr_split']) for sid in sids],
         }
+        input_dict |= {
+            'ref_copy_number_autosomal_contigs': 2,
+            'allosomal_contigs': ['chrX', 'chrY'],
+            'gcnv_qs_cutoff': 30,
+            'min_svsize': 50,
+            'run_matrix_qc': True,
+            'matrix_qc_distance': 1000000,
+        }
         input_dict |= get_references(
             [
                 'genome_file',
                 'primary_contigs_fai',
-                'ref_fasta',
                 'inclusion_bed',
                 'unpadded_intervals_file',
                 'dbsnp_vcf',
@@ -409,17 +414,14 @@ class GatherBatchEvidence(DatasetStage):
                 {'cnmops_chrom_file': 'autosome_file'},
                 'cnmops_exclude_list',
                 {'cnmops_allo_file': 'allosome_file'},
-                'cytobands',
+                'cytoband',
                 'mei_bed',
             ]
         )
+        input_dict |= {
+            'ref_dict': str(reference_path(f'broad/ref_fasta').with_suffix('.dict')),
+        }
         input_dict |= get_gcnv_models()
-        input_dict['ref_copy_number_autosomal_contigs'] = 2
-        input_dict['allosomal_contigs'] = ['chrX', 'chrY']
-        input_dict['gcnv_qs_cutoff'] = 30
-        input_dict['min_svsize'] = 50
-        input_dict['matrix_qc_distance'] = 1000000
-
         input_dict |= get_images(
             [
                 'sv_base_mini_docker',
@@ -650,7 +652,7 @@ def main(config_paths: list[str]):
     if _cpg_config_path_env_var := os.environ.get('CPG_CONFIG_PATH'):
         config_paths = _cpg_config_path_env_var.split(',') + config_paths
     set_config_paths(list(config_paths))
-    get_workflow().run(stages=[EvidenceQC])
+    get_workflow().run(stages=[GatherBatchEvidence])
 
 
 if __name__ == '__main__':
