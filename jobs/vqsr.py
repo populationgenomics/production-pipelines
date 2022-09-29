@@ -246,6 +246,7 @@ def make_vqsr_jobs(
             b,
             tranches=snps_tranches,
             disk_size=small_disk,
+            job_attrs=job_attrs,
         ).out_tranches
 
         assert isinstance(snp_gathered_tranches, hb.ResourceFile)
