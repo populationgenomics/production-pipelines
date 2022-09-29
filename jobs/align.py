@@ -391,7 +391,7 @@ def _align_one(
         use_bazam = False
         r1_param = '$BATCH_TMPDIR/R1.fq.gz'
         r2_param = '$BATCH_TMPDIR/R2.fq.gz'
-        # Need file names to end with ".gz" for aligner to parse correctly:
+        # Need file names to end with ".gz" for BWA or DRAGMAP to parse correctly:
         prepare_fastq_cmd = dedent(
             f"""\
         mv {fastq_pair.r1} {r1_param}
