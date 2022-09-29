@@ -24,7 +24,8 @@ EXCLUDE_KEYS = [
 
 @click.command()
 @click.option('--dockers-json-url', default=DOCKERS_URL)
-def main(dockers_json_url: str):
+@click.option('--dry-run', is_flag=True)
+def main(dockers_json_url: str, dry_run: bool):
     """
     Copies each docker image
     """
@@ -49,9 +50,16 @@ def main(dockers_json_url: str):
             continue
         src_path = 'docker://' + dockers_json[key]
         dst_path = 'docker://' + cpg_ar_path
-        subprocess.run(f'skopeo copy {src_path} {dst_path}', shell=True, check=True)
-        config_section[key] = image_name
+        cmd = f'skopeo copy {src_path} {dst_path}'
+        if not dry_run:
+            subprocess.run(cmd, shell=True, check=True)
+        else:
+            print(cmd)
+        config_section[key] = f'sv/{image_name}'
 
+    print()
+    print('TOML [images] config section:')
+    print()
     print(toml.dumps(config_section))
 
 
