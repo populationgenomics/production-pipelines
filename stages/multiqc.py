@@ -21,16 +21,13 @@ from jobs.multiqc import multiqc
 from .align import Align, qc_functions
 from .genotype import Genotype, GvcfHappy
 from .joint_genotyping import JointGenotyping, JointVcfHappy
-from .somalier import (
-    CramSomalierPedigree,
-    GvcfSomalierPedigree,
-)
+from .somalier import SomalierPedigree
 
 
 @stage(
     required_stages=[
         Align,
-        CramSomalierPedigree,
+        SomalierPedigree,
     ],
     forced=True,
 )
@@ -65,10 +62,8 @@ class CramMultiQC(DatasetStage):
 
         paths = []
         try:
-            somalier_samples = inputs.as_path(
-                dataset, CramSomalierPedigree, id='samples'
-            )
-            somalier_pairs = inputs.as_path(dataset, CramSomalierPedigree, id='pairs')
+            somalier_samples = inputs.as_path(dataset, SomalierPedigree, id='samples')
+            somalier_pairs = inputs.as_path(dataset, SomalierPedigree, id='pairs')
         except StageInputNotFoundError:
             pass
         else:
@@ -104,7 +99,7 @@ class CramMultiQC(DatasetStage):
 
         jobs = multiqc(
             self.b,
-            tmp_prefix=dataset.tmp_prefix(),
+            tmp_prefix=dataset.tmp_prefix() / 'multiqc' / 'cram',
             paths=paths,
             ending_to_trim=ending_to_trim,
             modules_to_trim_endings=modules_to_trim_endings,
@@ -125,7 +120,6 @@ class CramMultiQC(DatasetStage):
 @stage(
     required_stages=[
         Genotype,
-        GvcfSomalierPedigree,
         GvcfHappy,
     ],
     forced=True,
@@ -159,19 +153,6 @@ class GvcfMultiQC(DatasetStage):
             html_url = None
 
         paths = []
-        try:
-            somalier_samples = inputs.as_path(
-                dataset, CramSomalierPedigree, id='samples'
-            )
-            somalier_pairs = inputs.as_path(dataset, CramSomalierPedigree, id='pairs')
-        except StageInputNotFoundError:
-            pass
-        else:
-            paths = [
-                somalier_samples,
-                somalier_pairs,
-            ]
-
         ending_to_trim = set()  # endings to trim to get sample names
 
         for sample in dataset.get_samples():
