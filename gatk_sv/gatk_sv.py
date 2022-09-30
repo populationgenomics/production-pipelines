@@ -197,6 +197,10 @@ class GatherSampleEvidence(SampleStage):
             'bam_or_cram_file': str(cram_path),
             'bam_or_cram_index': str(cram_path) + '.crai',
             'sample_id': sample.id,
+            # This option forces CRAM localisation, otherwise it would be passed to
+            # samtools as a URL (in CramToBam.wdl) and it would fail to read it as 
+            # GCS_OAUTH_TOKEN is not set.
+            'requester_pays_crams': True,
         }
 
         input_dict |= get_images(
