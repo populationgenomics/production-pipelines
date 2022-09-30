@@ -1,6 +1,3 @@
-[workflows]
-check_expected_outputs = true
-
 [images]
 cnmops_docker = "sv/cnmops:2022-06-10-v0.23-beta-9c6fbf56"
 condense_counts_docker = "sv/gatk:4.2.6.1-36-g88b0578"
