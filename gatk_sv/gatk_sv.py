@@ -1,35 +1,12 @@
 """
 Driver for computing structural variants from GATK-SV.
-Uses metadata from the sample-metadata server.
-
-Example running:
-
-```
-pipelines/gatk_sv.py 
-    -n test \
-    --analysis-dataset acute-care
-    --dataset acute-care
-```
-
-OR with a config:
-
-```
-pipelines/gatk_sv.py --config pipelines/configs/acute-care-test.yml
-```
-
-WHERE pipelines/configs/acute-care-test.yml:
-
-```
-namespace: test
-analysis_dataset: acute-care
-datasets: [acute-care]
-```
 """
-import logging
+
 import os
 from os.path import join
 from typing import Any
 
+import coloredlogs
 import click
 from analysis_runner.cromwell import (
     run_cromwell_workflow_from_repo_and_get_outputs,
@@ -39,6 +16,7 @@ from cpg_utils import Path
 from cpg_utils.config import set_config_paths, get_config
 from cpg_utils.hail_batch import command, reference_path, image_path
 from cpg_utils.workflows.batch import make_job_name, Batch
+from cpg_utils.workflows.utils import exists
 from cpg_utils.workflows.workflow import (
     stage,
     SampleStage,
@@ -50,15 +28,15 @@ from cpg_utils.workflows.workflow import (
     Sample,
     Dataset,
     Cohort,
-    get_workflow,
+    run_workflow,
 )
 
-logger = logging.getLogger(__file__)
+fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
+coloredlogs.install(level='DEBUG', fmt=fmt)
 
 
-# GATK_SV_COMMIT = 'e4c5ffb1596e0de93eb491ae6d7cb6ec46874d11'
 GATK_SV_COMMIT = 'fdb03a26c5f57f0619cd2d0bd2e9bc77550c175f'
-SV_CALLERS = ['manta', 'wham']
+SV_CALLERS = ['manta', 'wham', 'scramble']
 
 
 def get_images(keys: list[str]) -> dict[str, str]:
@@ -178,18 +156,29 @@ class GatherSampleEvidence(SampleStage):
 
     def expected_outputs(self, sample: Sample) -> dict[str, Path]:
         """
-        Expected to produce coverage counts, and a VCF for each variant caller.
+        Expected to produce coverage counts, a VCF for each variant caller,
+        and a txt for each type of SV evidence (SR, PE, SD).
         """
         d: dict[str, Path] = dict()
+
+        # Coverage counts
         fname_by_key = {'coverage_counts': 'coverage_counts.tsv.gz'}
+
+        # Caller's VCFs
         for caller in SV_CALLERS:
             fname_by_key[f'{caller}_vcf'] = f'{caller}.vcf.gz'
             fname_by_key[f'{caller}_index'] = f'{caller}.vcf.gz.tbi'
 
-        # Split reads (SR) and Discordant read pairs (PE)
-        for k in ['disc', 'split']:
-            fname_by_key[f'pesr_{k}'] = f'pesr_{k}.txt.gz'
-            fname_by_key[f'pesr_{k}_index'] = f'pesr_{k}.txt.gz.tbi'
+        # SV evidence
+        # split reads:
+        fname_by_key['pesr_split'] = 'sr.txt.gz'
+        fname_by_key['pesr_split_index'] = 'sr.txt.gz.tbi'
+        # discordant paired end reads:
+        fname_by_key['pesr_disc'] = 'pe.txt.gz'
+        fname_by_key['pesr_disc_index'] = 'pe.txt.gz.tbi'
+        # site depth:
+        fname_by_key['pesr_sd'] = 'sd.txt.gz'
+        fname_by_key['pesr_sd_index'] = 'sd.txt.gz.tbi'
 
         for key, fname in fname_by_key.items():
             stage_name = self.name.lower()
@@ -203,7 +192,8 @@ class GatherSampleEvidence(SampleStage):
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """Add jobs to batch"""
-        cram_path = sample.dataset.prefix() / 'cram' / f'{sample.id}.cram'
+        cram_path = sample.make_cram_path()
+        assert exists(cram_path.path), cram_path
 
         input_dict: dict[str, Any] = {
             'bam_or_cram_file': str(cram_path),
@@ -652,7 +642,7 @@ def main(config_paths: list[str]):
     if _cpg_config_path_env_var := os.environ.get('CPG_CONFIG_PATH'):
         config_paths = _cpg_config_path_env_var.split(',') + config_paths
     set_config_paths(list(config_paths))
-    get_workflow().run(stages=[GatherBatchEvidence])
+    run_workflow(stages=[GatherBatchEvidence])
 
 
 if __name__ == '__main__':
