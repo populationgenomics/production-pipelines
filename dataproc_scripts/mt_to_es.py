@@ -23,7 +23,7 @@ from hail_scripts.elasticsearch.hail_elasticsearch_client import HailElasticsear
 
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
-coloredlogs.install(level='DEBUG', fmt=fmt)
+coloredlogs.install(level='INFO', fmt=fmt)
 
 
 class HailElasticsearchClientV8(HailElasticsearchClient):

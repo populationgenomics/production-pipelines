@@ -13,7 +13,7 @@ from stages.multiqc import GvcfMultiQC, CramMultiQC
 from stages.seqr_loader import MtToEs
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
-coloredlogs.install(level='DEBUG', fmt=fmt)
+coloredlogs.install(level='INFO', fmt=fmt)
 
 
 @click.command()
