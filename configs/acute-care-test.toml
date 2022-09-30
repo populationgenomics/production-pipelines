@@ -1,0 +1,19 @@
+[workflow]
+dataset_gcp_project = 'acute-care-321904'
+dataset = 'acute-care'
+datasets = ['acute-care']
+access_level = 'test'
+only_samples = [
+    'CPG202994',
+    'CPG203000',
+    'CPG203018',
+    'CPG203034',
+    'CPG203042',
+    'CPG203075',
+    'CPG203067',
+    'CPG203026',
+    'CPG203059',
+]
+
+[hail]
+billing_project = 'acute-care'
