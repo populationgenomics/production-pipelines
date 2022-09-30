@@ -12,7 +12,7 @@ from cpg_utils.config import get_config
 from query_modules.seqr_loader import annotate_cohort
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
-coloredlogs.install(level='DEBUG', fmt=fmt)
+coloredlogs.install(level='INFO', fmt=fmt)
 
 
 @click.command()

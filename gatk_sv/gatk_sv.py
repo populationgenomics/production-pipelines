@@ -30,7 +30,7 @@ from cpg_utils.workflows.workflow import (
 )
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
-coloredlogs.install(level='DEBUG', fmt=fmt)
+coloredlogs.install(level='INFO', fmt=fmt)
 
 
 GATK_SV_COMMIT = 'fdb03a26c5f57f0619cd2d0bd2e9bc77550c175f'
