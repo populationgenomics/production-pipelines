@@ -22,6 +22,10 @@ from cpg_utils import to_path
 from cpg_utils.config import get_config
 
 
+logging.basicConfig()
+logging.getLogger().setLevel(logging.DEBUG)
+
+
 @click.command()
 @click.option(
     '--multiqc-json',
@@ -101,10 +105,10 @@ def run(
                         if is_fail(val, threshold):
                             line = f'{metric}={val:0.2f}{fail_sign}{threshold:0.2f}'
                             bad_lines_by_sample[sample].append(line)
-                            logging.debug(f'⭕ {sample}: {line}')
+                            logging.info(f'⭕ {sample}: {line}')
                         else:
                             line = f'{metric}={val:0.2f}{good_sign}{threshold:0.2f}'
-                            logging.debug(f'✅ {sample}: {line}')
+                            logging.info(f'✅ {sample}: {line}')
 
     # Constructing Slack message
     if dataset and html_url:
