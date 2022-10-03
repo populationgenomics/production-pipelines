@@ -12,6 +12,8 @@ from analysis_runner.cromwell import (
     run_cromwell_workflow_from_repo_and_get_outputs,
     CromwellOutputType,
 )
+from hailtop.batch import Resource
+from hailtop.batch.job import Job
 
 from cpg_utils import Path
 from cpg_utils.config import set_config_paths, get_config
@@ -30,11 +32,12 @@ from cpg_utils.workflows.workflow import (
 )
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
-coloredlogs.install(level='INFO', fmt=fmt)
+coloredlogs.install(level='DEBUG', fmt=fmt)
 
 
-GATK_SV_COMMIT = 'fdb03a26c5f57f0619cd2d0bd2e9bc77550c175f'
+GATK_SV_COMMIT = '50d47e68ad05b29c78cba16606974ef0dca1b113'
 SV_CALLERS = ['manta', 'wham', 'scramble']
+REF_FASTA_KEY = 'broad/bwa_ref_fasta'  # change to 'broad/ref_fasta' for DRAGMAP CRAMs
 
 
 def get_images(keys: list[str]) -> dict[str, str]:
@@ -63,8 +66,14 @@ def get_gcnv_models() -> dict[str, str | list[str]]:
             )
             for s in get_config()['sv_ref_panel']['ref_panel_samples']
         ],
-        'ref_panel_SE_files': [
-            str(reference_path('broad/sv/ref_panel/ref_panel_SE_file_tmpl')).format(
+        'ref_panel_SR_files': [
+            str(reference_path('broad/sv/ref_panel/ref_panel_SR_file_tmpl')).format(
+                sample=s
+            )
+            for s in get_config()['sv_ref_panel']['ref_panel_samples']
+        ],
+        'ref_panel_SD_files': [
+            str(reference_path('broad/sv/ref_panel/ref_panel_SD_file_tmpl')).format(
                 sample=s
             )
             for s in get_config()['sv_ref_panel']['ref_panel_samples']
@@ -103,7 +112,7 @@ def add_gatk_sv_job(
     input_dict: dict[str, Any],
     expected_out_dict: dict[str, Path],
     sample_id: str | None = None,
-):
+) -> Job:
     """
     Generic function to add a job that would run one GATK-SV workflow.
     """
@@ -118,7 +127,7 @@ def add_gatk_sv_job(
         outputs_to_collect[key] = CromwellOutputType.single_path(f'{wfl_name}.{key}')
 
     job_prefix = make_job_name(wfl_name, sample=sample_id, dataset=dataset.name)
-    output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
+    output_dict: dict[str, Resource] = run_cromwell_workflow_from_repo_and_get_outputs(
         b=batch,
         job_prefix=job_prefix,
         dataset=get_config()['workflow']['dataset'],
@@ -141,8 +150,7 @@ def add_gatk_sv_job(
         out_path = expected_out_dict[key]
         cmds.append(f'gsutil cp $(cat {resource}) {out_path}')
     copy_j.command(command(cmds, setup_gcp=True))
-
-    return output_dict, copy_j
+    return copy_j
 
 
 @stage
@@ -160,32 +168,35 @@ class GatherSampleEvidence(SampleStage):
         d: dict[str, Path] = dict()
 
         # Coverage counts
-        fname_by_key = {'coverage_counts': 'coverage_counts.tsv.gz'}
+        ending_by_key = {'coverage_counts': 'coverage_counts.tsv.gz'}
 
         # Caller's VCFs
         for caller in SV_CALLERS:
-            fname_by_key[f'{caller}_vcf'] = f'{caller}.vcf.gz'
-            fname_by_key[f'{caller}_index'] = f'{caller}.vcf.gz.tbi'
+            ending_by_key[f'{caller}_vcf'] = f'{caller}.vcf.gz'
+            ending_by_key[f'{caller}_index'] = f'{caller}.vcf.gz.tbi'
 
         # SV evidence
         # split reads:
-        fname_by_key['pesr_split'] = 'sr.txt.gz'
-        fname_by_key['pesr_split_index'] = 'sr.txt.gz.tbi'
+        ending_by_key['sr'] = 'sr.txt.gz'
+        ending_by_key['sr_index'] = 'sr.txt.gz.tbi'
         # discordant paired end reads:
-        fname_by_key['pesr_disc'] = 'pe.txt.gz'
-        fname_by_key['pesr_disc_index'] = 'pe.txt.gz.tbi'
+        ending_by_key['pe'] = 'pe.txt.gz'
+        ending_by_key['pe_index'] = 'pe.txt.gz.tbi'
         # site depth:
-        fname_by_key['pesr_sd'] = 'sd.txt.gz'
-        fname_by_key['pesr_sd_index'] = 'sd.txt.gz.tbi'
+        ending_by_key['sd'] = 'sd.txt.gz'
+        ending_by_key['sd_index'] = 'sd.txt.gz.tbi'
 
-        for key, fname in fname_by_key.items():
+        for key, ending in ending_by_key.items():
             stage_name = self.name.lower()
-            d[key] = (
-                sample.dataset.prefix()
-                / 'gatk_sv'
-                / stage_name
-                / (sample.id + '-' + fname)
-            )
+            fname = f'{sample.id}.{ending}'  # the dot separator is critical here!!
+            # it's critical to separate the ending with a dot above: `*.sr.txt.gz`,
+            # `*.pe.txt.gz`, and `*.sd.txt.gz`. These files are passed to
+            # `gatk PrintSVEvidence`, that would determine file format based on the
+            # file name. It would strongly expect the files to end exactly with either
+            # `.sr.txt.gz`, `.pe.txt.gz`, or `.sd.txt.gz`, otherwise it would fail with
+            # "A USER ERROR has occurred: Cannot read file:///cromwell_root/... because
+            # no suitable codecs found".
+            d[key] = sample.dataset.prefix() / 'gatk_sv' / stage_name / fname
         return d
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
@@ -198,7 +209,7 @@ class GatherSampleEvidence(SampleStage):
             'bam_or_cram_index': str(cram_path) + '.crai',
             'sample_id': sample.id,
             # This option forces CRAM localisation, otherwise it would be passed to
-            # samtools as a URL (in CramToBam.wdl) and it would fail to read it as 
+            # samtools as a URL (in CramToBam.wdl) and it would fail to read it as
             # GCS_OAUTH_TOKEN is not set.
             'requester_pays_crams': True,
         }
@@ -213,6 +224,7 @@ class GatherSampleEvidence(SampleStage):
                 'cloud_sdk_docker',
                 'wham_docker',
                 'manta_docker',
+                'scramble_docker',
                 'sv_pipeline_base_docker',
                 'gatk_docker_pesr_override',
             ]
@@ -228,7 +240,7 @@ class GatherSampleEvidence(SampleStage):
             ]
         )
         input_dict |= {
-            'reference_fasta': str(ref_fasta := reference_path(f'broad/ref_fasta')),
+            'reference_fasta': str(ref_fasta := reference_path(REF_FASTA_KEY)),
             'reference_index': str(ref_fasta) + '.fai',
             'reference_dict': str(ref_fasta.with_suffix('.dict')),
         }
@@ -236,7 +248,7 @@ class GatherSampleEvidence(SampleStage):
 
         expected_d = self.expected_outputs(sample)
 
-        output_dict, j = add_gatk_sv_job(
+        j = add_gatk_sv_job(
             batch=self.b,
             dataset=sample.dataset,
             wfl_name=self.name,
@@ -244,8 +256,7 @@ class GatherSampleEvidence(SampleStage):
             expected_out_dict=expected_d,
             sample_id=sample.id,
         )
-
-        return self.make_outputs(sample, data=output_dict, jobs=[j])
+        return self.make_outputs(sample, data=expected_d, jobs=[j])
 
 
 @stage(required_stages=GatherSampleEvidence)
@@ -265,7 +276,6 @@ class EvidenceQC(DatasetStage):
             'WGD_dist': 'WGD_score_distributions.pdf',
             'WGD_matrix': 'WGD_scoring_matrix_output.bed.gz',
             'WGD_scores': 'WGD_scores.txt.gz',
-            'bincov_median': 'RD.txt.gz',
             'bincov_matrix': 'RD.txt.gz',
             'bincov_matrix_index': 'RD.txt.gz.tbi',
         }
@@ -311,14 +321,14 @@ class EvidenceQC(DatasetStage):
         )
 
         expected_d = self.expected_outputs(dataset)
-        output_dict, j = add_gatk_sv_job(
+        j = add_gatk_sv_job(
             batch=self.b,
             dataset=dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
         )
-        return self.make_outputs(dataset, data=output_dict, jobs=[j])
+        return self.make_outputs(dataset, data=expected_d, jobs=[j])
 
 
 @click.command()
