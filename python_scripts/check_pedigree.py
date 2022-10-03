@@ -24,6 +24,10 @@ from cpg_utils import to_path
 from cpg_utils.config import get_config
 
 
+logging.basicConfig()
+logging.getLogger().setLevel(logging.DEBUG)
+
+
 @click.command()
 @click.option(
     '--somalier-samples',
