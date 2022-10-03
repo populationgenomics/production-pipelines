@@ -331,6 +331,121 @@ class EvidenceQC(DatasetStage):
         return self.make_outputs(dataset, data=expected_d, jobs=[j])
 
 
+@stage(required_stages=[GatherSampleEvidence, EvidenceQC])
+class GatherBatchEvidence(DatasetStage):
+    """
+    https://github.com/broadinstitute/gatk-sv#gather-batch-evidence
+    https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherBatchEvidence.wdl
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+        d: dict[str, Path] = dict()
+        fname_by_key = {
+            'merged_BAF': f'{dataset.name}.baf.txt.gz',
+            'merged_BAF_index': f'{dataset.name}.baf.txt.gz.tbi',
+            'merged_SR': f'{dataset.name}.sr.txt.gz',
+            'merged_SR_index': f'{dataset.name}.sr.txt.gz.tbi',
+            'merged_PE': f'{dataset.name}.pe.txt.gz',
+            'merged_PE_index': f'{dataset.name}.pe.txt.gz.tbi',
+            # 'merged_bincov': '',
+            # 'merged_bincov_index': '',
+            # 'ploidy_matrix': '',
+            # 'ploidy_plots': '',
+            # 'combined_ped_file': '',
+            # 'merged_dels': '',
+            # 'merged_dups': '',
+            # 'cnmops_del': '',
+            # 'cnmops_del_index': '',
+            # 'cnmops_dup': '',
+            # 'cnmops_dup_index': '',
+            # 'cnmops_large_del': '',
+            # 'cnmops_large_del_index': '',
+            # 'cnmops_large_dup': '',
+            # 'cnmops_large_dup_index': '',
+            # 'median_cov': '',
+            # 'std_manta_vcf': '',
+            # 'std_delly_vcf': '',
+            # 'std_melt_vcf': '',
+            # 'std_scramble_vcf': '',
+            # 'std_wham_vcf': '',
+            # 'PE_stats': '',
+            # 'RD_stats': '',
+            # 'SR_stats': '',
+            # 'BAF_stats': '',
+            # 'Matrix_QC_plot': '',
+            # 'manta_tloc': '',
+            # 'metrics_file_batchevidence': '',
+        }
+        for key, fname in fname_by_key.items():
+            d[key] = dataset.prefix() / 'gatk_sv' / self.name.lower() / fname
+        return d
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """Add jobs to Batch"""
+        sids = dataset.get_sample_ids()
+
+        input_by_sid = inputs.as_dict_by_target(stage=GatherSampleEvidence)
+
+        input_dict: dict[str, Any] = {
+            'batch': dataset.name,
+            'samples': sids,
+            'ped_file': str(
+                dataset.write_ped_file(dataset.tmp_prefix() / 'samples.ped')
+            ),
+            'counts': [str(input_by_sid[sid]['coverage_counts']) for sid in sids],
+            'SR_files': [str(input_by_sid[sid]['sr']) for sid in sids],
+            'PE_files': [str(input_by_sid[sid]['pe']) for sid in sids],
+            'SD_files': [str(input_by_sid[sid]['sd']) for sid in sids],
+        }
+        input_dict |= {
+            'ref_copy_number_autosomal_contigs': 2,
+            'allosomal_contigs': ['chrX', 'chrY'],
+            'gcnv_qs_cutoff': 30,
+            'min_svsize': 50,
+            'run_matrix_qc': True,
+            'matrix_qc_distance': 1000000,
+        }
+        input_dict |= get_references(
+            [
+                'genome_file',
+                'primary_contigs_fai',
+                {'sd_locs_vcf': 'dbsnp_vcf'},
+                {'cnmops_chrom_file': 'autosome_file'},
+                'cnmops_exclude_list',
+                {'cnmops_allo_file': 'allosome_file'},
+                'cytoband',
+                'mei_bed',
+            ]
+        )
+        input_dict |= {
+            'ref_dict': str(reference_path(f'broad/ref_fasta').with_suffix('.dict')),
+        }
+        input_dict |= get_gcnv_models()
+        input_dict |= get_images(
+            [
+                'sv_base_mini_docker',
+                'sv_base_docker',
+                'sv_pipeline_docker',
+                'sv_pipeline_qc_docker',
+                'linux_docker',
+                'condense_counts_docker',
+                'gatk_docker',
+                'gcnv_gatk_docker',
+                'cnmops_docker',
+            ]
+        )
+
+        expected_d = self.expected_outputs(dataset)
+        j = add_gatk_sv_job(
+            batch=self.b,
+            dataset=dataset,
+            wfl_name=self.name,
+            input_dict=input_dict,
+            expected_out_dict=expected_d,
+        )
+        return self.make_outputs(dataset, data=expected_d, jobs=[j])
+
+
 @click.command()
 @click.argument('config_paths', nargs=-1)
 def main(config_paths: list[str]):
@@ -341,7 +456,7 @@ def main(config_paths: list[str]):
     if _cpg_config_path_env_var := os.environ.get('CPG_CONFIG_PATH'):
         config_paths = _cpg_config_path_env_var.split(',') + config_paths
     set_config_paths(list(config_paths))
-    run_workflow(stages=[EvidenceQC])
+    run_workflow(stages=[GatherBatchEvidence])
 
 
 if __name__ == '__main__':
