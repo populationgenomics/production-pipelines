@@ -7,6 +7,8 @@ This repository provides implementations of genomics workflows using Hail Batch 
 
 ## Seqr Loader
 
+![uml](docs/seqr_loader.png)
+
 Seqr Loader is a combination of the following [WARP](https://github.com/broadinstitute/warp) workflows:
 
 * Single-sample whole genome and WES germline calling, FASTQ -> GVCF (BWA/DRAGMAP, GATK4 HaplotypeCaller)
