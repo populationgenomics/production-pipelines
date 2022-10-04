@@ -5,7 +5,7 @@ skip_samples = [
   'CPG216010',  # https://batch.hail.populationgenomics.org.au/batches/74382
 ]
 
-datasets = ['prophecy']
+input_datasets = ['prophecy']
 sequencing_type = 'genome'
 access_level = 'full'
 dataset = 'prophecy'

@@ -1,5 +1,5 @@
 [workflow]
-datasets = ['validation']
+input_datasets = ['validation']
 create_es_index_for_datasets = ['validation']
 skip_samples = [
     'CPG243717',  # NA12878_KCCG low coverage (8x)
