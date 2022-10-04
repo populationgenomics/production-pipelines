@@ -1,11 +1,11 @@
 # GATK-SV
 
 Hail Batch driver for running the Broad's [GATK-SV workflow](https://github.com/broadinstitute/gatk-sv),
-and importing results to Seqr.
+and importing results to Seqr, using the [cpg_utils/workflows library](https://github.com/populationgenomics/cpg-utils/blob/main/cpg_utils/workflows/README.md).
 
 ## Usage
 
-To use, run the `gatk_sv.py` script, and pass the following TOML configs directly as command line arguments. Replace `acute-care-test.toml` with another config if you want to process a different dataset.
+To launch the workflow, run the `gatk_sv.py` script, and pass the following TOML configs directly as command line arguments. Replace `acute-care-test.toml` with another config if you want to process a different dataset.
 
 ```bash
 python gatk_sv.py \

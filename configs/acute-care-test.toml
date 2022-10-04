@@ -17,3 +17,6 @@ only_samples = [
 
 [hail]
 billing_project = 'acute-care'
+
+[references.broad]
+bwa_ref_fasta = 'Homo_sapiens_assembly38.fasta'
