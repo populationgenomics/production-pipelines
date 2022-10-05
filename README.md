@@ -22,7 +22,7 @@ As well as:
 * [Somalier](https://github.com/brentp/somalier) pedigree checks
 * [MultiQC](https://github.com/ewels/MultiQC) QC reporting.
 
-Both workflows Metamist as a source of FASTQ, CRAMs, and sample/participant metadata, nd TOML configs for extended configuration (dataset and samples, Hail Batch parameters, Elasticsearch credentials, QC thresholds).
+The workflows use Metamist as a source of FASTQ, CRAMs, and sample/participant metadata, and TOML configs for extended configuration (dataset and samples, Hail Batch parameters, Elasticsearch credentials, QC thresholds).
 
 To run Seqr Loader, there is a script called `main.py`, which can take configs as input, or be submitted with the analysis-runner:
 
