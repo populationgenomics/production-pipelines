@@ -13,7 +13,7 @@ Seqr Loader is a combination of the following [WARP](https://github.com/broadins
 
 * Single-sample whole genome and WES germline calling, FASTQ -> GVCF (BWA/DRAGMAP, GATK4 HaplotypeCaller)
 * Re-alignment, CRAM -> GVCF (we use [BAZAM](https://github.com/ssadedin/bazam) to extract FASTQ from CRAM/BAM)
-* Whole genome and WES joint-calling, GVCFs -> VCF
+* Whole genome and WES joint-calling, GVCFs -> pVCF
 * WES AS-VQSR and WGS VQSR workflows (we adjusted to use AS-VQSR for WGS as well)
 
 As well as:
