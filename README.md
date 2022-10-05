@@ -3,7 +3,7 @@
 This repository provides implementations of genomics workflows using Hail Batch and the [cpg_utils/workflows library](https://github.com/populationgenomics/cpg-utils/blob/main/cpg_utils/workflows/README.md), specifically:
 
 * WES/WGS Seqr Loader: FASTQ -> CRAM -> GVCF -> pVCF -> Matrix Table -> Elasticsearch index, with an ability to use parts of this pipeline as e.g. a single-sample germline variant calling workflow (FASTQ -> GVCF), joint-calling pipeline (GVCF -> pVCF), AS-VQSR pipeline, etc.
-* GATK-SV: CRAM -> VCF and more, orchestrates [GATK-SV WDL workflows](https://github.com/broadinstitute/gatk-sv) in Hail Batch.
+* (in progress) GATK-SV: CRAM -> VCF and more, orchestrates [GATK-SV WDL workflows](https://github.com/broadinstitute/gatk-sv) in Hail Batch.
 
 ## Seqr Loader
 
@@ -14,7 +14,7 @@ Seqr Loader is a combination of the following [WARP](https://github.com/broadins
 * Single-sample whole genome and WES germline calling, FASTQ -> GVCF (BWA/DRAGMAP, GATK4 HaplotypeCaller)
 * Re-alignment, CRAM -> GVCF (we use [BAZAM](https://github.com/ssadedin/bazam) to extract FASTQ from CRAM/BAM)
 * Whole genome and WES joint-calling, GVCFs -> pVCF
-* WES AS-VQSR and WGS VQSR workflows (we adjusted to use AS-VQSR for WGS as well)
+* WES AS-VQSR and WGS VQSR workflows
 
 As well as:
 
