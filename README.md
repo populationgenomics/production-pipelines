@@ -24,7 +24,7 @@ As well as:
 
 The workflows use Metamist as a source of FASTQ, CRAMs, and sample/participant metadata, and TOML configs for extended configuration (dataset and samples, Hail Batch parameters, Elasticsearch credentials, QC thresholds).
 
-To run Seqr Loader, there is a script called `main.py`, which can take configs as input, or be submitted with the analysis-runner:
+To run Seqr Loader, there is a script called `main.py`, which can take configs as input and should be submitted using the analysis-runner:
 
 ```bash
 analysis-runner \
