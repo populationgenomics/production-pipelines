@@ -1,7 +1,7 @@
 """
 Driver for computing structural variants from GATK-SV from WGS data.
 """
-
+import logging
 import os
 from os.path import join
 from typing import Any
@@ -19,7 +19,7 @@ from cpg_utils import Path
 from cpg_utils.config import set_config_paths, get_config
 from cpg_utils.hail_batch import command, reference_path, image_path
 from cpg_utils.workflows.batch import make_job_name, Batch
-from cpg_utils.workflows.utils import exists
+from cpg_utils.workflows.inputs import get_cohort
 from cpg_utils.workflows.workflow import (
     stage,
     SampleStage,
@@ -166,12 +166,11 @@ class GatherSampleEvidence(SampleStage):
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
         """Add jobs to batch"""
-        cram_path = sample.make_cram_path()
-        assert exists(cram_path.path), cram_path
+        assert sample.cram, sample
 
         input_dict: dict[str, Any] = {
-            'bam_or_cram_file': str(cram_path),
-            'bam_or_cram_index': str(cram_path) + '.crai',
+            'bam_or_cram_file': str(sample.cram),
+            'bam_or_cram_index': str(sample.cram) + '.crai',
             'sample_id': sample.id,
             # This option forces CRAM localisation, otherwise it would be passed to
             # samtools as a URL (in CramToBam.wdl) and it would fail to read it as
@@ -351,8 +350,6 @@ class GatherBatchEvidence(DatasetStage):
             'merged_dels': '.DEL.bed.gz',
             'merged_dups': '.DUP.bed.gz',
             'Matrix_QC_plot': '.00_matrix_FC_QC.png',
-            'batch_ploidy_plots': '_ploidy_plots.tar.gz',
-            'batch_ploidy_matrix': '_ploidy_matrix.bed.gz',
         }
         for caller in SV_CALLERS:
             ending_by_key[f'std_{caller}_vcf_tar'] = f'.{caller}.tar.gz'
@@ -561,6 +558,15 @@ def main(config_paths: list[str]):
     if _cpg_config_path_env_var := os.environ.get('CPG_CONFIG_PATH'):
         config_paths = _cpg_config_path_env_var.split(',') + config_paths
     set_config_paths(list(config_paths))
+    samples_with_no_cram = [s for s in get_cohort().get_samples() if not s.cram]
+    if samples_with_no_cram:
+        logging.warning(
+            f'Found {len(samples_with_no_cram)}/{len(get_cohort().get_samples())} '
+            'samples with no CRAM in Metamist. Skipping'
+        )
+        for s in samples_with_no_cram:
+            s.active = False
+
     run_workflow(stages=[ClusterBatch])
 
 
