@@ -61,6 +61,7 @@ protein_coding_gtf = "gs://gatk-sv-resources-public/hg38/v0/sv-resources/resourc
 
 [references.broad.sv.ref_panel]
 prefix = 'sv-resources/ref-panel'
+ped_file = 'ped_1kgp_all.ped'
 qc_definitions = "1KG/v2/single_sample.qc_definitions.tsv"
 contig_ploidy_model_tar = "1KG/v2/gcnv/ref_panel_1kg_v2-contig-ploidy-model.tar.gz"
 model_tar_tmpl = "1KG/v2/gcnv/model_files/ref_panel_1kg_v2-gcnv-model-shard-{shard}.tar.gz"

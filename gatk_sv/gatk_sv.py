@@ -384,14 +384,24 @@ class GatherBatchEvidence(DatasetStage):
         """Add jobs to Batch"""
         sids = dataset.get_sample_ids()
 
+        combined_ped_path = (
+            self.tmp_prefix()
+            / 'ped_with_ref_panel'
+            / f'{self.alignment_inputs_hash()}.ped'
+        )
+        with combined_ped_path.open('w') as out:
+            with dataset.write_ped_file().open() as f:
+                out.write(f.read())
+            with get_config()['sv_ref_panel']['ped_file'].open() as f:
+                # doesn't have any header, so can safely concatenate:
+                out.write(f.read())
+
         input_by_sid = inputs.as_dict_by_target(stage=GatherSampleEvidence)
 
         input_dict: dict[str, Any] = {
             'batch': dataset.name,
             'samples': sids,
-            'ped_file': str(
-                dataset.write_ped_file(dataset.tmp_prefix() / 'samples.ped')
-            ),
+            'ped_file': str(combined_ped_path),
             'counts': [str(input_by_sid[sid]['coverage_counts']) for sid in sids],
             'SR_files': [str(input_by_sid[sid]['sr']) for sid in sids],
             'PE_files': [str(input_by_sid[sid]['pe']) for sid in sids],
