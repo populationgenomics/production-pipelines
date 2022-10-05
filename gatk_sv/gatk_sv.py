@@ -296,6 +296,27 @@ class EvidenceQC(DatasetStage):
         return self.make_outputs(dataset, data=expected_d, jobs=[j])
 
 
+def _make_combined_ped(dataset: Dataset) -> Path:
+    """
+    Create cohort + ref panel PED.
+    Since the PED file must include reference panel samples as well, so concatenating
+    the `dataset`'s PED file with the reference panel PED file.
+    """
+    combined_ped_path = (
+        dataset.tmp_prefix()
+        / 'gatk-sv'
+        / 'ped_with_ref_panel'
+        / f'{dataset.alignment_inputs_hash()}.ped'
+    )
+    with combined_ped_path.open('w') as out:
+        with dataset.write_ped_file().open() as f:
+            out.write(f.read())
+        # THe ref panel PED doesn't have any header, so can safely concatenate:
+        with reference_path('broad/sv/ref_panel/ped_file').open() as f:
+            out.write(f.read())
+    return combined_ped_path
+
+
 @stage(required_stages=[GatherSampleEvidence, EvidenceQC])
 class GatherBatchEvidence(DatasetStage):
     """
@@ -345,26 +366,12 @@ class GatherBatchEvidence(DatasetStage):
         """Add jobs to Batch"""
         sids = dataset.get_sample_ids()
 
-        # PED file must include reference panel samples as well, so concatenating
-        # the `dataset` PED file with the reference panel PED file:
-        combined_ped_path = (
-            self.tmp_prefix
-            / 'ped_with_ref_panel'
-            / f'{dataset.alignment_inputs_hash()}.ped'
-        )
-        with combined_ped_path.open('w') as out:
-            with dataset.write_ped_file().open() as f:
-                out.write(f.read())
-            # THe ref panel PED doesn't have any header, so can safely concatenate:
-            with reference_path('broad/sv/ref_panel/ped_file').open() as f:
-                out.write(f.read())
-
         input_by_sid = inputs.as_dict_by_target(stage=GatherSampleEvidence)
 
         input_dict: dict[str, Any] = {
             'batch': dataset.name,
             'samples': sids,
-            'ped_file': str(combined_ped_path),
+            'ped_file': str(_make_combined_ped(dataset)),
             'counts': [str(input_by_sid[sid]['coverage_counts']) for sid in sids],
             'SR_files': [str(input_by_sid[sid]['sr']) for sid in sids],
             'PE_files': [str(input_by_sid[sid]['pe']) for sid in sids],
@@ -457,6 +464,91 @@ class GatherBatchEvidence(DatasetStage):
         return self.make_outputs(dataset, data=expected_d, jobs=[j])
 
 
+@stage(required_stages=GatherBatchEvidence)
+class ClusterBatch(DatasetStage):
+    """
+    https://github.com/broadinstitute/gatk-sv#clusterbatch
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict:
+        """
+        Clustered SV VCFs
+        Clustered depth-only call VCF
+        """
+
+        ending_by_key = {}
+        for caller in SV_CALLERS + ['depth']:
+            ending_by_key[f'clustered_{caller}_vcf'] = f'.clustered-{caller}.vcf.gz'
+            ending_by_key[
+                f'clustered_{caller}_vcf_index'
+            ] = f'.clustered-{caller}.vcf.gz.tbi'
+
+        d: dict[str, Path] = {}
+        for key, ending in ending_by_key.items():
+            fname = f'{dataset.name}{ending}'
+            d[key] = dataset.prefix() / 'gatk_sv' / self.name.lower() / fname
+        return d
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """
+        Inputs:
+        Standardized call VCFs (GatherBatchEvidence)
+        Depth-only (DEL/DUP) calls (GatherBatchEvidence)
+        """
+        batch_evidence_d = inputs.as_dict(dataset, GatherBatchEvidence)
+
+        input_dict: dict[str, Any] = {
+            'batch': dataset.name,
+            'del_bed': batch_evidence_d[f'merged_dels'],
+            'dup_bed': batch_evidence_d[f'merged_dups'],
+            'ped_file': str(_make_combined_ped(dataset)),
+        }
+        for caller in SV_CALLERS:
+            input_dict[f'{caller}_vcf_tar'] = batch_evidence_d[f'std_{caller}_vcf_tar']
+
+        input_dict |= {
+            'depth_exclude_overlap_fraction': 0.5,
+            'depth_interval_overlap': 0.8,
+            'depth_clustering_algorithm': 'SINGLE_LINKAGE',
+            'pesr_interval_overlap': 0.1,
+            'pesr_breakend_window': 300,
+            'pesr_clustering_algorithm': 'SINGLE_LINKAGE',
+        }
+
+        input_dict |= get_images(
+            [
+                'sv_base_mini_docker',
+                'sv_pipeline_docker',
+                'gatk_docker',
+                'linux_docker',
+                'sv_pipeline_base_docker',
+            ]
+        )
+
+        input_dict |= get_references(
+            [
+                {'contig_list': 'primary_contigs_list'},
+                {'depth_exclude_intervals': 'depth_exclude_list'},
+                {'pesr_exclude_intervals': 'pesr_exclude_list'},
+            ]
+        )
+        input_dict |= {
+            'reference_fasta': str(ref_fasta := reference_path(REF_FASTA_KEY)),
+            'reference_fasta_fai': str(ref_fasta) + '.fai',
+            'reference_dict': str(ref_fasta.with_suffix('.dict')),
+        }
+
+        expected_d = self.expected_outputs(dataset)
+        j = add_gatk_sv_job(
+            batch=self.b,
+            dataset=dataset,
+            wfl_name=self.name,
+            input_dict=input_dict,
+            expected_out_dict=expected_d,
+        )
+        return self.make_outputs(dataset, data=expected_d, jobs=[j])
+
+
 @click.command()
 @click.argument('config_paths', nargs=-1)
 def main(config_paths: list[str]):
@@ -467,7 +559,7 @@ def main(config_paths: list[str]):
     if _cpg_config_path_env_var := os.environ.get('CPG_CONFIG_PATH'):
         config_paths = _cpg_config_path_env_var.split(',') + config_paths
     set_config_paths(list(config_paths))
-    run_workflow(stages=[GatherBatchEvidence])
+    run_workflow(stages=[ClusterBatch])
 
 
 if __name__ == '__main__':
