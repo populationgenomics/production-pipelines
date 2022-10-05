@@ -34,7 +34,7 @@ fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
 coloredlogs.install(level='DEBUG', fmt=fmt)
 
 
-GATK_SV_COMMIT = '01b19c5c68c6ef16644625e5085d563df9a0ae26'
+GATK_SV_COMMIT = 'babfd49d19aad41bd7e937b71cac10e29f3cee09'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 REF_FASTA_KEY = 'broad/bwa_ref_fasta'  # change to 'broad/ref_fasta' for DRAGMAP CRAMs
 
