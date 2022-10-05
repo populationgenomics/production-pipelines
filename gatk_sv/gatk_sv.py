@@ -305,33 +305,39 @@ class GatherBatchEvidence(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         d: dict[str, Path] = dict()
-        fname_by_key = {
-            'cnmops_dup': f'{dataset.name}.DUP.header.bed.gz',
-            'cnmops_dup_index': f'{dataset.name}.DUP.header.bed.gz.tbi',
-            'cnmops_del': f'{dataset.name}.DEL.header.bed.gz',
-            'cnmops_del_index': f'{dataset.name}.DEL.header.bed.gz.tbi',
-            'cnmops_large_del': f'{dataset.name}.DEL.large.bed.gz',
-            'cnmops_large_del_index': f'{dataset.name}.DEL.large.bed.gz.tb',
-            'cnmops_large_dup': f'{dataset.name}.DUP.large.bed.gz',
-            'cnmops_large_dup_index': f'{dataset.name}.DUP.large.bed.gz.tbi',
-            'merged_SR': f'{dataset.name}.sr.txt.gz',
-            'merged_SR_index': f'{dataset.name}.sr.txt.gz.tbi',
-            'merged_PE': f'{dataset.name}.pe.txt.gz',
-            'merged_PE_index': f'{dataset.name}.pe.txt.gz.tbi',
-            'merged_BAF': f'{dataset.name}.baf.txt.gz',
-            'merged_BAF_index': f'{dataset.name}.baf.txt.gz.tbi',
-            'merged_bincov': f'{dataset.name}.RD.txt.gz',
-            'merged_bincov_index': f'{dataset.name}.RD.txt.gz.tbi',
-            'SR_stats': f'{dataset.name}.SR.QC_matrix.txt',
-            'PE_stats': f'{dataset.name}.PE.QC_matrix.txt',
-            'BAF_stats': f'{dataset.name}.BAF.QC_matrix.txt',
-            'RD_stats': f'{dataset.name}.RD.QC_matrix.txt',
-            'median_cov': f'{dataset.name}_medianCov.transposed.bed',
-            'merged_dels': f'{dataset.name}.DEL.bed.gz',
-            'merged_dups': f'{dataset.name}.DUP.bed.gz',
-            'Matrix_QC_plot': f'{dataset.name}.00_matrix_FC_QC.png',
+        ending_by_key = {
+            'cnmops_dup': '.DUP.header.bed.gz',
+            'cnmops_dup_index': '.DUP.header.bed.gz.tbi',
+            'cnmops_del': '.DEL.header.bed.gz',
+            'cnmops_del_index': '.DEL.header.bed.gz.tbi',
+            'cnmops_large_del': '.DEL.large.bed.gz',
+            'cnmops_large_del_index': '.DEL.large.bed.gz.tb',
+            'cnmops_large_dup': '.DUP.large.bed.gz',
+            'cnmops_large_dup_index': '.DUP.large.bed.gz.tbi',
+            'merged_SR': '.sr.txt.gz',
+            'merged_SR_index': '.sr.txt.gz.tbi',
+            'merged_PE': '.pe.txt.gz',
+            'merged_PE_index': '.pe.txt.gz.tbi',
+            'merged_BAF': '.baf.txt.gz',
+            'merged_BAF_index': '.baf.txt.gz.tbi',
+            'merged_bincov': '.RD.txt.gz',
+            'merged_bincov_index': '.RD.txt.gz.tbi',
+            'SR_stats': '.SR.QC_matrix.txt',
+            'PE_stats': '.PE.QC_matrix.txt',
+            'BAF_stats': '.BAF.QC_matrix.txt',
+            'RD_stats': '.RD.QC_matrix.txt',
+            'median_cov': '_medianCov.transposed.bed',
+            'merged_dels': '.DEL.bed.gz',
+            'merged_dups': '.DUP.bed.gz',
+            'Matrix_QC_plot': '.00_matrix_FC_QC.png',
+            'batch_ploidy_plots': '_ploidy_plots.tar.gz',
+            'batch_ploidy_matrix': '_ploidy_matrix.bed.gz',
         }
-        for key, fname in fname_by_key.items():
+        for caller in SV_CALLERS:
+            ending_by_key[f'std_{caller}_vcf_tar'] = f'.{caller}.tar.gz'
+
+        for key, ending in ending_by_key.items():
+            fname = f'{dataset.name}{ending}'
             d[key] = dataset.prefix() / 'gatk_sv' / self.name.lower() / fname
         return d
 
@@ -364,6 +370,10 @@ class GatherBatchEvidence(DatasetStage):
             'PE_files': [str(input_by_sid[sid]['pe']) for sid in sids],
             'SD_files': [str(input_by_sid[sid]['sd']) for sid in sids],
         }
+        for caller in SV_CALLERS:
+            input_dict[f'{caller}_vcfs'] = [
+                str(input_by_sid[sid][f'{caller}_vcf']) for sid in sids
+            ]
 
         input_dict |= {
             'ref_copy_number_autosomal_contigs': 2,
