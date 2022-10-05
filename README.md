@@ -38,7 +38,7 @@ analysis-runner \
   main.py
 ```
 
-Seqr Loader can be used partially, e.g. to just align and produce GVCFs (CRAM -> GVCF), do joint-calling (GVCF -> pVCF), run AS-VQSR, run matrix table annotation, create Elasticsearch index, create MultiQC reports, etc., if controlled by `workflows/first_stages`, `workflows/last_stages`, or `workflows/only_stages` parameters. It can also be followed with [the large cohort workflow](https://github.com/populationgenomics/large-cohort-pipeline) for:
+Seqr Loader can be used partially, e.g. to just align and produce GVCFs (CRAM -> GVCF), do joint-calling (GVCF -> pVCF), run AS-VQSR, run matrix table annotation, create Elasticsearch index, create MultiQC reports, etc., if controlled by `workflows/first_stages`, `workflows/last_stages`, or `workflows/only_stages` parameters. It can also be followed by [the large cohort workflow](https://github.com/populationgenomics/large-cohort-pipeline) for:
 	* VDS combiner to joint-call GVCFs directly into a VDS (sparse matrix table),
 	* A dense matrix table subset for QC, PCA, kin, sex and ancestry inference,
 	* PCA ancestry plots,
