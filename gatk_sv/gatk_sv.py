@@ -353,7 +353,7 @@ class GatherBatchEvidence(DatasetStage):
         with combined_ped_path.open('w') as out:
             with dataset.write_ped_file().open() as f:
                 out.write(f.read())
-            # THe ref panel PED doesn't have any header, so can safely concatenate:
+            # The ref panel PED doesn't have a header, so can safely concatenate:
             with reference_path('broad/sv/ref_panel/ped_file').open() as f:
                 out.write(f.read())
 
