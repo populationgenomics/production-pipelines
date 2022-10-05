@@ -384,16 +384,18 @@ class GatherBatchEvidence(DatasetStage):
         """Add jobs to Batch"""
         sids = dataset.get_sample_ids()
 
+        # PED file must include reference panel samples as well, so concatenating
+        # the `dataset` PED file with the reference panel PED file:
         combined_ped_path = (
-            self.tmp_prefix()
+            self.tmp_prefix
             / 'ped_with_ref_panel'
-            / f'{self.alignment_inputs_hash()}.ped'
+            / f'{dataset.alignment_inputs_hash()}.ped'
         )
         with combined_ped_path.open('w') as out:
             with dataset.write_ped_file().open() as f:
                 out.write(f.read())
-            with get_config()['sv_ref_panel']['ped_file'].open() as f:
-                # doesn't have any header, so can safely concatenate:
+            # THe ref panel PED doesn't have any header, so can safely concatenate:
+            with reference_path('broad/sv/ref_panel/ped_file').open() as f:
                 out.write(f.read())
 
         input_by_sid = inputs.as_dict_by_target(stage=GatherSampleEvidence)
