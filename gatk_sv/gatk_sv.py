@@ -499,12 +499,14 @@ class ClusterBatch(DatasetStage):
 
         input_dict: dict[str, Any] = {
             'batch': dataset.name,
-            'del_bed': batch_evidence_d[f'merged_dels'],
-            'dup_bed': batch_evidence_d[f'merged_dups'],
+            'del_bed': str(batch_evidence_d[f'merged_dels']),
+            'dup_bed': str(batch_evidence_d[f'merged_dups']),
             'ped_file': str(_make_combined_ped(dataset)),
         }
         for caller in SV_CALLERS:
-            input_dict[f'{caller}_vcf_tar'] = batch_evidence_d[f'std_{caller}_vcf_tar']
+            input_dict[f'{caller}_vcf_tar'] = str(
+                batch_evidence_d[f'std_{caller}_vcf_tar']
+            )
 
         input_dict |= {
             'depth_exclude_overlap_fraction': 0.5,
