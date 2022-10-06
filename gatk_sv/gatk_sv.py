@@ -12,7 +12,6 @@ from analysis_runner.cromwell import (
     run_cromwell_workflow_from_repo_and_get_outputs,
     CromwellOutputType,
 )
-from hailtop.batch import Resource
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
@@ -35,7 +34,7 @@ fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
 coloredlogs.install(level='DEBUG', fmt=fmt)
 
 
-GATK_SV_COMMIT = '50d47e68ad05b29c78cba16606974ef0dca1b113'
+GATK_SV_COMMIT = 'babfd49d19aad41bd7e937b71cac10e29f3cee09'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 REF_FASTA_KEY = 'broad/bwa_ref_fasta'  # change to 'broad/ref_fasta' for DRAGMAP CRAMs
 
