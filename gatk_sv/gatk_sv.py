@@ -77,7 +77,7 @@ def add_gatk_sv_job(
     input_dict: dict[str, Any],
     expected_out_dict: dict[str, Path],
     sample_id: str | None = None,
-) -> Job:
+) -> list[Job]:
     """
     Generic function to add a job that would run one GATK-SV workflow.
     """
@@ -92,7 +92,7 @@ def add_gatk_sv_job(
         outputs_to_collect[key] = CromwellOutputType.single_path(f'{wfl_name}.{key}')
 
     job_prefix = make_job_name(wfl_name, sample=sample_id, dataset=dataset.name)
-    output_dict: dict[str, Resource] = run_cromwell_workflow_from_repo_and_get_outputs(
+    submit_j, output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
         b=batch,
         job_prefix=job_prefix,
         dataset=get_config()['workflow']['dataset'],
@@ -115,7 +115,7 @@ def add_gatk_sv_job(
         out_path = expected_out_dict[key]
         cmds.append(f'gsutil cp $(cat {resource}) {out_path}')
     copy_j.command(command(cmds, setup_gcp=True))
-    return copy_j
+    return [submit_j, copy_j]
 
 
 @stage
@@ -212,7 +212,7 @@ class GatherSampleEvidence(SampleStage):
 
         expected_d = self.expected_outputs(sample)
 
-        j = add_gatk_sv_job(
+        jobs = add_gatk_sv_job(
             batch=self.b,
             dataset=sample.dataset,
             wfl_name=self.name,
@@ -220,7 +220,7 @@ class GatherSampleEvidence(SampleStage):
             expected_out_dict=expected_d,
             sample_id=sample.id,
         )
-        return self.make_outputs(sample, data=expected_d, jobs=[j])
+        return self.make_outputs(sample, data=expected_d, jobs=jobs)
 
 
 @stage(required_stages=GatherSampleEvidence)
@@ -285,14 +285,14 @@ class EvidenceQC(DatasetStage):
         )
 
         expected_d = self.expected_outputs(dataset)
-        j = add_gatk_sv_job(
+        jobs = add_gatk_sv_job(
             batch=self.b,
             dataset=dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
         )
-        return self.make_outputs(dataset, data=expected_d, jobs=[j])
+        return self.make_outputs(dataset, data=expected_d, jobs=jobs)
 
 
 def _make_combined_ped(dataset: Dataset) -> Path:
@@ -451,14 +451,14 @@ class GatherBatchEvidence(DatasetStage):
         )
 
         expected_d = self.expected_outputs(dataset)
-        j = add_gatk_sv_job(
+        jobs = add_gatk_sv_job(
             batch=self.b,
             dataset=dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
         )
-        return self.make_outputs(dataset, data=expected_d, jobs=[j])
+        return self.make_outputs(dataset, data=expected_d, jobs=jobs)
 
 
 @stage(required_stages=GatherBatchEvidence)
@@ -538,14 +538,14 @@ class ClusterBatch(DatasetStage):
         }
 
         expected_d = self.expected_outputs(dataset)
-        j = add_gatk_sv_job(
+        jobs = add_gatk_sv_job(
             batch=self.b,
             dataset=dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
         )
-        return self.make_outputs(dataset, data=expected_d, jobs=[j])
+        return self.make_outputs(dataset, data=expected_d, jobs=jobs)
 
 
 @click.command()
