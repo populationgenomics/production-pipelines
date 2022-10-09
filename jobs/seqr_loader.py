@@ -6,6 +6,7 @@ from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
 from cpg_utils import Path
+from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, genome_build, query_command
 
 from query_modules import seqr_loader
@@ -26,7 +27,7 @@ def annotate_cohort_jobs(
     Annotate cohort for seqr loader.
     """
     j = b.new_job(f'annotate cohort', job_attrs)
-    j.image(image_path('hail'))
+    j.image(get_config()['workflow']['driver_image'])
     j.command(
         query_command(
             seqr_loader,
@@ -62,7 +63,7 @@ def annotate_dataset_jobs(
     subset_j = b.new_job(
         f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
     )
-    subset_j.image(image_path('hail'))
+    subset_j.image(get_config()['workflow']['driver_image'])
     assert sample_ids
     subset_j.command(
         query_command(
@@ -78,7 +79,7 @@ def annotate_dataset_jobs(
     annotate_j = b.new_job(
         f'annotate dataset', (job_attrs or {}) | {'tool': 'hail query'}
     )
-    annotate_j.image(image_path('hail'))
+    annotate_j.image(get_config()['workflow']['driver_image'])
     annotate_j.command(
         query_command(
             seqr_loader,
