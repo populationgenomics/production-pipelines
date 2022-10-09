@@ -16,6 +16,7 @@ from cpg_utils.workflows.workflow import (
     DatasetStage,
     Cohort,
     Dataset,
+    get_workflow,
 )
 
 from .joint_genotyping import JointGenotyping
@@ -180,7 +181,9 @@ class MtToEs(DatasetStage):
         Expected to generate a Seqr index, which is not a file
         """
         sequencing_type = get_config()['workflow']['sequencing_type']
-        index_name = f'{dataset.name}-{sequencing_type}-{self.run_id}'.lower()
+        index_name = (
+            f'{dataset.name}-{sequencing_type}-{get_workflow().run_timestamp}'.lower()
+        )
         return {
             'index_name': index_name,
             'done_flag': dataset.prefix() / 'es' / f'{index_name}.done',

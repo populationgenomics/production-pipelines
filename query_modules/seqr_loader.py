@@ -26,22 +26,23 @@ def load_vqsr(site_only_vqsr_vcf_path: str):
         reference_genome=genome_build(),
     ).rows()
 
-    # Annotating FILTERS from AS_FilterStatus before dropping that latter
-    ht = ht.annotate(
-        filters=ht.filters.union(hl.set(ht.info.AS_FilterStatus)).filter(
-            lambda val: val != 'PASS'
-        ),
-    )
-
     # Dropping all INFO/AS* annotations as well as InbreedingCoeff, as they are
     # causing problems splitting multiallelics after parsing by Hail.
-    as_fields = [f for f in ht.info if f.startswith('AS_')]
+    as_fields = [f for f in ht.info if f.startswith('AS_') and f != 'AS_FilterStatus']
     fields_to_drop = as_fields + ['InbreedingCoeff']
     ht = ht.annotate(info=ht.info.drop(*fields_to_drop))
 
     logging.info(f'AS-VQSR: splitting multiallelics...')
     unsplit_count = ht.count()
     ht = hl.split_multi_hts(ht)
+    ht = ht.annotate(
+        info=ht.info.annotate(AS_FilterStatus=ht.info.AS_FilterStatus[ht.a_index - 1])
+    )
+    ht = ht.annotate(
+        filters=ht.filters.union(hl.set([ht.info.AS_FilterStatus])).filter(
+            lambda val: val != 'PASS'
+        ),
+    )
 
     split_count = ht.count()
     logging.info(
