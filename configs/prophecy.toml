@@ -1,4 +1,5 @@
 [workflow]
+access_level = 'full'
 last_stage = 'Genotype'
 skip_samples = [
   'CPG216275',  # https://batch.hail.populationgenomics.org.au/batches/74382

@@ -3,7 +3,7 @@
 """
 Batch pipeline to run WGS QC.
 """
-
+from cpg_utils.config import get_config
 from cpg_utils.workflows.utils import rich_sample_id_seds
 from hailtop.batch.job import Job
 from hailtop.batch import Batch, ResourceFile
@@ -148,7 +148,7 @@ def check_report_job(
         title += f' [{label}]'
     check_j = b.new_job(f'{title} check', (job_attrs or {}) | dict(tool='python'))
     STANDARD.set_resources(check_j, ncpu=2)
-    check_j.image(image_path('hail'))
+    check_j.image(get_config()['workflow']['driver_image'])
 
     script_path = to_path(check_multiqc.__file__)
     script_name = script_path.name

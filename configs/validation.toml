@@ -1,4 +1,5 @@
 [workflow]
+access_level = 'full'
 input_datasets = ['validation']
 create_es_index_for_datasets = ['validation']
 skip_samples = [
@@ -8,3 +9,4 @@ skip_samples = [
 check_inputs = false
 check_intermediates = false
 check_expected_outputs = false
+driver_image = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:14432044df1c5210237727cc10bee817674700c0-hail-48ff6e3a3f08a11ccb5b0ad5366ede25e43837a8'
