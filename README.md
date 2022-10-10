@@ -12,7 +12,7 @@ This repository provides implementations of genomics workflows using Hail Batch 
 Seqr Loader is a combination of the following [WARP](https://github.com/broadinstitute/warp)-inspired workflows:
 
 * Single-sample whole genome and WES germline calling, FASTQ -> GVCF (BWA/DRAGMAP, GATK4 HaplotypeCaller)
-* Re-alignment, CRAM -> GVCF (we use [BAZAM](https://github.com/ssadedin/bazam) to extract FASTQ from CRAM/BAM)
+* Single-sample calling with re-alignment, CRAM -> GVCF (we use [BAZAM](https://github.com/ssadedin/bazam) to extract FASTQ from CRAM/BAM)
 * Whole genome and WES joint-calling, GVCFs -> pVCF
 * WES AS-VQSR and WGS VQSR workflows
 
