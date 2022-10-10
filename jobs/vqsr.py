@@ -157,6 +157,7 @@ def make_vqsr_jobs(
         variant_types=['INDEL', 'MNP', 'MIXED'],
         job_attrs=job_attrs,
     )
+    jobs.append(indel_vcf_j)
     indel_vcf_j.name = f'VQSR: {indel_vcf_j.name}'
     indel_vcf = indel_vcf_j.output_vcf
     assert isinstance(indel_vcf, hb.ResourceGroup)
@@ -214,6 +215,7 @@ def make_vqsr_jobs(
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             )
             snp_subset_j.name = f'VQSR: {snp_subset_j.name}'
+            jobs.append(snp_subset_j)
             snp_subset_vcf = snp_subset_j.output_vcf
             snps_interval_vcfs.append(snp_subset_vcf)
 
