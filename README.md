@@ -60,11 +60,11 @@ Seqr Loader can be used partially, controlled by `workflows/first_stages`, `work
 
 ### Align Seqr genomes or exomes and produce CRAM QC
 
-All configuration files that is passed with the `--config` option are combined by analysis-runner. In order to align data, you only need to trigger the `Align` stage from the workflow, which can be done with `workflows/last_stages`. So you can create a configuration file like the following:
+All configuration files that is passed with the `--config` option are combined by analysis-runner. In order to align data, you only need to trigger the `Align` stage from the workflow (or `CramMultiQC`, if you also want a dataset-level MultiQC report), which can be done with `workflows/last_stages`. So you can create a configuration file like the following:
 
 ```toml
 [workflow]
-last_stages = ['Align', 'CramMultiQC']
+last_stages = ['CramMultiQC']
 ```
 
 And assuming it's named `config.toml`, run:
@@ -92,7 +92,7 @@ Do the same as above, but with the following section in `config.toml`:
 
 ```toml
 [workflow]
-last_stages = ['Genotype', 'GvcfMultiQC']
+last_stages = ['GvcfMultiQC']
 ```
 
 The genome GVCF QC report will be exposed as https://main-web.populationgenomics.org.au/validation/qc/gvcf/multiqc.html, for `validation` samples it would include a [hap.py](https://github.com/Illumina/hap.py) section with validation stats.
