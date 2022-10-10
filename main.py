@@ -7,7 +7,9 @@ import os
 
 import coloredlogs
 import click
-from cpg_utils.workflows.workflow import get_workflow
+
+from cpg_utils import to_path
+from cpg_utils.workflows.workflow import run_workflow
 from cpg_utils.config import set_config_paths
 from stages.multiqc import GvcfMultiQC, CramMultiQC
 from stages.seqr_loader import MtToEs
@@ -23,10 +25,14 @@ def main(config_paths: list[str]):
     Run a workflow, using CONFIG_PATHS in the order specified, overriding
     $CPG_CONFIG_PATH if specified.
     """
-    if _cpg_config_path_env_var := os.environ.get('CPG_CONFIG_PATH'):
-        config_paths = _cpg_config_path_env_var.split(',') + list(config_paths)
+    base_config_path = to_path(__file__).parent / 'configs' / 'seqr.toml'
+    assert base_config_path.exists(), base_config_path
+    config_paths = [str(base_config_path)] + list(config_paths)
+    if _env_var := os.environ.get('CPG_CONFIG_PATH'):
+        config_paths += _env_var.split(',') + list(config_paths)
     set_config_paths(list(config_paths))
-    get_workflow().run(stages=[MtToEs, CramMultiQC, GvcfMultiQC])
+
+    run_workflow(stages=[MtToEs, CramMultiQC, GvcfMultiQC])
 
 
 if __name__ == '__main__':
