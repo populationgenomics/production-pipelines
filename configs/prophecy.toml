@@ -1,11 +1,12 @@
 [workflow]
+access_level = 'full'
 last_stage = 'Genotype'
 skip_samples = [
   'CPG216275',  # https://batch.hail.populationgenomics.org.au/batches/74382
   'CPG216010',  # https://batch.hail.populationgenomics.org.au/batches/74382
 ]
 
-datasets = ['prophecy']
+input_datasets = ['prophecy']
 sequencing_type = 'genome'
 access_level = 'full'
 dataset = 'prophecy'

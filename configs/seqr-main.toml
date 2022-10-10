@@ -1,6 +1,6 @@
 [workflow]
 access_level = 'full'
-datasets = [
+input_datasets = [
     'acute-care',
     'perth-neuro',
     'ravenscroft-rdstudy',

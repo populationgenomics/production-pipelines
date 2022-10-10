@@ -1,4 +1,4 @@
 [workflow]
 access_level = 'test'
-datasets = ['validation']
+only_datasets = ['validation']
 create_es_index_for_datasets = ['validation']
