@@ -20,6 +20,7 @@ dataset_gcp_project = 'test-analysis-dataset-1234'
 dataset = 'test-analysis-dataset'
 access_level = 'test'
 sequencing_type = 'genome'
+driver_image = '<stub>'
 
 skip_stages = ['Align']
 check_inputs = false
