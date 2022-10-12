@@ -10,6 +10,7 @@ from cpg_utils.workflows.batch import get_batch
 from cpg_utils.workflows.filetypes import BamPath, FastqPair, FastqPairs
 from cpg_utils.workflows.inputs import get_cohort
 from cpg_utils.workflows.targets import Cohort
+from cpg_utils.workflows.utils import timestamp
 from cpg_utils.workflows.workflow import get_workflow
 from cpg_utils.config import set_config_paths
 from stages.seqr_loader import MtToEs
@@ -33,6 +34,7 @@ def _set_config(results_prefix: Path, extra_conf: dict | None = None):
                 'check_intermediates': False,
                 'check_expected_outputs': False,
                 'path_scheme': 'local',
+                'status_reporter': None,
             },
             'hail': {
                 'billing_project': 'test-analysis-dataset',
