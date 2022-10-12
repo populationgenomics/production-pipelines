@@ -32,12 +32,7 @@ def main(config_paths: list[str]):
         config_paths += _env_var.split(',') + list(config_paths)
     set_config_paths(list(config_paths))
 
-    stages = [GvcfMultiQC, CramMultiQC, MtToEs]
-    if last_stages := get_config()['workflow'].get('last_stages'):
-        stages = [s for s in stages if s.__name__ in last_stages]
-    if only_stages := get_config()['workflow'].get('only_stages'):
-        stages = [s for s in stages if s.__name__ in only_stages]
-    run_workflow(stages=stages)
+    run_workflow(stages=[GvcfMultiQC, CramMultiQC, MtToEs])
 
 
 if __name__ == '__main__':
