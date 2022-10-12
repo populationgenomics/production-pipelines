@@ -1,16 +1,15 @@
 """
 Utils for submitting the workflow to a Dataproc cluster.
 """
-import inspect
 import logging
-import math
-import tempfile
 
+import math
 from analysis_runner import dataproc
+from hailtop.batch.job import Job
+
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.workflows.batch import get_batch
-from hailtop.batch.job import Job
 
 logger = logging.getLogger(__file__)
 
