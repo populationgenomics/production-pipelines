@@ -5,12 +5,12 @@ Entry point to run the workflow.
 """
 import os
 
-import coloredlogs
 import click
+import coloredlogs
 
 from cpg_utils import to_path
-from cpg_utils.workflows.workflow import run_workflow
 from cpg_utils.config import set_config_paths
+from cpg_utils.workflows.workflow import run_workflow
 from stages.multiqc import GvcfMultiQC, CramMultiQC
 from stages.seqr_loader import MtToEs
 
@@ -19,7 +19,7 @@ coloredlogs.install(level='INFO', fmt=fmt)
 
 
 @click.command()
-@click.argument('config_paths', nargs=-1)
+@click.option('--config', 'config_paths', multiple=True)
 def main(config_paths: list[str]):
     """
     Run a workflow, using CONFIG_PATHS in the order specified, overriding
@@ -32,7 +32,7 @@ def main(config_paths: list[str]):
         config_paths += _env_var.split(',') + list(config_paths)
     set_config_paths(list(config_paths))
 
-    run_workflow(stages=[MtToEs, CramMultiQC, GvcfMultiQC])
+    run_workflow(stages=[GvcfMultiQC, CramMultiQC, MtToEs])
 
 
 if __name__ == '__main__':
