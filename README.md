@@ -40,7 +40,7 @@ The workflows use Metamist as a source of FASTQ, CRAMs, and sample/participant m
 
 ### Usage
 
-Run `main.py seqr` through the analysis runner:
+Run `main.py seqr_loader` through the analysis runner:
 
 ```bash
 analysis-runner \
