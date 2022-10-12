@@ -19,7 +19,7 @@ coloredlogs.install(level='INFO', fmt=fmt)
 
 
 @click.command()
-@click.argument('config_paths', nargs=-1)
+@click.option('--config', 'config_paths', multiple=True)
 def main(config_paths: list[str]):
     """
     Run a workflow, using CONFIG_PATHS in the order specified, overriding
