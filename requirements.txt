@@ -1,4 +1,5 @@
 cpg-utils [workflows]
+cloudpathlib
 analysis-runner
 cpg-gnomad
 pandas
