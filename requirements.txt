@@ -12,3 +12,5 @@ click
 toml
 hail
 coloredlogs
+numpy
+bokeh

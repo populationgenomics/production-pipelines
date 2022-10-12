@@ -171,7 +171,7 @@ def _infer_pop_labels(
             'and assign population labels to remaining samples'
         )
         pop_ht = scores_ht.annotate(
-            pop='oth',
+            pop='Other',
             is_training=False,
             pca_scores=scores_ht.scores,
         )

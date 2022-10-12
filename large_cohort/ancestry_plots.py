@@ -2,9 +2,8 @@
 Plot ancestry PCA analysis results
 """
 
-import logging
 from collections import Counter
-from typing import List, Iterable, Optional
+from typing import List, Iterable
 
 import pandas as pd
 import numpy as np
@@ -15,6 +14,7 @@ from bokeh.transform import factor_cmap, factor_mark
 from bokeh.plotting import ColumnDataSource, figure
 from bokeh.palettes import turbo  # flake: disable=F401
 from bokeh.models import CategoricalColorMapper, HoverTool
+
 from cpg_utils import Path
 from cpg_utils.hail_batch import reference_path, genome_build
 
@@ -70,20 +70,6 @@ def run(
         return ht_
 
     ht = key_by_external_id(scores_ht, sample_ht)
-
-    pop_full_names = hl.literal(
-        {
-            'nfe': 'Non-Finnish European',
-            'fin': 'Finnish',
-            'mid': 'Middle Eastern',
-            'oth': 'Other',
-            'afr': 'African/African American',
-            'eas': 'East Asian',
-            'sas': 'South Asian',
-            'amr': 'Latino/Admixed American',
-        }
-    )
-    ht = ht.annotate(pop=pop_full_names[ht.pop])
     ht = ht.cache()
 
     eigenvalues = eigenvalues_ht.f0.collect()

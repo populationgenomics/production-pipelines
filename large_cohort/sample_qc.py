@@ -59,8 +59,8 @@ def initialise_sample_table() -> hl.Table:
             'dataset': s.dataset.name,
             'gvcf': str(s.gvcf.path) or None,
             'sex': s.meta.get('sex') or None,
-            'continental_pop': s.meta.get('continental_pop') or None,
-            'subcontinental_pop': s.meta.get('subcontinental_pop') or None,
+            'continental_pop': s.meta.get('Superpopulation name') or None,
+            'subcontinental_pop': s.meta.get('Population name') or None,
         }
         for s in get_cohort().get_samples()
         if s.gvcf
