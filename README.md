@@ -67,14 +67,14 @@ All configuration files that is passed with the `--config` option are combined b
 last_stages = ['CramMultiQC']
 ```
 
-And assuming it's named `config.toml`, run:
+And assuming it's named `myconfig.toml`, run:
 
 ```bash
 analysis-runner --dataset seqr --description "Loader" --output-dir "loader" \
   --access-level test \
   --config configs/genome.toml \
   --config configs/seqr-main.toml \
-  --config config.toml \
+  --config myconfig.toml \
   main.py
 ```
 
@@ -88,7 +88,7 @@ If samples had pedigree data, a Somalier report will be run to infer and validat
 
 ### Call GVCFs for each sample and validate variant calls
 
-Do the same as above, but with the following section in `config.toml`:
+Do the same as above, but with the following section in `myconfig.toml`:
 
 ```toml
 [workflow]
@@ -106,7 +106,7 @@ If you want the workflow to create Elasticsearch indices in the end, run the ent
 create_es_index_for_datasets = ['validation']
 ```
 
-The resulting index will be named using the current datestamp, or using `worfklow/output_version` option if it's specified. The Elasticsearch server is configured using the `elasticsearch` section in `configs/seqr.toml`.
+The resulting index will be named using the current datestamp, or using `worfklow/output_version` option if it's specified. The Elasticsearch server is configured using the `elasticsearch` section in `configs/seqr.toml`. The reason for not automatically creating indices for every project is that the Elasticsearch instance can easily run out of disk space, so additional safeguard is needed. 
 
 ### Run the large cohort workflow
 
