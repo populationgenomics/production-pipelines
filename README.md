@@ -249,8 +249,6 @@ Row fields:
 Key: ['s']
 ```
 
-[//]: # (TODO: pedigree check)
-
 ### Ancestry
 
 PCA results are written into `gs://cpg-prophecy-test/large-cohort/v01/ancestry`:
@@ -275,7 +273,7 @@ Plots for PCA and loadings are written to `gs://cpg-prophecy-test-web/large-coho
  
 #### Dense subset
 
-For PCA, PC-related, and sex imputation, a dense subset of the original data is used. The QC variants for the subset are read from the `references.gnomad.predetermined_qc_variants` Hail table specified in the TOML config. The resulting subset is written to `gs://cpg-prophecy-test/large-cohort/v01/dense-subset.mt`.
+For PCA and PC-relate, a dense subset of the original dataset is used. The markers for the subset are read from the `references.gnomad.predetermined_qc_variants` Hail table specified in the TOML config. The table is suitable for both exomes and genomes, so that a mixture of different sequencing types can be processed together. The resulting subset is written to `gs://cpg-prophecy-test/large-cohort/v01/dense-subset.mt`.
 
 ### Allele-specific variant quality score recalibration (AS-VQSR)
 
@@ -288,7 +286,7 @@ Variants from good quality samples are filtered using the [AS-VQSR method](https
    * SNVs:   `AS_FS`, `AS_SOR`, `AS_ReadPosRankSum`, `AS_MQRankSum`, `AS_QD`, `AS_MQ`,
    * Indels: `AS_FS`, `AS_SOR`, `AS_ReadPosRankSum`, `AS_MQRankSum`, `AS_QD`.
    
-1. THe models are applied to the VCFs and combine them back into one VCF.
+1. The models are applied to the VCFs and combine them back into one VCF.
    
 1. VCF is converted back into a sites-only locus-level Hail table `gs://cpg-prophecy-test/large-cohort/v01/vqsr.ht`, with split multiallelics.
 
@@ -354,7 +352,7 @@ Row fields:
 Key: ['locus', 'alleles']
 ```
 
-#### Gnomad QC
+#### gnomAD QC
 
 The workflow is largely inspired by [the Hail pipeline used for the QC of gnomAD releases](https://github.com/broadinstitute/gnomad_qc). Good summaries of gnomAD QC can be found in gnomAD update blog posts:
 
