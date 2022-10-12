@@ -1,6 +1,6 @@
 cpg-utils [workflows]
 analysis-runner
-cpg-gnomad
+gnomad
 pandas
 peddy
 google-cloud-storage

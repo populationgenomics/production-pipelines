@@ -1,8 +1,16 @@
 [workflow]
+name = 'seqr_loader'
 dataset_gcp_project = 'seqr-308602'
 dataset = 'seqr'
 status_reporter = 'metamist'
 driver_image = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:14432044df1c5210237727cc10bee817674700c0-hail-48ff6e3a3f08a11ccb5b0ad5366ede25e43837a8'
+
+[vqsr]
+# VQSR, when applying model, targets indel_filter_level and snp_filter_level
+# sensitivities. The tool matches them internally to a VQSLOD score cutoff 
+# based on the model's estimated sensitivity to a set of true variants.
+snp_filter_level = 99.7
+indel_filter_level = 99.0
 
 [qc_thresholds.genome.min]
 "MEDIAN_COVERAGE" = 10
