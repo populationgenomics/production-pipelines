@@ -5,7 +5,7 @@ Generic script to run a function on dataproc.
 """
 
 import click
-from large_cohort.utils import start_hail_context
+from cpg_utils.hail_batch import start_query_context
 from cpg_utils import to_path
 from importlib import import_module
 
@@ -17,7 +17,7 @@ from importlib import import_module
 def main(import_module_name: str, function_name: str, function_path_args: list[str]):
     module = import_module(import_module_name)
     func = getattr(module, function_name)
-    start_hail_context()
+    start_query_context()
     func(*[to_path(path) for path in function_path_args])
 
 

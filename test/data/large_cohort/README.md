@@ -11,7 +11,7 @@ do
 done
 
 # Prepare reference
-python prep-ref-tables.py
+python build_ref_tables.py
 gsutil cp -r gs://cpg-reference/subset-toy-chr20-X-Y/ reference/
 
 mkdir -p reference/hg38/v0

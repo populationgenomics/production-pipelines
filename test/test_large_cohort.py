@@ -97,9 +97,9 @@ def test_large_cohort(mocker: MockFixture):
         ancestry_plots,
     )
     from large_cohort.variant_qc import site_only_vcf
-    from large_cohort.utils import start_hail_context
+    from cpg_utils.hail_batch import start_query_context
 
-    start_hail_context()
+    start_query_context()
 
     vds_path = results_prefix / 'v01.vds'
     combiner.run(out_vds_path=vds_path, tmp_prefix=results_prefix / 'tmp')

@@ -7,11 +7,10 @@ Subset reference data to test intervals.
 import hail as hl
 from cpg_utils import to_path
 from cpg_utils.workflows.utils import exists
+from cpg_utils.hail_batch import start_query_context
 
-from larcoh.utils import start_hail_context
 
-
-start_hail_context(
+start_query_context(
     query_backend='batch',
     dataset='thousand-genomes',
     billing_project='thousand-genomes',
