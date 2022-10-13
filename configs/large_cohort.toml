@@ -16,8 +16,8 @@ min_pop_prob = 0.5
 max_kin = 0.2
 # number of principal components
 n_pcs = 16
-# sample metadata tag to get population label (continental_pop, subcontinental_pop)
-pop_tag = 'continental_pop'
+# metamist `Participant/meta` field to get known ancestry label for RF training
+pop_meta_field = 'Superpopulation name'
 
 [large_cohort.sample_qc_cutoffs]
 min_coverage = 18

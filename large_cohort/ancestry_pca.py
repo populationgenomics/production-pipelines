@@ -32,7 +32,6 @@ def run(
     """
     min_pop_prob = get_config()['large_cohort']['min_pop_prob']
     n_pcs = get_config()['large_cohort']['n_pcs']
-    tag = get_config()['large_cohort'].get('pop_tag', 'continental_pop')
     mt = hl.read_matrix_table(str(dense_mt_path))
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
@@ -52,10 +51,8 @@ def run(
 
     scores_ht = hl.read_table(str(out_scores_ht_path))
 
-    training_pop_ht = sample_qc_ht.filter(
-        hl.is_defined(sample_qc_ht[tag]) & (sample_qc_ht[tag] != '-')
-    )
-    training_pop_ht = training_pop_ht.annotate(training_pop=training_pop_ht[tag])
+    training_pop_ht = sample_qc_ht.filter(hl.is_defined(sample_qc_ht.pop))
+    training_pop_ht = training_pop_ht.annotate(training_pop=training_pop_ht.pop)
     pop_ht = _infer_pop_labels(
         scores_ht=scores_ht,
         training_pop_ht=training_pop_ht,

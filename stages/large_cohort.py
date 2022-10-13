@@ -1,8 +1,7 @@
-from cpg_utils import Path, to_path
+from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.workflows.batch import get_batch
-from cpg_utils.workflows.inputs import get_cohort
 from cpg_utils.workflows.targets import Cohort
+from cpg_utils.workflows.utils import slugify
 from cpg_utils.workflows.workflow import (
     stage,
     CohortStage,
@@ -17,9 +16,9 @@ from .align import Align
 class Combiner(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         if vds_version := get_config()['workflow'].get('vds_version'):
+            vds_version = slugify(vds_version)
             if not vds_version.startswith('v'):
                 vds_version = f'v{vds_version}'
-            vds_version = vds_version.replace('.', '-')
 
         vds_version = (
             vds_version or get_workflow().output_version or get_workflow().run_timestamp

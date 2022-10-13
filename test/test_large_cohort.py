@@ -31,7 +31,6 @@ def _set_config(results_prefix: Path, extra_conf: dict | None = None):
                 'dataset': 'thousand-genomes',
                 'access_level': 'test',
                 'sequencing_type': 'genome',
-                'output_version': 'v10',
                 'check_intermediates': True,
                 'path_scheme': 'local',
                 'reference_prefix': str(

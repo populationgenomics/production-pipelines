@@ -11,4 +11,3 @@ skip_samples = [
 
 scatter_count = 20
 output_version = '0.1'
-vds_version = '0.1'
