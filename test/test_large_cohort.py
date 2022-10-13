@@ -2,7 +2,7 @@
 Test Hail Query functions.
 """
 import os
-import coloredlogs
+import logging
 from os.path import exists
 
 import toml
@@ -14,7 +14,8 @@ from cpg_utils.workflows.targets import Cohort
 from cpg_utils.workflows.utils import timestamp
 from pytest_mock import MockFixture
 
-coloredlogs.install(level='INFO')
+logging.basicConfig()
+logging.getLogger().setLevel(logging.INFO)
 
 
 def _set_config(results_prefix: Path, extra_conf: dict | None = None):
