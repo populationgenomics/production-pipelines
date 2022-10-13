@@ -17,7 +17,7 @@ logger = logging.getLogger(__file__)
 DATAPROC_PACKAGES = [
     'cpg-utils',
     'click',
-    'cpg-gnomad==0.6.3',
+    'gnomad',
     'google',
     'slackclient',
     'fsspec',
