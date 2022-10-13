@@ -59,7 +59,7 @@ def initialise_sample_table() -> hl.Table:
             'external_id': s.external_id,
             'dataset': s.dataset.name,
             'gvcf': str(s.gvcf.path) or None,
-            'sex': s.pedigree.sex.value if s.pedigree and s.pedigree else None,
+            'sex': s.pedigree.sex.value,
             'pop': s.meta.get(pop_meta_field) if pop_meta_field else None,
         }
         for s in get_cohort().get_samples()

@@ -50,7 +50,6 @@ def run(
     )
 
     scores_ht = hl.read_table(str(out_scores_ht_path))
-
     training_pop_ht = sample_qc_ht.filter(hl.is_defined(sample_qc_ht['pop']))
     training_pop_ht = training_pop_ht.annotate(training_pop=training_pop_ht.pop)
     pop_ht = _infer_pop_labels(
