@@ -8,11 +8,12 @@ this script would back-populate for an already finished workflow.
 """
 import json
 import logging
+import os
 from collections import defaultdict
 
 import click
 
-from cpg_utils.config import get_config
+from cpg_utils.config import get_config, set_config_paths
 from cpg_utils.workflows.inputs import get_cohort
 from cpg_utils.workflows.status import MetamistStatusReporter
 from cpg_utils.workflows.utils import exists
@@ -21,11 +22,6 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
 
 
-sequencing_type = get_config()['workflow']['sequencing_type']
-access_level = get_config()['workflow']['access_level']
-cohort = get_cohort()
-status = MetamistStatusReporter()
-
 COMMANDS = ['samples', 'qc', 'joint-calling', 'es-index']
 
 
@@ -33,6 +29,15 @@ COMMANDS = ['samples', 'qc', 'joint-calling', 'es-index']
 @click.argument('command', type=click.Choice(COMMANDS))
 @click.option('--config', 'config_paths', multiple=True)
 def main(command: str, config_paths: list[str]):
+    if _env_var := os.environ.get('CPG_CONFIG_PATH'):
+        config_paths += _env_var.split(',') + list(config_paths)
+    set_config_paths(list(config_paths))
+
+    sequencing_type = get_config()['workflow']['sequencing_type']
+    access_level = get_config()['workflow']['access_level']
+    cohort = get_cohort()
+    status = MetamistStatusReporter()
+
     if command == 'samples':
         from sample_metadata.apis import AnalysisApi
         from sample_metadata.models import AnalysisQueryModel, AnalysisStatus
@@ -175,3 +180,7 @@ def main(command: str, config_paths: list[str]):
                 ),
                 project_name=ds_name,
             )
+
+
+if __name__ == '__main__':
+    main()
