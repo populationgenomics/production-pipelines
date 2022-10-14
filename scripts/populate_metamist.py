@@ -34,7 +34,6 @@ def main(command: str, config_paths: list[str]):
     set_config_paths(list(config_paths))
 
     sequencing_type = get_config()['workflow']['sequencing_type']
-    access_level = get_config()['workflow']['access_level']
     cohort = get_cohort()
     status = MetamistStatusReporter()
 
@@ -48,11 +47,11 @@ def main(command: str, config_paths: list[str]):
                 status=AnalysisStatus('completed'),
             )
         )
-        paths = set(a['output'] for a in analyses)
+        existing_paths = set(a['output'] for a in analyses)
 
         for i, sample in enumerate(cohort.get_samples()):
             if path := sample.make_cram_path().path:
-                if str(path) in paths:
+                if str(path) in existing_paths:
                     continue
 
                 if not path.exists():
@@ -90,7 +89,7 @@ def main(command: str, config_paths: list[str]):
 
     if command == 'qc':
         """
-        Add Analysis SMDB entries of type="qc" from a MultiQC JSON data.
+        Add Analysis entries of type="qc" from a MultiQC JSON data.
         """
         multiqc_json_path = (
             cohort.analysis_dataset.prefix() / 'qc' / 'multiqc_data.json'
