@@ -30,22 +30,6 @@ class Combiner(CohortStage):
         from large_cohort.dataproc_utils import dataproc_job
         from large_cohort.combiner import run
 
-        scatter_count = get_config()['workflow'].get('scatter_count', 50)
-        if (
-            policy_name_template := get_config()['hail']
-            .get('dataproc', {})
-            .get('combiner_autoscaling_policy')
-        ):
-            if scatter_count > 100:
-                autoscaling_workers = '200'
-            elif scatter_count > 50:
-                autoscaling_workers = '100'
-            else:
-                autoscaling_workers = '50'
-            policy_name = policy_name_template.format(max_workers=autoscaling_workers)
-        else:
-            policy_name = None
-
         j = dataproc_job(
             job_name=self.__class__.__name__,
             function=run,
@@ -53,7 +37,11 @@ class Combiner(CohortStage):
                 out_vds_path=self.expected_outputs(cohort),
                 tmp_prefix=self.tmp_prefix,
             ),
-            autoscaling_policy=policy_name,
+            autoscaling_policy=(
+                get_config()['hail']
+                .get('dataproc', {})
+                .get('combiner_autoscaling_policy')
+            ),
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 

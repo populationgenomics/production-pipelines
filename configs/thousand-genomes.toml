@@ -3,6 +3,7 @@ dataset_gcp_project = 'thousand-genomes'
 dataset = 'thousand-genomes'
 sequencing_type = 'genome'
 scatter_count = 20
+cram_fasta = 'gs://cpg-reference/hg38/v0/Homo_sapiens_assembly38.fasta'
 
 [hail]
 billing_project = 'thousand-genomes'
