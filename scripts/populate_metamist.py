@@ -72,7 +72,7 @@ def main(command: str, config_paths: list[str]):
                 )
             if (path := sample.make_gvcf_path().path).exists():
                 print(f'#{i+1} {sample} {path}')
-                if str(path) in paths:
+                if str(path) in existing_paths:
                     continue
                 status.create_analysis(
                     str(path),
