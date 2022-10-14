@@ -3,7 +3,6 @@ dataset_gcp_project = 'thousand-genomes'
 dataset = 'thousand-genomes'
 sequencing_type = 'genome'
 scatter_count = 20
-first_stages = ['Combiner']
 
 [hail]
 billing_project = 'thousand-genomes'
