@@ -1,0 +1,43 @@
+[workflow]
+name = 'large_cohort'
+scatter_count = 50
+
+[vqsr]
+# VQSR, when applying model, targets indel_filter_level and snp_filter_level
+# sensitivities. The tool matches them internally to a VQSLOD score cutoff 
+# based on the model's estimated sensitivity to a set of true variants.
+snp_filter_level = 99.7
+indel_filter_level = 99.0
+
+[large_cohort]
+# minimum random forest probability for population assignment
+min_pop_prob = 0.5
+# maximum kin threshold to be considered unrelated
+max_kin = 0.2
+# number of principal components
+n_pcs = 16
+# metamist `Participant/meta` field to get known ancestry label for RF training
+pop_meta_field = 'Superpopulation name'
+
+[large_cohort.sample_qc_cutoffs]
+min_coverage = 18
+max_n_snps = 8000000
+min_n_snps = 2400000
+max_n_singletons = 800000
+max_r_duplication = 0.3
+max_r_het_hom = 3.3
+
+[hail]
+pool_label = 'large-cohort'
+delete_scratch_on_exit = false
+
+[hail.dataproc]
+combiner_autoscaling_policy = 'vcf-combiner-{max_workers}'
+
+[references]
+gencode_gtf = 'gencode/gencode.v39.annotation.gtf.bgz'
+
+[references.gnomad]
+prefix = 'gnomad/v0'
+tel_and_cent_ht = 'telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht'
+predetermined_qc_variants = 'sample_qc/pre_ld_pruning_qc_variants.ht'

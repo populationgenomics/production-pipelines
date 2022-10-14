@@ -1,6 +1,7 @@
 """
 Test entire seqr-loader in a dry mode.
 """
+import os
 
 import toml
 from cpg_utils import to_path, Path
@@ -9,51 +10,60 @@ from cpg_utils.workflows.batch import get_batch
 from cpg_utils.workflows.filetypes import BamPath, FastqPair, FastqPairs
 from cpg_utils.workflows.inputs import get_cohort
 from cpg_utils.workflows.targets import Cohort
+from cpg_utils.workflows.utils import timestamp
 from cpg_utils.workflows.workflow import get_workflow
 from cpg_utils.config import set_config_paths
 from stages.seqr_loader import MtToEs
 from pytest_mock import MockFixture
 
-DEFAULT_CONF = """
-[workflow]
-dataset_gcp_project = 'test-analysis-dataset-1234'
-dataset = 'test-analysis-dataset'
-access_level = 'test'
-sequencing_type = 'genome'
-driver_image = '<stub>'
 
-skip_stages = ['Align']
-check_inputs = false
-check_intermediates = false
-check_expected_outputs = false
-path_scheme = 'local'
-
-[hail]
-billing_project = 'test-analysis-dataset'
-delete_scratch_on_exit = true
-dry_run = true
-backend = 'local'
-"""
-
-
-def _set_config(dir_path: Path, extra_conf: dict | None = None):
-    d = toml.loads(DEFAULT_CONF)
+def _set_config(results_prefix: Path, extra_conf: dict | None = None):
+    with (to_path(__file__).parent.parent / 'configs' / 'seqr_loader.toml').open() as f:
+        d = toml.load(f)
+    update_dict(
+        d,
+        {
+            'workflow': {
+                'dataset_gcp_project': 'test-analysis-dataset-1234',
+                'dataset': 'test-analysis-dataset',
+                'access_level': 'test',
+                'sequencing_type': 'genome',
+                'driver_image': '<stub>',
+                'skip_stages': ['Align'],
+                'check_inputs': False,
+                'check_intermediates': False,
+                'check_expected_outputs': False,
+                'path_scheme': 'local',
+                'status_reporter': None,
+            },
+            'hail': {
+                'billing_project': 'test-analysis-dataset',
+                'delete_scratch_on_exit': True,
+                'dry_run': True,
+                'backend': 'local',
+            },
+        },
+    )
     if extra_conf:
         update_dict(d, extra_conf)
-    config_path = dir_path / 'config.toml'
-    with config_path.open('w') as f:
+    with (out_path := results_prefix / 'config.toml').open('w') as f:
         toml.dump(d, f)
-    set_config_paths([str(config_path)])
+    set_config_paths([str(out_path)])
 
 
-def test_seqr_loader_dry(mocker: MockFixture, tmpdir: str):
+def test_seqr_loader_dry(mocker: MockFixture):
     """
     Test entire seqr-loader in a dry mode.
     """
+    results_prefix = (
+        to_path(__file__).parent / 'results' / os.getenv('TEST_TIMESTAMP', timestamp())
+    ).absolute()
+    results_prefix.mkdir(parents=True, exist_ok=True)
+
     _set_config(
-        to_path(tmpdir),
+        results_prefix=results_prefix,
         extra_conf={
-            'local_dir': tmpdir,
+            'local_dir': str(results_prefix),
         },
     )
 

@@ -5,12 +5,12 @@ repos:
   rev: v4.2.0
   hooks:
   - id: check-yaml
-    exclude: '\.*conda/.*'
   - id: check-case-conflict
   - id: check-merge-conflict
   - id: detect-private-key
   - id: debug-statements
   - id: check-added-large-files
+    exclude: '\.*.interval_list'
 
 - repo: https://gitlab.com/pycqa/flake8
   rev: '4.0.1'
@@ -23,4 +23,4 @@ repos:
   rev: 'v0.960'
   hooks:
   - id: mypy
-    additional_dependencies: [ types-PyYAML==6.0.4, types-toml, types-python-slugify ]
+    args: [--pretty, --show-error-codes, --install-types, --non-interactive]
