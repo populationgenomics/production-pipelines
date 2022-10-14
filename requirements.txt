@@ -1,16 +1,1 @@
 cpg-utils [workflows]
-analysis-runner
-gnomad
-pandas
-peddy
-google-cloud-storage
-google-cloud-secret-manager
-fsspec
-slack_sdk
-elasticsearch == 8.*
-click
-toml
-hail
-coloredlogs
-numpy
-bokeh
