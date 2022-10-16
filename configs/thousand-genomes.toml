@@ -3,6 +3,9 @@ dataset_gcp_project = 'thousand-genomes'
 dataset = 'thousand-genomes'
 sequencing_type = 'genome'
 scatter_count = 20
+first_stages = ['Combiner']
+last_stages = ['Frequencies']
+skip_qc = true
 
 [references.broad]
 ref_fasta = 'Homo_sapiens_assembly38.fasta'

@@ -11,8 +11,6 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.workflows.batch import get_batch
 
-logger = logging.getLogger(__file__)
-
 
 DATAPROC_PACKAGES = [
     'cpg-utils',
@@ -46,8 +44,10 @@ def dataproc_job(
     """
     Submit script as a dataproc job.
     """
+    from large_cohort import dataproc_script
+
     script = (
-        f'scripts/dataproc_script.py '
+        f'{dataproc_script.__file__} '
         f'{function.__module__} {function.__name__} '
         f'{" ".join([str(p) for p in function_path_args.values()])}'
     )
