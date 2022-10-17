@@ -16,7 +16,7 @@ from cpg_utils.workflows.workflow import (
 )
 
 from jobs import align, somalier
-from jobs.align import Aligner, MarkDupTool, MissingAlignmentInputException
+from jobs.align import MissingAlignmentInputException
 from jobs.verifybamid import verifybamid
 from jobs.picard import picard_wgs_metrics, picard_collect_metrics, picard_hs_metrics
 
@@ -41,6 +41,8 @@ def qc_functions() -> list[Qc]:
     """
     QC functions and their outputs for MultiQC aggregation
     """
+    if get_config()['workflow'].get('skip_qc', False) is True:
+        return []
     qcs = [
         Qc(
             func=None,
@@ -112,18 +114,18 @@ class Align(SampleStage):
         """
         Stage is expected to generate a CRAM file and a corresponding index.
         """
-        qc_outs: dict[str, Path] = dict()
+        outs = {
+            'cram': sample.make_cram_path().path,
+        }
         for qc in qc_functions():
             for key, out in qc.outs.items():
                 if key == 'somalier':
-                    qc_outs[key] = sample.make_cram_path().somalier_path
+                    outs[key] = sample.make_cram_path().somalier_path
                 elif out:
-                    qc_outs[key] = (
+                    outs[key] = (
                         sample.dataset.prefix() / 'qc' / key / f'{sample.id}{out.suf}'
                     )
-        return {
-            'cram': sample.make_cram_path().path,
-        } | qc_outs
+        return outs
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """

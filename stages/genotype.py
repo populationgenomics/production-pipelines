@@ -31,12 +31,16 @@ class Genotype(SampleStage):
         """
         Generate a GVCF and corresponding TBI index, as well as QC.
         """
-        qc_prefix = sample.dataset.prefix() / 'qc' / sample.id
-        return {
+        outs = {
             'gvcf': sample.make_gvcf_path().path,
-            'qc_summary': to_path(f'{qc_prefix}.variant_calling_summary_metrics'),
-            'qc_detail': to_path(f'{qc_prefix}.variant_calling_detail_metrics'),
         }
+        if get_config()['workflow'].get('skip_qc', False) is False:
+            qc_prefix = sample.dataset.prefix() / 'qc' / sample.id
+            outs |= {
+                'qc_summary': to_path(f'{qc_prefix}.variant_calling_summary_metrics'),
+                'qc_detail': to_path(f'{qc_prefix}.variant_calling_detail_metrics'),
+            }
+        return outs
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """
@@ -54,19 +58,20 @@ class Genotype(SampleStage):
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.extend(gvcf_jobs)
-        qc_j = vcf_qc(
-            b=self.b,
-            vcf_or_gvcf=GvcfPath(gvcf_path).resource_group(self.b),
-            is_gvcf=True,
-            job_attrs=self.get_job_attrs(sample),
-            output_summary_path=self.expected_outputs(sample)['qc_summary'],
-            output_detail_path=self.expected_outputs(sample)['qc_detail'],
-            overwrite=not get_config()['workflow'].get('check_intermediates'),
-        )
-        if qc_j:
-            if gvcf_jobs:
-                qc_j.depends_on(*gvcf_jobs)
-            jobs.append(qc_j)
+        if get_config()['workflow'].get('skip_qc', False) is False:
+            qc_j = vcf_qc(
+                b=self.b,
+                vcf_or_gvcf=GvcfPath(gvcf_path).resource_group(self.b),
+                is_gvcf=True,
+                job_attrs=self.get_job_attrs(sample),
+                output_summary_path=self.expected_outputs(sample)['qc_summary'],
+                output_detail_path=self.expected_outputs(sample)['qc_detail'],
+                overwrite=not get_config()['workflow'].get('check_intermediates'),
+            )
+            if qc_j:
+                if gvcf_jobs:
+                    qc_j.depends_on(*gvcf_jobs)
+                jobs.append(qc_j)
 
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
 

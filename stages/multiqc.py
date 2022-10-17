@@ -5,6 +5,7 @@ Stage that summarises QC.
 import logging
 
 from cpg_utils import Path
+from cpg_utils.config import get_config
 from cpg_utils.workflows.workflow import (
     stage,
     StageInput,
@@ -40,6 +41,8 @@ class CramMultiQC(DatasetStage):
         """
         Expected to produce an HTML and a corresponding JSON file.
         """
+        if get_config()['workflow'].get('skip_qc', False) is True:
+            return {}
         h = dataset.alignment_inputs_hash()
         return {
             'html': dataset.web_prefix() / 'qc' / 'cram' / 'multiqc.html',
@@ -133,6 +136,8 @@ class GvcfMultiQC(DatasetStage):
         """
         Expected to produce an HTML and a corresponding JSON file.
         """
+        if get_config()['workflow'].get('skip_qc', False) is True:
+            return {}
         h = dataset.alignment_inputs_hash()
         return {
             'html': dataset.web_prefix() / 'qc' / 'gvcf' / 'multiqc.html',
@@ -215,6 +220,8 @@ class JointVcfMultiQC(CohortStage):
         """
         Expected to produce an HTML and a corresponding JSON file.
         """
+        if get_config()['workflow'].get('skip_qc', False) is True:
+            return {}
 
         h = cohort.alignment_inputs_hash()
         return {
