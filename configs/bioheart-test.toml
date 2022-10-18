@@ -1,0 +1,16 @@
+[workflow]
+dataset = 'bioheart'
+input_datasets = ['bioheart']
+dataset_gcp_project = 'bioheart'
+sequencing_type = 'genome'
+access_level = 'test'
+
+check_inputs = true
+check_expected_outputs = true
+# leave this to true, since one sample doesn't have sequencing data
+skip_samples_with_missing_input = true
+
+output_version = '0.1'
+
+[hail]
+billing_project = 'bioheart'
