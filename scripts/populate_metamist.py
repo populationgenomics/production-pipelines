@@ -22,7 +22,7 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
 
 
-COMMANDS = ['samples', 'qc', 'joint-calling', 'es-index']
+COMMANDS = ['analyses', 'qc', 'joint-calling', 'es-index']
 
 
 @click.command()
@@ -37,7 +37,7 @@ def main(command: str, config_paths: list[str]):
     cohort = get_cohort()
     status = MetamistStatusReporter()
 
-    if command == 'samples':
+    if command == 'analyses':
         from sample_metadata.apis import AnalysisApi
         from sample_metadata.models import AnalysisQueryModel, AnalysisStatus
 
