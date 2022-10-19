@@ -1,6 +1,4 @@
 [workflow]
-dataset_gcp_project = 'acute-care-321904'
-dataset = 'acute-care'
 input_datasets = ['acute-care']
 access_level = 'test'
 only_samples = [
@@ -15,9 +13,6 @@ only_samples = [
     'CPG203059',
 ]
 skip_qc = true
-
-[hail]
-billing_project = 'acute-care'
 
 [references.broad]
 bwa_ref_fasta = 'Homo_sapiens_assembly38.fasta'
