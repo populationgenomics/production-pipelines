@@ -13,7 +13,6 @@ only_samples = [
     'CPG203059',
 ]
 skip_qc = true
-check_expected_outputs = false
 
 [references.broad]
 bwa_ref_fasta = 'Homo_sapiens_assembly38.fasta'

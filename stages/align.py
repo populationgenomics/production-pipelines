@@ -142,9 +142,9 @@ class Align(SampleStage):
                 b=self.b,
                 sample=sample,
                 output_path=sample.make_cram_path(),
-                out_markdup_metrics_path=self.expected_outputs(sample)[
+                out_markdup_metrics_path=self.expected_outputs(sample).get(
                     'markduplicates_metrics'
-                ],
+                ),
                 job_attrs=self.get_job_attrs(sample),
                 overwrite=not get_config()['workflow'].get('check_intermediates'),
             )
