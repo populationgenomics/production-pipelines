@@ -260,14 +260,14 @@ class LoadVqsr(CohortStage):
             function=run,
             function_path_args=dict(
                 site_only_vcf_path=inputs.as_path(cohort, Vqsr, id='vcf'),
-                vqsr_ht_path=self.expected_outputs(cohort)['vqsr_ht'],
+                vqsr_ht_path=self.expected_outputs(cohort),
             ),
             depends_on=inputs.get_jobs(cohort),
         )
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[Combiner, SampleQC, Relatedness])
+@stage(required_stages=[Combiner, SampleQC, Relatedness, LoadVqsr])
 class Frequencies(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return get_workflow().prefix / 'frequencies.ht'
