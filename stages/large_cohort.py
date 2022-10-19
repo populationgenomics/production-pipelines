@@ -266,7 +266,7 @@ class LoadVqsr(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[Combiner, SampleQC, Relatedness, LoadVqsr])
+@stage(required_stages=[Combiner, SampleQC, Relatedness])
 class Frequencies(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return get_workflow().prefix / 'frequencies.ht'
