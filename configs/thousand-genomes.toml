@@ -6,6 +6,7 @@ scatter_count = 20
 first_stages = ['Combiner']
 last_stages = ['Frequencies']
 skip_qc = true
+output_version = '0.1'
 
 [references.broad]
 ref_fasta = 'Homo_sapiens_assembly38.fasta'
