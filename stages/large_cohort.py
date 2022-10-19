@@ -20,9 +20,8 @@ class Combiner(CohortStage):
             if not vds_version.startswith('v'):
                 vds_version = f'v{vds_version}'
 
-        vds_version = (
-            vds_version or get_workflow().output_version or get_workflow().run_timestamp
-        )
+        vds_version = vds_version or get_workflow().output_version
+        vds_version = vds_version or cohort.alignment_inputs_hash()
         return cohort.analysis_dataset.prefix() / 'vds' / f'{vds_version}.vds'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
