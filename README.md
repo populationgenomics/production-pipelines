@@ -47,8 +47,8 @@ analysis-runner \
   --dataset seqr --description "Seqr Loader" --output-dir "seqr" \
   --access-level test \
   --config configs/genome.toml \
-  --config configs/acute-care-test.toml
-  --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_utils:latest
+  --config configs/acute-care-test.toml \
+  --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_utils:latest \
   main.py seqr_loader
 ```
 
@@ -72,6 +72,7 @@ analysis-runner \
   --config configs/genome.toml \
   --config configs/acute-care-test.toml \
   --config ~/myconfig.toml \
+  --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_utils:latest \
   main.py seqr_loader
 ```
 
@@ -123,6 +124,7 @@ analysis-runner \
   --access-level test \
   --config configs/test.toml \
   --config configs/thousand-genomes.toml \
+  --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_utils:latest \
   main.py large_cohort
 ```
 
