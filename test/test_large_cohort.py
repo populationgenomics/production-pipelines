@@ -96,7 +96,7 @@ def test_large_cohort(mocker: MockFixture):
         ancestry_pca,
         ancestry_plots,
     )
-    from large_cohort.variant_qc import site_only_vcf
+    from large_cohort import site_only_vcf
     from cpg_utils.hail_batch import start_query_context
 
     start_query_context()
