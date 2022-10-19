@@ -4,7 +4,7 @@ dataset = 'thousand-genomes'
 sequencing_type = 'genome'
 scatter_count = 20
 first_stages = ['Combiner']
-last_stages = ['Frequencies']
+last_stages = ['LoadVqsr', 'Frequencies']
 skip_qc = true
 output_version = '0.1'
 
