@@ -31,6 +31,7 @@ def run(
         out_ht_path=site_only_ht_path,
     )
     logging.info(f'Writing site-only VCF to {out_vcf_path}')
+    assert out_vcf_path.suffix == '.bgz'
     hl.export_vcf(site_only_ht, str(out_vcf_path), tabix=True)
 
 
