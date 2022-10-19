@@ -14,6 +14,7 @@ only_samples = [
     'CPG203026',
     'CPG203059',
 ]
+skip_qc = true
 
 [hail]
 billing_project = 'acute-care'
