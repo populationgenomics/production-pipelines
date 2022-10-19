@@ -195,7 +195,7 @@ class MakeSiteOnlyVcf(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from large_cohort.dataproc_utils import dataproc_job
-        from large_cohort.variant_qc.site_only_vcf import run
+        from large_cohort.site_only_vcf import run
 
         j = dataproc_job(
             job_name=self.__class__.__name__,
@@ -252,7 +252,7 @@ class LoadVqsr(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from large_cohort.dataproc_utils import dataproc_job
-        from large_cohort.variant_qc.load_vqsr import run
+        from large_cohort.load_vqsr import run
 
         j = dataproc_job(
             job_name=self.__class__.__name__,
@@ -273,7 +273,7 @@ class Frequencies(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from large_cohort.dataproc_utils import dataproc_job
-        from large_cohort.variant_qc.frequencies import run
+        from large_cohort.frequencies import run
 
         j = dataproc_job(
             job_name=self.__class__.__name__,
