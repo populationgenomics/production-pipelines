@@ -138,7 +138,7 @@ class Ancestry(CohortStage):
                 dense_mt_path=inputs.as_path(cohort, DenseSubset),
                 sample_qc_ht_path=inputs.as_path(cohort, SampleQC),
                 relateds_to_drop_ht_path=inputs.as_path(
-                    cohort, Relatedness, id='relateds_to_drop'
+                    cohort, Relatedness, key='relateds_to_drop'
                 ),
                 tmp_prefix=self.tmp_prefix,
                 out_scores_ht_path=self.expected_outputs(cohort)['scores'],
@@ -173,11 +173,11 @@ class AncestryPlots(CohortStage):
             function_path_args=dict(
                 out_path_pattern=self.out_prefix / self.out_fname_pattern,
                 sample_qc_ht_path=inputs.as_path(cohort, SampleQC),
-                scores_ht_path=inputs.as_path(cohort, Ancestry, id='scores'),
-                eigenvalues_ht_path=inputs.as_path(cohort, Ancestry, id='eigenvalues'),
-                loadings_ht_path=inputs.as_path(cohort, Ancestry, id='loadings'),
+                scores_ht_path=inputs.as_path(cohort, Ancestry, key='scores'),
+                eigenvalues_ht_path=inputs.as_path(cohort, Ancestry, key='eigenvalues'),
+                loadings_ht_path=inputs.as_path(cohort, Ancestry, key='loadings'),
                 inferred_pop_ht_path=inputs.as_path(
-                    cohort, Ancestry, id='inferred_pop'
+                    cohort, Ancestry, key='inferred_pop'
                 ),
             ),
             depends_on=inputs.get_jobs(cohort),
@@ -204,7 +204,7 @@ class MakeSiteOnlyVcf(CohortStage):
                 vds_path=inputs.as_path(cohort, Combiner),
                 sample_qc_ht_path=inputs.as_path(cohort, SampleQC),
                 relateds_to_drop_ht_path=inputs.as_path(
-                    cohort, Relatedness, id='relateds_to_drop'
+                    cohort, Relatedness, key='relateds_to_drop'
                 ),
                 out_vcf_path=self.expected_outputs(cohort)['vcf'],
                 tmp_prefix=self.tmp_prefix,
@@ -230,7 +230,7 @@ class Vqsr(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from jobs import vqsr
 
-        vcf_path = inputs.as_path(cohort, MakeSiteOnlyVcf, id='vcf')
+        vcf_path = inputs.as_path(cohort, MakeSiteOnlyVcf, key='vcf')
         jobs = vqsr.make_vqsr_jobs(
             b=self.b,
             input_siteonly_vcf_path=vcf_path,
@@ -258,7 +258,7 @@ class LoadVqsr(CohortStage):
             job_name=self.__class__.__name__,
             function=run,
             function_path_args=dict(
-                site_only_vcf_path=inputs.as_path(cohort, Vqsr, id='vcf'),
+                site_only_vcf_path=inputs.as_path(cohort, Vqsr, key='vcf'),
                 vqsr_ht_path=self.expected_outputs(cohort),
             ),
             depends_on=inputs.get_jobs(cohort),
@@ -282,7 +282,7 @@ class Frequencies(CohortStage):
                 vds_path=inputs.as_path(cohort, stage=Combiner),
                 sample_qc_ht_path=inputs.as_path(cohort, stage=SampleQC),
                 relateds_to_drop_ht_path=inputs.as_path(
-                    cohort, stage=Relatedness, id='relateds_to_drop'
+                    cohort, stage=Relatedness, key='relateds_to_drop'
                 ),
                 out_ht_path=self.expected_outputs(cohort),
             ),

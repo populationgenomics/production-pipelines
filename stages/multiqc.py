@@ -65,8 +65,8 @@ class CramMultiQC(DatasetStage):
 
         paths = []
         try:
-            somalier_samples = inputs.as_path(dataset, SomalierPedigree, id='samples')
-            somalier_pairs = inputs.as_path(dataset, SomalierPedigree, id='pairs')
+            somalier_samples = inputs.as_path(dataset, SomalierPedigree, key='samples')
+            somalier_pairs = inputs.as_path(dataset, SomalierPedigree, key='pairs')
         except StageInputNotFoundError:
             pass
         else:

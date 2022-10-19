@@ -50,7 +50,7 @@ class JointGenotyping(CohortStage):
         """
         gvcf_by_sid = {
             sample.id: GvcfPath(
-                inputs.as_path(target=sample, stage=Genotype, id='gvcf')
+                inputs.as_path(target=sample, stage=Genotype, key='gvcf')
             )
             for sample in cohort.get_samples()
         }
@@ -134,7 +134,7 @@ class JointVcfHappy(SampleStage):
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """Queue jobs"""
-        vcf_path = inputs.as_path(target=self.cohort, stage=JointGenotyping, id='vcf')
+        vcf_path = inputs.as_path(target=self.cohort, stage=JointGenotyping, key='vcf')
 
         jobs = happy(
             b=self.b,
