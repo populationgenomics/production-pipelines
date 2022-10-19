@@ -41,8 +41,12 @@ def qc_functions() -> list[Qc]:
     """
     QC functions and their outputs for MultiQC aggregation
     """
+    qcs = [
+        Qc(func=somalier.extract, outs={'somalier': None}),
+    ]
     if get_config()['workflow'].get('skip_qc', False) is True:
-        return []
+        return qcs
+
     qcs = [
         Qc(
             func=None,
@@ -56,7 +60,6 @@ def qc_functions() -> list[Qc]:
             func=verifybamid,
             outs={'verify_bamid': QcOut('.verify-bamid.selfSM', 'verifybamid/selfsm')},
         ),
-        Qc(func=somalier.extract, outs={'somalier': None}),
         Qc(
             func=picard_collect_metrics,
             outs={
