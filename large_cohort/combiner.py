@@ -8,8 +8,6 @@ from cpg_utils.workflows.inputs import get_cohort
 from cpg_utils.workflows.utils import can_reuse, exists
 import hail as hl
 
-logger = logging.getLogger(__file__)
-
 
 def _check_gvcfs():
     """
@@ -18,7 +16,7 @@ def _check_gvcfs():
     for sample in get_cohort().get_samples():
         if not sample.gvcf:
             if get_config()['workflow'].get('skip_samples_with_missing_input', False):
-                logger.warning(f'Skipping {sample} which is missing GVCF')
+                logging.warning(f'Skipping {sample} which is missing GVCF')
                 sample.active = False
                 continue
             else:
@@ -34,7 +32,7 @@ def _check_gvcfs():
                 if get_config()['workflow'].get(
                     'skip_samples_with_missing_input', False
                 ):
-                    logger.warning(
+                    logging.warning(
                         f'Skipping {sample} that is missing GVCF {sample.gvcf.path}'
                     )
                     sample.active = False
@@ -86,7 +84,7 @@ def run(out_vds_path: Path, tmp_prefix: Path) -> hl.vds.VariantDataset:
             'must be one of: "exome", "genome"'
         )
 
-    logger.info(
+    logging.info(
         f'Combining {len(get_cohort().get_samples())} samples: '
         f'{", ".join(get_cohort().get_sample_ids())}, using parameters: '
         f'{params}'

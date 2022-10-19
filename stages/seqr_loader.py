@@ -44,11 +44,11 @@ class AnnotateCohort(CohortStage):
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        vcf_path = inputs.as_path(target=cohort, stage=JointGenotyping, id='vcf')
+        vcf_path = inputs.as_path(target=cohort, stage=JointGenotyping, key='vcf')
         siteonly_vqsr_vcf_path = inputs.as_path(
-            target=cohort, stage=Vqsr, id='siteonly'
+            target=cohort, stage=Vqsr, key='siteonly'
         )
-        vep_ht_path = inputs.as_path(target=cohort, stage=Vep, id='ht')
+        vep_ht_path = inputs.as_path(target=cohort, stage=Vep, key='ht')
 
         checkpoint_prefix = (
             to_path(self.expected_outputs(cohort)['prefix']) / 'checkpoints'
@@ -114,7 +114,7 @@ class AnnotateDataset(DatasetStage):
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        mt_path = inputs.as_path(target=self.cohort, stage=AnnotateCohort, id='mt')
+        mt_path = inputs.as_path(target=self.cohort, stage=AnnotateCohort, key='mt')
 
         checkpoint_prefix = (
             to_path(self.expected_outputs(dataset)['prefix']) / 'checkpoints'
@@ -199,7 +199,9 @@ class MtToEs(DatasetStage):
             # Skipping dataset that wasn't explicitly requested to upload to ES:
             return self.make_outputs(dataset)
 
-        dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset, id='mt')
+        dataset_mt_path = inputs.as_path(
+            target=dataset, stage=AnnotateDataset, key='mt'
+        )
         index_name = self.expected_outputs(dataset)['index_name']
         done_flag_path = self.expected_outputs(dataset)['done_flag']
 

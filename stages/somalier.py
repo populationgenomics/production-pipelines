@@ -58,7 +58,7 @@ class SomalierPedigree(DatasetStage):
         for sample in dataset.get_samples():
             if EXCLUDE_HIGH_CONTAMINATION:
                 verify_bamid_path = inputs.as_path(
-                    stage=Align, target=sample, id='verify_bamid'
+                    stage=Align, target=sample, key='verify_bamid'
                 )
                 if not exists(verify_bamid_path):
                     logging.warning(
@@ -67,7 +67,7 @@ class SomalierPedigree(DatasetStage):
                     )
                 else:
                     verifybamid_by_sid[sample.id] = verify_bamid_path
-            somalier_path = inputs.as_path(stage=Align, target=sample, id='somalier')
+            somalier_path = inputs.as_path(stage=Align, target=sample, key='somalier')
             somalier_by_sid[sample.id] = somalier_path
 
         html_path = self.expected_outputs(dataset)['html']

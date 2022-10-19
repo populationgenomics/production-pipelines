@@ -31,8 +31,10 @@ max_r_het_hom = 3.3
 pool_label = 'large-cohort'
 delete_scratch_on_exit = false
 
-[hail.dataproc]
-combiner_autoscaling_policy = 'vcf-combiner-{max_workers}'
+# Autoscaling policy must be created in the project that corresponds 
+# to the analysis dataset.
+#[hail.dataproc]
+#combiner_autoscaling_policy = 'vcf-combiner-50'
 
 [references]
 gencode_gtf = 'gencode/gencode.v39.annotation.gtf.bgz'

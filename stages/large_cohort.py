@@ -9,10 +9,10 @@ from cpg_utils.workflows.workflow import (
     StageOutput,
     get_workflow,
 )
-from .align import Align
+from .genotype import Genotype
 
 
-@stage(required_stages=[Align])
+@stage(required_stages=[Genotype])
 class Combiner(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         if vds_version := get_config()['workflow'].get('vds_version'):
@@ -20,31 +20,14 @@ class Combiner(CohortStage):
             if not vds_version.startswith('v'):
                 vds_version = f'v{vds_version}'
 
-        vds_version = (
-            vds_version or get_workflow().output_version or get_workflow().run_timestamp
-        )
+        vds_version = vds_version or get_workflow().output_version
+        vds_version = vds_version or cohort.alignment_inputs_hash()
         return cohort.analysis_dataset.prefix() / 'vds' / f'{vds_version}.vds'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         # Can't import it before all configs are set:
         from large_cohort.dataproc_utils import dataproc_job
         from large_cohort.combiner import run
-
-        scatter_count = get_config()['workflow'].get('scatter_count', 50)
-        if (
-            policy_name_template := get_config()['hail']
-            .get('dataproc', {})
-            .get('combiner_autoscaling_policy')
-        ):
-            if scatter_count > 100:
-                autoscaling_workers = '200'
-            elif scatter_count > 50:
-                autoscaling_workers = '100'
-            else:
-                autoscaling_workers = '50'
-            policy_name = policy_name_template.format(max_workers=autoscaling_workers)
-        else:
-            policy_name = None
 
         j = dataproc_job(
             job_name=self.__class__.__name__,
@@ -53,7 +36,11 @@ class Combiner(CohortStage):
                 out_vds_path=self.expected_outputs(cohort),
                 tmp_prefix=self.tmp_prefix,
             ),
-            autoscaling_policy=policy_name,
+            autoscaling_policy=(
+                get_config()['hail']
+                .get('dataproc', {})
+                .get('combiner_autoscaling_policy')
+            ),
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
@@ -151,7 +138,7 @@ class Ancestry(CohortStage):
                 dense_mt_path=inputs.as_path(cohort, DenseSubset),
                 sample_qc_ht_path=inputs.as_path(cohort, SampleQC),
                 relateds_to_drop_ht_path=inputs.as_path(
-                    cohort, Relatedness, id='relateds_to_drop'
+                    cohort, Relatedness, key='relateds_to_drop'
                 ),
                 tmp_prefix=self.tmp_prefix,
                 out_scores_ht_path=self.expected_outputs(cohort)['scores'],
@@ -186,11 +173,11 @@ class AncestryPlots(CohortStage):
             function_path_args=dict(
                 out_path_pattern=self.out_prefix / self.out_fname_pattern,
                 sample_qc_ht_path=inputs.as_path(cohort, SampleQC),
-                scores_ht_path=inputs.as_path(cohort, Ancestry, id='scores'),
-                eigenvalues_ht_path=inputs.as_path(cohort, Ancestry, id='eigenvalues'),
-                loadings_ht_path=inputs.as_path(cohort, Ancestry, id='loadings'),
+                scores_ht_path=inputs.as_path(cohort, Ancestry, key='scores'),
+                eigenvalues_ht_path=inputs.as_path(cohort, Ancestry, key='eigenvalues'),
+                loadings_ht_path=inputs.as_path(cohort, Ancestry, key='loadings'),
                 inferred_pop_ht_path=inputs.as_path(
-                    cohort, Ancestry, id='inferred_pop'
+                    cohort, Ancestry, key='inferred_pop'
                 ),
             ),
             depends_on=inputs.get_jobs(cohort),
@@ -217,7 +204,7 @@ class MakeSiteOnlyVcf(CohortStage):
                 vds_path=inputs.as_path(cohort, Combiner),
                 sample_qc_ht_path=inputs.as_path(cohort, SampleQC),
                 relateds_to_drop_ht_path=inputs.as_path(
-                    cohort, Relatedness, id='relateds_to_drop'
+                    cohort, Relatedness, key='relateds_to_drop'
                 ),
                 out_vcf_path=self.expected_outputs(cohort)['vcf'],
                 tmp_prefix=self.tmp_prefix,
@@ -243,7 +230,7 @@ class Vqsr(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from jobs import vqsr
 
-        vcf_path = inputs.as_path(cohort, MakeSiteOnlyVcf, id='vcf')
+        vcf_path = inputs.as_path(cohort, MakeSiteOnlyVcf, key='vcf')
         jobs = vqsr.make_vqsr_jobs(
             b=self.b,
             input_siteonly_vcf_path=vcf_path,
@@ -271,8 +258,8 @@ class LoadVqsr(CohortStage):
             job_name=self.__class__.__name__,
             function=run,
             function_path_args=dict(
-                site_only_vcf_path=inputs.as_path(cohort, Vqsr, id='vcf'),
-                vqsr_ht_path=self.expected_outputs(cohort)['vqsr_ht'],
+                site_only_vcf_path=inputs.as_path(cohort, Vqsr, key='vcf'),
+                vqsr_ht_path=self.expected_outputs(cohort),
             ),
             depends_on=inputs.get_jobs(cohort),
         )
@@ -295,7 +282,7 @@ class Frequencies(CohortStage):
                 vds_path=inputs.as_path(cohort, stage=Combiner),
                 sample_qc_ht_path=inputs.as_path(cohort, stage=SampleQC),
                 relateds_to_drop_ht_path=inputs.as_path(
-                    cohort, stage=Relatedness, id='relateds_to_drop'
+                    cohort, stage=Relatedness, key='relateds_to_drop'
                 ),
                 out_ht_path=self.expected_outputs(cohort),
             ),

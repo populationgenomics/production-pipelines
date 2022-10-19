@@ -343,7 +343,9 @@ def make_vqsr_jobs(
         final_vcf = apply_indel_j.output_vcf
 
     if out_path:
-        b.write_output(final_vcf, str(out_path).replace('.vcf.gz', ''))
+        b.write_output(
+            final_vcf, str(out_path).replace('.vcf.gz', '').replace('.vcf.bgz', '')
+        )
     return jobs
 
 

@@ -38,7 +38,7 @@ class Vqsr(CohortStage):
         Submit jobs.
         """
         siteonly_vcf_path = inputs.as_path(
-            stage=JointGenotyping, target=cohort, id='siteonly'
+            stage=JointGenotyping, target=cohort, key='siteonly'
         )
         jobs = vqsr.make_vqsr_jobs(
             b=self.b,

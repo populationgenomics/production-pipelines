@@ -7,11 +7,9 @@ import math
 from analysis_runner import dataproc
 from hailtop.batch.job import Job
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.workflows.batch import get_batch
-
-logger = logging.getLogger(__file__)
 
 
 DATAPROC_PACKAGES = [
@@ -46,8 +44,15 @@ def dataproc_job(
     """
     Submit script as a dataproc job.
     """
+    import large_cohort
+    from large_cohort import dataproc_script
+
+    package_path = to_path(large_cohort.__file__).parent
+    script_path = to_path(dataproc_script.__file__)
+    rel_script_path = script_path.relative_to(package_path.parent)
+
     script = (
-        f'scripts/dataproc_script.py '
+        f'{rel_script_path} '
         f'{function.__module__} {function.__name__} '
         f'{" ".join([str(p) for p in function_path_args.values()])}'
     )
@@ -58,7 +63,7 @@ def dataproc_job(
             batch=get_batch(),
             cluster_id=cluster_id,
             script=script,
-            pyfiles=['large_cohort'],
+            pyfiles=[large_cohort.__name__],
             job_name=job_name,
             region='australia-southeast1',
         )

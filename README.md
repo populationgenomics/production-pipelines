@@ -63,7 +63,7 @@ All configuration files that is passed with the `--config` option are combined b
 last_stages = ['CramMultiQC']
 ```
 
-And assuming it's named `myconfig.toml`, run:
+And assuming it's named `~/myconfig.toml`, run:
 
 ```bash
 analysis-runner \
@@ -71,7 +71,7 @@ analysis-runner \
   --access-level test \
   --config configs/genome.toml \
   --config configs/acute-care-test.toml \
-  --config myconfig.toml \
+  --config ~/myconfig.toml \
   main.py seqr_loader
 ```
 
@@ -85,7 +85,7 @@ If samples had pedigree data, a Somalier report will be run to infer and validat
 
 ### Call GVCFs for each sample and validate variant calls
 
-Do the same as above, but with the following section in `myconfig.toml`:
+Do the same as above, but with the following section in `~/myconfig.toml`:
 
 ```toml
 [workflow]
@@ -119,9 +119,10 @@ A [Hail Query](https://hail.is/) workflow for large germline genomic variant cal
 
 ```sh
 analysis-runner \
-  --dataset prophecy --description "Large Cohort Prophecy" --output-dir "large cohort" \
+  --dataset prophecy --description "Larcoh thousand-genomes" --output-dir "larcoh" \
   --access-level test \
-  --config configs/prophecy-test.toml \
+  --config configs/test.toml \
+  --config configs/thousand-genomes.toml \
   main.py large_cohort
 ```
 
@@ -131,11 +132,11 @@ The workflow will find GVCFs for input samples using Metamist, along with availa
 
 #### VDS
 
-GVCFs are combined into a [VDS folder format](https://hail.is/docs/0.2/vds/hail.vds.VariantDataset.html#variantdataset) which is writen to `gs://cpg-prophecy-test/vds/v01.vds`.
+GVCFs are combined into a [VDS folder format](https://hail.is/docs/0.2/vds/hail.vds.VariantDataset.html#variantdataset) which is writen to `gs://cpg-prophecy-test/vds/v0-1.vds`.
 
 #### Sample QC
 
-* Sample-level metadata and QC is written to `gs://cpg-prophecy-test/large-cohort/v01/sample_qc.ht`, with the following row fields.
+* Sample-level metadata and QC is written to `gs://cpg-prophecy-test/large-cohort/v0-1/sample_qc.ht`, with the following row fields.
 
 Metamist metadata:
 
@@ -226,7 +227,7 @@ Sex imputation based filters are `sex_aneuploidy` and `ambiguous_sex`.
 
 #### Relatedness
 
-[PC-Relate method](https://hail.is/docs/0.2/methods/relatedness.html#hail.methods.pc_relate) is used to identify pairs of the 1st and the 2nd degree relatives (kin coefficient threshold - below which samples are considered unrelated - is specified as `large-cohort.max_kin` in TOML). Pairwise sample relatedness matrix is written as a Hail table index by a tuple of sample IDs: `gs://cpg-prophecy-test/large-cohort/v01/relatedness.ht`
+[PC-Relate method](https://hail.is/docs/0.2/methods/relatedness.html#hail.methods.pc_relate) is used to identify pairs of the 1st and the 2nd degree relatives (kin coefficient threshold - below which samples are considered unrelated - is specified as `large-cohort.max_kin` in TOML). Pairwise sample relatedness matrix is written as a Hail table index by a tuple of sample IDs: `gs://cpg-prophecy-test/large-cohort/v0-1/relatedness.ht`
 
 ```
 Row fields:
@@ -240,7 +241,7 @@ Row fields:
 Key: ['i', 'j']
 ```
 
-`gs://cpg-prophecy-test/large-cohort/v01/relateds_to_drop.ht` is a sample-level table which contains related samples to drop, with top ranking sample selected from each family. Sets of unrelated individuals are determined using Hail's [`maximal_independent_set`](https://hail.is/docs/0.2/methods/misc.html?highlight=maximal_independent_set#hail.methods.maximal_independent_set). 
+`gs://cpg-prophecy-test/large-cohort/v0-1/relateds_to_drop.ht` is a sample-level table which contains related samples to drop, with top ranking sample selected from each family. Sets of unrelated individuals are determined using Hail's [`maximal_independent_set`](https://hail.is/docs/0.2/methods/misc.html?highlight=maximal_independent_set#hail.methods.maximal_independent_set). 
 
 ```
 Row fields:
@@ -252,12 +253,12 @@ Key: ['s']
 
 ### Ancestry
 
-PCA results are written into `gs://cpg-prophecy-test/large-cohort/v01/ancestry`:
-  * `gs://cpg-prophecy-test/large-cohort/v01/ancestry/eigenvalues.ht`
-  * `gs://cpg-prophecy-test/large-cohort/v01/ancestry/loadings.ht`
-  * `gs://cpg-prophecy-test/large-cohort/v01/ancestry/scores.ht`
+PCA results are written into `gs://cpg-prophecy-test/large-cohort/v0-1/ancestry`:
+  * `gs://cpg-prophecy-test/large-cohort/v0-1/ancestry/eigenvalues.ht`
+  * `gs://cpg-prophecy-test/large-cohort/v0-1/ancestry/loadings.ht`
+  * `gs://cpg-prophecy-test/large-cohort/v0-1/ancestry/scores.ht`
  
-When there are samples with known `continental_pop` available, using the PCA results a random forest method is used to infer population labels. The method is trained using 16 principal components as features on samples with known ancestry. Ancestry was assigned to all samples for which the probability of that ancestry was high enough (the threshold is configured as `large_cohort.min_pop_prob` in TOML). Results are written as sample-level table `gs://cpg-prophecy-test/large-cohort/v01/ancestry/inferred_pop.ht`.
+When there are samples with known `continental_pop` available, using the PCA results a random forest method is used to infer population labels. The method is trained using 16 principal components as features on samples with known ancestry. Ancestry was assigned to all samples for which the probability of that ancestry was high enough (the threshold is configured as `large_cohort.min_pop_prob` in TOML). Results are written as sample-level table `gs://cpg-prophecy-test/large-cohort/v0-1/ancestry/inferred_pop.ht`.
 
 ```
 Row fields:
@@ -270,11 +271,11 @@ Row fields:
 Key: ['s']
 ``` 
 
-Plots for PCA and loadings are written to `gs://cpg-prophecy-test-web/large-cohort/v01/ancestry/*`, a bucket that is exposed as https://test-web.populationgenomics.org.au/prophecy/large-cohort/ancestry/*
+Plots for PCA and loadings are written to `gs://cpg-prophecy-test-web/large-cohort/v0-1/ancestry/*`, a bucket that is exposed as https://test-web.populationgenomics.org.au/prophecy/large-cohort/ancestry/*
  
 #### Dense subset
 
-For PCA and PC-relate, a dense subset of the original dataset is used. The markers for the subset are read from the `references.gnomad.predetermined_qc_variants` Hail table specified in the TOML config. The table is suitable for both exomes and genomes, so that a mixture of different sequencing types can be processed together. The resulting subset is written to `gs://cpg-prophecy-test/large-cohort/v01/dense-subset.mt`.
+For PCA and PC-relate, a dense subset of the original dataset is used. The markers for the subset are read from the `references.gnomad.predetermined_qc_variants` Hail table specified in the TOML config. The table is suitable for both exomes and genomes, so that a mixture of different sequencing types can be processed together. The resulting subset is written to `gs://cpg-prophecy-test/large-cohort/v0-1/dense-subset.mt`.
 
 ### Allele-specific variant quality score recalibration (AS-VQSR)
 
@@ -289,7 +290,7 @@ Variants from good quality samples are filtered using the [AS-VQSR method](https
    
 1. The models are applied to the VCFs and combine them back into one VCF.
    
-1. VCF is converted back into a sites-only locus-level Hail table `gs://cpg-prophecy-test/large-cohort/v01/vqsr.ht`, with split multiallelics.
+1. VCF is converted back into a sites-only locus-level Hail table `gs://cpg-prophecy-test/large-cohort/v0-1/vqsr.ht`, with split multiallelics.
 
 ```
 Row fields:
@@ -315,7 +316,7 @@ This pipeline is largely compiled from the following two WDL workflows:
 
 #### Frequencies
 
-Frequencies are calculated using the Hail's [hl.variant_qc](https://hail.is/docs/0.2/methods/genetics.html#hail.methods.variant_qc) method from good quality samples, and written to `gs://cpg-prophecy-test/large-cohort/v01/frequencies.ht` locus-level table with split multiallelics:
+Frequencies are calculated using the Hail's [hl.variant_qc](https://hail.is/docs/0.2/methods/genetics.html#hail.methods.variant_qc) method from good quality samples, and written to `gs://cpg-prophecy-test/large-cohort/v0-1/frequencies.ht` locus-level table with split multiallelics:
 
 ```
 Row fields:
@@ -353,7 +354,37 @@ Row fields:
 Key: ['locus', 'alleles']
 ```
 
-#### gnomAD QC
+### Applied outputs
+
+Tables generated by the workflow can be applied to a VDS or a split+dense matrix table in the following way:
+
+```python
+import hail as hl
+
+vds = hl.vds.read_vds('gs://cpg-prophecy-test/vds/v0-1.vds')
+sample_qc_ht = hl.read_table('gs://cpg-prophecy-test/large-cohort/v0-1/sample_qc.ht')
+relateds_to_drop_ht = hl.read_table('gs://cpg-prophecy-test/large-cohort/v0-1/relateds_to_drop.ht')
+pop_ht = hl.read_table('gs://cpg-prophecy-test/large-cohort/v0-1/ancestry/inferred_pop.ht')
+vqsr_ht = hl.read_table('gs://cpg-prophecy-test/large-cohort/v0-1/vqsr.ht')
+freq_ht = hl.read_table('gs://cpg-prophecy-test/large-cohort/v0-1/frequencies.ht')
+
+# Row-level tables require a split+dense matrix table:
+vds = hl.vds.split_multi(vds, filter_changed_loci=True)
+mt = hl.vds.to_dense_mt(vds)
+
+# Hard-filtering samples and variants:
+mt = mt.filter_cols(hl.len(sample_qc_ht[mt.col_key].filters) > 0, keep=False)
+mt = mt.filter_cols(hl.is_defined(relateds_to_drop_ht[mt.col_key]), keep=False)
+mt = mt.filter_rows(hl.len(vqsr_ht[mt.row_key].filters) > 0, keep=False)
+
+# Annotating samples and variants:
+mt = mt.annotate_cols(**sample_qc_ht[mt.col_key])
+mt = mt.annotate_cols(**pop_ht[mt.col_key])
+mt = mt.annotate_rows(**vqsr_ht[mt.row_key])
+mt = mt.annotate_rows(**freq_ht[mt.row_key])
+```
+
+### References
 
 The workflow is largely inspired by [the Hail pipeline used for the QC of gnomAD releases](https://github.com/broadinstitute/gnomad_qc). Good summaries of gnomAD QC can be found in gnomAD update blog posts:
 
@@ -391,3 +422,15 @@ pip install -r requirements.txt
 ### Stages and jobs
 
 The `stages` folder provides implementations of the Seqr-Loader stages, that can be used altogether or in isolation. Stages use functions in the `jobs` module, that create jobs for different applications, e.g. alignment, deduplication, fastqc, haplotype caller, creating calling intervals, splitting VCF, running VQSR, etc. Those jobs can be called from the `queue_jobs()` method of a stage, or in isolation, as they don't need to know about the stage they are called from, but only need a `Batch` object. Feel free to explore both `stages` and `jobs` folders for examples and inspiration.
+
+### `cpg-utils/workflows`
+
+The codebase uses the `cpg-utils/workflows` library to drive workflows. If you are making changes to that library, you can create a pull request for [cpg-utils](https://github.com/populationgenomics/cpg-utils), which would trigger a Docker build, tagged with a Git commit SHA. Then you can pass that image to the analysis runner with `--image`, in order to use your `cpg-utils` change without pushing it to main.
+
+```bash
+analysis-runner --dataset thousand-genomes \
+--description "thousand-genomes larcoh" --output-dir "thousand-genomes" --access-level test \
+--config configs/genome.toml --config configs/thousand-genomes.toml \
+--image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_utils:b4cadbc63f406345c67437fd10efb3a6108f1726 \
+main.py large_cohort
+````

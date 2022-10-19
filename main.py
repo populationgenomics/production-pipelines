@@ -11,7 +11,7 @@ import coloredlogs
 from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
 from cpg_utils.workflows.workflow import run_workflow
-from stages.large_cohort import Frequencies
+from stages.large_cohort import LoadVqsr, Frequencies
 from stages.multiqc import GvcfMultiQC, CramMultiQC
 from stages.seqr_loader import MtToEs
 
@@ -21,7 +21,7 @@ coloredlogs.install(level='INFO', fmt=fmt)
 
 WORKFLOWS = {
     'seqr_loader': [MtToEs, GvcfMultiQC, CramMultiQC],
-    'large_cohort': [Frequencies, GvcfMultiQC, CramMultiQC],
+    'large_cohort': [LoadVqsr, Frequencies, GvcfMultiQC, CramMultiQC],
 }
 
 

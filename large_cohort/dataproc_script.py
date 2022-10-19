@@ -21,4 +21,5 @@ def main(import_module_name: str, function_name: str, function_path_args: list[s
     func(*[to_path(path) for path in function_path_args])
 
 
-main()
+if __name__ == '__main__':
+    main()
