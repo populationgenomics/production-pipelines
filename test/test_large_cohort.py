@@ -149,7 +149,7 @@ def test_large_cohort(mocker: MockFixture):
         inferred_pop_ht_path=inferred_pop_ht_path,
     )
 
-    siteonly_vcf_path = results_prefix / 'siteonly.vcf.bgz'
+    siteonly_vcf_path = results_prefix / 'siteonly.vcf.gz'
     site_only_vcf.run(
         vds_path=vds_path,
         sample_qc_ht_path=sample_qc_ht_path,

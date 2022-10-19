@@ -29,6 +29,7 @@ def load_vqsr(
     ht = hl.import_vcf(
         str(site_only_vcf_path),
         reference_genome=genome_build(),
+        force_bgz=True,
     ).rows()
 
     # VCF has SB fields as float in header:
