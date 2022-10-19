@@ -55,6 +55,9 @@ class CramMultiQC(DatasetStage):
         Call a function from the `jobs` module using inputs from `cramqc`
         and `somalier` stages.
         """
+        if get_config()['workflow'].get('skip_qc', False) is True:
+            return self.make_outputs(dataset)
+
         json_path = self.expected_outputs(dataset)['json']
         html_path = self.expected_outputs(dataset)['html']
         checks_path = self.expected_outputs(dataset)['checks']
@@ -138,6 +141,7 @@ class GvcfMultiQC(DatasetStage):
         """
         if get_config()['workflow'].get('skip_qc', False) is True:
             return {}
+
         h = dataset.alignment_inputs_hash()
         return {
             'html': dataset.web_prefix() / 'qc' / 'gvcf' / 'multiqc.html',
@@ -149,6 +153,9 @@ class GvcfMultiQC(DatasetStage):
         """
         Collect QC.
         """
+        if get_config()['workflow'].get('skip_qc', False) is True:
+            return self.make_outputs(dataset)
+
         json_path = self.expected_outputs(dataset)['json']
         html_path = self.expected_outputs(dataset)['html']
         checks_path = self.expected_outputs(dataset)['checks']
