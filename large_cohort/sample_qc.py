@@ -65,7 +65,7 @@ def initialise_sample_table() -> hl.Table:
         for s in get_cohort().get_samples()
         if s.gvcf
     ]
-    t = 'array<struct{s: str, external_id: str, dataset: str, gvcf: str, sex: str, pop: str}>'
+    t = 'array<struct{s: str, external_id: str, dataset: str, gvcf: str, sex: int, pop: str}>'
     ht = hl.Table.parallelize(hl.literal(a, t), key='s')
     return ht
 
