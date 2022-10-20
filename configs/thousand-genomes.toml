@@ -5,11 +5,12 @@ sequencing_type = 'genome'
 scatter_count = 20
 first_stages = ['Combiner']
 last_stages = ['LoadVqsr', 'Frequencies']
-skip_qc = true
 output_version = '0.1'
 
-[references.broad]
-ref_fasta = 'Homo_sapiens_assembly38.fasta'
+# CRAMs were aligned using an unmasked reference: 
+# gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta
+# we need to use the same reference to access CRAMs.
+ref_fasta = 'gs://cpg-reference/hg38/v0/Homo_sapiens_assembly38.fasta'
 
 [hail]
 billing_project = 'thousand-genomes'
