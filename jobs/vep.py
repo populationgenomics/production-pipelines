@@ -105,6 +105,7 @@ def vep_jobs(
             vep_results_paths=part_files,
             out_path=out_path,
             job_attrs=job_attrs,
+            depends_on=jobs,
         )
     else:
         assert len(part_files) == scatter_count
@@ -124,22 +125,38 @@ def gather_vep_json_to_ht(
     vep_results_paths: list[Path],
     out_path: Path,
     job_attrs: dict | None = None,
+    depends_on: list[hb.job.Job] | None = None,
 ) -> Job:
     """
     Parse results from VEP with annotations formatted in JSON,
     and write into a Hail Table using a Batch job.
     """
-    j = b.new_job('VEP json to Hail table', (job_attrs or {}) | dict(tool='hail query'))
-    j.image(image_path('cpg_utils'))
-    cmd = query_command(
-        vep_module,
-        vep_module.vep_json_to_ht.__name__,
-        [str(p) for p in vep_results_paths],
-        str(out_path),
-        setup_gcp=True,
-        setup_hail=True,
+    # Importing this requires CPG_CONFIG_PATH to be already set, that's why
+    # we are not importing it on the top level.
+    from analysis_runner import dataproc
+
+    j = dataproc.hail_dataproc_job(
+        b,
+        f'dataproc_scripts/vep_json_to_ht.py '
+        + ' '.join(f'--vep-result-json-path {p}' for p in vep_results_paths)
+        + f'--out-path {out_path}',
+        max_age='24h',
+        packages=[
+            'cpg_utils',
+            'google',
+            'fsspec',
+            'gcloud',
+        ],
+        num_workers=2,
+        num_secondary_workers=20,
+        job_name=f'VEP JSON to Hail table',
+        depends_on=depends_on,
+        scopes=['cloud-platform'],
+        pyfiles=[
+            'query_modules',
+        ],
     )
-    j.command(cmd)
+    j.attributes = (job_attrs or {}) | {'tool': 'hailctl dataproc'}
     return j
 
 
