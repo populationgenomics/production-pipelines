@@ -33,7 +33,9 @@ def main(workflow: str, config_paths: list[str]):
     Run a workflow, using CONFIG_PATHS in the order specified, overriding
     $CPG_CONFIG_PATH if specified.
     """
-    base_config_path = to_path(__file__).parent / 'configs' / f'{workflow}.toml'
+    base_config_path = (
+        to_path(__file__).parent / 'configs' / 'defaults' / f'{workflow}.toml'
+    )
     assert base_config_path.exists(), base_config_path
     config_paths = [str(base_config_path)] + list(config_paths)
     if _env_var := os.environ.get('CPG_CONFIG_PATH'):
