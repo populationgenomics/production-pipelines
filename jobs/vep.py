@@ -137,9 +137,8 @@ def gather_vep_json_to_ht(
 
     j = dataproc.hail_dataproc_job(
         b,
-        f'dataproc_scripts/vep_json_to_ht.py '
-        + ' '.join(f'--vep-result-json-path {p}' for p in vep_results_paths)
-        + f'--out-path {out_path}',
+        f'dataproc_scripts/vep_json_to_ht.py --out-path {out_path} '
+        + ' '.join(str(p) for p in vep_results_paths),
         max_age='24h',
         packages=[
             'cpg_utils',

@@ -12,12 +12,7 @@ from query_modules import vep
 
 
 @click.command()
-@click.option(
-    '--vep-result-json-path',
-    'vep_results_paths',
-    multiple=True,
-    required=True,
-)
+@click.argument('vep_results_paths', nargs=-1)
 @click.option(
     '--out-path',
     'out_path',

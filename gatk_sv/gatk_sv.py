@@ -20,7 +20,6 @@ from cpg_utils.config import set_config_paths, get_config
 from cpg_utils.hail_batch import command, reference_path, image_path
 from cpg_utils.workflows.batch import make_job_name, Batch
 from cpg_utils.workflows.inputs import get_cohort
-from cpg_utils.workflows.utils import exists
 from cpg_utils.workflows.workflow import (
     stage,
     SampleStage,
