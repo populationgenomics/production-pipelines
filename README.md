@@ -44,19 +44,21 @@ Run `main.py seqr_loader` through the analysis runner:
 
 ```bash
 analysis-runner \
-  --dataset seqr --description "Seqr Loader" --output-dir "seqr" \
-  --access-level test \
+  --dataset seqr --description "Seqr Loader validation" --output-dir "seqr" \
+  --access-level full \
   --config configs/genome.toml \
-  --config configs/validation-test.toml \
+  --config configs/validation.toml \
   --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_utils:latest \
   main.py seqr_loader
 ```
 
-Seqr Loader can be used partially, controlled by `workflows/first_stages`, `workflows/last_stages`, or `workflows/only_stages` parameters.
+Note the configs that are being passed to analysis-runner: `configs/genome.toml` and `configs/validation.toml`. They are merged together by analysis-runner, with values in the latter overwriting values in the former. For more about configs, see [team-docs](https://github.com/populationgenomics/team-docs/blob/main/cpg_utils_config.md). Note that the `seqr_loader` command loads the [configs/seqr_loader.toml](configs/seqr_loader.toml) by default.
 
 #### Align Seqr genomes or exomes and produce CRAM QC
 
-All configuration files that is passed with the `--config` option are combined by analysis-runner. In order to align data, you only need to trigger the `Align` stage from the workflow (or `CramMultiQC`, if you also want a dataset-level MultiQC report), which can be done with `workflows/last_stages`. So you can create a configuration file like the following:
+Seqr Loader can be used partially, controlled by `workflows/first_stages`, `workflows/last_stages`, or `workflows/only_stages` parameters.
+
+In order to align data, you only need to trigger the `Align` stage from the workflow (or `CramMultiQC`, if you also want a dataset-level MultiQC report), which can be done with `workflows/last_stages`. So you can create a configuration file like the following:
 
 ```toml
 [workflow]
@@ -68,9 +70,9 @@ And assuming it's named `~/myconfig.toml`, run:
 ```bash
 analysis-runner \
   --dataset seqr --description "CRAM MultiQC" --output-dir "seqr" \
-  --access-level test \
+  --access-level full \
   --config configs/genome.toml \
-  --config configs/acute-care-test.toml \
+  --config configs/validation.toml \
   --config ~/myconfig.toml \
   --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_utils:latest \
   main.py seqr_loader
@@ -129,6 +131,8 @@ analysis-runner \
 ```
 
 The workflow will find GVCFs for input samples using Metamist, along with available sample metadata (e.g. known population labels, sex, QC), and would write the results into the `gs://cpg-prophecy-test` bucket.
+
+Note that the `large_cohort` command loads the [configs/large_cohort.toml](configs/large_cohort.toml) by default, with other configs specified with `--config` put on top. For more about configs, see [team-docs](https://github.com/populationgenomics/team-docs/blob/main/cpg_utils_config.md). 
 
 ### Outputs
 
