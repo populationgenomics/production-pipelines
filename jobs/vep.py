@@ -71,6 +71,14 @@ def vep_jobs(
 
     # Splitting variant calling by intervals
     for idx in range(scatter_count):
+        if to_hail_table:
+            part_path = parts_bucket / f'part{idx + 1}.jsonl'
+        else:
+            part_path = parts_bucket / f'part{idx + 1}.vcf.gz'
+        part_files.append(part_path)
+        if can_reuse(part_path):
+            continue
+
         subset_j = subset_vcf(
             b,
             vcf=vcf,
@@ -79,12 +87,6 @@ def vep_jobs(
         )
         jobs.append(subset_j)
         assert isinstance(subset_j.output_vcf, hb.ResourceGroup)
-
-        if to_hail_table:
-            part_path = parts_bucket / f'part{idx + 1}.jsonl'
-        else:
-            part_path = parts_bucket / f'part{idx + 1}.vcf.gz'
-        part_files.append(part_path)
 
         # noinspection PyTypeChecker
         vep_one_job = vep_one(
