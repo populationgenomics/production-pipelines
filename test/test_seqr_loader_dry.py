@@ -18,7 +18,9 @@ from pytest_mock import MockFixture
 
 
 def _set_config(results_prefix: Path, extra_conf: dict | None = None):
-    with (to_path(__file__).parent.parent / 'configs' / 'seqr_loader.toml').open() as f:
+    with (
+        to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml'
+    ).open() as f:
         d = toml.load(f)
     update_dict(
         d,

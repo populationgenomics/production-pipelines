@@ -20,7 +20,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 def _set_config(results_prefix: Path, extra_conf: dict | None = None):
     with (
-        to_path(__file__).parent.parent / 'configs' / 'large_cohort.toml'
+        to_path(__file__).parent.parent / 'configs' / 'defaults' / 'large_cohort.toml'
     ).open() as f:
         d = toml.load(f)
     update_dict(
