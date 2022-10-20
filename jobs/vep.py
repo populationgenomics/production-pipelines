@@ -15,7 +15,6 @@ from cpg_utils.hail_batch import (
     image_path,
     reference_path,
     command,
-    query_command,
     authenticate_cloud_credentials_in_job,
 )
 from cpg_utils.workflows.resources import STANDARD
@@ -23,7 +22,6 @@ from cpg_utils.workflows.utils import can_reuse
 
 from .picard import get_intervals
 from .vcf import gather_vcfs, subset_vcf
-from query_modules import vep as vep_module
 
 
 def vep_jobs(
