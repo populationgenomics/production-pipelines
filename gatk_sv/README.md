@@ -5,13 +5,13 @@ and importing results to Seqr, using the [cpg_utils/workflows library](https://g
 
 ## Usage
 
-To launch the workflow, run the `gatk_sv.py` script, and pass the following TOML configs directly as command line arguments. Replace `acute-care-test.toml` with another config if you want to process a different dataset.
+To launch the workflow, run the `gatk_sv.py` script, and pass the following TOML configs directly as command line arguments. Replace `gatk-sv-acute-care-test.toml` with another config if you want to process a different dataset.
 
 ```bash
 python gatk_sv.py \
     ../configs/seqr.toml \
     ../configs/genome.toml \
-    ../configs/acute-care-test.toml \
+    ../configs/gatk-sv-acute-care-test.toml \
     ../configs/gatk-sv.toml
 ```
 
@@ -25,7 +25,7 @@ analysis-runner \
   --access-level test \
   --config ../configs/seqr.toml \
   --config ../configs/genome.toml \
-  --config ../configs/acute-care-test.toml \
+  --config ../configs/gatk-sv-acute-care-test.toml \
   --config ../configs/gatk-sv.toml \
   gatk_sv.py
 ```

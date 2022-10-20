@@ -47,7 +47,7 @@ analysis-runner \
   --dataset seqr --description "Seqr Loader" --output-dir "seqr" \
   --access-level test \
   --config configs/genome.toml \
-  --config configs/acute-care-test.toml \
+  --config configs/validation-test.toml \
   --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_utils:latest \
   main.py seqr_loader
 ```
