@@ -38,7 +38,8 @@ class SomalierPedigree(DatasetStage):
         https://github.com/ewels/MultiQC/blob/master/multiqc/utils/search_patterns
         .yaml#L472-L481
         """
-
+        if get_config()['workflow'].get('skip_qc', False) is True:
+            return {}
         h = dataset.alignment_inputs_hash()
         prefix = dataset.prefix() / 'somalier' / 'cram' / h
         return {

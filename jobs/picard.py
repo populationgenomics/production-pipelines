@@ -272,19 +272,20 @@ def picard_collect_metrics(
     reference = fasta_res_group(b)
 
     cmd = f"""\
-    picard -Xmx{res.get_java_mem_mb()}m \
-      CollectMultipleMetrics \
-      INPUT={cram.cram} \
-      REFERENCE_SEQUENCE={reference.base} \
-      OUTPUT=$BATCH_TMPDIR/prefix \
-      ASSUME_SORTED=true \
-      PROGRAM=null \
-      PROGRAM=CollectAlignmentSummaryMetrics \
-      PROGRAM=CollectInsertSizeMetrics \
-      PROGRAM=MeanQualityByCycle \
-      PROGRAM=CollectBaseDistributionByCycle \
-      PROGRAM=CollectQualityYieldMetrics \
-      METRIC_ACCUMULATION_LEVEL=null \
+    picard -Xmx{res.get_java_mem_mb()}m \\
+      CollectMultipleMetrics \\
+      INPUT={cram.cram} \\
+      REFERENCE_SEQUENCE={reference.base} \\
+      OUTPUT=$BATCH_TMPDIR/prefix \\
+      ASSUME_SORTED=true \\
+      PROGRAM=null \\
+      VALIDATION_STRINGENCY=SILENT \\
+      PROGRAM=CollectAlignmentSummaryMetrics \\
+      PROGRAM=CollectInsertSizeMetrics \\
+      PROGRAM=MeanQualityByCycle \\
+      PROGRAM=CollectBaseDistributionByCycle \\
+      PROGRAM=CollectQualityYieldMetrics \\
+      METRIC_ACCUMULATION_LEVEL=null \\
       METRIC_ACCUMULATION_LEVEL=SAMPLE
       
     ls $BATCH_TMPDIR/
@@ -402,14 +403,14 @@ def picard_wgs_metrics(
     )
 
     cmd = f"""\
-    picard -Xmx{res.get_java_mem_mb()}m \
-      CollectWgsMetrics \
-      INPUT={cram.cram} \
-      VALIDATION_STRINGENCY=SILENT \
-      REFERENCE_SEQUENCE={reference.base} \
-      INTERVALS={interval_file} \
-      OUTPUT={j.out_csv} \
-      USE_FAST_ALGORITHM=true \
+    picard -Xmx{res.get_java_mem_mb()}m \\
+      CollectWgsMetrics \\
+      INPUT={cram.cram} \\
+      VALIDATION_STRINGENCY=SILENT \\
+      REFERENCE_SEQUENCE={reference.base} \\
+      INTERVALS={interval_file} \\
+      OUTPUT={j.out_csv} \\
+      USE_FAST_ALGORITHM=true \\
       READ_LENGTH={read_length}
     """
 
