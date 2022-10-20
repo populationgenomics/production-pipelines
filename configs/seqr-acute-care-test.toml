@@ -7,6 +7,10 @@ only_samples = [
     'CPG203018',
     'CPG203042',
 ]
-skip_qc = true
-check_expected_outputs = false
-check_intermediates = false
+check_expected_outputs = true
+check_intermediates = true
+
+# CRAMs were aligned using an unmasked reference: 
+# gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta
+# we need to use the same reference to access CRAMs.
+ref_fasta = 'gs://cpg-reference/hg38/v0/Homo_sapiens_assembly38.fasta'
