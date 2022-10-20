@@ -223,8 +223,8 @@ class MakeSiteOnlyVcf(CohortStage):
 class Vqsr(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'vcf': self.tmp_prefix / 'siteonly.vqsr.vcf.bgz',
-            'tbi': self.tmp_prefix / 'siteonly.vqsr.vcf.bgz.tbi',
+            'vcf': self.tmp_prefix / 'siteonly.vqsr.vcf.gz',
+            'tbi': self.tmp_prefix / 'siteonly.vqsr.vcf.gz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:

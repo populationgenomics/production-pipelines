@@ -1,0 +1,12 @@
+[workflow]
+input_datasets = ['acute-care']
+access_level = 'test'
+only_samples = [
+    'CPG202994',
+    'CPG203000',
+    'CPG203018',
+    'CPG203042',
+]
+skip_qc = true
+check_expected_outputs = false
+check_intermediates = false
