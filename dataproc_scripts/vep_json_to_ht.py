@@ -5,14 +5,10 @@ Query script to parse JSON VEP results.
 """
 
 import click
-import coloredlogs
 import hail as hl
 
 from cpg_utils.hail_batch import genome_build
 from query_modules import vep
-
-fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
-coloredlogs.install(level='INFO', fmt=fmt)
 
 
 @click.command()

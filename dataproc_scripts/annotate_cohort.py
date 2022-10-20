@@ -5,15 +5,11 @@ Dataproc script to annotate cohort.
 """
 
 import click
-import coloredlogs
 import hail as hl
 
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build
 from query_modules.seqr_loader import annotate_cohort
-
-fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
-coloredlogs.install(level='INFO', fmt=fmt)
 
 
 @click.command()
