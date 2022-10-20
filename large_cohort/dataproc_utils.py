@@ -107,11 +107,9 @@ def dataproc_job(
         num_workers=num_primary_workers,
         autoscaling_policy=autoscaling_policy,
         depends_on=depends_on,
-        init=[
-            'gs://cpg-reference/hail_dataproc/install_common.sh',
-        ],
         worker_machine_type='n1-highmem-8' if use_highmem_workers else 'n1-standard-8',
         worker_boot_disk_size=worker_boot_disk_size,
         secondary_worker_boot_disk_size=secondary_worker_boot_disk_size,
         pyfiles=['large_cohort'],
+        init=['gs://cpg-reference/hail_dataproc/install_common.sh'],
     )

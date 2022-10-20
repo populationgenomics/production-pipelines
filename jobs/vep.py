@@ -154,9 +154,8 @@ def gather_vep_json_to_ht(
         job_name=f'VEP JSON to Hail table',
         depends_on=depends_on,
         scopes=['cloud-platform'],
-        pyfiles=[
-            'query_modules',
-        ],
+        pyfiles=['query_modules'],
+        init=['gs://cpg-reference/hail_dataproc/install_common.sh'],
     )
     j.attributes = (job_attrs or {}) | {'tool': 'hailctl dataproc'}
     return j
