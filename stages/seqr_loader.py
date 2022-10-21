@@ -82,6 +82,7 @@ class AnnotateCohort(CohortStage):
                 'seqr-loading-pipelines/hail_scripts',
                 'query_modules',
             ],
+            init=['gs://cpg-reference/hail_dataproc/install_common.sh'],
         )
         j.attributes = self.get_job_attrs(cohort) | {'tool': 'hailctl dataproc'}
 
@@ -152,6 +153,7 @@ class AnnotateDataset(DatasetStage):
                 'seqr-loading-pipelines/hail_scripts',
                 'query_modules',
             ],
+            init=['gs://cpg-reference/hail_dataproc/install_common.sh'],
         )
         j.attributes = self.get_job_attrs(dataset) | {'tool': 'hailctl dataproc'}
 
