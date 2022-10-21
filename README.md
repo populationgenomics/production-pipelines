@@ -134,6 +134,22 @@ The workflow will find GVCFs for input samples using Metamist, along with availa
 
 Note that the `large_cohort` command loads the [configs/large_cohort.toml](configs/defaults/large_cohort.toml) by default, with other configs specified with `--config` put on top. For more about configs, see [team-docs](https://github.com/populationgenomics/team-docs/blob/main/cpg_utils_config.md). 
 
+### CPG Seqr load
+
+`configs/seqr-main.toml` provides a configuration of a CPG production Seqr load: specifically, the list of datasets to process and joint-call together, and a list of blacklisted samples in those datasets. Another config, `configs/genome.toml` or `configs/exome.toml`, can be used to subset samples to WGS or WES specifically. One of these two must be provided, as the Seqr loader can work on only one type of data at a time. 
+
+For example, to load the genome data:
+
+```sh
+analysis-runner \
+  --dataset prophecy --description "Seqr Load" --output-dir "seqr" \
+  --access-level full \
+  --config configs/seqr-main.toml \
+  --config configs/genome.toml \
+  --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_utils:latest \
+  main.py seqr_load
+```
+
 ### Outputs
 
 #### VDS
