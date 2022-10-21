@@ -32,7 +32,7 @@ def genotype(
     """
     hc_gvcf_path = tmp_prefix / 'haplotypecaller' / f'{sample_name}.g.vcf.gz'
     if utils.can_reuse(output_path, overwrite):
-        return [b.new_job('Make GVCF [reuse]', job_attrs)]
+        return []
 
     jobs = haplotype_caller(
         b=b,
