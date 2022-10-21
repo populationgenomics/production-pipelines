@@ -28,3 +28,7 @@ def main(
         vep_results_paths=vep_results_paths,
         out_path=out_path,
     )
+
+
+if __name__ == '__main__':
+    main()
