@@ -1,0 +1,9 @@
+[workflow]
+name = 'pre_alignment'
+dataset_gcp_project = 'seqr-308602'
+dataset = 'seqr'
+status_reporter = 'metamist'
+
+[hail]
+pool_label = 'seqr'
+billing_project = 'seqr'
