@@ -40,6 +40,10 @@ def _collect_fastq_outs(sample) -> list[OneFastqc]:
         # Only running FASTQC if sequencing inputs are available.
         return []
 
+    if get_config()['workflow'].get('check_inputs', True):
+        if not alignment_input.exists():
+            return []
+
     prefix = sample.dataset.prefix() / 'qc' / 'fastqc'
 
     if isinstance(alignment_input, BamPath):
