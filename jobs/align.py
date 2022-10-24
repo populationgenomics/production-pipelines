@@ -280,9 +280,7 @@ def storage_for_align_job(alignment_input: AlignmentInput) -> int | None:
 
     sequencing_type = get_config()['workflow']['sequencing_type']
     if sequencing_type == 'genome':
-        if isinstance(alignment_input, FastqPairs) or isinstance(
-            alignment_input, BamPath
-        ):
+        if isinstance(alignment_input, FastqPair | FastqPairs | BamPath):
             storage_gb = 400  # for WGS FASTQ or BAM inputs, more disk is needed
     return storage_gb
 
