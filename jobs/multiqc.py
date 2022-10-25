@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Batch pipeline to run WGS QC.
+Batch jobs to run MultiQC.
 """
 from cpg_utils.config import get_config
 from cpg_utils.workflows.utils import rich_sample_id_seds
@@ -114,18 +114,21 @@ def multiqc(
     b.write_output(mqc_j.json, str(out_json_path))
 
     assert isinstance(mqc_j.json, ResourceFile)
-    check_j = check_report_job(
-        b=b,
-        multiqc_json_file=mqc_j.json,
-        multiqc_html_url=out_html_url,
-        rich_id_map=dataset.rich_id_map(),
-        dataset_name=dataset.name,
-        label=label,
-        out_checks_path=out_checks_path,
-        job_attrs=job_attrs,
-    )
-    check_j.depends_on(mqc_j)
-    return [mqc_j, check_j]
+    jobs: list[Job] = [mqc_j]
+    if get_config().get('qc_thresholds'):
+        check_j = check_report_job(
+            b=b,
+            multiqc_json_file=mqc_j.json,
+            multiqc_html_url=out_html_url,
+            rich_id_map=dataset.rich_id_map(),
+            dataset_name=dataset.name,
+            label=label,
+            out_checks_path=out_checks_path,
+            job_attrs=job_attrs,
+        )
+        check_j.depends_on(mqc_j)
+        jobs.append(check_j)
+    return jobs
 
 
 def check_report_job(
@@ -156,7 +159,6 @@ def check_report_job(
     {rich_sample_id_seds(rich_id_map, [multiqc_json_file])
     if rich_id_map else ''}
 
-    pip install cpg_utils
     python3 {script_name} \\
     --multiqc-json {multiqc_json_file} \\
     --html-url {multiqc_html_url} \\
