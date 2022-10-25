@@ -90,11 +90,19 @@ def _get_alignment_input(sample: Sample) -> AlignmentInput:
                 reference_assembly=_get_cram_reference_from_version(realign_cram_ver),
             )
 
-    if alignment_input is None or not alignment_input.exists():
+    if not alignment_input:
         raise MissingAlignmentInputException(
             f'No alignment inputs found for sample {sample}'
             + (f': {alignment_input}' if alignment_input else '')
         )
+
+    if get_config()['workflow'].get('check_inputs', True):
+        if not alignment_input.exists():
+            raise MissingAlignmentInputException(
+                f'Alignment inputs for sample {sample} do not exist '
+                + (f': {alignment_input}' if alignment_input else '')
+            )
+
     return alignment_input
 
 
