@@ -13,7 +13,7 @@ from cpg_utils.workflows.targets import Cohort
 from cpg_utils.workflows.utils import timestamp
 from cpg_utils.workflows.workflow import get_workflow
 from cpg_utils.config import set_config_paths
-from cpg_workflows.stages import MtToEs
+from cpg_workflows.stages.seqr_loader import MtToEs
 from pytest_mock import MockFixture
 
 
