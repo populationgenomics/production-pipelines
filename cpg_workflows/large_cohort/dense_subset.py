@@ -3,7 +3,7 @@ import logging
 import hail as hl
 from click import Path
 from cpg_utils.hail_batch import reference_path
-from cpg_utils.workflows.utils import can_reuse
+from utils import can_reuse
 
 
 def run(

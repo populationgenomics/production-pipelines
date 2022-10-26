@@ -6,12 +6,12 @@ import os
 import toml
 from cpg_utils import to_path, Path
 from cpg_utils.config import update_dict
-from cpg_utils.workflows.batch import get_batch
-from cpg_utils.workflows.filetypes import BamPath, FastqPair, FastqPairs
-from cpg_utils.workflows.inputs import get_cohort
-from cpg_utils.workflows.targets import Cohort
-from cpg_utils.workflows.utils import timestamp
-from cpg_utils.workflows.workflow import get_workflow
+from batch import get_batch
+from filetypes import BamPath, FastqPair, FastqPairs
+from inputs import get_cohort
+from targets import Cohort
+from utils import timestamp
+from workflow import get_workflow
 from cpg_utils.config import set_config_paths
 from cpg_workflows.stages.seqr_loader import MtToEs
 from pytest_mock import MockFixture
@@ -105,7 +105,7 @@ def test_seqr_loader_dry(mocker: MockFixture):
     def do_nothing(*args, **kwargs):
         return None
 
-    mocker.patch('cpg_utils.workflows.inputs.create_cohort', mock_create_cohort)
+    mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
     # functions like get_intervals checks file existence
     mocker.patch('cloudpathlib.cloudpath.CloudPath.exists', mock_exists)
     # cloudfuse (used in Vep) doesn't work with LocalBackend

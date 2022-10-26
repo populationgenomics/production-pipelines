@@ -2,7 +2,7 @@ import hail as hl
 import logging
 
 from cpg_utils import Path
-from cpg_utils.workflows.utils import can_reuse
+from utils import can_reuse
 from gnomad.resources.grch38.gnomad import POPS_TO_REMOVE_FOR_POPMAX
 from gnomad.sample_qc.sex import adjusted_sex_ploidy_expr
 from gnomad.utils.annotations import (
@@ -11,11 +11,9 @@ from gnomad.utils.annotations import (
     bi_allelic_site_inbreeding_expr,
     faf_expr,
     pop_max_expr,
-    set_female_y_metrics_to_na_expr,
-    annotate_freq,
     qual_hist_expr,
 )
-from gnomad.utils.release import make_faf_index_dict, make_freq_index_dict
+from gnomad.utils.release import make_faf_index_dict
 
 
 def run(

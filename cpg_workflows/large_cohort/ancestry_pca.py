@@ -5,7 +5,7 @@ import hail as hl
 import pandas as pd
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.workflows.utils import can_reuse
+from utils import can_reuse
 from gnomad.sample_qc.ancestry import run_pca_with_relateds, assign_population_pcs
 
 

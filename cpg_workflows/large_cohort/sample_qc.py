@@ -9,8 +9,8 @@ import hail as hl
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import reference_path, genome_build
-from cpg_utils.workflows.inputs import get_cohort
-from cpg_utils.workflows.utils import can_reuse
+from inputs import get_cohort
+from utils import can_reuse
 from gnomad.sample_qc.pipeline import annotate_sex
 
 

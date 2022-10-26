@@ -14,8 +14,8 @@ from hailtop.batch.job import Job
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, reference_path, image_path
-from cpg_utils.workflows.batch import make_job_name, Batch
-from cpg_utils.workflows.workflow import (
+from batch import make_job_name, Batch
+from workflow import (
     stage,
     SampleStage,
     StageOutput,

@@ -9,9 +9,9 @@ import toml
 from cpg_utils import to_path, Path
 from cpg_utils.config import set_config_paths
 from cpg_utils.config import update_dict
-from cpg_utils.workflows.filetypes import GvcfPath
-from cpg_utils.workflows.targets import Cohort
-from cpg_utils.workflows.utils import timestamp
+from filetypes import GvcfPath
+from targets import Cohort
+from utils import timestamp
 from pytest_mock import MockFixture
 
 logging.basicConfig()
@@ -86,7 +86,7 @@ def test_large_cohort(mocker: MockFixture):
         s = ds.add_sample(id=sample_id, external_id=sample_id.replace('CPG', 'EXT'))
         s.gvcf = GvcfPath(gvcf_path)
 
-    mocker.patch('cpg_utils.workflows.inputs.create_cohort', lambda: cohort)
+    mocker.patch('cpg_workflows.inputs.create_cohort', lambda: cohort)
 
     from cpg_workflows.large_cohort import combiner
     from cpg_workflows.large_cohort import ancestry_pca

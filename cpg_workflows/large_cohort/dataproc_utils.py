@@ -8,7 +8,7 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from cpg_utils.workflows.batch import get_batch
+from batch import get_batch
 
 
 DATAPROC_PACKAGES = [

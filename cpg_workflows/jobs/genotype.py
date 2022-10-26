@@ -10,9 +10,9 @@ from hailtop.batch.job import Job
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path, command
-from cpg_utils.workflows.filetypes import CramPath, GvcfPath
-from cpg_utils.workflows import utils
-from cpg_utils.workflows.resources import STANDARD, HIGHMEM
+from filetypes import CramPath, GvcfPath
+import utils
+from resources import STANDARD, HIGHMEM
 
 from .picard import get_intervals
 

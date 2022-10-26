@@ -8,11 +8,11 @@ from enum import Enum
 
 import pandas as pd
 from cpg_utils.config import get_config
-from cpg_utils.workflows.utils import can_reuse
+from utils import can_reuse
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path, command
 from cpg_utils import Path
-from cpg_utils.workflows.resources import STANDARD
-from cpg_utils.workflows.filetypes import GvcfPath
+from resources import STANDARD
+from filetypes import GvcfPath
 import hailtop.batch as hb
 from hailtop.batch import Resource
 from hailtop.batch.job import Job

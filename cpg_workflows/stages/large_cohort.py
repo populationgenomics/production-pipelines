@@ -1,8 +1,8 @@
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.workflows.targets import Cohort
-from cpg_utils.workflows.utils import slugify
-from cpg_utils.workflows.workflow import (
+from targets import Cohort
+from utils import slugify
+from workflow import (
     stage,
     CohortStage,
     StageInput,

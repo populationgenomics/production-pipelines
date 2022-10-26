@@ -1,4 +1,4 @@
-name: Test
+name: Test batch
 on:
   # Building on pull-requests, manual dispatch, and pushes to main; but restricting
   # publishing only to main pushes and manual dispatch with `if`s in specific steps.
@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  test:
+  test_batch:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -22,9 +22,7 @@ jobs:
           python-version: '3.10'
 
       - name: Install
-        run: |
-          pip install -r requirements-dev.txt
-          pip install -r requirements.txt
+        run: pip install .[test]
 
       - name: Run unit tests
-        run: python -m pytest test
+        run: python -m pytest test/test_batch.py

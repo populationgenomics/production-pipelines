@@ -5,8 +5,8 @@ import logging
 
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
-from cpg_utils.workflows.filetypes import GvcfPath
-from cpg_utils.workflows.workflow import (
+from filetypes import GvcfPath
+from workflow import (
     Sample,
     stage,
     StageInput,

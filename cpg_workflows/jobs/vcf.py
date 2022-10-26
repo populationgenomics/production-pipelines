@@ -8,8 +8,8 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path
 from cpg_utils.hail_batch import image_path, fasta_res_group, command
-from cpg_utils.workflows.resources import STANDARD
-from cpg_utils.workflows.utils import can_reuse
+from resources import STANDARD
+from utils import can_reuse
 
 
 def subset_vcf(

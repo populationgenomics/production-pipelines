@@ -9,9 +9,9 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from cpg_utils.hail_batch import command
-from cpg_utils.workflows.resources import HIGHMEM, STANDARD, storage_for_cram_qc_job
-from cpg_utils.workflows.filetypes import CramPath
-from cpg_utils.workflows.utils import can_reuse, exists
+from resources import HIGHMEM, STANDARD, storage_for_cram_qc_job
+from filetypes import CramPath
+from utils import can_reuse, exists
 
 
 def get_intervals(

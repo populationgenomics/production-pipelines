@@ -17,8 +17,8 @@ from cpg_utils.hail_batch import (
     command,
     authenticate_cloud_credentials_in_job,
 )
-from cpg_utils.workflows.resources import STANDARD
-from cpg_utils.workflows.utils import can_reuse
+from resources import STANDARD
+from utils import can_reuse
 
 from .picard import get_intervals
 from .vcf import gather_vcfs, subset_vcf

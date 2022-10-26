@@ -15,10 +15,10 @@ from cpg_utils.hail_batch import (
     copy_common_env,
     command,
 )
-from cpg_utils.workflows.resources import STANDARD
-from cpg_utils.workflows.targets import Dataset, Sample
-from cpg_utils.workflows.filetypes import CramPath, GvcfPath, BamPath
-from cpg_utils.workflows.utils import can_reuse, rich_sample_id_seds
+from resources import STANDARD
+from targets import Dataset, Sample
+from filetypes import CramPath, GvcfPath, BamPath
+from utils import can_reuse, rich_sample_id_seds
 
 from cpg_workflows.python_scripts import check_pedigree
 

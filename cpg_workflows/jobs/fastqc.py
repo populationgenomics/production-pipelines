@@ -10,11 +10,11 @@ from hailtop.batch.job import Job
 from cpg_utils import Path
 from cpg_utils.hail_batch import command
 from cpg_utils.hail_batch import image_path
-from cpg_utils.workflows.filetypes import (
+from filetypes import (
     BamPath,
     FastqPath,
 )
-from cpg_utils.workflows.resources import STANDARD
+from resources import STANDARD
 
 
 def fastqc(

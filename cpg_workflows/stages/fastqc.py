@@ -5,8 +5,8 @@ import dataclasses
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.workflows.filetypes import BamPath, FastqPairs
-from cpg_utils.workflows.workflow import (
+from filetypes import BamPath, FastqPairs
+from workflow import (
     Sample,
     Dataset,
     stage,
