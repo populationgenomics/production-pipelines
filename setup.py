@@ -6,7 +6,7 @@ setup(
     name='cpg-workflows',
     # This tag is automatically updated by bumpversion
     version='0.1.0',
-    description='CPG workflows for Hail batch',
+    description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     url=f'https://github.com/populationgenomics/production-pipelines',
