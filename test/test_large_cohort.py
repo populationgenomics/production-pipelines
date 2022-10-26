@@ -9,10 +9,11 @@ import toml
 from cpg_utils import to_path, Path
 from cpg_utils.config import set_config_paths
 from cpg_utils.config import update_dict
-from filetypes import GvcfPath
-from targets import Cohort
-from utils import timestamp
 from pytest_mock import MockFixture
+
+from cpg_workflows.filetypes import GvcfPath
+from cpg_workflows.targets import Cohort
+from cpg_workflows.utils import timestamp
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)

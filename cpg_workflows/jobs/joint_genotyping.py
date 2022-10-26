@@ -11,11 +11,12 @@ from cpg_utils.config import get_config
 from utils import can_reuse
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path, command
 from cpg_utils import Path
-from resources import STANDARD
-from filetypes import GvcfPath
 import hailtop.batch as hb
 from hailtop.batch import Resource
 from hailtop.batch.job import Job
+
+from cpg_workflows.resources import STANDARD
+from cpg_workflows.filetypes import GvcfPath
 
 from .vcf import gather_vcfs
 from .picard import get_intervals

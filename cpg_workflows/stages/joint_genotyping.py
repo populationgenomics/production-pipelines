@@ -5,7 +5,8 @@ import logging
 
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
-from filetypes import GvcfPath
+
+from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.workflow import (
     Sample,
     Cohort,
@@ -16,7 +17,6 @@ from cpg_workflows.workflow import (
     CohortStage,
     WorkflowError,
 )
-
 from cpg_workflows.jobs.happy import happy
 from cpg_workflows.jobs.picard import vcf_qc
 from cpg_workflows.jobs import joint_genotyping
