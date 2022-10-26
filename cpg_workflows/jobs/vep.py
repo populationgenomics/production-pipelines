@@ -24,7 +24,7 @@ from .picard import get_intervals
 from .vcf import gather_vcfs, subset_vcf
 
 
-def vep_jobs(
+def add_vep_jobs(
     b: Batch,
     vcf_path: Path,
     tmp_prefix: Path,

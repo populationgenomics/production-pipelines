@@ -10,7 +10,7 @@ import coloredlogs
 
 from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
-from cpg_workflows.workflow import run_workflow
+from cpg_workflows.workflow import run_workflow, StageDecorator
 from cpg_workflows.stages.large_cohort import LoadVqsr, Frequencies
 from cpg_workflows.stages.multiqc import GvcfMultiQC, CramMultiQC
 from cpg_workflows.stages.fastqc import FastQCMultiQC
@@ -21,7 +21,7 @@ fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
 coloredlogs.install(level='INFO', fmt=fmt)
 
 
-WORKFLOWS = {
+WORKFLOWS: dict[str, list[StageDecorator]] = {
     'pre_alignment': [FastQCMultiQC],
     'seqr_loader': [MtToEs, GvcfMultiQC, CramMultiQC],
     'large_cohort': [LoadVqsr, Frequencies, GvcfMultiQC, CramMultiQC],

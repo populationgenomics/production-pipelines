@@ -62,7 +62,8 @@ def annotate_cohort(
     checkpoint_prefix=None,
 ):
     """
-    Convert VCF to mt, annotate for seqr loader, add VEP annotations.
+    Convert VCF to matrix table, annotate for Seqr Loader, add VEP and VQSR
+    annotations.
     """
 
     def _read(path):

@@ -43,7 +43,7 @@ class Vep(CohortStage):
         if len(cohort.get_samples()) > 1000:
             scatter_count = 200
 
-        jobs = vep.vep_jobs(
+        jobs = vep.add_vep_jobs(
             self.b,
             vcf_path=inputs.as_path(cohort, stage=Vqsr, key='siteonly'),
             out_path=self.expected_outputs(cohort)['ht'],
