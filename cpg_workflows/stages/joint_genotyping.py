@@ -19,7 +19,7 @@ from cpg_utils.workflows.workflow import (
 
 from cpg_workflows.jobs.happy import happy
 from cpg_workflows.jobs.picard import vcf_qc
-from ..jobs import joint_genotyping
+from cpg_workflows.jobs import joint_genotyping
 from .genotype import Genotype
 
 

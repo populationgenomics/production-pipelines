@@ -17,7 +17,7 @@ from cpg_utils.workflows.workflow import (
     exists,
 )
 
-from ..jobs import somalier
+from cpg_workflows.jobs import somalier
 from .align import Align
 
 EXCLUDE_HIGH_CONTAMINATION = False

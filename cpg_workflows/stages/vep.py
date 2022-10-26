@@ -12,7 +12,7 @@ from cpg_utils.workflows.workflow import (
     Cohort,
 )
 
-from ..jobs import vep
+from cpg_workflows.jobs import vep
 from .vqsr import Vqsr
 
 

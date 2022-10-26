@@ -228,7 +228,7 @@ class Vqsr(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from ..jobs import vqsr
+        from cpg_workflows.jobs import vqsr
 
         vcf_path = inputs.as_path(cohort, MakeSiteOnlyVcf, key='vcf')
         jobs = vqsr.make_vqsr_jobs(

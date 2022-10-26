@@ -12,7 +12,7 @@ from cpg_utils.workflows.workflow import (
     Cohort,
 )
 
-from ..jobs import vqsr
+from cpg_workflows.jobs import vqsr
 from .joint_genotyping import JointGenotyping
 
 
