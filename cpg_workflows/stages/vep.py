@@ -37,6 +37,12 @@ class Vep(CohortStage):
         """
         Submit jobs.
         """
+        scatter_count = 50
+        if len(cohort.get_samples()) > 300:
+            scatter_count = 100
+        if len(cohort.get_samples()) > 1000:
+            scatter_count = 200
+
         jobs = vep.vep_jobs(
             self.b,
             vcf_path=inputs.as_path(cohort, stage=Vqsr, key='siteonly'),
@@ -44,6 +50,6 @@ class Vep(CohortStage):
             tmp_prefix=to_path(self.expected_outputs(cohort)['prefix']),
             overwrite=not get_config()['workflow'].get('check_intermediates'),
             job_attrs=self.get_job_attrs(),
-            gvcf_count=len(cohort.get_samples()),
+            scatter_count=scatter_count,
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), jobs)

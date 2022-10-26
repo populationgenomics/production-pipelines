@@ -28,7 +28,7 @@ def vep_jobs(
     b: Batch,
     vcf_path: Path,
     tmp_prefix: Path,
-    gvcf_count: int,
+    scatter_count: int,
     out_path: Path | None = None,
     overwrite: bool = False,
     job_attrs: dict | None = None,
@@ -48,12 +48,6 @@ def vep_jobs(
     vcf = b.read_input_group(
         **{'vcf.gz': str(vcf_path), 'vcf.gz.tbi': str(vcf_path) + '.tbi'}
     )
-
-    scatter_count = 50
-    if gvcf_count > 300:
-        scatter_count = 100
-    if gvcf_count > 1000:
-        scatter_count = 200
 
     parts_bucket = tmp_prefix / 'vep' / 'parts'
     part_files = []

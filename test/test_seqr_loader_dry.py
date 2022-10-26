@@ -5,16 +5,16 @@ import os
 
 import toml
 from cpg_utils import to_path, Path
-from cpg_utils.config import update_dict
-from batch import get_batch
-from filetypes import BamPath, FastqPair, FastqPairs
-from inputs import get_cohort
-from targets import Cohort
-from utils import timestamp
-from workflow import get_workflow
-from cpg_utils.config import set_config_paths
-from cpg_workflows.stages.seqr_loader import MtToEs
+from cpg_utils.config import update_dict, set_config_paths
 from pytest_mock import MockFixture
+
+from cpg_workflows.batch import get_batch
+from cpg_workflows.filetypes import BamPath, FastqPair, FastqPairs
+from cpg_workflows.inputs import get_cohort
+from cpg_workflows.targets import Cohort
+from cpg_workflows.utils import timestamp
+from cpg_workflows.workflow import get_workflow
+from cpg_workflows.stages.seqr_loader import MtToEs
 
 
 def _set_config(results_prefix: Path, extra_conf: dict | None = None):

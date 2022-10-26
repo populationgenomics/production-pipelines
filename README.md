@@ -492,7 +492,7 @@ For example, out "Align" stage that runs BWA might look like as following:
 
 ```python
 from cpg_utils import Path
-from workflow import stage, SampleStage, Sample, StageInput, StageOutput
+from cpg_workflows.workflow import stage, SampleStage, Sample, StageInput, StageOutput
 
 
 @stage
@@ -514,7 +514,7 @@ Stages can depend on each other (i.e. they form a directed acyclic graph), which
 
 ```python
 from cpg_utils import Path
-from workflow import stage, SampleStage, Sample, StageInput, StageOutput
+from cpg_workflows.workflow import stage, SampleStage, Sample, StageInput, StageOutput
 
 Align = ...
 
@@ -533,7 +533,7 @@ Stage of different levels can depend on each other, and the library will resolve
 
 ```python
 from cpg_utils import Path
-from workflow import stage, CohortStage, Cohort, StageInput, StageOutput
+from cpg_workflows.workflow import stage, CohortStage, Cohort, StageInput, StageOutput
 
 Genotype = ...
 
@@ -556,7 +556,7 @@ class JointCalling(CohortStage):
 To submit a set of defined stages to Hail Batch, just call the `run_workflow(stages)` method:
 
 ```python
-from workflow import run_workflow
+from cpg_workflows.workflow import run_workflow
 JointCalling = ...
 run_workflow().run(stages=[JointCalling])
 ```
@@ -629,7 +629,7 @@ somalier_sites = 'somalier/v0/sites.hg38.vcf.gz'
 The `cpg_workflows.batch` module provides a helper function `get_batch` to set up Hail Batch in the CPG context, assuming `hail/billing_project` and `hail/backend` are set in config.
 
 ```python
-from batch import get_batch
+from cpg_workflows.batch import get_batch
 b = get_batch(name='My batch')
 j = b.new_job('My job', ...)
 ...
