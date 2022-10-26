@@ -604,7 +604,9 @@ dataset = 'seqr'
 billing_project = 'seqr'
 ```
 
-If you are not using analysis-runner, you have to set those explicitly. Check `config-template.toml` for a list of possible config parameters. It also provides defaults for some required parameters which might work for CPG only, e.g.
+If you are not using analysis-runner, you have to set those explicitly. 
+
+Check `configs/defaults` for possible configuration parameters. It also provides defaults for some required parameters which might work for CPG only, e.g.
 
 ```toml
 [workflow]
