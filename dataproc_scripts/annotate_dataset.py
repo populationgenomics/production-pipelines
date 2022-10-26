@@ -60,7 +60,6 @@ def main(
         mt_path=str(subset_mt_path),
         out_mt_path=out_mt_path,
         checkpoint_prefix=checkpoint_prefix,
-        overwrite=not get_config()['workflow'].get('check_intermediates'),
     )
 
 

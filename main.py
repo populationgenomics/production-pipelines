@@ -15,6 +15,7 @@ from cpg_workflows.stages.large_cohort import LoadVqsr, Frequencies
 from cpg_workflows.stages.multiqc import GvcfMultiQC, CramMultiQC
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.seqr_loader import MtToEs
+from cpg_workflows.stages.gatk_sv import GatherBatchEvidence
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
 coloredlogs.install(level='INFO', fmt=fmt)
@@ -24,6 +25,7 @@ WORKFLOWS = {
     'pre_alignment': [FastQCMultiQC],
     'seqr_loader': [MtToEs, GvcfMultiQC, CramMultiQC],
     'large_cohort': [LoadVqsr, Frequencies, GvcfMultiQC, CramMultiQC],
+    'gatk_sv': [GatherBatchEvidence],
 }
 
 

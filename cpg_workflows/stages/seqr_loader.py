@@ -18,6 +18,7 @@ from cpg_utils.workflows.workflow import (
     Dataset,
     get_workflow,
 )
+from cpg_workflows.jobs.seqr_loader import annotate_cohort_jobs, annotate_dataset_jobs
 
 from .joint_genotyping import JointGenotyping
 from .vep import Vep
@@ -54,42 +55,21 @@ class AnnotateCohort(CohortStage):
             to_path(self.expected_outputs(cohort)['prefix']) / 'checkpoints'
         )
 
-        # Importing this requires CPG_CONFIG_PATH to be already set, that's why
-        # we are not importing it on the top level.
-        from analysis_runner import dataproc
-
-        j = dataproc.hail_dataproc_job(
-            self.b,
-            f'dataproc_scripts/annotate_cohort.py '
-            f'--vcf-path {vcf_path} '
-            f'--siteonly-vqsr-vcf-path {siteonly_vqsr_vcf_path} '
-            f'--vep-ht-path {vep_ht_path} '
-            f'--out-mt-path {self.expected_outputs(cohort)["mt"]} '
-            f'--checkpoint-prefix {checkpoint_prefix}',
-            max_age='24h',
-            packages=[
-                'cpg_utils',
-                'google',
-                'fsspec',
-                'gcloud',
-            ],
-            num_workers=2,
-            num_secondary_workers=20,
-            job_name=f'Annotate cohort',
+        jobs = annotate_cohort_jobs(
+            b=self.b,
+            vcf_path=vcf_path,
+            siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
+            vep_ht_path=vep_ht_path,
+            out_mt_path=self.expected_outputs(cohort)["mt"],
+            checkpoint_prefix=checkpoint_prefix,
+            job_attrs=self.get_job_attrs(cohort),
             depends_on=inputs.get_jobs(cohort),
-            scopes=['cloud-platform'],
-            pyfiles=[
-                'seqr-loading-pipelines/hail_scripts',
-                'query_modules',
-            ],
-            init=['gs://cpg-reference/hail_dataproc/install_common.sh'],
         )
-        j.attributes = self.get_job_attrs(cohort) | {'tool': 'hailctl dataproc'}
 
         return self.make_outputs(
             cohort,
             data=self.expected_outputs(cohort),
-            jobs=[j],
+            jobs=jobs,
         )
 
 
@@ -121,43 +101,19 @@ class AnnotateDataset(DatasetStage):
             to_path(self.expected_outputs(dataset)['prefix']) / 'checkpoints'
         )
 
-        sample_ids_list_path = dataset.tmp_prefix() / 'sample-list.txt'
-        if not get_config()['hail'].get('dry_run', False):
-            with sample_ids_list_path.open('w') as f:
-                f.write(','.join([s.id for s in dataset.get_samples()]))
-
-        # Importing this requires CPG_CONFIG_PATH to be already set, that's why
-        # we are not importing it on the top level.
-        from analysis_runner import dataproc
-
-        j = dataproc.hail_dataproc_job(
-            self.b,
-            f'dataproc_scripts/annotate_dataset.py '
-            f'--mt-path {mt_path} '
-            f'--sample-ids {sample_ids_list_path} '
-            f'--out-mt-path {self.expected_outputs(dataset)["mt"]} '
-            f'--checkpoint-prefix {checkpoint_prefix}',
-            max_age='24h',
-            packages=[
-                'cpg_utils',
-                'google',
-                'fsspec',
-                'gcloud',
-            ],
-            num_workers=2,
-            num_secondary_workers=20,
-            job_name=f'Annotate dataset',
+        jobs = annotate_dataset_jobs(
+            b=self.b,
+            mt_path=mt_path,
+            sample_ids=dataset.get_sample_ids(),
+            out_mt_path=self.expected_outputs(dataset)["mt"],
+            tmp_prefix=checkpoint_prefix,
+            job_attrs=self.get_job_attrs(dataset),
             depends_on=inputs.get_jobs(dataset),
-            scopes=['cloud-platform'],
-            pyfiles=[
-                'seqr-loading-pipelines/hail_scripts',
-                'query_modules',
-            ],
-            init=['gs://cpg-reference/hail_dataproc/install_common.sh'],
         )
-        j.attributes = self.get_job_attrs(dataset) | {'tool': 'hailctl dataproc'}
 
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[j])
+        return self.make_outputs(
+            dataset, data=self.expected_outputs(dataset), jobs=jobs
+        )
 
 
 def es_password() -> str:

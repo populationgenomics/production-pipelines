@@ -7,8 +7,11 @@ import os
 
 import hail as hl
 
+from cpg_utils.config import get_config
 from cpg_utils.hail_batch import reference_path, genome_build
 from hail_scripts.computed_fields import vep, variant_id
+
+from cpg_utils.workflows.utils import can_reuse
 
 
 def load_vqsr(site_only_vqsr_vcf_path: str):
@@ -56,8 +59,6 @@ def annotate_cohort(
     site_only_vqsr_vcf_path,
     vep_ht_path,
     out_mt_path,
-    overwrite=False,
-    sequencing_type='',
     checkpoint_prefix=None,
 ):
     """
@@ -76,7 +77,7 @@ def annotate_cohort(
     def _checkpoint(t, file_name):
         if checkpoint_prefix:
             path = os.path.join(checkpoint_prefix, file_name)
-            if not overwrite and hl.hadoop_exists(os.path.join(path, '_SUCCESS')):
+            if can_reuse(path):
                 t = _read(str(path))
             else:
                 t.write(str(path), overwrite=True)
@@ -203,7 +204,7 @@ def annotate_cohort(
         genomeVersion=genome_build().replace('GRCh', ''),
         hail_version=hl.version(),
     )
-    if sequencing_type:
+    if sequencing_type := get_config()['workflow'].get('sequencing_type'):
         # Map to Seqr-style string
         # https://github.com/broadinstitute/seqr/blob/e0c179c36c0f68c892017de5eab2e4c1b9ffdc92/seqr/models.py#L592-L594
         mt = mt.annotate_globals(
@@ -216,7 +217,7 @@ def annotate_cohort(
 
     logging.info('Done:')
     mt.describe()
-    mt.write(str(out_mt_path), overwrite=overwrite)
+    mt.write(str(out_mt_path), overwrite=True)
     logging.info(f'Written final matrix table into {out_mt_path}')
 
 
@@ -261,7 +262,7 @@ def subset_mt_to_samples(mt_path, sample_ids, out_mt_path):
     logging.info(f'Written {out_mt_path}')
 
 
-def annotate_dataset_mt(mt_path, out_mt_path, checkpoint_prefix, overwrite=False):
+def annotate_dataset_mt(mt_path, out_mt_path, checkpoint_prefix):
     """
     Add dataset-level annotations.
     """
@@ -289,9 +290,8 @@ def annotate_dataset_mt(mt_path, out_mt_path, checkpoint_prefix, overwrite=False
     mt = mt.annotate_rows(
         genotypes=hl.agg.collect(hl.struct(**genotype_fields)),
     )
-    mt = mt.checkpoint(
-        f'{checkpoint_prefix}/dataset-genotypes.mt', _read_if_exists=not overwrite
-    )
+
+    mt = mt.checkpoint(f'{checkpoint_prefix}/dataset-genotypes.mt')
     logging.info(f'Written {checkpoint_prefix}/dataset-genotypes.mt')
 
     def _genotype_filter_samples(fn):

@@ -1,13 +1,9 @@
 """
 Driver for computing structural variants from GATK-SV from WGS data.
 """
-import logging
-import os
 from os.path import join
 from typing import Any
 
-import click
-import coloredlogs
 from analysis_runner.cromwell import (
     run_cromwell_workflow_from_repo_and_get_outputs,
     CromwellOutputType,
@@ -16,10 +12,9 @@ from hailtop.batch import Resource
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
-from cpg_utils.config import set_config_paths, get_config
+from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, reference_path, image_path
 from cpg_utils.workflows.batch import make_job_name, Batch
-from cpg_utils.workflows.inputs import get_cohort
 from cpg_utils.workflows.workflow import (
     stage,
     SampleStage,
@@ -28,12 +23,7 @@ from cpg_utils.workflows.workflow import (
     StageInput,
     Sample,
     Dataset,
-    run_workflow,
 )
-
-fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
-coloredlogs.install(level='DEBUG', fmt=fmt)
-
 
 GATK_SV_COMMIT = '50d47e68ad05b29c78cba16606974ef0dca1b113'
 SV_CALLERS = ['manta', 'wham', 'scramble']
@@ -452,29 +442,3 @@ class GatherBatchEvidence(DatasetStage):
             expected_out_dict=expected_d,
         )
         return self.make_outputs(dataset, data=expected_d, jobs=[j])
-
-
-@click.command()
-@click.argument('config_paths', nargs=-1)
-def main(config_paths: list[str]):
-    """
-    Run a workflow, using CONFIG_PATHS in the order specified, overriding
-    $CPG_CONFIG_PATH if specified.
-    """
-    if _cpg_config_path_env_var := os.environ.get('CPG_CONFIG_PATH'):
-        config_paths = _cpg_config_path_env_var.split(',') + config_paths
-    set_config_paths(list(config_paths))
-    samples_with_no_cram = [s for s in get_cohort().get_samples() if not s.cram]
-    if samples_with_no_cram:
-        logging.warning(
-            f'Found {len(samples_with_no_cram)}/{len(get_cohort().get_samples())} '
-            'samples with no CRAM in Metamist. Skipping'
-        )
-        for s in samples_with_no_cram:
-            s.active = False
-
-    run_workflow(stages=[GatherBatchEvidence])
-
-
-if __name__ == '__main__':
-    main()  # pylint: disable=E1120
