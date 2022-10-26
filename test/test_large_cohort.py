@@ -27,7 +27,6 @@ def _set_config(results_prefix: Path, extra_conf: dict | None = None):
         d,
         {
             'workflow': {
-                'local_dir': str(results_prefix),
                 'dataset_gcp_project': 'thousand-genomes',
                 'dataset': 'thousand-genomes',
                 'access_level': 'test',
@@ -37,6 +36,14 @@ def _set_config(results_prefix: Path, extra_conf: dict | None = None):
                 'reference_prefix': str(
                     to_path(__file__).parent / 'data' / 'large_cohort' / 'reference'
                 ),
+            },
+            'path_schemes': {
+                'local': {
+                    'default': f'{results_prefix}',
+                    'tmp': f'{results_prefix}/tmp',
+                    'analysis': f'{results_prefix}/analysis',
+                    'web': f'{results_prefix}/web',
+                }
             },
             'large_cohort': {
                 'sample_qc_cutoffs': {
@@ -87,6 +94,12 @@ def test_large_cohort(mocker: MockFixture):
         s.gvcf = GvcfPath(gvcf_path)
 
     mocker.patch('cpg_utils.workflows.inputs.create_cohort', lambda: cohort)
+
+    def mock_write(self, path: str, *args, **kwargs):
+        to_path(path).parent.mkdir(parents=True, exist_ok=True)
+
+    mocker.patch('hail.table.write', mock_write)
+    mocker.patch('hail.matrixtable.write', mock_write)
 
     from large_cohort import (
         combiner,
