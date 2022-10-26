@@ -56,9 +56,9 @@ def load_vqsr(site_only_vqsr_vcf_path: str):
 
 def annotate_cohort(
     vcf_path,
-    site_only_vqsr_vcf_path,
-    vep_ht_path,
     out_mt_path,
+    vep_ht_path,
+    site_only_vqsr_vcf_path=None,
     checkpoint_prefix=None,
 ):
     """
@@ -92,11 +92,7 @@ def annotate_cohort(
         skip_invalid_loci=True,
         force_bgz=True,
     )
-    logging.info(
-        f'Importing VCF {vcf_path}, '
-        f'adding VQSR annotations from {site_only_vqsr_vcf_path}, '
-        f'adding VEP annotations from {vep_ht_path}'
-    )
+    logging.info(f'Importing VCF {vcf_path}')
 
     logging.info(f'Loading VEP Table from {vep_ht_path}')
     # Annotate VEP. Do ti before splitting multi, because we run VEP on unsplit VCF,
@@ -112,19 +108,20 @@ def annotate_cohort(
     )
     mt = _checkpoint(mt, 'mt-vep-split.mt')
 
-    vqsr_ht = load_vqsr(site_only_vqsr_vcf_path)
-    vqsr_ht = _checkpoint(vqsr_ht, 'vqsr.ht')
+    if site_only_vqsr_vcf_path:
+        vqsr_ht = load_vqsr(site_only_vqsr_vcf_path)
+        vqsr_ht = _checkpoint(vqsr_ht, 'vqsr.ht')
 
-    logging.info('Adding VQSR annotations into the Matrix Table')
-    mt = mt.annotate_globals(**vqsr_ht.index_globals())
-    mt = mt.annotate_rows(
-        # vqsr_ht has info annotation split by allele, plus the new AS-VQSR annotations
-        info=vqsr_ht[mt.row_key].info,
-        filters=mt.filters.union(vqsr_ht[mt.row_key].filters).filter(
-            lambda val: val != 'PASS'
-        ),
-    )
-    mt = _checkpoint(mt, 'mt-vep-split-vqsr.mt')
+        logging.info('Adding VQSR annotations into the Matrix Table')
+        mt = mt.annotate_globals(**vqsr_ht.index_globals())
+        mt = mt.annotate_rows(
+            # vqsr_ht has info annotation split by allele, plus the new AS-VQSR annotations
+            info=vqsr_ht[mt.row_key].info,
+            filters=mt.filters.union(vqsr_ht[mt.row_key].filters).filter(
+                lambda val: val != 'PASS'
+            ),
+        )
+        mt = _checkpoint(mt, 'mt-vep-split-vqsr.mt')
 
     ref_ht = hl.read_table(str(reference_path('seqr/combined_reference')))
     clinvar_ht = hl.read_table(str(reference_path('seqr/clinvar')))

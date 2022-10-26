@@ -15,10 +15,10 @@ from cpg_workflows.query_modules import seqr_loader
 def annotate_cohort_jobs(
     b: Batch,
     vcf_path: Path,
-    siteonly_vqsr_vcf_path: Path,
-    vep_ht_path: Path,
     out_mt_path: Path,
     checkpoint_prefix: Path,
+    vep_ht_path: Path,
+    siteonly_vqsr_vcf_path: Path | None = None,
     job_attrs: dict | None = None,
     use_dataproc: bool = True,
     depends_on: list[Job] | None = None,
@@ -35,10 +35,14 @@ def annotate_cohort_jobs(
             b,
             f'dataproc_scripts/annotate_cohort.py '
             f'--vcf-path {vcf_path} '
-            f'--siteonly-vqsr-vcf-path {siteonly_vqsr_vcf_path} '
             f'--vep-ht-path {vep_ht_path} '
             f'--out-mt-path {out_mt_path} '
-            f'--checkpoint-prefix {checkpoint_prefix}',
+            f'--checkpoint-prefix {checkpoint_prefix} '
+            + (
+                f'--siteonly-vqsr-vcf-path {siteonly_vqsr_vcf_path} '
+                if siteonly_vqsr_vcf_path
+                else ''
+            ),
             max_age='24h',
             packages=[
                 'cpg_utils',
@@ -66,9 +70,9 @@ def annotate_cohort_jobs(
                 seqr_loader,
                 seqr_loader.annotate_cohort.__name__,
                 str(vcf_path),
-                str(siteonly_vqsr_vcf_path),
-                str(vep_ht_path),
                 str(out_mt_path),
+                str(vep_ht_path),
+                str(siteonly_vqsr_vcf_path),
                 str(checkpoint_prefix),
                 setup_gcp=True,
             )
