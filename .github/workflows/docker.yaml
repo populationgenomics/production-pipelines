@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+env:
+  VERSION: 0.1.0
+
 jobs:
   docker:
     runs-on: ubuntu-latest
@@ -15,7 +18,7 @@ jobs:
       DOCKER_BUILDKIT: 1
       BUILDKIT_PROGRESS: plain
       CLOUDSDK_CORE_DISABLE_PROMPTS: 1
-      IMAGE_NAME: australia-southeast1-docker.pkg.dev/cpg-common/images/production-pipelines
+      IMAGE_NAME: australia-southeast1-docker.pkg.dev/cpg-common/images/cpg-workflows
     steps:
     - uses: actions/checkout@main
 
@@ -44,5 +47,7 @@ jobs:
     - name: push latest
       if: ${{ github.event_name != 'pull_request' }}
       run: |
+        docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:$VERSION
         docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:latest
+        docker push $IMAGE_NAME:$VERSION
         docker push $IMAGE_NAME:latest
