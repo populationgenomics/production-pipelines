@@ -52,8 +52,6 @@ def main(
         site_only_vqsr_vcf_path=siteonly_vqsr_vcf_path,
         vep_ht_path=vep_ht_path,
         out_mt_path=out_mt_path,
-        overwrite=not get_config()['workflow'].get('check_intermediates'),
-        sequencing_type=get_config()['workflow']['sequencing_type'],
         checkpoint_prefix=checkpoint_prefix,
     )
 
