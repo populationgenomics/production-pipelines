@@ -30,13 +30,17 @@ def _set_config(results_prefix: Path, extra_conf: dict | None = None):
                 'dataset': 'test-analysis-dataset',
                 'access_level': 'test',
                 'sequencing_type': 'genome',
-                'driver_image': '<stub>',
                 'skip_stages': ['Align'],
                 'check_inputs': False,
                 'check_intermediates': False,
                 'check_expected_outputs': False,
                 'path_scheme': 'local',
                 'status_reporter': None,
+            },
+            'path_schemes': {
+                'local': {
+                    'default': f'{results_prefix}',
+                }
             },
             'hail': {
                 'billing_project': 'test-analysis-dataset',
