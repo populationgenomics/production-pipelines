@@ -88,15 +88,13 @@ def test_large_cohort(mocker: MockFixture):
 
     mocker.patch('cpg_utils.workflows.inputs.create_cohort', lambda: cohort)
 
-    from large_cohort import (
-        combiner,
-        sample_qc,
-        dense_subset,
-        relatedness,
-        ancestry_pca,
-        ancestry_plots,
-    )
-    from large_cohort import site_only_vcf
+    from cpg_workflows.large_cohort import combiner
+    from cpg_workflows.large_cohort import ancestry_pca
+    from cpg_workflows.large_cohort import sample_qc
+    from cpg_workflows.large_cohort import dense_subset
+    from cpg_workflows.large_cohort import relatedness
+    from cpg_workflows.large_cohort import ancestry_plots
+    from cpg_workflows.large_cohort import site_only_vcf
     from cpg_utils.hail_batch import start_query_context
 
     start_query_context()

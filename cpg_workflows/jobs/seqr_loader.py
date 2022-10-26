@@ -8,7 +8,7 @@ from hailtop.batch import Batch
 from cpg_utils import Path
 from cpg_utils.hail_batch import image_path, genome_build, query_command
 
-from query_modules import seqr_loader
+from cpg_workflows.query_modules import seqr_loader
 
 
 def annotate_cohort_jobs(

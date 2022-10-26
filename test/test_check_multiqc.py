@@ -8,7 +8,7 @@ from cpg_utils import to_path, Path
 from cpg_utils.config import set_config_paths, update_dict
 from cpg_utils.workflows.utils import timestamp
 
-from python_scripts import check_multiqc
+from cpg_workflows.python_scripts import check_multiqc
 
 DEFAULT_CONF = """
 [workflow]

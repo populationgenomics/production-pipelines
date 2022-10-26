@@ -17,8 +17,8 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import reference_path, image_path, command
 from cpg_utils.workflows.resources import STANDARD, HIGHMEM
-from jobs.picard import get_intervals
-from jobs.vcf import gather_vcfs, subset_vcf
+from cpg_workflows.jobs.picard import get_intervals
+from cpg_workflows.jobs.vcf import gather_vcfs, subset_vcf
 
 STANDARD_FEATURES = [
     'ReadPosRankSum',

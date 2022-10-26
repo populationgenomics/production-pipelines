@@ -1,7 +1,6 @@
 """
 Utils for submitting the workflow to a Dataproc cluster.
 """
-import logging
 
 import math
 from analysis_runner import dataproc
@@ -44,8 +43,8 @@ def dataproc_job(
     """
     Submit script as a dataproc job.
     """
-    import large_cohort
-    from large_cohort import dataproc_script
+    from cpg_workflows import large_cohort
+    from cpg_workflows.large_cohort import dataproc_script
 
     package_path = to_path(large_cohort.__file__).parent
     script_path = to_path(dataproc_script.__file__)

@@ -2,8 +2,6 @@
 VEP stage.
 """
 
-import logging
-
 from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_utils.workflows.workflow import (
@@ -14,7 +12,7 @@ from cpg_utils.workflows.workflow import (
     Cohort,
 )
 
-from jobs import vep
+from ..jobs import vep
 from .vqsr import Vqsr
 
 

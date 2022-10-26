@@ -52,7 +52,7 @@ analysis-runner \
   main.py seqr_loader
 ```
 
-Note the configs that are being passed to analysis-runner: `configs/genome.toml` and `configs/validation.toml`. They are merged together by analysis-runner, with values in the latter overwriting values in the former. For more about configs, see [team-docs](https://github.com/populationgenomics/team-docs/blob/main/cpg_utils_config.md). Note that the `seqr_loader` command loads the [configs/seqr_loader.toml](configs/defaults/seqr_loader.toml) by default.
+Note the configs that are being passed to analysis-runner: `configs/genome.toml` and `configs/validation.toml`. They are merged together by analysis-runner, with values in the latter overwriting values in the former. For more about configs, see [team-docs](https://github.com/populationgenomics/team-docs/blob/main/cpg_utils_config.md). Note that the `seqr_loader` command loads the [configs/defaults/seqr_loader.toml](configs/defaults/seqr_loader.toml) by default.
 
 ### Seqr production load invocation
 
@@ -148,7 +148,7 @@ analysis-runner \
 
 The workflow will find GVCFs for input samples using Metamist, along with available sample metadata (e.g. known population labels, sex, QC), and would write the results into the `gs://cpg-prophecy-test` bucket.
 
-Note that the `large_cohort` command loads the [configs/large_cohort.toml](configs/defaults/large_cohort.toml) by default, with other configs specified with `--config` put on top. For more about configs, see [team-docs](https://github.com/populationgenomics/team-docs/blob/main/cpg_utils_config.md). 
+Note that the `large_cohort` command loads the [configs/defaults/large_cohort.toml](configs/defaults/large_cohort.toml) by default, with other configs specified with `--config` put on top. For more about configs, see [team-docs](https://github.com/populationgenomics/team-docs/blob/main/cpg_utils_config.md). 
 
 ### Outputs
 

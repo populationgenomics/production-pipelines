@@ -14,9 +14,9 @@ from cpg_utils.workflows.workflow import (
     SampleStage,
 )
 
-from jobs import genotype
-from jobs.happy import happy
-from jobs.picard import vcf_qc
+from ..jobs import genotype
+from cpg_workflows.jobs.happy import happy
+from cpg_workflows.jobs.picard import vcf_qc
 
 from .align import Align
 

@@ -15,10 +15,14 @@ from cpg_utils.workflows.workflow import (
     SampleStage,
 )
 
-from jobs import align, somalier
-from jobs.align import MissingAlignmentInputException
-from jobs.verifybamid import verifybamid
-from jobs.picard import picard_wgs_metrics, picard_collect_metrics, picard_hs_metrics
+from cpg_workflows.jobs import align, somalier
+from cpg_workflows.jobs.align import MissingAlignmentInputException
+from cpg_workflows.jobs.verifybamid import verifybamid
+from cpg_workflows.jobs.picard import (
+    picard_wgs_metrics,
+    picard_collect_metrics,
+    picard_hs_metrics,
+)
 
 
 @dataclasses.dataclass

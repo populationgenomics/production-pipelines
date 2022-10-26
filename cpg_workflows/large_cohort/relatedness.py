@@ -53,7 +53,7 @@ def pcrelate(
     logging.info('Running relatedness check')
     scores_ht_path = tmp_prefix / 'pcrelate' / 'relatedness_pca_scores.ht'
     if can_reuse(scores_ht_path):
-        scores_ht = hl.read_table(scores_ht_path)
+        scores_ht = hl.read_table(str(scores_ht_path))
     else:
         sample_num = mt.cols().count()
         _, scores_ht, _ = hl.hwe_normalized_pca(

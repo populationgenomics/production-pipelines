@@ -18,7 +18,7 @@ from cpg_utils.workflows.workflow import (
     Cohort,
 )
 
-from jobs.multiqc import multiqc
+from cpg_workflows.jobs.multiqc import multiqc
 from .align import Align, qc_functions
 from .genotype import Genotype, GvcfHappy
 from .joint_genotyping import JointGenotyping, JointVcfHappy

@@ -15,8 +15,8 @@ from cpg_utils.workflows.workflow import (
     SampleStage,
     DatasetStage,
 )
-from jobs import fastqc
-from jobs.multiqc import multiqc
+from cpg_workflows.jobs import fastqc
+from cpg_workflows.jobs.multiqc import multiqc
 
 
 @dataclasses.dataclass

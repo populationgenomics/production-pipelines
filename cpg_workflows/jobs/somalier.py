@@ -20,7 +20,7 @@ from cpg_utils.workflows.targets import Dataset, Sample
 from cpg_utils.workflows.filetypes import CramPath, GvcfPath, BamPath
 from cpg_utils.workflows.utils import can_reuse, rich_sample_id_seds
 
-from python_scripts import check_pedigree
+from cpg_workflows.python_scripts import check_pedigree
 
 # We want to exclude contaminated samples from relatedness checks. Somalier is not
 # designed to work with contaminated samples, and in a presence of contamination it

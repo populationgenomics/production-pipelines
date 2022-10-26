@@ -11,10 +11,10 @@ import coloredlogs
 from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
 from cpg_utils.workflows.workflow import run_workflow
-from stages.large_cohort import LoadVqsr, Frequencies
-from stages.multiqc import GvcfMultiQC, CramMultiQC
-from stages.fastqc import FastQCMultiQC
-from stages.seqr_loader import MtToEs
+from cpg_workflows.stages.large_cohort import LoadVqsr, Frequencies
+from cpg_workflows.stages.multiqc import GvcfMultiQC, CramMultiQC
+from cpg_workflows.stages.fastqc import FastQCMultiQC
+from cpg_workflows.stages.seqr_loader import MtToEs
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
 coloredlogs.install(level='INFO', fmt=fmt)

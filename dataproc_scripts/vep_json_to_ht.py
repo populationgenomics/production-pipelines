@@ -8,7 +8,7 @@ import click
 import hail as hl
 
 from cpg_utils.hail_batch import genome_build
-from query_modules import vep
+from cpg_workflows.query_modules import vep
 
 
 @click.command()
