@@ -23,8 +23,8 @@ from sample_metadata.apis import (
 )
 from sample_metadata.exceptions import ApiException
 
-from utils import exists
-from filetypes import (
+from .utils import exists
+from .filetypes import (
     FastqPair,
     CramPath,
     BamPath,
