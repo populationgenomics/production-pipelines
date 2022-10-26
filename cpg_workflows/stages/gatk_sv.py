@@ -15,7 +15,7 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, reference_path, image_path
 from batch import make_job_name, Batch
-from workflow import (
+from cpg_workflows.workflow import (
     stage,
     SampleStage,
     StageOutput,

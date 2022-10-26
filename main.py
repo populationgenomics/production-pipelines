@@ -10,7 +10,7 @@ import coloredlogs
 
 from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
-from workflow import run_workflow
+from cpg_workflows.workflow import run_workflow
 from cpg_workflows.stages.large_cohort import LoadVqsr, Frequencies
 from cpg_workflows.stages.multiqc import GvcfMultiQC, CramMultiQC
 from cpg_workflows.stages.fastqc import FastQCMultiQC

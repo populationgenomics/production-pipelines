@@ -8,7 +8,7 @@ from cpg_utils import to_path, Path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import reference_path
-from workflow import (
+from cpg_workflows.workflow import (
     stage,
     StageInput,
     StageOutput,
