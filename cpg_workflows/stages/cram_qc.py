@@ -112,7 +112,7 @@ def qc_functions() -> list[Qc]:
 
 
 @stage(required_stages=Align)
-class CramQc(SampleStage):
+class CramQC(SampleStage):
     """
     Calling tools that process CRAM for QC purposes.
     """
@@ -152,7 +152,7 @@ class CramQc(SampleStage):
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
 
 
-@stage(required_stages=[CramQc])
+@stage(required_stages=[CramQC])
 class SomalierPedigree(DatasetStage):
     """
     Checks pedigree from CRAM fingerprints.
@@ -188,7 +188,7 @@ class SomalierPedigree(DatasetStage):
         for sample in dataset.get_samples():
             if get_config().get('somalier', {}).get('exclude_high_contamination'):
                 verify_bamid_path = inputs.as_path(
-                    stage=CramQc, target=sample, key='verify_bamid'
+                    stage=CramQC, target=sample, key='verify_bamid'
                 )
                 if not exists(verify_bamid_path):
                     logging.warning(
@@ -197,7 +197,7 @@ class SomalierPedigree(DatasetStage):
                     )
                 else:
                     verifybamid_by_sid[sample.id] = verify_bamid_path
-            somalier_path = inputs.as_path(stage=CramQc, target=sample, key='somalier')
+            somalier_path = inputs.as_path(stage=CramQC, target=sample, key='somalier')
             somalier_by_sid[sample.id] = somalier_path
 
         html_path = self.expected_outputs(dataset)['html']
@@ -234,7 +234,7 @@ class SomalierPedigree(DatasetStage):
 
 @stage(
     required_stages=[
-        CramQc,
+        CramQC,
         SomalierPedigree,
     ],
     forced=True,
@@ -294,7 +294,7 @@ class CramMultiQC(DatasetStage):
                     if not out:
                         continue
                     try:
-                        path = inputs.as_path(sample, CramQc, key)
+                        path = inputs.as_path(sample, CramQC, key)
                     except StageInputNotFoundError:  # allow missing inputs
                         logging.warning(
                             f'Output CramQc/"{key}" not found for {sample}, '

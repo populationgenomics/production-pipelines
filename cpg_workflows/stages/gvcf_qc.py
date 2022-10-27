@@ -24,7 +24,7 @@ from cpg_workflows.jobs.picard import vcf_qc
 
 
 @stage(required_stages=Genotype)
-class GvcfQc(SampleStage):
+class GvcfQC(SampleStage):
     """
     Calling tools that process GVCF for QC purposes.
     """
@@ -104,7 +104,7 @@ class GvcfHappy(SampleStage):
 
 @stage(
     required_stages=[
-        GvcfQc,
+        GvcfQC,
         GvcfHappy,
     ],
     forced=True,
@@ -148,7 +148,7 @@ class GvcfMultiQC(DatasetStage):
 
         for sample in dataset.get_samples():
             for _stage, key in [
-                (GvcfQc, 'qc_detail'),
+                (GvcfQC, 'qc_detail'),
                 (GvcfHappy, None),
             ]:
                 try:
