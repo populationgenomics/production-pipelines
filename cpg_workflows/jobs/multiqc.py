@@ -62,8 +62,9 @@ def multiqc(
     STANDARD.set_resources(mqc_j, ncpu=16)
 
     file_list_path = tmp_prefix / 'multiqc-file-list.txt'
-    with file_list_path.open('w') as f:
-        f.writelines([f'{p}\n' for p in paths])
+    if not get_config()['hail'].get('dry_run', False):
+        with file_list_path.open('w') as f:
+            f.writelines([f'{p}\n' for p in paths])
     file_list = b.read_input(str(file_list_path))
 
     endings_conf = ', '.join(list(ending_to_trim)) if ending_to_trim else ''
@@ -73,7 +74,8 @@ def multiqc(
 
     if sample_id_map:
         sample_map_path = tmp_prefix / 'rename-sample-map.tsv'
-        _write_sample_id_map(sample_id_map, sample_map_path)
+        if not get_config()['hail'].get('dry_run', False):
+            _write_sample_id_map(sample_id_map, sample_map_path)
         sample_map_file = b.read_input(str(sample_map_path))
     else:
         sample_map_file = None

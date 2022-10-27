@@ -401,8 +401,9 @@ class Dataset(Target):
         if out_path is None:
             out_path = self.tmp_prefix() / 'ped' / f'{self.alignment_inputs_hash()}.ped'
 
-        with out_path.open('w') as fp:
-            df.to_csv(fp, sep='\t', index=False)
+        if not get_config()['hail'].get('dry_run', False):
+            with out_path.open('w') as fp:
+                df.to_csv(fp, sep='\t', index=False)
         return out_path
 
 
