@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 setup(
     name='cpg-workflows',
     # This tag is automatically updated by bumpversion
-    version='1.0.0',
+    version='0.1.0',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
