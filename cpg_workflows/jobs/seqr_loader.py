@@ -7,7 +7,7 @@ from hailtop.batch import Batch
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import image_path, genome_build, query_command
+from cpg_utils.hail_batch import image_path, query_command
 
 from cpg_workflows.query_modules import seqr_loader
 

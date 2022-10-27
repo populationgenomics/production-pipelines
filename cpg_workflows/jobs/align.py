@@ -14,16 +14,16 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from cpg_utils.hail_batch import command
-from targets import Sample
-from filetypes import (
+from cpg_workflows.targets import Sample
+from cpg_workflows.filetypes import (
     AlignmentInput,
     FastqPairs,
     CramPath,
     BamPath,
     FastqPair,
 )
-from resources import STANDARD
-from utils import can_reuse
+from cpg_workflows.resources import STANDARD
+from cpg_workflows.utils import can_reuse
 
 from . import picard
 
@@ -210,6 +210,7 @@ def align(
 
         elif sharded_bazam:  # Using BAZAM to shard CRAM
             assert realignment_shards_num, realignment_shards_num
+            assert isinstance(alignment_input, CramPath | BamPath)
             for shard_number in range(realignment_shards_num):
                 j, cmd = _align_one(
                     b=b,

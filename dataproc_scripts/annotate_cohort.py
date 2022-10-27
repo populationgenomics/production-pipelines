@@ -7,7 +7,6 @@ Dataproc script to annotate cohort.
 import click
 import hail as hl
 
-from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build
 from cpg_workflows.query_modules.seqr_loader import annotate_cohort
 

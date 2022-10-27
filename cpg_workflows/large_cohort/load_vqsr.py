@@ -3,7 +3,7 @@ import logging
 
 from cpg_utils import Path
 from cpg_utils.hail_batch import genome_build
-from utils import can_reuse
+from cpg_workflows.utils import can_reuse
 
 
 def run(

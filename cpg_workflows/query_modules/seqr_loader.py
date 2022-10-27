@@ -11,7 +11,7 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import reference_path, genome_build
 from hail_scripts.computed_fields import vep, variant_id
 
-from utils import can_reuse
+from cpg_workflows.utils import can_reuse
 
 
 def load_vqsr(site_only_vqsr_vcf_path: str):

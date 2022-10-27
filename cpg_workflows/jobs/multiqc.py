@@ -4,16 +4,15 @@
 Batch jobs to run MultiQC.
 """
 from cpg_utils.config import get_config
-from utils import rich_sample_id_seds
 from hailtop.batch.job import Job
 from hailtop.batch import Batch, ResourceFile
 
 from cpg_utils import to_path
 from cpg_utils.hail_batch import image_path, copy_common_env, command
 from cpg_utils import Path
-from resources import STANDARD
-from targets import Dataset
-
+from cpg_workflows.resources import STANDARD
+from cpg_workflows.targets import Dataset
+from cpg_workflows.utils import rich_sample_id_seds
 from cpg_workflows.python_scripts import check_multiqc
 
 

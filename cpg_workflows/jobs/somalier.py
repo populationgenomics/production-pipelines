@@ -15,11 +15,10 @@ from cpg_utils.hail_batch import (
     copy_common_env,
     command,
 )
-from resources import STANDARD
-from targets import Dataset, Sample
-from filetypes import CramPath, GvcfPath, BamPath
-from utils import can_reuse, rich_sample_id_seds
-
+from cpg_workflows.resources import STANDARD
+from cpg_workflows.targets import Dataset, Sample
+from cpg_workflows.filetypes import CramPath, GvcfPath, BamPath
+from cpg_workflows.utils import can_reuse, rich_sample_id_seds
 from cpg_workflows.python_scripts import check_pedigree
 
 # We want to exclude contaminated samples from relatedness checks. Somalier is not

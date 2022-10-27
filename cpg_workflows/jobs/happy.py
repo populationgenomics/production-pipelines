@@ -10,8 +10,8 @@ from cpg_utils.hail_batch import reference_path, image_path, fasta_res_group
 from hailtop.batch import ResourceGroup
 
 from cpg_utils.hail_batch import command
-from resources import STANDARD
-from targets import Sample
+from cpg_workflows.resources import STANDARD
+from cpg_workflows.targets import Sample
 
 
 def happy(

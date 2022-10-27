@@ -2,7 +2,7 @@ import logging
 import hail as hl
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from utils import can_reuse
+from cpg_workflows.utils import can_reuse
 from gnomad.sample_qc.relatedness import compute_related_samples_to_drop
 
 

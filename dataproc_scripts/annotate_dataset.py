@@ -8,7 +8,6 @@ import click
 import hail as hl
 
 from cpg_utils import to_path
-from cpg_utils.config import get_config
 
 from cpg_workflows.query_modules.seqr_loader import (
     subset_mt_to_samples,

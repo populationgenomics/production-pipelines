@@ -92,7 +92,7 @@ def run(out_vds_path: Path, tmp_prefix: Path) -> hl.vds.VariantDataset:
     )
 
     sample_names = get_cohort().get_sample_ids()
-    gvcf_paths = [str(s.gvcf.path) for s in get_cohort().get_samples()]
+    gvcf_paths = [str(s.gvcf.path) for s in get_cohort().get_samples() if s.gvcf]
     logging.info(f'Combining {len(sample_names)} samples: {", ".join(sample_names)}')
 
     check_duplicates(sample_names)

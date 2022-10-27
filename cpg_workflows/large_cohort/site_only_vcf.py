@@ -7,7 +7,7 @@ import logging
 
 import hail as hl
 from cpg_utils import Path
-from utils import can_reuse
+from cpg_workflows.utils import can_reuse
 from gnomad.utils.vcf import adjust_vcf_incompatible_types
 from gnomad.utils.sparse_mt import default_compute_info
 

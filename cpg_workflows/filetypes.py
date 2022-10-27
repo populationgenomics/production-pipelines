@@ -44,6 +44,9 @@ class CramOrBamPath(AlignmentInput, ABC):
             self.full_index_suffix = str(self.index_path).replace(
                 str(self.path.with_suffix('')), ''
             )
+        self.reference_assembly = None
+        if reference_assembly:
+            self.reference_assembly = to_path(reference_assembly)
 
     @property
     @abstractmethod
@@ -126,10 +129,7 @@ class CramPath(CramOrBamPath):
         index_path: str | Path | None = None,
         reference_assembly: str | Path = None,
     ):
-        self.reference_assembly = None
-        if reference_assembly:
-            self.reference_assembly = to_path(reference_assembly)
-        super().__init__(path, index_path)
+        super().__init__(path, index_path, reference_assembly)
         self.somalier_path = to_path(f'{self.path}.somalier')
 
     @property

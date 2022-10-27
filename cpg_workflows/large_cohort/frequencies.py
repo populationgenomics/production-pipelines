@@ -2,7 +2,7 @@ import hail as hl
 import logging
 
 from cpg_utils import Path
-from utils import can_reuse
+from cpg_workflows.utils import can_reuse
 from gnomad.resources.grch38.gnomad import POPS_TO_REMOVE_FOR_POPMAX
 from gnomad.sample_qc.sex import adjusted_sex_ploidy_expr
 from gnomad.utils.annotations import (

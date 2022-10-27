@@ -2,12 +2,12 @@
 Create Hail Batch jobs for VerifyBAMID.
 """
 from cpg_utils.config import get_config
-from utils import can_reuse
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from cpg_utils import Path
 from cpg_utils.hail_batch import command
-from filetypes import CramPath
-from resources import STANDARD, storage_for_cram_qc_job
+from cpg_workflows.utils import can_reuse
+from cpg_workflows.filetypes import CramPath
+from cpg_workflows.resources import STANDARD, storage_for_cram_qc_job
 
 from hailtop.batch.job import Job
 
