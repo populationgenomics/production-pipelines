@@ -11,6 +11,8 @@ from pytest_mock import MockFixture
 from cpg_workflows.batch import get_batch
 from cpg_workflows.filetypes import BamPath, FastqPair, FastqPairs
 from cpg_workflows.inputs import get_cohort
+from cpg_workflows.stages.cram_qc import CramMultiQC
+from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 from cpg_workflows.targets import Cohort
 from cpg_workflows.utils import timestamp
 from cpg_workflows.workflow import get_workflow
@@ -134,7 +136,7 @@ def test_seqr_loader_dry(mocker: MockFixture):
     )
     mocker.patch('sample_metadata.apis.AnalysisApi.update_analysis_status', do_nothing)
 
-    get_workflow().run(stages=[MtToEs])
+    get_workflow().run(stages=[MtToEs, GvcfMultiQC, CramMultiQC])
 
     assert (
         get_batch().job_by_tool['gatk HaplotypeCaller']['job_n']

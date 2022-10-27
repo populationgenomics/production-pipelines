@@ -110,8 +110,9 @@ def _make_sample_map(dataset: Dataset):
     df = pd.DataFrame(
         [{'id': s.id, 'pid': s.participant_id} for s in dataset.get_samples()]
     )
-    with sample_map_fpath.open('w') as fp:
-        df.to_csv(fp, sep='\t', index=False, header=False)
+    if not get_config()['hail'].get('dry_run', False):
+        with sample_map_fpath.open('w') as fp:
+            df.to_csv(fp, sep='\t', index=False, header=False)
     return sample_map_fpath
 
 
