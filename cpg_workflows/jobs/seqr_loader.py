@@ -9,8 +9,6 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, query_command
 
-from cpg_workflows.query_modules import seqr_loader
-
 
 def annotate_cohort_jobs(
     b: Batch,
@@ -63,6 +61,8 @@ def annotate_cohort_jobs(
         )
         j.attributes = (job_attrs or {}) | {'tool': 'hailctl dataproc'}
     else:
+        from cpg_workflows.query_modules import seqr_loader
+
         j = b.new_job(f'annotate cohort', job_attrs)
         j.image(image_path('cpg_utils'))
         j.command(
@@ -137,6 +137,8 @@ def annotate_dataset_jobs(
         jobs = [j]
 
     else:
+        from cpg_workflows.query_modules import seqr_loader
+
         subset_j = b.new_job(
             f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
         )
