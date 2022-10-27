@@ -115,7 +115,7 @@ class GvcfHappy(SampleStage):
 
 @stage(
     required_stages=[
-        Genotype,
+        GvcfQc,
         GvcfHappy,
     ],
     forced=True,
@@ -158,23 +158,26 @@ class GvcfMultiQC(DatasetStage):
         ending_to_trim = set()  # endings to trim to get sample names
 
         for sample in dataset.get_samples():
-            for st, key in [
-                (Genotype, 'qc_detail'),
+            for _stage, key in [
+                (GvcfQc, 'qc_detail'),
                 (GvcfHappy, None),
             ]:
                 try:
-                    path = inputs.as_path(sample, st, key)
+                    path = inputs.as_path(sample, _stage, key)
                 except StageInputNotFoundError:  # allow missing inputs
-                    if st != GvcfHappy:
+                    if _stage != GvcfHappy:
                         logging.warning(
-                            f'Output for stage {st.__name__} not found for {sample}, '
-                            f'skipping'
+                            f'Output {_stage.__name__}/"{key}" not found for {sample}, '
+                            f'it will be silently excluded from MultiQC'
                         )
                 else:
                     paths.append(path)
                     ending_to_trim.add(path.name.replace(sample.id, ''))
 
-        assert ending_to_trim
+        if not paths:
+            logging.warning('No GVCF QC found to aggregate with MultiQC')
+            return self.make_outputs(dataset)
+
         modules_to_trim_endings = {
             'picard/variant_calling_metrics',
             'happy',

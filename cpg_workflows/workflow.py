@@ -18,7 +18,7 @@ import pathlib
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from enum import Enum
-from typing import cast, Callable, Union, TypeVar, Generic, Optional, Type
+from typing import cast, Callable, Union, TypeVar, Generic, Optional, Type, Sequence
 
 from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
@@ -69,7 +69,7 @@ class StageOutput:
         self,
         target: 'Target',
         data: StageOutputData | None = None,
-        jobs: list[Job | None] | Job | None = None,
+        jobs: Sequence[Job | None] | Job | None = None,
         meta: dict | None = None,
         reusable: bool = False,
         skipped: bool = False,
@@ -80,7 +80,7 @@ class StageOutput:
         self.data = data
         self.stage = stage
         self.target = target
-        _jobs: list[Job | None] = [jobs] if isinstance(jobs, Job) else (jobs or [])
+        _jobs = [jobs] if isinstance(jobs, Job) else (jobs or [])
         self.jobs: list[Job] = [j for j in _jobs if j is not None]
         self.meta: dict = meta or {}
         self.reusable = reusable
@@ -391,7 +391,7 @@ class Stage(Generic[TargetT], ABC):
         self,
         target: 'Target',
         data: StageOutputData | str | dict[str, str] | None = None,
-        jobs: list[Job | None] | Job | None = None,
+        jobs: Sequence[Job | None] | Job | None = None,
         meta: dict | None = None,
         reusable: bool = False,
         skipped: bool = False,
