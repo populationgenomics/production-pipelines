@@ -69,7 +69,7 @@ class StageOutput:
         self,
         target: 'Target',
         data: StageOutputData | None = None,
-        jobs: list[Job] | Job | None = None,
+        jobs: list[Job | None] | Job | None = None,
         meta: dict | None = None,
         reusable: bool = False,
         skipped: bool = False,
@@ -80,7 +80,8 @@ class StageOutput:
         self.data = data
         self.stage = stage
         self.target = target
-        self.jobs: list[Job] = [jobs] if isinstance(jobs, Job) else (jobs or [])
+        jobs: list[Job | None] = [jobs] if isinstance(jobs, Job) else (jobs or [])
+        self.jobs: list[Job] = [j for j in jobs if j is not None]
         self.meta: dict = meta or {}
         self.reusable = reusable
         self.skipped = skipped
@@ -390,7 +391,7 @@ class Stage(Generic[TargetT], ABC):
         self,
         target: 'Target',
         data: StageOutputData | str | dict[str, str] | None = None,
-        jobs: list[Job] | Job | None = None,
+        jobs: list[Job | None] | Job | None = None,
         meta: dict | None = None,
         reusable: bool = False,
         skipped: bool = False,
