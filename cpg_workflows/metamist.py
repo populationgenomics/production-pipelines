@@ -10,9 +10,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from cpg_utils.config import get_config
-from cpg_utils import Path, to_path
-
 from sample_metadata import models
 from sample_metadata.apis import (
     SampleApi,
@@ -23,8 +20,11 @@ from sample_metadata.apis import (
 )
 from sample_metadata.exceptions import ApiException
 
-from .utils import exists
-from .filetypes import (
+from cpg_utils.config import get_config
+from cpg_utils import Path, to_path
+
+from cpg_workflows.utils import exists
+from cpg_workflows.filetypes import (
     FastqPair,
     CramPath,
     BamPath,
@@ -534,11 +534,11 @@ class Sequence:
                     logging.error(f'"Sequence" data does not have {key}: {data}')
             raise ValueError(f'Cannot parse metamist Sequence {data}')
 
-        sample_id = data['sample_id']
-        sequencing_type = data['type']
+        sample_id = str(data['sample_id'])
+        sequencing_type = str(data['type'])
         assert sequencing_type, data
         mm_seq = Sequence(
-            id=data['id'],
+            id=str(data['id']),
             sample_id=sample_id,
             meta=data['meta'],
             sequencing_type=sequencing_type,
