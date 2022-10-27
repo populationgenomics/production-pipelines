@@ -35,7 +35,7 @@ def fastqc(
     cmd = ''
     input_file: str | hb.ResourceFile = b.read_input(str(input_path))
     fname = basename(str(input_path))
-    if isinstance(input_path, FastqPath):
+    if not isinstance(input_path, BamPath):
         if not str(input_path).endswith('.gz'):
             cmd += f"""\
             mv {input_file} {input_file}.gz

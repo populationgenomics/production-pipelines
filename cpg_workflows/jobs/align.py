@@ -172,6 +172,7 @@ def align(
     if not sharded:  # Just running one alignment job
         if isinstance(alignment_input, FastqPairs):
             alignment_input = alignment_input[0]
+        assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
         align_j, align_cmd = _align_one(
             b=b,
             job_name=base_job_name,

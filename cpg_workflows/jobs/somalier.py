@@ -307,7 +307,7 @@ def _relate(
 
 def extract(
     b,
-    gvcf_or_cram_or_bam_path: CramPath | BamPath | GvcfPath,
+    gvcf_or_cram_path: CramPath | GvcfPath,
     out_somalier_path: Path | None = None,
     job_attrs: dict | None = None,
     overwrite: bool = True,
@@ -323,25 +323,23 @@ def extract(
     j = b.new_job('Somalier extract' + (f' {label}' if label else ''), job_attrs)
 
     if not out_somalier_path:
-        out_somalier_path = gvcf_or_cram_or_bam_path.somalier_path
+        out_somalier_path = gvcf_or_cram_path.somalier_path
 
     j.image(image_path('somalier'))
-    if isinstance(gvcf_or_cram_or_bam_path, CramPath | BamPath):
+    if isinstance(gvcf_or_cram_path, CramPath):
         storage_gb = None  # avoid extra disk by default
         if get_config()['workflow']['sequencing_type'] == 'genome':
             storage_gb = 100
-            if isinstance(gvcf_or_cram_or_bam_path, BamPath):
-                storage_gb = 200
         STANDARD.set_resources(j, ncpu=4, storage_gb=storage_gb)
         input_file = b.read_input_group(
-            base=str(gvcf_or_cram_or_bam_path),
-            index=str(gvcf_or_cram_or_bam_path.index_path),
+            base=str(gvcf_or_cram_path),
+            index=str(gvcf_or_cram_path.index_path),
         )
     else:
         STANDARD.set_resources(j, ncpu=2, storage_gb=10)
         input_file = b.read_input_group(
-            base=str(gvcf_or_cram_or_bam_path),
-            index=str(gvcf_or_cram_or_bam_path.tbi_path),
+            base=str(gvcf_or_cram_path),
+            index=str(gvcf_or_cram_path.tbi_path),
         )
 
     ref = fasta_res_group(b)
