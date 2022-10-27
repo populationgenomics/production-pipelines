@@ -7,6 +7,7 @@ from typing import Callable, Optional
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
+from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import somalier
 from cpg_workflows.jobs.multiqc import multiqc
 from cpg_workflows.jobs.picard import (
@@ -129,13 +130,7 @@ class CramQc(SampleStage):
         return outs
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
-        cram_path = sample.make_cram_path()
-        if get_config()['workflow'].get('check_inputs') and not cram_path.exists():
-            if get_config()['workflow'].get('skip_samples_with_missing_input'):
-                logging.warning(f'No CRAM found, skipping sample {sample}')
-                return self.make_outputs(sample, skipped=True)
-            else:
-                return self.make_outputs(sample, error_msg=f'No CRAM found')
+        cram_path = inputs.as_path(sample, Align, 'cram')
 
         jobs = []
         for qc in qc_functions():
@@ -146,7 +141,7 @@ class CramQc(SampleStage):
             if qc.func:
                 j = qc.func(  # type: ignore
                     self.b,
-                    cram_path,
+                    CramPath(cram_path),
                     job_attrs=self.get_job_attrs(sample),
                     overwrite=not get_config()['workflow'].get('check_intermediates'),
                     **out_path_kwargs,
