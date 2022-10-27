@@ -693,7 +693,7 @@ You can also force the pipeline to skip certain samples with `workflow/skip_samp
 
 ```toml
 [workflow.skip_samples_stages]
-VerifyBamId = ['CPG13409']
+CramQC = ['CPG13409']
 ```
 
 ### Available stages
