@@ -1,4 +1,4 @@
-name: Test
+name: Test large-cohort
 on:
   # Building on pull-requests, manual dispatch, and pushes to main; but restricting
   # publishing only to main pushes and manual dispatch with `if`s in specific steps.
@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  test:
+  test-large-cohort:
     runs-on: ubuntu-latest
     defaults:
       run:
