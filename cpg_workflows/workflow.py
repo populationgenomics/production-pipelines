@@ -816,6 +816,13 @@ class Workflow:
                         f'{", ".join(stage_names)}'
                     )
 
+        # E.g. if our last_stages is CramQc, MtToEs would still run because it's in
+        # a different branch. So we want to collect all stages after first_stages
+        # and before last_stages in their respective branches, and mark as skipped
+        # everything in other branches.
+        first_stages_keeps: list[str] = first_stages[:]
+        last_stages_keeps: list[str] = last_stages[:]
+
         for fs in first_stages:
             for descendant in nx.descendants(graph, fs):
                 if not stages_d[descendant].skipped:
@@ -832,12 +839,23 @@ class Workflow:
                         )
                         stages_d[grand_descendant].assume_outputs_exist = True
 
+            for ancestor in nx.ancestors(graph, fs):
+                first_stages_keeps.append(ancestor)
+
         for ls in last_stages:
             for ancestor in nx.ancestors(graph, ls):
                 if not stages_d[ancestor].skipped:
                     logging.info(f'Skipping stage {ancestor} (after last {ls})')
                     stages_d[ancestor].skipped = True
                     stages_d[ancestor].assume_outputs_exist = True
+
+            for ancestor in nx.descendants(graph, ls):
+                last_stages_keeps.append(ancestor)
+
+        for _stage in stages:
+            if _stage.name not in last_stages_keeps + first_stages_keeps:
+                _stage.skipped = True
+                _stage.assume_outputs_exist = True
 
     def set_stages(
         self,
@@ -852,14 +870,6 @@ class Workflow:
         only_stages = get_config()['workflow'].get('only_stages', [])
         first_stages = get_config()['workflow'].get('first_stages', [])
         last_stages = get_config()['workflow'].get('last_stages', [])
-
-        # TODO: fix this: if we have last_stages = ['Align'], it wouldn't work at all
-        if only_stages or last_stages:
-            # If stages are requested explicitly, we don't need other stages from
-            # the default list:
-            requested_stages = [
-                s for s in requested_stages if s.__name__ in only_stages + last_stages
-            ]
 
         # Round 1: initialising stage objects.
         _stages_d: dict[str, Stage] = {}
