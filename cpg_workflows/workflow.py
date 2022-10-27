@@ -80,8 +80,8 @@ class StageOutput:
         self.data = data
         self.stage = stage
         self.target = target
-        jobs: list[Job | None] = [jobs] if isinstance(jobs, Job) else (jobs or [])
-        self.jobs: list[Job] = [j for j in jobs if j is not None]
+        _jobs: list[Job | None] = [jobs] if isinstance(jobs, Job) else (jobs or [])
+        self.jobs: list[Job] = [j for j in _jobs if j is not None]
         self.meta: dict = meta or {}
         self.reusable = reusable
         self.skipped = skipped
