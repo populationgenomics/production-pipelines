@@ -29,7 +29,7 @@ class MachineType:
     """
 
     min_cpu: int = 2
-    threads_on_cpu = 2  # hyperthreading
+    threads_on_cpu = 2  # hyper-threading
 
     def __init__(
         self,
@@ -148,7 +148,7 @@ class MachineType:
         https://batch.hail.populationgenomics.org.au/batches/7488/jobs/12
         So this function will calculate the number of CPU to request so your jobs
         can be packed to fit the default instance's available storage
-        (caluclated with self.calc_instance_disk_gb()).
+        (calculated with self.calc_instance_disk_gb()).
         """
         fraction = storage_gb / self.calc_instance_disk_gb()
         fraction = min(fraction, 1.0)
@@ -162,7 +162,7 @@ class MachineType:
 
     def adjust_ncpu(self, ncpu: int) -> int:
         """
-        Adjust request number of CPU to a correct requestable number:
+        Adjust request number of CPU to a number allowed by Hail, i.e.
         the nearest power of 2, not less than the minimal number of cores allowed.
         """
         if ncpu > self.max_ncpu:

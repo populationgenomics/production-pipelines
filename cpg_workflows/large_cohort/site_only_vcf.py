@@ -57,7 +57,7 @@ def vds_to_site_only_ht(
         # with default INFO_VCF_AS_PIPE_DELIMITED_FIELDS, AS_VarDP will be converted
         # into a pipe-delimited value e.g.: VarDP=|132.1|140.2
         # which breaks VQSR parser (it doesn't recognise the delimiter and treats
-        # it as a array with a single string value "|132.1|140.2", leading to
+        # it as an array with a single string value "|132.1|140.2", leading to
         # an IndexOutOfBound exception when trying to access value for second allele)
         pipe_delimited_annotations=[],
     )

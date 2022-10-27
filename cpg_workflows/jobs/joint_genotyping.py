@@ -298,9 +298,7 @@ def genomicsdb(
     return j
 
 
-def joint_calling_storage_gb(
-    n_samples: int, sequencing_type: str, scatter_count: int
-) -> int:
+def joint_calling_storage_gb(n_samples: int, sequencing_type: str) -> int:
     """
     Calculate storage for a joint calling job, to fit a joint-called VCF
     and a genomics db. The required storage grows with a number of samples,
@@ -352,7 +350,7 @@ def _add_joint_genotyper_job(
     genotype likelihoods.
 
     ReblockGVCF must be run to add all the annotations necessary for VQSR:
-    QUALapprox, VarDP, RAW_MQandDP.
+    `QUALapprox`, `VarDP`, `RAW_MQandDP`.
     """
     if can_reuse(output_vcf_path, overwrite):
         return None, b.read_input_group(
@@ -369,7 +367,6 @@ def _add_joint_genotyper_job(
     res.attach_disk_storage_gb = joint_calling_storage_gb(
         number_of_samples,
         get_config()['workflow']['sequencing_type'],
-        scatter_count,
     )
     res.set_to_job(j)
 

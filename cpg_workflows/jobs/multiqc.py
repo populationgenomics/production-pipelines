@@ -3,6 +3,8 @@
 """
 Batch jobs to run MultiQC.
 """
+from typing import cast
+
 from cpg_utils.config import get_config
 from hailtop.batch.job import Job
 from hailtop.batch import Batch, ResourceFile
@@ -169,7 +171,7 @@ def check_report_job(
     echo "HTML URL: {multiqc_html_url}"
     """
 
-    copy_common_env(check_j)
+    copy_common_env(cast(Job, check_j))
     check_j.command(
         command(
             cmd,

@@ -82,7 +82,7 @@ def add_gatk_sv_job(
         outputs_to_collect[key] = CromwellOutputType.single_path(f'{wfl_name}.{key}')
 
     job_prefix = make_job_name(wfl_name, sample=sample_id, dataset=dataset.name)
-    output_dict: dict[str, Resource] = run_cromwell_workflow_from_repo_and_get_outputs(
+    j, output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
         b=batch,
         job_prefix=job_prefix,
         dataset=get_config()['workflow']['dataset'],
