@@ -141,20 +141,20 @@ def _prep_somalier_files(
             somalier_file_by_sample[sample.id] = input_path
             continue
 
-        gvcf_or_cram_or_bam_path: CramPath | GvcfPath
-        if input_path.name.endswith('.cram') or input_path.name.endswith('.bam'):
-            gvcf_or_cram_or_bam_path = CramPath(input_path)
+        gvcf_or_cram_path: CramPath | GvcfPath
+        if input_path.name.endswith('.cram'):
+            gvcf_or_cram_path = CramPath(input_path)
         else:
-            gvcf_or_cram_or_bam_path = GvcfPath(input_path)
+            gvcf_or_cram_path = GvcfPath(input_path)
         j = extract(
             b=b,
-            gvcf_or_cram_or_bam_path=gvcf_or_cram_or_bam_path,
+            gvcf_or_cram_path=gvcf_or_cram_path,
             overwrite=overwrite,
             label=label,
-            out_somalier_path=gvcf_or_cram_or_bam_path.somalier_path,
+            out_somalier_path=gvcf_or_cram_path.somalier_path,
             job_attrs=(job_attrs or {}) | sample.get_job_attrs(),
         )
-        somalier_file_by_sample[sample.id] = gvcf_or_cram_or_bam_path.somalier_path
+        somalier_file_by_sample[sample.id] = gvcf_or_cram_path.somalier_path
         if j is not None:
             extract_jobs.append(j)
 
