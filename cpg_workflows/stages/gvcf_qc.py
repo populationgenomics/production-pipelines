@@ -5,6 +5,7 @@ import logging
 
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
+from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.jobs.multiqc import multiqc
 
 from cpg_workflows.stages.genotype import Genotype
@@ -23,7 +24,7 @@ from cpg_workflows.jobs.picard import vcf_qc
 
 
 @stage(required_stages=Genotype)
-class GvcfQc(SampleStage):
+class GvcfQC(SampleStage):
     """
     Calling tools that process GVCF for QC purposes.
     """
@@ -45,17 +46,11 @@ class GvcfQc(SampleStage):
         """
         Use function from the jobs module
         """
-        gvcf_path = sample.make_gvcf_path()
-        if get_config()['workflow'].get('check_inputs') and not gvcf_path.exists():
-            if get_config()['workflow'].get('skip_samples_with_missing_input'):
-                logging.warning(f'No GVCF found, skipping sample {sample}')
-                return self.make_outputs(sample, skipped=True)
-            else:
-                return self.make_outputs(sample, error_msg=f'No GVCF found')
+        gvcf_path = inputs.as_path(sample, Genotype, 'gvcf')
 
         j = vcf_qc(
             b=self.b,
-            vcf_or_gvcf=gvcf_path.resource_group(self.b),
+            vcf_or_gvcf=GvcfPath(gvcf_path).resource_group(self.b),
             is_gvcf=True,
             job_attrs=self.get_job_attrs(sample),
             output_summary_path=self.expected_outputs(sample)['qc_summary'],
@@ -90,18 +85,12 @@ class GvcfHappy(SampleStage):
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """Queue jobs"""
-        gvcf_path = sample.make_gvcf_path()
-        if get_config()['workflow'].get('check_inputs') and not gvcf_path.exists():
-            if get_config()['workflow'].get('skip_samples_with_missing_input'):
-                logging.warning(f'No GVCF found, skipping sample {sample}')
-                return self.make_outputs(sample, skipped=True)
-            else:
-                return self.make_outputs(sample, error_msg=f'No GVCF found')
+        gvcf_path = inputs.as_path(sample, Genotype, 'gvcf')
 
         jobs = happy(
             b=self.b,
             sample=sample,
-            vcf_or_gvcf=sample.make_gvcf_path().resource_group(self.b),
+            vcf_or_gvcf=GvcfPath(gvcf_path).resource_group(self.b),
             is_gvcf=True,
             job_attrs=self.get_job_attrs(sample),
             output_path=self.expected_outputs(sample),
@@ -115,7 +104,7 @@ class GvcfHappy(SampleStage):
 
 @stage(
     required_stages=[
-        GvcfQc,
+        GvcfQC,
         GvcfHappy,
     ],
     forced=True,
@@ -159,7 +148,7 @@ class GvcfMultiQC(DatasetStage):
 
         for sample in dataset.get_samples():
             for _stage, key in [
-                (GvcfQc, 'qc_detail'),
+                (GvcfQC, 'qc_detail'),
                 (GvcfHappy, None),
             ]:
                 try:

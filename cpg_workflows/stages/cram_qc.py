@@ -7,6 +7,7 @@ from typing import Callable, Optional
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
+from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import somalier
 from cpg_workflows.jobs.multiqc import multiqc
 from cpg_workflows.jobs.picard import (
@@ -111,7 +112,7 @@ def qc_functions() -> list[Qc]:
 
 
 @stage(required_stages=Align)
-class CramQc(SampleStage):
+class CramQC(SampleStage):
     """
     Calling tools that process CRAM for QC purposes.
     """
@@ -129,13 +130,7 @@ class CramQc(SampleStage):
         return outs
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
-        cram_path = sample.make_cram_path()
-        if get_config()['workflow'].get('check_inputs') and not cram_path.exists():
-            if get_config()['workflow'].get('skip_samples_with_missing_input'):
-                logging.warning(f'No CRAM found, skipping sample {sample}')
-                return self.make_outputs(sample, skipped=True)
-            else:
-                return self.make_outputs(sample, error_msg=f'No CRAM found')
+        cram_path = inputs.as_path(sample, Align, 'cram')
 
         jobs = []
         for qc in qc_functions():
@@ -146,7 +141,7 @@ class CramQc(SampleStage):
             if qc.func:
                 j = qc.func(  # type: ignore
                     self.b,
-                    cram_path,
+                    CramPath(cram_path),
                     job_attrs=self.get_job_attrs(sample),
                     overwrite=not get_config()['workflow'].get('check_intermediates'),
                     **out_path_kwargs,
@@ -157,7 +152,7 @@ class CramQc(SampleStage):
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
 
 
-@stage(required_stages=[CramQc])
+@stage(required_stages=[CramQC])
 class SomalierPedigree(DatasetStage):
     """
     Checks pedigree from CRAM fingerprints.
@@ -193,7 +188,7 @@ class SomalierPedigree(DatasetStage):
         for sample in dataset.get_samples():
             if get_config().get('somalier', {}).get('exclude_high_contamination'):
                 verify_bamid_path = inputs.as_path(
-                    stage=CramQc, target=sample, key='verify_bamid'
+                    stage=CramQC, target=sample, key='verify_bamid'
                 )
                 if not exists(verify_bamid_path):
                     logging.warning(
@@ -202,7 +197,7 @@ class SomalierPedigree(DatasetStage):
                     )
                 else:
                     verifybamid_by_sid[sample.id] = verify_bamid_path
-            somalier_path = inputs.as_path(stage=CramQc, target=sample, key='somalier')
+            somalier_path = inputs.as_path(stage=CramQC, target=sample, key='somalier')
             somalier_by_sid[sample.id] = somalier_path
 
         html_path = self.expected_outputs(dataset)['html']
@@ -239,7 +234,7 @@ class SomalierPedigree(DatasetStage):
 
 @stage(
     required_stages=[
-        CramQc,
+        CramQC,
         SomalierPedigree,
     ],
     forced=True,
@@ -299,7 +294,7 @@ class CramMultiQC(DatasetStage):
                     if not out:
                         continue
                     try:
-                        path = inputs.as_path(sample, CramQc, key)
+                        path = inputs.as_path(sample, CramQC, key)
                     except StageInputNotFoundError:  # allow missing inputs
                         logging.warning(
                             f'Output CramQc/"{key}" not found for {sample}, '
