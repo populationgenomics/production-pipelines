@@ -7,9 +7,8 @@ import pytest
 import toml
 from cpg_utils import to_path, Path
 from cpg_utils.config import set_config_paths, update_dict
-from cpg_utils.workflows.utils import timestamp
-
-from python_scripts import check_pedigree
+from cpg_workflows.utils import timestamp
+from cpg_workflows.python_scripts import check_pedigree
 
 DEFAULT_CONF = """
 [workflow]

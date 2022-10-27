@@ -9,10 +9,11 @@ import toml
 from cpg_utils import to_path, Path
 from cpg_utils.config import set_config_paths
 from cpg_utils.config import update_dict
-from cpg_utils.workflows.filetypes import GvcfPath
-from cpg_utils.workflows.targets import Cohort
-from cpg_utils.workflows.utils import timestamp
 from pytest_mock import MockFixture
+
+from cpg_workflows.filetypes import GvcfPath
+from cpg_workflows.targets import Cohort
+from cpg_workflows.utils import timestamp
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
@@ -86,17 +87,15 @@ def test_large_cohort(mocker: MockFixture):
         s = ds.add_sample(id=sample_id, external_id=sample_id.replace('CPG', 'EXT'))
         s.gvcf = GvcfPath(gvcf_path)
 
-    mocker.patch('cpg_utils.workflows.inputs.create_cohort', lambda: cohort)
+    mocker.patch('cpg_workflows.inputs.create_cohort', lambda: cohort)
 
-    from large_cohort import (
-        combiner,
-        sample_qc,
-        dense_subset,
-        relatedness,
-        ancestry_pca,
-        ancestry_plots,
-    )
-    from large_cohort import site_only_vcf
+    from cpg_workflows.large_cohort import combiner
+    from cpg_workflows.large_cohort import ancestry_pca
+    from cpg_workflows.large_cohort import sample_qc
+    from cpg_workflows.large_cohort import dense_subset
+    from cpg_workflows.large_cohort import relatedness
+    from cpg_workflows.large_cohort import ancestry_plots
+    from cpg_workflows.large_cohort import site_only_vcf
     from cpg_utils.hail_batch import start_query_context
 
     start_query_context()

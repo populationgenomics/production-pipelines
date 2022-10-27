@@ -14,9 +14,9 @@ from collections import defaultdict
 import click
 
 from cpg_utils.config import get_config, set_config_paths
-from cpg_utils.workflows.inputs import get_cohort
-from cpg_utils.workflows.status import MetamistStatusReporter
-from cpg_utils.workflows.utils import exists
+from cpg_workflows.inputs import get_cohort
+from cpg_workflows.status import MetamistStatusReporter
+from cpg_workflows.utils import exists
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)

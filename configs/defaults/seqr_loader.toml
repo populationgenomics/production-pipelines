@@ -5,6 +5,24 @@ dataset = 'seqr'
 status_reporter = 'metamist'
 driver_image = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:14432044df1c5210237727cc10bee817674700c0-hail-48ff6e3a3f08a11ccb5b0ad5366ede25e43837a8'
 
+# Use GnarlyGenotyper instead of GenotypeGVCFs
+use_gnarly = false
+
+# Use allele-specific annotations for VQSR
+use_as_vqsr = true
+
+# Realign CRAM when available, instead of using FASTQ.
+# The parameter value should correspond to CRAM version
+# (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPG01234.cram
+#realign_from_cram_version = 'v0'
+
+# Calling intervals (defauls to whole genome intervals)
+#intervals_path =
+
+# Create Seqr ElasticSearch indices for these datasets. If not specified, will
+# create indices for all input datasets.
+#create_es_index_for_datasets = []
+
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
 # sensitivities. The tool matches them internally to a VQSLOD score cutoff 

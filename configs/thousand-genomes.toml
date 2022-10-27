@@ -6,6 +6,7 @@ scatter_count = 20
 first_stages = ['Combiner']
 last_stages = ['LoadVqsr', 'Frequencies']
 output_version = '0.1'
+skip_qc = true
 
 # CRAMs were aligned using an unmasked reference: 
 # gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta

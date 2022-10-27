@@ -2,6 +2,14 @@
 name = 'large_cohort'
 scatter_count = 50
 
+# Realign CRAM when available, instead of using FASTQ.
+# The parameter value should correspond to CRAM version
+# (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPG01234.cram
+#realign_from_cram_version = 'v0'
+
+# Calling intervals (defauls to whole genome intervals)
+#intervals_path =
+
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
 # sensitivities. The tool matches them internally to a VQSLOD score cutoff 
