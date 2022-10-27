@@ -183,7 +183,7 @@ class MtToEs(DatasetStage):
             f'--liftover-path {reference_path("liftover_38_to_37")}',
             max_age='24h',
             packages=[
-                'cpg_utils',
+                'cpg_workflows',
                 'elasticsearch==8.*',
                 'google',
                 'fsspec',

@@ -43,7 +43,7 @@ def annotate_cohort_jobs(
             ),
             max_age='24h',
             packages=[
-                'cpg_utils',
+                'cpg_workflows',
                 'google',
                 'fsspec',
                 'gcloud',
@@ -64,7 +64,7 @@ def annotate_cohort_jobs(
         from cpg_workflows.query_modules import seqr_loader
 
         j = b.new_job(f'annotate cohort', job_attrs)
-        j.image(image_path('cpg_utils'))
+        j.image(image_path('cpg_workflows'))
         j.command(
             query_command(
                 seqr_loader,
@@ -117,7 +117,7 @@ def annotate_dataset_jobs(
             f'--checkpoint-prefix {tmp_prefix}',
             max_age='24h',
             packages=[
-                'cpg_utils',
+                'cpg_workflows',
                 'google',
                 'fsspec',
                 'gcloud',
@@ -142,7 +142,7 @@ def annotate_dataset_jobs(
         subset_j = b.new_job(
             f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
         )
-        subset_j.image(image_path('cpg_utils'))
+        subset_j.image(image_path('cpg_workflows'))
         assert sample_ids
         subset_j.command(
             query_command(
@@ -160,7 +160,7 @@ def annotate_dataset_jobs(
         annotate_j = b.new_job(
             f'annotate dataset', (job_attrs or {}) | {'tool': 'hail query'}
         )
-        annotate_j.image(image_path('cpg_utils'))
+        annotate_j.image(image_path('cpg_workflows'))
         annotate_j.command(
             query_command(
                 seqr_loader,

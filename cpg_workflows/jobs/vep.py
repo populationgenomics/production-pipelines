@@ -135,7 +135,7 @@ def gather_vep_json_to_ht(
         + ' '.join(str(p) for p in vep_results_paths),
         max_age='24h',
         packages=[
-            'cpg_utils',
+            'cpg_workflows',
             'google',
             'fsspec',
             'gcloud',
