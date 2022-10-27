@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  test-seqr-loader:
+  test:
     runs-on: ubuntu-latest
     defaults:
       run:

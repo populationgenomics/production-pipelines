@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  test_cohort:
+  test:
     runs-on: ubuntu-latest
     defaults:
       run:
