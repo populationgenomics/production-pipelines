@@ -20,43 +20,52 @@ logging.getLogger().setLevel(logging.INFO)
 
 
 def _set_config(results_prefix: Path, extra_conf: dict | None = None):
-    with (
-        to_path(__file__).parent.parent / 'configs' / 'defaults' / 'large_cohort.toml'
-    ).open() as f:
-        d = toml.load(f)
-    update_dict(
-        d,
-        {
-            'workflow': {
-                'local_dir': str(results_prefix),
-                'dataset_gcp_project': 'thousand-genomes',
-                'dataset': 'thousand-genomes',
-                'access_level': 'test',
-                'sequencing_type': 'genome',
-                'check_intermediates': True,
-                'path_scheme': 'local',
-                'reference_prefix': str(
-                    to_path(__file__).parent / 'data' / 'large_cohort' / 'reference'
-                ),
-            },
-            'large_cohort': {
-                'sample_qc_cutoffs': {
-                    'min_n_snps': 2500,  # to make it pass for toy subset
-                },
-                'n_pcs': 3,  # minimal allowed number
-            },
-            'hail': {
-                'billing_project': 'thousand-genomes',
-                'dry_run': True,
-                'query_backend': 'spark_local',
-            },
+    d = {
+        'workflow': {
+            'local_dir': str(results_prefix),
+            'dataset_gcp_project': 'thousand-genomes',
+            'dataset': 'thousand-genomes',
+            'access_level': 'test',
+            'sequencing_type': 'genome',
+            'check_intermediates': True,
+            'path_scheme': 'local',
+            'reference_prefix': str(
+                to_path(__file__).parent / 'data' / 'large_cohort' / 'reference'
+            ),
         },
-    )
+        'large_cohort': {
+            'sample_qc_cutoffs': {
+                'min_n_snps': 2500,  # to make it pass for toy subset
+            },
+            'n_pcs': 3,  # minimal allowed number
+        },
+        'hail': {
+            'billing_project': 'thousand-genomes',
+            'dry_run': True,
+            'query_backend': 'spark_local',
+        },
+    }
     if extra_conf:
         update_dict(d, extra_conf)
-    with (out_path := results_prefix / 'config.toml').open('w') as f:
+    with (conf_path := results_prefix / 'config.toml').open('w') as f:
         toml.dump(d, f)
-    set_config_paths([str(out_path)])
+
+    set_config_paths(
+        [
+            str(p)
+            for p in [
+                to_path(__file__).parent.parent
+                / 'configs'
+                / 'defaults'
+                / 'workflows.toml',
+                to_path(__file__).parent.parent
+                / 'configs'
+                / 'defaults'
+                / 'large_cohort.toml',
+                conf_path,
+            ]
+        ]
+    )
 
 
 def test_large_cohort(mocker: MockFixture):
