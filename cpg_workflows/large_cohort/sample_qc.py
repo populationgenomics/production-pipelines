@@ -44,8 +44,24 @@ def run(
     sex_ht = impute_sex(vds, ht, tmp_prefix)
     ht = ht.annotate(**sex_ht[ht.s])
 
+    # Coverage
+    ht = annotate_coverage(vds, ht)
+
     ht = add_soft_filters(ht)
     ht.checkpoint(str(out_sample_qc_ht_path), overwrite=True)
+
+
+def annotate_coverage(vds: hl.vds.VariantDataset, ht: hl.Table) -> hl.Table:
+    calling_intervals_ht = _load_calling_intervals()
+    coverage_mt = hl.vds.interval_coverage(vds, intervals=calling_intervals_ht)
+    coverage_mt = coverage_mt.filter_rows(coverage_mt.interval.start.contig == 'chr20')
+    coverage_mt = coverage_mt.select_cols(
+        chr20_mean_dp=hl.agg.sum(coverage_mt.sum_dp)
+        / hl.agg.sum(coverage_mt.interval_size)
+    )
+    coverage_ht = coverage_mt.ht()
+    ht = ht.annotate(chr20_mean_dp=coverage_ht[ht.key].chr20_mean_dp)
+    return ht
 
 
 def initialise_sample_table() -> hl.Table:
@@ -70,6 +86,18 @@ def initialise_sample_table() -> hl.Table:
     return ht
 
 
+def _load_calling_intervals() -> hl.Table:
+    """Load calling intervals"""
+    seq_type = get_config()['workflow']['sequencing_type']
+    calling_intervals_path = reference_path(f'broad/{seq_type}_calling_interval_lists')
+    calling_intervals_ht = hl.import_locus_intervals(
+        str(calling_intervals_path), reference_genome=genome_build()
+    )
+    logging.info('Calling intervals table:')
+    calling_intervals_ht.describe()
+    return calling_intervals_ht
+
+
 def impute_sex(
     vds: hl.vds.VariantDataset,
     ht: hl.Table,
@@ -83,16 +111,9 @@ def impute_sex(
         sex_ht = hl.read_table(str(checkpoint_path))
         return ht.annotate(**sex_ht[ht.s])
 
-    # Load calling intervals
-    seq_type = get_config()['workflow']['sequencing_type']
-    calling_intervals_path = reference_path(f'broad/{seq_type}_calling_interval_lists')
-    calling_intervals_ht = hl.import_locus_intervals(
-        str(calling_intervals_path), reference_genome=genome_build()
-    )
-    logging.info('Calling intervals table:')
-    calling_intervals_ht.describe()
+    calling_intervals_ht = _load_calling_intervals()
 
-    # Infer sex (adds row fields: is_female, chr20_mean_dp, sex_karyotype)
+    # Infer sex (adds row fields: is_female, sex_karyotype)
     sex_ht = annotate_sex(
         vds,
         included_intervals=calling_intervals_ht,
@@ -139,8 +160,7 @@ def add_soft_filters(ht: hl.Table) -> hl.Table:
     cutoffs = get_config()['large_cohort']['sample_qc_cutoffs']
     ht = ht.annotate_globals(hard_filter_cutoffs=hl.struct(**cutoffs))
 
-    # Remove low-coverage samples
-    # chrom 20 coverage is computed to infer sex and used here
+    # Filter low-coverage samples.
     ht = add_filter(
         ht,
         ht.chr20_mean_dp < cutoffs['min_coverage'],
