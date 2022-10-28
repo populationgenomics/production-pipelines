@@ -151,7 +151,7 @@ class MetamistStatusReporter(StatusReporter):
             job_name += f' (for {analysis_type})'
 
         j = b.new_job(job_name, job_attrs)
-        j.image(image_path('cpg_utils'))
+        j.image(image_path('cpg_workflows'))
 
         calc_size_cmd = None
         if output_path:

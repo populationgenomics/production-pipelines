@@ -154,7 +154,7 @@ def check_report_job(
         title += f' [{label}]'
     check_j = b.new_job(f'{title} check', (job_attrs or {}) | dict(tool='python'))
     STANDARD.set_resources(check_j, ncpu=2)
-    check_j.image(image_path('cpg_utils'))
+    check_j.image(image_path('cpg_workflows'))
 
     script_path = to_path(check_multiqc.__file__)
     script_name = script_path.name

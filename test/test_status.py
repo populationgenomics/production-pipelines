@@ -50,10 +50,26 @@ def _set_config(dir_path: Path, extra_conf: dict | None = None):
     d['workflow']['local_dir'] = str(dir_path)
     if extra_conf:
         update_dict(d, extra_conf)
-    config_path = dir_path / 'config.toml'
-    with config_path.open('w') as f:
+    conf_path = dir_path / 'config.toml'
+    with conf_path.open('w') as f:
         toml.dump(d, f)
-    set_config_paths([str(config_path)])
+
+    set_config_paths(
+        [
+            str(p)
+            for p in [
+                to_path(__file__).parent.parent
+                / 'configs'
+                / 'defaults'
+                / 'workflows.toml',
+                to_path(__file__).parent.parent
+                / 'configs'
+                / 'defaults'
+                / 'seqr_loader.toml',
+                conf_path,
+            ]
+        ]
+    )
 
 
 def test_status_reporter(mocker: MockFixture):
