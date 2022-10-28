@@ -34,7 +34,7 @@ class JointGenotyping(CohortStage):
         Generate a pVCF and a site-only VCF.
         """
         h = cohort.alignment_inputs_hash()
-        prefix = str(cohort.analysis_dataset.tmp_prefix() / self.name / h)
+        prefix = str(cohort.analysis_dataset.prefix() / self.name / h)
         qc_prefix = self.cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / 'picard'
         return {
             'prefix': prefix,

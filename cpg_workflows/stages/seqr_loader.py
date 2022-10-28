@@ -37,8 +37,8 @@ class AnnotateCohort(CohortStage):
         """
         h = cohort.alignment_inputs_hash()
         return {
-            'prefix': str(self.tmp_prefix / 'mt' / h),
-            'mt': cohort.analysis_dataset.tmp_prefix() / 'mt' / f'{h}.mt',
+            'tmp_prefix': str(self.tmp_prefix / 'mt' / h),
+            'mt': self.cohort.analysis_dataset.prefix() / 'mt' / f'{h}.mt',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -52,7 +52,7 @@ class AnnotateCohort(CohortStage):
         vep_ht_path = inputs.as_path(target=cohort, stage=Vep, key='ht')
 
         checkpoint_prefix = (
-            to_path(self.expected_outputs(cohort)['prefix']) / 'checkpoints'
+            to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
         )
 
         jobs = annotate_cohort_jobs(
@@ -86,8 +86,7 @@ class AnnotateDataset(DatasetStage):
         """
         h = self.cohort.alignment_inputs_hash()
         return {
-            'prefix': str(self.tmp_prefix / 'mt' / f'{h}-{dataset.name}'),
-            # We want to write the matrix table into the main bucket.
+            'tmp_prefix': str(self.tmp_prefix / 'mt' / f'{h}-{dataset.name}'),
             'mt': dataset.prefix() / 'mt' / f'{h}-{dataset.name}.mt',
         }
 
@@ -98,7 +97,7 @@ class AnnotateDataset(DatasetStage):
         mt_path = inputs.as_path(target=self.cohort, stage=AnnotateCohort, key='mt')
 
         checkpoint_prefix = (
-            to_path(self.expected_outputs(dataset)['prefix']) / 'checkpoints'
+            to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
         )
 
         jobs = annotate_dataset_jobs(
