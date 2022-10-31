@@ -27,7 +27,7 @@ class Vqsr(CohortStage):
         Generate a site-only VCF.
         """
         h = cohort.alignment_inputs_hash()
-        prefix = str(cohort.analysis_dataset.tmp_prefix() / self.name / h)
+        prefix = str(cohort.analysis_dataset.prefix() / self.name / h)
         return {
             'prefix': prefix,
             'siteonly': to_path(f'{prefix}-siteonly.vcf.gz'),
