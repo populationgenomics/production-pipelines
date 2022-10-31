@@ -131,6 +131,7 @@ class CramQC(SampleStage):
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         cram_path = inputs.as_path(sample, Align, 'cram')
+        crai_path = inputs.as_path(sample, Align, 'crai')
 
         jobs = []
         for qc in qc_functions():
@@ -141,7 +142,7 @@ class CramQC(SampleStage):
             if qc.func:
                 j = qc.func(  # type: ignore
                     self.b,
-                    CramPath(cram_path),
+                    CramPath(cram_path, crai_path),
                     job_attrs=self.get_job_attrs(sample),
                     overwrite=not get_config()['workflow'].get('check_intermediates'),
                     **out_path_kwargs,
