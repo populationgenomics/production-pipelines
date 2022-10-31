@@ -45,6 +45,6 @@ def samtools_stats(
     $CRAM > {j.output_stats}
     """
 
-    j.command(command(cmd))
+    j.command(command(cmd, define_retry_function=True))
     b.write_output(j.output_stats, str(out_samtools_stats_path))
     return j

@@ -303,7 +303,7 @@ def picard_collect_metrics(
     cp $BATCH_TMPDIR/prefix.quality_yield_metrics {j.out_quality_yield_metrics}
     """
 
-    j.command(command(cmd))
+    j.command(command(cmd, define_retry_function=True))
     b.write_output(
         j.out_alignment_summary_metrics, str(out_alignment_summary_metrics_path)
     )
@@ -381,7 +381,7 @@ def picard_hs_metrics(
       OUTPUT={j.out_hs_metrics}
     """
 
-    j.command(command(cmd))
+    j.command(command(cmd, define_retry_function=True))
     b.write_output(j.out_hs_metrics, str(out_picard_hs_metrics_path))
     return j
 
@@ -435,6 +435,6 @@ def picard_wgs_metrics(
       READ_LENGTH={read_length}
     """
 
-    j.command(command(cmd))
+    j.command(command(cmd, define_retry_function=True))
     b.write_output(j.out_csv, str(out_picard_wgs_metrics_path))
     return j
