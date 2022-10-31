@@ -115,7 +115,8 @@ def gather_vcfs(
     {input_cmdl} \\
     --output $BATCH_TMPDIR/gathered.vcf.gz
 
-    bcftools sort $BATCH_TMPDIR/gathered.vcf.gz -Oz \
+    bcftools sort --temp-dir $BATCH_TMPDIR \
+    $BATCH_TMPDIR/gathered.vcf.gz -Oz \
     -o {j.output_vcf['vcf.gz']}
     
     tabix -p vcf {j.output_vcf['vcf.gz']}
