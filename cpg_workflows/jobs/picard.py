@@ -268,13 +268,20 @@ def picard_collect_metrics(
     res = STANDARD.request_resources(ncpu=2)
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
-    cram = cram_path.resource_group(b)
     reference = fasta_res_group(b)
 
+    assert cram_path.index_path
     cmd = f"""\
+    CRAM=$BATCH_TMPDIR/{cram_path.path.name}
+    CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
+
+    # Retrying copying to avoid google bandwidth limits
+    retry_gs_cp {str(cram_path.path)} $CRAM
+    retry_gs_cp {str(cram_path.index_path)} $CRAI
+
     picard -Xmx{res.get_java_mem_mb()}m \\
       CollectMultipleMetrics \\
-      INPUT={cram.cram} \\
+      INPUT=$CRAM \\
       REFERENCE_SEQUENCE={reference.base} \\
       OUTPUT=$BATCH_TMPDIR/prefix \\
       ASSUME_SORTED=true \\
@@ -334,13 +341,20 @@ def picard_hs_metrics(
     res = STANDARD.request_resources(ncpu=2)
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
-    cram = cram_path.resource_group(b)
     reference = fasta_res_group(b)
     interval_file = b.read_input(
         str(reference_path('broad/exome_evaluation_interval_lists'))
     )
 
+    assert cram_path.index_path
     cmd = f"""\
+    CRAM=$BATCH_TMPDIR/{cram_path.path.name}
+    CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
+
+    # Retrying copying to avoid google bandwidth limits
+    retry_gs_cp {str(cram_path.path)} $CRAM
+    retry_gs_cp {str(cram_path.index_path)} $CRAI
+
     # Picard is strict about the interval-list file header - contigs md5s, etc. - and 
     # if md5s do not match the ref.dict file, picard would crash. So fixing the header 
     # by converting the interval-list to bed (i.e. effectively dropping the header) 
@@ -356,7 +370,7 @@ def picard_hs_metrics(
     
     picard -Xmx{res.get_java_mem_mb()}m \\
       CollectHsMetrics \\
-      INPUT={cram.cram} \\
+      INPUT=$CRAM \\
       REFERENCE_SEQUENCE={reference.base} \\
       VALIDATION_STRINGENCY=SILENT \\
       TARGET_INTERVALS=$BATCH_TMPDIR/intervals.interval_list \\
@@ -396,16 +410,23 @@ def picard_wgs_metrics(
     res = STANDARD.request_resources(ncpu=2)
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
-    cram = cram_path.resource_group(b)
     reference = fasta_res_group(b)
     interval_file = b.read_input(
         str(reference_path('broad/genome_coverage_interval_list'))
     )
 
+    assert cram_path.index_path
     cmd = f"""\
+    CRAM=$BATCH_TMPDIR/{cram_path.path.name}
+    CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
+
+    # Retrying copying to avoid google bandwidth limits
+    retry_gs_cp {str(cram_path.path)} $CRAM
+    retry_gs_cp {str(cram_path.index_path)} $CRAI
+
     picard -Xmx{res.get_java_mem_mb()}m \\
       CollectWgsMetrics \\
-      INPUT={cram.cram} \\
+      INPUT=$CRAM \\
       VALIDATION_STRINGENCY=SILENT \\
       REFERENCE_SEQUENCE={reference.base} \\
       INTERVALS={interval_file} \\

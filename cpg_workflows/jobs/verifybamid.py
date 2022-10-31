@@ -35,7 +35,6 @@ def verifybamid(
     res = STANDARD.request_resources(ncpu=4)
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
-    cram = cram_path.resource_group(b)
     reference = fasta_res_group(b)
     sequencing_type = get_config()['workflow']['sequencing_type']
     contam_ud = reference_path(f'broad/{sequencing_type}_contam_ud')
@@ -46,13 +45,21 @@ def verifybamid(
     else:
         extra_opts = ''
 
+    assert cram_path.index_path
     cmd = f"""\
+    CRAM=$BATCH_TMPDIR/{cram_path.path.name}
+    CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
+
+    # Retrying copying to avoid google bandwidth limits
+    retry_gs_cp {str(cram_path.path)} $CRAM
+    retry_gs_cp {str(cram_path.index_path)} $CRAI
+        
     /root/micromamba/share/verifybamid2-2.0.1-7/VerifyBamID \
     --NumThread {res.get_nthreads()} \
     --Verbose \
     --NumPC 4 \
     --Output OUTPUT \
-    --BamFile {cram.cram} \
+    --BamFile $CRAM \
     --Reference {reference.base} \
     --UDPath {b.read_input(str(contam_ud))} \
     --MeanPath {b.read_input(str(contam_mu))} \
