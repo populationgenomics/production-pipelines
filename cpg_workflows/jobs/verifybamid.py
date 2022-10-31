@@ -70,6 +70,11 @@ def verifybamid(
     cp OUTPUT.selfSM {j.out_selfsm}
     """
 
-    j.command(command(cmd))
+    j.command(
+        command(
+            cmd,
+            define_retry_function=True,
+        )
+    )
     b.write_output(j.out_selfsm, str(out_verify_bamid_path))
     return j
