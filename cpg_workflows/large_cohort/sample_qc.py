@@ -92,7 +92,7 @@ def impute_sex(
     logging.info('Calling intervals table:')
     calling_intervals_ht.describe()
 
-    # Infer sex (adds row fields: is_female, chr20_mean_dp, sex_karyotype)
+    # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
     sex_ht = annotate_sex(
         vds,
         included_intervals=calling_intervals_ht,
@@ -143,7 +143,7 @@ def add_soft_filters(ht: hl.Table) -> hl.Table:
     # chrom 20 coverage is computed to infer sex and used here
     ht = add_filter(
         ht,
-        ht.chr20_mean_dp < cutoffs['min_coverage'],
+        ht.var_data_chr20_mean_dp < cutoffs['min_coverage'],
         'low_coverage',
     )
 
