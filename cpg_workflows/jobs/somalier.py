@@ -330,6 +330,10 @@ def extract(
 
     j.image(image_path('somalier'))
     if isinstance(gvcf_or_cram_path, CramPath):
+        if not gvcf_or_cram_path.index_path:
+            raise ValueError(
+                f'CRAM for somalier is required to have CRAI index ({gvcf_or_cram_path})'
+            )
         storage_gb = None  # avoid extra disk by default
         if get_config()['workflow']['sequencing_type'] == 'genome':
             storage_gb = 100
