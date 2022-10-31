@@ -816,6 +816,9 @@ class Workflow:
                         f'{", ".join(stage_names)}'
                     )
 
+        if not (last_stages or first_stages):
+            return
+
         # E.g. if our last_stages is CramQc, MtToEs would still run because it's in
         # a different branch. So we want to collect all stages after first_stages
         # and before last_stages in their respective branches, and mark as skipped
