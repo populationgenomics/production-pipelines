@@ -20,6 +20,7 @@ input_datasets = [
     'ag-hidden',
     'flinders-ophthal',
     'udn-aus-training',
+    'rdp-kidney'
 ]
 skip_samples = [
     'CPG11783',   # acute-care, no FASTQ data
