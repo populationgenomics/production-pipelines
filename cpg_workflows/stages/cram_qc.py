@@ -7,6 +7,7 @@ from typing import Callable, Optional
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
+from cpg_workflows import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import somalier
 from cpg_workflows.jobs.multiqc import multiqc
@@ -141,7 +142,7 @@ class CramQC(SampleStage):
             }
             if qc.func:
                 j = qc.func(  # type: ignore
-                    self.b,
+                    get_batch(),
                     CramPath(cram_path, crai_path),
                     job_attrs=self.get_job_attrs(sample),
                     overwrite=not get_config()['workflow'].get('check_intermediates'),
@@ -212,7 +213,7 @@ class SomalierPedigree(DatasetStage):
                 self.expected_outputs(dataset)['expected_ped']
             )
             jobs = somalier.pedigree(
-                b=self.b,
+                b=get_batch(),
                 dataset=dataset,
                 expected_ped_path=expected_ped_path,
                 somalier_path_by_sid=somalier_path_by_sid,
@@ -310,7 +311,7 @@ class CramMultiQC(DatasetStage):
             return self.make_outputs(dataset)
 
         jobs = multiqc(
-            self.b,
+            get_batch(),
             tmp_prefix=dataset.tmp_prefix() / 'multiqc' / 'cram',
             paths=paths,
             ending_to_trim=ending_to_trim,

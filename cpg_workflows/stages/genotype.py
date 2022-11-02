@@ -19,6 +19,7 @@ from cpg_workflows.jobs.happy import happy
 from cpg_workflows.jobs.picard import vcf_qc
 
 from .align import Align
+from .. import get_batch
 
 
 @stage(required_stages=Align, analysis_type='gvcf')
@@ -41,7 +42,7 @@ class Genotype(SampleStage):
         Use function from the jobs module
         """
         jobs = genotype.genotype(
-            b=self.b,
+            b=get_batch(),
             output_path=self.expected_outputs(sample)['gvcf'],
             sample_name=sample.id,
             cram_path=sample.make_cram_path(),

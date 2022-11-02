@@ -5,6 +5,7 @@ import logging
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
+from cpg_workflows import get_batch
 from cpg_workflows.jobs import align
 from cpg_workflows.jobs.align import MissingAlignmentInputException
 from cpg_workflows.workflow import (
@@ -51,7 +52,7 @@ class Align(SampleStage):
 
         try:
             jobs = align.align(
-                b=self.b,
+                b=get_batch(),
                 sample=sample,
                 output_path=sample.make_cram_path(),
                 job_attrs=self.get_job_attrs(sample),

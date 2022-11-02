@@ -493,7 +493,7 @@ For example, out "Align" stage that runs BWA might look like as following:
 ```python
 from cpg_utils import Path
 from cpg_workflows.workflow import stage, SampleStage, Sample, StageInput, StageOutput
-
+from cpg_workflows.batch import get_batch
 
 @stage
 class Align(SampleStage):
@@ -501,9 +501,9 @@ class Align(SampleStage):
         return sample.make_cram_path().path
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
-        j = self.b.new_job('BWA', self.get_job_attrs(sample))
+        j = get_batch().new_job('BWA', self.get_job_attrs(sample))
         j.command(f'bwa ... > {j.output}')
-        self.b.write_output(j.output, str(self.expected_outputs(sample)))
+        get_batch().write_output(j.output, str(self.expected_outputs(sample)))
         # Construct StageOutput object, where we pass a path to the results, 
         return self.make_outputs(sample, self.expected_outputs(sample), [j])
 ```

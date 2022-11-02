@@ -5,6 +5,7 @@ import dataclasses
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
+from cpg_workflows import get_batch
 from cpg_workflows.filetypes import BamPath, FastqPairs
 from cpg_workflows.workflow import (
     Sample,
@@ -99,7 +100,7 @@ class FastQC(SampleStage):
         jobs = []
         for fqc_out in fqc_outs:
             j = fastqc.fastqc(
-                b=self.b,
+                b=get_batch(),
                 output_html_path=fqc_out.out_html,
                 output_zip_path=fqc_out.out_zip,
                 input_path=fqc_out.input_path,
@@ -141,7 +142,7 @@ class FastQCMultiQC(DatasetStage):
                 sample_id_map[fq_name] = f'{sample.rich_id}{fqc_out.suffix}'
 
         jobs = multiqc(
-            self.b,
+            get_batch(),
             tmp_prefix=dataset.tmp_prefix() / 'multiqc' / 'fastqc',
             paths=paths,
             dataset=dataset,

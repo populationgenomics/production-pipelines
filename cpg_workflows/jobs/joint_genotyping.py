@@ -86,7 +86,7 @@ def make_joint_genotyping_jobs(
     df = pd.DataFrame(
         [{'id': sid, 'path': str(path)} for sid, path in gvcf_by_sid.items()]
     )
-    if not get_config()['hail'].get('dry_run', False):
+    if not get_config()['workflow'].get('dry_run', False):
         with sample_map_bucket_path.open('w') as fp:
             df.to_csv(fp, index=False, header=False, sep='\t')
 

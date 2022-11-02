@@ -302,9 +302,6 @@ class Stage(Generic[TargetT], ABC):
         assume_outputs_exist: bool = False,
         forced: bool = False,
     ):
-        self.b = get_batch()
-        self.cohort = get_cohort()
-
         self._name = name
         self.required_stages_classes: list[StageDecorator] = []
         if required_stages:
@@ -692,19 +689,21 @@ def skip(
 _workflow: Optional['Workflow'] = None
 
 
-def get_workflow() -> 'Workflow':
+def get_workflow(dry_run: bool = False) -> 'Workflow':
     global _workflow
     if _workflow is None:
-        _workflow = Workflow()
+        _workflow = Workflow(dry_run=dry_run)
     return _workflow
 
 
 def run_workflow(
     stages: list[StageDecorator] | None = None,
     wait: bool | None = False,
+    dry_run: bool = False,
 ) -> 'Workflow':
-    get_workflow().run(stages=stages, wait=wait)
-    return get_workflow()
+    wfl = get_workflow(dry_run=dry_run)
+    wfl = wfl.run(stages=stages, wait=wait)
+    return wfl
 
 
 class Workflow:
@@ -716,11 +715,14 @@ class Workflow:
     def __init__(
         self,
         stages: list[StageDecorator] | None = None,
+        dry_run: bool | None = None,
     ):
         if _workflow is not None:
             raise ValueError(
                 'Workflow already initialised. Use get_workflow() to get the instance'
             )
+
+        self.dry_run = dry_run or get_config()['workflow'].get('dry_run')
 
         analysis_dataset = get_config()['workflow']['dataset']
         name = get_config()['workflow'].get('name')
@@ -746,8 +748,9 @@ class Workflow:
         description += f': run_timestamp={self.run_timestamp}'
         if sequencing_type := get_config()['workflow'].get('sequencing_type'):
             description += f' [{sequencing_type}]'
-        if ds_set := set(d.name for d in get_cohort().get_datasets()):
-            description += ' ' + ', '.join(sorted(ds_set))
+        if not self.dry_run:
+            if ds_set := set(d.name for d in get_cohort().get_datasets()):
+                description += ' ' + ', '.join(sorted(ds_set))
         get_batch().name = description
 
         self.status_reporter = None
@@ -786,7 +789,9 @@ class Workflow:
         if not _stages:
             raise WorkflowError('No stages added')
         self.set_stages(_stages)
-        return get_batch().run(wait=wait)
+
+        if not self.dry_run:
+            get_batch().run(wait=wait)
 
     @staticmethod
     def _process_first_last_stages(
@@ -854,6 +859,8 @@ class Workflow:
         last_stages = get_config()['workflow'].get('last_stages', [])
 
         # TODO: fix this: if we have last_stages = ['Align'], it wouldn't work at all
+        # UPD: this pull request fixes it if approved:
+        # https://github.com/populationgenomics/production-pipelines/pull/158
         if only_stages or last_stages:
             # If stages are requested explicitly, we don't need other stages from
             # the default list:
@@ -932,17 +939,19 @@ class Workflow:
             )
 
         # Round 6: actually adding jobs from the stages.
-        for i, stg in enumerate(stages):
-            logging.info(f'*' * 60)
-            logging.info(f'Stage #{i + 1}: {stg}')
-            stg.output_by_target = stg.queue_for_cohort(get_cohort())
-            if errors := self._process_stage_errors(stg.output_by_target):
-                raise WorkflowError(
-                    f'Stage {stg} failed to queue jobs with errors: '
-                    + '\n'.join(errors)
-                )
+        if not self.dry_run:
+            cohort = get_cohort()  # Would communicate with metamist.
+            for i, stg in enumerate(stages):
+                logging.info(f'*' * 60)
+                logging.info(f'Stage #{i + 1}: {stg}')
+                stg.output_by_target = stg.queue_for_cohort(cohort)
+                if errors := self._process_stage_errors(stg.output_by_target):
+                    raise WorkflowError(
+                        f'Stage {stg} failed to queue jobs with errors: '
+                        + '\n'.join(errors)
+                    )
 
-            logging.info(f'')
+                logging.info(f'')
 
     @staticmethod
     def _process_stage_errors(
