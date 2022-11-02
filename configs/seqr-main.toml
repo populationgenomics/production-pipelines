@@ -37,3 +37,6 @@ skip_samples = [
 check_inputs = true
 check_intermediates = true
 check_expected_outputs = true
+
+[hail]
+pool_label = 'seqr' 
