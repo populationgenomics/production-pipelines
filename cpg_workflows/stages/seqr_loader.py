@@ -95,6 +95,7 @@ class AnnotateDataset(DatasetStage):
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
+        assert dataset.cohort
         mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateCohort, key='mt')
 
         checkpoint_prefix = (
