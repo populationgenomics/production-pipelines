@@ -33,6 +33,7 @@ def dataproc_job(
     job_name: str,
     function,
     function_path_args: dict[str, Path],
+    function_str_args: list[str] | None = None,
     preemptible: bool = True,
     num_workers: int | None = None,
     depends_on: list[Job | None] = None,
@@ -54,7 +55,8 @@ def dataproc_job(
     script = (
         f'{rel_script_path} '
         f'{function.__module__} {function.__name__} '
-        f'{" ".join([str(p) for p in function_path_args.values()])}'
+        f'{" ".join([f"-p {p}" for p in function_path_args.values()])}'
+        f'{" ".join([a for a in function_str_args or []])}'
     )
 
     if cluster_id := get_config()['hail'].get('dataproc', {}).get('cluster_id'):
