@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 """
-Benchmarking VCF combiner.
+Benchmarking Hail VDS combiner. Run with analysis runner:
 
-analysis-runner --dataset tob-wgs --access-level standard
+analysis-runner --dataset thousand-genomes --access-level standard <script>
 """
 
 import logging

@@ -1,5 +1,14 @@
+#!/usr/bin/env python3
+
 """
-Test how Hail Batch attaches disks to instances
+Test how Hail Batch attaches disks to instances. Motivation: job.storage(...) option
+does not directly translate into available_storage value that you can see in job logs.
+The `cpg_workflows.resources` module solves this problem by adding adjustments to the
+requested storage, and this script runs some tests to determine those adjustments.
+Additionally, when a larger storage is requested than available on a worker by default,
+Hail Batch would attempt to attach an external disk. We want to determine at what
+point it performs that attachment, as often we want to avoid extra costs incurred by
+external disk, and use the default space only.
 """
 
 from cpg_utils.config import update_dict, get_config
