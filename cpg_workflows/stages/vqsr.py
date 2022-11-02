@@ -14,6 +14,7 @@ from cpg_workflows.workflow import (
 
 from cpg_workflows.jobs import vqsr
 from .joint_genotyping import JointGenotyping
+from .. import get_batch
 
 
 @stage(required_stages=JointGenotyping)
@@ -41,7 +42,7 @@ class Vqsr(CohortStage):
             stage=JointGenotyping, target=cohort, key='siteonly'
         )
         jobs = vqsr.make_vqsr_jobs(
-            b=self.b,
+            b=get_batch(),
             input_siteonly_vcf_path=siteonly_vcf_path,
             gvcf_count=len(cohort.get_samples()),
             out_path=self.expected_outputs(cohort)['siteonly'],

@@ -14,6 +14,7 @@ from cpg_workflows.workflow import (
 
 from cpg_workflows.jobs import vep
 from .vqsr import Vqsr
+from .. import get_batch
 
 
 @stage(required_stages=[Vqsr])
@@ -44,7 +45,7 @@ class Vep(CohortStage):
             scatter_count = 200
 
         jobs = vep.add_vep_jobs(
-            self.b,
+            get_batch(),
             vcf_path=inputs.as_path(cohort, stage=Vqsr, key='siteonly'),
             out_path=self.expected_outputs(cohort)['ht'],
             tmp_prefix=to_path(self.expected_outputs(cohort)['prefix']),

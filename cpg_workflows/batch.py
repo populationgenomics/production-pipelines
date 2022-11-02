@@ -55,7 +55,14 @@ class Batch(hb.Batch):
     created jobs, in order to print statistics before submitting the Batch.
     """
 
-    def __init__(self, name, backend, *args, pool_label=None, **kwargs):
+    def __init__(
+        self,
+        name,
+        backend,
+        *args,
+        pool_label=None,
+        **kwargs,
+    ):
         super().__init__(name, backend, *args, **kwargs)
         # Job stats registry:
         self.job_by_label = dict()

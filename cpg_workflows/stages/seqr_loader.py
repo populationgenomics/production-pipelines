@@ -23,6 +23,7 @@ from cpg_workflows.jobs.seqr_loader import annotate_cohort_jobs, annotate_datase
 from .joint_genotyping import JointGenotyping
 from .vep import Vep
 from .vqsr import Vqsr
+from .. import get_cohort, get_batch
 
 
 @stage(required_stages=[JointGenotyping, Vqsr, Vep])
@@ -38,7 +39,7 @@ class AnnotateCohort(CohortStage):
         h = cohort.alignment_inputs_hash()
         return {
             'tmp_prefix': str(self.tmp_prefix / 'mt' / h),
-            'mt': self.cohort.analysis_dataset.prefix() / 'mt' / f'{h}.mt',
+            'mt': get_cohort().analysis_dataset.prefix() / 'mt' / f'{h}.mt',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -56,7 +57,7 @@ class AnnotateCohort(CohortStage):
         )
 
         jobs = annotate_cohort_jobs(
-            b=self.b,
+            b=get_batch(),
             vcf_path=vcf_path,
             siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
             vep_ht_path=vep_ht_path,
@@ -84,7 +85,7 @@ class AnnotateDataset(DatasetStage):
         """
         Expected to generate a matrix table
         """
-        h = self.cohort.alignment_inputs_hash()
+        h = get_cohort().alignment_inputs_hash()
         return {
             'tmp_prefix': str(self.tmp_prefix / 'mt' / f'{h}-{dataset.name}'),
             'mt': dataset.prefix() / 'mt' / f'{h}-{dataset.name}.mt',
@@ -94,14 +95,15 @@ class AnnotateDataset(DatasetStage):
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        mt_path = inputs.as_path(target=self.cohort, stage=AnnotateCohort, key='mt')
+        assert dataset.cohort
+        mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateCohort, key='mt')
 
         checkpoint_prefix = (
             to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
         )
 
         jobs = annotate_dataset_jobs(
-            b=self.b,
+            b=get_batch(),
             mt_path=mt_path,
             sample_ids=dataset.get_sample_ids(),
             out_mt_path=self.expected_outputs(dataset)['mt'],
@@ -173,7 +175,7 @@ class MtToEs(DatasetStage):
         from analysis_runner import dataproc
 
         j = dataproc.hail_dataproc_job(
-            self.b,
+            get_batch(),
             f'dataproc_scripts/mt_to_es.py '
             f'--mt-path {dataset_mt_path} '
             f'--es-index {index_name} '

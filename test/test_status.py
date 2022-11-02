@@ -115,9 +115,11 @@ def test_status_reporter(mocker: MockFixture):
             return dataset_path(f'{sample.id}.tsv')
 
         def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
-            j = self.b.new_job('Echo', self.get_job_attrs(sample) | dict(tool='echo'))
+            j = get_batch().new_job(
+                'Echo', self.get_job_attrs(sample) | dict(tool='echo')
+            )
             j.command(f'echo {sample.id}_done >> {j.output}')
-            self.b.write_output(j.output, str(self.expected_outputs(sample)))
+            get_batch().write_output(j.output, str(self.expected_outputs(sample)))
             print(f'Writing to {self.expected_outputs(sample)}')
             return self.make_outputs(sample, self.expected_outputs(sample), [j])
 

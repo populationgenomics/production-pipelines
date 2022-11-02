@@ -5,6 +5,7 @@ import logging
 
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
+from cpg_workflows import get_batch
 from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.jobs.multiqc import multiqc
 
@@ -49,8 +50,8 @@ class GvcfQC(SampleStage):
         gvcf_path = inputs.as_path(sample, Genotype, 'gvcf')
 
         j = vcf_qc(
-            b=self.b,
-            vcf_or_gvcf=GvcfPath(gvcf_path).resource_group(self.b),
+            b=get_batch(),
+            vcf_or_gvcf=GvcfPath(gvcf_path).resource_group(get_batch()),
             is_gvcf=True,
             job_attrs=self.get_job_attrs(sample),
             output_summary_path=self.expected_outputs(sample)['qc_summary'],
@@ -88,9 +89,9 @@ class GvcfHappy(SampleStage):
         gvcf_path = inputs.as_path(sample, Genotype, 'gvcf')
 
         jobs = happy(
-            b=self.b,
+            b=get_batch(),
             sample=sample,
-            vcf_or_gvcf=GvcfPath(gvcf_path).resource_group(self.b),
+            vcf_or_gvcf=GvcfPath(gvcf_path).resource_group(get_batch()),
             is_gvcf=True,
             job_attrs=self.get_job_attrs(sample),
             output_path=self.expected_outputs(sample),
@@ -173,7 +174,7 @@ class GvcfMultiQC(DatasetStage):
         }
 
         jobs = multiqc(
-            self.b,
+            get_batch(),
             tmp_prefix=dataset.tmp_prefix() / 'multiqc' / 'gvcf',
             paths=paths,
             ending_to_trim=ending_to_trim,

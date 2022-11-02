@@ -21,6 +21,7 @@ from cpg_workflows.jobs.happy import happy
 from cpg_workflows.jobs.picard import vcf_qc
 from cpg_workflows.jobs import joint_genotyping
 from .genotype import Genotype
+from .. import get_batch
 
 
 @stage(required_stages=Genotype)
@@ -35,7 +36,7 @@ class JointGenotyping(CohortStage):
         """
         h = cohort.alignment_inputs_hash()
         prefix = str(cohort.analysis_dataset.prefix() / self.name / h)
-        qc_prefix = self.cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / 'picard'
+        qc_prefix = cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / 'picard'
         return {
             'prefix': prefix,
             'vcf': to_path(f'{prefix}.vcf.gz'),
@@ -71,7 +72,7 @@ class JointGenotyping(CohortStage):
         siteonly_vcf_path = self.expected_outputs(cohort)['siteonly']
 
         jc_jobs = joint_genotyping.make_joint_genotyping_jobs(
-            b=self.b,
+            b=get_batch(),
             out_vcf_path=vcf_path,
             out_siteonly_vcf_path=siteonly_vcf_path,
             tmp_bucket=to_path(self.expected_outputs(cohort)['prefix']),
@@ -86,8 +87,8 @@ class JointGenotyping(CohortStage):
         jobs.extend(jc_jobs)
 
         qc_j = vcf_qc(
-            b=self.b,
-            vcf_or_gvcf=self.b.read_input_group(
+            b=get_batch(),
+            vcf_or_gvcf=get_batch().read_input_group(
                 **{
                     'vcf.gz': str(vcf_path),
                     'vcf.gz.tbi': str(vcf_path) + '.tbi',

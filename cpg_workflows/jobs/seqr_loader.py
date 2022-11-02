@@ -97,7 +97,7 @@ def annotate_dataset_jobs(
     that will be loaded into Seqr).
     """
     sample_ids_list_path = tmp_prefix / 'sample-list.txt'
-    if not get_config()['hail'].get('dry_run', False):
+    if not get_config()['workflow'].get('dry_run', False):
         with sample_ids_list_path.open('w') as f:
             f.write(','.join(sample_ids))
 

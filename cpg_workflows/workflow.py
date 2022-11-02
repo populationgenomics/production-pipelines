@@ -302,9 +302,6 @@ class Stage(Generic[TargetT], ABC):
         assume_outputs_exist: bool = False,
         forced: bool = False,
     ):
-        self.b = get_batch()
-        self.cohort = get_cohort()
-
         self._name = name
         self.required_stages_classes: list[StageDecorator] = []
         if required_stages:
@@ -312,8 +309,6 @@ class Stage(Generic[TargetT], ABC):
                 self.required_stages_classes.extend(required_stages)
             else:
                 self.required_stages_classes.append(required_stages)
-
-        self.tmp_prefix = get_workflow().tmp_prefix / name
 
         # Dependencies. Populated in workflow.run(), after we know all stages.
         self.required_stages: list[Stage] = []
@@ -329,6 +324,10 @@ class Stage(Generic[TargetT], ABC):
         self.skipped = skipped
         self.forced = forced
         self.assume_outputs_exist = assume_outputs_exist
+
+    @property
+    def tmp_prefix(self):
+        return get_workflow().tmp_prefix / self.name
 
     def __str__(self):
         res = f'{self._name}'
@@ -692,19 +691,21 @@ def skip(
 _workflow: Optional['Workflow'] = None
 
 
-def get_workflow() -> 'Workflow':
+def get_workflow(dry_run: bool = False) -> 'Workflow':
     global _workflow
     if _workflow is None:
-        _workflow = Workflow()
+        _workflow = Workflow(dry_run=dry_run)
     return _workflow
 
 
 def run_workflow(
     stages: list[StageDecorator] | None = None,
     wait: bool | None = False,
+    dry_run: bool = False,
 ) -> 'Workflow':
-    get_workflow().run(stages=stages, wait=wait)
-    return get_workflow()
+    wfl = get_workflow(dry_run=dry_run)
+    wfl = wfl.run(stages=stages, wait=wait)
+    return wfl
 
 
 class Workflow:
@@ -716,11 +717,14 @@ class Workflow:
     def __init__(
         self,
         stages: list[StageDecorator] | None = None,
+        dry_run: bool | None = None,
     ):
         if _workflow is not None:
             raise ValueError(
                 'Workflow already initialised. Use get_workflow() to get the instance'
             )
+
+        self.dry_run = dry_run or get_config()['workflow'].get('dry_run')
 
         analysis_dataset = get_config()['workflow']['dataset']
         name = get_config()['workflow'].get('name')
@@ -746,9 +750,10 @@ class Workflow:
         description += f': run_timestamp={self.run_timestamp}'
         if sequencing_type := get_config()['workflow'].get('sequencing_type'):
             description += f' [{sequencing_type}]'
-        if ds_set := set(d.name for d in get_cohort().get_datasets()):
-            description += ' ' + ', '.join(sorted(ds_set))
-        get_batch().name = description
+        if not self.dry_run:
+            if ds_set := set(d.name for d in get_cohort().get_datasets()):
+                description += ' ' + ', '.join(sorted(ds_set))
+            get_batch().name = description
 
         self.status_reporter = None
         if get_config()['workflow'].get('status_reporter') == 'metamist':
@@ -786,7 +791,9 @@ class Workflow:
         if not _stages:
             raise WorkflowError('No stages added')
         self.set_stages(_stages)
-        return get_batch().run(wait=wait)
+
+        if not self.dry_run:
+            get_batch().run(wait=wait)
 
     @staticmethod
     def _process_first_last_stages(
@@ -853,7 +860,19 @@ class Workflow:
         first_stages = get_config()['workflow'].get('first_stages', [])
         last_stages = get_config()['workflow'].get('last_stages', [])
 
+        logging.info(
+            f'End stages for the workflow "{self.name}": '
+            f'{[cls.__name__ for cls in requested_stages]}'
+        )
+        logging.info('Stages additional configuration:')
+        logging.info(f'  workflow/skip_stages: {skip_stages}')
+        logging.info(f'  workflow/only_stages: {only_stages}')
+        logging.info(f'  workflow/first_stages: {first_stages}')
+        logging.info(f'  workflow/last_stages: {last_stages}')
+
         # TODO: fix this: if we have last_stages = ['Align'], it wouldn't work at all
+        # UPD: this pull request fixes it if approved:
+        # https://github.com/populationgenomics/production-pipelines/pull/158
         if only_stages or last_stages:
             # If stages are requested explicitly, we don't need other stages from
             # the default list:
@@ -916,7 +935,7 @@ class Workflow:
         except nx.NetworkXUnfeasible:
             logging.error('Circular dependencies found between stages')
             raise
-        logging.info(f'Stages in order of execution: {stage_names}')
+        logging.info(f'Stages in order of execution:\n{stage_names}')
         stages = [_stages_d[name] for name in stage_names]
 
         # Round 5: applying workflow options first_stages and last_stages.
@@ -924,7 +943,10 @@ class Workflow:
 
         if not (final_set_of_stages := [s.name for s in stages if not s.skipped]):
             raise WorkflowError('No stages to run')
-        logging.info(f'Setting stages: {", ".join(final_set_of_stages)}')
+        logging.info(
+            f'Final list of stages after applying workflow/first_stages and '
+            f'workflow/last_stages stages:\n{final_set_of_stages}'
+        )
         required_skipped_stages = [s for s in stages if s.skipped]
         if required_skipped_stages:
             logging.info(
@@ -932,17 +954,19 @@ class Workflow:
             )
 
         # Round 6: actually adding jobs from the stages.
-        for i, stg in enumerate(stages):
-            logging.info(f'*' * 60)
-            logging.info(f'Stage #{i + 1}: {stg}')
-            stg.output_by_target = stg.queue_for_cohort(get_cohort())
-            if errors := self._process_stage_errors(stg.output_by_target):
-                raise WorkflowError(
-                    f'Stage {stg} failed to queue jobs with errors: '
-                    + '\n'.join(errors)
-                )
+        if not self.dry_run:
+            cohort = get_cohort()  # Would communicate with metamist.
+            for i, stg in enumerate(stages):
+                logging.info(f'*' * 60)
+                logging.info(f'Stage #{i + 1}: {stg}')
+                stg.output_by_target = stg.queue_for_cohort(cohort)
+                if errors := self._process_stage_errors(stg.output_by_target):
+                    raise WorkflowError(
+                        f'Stage {stg} failed to queue jobs with errors: '
+                        + '\n'.join(errors)
+                    )
 
-            logging.info(f'')
+                logging.info(f'')
 
     @staticmethod
     def _process_stage_errors(

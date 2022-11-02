@@ -2,70 +2,84 @@
 Test Hail Query functions.
 """
 import os
+import string
+import time
+from random import choices
 import logging
 from os.path import exists
 
 import toml
 from cpg_utils import to_path, Path
-from cpg_utils.config import set_config_paths
-from cpg_utils.config import update_dict
 from pytest_mock import MockFixture
-
-from cpg_workflows.filetypes import GvcfPath
-from cpg_workflows.targets import Cohort
-from cpg_workflows.utils import timestamp
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 
-def _set_config(results_prefix: Path, extra_conf: dict | None = None):
-    d = {
-        'workflow': {
-            'local_dir': str(results_prefix),
-            'dataset_gcp_project': 'thousand-genomes',
-            'dataset': 'thousand-genomes',
-            'access_level': 'test',
-            'sequencing_type': 'genome',
-            'check_intermediates': True,
-            'path_scheme': 'local',
-            'reference_prefix': str(
-                to_path(__file__).parent / 'data' / 'large_cohort' / 'reference'
-            ),
-        },
-        'large_cohort': {
-            'sample_qc_cutoffs': {
-                'min_n_snps': 2500,  # to make it pass for toy subset
-            },
-            'n_pcs': 3,  # minimal allowed number
-        },
-        'hail': {
-            'billing_project': 'thousand-genomes',
-            'dry_run': True,
-            'query_backend': 'spark_local',
-        },
-    }
-    if extra_conf:
-        update_dict(d, extra_conf)
-    with (conf_path := results_prefix / 'config.toml').open('w') as f:
-        toml.dump(d, f)
+def update_dict(d1: dict, d2: dict) -> None:
+    """Updates the d1 dict with the values from the d2 dict recursively in-place."""
+    for k, v2 in d2.items():
+        v1 = d1.get(k)
+        if isinstance(v1, dict) and isinstance(v2, dict):
+            update_dict(v1, v2)
+        else:
+            d1[k] = v2
 
-    set_config_paths(
-        [
-            str(p)
-            for p in [
-                to_path(__file__).parent.parent
-                / 'configs'
-                / 'defaults'
-                / 'workflows.toml',
-                to_path(__file__).parent.parent
-                / 'configs'
-                / 'defaults'
-                / 'large_cohort.toml',
-                conf_path,
-            ]
-        ]
+
+def timestamp(rand_suffix_len: int = 5) -> str:
+    """
+    Generate a timestamp string. If `rand_suffix_len` is set, adds a short random
+    string of this length for uniqueness.
+    """
+    result = time.strftime('%Y_%m%d_%H%M')
+    if rand_suffix_len:
+        rand_bit = ''.join(
+            choices(string.ascii_uppercase + string.digits, k=rand_suffix_len)
+        )
+        result += f'_{rand_bit}'
+    return result
+
+
+def _make_config(results_prefix: Path) -> dict:
+    d: dict = {}
+    for fp in (
+        to_path(__file__).parent.parent / 'configs' / 'defaults' / 'workflows.toml',
+        to_path(__file__).parent.parent / 'configs' / 'defaults' / 'large_cohort.toml',
+    ):
+        with fp.open():
+            update_dict(d, toml.load(fp))
+
+    update_dict(
+        d,
+        {
+            'workflow': {
+                'local_dir': str(results_prefix),
+                'dataset_gcp_project': 'thousand-genomes',
+                'dataset': 'thousand-genomes',
+                'access_level': 'test',
+                'sequencing_type': 'genome',
+                'check_intermediates': True,
+                'path_scheme': 'local',
+                'reference_prefix': str(
+                    to_path(__file__).parent / 'data' / 'large_cohort' / 'reference'
+                ),
+            },
+            'large_cohort': {
+                'sample_qc_cutoffs': {
+                    'min_n_snps': 2500,  # to make it pass for toy subset
+                },
+                'n_pcs': 3,  # minimal allowed number
+            },
+            'hail': {
+                'billing_project': 'thousand-genomes',
+                'query_backend': 'spark_local',
+            },
+            'combiner': {
+                'intervals': ['chr20:start-end', 'chrX:start-end', 'chrY:start-end'],
+            },
+        },
     )
+    return d
 
 
 def test_large_cohort(mocker: MockFixture):
@@ -76,15 +90,12 @@ def test_large_cohort(mocker: MockFixture):
         to_path(__file__).parent / 'results' / os.getenv('TEST_TIMESTAMP', timestamp())
     ).absolute()
     results_prefix.mkdir(parents=True, exist_ok=True)
+    conf = _make_config(results_prefix)
 
-    _set_config(
-        results_prefix=results_prefix,
-        extra_conf={
-            'combiner': {
-                'intervals': ['chr20:start-end', 'chrX:start-end', 'chrY:start-end'],
-            },
-        },
-    )
+    mocker.patch('cpg_utils.config.get_config', lambda: conf)
+
+    from cpg_workflows.filetypes import GvcfPath
+    from cpg_workflows.targets import Cohort
 
     cohort = Cohort()
     ds = cohort.create_dataset('thousand-genomes')
