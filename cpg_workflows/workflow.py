@@ -310,8 +310,6 @@ class Stage(Generic[TargetT], ABC):
             else:
                 self.required_stages_classes.append(required_stages)
 
-        self.tmp_prefix = get_workflow().tmp_prefix / name
-
         # Dependencies. Populated in workflow.run(), after we know all stages.
         self.required_stages: list[Stage] = []
 
@@ -326,6 +324,10 @@ class Stage(Generic[TargetT], ABC):
         self.skipped = skipped
         self.forced = forced
         self.assume_outputs_exist = assume_outputs_exist
+
+    @property
+    def tmp_prefix(self):
+        return get_workflow().tmp_prefix / self.name
 
     def __str__(self):
         res = f'{self._name}'
@@ -751,7 +753,7 @@ class Workflow:
         if not self.dry_run:
             if ds_set := set(d.name for d in get_cohort().get_datasets()):
                 description += ' ' + ', '.join(sorted(ds_set))
-        get_batch().name = description
+            get_batch().name = description
 
         self.status_reporter = None
         if get_config()['workflow'].get('status_reporter') == 'metamist':
@@ -858,6 +860,16 @@ class Workflow:
         first_stages = get_config()['workflow'].get('first_stages', [])
         last_stages = get_config()['workflow'].get('last_stages', [])
 
+        logging.info(
+            f'End stages for the workflow "{self.name}": '
+            f'{[cls.__name__ for cls in requested_stages]}'
+        )
+        logging.info('Stages additional configuration:')
+        logging.info(f'  workflow/skip_stages: {skip_stages}')
+        logging.info(f'  workflow/only_stages: {only_stages}')
+        logging.info(f'  workflow/first_stages: {first_stages}')
+        logging.info(f'  workflow/last_stages: {last_stages}')
+
         # TODO: fix this: if we have last_stages = ['Align'], it wouldn't work at all
         # UPD: this pull request fixes it if approved:
         # https://github.com/populationgenomics/production-pipelines/pull/158
@@ -923,7 +935,7 @@ class Workflow:
         except nx.NetworkXUnfeasible:
             logging.error('Circular dependencies found between stages')
             raise
-        logging.info(f'Stages in order of execution: {stage_names}')
+        logging.info(f'Stages in order of execution:\n{stage_names}')
         stages = [_stages_d[name] for name in stage_names]
 
         # Round 5: applying workflow options first_stages and last_stages.
@@ -931,7 +943,10 @@ class Workflow:
 
         if not (final_set_of_stages := [s.name for s in stages if not s.skipped]):
             raise WorkflowError('No stages to run')
-        logging.info(f'Setting stages: {", ".join(final_set_of_stages)}')
+        logging.info(
+            f'Final list of stages after applying workflow/first_stages and '
+            f'workflow/last_stages stages:\n{final_set_of_stages}'
+        )
         required_skipped_stages = [s for s in stages if s.skipped]
         if required_skipped_stages:
             logging.info(
