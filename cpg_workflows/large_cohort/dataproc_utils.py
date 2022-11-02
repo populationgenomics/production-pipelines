@@ -55,8 +55,8 @@ def dataproc_job(
     script = (
         f'{rel_script_path} '
         f'{function.__module__} {function.__name__} '
-        f'{" ".join([f"-p {p}" for p in function_path_args.values()])}'
-        f'{" ".join([a for a in function_str_args or []])}'
+        f'{" ".join([f"-p {p}" for p in function_path_args.values()])} '
+        f'{" ".join([a for a in function_str_args or []])} '
     )
 
     if cluster_id := get_config()['hail'].get('dataproc', {}).get('cluster_id'):
