@@ -5,28 +5,50 @@ Entry point to run the workflow.
 """
 import os
 
-import coloredlogs
 import click
-from cpg_utils.workflows.workflow import get_workflow
+import coloredlogs
+
+from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
-from stages.multiqc import GvcfMultiQC, CramMultiQC
-from stages.seqr_loader import MtToEs
+from cpg_workflows.workflow import run_workflow, StageDecorator
+from cpg_workflows.stages.large_cohort import LoadVqsr, Frequencies
+from cpg_workflows.stages.cram_qc import CramMultiQC
+from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
+from cpg_workflows.stages.fastqc import FastQCMultiQC
+from cpg_workflows.stages.seqr_loader import MtToEs
+from cpg_workflows.stages.gatk_sv import GatherBatchEvidence
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
 coloredlogs.install(level='INFO', fmt=fmt)
 
 
+WORKFLOWS: dict[str, list[StageDecorator]] = {
+    'pre_alignment': [FastQCMultiQC],
+    'seqr_loader': [MtToEs, GvcfMultiQC, CramMultiQC],
+    'large_cohort': [LoadVqsr, Frequencies, GvcfMultiQC, CramMultiQC],
+    'gatk_sv': [GatherBatchEvidence],
+}
+
+
 @click.command()
-@click.argument('config_paths', nargs=-1)
-def main(config_paths: list[str]):
+@click.argument('workflow', type=click.Choice(list(WORKFLOWS.keys())))
+@click.option('--config', 'config_paths', multiple=True)
+def main(workflow: str, config_paths: list[str]):
     """
     Run a workflow, using CONFIG_PATHS in the order specified, overriding
     $CPG_CONFIG_PATH if specified.
     """
-    if _cpg_config_path_env_var := os.environ.get('CPG_CONFIG_PATH'):
-        config_paths = _cpg_config_path_env_var.split(',') + list(config_paths)
+    base_config_paths = [
+        to_path(__file__).parent / 'configs' / 'defaults' / f'workflows.toml',
+        to_path(__file__).parent / 'configs' / 'defaults' / f'{workflow}.toml',
+    ]
+    assert all(path.exists() for path in base_config_paths)
+    config_paths = [str(path) for path in base_config_paths] + list(config_paths)
+    if _env_var := os.environ.get('CPG_CONFIG_PATH'):
+        config_paths += _env_var.split(',') + list(config_paths)
     set_config_paths(list(config_paths))
-    get_workflow().run(stages=[MtToEs, CramMultiQC, GvcfMultiQC])
+
+    run_workflow(stages=WORKFLOWS[workflow])
 
 
 if __name__ == '__main__':

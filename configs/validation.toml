@@ -1,4 +1,5 @@
 [workflow]
+access_level = 'full'
 input_datasets = ['validation']
 create_es_index_for_datasets = ['validation']
 skip_samples = [

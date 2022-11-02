@@ -5,16 +5,14 @@ Dataproc script to annotate cohort.
 """
 
 import click
-import coloredlogs
 import hail as hl
 
 from cpg_utils import to_path
-from cpg_utils.config import get_config
 
-from query_modules.seqr_loader import subset_mt_to_samples, annotate_dataset_mt
-
-fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
-coloredlogs.install(level='INFO', fmt=fmt)
+from cpg_workflows.query_modules.seqr_loader import (
+    subset_mt_to_samples,
+    annotate_dataset_mt,
+)
 
 
 @click.command()
@@ -61,7 +59,6 @@ def main(
         mt_path=str(subset_mt_path),
         out_mt_path=out_mt_path,
         checkpoint_prefix=checkpoint_prefix,
-        overwrite=not get_config()['workflow'].get('check_intermediates'),
     )
 
 

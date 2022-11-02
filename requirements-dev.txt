@@ -1,6 +1,4 @@
-bump2version
 pre-commit
 pylint
+bump2version
 black
-pytest
-pytest-mock
