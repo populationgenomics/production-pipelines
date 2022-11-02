@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Entry point to run the workflow.
+Entry point to run workflows.
 """
 import os
 
@@ -15,7 +15,7 @@ from cpg_workflows.stages.large_cohort import LoadVqsr, Frequencies
 from cpg_workflows.stages.cram_qc import CramMultiQC
 from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 from cpg_workflows.stages.fastqc import FastQCMultiQC
-from cpg_workflows.stages.seqr_loader import MtToEs
+from cpg_workflows.stages.seqr_loader import MtToEs, AnnotateDataset
 from cpg_workflows.stages.gatk_sv import GatherBatchEvidence
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
@@ -24,20 +24,71 @@ coloredlogs.install(level='INFO', fmt=fmt)
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'pre_alignment': [FastQCMultiQC],
-    'seqr_loader': [MtToEs, GvcfMultiQC, CramMultiQC],
+    'seqr_loader': [AnnotateDataset, MtToEs, GvcfMultiQC, CramMultiQC],
     'large_cohort': [LoadVqsr, Frequencies, GvcfMultiQC, CramMultiQC],
     'gatk_sv': [GatherBatchEvidence],
 }
 
 
-@click.command()
-@click.argument('workflow', type=click.Choice(list(WORKFLOWS.keys())))
-@click.option('--config', 'config_paths', multiple=True)
-def main(workflow: str, config_paths: list[str]):
+@click.command(no_args_is_help=True)
+@click.argument('workflow', required=False)
+@click.option(
+    '--config',
+    'config_paths',
+    multiple=True,
+    type=click.Path(exists=True),
+    help='Add configuration files to the files specified $CPG_CONFIG_PATH.'
+    'Configs are merged left to right, meaning the rightmost file has the'
+    'highest priority.',
+)
+@click.option(
+    '--list-workflows',
+    'list_workflows',
+    is_flag=True,
+    help='Only list possible values for WORKFLOW (and available last stages)',
+)
+@click.option(
+    '--list-last-stages',
+    'list_last_stages',
+    is_flag=True,
+    help='Only list possible end stages for a workflow, that can be specified '
+    'with `workflow/last_stages` in config',
+)
+@click.option(
+    '--dry-run',
+    'dry_run',
+    is_flag=True,
+    help='Dry run: do not actually communicate with Metamist or Hail Batch, '
+    'instead only print a final config and stages to be run',
+)
+def main(
+    workflow: str,
+    config_paths: list[str],
+    list_workflows: bool,
+    list_last_stages: bool,
+    dry_run: bool,
+):
     """
-    Run a workflow, using CONFIG_PATHS in the order specified, overriding
-    $CPG_CONFIG_PATH if specified.
+    Run a Hail Batch workflow specified as a positional command line argument [WORKFLOW]
     """
+    if not workflow and not list_workflows:
+        click.echo(
+            f'You must specify WORKFLOW as a first positional command line argument.'
+        )
+    if not workflow or list_workflows or workflow == 'list':
+        click.echo(f'Available values for WORKFLOW (and corresponding last stages):')
+        for wfl, last_stages in WORKFLOWS.items():
+            click.echo(f'\t{wfl} ({", ".join(s.__name__ for s in last_stages)})')
+        return
+
+    if list_last_stages:
+        click.echo(
+            f'Available last stages that can be listed with '
+            f'workflow/last_stages for the workflow "{workflow}":'
+        )
+        click.echo(f'{", ".join(s.__name__ for s in WORKFLOWS[workflow])}')
+        return
+
     base_config_paths = [
         to_path(__file__).parent / 'configs' / 'defaults' / f'workflows.toml',
         to_path(__file__).parent / 'configs' / 'defaults' / f'{workflow}.toml',
@@ -48,7 +99,7 @@ def main(workflow: str, config_paths: list[str]):
         config_paths += _env_var.split(',') + list(config_paths)
     set_config_paths(list(config_paths))
 
-    run_workflow(stages=WORKFLOWS[workflow])
+    run_workflow(stages=WORKFLOWS[workflow], dry_run=dry_run)
 
 
 if __name__ == '__main__':
