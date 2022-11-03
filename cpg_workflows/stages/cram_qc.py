@@ -154,7 +154,7 @@ class CramQC(SampleStage):
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
 
 
-@stage(required_stages=[CramQC])
+@stage(required_stages=[CramQC], forced=True)
 class SomalierPedigree(DatasetStage):
     """
     Checks pedigree from CRAM fingerprints.
