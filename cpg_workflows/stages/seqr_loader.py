@@ -129,7 +129,11 @@ def es_password() -> str:
     )
 
 
-@stage(required_stages=[AnnotateDataset], analysis_type='es-index')
+@stage(
+    required_stages=[AnnotateDataset],
+    analysis_type='es-index',
+    analysis_key='index_name',
+)
 class MtToEs(DatasetStage):
     """
     Create a Seqr index.

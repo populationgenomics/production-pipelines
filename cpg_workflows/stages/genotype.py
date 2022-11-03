@@ -1,12 +1,10 @@
 """
 Stage that generates a GVCF file.
 """
-import logging
 
-from cpg_utils import to_path, Path
+from cpg_utils import Path
 from cpg_utils.config import get_config
-
-from cpg_workflows.filetypes import GvcfPath
+from cpg_workflows.jobs import genotype
 from cpg_workflows.workflow import (
     Sample,
     stage,
@@ -14,15 +12,11 @@ from cpg_workflows.workflow import (
     StageOutput,
     SampleStage,
 )
-from cpg_workflows.jobs import genotype
-from cpg_workflows.jobs.happy import happy
-from cpg_workflows.jobs.picard import vcf_qc
-
 from .align import Align
 from .. import get_batch
 
 
-@stage(required_stages=Align, analysis_type='gvcf')
+@stage(required_stages=Align, analysis_type='gvcf', analysis_key='gvcf')
 class Genotype(SampleStage):
     """
     Use HaplotypeCaller to genotype individual samples (i.e. CRAM -> GVCF).
