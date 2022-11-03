@@ -14,7 +14,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'cpg-utils',
-        'hail>=0.2.104',
+        'hail',
         'networkx',
         'sample-metadata>=5.0.1',
         'analysis-runner',
@@ -28,7 +28,6 @@ setup(
         'bokeh',
         'numpy',
         'click',
-        'slack_sdk',
     ],
     extras_require={
         'test': [
