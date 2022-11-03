@@ -298,6 +298,7 @@ class Stage(Generic[TargetT], ABC):
         name: str,
         required_stages: list[StageDecorator] | StageDecorator | None = None,
         analysis_type: str | None = None,
+        analysis_key: str | None = None,
         skipped: bool = False,
         assume_outputs_exist: bool = False,
         forced: bool = False,
@@ -314,9 +315,12 @@ class Stage(Generic[TargetT], ABC):
         self.required_stages: list[Stage] = []
 
         self.status_reporter = get_workflow().status_reporter
-        # If analysis type is defined, it will be used to update analysis status,
-        # as well as find and reuse existing outputs from the status reporter
+        # If `analysis_type` is defined, it will be used to create/update Analysis
+        # entries in Metamist.
         self.analysis_type = analysis_type
+        # If `analysis_key` is defined, it will be used to extract the value for
+        # `Analysis.output` if the Stage.expected_outputs() returns a dict.
+        self.analysis_key = analysis_key
 
         # Populated with the return value of `add_to_the_workflow()`
         self.output_by_target: dict[str, StageOutput | None] = dict()
@@ -454,9 +458,28 @@ class Stage(Generic[TargetT], ABC):
 
         # Adding status reporter jobs
         if self.analysis_type and self.status_reporter:
+            output: str | Path
+            if isinstance(outputs.data, dict):
+                if not self.analysis_key:
+                    raise WorkflowError(
+                        f'Cannot create Analysis for stage {self.name}: `analysis_key` '
+                        f'must be set with the @stage decorator to select value from '
+                        f'the expected_outputs dict: {outputs.data}'
+                    )
+                if self.analysis_key not in outputs.data:
+                    raise WorkflowError(
+                        f'Cannot create Analysis for stage {self.name}: `analysis_key` '
+                        f'"{self.analysis_key}" is not found in the expected_outputs '
+                        f'dict {outputs.data}'
+                    )
+                output = outputs.data[self.analysis_key]
+            else:
+                assert isinstance(outputs.data, str) or isinstance(outputs.data, Path)
+                output = outputs.data
+
             self.status_reporter.add_updaters_jobs(
                 b=get_batch(),
-                output=outputs.data,
+                output=str(output),
                 analysis_type=self.analysis_type,
                 target=target,
                 jobs=outputs.jobs,
@@ -605,6 +628,7 @@ def stage(
     cls: Optional[Type['Stage']] = None,
     *,
     analysis_type: str | None = None,
+    analysis_key: str | None = None,
     required_stages: list[StageDecorator] | StageDecorator | None = None,
     skipped: bool = False,
     assume_outputs_exist: bool = False,
@@ -621,6 +645,25 @@ def stage(
             ...
         def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
             ...
+
+        self.status_reporter = get_workflow().status_reporter
+        # If `analysis_type` is defined, it will be used to create/update Analysis
+        # entries in Metamist.
+        self.analysis_type = analysis_type
+        # If `analysis_key` is defined, it will be used to extract the value for
+        # `Analysis.output` if the Stage.expected_outputs() returns a dict.
+
+    @analysis_type: if defined, will be used to create/update `Analysis` entries
+        using the status reporter.
+    @analysis_key: is defined, will be used to extract the value for `Analysis.output`
+        if the Stage.expected_outputs() returns a dict.
+    @required_stages: list of other stage classes that are required prerequisites
+        for this stage. Outputs of those stages will be passed to
+        `Stage.queue_jobs(... , inputs)` as `inputs`, and all required
+        dependencies between Hail Batch jobs will be set automatically as well.
+    @skipped: always skip this stage.
+    @assume_outputs_exist: assume expected outputs of this stage always exist.
+    @forced: always force run this stage, regardless of the outputs' existence.
     """
 
     def decorator_stage(_cls) -> StageDecorator:
@@ -633,6 +676,7 @@ def stage(
                 name=_cls.__name__,
                 required_stages=required_stages,
                 analysis_type=analysis_type,
+                analysis_key=analysis_key,
                 skipped=skipped,
                 assume_outputs_exist=assume_outputs_exist,
                 forced=forced,
