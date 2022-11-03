@@ -16,7 +16,6 @@ setup(
         'cpg-utils',
         'networkx',
         'sample-metadata>=5.0.1',
-        'analysis-runner',
         'gnomad',
         'pandas',
         'peddy',
@@ -36,7 +35,9 @@ setup(
         # Putting "hail" into an extra because by default we want to avoid
         # overriding the driver image CPG-fork based package:
         # https://github.com/populationgenomics/analysis-runner/blob/main/driver/Dockerfile.hail#L48-L57
-        'hail': [
+        # "analysis-runner" also depends on "hail"
+        'full': [
+            'analysis-runner',
             'hail',
         ],
     },
