@@ -450,7 +450,7 @@ source venv/bin/activate
 Install the package, and the development environment:
 
 ```bash
-pip install -e .
+pip install -e .[hail]
 pip install -r requirements-dev.txt
 ```
 
