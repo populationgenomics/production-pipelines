@@ -23,7 +23,7 @@ class StatusReporter(ABC):
     def add_updaters_jobs(
         self,
         b: Batch,
-        output: str | Path | Resource | dict[str, Path | Resource],
+        output: str,
         analysis_type: str,
         target: Target,
         jobs: list[Job] | None = None,
