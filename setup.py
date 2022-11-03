@@ -14,7 +14,6 @@ setup(
     packages=find_packages(),
     install_requires=[
         'cpg-utils',
-        'hail',
         'networkx',
         'sample-metadata>=5.0.1',
         'analysis-runner',
@@ -33,6 +32,12 @@ setup(
         'test': [
             'pytest',
             'pytest-mock',
+        ],
+        # Putting "hail" into an extra because by default we want to avoid
+        # overriding the driver image CPG-fork based package:
+        # https://github.com/populationgenomics/analysis-runner/blob/main/driver/Dockerfile.hail#L48-L57
+        'hail': [
+            'hail',
         ],
     },
     keywords='bioinformatics',
