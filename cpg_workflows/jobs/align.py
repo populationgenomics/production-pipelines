@@ -330,6 +330,8 @@ def _align_one(
         storage_gb=storage_for_align_job(alignment_input=alignment_input),
     ).get_nthreads()
 
+    sort_index_input_cmd = ''
+
     # 2022-07-22 mfranklin:
     #   Replace process substitution with named-pipes (FIFO)
     #   This is named-pipe name -> command to populate it
@@ -362,7 +364,6 @@ def _align_one(
             f'-Dsamjdk.reference_fasta={reference_inp}' if reference_inp else ''
         )
 
-        sort_index_input_cmd = ''
         if not alignment_input.index_path:
             sort_index_input_cmd = dedent(
                 f"""
@@ -383,7 +384,6 @@ def _align_one(
 
         bazam_cmd = dedent(
             f"""\
-        {sort_index_input_cmd}
         bazam -Xmx16g {_reference_command_inp} \
         -n{min(nthreads, 6)} -bam {group[alignment_input.ext]}{shard_param} \
         """
@@ -485,7 +485,7 @@ def _align_one(
         ).strip()
 
         # Now prepare command
-        cmd = '\n'.join([*fifo_pre, cmd, fifo_post])
+        cmd = '\n'.join([sort_index_input_cmd, *fifo_pre, cmd, fifo_post])
     return j, cmd
 
 
