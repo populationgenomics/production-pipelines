@@ -288,10 +288,18 @@ def storage_for_align_job(alignment_input: AlignmentInput) -> int | None:
         assert isinstance(storage_gb, int), storage_gb
         return storage_gb
 
-    sequencing_type = get_config()['workflow']['sequencing_type']
-    if sequencing_type == 'genome':
+    # Taking a full instance without attached by default:
+    storage_gb = STANDARD.calc_instance_disk_gb()
+    if get_config()['workflow']['sequencing_type'] == 'genome':
+        # More disk is needed for FASTQ or BAM inputs than for realignment from CRAM
         if isinstance(alignment_input, FastqPair | FastqPairs | BamPath):
-            storage_gb = 400  # for WGS FASTQ or BAM inputs, more disk is needed
+            storage_gb = 400
+        # For unindexed/unsorted CRAM or BAM inputs, extra storage is needed for tmp
+        if (
+            isinstance(alignment_input, CramPath | BamPath)
+            and not alignment_input.index_path
+        ):
+            storage_gb += 150
     return storage_gb
 
 
