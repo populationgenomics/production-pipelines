@@ -348,7 +348,8 @@ def _align_one(
         else:
             shard_param = ''
 
-        reference_inp = None
+        bazam_ref_cmd = ''
+        samtools_ref_cmd = ''
         if isinstance(alignment_input, CramPath):
             assert (
                 alignment_input.reference_assembly
@@ -357,19 +358,17 @@ def _align_one(
                 base=str(alignment_input.reference_assembly),
                 fai=str(alignment_input.reference_assembly) + '.fai',
             ).base
+            bazam_ref_cmd = f'-Dsamjdk.reference_fasta={reference_inp}'
+            samtools_ref_cmd = f'--reference {reference_inp}'
 
         group = alignment_input.resource_group(b)
-
-        _reference_command_inp = (
-            f'-Dsamjdk.reference_fasta={reference_inp}' if reference_inp else ''
-        )
 
         if not alignment_input.index_path:
             sort_index_input_cmd = dedent(
                 f"""
             mkdir -p $BATCH_TMPDIR/sorted
             mkdir -p $BATCH_TMPDIR/sort_tmp
-            samtools sort \
+            samtools sort {samtools_ref_cmd} \
             {group[alignment_input.ext]} \
             -@{nthreads - 1} \
             -T $BATCH_TMPDIR/sort_tmp \
@@ -384,7 +383,7 @@ def _align_one(
 
         bazam_cmd = dedent(
             f"""\
-        bazam -Xmx16g {_reference_command_inp} \
+        bazam -Xmx16g {bazam_ref_cmd} \
         -n{min(nthreads, 6)} -bam {group[alignment_input.ext]}{shard_param} \
         """
         )
