@@ -54,7 +54,7 @@ def verifybamid(
     retry_gs_cp {str(cram_path.path)} $CRAM
     retry_gs_cp {str(cram_path.index_path)} $CRAI
         
-    /root/micromamba/share/verifybamid2-2.0.1-7/VerifyBamID \
+    /root/micromamba/share/verifybamid2-2.0.1-8/VerifyBamID \
     --NumThread {res.get_nthreads()} \
     --Verbose \
     --NumPC 4 \
