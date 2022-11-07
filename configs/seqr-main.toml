@@ -25,6 +25,8 @@ input_datasets = [
     # 'udn-aus-training',
     'validation',
 ]
+
+skip_samples = [
     'CPG11783',   # acute-care, no FASTQ data
     'CPG255232',  # perth-neuro: new
     'CPG255240',  # perth-neuro: new
@@ -43,7 +45,7 @@ input_datasets = [
     # ohmr4 - samples waiting for deletion https://github.com/populationgenomics/seqr-private/issues/25
     'CPG221978', 'CPG222000',
     # ohmr4 - cram parsing in align issues
-    'CPG261339','CPG261347'
+    'CPG261339','CPG261347',
 ]
 check_inputs = true
 check_intermediates = true
