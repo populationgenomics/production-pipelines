@@ -40,7 +40,8 @@ def load_vqsr(
     # To mitigate this, we can drop the SB field before the HT is (lazily) parsed.
     # In order words, dropping it before calling ht.write() makes sure that Hail would
     # never attempt to actually parse it.
-    ht = ht.annotate(info=ht.info.drop('SB'))
+    if 'SB' in ht.info:
+        ht = ht.annotate(info=ht.info.drop('SB'))
 
     # Dropping also all INFO/AS* annotations as well as InbreedingCoeff, as they are
     # causing problems splitting multiallelics after parsing by Hail, when Hail attempts
