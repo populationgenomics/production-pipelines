@@ -333,6 +333,14 @@ class Stage(Generic[TargetT], ABC):
     def tmp_prefix(self):
         return get_workflow().tmp_prefix / self.name
 
+    @property
+    def web_prefix(self) -> Path:
+        return get_workflow().web_prefix / self.name
+
+    @property
+    def prefix(self) -> Path:
+        return get_workflow().prefix / self.name
+
     def __str__(self):
         res = f'{self._name}'
         if self.skipped:
@@ -346,7 +354,7 @@ class Stage(Generic[TargetT], ABC):
         return res
 
     @property
-    def name(self):
+    def name(self) -> str:
         """
         Stage name (unique and descriptive stage)
         """
@@ -816,7 +824,10 @@ class Workflow:
     def prefix(self) -> Path:
         return self._prefix()
 
-    def _prefix(self, category=None) -> Path:
+    def _prefix(self, category: str | None = None) -> Path:
+        """
+        Prepare a unique path for the workflow with this name and this input data.
+        """
         prefix = get_cohort().analysis_dataset.prefix(category=category) / self.name
         prefix /= self.output_version or get_cohort().alignment_inputs_hash()
         return prefix
