@@ -22,10 +22,9 @@ input_datasets = [
     'rdnow',
     'rdp-kidney',
     'schr-neuro',
-    'udn-aus-training',
+    # 'udn-aus-training',
     'validation',
 ]
-skip_samples = [
     'CPG11783',   # acute-care, no FASTQ data
     'CPG255232',  # perth-neuro: new
     'CPG255240',  # perth-neuro: new
@@ -35,8 +34,17 @@ skip_samples = [
     'CPG246645',  # ag-hidden, eof issue  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/440
     'CPG246678',  # ag-hidden, diff fastq size  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/446
     'CPG246561',  # ag-hidden, coverage ~0x https://main-web.populationgenomics.org.au/ag-hidden/qc/cram/multiqc.html
+    # Temporary exclusions for Nov22 load
+    # rdp-kidney samples incorectly imported into ibmdx
+    'CPG261552','CPG261560','CPG261578','CPG261586','CPG261594','CPG261602','CPG261610','CPG261628','CPG261636','CPG261644','CPG261651','CPG261669','CPG261677','CPG261685','CPG261693','CPG261701','CPG261719','CPG261727','CPG261735','CPG261743',
+    'CPG261792', # rdp-kidney misformated fastq - https://batch.hail.populationgenomics.org.au/batches/378736/jobs/43
+    # acute-care fasq parsing errors https://batch.hail.populationgenomics.org.au/batches/379303/jobs/24
+    'CPG259150','CPG258814','CPG258137','CPG258111','CPG258012',
+    # ohmr4 - samples waiting for deletion https://github.com/populationgenomics/seqr-private/issues/25
+    'CPG221978', 'CPG222000',
+    # ohmr4 - cram parsing in align issues
+    'CPG261339','CPG261347'
 ]
-
 check_inputs = true
 check_intermediates = true
 check_expected_outputs = true
