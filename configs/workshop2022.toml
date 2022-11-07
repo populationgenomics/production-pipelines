@@ -1,0 +1,9 @@
+[workflow]
+dataset_gcp_project = 'fewgenomes'
+dataset = 'workshop-nov-22'
+sequencing_type = 'genome'
+output_version = '0.1'
+skip_qc = true
+
+[hail]
+billing_project = 'fewgenomes'
