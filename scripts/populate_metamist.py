@@ -30,7 +30,7 @@ COMMANDS = ['analyses', 'qc', 'joint-calling', 'es-index']
 @click.option('--config', 'config_paths', multiple=True)
 def main(command: str, config_paths: list[str]):
     if _env_var := os.environ.get('CPG_CONFIG_PATH'):
-        config_paths += _env_var.split(',') + list(config_paths)
+        config_paths += list(_env_var.split(',')) + list(config_paths)
     set_config_paths(list(config_paths))
 
     sequencing_type = get_config()['workflow']['sequencing_type']
