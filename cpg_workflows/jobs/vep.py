@@ -129,9 +129,11 @@ def gather_vep_json_to_ht(
     # we are not importing it on the top level.
     from analysis_runner import dataproc
 
+    script_path = to_path(__file__).parent / 'dataproc_scripts' / 'vep_json_to_ht.py'
+
     j = dataproc.hail_dataproc_job(
         b,
-        f'dataproc_scripts/vep_json_to_ht.py --out-path {out_path} '
+        f'{script_path} --out-path {out_path} '
         + ' '.join(str(p) for p in vep_results_paths),
         max_age='24h',
         packages=[
