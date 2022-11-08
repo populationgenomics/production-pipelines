@@ -1,6 +1,7 @@
 [workflow]
 dataset_gcp_project = 'fewgenomes'
-dataset = 'workshop-nov-22'
+dataset = 'fewgenomes'
+access_level='test'
 sequencing_type = 'genome'
 output_version = '0.1'
 skip_qc = true
