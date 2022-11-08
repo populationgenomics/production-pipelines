@@ -178,9 +178,11 @@ class MtToEs(DatasetStage):
         # we are not importing it on the top level.
         from analysis_runner import dataproc
 
+        script_path = to_path(__file__).parent / 'dataproc_scripts' / 'mt_to_es.py'
+
         j = dataproc.hail_dataproc_job(
             get_batch(),
-            f'dataproc_scripts/mt_to_es.py '
+            f'{script_path} '
             f'--mt-path {dataset_mt_path} '
             f'--es-index {index_name} '
             f'--done-flag-path {done_flag_path} '

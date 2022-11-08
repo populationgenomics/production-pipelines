@@ -5,7 +5,7 @@ Hail Query Batch-Backend jobs for seqr-loader.
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, query_command
 
@@ -29,9 +29,13 @@ def annotate_cohort_jobs(
         # we are not importing it on the top level.
         from analysis_runner import dataproc
 
+        script_path = (
+            to_path(__file__).parent / 'dataproc_scripts' / 'annotate_cohort.py'
+        )
+
         j = dataproc.hail_dataproc_job(
             b,
-            f'dataproc_scripts/annotate_cohort.py '
+            f'{script_path} '
             f'--vcf-path {vcf_path} '
             f'--vep-ht-path {vep_ht_path} '
             f'--out-mt-path {out_mt_path} '
@@ -108,9 +112,13 @@ def annotate_dataset_jobs(
         # we are not importing it on the top level.
         from analysis_runner import dataproc
 
+        script_path = (
+            to_path(__file__).parent / 'dataproc_scripts' / 'annotate_dataset.py'
+        )
+
         j = dataproc.hail_dataproc_job(
             b,
-            f'dataproc_scripts/annotate_dataset.py '
+            f'{script_path} '
             f'--mt-path {mt_path} '
             f'--sample-ids {sample_ids_list_path} '
             f'--out-mt-path {out_mt_path} '
