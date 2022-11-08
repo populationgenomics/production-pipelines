@@ -113,13 +113,8 @@ def gather_vcfs(
     --ignore-safety-checks \\
     --gather-type BLOCK \\
     {input_cmdl} \\
-    --output $BATCH_TMPDIR/gathered.vcf.gz
+    --output {j.output_vcf['vcf.gz']}
 
-    bcftools sort --temp-dir $BATCH_TMPDIR \
-    $BATCH_TMPDIR/gathered.vcf.gz -Oz \
-    -o {j.output_vcf['vcf.gz']}
-    
-    tabix -p vcf {j.output_vcf['vcf.gz']}
     """
     j.command(command(cmd, monitor_space=True))
     if out_vcf_path:
