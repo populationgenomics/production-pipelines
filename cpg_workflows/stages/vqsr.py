@@ -27,11 +27,9 @@ class Vqsr(CohortStage):
         """
         Generate a site-only VCF.
         """
-        h = cohort.alignment_inputs_hash()
-        prefix = str(cohort.analysis_dataset.prefix() / self.name / h)
         return {
-            'prefix': prefix,
-            'siteonly': to_path(f'{prefix}-siteonly.vcf.gz'),
+            'prefix': self.prefix,
+            'siteonly': to_path(f'{self.prefix}-siteonly.vcf.gz'),
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
