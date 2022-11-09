@@ -92,7 +92,7 @@ def gather_vcfs(
     j.image(image_path('gatk'))
 
     if gvcf_count:
-        storage_gb = (1 if site_only else 2) * gvcf_count
+        storage_gb = (1 if site_only else 4) * gvcf_count
         res = STANDARD.set_resources(j, fraction=1, storage_gb=storage_gb)
     else:
         res = STANDARD.set_resources(j, fraction=1)
