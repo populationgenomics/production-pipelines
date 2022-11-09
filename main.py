@@ -18,6 +18,7 @@ from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.seqr_loader import MtToEs, AnnotateDataset
 from cpg_workflows.stages.gatk_sv import GatherBatchEvidence
 from cpg_workflows.stages.align import Align
+from cpg_workflows.stages.genotype import Genotype
 from cpg_workflows.stages.cram_qc import CramQC
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
@@ -29,7 +30,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'seqr_loader': [AnnotateDataset, MtToEs, GvcfMultiQC, CramMultiQC],
     'large_cohort': [LoadVqsr, Frequencies, GvcfMultiQC, CramMultiQC],
     'gatk_sv': [GatherBatchEvidence],
-    'workshop22': [Align, CramQC]
+    'workshop22': [Align, CramQC, Genotype, GvcfMultiQC]
 }
 
 
