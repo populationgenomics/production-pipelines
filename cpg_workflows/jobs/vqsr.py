@@ -277,7 +277,7 @@ def make_vqsr_jobs(
             site_only=True,
             sample_count=gvcf_count,
             job_attrs=job_attrs,
-            sort=False,
+            sort=True,  # need to sort because we have indels and snps separate
         )
         for j in snps_applied_gathered_jobs:
             j.name = f'VQSR: {j.name}'
