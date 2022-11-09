@@ -110,7 +110,6 @@ def gather_vcfs(
     res.set_to_job(j)
 
     input_cmdl = ' '.join([f'--input {v}' for v in input_vcfs])
-    assert isinstance(j.output_vcf, hb.ResourceGroup)
     cmd = f"""
     # --ignore-safety-checks makes a big performance difference so we include it in 
     # our invocation. This argument disables expensive checks that the file headers 
