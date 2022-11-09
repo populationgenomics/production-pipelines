@@ -3,23 +3,19 @@ Stage that performs joint genotyping of GVCFs using GATK.
 """
 import logging
 
-from cpg_utils import to_path, Path
+from cpg_utils import to_path
 from cpg_utils.config import get_config
-
 from cpg_workflows.filetypes import GvcfPath
+from cpg_workflows.jobs import joint_genotyping
+from cpg_workflows.jobs.picard import vcf_qc
 from cpg_workflows.workflow import (
-    Sample,
     Cohort,
     stage,
     StageInput,
     StageOutput,
-    SampleStage,
     CohortStage,
     WorkflowError,
 )
-from cpg_workflows.jobs.happy import happy
-from cpg_workflows.jobs.picard import vcf_qc
-from cpg_workflows.jobs import joint_genotyping
 from .genotype import Genotype
 from .. import get_batch
 
@@ -77,7 +73,6 @@ class JointGenotyping(CohortStage):
             out_siteonly_vcf_path=siteonly_vcf_path,
             tmp_bucket=to_path(self.expected_outputs(cohort)['prefix']),
             gvcf_by_sid=gvcf_by_sid,
-            overwrite=not get_config()['workflow'].get('check_intermediates'),
             tool=joint_genotyping.JointGenotyperTool.GnarlyGenotyper
             if get_config()['workflow'].get('use_gnarly', False)
             else joint_genotyping.JointGenotyperTool.GenotypeGVCFs,
