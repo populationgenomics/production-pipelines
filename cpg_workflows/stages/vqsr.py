@@ -48,7 +48,6 @@ class Vqsr(CohortStage):
             out_path=self.expected_outputs(cohort)['siteonly'],
             tmp_prefix=to_path(self.expected_outputs(cohort)['prefix']),
             use_as_annotations=get_config()['workflow'].get('use_as_vqsr', True),
-            overwrite=not get_config()['workflow'].get('check_intermediates'),
             intervals_path=get_config()['workflow'].get('intervals_path'),
             job_attrs=self.get_job_attrs(),
         )

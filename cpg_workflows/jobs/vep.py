@@ -30,7 +30,6 @@ def add_vep_jobs(
     tmp_prefix: Path,
     scatter_count: int,
     out_path: Path | None = None,
-    overwrite: bool = False,
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """
@@ -41,7 +40,7 @@ def add_vep_jobs(
     if not to_hail_table:
         assert str(out_path).endswith('.vcf.gz'), out_path
 
-    if out_path and can_reuse(out_path, overwrite):
+    if out_path and can_reuse(out_path):
         return []
 
     jobs: list[Job] = []
@@ -87,30 +86,30 @@ def add_vep_jobs(
             out_format='json' if to_hail_table else 'vcf',
             out_path=part_path,
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
-            overwrite=overwrite,
         )
         if vep_one_job:
             jobs.append(vep_one_job)
 
-    gather_j: Job | None = None
     if to_hail_table:
-        gather_j = gather_vep_json_to_ht(
+        j = gather_vep_json_to_ht(
             b=b,
             vep_results_paths=part_files,
             out_path=out_path,
             job_attrs=job_attrs,
             depends_on=jobs,
         )
+        gather_jobs = [j]
     else:
         assert len(part_files) == scatter_count
-        gather_j, gather_vcf = gather_vcfs(
+        gather_jobs, gather_vcf = gather_vcfs(
             b=b,
             input_vcfs=part_files,
             out_vcf_path=out_path,
+            sort=False,
         )
-    if gather_j:
-        gather_j.depends_on(*jobs)
-        jobs.append(gather_j)
+    for j in gather_jobs:
+        j.depends_on(*jobs)
+        jobs.append(j)
     return jobs
 
 
@@ -160,12 +159,11 @@ def vep_one(
     out_path: Path | None = None,
     out_format: Literal['vcf', 'json'] = 'vcf',
     job_attrs: dict | None = None,
-    overwrite: bool = False,
 ) -> Job | None:
     """
     Run a single VEP job.
     """
-    if out_path and can_reuse(out_path, overwrite):
+    if out_path and can_reuse(out_path):
         return None
 
     j = b.new_job('VEP', (job_attrs or {}) | dict(tool='vep'))

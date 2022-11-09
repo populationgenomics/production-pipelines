@@ -49,7 +49,6 @@ class Vep(CohortStage):
             vcf_path=inputs.as_path(cohort, stage=Vqsr, key='siteonly'),
             out_path=self.expected_outputs(cohort)['ht'],
             tmp_prefix=to_path(self.expected_outputs(cohort)['prefix']),
-            overwrite=not get_config()['workflow'].get('check_intermediates'),
             job_attrs=self.get_job_attrs(),
             scatter_count=scatter_count,
         )

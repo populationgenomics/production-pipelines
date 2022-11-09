@@ -6,7 +6,7 @@ from typing import Literal
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.hail_batch import image_path, fasta_res_group, command
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import can_reuse
@@ -64,42 +64,50 @@ def subset_vcf(
 def gather_vcfs(
     b: hb.Batch,
     input_vcfs: list[hb.ResourceFile],
-    overwrite: bool = True,
     out_vcf_path: Path | None = None,
     site_only: bool = False,
-    gvcf_count: int | None = None,
+    sample_count: int | None = None,
     job_attrs: dict | None = None,
-) -> tuple[Job | None, hb.ResourceGroup]:
+    sort: bool = False,
+) -> tuple[list[Job], hb.ResourceGroup]:
     """
     Combines per-interval scattered VCFs into a single VCF.
-    Saves the output VCF to a bucket `output_vcf_path`.
 
     Requires all VCFs to be strictly distinct, so doesn't work well
     for indels SelectVariants based on intervals from IntervalListTools,
     as ond indel might span 2 intervals and would end up in both.
+
+    @param b: Batch object
+    @param input_vcfs: list of Hail Batch ResourceFiles pointing to
+        interval-split VCFs
+    @param out_vcf_path: path to permanently write the resulting VCFs
+    @param site_only: input VCFs are site-only
+    @param sample_count: number of samples used for input VCFs (to determine the
+        storage size)
+    @param job_attrs: Hail Batch job attributes dictionary
+    @param sort: whether to sort VCF before tabixing (computationally expensive, but
+        required if the input VCFs can overlap)
     """
-    if out_vcf_path and can_reuse(out_vcf_path, overwrite):
-        return None, b.read_input_group(
+    if out_vcf_path and can_reuse([out_vcf_path, to_path(f'{out_vcf_path}.tbi')]):
+        return [], b.read_input_group(
             **{
                 'vcf.gz': str(out_vcf_path),
                 'vcf.gz.tbi': f'{out_vcf_path}.tbi',
             }
         )
 
+    jobs: list[Job] = []
+
     job_name = f'Gather {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
     job_attrs = (job_attrs or {}) | {'tool': 'gatk GatherVcfsCloud'}
     j = b.new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
-
-    if gvcf_count:
-        storage_gb = (1 if site_only else 4) * gvcf_count
-        res = STANDARD.set_resources(j, fraction=1, storage_gb=storage_gb)
+    if sample_count:
+        storage_gb = (1 if site_only else 2) * sample_count
+        res = STANDARD.request_resources(fraction=1, storage_gb=storage_gb)
     else:
-        res = STANDARD.set_resources(j, fraction=1)
-
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
+        res = STANDARD.request_resources(fraction=1)
+    res.set_to_job(j)
 
     input_cmdl = ' '.join([f'--input {v}' for v in input_vcfs])
     assert isinstance(j.output_vcf, hb.ResourceGroup)
@@ -113,15 +121,38 @@ def gather_vcfs(
     --ignore-safety-checks \\
     --gather-type BLOCK \\
     {input_cmdl} \\
-    --output $BATCH_TMPDIR/gathered.vcf.gz
-
-    bcftools sort --temp-dir $BATCH_TMPDIR \
-    $BATCH_TMPDIR/gathered.vcf.gz -Oz \
-    -o {j.output_vcf['vcf.gz']}
-    
-    tabix -p vcf {j.output_vcf['vcf.gz']}
+    --output {j.gathered_vcf}
     """
     j.command(command(cmd, monitor_space=True))
+    jobs.append(j)
+
+    job_attrs['tool'] = 'bcftools sort'
+    j = b.new_job('Sort gathered VCF', job_attrs)
+    j.image(image_path('bcftools'))
+    if sample_count:
+        storage_gb = (1 if site_only else 4) * sample_count
+        STANDARD.set_resources(j, fraction=1, storage_gb=storage_gb)
+    else:
+        STANDARD.set_resources(j, fraction=1)
+    j.declare_resource_group(
+        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+    assert isinstance(j.output_vcf, hb.ResourceGroup)
+    cmd = ''
+    if sort:
+        cmd += f"""
+        bcftools sort {jobs[-1].gathered_vcf} \
+        --temp-dir $BATCH_TMPDIR \
+        -Oz -o {j.output_vcf['vcf.gz']}
+        """
+
+    cmd += f"""
+    tabix -p vcf {j.output_vcf['vcf.gz']}
+    """
+
+    j.command(command(cmd, monitor_space=True))
+    jobs.append(j)
     if out_vcf_path:
         b.write_output(j.output_vcf, str(out_vcf_path).replace('.vcf.gz', ''))
-    return j, j.output_vcf
+
+    return jobs, j.output_vcf

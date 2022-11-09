@@ -85,7 +85,6 @@ def make_vqsr_jobs(
     gvcf_count: int,
     out_path: Path | None = None,
     use_as_annotations: bool = True,
-    overwrite: bool = False,
     intervals_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:
@@ -100,7 +99,6 @@ def make_vqsr_jobs(
     @param intervals_path: path to specific interval list
     @param out_path: path to write final recalibrated VCF to
     @param use_as_annotations: use allele-specific annotation for VQSR
-    @param overwrite: whether to not reuse intermediate files
     @param job_attrs: default job attributes
     @return: a final Job, and a path to the VCF with VQSR annotations
     """
@@ -273,17 +271,17 @@ def make_vqsr_jobs(
             assert isinstance(applied_snps_vcf, hb.ResourceGroup)
             snps_interval_snp_applied_vcfs.append(applied_snps_vcf['vcf.gz'])
 
-        snps_applied_gathered_j, snps_applied_gathered_vcf = gather_vcfs(
+        snps_applied_gathered_jobs, snps_applied_gathered_vcf = gather_vcfs(
             b=b,
             input_vcfs=snps_interval_snp_applied_vcfs + [indel_vcf['vcf.gz']],
-            overwrite=overwrite,
             site_only=True,
-            gvcf_count=gvcf_count,
+            sample_count=gvcf_count,
             job_attrs=job_attrs,
+            sort=False,
         )
-        if snps_applied_gathered_j:
-            snps_applied_gathered_j.name = f'VQSR: {snps_applied_gathered_j.name}'
-            jobs.append(snps_applied_gathered_j)
+        for j in snps_applied_gathered_jobs:
+            j.name = f'VQSR: {j.name}'
+            jobs.append(j)
 
         apply_indel_j = apply_recalibration_indels(
             b,
