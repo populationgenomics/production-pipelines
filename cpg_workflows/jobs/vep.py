@@ -129,9 +129,13 @@ def gather_vep_json_to_ht(
     # we are not importing it on the top level.
     from analysis_runner import dataproc
 
+    # Script path and pyfiles should be relative to the repository root
+    script_path = 'cpg_workflows/dataproc_scripts/vep_json_to_ht.py'
+    pyfiles = ['cpg_workflows/query_modules']
+
     j = dataproc.hail_dataproc_job(
         b,
-        f'dataproc_scripts/vep_json_to_ht.py --out-path {out_path} '
+        f'{script_path} --out-path {out_path} '
         + ' '.join(str(p) for p in vep_results_paths),
         max_age='24h',
         packages=[
@@ -145,7 +149,7 @@ def gather_vep_json_to_ht(
         job_name=f'VEP JSON to Hail table',
         depends_on=depends_on,
         scopes=['cloud-platform'],
-        pyfiles=['query_modules'],
+        pyfiles=pyfiles,
         init=['gs://cpg-reference/hail_dataproc/install_common.sh'],
     )
     j.attributes = (job_attrs or {}) | {'tool': 'hailctl dataproc'}

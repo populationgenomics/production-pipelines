@@ -5,7 +5,7 @@ Hail Query Batch-Backend jobs for seqr-loader.
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, query_command
 
@@ -29,9 +29,16 @@ def annotate_cohort_jobs(
         # we are not importing it on the top level.
         from analysis_runner import dataproc
 
+        # Script path and pyfiles should be relative to the repository root
+        script_path = 'cpg_workflows/dataproc_scripts/annotate_cohort.py'
+        pyfiles = [
+            'seqr-loading-pipelines/hail_scripts',
+            'cpg_workflows/query_modules',
+        ]
+
         j = dataproc.hail_dataproc_job(
             b,
-            f'dataproc_scripts/annotate_cohort.py '
+            f'{script_path} '
             f'--vcf-path {vcf_path} '
             f'--vep-ht-path {vep_ht_path} '
             f'--out-mt-path {out_mt_path} '
@@ -53,10 +60,7 @@ def annotate_cohort_jobs(
             job_name=f'Annotate cohort',
             depends_on=depends_on,
             scopes=['cloud-platform'],
-            pyfiles=[
-                'seqr-loading-pipelines/hail_scripts',
-                'cpg_workflows/query_modules',
-            ],
+            pyfiles=pyfiles,
             init=['gs://cpg-reference/hail_dataproc/install_common.sh'],
         )
         j.attributes = (job_attrs or {}) | {'tool': 'hailctl dataproc'}
@@ -97,7 +101,7 @@ def annotate_dataset_jobs(
     that will be loaded into Seqr).
     """
     sample_ids_list_path = tmp_prefix / 'sample-list.txt'
-    if not get_config()['hail'].get('dry_run', False):
+    if not get_config()['workflow'].get('dry_run', False):
         with sample_ids_list_path.open('w') as f:
             f.write(','.join(sample_ids))
 
@@ -108,9 +112,16 @@ def annotate_dataset_jobs(
         # we are not importing it on the top level.
         from analysis_runner import dataproc
 
+        # Script path and pyfiles should be relative to the repository root
+        script_path = 'cpg_workflows/dataproc_scripts/annotate_dataset.py'
+        pyfiles = [
+            'seqr-loading-pipelines/hail_scripts',
+            'cpg_workflows/query_modules',
+        ]
+
         j = dataproc.hail_dataproc_job(
             b,
-            f'dataproc_scripts/annotate_dataset.py '
+            f'{script_path} '
             f'--mt-path {mt_path} '
             f'--sample-ids {sample_ids_list_path} '
             f'--out-mt-path {out_mt_path} '
@@ -127,10 +138,7 @@ def annotate_dataset_jobs(
             job_name=f'Annotate dataset',
             depends_on=depends_on,
             scopes=['cloud-platform'],
-            pyfiles=[
-                'seqr-loading-pipelines/hail_scripts',
-                'query_modules',
-            ],
+            pyfiles=pyfiles,
             init=['gs://cpg-reference/hail_dataproc/install_common.sh'],
         )
         j.attributes = (job_attrs or {}) | {'tool': 'hailctl dataproc'}

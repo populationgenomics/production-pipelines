@@ -298,13 +298,11 @@ class Stage(Generic[TargetT], ABC):
         name: str,
         required_stages: list[StageDecorator] | StageDecorator | None = None,
         analysis_type: str | None = None,
+        analysis_key: str | None = None,
         skipped: bool = False,
         assume_outputs_exist: bool = False,
         forced: bool = False,
     ):
-        self.b = get_batch()
-        self.cohort = get_cohort()
-
         self._name = name
         self.required_stages_classes: list[StageDecorator] = []
         if required_stages:
@@ -313,15 +311,16 @@ class Stage(Generic[TargetT], ABC):
             else:
                 self.required_stages_classes.append(required_stages)
 
-        self.tmp_prefix = get_workflow().tmp_prefix / name
-
         # Dependencies. Populated in workflow.run(), after we know all stages.
         self.required_stages: list[Stage] = []
 
         self.status_reporter = get_workflow().status_reporter
-        # If analysis type is defined, it will be used to update analysis status,
-        # as well as find and reuse existing outputs from the status reporter
+        # If `analysis_type` is defined, it will be used to create/update Analysis
+        # entries in Metamist.
         self.analysis_type = analysis_type
+        # If `analysis_key` is defined, it will be used to extract the value for
+        # `Analysis.output` if the Stage.expected_outputs() returns a dict.
+        self.analysis_key = analysis_key
 
         # Populated with the return value of `add_to_the_workflow()`
         self.output_by_target: dict[str, StageOutput | None] = dict()
@@ -329,6 +328,18 @@ class Stage(Generic[TargetT], ABC):
         self.skipped = skipped
         self.forced = forced
         self.assume_outputs_exist = assume_outputs_exist
+
+    @property
+    def tmp_prefix(self):
+        return get_workflow().tmp_prefix / self.name
+
+    @property
+    def web_prefix(self) -> Path:
+        return get_workflow().web_prefix / self.name
+
+    @property
+    def prefix(self) -> Path:
+        return get_workflow().prefix / self.name
 
     def __str__(self):
         res = f'{self._name}'
@@ -343,7 +354,7 @@ class Stage(Generic[TargetT], ABC):
         return res
 
     @property
-    def name(self):
+    def name(self) -> str:
         """
         Stage name (unique and descriptive stage)
         """
@@ -455,9 +466,28 @@ class Stage(Generic[TargetT], ABC):
 
         # Adding status reporter jobs
         if self.analysis_type and self.status_reporter:
+            output: str | Path
+            if isinstance(outputs.data, dict):
+                if not self.analysis_key:
+                    raise WorkflowError(
+                        f'Cannot create Analysis for stage {self.name}: `analysis_key` '
+                        f'must be set with the @stage decorator to select value from '
+                        f'the expected_outputs dict: {outputs.data}'
+                    )
+                if self.analysis_key not in outputs.data:
+                    raise WorkflowError(
+                        f'Cannot create Analysis for stage {self.name}: `analysis_key` '
+                        f'"{self.analysis_key}" is not found in the expected_outputs '
+                        f'dict {outputs.data}'
+                    )
+                output = outputs.data[self.analysis_key]
+            else:
+                assert isinstance(outputs.data, str) or isinstance(outputs.data, Path)
+                output = outputs.data
+
             self.status_reporter.add_updaters_jobs(
                 b=get_batch(),
-                output=outputs.data,
+                output=str(output),
                 analysis_type=self.analysis_type,
                 target=target,
                 jobs=outputs.jobs,
@@ -606,6 +636,7 @@ def stage(
     cls: Optional[Type['Stage']] = None,
     *,
     analysis_type: str | None = None,
+    analysis_key: str | None = None,
     required_stages: list[StageDecorator] | StageDecorator | None = None,
     skipped: bool = False,
     assume_outputs_exist: bool = False,
@@ -622,6 +653,25 @@ def stage(
             ...
         def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
             ...
+
+        self.status_reporter = get_workflow().status_reporter
+        # If `analysis_type` is defined, it will be used to create/update Analysis
+        # entries in Metamist.
+        self.analysis_type = analysis_type
+        # If `analysis_key` is defined, it will be used to extract the value for
+        # `Analysis.output` if the Stage.expected_outputs() returns a dict.
+
+    @analysis_type: if defined, will be used to create/update `Analysis` entries
+        using the status reporter.
+    @analysis_key: is defined, will be used to extract the value for `Analysis.output`
+        if the Stage.expected_outputs() returns a dict.
+    @required_stages: list of other stage classes that are required prerequisites
+        for this stage. Outputs of those stages will be passed to
+        `Stage.queue_jobs(... , inputs)` as `inputs`, and all required
+        dependencies between Hail Batch jobs will be set automatically as well.
+    @skipped: always skip this stage.
+    @assume_outputs_exist: assume expected outputs of this stage always exist.
+    @forced: always force run this stage, regardless of the outputs' existence.
     """
 
     def decorator_stage(_cls) -> StageDecorator:
@@ -634,6 +684,7 @@ def stage(
                 name=_cls.__name__,
                 required_stages=required_stages,
                 analysis_type=analysis_type,
+                analysis_key=analysis_key,
                 skipped=skipped,
                 assume_outputs_exist=assume_outputs_exist,
                 forced=forced,
@@ -692,19 +743,21 @@ def skip(
 _workflow: Optional['Workflow'] = None
 
 
-def get_workflow() -> 'Workflow':
+def get_workflow(dry_run: bool = False) -> 'Workflow':
     global _workflow
     if _workflow is None:
-        _workflow = Workflow()
+        _workflow = Workflow(dry_run=dry_run)
     return _workflow
 
 
 def run_workflow(
     stages: list[StageDecorator] | None = None,
     wait: bool | None = False,
+    dry_run: bool = False,
 ) -> 'Workflow':
-    get_workflow().run(stages=stages, wait=wait)
-    return get_workflow()
+    wfl = get_workflow(dry_run=dry_run)
+    wfl = wfl.run(stages=stages, wait=wait)
+    return wfl
 
 
 class Workflow:
@@ -716,11 +769,14 @@ class Workflow:
     def __init__(
         self,
         stages: list[StageDecorator] | None = None,
+        dry_run: bool | None = None,
     ):
         if _workflow is not None:
             raise ValueError(
                 'Workflow already initialised. Use get_workflow() to get the instance'
             )
+
+        self.dry_run = dry_run or get_config()['workflow'].get('dry_run')
 
         analysis_dataset = get_config()['workflow']['dataset']
         name = get_config()['workflow'].get('name')
@@ -746,9 +802,10 @@ class Workflow:
         description += f': run_timestamp={self.run_timestamp}'
         if sequencing_type := get_config()['workflow'].get('sequencing_type'):
             description += f' [{sequencing_type}]'
-        if ds_set := set(d.name for d in get_cohort().get_datasets()):
-            description += ' ' + ', '.join(sorted(ds_set))
-        get_batch().name = description
+        if not self.dry_run:
+            if ds_set := set(d.name for d in get_cohort().get_datasets()):
+                description += ' ' + ', '.join(sorted(ds_set))
+            get_batch().name = description
 
         self.status_reporter = None
         if get_config()['workflow'].get('status_reporter') == 'metamist':
@@ -767,7 +824,10 @@ class Workflow:
     def prefix(self) -> Path:
         return self._prefix()
 
-    def _prefix(self, category=None) -> Path:
+    def _prefix(self, category: str | None = None) -> Path:
+        """
+        Prepare a unique path for the workflow with this name and this input data.
+        """
         prefix = get_cohort().analysis_dataset.prefix(category=category) / self.name
         prefix /= self.output_version or get_cohort().alignment_inputs_hash()
         return prefix
@@ -786,7 +846,9 @@ class Workflow:
         if not _stages:
             raise WorkflowError('No stages added')
         self.set_stages(_stages)
-        return get_batch().run(wait=wait)
+
+        if not self.dry_run:
+            get_batch().run(wait=wait)
 
     @staticmethod
     def _process_first_last_stages(
@@ -874,6 +936,26 @@ class Workflow:
         first_stages = get_config()['workflow'].get('first_stages', [])
         last_stages = get_config()['workflow'].get('last_stages', [])
 
+        logging.info(
+            f'End stages for the workflow "{self.name}": '
+            f'{[cls.__name__ for cls in requested_stages]}'
+        )
+        logging.info('Stages additional configuration:')
+        logging.info(f'  workflow/skip_stages: {skip_stages}')
+        logging.info(f'  workflow/only_stages: {only_stages}')
+        logging.info(f'  workflow/first_stages: {first_stages}')
+        logging.info(f'  workflow/last_stages: {last_stages}')
+
+        # TODO: fix this: if we have last_stages = ['Align'], it wouldn't work at all
+        # UPD: this pull request fixes it if approved:
+        # https://github.com/populationgenomics/production-pipelines/pull/158
+        if only_stages or last_stages:
+            # If stages are requested explicitly, we don't need other stages from
+            # the default list:
+            requested_stages = [
+                s for s in requested_stages if s.__name__ in only_stages + last_stages
+            ]
+
         # Round 1: initialising stage objects.
         _stages_d: dict[str, Stage] = {}
         for cls in requested_stages:
@@ -929,7 +1011,7 @@ class Workflow:
         except nx.NetworkXUnfeasible:
             logging.error('Circular dependencies found between stages')
             raise
-        logging.info(f'Stages in order of execution: {stage_names}')
+        logging.info(f'Stages in order of execution:\n{stage_names}')
         stages = [_stages_d[name] for name in stage_names]
 
         # Round 5: applying workflow options first_stages and last_stages.
@@ -937,7 +1019,10 @@ class Workflow:
 
         if not (final_set_of_stages := [s.name for s in stages if not s.skipped]):
             raise WorkflowError('No stages to run')
-        logging.info(f'Setting stages: {", ".join(final_set_of_stages)}')
+        logging.info(
+            f'Final list of stages after applying workflow/first_stages and '
+            f'workflow/last_stages stages:\n{final_set_of_stages}'
+        )
         required_skipped_stages = [s for s in stages if s.skipped]
         if required_skipped_stages:
             logging.info(
@@ -945,17 +1030,19 @@ class Workflow:
             )
 
         # Round 6: actually adding jobs from the stages.
-        for i, stg in enumerate(stages):
-            logging.info(f'*' * 60)
-            logging.info(f'Stage #{i + 1}: {stg}')
-            stg.output_by_target = stg.queue_for_cohort(get_cohort())
-            if errors := self._process_stage_errors(stg.output_by_target):
-                raise WorkflowError(
-                    f'Stage {stg} failed to queue jobs with errors: '
-                    + '\n'.join(errors)
-                )
+        if not self.dry_run:
+            cohort = get_cohort()  # Would communicate with metamist.
+            for i, stg in enumerate(stages):
+                logging.info(f'*' * 60)
+                logging.info(f'Stage #{i + 1}: {stg}')
+                stg.output_by_target = stg.queue_for_cohort(cohort)
+                if errors := self._process_stage_errors(stg.output_by_target):
+                    raise WorkflowError(
+                        f'Stage {stg} failed to queue jobs with errors: '
+                        + '\n'.join(errors)
+                    )
 
-            logging.info(f'')
+                logging.info(f'')
 
     @staticmethod
     def _process_stage_errors(

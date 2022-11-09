@@ -23,6 +23,7 @@ from cpg_workflows.jobs.seqr_loader import annotate_cohort_jobs, annotate_datase
 from .joint_genotyping import JointGenotyping
 from .vep import Vep
 from .vqsr import Vqsr
+from .. import get_cohort, get_batch
 
 
 @stage(required_stages=[JointGenotyping, Vqsr, Vep])
@@ -38,7 +39,7 @@ class AnnotateCohort(CohortStage):
         h = cohort.alignment_inputs_hash()
         return {
             'tmp_prefix': str(self.tmp_prefix / 'mt' / h),
-            'mt': self.cohort.analysis_dataset.prefix() / 'mt' / f'{h}.mt',
+            'mt': get_cohort().analysis_dataset.prefix() / 'mt' / f'{h}.mt',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -56,7 +57,7 @@ class AnnotateCohort(CohortStage):
         )
 
         jobs = annotate_cohort_jobs(
-            b=self.b,
+            b=get_batch(),
             vcf_path=vcf_path,
             siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
             vep_ht_path=vep_ht_path,
@@ -84,7 +85,7 @@ class AnnotateDataset(DatasetStage):
         """
         Expected to generate a matrix table
         """
-        h = self.cohort.alignment_inputs_hash()
+        h = get_cohort().alignment_inputs_hash()
         return {
             'tmp_prefix': str(self.tmp_prefix / 'mt' / f'{h}-{dataset.name}'),
             'mt': dataset.prefix() / 'mt' / f'{h}-{dataset.name}.mt',
@@ -94,14 +95,15 @@ class AnnotateDataset(DatasetStage):
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        mt_path = inputs.as_path(target=self.cohort, stage=AnnotateCohort, key='mt')
+        assert dataset.cohort
+        mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateCohort, key='mt')
 
         checkpoint_prefix = (
             to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
         )
 
         jobs = annotate_dataset_jobs(
-            b=self.b,
+            b=get_batch(),
             mt_path=mt_path,
             sample_ids=dataset.get_sample_ids(),
             out_mt_path=self.expected_outputs(dataset)['mt'],
@@ -127,7 +129,11 @@ def es_password() -> str:
     )
 
 
-@stage(required_stages=[AnnotateDataset], analysis_type='es-index')
+@stage(
+    required_stages=[AnnotateDataset],
+    analysis_type='es-index',
+    analysis_key='index_name',
+)
 class MtToEs(DatasetStage):
     """
     Create a Seqr index.
@@ -172,9 +178,12 @@ class MtToEs(DatasetStage):
         # we are not importing it on the top level.
         from analysis_runner import dataproc
 
+        script_path = 'cpg_workflows/dataproc_scripts/mt_to_es.py'
+        pyfiles = ['seqr-loading-pipelines/hail_scripts']
+
         j = dataproc.hail_dataproc_job(
-            self.b,
-            f'dataproc_scripts/mt_to_es.py '
+            get_batch(),
+            f'{script_path} '
             f'--mt-path {dataset_mt_path} '
             f'--es-index {index_name} '
             f'--done-flag-path {done_flag_path} '
@@ -193,7 +202,7 @@ class MtToEs(DatasetStage):
             job_name=f'{dataset.name}: create ES index',
             depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
-            pyfiles=['seqr-loading-pipelines/hail_scripts'],
+            pyfiles=pyfiles,
         )
         j._preemptible = False
         j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}

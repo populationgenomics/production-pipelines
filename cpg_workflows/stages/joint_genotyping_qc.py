@@ -16,6 +16,7 @@ from cpg_workflows.workflow import (
 
 from cpg_workflows.jobs.multiqc import multiqc
 from .joint_genotyping import JointGenotyping
+from .. import get_cohort, get_batch
 from ..jobs.happy import happy
 from ..targets import Sample
 
@@ -36,9 +37,9 @@ class JointVcfHappy(SampleStage):
         ):
             return None
 
-        h = self.cohort.alignment_inputs_hash()
+        h = get_cohort().alignment_inputs_hash()
         return (
-            self.cohort.analysis_dataset.prefix()
+            get_cohort().analysis_dataset.prefix()
             / 'qc'
             / 'jc'
             / 'hap.py'
@@ -47,12 +48,15 @@ class JointVcfHappy(SampleStage):
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         """Queue jobs"""
-        vcf_path = inputs.as_path(target=self.cohort, stage=JointGenotyping, key='vcf')
+        assert sample.dataset.cohort
+        vcf_path = inputs.as_path(
+            target=sample.dataset.cohort, stage=JointGenotyping, key='vcf'
+        )
 
         jobs = happy(
-            b=self.b,
+            b=get_batch(),
             sample=sample,
-            vcf_or_gvcf=self.b.read_input_group(
+            vcf_or_gvcf=get_batch().read_input_group(
                 **{
                     'vcf.gz': str(vcf_path),
                     'vcf.gz.tbi': str(vcf_path) + '.tbi',
@@ -127,7 +131,7 @@ class JointVcfMultiQC(CohortStage):
                 ending_to_trim.add(path.name.replace(sample.id, ''))
 
         jobs = multiqc(
-            self.b,
+            get_batch(),
             tmp_prefix=self.tmp_prefix,
             paths=paths,
             ending_to_trim=ending_to_trim,

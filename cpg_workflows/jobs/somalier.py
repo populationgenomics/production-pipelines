@@ -1,7 +1,6 @@
 """
 Adding jobs for fingerprinting and pedigree checks. Mostly using Somalier.
 """
-import logging
 from typing import cast
 
 import pandas as pd
@@ -17,11 +16,11 @@ from cpg_utils.hail_batch import (
     copy_common_env,
     command,
 )
-from cpg_workflows.resources import STANDARD
-from cpg_workflows.targets import Dataset, Sample
-from cpg_workflows.filetypes import CramPath, GvcfPath
-from cpg_workflows.utils import can_reuse, rich_sample_id_seds
+from cpg_workflows.filetypes import CramPath
 from cpg_workflows.python_scripts import check_pedigree
+from cpg_workflows.resources import STANDARD
+from cpg_workflows.targets import Dataset
+from cpg_workflows.utils import can_reuse, rich_sample_id_seds
 
 # We want to exclude contaminated samples from relatedness checks. Somalier is not
 # designed to work with contaminated samples, and in a presence of contamination it
@@ -33,8 +32,7 @@ def pedigree(
     b,
     dataset: Dataset,
     expected_ped_path: Path,
-    input_path_by_sid: dict[str, Path | str],
-    overwrite: bool,
+    somalier_path_by_sid: dict[str, Path],
     out_samples_path: Path,
     out_pairs_path: Path,
     out_html_path: Path,
@@ -42,41 +40,27 @@ def pedigree(
     out_checks_path: Path | None = None,
     verifybamid_by_sid: dict[str, Path | str] | None = None,
     label: str | None = None,
-    ignore_missing: bool = False,
     job_attrs: dict | None = None,
     send_to_slack: bool = True,
 ) -> list[Job]:
     """
-    Add somalier and peddy based jobs that infer relatedness and sex, compare that
+    Add somalier and peddy jobs that infer relatedness and sex, compare that
     to the provided PED file, and attempt to recover it. If unable to recover, cancel
     the further workflow jobs.
 
     Returns a job, a path to a fixed PED file if able to recover, and a path to a file
     with relatedness information for each sample pair
 
-    input_path_by_sid can have paths to CRAMs, BAMs, GVCFs, or .somalier
-    fingerprints, which will be determined based on extension. Unless a .somalier
-    print is provided, `somalier extract` will be run to extract one.
+    somalier_path_by_sid should be a dict of paths to .somalier fingerprints.
     """
-    extract_jobs, somalier_file_by_sample = _prep_somalier_files(
-        b=b,
-        samples=dataset.get_samples(),
-        input_path_by_sid=input_path_by_sid,
-        overwrite=overwrite,
-        label=label,
-        ignore_missing=ignore_missing,
-        job_attrs=job_attrs,
-    )
-
     relate_j = _relate(
         b=b,
-        somalier_file_by_sid=somalier_file_by_sample,
+        somalier_path_by_sid=somalier_path_by_sid,
         verifybamid_by_sid=verifybamid_by_sid,
         sample_ids=dataset.get_sample_ids(),
         rich_id_map=dataset.rich_id_map(),
         expected_ped_path=expected_ped_path,
         label=label,
-        extract_jobs=extract_jobs,
         out_samples_path=out_samples_path,
         out_pairs_path=out_pairs_path,
         out_html_path=out_html_path,
@@ -99,7 +83,7 @@ def pedigree(
     )
     check_j.depends_on(relate_j)
 
-    return extract_jobs + [relate_j, check_j]
+    return [relate_j, check_j]
 
 
 def _make_sample_map(dataset: Dataset):
@@ -110,66 +94,10 @@ def _make_sample_map(dataset: Dataset):
     df = pd.DataFrame(
         [{'id': s.id, 'pid': s.participant_id} for s in dataset.get_samples()]
     )
-    if not get_config()['hail'].get('dry_run', False):
+    if not get_config()['workflow'].get('dry_run', False):
         with sample_map_fpath.open('w') as fp:
             df.to_csv(fp, sep='\t', index=False, header=False)
     return sample_map_fpath
-
-
-def _prep_somalier_files(
-    b,
-    samples: list[Sample],
-    input_path_by_sid: dict[str, Path | str],
-    overwrite: bool,
-    label: str | None = None,
-    ignore_missing: bool = False,
-    job_attrs: dict | None = None,
-) -> tuple[list[Job], dict[str, Path]]:
-    """
-    Generate .somalier file for each input.
-    """
-    extract_jobs: list[Job] = []
-    missing_input = []
-    somalier_file_by_sample = dict()
-    for sample in samples:
-        input_path = input_path_by_sid.get(sample.id)
-        if input_path is None:
-            missing_input.append(sample)
-            logging.error(f'Not found somalier input for {sample.id}')
-            continue
-
-        input_path = to_path(input_path)
-
-        if input_path.name.endswith('.somalier'):
-            somalier_file_by_sample[sample.id] = input_path
-            continue
-
-        gvcf_or_cram_path: CramPath | GvcfPath
-        if input_path.name.endswith('.cram'):
-            gvcf_or_cram_path = CramPath(input_path)
-        else:
-            gvcf_or_cram_path = GvcfPath(input_path)
-        j = extract(
-            b=b,
-            gvcf_or_cram_path=gvcf_or_cram_path,
-            overwrite=overwrite,
-            label=label,
-            out_somalier_path=gvcf_or_cram_path.somalier_path,
-            job_attrs=(job_attrs or {}) | sample.get_job_attrs(),
-        )
-        somalier_file_by_sample[sample.id] = gvcf_or_cram_path.somalier_path
-        if j is not None:
-            extract_jobs.append(j)
-
-    if len(missing_input) > 0:
-        msg = (
-            f'Could not find input for ' f'{len(missing_input)}/{len(samples)} samples'
-        )
-        if ignore_missing:
-            logging.warning(msg)
-        else:
-            raise ValueError(msg)
-    return extract_jobs, somalier_file_by_sample
 
 
 def _check_pedigree(
@@ -195,7 +123,7 @@ def _check_pedigree(
 
     check_j = b.new_job(title, (job_attrs or {}) | dict(tool='python'))
     STANDARD.set_resources(check_j, ncpu=2)
-    check_j.image(image_path('peddy'))
+    check_j.image(image_path('cpg_workflows'))
 
     script_path = to_path(check_pedigree.__file__)
     script_name = script_path.name
@@ -231,12 +159,11 @@ def _check_pedigree(
 
 def _relate(
     b: Batch,
-    somalier_file_by_sid: dict[str, Path],
+    somalier_path_by_sid: dict[str, Path],
     sample_ids: list[str],
     rich_id_map: dict[str, str],
     expected_ped_path: Path,
     label: str | None,
-    extract_jobs: list[Job],
     out_samples_path: Path,
     out_pairs_path: Path,
     out_html_path: Path,
@@ -253,7 +180,6 @@ def _relate(
     # Size of one somalier file is 212K, so we add another G only if the number of
     # samples is >4k
     STANDARD.set_resources(j, storage_gb=1 + len(sample_ids) // 4000 * 1)
-    j.depends_on(*extract_jobs)
 
     cmd = ''
     input_files_file = '$BATCH_TMPDIR/input_files.list'
@@ -264,7 +190,7 @@ def _relate(
         if verifybamid_by_sid:
             if sample_id not in verifybamid_by_sid:
                 continue
-            somalier_file = b.read_input(str(somalier_file_by_sid[sample_id]))
+            somalier_file = b.read_input(str(somalier_path_by_sid[sample_id]))
             cmd += f"""
             FREEMIX=$(cat {b.read_input(str(verifybamid_by_sid[sample_id]))} | tail -n1 | cut -f7)
             if [[ $(echo "$FREEMIX > {MAX_FREEMIX}" | bc) -eq 0 ]]; then \
@@ -273,7 +199,7 @@ def _relate(
             fi
             """
         else:
-            somalier_file = b.read_input(str(somalier_file_by_sid[sample_id]))
+            somalier_file = b.read_input(str(somalier_path_by_sid[sample_id]))
             cmd += f"""
             echo "{somalier_file}" >> {input_files_file}
             echo "{sample_id}" >> {samples_ids_file}
@@ -310,7 +236,7 @@ def _relate(
 
 def extract(
     b,
-    gvcf_or_cram_path: CramPath | GvcfPath,
+    cram_path: CramPath,
     out_somalier_path: Path | None = None,
     job_attrs: dict | None = None,
     overwrite: bool = True,
@@ -325,29 +251,15 @@ def extract(
     job_attrs = (job_attrs or {}) | {'tool': 'somalier'}
     j = b.new_job('Somalier extract' + (f' {label}' if label else ''), job_attrs)
 
-    if not out_somalier_path:
-        out_somalier_path = gvcf_or_cram_path.somalier_path
-
     j.image(image_path('somalier'))
-    if isinstance(gvcf_or_cram_path, CramPath):
-        if not gvcf_or_cram_path.index_path:
-            raise ValueError(
-                f'CRAM for somalier is required to have CRAI index ({gvcf_or_cram_path})'
-            )
-        storage_gb = None  # avoid extra disk by default
-        if get_config()['workflow']['sequencing_type'] == 'genome':
-            storage_gb = 100
-        STANDARD.set_resources(j, ncpu=4, storage_gb=storage_gb)
-        input_file = b.read_input_group(
-            base=str(gvcf_or_cram_path),
-            index=str(gvcf_or_cram_path.index_path),
+    if not cram_path.index_path:
+        raise ValueError(
+            f'CRAM for somalier is required to have CRAI index ({cram_path})'
         )
-    else:
-        STANDARD.set_resources(j, ncpu=2, storage_gb=10)
-        input_file = b.read_input_group(
-            base=str(gvcf_or_cram_path),
-            index=str(gvcf_or_cram_path.tbi_path),
-        )
+    storage_gb = None  # avoid extra disk by default
+    if get_config()['workflow']['sequencing_type'] == 'genome':
+        storage_gb = 100
+    STANDARD.set_resources(j, ncpu=4, storage_gb=storage_gb)
 
     ref = fasta_res_group(b)
     sites = b.read_input(str(reference_path('somalier_sites')))
@@ -356,8 +268,14 @@ def extract(
     SITES=$BATCH_TMPDIR/sites/{reference_path('somalier_sites').name}
     retry gsutil cp {reference_path('somalier_sites')} $SITES
 
-    somalier extract -d extracted/ --sites {sites} -f {ref.base} \\
-    {input_file['base']}
+    CRAM=$BATCH_TMPDIR/{cram_path.path.name}
+    CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
+    
+    # Retrying copying to avoid google bandwidth limits
+    retry_gs_cp {str(cram_path.path)} $CRAM
+    retry_gs_cp {str(cram_path.index_path)} $CRAI
+
+    somalier extract -d extracted/ --sites {sites} -f {ref.base} $CRAM
 
     mv extracted/*.somalier {j.output_file}
     """

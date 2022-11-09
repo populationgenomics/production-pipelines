@@ -14,7 +14,7 @@ from hailtop.batch.job import Job
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, reference_path, image_path
-from cpg_workflows.batch import make_job_name, Batch
+from cpg_workflows.batch import make_job_name, Batch, get_batch
 from cpg_workflows.workflow import (
     stage,
     SampleStage,
@@ -203,7 +203,7 @@ class GatherSampleEvidence(SampleStage):
         expected_d = self.expected_outputs(sample)
 
         j = add_gatk_sv_job(
-            batch=self.b,
+            batch=get_batch(),
             dataset=sample.dataset,
             wfl_name=self.name,
             input_dict=input_dict,
@@ -276,7 +276,7 @@ class EvidenceQC(DatasetStage):
 
         expected_d = self.expected_outputs(dataset)
         j = add_gatk_sv_job(
-            batch=self.b,
+            batch=get_batch(),
             dataset=dataset,
             wfl_name=self.name,
             input_dict=input_dict,
@@ -435,7 +435,7 @@ class GatherBatchEvidence(DatasetStage):
 
         expected_d = self.expected_outputs(dataset)
         j = add_gatk_sv_job(
-            batch=self.b,
+            batch=get_batch(),
             dataset=dataset,
             wfl_name=self.name,
             input_dict=input_dict,

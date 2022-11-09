@@ -86,7 +86,7 @@ def make_joint_genotyping_jobs(
     df = pd.DataFrame(
         [{'id': sid, 'path': str(path)} for sid, path in gvcf_by_sid.items()]
     )
-    if not get_config()['hail'].get('dry_run', False):
+    if not get_config()['workflow'].get('dry_run', False):
         with sample_map_bucket_path.open('w') as fp:
             df.to_csv(fp, index=False, header=False, sep='\t')
 
@@ -377,9 +377,9 @@ def _add_joint_genotyper_job(
     if str(genomicsdb_path).endswith('.tar'):
         # can't use directly from cloud, need to copy and uncompress:
         input_cmd = f"""\
-        retry_gs_cp {genomicsdb_path} {genomicsdb_path.name}
-        tar -xf {genomicsdb_path.name}
-        WORKSPACE=gendb://{genomicsdb_path.with_suffix('').name}
+        retry_gs_cp {genomicsdb_path} $BATCH_TMPDIR/{genomicsdb_path.name}
+        tar -xf $BATCH_TMPDIR/{genomicsdb_path.name} -C $BATCH_TMPDIR/
+        WORKSPACE=gendb://$BATCH_TMPDIR/{genomicsdb_path.with_suffix('').name}
         """
     else:
         input_cmd = f"""\

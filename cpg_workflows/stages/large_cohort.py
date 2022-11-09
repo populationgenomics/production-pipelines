@@ -10,6 +10,7 @@ from cpg_workflows.workflow import (
     get_workflow,
 )
 from .genotype import Genotype
+from .. import get_batch
 
 
 @stage(required_stages=[Genotype])
@@ -232,7 +233,7 @@ class Vqsr(CohortStage):
 
         vcf_path = inputs.as_path(cohort, MakeSiteOnlyVcf, key='vcf')
         jobs = vqsr.make_vqsr_jobs(
-            b=self.b,
+            b=get_batch(),
             input_siteonly_vcf_path=vcf_path,
             gvcf_count=len(cohort.get_samples()),
             out_path=self.expected_outputs(cohort)['vcf'],

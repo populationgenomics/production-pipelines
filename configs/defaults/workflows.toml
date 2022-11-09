@@ -39,7 +39,7 @@ web_url_template = 'https://{namespace}-web.populationgenomics.org.au/{dataset}'
 
 # Map of stages to lists of samples, to skip for specific stages
 #[workflow.skip_samples_stages]
-#VerifyBamId = ['CPG13409']
+#CramQC = ['CPG13409']
 
 # Name of the workflow (to prefix output paths)
 #name =
@@ -78,6 +78,11 @@ check_expected_outputs = true
 # Calling intervals (defauls to whole genome intervals)
 #intervals_path =
 
+# Only print the final merged config and a list of stages to be submitted.
+# Will skip any communication with Metamist, Hail Batch, and Cloud Storage, so 
+# the code can be run without permissions.
+#dry_run = true
+
 [images]
 # Docker image URLs. Can be absolute or relative to `workflow.image_registry_prefix`.
 gatk = 'gatk:4.2.6.1'
@@ -94,7 +99,7 @@ vep = 'vep:105.0'
 verifybamid = 'verifybamid:2.0.1'
 multiqc = 'multiqc:v1.12'
 fastqc = 'fastqc:v0.11.9_cv8'
-happy = 'hap.py:v0.3.15'
+hap.py = 'hap.py:v0.3.15'
 cpg_workflows = 'cpg_workflows:latest'
 
 [references]
@@ -198,7 +203,4 @@ HG001_NA12878 = 'HG001'
 SYNDIP = 'syndip'
 
 [hail]
-#billing_project =
-#pool_label = 'seqr'
 delete_scratch_on_exit = false
-dry_run = false

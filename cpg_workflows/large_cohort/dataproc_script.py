@@ -13,12 +13,18 @@ from importlib import import_module
 @click.command()
 @click.argument('import_module_name')
 @click.argument('function_name')
-@click.argument('function_path_args', nargs=-1)
-def main(import_module_name: str, function_name: str, function_path_args: list[str]):
+@click.argument('function_str_args', nargs=-1)
+@click.option('-p', '--path', 'function_path_args', multiple=True)
+def main(
+    import_module_name: str,
+    function_name: str,
+    function_str_args: list[str],
+    function_path_args: list[str],
+):
     module = import_module(import_module_name)
     func = getattr(module, function_name)
     start_query_context()
-    func(*[to_path(path) for path in function_path_args])
+    func(*[to_path(path) for path in function_path_args], *function_str_args)
 
 
 if __name__ == '__main__':

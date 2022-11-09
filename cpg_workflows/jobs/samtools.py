@@ -28,16 +28,23 @@ def samtools_stats(
 
     j.image(image_path('samtools'))
     res = STANDARD.set_resources(j, fraction=1)
-    cram = cram_path.resource_group(b)
     reference = fasta_res_group(b)
 
+    assert cram_path.index_path
     cmd = f"""\
+    CRAM=$BATCH_TMPDIR/{cram_path.path.name}
+    CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
+
+    # Retrying copying to avoid google bandwidth limits
+    retry_gs_cp {str(cram_path.path)} $CRAM
+    retry_gs_cp {str(cram_path.index_path)} $CRAI
+
     samtools stats \\
     -@{res.get_nthreads() - 1} \\
     --reference {reference.base} \\
-    {cram.cram} > {j.output_stats}
+    $CRAM > {j.output_stats}
     """
 
-    j.command(command(cmd))
+    j.command(command(cmd, define_retry_function=True))
     b.write_output(j.output_stats, str(out_samtools_stats_path))
     return j

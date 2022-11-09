@@ -8,6 +8,7 @@ from pytest_mock import MockFixture
 from cpg_utils import to_path, Path
 from cpg_utils.config import set_config_paths, update_dict
 from cpg_utils.hail_batch import dataset_path
+from cpg_workflows import get_batch
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.targets import Sample, Cohort
 from cpg_workflows.utils import timestamp
@@ -83,9 +84,9 @@ def test_workflow(mocker: MockFixture):
             return to_path(dataset_path(f'{sample.id}.tsv'))
 
         def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
-            j = self.b.new_job('Sample job', self.get_job_attrs(sample))
+            j = get_batch().new_job('Sample job', self.get_job_attrs(sample))
             j.command(f'echo {sample.id}_done >> {j.output}')
-            self.b.write_output(j.output, str(self.expected_outputs(sample)))
+            get_batch().write_output(j.output, str(self.expected_outputs(sample)))
             print(f'Writing to {self.expected_outputs(sample)}')
             return self.make_outputs(sample, self.expected_outputs(sample))
 
@@ -101,12 +102,12 @@ def test_workflow(mocker: MockFixture):
         def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
             path_by_sample = inputs.as_path_by_target(MySampleStage)
             assert len(path_by_sample) == len(cohort.get_samples())
-            j = self.b.new_job('Cohort job', self.get_job_attrs(cohort))
+            j = get_batch().new_job('Cohort job', self.get_job_attrs(cohort))
             j.command(f'touch {j.output}')
             for _, sample_result_path in path_by_sample.items():
-                input_file = self.b.read_input(str(sample_result_path))
+                input_file = get_batch().read_input(str(sample_result_path))
                 j.command(f'cat {input_file} >> {j.output}')
-            self.b.write_output(j.output, str(self.expected_outputs(cohort)))
+            get_batch().write_output(j.output, str(self.expected_outputs(cohort)))
             print(f'Writing to {self.expected_outputs(cohort)}')
             return self.make_outputs(cohort, self.expected_outputs(cohort))
 

@@ -7,6 +7,7 @@ from typing import Callable, Optional
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
+from cpg_workflows import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import somalier
 from cpg_workflows.jobs.multiqc import multiqc
@@ -141,7 +142,7 @@ class CramQC(SampleStage):
             }
             if qc.func:
                 j = qc.func(  # type: ignore
-                    self.b,
+                    get_batch(),
                     CramPath(cram_path, crai_path),
                     job_attrs=self.get_job_attrs(sample),
                     overwrite=not get_config()['workflow'].get('check_intermediates'),
@@ -153,7 +154,7 @@ class CramQC(SampleStage):
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
 
 
-@stage(required_stages=[CramQC])
+@stage(required_stages=[CramQC], forced=True)
 class SomalierPedigree(DatasetStage):
     """
     Checks pedigree from CRAM fingerprints.
@@ -185,7 +186,7 @@ class SomalierPedigree(DatasetStage):
         Checks calls job from the pedigree module
         """
         verifybamid_by_sid = {}
-        somalier_by_sid = {}
+        somalier_path_by_sid = {}
         for sample in dataset.get_samples():
             if get_config().get('somalier', {}).get('exclude_high_contamination'):
                 verify_bamid_path = inputs.as_path(
@@ -199,7 +200,7 @@ class SomalierPedigree(DatasetStage):
                 else:
                     verifybamid_by_sid[sample.id] = verify_bamid_path
             somalier_path = inputs.as_path(stage=CramQC, target=sample, key='somalier')
-            somalier_by_sid[sample.id] = somalier_path
+            somalier_path_by_sid[sample.id] = somalier_path
 
         html_path = self.expected_outputs(dataset)['html']
         if base_url := dataset.web_url():
@@ -212,12 +213,11 @@ class SomalierPedigree(DatasetStage):
                 self.expected_outputs(dataset)['expected_ped']
             )
             jobs = somalier.pedigree(
-                self.b,
-                dataset,
+                b=get_batch(),
+                dataset=dataset,
                 expected_ped_path=expected_ped_path,
-                input_path_by_sid=somalier_by_sid,
+                somalier_path_by_sid=somalier_path_by_sid,
                 verifybamid_by_sid=verifybamid_by_sid,
-                overwrite=not not get_config()['workflow'].get('check_intermediates'),
                 out_samples_path=self.expected_outputs(dataset)['samples'],
                 out_pairs_path=self.expected_outputs(dataset)['pairs'],
                 out_html_path=html_path,
@@ -311,7 +311,7 @@ class CramMultiQC(DatasetStage):
             return self.make_outputs(dataset)
 
         jobs = multiqc(
-            self.b,
+            get_batch(),
             tmp_prefix=dataset.tmp_prefix() / 'multiqc' / 'cram',
             paths=paths,
             ending_to_trim=ending_to_trim,

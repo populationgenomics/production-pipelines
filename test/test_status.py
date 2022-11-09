@@ -3,6 +3,7 @@ Test workflow status reporter.
 """
 
 import toml
+import pytest
 from pytest_mock import MockFixture
 
 from cpg_utils import to_path, Path
@@ -16,9 +17,9 @@ from cpg_workflows.workflow import (
     SampleStage,
     StageInput,
     StageOutput,
-    ExpectedResultT,
     stage,
     run_workflow,
+    WorkflowError,
 )
 
 tmp_dir_path = to_path(__file__).parent / 'results' / timestamp()
@@ -72,10 +73,7 @@ def _set_config(dir_path: Path, extra_conf: dict | None = None):
     )
 
 
-def test_status_reporter(mocker: MockFixture):
-    """
-    Testing metamist status reporter.
-    """
+def _common(mocker):
     _set_config(
         tmp_dir_path,
         {
@@ -105,26 +103,85 @@ def test_status_reporter(mocker: MockFixture):
 
     mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
 
+
+def test_status_reporter(mocker: MockFixture):
+    _common(mocker)
+
+    @stage(analysis_type='qc')
+    class MyQcStage1(SampleStage):
+        """
+        Just a sample-level stage.
+        """
+
+        def expected_outputs(self, sample: Sample) -> Path:
+            return to_path(dataset_path(f'{sample.id}.tsv'))
+
+        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+            j = get_batch().new_job(
+                'Echo', self.get_job_attrs(sample) | dict(tool='echo')
+            )
+            j.command(f'echo {sample.id}_done >> {j.output}')
+            get_batch().write_output(j.output, str(self.expected_outputs(sample)))
+            print(f'Writing to {self.expected_outputs(sample)}')
+            return self.make_outputs(sample, self.expected_outputs(sample), [j])
+
+    @stage(analysis_type='qc', analysis_key='bed')
+    class MyQcStage2(SampleStage):
+        """
+        Just a sample-level stage.
+        """
+
+        def expected_outputs(self, sample: Sample) -> dict:
+            return {
+                'bed': to_path(dataset_path(f'{sample.id}.bed')),
+                'tsv': to_path(dataset_path(f'{sample.id}.tsv')),
+            }
+
+        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+            j = get_batch().new_job(
+                'Echo', self.get_job_attrs(sample) | dict(tool='echo')
+            )
+            j.command(f'echo {sample.id}_done >> {j.output}')
+            get_batch().write_output(
+                j.output, str(self.expected_outputs(sample)['bed'])
+            )
+            print(f'Writing to {self.expected_outputs(sample)["bed"]}')
+            return self.make_outputs(sample, self.expected_outputs(sample), [j])
+
+    run_workflow(stages=[MyQcStage1, MyQcStage2])
+
+    assert 'metamist' in get_batch().job_by_tool, get_batch().job_by_tool
+    assert (
+        get_batch().job_by_tool['metamist']['job_n']
+        == len(get_cohort().get_samples()) * 4
+    )
+
+
+def test_status_reporter_fails(mocker: MockFixture):
+    _common(mocker)
+
     @stage(analysis_type='qc')
     class MyQcStage(SampleStage):
         """
         Just a sample-level stage.
         """
 
-        def expected_outputs(self, sample: Sample) -> ExpectedResultT:
-            return dataset_path(f'{sample.id}.tsv')
+        def expected_outputs(self, sample: Sample) -> dict:
+            return {
+                'bed': dataset_path(f'{sample.id}.bed'),
+                'tsv': dataset_path(f'{sample.id}.tsv'),
+            }
 
         def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
-            j = self.b.new_job('Echo', self.get_job_attrs(sample) | dict(tool='echo'))
+            j = get_batch().new_job(
+                'Echo', self.get_job_attrs(sample) | dict(tool='echo')
+            )
             j.command(f'echo {sample.id}_done >> {j.output}')
-            self.b.write_output(j.output, str(self.expected_outputs(sample)))
-            print(f'Writing to {self.expected_outputs(sample)}')
+            get_batch().write_output(
+                j.output, str(self.expected_outputs(sample)['bed'])
+            )
+            print(f'Writing to {self.expected_outputs(sample)["bed"]}')
             return self.make_outputs(sample, self.expected_outputs(sample), [j])
 
-    run_workflow(stages=[MyQcStage])
-
-    assert 'metamist' in get_batch().job_by_tool, get_batch().job_by_tool
-    assert (
-        get_batch().job_by_tool['metamist']['job_n']
-        == len(get_cohort().get_samples()) * 2
-    )
+    with pytest.raises(WorkflowError):
+        run_workflow(stages=[MyQcStage])
