@@ -696,6 +696,8 @@ You can also force the pipeline to skip certain samples with `workflow/skip_samp
 CramQC = ['CPG13409']
 ```
 
+Note that currently only "end" stages returned by `python main.py seqr_loader --list-last-stages` are allowed as values for `first_stages` and `last_stages`. [A fix is proposed](https://github.com/populationgenomics/production-pipelines/pull/158) to allow any stage to be specified there.
+
 ### Available stages
 
 To see available workflow stages, explore the `cpg_workflows/stages` folder. A stage wrappers for Hail Batch jobs that allow to glue them together into genomics workflows. `cpg_workflows` also provides helper functions that create Hail Batch jobs for different domain-specific applications, e.g. alignment, deduplication, QC, variant calling, creating calling intervals, running VQSR, creating ES index, etc. Those jobs can be called from the `queue_jobs` method of a stage, or in isolation, as they don't need to know about the stage they are called from, but only need a `Batch` object.
