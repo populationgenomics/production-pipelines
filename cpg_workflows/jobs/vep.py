@@ -101,7 +101,7 @@ def add_vep_jobs(
         gather_jobs = [j]
     else:
         assert len(part_files) == scatter_count
-        gather_jobs, gather_vcf = gather_vcfs(
+        gather_jobs = gather_vcfs(
             b=b,
             input_vcfs=part_files,
             out_vcf_path=out_path,

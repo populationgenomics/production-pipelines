@@ -61,6 +61,13 @@ def subset_vcf(
     return j
 
 
+def cohort_vcf_storage(sample_count: int | None) -> int | None:
+    if not sample_count:
+        return None
+    gb_per_sample = 2
+    return gb_per_sample * sample_count
+
+
 def gather_vcfs(
     b: hb.Batch,
     input_vcfs: list[hb.ResourceFile],
@@ -69,7 +76,7 @@ def gather_vcfs(
     sample_count: int | None = None,
     job_attrs: dict | None = None,
     sort: bool = False,
-) -> tuple[list[Job], hb.ResourceGroup]:
+) -> list[Job]:
     """
     Combines per-interval scattered VCFs into a single VCF.
 
@@ -88,70 +95,122 @@ def gather_vcfs(
     @param sort: whether to sort VCF before tabixing (computationally expensive, but
         required if the input VCFs can overlap)
     """
-    if out_vcf_path and can_reuse([out_vcf_path, to_path(f'{out_vcf_path}.tbi')]):
-        return [], b.read_input_group(
-            **{
-                'vcf.gz': str(out_vcf_path),
-                'vcf.gz.tbi': f'{out_vcf_path}.tbi',
-            }
-        )
+    jobs: list[Job | None] = []
+    gathered_vcf: hb.ResourceFile
 
-    jobs: list[Job] = []
+    if not can_reuse(out_vcf_path):
+        job_name = f'Gather {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
+        j = b.new_job(job_name, (job_attrs or {}) | {'tool': 'gatk GatherVcfsCloud'})
+        j.image(image_path('gatk'))
+        res = STANDARD.set_resources(j, storage_gb=cohort_vcf_storage(sample_count))
 
-    job_name = f'Gather {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
-    job_attrs = (job_attrs or {}) | {'tool': 'gatk GatherVcfsCloud'}
-    j = b.new_job(job_name, job_attrs)
-    j.image(image_path('gatk'))
-    if sample_count:
-        storage_gb = (1 if site_only else 2) * sample_count
-        res = STANDARD.request_resources(fraction=1, storage_gb=storage_gb)
+        input_cmdl = ' '.join([f'--input {v}' for v in input_vcfs])
+        cmd = f"""
+        # --ignore-safety-checks makes a big performance difference so we include it in 
+        # our invocation. This argument disables expensive checks that the file headers 
+        # contain the same set of genotyped samples and that files are in order 
+        # by position of first record.
+        gatk --java-options -Xms{res.get_java_mem_mb()}m \\
+        GatherVcfsCloud \\
+        --ignore-safety-checks \\
+        --gather-type BLOCK \\
+        {input_cmdl} \\
+        --output {j.output_vcf}
+        """
+        j.command(command(cmd, monitor_space=True))
+        if not sort and out_vcf_path:
+            b.write_output(j.output_vcf, str(out_vcf_path))
+        assert isinstance(j.output_vcf, hb.ResourceFile)
+        gathered_vcf = j.output_vcf
     else:
-        res = STANDARD.request_resources(fraction=1)
-    res.set_to_job(j)
+        gathered_vcf = b.read_input(str(out_vcf_path))
 
-    input_cmdl = ' '.join([f'--input {v}' for v in input_vcfs])
-    cmd = f"""
-    # --ignore-safety-checks makes a big performance difference so we include it in 
-    # our invocation. This argument disables expensive checks that the file headers 
-    # contain the same set of genotyped samples and that files are in order 
-    # by position of first record.
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
-    GatherVcfsCloud \\
-    --ignore-safety-checks \\
-    --gather-type BLOCK \\
-    {input_cmdl} \\
-    --output {j.gathered_vcf}
+    out_tbi_path = to_path(f'{out_vcf_path}.tbi')
+    if not can_reuse(out_tbi_path):
+        if sort:
+            jobs.append(
+                sort_vcf(
+                    b,
+                    vcf=gathered_vcf,
+                    out_vcf_path=out_vcf_path,
+                    job_attrs=job_attrs,
+                )
+            )
+        else:
+            jobs.append(
+                tabix_vcf(
+                    b,
+                    vcf=gathered_vcf,
+                    out_tbi_path=out_tbi_path,
+                    job_attrs=job_attrs,
+                )
+            )
+    return [j for j in jobs if j is not None]
+
+
+def sort_vcf(
+    b: hb.Batch,
+    vcf: hb.ResourceFile,
+    out_vcf_path: Path | None = None,
+    job_attrs: dict | None = None,
+) -> Job | None:
     """
-    j.command(command(cmd, monitor_space=True))
-    jobs.append(j)
+    Sort and index VCF.
+    """
+    if can_reuse([out_vcf_path, f'{out_vcf_path}.tbi']):
+        return None
 
-    job_attrs['tool'] = 'bcftools sort'
+    job_attrs = (job_attrs or {}) | {'tool': 'bcftools sort'}
     j = b.new_job('Sort gathered VCF', job_attrs)
     j.image(image_path('bcftools'))
-    if sample_count:
-        storage_gb = (1 if site_only else 4) * sample_count
-        STANDARD.set_resources(j, fraction=1, storage_gb=storage_gb)
-    else:
-        STANDARD.set_resources(j, fraction=1)
+    STANDARD.set_resources(j, fraction=1)
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
     assert isinstance(j.output_vcf, hb.ResourceGroup)
-    cmd = ''
-    if sort:
-        cmd += f"""
-        bcftools sort {jobs[-1].gathered_vcf} \
-        --temp-dir $BATCH_TMPDIR \
-        -Oz -o {j.output_vcf['vcf.gz']}
-        """
+    cmd = f"""
+    bcftools sort {vcf} \
+    --temp-dir $BATCH_TMPDIR \
+    -Oz -o {j.output_vcf['vcf.gz']}
 
-    cmd += f"""
     tabix -p vcf {j.output_vcf['vcf.gz']}
     """
 
     j.command(command(cmd, monitor_space=True))
-    jobs.append(j)
     if out_vcf_path:
         b.write_output(j.output_vcf, str(out_vcf_path).replace('.vcf.gz', ''))
 
-    return jobs, j.output_vcf
+    return j
+
+
+def tabix_vcf(
+    b: hb.Batch,
+    vcf: hb.ResourceFile,
+    out_tbi_path: Path | None = None,
+    job_attrs: dict | None = None,
+) -> Job | None:
+    """
+    Index VCF, assuming it's sorted.
+    """
+    if can_reuse(out_tbi_path):
+        return None
+
+    job_attrs = (job_attrs or {}) | {'tool': 'tabix'}
+    j = b.new_job('Tabix sorted VCF', job_attrs)
+    j.image(image_path('bcftools'))
+    STANDARD.set_resources(j, fraction=1)
+    j.declare_resource_group(
+        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+    assert isinstance(j.output_vcf, hb.ResourceGroup)
+    cmd = f"""
+    mv {vcf} $BATCH_TMPDIR/result.vcf.gz
+    tabix -p vcf $BATCH_TMPDIR/result.vcf.gz
+    mv $BATCH_TMPDIR/result.vcf.gz.tbi {j.output_tbi}
+    """
+
+    j.command(command(cmd, monitor_space=True))
+    if out_tbi_path:
+        b.write_output(j.output_tbi, str(out_tbi_path))
+
+    return j

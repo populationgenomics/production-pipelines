@@ -13,7 +13,7 @@ from typing import List
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import reference_path, image_path, command
 from cpg_workflows.resources import STANDARD, HIGHMEM
@@ -81,6 +81,7 @@ INDEL_RECALIBRATION_TRANCHE_VALUES = [
 def make_vqsr_jobs(
     b: hb.Batch,
     input_siteonly_vcf_path: Path,
+    input_siteonly_vcf_partitions: list[Path],
     tmp_prefix: Path,
     gvcf_count: int,
     out_path: Path | None = None,
@@ -93,6 +94,7 @@ def make_vqsr_jobs(
 
     @param b: Batch object to add jobs to
     @param input_siteonly_vcf_path: path to a site-only VCF
+    @param input_siteonly_vcf_partitions: same VCF split by intervals
     @param tmp_prefix: bucket for intermediate files
     @param gvcf_count: number of input samples. Can't read from combined_mt_path as it
            might not be yet generated the point of Batch job submission
@@ -271,17 +273,25 @@ def make_vqsr_jobs(
             assert isinstance(applied_snps_vcf, hb.ResourceGroup)
             snps_interval_snp_applied_vcfs.append(applied_snps_vcf['vcf.gz'])
 
-        snps_applied_gathered_jobs, snps_applied_gathered_vcf = gather_vcfs(
+        gathered_vcf_path = tmp_prefix / 'gathered.vcf.gz'
+        snps_applied_gathered_jobs = gather_vcfs(
             b=b,
             input_vcfs=snps_interval_snp_applied_vcfs + [indel_vcf['vcf.gz']],
             site_only=True,
             sample_count=gvcf_count,
             job_attrs=job_attrs,
             sort=True,  # need to sort because we have indels and snps separate
+            out_vcf_path=gathered_vcf_path,
         )
         for j in snps_applied_gathered_jobs:
             j.name = f'VQSR: {j.name}'
             jobs.append(j)
+        snps_applied_gathered_vcf = b.read_input_group(
+            **{
+                'vcf.gz': gathered_vcf_path,
+                'vcf.gz.tbi': to_path(f'{gathered_vcf_path}.tbi'),
+            }
+        )
 
         apply_indel_j = apply_recalibration_indels(
             b,

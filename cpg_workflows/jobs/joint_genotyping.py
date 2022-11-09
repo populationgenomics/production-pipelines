@@ -10,7 +10,7 @@ import pandas as pd
 from cpg_utils.config import get_config
 from cpg_workflows.utils import can_reuse
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path, command
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 import hailtop.batch as hb
 from hailtop.batch import Resource
 from hailtop.batch.job import Job
@@ -18,7 +18,7 @@ from hailtop.batch.job import Job
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.filetypes import GvcfPath
 
-from .vcf import gather_vcfs
+from .vcf import gather_vcfs, tabix_vcf
 from .picard import get_intervals
 
 
@@ -162,32 +162,31 @@ def make_joint_genotyping_jobs(
 
     if scatter_count > 1:
         logging.info(f'Queueing gather VCFs job')
-        gather_jobs, _ = gather_vcfs(
-            b,
-            input_vcfs=vcfs,
-            out_vcf_path=out_vcf_path,
-            site_only=False,
-            sample_count=len(gvcf_by_sid),
-            job_attrs=job_attrs,
-            sort=False,
+        jobs.extend(
+            gather_vcfs(
+                b,
+                input_vcfs=vcfs,
+                site_only=False,
+                sample_count=len(gvcf_by_sid),
+                job_attrs=job_attrs,
+                out_vcf_path=out_vcf_path,
+            )
         )
-        for j in gather_jobs:
-            j.name = f'Joint genotyping: {j.name}'
-            jobs.append(j)
 
         logging.info(f'Queueing gather site-only VCFs job')
-        gather_siteonly_jobs, _ = gather_vcfs(
-            b,
-            input_vcfs=siteonly_vcfs,
-            out_vcf_path=out_siteonly_vcf_path,
-            site_only=True,
-            job_attrs=job_attrs,
-            sort=False,
+        jobs.extend(
+            gather_vcfs(
+                b,
+                input_vcfs=siteonly_vcfs,
+                site_only=True,
+                job_attrs=job_attrs,
+                out_vcf_path=out_siteonly_vcf_path,
+            )
         )
-        for j in gather_siteonly_jobs:
-            j.name = f'Joint genotyping: {j.name}'
-            jobs.append(j)
 
+    jobs = [j for j in jobs if j is not None]
+    for j in jobs:
+        j.name = f'Joint genotyping: {j.name}'
     return jobs
 
 
@@ -214,7 +213,7 @@ def genomicsdb(
     if can_reuse(output_path):
         return None
 
-    job_name = 'Joint genotyping: creating GenomicsDB'
+    job_name = 'Create GenomicsDB'
     j = b.new_job(
         job_name,
         (job_attrs or {})
@@ -349,7 +348,7 @@ def _add_joint_genotyper_job(
                 'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
             }
         )
-    job_name = f'Joint genotyping: {tool.name}'
+    job_name = f'{tool.name}'
     job_attrs = (job_attrs or {}) | {'tool': f'gatk {tool.name}'}
     j = b.new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
@@ -441,7 +440,7 @@ def _add_excess_het_filter(
             }
         )
 
-    job_name = 'Joint genotyping: ExcessHet filter'
+    job_name = 'ExcessHet filter'
     j = b.new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
     j.memory('8G')
@@ -494,7 +493,7 @@ def _add_make_sitesonly_job(
             }
         )
 
-    job_name = 'Joint genotyping: MakeSitesOnlyVcf'
+    job_name = 'MakeSitesOnlyVcf'
     job_attrs = (job_attrs or {}) | {'tool': 'gatk MakeSitesOnlyVcf'}
     j = b.new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
