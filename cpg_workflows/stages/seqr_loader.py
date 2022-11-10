@@ -36,7 +36,6 @@ class AnnotateCohort(CohortStage):
         """
         Expected to write a matrix table.
         """
-        h = cohort.alignment_inputs_hash()
         return {
             # writing into perm location for late debugging
             # convert to str to avoid checking existence
@@ -87,6 +86,7 @@ class AnnotateDataset(DatasetStage):
         """
         Expected to generate a matrix table
         """
+        h = get_cohort().alignment_inputs_hash()
         return {
             'tmp_prefix': str(self.tmp_prefix / f'{dataset.name}'),
             'mt': dataset.prefix() / 'mt' / f'{h}-{dataset.name}.mt',

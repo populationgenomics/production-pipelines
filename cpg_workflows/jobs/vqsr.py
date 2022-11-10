@@ -16,7 +16,7 @@ from hailtop.batch.job import Job
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import reference_path, image_path, command
-from cpg_workflows.resources import STANDARD, HIGHMEM
+from cpg_workflows.resources import STANDARD, HIGHMEM, joint_calling_scatter_count
 from cpg_workflows.jobs.picard import get_intervals
 from cpg_workflows.jobs.vcf import gather_vcfs
 
