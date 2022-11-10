@@ -16,7 +16,7 @@ from hailtop.batch.job import Job
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import reference_path, image_path, command
-from cpg_workflows.resources import STANDARD, HIGHMEM, joint_calling_scatter_count
+from cpg_workflows.resources import STANDARD, HIGHMEM
 from cpg_workflows.jobs.picard import get_intervals
 from cpg_workflows.jobs.vcf import gather_vcfs
 
@@ -81,7 +81,6 @@ INDEL_RECALIBRATION_TRANCHE_VALUES = [
 def make_vqsr_jobs(
     b: hb.Batch,
     input_siteonly_vcf_path: Path,
-    input_siteonly_vcf_part_paths: list[Path],
     tmp_prefix: Path,
     gvcf_count: int,
     scatter_count: int | None = None,
@@ -95,7 +94,6 @@ def make_vqsr_jobs(
 
     @param b: Batch object to add jobs to
     @param input_siteonly_vcf_path: path to a site-only VCF
-    @param input_siteonly_vcf_part_paths: same VCF split by intervals
     @param tmp_prefix: bucket for intermediate files
     @param gvcf_count: number of input samples. Can't read from combined_mt_path as it
            might not be yet generated the point of Batch job submission
@@ -148,13 +146,6 @@ def make_vqsr_jobs(
         }
     )
 
-    scatter_count = scatter_count or joint_calling_scatter_count(gvcf_count)
-    assert len(input_siteonly_vcf_part_paths) == scatter_count
-    input_siteonly_vcf_parts = [
-        b.read_input_group(**{'vcf.gz': str(path), 'vcf.gz.tbi': str(path) + '.tbi'})
-        for path in input_siteonly_vcf_part_paths
-    ]
-
     indel_recalibrator_j = indel_recalibrator_job(
         b=b,
         siteonly_vcf=siteonly_vcf,
@@ -201,11 +192,9 @@ def make_vqsr_jobs(
 
         snps_recal_jobs = []
         for idx in range(scatter_count):
-            snps_interval_vcf = input_siteonly_vcf_parts[idx]
-            assert isinstance(snps_interval_vcf, hb.ResourceGroup)
             snps_recal_j = snps_recalibrator_scattered(
                 b,
-                siteonly_vcf=snps_interval_vcf,
+                siteonly_vcf=siteonly_vcf,
                 interval=intervals[idx],
                 model_file=model_j.model_file,
                 hapmap_resource_vcf=resources['hapmap'],
@@ -236,11 +225,9 @@ def make_vqsr_jobs(
         for idx in range(scatter_count):
             snp_recalibration = snps_recalibrations[idx]
             assert isinstance(snp_recalibration, hb.ResourceGroup)
-            snps_interval_vcf = input_siteonly_vcf_parts[idx]
-            assert isinstance(snps_interval_vcf, hb.ResourceGroup)
             snps_applied_vcf = apply_recalibration_snps(
                 b,
-                input_vcf=snps_interval_vcf,
+                input_vcf=siteonly_vcf,
                 interval=intervals[idx],
                 recalibration=snp_recalibration,
                 tranches=snp_gathered_tranches,
