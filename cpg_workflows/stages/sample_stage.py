@@ -39,8 +39,8 @@ class TestSampleStage(SampleStage):
 
         jobs = little_sample_job.little_sample_job(
                 b=get_batch(),
-                output_path=f'{sample.participant_id}.cram',
-                input_path=f'{sample.id}.cram',
+                output_path=f'gs://cpg-fewgenomes-test/vivbak/WorkshopNov22/{sample.participant_id}.fastq.gz',
+                input_path=f'gs://cpg-fewgenomes-test/vivbak/WorkshopNov22/BRCA1_R1.fastq.gz',
         )
         return self.make_outputs(
             sample, data=self.expected_outputs(sample), jobs=jobs
