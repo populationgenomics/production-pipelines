@@ -100,11 +100,7 @@ class StageOutput:
         )
         return res
 
-    def as_path(self, key=None) -> Path:
-        """
-        Cast the result to a path object. Throw an exception when can't cast.
-        `key` is used to extract the value when the result is a dictionary.
-        """
+    def _get(self, key=None) -> str | Path:
         if self.data is None:
             raise ValueError(f'{self.stage}: output data is not available')
 
@@ -116,7 +112,24 @@ class StageOutput:
             res = cast(dict, self.data)[key]
         else:
             res = self.data
+        return res
 
+    def as_str(self, key=None) -> str:
+        """
+        Cast the result to a simple string. Throw an exception when can't cast.
+        `key` is used to extract the value when the result is a dictionary.
+        """
+        res = self._get(key)
+        if not isinstance(res, str):
+            raise ValueError(f'{res} is not a str.')
+        return cast(str, res)
+
+    def as_path(self, key=None) -> Path:
+        """
+        Cast the result to a path object. Throw an exception when can't cast.
+        `key` is used to extract the value when the result is a dictionary.
+        """
+        res = self._get(key)
         if not isinstance(res, CloudPath | pathlib.Path):
             raise ValueError(f'{res} is not a path object.')
 
@@ -249,6 +262,19 @@ class StageInput:
         """
         res = self._get(target=target, stage=stage)
         return res.as_path(key)
+
+    def as_str(
+        self,
+        target: 'Target',
+        stage: StageDecorator,
+        key: str | None = None,
+    ) -> str:
+        """
+        Represent as a simple string, otherwise fail.
+        `stage` can be callable, or a subclass of Stage
+        """
+        res = self._get(target=target, stage=stage)
+        return res.as_str(key)
 
     def as_dict(self, target: 'Target', stage: StageDecorator) -> dict[str, Path]:
         """
@@ -496,15 +522,6 @@ class Stage(Generic[TargetT], ABC):
                 job_attrs=self.get_job_attrs(target),
             )
         return outputs
-
-    def new_reuse_job(self, target: Target) -> Job:
-        """
-        Add "reuse" job. Target doesn't have to be specific for a stage here,
-        this using abstract class Target instead of generic parameter TargetT.
-        """
-        attrs = dict(stage=self.name, reuse=True)
-        attrs |= target.get_job_attrs()
-        return get_batch().new_job(self.name, attrs)
 
     def _get_action(self, target: TargetT) -> Action:
         """
