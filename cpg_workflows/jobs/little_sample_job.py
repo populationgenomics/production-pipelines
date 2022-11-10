@@ -37,6 +37,7 @@ def little_sample_job(
     input_file: str | hb.ResourceFile = b.read_input(input_path)
 
     cmd += f"""\
+    echo {input_file}
     echo {input_file} > {j.out}
     """
     j.command(command(cmd))
