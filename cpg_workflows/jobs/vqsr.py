@@ -162,6 +162,7 @@ def make_vqsr_jobs(
     assert isinstance(indel_recalibrator_j.tranches, hb.ResourceFile)
     jobs.append(indel_recalibrator_j)
 
+    scatter_count = scatter_count or joint_calling_scatter_count(gvcf_count)
     if scatter_count > 1:
         # Run SNP recalibrator in a scattered mode
         model_j = snps_recalibrator_create_model_job(
