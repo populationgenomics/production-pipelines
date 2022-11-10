@@ -15,6 +15,7 @@ from cpg_workflows.workflow import (
 from cpg_workflows.jobs import vqsr
 from .joint_genotyping import JointGenotyping
 from .. import get_batch
+from ..resources import joint_calling_scatter_count
 
 
 @stage(required_stages=JointGenotyping)
@@ -28,8 +29,10 @@ class Vqsr(CohortStage):
         Generate a site-only VCF.
         """
         return {
-            'prefix': self.prefix,
-            'siteonly': to_path(f'{self.prefix}-siteonly.vcf.gz'),
+            # writing into perm location for late debugging
+            # convert to str to avoid checking existence
+            'tmp_prefix': str(self.prefix / 'tmp'),
+            'siteonly': self.prefix / 'siteonly.vcf.gz',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -39,14 +42,15 @@ class Vqsr(CohortStage):
         siteonly_vcf_path = inputs.as_path(
             stage=JointGenotyping, target=cohort, key='siteonly'
         )
+
         jobs = vqsr.make_vqsr_jobs(
             b=get_batch(),
             input_siteonly_vcf_path=siteonly_vcf_path,
+            scatter_count=joint_calling_scatter_count(len(cohort.get_samples())),
             gvcf_count=len(cohort.get_samples()),
             out_path=self.expected_outputs(cohort)['siteonly'],
             tmp_prefix=to_path(self.expected_outputs(cohort)['prefix']),
             use_as_annotations=get_config()['workflow'].get('use_as_vqsr', True),
-            overwrite=not get_config()['workflow'].get('check_intermediates'),
             intervals_path=get_config()['workflow'].get('intervals_path'),
             job_attrs=self.get_job_attrs(),
         )
