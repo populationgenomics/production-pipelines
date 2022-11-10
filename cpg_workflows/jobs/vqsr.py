@@ -19,6 +19,7 @@ from cpg_utils.hail_batch import reference_path, image_path, command
 from cpg_workflows.resources import STANDARD, HIGHMEM
 from cpg_workflows.jobs.picard import get_intervals
 from cpg_workflows.jobs.vcf import gather_vcfs, subset_vcf
+from cpg_workflows.utils import joint_calling_scatter_count
 
 STANDARD_FEATURES = [
     'ReadPosRankSum',
@@ -81,9 +82,10 @@ INDEL_RECALIBRATION_TRANCHE_VALUES = [
 def make_vqsr_jobs(
     b: hb.Batch,
     input_siteonly_vcf_path: Path,
-    input_siteonly_vcf_partitions: list[Path],
     tmp_prefix: Path,
     gvcf_count: int,
+    scatter_count: int | None = None,
+    input_siteonly_part_vcf_paths: list[Path] | None = None,
     out_path: Path | None = None,
     use_as_annotations: bool = True,
     intervals_path: Path | None = None,
@@ -94,10 +96,11 @@ def make_vqsr_jobs(
 
     @param b: Batch object to add jobs to
     @param input_siteonly_vcf_path: path to a site-only VCF
-    @param input_siteonly_vcf_partitions: same VCF split by intervals
     @param tmp_prefix: bucket for intermediate files
+    @param input_siteonly_part_vcf_paths: same VCF split by intervals
     @param gvcf_count: number of input samples. Can't read from combined_mt_path as it
            might not be yet generated the point of Batch job submission
+    @param scatter_count: number of partitions
     @param intervals_path: path to specific interval list
     @param out_path: path to write final recalibrated VCF to
     @param use_as_annotations: use allele-specific annotation for VQSR
@@ -137,12 +140,6 @@ def make_vqsr_jobs(
     # To fit a joint-called VCF
     huge_disk = 200 if is_small_callset else (500 if not is_huge_callset else 2000)
 
-    scatter_count = 50
-    if gvcf_count > 300:
-        scatter_count = 100
-    if gvcf_count > 1000:
-        scatter_count = 200
-
     jobs: list[Job] = []
 
     siteonly_vcf = b.read_input_group(
@@ -151,6 +148,13 @@ def make_vqsr_jobs(
             'vcf.gz.tbi': str(input_siteonly_vcf_path) + '.tbi',
         }
     )
+
+    scatter_count = scatter_count or joint_calling_scatter_count(gvcf_count)
+
+    if input_siteonly_part_vcf_paths:
+        assert len(input_siteonly_part_vcf_paths) == scatter_count
+
+    # TODO: use input_siteonly_part_vcf_paths
 
     indel_vcf_j = subset_vcf(
         b=b,
@@ -288,8 +292,8 @@ def make_vqsr_jobs(
             jobs.append(j)
         snps_applied_gathered_vcf = b.read_input_group(
             **{
-                'vcf.gz': gathered_vcf_path,
-                'vcf.gz.tbi': to_path(f'{gathered_vcf_path}.tbi'),
+                'vcf.gz': str(gathered_vcf_path),
+                'vcf.gz.tbi': f'{gathered_vcf_path}.tbi',
             }
         )
 
@@ -303,6 +307,8 @@ def make_vqsr_jobs(
             filter_level=indel_filter_level,
             job_attrs=job_attrs,
         )
+        if snps_applied_gathered_jobs:
+            apply_indel_j.depends_on(*snps_applied_gathered_jobs)
         jobs.append(apply_indel_j)
         final_vcf = apply_indel_j.output_vcf
 

@@ -15,6 +15,7 @@ from cpg_workflows.workflow import (
 from cpg_workflows.jobs import vqsr
 from .joint_genotyping import JointGenotyping
 from .. import get_batch
+from ..utils import joint_calling_scatter_count
 
 
 @stage(required_stages=JointGenotyping)
@@ -41,9 +42,25 @@ class Vqsr(CohortStage):
         siteonly_vcf_path = inputs.as_path(
             stage=JointGenotyping, target=cohort, key='siteonly'
         )
+
+        scatter_count = joint_calling_scatter_count(len(cohort.get_samples()))
+        try:
+            input_siteonly_vcf_partitions = [
+                inputs.as_path(
+                    stage=JointGenotyping,
+                    target=cohort,
+                    key=f'siteonly_part_{idx}',
+                )
+                for idx in range(scatter_count)
+            ]
+        except KeyError:
+            input_siteonly_vcf_partitions = None
+
         jobs = vqsr.make_vqsr_jobs(
             b=get_batch(),
             input_siteonly_vcf_path=siteonly_vcf_path,
+            input_siteonly_part_vcf_paths=input_siteonly_vcf_partitions,
+            scatter_count=scatter_count,
             gvcf_count=len(cohort.get_samples()),
             out_path=self.expected_outputs(cohort)['siteonly'],
             tmp_prefix=to_path(self.expected_outputs(cohort)['prefix']),

@@ -8,7 +8,7 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
 from cpg_utils.hail_batch import image_path, fasta_res_group, command
-from cpg_workflows.resources import STANDARD
+from cpg_workflows.resources import STANDARD, storage_for_joint_vcf
 from cpg_workflows.utils import can_reuse
 
 
@@ -61,13 +61,6 @@ def subset_vcf(
     return j
 
 
-def cohort_vcf_storage(sample_count: int | None) -> int | None:
-    if not sample_count:
-        return None
-    gb_per_sample = 2
-    return gb_per_sample * sample_count
-
-
 def gather_vcfs(
     b: hb.Batch,
     input_vcfs: list[hb.ResourceFile],
@@ -92,8 +85,8 @@ def gather_vcfs(
     @param sample_count: number of samples used for input VCFs (to determine the
         storage size)
     @param job_attrs: Hail Batch job attributes dictionary
-    @param sort: whether to sort VCF before tabixing (computationally expensive, but
-        required if the input VCFs can overlap)
+    @param sort: whether to sort VCF before tabixing (computationally expensive,
+        but required if the input VCFs can overlap)
     """
     jobs: list[Job | None] = []
     gathered_vcf: hb.ResourceFile
@@ -102,7 +95,9 @@ def gather_vcfs(
         job_name = f'Gather {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
         j = b.new_job(job_name, (job_attrs or {}) | {'tool': 'gatk GatherVcfsCloud'})
         j.image(image_path('gatk'))
-        res = STANDARD.set_resources(j, storage_gb=cohort_vcf_storage(sample_count))
+        res = STANDARD.set_resources(
+            j, storage_gb=storage_for_joint_vcf(sample_count, site_only)
+        )
 
         input_cmdl = ' '.join([f'--input {v}' for v in input_vcfs])
         cmd = f"""
@@ -115,7 +110,8 @@ def gather_vcfs(
         --ignore-safety-checks \\
         --gather-type BLOCK \\
         {input_cmdl} \\
-        --output {j.output_vcf}
+        --output $BATCH_TMPDIR/gathered.vcf.gz
+        mv $BATCH_TMPDIR/gathered.vcf.gz {j.output_vcf}
         """
         j.command(command(cmd, monitor_space=True))
         if not sort and out_vcf_path:
@@ -134,6 +130,8 @@ def gather_vcfs(
                     vcf=gathered_vcf,
                     out_vcf_path=out_vcf_path,
                     job_attrs=job_attrs,
+                    sample_count=sample_count,
+                    site_only=site_only,
                 )
             )
         else:
@@ -143,6 +141,8 @@ def gather_vcfs(
                     vcf=gathered_vcf,
                     out_tbi_path=out_tbi_path,
                     job_attrs=job_attrs,
+                    sample_count=sample_count,
+                    site_only=site_only,
                 )
             )
     return [j for j in jobs if j is not None]
@@ -153,6 +153,8 @@ def sort_vcf(
     vcf: hb.ResourceFile,
     out_vcf_path: Path | None = None,
     job_attrs: dict | None = None,
+    site_only: bool = False,
+    sample_count: int | None = None,
 ) -> Job | None:
     """
     Sort and index VCF.
@@ -163,7 +165,10 @@ def sort_vcf(
     job_attrs = (job_attrs or {}) | {'tool': 'bcftools sort'}
     j = b.new_job('Sort gathered VCF', job_attrs)
     j.image(image_path('bcftools'))
-    STANDARD.set_resources(j, fraction=1)
+    if storage_gb := storage_for_joint_vcf(sample_count, site_only):
+        storage_gb *= 2  # sort needs extra tmp space
+    STANDARD.set_resources(j, fraction=1, storage_gb=storage_gb)
+
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
@@ -188,6 +193,8 @@ def tabix_vcf(
     vcf: hb.ResourceFile,
     out_tbi_path: Path | None = None,
     job_attrs: dict | None = None,
+    site_only: bool = False,
+    sample_count: int | None = None,
 ) -> Job | None:
     """
     Index VCF, assuming it's sorted.
@@ -198,7 +205,9 @@ def tabix_vcf(
     job_attrs = (job_attrs or {}) | {'tool': 'tabix'}
     j = b.new_job('Tabix sorted VCF', job_attrs)
     j.image(image_path('bcftools'))
-    STANDARD.set_resources(j, fraction=1)
+    STANDARD.set_resources(
+        j, fraction=1, storage_gb=storage_for_joint_vcf(sample_count, site_only)
+    )
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )

@@ -8,7 +8,10 @@ from enum import Enum
 
 import pandas as pd
 from cpg_utils.config import get_config
-from cpg_workflows.utils import can_reuse
+from cpg_workflows.utils import (
+    can_reuse,
+    joint_calling_scatter_count,
+)
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path, command
 from cpg_utils import Path, to_path
 import hailtop.batch as hb
@@ -18,7 +21,7 @@ from hailtop.batch.job import Job
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.filetypes import GvcfPath
 
-from .vcf import gather_vcfs, tabix_vcf
+from .vcf import gather_vcfs
 from .picard import get_intervals
 
 
@@ -42,6 +45,9 @@ def make_joint_genotyping_jobs(
     # variants with AC_adj annotations (other variants have AC):
     # bcftools view gs://cpg-fewgenomes-test/unittest/inputs/chr20/gnarly/joint-called-siteonly.vcf.gz | zgrep 7105364
     tool: JointGenotyperTool = JointGenotyperTool.GenotypeGVCFs,
+    scatter_count: int | None = None,
+    out_partitioned_vcf_paths: list[Path] | None = None,
+    out_partitioned_siteonly_vcf_paths: list[Path] | None = None,
     do_filter_excesshet: bool = True,
     intervals_path: Path | None = None,
     job_attrs: dict | None = None,
@@ -50,20 +56,24 @@ def make_joint_genotyping_jobs(
     Adds samples to the GenomicsDB and runs joint genotyping on them.
     Outputs a multi-sample VCF under `output_vcf_path`.
     """
-    if can_reuse([out_vcf_path, out_siteonly_vcf_path]):
-        return []
     if len(gvcf_by_sid) == 0:
         raise ValueError(
             'Provided samples collection for joint calling should contain '
             'at least one active sample'
         )
-    logging.info(f'Submitting joint-calling jobs')
+    scatter_count = scatter_count or joint_calling_scatter_count(len(gvcf_by_sid))
 
-    scatter_count = 50
-    if len(gvcf_by_sid) > 300:
-        scatter_count = 100
-    if len(gvcf_by_sid) > 1000:
-        scatter_count = 200
+    all_output_paths = [out_vcf_path, out_siteonly_vcf_path]
+    if out_partitioned_vcf_paths:
+        assert len(out_partitioned_vcf_paths) == scatter_count
+        all_output_paths.extend(out_partitioned_vcf_paths)
+    if out_partitioned_siteonly_vcf_paths:
+        assert len(out_partitioned_siteonly_vcf_paths) == scatter_count
+        all_output_paths.extend(out_partitioned_siteonly_vcf_paths)
+    if can_reuse(all_output_paths + [to_path(f'{p}.tbi') for p in all_output_paths]):
+        return []
+
+    logging.info(f'Submitting joint-calling jobs')
 
     jobs: list[Job] = []
     intervals_j, intervals = get_intervals(
@@ -118,11 +128,17 @@ def make_joint_genotyping_jobs(
             if scatter_count > 1
             else out_siteonly_vcf_path
         )
+        if out_partitioned_vcf_paths:
+            if do_filter_excesshet:
+                filt_jc_vcf_path = out_partitioned_vcf_paths[idx]
+            else:
+                jc_vcf_path = out_partitioned_vcf_paths[idx]
+        if out_partitioned_siteonly_vcf_paths:
+            siteonly_jc_vcf_path = out_partitioned_siteonly_vcf_paths[idx]
 
         jc_vcf_j, jc_vcf = _add_joint_genotyper_job(
             b,
             genomicsdb_path=genomicsdb_path,
-            number_of_samples=len(gvcf_by_sid),
             interval=interval,
             tool=tool,
             output_vcf_path=jc_vcf_path,
@@ -289,24 +305,39 @@ def genomicsdb(
     return j
 
 
-def joint_calling_storage_gb(n_samples: int, sequencing_type: str) -> int:
+def joint_calling_storage_gb(n_samples: int, scatter_count: int = None) -> int:
     """
-    Calculate storage for a joint calling job, to fit a joint-called VCF
-    and a genomics db. The required storage grows with a number of samples,
+    Calculate storage for a joint calling job, to fit a joint-called VCF alongside
+    a GenomicsDB for an interval. The required storage grows with a number of samples,
     but sublinearly.
-    >>> joint_calling_storage_gb(1, 'genome')
+
+    1359 samples:
+
+    Joint:
+    All GenomicsDBs: 1.09 TB
+    VCF: 528.86 GB
+    Site-only: 4.29 GB
+
+    For scatter count = 200:
+    max GenomicsDB tar = 11.18G
+    max VCF = 5.25G
+
+    >>> joint_calling_storage_gb(1)
     26
-    >>> joint_calling_storage_gb(50, 'genome')
+    >>> joint_calling_storage_gb(50)
     26
-    >>> joint_calling_storage_gb(100, 'genome')
+    >>> joint_calling_storage_gb(100)
     86
-    >>> joint_calling_storage_gb(200, 'genome')
+    >>> joint_calling_storage_gb(200)
     226
-    >>> joint_calling_storage_gb(10000, 'genome')
+    >>> joint_calling_storage_gb(10000)
     486
     """
+    genomicsdb_tar_gb = 12
+
+    sequencing_type = get_config()['workflow']['sequencing_type']
     disk_gb = 26  # Minimal disk (default for a 4-cpu standard machine)
-    if n_samples >= 50:
+    if n_samples and n_samples >= 50:
         # for every 10x samples (starting from 50), add {multiplier}G
         multiplier = {
             'genome': 200,
@@ -319,7 +350,6 @@ def joint_calling_storage_gb(n_samples: int, sequencing_type: str) -> int:
 def _add_joint_genotyper_job(
     b: hb.Batch,
     genomicsdb_path: Path,
-    number_of_samples: int,
     interval: hb.Resource | None = None,
     output_vcf_path: Path | None = None,
     tool: JointGenotyperTool = JointGenotyperTool.GnarlyGenotyper,
@@ -353,10 +383,6 @@ def _add_joint_genotyper_job(
     j = b.new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
     res = STANDARD.request_resources(ncpu=4)
-    res.attach_disk_storage_gb = joint_calling_storage_gb(
-        number_of_samples,
-        get_config()['workflow']['sequencing_type'],
-    )
     res.set_to_job(j)
 
     j.declare_resource_group(
@@ -411,7 +437,6 @@ def _add_joint_genotyper_job(
 def _add_excess_het_filter(
     b: hb.Batch,
     input_vcf: hb.ResourceGroup,
-    disk_size: int = 32,
     excess_het_threshold: float = 54.69,
     interval: hb.Resource | None = None,
     output_vcf_path: Path | None = None,
@@ -443,8 +468,7 @@ def _add_excess_het_filter(
     job_name = 'ExcessHet filter'
     j = b.new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
-    j.memory('8G')
-    j.storage(f'{disk_size}G')
+    res = STANDARD.set_resources(j, ncpu=2)
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
@@ -456,7 +480,7 @@ def _add_excess_het_filter(
     # Capturing stderr to avoid Batch pod from crashing with OOM from millions of
     # warning messages from VariantFiltration, e.g.:
     # > JexlEngine - ![0,9]: 'ExcessHet > 54.69;' undefined variable ExcessHet
-    gatk --java-options -Xms3g \\
+    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
     VariantFiltration \\
     --filter-expression 'ExcessHet > {excess_het_threshold}' \\
     --filter-name ExcessHet \\
@@ -475,7 +499,6 @@ def _add_excess_het_filter(
 def _add_make_sitesonly_job(
     b: hb.Batch,
     input_vcf: hb.ResourceFile,
-    disk_size: int = 32,
     output_vcf_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> tuple[Job | None, hb.ResourceGroup]:
@@ -497,8 +520,7 @@ def _add_make_sitesonly_job(
     job_attrs = (job_attrs or {}) | {'tool': 'gatk MakeSitesOnlyVcf'}
     j = b.new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
-    j.memory('8G')
-    j.storage(f'{disk_size}G')
+    res = STANDARD.set_resources(j, ncpu=2)
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
@@ -507,7 +529,7 @@ def _add_make_sitesonly_job(
     j.command(
         command(
             f"""
-    gatk --java-options -Xms6g \\
+    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
     MakeSitesOnlyVcf \\
     -I {input_vcf} \\
     -O {j.output_vcf['vcf.gz']}
