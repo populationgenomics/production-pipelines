@@ -27,7 +27,7 @@ class TestSampleStage(SampleStage):
         Generate some stuff!.
         """
         return {
-            'new_file': f'{sample.participant_id}.cram',
+            'new_file': f'{sample.participant_id}.fastq.qz',
         }
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
