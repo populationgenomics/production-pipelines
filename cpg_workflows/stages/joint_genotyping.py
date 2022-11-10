@@ -3,23 +3,19 @@ Stage that performs joint genotyping of GVCFs using GATK.
 """
 import logging
 
-from cpg_utils import to_path, Path
+from cpg_utils import to_path
 from cpg_utils.config import get_config
-
 from cpg_workflows.filetypes import GvcfPath
+from cpg_workflows.jobs import joint_genotyping
+from cpg_workflows.jobs.picard import vcf_qc
 from cpg_workflows.workflow import (
-    Sample,
     Cohort,
     stage,
     StageInput,
     StageOutput,
-    SampleStage,
     CohortStage,
     WorkflowError,
 )
-from cpg_workflows.jobs.happy import happy
-from cpg_workflows.jobs.picard import vcf_qc
-from cpg_workflows.jobs import joint_genotyping
 from .genotype import Genotype
 from .. import get_batch
 
@@ -35,12 +31,11 @@ class JointGenotyping(CohortStage):
         Generate a pVCF and a site-only VCF.
         """
         h = cohort.alignment_inputs_hash()
-        prefix = str(cohort.analysis_dataset.prefix() / self.name / h)
         qc_prefix = cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / 'picard'
         return {
-            'prefix': prefix,
-            'vcf': to_path(f'{prefix}.vcf.gz'),
-            'siteonly': to_path(f'{prefix}-siteonly.vcf.gz'),
+            'prefix': self.prefix,
+            'vcf': to_path(f'{self.prefix}.vcf.gz'),
+            'siteonly': to_path(f'{self.prefix}-siteonly.vcf.gz'),
             'qc_summary': to_path(f'{qc_prefix}.variant_calling_summary_metrics'),
             'qc_detail': to_path(f'{qc_prefix}.variant_calling_detail_metrics'),
         }
