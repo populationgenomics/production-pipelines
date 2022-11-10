@@ -9,7 +9,7 @@ import click
 import coloredlogs
 
 from cpg_utils import to_path
-from cpg_utils.config import set_config_paths, prepend_config_paths
+from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
 from cpg_workflows.workflow import run_workflow, StageDecorator
 from cpg_workflows.stages.large_cohort import LoadVqsr, Frequencies
