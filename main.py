@@ -9,7 +9,8 @@ import click
 import coloredlogs
 
 from cpg_utils import to_path
-from cpg_utils.config import set_config_paths
+from cpg_utils.config import set_config_paths, prepend_config_paths
+from cpg_workflows import defaults_config_path
 from cpg_workflows.workflow import run_workflow, StageDecorator
 from cpg_workflows.stages.large_cohort import LoadVqsr, Frequencies
 from cpg_workflows.stages.cram_qc import CramMultiQC
@@ -89,15 +90,12 @@ def main(
         click.echo(f'{", ".join(s.__name__ for s in WORKFLOWS[workflow])}')
         return
 
-    base_config_paths = [
-        to_path(__file__).parent / 'configs' / 'defaults' / f'workflows.toml',
-        to_path(__file__).parent / 'configs' / 'defaults' / f'{workflow}.toml',
-    ]
-    assert all(path.exists() for path in base_config_paths)
-    config_paths = [str(path) for path in base_config_paths] + list(config_paths)
-    if _env_var := os.environ.get('CPG_CONFIG_PATH'):
-        config_paths += _env_var.split(',') + list(config_paths)
-    set_config_paths(list(config_paths))
+    wfl_conf_path = to_path(__file__).parent / f'configs/defaults/{workflow}.toml'
+    assert wfl_conf_path.exists(), wfl_conf_path
+    config_paths = os.environ['CPG_CONFIG_PATH'].split(',')
+    assert config_paths[0] == defaults_config_path  # assuming it's loaded in __init__
+    # Inserting after the defaults config, but before user configs
+    set_config_paths(config_paths[:1] + [str(wfl_conf_path)] + config_paths[1:])
 
     run_workflow(stages=WORKFLOWS[workflow], dry_run=dry_run)
 
