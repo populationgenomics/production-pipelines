@@ -27,9 +27,10 @@ from .vcf import gather_vcfs, subset_vcf
 
 def add_vep_jobs(
     b: Batch,
-    vcf_path: Path,
+    input_siteonly_vcf_path: Path,
     tmp_prefix: Path,
     scatter_count: int,
+    input_siteonly_vcf_part_paths: list[Path] | None = None,
     out_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:
@@ -45,47 +46,61 @@ def add_vep_jobs(
         return []
 
     jobs: list[Job] = []
-    vcf = b.read_input_group(
-        **{'vcf.gz': str(vcf_path), 'vcf.gz.tbi': str(vcf_path) + '.tbi'}
+    siteonly_vcf = b.read_input_group(
+        **{
+            'vcf.gz': str(input_siteonly_vcf_path),
+            'vcf.gz.tbi': str(input_siteonly_vcf_path) + '.tbi',
+        }
     )
 
-    parts_bucket = tmp_prefix / 'vep' / 'parts'
-    part_files = []
+    input_vcf_parts: list[hb.ResourceGroup] = []
+    if input_siteonly_vcf_part_paths:
+        assert len(input_siteonly_vcf_part_paths) == scatter_count
+        for path in input_siteonly_vcf_part_paths:
+            input_vcf_parts.append(
+                b.read_input_group(
+                    **{'vcf.gz': str(path), 'vcf.gz.tbi': str(path) + '.tbi'}
+                )
+            )
+    else:
+        intervals_j, intervals = get_intervals(
+            b=b,
+            scatter_count=scatter_count,
+            job_attrs=job_attrs,
+            output_prefix=tmp_prefix / f'intervals_{scatter_count}',
+        )
+        if intervals_j:
+            jobs.append(intervals_j)
 
-    intervals_j, intervals = get_intervals(
-        b=b,
-        scatter_count=scatter_count,
-        job_attrs=job_attrs,
-        output_prefix=tmp_prefix / f'intervals_{scatter_count}',
-    )
-    if intervals_j:
-        jobs.append(intervals_j)
+        # Splitting variant calling by intervals
+        for idx in range(scatter_count):
+            subset_j = subset_vcf(
+                b,
+                vcf=siteonly_vcf,
+                interval=intervals[idx],
+                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
+            )
+            jobs.append(subset_j)
+            assert isinstance(subset_j.output_vcf, hb.ResourceGroup)
+            input_vcf_parts.append(subset_j.output_vcf)
 
-    # Splitting variant calling by intervals
+    result_parts_bucket = tmp_prefix / 'vep' / 'parts'
+    result_part_paths = []
     for idx in range(scatter_count):
         if to_hail_table:
-            part_path = parts_bucket / f'part{idx + 1}.jsonl'
+            result_part_path = result_parts_bucket / f'part{idx + 1}.jsonl'
         else:
-            part_path = parts_bucket / f'part{idx + 1}.vcf.gz'
-        part_files.append(part_path)
-        if can_reuse(part_path):
+            result_part_path = result_parts_bucket / f'part{idx + 1}.vcf.gz'
+        result_part_paths.append(result_part_path)
+        if can_reuse(result_part_path):
             continue
-
-        subset_j = subset_vcf(
-            b,
-            vcf=vcf,
-            interval=intervals[idx],
-            job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
-        )
-        jobs.append(subset_j)
-        assert isinstance(subset_j.output_vcf, hb.ResourceGroup)
 
         # noinspection PyTypeChecker
         vep_one_job = vep_one(
             b,
-            vcf=subset_j.output_vcf['vcf.gz'],
+            vcf=input_vcf_parts[idx]['vcf.gz'],
             out_format='json' if to_hail_table else 'vcf',
-            out_path=part_path,
+            out_path=result_part_paths[idx],
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
         if vep_one_job:
@@ -94,19 +109,18 @@ def add_vep_jobs(
     if to_hail_table:
         j = gather_vep_json_to_ht(
             b=b,
-            vep_results_paths=part_files,
+            vep_results_paths=result_part_paths,
             out_path=out_path,
             job_attrs=job_attrs,
             depends_on=jobs,
         )
         gather_jobs = [j]
     else:
-        assert len(part_files) == scatter_count
+        assert len(result_part_paths) == scatter_count
         gather_jobs = gather_vcfs(
             b=b,
-            input_vcfs=part_files,
+            input_vcfs=result_part_paths,
             out_vcf_path=out_path,
-            sort=False,
         )
     for j in gather_jobs:
         j.depends_on(*jobs)

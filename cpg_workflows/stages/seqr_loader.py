@@ -38,8 +38,10 @@ class AnnotateCohort(CohortStage):
         """
         h = cohort.alignment_inputs_hash()
         return {
-            'tmp_prefix': str(self.tmp_prefix / 'mt' / h),
-            'mt': get_cohort().analysis_dataset.prefix() / 'mt' / f'{h}.mt',
+            # writing into perm location for late debugging
+            # convert to str to avoid checking existence
+            'tmp_prefix': str(self.tmp_prefix),
+            'mt': self.prefix / 'cohort.mt',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -87,7 +89,7 @@ class AnnotateDataset(DatasetStage):
         """
         h = get_cohort().alignment_inputs_hash()
         return {
-            'tmp_prefix': str(self.tmp_prefix / 'mt' / f'{h}-{dataset.name}'),
+            'tmp_prefix': str(self.tmp_prefix / f'{dataset.name}'),
             'mt': dataset.prefix() / 'mt' / f'{h}-{dataset.name}.mt',
         }
 

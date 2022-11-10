@@ -30,19 +30,16 @@ class JointGenotyping(CohortStage):
         """
         Generate a pVCF and a site-only VCF.
         """
-        h = cohort.alignment_inputs_hash()
-        d = {
-            'prefix': str(self.prefix),  # convert to str to avoid checking existence
-            'vcf': to_path(f'{self.prefix}.vcf.gz'),
-            'siteonly': to_path(f'{self.prefix}-siteonly.vcf.gz'),
+        return {
+            # writing into perm location for late debugging
+            # convert to str to avoid checking existence
+            'tmp_prefix': str(self.prefix / 'tmp'),
+            'vcf': to_path(self.prefix / 'full.vcf.gz'),
+            'siteonly': to_path(self.prefix / 'siteonly.vcf.gz'),
+            'siteonly_part_pattern': str(
+                self.prefix / 'siteonly_parts' / 'part{idx}.vcf.gz'
+            ),
         }
-        scatter_count = joint_calling_scatter_count(len(cohort.get_samples()))
-        for idx in range(scatter_count):
-            d[f'vcf_part_{idx}'] = self.prefix / 'parts' / f'part{idx}.vcf.gz'
-            d[f'siteonly_part_{idx}'] = (
-                self.prefix / 'siteonly_parts' / f'part{idx}.vcf.gz'
-            )
-        return d
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
@@ -70,26 +67,16 @@ class JointGenotyping(CohortStage):
         vcf_path = self.expected_outputs(cohort)['vcf']
         siteonly_vcf_path = self.expected_outputs(cohort)['siteonly']
         scatter_count = joint_calling_scatter_count(len(cohort.get_samples()))
-        try:
-            out_partitioned_vcf_paths = [
-                self.expected_outputs(cohort)[f'vcf_part_{idx}']
-                for idx in range(scatter_count)
-            ]
-        except KeyError:
-            out_partitioned_vcf_paths = None
-        try:
-            out_partitioned_siteonly_vcf_paths = [
-                self.expected_outputs(cohort)[f'siteonly_part_{idx}']
-                for idx in range(scatter_count)
-            ]
-        except KeyError:
-            out_partitioned_siteonly_vcf_paths = None
+        out_siteonly_vcf_part_paths = [
+            to_path(self.expected_outputs(cohort)['siteonly_part_pattern'].format(idx))
+            for idx in range(scatter_count)
+        ]
 
         jc_jobs = joint_genotyping.make_joint_genotyping_jobs(
             b=get_batch(),
             out_vcf_path=vcf_path,
             out_siteonly_vcf_path=siteonly_vcf_path,
-            tmp_bucket=to_path(self.expected_outputs(cohort)['prefix']),
+            tmp_bucket=to_path(self.expected_outputs(cohort)['tmp_prefix']),
             gvcf_by_sid=gvcf_by_sid,
             tool=joint_genotyping.JointGenotyperTool.GnarlyGenotyper
             if get_config()['workflow'].get('use_gnarly', False)
@@ -97,8 +84,7 @@ class JointGenotyping(CohortStage):
             intervals_path=get_config()['workflow'].get('intervals_path'),
             job_attrs=self.get_job_attrs(),
             scatter_count=scatter_count,
-            out_partitioned_vcf_paths=out_partitioned_vcf_paths,
-            out_partitioned_siteonly_vcf_paths=out_partitioned_siteonly_vcf_paths,
+            out_siteonly_vcf_part_paths=out_siteonly_vcf_part_paths,
         )
         jobs.extend(jc_jobs)
         for job in jobs:

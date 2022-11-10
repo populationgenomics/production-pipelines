@@ -15,7 +15,7 @@ from cpg_workflows.workflow import (
 from cpg_workflows.jobs import vqsr
 from .joint_genotyping import JointGenotyping
 from .. import get_batch
-from ..utils import joint_calling_scatter_count
+from ..resources import joint_calling_scatter_count
 
 
 @stage(required_stages=JointGenotyping)
@@ -29,8 +29,10 @@ class Vqsr(CohortStage):
         Generate a site-only VCF.
         """
         return {
-            'prefix': self.prefix,
-            'siteonly': to_path(f'{self.prefix}-siteonly.vcf.gz'),
+            # writing into perm location for late debugging
+            # convert to str to avoid checking existence
+            'tmp_prefix': str(self.prefix / 'tmp'),
+            'siteonly': self.prefix / 'siteonly.vcf.gz',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -42,22 +44,21 @@ class Vqsr(CohortStage):
         )
 
         scatter_count = joint_calling_scatter_count(len(cohort.get_samples()))
-        try:
-            input_siteonly_vcf_partitions = [
-                inputs.as_path(
+        input_siteonly_vcf_part_paths = [
+            to_path(
+                inputs.as_str(
                     stage=JointGenotyping,
                     target=cohort,
-                    key=f'siteonly_part_{idx}',
-                )
-                for idx in range(scatter_count)
-            ]
-        except KeyError:
-            input_siteonly_vcf_partitions = None
+                    key=f'siteonly_part_pattern',
+                ).format(idx)
+            )
+            for idx in range(scatter_count)
+        ]
 
         jobs = vqsr.make_vqsr_jobs(
             b=get_batch(),
             input_siteonly_vcf_path=siteonly_vcf_path,
-            input_siteonly_part_vcf_paths=input_siteonly_vcf_partitions,
+            input_siteonly_vcf_part_paths=input_siteonly_vcf_part_paths,
             scatter_count=scatter_count,
             gvcf_count=len(cohort.get_samples()),
             out_path=self.expected_outputs(cohort)['siteonly'],

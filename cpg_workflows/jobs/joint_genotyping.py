@@ -8,17 +8,14 @@ from enum import Enum
 
 import pandas as pd
 from cpg_utils.config import get_config
-from cpg_workflows.utils import (
-    can_reuse,
-    joint_calling_scatter_count,
-)
+from cpg_workflows.utils import can_reuse
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path, command
 from cpg_utils import Path, to_path
 import hailtop.batch as hb
 from hailtop.batch import Resource
 from hailtop.batch.job import Job
 
-from cpg_workflows.resources import STANDARD
+from cpg_workflows.resources import STANDARD, joint_calling_scatter_count
 from cpg_workflows.filetypes import GvcfPath
 
 from .vcf import gather_vcfs
@@ -46,8 +43,7 @@ def make_joint_genotyping_jobs(
     # bcftools view gs://cpg-fewgenomes-test/unittest/inputs/chr20/gnarly/joint-called-siteonly.vcf.gz | zgrep 7105364
     tool: JointGenotyperTool = JointGenotyperTool.GenotypeGVCFs,
     scatter_count: int | None = None,
-    out_partitioned_vcf_paths: list[Path] | None = None,
-    out_partitioned_siteonly_vcf_paths: list[Path] | None = None,
+    out_siteonly_vcf_part_paths: list[Path] | None = None,
     do_filter_excesshet: bool = True,
     intervals_path: Path | None = None,
     job_attrs: dict | None = None,
@@ -64,12 +60,9 @@ def make_joint_genotyping_jobs(
     scatter_count = scatter_count or joint_calling_scatter_count(len(gvcf_by_sid))
 
     all_output_paths = [out_vcf_path, out_siteonly_vcf_path]
-    if out_partitioned_vcf_paths:
-        assert len(out_partitioned_vcf_paths) == scatter_count
-        all_output_paths.extend(out_partitioned_vcf_paths)
-    if out_partitioned_siteonly_vcf_paths:
-        assert len(out_partitioned_siteonly_vcf_paths) == scatter_count
-        all_output_paths.extend(out_partitioned_siteonly_vcf_paths)
+    if out_siteonly_vcf_part_paths:
+        assert len(out_siteonly_vcf_part_paths) == scatter_count
+        all_output_paths.extend(out_siteonly_vcf_part_paths)
     if can_reuse(all_output_paths + [to_path(f'{p}.tbi') for p in all_output_paths]):
         return []
 
@@ -123,18 +116,14 @@ def make_joint_genotyping_jobs(
             if scatter_count > 1 and do_filter_excesshet
             else out_vcf_path
         )
-        siteonly_jc_vcf_path = (
-            (tmp_bucket / 'siteonly' / 'parts' / f'part{idx + 1}.vcf.gz')
-            if scatter_count > 1
-            else out_siteonly_vcf_path
-        )
-        if out_partitioned_vcf_paths:
-            if do_filter_excesshet:
-                filt_jc_vcf_path = out_partitioned_vcf_paths[idx]
-            else:
-                jc_vcf_path = out_partitioned_vcf_paths[idx]
-        if out_partitioned_siteonly_vcf_paths:
-            siteonly_jc_vcf_path = out_partitioned_siteonly_vcf_paths[idx]
+        if out_siteonly_vcf_part_paths:
+            siteonly_jc_vcf_path = out_siteonly_vcf_part_paths[idx]
+        else:
+            siteonly_jc_vcf_path = (
+                (tmp_bucket / 'siteonly' / 'parts' / f'part{idx + 1}.vcf.gz')
+                if scatter_count > 1
+                else out_siteonly_vcf_path
+            )
 
         jc_vcf_j, jc_vcf = _add_joint_genotyper_job(
             b,
@@ -305,48 +294,6 @@ def genomicsdb(
     return j
 
 
-def joint_calling_storage_gb(n_samples: int, scatter_count: int = None) -> int:
-    """
-    Calculate storage for a joint calling job, to fit a joint-called VCF alongside
-    a GenomicsDB for an interval. The required storage grows with a number of samples,
-    but sublinearly.
-
-    1359 samples:
-
-    Joint:
-    All GenomicsDBs: 1.09 TB
-    VCF: 528.86 GB
-    Site-only: 4.29 GB
-
-    For scatter count = 200:
-    max GenomicsDB tar = 11.18G
-    max VCF = 5.25G
-
-    >>> joint_calling_storage_gb(1)
-    26
-    >>> joint_calling_storage_gb(50)
-    26
-    >>> joint_calling_storage_gb(100)
-    86
-    >>> joint_calling_storage_gb(200)
-    226
-    >>> joint_calling_storage_gb(10000)
-    486
-    """
-    genomicsdb_tar_gb = 12
-
-    sequencing_type = get_config()['workflow']['sequencing_type']
-    disk_gb = 26  # Minimal disk (default for a 4-cpu standard machine)
-    if n_samples and n_samples >= 50:
-        # for every 10x samples (starting from 50), add {multiplier}G
-        multiplier = {
-            'genome': 200,
-            'exome': 20,
-        }[sequencing_type]
-        disk_gb += int(multiplier * math.log(n_samples / 50, 10))
-    return min(1000, disk_gb)  # requesting 1T max
-
-
 def _add_joint_genotyper_job(
     b: hb.Batch,
     genomicsdb_path: Path,
@@ -382,6 +329,13 @@ def _add_joint_genotyper_job(
     job_attrs = (job_attrs or {}) | {'tool': f'gatk {tool.name}'}
     j = b.new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
+    # Standard 375/4 = 93G storage should be enough, based on the following estimations:
+    # For example, for 1359 samples, and scatter_count=200,
+    # * all of 200 GenomicsDBs tarballs = 1.09 TB
+    # * max one-interval GenomicsDB tarballs = 11.18G
+    # * max one-interval full VCF = 5.25G
+    # * gathered full VCF: 528.86 GB
+    # * gathered site-only VCF: 4.29 GB
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 

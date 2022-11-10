@@ -13,13 +13,12 @@ from typing import List
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_utils import Path, to_path
+from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import reference_path, image_path, command
-from cpg_workflows.resources import STANDARD, HIGHMEM
+from cpg_workflows.resources import STANDARD, HIGHMEM, joint_calling_scatter_count
 from cpg_workflows.jobs.picard import get_intervals
-from cpg_workflows.jobs.vcf import gather_vcfs, subset_vcf
-from cpg_workflows.utils import joint_calling_scatter_count
+from cpg_workflows.jobs.vcf import gather_vcfs
 
 STANDARD_FEATURES = [
     'ReadPosRankSum',
@@ -82,10 +81,10 @@ INDEL_RECALIBRATION_TRANCHE_VALUES = [
 def make_vqsr_jobs(
     b: hb.Batch,
     input_siteonly_vcf_path: Path,
+    input_siteonly_vcf_part_paths: list[Path],
     tmp_prefix: Path,
     gvcf_count: int,
     scatter_count: int | None = None,
-    input_siteonly_part_vcf_paths: list[Path] | None = None,
     out_path: Path | None = None,
     use_as_annotations: bool = True,
     intervals_path: Path | None = None,
@@ -96,8 +95,8 @@ def make_vqsr_jobs(
 
     @param b: Batch object to add jobs to
     @param input_siteonly_vcf_path: path to a site-only VCF
+    @param input_siteonly_vcf_part_paths: same VCF split by intervals
     @param tmp_prefix: bucket for intermediate files
-    @param input_siteonly_part_vcf_paths: same VCF split by intervals
     @param gvcf_count: number of input samples. Can't read from combined_mt_path as it
            might not be yet generated the point of Batch job submission
     @param scatter_count: number of partitions
@@ -150,25 +149,15 @@ def make_vqsr_jobs(
     )
 
     scatter_count = scatter_count or joint_calling_scatter_count(gvcf_count)
+    assert len(input_siteonly_vcf_part_paths) == scatter_count
+    input_siteonly_vcf_parts = [
+        b.read_input_group(**{'vcf.gz': str(path), 'vcf.gz.tbi': str(path) + '.tbi'})
+        for path in input_siteonly_vcf_part_paths
+    ]
 
-    if input_siteonly_part_vcf_paths:
-        assert len(input_siteonly_part_vcf_paths) == scatter_count
-
-    # TODO: use input_siteonly_part_vcf_paths
-
-    indel_vcf_j = subset_vcf(
-        b=b,
-        vcf=siteonly_vcf,
-        variant_types=['INDEL', 'MNP', 'MIXED'],
-        job_attrs=job_attrs,
-    )
-    jobs.append(indel_vcf_j)
-    indel_vcf_j.name = f'VQSR: {indel_vcf_j.name}'
-    indel_vcf = indel_vcf_j.output_vcf
-    assert isinstance(indel_vcf, hb.ResourceGroup)
     indel_recalibrator_j = indel_recalibrator_job(
         b=b,
-        siteonly_vcf=indel_vcf,
+        siteonly_vcf=siteonly_vcf,
         mills_resource_vcf=resources['mills'],
         axiom_poly_resource_vcf=resources['axiom_poly'],
         dbsnp_resource_vcf=resources['dbsnp'],
@@ -210,23 +199,9 @@ def make_vqsr_jobs(
         if intervals_j:
             jobs.append(intervals_j)
 
-        snps_interval_vcfs = []
-        for idx in range(scatter_count):
-            snp_subset_j = subset_vcf(
-                b=b,
-                vcf=siteonly_vcf,
-                interval=intervals[idx],
-                variant_types=['SNP'],
-                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
-            )
-            snp_subset_j.name = f'VQSR: {snp_subset_j.name}'
-            jobs.append(snp_subset_j)
-            snp_subset_vcf = snp_subset_j.output_vcf
-            snps_interval_vcfs.append(snp_subset_vcf)
-
         snps_recal_jobs = []
         for idx in range(scatter_count):
-            snps_interval_vcf = snps_interval_vcfs[idx]
+            snps_interval_vcf = input_siteonly_vcf_parts[idx]
             assert isinstance(snps_interval_vcf, hb.ResourceGroup)
             snps_recal_j = snps_recalibrator_scattered(
                 b,
@@ -257,13 +232,13 @@ def make_vqsr_jobs(
         ).out_tranches
 
         assert isinstance(snp_gathered_tranches, hb.ResourceFile)
-        snps_interval_snp_applied_vcfs = []
+        interval_snps_applied_vcfs = []
         for idx in range(scatter_count):
             snp_recalibration = snps_recalibrations[idx]
             assert isinstance(snp_recalibration, hb.ResourceGroup)
-            snps_interval_vcf = snps_interval_vcfs[idx]
+            snps_interval_vcf = input_siteonly_vcf_parts[idx]
             assert isinstance(snps_interval_vcf, hb.ResourceGroup)
-            applied_snps_vcf = apply_recalibration_snps(
+            snps_applied_vcf = apply_recalibration_snps(
                 b,
                 input_vcf=snps_interval_vcf,
                 interval=intervals[idx],
@@ -274,17 +249,16 @@ def make_vqsr_jobs(
                 filter_level=snp_filter_level,
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             ).output_vcf
-            assert isinstance(applied_snps_vcf, hb.ResourceGroup)
-            snps_interval_snp_applied_vcfs.append(applied_snps_vcf['vcf.gz'])
+            assert isinstance(snps_applied_vcf, hb.ResourceGroup)
+            interval_snps_applied_vcfs.append(snps_applied_vcf['vcf.gz'])
 
         gathered_vcf_path = tmp_prefix / 'gathered.vcf.gz'
         snps_applied_gathered_jobs = gather_vcfs(
             b=b,
-            input_vcfs=snps_interval_snp_applied_vcfs + [indel_vcf['vcf.gz']],
+            input_vcfs=interval_snps_applied_vcfs,
             site_only=True,
             sample_count=gvcf_count,
             job_attrs=job_attrs,
-            sort=True,  # need to sort because we have indels and snps separate
             out_vcf_path=gathered_vcf_path,
         )
         for j in snps_applied_gathered_jobs:
