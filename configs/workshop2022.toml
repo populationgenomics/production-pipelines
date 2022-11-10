@@ -9,4 +9,3 @@ only_samples=['CPG261990']
 
 [hail]
 billing_project = 'fewgenomes'
-dry_run = true 
