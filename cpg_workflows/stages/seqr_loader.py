@@ -178,7 +178,8 @@ class MtToEs(DatasetStage):
         # we are not importing it on the top level.
         from analysis_runner import dataproc
 
-        script_path = to_path(__file__).parent / 'dataproc_scripts' / 'mt_to_es.py'
+        script_path = 'cpg_workflows/dataproc_scripts/mt_to_es.py'
+        pyfiles = ['seqr-loading-pipelines/hail_scripts']
 
         j = dataproc.hail_dataproc_job(
             get_batch(),
@@ -201,7 +202,7 @@ class MtToEs(DatasetStage):
             job_name=f'{dataset.name}: create ES index',
             depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
-            pyfiles=['seqr-loading-pipelines/hail_scripts'],
+            pyfiles=pyfiles,
         )
         j._preemptible = False
         j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}

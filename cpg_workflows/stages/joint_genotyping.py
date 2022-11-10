@@ -17,7 +17,7 @@ from cpg_workflows.workflow import (
 )
 from .genotype import Genotype
 from .. import get_batch
-from ..utils import joint_calling_scatter_count
+from ..resources import joint_calling_scatter_count
 
 
 @stage(required_stages=Genotype)
@@ -31,17 +31,17 @@ class JointGenotyping(CohortStage):
         Generate a pVCF and a site-only VCF.
         """
         h = cohort.alignment_inputs_hash()
-        prefix = cohort.analysis_dataset.prefix() / self.name / h
-        qc_prefix = cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / 'picard'
         d = {
-            'prefix': str(prefix),
-            'vcf': to_path(f'{prefix}.vcf.gz'),
-            'siteonly': to_path(f'{prefix}-siteonly.vcf.gz'),
+            'prefix': str(self.prefix),  # convert to str to avoid checking existence
+            'vcf': to_path(f'{self.prefix}.vcf.gz'),
+            'siteonly': to_path(f'{self.prefix}-siteonly.vcf.gz'),
         }
-        # scatter_count = joint_calling_scatter_count(len(cohort.get_samples()))
-        # for idx in range(scatter_count):
-        #     d[f'vcf_part_{idx}'] = prefix / 'parts' / f'part{idx}.vcf.gz'
-        #     d[f'siteonly_part_{idx}'] = prefix / 'siteonly_parts' / f'part{idx}.vcf.gz'
+        scatter_count = joint_calling_scatter_count(len(cohort.get_samples()))
+        for idx in range(scatter_count):
+            d[f'vcf_part_{idx}'] = self.prefix / 'parts' / f'part{idx}.vcf.gz'
+            d[f'siteonly_part_{idx}'] = (
+                self.prefix / 'siteonly_parts' / f'part{idx}.vcf.gz'
+            )
         return d
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:

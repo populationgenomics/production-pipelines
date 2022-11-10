@@ -27,11 +27,9 @@ class Vep(CohortStage):
         """
         Expected to write a hail table.
         """
-        h = cohort.alignment_inputs_hash()
-        prefix = str(cohort.analysis_dataset.tmp_prefix() / self.name / h)
         return {
-            'prefix': prefix,
-            'ht': to_path(f'{prefix}.ht'),
+            'prefix': self.tmp_prefix,
+            'ht': to_path(f'{self.tmp_prefix}.ht'),
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:

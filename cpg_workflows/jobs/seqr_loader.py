@@ -29,9 +29,12 @@ def annotate_cohort_jobs(
         # we are not importing it on the top level.
         from analysis_runner import dataproc
 
-        script_path = (
-            to_path(__file__).parent / 'dataproc_scripts' / 'annotate_cohort.py'
-        )
+        # Script path and pyfiles should be relative to the repository root
+        script_path = 'cpg_workflows/dataproc_scripts/annotate_cohort.py'
+        pyfiles = [
+            'seqr-loading-pipelines/hail_scripts',
+            'cpg_workflows/query_modules',
+        ]
 
         j = dataproc.hail_dataproc_job(
             b,
@@ -57,10 +60,7 @@ def annotate_cohort_jobs(
             job_name=f'Annotate cohort',
             depends_on=depends_on,
             scopes=['cloud-platform'],
-            pyfiles=[
-                'seqr-loading-pipelines/hail_scripts',
-                'cpg_workflows/query_modules',
-            ],
+            pyfiles=pyfiles,
             init=['gs://cpg-reference/hail_dataproc/install_common.sh'],
         )
         j.attributes = (job_attrs or {}) | {'tool': 'hailctl dataproc'}
@@ -112,9 +112,12 @@ def annotate_dataset_jobs(
         # we are not importing it on the top level.
         from analysis_runner import dataproc
 
-        script_path = (
-            to_path(__file__).parent / 'dataproc_scripts' / 'annotate_dataset.py'
-        )
+        # Script path and pyfiles should be relative to the repository root
+        script_path = 'cpg_workflows/dataproc_scripts/annotate_dataset.py'
+        pyfiles = [
+            'seqr-loading-pipelines/hail_scripts',
+            'cpg_workflows/query_modules',
+        ]
 
         j = dataproc.hail_dataproc_job(
             b,
@@ -135,10 +138,7 @@ def annotate_dataset_jobs(
             job_name=f'Annotate dataset',
             depends_on=depends_on,
             scopes=['cloud-platform'],
-            pyfiles=[
-                'seqr-loading-pipelines/hail_scripts',
-                'query_modules',
-            ],
+            pyfiles=pyfiles,
             init=['gs://cpg-reference/hail_dataproc/install_common.sh'],
         )
         j.attributes = (job_attrs or {}) | {'tool': 'hailctl dataproc'}
