@@ -35,6 +35,9 @@ setup(
             'pytest-mock',
         ],
     },
+    package_data={
+        'cpg_workflows': ['defaults.toml'],
+    },
     keywords='bioinformatics',
     classifiers=[
         'Environment :: Console',

@@ -92,9 +92,9 @@ def main(
 
     wfl_conf_path = to_path(__file__).parent / f'configs/defaults/{workflow}.toml'
     assert wfl_conf_path.exists(), wfl_conf_path
-    config_paths = os.environ['CPG_CONFIG_PATH'].split(',')
+    config_paths = os.environ['CPG_CONFIG_PATH'].split(',') + config_paths
     assert config_paths[0] == defaults_config_path  # assuming it's loaded in __init__
-    # Inserting after the defaults config, but before user configs
+    # Inserting after the "defaults" config, but before user configs:
     set_config_paths(config_paths[:1] + [str(wfl_conf_path)] + config_paths[1:])
 
     run_workflow(stages=WORKFLOWS[workflow], dry_run=dry_run)
