@@ -59,10 +59,7 @@ def _set_config(dir_path: Path, extra_conf: dict | None = None):
         [
             str(p)
             for p in [
-                to_path(__file__).parent.parent
-                / 'configs'
-                / 'defaults'
-                / 'workflows.toml',
+                to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml',
                 to_path(__file__).parent.parent
                 / 'configs'
                 / 'defaults'

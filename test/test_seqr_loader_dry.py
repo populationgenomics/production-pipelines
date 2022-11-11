@@ -39,8 +39,8 @@ def timestamp(rand_suffix_len: int = 5) -> str:
 def _make_config(results_prefix: Path) -> dict:
     d: dict = {}
     for fp in [
-        to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml',
         to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml',
+        to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml',
     ]:
         with fp.open():
             update_dict(d, toml.load(fp))
