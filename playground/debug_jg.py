@@ -11,12 +11,12 @@ from cpg_workflows.resources import STANDARD
 b = get_batch(
     'Debug exomes missing variant https://github.com/populationgenomics/seqr-private/issues/32'
 )
-reference = fasta_res_group(b)
-tar_path = 'gs://cpg-seqr-main/exome/JointGenotyping/dd7b2003026c7a6c70057a9c0f170074be6322_628/genomicsdbs/interval_60_outof_100.tar'
-tar = b.read_input(tar_path)
-interval = b.read_input(
-    'gs://cpg-seqr-main/exome/JointGenotyping/dd7b2003026c7a6c70057a9c0f170074be6322_628/intervals_100/60.interval_list'
-)
+# reference = fasta_res_group(b)
+# tar_path = 'gs://cpg-seqr-main/exome/JointGenotyping/dd7b2003026c7a6c70057a9c0f170074be6322_628/genomicsdbs/interval_60_outof_100.tar'
+# tar = b.read_input(tar_path)
+# interval = b.read_input(
+#     'gs://cpg-seqr-main/exome/JointGenotyping/dd7b2003026c7a6c70057a9c0f170074be6322_628/intervals_100/60.interval_list'
+# )
 
 
 def _run_genotypegvcfs():
