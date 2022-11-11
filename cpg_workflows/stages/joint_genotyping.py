@@ -68,7 +68,9 @@ class JointGenotyping(CohortStage):
         siteonly_vcf_path = self.expected_outputs(cohort)['siteonly']
         scatter_count = joint_calling_scatter_count(len(cohort.get_samples()))
         out_siteonly_vcf_part_paths = [
-            to_path(self.expected_outputs(cohort)['siteonly_part_pattern'].format(idx))
+            to_path(
+                self.expected_outputs(cohort)['siteonly_part_pattern'].format(idx=idx)
+            )
             for idx in range(scatter_count)
         ]
 
