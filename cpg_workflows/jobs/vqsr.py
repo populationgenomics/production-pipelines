@@ -264,7 +264,7 @@ def make_vqsr_jobs(
             input_vcf=snps_applied_gathered_vcf,
             recalibration=indel_recalibrator_j.recalibration,
             tranches=indel_recalibrator_j.tranches,
-            disk_size=huge_disk,
+            disk_size=small_disk,
             use_as_annotations=use_as_annotations,
             filter_level=indel_filter_level,
             job_attrs=job_attrs,
@@ -409,7 +409,10 @@ def indel_recalibrator_job(
     j.command(
         f"""set -euo pipefail
 
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
+    gatk --java-options \
+      "-Xms{res.get_java_mem_mb()}m \
+      -XX:+UseParallelGC \
+      -XX:ParallelGCThreads={res.get_nthreads() - 2}" \\
       VariantRecalibrator \\
       -V {siteonly_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
@@ -494,7 +497,10 @@ def snps_recalibrator_create_model_job(
     j.command(
         f"""set -euo pipefail
 
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
+    gatk --java-options \
+      "-Xms{res.get_java_mem_mb()}m \
+      -XX:+UseParallelGC \
+      -XX:ParallelGCThreads={res.get_nthreads() - 2}" \\
       VariantRecalibrator \\
       -V {siteonly_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
@@ -558,7 +564,7 @@ def snps_recalibrator_scattered(
     if is_small_callset:
         res = STANDARD.set_resources(j, ncpu=4, storage_gb=disk_size)
     else:
-        res = STANDARD.set_resources(j, ncpu=8, storage_gb=disk_size)
+        res = HIGHMEM.set_resources(j, ncpu=4, storage_gb=disk_size)
 
     j.declare_resource_group(recalibration={'index': '{root}.idx', 'base': '{root}'})
 
@@ -578,7 +584,10 @@ def snps_recalibrator_scattered(
 
     MODEL_REPORT={model_file}
 
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
+    gatk --java-options \
+      "-Xms{res.get_java_mem_mb()}m \
+      -XX:+UseParallelGC \
+      -XX:ParallelGCThreads={res.get_nthreads() - 2}" \\
       VariantRecalibrator \\
       -V {siteonly_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
@@ -648,7 +657,10 @@ def snps_recalibrator_job(
     j.command(
         f"""set -euo pipefail
 
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
+    gatk --java-options \
+      "-Xms{res.get_java_mem_mb()}m \
+      -XX:+UseParallelGC \
+      -XX:ParallelGCThreads={res.get_nthreads() - 2}" \\
       VariantRecalibrator \\
       -V {sites_only_variant_filtered_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
