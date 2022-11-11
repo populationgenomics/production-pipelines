@@ -23,7 +23,7 @@ from ..targets import Sample
 
 
 @stage(required_stages=JointGenotyping)
-class JointVcfQc(CohortStage):
+class JointVcfQC(CohortStage):
     """
     QC joint VCF
     """
@@ -114,7 +114,7 @@ class JointVcfHappy(SampleStage):
 
 @stage(
     required_stages=[
-        JointVcfQc,
+        JointVcfQC,
         JointVcfHappy,
     ],
     forced=True,
@@ -159,7 +159,7 @@ class JointVcfMultiQC(CohortStage):
         paths = []
         ending_to_trim = set()  # endings to trim to get sample names
 
-        paths.append(inputs.as_path(cohort, JointVcfQc, 'qc_detail'))
+        paths.append(inputs.as_path(cohort, JointVcfQC, 'qc_detail'))
 
         for sample in cohort.get_samples():
             try:

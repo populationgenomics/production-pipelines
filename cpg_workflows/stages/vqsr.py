@@ -49,7 +49,7 @@ class Vqsr(CohortStage):
             scatter_count=joint_calling_scatter_count(len(cohort.get_samples())),
             gvcf_count=len(cohort.get_samples()),
             out_path=self.expected_outputs(cohort)['siteonly'],
-            tmp_prefix=to_path(self.expected_outputs(cohort)['prefix']),
+            tmp_prefix=to_path(self.expected_outputs(cohort)['tmp_prefix']),
             use_as_annotations=get_config()['workflow'].get('use_as_vqsr', True),
             intervals_path=get_config()['workflow'].get('intervals_path'),
             job_attrs=self.get_job_attrs(),

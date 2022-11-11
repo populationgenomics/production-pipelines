@@ -38,10 +38,10 @@ def timestamp(rand_suffix_len: int = 5) -> str:
 
 def _make_config(results_prefix: Path) -> dict:
     d: dict = {}
-    for fp in (
-        to_path(__file__).parent.parent / 'configs' / 'defaults' / 'workflows.toml',
+    for fp in [
+        to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml',
         to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml',
-    ):
+    ]:
         with fp.open():
             update_dict(d, toml.load(fp))
 
@@ -81,7 +81,7 @@ def test_seqr_loader_dry(mocker: MockFixture):
         to_path(__file__).parent / 'results' / os.getenv('TEST_TIMESTAMP', timestamp())
     ).absolute()
     results_prefix.mkdir(parents=True, exist_ok=True)
-    conf = _make_config(results_prefix)
+    mocker.patch('cpg_utils.config.get_config', lambda: _make_config(results_prefix))
 
     def mock_create_cohort(*args, **kwargs):
         from cpg_workflows.targets import Cohort
@@ -116,6 +116,8 @@ def test_seqr_loader_dry(mocker: MockFixture):
         )
         return cohort
 
+    mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
+
     def mock_exists(*args, **kwargs) -> bool:
         return False
 
@@ -126,8 +128,6 @@ def test_seqr_loader_dry(mocker: MockFixture):
         return 1
 
     mocker.patch('pathlib.Path.open', mock_open(read_data='<stub>'))
-    mocker.patch('cpg_utils.config.get_config', lambda: conf)
-    mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
     # functions like get_intervals checks file existence
     mocker.patch('cloudpathlib.cloudpath.CloudPath.exists', mock_exists)
     # cloudfuse (used in Vep) doesn't work with LocalBackend
@@ -148,10 +148,11 @@ def test_seqr_loader_dry(mocker: MockFixture):
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.stages.cram_qc import CramMultiQC
     from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
+    from cpg_workflows.stages.joint_genotyping_qc import JointVcfQC
     from cpg_workflows.workflow import get_workflow
     from cpg_workflows.stages.seqr_loader import MtToEs
 
-    get_workflow().run(stages=[MtToEs, GvcfMultiQC, CramMultiQC])
+    get_workflow().run(stages=[MtToEs, GvcfMultiQC, CramMultiQC, JointVcfQC])
 
     assert (
         get_batch().job_by_tool['gatk HaplotypeCaller']['job_n']
