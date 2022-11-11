@@ -491,7 +491,12 @@ class Stage(Generic[TargetT], ABC):
             return outputs
 
         # Adding status reporter jobs
-        if self.analysis_type and self.status_reporter:
+        if (
+            self.analysis_type
+            and self.status_reporter
+            and action == Action.QUEUE
+            and outputs.data
+        ):
             output: str | Path
             if isinstance(outputs.data, dict):
                 if not self.analysis_key:
@@ -508,8 +513,9 @@ class Stage(Generic[TargetT], ABC):
                     )
                 output = outputs.data[self.analysis_key]
             else:
-                assert isinstance(outputs.data, str) or isinstance(outputs.data, Path)
                 output = outputs.data
+
+            assert isinstance(output, str) or isinstance(output, Path), output
 
             self.status_reporter.add_updaters_jobs(
                 b=get_batch(),
