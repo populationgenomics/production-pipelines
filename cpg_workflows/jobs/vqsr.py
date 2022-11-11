@@ -264,7 +264,7 @@ def make_vqsr_jobs(
             input_vcf=snps_applied_gathered_vcf,
             recalibration=indel_recalibrator_j.recalibration,
             tranches=indel_recalibrator_j.tranches,
-            disk_size=huge_disk,
+            disk_size=small_disk,
             use_as_annotations=use_as_annotations,
             filter_level=indel_filter_level,
             job_attrs=job_attrs,
