@@ -115,23 +115,6 @@ def _vep():
 from analysis_runner import dataproc
 
 
-j = dataproc.hail_dataproc_job(
-    get_batch(),
-    f'touch',
-    max_age='24h',
-    packages=[
-        'cpg_workflows',
-        'elasticsearch==8.*',
-        'google',
-        'fsspec',
-        'gcloud',
-    ],
-    num_workers=2,
-    num_secondary_workers=0,
-    job_name=f'test',
-    scopes=['cloud-platform'],
-)
-
+j = b.new_job('test')
 j._preemptible = False
-
 b.run(wait=False)
