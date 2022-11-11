@@ -8,9 +8,9 @@ from cpg_workflows import get_batch, get_cohort
 from cpg_workflows.jobs import vep
 from cpg_workflows.resources import STANDARD
 
-b = get_batch(
-    'Debug exomes missing variant https://github.com/populationgenomics/seqr-private/issues/32'
-)
+# b = get_batch(
+#     'Debug exomes missing variant https://github.com/populationgenomics/seqr-private/issues/32'
+# )
 # reference = fasta_res_group(b)
 # tar_path = 'gs://cpg-seqr-main/exome/JointGenotyping/dd7b2003026c7a6c70057a9c0f170074be6322_628/genomicsdbs/interval_60_outof_100.tar'
 # tar = b.read_input(tar_path)
@@ -111,10 +111,7 @@ def _vep():
 # )
 # _vep()
 
-
-from analysis_runner import dataproc
-
-
-j = b.new_job('test')
+b = get_batch('test non-preempt jobs')
+j = b.new_job('non-preempt jobs')
 j._preemptible = False
 b.run(wait=False)
