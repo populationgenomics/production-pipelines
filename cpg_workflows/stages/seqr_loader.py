@@ -190,7 +190,7 @@ class MtToEs(DatasetStage):
             f'--done-flag-path {done_flag_path} '
             f'--es-password {es_password()} '
             f'--liftover-path {reference_path("liftover_38_to_37")}',
-            max_age='24h',
+            max_age='48h',
             packages=[
                 'cpg_workflows',
                 'elasticsearch==8.*',
