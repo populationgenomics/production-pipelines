@@ -35,7 +35,7 @@ class TestSampleStage(SampleStage):
         Submit jobs.
         """
 
-        input_path = (sample.dataset.prefix() / 'WorkshopNov22' / 'BRACA1_R1.fastq.gz')
+        input_path = (sample.dataset.prefix() / 'WorkshopNov22' / 'BRCA1_R1.fastq.gz')
         output_path = (sample.dataset.prefix() / 'WorkshopNov22' / f'{sample.participant_id}.fastq.gz')
 
         jobs = little_sample_job.little_sample_job(
