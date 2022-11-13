@@ -11,47 +11,8 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import reference_path, genome_build
 from hail_scripts.computed_fields import vep, variant_id
 
+from cpg_workflows.large_cohort.load_vqsr import load_vqsr
 from cpg_workflows.utils import can_reuse
-
-
-def load_vqsr(site_only_vqsr_vcf_path: str):
-    """
-    Loads the site-only VCF with applied AS-VQSR filters into a site-only hail table.
-    Populates "ht.filters".
-    """
-    logging.info(
-        f'AS-VQSR: importing annotations from a site-only VCF '
-        f'{site_only_vqsr_vcf_path}'
-    )
-    ht = hl.import_vcf(
-        str(site_only_vqsr_vcf_path),
-        force_bgz=True,
-        reference_genome=genome_build(),
-    ).rows()
-
-    # Dropping all INFO/AS* annotations as well as InbreedingCoeff, as they are
-    # causing problems splitting multiallelics after parsing by Hail.
-    as_fields = [f for f in ht.info if f.startswith('AS_') and f != 'AS_FilterStatus']
-    fields_to_drop = as_fields + ['InbreedingCoeff']
-    ht = ht.annotate(info=ht.info.drop(*fields_to_drop))
-
-    logging.info(f'AS-VQSR: splitting multiallelics...')
-    unsplit_count = ht.count()
-    ht = hl.split_multi_hts(ht)
-    ht = ht.annotate(
-        info=ht.info.annotate(AS_FilterStatus=ht.info.AS_FilterStatus[ht.a_index - 1])
-    )
-    ht = ht.annotate(
-        filters=ht.filters.union(hl.set([ht.info.AS_FilterStatus])).filter(
-            lambda val: val != 'PASS'
-        ),
-    )
-
-    split_count = ht.count()
-    logging.info(
-        f'AS-VQSR: Found {unsplit_count} unsplit and {split_count} split variants'
-    )
-    return ht
 
 
 def annotate_cohort(

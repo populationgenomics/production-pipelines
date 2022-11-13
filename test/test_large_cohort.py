@@ -42,10 +42,10 @@ def timestamp(rand_suffix_len: int = 5) -> str:
 
 def _make_config(results_prefix: Path) -> dict:
     d: dict = {}
-    for fp in (
-        to_path(__file__).parent.parent / 'configs' / 'defaults' / 'workflows.toml',
+    for fp in [
+        to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml',
         to_path(__file__).parent.parent / 'configs' / 'defaults' / 'large_cohort.toml',
-    ):
+    ]:
         with fp.open():
             update_dict(d, toml.load(fp))
 
@@ -91,7 +91,6 @@ def test_large_cohort(mocker: MockFixture):
     ).absolute()
     results_prefix.mkdir(parents=True, exist_ok=True)
     conf = _make_config(results_prefix)
-
     mocker.patch('cpg_utils.config.get_config', lambda: conf)
 
     from cpg_workflows.filetypes import GvcfPath
