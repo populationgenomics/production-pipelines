@@ -42,6 +42,7 @@ class TestSampleStage(SampleStage):
                 b=get_batch(),
                 output_path=output_path,
                 input_path=input_path,
+                job_attrs={'sample': sample.id, 'participant': sample.participant_id}
         )
         return self.make_outputs(
             sample, data=self.expected_outputs(sample), jobs=jobs
