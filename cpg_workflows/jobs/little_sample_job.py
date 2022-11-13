@@ -1,7 +1,6 @@
 """
 Sample Jobs.
 """
-import logging
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
