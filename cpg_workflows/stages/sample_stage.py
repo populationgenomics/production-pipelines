@@ -25,9 +25,9 @@ class TestSampleStage(SampleStage):
         """
         Generate some stuff!
         """
-        path = (sample.dataset.prefix() / 'WorkshopNov22' / f'{sample.participant_id}.fastq.gz')
+        expected_out_path = (sample.dataset.prefix() / 'WorkshopNov22' / f'{sample.participant_id}.fastq.gz')
         return {
-            'new_file': str(path),
+            'new_file': str(expected_out_path),
         }
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
@@ -35,12 +35,13 @@ class TestSampleStage(SampleStage):
         Submit jobs.
         """
 
-        input_path = (sample.dataset.prefix() / 'Workshop22' / 'BRACA1_R1.fastq.gz')
+        input_path = (sample.dataset.prefix() / 'WorkshopNov22' / 'BRACA1_R1.fastq.gz')
+        output_path = (sample.dataset.prefix() / 'WorkshopNov22' / f'{sample.participant_id}.fastq.gz')
 
         jobs = little_sample_job.little_sample_job(
                 b=get_batch(),
-                output_path=f'gs://cpg-fewgenomes-test/WorkshopNov22/{sample.participant_id}.fastq.gz',
-                input_path=str(input_path),
+                output_path=output_path,
+                input_path=input_path,
         )
         return self.make_outputs(
             sample, data=self.expected_outputs(sample), jobs=jobs

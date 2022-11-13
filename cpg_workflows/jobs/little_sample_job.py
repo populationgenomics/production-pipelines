@@ -13,7 +13,7 @@ from cpg_utils.hail_batch import image_path
 def little_sample_job(
     b: hb.Batch,
     output_path: Path,
-    input_path,
+    input_path: Path,
     subsample: bool = True,
     job_attrs: dict | None = None,
 ) -> Job:
@@ -25,7 +25,7 @@ def little_sample_job(
     j.image(image_path('cpg_workflows'))
 
     cmd = ''
-    input_file: str | hb.ResourceFile = b.read_input(input_path)
+    input_file: str | hb.ResourceFile = b.read_input(str(input_path))
 
     cmd += f"""\
     echo {input_file} > {j.out}
