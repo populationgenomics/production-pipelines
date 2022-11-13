@@ -1,11 +1,5 @@
 [workflow]
-dataset_gcp_project = 'fewgenomes'
-dataset = 'fewgenomes'
 access_level='test'
 sequencing_type = 'genome'
-output_version = '0.1'
 skip_qc = false
 only_samples=['CPG261990']
-
-[hail]
-billing_project = 'fewgenomes'
