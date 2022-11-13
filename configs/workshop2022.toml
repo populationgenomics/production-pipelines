@@ -1,4 +1,3 @@
 [workflow]
 access_level='test'
 sequencing_type = 'genome'
-only_samples=['CPG261990']
