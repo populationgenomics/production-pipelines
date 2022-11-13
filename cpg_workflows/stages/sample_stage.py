@@ -1,7 +1,6 @@
 """
 A sample stage.
 """
-
 import logging
 from cpg_utils.config import get_config
 from cpg_workflows.workflow import (
@@ -30,7 +29,7 @@ class TestSampleStage(SampleStage):
         logging.info(path)
         print(path)
         return {
-            'new_file': path,
+            'new_file': str(path),
         }
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
@@ -43,7 +42,6 @@ class TestSampleStage(SampleStage):
         logging.info(sample.make_cram_path())
 
         input_path = (sample.dataset.prefix() / 'Workshop22' / 'BRACA1_R1.fastq.gz')
-        logging.info(input_path)
 
         jobs = little_sample_job.little_sample_job(
                 b=get_batch(),

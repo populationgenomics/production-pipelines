@@ -1,7 +1,7 @@
 """
 Sample Jobs.
 """
-
+import logging
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
@@ -25,7 +25,7 @@ def little_sample_job(
     j.image(image_path('cpg_workflows'))
 
     cmd = ''
-    input_file: str | hb.ResourceFile = b.read_input(input_path)
+    input_file: str | hb.ResourceFile = b.read_input(str(input_path))
 
     cmd += f"""\
     echo {input_file} > {j.out}
