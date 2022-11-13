@@ -2,6 +2,7 @@
 A sample stage.
 """
 
+import logging
 from cpg_utils.config import get_config
 from cpg_workflows.workflow import (
     stage,
@@ -26,9 +27,10 @@ class TestSampleStage(SampleStage):
         Generate some stuff!
         """
         path = (sample.dataset.prefix() / 'WorkshopNov22' / f'{sample.participant_id}.fastq.gz')
+        logging.info(path)
         print(path)
         return {
-            'new_file': f'gs://cpg-fewgenomes-test/WorkshopNov22/{sample.participant_id}.fastq.gz',
+            'new_file': path,
         }
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
@@ -38,10 +40,15 @@ class TestSampleStage(SampleStage):
         print(sample.make_cram_path())
         print(self.get_job_attrs(sample))
 
+        logging.info(sample.make_cram_path())
+
+        input_path = (sample.dataset.prefix() / 'Workshop22' / 'BRACA1_R1.fastq.gz')
+        logging.info(input_path)
+
         jobs = little_sample_job.little_sample_job(
                 b=get_batch(),
                 output_path=f'gs://cpg-fewgenomes-test/WorkshopNov22/{sample.participant_id}.fastq.gz',
-                input_path=f'gs://cpg-fewgenomes-test/WorkshopNov22/BRCA1_R1.fastq.gz',
+                input_path=input_path,
         )
         return self.make_outputs(
             sample, data=self.expected_outputs(sample), jobs=jobs
