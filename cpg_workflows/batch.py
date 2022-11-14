@@ -158,7 +158,7 @@ class Batch(hb.Batch):
                 job.name, job.attributes = self._process_attributes(
                     job.name, job.attributes
                 )
-                if self.pool_label:
+                if self.pool_label and job._preemptible:
                     job._pool_label = self.pool_label
                 copy_common_env(job)
 

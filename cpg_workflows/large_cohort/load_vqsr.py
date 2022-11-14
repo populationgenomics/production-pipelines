@@ -15,7 +15,7 @@ def run(
 
 def load_vqsr(
     site_only_vcf_path: Path,
-    out_ht_path: Path,
+    out_ht_path: Path | None = None,
 ) -> hl.Table:
     """
     Convert VQSR VCF to HT
@@ -40,7 +40,8 @@ def load_vqsr(
     # To mitigate this, we can drop the SB field before the HT is (lazily) parsed.
     # In order words, dropping it before calling ht.write() makes sure that Hail would
     # never attempt to actually parse it.
-    ht = ht.annotate(info=ht.info.drop('SB'))
+    if 'SB' in ht.info:
+        ht = ht.annotate(info=ht.info.drop('SB'))
 
     # Dropping also all INFO/AS* annotations as well as InbreedingCoeff, as they are
     # causing problems splitting multiallelics after parsing by Hail, when Hail attempts
@@ -55,9 +56,10 @@ def load_vqsr(
 
     unsplit_count = ht.count()
     ht = hl.split_multi_hts(ht)
-    ht.write(str(out_ht_path), overwrite=True)
-    ht = hl.read_table(str(out_ht_path))
-    logging.info(f'Wrote split HT to {out_ht_path}')
+    if out_ht_path:
+        ht.write(str(out_ht_path), overwrite=True)
+        ht = hl.read_table(str(out_ht_path))
+        logging.info(f'Wrote split HT to {out_ht_path}')
     split_count = ht.count()
     logging.info(
         f'Found {unsplit_count} unsplit and {split_count} split variants with VQSR annotations'

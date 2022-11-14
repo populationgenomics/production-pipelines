@@ -16,9 +16,9 @@ from hailtop.batch.job import Job
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import reference_path, image_path, command
-from cpg_workflows.resources import STANDARD, HIGHMEM
+from cpg_workflows.resources import STANDARD, HIGHMEM, joint_calling_scatter_count
 from cpg_workflows.jobs.picard import get_intervals
-from cpg_workflows.jobs.vcf import gather_vcfs, subset_vcf
+from cpg_workflows.jobs.vcf import gather_vcfs
 
 STANDARD_FEATURES = [
     'ReadPosRankSum',
@@ -83,9 +83,9 @@ def make_vqsr_jobs(
     input_siteonly_vcf_path: Path,
     tmp_prefix: Path,
     gvcf_count: int,
+    scatter_count: int | None = None,
     out_path: Path | None = None,
     use_as_annotations: bool = True,
-    overwrite: bool = False,
     intervals_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:
@@ -97,10 +97,10 @@ def make_vqsr_jobs(
     @param tmp_prefix: bucket for intermediate files
     @param gvcf_count: number of input samples. Can't read from combined_mt_path as it
            might not be yet generated the point of Batch job submission
+    @param scatter_count: number of partitions
     @param intervals_path: path to specific interval list
     @param out_path: path to write final recalibrated VCF to
     @param use_as_annotations: use allele-specific annotation for VQSR
-    @param overwrite: whether to not reuse intermediate files
     @param job_attrs: default job attributes
     @return: a final Job, and a path to the VCF with VQSR annotations
     """
@@ -137,12 +137,6 @@ def make_vqsr_jobs(
     # To fit a joint-called VCF
     huge_disk = 200 if is_small_callset else (500 if not is_huge_callset else 2000)
 
-    scatter_count = 50
-    if gvcf_count > 300:
-        scatter_count = 100
-    if gvcf_count > 1000:
-        scatter_count = 200
-
     jobs: list[Job] = []
 
     siteonly_vcf = b.read_input_group(
@@ -152,19 +146,9 @@ def make_vqsr_jobs(
         }
     )
 
-    indel_vcf_j = subset_vcf(
-        b=b,
-        vcf=siteonly_vcf,
-        variant_types=['INDEL', 'MNP', 'MIXED'],
-        job_attrs=job_attrs,
-    )
-    jobs.append(indel_vcf_j)
-    indel_vcf_j.name = f'VQSR: {indel_vcf_j.name}'
-    indel_vcf = indel_vcf_j.output_vcf
-    assert isinstance(indel_vcf, hb.ResourceGroup)
     indel_recalibrator_j = indel_recalibrator_job(
         b=b,
-        siteonly_vcf=indel_vcf,
+        siteonly_vcf=siteonly_vcf,
         mills_resource_vcf=resources['mills'],
         axiom_poly_resource_vcf=resources['axiom_poly'],
         dbsnp_resource_vcf=resources['dbsnp'],
@@ -178,6 +162,7 @@ def make_vqsr_jobs(
     assert isinstance(indel_recalibrator_j.tranches, hb.ResourceFile)
     jobs.append(indel_recalibrator_j)
 
+    scatter_count = scatter_count or joint_calling_scatter_count(gvcf_count)
     if scatter_count > 1:
         # Run SNP recalibrator in a scattered mode
         model_j = snps_recalibrator_create_model_job(
@@ -206,27 +191,11 @@ def make_vqsr_jobs(
         if intervals_j:
             jobs.append(intervals_j)
 
-        snps_interval_vcfs = []
-        for idx in range(scatter_count):
-            snp_subset_j = subset_vcf(
-                b=b,
-                vcf=siteonly_vcf,
-                interval=intervals[idx],
-                variant_types=['SNP'],
-                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
-            )
-            snp_subset_j.name = f'VQSR: {snp_subset_j.name}'
-            jobs.append(snp_subset_j)
-            snp_subset_vcf = snp_subset_j.output_vcf
-            snps_interval_vcfs.append(snp_subset_vcf)
-
         snps_recal_jobs = []
         for idx in range(scatter_count):
-            snps_interval_vcf = snps_interval_vcfs[idx]
-            assert isinstance(snps_interval_vcf, hb.ResourceGroup)
             snps_recal_j = snps_recalibrator_scattered(
                 b,
-                siteonly_vcf=snps_interval_vcf,
+                siteonly_vcf=siteonly_vcf,
                 interval=intervals[idx],
                 model_file=model_j.model_file,
                 hapmap_resource_vcf=resources['hapmap'],
@@ -253,15 +222,13 @@ def make_vqsr_jobs(
         ).out_tranches
 
         assert isinstance(snp_gathered_tranches, hb.ResourceFile)
-        snps_interval_snp_applied_vcfs = []
+        interval_snps_applied_vcfs = []
         for idx in range(scatter_count):
             snp_recalibration = snps_recalibrations[idx]
             assert isinstance(snp_recalibration, hb.ResourceGroup)
-            snps_interval_vcf = snps_interval_vcfs[idx]
-            assert isinstance(snps_interval_vcf, hb.ResourceGroup)
-            applied_snps_vcf = apply_recalibration_snps(
+            snps_applied_vcf = apply_recalibration_snps(
                 b,
-                input_vcf=snps_interval_vcf,
+                input_vcf=siteonly_vcf,
                 interval=intervals[idx],
                 recalibration=snp_recalibration,
                 tranches=snp_gathered_tranches,
@@ -270,31 +237,40 @@ def make_vqsr_jobs(
                 filter_level=snp_filter_level,
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             ).output_vcf
-            assert isinstance(applied_snps_vcf, hb.ResourceGroup)
-            snps_interval_snp_applied_vcfs.append(applied_snps_vcf['vcf.gz'])
+            assert isinstance(snps_applied_vcf, hb.ResourceGroup)
+            interval_snps_applied_vcfs.append(snps_applied_vcf['vcf.gz'])
 
-        snps_applied_gathered_j, snps_applied_gathered_vcf = gather_vcfs(
+        gathered_vcf_path = tmp_prefix / 'gathered.vcf.gz'
+        snps_applied_gathered_jobs = gather_vcfs(
             b=b,
-            input_vcfs=snps_interval_snp_applied_vcfs + [indel_vcf['vcf.gz']],
-            overwrite=overwrite,
+            input_vcfs=interval_snps_applied_vcfs,
             site_only=True,
-            gvcf_count=gvcf_count,
+            sample_count=gvcf_count,
             job_attrs=job_attrs,
+            out_vcf_path=gathered_vcf_path,
         )
-        if snps_applied_gathered_j:
-            snps_applied_gathered_j.name = f'VQSR: {snps_applied_gathered_j.name}'
-            jobs.append(snps_applied_gathered_j)
+        for j in snps_applied_gathered_jobs:
+            j.name = f'VQSR: {j.name}'
+            jobs.append(j)
+        snps_applied_gathered_vcf = b.read_input_group(
+            **{
+                'vcf.gz': str(gathered_vcf_path),
+                'vcf.gz.tbi': f'{gathered_vcf_path}.tbi',
+            }
+        )
 
         apply_indel_j = apply_recalibration_indels(
             b,
             input_vcf=snps_applied_gathered_vcf,
             recalibration=indel_recalibrator_j.recalibration,
             tranches=indel_recalibrator_j.tranches,
-            disk_size=huge_disk,
+            disk_size=small_disk,
             use_as_annotations=use_as_annotations,
             filter_level=indel_filter_level,
             job_attrs=job_attrs,
         )
+        if snps_applied_gathered_jobs:
+            apply_indel_j.depends_on(*snps_applied_gathered_jobs)
         jobs.append(apply_indel_j)
         final_vcf = apply_indel_j.output_vcf
 
@@ -433,7 +409,10 @@ def indel_recalibrator_job(
     j.command(
         f"""set -euo pipefail
 
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
+    gatk --java-options \
+      "-Xms{res.get_java_mem_mb()}m \
+      -XX:+UseParallelGC \
+      -XX:ParallelGCThreads={res.get_nthreads() - 2}" \\
       VariantRecalibrator \\
       -V {siteonly_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
@@ -518,7 +497,10 @@ def snps_recalibrator_create_model_job(
     j.command(
         f"""set -euo pipefail
 
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
+    gatk --java-options \
+      "-Xms{res.get_java_mem_mb()}m \
+      -XX:+UseParallelGC \
+      -XX:ParallelGCThreads={res.get_nthreads() - 2}" \\
       VariantRecalibrator \\
       -V {siteonly_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
@@ -582,7 +564,7 @@ def snps_recalibrator_scattered(
     if is_small_callset:
         res = STANDARD.set_resources(j, ncpu=4, storage_gb=disk_size)
     else:
-        res = STANDARD.set_resources(j, ncpu=8, storage_gb=disk_size)
+        res = HIGHMEM.set_resources(j, ncpu=4, storage_gb=disk_size)
 
     j.declare_resource_group(recalibration={'index': '{root}.idx', 'base': '{root}'})
 
@@ -602,7 +584,10 @@ def snps_recalibrator_scattered(
 
     MODEL_REPORT={model_file}
 
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
+    gatk --java-options \
+      "-Xms{res.get_java_mem_mb()}m \
+      -XX:+UseParallelGC \
+      -XX:ParallelGCThreads={res.get_nthreads() - 2}" \\
       VariantRecalibrator \\
       -V {siteonly_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
@@ -672,7 +657,10 @@ def snps_recalibrator_job(
     j.command(
         f"""set -euo pipefail
 
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
+    gatk --java-options \
+      "-Xms{res.get_java_mem_mb()}m \
+      -XX:+UseParallelGC \
+      -XX:ParallelGCThreads={res.get_nthreads() - 2}" \\
       VariantRecalibrator \\
       -V {sites_only_variant_filtered_vcf['vcf.gz']} \\
       -O {j.recalibration} \\

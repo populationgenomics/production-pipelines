@@ -100,11 +100,7 @@ class StageOutput:
         )
         return res
 
-    def as_path(self, key=None) -> Path:
-        """
-        Cast the result to a path object. Throw an exception when can't cast.
-        `key` is used to extract the value when the result is a dictionary.
-        """
+    def _get(self, key=None) -> str | Path:
         if self.data is None:
             raise ValueError(f'{self.stage}: output data is not available')
 
@@ -116,7 +112,24 @@ class StageOutput:
             res = cast(dict, self.data)[key]
         else:
             res = self.data
+        return res
 
+    def as_str(self, key=None) -> str:
+        """
+        Cast the result to a simple string. Throw an exception when can't cast.
+        `key` is used to extract the value when the result is a dictionary.
+        """
+        res = self._get(key)
+        if not isinstance(res, str):
+            raise ValueError(f'{res} is not a str.')
+        return cast(str, res)
+
+    def as_path(self, key=None) -> Path:
+        """
+        Cast the result to a path object. Throw an exception when can't cast.
+        `key` is used to extract the value when the result is a dictionary.
+        """
+        res = self._get(key)
         if not isinstance(res, CloudPath | pathlib.Path):
             raise ValueError(f'{res} is not a path object.')
 
@@ -250,6 +263,19 @@ class StageInput:
         res = self._get(target=target, stage=stage)
         return res.as_path(key)
 
+    def as_str(
+        self,
+        target: 'Target',
+        stage: StageDecorator,
+        key: str | None = None,
+    ) -> str:
+        """
+        Represent as a simple string, otherwise fail.
+        `stage` can be callable, or a subclass of Stage
+        """
+        res = self._get(target=target, stage=stage)
+        return res.as_str(key)
+
     def as_dict(self, target: 'Target', stage: StageDecorator) -> dict[str, Path]:
         """
         Get a dict of paths for a specific target and stage
@@ -298,6 +324,7 @@ class Stage(Generic[TargetT], ABC):
         name: str,
         required_stages: list[StageDecorator] | StageDecorator | None = None,
         analysis_type: str | None = None,
+        analysis_key: str | None = None,
         skipped: bool = False,
         assume_outputs_exist: bool = False,
         forced: bool = False,
@@ -314,9 +341,12 @@ class Stage(Generic[TargetT], ABC):
         self.required_stages: list[Stage] = []
 
         self.status_reporter = get_workflow().status_reporter
-        # If analysis type is defined, it will be used to update analysis status,
-        # as well as find and reuse existing outputs from the status reporter
+        # If `analysis_type` is defined, it will be used to create/update Analysis
+        # entries in Metamist.
         self.analysis_type = analysis_type
+        # If `analysis_key` is defined, it will be used to extract the value for
+        # `Analysis.output` if the Stage.expected_outputs() returns a dict.
+        self.analysis_key = analysis_key
 
         # Populated with the return value of `add_to_the_workflow()`
         self.output_by_target: dict[str, StageOutput | None] = dict()
@@ -328,6 +358,14 @@ class Stage(Generic[TargetT], ABC):
     @property
     def tmp_prefix(self):
         return get_workflow().tmp_prefix / self.name
+
+    @property
+    def web_prefix(self) -> Path:
+        return get_workflow().web_prefix / self.name
+
+    @property
+    def prefix(self) -> Path:
+        return get_workflow().prefix / self.name
 
     def __str__(self):
         res = f'{self._name}'
@@ -342,7 +380,7 @@ class Stage(Generic[TargetT], ABC):
         return res
 
     @property
-    def name(self):
+    def name(self) -> str:
         """
         Stage name (unique and descriptive stage)
         """
@@ -453,10 +491,35 @@ class Stage(Generic[TargetT], ABC):
             return outputs
 
         # Adding status reporter jobs
-        if self.analysis_type and self.status_reporter:
+        if (
+            self.analysis_type
+            and self.status_reporter
+            and action == Action.QUEUE
+            and outputs.data
+        ):
+            output: str | Path
+            if isinstance(outputs.data, dict):
+                if not self.analysis_key:
+                    raise WorkflowError(
+                        f'Cannot create Analysis for stage {self.name}: `analysis_key` '
+                        f'must be set with the @stage decorator to select value from '
+                        f'the expected_outputs dict: {outputs.data}'
+                    )
+                if self.analysis_key not in outputs.data:
+                    raise WorkflowError(
+                        f'Cannot create Analysis for stage {self.name}: `analysis_key` '
+                        f'"{self.analysis_key}" is not found in the expected_outputs '
+                        f'dict {outputs.data}'
+                    )
+                output = outputs.data[self.analysis_key]
+            else:
+                output = outputs.data
+
+            assert isinstance(output, str) or isinstance(output, Path), output
+
             self.status_reporter.add_updaters_jobs(
                 b=get_batch(),
-                output=outputs.data,
+                output=str(output),
                 analysis_type=self.analysis_type,
                 target=target,
                 jobs=outputs.jobs,
@@ -465,15 +528,6 @@ class Stage(Generic[TargetT], ABC):
                 job_attrs=self.get_job_attrs(target),
             )
         return outputs
-
-    def new_reuse_job(self, target: Target) -> Job:
-        """
-        Add "reuse" job. Target doesn't have to be specific for a stage here,
-        this using abstract class Target instead of generic parameter TargetT.
-        """
-        attrs = dict(stage=self.name, reuse=True)
-        attrs |= target.get_job_attrs()
-        return get_batch().new_job(self.name, attrs)
 
     def _get_action(self, target: TargetT) -> Action:
         """
@@ -605,6 +659,7 @@ def stage(
     cls: Optional[Type['Stage']] = None,
     *,
     analysis_type: str | None = None,
+    analysis_key: str | None = None,
     required_stages: list[StageDecorator] | StageDecorator | None = None,
     skipped: bool = False,
     assume_outputs_exist: bool = False,
@@ -621,6 +676,25 @@ def stage(
             ...
         def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
             ...
+
+        self.status_reporter = get_workflow().status_reporter
+        # If `analysis_type` is defined, it will be used to create/update Analysis
+        # entries in Metamist.
+        self.analysis_type = analysis_type
+        # If `analysis_key` is defined, it will be used to extract the value for
+        # `Analysis.output` if the Stage.expected_outputs() returns a dict.
+
+    @analysis_type: if defined, will be used to create/update `Analysis` entries
+        using the status reporter.
+    @analysis_key: is defined, will be used to extract the value for `Analysis.output`
+        if the Stage.expected_outputs() returns a dict.
+    @required_stages: list of other stage classes that are required prerequisites
+        for this stage. Outputs of those stages will be passed to
+        `Stage.queue_jobs(... , inputs)` as `inputs`, and all required
+        dependencies between Hail Batch jobs will be set automatically as well.
+    @skipped: always skip this stage.
+    @assume_outputs_exist: assume expected outputs of this stage always exist.
+    @forced: always force run this stage, regardless of the outputs' existence.
     """
 
     def decorator_stage(_cls) -> StageDecorator:
@@ -633,6 +707,7 @@ def stage(
                 name=_cls.__name__,
                 required_stages=required_stages,
                 analysis_type=analysis_type,
+                analysis_key=analysis_key,
                 skipped=skipped,
                 assume_outputs_exist=assume_outputs_exist,
                 forced=forced,
@@ -772,7 +847,10 @@ class Workflow:
     def prefix(self) -> Path:
         return self._prefix()
 
-    def _prefix(self, category=None) -> Path:
+    def _prefix(self, category: str | None = None) -> Path:
+        """
+        Prepare a unique path for the workflow with this name and this input data.
+        """
         prefix = get_cohort().analysis_dataset.prefix(category=category) / self.name
         prefix /= self.output_version or get_cohort().alignment_inputs_hash()
         return prefix
@@ -823,6 +901,16 @@ class Workflow:
                         f'{", ".join(stage_names)}'
                     )
 
+        if not (last_stages or first_stages):
+            return
+
+        # E.g. if our last_stages is CramQc, MtToEs would still run because it's in
+        # a different branch. So we want to collect all stages after first_stages
+        # and before last_stages in their respective branches, and mark as skipped
+        # everything in other branches.
+        first_stages_keeps: list[str] = first_stages[:]
+        last_stages_keeps: list[str] = last_stages[:]
+
         for fs in first_stages:
             for descendant in nx.descendants(graph, fs):
                 if not stages_d[descendant].skipped:
@@ -839,12 +927,23 @@ class Workflow:
                         )
                         stages_d[grand_descendant].assume_outputs_exist = True
 
+            for ancestor in nx.ancestors(graph, fs):
+                first_stages_keeps.append(ancestor)
+
         for ls in last_stages:
             for ancestor in nx.ancestors(graph, ls):
                 if not stages_d[ancestor].skipped:
                     logging.info(f'Skipping stage {ancestor} (after last {ls})')
                     stages_d[ancestor].skipped = True
                     stages_d[ancestor].assume_outputs_exist = True
+
+            for ancestor in nx.descendants(graph, ls):
+                last_stages_keeps.append(ancestor)
+
+        for _stage in stages:
+            if _stage.name not in last_stages_keeps + first_stages_keeps:
+                _stage.skipped = True
+                _stage.assume_outputs_exist = True
 
     def set_stages(
         self,
@@ -869,16 +968,6 @@ class Workflow:
         logging.info(f'  workflow/only_stages: {only_stages}')
         logging.info(f'  workflow/first_stages: {first_stages}')
         logging.info(f'  workflow/last_stages: {last_stages}')
-
-        # TODO: fix this: if we have last_stages = ['Align'], it wouldn't work at all
-        # UPD: this pull request fixes it if approved:
-        # https://github.com/populationgenomics/production-pipelines/pull/158
-        if only_stages or last_stages:
-            # If stages are requested explicitly, we don't need other stages from
-            # the default list:
-            requested_stages = [
-                s for s in requested_stages if s.__name__ in only_stages + last_stages
-            ]
 
         # Round 1: initialising stage objects.
         _stages_d: dict[str, Stage] = {}

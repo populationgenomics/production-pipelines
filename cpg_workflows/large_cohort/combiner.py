@@ -7,14 +7,15 @@ from cpg_utils.hail_batch import genome_build
 import hail as hl
 
 from cpg_workflows.inputs import get_cohort
+from cpg_workflows.targets import Sample
 from cpg_workflows.utils import can_reuse, exists
 
 
-def _check_gvcfs():
+def _check_gvcfs(samples: list[Sample]):
     """
     Making sure each sample has a GVCF
     """
-    for sample in get_cohort().get_samples():
+    for sample in samples:
         if not sample.gvcf:
             if get_config()['workflow'].get('skip_samples_with_missing_input', False):
                 logging.warning(f'Skipping {sample} which is missing GVCF')
@@ -58,11 +59,23 @@ def check_duplicates(iterable):
     return duplicates
 
 
-def run(out_vds_path: Path, tmp_prefix: Path) -> hl.vds.VariantDataset:
+def run(out_vds_path: Path, tmp_prefix: Path, *sample_ids) -> hl.vds.VariantDataset:
+    """
+    run VDS combiner, assuming we are on a cluster.
+    @param out_vds_path: output path for VDS
+    @param tmp_prefix: tmp path for intermediate fields
+    @param sample_ids: optional list of samples to subset from get_cohort()
+    @return: VDS object
+    """
     if can_reuse(out_vds_path):
         return hl.vds.read_vds(str(out_vds_path))
 
-    _check_gvcfs()
+    samples = get_cohort().get_samples()
+    if sample_ids:
+        samples = [s for s in samples if s in sample_ids]
+
+    _check_gvcfs(samples)
+
     params = get_config().get('combiner', {})
 
     if intervals := params.get('intervals'):
@@ -85,14 +98,14 @@ def run(out_vds_path: Path, tmp_prefix: Path) -> hl.vds.VariantDataset:
             'must be one of: "exome", "genome"'
         )
 
+    sample_names = [s.id for s in samples]
     logging.info(
-        f'Combining {len(get_cohort().get_samples())} samples: '
-        f'{", ".join(get_cohort().get_sample_ids())}, using parameters: '
+        f'Combining {len(samples)} samples: '
+        f'{", ".join(sample_names)}, using parameters: '
         f'{params}'
     )
 
-    sample_names = get_cohort().get_sample_ids()
-    gvcf_paths = [str(s.gvcf.path) for s in get_cohort().get_samples() if s.gvcf]
+    gvcf_paths = [str(s.gvcf.path) for s in samples if s.gvcf]
     logging.info(f'Combining {len(sample_names)} samples: {", ".join(sample_names)}')
 
     check_duplicates(sample_names)

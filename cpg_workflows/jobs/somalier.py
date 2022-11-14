@@ -123,7 +123,7 @@ def _check_pedigree(
 
     check_j = b.new_job(title, (job_attrs or {}) | dict(tool='python'))
     STANDARD.set_resources(check_j, ncpu=2)
-    check_j.image(image_path('peddy'))
+    check_j.image(image_path('cpg_workflows'))
 
     script_path = to_path(check_pedigree.__file__)
     script_name = script_path.name

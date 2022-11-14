@@ -74,7 +74,7 @@ def happy(
     job_name = f'hap.py ({"GVCF" if is_gvcf else "VCF"})'
     job_attrs = (job_attrs or {}) | dict(tool='hap.py')
     j = b.new_job(job_name, job_attrs)
-    j.image(image_path('happy'))
+    j.image(image_path('hap.py'))
     reference = fasta_res_group(b)
     res = STANDARD.set_resources(j, fraction=1)
     cmd = f"""\

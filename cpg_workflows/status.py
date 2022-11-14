@@ -23,7 +23,7 @@ class StatusReporter(ABC):
     def add_updaters_jobs(
         self,
         b: Batch,
-        output: str | Path | Resource | dict[str, Path | Resource],
+        output: str,
         analysis_type: str,
         target: Target,
         jobs: list[Job] | None = None,
@@ -60,7 +60,7 @@ class MetamistStatusReporter(StatusReporter):
     def add_updaters_jobs(
         self,
         b: Batch,
-        output: str | Path | Resource | dict[str, Path | Resource],
+        output: str,
         analysis_type: str,
         target: Target,
         jobs: list[Job] | None = None,
@@ -77,7 +77,7 @@ class MetamistStatusReporter(StatusReporter):
         # 1. Create a "queued" analysis
         if (
             aid := self.create_analysis(
-                output=str(output),
+                output=output,
                 analysis_type=analysis_type,
                 analysis_status='queued',
                 target=target,

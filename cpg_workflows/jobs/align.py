@@ -288,10 +288,18 @@ def storage_for_align_job(alignment_input: AlignmentInput) -> int | None:
         assert isinstance(storage_gb, int), storage_gb
         return storage_gb
 
-    sequencing_type = get_config()['workflow']['sequencing_type']
-    if sequencing_type == 'genome':
+    # Taking a full instance without attached by default:
+    storage_gb = STANDARD.calc_instance_disk_gb()
+    if get_config()['workflow']['sequencing_type'] == 'genome':
+        # More disk is needed for FASTQ or BAM inputs than for realignment from CRAM
         if isinstance(alignment_input, FastqPair | FastqPairs | BamPath):
-            storage_gb = 400  # for WGS FASTQ or BAM inputs, more disk is needed
+            storage_gb = 400
+        # For unindexed/unsorted CRAM or BAM inputs, extra storage is needed for tmp
+        if (
+            isinstance(alignment_input, CramPath | BamPath)
+            and not alignment_input.index_path
+        ):
+            storage_gb += 150
     return storage_gb
 
 
@@ -330,6 +338,8 @@ def _align_one(
         storage_gb=storage_for_align_job(alignment_input=alignment_input),
     ).get_nthreads()
 
+    sort_index_input_cmd = ''
+
     # 2022-07-22 mfranklin:
     #   Replace process substitution with named-pipes (FIFO)
     #   This is named-pipe name -> command to populate it
@@ -346,7 +356,8 @@ def _align_one(
         else:
             shard_param = ''
 
-        reference_inp = None
+        bazam_ref_cmd = ''
+        samtools_ref_cmd = ''
         if isinstance(alignment_input, CramPath):
             assert (
                 alignment_input.reference_assembly
@@ -355,20 +366,17 @@ def _align_one(
                 base=str(alignment_input.reference_assembly),
                 fai=str(alignment_input.reference_assembly) + '.fai',
             ).base
+            bazam_ref_cmd = f'-Dsamjdk.reference_fasta={reference_inp}'
+            samtools_ref_cmd = f'--reference {reference_inp}'
 
         group = alignment_input.resource_group(b)
 
-        _reference_command_inp = (
-            f'-Dsamjdk.reference_fasta={reference_inp}' if reference_inp else ''
-        )
-
-        sort_index_input_cmd = ''
         if not alignment_input.index_path:
             sort_index_input_cmd = dedent(
                 f"""
             mkdir -p $BATCH_TMPDIR/sorted
             mkdir -p $BATCH_TMPDIR/sort_tmp
-            samtools sort \
+            samtools sort {samtools_ref_cmd} \
             {group[alignment_input.ext]} \
             -@{nthreads - 1} \
             -T $BATCH_TMPDIR/sort_tmp \
@@ -383,8 +391,7 @@ def _align_one(
 
         bazam_cmd = dedent(
             f"""\
-        {sort_index_input_cmd}
-        bazam -Xmx16g {_reference_command_inp} \
+        bazam -Xmx16g {bazam_ref_cmd} \
         -n{min(nthreads, 6)} -bam {group[alignment_input.ext]}{shard_param} \
         """
         )
@@ -485,7 +492,7 @@ def _align_one(
         ).strip()
 
         # Now prepare command
-        cmd = '\n'.join([*fifo_pre, cmd, fifo_post])
+        cmd = '\n'.join([sort_index_input_cmd, *fifo_pre, cmd, fifo_post])
     return j, cmd
 
 
