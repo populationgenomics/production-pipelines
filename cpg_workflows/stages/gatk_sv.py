@@ -24,7 +24,7 @@ from cpg_workflows.workflow import (
     Dataset,
 )
 
-GATK_SV_COMMIT = 'b59a8b070da48ceed475814117787cf80cace170'
+GATK_SV_COMMIT = 'e94aa59728ecd9681e06d66917fdef25571b77c5'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 
 
@@ -285,7 +285,6 @@ class EvidenceQC(DatasetStage):
         return d
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        """Add jobs to batch"""
         d = inputs.as_dict_by_target(GatherSampleEvidence)
 
         sids = dataset.get_sample_ids()
@@ -472,11 +471,14 @@ class ClusterBatch(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict:
         """
-        Clustered SV VCFs
-        Clustered depth-only call VCF
+        * Clustered SV VCFs
+        * Clustered depth-only call VCF
+        * Metrics
         """
 
-        ending_by_key = {}
+        ending_by_key = {
+            'metrics_file_clusterbatch': '.metrics.tsv',
+        }
         for caller in SV_CALLERS + ['depth']:
             ending_by_key[f'clustered_{caller}_vcf'] = f'.clustered-{caller}.vcf.gz'
             ending_by_key[

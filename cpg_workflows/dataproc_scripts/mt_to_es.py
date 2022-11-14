@@ -7,6 +7,8 @@ Loads the matrix table into an ElasticSearch index.
 """
 
 import logging
+import time
+
 import math
 from pprint import pformat
 
@@ -18,12 +20,55 @@ import elasticsearch
 from cpg_utils import to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
+from cpg_utils.hail_batch import start_query_context, reference_path
 
 from hail_scripts.elasticsearch.hail_elasticsearch_client import HailElasticsearchClient
 
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
 coloredlogs.install(level='INFO', fmt=fmt)
+
+
+def sv_load():
+    start_time = time.time()
+    start_query_context('spark_local')
+
+    mt = load_mt(args.input_dataset, args.matrixtable_file, args.overwrite_matrixtable)
+
+    _annotate_grch37(mt)
+
+    mt = subset_mt(
+        args.project_guid,
+        mt,
+        skip_sample_subset=args.skip_sample_subset,
+        ignore_missing_samples=args.ignore_missing_samples,
+        id_file=args.id_file,
+    )
+
+    rows = annotate_fields(mt, args.gencode_release, args.gencode_path)
+
+    if args.strvctvre:
+        rows = add_strvctvre(rows, args.strvctvre)
+
+    export_to_es(
+        rows,
+        args.input_dataset,
+        args.project_guid,
+        args.es_host,
+        args.es_port,
+        args.es_password,
+        args.block_size,
+        args.num_shards,
+        'true' if args.es_nodes_wan_only else 'false',
+    )
+    logger.info(
+        'Total time for subsetting, annotating, and exporting: {}'.format(
+            time.time() - start_time
+        )
+    )
+
+    if not args.use_dataproc:
+        hl.stop()
 
 
 class HailElasticsearchClientV8(HailElasticsearchClient):
@@ -109,12 +154,6 @@ class HailElasticsearchClientV8(HailElasticsearchClient):
     help='File to touch in the end',
 )
 @click.option(
-    '--liftover-path',
-    'liftover_path',
-    help='Path to liftover chain',
-    required=True,
-)
-@click.option(
     '--es-password',
     'password',
 )
@@ -122,7 +161,6 @@ def main(
     mt_path: str,
     es_index: str,
     done_flag_path: str,
-    liftover_path: str,
     password: str = None,
 ):
     """
@@ -155,14 +193,10 @@ def main(
     )
 
     mt = hl.read_matrix_table(mt_path)
+
     # Annotate GRCh37 coordinates here, until liftover is supported by Batch Backend
     # and can be moved to annotate_cohort.
-    logging.info('Adding GRCh37 coords')
-    rg37 = hl.get_reference('GRCh37')
-    rg38 = hl.get_reference('GRCh38')
-    rg38.add_liftover(liftover_path, rg37)
-    mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
-    mt = mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
+    _annotate_grch37(mt)
 
     logging.info('Getting rows and exporting to the ES')
     row_ht = elasticsearch_row(mt)
@@ -177,6 +211,16 @@ def main(
     _cleanup(es, es_index, es_shards)
     with to_path(done_flag_path).open('w') as f:
         f.write('done')
+
+
+def _annotate_grch37(mt):
+    logging.info('Adding GRCh37 coords')
+    liftover_path = reference_path("liftover_38_to_37")
+    rg37 = hl.get_reference('GRCh37')
+    rg38 = hl.get_reference('GRCh38')
+    rg38.add_liftover(str(liftover_path), rg37)
+    mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
+    mt = mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
 
 
 def elasticsearch_row(mt: hl.MatrixTable):
