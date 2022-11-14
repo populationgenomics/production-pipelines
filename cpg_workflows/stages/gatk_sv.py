@@ -65,7 +65,7 @@ def add_gatk_sv_jobs(
     input_dict: dict[str, Any],
     expected_out_dict: dict[str, Path],
     sample_id: str | None = None,
-    driver_image: str = image_path('cpg_workflows'),
+    driver_image: str | None = None,
 ) -> list[Job]:
     """
     Generic function to add a job that would run one GATK-SV workflow.
@@ -79,6 +79,8 @@ def add_gatk_sv_jobs(
     outputs_to_collect = dict()
     for key in expected_out_dict.keys():
         outputs_to_collect[key] = CromwellOutputType.single_path(f'{wfl_name}.{key}')
+
+    driver_image = driver_image or image_path('cpg_workflows')
 
     job_prefix = make_job_name(wfl_name, sample=sample_id, dataset=dataset.name)
     submit_j, output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
