@@ -440,7 +440,7 @@ class GatherBatchEvidence(DatasetStage):
         )
 
         expected_d = self.expected_outputs(dataset)
-        jobs = add_gatk_sv_job(
+        jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=dataset,
             wfl_name=self.name,
