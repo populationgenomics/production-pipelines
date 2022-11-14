@@ -173,7 +173,7 @@ def main(
 
 def _annotate_grch37(mt):
     logging.info('Adding GRCh37 coords')
-    liftover_path = reference_path("liftover_38_to_37")
+    liftover_path = reference_path('liftover_38_to_37')
     rg37 = hl.get_reference('GRCh37')
     rg38 = hl.get_reference('GRCh38')
     rg38.add_liftover(str(liftover_path), rg37)
