@@ -12,7 +12,7 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, reference_path, image_path
+from cpg_utils.hail_batch import command, reference_path, image_path, genome_build
 from cpg_workflows.batch import make_job_name, Batch, get_batch
 from cpg_workflows.workflow import (
     stage,
@@ -105,6 +105,46 @@ def add_gatk_sv_jobs(
         cmds.append(f'gsutil cp $(cat {resource}) {out_path}')
     copy_j.command(command(cmds, setup_gcp=True))
     return [submit_j, copy_j]
+
+
+def get_ref_panel(keys: list[str] | None = None) -> dict:
+    return {
+        k: v
+        for k, v in {
+            'ref_panel_samples': get_config()['sv_ref_panel']['ref_panel_samples'],
+            'ref_ped_file': str(reference_path('broad/sv/ref_panel/ped_file')),
+            'ref_panel_vcf': str(reference_path('broad/sv/ref_panel/clean_vcf')),
+            'ref_panel_bincov_matrix': str(
+                reference_path('broad/sv/ref_panel/ref_panel_bincov_matrix')
+            ),
+            'contig_ploidy_model_tar': str(
+                reference_path('broad/sv/ref_panel/contig_ploidy_model_tar')
+            ),
+            'gcnv_model_tars': [
+                str(reference_path('broad/sv/ref_panel/model_tar_tmpl')).format(shard=i)
+                for i in range(get_config()['sv_ref_panel']['model_tar_cnt'])
+            ],
+            'ref_panel_PE_files': [
+                str(reference_path('broad/sv/ref_panel/ref_panel_PE_file_tmpl')).format(
+                    sample=s
+                )
+                for s in get_config()['sv_ref_panel']['ref_panel_samples']
+            ],
+            'ref_panel_SR_files': [
+                str(reference_path('broad/sv/ref_panel/ref_panel_SR_file_tmpl')).format(
+                    sample=s
+                )
+                for s in get_config()['sv_ref_panel']['ref_panel_samples']
+            ],
+            'ref_panel_SD_files': [
+                str(reference_path('broad/sv/ref_panel/ref_panel_SD_file_tmpl')).format(
+                    sample=s
+                )
+                for s in get_config()['sv_ref_panel']['ref_panel_samples']
+            ],
+        }.items()
+        if not keys or k in keys
+    }
 
 
 @stage
@@ -303,7 +343,7 @@ def _make_combined_ped(dataset: Dataset) -> Path:
     with combined_ped_path.open('w') as out:
         with dataset.write_ped_file().open() as f:
             out.write(f.read())
-        # THe ref panel PED doesn't have any header, so can safely concatenate:
+        # The ref panel PED doesn't have any header, so can safely concatenate:
         with reference_path('broad/sv/ref_panel/ped_file').open() as f:
             out.write(f.read())
     return combined_ped_path
@@ -397,37 +437,7 @@ class GatherBatchEvidence(DatasetStage):
         }
 
         # reference panel gCNV models
-        input_dict |= {
-            'ref_panel_samples': get_config()['sv_ref_panel']['ref_panel_samples'],
-            'ref_panel_bincov_matrix': str(
-                reference_path('broad/sv/ref_panel/ref_panel_bincov_matrix')
-            ),
-            'contig_ploidy_model_tar': str(
-                reference_path('broad/sv/ref_panel/contig_ploidy_model_tar')
-            ),
-            'gcnv_model_tars': [
-                str(reference_path('broad/sv/ref_panel/model_tar_tmpl')).format(shard=i)
-                for i in range(get_config()['sv_ref_panel']['model_tar_cnt'])
-            ],
-            'ref_panel_PE_files': [
-                str(reference_path('broad/sv/ref_panel/ref_panel_PE_file_tmpl')).format(
-                    sample=s
-                )
-                for s in get_config()['sv_ref_panel']['ref_panel_samples']
-            ],
-            'ref_panel_SR_files': [
-                str(reference_path('broad/sv/ref_panel/ref_panel_SR_file_tmpl')).format(
-                    sample=s
-                )
-                for s in get_config()['sv_ref_panel']['ref_panel_samples']
-            ],
-            'ref_panel_SD_files': [
-                str(reference_path('broad/sv/ref_panel/ref_panel_SD_file_tmpl')).format(
-                    sample=s
-                )
-                for s in get_config()['sv_ref_panel']['ref_panel_samples']
-            ],
-        }
+        input_dict |= get_ref_panel()
 
         input_dict |= get_images(
             [
