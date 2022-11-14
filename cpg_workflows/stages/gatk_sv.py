@@ -10,7 +10,7 @@ from analysis_runner.cromwell import (
 )
 from hailtop.batch.job import Job
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, reference_path, image_path
 from cpg_workflows.batch import make_job_name, Batch, get_batch
@@ -24,9 +24,8 @@ from cpg_workflows.workflow import (
     Dataset,
 )
 
-GATK_SV_COMMIT = 'b2c71517d1716493673af7b11e0fa717b194537f'
+GATK_SV_COMMIT = '2331f814c880c576c8da355e2abc8f7243e14227'
 SV_CALLERS = ['manta', 'wham', 'scramble']
-REF_FASTA_KEY = 'broad/bwa_ref_fasta'  # change to 'broad/ref_fasta' for DRAGMAP CRAMs
 
 
 def get_images(keys: list[str]) -> dict[str, str]:
@@ -66,6 +65,7 @@ def add_gatk_sv_jobs(
     input_dict: dict[str, Any],
     expected_out_dict: dict[str, Path],
     sample_id: str | None = None,
+    driver_image: str = image_path('cpg_workflows'),
 ) -> list[Job]:
     """
     Generic function to add a job that would run one GATK-SV workflow.
@@ -94,11 +94,11 @@ def add_gatk_sv_jobs(
         output_prefix=output_prefix,
         input_dict={f'{wfl_name}.{k}': v for k, v in input_dict.items()},
         outputs_to_collect=outputs_to_collect,
-        driver_image=image_path('hail'),
+        driver_image=driver_image,
     )
 
     copy_j = batch.new_job(f'{job_prefix}: copy outputs')
-    copy_j.image(image_path('hail'))
+    copy_j.image(driver_image)
     cmds = []
     for key, resource in output_dict.items():
         out_path = expected_out_dict[key]
@@ -192,8 +192,12 @@ class GatherSampleEvidence(SampleStage):
                 {'sd_locs_vcf': 'dbsnp_vcf'},
             ]
         )
+        ref_fasta = to_path(
+            get_config()['workflow'].get('ref_fasta')
+            or reference_path('broad/ref_fasta')
+        )
         input_dict |= {
-            'reference_fasta': str(ref_fasta := reference_path(REF_FASTA_KEY)),
+            'reference_fasta': str(ref_fasta),
             'reference_index': str(ref_fasta) + '.fai',
             'reference_dict': str(ref_fasta.with_suffix('.dict')),
         }
@@ -520,8 +524,12 @@ class ClusterBatch(DatasetStage):
                 {'pesr_exclude_intervals': 'pesr_exclude_list'},
             ]
         )
+        ref_fasta = to_path(
+            get_config()['workflow'].get('ref_fasta')
+            or reference_path('broad/ref_fasta')
+        )
         input_dict |= {
-            'reference_fasta': str(ref_fasta := reference_path(REF_FASTA_KEY)),
+            'reference_fasta': str(ref_fasta),
             'reference_fasta_fai': str(ref_fasta) + '.fai',
             'reference_dict': str(ref_fasta.with_suffix('.dict')),
         }

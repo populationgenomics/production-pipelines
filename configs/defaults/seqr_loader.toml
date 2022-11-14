@@ -3,7 +3,6 @@ name = 'seqr_loader'
 dataset_gcp_project = 'seqr-308602'
 dataset = 'seqr'
 status_reporter = 'metamist'
-driver_image = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:14432044df1c5210237727cc10bee817674700c0-hail-48ff6e3a3f08a11ccb5b0ad5366ede25e43837a8'
 
 # Use GnarlyGenotyper instead of GenotypeGVCFs
 use_gnarly = false
