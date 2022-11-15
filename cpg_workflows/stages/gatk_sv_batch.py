@@ -141,6 +141,7 @@ class GATKSVPipelineBatch(DatasetStage):
                 'GATKSVPipelinePhase1.cytoband',
                 {'GATKSVPipelinePhase1.pesr_exclude_intervals': 'pesr_exclude_list'},
                 {'GATKSVPipelinePhase1.depth_exclude_intervals': 'depth_exclude_list'},
+                {'GATKSVPipelinePhase1.sd_locs_vcf': 'dbsnp_vcf'},
                 'EvidenceQC.wgd_scoring_mask',
                 'GatherSampleEvidenceBatch.wham_include_list_bed_file',
                 'GatherSampleEvidenceBatch.preprocessed_intervals',
