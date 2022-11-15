@@ -442,7 +442,17 @@ class GatherBatchEvidence(DatasetStage):
         }
 
         # reference panel gCNV models
-        input_dict |= get_ref_panel()
+        input_dict |= get_ref_panel(
+            [
+                'ref_panel_samples',
+                'ref_panel_bincov_matrix',
+                'contig_ploidy_model_tar',
+                'gcnv_model_tars',
+                'ref_panel_PE_files',
+                'ref_panel_SR_files',
+                'ref_panel_SD_files',
+            ]
+        )
 
         input_dict |= get_images(
             [
@@ -778,4 +788,3 @@ class AnnotateVcf(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         pass
-
