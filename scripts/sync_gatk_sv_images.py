@@ -32,7 +32,12 @@ def main(dockers_json_url: str, dry_run: bool):
     Copies each docker image
     """
     subprocess.run(
-        ['gcloud', 'auth', 'configure-docker', 'australia-southeast1-docker.pkg.dev'],
+        [
+            'gcloud',
+            'auth',
+            'configure-docker',
+            'australia-southeast1-docker.pkg.dev',
+        ],
         check=True,
     )
 
@@ -59,10 +64,11 @@ def main(dockers_json_url: str, dry_run: bool):
             print(cmd)
         config_section[key] = f'sv/{image_name}'
 
-    print()
-    print('TOML [images] config section:')
-    print()
-    print(toml.dumps(config_section))
+    if config_section:
+        print()
+        print('TOML [images] config section:')
+        print()
+        print(toml.dumps(config_section))
 
 
 if __name__ == '__main__':
