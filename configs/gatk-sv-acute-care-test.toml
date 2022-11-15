@@ -15,5 +15,10 @@ only_samples = [
     'CPG203059',
 ]
 
+# CRAMs were aligned using an unmasked reference: 
+# gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta
+# we need to use the same reference to access CRAMs.
+ref_fasta = 'gs://cpg-reference/hg38/v0/Homo_sapiens_assembly38.fasta'
+
 [hail]
 billing_project = 'acute-care'
