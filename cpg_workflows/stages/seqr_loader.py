@@ -88,7 +88,7 @@ class AnnotateDataset(DatasetStage):
         """
         h = get_cohort().alignment_inputs_hash()
         return {
-            'tmp_prefix': str(self.tmp_prefix / f'{dataset.name}'),
+            'tmp_prefix': str(self.tmp_prefix / dataset.name),
             'mt': dataset.prefix() / 'mt' / f'{h}-{dataset.name}.mt',
         }
 
@@ -188,8 +188,7 @@ class MtToEs(DatasetStage):
             f'--mt-path {dataset_mt_path} '
             f'--es-index {index_name} '
             f'--done-flag-path {done_flag_path} '
-            f'--es-password {es_password()} '
-            f'--liftover-path {reference_path("liftover_38_to_37")}',
+            f'--es-password {es_password()}',
             max_age='48h',
             packages=[
                 'cpg_workflows',
