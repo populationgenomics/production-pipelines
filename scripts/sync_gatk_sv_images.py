@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """ 
 A simple script to copy docker images specified in a json file to 
 CPG artefact registry.
