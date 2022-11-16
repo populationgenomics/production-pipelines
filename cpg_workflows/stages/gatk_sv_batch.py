@@ -44,7 +44,7 @@ class GATKSVPipelineBatch(DatasetStage):
         }
 
         for key, fname in fname_d.items():
-            d[key] = self.prefix / dataset.name / fname
+            d[key] = self.prefix / fname
         return d
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -174,5 +174,6 @@ class GATKSVPipelineBatch(DatasetStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            cromwell_output_path=self.prefix / 'cromwell_output',
         )
         return self.make_outputs(dataset, data=expected_d, jobs=jobs)
