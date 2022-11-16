@@ -45,7 +45,7 @@ class ExampleStage(SampleStage):
         input_path = (sample.dataset.prefix() / 'WorkshopNov22' / 'BRCA1_R1.fastq.gz')
 
         job_attrs = {
-            'sample': sample_id,
+            'sample': sample.id,
             'external_id': sample.external_id
         }
 
