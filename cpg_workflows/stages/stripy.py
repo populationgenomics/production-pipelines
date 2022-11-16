@@ -45,8 +45,8 @@ class Stripy(SampleStage):
         jobs = []
         j = stripy.stripy(
             b=get_batch(),
-            CramPath(cram_path, crai_path),
-            sample.dataset.prefix() / 'stripy' / f'{sample.external_id}.pdf',
+            cram_path=CramPath(cram_path, crai_path),
+            out_pdf_path=sample.dataset.prefix() / 'stripy' / f'{sample.external_id}.pdf',
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(j)
