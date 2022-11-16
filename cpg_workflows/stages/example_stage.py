@@ -12,5 +12,5 @@ class ExampleStage(SampleStage):
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         input_path = sample.dataset.prefix() / 'WorkshopNov22' / 'BRCA1_R1.fastq.gz'
         expected = self.expected_outputs(sample)
-        job = example_job.example_job(b=get_batch(), output_path=expected['new_file'], input_path=input_path, job_attr={'sample': sample.id, 'external_id': sample.external_id})
+        job = example_job.example_job(b=get_batch(), output_path=expected['new_file'], input_path=input_path, job_attrs={'sample': sample.id, 'external_id': sample.external_id})
         return self.make_outputs(sample, data=expected, jobs=[job])
