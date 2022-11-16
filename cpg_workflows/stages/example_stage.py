@@ -55,9 +55,9 @@ class ExampleStage(SampleStage):
 
         job = example_job.example_job(
             b = get_batch(),
-            output_path: expected_output_path,
-            input_path: input_path,
-            job_attrs: job_attrs,
+            output_path = expected_output_path,
+            input_path = input_path,
+            job_attrs = job_attrs,
         )
 
         return self.make_outputs(sample, data = self.expected_outputs[sample], jobs=[job])
