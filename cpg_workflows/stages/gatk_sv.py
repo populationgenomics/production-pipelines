@@ -32,7 +32,15 @@ def get_images(keys: list[str]) -> dict[str, str]:
     """
     Dict of WDL inputs with docker image paths.
     """
-    return {k: image_path(k) for k in get_config()['images'].keys() if k in keys}
+    return {
+        k: (
+            'us.gcr.io/broad-dsde-methods/gatk-sv/sv-pipeline:2022-11-04-v0.26.4-beta-610e1093'
+            if k.startswith('sv_pipeline_')
+            else image_path(k)
+        )
+        for k in get_config()['images'].keys()
+        if k in keys
+    }
 
 
 def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str]]:
@@ -59,6 +67,7 @@ def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str
 def add_gatk_sv_jobs(
     batch: Batch,
     dataset: Dataset,
+    cromwell_output_path: Path,
     wfl_name: str,
     # "dict" is invariant (supports updating), "Mapping" is covariant (read-only)
     # we have to support inputs of type dict[str, str], so using Mapping here:
@@ -70,12 +79,6 @@ def add_gatk_sv_jobs(
     """
     Generic function to add a job that would run one GATK-SV workflow.
     """
-    # Where Cromwell writes the output.
-    # Will be different from paths in expected_out_dict:
-    output_prefix = f'gatk_sv/output/{wfl_name}/{dataset.name}'
-    if sample_id:
-        output_prefix = join(output_prefix, sample_id)
-
     outputs_to_collect = dict()
     for key in expected_out_dict.keys():
         outputs_to_collect[key] = CromwellOutputType.single_path(f'{wfl_name}.{key}')
@@ -93,7 +96,7 @@ def add_gatk_sv_jobs(
         cwd='wdl',
         workflow=f'{wfl_name}.wdl',
         libs=['.'],
-        output_prefix=output_prefix,
+        output_prefix=str(cromwell_output_path),
         input_dict={
             f'{wfl_name}.{k}': str(v) if isinstance(v, Path) else v
             for k, v in input_dict.items()
@@ -187,7 +190,6 @@ class GatherSampleEvidence(SampleStage):
         ending_by_key['sd_index'] = 'sd.txt.gz.tbi'
 
         for key, ending in ending_by_key.items():
-            stage_name = self.name.lower()
             fname = f'{sample.id}.{ending}'  # the dot separator is critical here!!
             # it's critical to separate the ending with a dot above: `*.sr.txt.gz`,
             # `*.pe.txt.gz`, and `*.sd.txt.gz`. These files are passed to
@@ -196,7 +198,7 @@ class GatherSampleEvidence(SampleStage):
             # `.sr.txt.gz`, `.pe.txt.gz`, or `.sd.txt.gz`, otherwise it would fail with
             # "A USER ERROR has occurred: Cannot read file:///cromwell_root/... because
             # no suitable codecs found".
-            d[key] = sample.dataset.prefix() / 'gatk_sv' / stage_name / fname
+            d[key] = sample.dataset.prefix() / 'gatk_sv' / self.name / fname
         return d
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
@@ -258,6 +260,9 @@ class GatherSampleEvidence(SampleStage):
             input_dict=input_dict,
             expected_out_dict=expected_d,
             sample_id=sample.id,
+            cromwell_output_path=(
+                sample.dataset.prefix() / 'gatk_sv' / self.name / 'cromwell_output'
+            ),
         )
         return self.make_outputs(sample, data=expected_d, jobs=jobs)
 
