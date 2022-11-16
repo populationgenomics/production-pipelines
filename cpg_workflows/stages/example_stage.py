@@ -56,4 +56,4 @@ class ExampleStage(SampleStage):
             job_attrs = job_attrs,
         )
 
-        return self.make_outputs(sample, data = self.expected_outputs[sample], jobs=[job])
+        return self.make_outputs(sample, data = self.expected_outputs(sample), jobs=[job])
