@@ -6,7 +6,7 @@ from .. import get_batch
 @stage()
 class ExampleStage(SampleStage):
     def expected_outputs(self, sample: Sample):
-        expected_output_path = sample.dataset.prefix() / 'WorkshopNov22' / f'sample.external_id}.fastq.gz'
+        expected_output_path = sample.dataset.prefix() / 'WorkshopNov22' / f'{sample.external_id}.fastq.gz'
         return { 'new_file': expected_output_path }
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
