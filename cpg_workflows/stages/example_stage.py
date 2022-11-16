@@ -12,11 +12,7 @@ from cpg_workflows.workflow import (
 )
 from .. import get_batch
 
-@stage(
-    required_stages=Align,
-    analysis_type='gvcf',
-    analysis_key='gvcf',
-)
+@stage
 class ExampleStage(SampleStage):
     """
     Copy a FASTQ file and name it using it's external sample ID.
