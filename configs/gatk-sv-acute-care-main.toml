@@ -2,7 +2,7 @@
 dataset_gcp_project = 'acute-care-321904'
 dataset = 'acute-care'
 input_datasets = ['acute-care']
-access_level = 'main'
+access_level = 'full'
 
 only_samples = [
     'CPG225243',
