@@ -18,8 +18,6 @@ from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.seqr_loader import MtToEs, AnnotateDataset
 from cpg_workflows.stages.gatk_sv import GatherBatchEvidence
-from cpg_workflows.stages.align import Align
-from cpg_workflows.stages.genotype import Genotype
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
 coloredlogs.install(level='INFO', fmt=fmt)
@@ -30,7 +28,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'seqr_loader': [AnnotateDataset, MtToEs, GvcfMultiQC, CramMultiQC],
     'large_cohort': [LoadVqsr, Frequencies, GvcfMultiQC, CramMultiQC],
     'gatk_sv': [GatherBatchEvidence],
-    'workshop22': [Genotype]    
+    'workshop22': [CramMultiQC]    
 }
 
 
