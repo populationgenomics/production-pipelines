@@ -1,0 +1,3 @@
+[workflow]
+acces_level = 'test'
+only_samples = ['CPG262071', 'CPG262089']
