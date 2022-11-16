@@ -30,7 +30,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'seqr_loader': [AnnotateDataset, MtToEs, GvcfMultiQC, CramMultiQC],
     'large_cohort': [LoadVqsr, Frequencies, GvcfMultiQC, CramMultiQC],
     'gatk_sv': [GatherBatchEvidence],
-    'workshop22': [Align, Genotype]
+    'workshop22': [CramMultiQC]
     
 }
 
