@@ -17,6 +17,7 @@ from cpg_workflows.stages.cram_qc import CramMultiQC
 from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.seqr_loader import MtToEs, AnnotateDataset
+from cpg_workflows.stages.gatk_sv import FilterBatch
 from cpg_workflows.stages.gatk_sv_batch import GATKSVPipelineBatch
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
