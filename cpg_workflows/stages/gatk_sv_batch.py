@@ -57,9 +57,9 @@ class GATKSVPipelineBatch(DatasetStage):
             'counts_files_input': [
                 str(sample_d[sid]['coverage_counts']) for sid in sids
             ],
-            'sr_files_input': [str(sample_d[sid]['sr']) for sid in sids],
-            'pe_files_input': [str(sample_d[sid]['pe']) for sid in sids],
-            'sd_files_input': [str(sample_d[sid]['sd']) for sid in sids],
+            'sr_files_input': [str(sample_d[sid]['pesr_split']) for sid in sids],
+            'pe_files_input': [str(sample_d[sid]['pesr_disc']) for sid in sids],
+            'sd_files_input': [str(sample_d[sid]['pesr_sd']) for sid in sids],
             'ped_file': str(make_combined_ped(dataset)),
             'chr_x': 'chrX',
             'chr_y': 'chrY',

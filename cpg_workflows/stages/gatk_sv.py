@@ -180,14 +180,14 @@ class GatherSampleEvidence(SampleStage):
 
         # SV evidence
         # split reads:
-        ending_by_key['sr'] = 'sr.txt.gz'
-        ending_by_key['sr_index'] = 'sr.txt.gz.tbi'
+        ending_by_key['pesr_split'] = 'sr.txt.gz'
+        ending_by_key['pesr_split_index'] = 'sr.txt.gz.tbi'
         # discordant paired end reads:
-        ending_by_key['pe'] = 'pe.txt.gz'
-        ending_by_key['pe_index'] = 'pe.txt.gz.tbi'
+        ending_by_key['pesr_disc'] = 'pe.txt.gz'
+        ending_by_key['pesr_disc_index'] = 'pe.txt.gz.tbi'
         # site depth:
-        ending_by_key['sd'] = 'sd.txt.gz'
-        ending_by_key['sd_index'] = 'sd.txt.gz.tbi'
+        ending_by_key['pesr_sd'] = 'sd.txt.gz'
+        ending_by_key['pesr_sd_index'] = 'sd.txt.gz.tbi'
 
         for key, ending in ending_by_key.items():
             fname = f'{sample.id}.{ending}'  # the dot separator is critical here!!
@@ -334,6 +334,7 @@ class EvidenceQC(DatasetStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            cromwell_output_path=self.prefix / 'cromwell_output',
         )
         return self.make_outputs(dataset, data=expected_d, jobs=jobs)
 
@@ -413,9 +414,9 @@ class GatherBatchEvidence(DatasetStage):
             'samples': sids,
             'ped_file': str(make_combined_ped(dataset)),
             'counts': [str(input_by_sid[sid]['coverage_counts']) for sid in sids],
-            'SR_files': [str(input_by_sid[sid]['sr']) for sid in sids],
-            'PE_files': [str(input_by_sid[sid]['pe']) for sid in sids],
-            'SD_files': [str(input_by_sid[sid]['sd']) for sid in sids],
+            'SR_files': [str(input_by_sid[sid]['pesr_split']) for sid in sids],
+            'PE_files': [str(input_by_sid[sid]['pesr_disc']) for sid in sids],
+            'SD_files': [str(input_by_sid[sid]['pesr_sd']) for sid in sids],
         }
         for caller in SV_CALLERS:
             input_dict[f'{caller}_vcfs'] = [
@@ -480,6 +481,7 @@ class GatherBatchEvidence(DatasetStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            cromwell_output_path=self.prefix / 'cromwell_output',
         )
         return self.make_outputs(dataset, data=expected_d, jobs=jobs)
 
@@ -574,6 +576,7 @@ class ClusterBatch(DatasetStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            cromwell_output_path=self.prefix / 'cromwell_output',
         )
         return self.make_outputs(dataset, data=expected_d, jobs=jobs)
 
@@ -657,6 +660,7 @@ class GenerateBatchMetrics(DatasetStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            cromwell_output_path=self.prefix / 'cromwell_output',
         )
         return self.make_outputs(dataset, data=expected_d, jobs=jobs)
 
@@ -730,6 +734,7 @@ class FilterBatch(DatasetStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            cromwell_output_path=self.prefix / 'cromwell_output',
         )
         return self.make_outputs(dataset, data=expected_d, jobs=jobs)
 
