@@ -778,4 +778,3 @@ class AnnotateVcf(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         pass
-
