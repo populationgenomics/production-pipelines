@@ -26,7 +26,7 @@ from cpg_utils.config import get_config
 from cpg_utils import Path
 
 from .batch import get_batch
-from .status import MetamistStatusReporter
+from .status import MetamistStateProvider, JsonFileStateProvider, FSStateProvider
 from .targets import Target, Dataset, Sample, Cohort
 from .utils import exists, timestamp, slugify
 from .inputs import get_cohort
@@ -340,7 +340,7 @@ class Stage(Generic[TargetT], ABC):
         # Dependencies. Populated in workflow.run(), after we know all stages.
         self.required_stages: list[Stage] = []
 
-        self.status_reporter = get_workflow().status_reporter
+        self.state_provider = get_workflow().state_provider
         # If `analysis_type` is defined, it will be used to create/update Analysis
         # entries in Metamist.
         self.analysis_type = analysis_type
@@ -493,7 +493,7 @@ class Stage(Generic[TargetT], ABC):
         # Adding status reporter jobs
         if (
             self.analysis_type
-            and self.status_reporter
+            and self.state_provider
             and action == Action.QUEUE
             and outputs.data
         ):
@@ -517,7 +517,7 @@ class Stage(Generic[TargetT], ABC):
 
             assert isinstance(output, str) or isinstance(output, Path), output
 
-            self.status_reporter.add_updaters_jobs(
+            self.state_provider.add_status_updaters_jobs(
                 b=get_batch(),
                 output=str(output),
                 analysis_type=self.analysis_type,
@@ -830,9 +830,13 @@ class Workflow:
                 description += ' ' + ', '.join(sorted(ds_set))
             get_batch().name = description
 
-        self.status_reporter = None
-        if get_config()['workflow'].get('status_reporter') == 'metamist':
-            self.status_reporter = MetamistStatusReporter()
+        self.state_provider = None
+        if get_config()['workflow'].get('state_provider') == 'metamist':
+            self.state_provider = MetamistStateProvider()
+        if get_config()['workflow'].get('state_provider') == 'json_file':
+            self.state_provider = JsonFileStateProvider()
+        else:
+            self.state_provider = FSStateProvider()
         self._stages: list[StageDecorator] | None = stages
 
     @property

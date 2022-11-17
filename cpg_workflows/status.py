@@ -1,7 +1,7 @@
 """
 Metamist wrapper to report analysis progress.
 """
-
+from enum import Enum
 from textwrap import dedent
 from abc import ABC, abstractmethod
 
@@ -14,59 +14,87 @@ from .targets import Target
 from .metamist import get_metamist, AnalysisStatus, MetamistError
 
 
-class StatusReporter(ABC):
+class StateProvider(ABC):
     """
-    Status reporter
+    Abstract pipeline state provider.
     """
 
     @abstractmethod
-    def add_updaters_jobs(
+    def read_state(self, run_id) -> dict[str, dict[str, AnalysisStatus]]:
+        """
+        On workflow-creating time, initialise state for each stage.
+        Would read state for each stage+target into a dictionary, indexed by stage ID,
+        then by target ID.
+        """
+        pass
+
+    @abstractmethod
+    def add_status_updaters_jobs(
         self,
         b: Batch,
-        output: str,
-        analysis_type: str,
+        outputs: dict | Path | str | None,
+        stage_name: str,
         target: Target,
+        analysis_type: str,
         jobs: list[Job] | None = None,
         prev_jobs: list[Job] | None = None,
         meta: dict | None = None,
+        job_attrs: dict | None = None,
     ) -> list[Job]:
         """
-        Add Hail Batch jobs that update the analysis status.
+        Add Hail Batch jobs that update the stage status.
         """
 
     @abstractmethod
-    def create_analysis(
+    def create_status(
         self,
-        output: str,
-        analysis_type: str,
-        analysis_status: str,
+        outputs: dict | str | Path | None,
+        status: AnalysisStatus,
+        stage_name: str,
         target: Target,
+        analysis_type: str,
         meta: dict | None = None,
         project_name: str = None,
     ) -> int | None:
         """
-        Record analysis entry.
+        Create status for a stage.
         """
 
 
-class MetamistStatusReporter(StatusReporter):
+class FSStateProvider(StateProvider):
     """
-    Job status reporter. Works through creating and updating metamist Analysis entries.
+    Works through checking stage's outputs existence on the file system.
+    """
+
+
+class JsonFileStateProvider(StateProvider):
+    """
+    Works through updating a JSON file.
+    """
+
+
+class MetamistStateProvider(StateProvider):
+    """
+    Works through creating and updating Metamist's Analysis entries.
     """
 
     def __init__(self):
         super().__init__()
 
-    def add_updaters_jobs(
+    def read_state(self):
+        pass
+
+    def add_status_updaters_jobs(
         self,
         b: Batch,
-        output: str,
-        analysis_type: str,
+        outputs: dict | Path | str | None,
+        stage_name: str,
         target: Target,
+        analysis_type: str,
         jobs: list[Job] | None = None,
         prev_jobs: list[Job] | None = None,
         meta: dict | None = None,
-        job_attrs: dict[str, str] | None = None,
+        job_attrs: dict | None = None,
     ) -> list[Job]:
         """
         Create "queued" analysis and insert "in_progress" and "completed" updater jobs.
@@ -74,12 +102,15 @@ class MetamistStatusReporter(StatusReporter):
         if not jobs:
             return []
 
+        assert isinstance(outputs, str | Path | None)
+
         # 1. Create a "queued" analysis
         if (
-            aid := self.create_analysis(
-                output=output,
+            aid := self.create_status(
+                outputs=outputs,
+                status=AnalysisStatus.QUEUED,
+                stage_name=stage_name,
                 analysis_type=analysis_type,
-                analysis_status='queued',
                 target=target,
                 meta=meta,
             )
@@ -101,7 +132,7 @@ class MetamistStatusReporter(StatusReporter):
             status=AnalysisStatus.COMPLETED,
             analysis_type=analysis_type,
             job_attrs=(job_attrs or {}) | dict(tool='metamist'),
-            output_path=output if not isinstance(output, str | dict) else None,
+            output_path=outputs if not isinstance(outputs, str | dict) else None,
         )
 
         if prev_jobs:
@@ -109,23 +140,25 @@ class MetamistStatusReporter(StatusReporter):
         completed_j.depends_on(*jobs)
         return [in_progress_j, *jobs, completed_j]
 
-    def create_analysis(
+    def create_status(
         self,
-        output: str,
-        analysis_type: str,
-        analysis_status: str,
+        outputs: dict | str | Path | None,
+        status: AnalysisStatus,
+        stage_name: str,
         target: Target,
+        analysis_type: str,
         meta: dict | None = None,
-        project_name: str = None,
+        dataset: str = None,
     ) -> int | None:
         """Record analysis entry"""
+        assert isinstance(outputs, Path | str | None)
         return get_metamist().create_analysis(
-            output=output,
+            output=outputs,
             type_=analysis_type,
-            status=analysis_status,
+            status=status,
             sample_ids=target.get_sample_ids(),
             meta=meta,
-            dataset=project_name,
+            dataset=dataset,
         )
 
     @staticmethod

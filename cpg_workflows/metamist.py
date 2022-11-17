@@ -330,7 +330,7 @@ class Metamist:
 
     def create_analysis(
         self,
-        output: Path | str,
+        output: Path | str | None,
         type_: str | AnalysisType,
         status: str | AnalysisStatus,
         sample_ids: list[str],
@@ -353,7 +353,7 @@ class Metamist:
         am = models.AnalysisModel(
             type=models.AnalysisType(type_),
             status=models.AnalysisStatus(status),
-            output=str(output),
+            output=str(output) if output else None,
             sample_ids=list(sample_ids),
             meta=meta or {},
         )
