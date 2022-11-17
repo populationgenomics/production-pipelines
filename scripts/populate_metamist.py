@@ -58,7 +58,7 @@ def main(command: str, config_paths: list[str]):
                     continue
 
                 print(f'#{i+1} {sample} {path}')
-                status.create_status(
+                status.record_status(
                     str(path),
                     analysis_type='cram',
                     analysis_status='completed',
@@ -74,7 +74,7 @@ def main(command: str, config_paths: list[str]):
                 print(f'#{i+1} {sample} {path}')
                 if str(path) in existing_paths:
                     continue
-                status.create_status(
+                status.record_status(
                     str(path),
                     analysis_type='gvcf',
                     analysis_status='completed',
@@ -112,7 +112,7 @@ def main(command: str, config_paths: list[str]):
                 print(f'{sample.rich_id} not found in MultiQC, skipping')
                 continue
             metrics_d = metrics_by_sample[sample.rich_id]
-            status.create_status(
+            status.record_status(
                 str(multiqc_json_path),
                 analysis_type='qc',
                 analysis_status='completed',
@@ -129,7 +129,7 @@ def main(command: str, config_paths: list[str]):
         h = cohort.alignment_inputs_hash()
         path = cohort.analysis_dataset.prefix() / 'mt' / f'{h}.mt'
         if exists(path):
-            status.create_status(
+            status.record_status(
                 str(path),
                 analysis_type='joint-calling',
                 analysis_status='completed',
@@ -168,7 +168,7 @@ def main(command: str, config_paths: list[str]):
             ds_name = name.split(f'-{sequencing_type}-')[0]
             print(f'Adding {ds_name}')
             dataset = cohort.create_dataset(ds_name)
-            status.create_status(
+            status.record_status(
                 str(name),
                 analysis_type='es-index',
                 analysis_status='completed',

@@ -517,7 +517,7 @@ class Stage(Generic[TargetT], ABC):
 
             assert isinstance(output, str) or isinstance(output, Path), output
 
-            self.state_provider.add_status_updaters_jobs(
+            self.state_provider.wrap_jobs_with_status_updaters(
                 b=get_batch(),
                 output=str(output),
                 analysis_type=self.analysis_type,

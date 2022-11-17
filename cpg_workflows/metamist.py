@@ -336,7 +336,7 @@ class Metamist:
         sample_ids: list[str],
         dataset: str | None = None,
         meta: dict | None = None,
-    ) -> int | None:
+    ) -> int:
         """
         Tries to create an Analysis entry, returns its id if successful.
         """
@@ -357,19 +357,13 @@ class Metamist:
             sample_ids=list(sample_ids),
             meta=meta or {},
         )
-        try:
-            aid = self.aapi.create_new_analysis(
-                project=metamist_proj, analysis_model=am
-            )
-        except ApiException:
-            traceback.print_exc()
-            return None
-        else:
-            logging.info(
-                f'Created Analysis(id={aid}, type={type_}, status={status}, '
-                f'output={str(output)}) in {metamist_proj}'
-            )
-            return aid
+        aid = self.aapi.create_new_analysis(project=metamist_proj, analysis_model=am)
+        assert aid
+        logging.info(
+            f'Created Analysis(id={aid}, type={type_}, status={status}, '
+            f'output={str(output)}) in {metamist_proj}'
+        )
+        return aid
 
     def process_existing_analysis(
         self,
