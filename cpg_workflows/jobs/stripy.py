@@ -17,7 +17,7 @@ from cpg_workflows.utils import can_reuse, exists
 def stripy(
     b,
     cram_path: CramPath,
-    out_pdf_path: Path,
+    out_path: Path,
     job_attrs: dict | None = None,
     overwrite: bool = False,
 ) -> Job | None:
@@ -26,7 +26,7 @@ def stripy(
     """
     if can_reuse(
         [
-            out_pdf_path,
+            out_path,
         ],
         overwrite,
     ):
@@ -60,11 +60,11 @@ def stripy(
 
     echo "BATCH_TMPDIR = $BATCH_TMPDIR"
     ls $BATCH_TMPDIR/
-    ls $BATCH_TMPDIR/STRipy*
   
-    cp $BATCH_TMPDIR/foo {j.out_pdf_path}
+    cp $CRAM.bam.html {j.out_path}
+
     """
 
     j.command(command(cmd, define_retry_function=True))
-    b.write_output(j.out_pdf_path, str(out_pdf_path))
+    b.write_output(j.out_path, str(out_path))
     return j
