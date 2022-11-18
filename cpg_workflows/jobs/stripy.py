@@ -48,14 +48,20 @@ def stripy(
     retry_gs_cp {str(cram_path.path)} $CRAM
     retry_gs_cp {str(cram_path.index_path)} $CRAI
 
+    samtools view -b -T {reference.base}  $CRAM > $CRAM.bam
+    samtools index $CRAM.bam
+
     python3 stri.py \\
         --genome hg38 \\
         --reference {reference.base} \\
         --output $BATCH_TMPDIR/ \\
         --locus AFF2,ATXN3,HTT,PHOX2B \\
-        --input $CRAM
+        --input $CRAM.bam
 
+    echo "BATCH_TMPDIR = $BATCH_TMPDIR"
     ls $BATCH_TMPDIR/
+    ls /
+    ls
     cp $BATCH_TMPDIR/foo {j.out_pdf_path}
     """
 
