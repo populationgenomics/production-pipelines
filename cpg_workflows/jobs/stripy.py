@@ -60,8 +60,8 @@ def stripy(
 
     echo "BATCH_TMPDIR = $BATCH_TMPDIR"
     ls $BATCH_TMPDIR/
-    ls /
-    ls
+    ls $BATCH_TMPDIR/STRipy*
+  
     cp $BATCH_TMPDIR/foo {j.out_pdf_path}
     """
 
