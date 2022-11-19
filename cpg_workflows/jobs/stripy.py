@@ -48,7 +48,7 @@ def stripy(
     retry_gs_cp {str(cram_path.path)} $CRAM
     retry_gs_cp {str(cram_path.index_path)} $CRAI
 
-    samtools view -b -T {reference.base}  $CRAM > $CRAM.bam
+    samtools view -b -@ 3 -T {reference.base}  $CRAM > $CRAM.bam
     samtools index $CRAM.bam
 
     python3 stri.py \\
@@ -65,6 +65,6 @@ def stripy(
 
     """
 
-    j.command(command(cmd, define_retry_function=True))
+    j.command(command(cmd, define_retry_function=True, monitor_space=True))
     b.write_output(j.out_path, str(out_path))
     return j
