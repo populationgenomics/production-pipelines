@@ -50,7 +50,7 @@ class Stripy(SampleStage):
         j = stripy.stripy(
             b=get_batch(),
             cram_path=CramPath(cram_path, crai_path),
-            log_path=CramPath(cram_path, crai_path),
+            log_path=sample.dataset.prefix() / 'stripy' / f'{sample.external_id}.stripy.log.txt',
             analysis_type=get_config()['stripy']['analysis_type'],
             write_to_bam=get_config()['stripy']['write_to_bam'],
             out_path=sample.dataset.prefix() / 'stripy' / f'{sample.external_id}.stripy.html',

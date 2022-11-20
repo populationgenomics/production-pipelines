@@ -69,7 +69,7 @@ def stripy(
 
     CRAM=$BATCH_TMPDIR/{cram_path.path.name}
     CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
-    LOG=$BATCH_TMPDIR/{log_path.index_path.name}
+    LOG=$BATCH_TMPDIR/{log_path.name}
 
     # Retrying copying to avoid google bandwidth limits
     retry_gs_cp {str(cram_path.path)} $CRAM
