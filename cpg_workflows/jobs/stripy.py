@@ -64,7 +64,7 @@ def stripy(
     assert cram_path.index_path
     cmd = f"""\
     ## Dodgy write to config
-    sed -i 's/"log_flag_threshold": 1/"log_flag_threshold": -1/' /usr/local/bin/stripy-pipeline/config.json > $BATCH_TMPDIR/config.json
+    sed 's/"log_flag_threshold": 1/"log_flag_threshold": -1/' /usr/local/bin/stripy-pipeline/config.json > $BATCH_TMPDIR/config.json
     cat $BATCH_TMPDIR/config.json
 
     CRAM=$BATCH_TMPDIR/{cram_path.path.name}
