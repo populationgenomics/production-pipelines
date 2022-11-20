@@ -63,7 +63,8 @@ def stripy(
     echo "BATCH_TMPDIR = $BATCH_TMPDIR"
     ls $BATCH_TMPDIR/
   
-    cp $CRAM.bam.html {j.out_path}
+    # cp $CRAM.bam.html {j.out_path}
+    cp $CRAM.html {j.out_path}
 
     """
 
