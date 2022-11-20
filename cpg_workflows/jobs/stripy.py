@@ -64,8 +64,8 @@ def stripy(
     assert cram_path.index_path
     cmd = f"""\
     ## Dodgy write to config
-    sed -i 's/"log_flag_threshold": 1/"log_flag_threshold": -1/' stripy-pipeline/config.json
-    cat stripy-pipeline/config.json
+    sed -i 's/"log_flag_threshold": 1/"log_flag_threshold": -1/' /usr/local/bin/stripy-pipeline/config.json > $BATCH_TMPDIR/config.json
+    cat $BATCH_TMPDIR/config.json
 
     CRAM=$BATCH_TMPDIR/{cram_path.path.name}
     CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
@@ -83,6 +83,7 @@ def stripy(
         --output $BATCH_TMPDIR/ \\
         --input $ALIGNMENT \\
         --logflags $LOG \\
+        --config $BATCH_TMPDIR/config.json \\
         --analysis {analysis_type} \\
         --locus AFF2,AR,ARX_1,ARX_2,ATN1,ATXN1,ATXN10,ATXN2,ATXN3,ATXN7,ATXN8OS,\
 BEAN1,C9ORF72,CACNA1A,CBL,CNBP,COMP,DAB1,DIP2B,DMD,DMPK,FMR1,FOXL2,FXN,GIPC1,GLS,\
