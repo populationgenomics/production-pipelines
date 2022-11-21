@@ -46,26 +46,28 @@ def stripy(
     j = b.new_job('STRipy', job_attrs)
     j.image(image_path('stripy'))
     
+    reference = fasta_res_group(b)
+
+    assert cram_path.index_path
+
     if write_to_bam:
         res = STANDARD.request_resources(storage_gb=100)
-        write_bam_cmd = '''
+        res.set_to_job(j)
+        write_bam_cmd = f"""
             BAM=$BATCH_TMPDIR/{cram_path.path.stem}.bam
             samtools view -b -@ 6 -T {reference.base}  $CRAM > $BAM
             samtools index $BAM
             ALIGNMENT=$BAM
-        '''
+        """
     else:
         res = STANDARD.request_resources(ncpu=2)
-        write_bam_cmd = '''ALIGNMENT=$CRAM'''
+        res.set_to_job(j)
+        write_bam_cmd = """ALIGNMENT=$CRAM"""
     
-    res.set_to_job(j)
-    reference = fasta_res_group(b)
-
-    assert cram_path.index_path
     cmd = f"""\
-    ## Dodgy write to config
-    sed 's/"log_flag_threshold": 1/"log_flag_threshold": -1/' /usr/local/bin/stripy-pipeline/config.json > $BATCH_TMPDIR/config.json
-    cat $BATCH_TMPDIR/config.json
+    ## Dodgy re-write stripy config
+    sed 's/"log_flag_threshold": 1/"log_flag_threshold": -1/' /usr/local/bin/stripy-pipeline/config.json \
+        > $BATCH_TMPDIR/config.json
 
     CRAM=$BATCH_TMPDIR/{cram_path.path.name}
     CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
@@ -100,4 +102,5 @@ TBX1,TCF4,TNRC6A,XYLT1,YEATS2,ZIC2,ZIC3
 
     j.command(command(cmd, define_retry_function=True, monitor_space=True))
     b.write_output(j.out_path, str(out_path))
+    b.write_output(j.log_path, str(log_path))
     return j
