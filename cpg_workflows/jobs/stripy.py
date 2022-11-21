@@ -27,12 +27,14 @@ def stripy(
     """
     Run STRipy
 
-    Stripy currently is very inefficient at reading from cram files as it does not pass a local 
+    Stripy is very inefficient at reading from cram files as it does not pass a local 
     reference genome when opening the file reader. The right thing to do would be to patch this throughout
     the package and upstream. As a workaround we can either use the slow default (write_to_bam=False) or
-    convert to a temporary bam then run stripy on that (write_to_bam=True) which is faster but more 
+    convert to a temporary bam then run stripy on that (write_to_bam=True) which is ~3x faster but ~2x more 
     expensive due to the local storage required.
 
+    As implemented, this job will fail on a significant minority of our crams (aprox 1 in 5). No useful logs are produced
+    even with the most verbose logging configuration set. 
     """
     if can_reuse(
         [
@@ -65,14 +67,13 @@ def stripy(
         write_bam_cmd = """ALIGNMENT=$CRAM"""
     
     cmd = f"""\
-    ## Dodgy re-write stripy config
+    ## Dodgy re-write of stripy config file
     sed 's/"log_flag_threshold": 1/"log_flag_threshold": -1/' /usr/local/bin/stripy-pipeline/config.json \
         > $BATCH_TMPDIR/config.json
 
     CRAM=$BATCH_TMPDIR/{cram_path.path.name}
     CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
 
-    # Retrying copying to avoid google bandwidth limits
     retry_gs_cp {str(cram_path.path)} $CRAM
     retry_gs_cp {str(cram_path.index_path)} $CRAI
 
@@ -99,6 +100,7 @@ TBX1,TCF4,TNRC6A,XYLT1,YEATS2,ZIC2,ZIC3
     """
 
     j.command(command(cmd, define_retry_function=True, monitor_space=True))
-    b.write_output(j.out_path, str(out_path))
     b.write_output(j.log_path, str(log_path))
+    b.write_output(j.out_path, str(out_path))
+
     return j

@@ -30,10 +30,10 @@ class Stripy(SampleStage):
     """
 
     def expected_outputs(self, sample: Sample) -> dict[str, Path]:
-        expected_output_path = (
+        stripy_html  = (
             sample.dataset.prefix() / 'stripy' / f'{sample.external_id}.stripy.html'
         )
-        log_path = (
+        stripy_log = (
             sample.dataset.prefix() / 'stripy' / f'{sample.external_id}.stripy.log.txt'
         )
 
@@ -50,10 +50,10 @@ class Stripy(SampleStage):
         j = stripy.stripy(
             b=get_batch(),
             cram_path=CramPath(cram_path, crai_path),
-            log_path=sample.dataset.prefix() / 'stripy' / f'{sample.external_id}.stripy.log.txt',
+            log_path=self.expected_outputs(sample)['stripy_log'],
             analysis_type=get_config()['stripy']['analysis_type'],
             write_to_bam=get_config()['stripy']['write_to_bam'],
-            out_path=sample.dataset.prefix() / 'stripy' / f'{sample.external_id}.stripy.html',
+            out_path=self.expected_outputs(sample)['stripy_html']',
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(j)
