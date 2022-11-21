@@ -53,7 +53,7 @@ class Stripy(SampleStage):
             log_path=self.expected_outputs(sample)['stripy_log'],
             analysis_type=get_config()['stripy']['analysis_type'],
             write_to_bam=get_config()['stripy']['write_to_bam'],
-            out_path=self.expected_outputs(sample)['stripy_html']',
+            out_path=self.expected_outputs(sample)['stripy_html'],
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(j)
