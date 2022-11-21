@@ -71,7 +71,6 @@ def stripy(
 
     CRAM=$BATCH_TMPDIR/{cram_path.path.name}
     CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
-    LOG=$BATCH_TMPDIR/{log_path.name}
 
     # Retrying copying to avoid google bandwidth limits
     retry_gs_cp {str(cram_path.path)} $CRAM
@@ -84,7 +83,7 @@ def stripy(
         --reference {reference.base} \\
         --output $BATCH_TMPDIR/ \\
         --input $ALIGNMENT \\
-        --logflags $LOG \\
+        --logflags {j.log_path} \\
         --config $BATCH_TMPDIR/config.json \\
         --analysis {analysis_type} \\
         --locus AFF2,AR,ARX_1,ARX_2,ATN1,ATXN1,ATXN10,ATXN2,ATXN3,ATXN7,ATXN8OS,\
@@ -96,7 +95,6 @@ TBX1,TCF4,TNRC6A,XYLT1,YEATS2,ZIC2,ZIC3
     ls $BATCH_TMPDIR/
   
     cp $ALIGNMENT.html {j.out_path}
-    cp $LOG {j.log_path}
 
     """
 
