@@ -30,16 +30,9 @@ class Stripy(SampleStage):
     """
 
     def expected_outputs(self, sample: Sample) -> dict[str, Path]:
-        stripy_html  = (
-            sample.dataset.prefix() / 'stripy' / f'{sample.external_id}.stripy.html'
-        )
-        stripy_log = (
-            sample.dataset.prefix() / 'stripy' / f'{sample.external_id}.stripy.log.txt'
-        )
-
         return {
-            'stripy_html': expected_output_path,
-            'stripy_log': log_path
+            'stripy_html': sample.dataset.prefix() / 'stripy' / f'{sample.external_id}.stripy.html',
+            'stripy_log': sample.dataset.prefix() / 'stripy' / f'{sample.external_id}.stripy.log.txt
         }
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
