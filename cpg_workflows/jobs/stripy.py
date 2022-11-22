@@ -68,8 +68,8 @@ def stripy(
         res.set_to_job(j)
         write_bam_cmd = """ALIGNMENT=$CRAM"""
     
-    if sample.sex:
-        sex_argument = f'--sex {str(sample.sex).lower()}'
+    if sample.pedigree.sex:
+        sex_argument = f'--sex {str(sample.pedigree.sex).lower()}'
     else:
         sex_argument = ""
 
