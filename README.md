@@ -142,7 +142,6 @@ Large-cohort workflow diverges from seqr-loader after the single-sample `Genotyp
 analysis-runner \
   --dataset prophecy --description "Larcoh thousand-genomes" --output-dir "larcoh" \
   --access-level test \
-  --config configs/test.toml \
   --config configs/thousand-genomes.toml \
   --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:latest \
   main.py large_cohort

@@ -1,5 +1,4 @@
 [workflow]
-access_level = 'full'
 input_datasets = [
     'acute-care',
     'ag-hidden',
