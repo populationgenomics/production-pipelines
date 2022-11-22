@@ -12,10 +12,12 @@ from cpg_utils.hail_batch import command
 from cpg_workflows.resources import HIGHMEM, STANDARD
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.utils import can_reuse, exists
+from cpg_workflows.targets import Sample
 
 
 def stripy(
     b,
+    sample: Sample,
     cram_path: CramPath,
     out_path: Path,
     log_path: Path,
@@ -30,7 +32,7 @@ def stripy(
     Stripy is very inefficient at reading from cram files as it does not pass a local 
     reference genome when opening the file reader. The right thing to do would be to patch this throughout
     the package and upstream. As a workaround we can either use the slow default (write_to_bam=False) or
-    convert to a temporary bam then run stripy on that (write_to_bam=True) which is ~3x faster but ~2x more 
+    convert to a temporary bam then run stripy on that (write_to_bam=True) which is ~3x faster wall time but ~2x more 
     expensive due to the local storage required.
 
     As implemented, this job will fail on a significant minority of our crams (aprox 1 in 5). No useful logs are produced
@@ -66,6 +68,11 @@ def stripy(
         res.set_to_job(j)
         write_bam_cmd = """ALIGNMENT=$CRAM"""
     
+    if sample.sex:
+        sex_argument = f'--sex {str(sample.sex).lower()}'
+    else:
+        sex_argument = ""
+
     cmd = f"""\
     ## Dodgy re-write of stripy config file
     sed 's/"log_flag_threshold": 1/"log_flag_threshold": -1/' /usr/local/bin/stripy-pipeline/config.json \
@@ -82,6 +89,7 @@ def stripy(
     python3 stri.py \\
         --genome hg38 \\
         --reference {reference.base} \\
+        {sex_argument} \
         --output $BATCH_TMPDIR/ \\
         --input $ALIGNMENT \\
         --logflags {j.log_path} \\
