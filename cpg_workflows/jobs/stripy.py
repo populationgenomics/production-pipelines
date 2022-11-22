@@ -29,14 +29,14 @@ def stripy(
     """
     Run STRipy
 
-    Stripy is very inefficient at reading from cram files as it does not pass a local 
+    Stripy is very inefficient at reading from cram files as it does not pass a local
     reference genome when opening the file reader. The right thing to do would be to patch this throughout
     the package and upstream. As a workaround we can either use the slow default (write_to_bam=False) or
-    convert to a temporary bam then run stripy on that (write_to_bam=True) which is ~3x faster wall time but ~2x more 
+    convert to a temporary bam then run stripy on that (write_to_bam=True) which is ~3x faster wall time but ~2x more
     expensive due to the local storage required.
 
     As implemented, this job will fail on a significant minority of our crams (aprox 1 in 5). No useful logs are produced
-    even with the most verbose logging configuration set. 
+    even with the most verbose logging configuration set.
     """
     if can_reuse(
         [
@@ -49,7 +49,7 @@ def stripy(
     job_attrs = (job_attrs or {}) | {'tool': 'stripy'}
     j = b.new_job('STRipy', job_attrs)
     j.image(image_path('stripy'))
-    
+
     reference = fasta_res_group(b)
 
     assert cram_path.index_path
@@ -67,16 +67,18 @@ def stripy(
         res = STANDARD.request_resources(ncpu=2)
         res.set_to_job(j)
         write_bam_cmd = """ALIGNMENT=$CRAM"""
-    
+
     if sample.pedigree.sex:
         sex_argument = f'--sex {str(sample.pedigree.sex).lower()}'
     else:
         sex_argument = ''
 
     cmd = f"""\
-    ## Dodgy re-write of stripy config file
+    # Increase logging to max verbosity. Needs to be passed as a config file so doing a quick an dirty edit
+    # just edit of the default config on the fly and cat to the job log.
     sed 's/"log_flag_threshold": 1/"log_flag_threshold": -1/' /usr/local/bin/stripy-pipeline/config.json \
         > $BATCH_TMPDIR/config.json
+    cat $BATCH_TMPDIR/config.json
 
     CRAM=$BATCH_TMPDIR/{cram_path.path.name}
     CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
