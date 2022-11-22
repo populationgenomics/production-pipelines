@@ -21,7 +21,7 @@ def stripy(
     cram_path: CramPath,
     out_path: Path,
     log_path: Path,
-    analysis_type: str = "standard",
+    analysis_type: str = 'standard',
     write_to_bam: bool = False,
     job_attrs: dict | None = None,
     overwrite: bool = False,
@@ -71,7 +71,7 @@ def stripy(
     if sample.pedigree.sex:
         sex_argument = f'--sex {str(sample.pedigree.sex).lower()}'
     else:
-        sex_argument = ""
+        sex_argument = ''
 
     cmd = f"""\
     ## Dodgy re-write of stripy config file
