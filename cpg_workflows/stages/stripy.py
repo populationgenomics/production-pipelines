@@ -48,7 +48,7 @@ class Stripy(SampleStage):
             b=get_batch(),
             sample=sample,
             cram_path=CramPath(cram_path, crai_path),
-            target_loci=get_config()['stripy']['target_loci']
+            target_loci=get_config()['stripy']['target_loci'],
             log_path=self.expected_outputs(sample)['stripy_log'],
             analysis_type=get_config()['stripy']['analysis_type'],
             write_to_bam=get_config()['stripy']['write_to_bam'],
