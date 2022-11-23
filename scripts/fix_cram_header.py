@@ -7,7 +7,7 @@ Usage:
 
 ```sh
 samtools reheader sample.cram --in-place \
-    --command "fix_cram_header.py Homo_sapiens_assembly38.fasta"
+    --command "fix_cram_header.py Homo_sapiens_assembly38.dict"
 ```
 """
 import sys
