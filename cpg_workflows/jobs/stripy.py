@@ -76,7 +76,7 @@ def stripy(
     cmd = f"""\
 
     cd ..
-    git clone -b add-logging --single-branch https://gitlab.com/andreassh/stripy-pipeline.git stripy-test
+    git clone -b add-logging --single-branch https://gitlab.com/cassimons/stripy-pipeline.git stripy-test
     cd stripy-test
     chmod batch.sh 
     
