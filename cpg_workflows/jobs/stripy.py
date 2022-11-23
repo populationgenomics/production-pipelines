@@ -75,7 +75,8 @@ def stripy(
             ALIGNMENT=$BAM
         """
     else:
-        res = STANDARD.request_resources(ncpu=2)
+        # res = STANDARD.request_resources(ncpu=2)
+        res = STANDARD.request_resources(ncpu=16)
         res.set_to_job(j)
         write_bam_cmd = """ALIGNMENT=$CRAM"""
 
