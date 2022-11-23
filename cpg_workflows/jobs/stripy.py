@@ -74,6 +74,12 @@ def stripy(
         sex_argument = ''
 
     cmd = f"""\
+
+    cd ..
+    git clone -b add-logging --single-branch https://gitlab.com/andreassh/stripy-pipeline.git stripy-test
+    cd stripy-test
+    chmod batch.sh 
+    
     # Increase logging to max verbosity. Needs to be passed as a config file so doing a quick an dirty edit
     # just edit of the default config on the fly and cat to the job log.
     sed 's/"log_flag_threshold": 1/"log_flag_threshold": -1/' /usr/local/bin/stripy-pipeline/config.json \
