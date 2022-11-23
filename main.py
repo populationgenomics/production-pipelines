@@ -10,6 +10,7 @@ import coloredlogs
 
 from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
+from cpg_workflows import defaults_config_path
 from cpg_workflows.workflow import run_workflow, StageDecorator
 from cpg_workflows.stages.large_cohort import LoadVqsr, Frequencies
 from cpg_workflows.stages.cram_qc import CramMultiQC
@@ -93,6 +94,8 @@ def main(
     wfl_conf_path = to_path(__file__).parent / f'configs/defaults/{workflow}.toml'
     assert wfl_conf_path.exists(), wfl_conf_path
     config_paths = os.environ['CPG_CONFIG_PATH'].split(',') + list(config_paths)
+    # Assuming the defaults is already loaded in __init__.py:
+    assert to_path(config_paths[0]) == defaults_config_path
     # Inserting after the "defaults" config, but before user configs:
     set_config_paths(config_paths[:1] + [str(wfl_conf_path)] + config_paths[1:])
 
