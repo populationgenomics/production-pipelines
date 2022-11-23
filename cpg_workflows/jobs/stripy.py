@@ -123,7 +123,7 @@ def stripy(
 
     ls $BATCH_TMPDIR/
   
-    cp $ALIGNMENT.html {j.out_path}
+    cp $BATCH_TMPDIR/{cram_path.path.name}.html {j.out_path}
 
     """
 
