@@ -55,6 +55,13 @@ def stripy(
 
     assert cram_path.index_path
 
+    ## Atempt to mount bucket
+    bucket = cram_path.path.drive
+    print(f'bucket = {bucket}')
+    bucket_mount_path = '/bucket'
+    j.cloudfuse(bucket, str(bucket_mount_path), read_only=True)
+
+
     if write_to_bam:
         res = STANDARD.request_resources(storage_gb=100)
         res.set_to_job(j)
@@ -75,6 +82,10 @@ def stripy(
         sex_argument = ''
 
     cmd = f"""\
+
+    ls -l /
+
+    ls -l {bucket_mount_path}
 
     cd ..
     git clone -b add-logging --single-branch https://gitlab.com/cassimons/stripy-pipeline.git stripy-test
