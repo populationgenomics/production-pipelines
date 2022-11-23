@@ -61,6 +61,9 @@ def stripy(
     bucket_mount_path = '/bucket'
     j.cloudfuse(bucket, str(bucket_mount_path), read_only=True)
 
+    mounted_cram_path = bucket_mount_path / '/'.join(cram_path.path.parts[2:])
+    mounted_cram_index_path = bucket_mount_path / '/'.join(cram_path.index_path.parts[2:])
+
 
     if write_to_bam:
         res = STANDARD.request_resources(storage_gb=100)
@@ -83,9 +86,7 @@ def stripy(
 
     cmd = f"""\
 
-    ls -l /
-
-    ls -l {bucket_mount_path}
+    ls -l {mounted_cram_path} {mounted_cram_index_path}
 
     cd ..
     git clone -b add-logging --single-branch https://gitlab.com/cassimons/stripy-pipeline.git stripy-test
@@ -98,11 +99,13 @@ def stripy(
         > $BATCH_TMPDIR/config.json
     cat $BATCH_TMPDIR/config.json
 
-    CRAM=$BATCH_TMPDIR/{cram_path.path.name}
-    CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
+    # CRAM=$BATCH_TMPDIR/{cram_path.path.name}
+    # CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
+    CRAM={mounted_cram_path}
+    CRAI={mounted_cram_index_path}
 
-    retry_gs_cp {str(cram_path.path)} $CRAM
-    retry_gs_cp {str(cram_path.index_path)} $CRAI
+    # retry_gs_cp {str(cram_path.path)} $CRAM
+    # retry_gs_cp {str(cram_path.index_path)} $CRAI
 
     {write_bam_cmd}
     
