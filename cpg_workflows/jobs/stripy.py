@@ -78,7 +78,7 @@ def stripy(
     cd ..
     git clone -b add-logging --single-branch https://gitlab.com/cassimons/stripy-pipeline.git stripy-test
     cd stripy-test
-    chmod batch.sh 
+    chmod 755 batch.sh 
     
     # Increase logging to max verbosity. Needs to be passed as a config file so doing a quick an dirty edit
     # just edit of the default config on the fly and cat to the job log.
