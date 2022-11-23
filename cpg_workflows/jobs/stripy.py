@@ -36,8 +36,6 @@ def stripy(
     convert to a temporary bam then run stripy on that (write_to_bam=True) which is ~3x faster wall time but ~2x more
     expensive due to the local storage required.
 
-    As implemented, this job will fail on a significant minority of our crams (aprox 1 in 5). No useful logs are produced
-    even with the most verbose logging configuration set.
     """
     if can_reuse(
         [
@@ -53,17 +51,16 @@ def stripy(
 
     reference = fasta_res_group(b)
 
-    assert cram_path.index_path
-
-    ## Atempt to mount bucket
+    # Stripy accesses a relatively small number of discrete regions from each cram
+    # accessing the cram via cloudfuse is faster than localising the full cram   
     bucket = cram_path.path.drive
     print(f'bucket = {bucket}')
     bucket_mount_path = to_path('/bucket')
     j.cloudfuse(bucket, str(bucket_mount_path), read_only=True)
 
     mounted_cram_path = bucket_mount_path / '/'.join(cram_path.path.parts[2:])
+    assert cram_path.index_path
     mounted_cram_index_path = bucket_mount_path / '/'.join(cram_path.index_path.parts[2:])
-
 
     if write_to_bam:
         res = STANDARD.request_resources(storage_gb=100)
@@ -86,11 +83,8 @@ def stripy(
         sex_argument = ''
 
     cmd = f"""\
-
-    ls -l {mounted_cram_path} {mounted_cram_index_path}
-
     cd ..
-    git clone -b add-logging --single-branch https://gitlab.com/cassimons/stripy-pipeline.git stripy-test
+    git clone -b pass-reference-to-cram-reader --single-branch https://gitlab.com/cassimons/stripy-pipeline.git stripy-test
     cd stripy-test
     chmod 755 batch.sh 
     
