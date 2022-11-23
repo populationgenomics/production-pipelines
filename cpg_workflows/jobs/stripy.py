@@ -5,7 +5,7 @@ Create Hail Batch jobs to run STRipy
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from cpg_utils.hail_batch import command
@@ -58,7 +58,7 @@ def stripy(
     ## Atempt to mount bucket
     bucket = cram_path.path.drive
     print(f'bucket = {bucket}')
-    bucket_mount_path = '/bucket'
+    bucket_mount_path = to_path('/bucket')
     j.cloudfuse(bucket, str(bucket_mount_path), read_only=True)
 
     mounted_cram_path = bucket_mount_path / '/'.join(cram_path.path.parts[2:])
