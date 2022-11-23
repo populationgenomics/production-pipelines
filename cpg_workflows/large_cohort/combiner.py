@@ -19,18 +19,20 @@ def _check_gvcfs(samples: list[Sample]) -> list[Sample]:
         if not sample.gvcf:
             if exists(sample.make_gvcf_path().path):
                 sample.gvcf = sample.make_gvcf_path()
-
-            if get_config()['workflow'].get('skip_samples_with_missing_input', False):
-                logging.warning(f'Skipping {sample} which is missing GVCF')
-                sample.active = False
-                continue
             else:
-                raise ValueError(
-                    f'Sample {sample} is missing GVCF. '
-                    f'Use workflow/skip_samples = [] or '
-                    f'workflow/skip_samples_with_missing_input '
-                    f'to control behaviour'
-                )
+                if get_config()['workflow'].get(
+                    'skip_samples_with_missing_input', False
+                ):
+                    logging.warning(f'Skipping {sample} which is missing GVCF')
+                    sample.active = False
+                    continue
+                else:
+                    raise ValueError(
+                        f'Sample {sample} is missing GVCF. '
+                        f'Use workflow/skip_samples = [] or '
+                        f'workflow/skip_samples_with_missing_input '
+                        f'to control behaviour'
+                    )
 
         if get_config()['workflow'].get('check_inputs', True):
             if not exists(sample.gvcf.path):
