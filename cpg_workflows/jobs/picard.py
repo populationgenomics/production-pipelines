@@ -63,24 +63,6 @@ def get_intervals(
             for idx in range(scatter_count)
         ]
 
-    if not source_intervals_path and exists(
-        (
-            existing_split_intervals_prefix := (
-                reference_path('intervals_prefix')
-                / sequencing_type
-                / f'{scatter_count}intervals'
-            )
-        )
-        / '1.interval_list'
-    ):
-        # We already have split intervals for this sequencing_type:
-        return None, [
-            b.read_input(
-                str(existing_split_intervals_prefix / f'{idx + 1}.interval_list')
-            )
-            for idx in range(scatter_count)
-        ]
-
     j = b.new_job(
         f'Make {scatter_count} intervals for {sequencing_type}',
         attributes=(job_attrs or {}) | dict(tool='picard IntervalListTools'),

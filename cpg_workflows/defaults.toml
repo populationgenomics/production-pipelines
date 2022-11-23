@@ -115,8 +115,6 @@ somalier_1kg_targz = 'somalier/v0/1kg.somalier.tar.gz'
 somalier_1kg_labels = 'somalier/v0/ancestry-labels-1kg.tsv'
 # Contains uncompressed VEP tarballs for mounting with cloudfuse.
 vep_mount = 'vep/105.0/mount'
-# To cache intervals.
-intervals_prefix = 'intervals'
 # Liftover chain file to translate from GRCh38 to GRCh37 coordinates
 liftover_38_to_37 = 'liftover/grch38_to_grch37.over.chain.gz'
 
