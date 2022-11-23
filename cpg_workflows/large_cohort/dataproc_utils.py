@@ -48,7 +48,7 @@ def dataproc_job(
     import cpg_workflows
     from cpg_workflows.large_cohort import dataproc_script
 
-    package_path = to_path(cpg_workflows.__file__)
+    package_path = to_path(cpg_workflows.__file__).parent
     script_path = to_path(dataproc_script.__file__)
     rel_script_path = script_path.relative_to(package_path.parent)
 
@@ -112,6 +112,6 @@ def dataproc_job(
         worker_machine_type='n1-highmem-8' if use_highmem_workers else 'n1-standard-8',
         worker_boot_disk_size=worker_boot_disk_size,
         secondary_worker_boot_disk_size=secondary_worker_boot_disk_size,
-        pyfiles=['large_cohort'],
+        pyfiles=[cpg_workflows.__name__],
         init=['gs://cpg-reference/hail_dataproc/install_common.sh'],
     )
