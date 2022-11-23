@@ -53,3 +53,9 @@ username = 'seqr'
 # Load ElasticSearch password from a secret, unless SEQR_ES_PASSWORD is set
 password_secret_id = 'seqr-es-password'
 password_project_id = 'seqr-308602'
+
+[stripy]
+# Analysis_type can be "standard" (fast) or "extended" (marginally slower 
+# but also uses unmapped reads for genotying)
+analysis_type = "extended"
+write_to_bam = false
