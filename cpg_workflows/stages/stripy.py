@@ -34,6 +34,9 @@ class Stripy(SampleStage):
             'stripy_html': sample.dataset.web_prefix()
             / 'stripy'
             / f'{sample._external_id}.stripy.html',
+            'stripy_json': sample.dataset.prefix()
+            / 'stripy'
+            / f'{sample._external_id}.stripy.json',
             'stripy_log': sample.dataset.prefix()
             / 'stripy'
             / f'{sample.id}.stripy.log.txt',
@@ -53,6 +56,7 @@ class Stripy(SampleStage):
             analysis_type=get_config()['stripy']['analysis_type'],
             write_to_bam=get_config()['stripy']['write_to_bam'],
             out_path=self.expected_outputs(sample)['stripy_html'],
+            json_path=self.expected_outputs(sample)['stripy_json'],
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(j)

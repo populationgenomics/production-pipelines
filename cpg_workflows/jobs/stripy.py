@@ -22,6 +22,7 @@ def stripy(
     target_loci: str,
     out_path: Path,
     log_path: Path,
+    json_path: Path,
     analysis_type: str = 'standard',
     write_to_bam: bool = False,
     job_attrs: dict | None = None,
@@ -66,6 +67,12 @@ def stripy(
         res = STANDARD.request_resources(storage_gb=100)
         res.set_to_job(j)
         write_bam_cmd = f"""
+            CRAM=$BATCH_TMPDIR/{cram_path.path.name}
+            CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
+            
+            retry_gs_cp {str(cram_path.path)} $CRAM
+            retry_gs_cp {str(cram_path.index_path)} $CRAI
+
             BAM=$BATCH_TMPDIR/{cram_path.path.stem}.bam
             samtools view -b -@ 6 -T {reference.base}  $CRAM > $BAM
             samtools index $BAM
@@ -75,7 +82,11 @@ def stripy(
         # res = STANDARD.request_resources(ncpu=2)
         res = STANDARD.request_resources(ncpu=16)
         res.set_to_job(j)
-        write_bam_cmd = """ALIGNMENT=$CRAM"""
+        write_bam_cmd = """
+            CRAM={mounted_cram_path}
+            CRAI={mounted_cram_index_path}
+            ALIGNMENT=$CRAM
+        """
 
     if sample.pedigree.sex:
         sex_argument = f'--sex {str(sample.pedigree.sex).lower()}'
@@ -88,19 +99,12 @@ def stripy(
     cd stripy-test
     chmod 755 batch.sh 
     
-    # Increase logging to max verbosity. Needs to be passed as a config file so doing a quick an dirty edit
-    # just edit of the default config on the fly and cat to the job log.
+    # Increase logging to max verbosity and output json results. Needs to be passed as a config file so doing a 
+    # quick an dirty edit of the default config on the fly and cat to the job log.
     sed 's/"log_flag_threshold": 1/"log_flag_threshold": -1/' config.json \
+        | sed 's/"output_json": false/""output_json": true/' \
         > $BATCH_TMPDIR/config.json
     cat $BATCH_TMPDIR/config.json
-
-    # CRAM=$BATCH_TMPDIR/{cram_path.path.name}
-    # CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
-    CRAM={mounted_cram_path}
-    CRAI={mounted_cram_index_path}
-
-    # retry_gs_cp {str(cram_path.path)} $CRAM
-    # retry_gs_cp {str(cram_path.index_path)} $CRAI
 
     {write_bam_cmd}
     
@@ -118,11 +122,13 @@ def stripy(
     ls $BATCH_TMPDIR/
   
     cp $BATCH_TMPDIR/{cram_path.path.name}.html {j.out_path}
+    cp $BATCH_TMPDIR/{cram_path.path.name}.json {j.json_path}
 
     """
 
     j.command(command(cmd, define_retry_function=True, monitor_space=True))
     b.write_output(j.log_path, str(log_path))
+    b.write_output(j.json_path, str(json_path))
     b.write_output(j.out_path, str(out_path))
 
     return j
