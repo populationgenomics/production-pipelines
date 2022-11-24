@@ -94,15 +94,15 @@ def stripy(
         sex_argument = ''
 
     cmd = f"""\
-    cd ..
-    git clone -b pass-reference-to-cram-reader --single-branch https://gitlab.com/cassimons/stripy-pipeline.git stripy-test
-    cd stripy-test
-    chmod 755 batch.sh 
+    # cd ..
+    # git clone -b pass-reference-to-cram-reader --single-branch https://gitlab.com/cassimons/stripy-pipeline.git stripy-test
+    # cd stripy-test
+    # chmod 755 batch.sh 
     
     # Increase logging to max verbosity and output json results. Needs to be passed as a config file so doing a 
     # quick an dirty edit of the default config on the fly and cat to the job log.
     sed 's/"log_flag_threshold": 1/"log_flag_threshold": -1/' config.json \
-        | sed 's/"output_json": false/""output_json": true/' \
+        | sed 's/"output_json": false/"output_json": true/' \
         > $BATCH_TMPDIR/config.json
     cat $BATCH_TMPDIR/config.json
 
