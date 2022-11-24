@@ -82,7 +82,7 @@ def stripy(
         # res = STANDARD.request_resources(ncpu=2)
         res = STANDARD.request_resources(ncpu=16)
         res.set_to_job(j)
-        write_bam_cmd = """
+        write_bam_cmd = f"""
             CRAM={mounted_cram_path}
             CRAI={mounted_cram_index_path}
             ALIGNMENT=$CRAM
