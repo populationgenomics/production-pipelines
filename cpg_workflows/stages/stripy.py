@@ -1,9 +1,8 @@
 """
-Stage to run STR analysis with SRRipy-pipeline.
+Stage to run STR analysis with STRipy-pipeline.
+
+See https://gitlab.com/andreassh/stripy-pipeline
 """
-import logging
-import dataclasses
-from typing import Callable, Optional
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
@@ -11,15 +10,13 @@ from cpg_workflows import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import stripy
 from cpg_workflows.stages.align import Align
-from cpg_workflows.targets import Sample, Dataset
+from cpg_workflows.targets import Sample
 from cpg_workflows.utils import exists
 from cpg_workflows.workflow import (
     stage,
     StageInput,
     StageOutput,
     SampleStage,
-    DatasetStage,
-    StageInputNotFoundError,
 )
 
 
@@ -54,7 +51,6 @@ class Stripy(SampleStage):
             target_loci=get_config()['stripy']['target_loci'],
             log_path=self.expected_outputs(sample)['stripy_log'],
             analysis_type=get_config()['stripy']['analysis_type'],
-            write_to_bam=get_config()['stripy']['write_to_bam'],
             out_path=self.expected_outputs(sample)['stripy_html'],
             json_path=self.expected_outputs(sample)['stripy_json'],
             job_attrs=self.get_job_attrs(sample),
