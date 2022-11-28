@@ -88,6 +88,11 @@ def annotate_cohort(
     clinvar_ht = hl.read_table(str(reference_path('seqr/clinvar')))
 
     logging.info('Annotating with seqr-loader fields: round 1')
+
+    # don't fail if the AC attribute is an inappropriate type
+    if isinstance(mt.info.AC, hl.Int32Expression):
+        mt = mt.annotate_rows(info=mt.info.annotate(AC=[mt.info.AC]))
+
     mt = mt.annotate_rows(
         AC=mt.info.AC[mt.a_index - 1],
         AF=mt.info.AF[mt.a_index - 1],
