@@ -14,7 +14,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'cpg-utils',
-        'analysis-runner',
+        'analysis-runner>=2.36.4',
         'hail',
         'networkx',
         'sample-metadata>=5.0.1',
