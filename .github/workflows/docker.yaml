@@ -22,6 +22,8 @@ jobs:
       IMAGE_NAME: australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows
     steps:
     - uses: actions/checkout@main
+      with:
+        submodules: recursive
 
     - name: gcloud auth
       uses: 'google-github-actions/auth@v0'

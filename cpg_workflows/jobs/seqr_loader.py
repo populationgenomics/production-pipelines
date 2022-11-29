@@ -76,7 +76,7 @@ def annotate_cohort_jobs(
                 str(vcf_path),
                 str(out_mt_path),
                 str(vep_ht_path),
-                str(siteonly_vqsr_vcf_path),
+                str(siteonly_vqsr_vcf_path) if siteonly_vqsr_vcf_path else None,
                 str(checkpoint_prefix),
                 setup_gcp=True,
             )
