@@ -45,7 +45,7 @@ for i, entry in enumerate(get_metamist().get_sample_entries(dataset.name)):
         cmd = f"""\
 # Retrying copying to avoid google bandwidth limits
 CRAM=$BATCH_TMPDIR/sample.cram
-retry_gs_cp {str(cram_path.path)}
+retry_gs_cp {str(cram_path.path)} $CRAM
 
 cat <<EOT >> fix_one_header.py
 {script.replace('`', '')}
