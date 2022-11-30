@@ -178,7 +178,7 @@ def _plot_pca(
 def _plot_loadings(number_of_pcs, loadings_ht, out_path_pattern=None):
     plots = []
     gtf_ht = hl.experimental.import_gtf(
-        str(reference_path('gencode_gtf')),
+        str(reference_path('broad/protein_coding_gtf')),
         reference_genome=genome_build(),
         skip_invalid_contigs=True,
         min_partitions=12,
