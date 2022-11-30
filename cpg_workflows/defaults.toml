@@ -1,14 +1,7 @@
+[images]
+dragmap = 'australia-southeast1-docker.pkg.dev/cpg-common/images/dragmap:1.3.0'
+
 [workflow]
-# Prefix to find docker images referenced in `image_config_yaml_path`
-image_registry_prefix = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
-
-# Prefix to find reference files referenced in `refdata_yaml_path`
-reference_prefix = 'gs://cpg-reference'
-
-# Template to build HTTP URLs matching the dataset_path of category
-# "web". Should be parametrised by namespace and dataset in Jinja format:
-web_url_template = 'https://{namespace}-web.populationgenomics.org.au/{dataset}'
-
 # Datasets to load inputs. If not provided, datasets will be determined
 # automatically based on the input provider implementation:
 #input_datasets = []
