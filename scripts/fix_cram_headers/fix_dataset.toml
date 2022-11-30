@@ -1,0 +1,6 @@
+[workflow]
+dataset = 'validation'
+access_level = 'full'
+
+[hail]
+billing_project = 'validation'

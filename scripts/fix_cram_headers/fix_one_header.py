@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 """
-Change the reference contigs md5-sums in a CRAM header from masked to unmasked versions.
+Change the reference contigs md5-sums in a CRAM header 
+from alts-masked to alts-unmasked versions.
 
 Usage:
 
@@ -37,8 +38,7 @@ def main():
                 print(f'original record: {record}', file=sys.stderr)
                 print(f'unmasked record: {unmasked_record}', file=sys.stderr)
 
-            record['M5'] = unmasked_record['M5']
-            record['UR'] = unmasked_record['UR']
+            record['M5'] = unmasked_record['M5']  # fixing MD5 sums
             line = '\t'.join(['@SQ'] + [f'{k}:{v}' for k, v in record.items()])
             print(line)
         else:

@@ -10,13 +10,12 @@ from cpg_utils.hail_batch import command, fasta_res_group
 from cpg_workflows import get_batch
 from cpg_workflows.metamist import get_metamist
 from cpg_workflows.targets import Dataset
-import fix_one_header
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
 
 
-script = to_path(fix_one_header.__name__).open().read()
+script = (to_path(__file__).parent / 'fix_one_header.py').open().read()
 
 
 dataset = Dataset(name=get_config()['workflow']['dataset'])
@@ -33,7 +32,7 @@ for i, entry in enumerate(get_metamist().get_sample_entries(dataset.name)):
         if not cram_path.exists():
             continue
 
-        out_path = cram_path.path.with_suffix('-fixed.cram')
+        out_path = cram_path.path.with_suffix('.REHEADERED.cram')
         logging.info(f'#{i+1} {sample} {cram_path} -> {out_path}')
 
         j = b.new_job(f'Reheader {cram_path} -> {out_path}')
