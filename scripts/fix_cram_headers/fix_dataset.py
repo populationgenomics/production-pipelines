@@ -57,7 +57,7 @@ samtools reheader $CRAM --in-place \
 --command "python fix_one_header.py {unmasked_dict}"
 
 mv $CRAM {j.out_cram}
-mv $CRAM {j.out_crai}
+mv $CRAI {j.out_crai}
 """
         j.command(
             command(
