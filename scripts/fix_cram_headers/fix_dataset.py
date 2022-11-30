@@ -35,17 +35,19 @@ for i, entry in enumerate(get_metamist().get_sample_entries(dataset.name)):
         if not cram_path.exists():
             continue
 
-        out_path = cram_path.path.with_suffix('.REHEADERED.cram')
+        out_path = cram_path.path.parent / 'reheadered' / cram_path.path.name
         logging.info(f'#{i+1} {sample} {cram_path} -> {out_path}')
 
         j = b.new_job(f'Reheader {cram_path} -> {out_path}')
-        j.storage('150G' if seq_type == 'genome' else '50G')
+        j.storage('100G' if seq_type == 'genome' else '30G')
         j.image(image_path('samtools'))
 
         cmd = f"""\
 # Retrying copying to avoid google bandwidth limits
 CRAM=$BATCH_TMPDIR/sample.cram
+CRAI=$BATCH_TMPDIR/sample.cram.crai
 retry_gs_cp {str(cram_path.path)} $CRAM
+retry_gs_cp {str(cram_path.path)}.crai $CRAI
 
 cat <<EOT >> fix_one_header.py
 {script.replace('`', '')}
@@ -54,7 +56,8 @@ EOT
 samtools reheader $CRAM --in-place \
 --command "python fix_one_header.py {unmasked_dict}"
 
-cp $CRAM {j.out_cram}
+mv $CRAM {j.out_cram}
+mv $CRAM {j.out_crai}
 """
         j.command(
             command(
@@ -65,7 +68,8 @@ cp $CRAM {j.out_cram}
                 rm_leading_space=False,
             )
         )
-        b.write_output(j.out_cram, str(out_path.with_suffix('')))
+        b.write_output(j.out_cram, str(out_path))
+        b.write_output(j.out_crai, str(out_path.with_suffix('.cram.crai')))
 
 
 b.run(wait=False)
