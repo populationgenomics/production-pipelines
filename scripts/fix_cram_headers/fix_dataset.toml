@@ -1,6 +1,7 @@
 [workflow]
 dataset = 'validation'
 access_level = 'full'
+only_samples = ['CPG255190']
 
 [hail]
-billing_project = 'validation'
+billing_project = 'seqr'

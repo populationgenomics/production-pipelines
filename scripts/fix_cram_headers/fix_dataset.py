@@ -39,18 +39,24 @@ for i, entry in enumerate(get_metamist().get_sample_entries(dataset.name)):
         j.storage('150G' if seq_type == 'genome' else '50G')
 
         cmd = f"""\
-        # Retrying copying to avoid google bandwidth limits
-        retry_gs_cp {str(cram_path.path)} {j.out_cram}
+# Retrying copying to avoid google bandwidth limits
+retry_gs_cp {str(cram_path.path)} {j.out_cram}
 
-        cat <<EOT >> fix_one_header.py
-        {script}
-        EOT
+cat <<EOT >> fix_one_header.py
+{script.replace('`', '')}
+EOT
 
-        samtools reheader {j.out_cram} --in-place \
-        --command "fix_one_header.py {fasta_res_group(b)['dict']}"
-        """
+samtools reheader {j.out_cram} --in-place \
+--command "fix_one_header.py {fasta_res_group(b)['dict']}"
+"""
         j.command(
-            command(cmd, monitor_space=True, setup_gcp=True, define_retry_function=True)
+            command(
+                cmd,
+                monitor_space=True,
+                setup_gcp=True,
+                define_retry_function=True,
+                rm_leading_space=False,
+            )
         )
         b.write_output(j.out_cram, str(out_path.with_suffix('')))
 
