@@ -129,7 +129,7 @@ def markdup(
         j.name = f'{j.name} [reuse]'
         return j
 
-    j.image(image_path('picard_samtools'))
+    j.image(image_path('picard'))
     resource = HIGHMEM.request_resources(ncpu=4)
     # enough for input BAM and output CRAM
     resource.attach_disk_storage_gb = 250
