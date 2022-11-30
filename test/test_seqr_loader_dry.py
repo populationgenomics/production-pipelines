@@ -70,7 +70,7 @@ def _make_config(results_prefix: Path) -> dict:
                     'tmp': f'{results_prefix}-test-tmp',
                     'web_url': 'https://test-web.populationgenomics.org.au/fewgenomes',
                 },
-                'fewgenomes': {
+                'test-analysis-dataset': {
                     'default': f'{results_prefix}',
                     'web': f'{results_prefix}-web',
                     'analysis': f'{results_prefix}-analysis',
