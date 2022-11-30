@@ -247,7 +247,9 @@ def align(
         ).get_nthreads()
 
         align_cmd = f"""\
-        samtools merge -@{nthreads - 1} - {' '.join(map(str, sorted_bams))}
+        samtools merge \\
+        --reference {fasta_res_group(b).base} \\
+        -@{nthreads - 1} - {' '.join(map(str, sorted_bams))}
         """.strip()
         output_fmt = 'bam'
         jobs.extend(sharded_align_jobs)
