@@ -51,10 +51,8 @@ cat <<EOT >> fix_one_header.py
 {script.replace('`', '')}
 EOT
 
-chmod +x fix_one_header.py
-
 samtools reheader $CRAM --in-place \
---command "fix_one_header.py {unmasked_dict}"
+--command "python fix_one_header.py {unmasked_dict}"
 
 cp $CRAM {j.out_cram}
 """
