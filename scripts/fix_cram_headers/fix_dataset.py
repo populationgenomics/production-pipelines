@@ -6,7 +6,7 @@ import logging
 
 from cpg_utils import to_path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, fasta_res_group
+from cpg_utils.hail_batch import command, fasta_res_group, image_path
 from cpg_workflows import get_batch
 from cpg_workflows.metamist import get_metamist
 from cpg_workflows.targets import Dataset
@@ -14,12 +14,15 @@ from cpg_workflows.targets import Dataset
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
 
+UNMASKED_REF_DICT = (
+    'gs://cpg-common-main/references/hg38/v0/Homo_sapiens_assembly38.dict'
+)
 
 script = (to_path(__file__).parent / 'fix_one_header.py').open().read()
 
-
 dataset = Dataset(name=get_config()['workflow']['dataset'])
 b = get_batch(f'Reheader {dataset}')
+unmasked_dict = b.read_input(UNMASKED_REF_DICT)
 
 for i, entry in enumerate(get_metamist().get_sample_entries(dataset.name)):
     sample = dataset.add_sample(
@@ -37,6 +40,7 @@ for i, entry in enumerate(get_metamist().get_sample_entries(dataset.name)):
 
         j = b.new_job(f'Reheader {cram_path} -> {out_path}')
         j.storage('150G' if seq_type == 'genome' else '50G')
+        j.image(image_path('samtools'))
 
         cmd = f"""\
 # Retrying copying to avoid google bandwidth limits
@@ -47,7 +51,7 @@ cat <<EOT >> fix_one_header.py
 EOT
 
 samtools reheader {j.out_cram} --in-place \
---command "fix_one_header.py {fasta_res_group(b)['dict']}"
+--command "fix_one_header.py {unmasked_dict}"
 """
         j.command(
             command(
