@@ -64,6 +64,22 @@ def _make_config(results_prefix: Path) -> dict:
                     to_path(__file__).parent / 'data' / 'large_cohort' / 'reference'
                 ),
             },
+            'storage': {
+                'default': {
+                    'default': 'gs://cpg-fewgenomes-test',
+                    'web': 'gs://cpg-fewgenomes-test-web',
+                    'analysis': 'gs://cpg-fewgenomes-test-analysis',
+                    'tmp': 'gs://cpg-fewgenomes-test-tmp',
+                    'web_url': 'https://test-web.populationgenomics.org.au/fewgenomes',
+                },
+                'fewgenomes': {
+                    'default': 'gs://cpg-fewgenomes-test',
+                    'web': 'gs://cpg-fewgenomes-test-web',
+                    'analysis': 'gs://cpg-fewgenomes-test-analysis',
+                    'tmp': 'gs://cpg-fewgenomes-test-tmp',
+                    'web_url': 'https://test-web.populationgenomics.org.au/fewgenomes',
+                },
+            },
             'large_cohort': {
                 'sample_qc_cutoffs': {
                     'min_n_snps': 2500,  # to make it pass for toy subset

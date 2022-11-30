@@ -62,6 +62,22 @@ def _make_config(results_prefix: Path) -> dict:
                 'status_reporter': None,
                 'local_dir': str(results_prefix),
             },
+            'storage': {
+                'default': {
+                    'default': 'gs://cpg-fewgenomes-test',
+                    'web': 'gs://cpg-fewgenomes-test-web',
+                    'analysis': 'gs://cpg-fewgenomes-test-analysis',
+                    'tmp': 'gs://cpg-fewgenomes-test-tmp',
+                    'web_url': 'https://test-web.populationgenomics.org.au/fewgenomes',
+                },
+                'fewgenomes': {
+                    'default': 'gs://cpg-fewgenomes-test',
+                    'web': 'gs://cpg-fewgenomes-test-web',
+                    'analysis': 'gs://cpg-fewgenomes-test-analysis',
+                    'tmp': 'gs://cpg-fewgenomes-test-tmp',
+                    'web_url': 'https://test-web.populationgenomics.org.au/fewgenomes',
+                },
+            },
             'hail': {
                 'billing_project': 'test-analysis-dataset',
                 'delete_scratch_on_exit': True,

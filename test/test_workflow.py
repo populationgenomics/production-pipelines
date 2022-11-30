@@ -37,6 +37,20 @@ check_intermediates = false
 check_expected_outputs = false
 path_scheme = 'local'
 
+[storage.default]
+default = "gs://cpg-fewgenomes-test"
+web = "gs://cpg-fewgenomes-test-web"
+analysis = "gs://cpg-fewgenomes-test-analysis"
+tmp = "gs://cpg-fewgenomes-test-tmp"
+web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
+
+[storage.fewgenomes]
+default = "gs://cpg-fewgenomes-test"
+web = "gs://cpg-fewgenomes-test-web"
+analysis = "gs://cpg-fewgenomes-test-analysis"
+tmp = "gs://cpg-fewgenomes-test-tmp"
+web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
+
 [hail]
 billing_project = 'fewgenomes'
 delete_scratch_on_exit = false
