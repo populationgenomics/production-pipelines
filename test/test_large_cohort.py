@@ -88,6 +88,19 @@ def _make_config(results_prefix: Path) -> dict:
             'combiner': {
                 'intervals': ['chr20:start-end', 'chrX:start-end', 'chrY:start-end'],
             },
+            'references': {
+                'genome_build': 'GRCh38',
+                'gnomad': {
+                    'tel_and_cent_ht': 'stub',
+                    'lcr_intervals_ht': 'stub',
+                    'seg_dup_intervals_ht': 'stub',
+                    'clinvar_ht': 'stub',
+                    'hapmap_ht': 'stub',
+                    'kgp_omni_ht': 'stub',
+                    'kgp_hc_ht': 'stub',
+                    'mills_ht': 'stub',
+                },
+            },
         },
     )
     return d
