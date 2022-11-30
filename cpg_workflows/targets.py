@@ -264,61 +264,64 @@ class Dataset(Target):
     def __str__(self):
         return f'{self.name} ({len(self.get_samples())} samples)'
 
-    def _seq_type_subdir(self) -> str:
+    def _seq_type_subdir(self, sequencing_type: str | None = None) -> str:
         """
         Subdirectory parametrised by sequencing type. For genomes, we don't
         prefix at all.
         """
-        seq_type = get_config()['workflow'].get('sequencing_type')
+        seq_type = sequencing_type or get_config()['workflow'].get('sequencing_type')
         return (
             '' if not self.cohort or not seq_type or seq_type == 'genome' else seq_type
         )
 
-    def prefix(self, **kwargs) -> Path:
+    def prefix(
+        self,
+        category: str | None = None,
+        sequencing_type: str | None = None,
+    ) -> Path:
         """
         The primary storage path.
         """
         return to_path(
             dataset_path(
-                self._seq_type_subdir(),
+                self._seq_type_subdir(sequencing_type=sequencing_type),
                 dataset=self.name,
-                **kwargs,
+                category=category,
             )
         )
 
-    def tmp_prefix(self, **kwargs) -> Path:
+    def tmp_prefix(self, sequencing_type: str | None = None) -> Path:
         """
         Storage path for temporary files.
         """
         return to_path(
             dataset_path(
-                self._seq_type_subdir(),
+                self._seq_type_subdir(sequencing_type=sequencing_type),
                 dataset=self.name,
                 category='tmp',
-                **kwargs,
             )
         )
 
-    def web_prefix(self, **kwargs) -> Path:
+    def web_prefix(self, sequencing_type: str | None = None) -> Path:
         """
         Path for files served by an HTTP server Matches corresponding URLs returns by
         self.web_url() URLs.
         """
         return to_path(
             dataset_path(
-                self._seq_type_subdir(),
+                self._seq_type_subdir(sequencing_type=sequencing_type),
                 dataset=self.name,
                 category='web',
                 **kwargs,
             )
         )
 
-    def web_url(self) -> str | None:
+    def web_url(self, sequencing_type: str | None = None) -> str | None:
         """
         URLs matching self.storage_web_path() files serverd by an HTTP server.
         """
         return web_url(
-            self._seq_type_subdir(),
+            self._seq_type_subdir(sequencing_type=sequencing_type),
             dataset=self.name,
         )
 
@@ -548,11 +551,15 @@ class Sample(Target):
         """
         return self.pedigree.get_ped_dict(use_participant_id)
 
-    def make_cram_path(self) -> CramPath:
+    def make_cram_path(self, sequencing_type: str | None = None) -> CramPath:
         """
         Path to a CRAM file. Not checking its existence here.
         """
-        path = self.dataset.prefix() / 'cram' / f'{self.id}.cram'
+        path = (
+            self.dataset.prefix(sequencing_type=sequencing_type)
+            / 'cram'
+            / f'{self.id}.cram'
+        )
         return CramPath(
             path=path,
             index_path=path.with_suffix('.cram.crai'),
