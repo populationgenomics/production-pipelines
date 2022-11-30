@@ -1,6 +1,4 @@
 [workflow]
-dataset = "seqr"
-dataset_gcp_project = "seqr-308602"
 input_datasets = ['validation']
 create_es_index_for_datasets = ['validation']
 skip_samples = [
@@ -10,7 +8,3 @@ skip_samples = [
 check_inputs = false
 check_intermediates = false
 check_expected_outputs = false
-
-[hail]
-billing_project = 'seqr'
-bucket = "cpg-seqr-hail"
