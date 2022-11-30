@@ -310,7 +310,6 @@ class Dataset(Target):
                 self._seq_type_subdir(sequencing_type=sequencing_type),
                 dataset=self.name,
                 category='web',
-                **kwargs,
             )
         )
 
