@@ -29,18 +29,10 @@ check_expected_outputs = false
 path_scheme = 'local'
 
 [storage.default]
-default = "gs://cpg-fewgenomes-test"
-web = "gs://cpg-fewgenomes-test-web"
-analysis = "gs://cpg-fewgenomes-test-analysis"
-tmp = "gs://cpg-fewgenomes-test-tmp"
-web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
+default = '{str(tmp_dir_path)}'
 
 [storage.fewgenomes]
-default = "gs://cpg-fewgenomes-test"
-web = "gs://cpg-fewgenomes-test-web"
-analysis = "gs://cpg-fewgenomes-test-analysis"
-tmp = "gs://cpg-fewgenomes-test-tmp"
-web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
+default = '{str(tmp_dir_path)}'
 
 [large_cohort]
 pop_meta_field = 'Superpopulation name'
@@ -54,7 +46,6 @@ backend = 'local'
 
 def _set_config(dir_path: Path, extra_conf: dict | None = None):
     d = toml.loads(DEFAULT_CONF)
-    d['workflow']['local_dir'] = str(dir_path)
     if extra_conf:
         update_dict(d, extra_conf)
     config_path = dir_path / 'config.toml'

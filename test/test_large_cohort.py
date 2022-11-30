@@ -53,30 +53,25 @@ def _make_config(results_prefix: Path) -> dict:
         d,
         {
             'workflow': {
-                'local_dir': str(results_prefix),
                 'dataset_gcp_project': 'thousand-genomes',
                 'dataset': 'thousand-genomes',
                 'access_level': 'test',
                 'sequencing_type': 'genome',
                 'check_intermediates': True,
-                'path_scheme': 'local',
-                'reference_prefix': str(
-                    to_path(__file__).parent / 'data' / 'large_cohort' / 'reference'
-                ),
             },
             'storage': {
                 'default': {
-                    'default': 'gs://cpg-fewgenomes-test',
-                    'web': 'gs://cpg-fewgenomes-test-web',
-                    'analysis': 'gs://cpg-fewgenomes-test-analysis',
-                    'tmp': 'gs://cpg-fewgenomes-test-tmp',
+                    'default': f'{results_prefix}',
+                    'web': f'{results_prefix}-web',
+                    'analysis': f'{results_prefix}-analysis',
+                    'tmp': f'{results_prefix}-test-tmp',
                     'web_url': 'https://test-web.populationgenomics.org.au/fewgenomes',
                 },
                 'fewgenomes': {
-                    'default': 'gs://cpg-fewgenomes-test',
-                    'web': 'gs://cpg-fewgenomes-test-web',
-                    'analysis': 'gs://cpg-fewgenomes-test-analysis',
-                    'tmp': 'gs://cpg-fewgenomes-test-tmp',
+                    'default': f'{results_prefix}',
+                    'web': f'{results_prefix}-web',
+                    'analysis': f'{results_prefix}-analysis',
+                    'tmp': f'{results_prefix}-test-tmp',
                     'web_url': 'https://test-web.populationgenomics.org.au/fewgenomes',
                 },
             },
