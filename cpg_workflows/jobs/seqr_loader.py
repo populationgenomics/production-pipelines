@@ -5,7 +5,7 @@ Hail Query Batch-Backend jobs for seqr-loader.
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
-from cpg_utils import Path, to_path
+from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, query_command
 
