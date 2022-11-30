@@ -270,9 +270,7 @@ class Dataset(Target):
         prefix at all.
         """
         seq_type = sequencing_type or get_config()['workflow'].get('sequencing_type')
-        return (
-            '' if not self.cohort or not seq_type or seq_type == 'genome' else seq_type
-        )
+        return '' if not seq_type or seq_type == 'genome' else seq_type
 
     def prefix(
         self,
