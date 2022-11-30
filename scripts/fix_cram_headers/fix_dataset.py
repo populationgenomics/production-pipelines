@@ -56,6 +56,8 @@ EOT
 samtools reheader $CRAM --in-place \
 --command "python fix_one_header.py {unmasked_dict}"
 
+samtools quickcheck $CRAM
+
 mv $CRAM {j.out_cram}
 mv $CRAI {j.out_crai}
 """
