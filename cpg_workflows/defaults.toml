@@ -79,7 +79,7 @@ check_expected_outputs = true
 #intervals_path =
 
 # The GQ bands used for ReblockGVCF, specified as exclusive upper bounds for reference
-# confidence GQ bands (must be in [1, 100] and specified in increasing order).  Finer
+# confidence GQ bands (must be in [1, 100] and specified in increasing order). Finer
 # granularity bands result in more reference blocks and therefore larger GVCFs.
 reblock_gq_bands = [20, 30, 40]
 
