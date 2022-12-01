@@ -25,7 +25,12 @@ sequencing_type = 'genome'
 check_inputs = false
 check_intermediates = false
 check_expected_outputs = false
-path_scheme = 'local'
+
+[storage.default]
+default = '{str(tmp_dir_path)}'
+
+[storage.fewgenomes]
+default = '{str(tmp_dir_path)}'
 
 [hail]
 billing_project = 'fewgenomes'
@@ -36,7 +41,6 @@ backend = 'local'
 
 def _set_config(dir_path: Path, extra_conf: dict | None = None):
     d = toml.loads(DEFAULT_CONF)
-    d['workflow']['local_dir'] = str(dir_path)
     if extra_conf:
         update_dict(d, extra_conf)
     config_path = dir_path / 'config.toml'
@@ -70,32 +74,3 @@ def test_batch_job():
     b.run()
     with to_path(output2_path).open() as fh:
         assert fh.read().strip() == text
-
-
-def test_batch_python_job():
-    """
-    Testing calling a python job.
-    """
-    _set_config(tmp_dir_path)
-
-    b = get_batch('Test batch python job')
-    j = b.new_python_job('Test python job')
-
-    input_tsv_path = to_path(dataset_path('input.tsv'))
-    input_tsv_path.parent.mkdir(parents=True, exist_ok=True)
-    with input_tsv_path.open('w') as f:
-        f.write('col1\tcol2\n1\t2')
-
-    def query_fn(tsv_path: str, out_ht_path: str):
-        ht = hl.import_table(tsv_path, types={'col1': hl.tint, 'col2': hl.tint})
-        ht.show()
-        ht = ht.annotate(col3=ht.col1 + ht.col2)
-        ht.write(out_ht_path, overwrite=True)
-
-    output_ht_path = dataset_path('output.ht')
-    j.call(query_fn, str(input_tsv_path), output_ht_path)
-    b.run()
-
-    hl.init_local(log=dataset_path('hail-log.txt'))
-    result = hl.read_table(str(output_ht_path)).col3.collect()[0]
-    assert result == 3, result
