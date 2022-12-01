@@ -107,6 +107,7 @@ def _make_config(results_prefix: Path) -> dict:
                 },
                 'broad': {
                     'genome_calling_interval_lists': f'{broad_prefix}/wgs_calling_regions.hg38.interval_list',
+                    'protein_coding_gtf': f'{broad_prefix}/sv-resources/resources/v1/MANE.GRCh38.v0.95.select_ensembl_genomic.gtf',
                 },
             },
         },
