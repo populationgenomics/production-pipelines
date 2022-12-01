@@ -49,7 +49,8 @@ def _make_config(results_prefix: Path) -> dict:
         with fp.open():
             update_dict(d, toml.load(fp))
 
-    gnomad_prefix = to_path(__file__).parent / 'data/large_cohort/reference/gnomad/v0'
+    ref_prefix = to_path(__file__).parent / 'data/large_cohort/reference'
+    gnomad_prefix = ref_prefix / 'gnomad/v0'
 
     update_dict(
         d,
@@ -93,29 +94,18 @@ def _make_config(results_prefix: Path) -> dict:
             'references': {
                 'genome_build': 'GRCh38',
                 'gnomad': {
-                    'tel_and_cent_ht': str(
-                        gnomad_prefix
-                        / 'telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht'
-                    ),
-                    'lcr_intervals_ht': str(
-                        gnomad_prefix / 'lcr_intervals/LCRFromHengHg38.ht'
-                    ),
-                    'seg_dup_intervals_ht': str(
-                        gnomad_prefix / 'seg_dup_intervals/GRCh38_segdups.ht'
-                    ),
-                    'clinvar_ht': str(gnomad_prefix / 'clinvar/clinvar_20190923.ht'),
-                    'hapmap_ht': str(gnomad_prefix / 'hapmap/hapmap_3.3.hg38.ht'),
-                    'kgp_omni_ht': str(gnomad_prefix / 'kgp/1000G_omni2.5.hg38.ht'),
-                    'kgp_hc_ht': str(
-                        gnomad_prefix / 'kgp/1000G_phase1.snps.high_confidence.hg38.ht'
-                    ),
-                    'mills_ht': str(
-                        gnomad_prefix
-                        / 'mills/Mills_and_1000G_gold_standard.indels.hg38.ht'
-                    ),
-                    'predetermined_qc_variants': str(
-                        gnomad_prefix / 'sample_qc/pre_ld_pruning_qc_variants.ht'
-                    ),
+                    'tel_and_cent_ht': f'{gnomad_prefix}/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht',
+                    'lcr_intervals_ht': f'{gnomad_prefix}/lcr_intervals/LCRFromHengHg38.ht',
+                    'seg_dup_intervals_ht': f'{gnomad_prefix}/seg_dup_intervals/GRCh38_segdups.ht',
+                    'clinvar_ht': f'{gnomad_prefix}/clinvar/clinvar_20190923.ht',
+                    'hapmap_ht': f'{gnomad_prefix}/hapmap/hapmap_3.3.hg38.ht',
+                    'kgp_omni_ht': f'{gnomad_prefix}/kgp/1000G_omni2.5.hg38.ht',
+                    'kgp_hc_ht': f'{gnomad_prefix}/kgp/1000G_phase1.snps.high_confidence.hg38.ht',
+                    'mills_ht': f'{gnomad_prefix}/mills/Mills_and_1000G_gold_standard.indels.hg38.ht',
+                    'predetermined_qc_variants': f'{gnomad_prefix}/sample_qc/pre_ld_pruning_qc_variants.ht',
+                },
+                'broad': {
+                    'genome_calling_interval_lists': f'{ref_prefix}/wgs_calling_regions.hg38.interval_list',
                 },
             },
         },
