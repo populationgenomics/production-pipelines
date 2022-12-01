@@ -1,6 +1,6 @@
 [images]
 dragmap = 'australia-southeast1-docker.pkg.dev/cpg-common/images/dragmap:1.3.0'
-cpg_workflows = 'australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:1.1.9'
+cpg_workflows = 'australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:1.1.10'
 
 [workflow]
 # Datasets to load inputs. If not provided, datasets will be determined
