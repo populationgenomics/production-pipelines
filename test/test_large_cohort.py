@@ -51,6 +51,7 @@ def _make_config(results_prefix: Path) -> dict:
 
     ref_prefix = to_path(__file__).parent / 'data/large_cohort/reference'
     gnomad_prefix = ref_prefix / 'gnomad/v0'
+    broad_prefix = ref_prefix / 'hg38/v0'
 
     update_dict(
         d,
@@ -105,7 +106,7 @@ def _make_config(results_prefix: Path) -> dict:
                     'predetermined_qc_variants': f'{gnomad_prefix}/sample_qc/pre_ld_pruning_qc_variants.ht',
                 },
                 'broad': {
-                    'genome_calling_interval_lists': f'{ref_prefix}/wgs_calling_regions.hg38.interval_list',
+                    'genome_calling_interval_lists': f'{broad_prefix}/wgs_calling_regions.hg38.interval_list',
                 },
             },
         },
