@@ -49,7 +49,7 @@ def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str
         # e.g. GATKSVPipelineBatch.rmsk -> rmsk
         ref_d_key = ref_d_key.split('.')[-1]
         try:
-            res[key] = str(reference_path(f'broad/sv/resources/{ref_d_key}'))
+            res[key] = str(reference_path(f'gatk_sv/{ref_d_key}'))
         except KeyError:
             res[key] = str(reference_path(f'broad/{ref_d_key}'))
 
@@ -117,35 +117,29 @@ def get_ref_panel(keys: list[str] | None = None) -> dict:
         k: v
         for k, v in {
             'ref_panel_samples': get_config()['sv_ref_panel']['ref_panel_samples'],
-            'ref_ped_file': str(reference_path('broad/sv/ref_panel/ped_file')),
-            'ref_panel_vcf': str(reference_path('broad/sv/ref_panel/clean_vcf')),
-            'qc_definitions': str(reference_path('broad/sv/ref_panel/qc_definitions')),
+            'ref_ped_file': str(reference_path('gatk_sv/ped_file')),
+            'ref_panel_vcf': str(reference_path('gatk_sv/clean_vcf')),
+            'qc_definitions': str(reference_path('gatk_sv/qc_definitions')),
             'ref_panel_bincov_matrix': str(
-                reference_path('broad/sv/ref_panel/ref_panel_bincov_matrix')
+                reference_path('gatk_sv/ref_panel_bincov_matrix')
             ),
             'contig_ploidy_model_tar': str(
-                reference_path('broad/sv/ref_panel/contig_ploidy_model_tar')
+                reference_path('gatk_sv/contig_ploidy_model_tar')
             ),
             'gcnv_model_tars': [
-                str(reference_path('broad/sv/ref_panel/model_tar_tmpl')).format(shard=i)
+                str(reference_path('gatk_sv/model_tar_tmpl')).format(shard=i)
                 for i in range(get_config()['sv_ref_panel']['model_tar_cnt'])
             ],
             'ref_panel_PE_files': [
-                str(reference_path('broad/sv/ref_panel/ref_panel_PE_file_tmpl')).format(
-                    sample=s
-                )
+                str(reference_path('gatk_sv/ref_panel_PE_file_tmpl')).format(sample=s)
                 for s in get_config()['sv_ref_panel']['ref_panel_samples']
             ],
             'ref_panel_SR_files': [
-                str(reference_path('broad/sv/ref_panel/ref_panel_SR_file_tmpl')).format(
-                    sample=s
-                )
+                str(reference_path('gatk_sv/ref_panel_SR_file_tmpl')).format(sample=s)
                 for s in get_config()['sv_ref_panel']['ref_panel_samples']
             ],
             'ref_panel_SD_files': [
-                str(reference_path('broad/sv/ref_panel/ref_panel_SD_file_tmpl')).format(
-                    sample=s
-                )
+                str(reference_path('gatk_sv/ref_panel_SD_file_tmpl')).format(sample=s)
                 for s in get_config()['sv_ref_panel']['ref_panel_samples']
             ],
         }.items()
@@ -349,7 +343,7 @@ def make_combined_ped(dataset: Dataset) -> Path:
         with dataset.write_ped_file().open() as f:
             out.write(f.read())
         # The ref panel PED doesn't have any header, so can safely concatenate:
-        with reference_path('broad/sv/ref_panel/ped_file').open() as f:
+        with reference_path('gatk_sv/ped_file').open() as f:
             out.write(f.read())
     return combined_ped_path
 

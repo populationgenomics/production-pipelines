@@ -1,14 +1,8 @@
+[images]
+dragmap = 'australia-southeast1-docker.pkg.dev/cpg-common/images/dragmap:1.3.0'
+cpg_workflows = 'australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:1.1.11'
+
 [workflow]
-# Prefix to find docker images referenced in `image_config_yaml_path`
-image_registry_prefix = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
-
-# Prefix to find reference files referenced in `refdata_yaml_path`
-reference_prefix = 'gs://cpg-reference'
-
-# Template to build HTTP URLs matching the dataset_path of category
-# "web". Should be parametrised by namespace and dataset in Jinja format:
-web_url_template = 'https://{namespace}-web.populationgenomics.org.au/{dataset}'
-
 # Datasets to load inputs. If not provided, datasets will be determined
 # automatically based on the input provider implementation:
 #input_datasets = []
@@ -78,127 +72,19 @@ check_expected_outputs = true
 # Calling intervals (defauls to whole genome intervals)
 #intervals_path =
 
+# The GQ bands used for ReblockGVCF, specified as exclusive upper bounds for reference
+# confidence GQ bands (must be in [1, 100] and specified in increasing order). Finer
+# granularity bands result in more reference blocks and therefore larger GVCFs.
+reblock_gq_bands = [20, 30, 40]
+
 # Only print the final merged config and a list of stages to be submitted.
 # Will skip any communication with Metamist, Hail Batch, and Cloud Storage, so 
 # the code can be run without permissions.
 #dry_run = true
 
-[images]
-# Docker image URLs. Can be absolute or relative to `workflow.image_registry_prefix`.
-gatk = 'gatk:4.2.6.1'
-bcftools = 'bcftools:1.16'
-bwa = 'bwa:v0'
-bwamem2 = 'bwamem2:v0'
-dragmap = 'dragmap:1.3.0'
-samtools = 'picard_samtools:v0'
-picard = 'picard_samtools:v0'
-picard_samtools = 'picard_samtools:v0'
-somalier = 'somalier:v0.2.15'
-peddy = 'peddy:v0'
-vep = 'vep:105.0'
-verifybamid = 'verifybamid:2.0.1'
-multiqc = 'multiqc:v1.12'
-fastqc = 'fastqc:v0.11.9_cv8'
-hap.py = 'hap.py:v0.3.15'
-cpg_workflows = 'cpg_workflows:latest'
-stripy = 'stripy:v2.2'
-
-[references]
-# Genome build. Only GRCh38 is currently supported.
-genome_build = 'GRCh38'
-
-# Site list for somalier https://github.com/brentp/somalier/releases/tag/v0.2.15
-somalier_sites = 'somalier/v0/sites.hg38.vcf.gz'
-# Somalier 1kg data for the "ancestry" command
-somalier_1kg_targz = 'somalier/v0/1kg.somalier.tar.gz'
-# Somalier list of 1kg samples for the "ancestry" command.
-somalier_1kg_labels = 'somalier/v0/ancestry-labels-1kg.tsv'
-# Contains uncompressed VEP tarballs for mounting with cloudfuse.
-vep_mount = 'vep/105.0/mount'
-# Liftover chain file to translate from GRCh38 to GRCh37 coordinates
-liftover_38_to_37 = 'liftover/grch38_to_grch37.over.chain.gz'
-
-## The Broad references
-[references.broad]
-# Path to a copy of the Broad reference bucket
-# gs://gcp-public-data--broad-references/hg38/v0
-prefix = 'hg38/v0'
-
-# Path to DRAGMAP index (relative to braod_ref)
-dragmap_prefix = 'dragen_reference'
-ref_fasta = 'dragen_reference/Homo_sapiens_assembly38_masked.fasta'
-# For DRAGMAP, also the following files are expected to exist in `dragen_reference`:
-#  ['hash_table.cfg.bin', 'hash_table.cmp', 'reference.bin']
-# For BWA, files with the following indices added to ref_fasta expected:
-# are expected to exist: ['sa', 'amb', 'bwt', 'ann', 'pac', 'alt']
-# Similarly, for bwamem2: ['0123', 'amb', 'bwt.2bit.64', 'ann', 'pac', 'alt']
-
-# Primary contigs BED file (relative to broad_ref)
-noalt_bed = 'sv-resources/resources/v1/primary_contigs_plus_mito.bed.gz'
-
-# Exome calling regions (relative to broad_ref)
-exome_bed = 'Homo_sapiens_assembly38.contam.exome_calling_regions.v1.bed'
-
-# Calling intervals lists (relative to broad_ref)
-genome_calling_interval_lists = 'wgs_calling_regions.hg38.interval_list'
-exome_calling_interval_lists = 'exome_calling_regions.v1.interval_list'
-genome_evaluation_interval_lists = 'wgs_evaluation_regions.hg38.interval_list'
-exome_evaluation_interval_lists = 'exome_evaluation_regions.v1.interval_list'
-genome_coverage_interval_list = 'wgs_coverage_regions.hg38.interval_list'
-
-# VQSR (relative to broad_ref)
-dbsnp_vcf = 'Homo_sapiens_assembly38.dbsnp138.vcf'
-dbsnp_vcf_index = 'Homo_sapiens_assembly38.dbsnp138.vcf.idx'
-hapmap_vcf = 'hapmap_3.3.hg38.vcf.gz'
-hapmap_vcf_index = 'hapmap_3.3.hg38.vcf.gz.tbi'
-omni_vcf = '1000G_omni2.5.hg38.vcf.gz'
-omni_vcf_index = '1000G_omni2.5.hg38.vcf.gz.tbi'
-one_thousand_genomes_vcf = '1000G_phase1.snps.high_confidence.hg38.vcf.gz'
-one_thousand_genomes_vcf_index = '1000G_phase1.snps.high_confidence.hg38.vcf.gz.tbi'
-mills_vcf = 'Mills_and_1000G_gold_standard.indels.hg38.vcf.gz'
-mills_vcf_index = 'Mills_and_1000G_gold_standard.indels.hg38.vcf.gz.tbi'
-axiom_poly_vcf = 'Axiom_Exome_Plus.genotypes.all_populations.poly.hg38.vcf.gz'
-axiom_poly_vcf_index = 'Axiom_Exome_Plus.genotypes.all_populations.poly.hg38.vcf.gz.tbi'
-
-# Genome contamination check
-genome_contam_ud =  'contamination-resources/1000g/1000g.phase3.100k.b38.vcf.gz.dat.UD'
-genome_contam_bed = 'contamination-resources/1000g/1000g.phase3.100k.b38.vcf.gz.dat.bed'
-genome_contam_mu =  'contamination-resources/1000g/1000g.phase3.100k.b38.vcf.gz.dat.mu'
-# Exome contamination check
-exome_contam_ud = 'contamination-resources/1000g/whole_exome_illumina_coding_v1.Homo_sapiens_assembly38.1000g.contam.UD'
-exome_contam_bed = 'contamination-resources/1000g/whole_exome_illumina_coding_v1.Homo_sapiens_assembly38.1000g.contam.bed'
-exome_contam_mu = 'contamination-resources/1000g/whole_exome_illumina_coding_v1.Homo_sapiens_assembly38.1000g.contam.mu'
-
-## GnomAD resources for Hail Query
-[references.gnomad]
-prefix = 'gnomad/v0'
-# All paths below relative to prefix.
-tel_and_cent_ht = 'telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht'
-lcr_intervals_ht = 'lcr_intervals/LCRFromHengHg38.ht'
-seg_dup_intervals_ht = 'seg_dup_intervals/GRCh38_segdups.ht'
-clinvar_ht = 'clinvar/clinvar_20190923.ht'
-hapmap_ht = 'hapmap/hapmap_3.3.hg38.ht'
-kgp_omni_ht = 'kgp/1000G_omni2.5.hg38.ht'
-kgp_hc_ht = 'kgp/1000G_phase1.snps.high_confidence.hg38.ht'
-mills_ht = 'mills/Mills_and_1000G_gold_standard.indels.hg38.ht'
-
-[references.seqr]
-prefix = 'seqr/v0-1'
-combined_reference = 'combined_reference_data_grch38-2.0.4.ht'
-clinvar = 'clinvar.GRCh38.ht'
-
-[references.validation]
-prefix = 'validation'
-[references.validation.syndip]
-truth = 'syndip/truth/full.38.20180222.vcf.gz'
-regions = 'syndip/regions/syndip.b38_20180222.bed'
-[references.validation.HG001]
-truth = 'giab/truth/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_PGandRTGphasetransfer.vcf.gz'
-regions = 'giab/regions/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed'
-
 # Map internally used validation sample external_id to truth sample names
 [validation.sample_map]
-HG001_NA12878 = 'HG001'
+HG001_NA12878 = 'na12878'
 SYNDIP = 'syndip'
 
 [hail]
