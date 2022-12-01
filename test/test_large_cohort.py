@@ -49,7 +49,7 @@ def _make_config(results_prefix: Path) -> dict:
         with fp.open():
             update_dict(d, toml.load(fp))
 
-    reference_prefix = to_path(__file__).parent / 'data' / 'large_cohort' / 'reference'
+    gnomad_prefix = to_path(__file__).parent / 'data/large_cohort/reference/gnomad/v0'
 
     update_dict(
         d,
@@ -94,28 +94,27 @@ def _make_config(results_prefix: Path) -> dict:
                 'genome_build': 'GRCh38',
                 'gnomad': {
                     'tel_and_cent_ht': str(
-                        reference_prefix
+                        gnomad_prefix
                         / 'telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht'
                     ),
                     'lcr_intervals_ht': str(
-                        reference_prefix / 'lcr_intervals/LCRFromHengHg38.ht'
+                        gnomad_prefix / 'lcr_intervals/LCRFromHengHg38.ht'
                     ),
                     'seg_dup_intervals_ht': str(
-                        reference_prefix / 'seg_dup_intervals/GRCh38_segdups.ht'
+                        gnomad_prefix / 'seg_dup_intervals/GRCh38_segdups.ht'
                     ),
-                    'clinvar_ht': str(reference_prefix / 'clinvar/clinvar_20190923.ht'),
-                    'hapmap_ht': str(reference_prefix / 'hapmap/hapmap_3.3.hg38.ht'),
-                    'kgp_omni_ht': str(reference_prefix / 'kgp/1000G_omni2.5.hg38.ht'),
+                    'clinvar_ht': str(gnomad_prefix / 'clinvar/clinvar_20190923.ht'),
+                    'hapmap_ht': str(gnomad_prefix / 'hapmap/hapmap_3.3.hg38.ht'),
+                    'kgp_omni_ht': str(gnomad_prefix / 'kgp/1000G_omni2.5.hg38.ht'),
                     'kgp_hc_ht': str(
-                        reference_prefix
-                        / 'kgp/1000G_phase1.snps.high_confidence.hg38.ht'
+                        gnomad_prefix / 'kgp/1000G_phase1.snps.high_confidence.hg38.ht'
                     ),
                     'mills_ht': str(
-                        reference_prefix
+                        gnomad_prefix
                         / 'mills/Mills_and_1000G_gold_standard.indels.hg38.ht'
                     ),
                     'predetermined_qc_variants': str(
-                        reference_prefix / 'sample_qc/pre_ld_pruning_qc_variants.ht'
+                        gnomad_prefix / 'sample_qc/pre_ld_pruning_qc_variants.ht'
                     ),
                 },
             },
