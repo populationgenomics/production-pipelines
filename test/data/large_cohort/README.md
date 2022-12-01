@@ -25,10 +25,10 @@ picard IntervalListTools --ACTION INTERSECT \
   -I intervals.interval_list \
   -O reference/hg38/v0/wgs_calling_regions.hg38.interval_list
 
-mkdir -p reference/gencode
+GTF=gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/MANE.GRCh38.v0.95.select_ensembl_genomic.gtf
+mkdir -p reference/hg38/v0/sv-resources/resources/v1
 bedtools intersect -wa \
-  -a <(gsutil cat gs://cpg-reference/gencode/gencode.v39.annotation.gtf.bgz | gunzip -c) \
-  -b intervals.bed > reference/gencode/gencode.v39.annotation.gtf
-bgzip reference/gencode/gencode.v39.annotation.gtf -c > reference/gencode/gencode.v39.annotation.gtf.bgz
-rm reference/gencode/gencode.v39.annotation.gtf
+  -a <(gsutil cat $GTF) \
+  -b intervals.bed > \
+  reference/hg38/v0/sv-resources/resources/v1/MANE.GRCh38.v0.95.select_ensembl_genomic.gtf
 ```

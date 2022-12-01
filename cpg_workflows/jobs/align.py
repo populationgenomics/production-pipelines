@@ -234,7 +234,7 @@ def align(
         merge_j = b.new_job(
             'Merge BAMs', (job_attrs or {}) | dict(tool='samtools_merge')
         )
-        merge_j.image(image_path('bwa'))
+        merge_j.image(image_path('samtools'))
 
         nthreads = STANDARD.set_resources(
             merge_j,
