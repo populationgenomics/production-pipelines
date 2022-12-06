@@ -43,7 +43,6 @@ The detailed description for each stage is as follows:
 	4.  `picard_collect_metrics`: This runs Picard’s CollectMultipleMetrics, which is a ‘meta-metrics' tool that runs one or more metrics collection modules at the same time to cut down on the time spent reading in data from input files. For all available modules, see the [Picard CollectMultipleMetrics help page](https://gatk.broadinstitute.org/hc/en-us/articles/360037594031-CollectMultipleMetrics-Picard- ""). The tool produces outputs of '.pdf' and '.txt' files for each module, except for the `CollectAlignmentSummaryMetrics module`, which outputs only a '.txt' file.
 	5.  `samtools_stats`: this runs  `samtools stats` for alignment QC, which produces a comprehensive list of statistics from the alignment file. For all output statistics, see the [samtools-stats page](http://www.htslib.org/doc/samtools-stats.html "")
 	6.  `verifybamid`: this runs `VerifyBamID` contamination checks, as explained in the [VerifyBamID GitHub page](https://github.com/Griffan/VerifyBamID ""). The expected output is a *.selfSM file, along with a TSV file with 2 rows and 19 columns. The first row contains keys (e.g., `SEQ_SM`, `RG`, `FREEMIX`) while the second row contains associated `VerifyBamID` values.
-
 <ins>Configurable inputs:</ins>
 	* [workflow].dry_run
 	* [workflow].sequencing_type
