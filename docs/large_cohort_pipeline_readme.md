@@ -7,10 +7,11 @@ This pipeline takes in FASTQ or CRAM files as input and runs a series of python 
 4. LoadVqsr Stage: Converts the VDS into a sites-only VCF-ready table, then performs allele-specific VQSR variant QC.
 
 Graphically, the pipeline has the following workflow:
+
 ![uml](large_cohort.png)
 
 ## Running the pipeline
-To run, the pipeline takes in at least two config files: an exome/genome config file, specifying whether samples are whole genome or whole exome sequences (e.g., `configs/genome.toml`), and a config file specifying parameters specific to the dataset. This second config file **must** be named after the dataset + access level, e.g., `configs/bioheart-test.toml` . By default, a third config file,  `configs/defaults/large_cohort.toml` , is also loaded into the pipeline. This config file does (<mark >x, y, z - how is this different to the dataset + access level config file?</mark>). Any additional config files can be provided by adding  `--config` to the analysis runner command. 
+To run, the pipeline takes in at least two config files: an exome/genome config file, specifying whether samples are whole genome or whole exome sequences (e.g., `configs/genome.toml`), and a config file specifying parameters specific to the dataset. This second config file **must** be named after the dataset + access level, e.g., `configs/bioheart-test.toml` . By default, a third config file,  `configs/defaults/large_cohort.toml` , is also loaded into the pipeline. This config file does (==x, y, z - how is this different to the dataset + access level config file?==). Any additional config files can be provided by adding  `--config` to the analysis runner command. 
 
 An example run would look like the following:
 
@@ -26,7 +27,7 @@ The detailed description for each stage is as follows:
 ### CramMultiQC Stage
 
 1.  Alignment: the first step is to align the given input files. By default, DRAGMAP version 1.3.0 is used (==where is this actually fed into the script from the config file?==). This then outputs a CRAM file with a corresponding index ==(what does that mean?)==. 
-~Configurable inputs:~ 
+<ins>Configurable inputs:</ins>
 	* [workflow].check_intermediates
 	* [workflow].skip_samples_with_missing_input
 	* [workflow].cram_version_reference
