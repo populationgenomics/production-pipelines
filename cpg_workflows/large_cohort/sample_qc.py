@@ -53,20 +53,22 @@ def initialise_sample_table() -> hl.Table:
     Export the cohort into a sample-level Hail Table.
     """
     pop_meta_field = get_config()['large_cohort'].get('pop_meta_field')
-    a = [
+    entries = [
         {
             's': s.id,
             'external_id': s.external_id,
             'dataset': s.dataset.name,
-            'gvcf': str(s.gvcf.path) or None,
+            'gvcf': str(s.gvcf.path),
             'sex': s.pedigree.sex.value,
             'pop': s.meta.get(pop_meta_field) if pop_meta_field else None,
         }
         for s in get_cohort().get_samples()
         if s.gvcf
     ]
+    if not entries:
+        raise ValueError('No samples with GVCFs found')
     t = 'array<struct{s: str, external_id: str, dataset: str, gvcf: str, sex: int, pop: str}>'
-    ht = hl.Table.parallelize(hl.literal(a, t), key='s')
+    ht = hl.Table.parallelize(hl.literal(entries, t), key='s')
     return ht
 
 

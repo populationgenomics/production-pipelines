@@ -109,6 +109,9 @@ def run(out_vds_path: Path, tmp_prefix: Path, *sample_ids) -> hl.vds.VariantData
     )
 
     gvcf_paths = [str(s.gvcf.path) for s in samples if s.gvcf]
+    if not gvcf_paths:
+        raise ValueError('No samples with GVCFs found')
+
     logging.info(f'Combining {len(sample_names)} samples: {", ".join(sample_names)}')
 
     check_duplicates(sample_names)
