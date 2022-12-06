@@ -10,7 +10,7 @@ Graphically, the pipeline has the following workflow:
 ![uml](large_cohort.png)
 
 ## Running the pipeline
-To run, the pipeline takes in at least two config files: an exome/genome config file, specifying whether samples are whole genome or whole exome sequences (e.g., `configs/genome.toml`), and a config file specifying parameters specific to the dataset. This second config file **must** be named after the dataset + access level, e.g., `configs/bioheart-test.toml` . By default, a third config file,  `configs/defaults/large_cohort.toml` , is also loaded into the pipeline. This config file does (==x, y, z - how is this different to the dataset + access level config file?==). Any additional config files can be provided by adding  `--config` to the analysis runner command. 
+To run, the pipeline takes in at least two config files: an exome/genome config file, specifying whether samples are whole genome or whole exome sequences (e.g., `configs/genome.toml`), and a config file specifying parameters specific to the dataset. This second config file **must** be named after the dataset + access level, e.g., `configs/bioheart-test.toml` . By default, a third config file,  `configs/defaults/large_cohort.toml` , is also loaded into the pipeline. This config file does (<mark >x, y, z - how is this different to the dataset + access level config file?</mark>). Any additional config files can be provided by adding  `--config` to the analysis runner command. 
 
 An example run would look like the following:
 
