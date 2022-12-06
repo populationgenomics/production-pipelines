@@ -122,7 +122,7 @@ Key: ['i', 'j']
 A pairwise sample relatedness matrix is written as a Hail table to: `gs://{project-name}/relatedness.ht`.
 Once pcrelate is performed, a sample-level table which contains related samples to drop is created using Hail’s [`maximal_independent_set`](https://hail.is/docs/0.2/methods/misc.html?highlight=maximal_independent_set#hail.methods.maximal_independent_set)and stored in `gs://{project-name}/relateds_to_drop.ht`.
 <br><ins>Configurable inputs:</ins><br>
-	* [large_cohort].[max_kin]
+* [large_cohort].[max_kin]
 
 6. Ancestry: This runs a PCA, excluding given related samples, and projects samples in PC space to return their scores (taken from the `run_pca_with_relateds` [function from gnomAD](https://broadinstitute.github.io/gnomad_methods/api_reference/sample_qc/ancestry.html#gnomad.sample_qc.ancestry.run_pca_with_relateds "")). This function returns four tables: `scores.ht`, `eigenvalues.ht`, `loadings.ht`, and an original sample ht (annotated with the `training_pop` , `pca_scores`, `pop`, and `prob` for each population label). The output is stored in `gs://{project-name}/ancestry` bucket. 
 When there are samples with known `continental_pop` available, a random forest method is used to infer population labels. The method is trained using 16 principal components as features on samples with known ancestry. Ancestry is assigned to all samples for which the probability of that ancestry is high enough (the threshold is configured as `large_cohort.min_pop_prob` in TOML). Results are written as sample-level table `gs://cpg-{dataset}-{access-level}/large-cohort/v0-1/ancestry`.
