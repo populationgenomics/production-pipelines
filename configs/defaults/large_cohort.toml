@@ -1,6 +1,7 @@
 [workflow]
 name = 'large_cohort'
 scatter_count = 50
+status_reporter = 'metamist'
 
 # Realign CRAM when available, instead of using FASTQ.
 # The parameter value should correspond to CRAM version
