@@ -31,6 +31,9 @@ cpg_workflows = 'australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workf
 # Finish at this stage:
 #last_stages = []
 
+# Force stage rerun
+#force_stages = []
+
 # Map of stages to lists of samples, to skip for specific stages
 #[workflow.skip_samples_stages]
 #CramQC = ['CPG13409']
