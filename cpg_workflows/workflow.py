@@ -352,7 +352,9 @@ class Stage(Generic[TargetT], ABC):
         self.output_by_target: dict[str, StageOutput | None] = dict()
 
         self.skipped = skipped
-        self.forced = forced
+        self.forced = forced or self.name in get_config()['workflow'].get(
+            'force_stages', []
+        )
         self.assume_outputs_exist = assume_outputs_exist
 
     @property

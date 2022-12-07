@@ -41,6 +41,9 @@ pop_meta_field = 'Superpopulation name'
 billing_project = 'fewgenomes'
 delete_scratch_on_exit = false
 backend = 'local'
+
+[references.broad]
+ref_fasta = 'stub'
 """
 
 
