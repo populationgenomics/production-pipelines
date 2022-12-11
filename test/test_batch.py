@@ -2,7 +2,6 @@
 Test initializing Batch object.
 """
 
-import hail as hl
 import toml
 
 from cpg_utils import to_path, Path
