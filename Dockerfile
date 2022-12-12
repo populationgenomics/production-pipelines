@@ -1,6 +1,7 @@
-FROM australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_utils:latest
+FROM australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:latest
 
 COPY README.md .
 COPY setup.py .
 COPY cpg_workflows cpg_workflows
+COPY seqr-loading-pipelines/hail_scripts hail_scripts
 RUN pip install .

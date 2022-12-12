@@ -100,11 +100,7 @@ class StageOutput:
         )
         return res
 
-    def as_path(self, key=None) -> Path:
-        """
-        Cast the result to a path object. Throw an exception when can't cast.
-        `key` is used to extract the value when the result is a dictionary.
-        """
+    def _get(self, key=None) -> str | Path:
         if self.data is None:
             raise ValueError(f'{self.stage}: output data is not available')
 
@@ -116,7 +112,24 @@ class StageOutput:
             res = cast(dict, self.data)[key]
         else:
             res = self.data
+        return res
 
+    def as_str(self, key=None) -> str:
+        """
+        Cast the result to a simple string. Throw an exception when can't cast.
+        `key` is used to extract the value when the result is a dictionary.
+        """
+        res = self._get(key)
+        if not isinstance(res, str):
+            raise ValueError(f'{res} is not a str.')
+        return cast(str, res)
+
+    def as_path(self, key=None) -> Path:
+        """
+        Cast the result to a path object. Throw an exception when can't cast.
+        `key` is used to extract the value when the result is a dictionary.
+        """
+        res = self._get(key)
         if not isinstance(res, CloudPath | pathlib.Path):
             raise ValueError(f'{res} is not a path object.')
 
@@ -250,6 +263,19 @@ class StageInput:
         res = self._get(target=target, stage=stage)
         return res.as_path(key)
 
+    def as_str(
+        self,
+        target: 'Target',
+        stage: StageDecorator,
+        key: str | None = None,
+    ) -> str:
+        """
+        Represent as a simple string, otherwise fail.
+        `stage` can be callable, or a subclass of Stage
+        """
+        res = self._get(target=target, stage=stage)
+        return res.as_str(key)
+
     def as_dict(self, target: 'Target', stage: StageDecorator) -> dict[str, Path]:
         """
         Get a dict of paths for a specific target and stage
@@ -326,7 +352,9 @@ class Stage(Generic[TargetT], ABC):
         self.output_by_target: dict[str, StageOutput | None] = dict()
 
         self.skipped = skipped
-        self.forced = forced
+        self.forced = forced or self.name in get_config()['workflow'].get(
+            'force_stages', []
+        )
         self.assume_outputs_exist = assume_outputs_exist
 
     @property
@@ -465,7 +493,12 @@ class Stage(Generic[TargetT], ABC):
             return outputs
 
         # Adding status reporter jobs
-        if self.analysis_type and self.status_reporter:
+        if (
+            self.analysis_type
+            and self.status_reporter
+            and action == Action.QUEUE
+            and outputs.data
+        ):
             output: str | Path
             if isinstance(outputs.data, dict):
                 if not self.analysis_key:
@@ -482,8 +515,9 @@ class Stage(Generic[TargetT], ABC):
                     )
                 output = outputs.data[self.analysis_key]
             else:
-                assert isinstance(outputs.data, str) or isinstance(outputs.data, Path)
                 output = outputs.data
+
+            assert isinstance(output, str) or isinstance(output, Path), output
 
             self.status_reporter.add_updaters_jobs(
                 b=get_batch(),
@@ -496,15 +530,6 @@ class Stage(Generic[TargetT], ABC):
                 job_attrs=self.get_job_attrs(target),
             )
         return outputs
-
-    def new_reuse_job(self, target: Target) -> Job:
-        """
-        Add "reuse" job. Target doesn't have to be specific for a stage here,
-        this using abstract class Target instead of generic parameter TargetT.
-        """
-        attrs = dict(stage=self.name, reuse=True)
-        attrs |= target.get_job_attrs()
-        return get_batch().new_job(self.name, attrs)
 
     def _get_action(self, target: TargetT) -> Action:
         """
@@ -945,16 +970,6 @@ class Workflow:
         logging.info(f'  workflow/only_stages: {only_stages}')
         logging.info(f'  workflow/first_stages: {first_stages}')
         logging.info(f'  workflow/last_stages: {last_stages}')
-
-        # TODO: fix this: if we have last_stages = ['Align'], it wouldn't work at all
-        # UPD: this pull request fixes it if approved:
-        # https://github.com/populationgenomics/production-pipelines/pull/158
-        if only_stages or last_stages:
-            # If stages are requested explicitly, we don't need other stages from
-            # the default list:
-            requested_stages = [
-                s for s in requested_stages if s.__name__ in only_stages + last_stages
-            ]
 
         # Round 1: initialising stage objects.
         _stages_d: dict[str, Stage] = {}

@@ -30,7 +30,7 @@ COMMANDS = ['analyses', 'qc', 'joint-calling', 'es-index']
 @click.option('--config', 'config_paths', multiple=True)
 def main(command: str, config_paths: list[str]):
     if _env_var := os.environ.get('CPG_CONFIG_PATH'):
-        config_paths += list(_env_var.split(',')) + list(config_paths)
+        config_paths = list(_env_var.split(',')) + list(config_paths)
     set_config_paths(list(config_paths))
 
     sequencing_type = get_config()['workflow']['sequencing_type']
@@ -145,17 +145,17 @@ def main(command: str, config_paths: list[str]):
         names = []
         if sequencing_type == 'genome':
             names = [
-                'acute-care-genome-2022_0815_1644_xkhvx',
-                'validation-genome-2022_0810_2358_474tt',
-                'ravenscroft-arch-genome-2022_0618_1137_4qfyn',
-                'circa-genome-2022_0618_1137_4qfyn',
-                'ohmr3-mendelian-genome-2022_0618_1137_4qfyn',
-                'mito-disease-genome-2022_0618_1137_4qfyn',
-                'perth-neuro-genome-2022_0618_1137_4qfyn',
-                'ohmr4-epilepsy-genome-2022_0618_1137_4qfyn',
-                'hereditary-neuro-genome-2022_0618_1137_4qfyn',
-                'ravenscroft-rdstudy-genome-2022_0618_1137_4qfyn',
-                'heartkids-genome-2022_0618_1137_4qfyn',
+                'acute-care-genome-2022_1111_1947_54vza',
+                # 'validation-genome-2022_0810_2358_474tt',
+                # 'ravenscroft-arch-genome-2022_0618_1137_4qfyn',
+                # 'circa-genome-2022_0618_1137_4qfyn',
+                # 'ohmr3-mendelian-genome-2022_0618_1137_4qfyn',
+                # 'mito-disease-genome-2022_0618_1137_4qfyn',
+                # 'perth-neuro-genome-2022_0618_1137_4qfyn',
+                # 'ohmr4-epilepsy-genome-2022_0618_1137_4qfyn',
+                # 'hereditary-neuro-genome-2022_0618_1137_4qfyn',
+                # 'ravenscroft-rdstudy-genome-2022_0618_1137_4qfyn',
+                # 'heartkids-genome-2022_0618_1137_4qfyn',
             ]
         if sequencing_type == 'exome':
             names = [

@@ -9,7 +9,12 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from cpg_utils.hail_batch import command
-from cpg_workflows.resources import HIGHMEM, STANDARD, storage_for_cram_qc_job
+from cpg_workflows.resources import (
+    HIGHMEM,
+    STANDARD,
+    storage_for_cram_qc_job,
+    storage_for_joint_vcf,
+)
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.utils import can_reuse, exists
 
@@ -55,24 +60,6 @@ def get_intervals(
     if output_prefix and exists(output_prefix / '1.interval_list'):
         return None, [
             b.read_input(str(output_prefix / f'{idx + 1}.interval_list'))
-            for idx in range(scatter_count)
-        ]
-
-    if not source_intervals_path and exists(
-        (
-            existing_split_intervals_prefix := (
-                reference_path('intervals_prefix')
-                / sequencing_type
-                / f'{scatter_count}intervals'
-            )
-        )
-        / '1.interval_list'
-    ):
-        # We already have split intervals for this sequencing_type:
-        return None, [
-            b.read_input(
-                str(existing_split_intervals_prefix / f'{idx + 1}.interval_list')
-            )
             for idx in range(scatter_count)
         ]
 
@@ -142,7 +129,7 @@ def markdup(
         j.name = f'{j.name} [reuse]'
         return j
 
-    j.image(image_path('picard_samtools'))
+    j.image(image_path('picard'))
     resource = HIGHMEM.request_resources(ncpu=4)
     # enough for input BAM and output CRAM
     resource.attach_disk_storage_gb = 250
@@ -182,6 +169,7 @@ def vcf_qc(
     b: hb.Batch,
     vcf_or_gvcf: hb.ResourceGroup,
     is_gvcf: bool,
+    sample_count: int | None = None,
     job_attrs: dict | None = None,
     output_summary_path: Path | None = None,
     output_detail_path: Path | None = None,
@@ -196,7 +184,8 @@ def vcf_qc(
     job_attrs = (job_attrs or {}) | {'tool': 'picard CollectVariantCallingMetrics'}
     j = b.new_job('CollectVariantCallingMetrics', job_attrs)
     j.image(image_path('picard'))
-    res = STANDARD.set_resources(j, storage_gb=20, mem_gb=3)
+    storage_gb = 20 if is_gvcf else storage_for_joint_vcf(sample_count, site_only=False)
+    res = STANDARD.set_resources(j, storage_gb=storage_gb, mem_gb=3)
     reference = fasta_res_group(b)
     dbsnp_vcf = b.read_input_group(
         base=str(reference_path('broad/dbsnp_vcf')),

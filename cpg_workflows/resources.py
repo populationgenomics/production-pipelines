@@ -37,11 +37,13 @@ class MachineType:
         ncpu: int,
         mem_gb_per_core: float,
         price_per_hour: float,
+        disk_size_gb: int,
     ):
         self.name = name
         self.max_ncpu = ncpu
         self.mem_gb_per_core = mem_gb_per_core
         self.price_per_hour = price_per_hour
+        self.disk_size_gb = disk_size_gb
 
     def gcp_name(self):
         """
@@ -62,10 +64,9 @@ class MachineType:
         as the disk size (375G) minus reserved image size (30G) minus
         reserved storage per core (5G*ncpu = 120G for a 32-core instance),
         """
-        disk_size_gb = 375
         reserved_gb = 30
         reserved_gb_per_core = 5
-        return disk_size_gb - reserved_gb - reserved_gb_per_core * self.max_ncpu
+        return self.disk_size_gb - reserved_gb - reserved_gb_per_core * self.max_ncpu
 
     def set_resources(
         self,
@@ -184,9 +185,10 @@ class MachineType:
 # however would mean a smaller available storage (5G per core is reserved)
 STANDARD = MachineType(
     'standard',
-    ncpu=16,  # 32
+    ncpu=16,
     mem_gb_per_core=3.75,  # Total 60G
     price_per_hour=1.0787,  # 32-core machine would cost 2.1574
+    disk_size_gb=375,
 )
 
 # ~1.7 times memory per core than standard-32, but only 16 cores.
@@ -197,6 +199,7 @@ HIGHMEM = MachineType(
     ncpu=16,
     mem_gb_per_core=6.5,
     price_per_hour=1.3431,
+    disk_size_gb=375,
 )
 
 
@@ -307,3 +310,38 @@ def storage_for_cram_qc_job() -> int | None:
     if sequencing_type == 'exome':
         storage_gb = 20
     return storage_gb
+
+
+def joint_calling_scatter_count(sample_count: int) -> int:
+    """
+    Number of partitions for joint-calling jobs (GenotypeGVCFs, VQSR, VEP),
+    as a function of the sample number.
+    """
+    if scatter_count := get_config()['workflow'].get('scatter_count'):
+        return scatter_count
+
+    for _sample_count, scatter_count in {
+        4000: 1000,
+        3000: 800,
+        2000: 600,
+        1000: 400,
+        500: 200,
+        250: 100,
+    }.items():
+        if sample_count >= _sample_count:
+            return scatter_count
+    return 50
+
+
+def storage_for_joint_vcf(
+    sample_count: int | None, site_only: bool = True
+) -> int | None:
+    """
+    Storage enough to fit and process a joint-called VCF
+    """
+    if not sample_count:
+        return None
+    gb_per_sample = 1
+    if not site_only:
+        gb_per_sample = 4
+    return gb_per_sample * sample_count

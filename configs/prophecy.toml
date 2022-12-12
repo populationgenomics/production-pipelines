@@ -7,6 +7,7 @@ skip_samples = [
   'CPG216010',  # https://batch.hail.populationgenomics.org.au/batches/74382
   'CPG214858',  # missing GVCF
   'CPG216481',  # missing GVCF
+  'CPG241299',  # Replaced by CPG262907
 ]
 
 scatter_count = 20

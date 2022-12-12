@@ -2,7 +2,7 @@
 Stage that summarises QC.
 """
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_workflows.workflow import (
     stage,
@@ -15,10 +15,50 @@ from cpg_workflows.workflow import (
 )
 
 from cpg_workflows.jobs.multiqc import multiqc
+from cpg_workflows.jobs.picard import vcf_qc
 from .joint_genotyping import JointGenotyping
 from .. import get_cohort, get_batch
 from ..jobs.happy import happy
 from ..targets import Sample
+
+
+@stage(required_stages=JointGenotyping)
+class JointVcfQC(CohortStage):
+    """
+    QC joint VCF
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict:
+        """
+        Generate a pVCF and a site-only VCF.
+        """
+        h = cohort.alignment_inputs_hash()
+        qc_prefix = cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / 'picard'
+        d = {
+            'qc_summary': to_path(f'{qc_prefix}.variant_calling_summary_metrics'),
+            'qc_detail': to_path(f'{qc_prefix}.variant_calling_detail_metrics'),
+        }
+        return d
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        """
+        Submit jobs.
+        """
+        vcf_path = inputs.as_path(target=cohort, stage=JointGenotyping, key='vcf')
+        j = vcf_qc(
+            b=get_batch(),
+            vcf_or_gvcf=get_batch().read_input_group(
+                **{
+                    'vcf.gz': str(vcf_path),
+                    'vcf.gz.tbi': str(vcf_path) + '.tbi',
+                }
+            ),
+            is_gvcf=False,
+            job_attrs=self.get_job_attrs(cohort),
+            output_summary_path=self.expected_outputs(cohort)['qc_summary'],
+            output_detail_path=self.expected_outputs(cohort)['qc_detail'],
+        )
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
 @stage(required_stages=JointGenotyping)
@@ -74,7 +114,7 @@ class JointVcfHappy(SampleStage):
 
 @stage(
     required_stages=[
-        JointGenotyping,
+        JointVcfQC,
         JointVcfHappy,
     ],
     forced=True,
@@ -119,7 +159,7 @@ class JointVcfMultiQC(CohortStage):
         paths = []
         ending_to_trim = set()  # endings to trim to get sample names
 
-        paths.append(inputs.as_path(cohort, JointGenotyping, 'qc_detail'))
+        paths.append(inputs.as_path(cohort, JointVcfQC, 'qc_detail'))
 
         for sample in cohort.get_samples():
             try:

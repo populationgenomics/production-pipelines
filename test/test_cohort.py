@@ -28,6 +28,12 @@ check_intermediates = false
 check_expected_outputs = false
 path_scheme = 'local'
 
+[storage.default]
+default = '{str(tmp_dir_path)}'
+
+[storage.fewgenomes]
+default = '{str(tmp_dir_path)}'
+
 [large_cohort]
 pop_meta_field = 'Superpopulation name'
 
@@ -35,12 +41,14 @@ pop_meta_field = 'Superpopulation name'
 billing_project = 'fewgenomes'
 delete_scratch_on_exit = false
 backend = 'local'
+
+[references.broad]
+ref_fasta = 'stub'
 """
 
 
 def _set_config(dir_path: Path, extra_conf: dict | None = None):
     d = toml.loads(DEFAULT_CONF)
-    d['workflow']['local_dir'] = str(dir_path)
     if extra_conf:
         update_dict(d, extra_conf)
     config_path = dir_path / 'config.toml'

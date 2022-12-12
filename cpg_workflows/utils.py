@@ -3,6 +3,7 @@ Utility functions and constants.
 """
 
 import logging
+import math
 import re
 import string
 import sys

@@ -38,10 +38,10 @@ def timestamp(rand_suffix_len: int = 5) -> str:
 
 def _make_config(results_prefix: Path) -> dict:
     d: dict = {}
-    for fp in (
-        to_path(__file__).parent.parent / 'configs' / 'defaults' / 'workflows.toml',
+    for fp in [
+        to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml',
         to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml',
-    ):
+    ]:
         with fp.open():
             update_dict(d, toml.load(fp))
 
@@ -62,11 +62,96 @@ def _make_config(results_prefix: Path) -> dict:
                 'status_reporter': None,
                 'local_dir': str(results_prefix),
             },
+            'storage': {
+                'default': {
+                    'default': f'{results_prefix}',
+                    'web': f'{results_prefix}-web',
+                    'analysis': f'{results_prefix}-analysis',
+                    'tmp': f'{results_prefix}-test-tmp',
+                    'web_url': 'https://test-web.populationgenomics.org.au/fewgenomes',
+                },
+                'test-input-dataset': {
+                    'default': f'{results_prefix}',
+                    'web': f'{results_prefix}-web',
+                    'analysis': f'{results_prefix}-analysis',
+                    'tmp': f'{results_prefix}-test-tmp',
+                    'web_url': 'https://test-web.populationgenomics.org.au/fewgenomes',
+                },
+                'test-analysis-dataset': {
+                    'default': f'{results_prefix}',
+                    'web': f'{results_prefix}-web',
+                    'analysis': f'{results_prefix}-analysis',
+                    'tmp': f'{results_prefix}-test-tmp',
+                    'web_url': 'https://test-web.populationgenomics.org.au/fewgenomes',
+                },
+            },
             'hail': {
                 'billing_project': 'test-analysis-dataset',
                 'delete_scratch_on_exit': True,
                 'dry_run': True,
                 'backend': 'local',
+            },
+            'images': {
+                'bcftools': 'stub',
+                'bedtools': 'stub',
+                'fastqc': 'stub',
+                'gatk': 'stub',
+                'hap-py': 'stub',
+                'multipy': 'stub',
+                'multiqc': 'stub',
+                'peer': 'stub',
+                'picard': 'stub',
+                'samtools': 'stub',
+                'somalier': 'stub',
+                'vep': 'stub',
+                'verifybamid': 'stub',
+            },
+            'references': {
+                'genome_build': 'GRCh38',
+                'vep_mount': 'stub',
+                'liftover_38_to_37': 'stub',
+                'somalier_sites': 'stub',
+                'seqr_combined_reference_data': 'stub',
+                'seqr_clinvar': 'stub',
+                'broad': {
+                    'dragmap_prefix': 'stub',
+                    'ref_fasta': 'stub',
+                    'noalt_bed': 'stub',
+                    'genome_calling_interval_lists': 'stub',
+                    'exome_calling_interval_lists': 'stub',
+                    'genome_evaluation_interval_lists': 'stub',
+                    'exome_evaluation_interval_lists': 'stub',
+                    'genome_coverage_interval_list': 'stub',
+                    'unpadded_intervals_file': 'stub',
+                    'dbsnp_vcf': 'stub',
+                    'dbsnp_vcf_index': 'stub',
+                    'hapmap_vcf': 'stub',
+                    'hapmap_vcf_index': 'stub',
+                    'omni_vcf': 'stub',
+                    'omni_vcf_index': 'stub',
+                    'one_thousand_genomes_vcf': 'stub',
+                    'one_thousand_genomes_vcf_index': 'stub',
+                    'mills_vcf': 'stub',
+                    'mills_vcf_index': 'stub',
+                    'axiom_poly_vcf': 'stub',
+                    'axiom_poly_vcf_index': 'stub',
+                    'genome_contam_ud': 'stub',
+                    'genome_contam_bed': 'stub',
+                    'genome_contam_mu': 'stub',
+                    'exome_contam_ud': 'stub',
+                    'exome_contam_bed': 'stub',
+                    'exome_contam_mu': 'stub',
+                },
+                'gnomad': {
+                    'tel_and_cent_ht': 'stub',
+                    'lcr_intervals_ht': 'stub',
+                    'seg_dup_intervals_ht': 'stub',
+                    'clinvar_ht': 'stub',
+                    'hapmap_ht': 'stub',
+                    'kgp_omni_ht': 'stub',
+                    'kgp_hc_ht': 'stub',
+                    'mills_ht': 'stub',
+                },
             },
         },
     )
@@ -81,7 +166,7 @@ def test_seqr_loader_dry(mocker: MockFixture):
         to_path(__file__).parent / 'results' / os.getenv('TEST_TIMESTAMP', timestamp())
     ).absolute()
     results_prefix.mkdir(parents=True, exist_ok=True)
-    conf = _make_config(results_prefix)
+    mocker.patch('cpg_utils.config.get_config', lambda: _make_config(results_prefix))
 
     def mock_create_cohort(*args, **kwargs):
         from cpg_workflows.targets import Cohort
@@ -116,6 +201,8 @@ def test_seqr_loader_dry(mocker: MockFixture):
         )
         return cohort
 
+    mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
+
     def mock_exists(*args, **kwargs) -> bool:
         return False
 
@@ -126,8 +213,6 @@ def test_seqr_loader_dry(mocker: MockFixture):
         return 1
 
     mocker.patch('pathlib.Path.open', mock_open(read_data='<stub>'))
-    mocker.patch('cpg_utils.config.get_config', lambda: conf)
-    mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
     # functions like get_intervals checks file existence
     mocker.patch('cloudpathlib.cloudpath.CloudPath.exists', mock_exists)
     # cloudfuse (used in Vep) doesn't work with LocalBackend
@@ -148,10 +233,11 @@ def test_seqr_loader_dry(mocker: MockFixture):
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.stages.cram_qc import CramMultiQC
     from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
+    from cpg_workflows.stages.joint_genotyping_qc import JointVcfQC
     from cpg_workflows.workflow import get_workflow
     from cpg_workflows.stages.seqr_loader import MtToEs
 
-    get_workflow().run(stages=[MtToEs, GvcfMultiQC, CramMultiQC])
+    get_workflow().run(stages=[MtToEs, GvcfMultiQC, CramMultiQC, JointVcfQC])
 
     assert (
         get_batch().job_by_tool['gatk HaplotypeCaller']['job_n']

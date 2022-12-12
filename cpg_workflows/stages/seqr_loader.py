@@ -36,10 +36,11 @@ class AnnotateCohort(CohortStage):
         """
         Expected to write a matrix table.
         """
-        h = cohort.alignment_inputs_hash()
         return {
-            'tmp_prefix': str(self.tmp_prefix / 'mt' / h),
-            'mt': get_cohort().analysis_dataset.prefix() / 'mt' / f'{h}.mt',
+            # writing into perm location for late debugging
+            # convert to str to avoid checking existence
+            'tmp_prefix': str(self.tmp_prefix),
+            'mt': self.prefix / 'cohort.mt',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -87,7 +88,7 @@ class AnnotateDataset(DatasetStage):
         """
         h = get_cohort().alignment_inputs_hash()
         return {
-            'tmp_prefix': str(self.tmp_prefix / 'mt' / f'{h}-{dataset.name}'),
+            'tmp_prefix': str(self.tmp_prefix / dataset.name),
             'mt': dataset.prefix() / 'mt' / f'{h}-{dataset.name}.mt',
         }
 
@@ -187,9 +188,8 @@ class MtToEs(DatasetStage):
             f'--mt-path {dataset_mt_path} '
             f'--es-index {index_name} '
             f'--done-flag-path {done_flag_path} '
-            f'--es-password {es_password()} '
-            f'--liftover-path {reference_path("liftover_38_to_37")}',
-            max_age='24h',
+            f'--es-password {es_password()}',
+            max_age='48h',
             packages=[
                 'cpg_workflows',
                 'elasticsearch==8.*',
@@ -203,6 +203,7 @@ class MtToEs(DatasetStage):
             depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
             pyfiles=pyfiles,
+            init=['gs://cpg-reference/hail_dataproc/install_common.sh'],
         )
         j._preemptible = False
         j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}

@@ -3,7 +3,6 @@ name = 'seqr_loader'
 dataset_gcp_project = 'seqr-308602'
 dataset = 'seqr'
 status_reporter = 'metamist'
-driver_image = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:14432044df1c5210237727cc10bee817674700c0-hail-48ff6e3a3f08a11ccb5b0ad5366ede25e43837a8'
 
 # Use GnarlyGenotyper instead of GenotypeGVCFs
 use_gnarly = false
@@ -54,3 +53,15 @@ username = 'seqr'
 # Load ElasticSearch password from a secret, unless SEQR_ES_PASSWORD is set
 password_secret_id = 'seqr-es-password'
 password_project_id = 'seqr-308602'
+
+[stripy]
+# Analysis_type can be "standard" (fast) or "extended" (marginally slower 
+# but also uses unmapped reads for genotying)
+analysis_type = "extended"
+# See https://gitlab.com/andreassh/stripy-pipeline#list-of-loci
+# Excluded by default: C9orf72, HTT
+target_loci = """AFF2,AR,ARX_1,ARX_2,ATN1,ATXN1,ATXN10,ATXN2,ATXN3,ATXN7,ATXN8OS,\
+BEAN1,CACNA1A,CBL,CNBP,COMP,DAB1,DIP2B,DMD,DMPK,FMR1,FOXL2,FXN,GIPC1,GLS,\
+HOXA13_1,HOXA13_2,HOXA13_3,HOXD13,JPH3,LRP12,MARCHF6,NIPA1,NOP56,NOTCH2NLC,\
+NUTM2B-AS1,PABPN1,PHOX2B,PPP2R2B,PRDM12,RAPGEF2,RFC1,RUNX2,SAMD12,SOX3,STARD7,TBP,\
+TBX1,TCF4,TNRC6A,XYLT1,YEATS2,ZIC2,ZIC3"""

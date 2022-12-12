@@ -1,6 +1,7 @@
 [workflow]
 name = 'large_cohort'
 scatter_count = 50
+status_reporter = 'metamist'
 
 # Realign CRAM when available, instead of using FASTQ.
 # The parameter value should correspond to CRAM version
@@ -44,10 +45,6 @@ delete_scratch_on_exit = false
 #[hail.dataproc]
 #combiner_autoscaling_policy = 'vcf-combiner-50'
 
-[references]
-gencode_gtf = 'gencode/gencode.v39.annotation.gtf.bgz'
-
 [references.gnomad]
-prefix = 'gnomad/v0'
-tel_and_cent_ht = 'telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht'
-predetermined_qc_variants = 'sample_qc/pre_ld_pruning_qc_variants.ht'
+tel_and_cent_ht = "gs://cpg-common-main/references/gnomad/v0/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht"
+predetermined_qc_variants = "gs://cpg-common-main/references/gnomad/v0/sample_qc/pre_ld_pruning_qc_variants.ht"

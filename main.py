@@ -10,13 +10,15 @@ import coloredlogs
 
 from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
+from cpg_workflows import defaults_config_path
 from cpg_workflows.workflow import run_workflow, StageDecorator
-from cpg_workflows.stages.large_cohort import LoadVqsr, Frequencies
+from cpg_workflows.stages.large_cohort import LoadVqsr, Frequencies, AncestryPlots
 from cpg_workflows.stages.cram_qc import CramMultiQC
 from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.seqr_loader import MtToEs, AnnotateDataset
-from cpg_workflows.stages.gatk_sv import GatherBatchEvidence
+from cpg_workflows.stages.gatk_sv import ClusterBatch
+from cpg_workflows.stages.stripy import Stripy
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
 coloredlogs.install(level='INFO', fmt=fmt)
@@ -24,9 +26,9 @@ coloredlogs.install(level='INFO', fmt=fmt)
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'pre_alignment': [FastQCMultiQC],
-    'seqr_loader': [AnnotateDataset, MtToEs, GvcfMultiQC, CramMultiQC],
-    'large_cohort': [LoadVqsr, Frequencies, GvcfMultiQC, CramMultiQC],
-    'gatk_sv': [GatherBatchEvidence],
+    'seqr_loader': [AnnotateDataset, MtToEs, GvcfMultiQC, CramMultiQC, Stripy],
+    'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
+    'gatk_sv': [ClusterBatch],
 }
 
 
@@ -89,15 +91,13 @@ def main(
         click.echo(f'{", ".join(s.__name__ for s in WORKFLOWS[workflow])}')
         return
 
-    base_config_paths = [
-        to_path(__file__).parent / 'configs' / 'defaults' / f'workflows.toml',
-        to_path(__file__).parent / 'configs' / 'defaults' / f'{workflow}.toml',
-    ]
-    assert all(path.exists() for path in base_config_paths)
-    config_paths = [str(path) for path in base_config_paths] + list(config_paths)
-    if _env_var := os.environ.get('CPG_CONFIG_PATH'):
-        config_paths += _env_var.split(',') + list(config_paths)
-    set_config_paths(list(config_paths))
+    wfl_conf_path = to_path(__file__).parent / f'configs/defaults/{workflow}.toml'
+    assert wfl_conf_path.exists(), wfl_conf_path
+    config_paths = os.environ['CPG_CONFIG_PATH'].split(',') + list(config_paths)
+    # Assuming the defaults is already loaded in __init__.py:
+    assert to_path(config_paths[0]) == defaults_config_path
+    # Inserting after the "defaults" config, but before user configs:
+    set_config_paths(config_paths[:1] + [str(wfl_conf_path)] + config_paths[1:])
 
     run_workflow(stages=WORKFLOWS[workflow], dry_run=dry_run)
 

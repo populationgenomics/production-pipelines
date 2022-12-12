@@ -42,27 +42,42 @@ def timestamp(rand_suffix_len: int = 5) -> str:
 
 def _make_config(results_prefix: Path) -> dict:
     d: dict = {}
-    for fp in (
-        to_path(__file__).parent.parent / 'configs' / 'defaults' / 'workflows.toml',
+    for fp in [
+        to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml',
         to_path(__file__).parent.parent / 'configs' / 'defaults' / 'large_cohort.toml',
-    ):
+    ]:
         with fp.open():
             update_dict(d, toml.load(fp))
+
+    ref_prefix = to_path(__file__).parent / 'data/large_cohort/reference'
+    gnomad_prefix = ref_prefix / 'gnomad/v0'
+    broad_prefix = ref_prefix / 'hg38/v0'
 
     update_dict(
         d,
         {
             'workflow': {
-                'local_dir': str(results_prefix),
                 'dataset_gcp_project': 'thousand-genomes',
                 'dataset': 'thousand-genomes',
                 'access_level': 'test',
                 'sequencing_type': 'genome',
                 'check_intermediates': True,
-                'path_scheme': 'local',
-                'reference_prefix': str(
-                    to_path(__file__).parent / 'data' / 'large_cohort' / 'reference'
-                ),
+            },
+            'storage': {
+                'default': {
+                    'default': f'{results_prefix}',
+                    'web': f'{results_prefix}-web',
+                    'analysis': f'{results_prefix}-analysis',
+                    'tmp': f'{results_prefix}-test-tmp',
+                    'web_url': 'https://test-web.populationgenomics.org.au/fewgenomes',
+                },
+                'thousand-genomes': {
+                    'default': f'{results_prefix}',
+                    'web': f'{results_prefix}-web',
+                    'analysis': f'{results_prefix}-analysis',
+                    'tmp': f'{results_prefix}-test-tmp',
+                    'web_url': 'https://test-web.populationgenomics.org.au/fewgenomes',
+                },
             },
             'large_cohort': {
                 'sample_qc_cutoffs': {
@@ -76,6 +91,24 @@ def _make_config(results_prefix: Path) -> dict:
             },
             'combiner': {
                 'intervals': ['chr20:start-end', 'chrX:start-end', 'chrY:start-end'],
+            },
+            'references': {
+                'genome_build': 'GRCh38',
+                'gnomad': {
+                    'tel_and_cent_ht': f'{gnomad_prefix}/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht',
+                    'lcr_intervals_ht': f'{gnomad_prefix}/lcr_intervals/LCRFromHengHg38.ht',
+                    'seg_dup_intervals_ht': f'{gnomad_prefix}/seg_dup_intervals/GRCh38_segdups.ht',
+                    'clinvar_ht': f'{gnomad_prefix}/clinvar/clinvar_20190923.ht',
+                    'hapmap_ht': f'{gnomad_prefix}/hapmap/hapmap_3.3.hg38.ht',
+                    'kgp_omni_ht': f'{gnomad_prefix}/kgp/1000G_omni2.5.hg38.ht',
+                    'kgp_hc_ht': f'{gnomad_prefix}/kgp/1000G_phase1.snps.high_confidence.hg38.ht',
+                    'mills_ht': f'{gnomad_prefix}/mills/Mills_and_1000G_gold_standard.indels.hg38.ht',
+                    'predetermined_qc_variants': f'{gnomad_prefix}/sample_qc/pre_ld_pruning_qc_variants.ht',
+                },
+                'broad': {
+                    'genome_calling_interval_lists': f'{broad_prefix}/wgs_calling_regions.hg38.interval_list',
+                    'protein_coding_gtf': f'{broad_prefix}/sv-resources/resources/v1/MANE.GRCh38.v0.95.select_ensembl_genomic.gtf',
+                },
             },
         },
     )
@@ -91,7 +124,6 @@ def test_large_cohort(mocker: MockFixture):
     ).absolute()
     results_prefix.mkdir(parents=True, exist_ok=True)
     conf = _make_config(results_prefix)
-
     mocker.patch('cpg_utils.config.get_config', lambda: conf)
 
     from cpg_workflows.filetypes import GvcfPath

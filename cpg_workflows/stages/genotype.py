@@ -16,7 +16,11 @@ from .align import Align
 from .. import get_batch
 
 
-@stage(required_stages=Align, analysis_type='gvcf', analysis_key='gvcf')
+@stage(
+    required_stages=Align,
+    analysis_type='gvcf',
+    analysis_key='gvcf',
+)
 class Genotype(SampleStage):
     """
     Use HaplotypeCaller to genotype individual samples (i.e. CRAM -> GVCF).

@@ -1,5 +1,4 @@
 [workflow]
-access_level = 'full'
 input_datasets = [
     'acute-care',
     'ag-hidden',
@@ -23,6 +22,7 @@ input_datasets = [
     'rdp-kidney',
     'schr-neuro',
     # 'udn-aus-training',
+    'udn-aus',
     'validation',
 ]
 
