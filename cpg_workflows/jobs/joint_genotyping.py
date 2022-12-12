@@ -155,7 +155,7 @@ def make_joint_genotyping_jobs(
         else:
             vcfs.append(jc_vcf['vcf.gz'])
 
-        siteonly_j, siteonly_vcf = _add_make_sitesonly_job(
+        siteonly_j, siteonly_vcf = add_make_sitesonly_job(
             b=b,
             input_vcf=vcfs[idx],
             output_vcf_path=siteonly_jc_vcf_path,
@@ -450,11 +450,12 @@ def _add_excess_het_filter(
     return j, j.output_vcf
 
 
-def _add_make_sitesonly_job(
+def add_make_sitesonly_job(
     b: hb.Batch,
     input_vcf: hb.ResourceFile,
     output_vcf_path: Path | None = None,
     job_attrs: dict | None = None,
+    storage_gb: int | None = None,
 ) -> tuple[Job | None, hb.ResourceGroup]:
     """
     Create sites-only VCF with only site-level annotations.
@@ -475,6 +476,8 @@ def _add_make_sitesonly_job(
     j = b.new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
     res = STANDARD.set_resources(j, ncpu=2)
+    if storage_gb:
+        j.storage(storage_gb)
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
