@@ -72,6 +72,10 @@ def run_workflow(mocker):
     class C(TestStage):
         pass
 
+    @stage(required_stages=C)
+    class D(TestStage):
+        pass
+
     @stage
     class A2(TestStage):
         pass
