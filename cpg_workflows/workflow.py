@@ -583,7 +583,7 @@ class Stage(Generic[TargetT], ABC):
                 )
                 return Action.REUSE
             else:
-                raise ValueError(
+                raise WorkflowError(
                     f'{self.name}: stage is required, but is skipped, and '
                     f'the following expected outputs for target {target} do not exist: '
                     f'{first_missing_path}'
