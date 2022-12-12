@@ -14,7 +14,7 @@ tmp_dir_path = to_path(__file__).parent / 'results' / timestamp()
 tmp_dir_path = tmp_dir_path.absolute()
 tmp_dir_path.mkdir(parents=True, exist_ok=True)
 
-DEFAULT_CONF = f"""
+TOML_CONFIG = f"""
 [workflow]
 dataset_gcp_project = 'fewgenomes'
 access_level = 'test'
@@ -39,7 +39,7 @@ backend = 'local'
 
 
 def _set_config(dir_path: Path, extra_conf: dict | None = None):
-    d = toml.loads(DEFAULT_CONF)
+    d = toml.loads(TOML_CONFIG)
     if extra_conf:
         update_dict(d, extra_conf)
     config_path = dir_path / 'config.toml'

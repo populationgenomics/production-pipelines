@@ -9,7 +9,7 @@ from cpg_utils.config import set_config_paths, update_dict
 from cpg_workflows.utils import timestamp
 from cpg_workflows.python_scripts import check_multiqc
 
-DEFAULT_CONF = """
+TOML_CONFIG = """
 [workflow]
 sequencing_type = 'genome'
 
@@ -31,7 +31,7 @@ def tmp_dir() -> Path:
 
 
 def _set_config(dir_path: Path, extra_conf: dict | None = None):
-    d = toml.loads(DEFAULT_CONF)
+    d = toml.loads(TOML_CONFIG)
     if extra_conf:
         update_dict(d, extra_conf)
     config_path = dir_path / 'config.toml'
