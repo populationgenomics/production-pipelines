@@ -1,15 +1,11 @@
 """
 Test Hail Query functions.
 """
-import shutil
-import pytest
 import toml
-from cpg_utils import to_path, Path
-from cpg_utils.config import set_config_paths, update_dict
-from cpg_workflows.utils import timestamp
-from cpg_workflows.python_scripts import check_multiqc
+from pytest_mock import MockFixture
+from cpg_utils import to_path
 
-TOML_CONFIG = """
+TOML = """
 [workflow]
 sequencing_type = 'genome'
 
@@ -22,26 +18,11 @@ sequencing_type = 'genome'
 """
 
 
-@pytest.fixture()
-def tmp_dir() -> Path:
-    dir_path = to_path('results') / timestamp()
-    dir_path.mkdir(parents=True, exist_ok=True)
-    yield dir_path
-    shutil.rmtree(dir_path)
+def test_check_multiqc(mocker: MockFixture, caplog):
+    mocker.patch('cpg_utils.config.get_config', lambda: toml.loads(TOML))
 
+    from cpg_workflows.python_scripts import check_multiqc
 
-def _set_config(dir_path: Path, extra_conf: dict | None = None):
-    d = toml.loads(TOML_CONFIG)
-    if extra_conf:
-        update_dict(d, extra_conf)
-    config_path = dir_path / 'config.toml'
-    with config_path.open('w') as f:
-        toml.dump(d, f)
-    set_config_paths([str(config_path)])
-
-
-def test_check_multiqc(caplog, tmp_dir: Path):
-    _set_config(tmp_dir)
     data_dir = to_path(__file__).parent / 'data' / 'check_multiqc'
     check_multiqc.run(str(data_dir / 'validation_multiqc.json'))
     for expected_line in ['⭕ CPG243717|NA12878_KCCG: MEDIAN_COVERAGE=8.00<10.00']:
