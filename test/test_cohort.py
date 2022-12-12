@@ -4,9 +4,7 @@ Test reading inputs into a Cohort object.
 
 import toml
 from pytest_mock import MockFixture
-import conftest
-
-tmp_dir_path = conftest.results_prefix()
+from . import results_prefix
 
 TOML = f"""
 [workflow]
@@ -21,10 +19,10 @@ check_expected_outputs = false
 path_scheme = 'local'
 
 [storage.default]
-default = '{str(tmp_dir_path)}'
+default = '{results_prefix()}'
 
 [storage.fewgenomes]
-default = '{str(tmp_dir_path)}'
+default = '{results_prefix()}'
 
 [large_cohort]
 pop_meta_field = 'Superpopulation name'

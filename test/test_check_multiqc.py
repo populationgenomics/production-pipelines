@@ -1,6 +1,7 @@
 """
 Test Hail Query functions.
 """
+
 import toml
 from pytest_mock import MockFixture
 from cpg_utils import to_path

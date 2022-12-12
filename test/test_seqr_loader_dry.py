@@ -6,9 +6,7 @@ from unittest.mock import mock_open
 import toml
 from cpg_utils import to_path
 from pytest_mock import MockFixture
-import conftest
-
-results_prefix = conftest.results_prefix()
+from . import results_prefix, update_dict
 
 TOML = f"""
 [workflow]
@@ -54,24 +52,24 @@ seqr_combined_reference_data = "stub"
 seqr_clinvar = "stub"
 
 [storage.default]
-default = "{results_prefix}"
-web = "{results_prefix}-web"
-analysis = "{results_prefix}-analysis"
-tmp = "{results_prefix}-test-tmp"
+default = '{results_prefix()}'
+web = "{results_prefix()}-web"
+analysis = "{results_prefix()}-analysis"
+tmp = "{results_prefix()}-test-tmp"
 web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
 
 [storage.test-input-dataset]
-default = "{results_prefix}"
-web = "{results_prefix}-web"
-analysis = "{results_prefix}-analysis"
-tmp = "{results_prefix}-test-tmp"
+default = "{results_prefix()}"
+web = "{results_prefix()}-web"
+analysis = "{results_prefix()}-analysis"
+tmp = "{results_prefix()}-test-tmp"
 web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
 
 [storage.test-analysis-dataset]
-default = "{results_prefix}"
-web = "{results_prefix}-web"
-analysis = "{results_prefix}-analysis"
-tmp = "{results_prefix}-test-tmp"
+default = "{results_prefix()}"
+web = "{results_prefix()}-web"
+analysis = "{results_prefix()}-analysis"
+tmp = "{results_prefix()}-test-tmp"
 web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
 
 [references.broad]
@@ -122,9 +120,9 @@ def _mock_config() -> dict:
         to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml',
     ]:
         with fp.open():
-            conftest.update_dict(d, toml.load(fp))
+            update_dict(d, toml.load(fp))
 
-    conftest.update_dict(d, toml.loads(TOML))
+    update_dict(d, toml.loads(TOML))
     return d
 
 
