@@ -9,6 +9,8 @@ skip_samples = [
   'CPG216481',  # missing GVCF
   'CPG241299',  # Replaced by CPG262907
 ]
+skip_stages = ['SomalierPedigree']
+skip_samples_with_missing_input = true
 
 scatter_count = 20
 output_version = '0.1'
