@@ -3,7 +3,7 @@
 from cpg_workflows import get_batch
 from cpg_workflows.filetypes import BamPath, CramPath
 from cpg_workflows.jobs import align
-from cpg_workflows.targets import Sample, Dataset
+from cpg_workflows.targets import Dataset
 
 dataset = Dataset('test')
 sample = dataset.add_sample(
