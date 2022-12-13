@@ -3,8 +3,6 @@ from cpg_workflows.filetypes import BamPath, CramPath
 from cpg_workflows.jobs import align
 from cpg_workflows.targets import Sample, Dataset
 
-IMAGE = 'australia-southeast1-docker.pkg.dev/cpg-common/images/dragmap:1.3.0-broken'
-
 dataset = Dataset('test')
 sample = dataset.add_sample(
     'CHM1_CHM13_2',
