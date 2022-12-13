@@ -1,5 +1,5 @@
 [images]
-dragmap = 'australia-southeast1-docker.pkg.dev/cpg-common/images/dragmap:1.3.0-broken'
+dragmap = 'australia-southeast1-docker.pkg.dev/cpg-common/images/dragmap:1.3.0-conda'
 
 [workflow]
 sequencing_type = 'genome'
