@@ -11,6 +11,7 @@ skip_samples = [
 ]
 skip_stages = ['SomalierPedigree']
 skip_samples_with_missing_input = true
+highmem_workers = true
 
 scatter_count = 20
 output_version = '0.1'
