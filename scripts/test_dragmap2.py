@@ -7,7 +7,7 @@ from cpg_workflows.targets import Dataset
 
 dataset = Dataset('test')
 sample = dataset.add_sample(
-    'CHM1_CHM13_2',
+    'FROM_FASTQ',
     alignment_input_by_seq_type={
         'genome': FastqPairs(
             [
@@ -21,8 +21,8 @@ sample = dataset.add_sample(
 )
 
 jobs = align.align(
-    b=get_batch('Test dragmap'),
+    b=get_batch('Test dragmap from fq'),
     sample=sample,
-    output_path=CramPath('gs://cpg-validation-test-tmp/test-dragmap/CHM1_CHM13_2.cram'),
+    output_path=CramPath('gs://cpg-validation-test-tmp/test-dragmap/from_fq.cram'),
 )
 get_batch().run(wait=False)
