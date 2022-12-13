@@ -174,5 +174,7 @@ def test_status_reporter_fails(mocker: MockFixture):
             print(f'Writing to {self.expected_outputs(sample)["bed"]}')
             return self.make_outputs(sample, self.expected_outputs(sample), [j])
 
+    from cpg_workflows.workflow import WorkflowError
+
     with pytest.raises(WorkflowError):
         run_workflow(stages=[MyQcStage])
