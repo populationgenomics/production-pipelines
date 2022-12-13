@@ -1,207 +1,173 @@
 """
-Test entire seqr-loader in a dry mode.
+Test seqr-loader workflow.
 """
-import os
-import string
-import time
-from random import choices
 from unittest.mock import mock_open
 
 import toml
-from cpg_utils import to_path, Path
+from cpg_utils import to_path
 from pytest_mock import MockFixture
+import conftest
+
+results_prefix = conftest.results_prefix()
+
+TOML = f"""
+[workflow]
+dataset_gcp_project = "test-analysis-dataset-1234"
+dataset = "test-analysis-dataset"
+access_level = "test"
+sequencing_type = "genome"
+driver_image = "<stub>"
+skip_stages = [ "Align",]
+check_inputs = false
+check_intermediates = false
+check_expected_outputs = false
+path_scheme = "local"
+local_dir = "{results_prefix}"
+
+[hail]
+billing_project = "test-analysis-dataset"
+delete_scratch_on_exit = true
+dry_run = true
+backend = "local"
+
+[images]
+bcftools = "stub"
+bedtools = "stub"
+fastqc = "stub"
+gatk = "stub"
+hap-py = "stub"
+multipy = "stub"
+multiqc = "stub"
+peer = "stub"
+picard = "stub"
+samtools = "stub"
+somalier = "stub"
+vep = "stub"
+verifybamid = "stub"
+
+[references]
+genome_build = "GRCh38"
+vep_mount = "stub"
+liftover_38_to_37 = "stub"
+somalier_sites = "stub"
+seqr_combined_reference_data = "stub"
+seqr_clinvar = "stub"
+
+[storage.default]
+default = "{results_prefix}"
+web = "{results_prefix}-web"
+analysis = "{results_prefix}-analysis"
+tmp = "{results_prefix}-test-tmp"
+web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
+
+[storage.test-input-dataset]
+default = "{results_prefix}"
+web = "{results_prefix}-web"
+analysis = "{results_prefix}-analysis"
+tmp = "{results_prefix}-test-tmp"
+web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
+
+[storage.test-analysis-dataset]
+default = "{results_prefix}"
+web = "{results_prefix}-web"
+analysis = "{results_prefix}-analysis"
+tmp = "{results_prefix}-test-tmp"
+web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
+
+[references.broad]
+dragmap_prefix = "stub"
+ref_fasta = "stub"
+noalt_bed = "stub"
+genome_calling_interval_lists = "stub"
+exome_calling_interval_lists = "stub"
+genome_evaluation_interval_lists = "stub"
+exome_evaluation_interval_lists = "stub"
+genome_coverage_interval_list = "stub"
+unpadded_intervals_file = "stub"
+dbsnp_vcf = "stub"
+dbsnp_vcf_index = "stub"
+hapmap_vcf = "stub"
+hapmap_vcf_index = "stub"
+omni_vcf = "stub"
+omni_vcf_index = "stub"
+one_thousand_genomes_vcf = "stub"
+one_thousand_genomes_vcf_index = "stub"
+mills_vcf = "stub"
+mills_vcf_index = "stub"
+axiom_poly_vcf = "stub"
+axiom_poly_vcf_index = "stub"
+genome_contam_ud = "stub"
+genome_contam_bed = "stub"
+genome_contam_mu = "stub"
+exome_contam_ud = "stub"
+exome_contam_bed = "stub"
+exome_contam_mu = "stub"
+
+[references.gnomad]
+tel_and_cent_ht = "stub"
+lcr_intervals_ht = "stub"
+seg_dup_intervals_ht = "stub"
+clinvar_ht = "stub"
+hapmap_ht = "stub"
+kgp_omni_ht = "stub"
+kgp_hc_ht = "stub"
+mills_ht = "stub"
+"""
 
 
-def update_dict(d1: dict, d2: dict) -> None:
-    """Updates the d1 dict with the values from the d2 dict recursively in-place."""
-    for k, v2 in d2.items():
-        v1 = d1.get(k)
-        if isinstance(v1, dict) and isinstance(v2, dict):
-            update_dict(v1, v2)
-        else:
-            d1[k] = v2
-
-
-def timestamp(rand_suffix_len: int = 5) -> str:
-    """
-    Generate a timestamp string. If `rand_suffix_len` is set, adds a short random
-    string of this length for uniqueness.
-    """
-    result = time.strftime('%Y_%m%d_%H%M')
-    if rand_suffix_len:
-        rand_bit = ''.join(
-            choices(string.ascii_uppercase + string.digits, k=rand_suffix_len)
-        )
-        result += f'_{rand_bit}'
-    return result
-
-
-def _make_config(results_prefix: Path) -> dict:
+def _mock_config() -> dict:
     d: dict = {}
     for fp in [
         to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml',
         to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml',
     ]:
         with fp.open():
-            update_dict(d, toml.load(fp))
+            conftest.update_dict(d, toml.load(fp))
 
-    update_dict(
-        d,
-        {
-            'workflow': {
-                'dataset_gcp_project': 'test-analysis-dataset-1234',
-                'dataset': 'test-analysis-dataset',
-                'access_level': 'test',
-                'sequencing_type': 'genome',
-                'driver_image': '<stub>',
-                'skip_stages': ['Align'],
-                'check_inputs': False,
-                'check_intermediates': False,
-                'check_expected_outputs': False,
-                'path_scheme': 'local',
-                'status_reporter': None,
-                'local_dir': str(results_prefix),
-            },
-            'storage': {
-                'default': {
-                    'default': f'{results_prefix}',
-                    'web': f'{results_prefix}-web',
-                    'analysis': f'{results_prefix}-analysis',
-                    'tmp': f'{results_prefix}-test-tmp',
-                    'web_url': 'https://test-web.populationgenomics.org.au/fewgenomes',
-                },
-                'test-input-dataset': {
-                    'default': f'{results_prefix}',
-                    'web': f'{results_prefix}-web',
-                    'analysis': f'{results_prefix}-analysis',
-                    'tmp': f'{results_prefix}-test-tmp',
-                    'web_url': 'https://test-web.populationgenomics.org.au/fewgenomes',
-                },
-                'test-analysis-dataset': {
-                    'default': f'{results_prefix}',
-                    'web': f'{results_prefix}-web',
-                    'analysis': f'{results_prefix}-analysis',
-                    'tmp': f'{results_prefix}-test-tmp',
-                    'web_url': 'https://test-web.populationgenomics.org.au/fewgenomes',
-                },
-            },
-            'hail': {
-                'billing_project': 'test-analysis-dataset',
-                'delete_scratch_on_exit': True,
-                'dry_run': True,
-                'backend': 'local',
-            },
-            'images': {
-                'bcftools': 'stub',
-                'bedtools': 'stub',
-                'fastqc': 'stub',
-                'gatk': 'stub',
-                'hap-py': 'stub',
-                'multipy': 'stub',
-                'multiqc': 'stub',
-                'peer': 'stub',
-                'picard': 'stub',
-                'samtools': 'stub',
-                'somalier': 'stub',
-                'vep': 'stub',
-                'verifybamid': 'stub',
-            },
-            'references': {
-                'genome_build': 'GRCh38',
-                'vep_mount': 'stub',
-                'liftover_38_to_37': 'stub',
-                'somalier_sites': 'stub',
-                'seqr_combined_reference_data': 'stub',
-                'seqr_clinvar': 'stub',
-                'broad': {
-                    'dragmap_prefix': 'stub',
-                    'ref_fasta': 'stub',
-                    'noalt_bed': 'stub',
-                    'genome_calling_interval_lists': 'stub',
-                    'exome_calling_interval_lists': 'stub',
-                    'genome_evaluation_interval_lists': 'stub',
-                    'exome_evaluation_interval_lists': 'stub',
-                    'genome_coverage_interval_list': 'stub',
-                    'unpadded_intervals_file': 'stub',
-                    'dbsnp_vcf': 'stub',
-                    'dbsnp_vcf_index': 'stub',
-                    'hapmap_vcf': 'stub',
-                    'hapmap_vcf_index': 'stub',
-                    'omni_vcf': 'stub',
-                    'omni_vcf_index': 'stub',
-                    'one_thousand_genomes_vcf': 'stub',
-                    'one_thousand_genomes_vcf_index': 'stub',
-                    'mills_vcf': 'stub',
-                    'mills_vcf_index': 'stub',
-                    'axiom_poly_vcf': 'stub',
-                    'axiom_poly_vcf_index': 'stub',
-                    'genome_contam_ud': 'stub',
-                    'genome_contam_bed': 'stub',
-                    'genome_contam_mu': 'stub',
-                    'exome_contam_ud': 'stub',
-                    'exome_contam_bed': 'stub',
-                    'exome_contam_mu': 'stub',
-                },
-                'gnomad': {
-                    'tel_and_cent_ht': 'stub',
-                    'lcr_intervals_ht': 'stub',
-                    'seg_dup_intervals_ht': 'stub',
-                    'clinvar_ht': 'stub',
-                    'hapmap_ht': 'stub',
-                    'kgp_omni_ht': 'stub',
-                    'kgp_hc_ht': 'stub',
-                    'mills_ht': 'stub',
-                },
-            },
+    conftest.update_dict(d, toml.loads(TOML))
+    return d
+
+
+def _mock_cohort():
+    from cpg_workflows.targets import Cohort
+    from cpg_workflows.filetypes import BamPath, FastqPair, FastqPairs
+
+    cohort = Cohort()
+    ds = cohort.create_dataset('test-input-dataset')
+    ds.add_sample(
+        'CPG01',
+        'SAMPLE1',
+        alignment_input_by_seq_type={
+            'genome': BamPath('gs://test-input-dataset-upload/sample1.bam')
         },
     )
-    return d
+    ds.add_sample(
+        'CPG02',
+        'SAMPLE2',
+        alignment_input_by_seq_type={
+            'genome': FastqPairs(
+                [
+                    FastqPair(
+                        'gs://test-input-dataset-upload/sample2_L1_R1.fq.gz',
+                        'gs://test-input-dataset-upload/sample2_L1_R2.fq.gz',
+                    ),
+                    FastqPair(
+                        'gs://test-input-dataset-upload/sample2_L2_R1.fq.gz',
+                        'gs://test-input-dataset-upload/sample2_L2_R2.fq.gz',
+                    ),
+                ]
+            )
+        },
+    )
+    return cohort
 
 
 def test_seqr_loader_dry(mocker: MockFixture):
     """
     Test entire seqr-loader in a dry mode.
     """
-    results_prefix = (
-        to_path(__file__).parent / 'results' / os.getenv('TEST_TIMESTAMP', timestamp())
-    ).absolute()
-    results_prefix.mkdir(parents=True, exist_ok=True)
-    mocker.patch('cpg_utils.config.get_config', lambda: _make_config(results_prefix))
-
-    def mock_create_cohort(*args, **kwargs):
-        from cpg_workflows.targets import Cohort
-        from cpg_workflows.filetypes import BamPath, FastqPair, FastqPairs
-
-        cohort = Cohort()
-        ds = cohort.create_dataset('test-input-dataset')
-        ds.add_sample(
-            'CPG01',
-            'SAMPLE1',
-            alignment_input_by_seq_type={
-                'genome': BamPath('gs://test-input-dataset-upload/sample1.bam')
-            },
-        )
-        ds.add_sample(
-            'CPG02',
-            'SAMPLE2',
-            alignment_input_by_seq_type={
-                'genome': FastqPairs(
-                    [
-                        FastqPair(
-                            'gs://test-input-dataset-upload/sample2_L1_R1.fq.gz',
-                            'gs://test-input-dataset-upload/sample2_L1_R2.fq.gz',
-                        ),
-                        FastqPair(
-                            'gs://test-input-dataset-upload/sample2_L2_R1.fq.gz',
-                            'gs://test-input-dataset-upload/sample2_L2_R2.fq.gz',
-                        ),
-                    ]
-                )
-            },
-        )
-        return cohort
-
-    mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
+    mocker.patch('cpg_utils.config.get_config', _mock_config)
+    mocker.patch('cpg_workflows.inputs.create_cohort', _mock_cohort)
 
     def mock_exists(*args, **kwargs) -> bool:
         return False

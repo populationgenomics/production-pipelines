@@ -1,6 +1,7 @@
 """
-Test Hail Query functions.
+Test large-cohort workflow.
 """
+
 import os
 import string
 import time
@@ -11,135 +12,110 @@ from os.path import exists
 import toml
 from cpg_utils import to_path, Path
 from pytest_mock import MockFixture
+import conftest
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 
-def update_dict(d1: dict, d2: dict) -> None:
-    """Updates the d1 dict with the values from the d2 dict recursively in-place."""
-    for k, v2 in d2.items():
-        v1 = d1.get(k)
-        if isinstance(v1, dict) and isinstance(v2, dict):
-            update_dict(v1, v2)
-        else:
-            d1[k] = v2
+results_prefix = conftest.results_prefix()
+
+ref_prefix = to_path(__file__).parent / 'data/large_cohort/reference'
+gnomad_prefix = ref_prefix / 'gnomad/v0'
+broad_prefix = ref_prefix / 'hg38/v0'
+
+TOML = f"""
+[workflow]
+dataset_gcp_project = "thousand-genomes"
+dataset = "thousand-genomes"
+access_level = "test"
+sequencing_type = "genome"
+check_intermediates = true
+
+[large_cohort]
+n_pcs = 3
+
+[hail]
+billing_project = "thousand-genomes"
+query_backend = "spark_local"
+
+[combiner]
+intervals = [ "chr20:start-end", "chrX:start-end", "chrY:start-end",]
+
+[references]
+genome_build = "GRCh38"
+
+[storage.default]
+default = "{results_prefix}"
+web = "{results_prefix}-web"
+analysis = "{results_prefix}-analysis"
+tmp = "{results_prefix}-test-tmp"
+web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
+
+[storage.thousand-genomes]
+default = "{results_prefix}"
+web = "{results_prefix}-web"
+analysis = "{results_prefix}-analysis"
+tmp = "{results_prefix}-test-tmp"
+web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
+
+[large_cohort.sample_qc_cutoffs]
+min_n_snps = 2500
+
+[references.gnomad]
+tel_and_cent_ht = "{gnomad_prefix}/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht"
+lcr_intervals_ht = "{gnomad_prefix}/lcr_intervals/LCRFromHengHg38.ht"
+seg_dup_intervals_ht = "{gnomad_prefix}/seg_dup_intervals/GRCh38_segdups.ht"
+clinvar_ht = "{gnomad_prefix}/clinvar/clinvar_20190923.ht"
+hapmap_ht = "{gnomad_prefix}/hapmap/hapmap_3.3.hg38.ht"
+kgp_omni_ht = "{gnomad_prefix}/kgp/1000G_omni2.5.hg38.ht"
+kgp_hc_ht = "{gnomad_prefix}/kgp/1000G_phase1.snps.high_confidence.hg38.ht"
+mills_ht = "{gnomad_prefix}/mills/Mills_and_1000G_gold_standard.indels.hg38.ht"
+predetermined_qc_variants = "{gnomad_prefix}/sample_qc/pre_ld_pruning_qc_variants.ht"
+
+[references.broad]
+genome_calling_interval_lists = "{broad_prefix}/wgs_calling_regions.hg38.interval_list"
+protein_coding_gtf = "{broad_prefix}/sv-resources/resources/v1/MANE.GRCh38.v0.95.select_ensembl_genomic.gtf"
+"""
 
 
-def timestamp(rand_suffix_len: int = 5) -> str:
-    """
-    Generate a timestamp string. If `rand_suffix_len` is set, adds a short random
-    string of this length for uniqueness.
-    """
-    result = time.strftime('%Y_%m%d_%H%M')
-    if rand_suffix_len:
-        rand_bit = ''.join(
-            choices(string.ascii_uppercase + string.digits, k=rand_suffix_len)
-        )
-        result += f'_{rand_bit}'
-    return result
-
-
-def _make_config(results_prefix: Path) -> dict:
+def _mock_config() -> dict:
     d: dict = {}
     for fp in [
         to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml',
         to_path(__file__).parent.parent / 'configs' / 'defaults' / 'large_cohort.toml',
     ]:
         with fp.open():
-            update_dict(d, toml.load(fp))
+            conftest.update_dict(d, toml.load(fp))
 
-    ref_prefix = to_path(__file__).parent / 'data/large_cohort/reference'
-    gnomad_prefix = ref_prefix / 'gnomad/v0'
-    broad_prefix = ref_prefix / 'hg38/v0'
-
-    update_dict(
-        d,
-        {
-            'workflow': {
-                'dataset_gcp_project': 'thousand-genomes',
-                'dataset': 'thousand-genomes',
-                'access_level': 'test',
-                'sequencing_type': 'genome',
-                'check_intermediates': True,
-            },
-            'storage': {
-                'default': {
-                    'default': f'{results_prefix}',
-                    'web': f'{results_prefix}-web',
-                    'analysis': f'{results_prefix}-analysis',
-                    'tmp': f'{results_prefix}-test-tmp',
-                    'web_url': 'https://test-web.populationgenomics.org.au/fewgenomes',
-                },
-                'thousand-genomes': {
-                    'default': f'{results_prefix}',
-                    'web': f'{results_prefix}-web',
-                    'analysis': f'{results_prefix}-analysis',
-                    'tmp': f'{results_prefix}-test-tmp',
-                    'web_url': 'https://test-web.populationgenomics.org.au/fewgenomes',
-                },
-            },
-            'large_cohort': {
-                'sample_qc_cutoffs': {
-                    'min_n_snps': 2500,  # to make it pass for toy subset
-                },
-                'n_pcs': 3,  # minimal allowed number
-            },
-            'hail': {
-                'billing_project': 'thousand-genomes',
-                'query_backend': 'spark_local',
-            },
-            'combiner': {
-                'intervals': ['chr20:start-end', 'chrX:start-end', 'chrY:start-end'],
-            },
-            'references': {
-                'genome_build': 'GRCh38',
-                'gnomad': {
-                    'tel_and_cent_ht': f'{gnomad_prefix}/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht',
-                    'lcr_intervals_ht': f'{gnomad_prefix}/lcr_intervals/LCRFromHengHg38.ht',
-                    'seg_dup_intervals_ht': f'{gnomad_prefix}/seg_dup_intervals/GRCh38_segdups.ht',
-                    'clinvar_ht': f'{gnomad_prefix}/clinvar/clinvar_20190923.ht',
-                    'hapmap_ht': f'{gnomad_prefix}/hapmap/hapmap_3.3.hg38.ht',
-                    'kgp_omni_ht': f'{gnomad_prefix}/kgp/1000G_omni2.5.hg38.ht',
-                    'kgp_hc_ht': f'{gnomad_prefix}/kgp/1000G_phase1.snps.high_confidence.hg38.ht',
-                    'mills_ht': f'{gnomad_prefix}/mills/Mills_and_1000G_gold_standard.indels.hg38.ht',
-                    'predetermined_qc_variants': f'{gnomad_prefix}/sample_qc/pre_ld_pruning_qc_variants.ht',
-                },
-                'broad': {
-                    'genome_calling_interval_lists': f'{broad_prefix}/wgs_calling_regions.hg38.interval_list',
-                    'protein_coding_gtf': f'{broad_prefix}/sv-resources/resources/v1/MANE.GRCh38.v0.95.select_ensembl_genomic.gtf',
-                },
-            },
-        },
-    )
+    conftest.update_dict(d, toml.loads(TOML))
     return d
+
+
+def _mock_cohort():
+    from cpg_workflows.filetypes import GvcfPath
+    from cpg_workflows.targets import Cohort
+
+    cohort = Cohort()
+    dataset = cohort.create_dataset('thousand-genomes')
+    gvcf_root = to_path(__file__).parent / 'data' / 'large_cohort' / 'gvcf'
+    found_gvcf_paths = list(gvcf_root.glob('*.g.vcf.gz'))
+    assert len(found_gvcf_paths) > 0, gvcf_root
+    for gvcf_path in found_gvcf_paths:
+        sample_id = gvcf_path.name.split('.')[0]
+        sample = dataset.add_sample(
+            id=sample_id, external_id=sample_id.replace('CPG', 'EXT')
+        )
+        sample.gvcf = GvcfPath(gvcf_path)
+    return cohort
 
 
 def test_large_cohort(mocker: MockFixture):
     """
     Run entire workflow in a local mode.
     """
-    results_prefix = (
-        to_path(__file__).parent / 'results' / os.getenv('TEST_TIMESTAMP', timestamp())
-    ).absolute()
-    results_prefix.mkdir(parents=True, exist_ok=True)
-    conf = _make_config(results_prefix)
-    mocker.patch('cpg_utils.config.get_config', lambda: conf)
-
-    from cpg_workflows.filetypes import GvcfPath
-    from cpg_workflows.targets import Cohort
-
-    cohort = Cohort()
-    ds = cohort.create_dataset('thousand-genomes')
-    gvcf_root = to_path(__file__).parent / 'data' / 'large_cohort' / 'gvcf'
-    found_gvcf_paths = list(gvcf_root.glob('*.g.vcf.gz'))
-    assert len(found_gvcf_paths) > 0, gvcf_root
-    for gvcf_path in found_gvcf_paths:
-        sample_id = gvcf_path.name.split('.')[0]
-        s = ds.add_sample(id=sample_id, external_id=sample_id.replace('CPG', 'EXT'))
-        s.gvcf = GvcfPath(gvcf_path)
-
-    mocker.patch('cpg_workflows.inputs.create_cohort', lambda: cohort)
+    mocker.patch('cpg_utils.config.get_config', _mock_config)
+    mocker.patch('cpg_workflows.inputs.create_cohort', _mock_cohort)
 
     from cpg_workflows.large_cohort import combiner
     from cpg_workflows.large_cohort import ancestry_pca
