@@ -5,11 +5,8 @@ Test workflow status reporter.
 import toml
 import pytest
 from pytest_mock import MockFixture
-
 from cpg_utils import to_path, Path
-import conftest
-
-tmp_dir_path = conftest.results_prefix()
+from . import results_prefix, update_dict
 
 TOML = f"""
 [workflow]
@@ -26,10 +23,10 @@ check_expected_outputs = false
 path_scheme = 'local'
 
 [storage.default]
-default = '{str(tmp_dir_path)}'
+default = '{results_prefix()}'
 
 [storage.fewgenomes]
-default = '{str(tmp_dir_path)}'
+default = '{results_prefix()}'
 
 [hail]
 billing_project = 'fewgenomes'
@@ -46,9 +43,9 @@ def _mock_config() -> dict:
         to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml',
     ]:
         with fp.open():
-            conftest.update_dict(d, toml.load(fp))
+            update_dict(d, toml.load(fp))
 
-    conftest.update_dict(d, toml.loads(TOML))
+    update_dict(d, toml.loads(TOML))
     return d
 
 

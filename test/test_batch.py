@@ -4,11 +4,8 @@ Test initialising Batch object.
 
 import toml
 from pytest_mock import MockFixture
-
 from cpg_utils import to_path
-import conftest
-
-tmp_dir_path = conftest.results_prefix()
+from . import results_prefix
 
 TOML = f"""
 [workflow]
@@ -22,10 +19,10 @@ check_intermediates = false
 check_expected_outputs = false
 
 [storage.default]
-default = '{str(tmp_dir_path)}'
+default = '{results_prefix()}'
 
 [storage.fewgenomes]
-default = '{str(tmp_dir_path)}'
+default = '{results_prefix()}'
 
 [hail]
 billing_project = 'fewgenomes'

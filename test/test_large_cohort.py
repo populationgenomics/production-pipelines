@@ -12,13 +12,7 @@ from os.path import exists
 import toml
 from cpg_utils import to_path, Path
 from pytest_mock import MockFixture
-import conftest
-
-logging.basicConfig()
-logging.getLogger().setLevel(logging.INFO)
-
-
-results_prefix = conftest.results_prefix()
+from . import results_prefix, update_dict
 
 ref_prefix = to_path(__file__).parent / 'data/large_cohort/reference'
 gnomad_prefix = ref_prefix / 'gnomad/v0'
@@ -46,17 +40,17 @@ intervals = [ "chr20:start-end", "chrX:start-end", "chrY:start-end",]
 genome_build = "GRCh38"
 
 [storage.default]
-default = "{results_prefix}"
-web = "{results_prefix}-web"
-analysis = "{results_prefix}-analysis"
-tmp = "{results_prefix}-test-tmp"
+default = "{results_prefix()}"
+web = "{results_prefix()}-web"
+analysis = "{results_prefix()}-analysis"
+tmp = "{results_prefix()}-test-tmp"
 web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
 
 [storage.thousand-genomes]
-default = "{results_prefix}"
-web = "{results_prefix}-web"
-analysis = "{results_prefix}-analysis"
-tmp = "{results_prefix}-test-tmp"
+default = "{results_prefix()}"
+web = "{results_prefix()}-web"
+analysis = "{results_prefix()}-analysis"
+tmp = "{results_prefix()}-test-tmp"
 web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
 
 [large_cohort.sample_qc_cutoffs]
@@ -86,9 +80,9 @@ def _mock_config() -> dict:
         to_path(__file__).parent.parent / 'configs' / 'defaults' / 'large_cohort.toml',
     ]:
         with fp.open():
-            conftest.update_dict(d, toml.load(fp))
+            update_dict(d, toml.load(fp))
 
-    conftest.update_dict(d, toml.loads(TOML))
+    update_dict(d, toml.loads(TOML))
     return d
 
 
@@ -128,47 +122,48 @@ def test_large_cohort(mocker: MockFixture):
 
     start_query_context()
 
-    vds_path = results_prefix / 'v01.vds'
-    combiner.run(out_vds_path=vds_path, tmp_prefix=results_prefix / 'tmp')
+    res_pref = to_path(results_prefix())
+    vds_path = res_pref / 'v01.vds'
+    combiner.run(out_vds_path=vds_path, tmp_prefix=res_pref / 'tmp')
 
-    sample_qc_ht_path = results_prefix / 'sample_qc.ht'
+    sample_qc_ht_path = res_pref / 'sample_qc.ht'
     sample_qc.run(
         vds_path=vds_path,
         out_sample_qc_ht_path=sample_qc_ht_path,
-        tmp_prefix=results_prefix / 'tmp',
+        tmp_prefix=res_pref / 'tmp',
     )
 
-    dense_mt_path = results_prefix / 'dense.mt'
+    dense_mt_path = res_pref / 'dense.mt'
     dense_subset.run(
         vds_path=vds_path,
         out_dense_mt_path=dense_mt_path,
     )
 
-    relateds_to_drop_ht_path = results_prefix / 'relateds_to_drop.ht'
+    relateds_to_drop_ht_path = res_pref / 'relateds_to_drop.ht'
     relatedness.run(
         dense_mt_path=dense_mt_path,
         sample_qc_ht_path=sample_qc_ht_path,
-        out_relatedness_ht_path=results_prefix / 'relatedness.ht',
+        out_relatedness_ht_path=res_pref / 'relatedness.ht',
         out_relateds_to_drop_ht_path=relateds_to_drop_ht_path,
-        tmp_prefix=results_prefix / 'tmp',
+        tmp_prefix=res_pref / 'tmp',
     )
 
-    scores_ht_path = results_prefix / 'scores.ht'
-    eigenvalues_ht_path = results_prefix / 'eigenvalues.ht'
-    loadings_ht_path = results_prefix / 'loadings.ht'
-    inferred_pop_ht_path = results_prefix / 'inferred_pop.ht'
+    scores_ht_path = res_pref / 'scores.ht'
+    eigenvalues_ht_path = res_pref / 'eigenvalues.ht'
+    loadings_ht_path = res_pref / 'loadings.ht'
+    inferred_pop_ht_path = res_pref / 'inferred_pop.ht'
     ancestry_pca.run(
         dense_mt_path=dense_mt_path,
         sample_qc_ht_path=sample_qc_ht_path,
         relateds_to_drop_ht_path=relateds_to_drop_ht_path,
-        tmp_prefix=results_prefix / 'tmp',
+        tmp_prefix=res_pref / 'tmp',
         out_scores_ht_path=scores_ht_path,
         out_eigenvalues_ht_path=eigenvalues_ht_path,
         out_loadings_ht_path=loadings_ht_path,
         out_inferred_pop_ht_path=inferred_pop_ht_path,
     )
     ancestry_plots.run(
-        out_path_pattern=results_prefix / 'plots' / '{scope}_pc{pci}.{ext}',
+        out_path_pattern=res_pref / 'plots' / '{scope}_pc{pci}.{ext}',
         sample_qc_ht_path=sample_qc_ht_path,
         scores_ht_path=scores_ht_path,
         eigenvalues_ht_path=eigenvalues_ht_path,
@@ -176,15 +171,15 @@ def test_large_cohort(mocker: MockFixture):
         inferred_pop_ht_path=inferred_pop_ht_path,
     )
 
-    siteonly_vcf_path = results_prefix / 'siteonly.vcf.bgz'
+    siteonly_vcf_path = res_pref / 'siteonly.vcf.bgz'
     site_only_vcf.run(
         vds_path=vds_path,
         sample_qc_ht_path=sample_qc_ht_path,
         relateds_to_drop_ht_path=relateds_to_drop_ht_path,
         out_vcf_path=siteonly_vcf_path,
-        tmp_prefix=results_prefix / 'tmp',
+        tmp_prefix=res_pref / 'tmp',
     )
 
     assert exists(vds_path)
-    assert exists(results_prefix / 'plots' / 'dataset_pc1.html')
+    assert exists(res_pref / 'plots' / 'dataset_pc1.html')
     assert exists(siteonly_vcf_path)
