@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from cpg_workflows import get_batch
 from cpg_workflows.filetypes import BamPath, CramPath
 from cpg_workflows.jobs import align
