@@ -11,7 +11,9 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import reference_path, genome_build
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
-from gnomad.sample_qc.pipeline import annotate_sex
+
+# from gnomad.sample_qc.pipeline import annotate_sex
+from .gnomad_qc_sex import annotate_sex
 
 
 def run(
@@ -37,7 +39,9 @@ def run(
     )
 
     # Run Hail sample-QC stats:
-    ht = ht.annotate(sample_qc=hl.vds.sample_qc(autosome_vds)[ht.s])
+    sqc_ht = hl.vds.sample_qc(autosome_vds)
+    sqc_ht = sqc_ht.checkpoint(str(tmp_prefix / 'sample_qc.ht'), overwrite=True)
+    ht = ht.annotate(sample_qc=sqc_ht[ht.s])
     ht.describe()
 
     # Impute sex
@@ -99,6 +103,7 @@ def impute_sex(
         vds,
         included_intervals=calling_intervals_ht,
         gt_expr='LGT',
+        tmp_prefix=tmp_prefix / 'annotate_sex',
     )
     sex_ht.describe()
     sex_ht = sex_ht.transmute(
@@ -109,7 +114,7 @@ def impute_sex(
             observed_homs=sex_ht.observed_homs,
         )
     )
-    sex_ht.checkpoint(str(checkpoint_path), overwrite=True)
+    sex_ht = sex_ht.checkpoint(str(checkpoint_path), overwrite=True)
     logging.info('Sex table:')
     sex_ht.describe()
     return sex_ht
