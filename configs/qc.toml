@@ -14,5 +14,5 @@ allow_missing_outputs_for_stages = [
     'Align', 
     'Genotype', 
     'JointGenotyping',
-    'CramSomalierPedigree'
+    'SomalierPedigree'
 ]
