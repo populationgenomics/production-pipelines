@@ -1,5 +1,4 @@
 [images]
-dragmap = 'australia-southeast1-docker.pkg.dev/cpg-common/images/dragmap:1.3.0'
 cpg_workflows = 'australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:1.4.1'
 
 [workflow]
