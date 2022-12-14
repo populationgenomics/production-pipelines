@@ -233,7 +233,7 @@ def vep_one(
     ls {vep_dir}
     ls {vep_dir}/vep
 
-    LOFTEE_PLUGIN_PATH=/root/micromamba/share/ensembl-vep
+    LOFTEE_PLUGIN_PATH=$MAMBA_ROOT_PREFIX/share/ensembl-vep
     FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
 
     vep \\
