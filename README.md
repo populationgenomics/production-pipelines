@@ -212,7 +212,7 @@ Metamist metadata:
 
 ```
 'is_female': bool
-'autosomal_mean_dp': float64
+'var_data_chr20_mean_dp': float64
 'chrX_mean_dp': float64
 'chrX_ploidy': float64
 'chrY_mean_dp': float64
