@@ -541,7 +541,7 @@ def annotate_sex(
                     hl.vds.filter_intervals(mtds, ref_keep_locus_intervals),
                     calling_intervals=included_intervals,
                     normalization_contig=normalization_contig,
-                    use_variant_dataset=False,
+                    use_variant_dataset=True,
                 )
             ploidy_ht = ploidy_ht.rename(
                 {
