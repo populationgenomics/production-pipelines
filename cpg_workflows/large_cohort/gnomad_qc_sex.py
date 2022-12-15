@@ -5,8 +5,6 @@ import logging
 import operator
 from typing import List, Optional, Union
 
-import hail as hl
-
 from gnomad.sample_qc.sex import (
     gaussian_mixture_model_karyotype_assignment,
     get_chr_x_hom_alt_cutoffs,
@@ -22,9 +20,122 @@ from gnomad.utils.filtering import filter_low_conf_regions, filter_to_adj
 from gnomad.utils.reference_genome import get_reference_genome
 from gnomad.utils.sparse_mt import impute_sex_ploidy
 
+import hail as hl
+from hail.table import Table
+from hail.utils.java import info
+from hail.vds import impute_sex_chr_ploidy_from_interval_coverage, interval_coverage
+from hail.vds.variant_dataset import VariantDataset
+
 logging.basicConfig(format="%(levelname)s (%(name)s %(lineno)s): %(message)s")
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import genome_build, reference_path
+
+# seq_type = get_config()['workflow']['sequencing_type']
+# calling_intervals_path = reference_path(f'broad/{seq_type}_calling_interval_lists')
+# calling_intervals = hl.import_locus_intervals(
+#     str(calling_intervals_path), reference_genome=genome_build()
+# )
+#
+# vds = hl.vds.read_vds(str('gs://cpg-prophecy-main/vds/v0-1.vds'))
+# normalization_contig = 'chr20'
+# use_variant_dataset = False
+# tel_cent_ht = hl.read_table(str(reference_path('gnomad/tel_and_cent_ht')))
+# if tel_cent_ht.count() > 0:
+#     vds = hl.vds.filter_intervals(vds, tel_cent_ht, keep=False)
+# tmp_prefix = 'gs://cpg-prophecy-main-tmp/large_cohort/v0-1/SampleQC/checkpoints'
+
+
+def impute_sex_chromosome_ploidy(
+    vds,
+    calling_intervals,
+    normalization_contig: str,
+    use_variant_dataset: bool,
+    tmp_prefix: str,
+):
+    if not isinstance(calling_intervals, Table):
+        calling_intervals = hl.Table.parallelize(
+            hl.map(lambda i: hl.struct(interval=i), calling_intervals),
+            schema=hl.tstruct(interval=calling_intervals.dtype.element_type),
+            key='interval',
+        )
+    else:
+        key_dtype = calling_intervals.key.dtype
+        if (
+            len(key_dtype) != 1
+            or not isinstance(calling_intervals.key[0].dtype, hl.tinterval)
+            or calling_intervals.key[0].dtype.point_type
+            != vds.reference_data.locus.dtype
+        ):
+            raise ValueError(
+                f"'impute_sex_chromosome_ploidy': expect calling_intervals to be list of intervals or"
+                f" table with single key of type interval<locus>, found table with key: {key_dtype}"
+            )
+
+    rg = vds.reference_data.locus.dtype.reference_genome
+
+    par_boundaries = []
+    for par_interval in rg.par:
+        par_boundaries.append(par_interval.start)
+        par_boundaries.append(par_interval.end)
+
+    # segment on PAR interval boundaries
+    calling_intervals = hl.segment_intervals(calling_intervals, par_boundaries)
+
+    # remove intervals overlapping PAR
+    calling_intervals = calling_intervals.filter(
+        hl.all(lambda x: ~x.overlaps(calling_intervals.interval), hl.literal(rg.par))
+    )
+
+    # checkpoint for efficient multiple downstream usages
+    info("'impute_sex_chromosome_ploidy': checkpointing calling intervals")
+    calling_intervals_checkpoint_path = f'{tmp_prefix}/calling_intervals.ht'
+    logging.info(f'Checkpoint calling intervals to {calling_intervals_checkpoint_path}')
+    calling_intervals = calling_intervals.checkpoint(calling_intervals_checkpoint_path)
+
+    interval = calling_intervals.key[0]
+    (any_bad_intervals, chrs_represented) = calling_intervals.aggregate(
+        (
+            hl.agg.any(interval.start.contig != interval.end.contig),
+            hl.agg.collect_as_set(interval.start.contig),
+        )
+    )
+    if any_bad_intervals:
+        raise ValueError(
+            "'impute_sex_chromosome_ploidy' does not support calling intervals that span chromosome boundaries"
+        )
+
+    if len(rg.x_contigs) != 1:
+        raise NotImplementedError(
+            f"reference genome {rg.name!r} has multiple X contigs, this is not supported in 'impute_sex_chromosome_ploidy'"
+        )
+    if len(rg.y_contigs) != 1:
+        raise NotImplementedError(
+            f"reference genome {rg.name!r} has multiple Y contigs, this is not supported in 'impute_sex_chromosome_ploidy'"
+        )
+
+    kept_contig_filter = hl.array(chrs_represented).map(
+        lambda x: hl.parse_locus_interval(x, reference_genome=rg)
+    )
+    vds = VariantDataset(
+        hl.filter_intervals(vds.reference_data, kept_contig_filter),
+        hl.filter_intervals(vds.variant_data, kept_contig_filter),
+    )
+
+    if use_variant_dataset:
+        mt = vds.variant_data
+        calling_intervals = calling_intervals.annotate(interval_dup=interval)
+        mt = mt.annotate_rows(interval=calling_intervals[mt.locus].interval_dup)
+        mt = mt.filter_rows(hl.is_defined(mt.interval))
+        coverage = mt.select_entries(sum_dp=mt.DP, interval_size=hl.is_defined(mt.DP))
+    else:
+        coverage = interval_coverage(vds, calling_intervals, gq_thresholds=()).drop(
+            'gq_thresholds'
+        )
+    return impute_sex_chr_ploidy_from_interval_coverage(coverage, normalization_contig)
 
 
 def filter_rows_for_qc(
@@ -537,11 +648,12 @@ def annotate_sex(
                     normalization_contig=normalization_contig,
                 )
             else:
-                ploidy_ht = hl.vds.impute_sex_chromosome_ploidy(
+                ploidy_ht = impute_sex_chromosome_ploidy(
                     hl.vds.filter_intervals(mtds, ref_keep_locus_intervals),
                     calling_intervals=included_intervals,
                     normalization_contig=normalization_contig,
                     use_variant_dataset=True,
+                    tmp_prefix=str(tmp_prefix),
                 )
             ploidy_ht = ploidy_ht.rename(
                 {
