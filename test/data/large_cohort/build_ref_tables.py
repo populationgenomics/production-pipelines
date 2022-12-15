@@ -16,8 +16,8 @@ start_query_context(
     billing_project='thousand-genomes',
 )
 
-src_prefix = to_path('gs://cpg-reference')
-dst_prefix = to_path('gs://cpg-reference/subset-toy-chr20-X-Y')
+src_prefix = to_path('gs://cpg-common-main/references')
+dst_prefix = to_path('gs://cpg-common-main/references/subset-toy-chr20-X-Y')
 
 intervals_path = dst_prefix / 'intervals.bed'
 if intervals_path.exists():
