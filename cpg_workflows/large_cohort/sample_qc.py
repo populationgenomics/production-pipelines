@@ -12,8 +12,7 @@ from cpg_utils.hail_batch import reference_path, genome_build
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
 
-# from gnomad.sample_qc.pipeline import annotate_sex
-from .gnomad_qc_sex import annotate_sex
+from gnomad.sample_qc.pipeline import annotate_sex
 
 
 def run(
@@ -103,7 +102,8 @@ def impute_sex(
         vds,
         included_intervals=calling_intervals_ht,
         gt_expr='LGT',
-        tmp_prefix=tmp_prefix / 'annotate_sex',
+        variants_only_x_ploidy=True,
+        variants_only_y_ploidy=True,
     )
     sex_ht.describe()
     sex_ht = sex_ht.transmute(
