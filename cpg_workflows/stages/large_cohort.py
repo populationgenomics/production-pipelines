@@ -42,6 +42,7 @@ class Combiner(CohortStage):
                 .get('dataproc', {})
                 .get('combiner_autoscaling_policy')
             ),
+            depends_on=inputs.get_jobs(cohort),
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
