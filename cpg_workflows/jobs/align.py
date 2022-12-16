@@ -115,7 +115,7 @@ def align(
     aligner: Aligner = Aligner.DRAGMAP,
     markdup_tool: MarkDupTool = MarkDupTool.PICARD,
     extra_label: str | None = None,
-    overwrite: bool = False,
+    overwrite: bool | None = None,
     requested_nthreads: int | None = None,
 ) -> list[Job]:
     """
@@ -556,7 +556,7 @@ def finalise_alignment(
     output_path: CramPath | None = None,
     out_markdup_metrics_path: Path | None = None,
     align_cmd_out_fmt: str = 'sam',
-    overwrite: bool = False,
+    overwrite: bool | None = None,
 ) -> Job | None:
     """
     For `MarkDupTool.BIOBAMBAM`, adds bamsormadup command piped to the existing job.

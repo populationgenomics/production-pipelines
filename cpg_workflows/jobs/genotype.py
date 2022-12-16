@@ -24,7 +24,7 @@ def genotype(
     cram_path: CramPath,
     job_attrs: dict[str, str] | None = None,
     output_path: Path | None = None,
-    overwrite: bool = False,
+    overwrite: bool | None = None,
     dragen_mode: bool = True,
 ) -> list[Job]:
     """
@@ -68,7 +68,7 @@ def haplotype_caller(
     scatter_count: int,
     job_attrs: dict[str, str] | None = None,
     output_path: Path | None = None,
-    overwrite: bool = True,
+    overwrite: bool | None = None,
     dragen_mode: bool = True,
 ) -> list[Job]:
     """
@@ -137,7 +137,7 @@ def _haplotype_caller_one(
     job_attrs: dict | None = None,
     interval: hb.Resource | None = None,
     out_gvcf_path: Path | None = None,
-    overwrite: bool = True,
+    overwrite: bool | None = None,
     dragen_mode: bool = True,
 ) -> Job:
     """
@@ -220,7 +220,7 @@ def merge_gvcfs_job(
     gvcf_groups: list[hb.Resource],
     job_attrs: dict | None = None,
     out_gvcf_path: Path | None = None,
-    overwrite: bool = True,
+    overwrite: bool | None = None,
 ) -> Job:
     """
     Combine by-interval GVCFs into a single sample-wide GVCF file.
@@ -264,7 +264,7 @@ def postproc_gvcf(
     gvcf_path: GvcfPath,
     sample_name: str,
     job_attrs: dict | None = None,
-    overwrite: bool = True,
+    overwrite: bool | None = None,
     output_path: Path | None = None,
     depends_on: list[Job] | None = None,
 ) -> Job:

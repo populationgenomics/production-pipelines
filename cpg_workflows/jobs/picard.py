@@ -118,16 +118,15 @@ def markdup(
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     out_markdup_metrics_path: Path | None = None,
-    overwrite: bool = False,
-) -> Job:
+    overwrite: bool | None = None,
+) -> Job | None:
     """
     Make job that runs Picard MarkDuplicates and converts the result to CRAM.
     """
     job_attrs = (job_attrs or {}) | dict(tool='picard_MarkDuplicates')
     j = b.new_job('MarkDuplicates', job_attrs)
     if can_reuse(output_path, overwrite):
-        j.name = f'{j.name} [reuse]'
-        return j
+        return None
 
     j.image(image_path('picard'))
     resource = HIGHMEM.request_resources(ncpu=4)
