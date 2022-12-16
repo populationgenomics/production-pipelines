@@ -166,7 +166,7 @@ def gather_vep_json_to_ht(
             depends_on=depends_on,
             scopes=['cloud-platform'],
             pyfiles=pyfiles,
-            init=['gs://cpg-common-main/references/hail_dataproc/install_common.sh'],
+            init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
         )
         j.attributes = (job_attrs or {}) | {'tool': 'hailctl dataproc'}
     else:
