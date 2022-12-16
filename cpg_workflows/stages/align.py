@@ -56,7 +56,7 @@ class Align(SampleStage):
                 sample=sample,
                 output_path=sample.make_cram_path(),
                 job_attrs=self.get_job_attrs(sample),
-                overwrite=not get_config()['workflow'].get('check_intermediates'),
+                overwrite=True if sample.forced else None,
                 out_markdup_metrics_path=markdup_metrics_path,
             )
             return self.make_outputs(
