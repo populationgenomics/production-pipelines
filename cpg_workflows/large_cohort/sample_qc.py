@@ -101,7 +101,8 @@ def impute_sex(
     # below to `False` to avoid the function calling gnomAD's `resources` module:
     for name in ['lcr_intervals_ht', 'seg_dup_intervals_ht']:
         ht = hl.read_table(str(reference_path(f'gnomad/{name}')))
-        vds = hl.vds.filter_intervals(vds, ht, keep=False)
+        if ht.count() > 0:
+            vds = hl.vds.filter_intervals(vds, ht, keep=False)
 
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
     sex_ht = annotate_sex(
