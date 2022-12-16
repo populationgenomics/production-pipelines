@@ -15,4 +15,4 @@ highmem_workers = true
 force_samples = ['CPG243477', 'CPG217794', 'CPG216481', 'CPG214858']
 
 scatter_count = 20
-output_version = '0.1'
+output_version = '1.0'

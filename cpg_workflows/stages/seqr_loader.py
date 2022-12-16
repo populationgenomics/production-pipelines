@@ -203,7 +203,7 @@ class MtToEs(DatasetStage):
             depends_on=inputs.get_jobs(dataset),
             scopes=['cloud-platform'],
             pyfiles=pyfiles,
-            init=['gs://cpg-common-main/references/hail_dataproc/install_common.sh'],
+            init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
         )
         j._preemptible = False
         j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}
