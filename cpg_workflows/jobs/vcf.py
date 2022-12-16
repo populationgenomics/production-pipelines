@@ -92,14 +92,26 @@ def gather_vcfs(
     gathered_vcf: hb.ResourceFile
 
     if not can_reuse(out_vcf_path):
-        job_name = f'Merge {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
-        j = b.new_job(job_name, (job_attrs or {}) | {'tool': 'bcftools merge'})
-        j.image(image_path('bcftools'))
-        STANDARD.set_resources(
+        job_name = f'Gather {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
+        j = b.new_job(job_name, (job_attrs or {}) | {'tool': 'gatk GatherVcfsCloud'})
+        j.image(image_path('gatk'))
+        res = STANDARD.set_resources(
             j, storage_gb=storage_for_joint_vcf(sample_count, site_only)
         )
+
+        input_cmdl = ' '.join([f'--input {v}' for v in input_vcfs])
         cmd = f"""
-        bcftools merge {" ".join(input_vcfs)} -Oz -o {j.output_vcf}
+        # --ignore-safety-checks makes a big performance difference so we include it in 
+        # our invocation. This argument disables expensive checks that the file headers 
+        # contain the same set of genotyped samples and that files are in order 
+        # by position of first record.
+        gatk --java-options -Xms{res.get_java_mem_mb()}m \\
+        GatherVcfsCloud \\
+        --ignore-safety-checks \\
+        --gather-type BLOCK \\
+        {input_cmdl} \\
+        --output $BATCH_TMPDIR/gathered.vcf.gz
+        mv $BATCH_TMPDIR/gathered.vcf.gz {j.output_vcf}
         """
         j.command(command(cmd, monitor_space=True))
         if not sort and out_vcf_path:
