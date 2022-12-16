@@ -113,5 +113,5 @@ def dataproc_job(
         worker_boot_disk_size=worker_boot_disk_size,
         secondary_worker_boot_disk_size=secondary_worker_boot_disk_size,
         pyfiles=[cpg_workflows.__name__],
-        init=['gs://cpg-reference/hail_dataproc/install_common.sh'],
+        init=['gs://cpg-common-main/references/hail_dataproc/install_common.sh'],
     )

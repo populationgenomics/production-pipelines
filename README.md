@@ -610,7 +610,7 @@ Check `configs/defaults` for possible configuration parameters. It also provides
 ```toml
 [workflow]
 image_registry_prefix = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
-reference_prefix = 'gs://cpg-reference'
+reference_prefix = 'gs://cpg-common-main/references'
 web_url_template = 'https://{namespace}-web.populationgenomics.org.au/{dataset}'
 
 [images]
