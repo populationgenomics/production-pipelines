@@ -16,8 +16,8 @@ start_query_context(
     billing_project='thousand-genomes',
 )
 
-src_prefix = to_path('gs://cpg-common-main/references')
-dst_prefix = to_path('gs://cpg-common-main/references/subset-toy-chr20-X-Y')
+src_prefix = to_path('gs://cpg-common-main/references/gnomad/v0')
+dst_prefix = to_path('gs://cpg-common-main/references/gnomad/v0-toy-chr20-x-y')
 
 intervals_path = dst_prefix / 'intervals.bed'
 if intervals_path.exists():
@@ -27,15 +27,15 @@ with (to_path(__file__) / 'intervals.bed').open() as f, intervals_path.open('w')
 intervals_ht = hl.import_bed(str(intervals_path))
 
 for path in [
-    'gnomad/v0/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht',
-    'gnomad/v0/lcr_intervals/LCRFromHengHg38.ht',
-    'gnomad/v0/seg_dup_intervals/GRCh38_segdups.ht',
-    'gnomad/v0/clinvar/clinvar_20190923.ht',
-    'gnomad/v0/hapmap/hapmap_3.3.hg38.ht',
-    'gnomad/v0/kgp/1000G_omni2.5.hg38.ht',
-    'gnomad/v0/kgp/1000G_phase1.snps.high_confidence.hg38.ht',
-    'gnomad/v0/mills/Mills_and_1000G_gold_standard.indels.hg38.ht',
-    'gnomad/v0/sample_qc/pre_ld_pruning_qc_variants.ht',
+    'telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht',
+    'lcr_intervals/LCRFromHengHg38.ht',
+    'seg_dup_intervals/GRCh38_segdups.ht',
+    'clinvar/clinvar_20190923.ht',
+    'hapmap/hapmap_3.3.hg38.ht',
+    'kgp/1000G_omni2.5.hg38.ht',
+    'kgp/1000G_phase1.snps.high_confidence.hg38.ht',
+    'mills/Mills_and_1000G_gold_standard.indels.hg38.ht',
+    'sample_qc/pre_ld_pruning_qc_variants.ht',
 ]:
     src_path = src_prefix / path
     dst_path = dst_prefix / path

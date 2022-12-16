@@ -12,7 +12,7 @@ done
 
 # Prepare reference
 python build_ref_tables.py
-gsutil cp -r gs://cpg-common-main/references/subset-toy-chr20-X-Y/ reference/
+gsutil cp -r gs://cpg-common-main/references/gnomad/v0-toy-chr20-x-y reference/gnomad/v0
 
 mkdir -p reference/hg38/v0
 gsutil cp gs://cpg-common-main/references/hg38/v0/wgs_calling_regions.hg38.interval_list \
