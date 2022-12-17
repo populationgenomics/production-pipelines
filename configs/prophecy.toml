@@ -11,8 +11,5 @@ skip_stages = ['SomalierPedigree']
 skip_samples_with_missing_input = true
 highmem_workers = true
 
-# Process the following samples even if outputs exist, to handle replaced samples
-force_samples = ['CPG243477', 'CPG217794', 'CPG216481', 'CPG214858']
-
 scatter_count = 20
 output_version = '1.0'
