@@ -11,7 +11,7 @@ Graphically, the pipeline has the following workflow:
 ![uml](large_cohort.png)
 
 ## Running the pipeline
-To run, the pipeline takes in at least two config files: an exome/genome config file, specifying whether samples are whole genome or whole exome sequences (e.g., `configs/genome.toml`), and a config file specifying parameters specific to the dataset. This second config file **must** be named after the dataset + access level, e.g., `configs/bioheart-test.toml` . By default, a third config file,  `configs/defaults/large_cohort.toml` , is also loaded into the pipeline. This config file does (==x, y, z - how is this different to the dataset + access level config file?==). Any additional config files can be provided by adding  `--config` to the analysis runner command. 
+To run, the pipeline takes in at least two config files: an exome/genome config file, specifying whether samples are whole genome or whole exome sequences (e.g., `configs/genome.toml`), and a config file specifying parameters specific to the dataset (this can have any name); any additional config files can be provided by adding  `--config` to the analysis runner command. All confog files are then merged with a default config file,  `configs/defaults/large_cohort.toml`, to form one master file which is fed into the analysis. Any duplicated entries in separate config files will result in the last config file overwriting previous ones. 
 
 An example run would look like the following:
 
@@ -96,13 +96,13 @@ The detailed description for each stage is as follows:
 	* [workflow].check_inputs
 	* [workflow].skip_samples_with_missing_input
 
-3. SampleQC: This step takes an input VDS table and performs the following steps: 1. removes centromeres and telomeres 2. filters to autosomes and 3. computes sample quality metrics about the VDS (==what specifically are these? Can’t find in the `vds.sample_qc` docs==). Sex is then imputed on the VDS and the following soft filters added: samples with ambiguous sex assignments, low-coverage samples, and extreme raw bi-allelic sample QC outliers. Sample-QC based filters are calculated according to the thresholds specified in the `large_cohort.sample_qc_cutoffs` section of the `configs/defaults/large_cohort.toml`. The output of this step is written to `gs://cpg-{dataset}-{access-level}/large-cohort/v0-1/sample_qc.ht`. 
+3. SampleQC: This step takes an input VDS table and performs the following steps: 1. removes centromeres and telomeres 2. filters to autosomes and 3. computes sample quality metrics about the VDS (supplied in the `large_cohort.sample_qc_cutoffs` within the `large_cohort.toml` file). Sex is then imputed on the VDS and the following soft filters added: samples with ambiguous sex assignments, low-coverage samples, and extreme raw bi-allelic sample QC outliers. Sample-QC based filters are calculated according to the thresholds specified in the `large_cohort.sample_qc_cutoffs` section of the `configs/defaults/large_cohort.toml`. The output of this step is written to `gs://cpg-{dataset}-{access-level}/large-cohort/v0-1/sample_qc.ht`. 
 <ins>Configurable inputs:</ins>
 	* [workflow].[sequencing_type]
 	* [workflow].[sequencing_type]
 	* [large_cohort].[sample_qc_cutoffs]
 
-4. DenseSubset: This step filters a sparse VDS to a set of predetermined QC sites and returns a dense (no filtered entries) MatrixTable with split multiallelics. The markers for the subset are read from the `references.gnomad.predetermined_qc_variants` Hail table specified in the TOML config (==which config?==). The table is suitable for both exomes and genomes, so that a mixture of different sequencing types can be processed together. The resulting subset is written to `gs://cpg-{dataset}-{access-level}/large-cohort/v0-1/dense-subset.mt`.
+4. DenseSubset: This step filters a sparse VDS to a set of predetermined QC sites and returns a dense (no filtered entries) MatrixTable with split multiallelics. The markers for the subset are read from the `references.gnomad.predetermined_qc_variants` Hail table within the `configs/defaults/large_cohort.toml` config. The table is suitable for both exomes and genomes, so that a mixture of different sequencing types can be processed together. The resulting subset is written to `gs://cpg-{dataset}-{access-level}/large-cohort/v0-1/dense-subset.mt`.
 <br><ins>Configurable inputs:</ins>
 	* NA
 
