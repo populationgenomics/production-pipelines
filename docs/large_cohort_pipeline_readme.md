@@ -11,7 +11,7 @@ Graphically, the pipeline has the following workflow:
 ![uml](large_cohort.png)
 
 ## Running the pipeline
-To run, the pipeline takes in at least two config files: an exome/genome config file, specifying whether samples are whole genome or whole exome sequences (e.g., `configs/genome.toml`), and a config file specifying parameters specific to the dataset (this can have any name); any additional config files can be provided by adding  `--config` to the analysis runner command. All confog files are then merged with a default config file,  `configs/defaults/large_cohort.toml`, to form one master file which is fed into the analysis. Any duplicated entries in separate config files will result in the last config file overwriting previous ones. 
+To run, the pipeline takes in at least one config file, however multiple can be given. As an example, an exome/genome config file can be provided specifying whether samples are whole genome or whole exome sequences (e.g., `configs/genome.toml`), and a config file specifying parameters specific to the dataset can be provided with any name the user chooses. Any additional config files can be provided by adding  `--config` to the analysis runner command. All config files are then merged with a default config file,  `configs/defaults/large_cohort.toml`, to form one master file which is fed into the analysis. Any duplicated entries in separate config files will result in entries from the last config file overwriting previous ones. 
 
 An example run would look like the following:
 
@@ -26,7 +26,7 @@ analysis-runner --dataset bioheart --description "bioheart larcoh" \
 The detailed description for each stage is as follows:
 ### CramMultiQC Stage
 
-1.  Alignment: the first step is to align the given input files. By default, DRAGMAP version 1.3.0 is used (==where is this actually fed into the script from the config file?==). This then outputs a CRAM file with a corresponding index ==(what does that mean?)==. 
+1.  Alignment: the first step is to align the given input files. By default, DRAGMAP is used, with the version matching the tag of the corresponding image used for the alignment job (specified in. [images] within the config file). This then outputs a CRAM file with a corresponding index file (.crai file). 
 <ins>Configurable inputs:</ins>
 	* [workflow].check_intermediates
 	* [workflow].skip_samples_with_missing_input
@@ -55,7 +55,7 @@ The detailed description for each stage is as follows:
 4. CramMultiqc: This step runs [MultiQC](https://multiqc.info/ "") to aggregate CRAM QC stats (from above), using the `multiqc.py` job to generate the output.
 <br><ins>Configurable inputs:</ins>
 	* [workflow].skip_qc
-	* get_config().get('qc_thresholds') - ==where does this come from?==
+	* [qc_thresholds]
 
 ### GvcfMultiQC Stage
 1. Genotype: This step uses the `genotype` job to run the HaplotypeCaller, which genotypes individual samples (i.e. CRAM -> GVCF) and produces a GVCF + corresponding TBI index. 
@@ -73,13 +73,13 @@ The detailed description for each stage is as follows:
 3. GvcfHappy: This step runs [Hap.py](https://github.com/Illumina/hap.py/blob/master/doc/happy.md "") validation/concordance stats to validate a GVCF for samples where a truth callset is available. The expected output is a MultiQC `*.summary.csv` file. 
 <br><ins>Configurable inputs:</ins>
 	* [workflow].[sequencing_type]
-	* get_config().get(‘validation’, {}).get()sample_map) - ==where does this come from?==
+	* [validation].sample_map
 
 4. GvcfMultiQC: This step runs MultiQC to summarise all GVCF QC output, with an HTML and corresponding JSON file produced.
 <ins>Configurable inputs:</ins>
 	* [workflow].skip_qc
 	* [workflow].dry_run
-	* get_config().get('qc_thresholds') - ==where does this come from?==
+	* [qc_thresholds]
 ### FrequenciesStage
 1. Genotype: This step uses the `genotype` job to run the HaplotypeCaller, which genotypes individual samples (i.e. CRAM -> GVCF) and produces a GVCF + corresponding TBI index. 
 <br><ins>Configurable inputs:</ins>
@@ -174,62 +174,43 @@ When there are samples with known `continental_pop` available, a random forest m
 ## To do:
 - [ ] ensure all correct default values are added in the configurable inputs parameters field
 - [ ] make all descriptions in configurable inputs easy to understand (some of these are still hard to follow)
-- [ ] redistribute settoings in `unsure` configurable inputs section to corresponding toml files
+- [x] redistribute settings in `unsure` configurable inputs section to corresponding toml files
 
 ## Configurable inputs
 
-### unsure
-| Setting                               | Parameters                                                   | Description                                                  |
-|---------------------------------------|--------------------------------------------------------------|--------------------------------------------------------------|
-| [workflow].check_intermediates        | boolean value; default = true                                | Within jobs, check all in-job intermediate files for possible reuse. If set to False, this will overwrite all intermediates. |
-| [workflow].skip_qc                    | boolean value; default = false                               | Whether or not to skip the QC stage of the pipeline (==specifically which QC stage??)== |
-| [workflow].use_as_vqsr                | boolean value; default = true                                | Use allele-specific annotations for VQSR<br>use_as_vqsr = true — ==this makes no sense to me== |
-| [workflow].vds_version                |                                                              |                                                              |
-| [workflow].cram_version_reference     | ==what are the available options?==                          | ==Need info==                                                |
-| [workflow].check_inputs               | boolean value; default = true                                | Check input file existence (e.g. FASTQ files). If files are missing, the --skip-samples-with-missing-input option controls whether such samples should be ignored, or raise an error |
-| [workflow].resources.Align.storage_gb | ==what are the available options?==                          | ==Need info - where is this being pulled from?==             |
-| [somalier].exclude_high_contamination | ==what are the available options?==                          | ==Need info==                                                |
-| [validation].sample_map               |                                                              | Map internally used validation sample external_id to truth sample names |
-| [hail].combiner_autoscaling_policy    | ==xx in the format …==; default = vcf-combiner-50            | Autoscaling policy must be created in the project that corresponds to the analysis dataset. — ==this makes no sense to me== |
-| [vqsr].[snp_filter_level]             | ==what are the available options? why is 99.7 chosen as the default?== | ==Need info==                                                |
-| [vqsr].[indel_filter_level]           | ==what are the available options? why is 99.0 chosen as the default?== | ==Need info==                                                |
-| get_config().get('combiner', {})      | ==what are the available options?==                          | ==Need info==                                                |
-| get_config().get('qc_thresholds')     | ==what are the available options?==                          | ==Need info==                                                |
-| [workflow].dry_run                    | ==What is the default?==                                     | Only print the final merged config and a list of stages to be submitted.<br>This will skip any communication with Metamist, Hail Batch, and Cloud Storage, so the code can be run without permissions. |
-
-### large_cohort.toml
-
-This config ([toml](https://docs.fileformat.com/programming/toml/)) file feeds into the large cohort pipeline workflow. 
+All inputs below are either required or optional configurable inputs to the large cohort pipeline. Values can be entered into one or multiple config files, which are then merged with the `large_cohort.toml` found in the `configs/defaults/` folder. If an entry in one of the config files provided by the user is duplicated, the entry from the last config file will get used. E.g.,  if [large_cohort.sample_qc_cutoffs].min_coverage within the `large_cohort.toml` is set to 18 but set to 20 within a line of a later config supplied by the user, 20 will be used. 
 
 | Setting                                           | Parameters                                                   | Description                                                  |
-|---------------------------------------------------|:------------------------------------------------------------:|--------------------------------------------------------------|
+|---------------------------------------------------|--------------------------------------------------------------|--------------------------------------------------------------|
+| [workflow].check_intermediates                    | boolean value; default = true                                | Within jobs, check all in-job intermediate files for possible reuse. If set to False, this will overwrite all intermediates. |
+| [workflow].skip_qc                                | boolean value; default = false                               | Whether or not to skip the QC stage of the pipeline (==specifically which QC stage??)== |
+| [workflow].use_as_vqsr                            | boolean value; default = true                                | Use allele-specific annotations for VQSR<br>use_as_vqsr = true — ==could this be described in a way that’s easy for the user to understand? I don’t fully understand what’s happening here== |
+| [workflow].vds_version                            | Whole number or a floating point number (e.g., ‘0.1’)        | A numerical version to assign as the version number for the analysis run.  |
+| [workflow].cram_version_reference                 | ==what are the available options?==                          | ==Need info==                                                |
+| [workflow].check_inputs                           | boolean value; default = true                                | Check input file existence (e.g. FASTQ files). If files are missing, the --skip-samples-with-missing-input option controls whether such samples should be ignored, or raise an error |
 | [workflow].intervals_path                         | defauls to whole genome intervals; ==what are the other options?== | Calling intervals (defauls to whole genome intervals)        |
-| [workflow].realign_from_cram_version              | v + version number (integer), e.g., v1. The default value is v0. | Realign CRAM when available, instead of using FASTQ. The parameter value should correspond to CRAM version (e.g. v0 in `gs://cpg-fewgenomes-main/cram/v0/CPG01234.cram`)  |
+| [workflow].dry_run                                | ==What is the default, if there is one?==                    | Only print the final merged config and a list of stages to be submitted.<br>This will skip any communication with Metamist, Hail Batch, and Cloud Storage, so the code can be run without permissions. |
+| [workflow].input_datasets                         | default = NA                                                 | The dataset used for the large cohort pipeline run. This feeds into `inputs.py` |
+| [workflow].realign_from_cram_version              | v + version number (integer), e.g., v1. The default value is v0. | Realign CRAM when available, instead of using FASTQ. The parameter value should correspond to CRAM version (e.g. v0 in `gs://cpg-fewgenomes-main/cram/v0/CPG01234.cram`) |
+| [workflow].skip_samples_with_missing_input        | boolean value; default = true                                | For the first (not-skipped) stage, if the input for a target does not exist, just skip this target instead of failing. E.g. if the first stage is Align, and `sample.alignment_input` for a sample does not exist, remove this sample instead of failing. In other words, ignore samples that are missing results from skipped stages. |
+| [workflow].input_datasets                         |                                                              |                                                              |
+| [workflow].sequencing_type                        | choose between ‘genome’ or ‘exome’ as input                  | Specifies whether samples are whole genome or whole exome sequences |
+| [workflow].resources.Align.storage_gb             | ==what are the available options?==                          | ==Need info - what is this doing?==                          |
+| [somalier].exclude_high_contamination             | ==what are the available options?==                          | ==Need info==                                                |
+| [validation].sample_map                           | ==Is there a default?==                                      | Map internally used validation sample external_id to truth sample names. ==This needs to be explained better here== |
+| [vqsr].snp_filter_level                           | ==what are the available options? why is 99.7 chosen as the default?== | ==Need info==                                                |
+| [vqsr].[indel_filter_level]                       | ==what are the available options? why is 99.0 chosen as the default?== | ==Need info==                                                |
+| get_config().get('combiner', {})                  | ==what are the available options?==                          | ==What is this doing, and where is it coming from in the config?== |
+| [qc_thresholds]                                   | ==what are the available options?==                          | additional QC thresholds provided by the user ==Need info==  |
 | [large_cohort].n_pcs                              | numeric values of 1 - n features; default = 16               | Number of principal components to use for PCA in ancestry analysis (job ancestry_pca.py) |
 | [large_cohort].min_pop_prob                       | Float value from 0.0 - 1.0; default = 0.5                    | The minimum random forest probability to use for population assignment |
 | [large_cohort].max_kin                            | A float value from 0 - 0.5, where 0 is x and 0.5 is identical (monozygotic twins). The default value to be considered unrelated is 0.2 | The maximum kin threshold, caculated by [PC relate](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4716688/ ""), to be considered unrelated. Under the PC-Relate model, kinship, ϕijϕij​, ranges from 0 to 0.5, and is precisely half of the fraction-of-genetic-material-shared. Information on relatedness and relatedness thresholds can be viewed in the hail docs [here](https://hail.is/docs/0.2/methods/relatedness.html ""). |
-| [large_cohort].pop_meta_field                     |                                                              |                                                              |
+| [large_cohort].pop_meta_field                     | ==what are the available options?==                          | ==Needs a description here==                                 |
 | [large_cohort.sample_qc_cutoffs].min_coverage     | 18                                                           | ==Why was this threshold used? What is this used for?==      |
 | [large_cohort.sample_qc_cutoffs].max_n_snps       | 8000000                                                      | ‘’                                                           |
 | [large_cohort.sample_qc_cutoffs].min_n_snps       | 2400000                                                      | ‘’                                                           |
 | [large_cohort.sample_qc_cutoffs].max_n_singletons | 800000                                                       | ‘’                                                           |
 | [large_cohort.sample_qc_cutoffs].max_r_het_hom    | 3.3                                                          | ‘’                                                           |
 | [hail].pool_label                                 | default = ‘large-cohort’                                     | no idea what this does                                       |
-| [hail].delete_scratch_on_exit                     | boolean value; default = false                               | ‘’                                                           |
-
-
-### bioheart-test.toml
-
-What actually goes in here? And what are all the possibilities?
-
-| Setting                                    | Parameters                    | Description                                                  |
-|--------------------------------------------|-------------------------------|--------------------------------------------------------------|
-| [workflow].skip_samples_with_missing_input | boolean value; default = true | For the first (not-skipped) stage, if the input for a target does not exist, just skip this target instead of failing. E.g. if the first stage is Align, and `sample.alignment_input` for a sample does not exist, remove this sample instead of failing. In other words, ignore samples that are missing results from skipped stages. |
-| [workflow].input_datasets                  | default = NA                  | The dataset used for the large cohort pipeline run. This feeds into `inputs.py` |
-| [workflow].input_datasets                  |                               |                                                              |
-
-### exome/genome.toml
-
-| Setting                    | Parameters                                  | Description                                                  |
-|----------------------------|---------------------------------------------|--------------------------------------------------------------|
-| [workflow].sequencing_type | choose between ‘genome’ or ‘exome’ as input | Specifies whether samples are whole genome or whole exome sequences |
+| [hail].combiner_autoscaling_policy                | ==xx in the format …==; default = vcf-combiner-50            | Autoscaling policy must be created in the project that corresponds to the analysis dataset. — ==this needs more info, and to be easier to understand== |
+| [hail].delete_scratch_on_exit                     | boolean value; default = false                               | ==this needs more info==                                     |
