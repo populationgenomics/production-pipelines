@@ -12,7 +12,7 @@ from cpg_utils.hail_batch import reference_path, genome_build
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
 
-from gnomad.sample_qc.pipeline import annotate_sex
+# from gnomad.sample_qc.pipeline import annotate_sex
 
 
 def run(
@@ -105,8 +105,11 @@ def impute_sex(
             vds = hl.vds.filter_intervals(vds, ht, keep=False)
 
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
+    from cpg_workflows.large_cohort.gnomad_sex_pipeline import annotate_sex
+
     sex_ht = annotate_sex(
         vds,
+        tmp_prefix=str(tmp_prefix / 'annotate_sex'),
         included_intervals=calling_intervals_ht,
         gt_expr='LGT',
         variants_only_x_ploidy=True,
@@ -114,18 +117,17 @@ def impute_sex(
         variants_filter_lcr=False,  # already filtered above
         variants_filter_segdup=False,  # already filtered above
         variants_filter_decoy=False,
-        compute_fstat=False,
     )
     logging.info('Sex table:')
     sex_ht.describe()
-    # sex_ht = sex_ht.transmute(
-    #     impute_sex_stats=hl.struct(
-    #         f_stat=sex_ht.f_stat,
-    #         n_called=sex_ht.n_called,
-    #         expected_homs=sex_ht.expected_homs,
-    #         observed_homs=sex_ht.observed_homs,
-    #     )
-    # )
+    sex_ht = sex_ht.transmute(
+        impute_sex_stats=hl.struct(
+            f_stat=sex_ht.f_stat,
+            n_called=sex_ht.n_called,
+            expected_homs=sex_ht.expected_homs,
+            observed_homs=sex_ht.observed_homs,
+        )
+    )
     sex_ht = sex_ht.checkpoint(str(checkpoint_path), overwrite=True)
     return sex_ht
 
