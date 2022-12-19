@@ -114,19 +114,19 @@ def impute_sex(
         variants_filter_lcr=False,  # already filtered above
         variants_filter_segdup=False,  # already filtered above
         variants_filter_decoy=False,
+        compute_fstat=False,
     )
-    sex_ht.describe()
-    sex_ht = sex_ht.transmute(
-        impute_sex_stats=hl.struct(
-            f_stat=sex_ht.f_stat,
-            n_called=sex_ht.n_called,
-            expected_homs=sex_ht.expected_homs,
-            observed_homs=sex_ht.observed_homs,
-        )
-    )
-    sex_ht = sex_ht.checkpoint(str(checkpoint_path), overwrite=True)
     logging.info('Sex table:')
     sex_ht.describe()
+    # sex_ht = sex_ht.transmute(
+    #     impute_sex_stats=hl.struct(
+    #         f_stat=sex_ht.f_stat,
+    #         n_called=sex_ht.n_called,
+    #         expected_homs=sex_ht.expected_homs,
+    #         observed_homs=sex_ht.observed_homs,
+    #     )
+    # )
+    sex_ht = sex_ht.checkpoint(str(checkpoint_path), overwrite=True)
     return sex_ht
 
 
