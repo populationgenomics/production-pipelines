@@ -32,21 +32,26 @@ def run(
     if tel_cent_ht.count() > 0:
         vds = hl.vds.filter_intervals(vds, tel_cent_ht, keep=False)
 
-    # Filter to autosomes:
-    autosome_vds = hl.vds.filter_chromosomes(
-        vds, keep=[f'chr{chrom}' for chrom in range(1, 23)]
-    )
-
     # Run Hail sample-QC stats:
-    sqc_ht = hl.vds.sample_qc(autosome_vds)
-    sqc_ht = sqc_ht.checkpoint(str(tmp_prefix / 'sample_qc.ht'), overwrite=True)
+    sqc_ht_path = tmp_prefix / 'sample_qc.ht'
+    if can_reuse(sqc_ht_path):
+        sqc_ht = hl.read_table(str(sqc_ht_path))
+    else:
+        # Filter to autosomes:
+        autosome_vds = hl.vds.filter_chromosomes(
+            vds, keep=[f'chr{chrom}' for chrom in range(1, 23)]
+        )
+        sqc_ht = hl.vds.sample_qc(autosome_vds)
+        sqc_ht = sqc_ht.checkpoint(str(sqc_ht_path), overwrite=True)
     ht = ht.annotate(sample_qc=sqc_ht[ht.s])
+    logging.info('Sample QC table:')
     ht.describe()
 
-    # Impute sex
+    logging.info('Run sex imputation')
     sex_ht = impute_sex(vds, ht, tmp_prefix)
     ht = ht.annotate(**sex_ht[ht.s])
 
+    logging.info('Adding soft filters')
     ht = add_soft_filters(ht)
     ht.checkpoint(str(out_sample_qc_ht_path), overwrite=True)
 
@@ -137,7 +142,6 @@ def add_soft_filters(ht: hl.Table) -> hl.Table:
     Uses the sex imputation results, variant sample qc, and input QC metrics
     to populate "filters" field to the sample table.
     """
-    logging.info('Adding soft filters')
     ht = ht.annotate(filters=hl.empty_set(hl.tstr))
 
     # Helper function to add filters into the `hard_filters` set
