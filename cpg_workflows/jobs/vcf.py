@@ -63,7 +63,7 @@ def subset_vcf(
 
 def gather_vcfs(
     b: hb.Batch,
-    input_vcfs: list[hb.ResourceFile],
+    input_vcfs: list[hb.ResourceGroup],
     out_vcf_path: Path | None = None,
     site_only: bool = False,
     sample_count: int | None = None,
@@ -79,7 +79,7 @@ def gather_vcfs(
 
     @param b: Batch object
     @param input_vcfs: list of Hail Batch ResourceFiles pointing to
-        interval-split VCFs
+        interval-split VCFs indexed with tabix
     @param out_vcf_path: path to permanently write the resulting VCFs
     @param site_only: input VCFs are site-only
     @param sample_count: number of samples used for input VCFs (to determine the
@@ -99,7 +99,8 @@ def gather_vcfs(
             j, storage_gb=storage_for_joint_vcf(sample_count, site_only)
         )
         cmd = f"""
-        bcftools merge {" ".join(input_vcfs)} -Oz -o {j.output_vcf}
+        bcftools merge {" ".join(vcf["vcf.gz"] for vcf in input_vcfs)} \
+        -Oz -o {j.output_vcf}
         """
         j.command(command(cmd, monitor_space=True))
         if not sort and out_vcf_path:

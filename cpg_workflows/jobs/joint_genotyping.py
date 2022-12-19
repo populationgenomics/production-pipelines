@@ -79,8 +79,8 @@ def make_joint_genotyping_jobs(
     if intervals_j:
         jobs.append(intervals_j)
 
-    vcfs: list[hb.ResourceFile] = []
-    siteonly_vcfs: list[hb.ResourceFile] = []
+    vcfs: list[hb.ResourceGroup] = []
+    siteonly_vcfs: list[hb.ResourceGroup] = []
 
     # Preparing inputs for GenomicsDB
     genomicsdb_bucket = tmp_bucket / 'genomicsdbs'
@@ -151,9 +151,9 @@ def make_joint_genotyping_jobs(
                 jobs.append(excess_filter_j)
                 if jc_vcf_j:
                     excess_filter_j.depends_on(jc_vcf_j)
-            vcfs.append(excess_filter_jc_vcf['vcf.gz'])
+            vcfs.append(excess_filter_jc_vcf)
         else:
-            vcfs.append(jc_vcf['vcf.gz'])
+            vcfs.append(jc_vcf)
 
         siteonly_j = add_make_sitesonly_job(
             b=b,
@@ -161,7 +161,14 @@ def make_joint_genotyping_jobs(
             output_vcf_path=siteonly_jc_vcf_path,
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
-        siteonly_vcfs.append(b.read_input(siteonly_jc_vcf_path))
+        siteonly_vcfs.append(
+            b.read_input_group(
+                **{
+                    'vcf.gz': siteonly_jc_vcf_path,
+                    'vcf.gz.tbi': siteonly_jc_vcf_path + '.tbi',
+                }
+            )
+        )
         if siteonly_j:
             jobs.append(siteonly_j)
 
@@ -379,6 +386,10 @@ def _add_joint_genotyper_job(
         cmd += f"""\
     --merge-input-intervals \\
     -G AS_StandardAnnotation
+    
+    if [[ ! -e {j.output_vcf['vcf.gz.tbi']} ]]; then 
+        tabix -p vcf {j.output_vcf['vcf.gz']}
+    fi
     """
     j.command(
         command(cmd, monitor_space=True, setup_gcp=True, define_retry_function=True)
@@ -442,6 +453,10 @@ def _add_excess_het_filter(
     -O {j.output_vcf['vcf.gz']} \\
     -V {input_vcf['vcf.gz']} \\
     2> {j.stderr}
+    
+    if [[ ! -e {j.output_vcf['vcf.gz.tbi']} ]]; then 
+        tabix -p vcf {j.output_vcf['vcf.gz']}
+    fi
     """
         )
     )
@@ -452,7 +467,7 @@ def _add_excess_het_filter(
 
 def add_make_sitesonly_job(
     b: hb.Batch,
-    input_vcf: hb.ResourceFile,
+    input_vcf: hb.ResourceGroup,
     output_vcf_path: Path | None = None,
     job_attrs: dict | None = None,
     storage_gb: int | None = None,
@@ -485,6 +500,10 @@ def add_make_sitesonly_job(
     MakeSitesOnlyVcf \\
     -I {input_vcf} \\
     -O {j.output_vcf['vcf.gz']}
+
+    if [[ ! -e {j.output_vcf['vcf.gz.tbi']} ]]; then 
+        tabix -p vcf {j.output_vcf['vcf.gz']}
+    fi
     """
         )
     )
