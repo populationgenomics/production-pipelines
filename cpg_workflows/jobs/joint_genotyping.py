@@ -164,8 +164,8 @@ def make_joint_genotyping_jobs(
         siteonly_vcfs.append(
             b.read_input_group(
                 **{
-                    'vcf.gz': siteonly_jc_vcf_path,
-                    'vcf.gz.tbi': siteonly_jc_vcf_path + '.tbi',
+                    'vcf.gz': str(siteonly_jc_vcf_path),
+                    'vcf.gz.tbi': str(siteonly_jc_vcf_path) + '.tbi',
                 }
             )
         )
