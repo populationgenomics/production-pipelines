@@ -78,6 +78,9 @@ def stripy(
         --locus {target_loci}
 
     ls $BATCH_TMPDIR/
+
+    # Add external ID into html report
+    sed -iBAK 's/{sample.id}.cram/{sample.id}.cram | {sample._external_id}/g' $BATCH_TMPDIR/{cram_path.path.name}.html
   
     cp $BATCH_TMPDIR/{cram_path.path.name}.html {j.out_path}
     cp $BATCH_TMPDIR/{cram_path.path.name}.json {j.json_path}
