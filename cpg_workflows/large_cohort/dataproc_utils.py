@@ -15,7 +15,6 @@ from cpg_workflows.batch import get_batch
 DATAPROC_PACKAGES = [
     'cpg-utils',
     'click',
-    'gnomad',
     'google',
     'slackclient',
     'fsspec',
@@ -112,6 +111,9 @@ def dataproc_job(
         worker_machine_type='n1-highmem-8' if use_highmem_workers else 'n1-standard-8',
         worker_boot_disk_size=worker_boot_disk_size,
         secondary_worker_boot_disk_size=secondary_worker_boot_disk_size,
-        pyfiles=[cpg_workflows.__name__],
+        pyfiles=[
+            cpg_workflows.__name__,
+            'gnomad_methods/gnomad',
+        ],
         init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
     )
