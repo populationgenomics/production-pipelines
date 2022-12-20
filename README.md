@@ -40,34 +40,49 @@ The workflow uses Metamist as a source of FASTQ, CRAMs, and sample/participant m
 
 ### Example usage
 
-Run `main.py seqr_loader` with the analysis-runner:
+To run the Seqr Loader workflow on the dataset called `validation`, create a config file `~/myconfig.toml` as follows:
+
+```toml
+[workflow]
+input_datasets = ['validation']
+sequencing_type = 'genome'
+create_es_index_for_datasets = ['validation']
+skip_samples = [
+    'CPG243717',  # NA12878_KCCG low coverage (8x)
+]
+```
+
+Submit `main.py seqr_loader` to the analysis runner, and pass along the config above, as well as the `cpg_workflows` Docker image:
 
 ```bash
 analysis-runner \
-  --dataset seqr --description "Seqr Loader validation" --output-dir "seqr" \
+  --dataset seqr --description "Seqr Loader" --output-dir "seqr-loader" \
   --access-level full \
-  --config configs/genome.toml \
-  --config configs/validation.toml \
+  --config ~/myconfig.toml \
   --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:latest \
-  main.py seqr_loader
+  main.py \
+  seqr_loader
 ```
 
-Note the configuration files that are passed to analysis-runner: `configs/genome.toml` and `configs/validation.toml`. They are merged by analysis-runner, with values in those specified later taking precedence. For more about configs, see [team-docs](https://github.com/populationgenomics/team-docs/blob/main/cpg_utils_config.md). Note that the `seqr_loader` command loads the [configs/defaults/seqr_loader.toml](configs/defaults/seqr_loader.toml) by default.
+Note that you can pass multiple configs to analysis-runner, by repeating the `--config` option multiple times. All config will be merged by analysis runner. For more info about configs, see [team-docs](https://github.com/populationgenomics/team-docs/blob/main/cpg_utils_config.md).
+
+For more options available for seqr-loader configuration, check the seqr-loader defaults in [configs/defaults/seqr_loader.toml](configs/defaults/seqr_loader.toml) as well as cpg-workflows defaults in [cpg_workflows/defaults.toml](cpg_workflows/defaults.toml).
 
 ### Seqr production load invocation
 
-`configs/seqr-main.toml` provides a configuration of a CPG production Seqr load: specifically, the list of datasets to process and joint-call together, and a list of blacklisted samples in those datasets. Another config, `configs/genome.toml` or `configs/exome.toml`, can be used to subset samples to WGS or WES specifically. One of these two must be provided, as the Seqr loader can work on only one type of data at a time. 
+`configs/seqr-main.toml` provides relevant configuration defaults for a CPG production seqr-loader run. Specifically, in contains the list of datasets to query from Metamist and joint-call together, and a list of blacklisted samples in those datasets. Another handy configs, `configs/genome.toml` or `configs/exome.toml`, can be passed to subset samples to WGS or WES specifically. To use along with `configs/seqr-main.toml`, of these two must be provided, as the seqr-loader can work on only one type of data at a time. 
 
 For example, to load the genome data:
 
 ```sh
 analysis-runner \
-  --dataset prophecy --description "Seqr Load" --output-dir "seqr" \
+  --dataset seqr --description "Seqr Loader" --output-dir "seqr-loader" \
   --access-level full \
   --config configs/seqr-main.toml \
   --config configs/genome.toml \
   --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:latest \
-  main.py seqr_load
+  main.py \
+  seqr_loader
 ```
 
 #### Only align Seqr samples
@@ -87,11 +102,12 @@ And assuming it's named `~/myconfig.toml`, run:
 analysis-runner \
   --dataset seqr --description "CRAM MultiQC" --output-dir "seqr" \
   --access-level full \
+  --config configs/seqr-main.toml \
   --config configs/genome.toml \
-  --config configs/validation.toml \
   --config ~/myconfig.toml \
   --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:latest \
-  main.py seqr_loader
+  main.py \
+  seqr_loader
 ```
 
 For exomes, replace `configs/genome.toml` with `configs/exome.toml`, or set `sequencing_type = 'exome'` in the `workflow` section.
@@ -144,7 +160,8 @@ analysis-runner \
   --access-level test \
   --config configs/thousand-genomes.toml \
   --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:latest \
-  main.py large_cohort
+  main.py \
+  large_cohort
 ```
 
 The workflow will find GVCFs for input samples using Metamist, along with available sample metadata (e.g. known population labels, sex, QC), and would write the results into the `gs://cpg-prophecy-test` bucket.
