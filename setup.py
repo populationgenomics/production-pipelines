@@ -18,7 +18,6 @@ setup(
         'hail',
         'networkx',
         'sample-metadata>=5.0.1',
-        'gnomad',
         'pandas',
         'peddy',
         'fsspec',
