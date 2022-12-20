@@ -212,6 +212,7 @@ def make_vqsr_jobs(
     snps_tranches_paths = [
         tmp_prefix / f'snp_tranches_{i}' for i in range(scatter_count)
     ]
+    scattered_jobs = []
     for idx in range(scatter_count):
         if not can_reuse(
             [
@@ -235,12 +236,13 @@ def make_vqsr_jobs(
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             )
             snps_recal_j.depends_on(*jobs)
-            jobs.append(snps_recal_j)
+            scattered_jobs.append(snps_recal_j)
             b.write_output(snps_recal_j.recalibration, str(snps_recal_paths[idx]))
             b.write_output(
                 snps_recal_j.recalibration_idx, str(snps_recal_paths[idx]) + '.idx'
             )
             b.write_output(snps_recal_j.tranches, str(snps_tranches_paths[idx]))
+    jobs.extend(scattered_jobs)
     snps_recalibrations = [b.read_input(str(p)) for p in snps_recal_paths]
     snps_recalibration_idxs = [b.read_input(str(p) + '.idx') for p in snps_recal_paths]
     snps_tranches = [b.read_input(str(p)) for p in snps_tranches_paths]
@@ -264,6 +266,7 @@ def make_vqsr_jobs(
         tmp_prefix / f'interval_snps_applied_{idx}.vcf.gz'
         for idx in range(scatter_count)
     ]
+    scattered_apply_jobs = []
     for idx in range(scatter_count):
         if not can_reuse(
             [
@@ -284,11 +287,12 @@ def make_vqsr_jobs(
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             )
             j.depends_on(*jobs)
-            jobs.append(j)
+            scattered_apply_jobs.append(j)
             b.write_output(j.output_vcf, str(interval_snps_applied_vcf_paths[idx]))
             b.write_output(
                 j.output_tbi, str(interval_snps_applied_vcf_paths[idx]) + '.tbi'
             )
+    jobs.extend(scattered_apply_jobs)
     interval_snps_applied_vcfs = [
         b.read_input_group(
             **{
