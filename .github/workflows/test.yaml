@@ -40,4 +40,6 @@ jobs:
         run: pip install .[test]
 
       - name: Run unit tests
-        run: python -m pytest test/test_${{ matrix.suffix }}.py
+        run: |
+          PYTHONPATH=$PWD/gnomad_methods:$PWD/seqr-loading-pipelines \
+          python -m pytest test/test_${{ matrix.suffix }}.py
