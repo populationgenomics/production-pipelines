@@ -299,6 +299,19 @@ class Dataset(Target):
             )
         )
 
+    def analysis_prefix(self, **kwargs) -> Path:
+        """
+        Storage path for analysis files.
+        """
+        return to_path(
+            dataset_path(
+                self._seq_type_subdir(),
+                dataset=self.name,
+                category='analysis',
+                **kwargs,
+            )
+        )
+
     def web_prefix(self, **kwargs) -> Path:
         """
         Path for files served by an HTTP server Matches corresponding URLs returns by
