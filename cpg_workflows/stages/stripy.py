@@ -31,10 +31,10 @@ class Stripy(SampleStage):
             'stripy_html': sample.dataset.web_prefix()
             / 'stripy'
             / f'{sample.id}.stripy.html',
-            'stripy_json': sample.analysis_prefix.prefix()
+            'stripy_json': sample.dataset.analysis_prefix.prefix()
             / 'stripy'
             / f'{sample.id}.stripy.json',
-            'stripy_log': sample.analysis_prefix.prefix()
+            'stripy_log': sample.dataset.analysis_prefix.prefix()
             / 'stripy'
             / f'{sample.id}.stripy.log.txt',
         }
