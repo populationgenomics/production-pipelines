@@ -1,3 +1,6 @@
 [submodule "seqr-loading-pipelines"]
 	path = seqr-loading-pipelines
 	url = https://github.com/populationgenomics/seqr-loading-pipelines.git
+[submodule "gnomad_methods"]
+	path = gnomad_methods
+	url = https://github.com/populationgenomics/gnomad_methods.git
