@@ -32,7 +32,7 @@ Seqr Loader is a combination of the following [WARP](https://github.com/broadins
 
 As well as:
 
-* [the Broad's seqr loading pipelines](https://github.com/broadinstitute/seqr-loading-pipelines)
+* [The Broad's seqr loading pipelines](https://github.com/broadinstitute/seqr-loading-pipelines)
 * [Somalier](https://github.com/brentp/somalier) pedigree checks
 * [MultiQC](https://github.com/ewels/MultiQC) QC reporting.
 
@@ -64,7 +64,7 @@ analysis-runner \
   seqr_loader
 ```
 
-Note that you can pass multiple configs to analysis-runner, by repeating the `--config` option multiple times. All config will be merged by analysis runner. For more info about configs, see [team-docs](https://github.com/populationgenomics/team-docs/blob/main/cpg_utils_config.md).
+Note that you can pass multiple configs to the analysis runner, by repeating the `--config` option multiple times. All config will be merged by the  analysis runner. For more info about configs, see [team-docs](https://github.com/populationgenomics/team-docs/blob/main/cpg_utils_config.md).
 
 For more options available for seqr-loader configuration, check the seqr-loader defaults in [configs/defaults/seqr_loader.toml](configs/defaults/seqr_loader.toml) as well as cpg-workflows defaults in [cpg_workflows/defaults.toml](cpg_workflows/defaults.toml).
 
@@ -85,7 +85,7 @@ analysis-runner \
   seqr_loader
 ```
 
-#### Only align Seqr samples
+### Stage selection example: only align Seqr samples
 
 Seqr Loader can be used partially, controlled by `workflows/first_stages`, `workflows/last_stages`, and `workflows/only_stages` parameters.
 
@@ -118,7 +118,7 @@ QC reports for each dataset would be exposed on a web server, e.g. for `validati
 
 If samples had pedigree data, a Somalier report will be run to infer and validate participant relationships, with report produced as https://main-web.populationgenomics.org.au/validation/qc/cram/somalier.html
 
-### Call GVCFs for each sample and validate variant calls
+### Stage selection example: create GVCFs and QC variant calls
 
 Run the same command as in the above section, but with the following section in `~/myconfig.toml`:
 
@@ -129,16 +129,17 @@ last_stages = ['GvcfMultiQC']
 
 The genome GVCF QC report will be exposed as https://main-web.populationgenomics.org.au/validation/qc/gvcf/multiqc.html, for `validation` samples it would include a [hap.py](https://github.com/Illumina/hap.py) section with validation stats.
 
-### Upload Elasticsearch indices
+### Stage selection example: upload Elasticsearch indices
 
-If you want the workflow to create Elasticsearch indices in the end, run the entire workflow, but specify the `workflow/create_es_index_for_datasets` section with the list of datasets for which you want the indices to be created:
+If you want the workflow to create Elasticsearch indices in the end, make sure you include the stage `MtToEs` into the workflow (if every prerequisite stage is already finished, you can specify it under `first_stages`), and set the `workflow/create_es_index_for_datasets` section with the list of datasets for which you want the indices to be created:
 
 ```toml
 [workflow]
+first_stages = ['MtToEs']
 create_es_index_for_datasets = ['validation']
 ```
 
-The resulting index will be named using the current datestamp, or using `worfklow/output_version` option if it's specified. The Elasticsearch server is configured using the `elasticsearch` section in `configs/seqr.toml`. The reason for not automatically creating indices for every project is that the Elasticsearch instance can easily run out of disk space, so additional safeguard is needed. 
+The resulting index will be named using the current datestamp, or using `worfklow/output_version` option if it's specified. The Elasticsearch server is configured using the `elasticsearch` section in `configs/defailts/seqr_loader.toml`. The reason for not automatically creating indices for every project is that the Elasticsearch instance can easily run out of disk space, so additional safeguard is handy. 
 
 ## Large Cohort Workflow
 
@@ -154,19 +155,33 @@ Large-cohort workflow diverges from seqr-loader after the single-sample `Genotyp
 
 ### Usage
 
+Given the config `~/myconfig.toml` is:
+
+```toml
+[workflow]
+input_datasets = ['validation']
+sequencing_type = 'genome'
+scatter_count = 20
+output_version = '0.1'
+```
+
+Run the analysis runner:
+
 ```sh
 analysis-runner \
-  --dataset prophecy --description "Larcoh thousand-genomes" --output-dir "larcoh" \
-  --access-level test \
-  --config configs/thousand-genomes.toml \
+  --dataset prophecy --description "Larcoh validation" --output-dir "larcoh" \
+  --access-level main \
+  --config ~/myconfig.toml \
   --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:latest \
   main.py \
   large_cohort
 ```
 
-The workflow will find GVCFs for input samples using Metamist, along with available sample metadata (e.g. known population labels, sex, QC), and would write the results into the `gs://cpg-prophecy-test` bucket.
+The workflow will find inputs using Metamist along with available sample metadata (e.g. known population labels, pedigree), align and call GVCFs, and follow with the VCF combiner and downstream annotation, writing the results into the `gs://cpg-validation-main` bucket.
 
-Note that the `large_cohort` command loads the [configs/defaults/large_cohort.toml](configs/defaults/large_cohort.toml) by default, with other configs specified with `--config` put on top. For more about configs, see [team-docs](https://github.com/populationgenomics/team-docs/blob/main/cpg_utils_config.md). 
+Note that you can pass multiple configs to the analysis runner, by repeating the `--config` option multiple times. All config will be merged by the analysis runner. For more info about configs, see [team-docs](https://github.com/populationgenomics/team-docs/blob/main/cpg_utils_config.md).
+
+For more options available for the large-cohort workflow configuration, check the defaults in [configs/defaults/large_cohort.toml](configs/defaults/large_cohort.toml), as well as cpg-workflows defaults in [cpg_workflows/defaults.toml](cpg_workflows/defaults.toml).
 
 ### Outputs
 
@@ -476,7 +491,7 @@ The entry point of the codebase is `main.py` script. It contains `WORKFLOWS` dic
 
 In this documentation section, we describe in more detail how exactly it's implemented.
 
-### Stages/workflows library
+### `cpg_workflows` library
 
 [Hail Batch](https://hail.is/#hail-batch) is a powerful system for workflow programming and execution using cloud compute and storage. In CPG, we manage our own Hail Batch deployment, along with the [analysis-runner](https://github.com/populationgenomics/analysis-runner) tool that provides an approachable and secure way to submit analysis scripts to Hail Batch.
 
@@ -608,37 +623,46 @@ from cpg_utils.config import get_config
 assert get_config()['workflow']['sequencing_type'] == 'genome'
 ```
 
-Note that the workflow implicitly reads inputs from Metamist, and requires `workflow/only_datasets` and `workflow/sequencing_type` to be defined to pull proper inputs. Also keep in mind that analysis-runner would implicitly set a set of config parameters suitable specifically for the CPG infrastructure, e.g. 
+Note that the workflow implicitly reads inputs from Metamist, and requires `workflow/only_datasets` and `workflow/sequencing_type` to be defined to pull proper inputs. 
+
+TOML files in [configs/defaults](configs/defaults) and [cpg_workflows/defaults.toml](cpg_workflows/defaults.toml) list possible configuration parameters for workflows, please refer to those configs for documentation.
+
+Also keep in mind that analysis-runner would implicitly set a set of config parameters suitable specifically for the CPG infrastructure, e.g. the generated config after analysis-runner post-processing would look like this:
 
 ```toml
 [workflow]
-access_level = 'test'
-dataset_gcp_project = 'seqr-308602'
-dataset = 'seqr'
+access_level = "test"
+dataset_gcp_project = "validation"
+dataset = "validation"
 
 [hail]
-billing_project = 'seqr'
-```
-
-If you are not using analysis-runner, you have to set those explicitly. 
-
-Check `configs/defaults` for possible configuration parameters. It also provides defaults for some required parameters which might work for CPG only, e.g.
-
-```toml
-[workflow]
-image_registry_prefix = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
-reference_prefix = 'gs://cpg-common-main/references'
-web_url_template = 'https://{namespace}-web.populationgenomics.org.au/{dataset}'
+billing_project = "validation"
+pool_label = "large-cohort"
 
 [images]
-gatk = 'gatk:4.2.6.1'
-# ...
+cpg_workflows = "australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:1.4.1"
+bcftools = "australia-southeast1-docker.pkg.dev/cpg-common/images/bcftools:1.16"
+...
 
 [references]
-genome_build = 'GRCh38'
-somalier_sites = 'somalier/v0/sites.hg38.vcf.gz'
-# ...
+genome_build = "GRCh38"
+vep_mount = "gs://cpg-common-main/references/vep/105.0/mount"
+...
+
+[references.broad]
+dragmap_prefix = "gs://cpg-common-main/references/hg38/v0/dragen_reference"
+...
+
+[storage.default]
+default = "gs://cpg-validation-main"
+web = "gs://cpg-validation-main-web"
+analysis = "gs://cpg-validation-main-analysis"
+tmp = "gs://cpg-validation-main-tmp"
+web_url = "https://main-web.populationgenomics.org.au/validation"
+...
 ```
+
+If you are not using the analysis runner, you'd have to set those generated values explicitly. 
 
 ### Batch helpers
 
