@@ -45,7 +45,7 @@ class Genotype(SampleStage):
             sample_name=sample.id,
             cram_path=sample.make_cram_path(),
             tmp_prefix=self.tmp_prefix / sample.id,
-            overwrite=True if sample.forced else None,
+            overwrite=sample.forced,
             job_attrs=self.get_job_attrs(sample),
         )
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)

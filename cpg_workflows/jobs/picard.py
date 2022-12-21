@@ -118,7 +118,7 @@ def markdup(
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     out_markdup_metrics_path: Path | None = None,
-    overwrite: bool | None = None,
+    overwrite: bool = False,
 ) -> Job | None:
     """
     Make job that runs Picard MarkDuplicates and converts the result to CRAM.

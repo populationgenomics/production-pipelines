@@ -56,7 +56,7 @@ class GvcfQC(SampleStage):
             job_attrs=self.get_job_attrs(sample),
             output_summary_path=self.expected_outputs(sample)['qc_summary'],
             output_detail_path=self.expected_outputs(sample)['qc_detail'],
-            overwrite=not get_config()['workflow'].get('check_intermediates'),
+            overwrite=sample.forced,
         )
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])
 
