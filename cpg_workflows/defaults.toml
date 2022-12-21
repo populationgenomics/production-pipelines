@@ -1,5 +1,5 @@
 [images]
-cpg_workflows = 'australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:1.7.1'
+cpg_workflows = 'australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:1.8.0'
 
 [workflow]
 # Datasets to load inputs. If not provided, datasets will be determined
