@@ -33,6 +33,9 @@ billing_project = 'fewgenomes'
 delete_scratch_on_exit = false
 backend = 'local'
 dry_run = true
+
+[images]
+cpg_workflows = "stub"
 """
 
 
