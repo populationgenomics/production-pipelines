@@ -51,6 +51,17 @@ def dataproc_job(
     script_path = to_path(dataproc_script.__file__)
     rel_script_path = script_path.relative_to(package_path.parent)
 
+    if not to_path(gnomad_path := 'gnomad_methods/gnomad').exists():
+        raise ValueError(
+            f'Cannot find gnomad_methods Git submodule: {gnomad_path}. Make sure '
+            f'you cloned the repo recursively with `git clone --recurse-submodules '
+            f'git@github.com:populationgenomics/production-pipelines.git`.'
+        )
+    pyfiles = [
+        cpg_workflows.__name__,
+        gnomad_path,
+    ]
+
     script = (
         f'{rel_script_path} '
         f'{function.__module__} {function.__name__} '
@@ -64,7 +75,7 @@ def dataproc_job(
             batch=get_batch(),
             cluster_id=cluster_id,
             script=script,
-            pyfiles=[cpg_workflows.__name__],
+            pyfiles=pyfiles,
             job_name=job_name,
             region='australia-southeast1',
         )
@@ -111,9 +122,6 @@ def dataproc_job(
         worker_machine_type='n1-highmem-8' if use_highmem_workers else 'n1-standard-8',
         worker_boot_disk_size=worker_boot_disk_size,
         secondary_worker_boot_disk_size=secondary_worker_boot_disk_size,
-        pyfiles=[
-            cpg_workflows.__name__,
-            'gnomad_methods/gnomad',
-        ],
+        pyfiles=pyfiles,
         init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
     )
