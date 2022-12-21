@@ -83,8 +83,8 @@ def stripy(
 
     ls $BATCH_TMPDIR/
   
-    cp $BATCH_TMPDIR/{cram_path.path.name}.html {j.out_path}
-    cp $BATCH_TMPDIR/{cram_path.path.name}.json {j.json_path}
+    cp $BATCH_TMPDIR/{sample.id}__{sample.external_id}.cram.html {j.out_path}
+    cp $BATCH_TMPDIR/{sample.id}__{sample.external_id}.cram.json {j.json_path}
 
     """
 
