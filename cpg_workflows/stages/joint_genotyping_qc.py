@@ -143,7 +143,11 @@ class JointVcfMultiQC(CohortStage):
             / 'jc'
             / get_workflow().output_version
             / 'multiqc_data.json',
-            'checks': cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / '.checks',
+            'checks': cohort.analysis_dataset.prefix()
+            / 'qc'
+            / 'jc'
+            / get_workflow().output_version
+            / '.checks',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
