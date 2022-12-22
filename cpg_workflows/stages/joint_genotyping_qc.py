@@ -12,6 +12,7 @@ from cpg_workflows.workflow import (
     StageInputNotFoundError,
     Cohort,
     SampleStage,
+    get_workflow,
 )
 
 from cpg_workflows.jobs.multiqc import multiqc
@@ -32,8 +33,13 @@ class JointVcfQC(CohortStage):
         """
         Generate a pVCF and a site-only VCF.
         """
-        h = cohort.alignment_inputs_hash()
-        qc_prefix = cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / 'picard'
+        qc_prefix = (
+            cohort.analysis_dataset.prefix()
+            / 'qc'
+            / 'jc'
+            / get_workflow().output_version
+            / 'picard'
+        )
         d = {
             'qc_summary': to_path(f'{qc_prefix}.variant_calling_summary_metrics'),
             'qc_detail': to_path(f'{qc_prefix}.variant_calling_detail_metrics'),
@@ -77,13 +83,12 @@ class JointVcfHappy(SampleStage):
         ):
             return None
 
-        h = get_cohort().alignment_inputs_hash()
         return (
             get_cohort().analysis_dataset.prefix()
             / 'qc'
             / 'jc'
             / 'hap.py'
-            / f'{h}-{sample.id}.summary.csv'
+            / f'{get_workflow().output_version}-{sample.id}.summary.csv'
         )
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
@@ -131,13 +136,12 @@ class JointVcfMultiQC(CohortStage):
         if get_config()['workflow'].get('skip_qc', False) is True:
             return {}
 
-        h = cohort.alignment_inputs_hash()
         return {
             'html': cohort.analysis_dataset.web_prefix() / 'qc' / 'jc' / 'multiqc.html',
             'json': cohort.analysis_dataset.prefix()
             / 'qc'
             / 'jc'
-            / h
+            / get_workflow().output_version
             / 'multiqc_data.json',
             'checks': cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / '.checks',
         }
