@@ -23,7 +23,7 @@ def stripy(
     json_path: Path,
     analysis_type: str = 'standard',
     job_attrs: dict | None = None,
-    overwrite: bool = False
+    overwrite: bool = False,
 ) -> Job | None:
     """
     Run STRipy
