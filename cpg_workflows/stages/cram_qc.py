@@ -145,7 +145,7 @@ class CramQC(SampleStage):
                     get_batch(),
                     CramPath(cram_path, crai_path),
                     job_attrs=self.get_job_attrs(sample),
-                    overwrite=not get_config()['workflow'].get('check_intermediates'),
+                    overwrite=sample.forced,
                     **out_path_kwargs,
                 )
                 if j:

@@ -49,6 +49,8 @@ def stripy(
     bucket_mount_path = to_path('/bucket')
     j.cloudfuse(bucket, str(bucket_mount_path), read_only=True)
     mounted_cram_path = bucket_mount_path / '/'.join(cram_path.path.parts[2:])
+    assert cram_path.index_path  # keep mypy happy as index_path is optional
+    mounted_cram_index_path = bucket_mount_path / '/'.join(cram_path.index_path.parts[2:])
 
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
@@ -66,12 +68,15 @@ def stripy(
         > $BATCH_TMPDIR/config.json
     cat $BATCH_TMPDIR/config.json
 
+    ln -s {mounted_cram_path} {sample.id}__{sample.external_id}.cram 
+    ln -s {mounted_cram_index_path} {sample.id}__{sample.external_id}.crai 
+
     python3 stri.py \\
         --genome hg38 \\
         --reference {reference.base} \\
         {sex_argument} \
         --output $BATCH_TMPDIR/ \\
-        --input {mounted_cram_path} \\
+        --input {sample.id}__{sample.external_id}.cram  \\
         --logflags {j.log_path} \\
         --config $BATCH_TMPDIR/config.json \\
         --analysis {analysis_type} \\
@@ -79,8 +84,8 @@ def stripy(
 
     ls $BATCH_TMPDIR/
   
-    cp $BATCH_TMPDIR/{cram_path.path.name}.html {j.out_path}
-    cp $BATCH_TMPDIR/{cram_path.path.name}.json {j.json_path}
+    cp $BATCH_TMPDIR/{sample.id}__{sample.external_id}.cram.html {j.out_path}
+    cp $BATCH_TMPDIR/{sample.id}__{sample.external_id}.cram.json {j.json_path}
 
     """
 
