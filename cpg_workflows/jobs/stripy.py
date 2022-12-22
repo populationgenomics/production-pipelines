@@ -49,6 +49,7 @@ def stripy(
     bucket_mount_path = to_path('/bucket')
     j.cloudfuse(bucket, str(bucket_mount_path), read_only=True)
     mounted_cram_path = bucket_mount_path / '/'.join(cram_path.path.parts[2:])
+    assert cram_path.index_path  # keep mypy happy as index_path is optional
     mounted_cram_index_path = bucket_mount_path / '/'.join(cram_path.index_path.parts[2:])
 
     res = STANDARD.request_resources(ncpu=4)
