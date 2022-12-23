@@ -809,21 +809,18 @@ class Workflow:
         name = name or description or analysis_dataset
         self.name = slugify(name)
 
-        self.output_version: str | None = None
+        self._output_version: str | None = None
         if output_version := get_config()['workflow'].get('output_version'):
-            output_version = slugify(output_version)
-            if not output_version.startswith('v'):
-                output_version = f'v{output_version}'
-            self.output_version = output_version
+            self._output_version = slugify(output_version)
 
-        self.run_timestamp: str = get_config()['workflow'].get(
-            'run_timestamp', timestamp()
+        self.run_timestamp: str = (
+            get_config()['workflow'].get('run_timestamp') or timestamp()
         )
 
         # Description
         description = description or name
-        if self.output_version:
-            description += f': output_version={self.output_version}'
+        if self._output_version:
+            description += f': output_version={self._output_version}'
         description += f': run_timestamp={self.run_timestamp}'
         if sequencing_type := get_config()['workflow'].get('sequencing_type'):
             description += f' [{sequencing_type}]'
@@ -836,6 +833,10 @@ class Workflow:
         if get_config()['workflow'].get('status_reporter') == 'metamist':
             self.status_reporter = MetamistStatusReporter()
         self._stages: list[StageDecorator] | None = stages
+
+    @property
+    def output_version(self) -> str:
+        return self._output_version or get_cohort().alignment_inputs_hash()
 
     @property
     def tmp_prefix(self) -> Path:
@@ -854,7 +855,7 @@ class Workflow:
         Prepare a unique path for the workflow with this name and this input data.
         """
         prefix = get_cohort().analysis_dataset.prefix(category=category) / self.name
-        prefix /= self.output_version or get_cohort().alignment_inputs_hash()
+        prefix /= self.output_version
         return prefix
 
     def run(

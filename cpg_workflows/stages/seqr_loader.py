@@ -22,7 +22,7 @@ from cpg_workflows.jobs.seqr_loader import annotate_cohort_jobs, annotate_datase
 from .joint_genotyping import JointGenotyping
 from .vep import Vep
 from .vqsr import Vqsr
-from .. import get_cohort, get_batch
+from .. import get_batch
 
 
 @stage(required_stages=[JointGenotyping, Vqsr, Vep])
@@ -85,10 +85,13 @@ class AnnotateDataset(DatasetStage):
         """
         Expected to generate a matrix table
         """
-        h = get_cohort().alignment_inputs_hash()
         return {
             'tmp_prefix': str(self.tmp_prefix / dataset.name),
-            'mt': dataset.prefix() / 'mt' / f'{h}-{dataset.name}.mt',
+            'mt': (
+                dataset.prefix()
+                / 'mt'
+                / f'{get_workflow().output_version}-{dataset.name}.mt'
+            ),
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:

@@ -17,6 +17,7 @@ from cpg_utils.config import get_config, set_config_paths
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.status import MetamistStatusReporter
 from cpg_workflows.utils import exists
+from cpg_workflows.workflow import get_workflow
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
@@ -34,6 +35,7 @@ def main(command: str, config_paths: list[str]):
     set_config_paths(list(config_paths))
 
     sequencing_type = get_config()['workflow']['sequencing_type']
+    wfl = get_workflow()
     cohort = get_cohort()
     status = MetamistStatusReporter()
 
@@ -126,8 +128,7 @@ def main(command: str, config_paths: list[str]):
             )
 
     if command == 'joint-calling':
-        h = cohort.alignment_inputs_hash()
-        path = cohort.analysis_dataset.prefix() / 'mt' / f'{h}.mt'
+        path = cohort.analysis_dataset.prefix() / 'mt' / f'{wfl.output_version}.mt'
         if exists(path):
             status.create_analysis(
                 str(path),
