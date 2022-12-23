@@ -260,29 +260,17 @@ Metamist metadata:
 }
 ```
 
-Soft filters are populated based on the above results:
+Soft filters are assigned based on the sample QC (`low_coverage` and `bad_sample_qc_metrics`) and sex imputation results (`sex_aneuploidy` and `ambiguous_sex`):
 
 ```
 'filters': set<str>
 ```
 
-Sample-QC based filters are calculated according to the thresholds specified in the config TOML, with available values `low_coverage` and `bad_sample_qc_metrics`:
-
-```toml
-[large_cohort.sample_qc_cutoffs]
-min_coverage = 18
-max_n_snps = 8000000
-min_n_snps = 2400000
-max_n_singletons = 800000
-max_r_duplication = 0.3
-max_r_het_hom = 3.3
-```
-
-Sex imputation based filters are `sex_aneuploidy` and `ambiguous_sex`.
+Thresholds for sample QC filters are pulled from the config TOML (you can see the default values in [configs/defaults/large_cohort.toml](configs/defaults/large_cohort.toml).
 
 #### Relatedness
 
-[PC-Relate method](https://hail.is/docs/0.2/methods/relatedness.html#hail.methods.pc_relate) is used to identify pairs of the 1st and the 2nd degree relatives (kin coefficient threshold - below which samples are considered unrelated - is specified as `large-cohort.max_kin` in TOML). Pairwise sample relatedness matrix is written as a Hail table index by a tuple of sample IDs: `gs://cpg-prophecy-test/large-cohort/v0-1/relatedness.ht`
+[PC-Relate method](https://hail.is/docs/0.2/methods/relatedness.html#hail.methods.pc_relate) is used to identify pairs of the 1st and the 2nd degree relatives (kin coefficient threshold - below which samples are considered unrelated - is specified as `large_cohort.max_kin` in [TOML](configs/defaults/large_cohort.toml)). Pairwise sample relatedness matrix is written as a Hail table index by a tuple of sample IDs: `gs://cpg-prophecy-test/large-cohort/v0-1/relatedness.ht`
 
 ```
 Row fields:
@@ -313,7 +301,7 @@ PCA results are written into `gs://cpg-prophecy-test/large-cohort/v0-1/ancestry`
   * `gs://cpg-prophecy-test/large-cohort/v0-1/ancestry/loadings.ht`
   * `gs://cpg-prophecy-test/large-cohort/v0-1/ancestry/scores.ht`
  
-When there are samples with known `continental_pop` available, using the PCA results a random forest method is used to infer population labels. The method is trained using 16 principal components as features on samples with known ancestry. Ancestry was assigned to all samples for which the probability of that ancestry was high enough (the threshold is configured as `large_cohort.min_pop_prob` in TOML). Results are written as sample-level table `gs://cpg-prophecy-test/large-cohort/v0-1/ancestry/inferred_pop.ht`.
+When there are samples with known continental population available (the metamist participant metadata field with that data can be specified in the [TOML](configs/defaults/large_cohort.toml) as `large_cohort.pop_meta_field`), a random forest method is used to infer population labels from the PCA results. The method is trained using 16 principal components as features on samples with known ancestry (the number of components can be adjusted in the TOML as well as `large_cohort.n_pcs`). Ancestry was assigned to all samples for which the probability of that ancestry was high enough (the threshold is configured as `large_cohort.min_pop_prob` in the TOML). Results are written as sample-level table `gs://cpg-prophecy-test/large-cohort/v0-1/ancestry/inferred_pop.ht`.
 
 ```
 Row fields:
@@ -361,7 +349,7 @@ Row fields:
     'was_split': bool
 ```
 
-Note that the `info.AS-*` annotations used for AS-VQSR are dropped, and only the resulting filter label is appended into the `filters` field, e.g. `VQSRTrancheINDEL99.50to99.90`, `VQSRTrancheSNP99.00to99.90+`, etc. The AS_VQSLOD thresholds for assigning filters are configurable in TOML as `vqsr.snp_filter_level` and `vqsr.indel_filter_level`.
+Note that the `info.AS-*` annotations used for AS-VQSR are dropped, and only the resulting filter label is appended into the `filters` field, e.g. `VQSRTrancheINDEL99.50to99.90`, `VQSRTrancheSNP99.00to99.90+`, etc. The AS_VQSLOD thresholds for assigning filters are configurable in the [TOML](configs/defaults/large_cohort.toml) as `vqsr.snp_filter_level` and `vqsr.indel_filter_level`.
 
 This pipeline is largely compiled from the following two WDL workflows:
    
