@@ -1,17 +1,23 @@
 """
 Metamist wrapper to report analysis progress.
 """
-
-from textwrap import dedent
+import inspect
 from abc import ABC, abstractmethod
+from typing import Callable, Any
 
 from cpg_utils import Path
 from cpg_utils.hail_batch import command, image_path
 from hailtop.batch.job import Job
-from hailtop.batch import Batch, Resource
+from hailtop.batch import Batch
 
 from .targets import Target
 from .metamist import get_metamist, AnalysisStatus, MetamistError
+
+
+class StatusReporterError(Exception):
+    """
+    Error thrown by StatusReporter.
+    """
 
 
 class StatusReporter(ABC):
@@ -49,6 +55,55 @@ class StatusReporter(ABC):
         """
 
 
+def _calculate_size(output_path: str) -> dict[str, Any]:
+    """
+    Self-contained function to calculate size of an object at given path.
+    @param output_path: remote path of the output file
+    @return: dictionary to merge into `Analysis.meta`
+    """
+    from cloudpathlib import CloudPath
+
+    size = CloudPath(str(output_path)).stat().st_size
+    return dict(size=size)
+
+
+def _update_analysis_status(
+    analysis_id: int,
+    new_status: str,
+    updater_func_names: list[str] | None = None,
+    output_path: str | None = None,
+) -> None:
+    """
+    Self-contained function to update Metamist analysis entry.
+    @param analysis_id: ID of Analysis entry
+    @param new_status: new status to assign to the entry
+    @param updater_func_names: list of function names to update the entry's metadata,
+    assuming output_path as input parameter
+    @param output_path: remote path of the output file, to be passed to the updaters
+    """
+    from sample_metadata.apis import AnalysisApi
+    from sample_metadata.models import AnalysisUpdateModel, AnalysisStatus
+    from sample_metadata import exceptions
+    import traceback
+
+    meta: dict[str, Any] = dict()
+    if output_path and updater_func_names:
+        for func_name in updater_func_names or []:
+            meta |= locals()[func_name](output_path)
+
+    aapi = AnalysisApi()
+    try:
+        aapi.update_analysis_status(
+            analysis_id=analysis_id,
+            analysis_update_model=AnalysisUpdateModel(
+                status=AnalysisStatus(new_status),
+                meta=meta,
+            ),
+        )
+    except exceptions.ApiException:
+        traceback.print_exc()
+
+
 class MetamistStatusReporter(StatusReporter):
     """
     Job status reporter. Works through creating and updating metamist Analysis entries.
@@ -60,13 +115,14 @@ class MetamistStatusReporter(StatusReporter):
     def add_updaters_jobs(
         self,
         b: Batch,
-        output: str,
+        output: str | Path,
         analysis_type: str,
         target: Target,
         jobs: list[Job] | None = None,
         prev_jobs: list[Job] | None = None,
         meta: dict | None = None,
         job_attrs: dict[str, str] | None = None,
+        update_analysis_meta: Callable[[str], dict] | None = None,
     ) -> list[Job]:
         """
         Create "queued" analysis and insert "in_progress" and "completed" updater jobs.
@@ -77,7 +133,7 @@ class MetamistStatusReporter(StatusReporter):
         # 1. Create a "queued" analysis
         if (
             aid := self.create_analysis(
-                output=output,
+                output=str(output),
                 analysis_type=analysis_type,
                 analysis_status='queued',
                 target=target,
@@ -101,7 +157,8 @@ class MetamistStatusReporter(StatusReporter):
             status=AnalysisStatus.COMPLETED,
             analysis_type=analysis_type,
             job_attrs=(job_attrs or {}) | dict(tool='metamist'),
-            output_path=output if not isinstance(output, str | dict) else None,
+            output=output,
+            update_analysis_meta=update_analysis_meta,
         )
 
         if prev_jobs:
@@ -135,7 +192,8 @@ class MetamistStatusReporter(StatusReporter):
         status: AnalysisStatus,
         analysis_type: str,
         job_attrs: dict | None = None,
-        output_path: Path | None = None,
+        output: Path | str | None = None,
+        update_analysis_meta: Callable[[str], dict] | None = None,
     ) -> Job:
         """
         Create a Hail Batch job that updates status of analysis. For status=COMPLETED,
@@ -153,37 +211,34 @@ class MetamistStatusReporter(StatusReporter):
         j = b.new_job(job_name, job_attrs)
         j.image(image_path('cpg_workflows'))
 
-        calc_size_cmd = None
-        if output_path:
-            calc_size_cmd = f"""
-        from cloudpathlib import CloudPath
-        meta['size'] = CloudPath('{str(output_path)}').stat().st_size
-        """
-        cmd = dedent(
-            f"""\
-        cat <<EOT >> update.py
-        from sample_metadata.apis import AnalysisApi
-        from sample_metadata.models import AnalysisUpdateModel, AnalysisStatus
-        from sample_metadata import exceptions
-        import traceback
+        meta_updaters_definitions = ''
+        meta_updaters_funcs: list[Callable[[str], dict]] = []
+        if output:
+            if isinstance(output, Path):
+                meta_updaters_funcs.append(_calculate_size)
+            if update_analysis_meta:
+                meta_updaters_funcs.append(update_analysis_meta)
 
-        meta = dict()
-        {calc_size_cmd}
+            for func in meta_updaters_funcs:
+                meta_updaters_definitions += inspect.getsource(func)
 
-        aapi = AnalysisApi()
-        try:
-            aapi.update_analysis_status(
-                analysis_id={analysis_id_int},
-                analysis_update_model=AnalysisUpdateModel(
-                    status=AnalysisStatus('{status.value}'),
-                    meta=meta,
-                ),
-            )
-        except exceptions.ApiException:
-            traceback.print_exc()
-        EOT
-        python3 update.py
-        """
-        )
+        cmd = f"""
+cat <<EOT >> update.py
+
+{meta_updaters_definitions}
+
+{inspect.getsource(_update_analysis_status)}
+
+{_update_analysis_status.__name__}(
+    analysis_id={analysis_id_int},
+    status="{status.value}",
+    updaters_functions={['"' + f.__name__ + '"' for f in meta_updaters_funcs]},
+    output_path="{output}",
+)
+
+EOT
+python3 update.py
+"""
+
         j.command(command(cmd, rm_leading_space=False, setup_gcp=True))
         return j
