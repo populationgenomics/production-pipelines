@@ -230,6 +230,7 @@ class MetamistStatusReporter(StatusReporter):
         cmd = f"""
 cat <<EOT >> update.py
 
+from typing import Any, Callable
 from cpg_workflows.metamist import AnalysisStatus
 
 {meta_updaters_definitions}
