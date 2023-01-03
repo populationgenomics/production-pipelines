@@ -2,6 +2,7 @@
 Stage that generates a CRAM file.
 """
 import logging
+from cloudpathlib import CloudPath
 
 from cpg_utils import Path
 from cpg_utils.config import get_config

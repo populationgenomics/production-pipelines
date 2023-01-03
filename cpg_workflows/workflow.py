@@ -28,7 +28,7 @@ from cpg_utils import Path
 from .batch import get_batch
 from .status import MetamistStatusReporter
 from .targets import Target, Dataset, Sample, Cohort
-from .utils import exists, timestamp, slugify
+from .utils import exists, timestamp, slugify, ExpectedResultT
 from .inputs import get_cohort
 
 
@@ -39,10 +39,6 @@ StageDecorator = Callable[..., 'Stage']
 # it would violate the Liskov substitution principle (i.e. any Stage subclass would
 # have to be able to work on any Target subclass).
 TargetT = TypeVar('TargetT', bound=Target)
-
-ExpectedResultT = Union[Path, dict[str, Path], dict[str, str], str, None]
-
-StageOutputData = Union[Path, dict[str, Path]]
 
 
 class WorkflowError(Exception):
@@ -68,7 +64,7 @@ class StageOutput:
     def __init__(
         self,
         target: 'Target',
-        data: StageOutputData | None = None,
+        data: ExpectedResultT = None,
         jobs: Sequence[Job | None] | Job | None = None,
         meta: dict | None = None,
         reusable: bool = False,
@@ -325,6 +321,7 @@ class Stage(Generic[TargetT], ABC):
         required_stages: list[StageDecorator] | StageDecorator | None = None,
         analysis_type: str | None = None,
         analysis_key: str | None = None,
+        update_analysis_meta: Callable[[str], dict] | None = None,
         skipped: bool = False,
         assume_outputs_exist: bool = False,
         forced: bool = False,
@@ -347,6 +344,9 @@ class Stage(Generic[TargetT], ABC):
         # If `analysis_key` is defined, it will be used to extract the value for
         # `Analysis.output` if the Stage.expected_outputs() returns a dict.
         self.analysis_key = analysis_key
+        # if `update_analysis_meta` is defined, it is called on the `Analysis.output`
+        # field, and result is merged into the `Analysis.meta` dictionary.
+        self.update_analysis_meta = update_analysis_meta
 
         # Populated with the return value of `add_to_the_workflow()`
         self.output_by_target: dict[str, StageOutput | None] = dict()
@@ -429,7 +429,7 @@ class Stage(Generic[TargetT], ABC):
     def make_outputs(
         self,
         target: 'Target',
-        data: StageOutputData | str | dict[str, str] | None = None,
+        data: ExpectedResultT = None,
         jobs: Sequence[Job | None] | Job | None = None,
         meta: dict | None = None,
         reusable: bool = False,
@@ -503,7 +503,7 @@ class Stage(Generic[TargetT], ABC):
             if isinstance(outputs.data, dict):
                 if not self.analysis_key:
                     raise WorkflowError(
-                        f'Cannot create Analysis for stage {self.name}: `analysis_key` '
+                        f'Cannot create Analysis: `analysis_key` '
                         f'must be set with the @stage decorator to select value from '
                         f'the expected_outputs dict: {outputs.data}'
                     )
@@ -521,13 +521,14 @@ class Stage(Generic[TargetT], ABC):
 
             self.status_reporter.add_updaters_jobs(
                 b=get_batch(),
-                output=str(output),
+                output=output,
                 analysis_type=self.analysis_type,
                 target=target,
                 jobs=outputs.jobs,
                 prev_jobs=inputs.get_jobs(target),
                 meta=outputs.meta,
                 job_attrs=self.get_job_attrs(target),
+                update_analysis_meta=self.update_analysis_meta,
             )
         return outputs
 
@@ -662,6 +663,7 @@ def stage(
     *,
     analysis_type: str | None = None,
     analysis_key: str | None = None,
+    update_analysis_meta: Callable[[str], dict] | None = None,
     required_stages: list[StageDecorator] | StageDecorator | None = None,
     skipped: bool = False,
     assume_outputs_exist: bool = False,
@@ -679,17 +681,12 @@ def stage(
         def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
             ...
 
-        self.status_reporter = get_workflow().status_reporter
-        # If `analysis_type` is defined, it will be used to create/update Analysis
-        # entries in Metamist.
-        self.analysis_type = analysis_type
-        # If `analysis_key` is defined, it will be used to extract the value for
-        # `Analysis.output` if the Stage.expected_outputs() returns a dict.
-
     @analysis_type: if defined, will be used to create/update `Analysis` entries
         using the status reporter.
     @analysis_key: is defined, will be used to extract the value for `Analysis.output`
         if the Stage.expected_outputs() returns a dict.
+    @update_analysis_meta: if defined, this function is called on the `Analysis.output`
+        field, and returns a dictionary to be merged into the `Analysis.meta`
     @required_stages: list of other stage classes that are required prerequisites
         for this stage. Outputs of those stages will be passed to
         `Stage.queue_jobs(... , inputs)` as `inputs`, and all required
@@ -710,6 +707,7 @@ def stage(
                 required_stages=required_stages,
                 analysis_type=analysis_type,
                 analysis_key=analysis_key,
+                update_analysis_meta=update_analysis_meta,
                 skipped=skipped,
                 assume_outputs_exist=assume_outputs_exist,
                 forced=forced,
