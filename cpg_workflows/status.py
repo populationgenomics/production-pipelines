@@ -69,34 +69,34 @@ def _calculate_size(output_path: str) -> dict[str, Any]:
 
 def _update_analysis_status(
     analysis_id: int,
-    new_status: str,
-    updater_func_names: list[str] | None = None,
+    new_status: AnalysisStatus,
+    updater_funcs: list[Callable[[str], dict[str, Any]]] | None = None,
     output_path: str | None = None,
 ) -> None:
     """
     Self-contained function to update Metamist analysis entry.
     @param analysis_id: ID of Analysis entry
     @param new_status: new status to assign to the entry
-    @param updater_func_names: list of function names to update the entry's metadata,
+    @param updater_funcs: list of functions to update the entry's metadata,
     assuming output_path as input parameter
     @param output_path: remote path of the output file, to be passed to the updaters
     """
     from sample_metadata.apis import AnalysisApi
-    from sample_metadata.models import AnalysisUpdateModel, AnalysisStatus
+    from sample_metadata.models import AnalysisUpdateModel
     from sample_metadata import exceptions
     import traceback
 
     meta: dict[str, Any] = dict()
-    if output_path and updater_func_names:
-        for func_name in updater_func_names or []:
-            meta |= locals()[func_name](output_path)
+    if output_path and updater_funcs:
+        for func in updater_funcs or []:
+            meta |= func(output_path)
 
     aapi = AnalysisApi()
     try:
         aapi.update_analysis_status(
             analysis_id=analysis_id,
             analysis_update_model=AnalysisUpdateModel(
-                status=AnalysisStatus(new_status),
+                status=new_status,
                 meta=meta,
             ),
         )
@@ -220,10 +220,17 @@ class MetamistStatusReporter(StatusReporter):
                 meta_updaters_funcs.append(update_analysis_meta)
 
             for func in meta_updaters_funcs:
-                meta_updaters_definitions += inspect.getsource(func)
+                definition = inspect.getsource(func)
+                if not definition.startswith('def '):
+                    raise MetamistError(
+                        f'Status updater must be a module-level function: {str(func)}'
+                    )
+                meta_updaters_definitions += definition + '\n'
 
         cmd = f"""
 cat <<EOT >> update.py
+
+from cpg_workflows.metamist import AnalysisStatus
 
 {meta_updaters_definitions}
 
@@ -231,8 +238,8 @@ cat <<EOT >> update.py
 
 {_update_analysis_status.__name__}(
     analysis_id={analysis_id_int},
-    status="{status.value}",
-    updaters_functions={['"' + f.__name__ + '"' for f in meta_updaters_funcs]},
+    new_status=AnalysisStatus("{status.value}"),
+    updater_funcs=[{', '.join(f.__name__ for f in meta_updaters_funcs)}],
     output_path="{output}",
 )
 
