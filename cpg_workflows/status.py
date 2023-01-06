@@ -59,7 +59,7 @@ def _calculate_size(output_path: str) -> dict[str, Any]:
     """
     Self-contained function to calculate size of an object at given path.
     @param output_path: remote path of the output file
-    @return: dictionary to merge into `Analysis.meta`
+    @return: dictionary to merge into Analysis.meta
     """
     from cloudpathlib import CloudPath
 
@@ -242,7 +242,7 @@ from cpg_workflows.metamist import AnalysisStatus
     analysis_id={analysis_id_int},
     new_status=AnalysisStatus("{status.value}"),
     updater_funcs=[{', '.join(f.__name__ for f in meta_updaters_funcs)}],
-    output_path="{output}",
+    output_path={'"' + output + '"' if output else 'None'},
 )
 
 EOT
