@@ -84,6 +84,7 @@ def _update_analysis_status(
     from sample_metadata.apis import AnalysisApi
     from sample_metadata.models import AnalysisUpdateModel
     from sample_metadata import exceptions
+    from sample_metadata.model.analysis_status import AnalysisStatus as MmAnalysisStatus
     import traceback
 
     meta: dict[str, Any] = dict()
@@ -96,7 +97,7 @@ def _update_analysis_status(
         aapi.update_analysis_status(
             analysis_id=analysis_id,
             analysis_update_model=AnalysisUpdateModel(
-                status=new_status,
+                status=MmAnalysisStatus(new_status.value),
                 meta=meta,
             ),
         )
