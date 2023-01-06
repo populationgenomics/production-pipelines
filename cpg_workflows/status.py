@@ -242,7 +242,7 @@ from cpg_workflows.metamist import AnalysisStatus
     analysis_id={analysis_id_int},
     new_status=AnalysisStatus("{status.value}"),
     updater_funcs=[{', '.join(f.__name__ for f in meta_updaters_funcs)}],
-    output_path={'"' + output + '"' if output else 'None'},
+    output_path={'"' + str(output) + '"' if output else 'None'},
 )
 
 EOT
