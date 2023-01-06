@@ -59,7 +59,7 @@ def _calculate_size(output_path: str) -> dict[str, Any]:
     """
     Self-contained function to calculate size of an object at given path.
     @param output_path: remote path of the output file
-    @return: dictionary to merge into `Analysis.meta`
+    @return: dictionary to merge into Analysis.meta
     """
     from cloudpathlib import CloudPath
 
@@ -84,6 +84,7 @@ def _update_analysis_status(
     from sample_metadata.apis import AnalysisApi
     from sample_metadata.models import AnalysisUpdateModel
     from sample_metadata import exceptions
+    from sample_metadata.model.analysis_status import AnalysisStatus as MmAnalysisStatus
     import traceback
 
     meta: dict[str, Any] = dict()
@@ -96,7 +97,7 @@ def _update_analysis_status(
         aapi.update_analysis_status(
             analysis_id=analysis_id,
             analysis_update_model=AnalysisUpdateModel(
-                status=new_status,
+                status=MmAnalysisStatus(new_status.value),
                 meta=meta,
             ),
         )
@@ -241,7 +242,7 @@ from cpg_workflows.metamist import AnalysisStatus
     analysis_id={analysis_id_int},
     new_status=AnalysisStatus("{status.value}"),
     updater_funcs=[{', '.join(f.__name__ for f in meta_updaters_funcs)}],
-    output_path="{output}",
+    output_path={'"' + str(output) + '"' if output else 'None'},
 )
 
 EOT
