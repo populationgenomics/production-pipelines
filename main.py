@@ -38,7 +38,6 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     '--config',
     'config_paths',
     multiple=True,
-    type=click.Path(exists=True),
     help='Add configuration files to the files specified $CPG_CONFIG_PATH.'
     'Configs are merged left to right, meaning the rightmost file has the'
     'highest priority.',
@@ -93,6 +92,10 @@ def main(
 
     wfl_conf_path = to_path(__file__).parent / f'configs/defaults/{workflow}.toml'
     assert wfl_conf_path.exists(), wfl_conf_path
+
+    for path in config_paths:
+        assert to_path(path).exists(), path
+
     config_paths = os.environ['CPG_CONFIG_PATH'].split(',') + list(config_paths)
     # Assuming the defaults is already loaded in __init__.py:
     assert to_path(config_paths[0]) == defaults_config_path
