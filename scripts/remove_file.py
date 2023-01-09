@@ -13,6 +13,7 @@ def main(suffix: str):
     Remove arbitrary file from a workflow run output prefix.
     """
 
+    print('Loading workflow...')
     wfl = get_workflow()
     path = wfl.prefix / suffix
     print(f'Using workflow prefix {wfl.prefix}, full path would be {path}')
@@ -21,3 +22,7 @@ def main(suffix: str):
     else:
         path.unlink()
         print(f'Removed object {path}')
+
+
+if __name__ == '__main__':
+    main()
