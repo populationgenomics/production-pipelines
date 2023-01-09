@@ -10,9 +10,8 @@ from cpg_utils.hail_batch import command, image_path
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
-from . import get_cohort
 from .targets import Target, Cohort
-from .metamist import get_metamist, AnalysisStatus, MetamistError, AnalysisType
+from .metamist import get_metamist, AnalysisStatus, AnalysisType
 
 
 class StateProviderError(Exception):
@@ -107,7 +106,7 @@ class StateProvider(ABC):
         b: Batch,
         entry_id: int,
         status: AnalysisStatus,
-        analysis_type: str | None = None,,
+        analysis_type: str | None = None,
         job_attrs: dict | None = None,
         outputs: dict | str | Path | None = None,
         main_output_key: str | None = None,
@@ -126,7 +125,7 @@ class StateProvider(ABC):
 
         meta_updaters_definitions = ''
         meta_updaters_funcs: list[Callable[[str], dict]] = []
-        
+
         output_path = None
         if outputs:
             if isinstance(outputs, dict):
@@ -309,3 +308,9 @@ class MetamistStateProvider(StateProvider):
             meta=meta,
             dataset=dataset,
         )
+
+
+class JsonFileStateProvider(StateProvider):
+    """
+    Works through updating a JSON file.
+    """
