@@ -1,9 +1,8 @@
-name: Test batch
+name: Test
 on:
   # Building on pull-requests, manual dispatch, and pushes to main; but restricting
   # publishing only to main pushes and manual dispatch with `if`s in specific steps.
   pull_request:
-  workflow_dispatch:
   push:
     branches:
       - main
@@ -14,8 +13,24 @@ jobs:
     defaults:
       run:
         shell: bash -l {0}
+    strategy:
+      fail-fast: false
+      matrix:
+        suffix:
+          [
+            batch,
+            workflow,
+            cohort,
+            status,
+            large_cohort,
+            seqr_loader_dry,
+            check_multiqc,
+            check_pedigree,
+          ]
     steps:
       - uses: actions/checkout@main
+        with:
+          submodules: 'true'
 
       - uses: actions/setup-python@v2
         with:
@@ -25,4 +40,6 @@ jobs:
         run: pip install .[test]
 
       - name: Run unit tests
-        run: python -m pytest test/test_batch.py
+        run: |
+          PYTHONPATH=$PWD/gnomad_methods:$PWD/seqr-loading-pipelines \
+          python -m pytest test/test_${{ matrix.suffix }}.py

@@ -22,7 +22,6 @@ class Combiner(CohortStage):
                 vds_version = f'v{vds_version}'
 
         vds_version = vds_version or get_workflow().output_version
-        vds_version = vds_version or cohort.alignment_inputs_hash()
         return cohort.analysis_dataset.prefix() / 'vds' / f'{vds_version}.vds'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -42,6 +41,7 @@ class Combiner(CohortStage):
                 .get('dataproc', {})
                 .get('combiner_autoscaling_policy')
             ),
+            depends_on=inputs.get_jobs(cohort),
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 

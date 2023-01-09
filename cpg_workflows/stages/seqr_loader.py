@@ -7,7 +7,6 @@ Hail Query stages for the Seqr loader workflow.
 from cpg_utils import to_path, Path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import reference_path
 from cpg_workflows.workflow import (
     stage,
     StageInput,
@@ -23,7 +22,7 @@ from cpg_workflows.jobs.seqr_loader import annotate_cohort_jobs, annotate_datase
 from .joint_genotyping import JointGenotyping
 from .vep import Vep
 from .vqsr import Vqsr
-from .. import get_cohort, get_batch
+from .. import get_batch
 
 
 @stage(required_stages=[JointGenotyping, Vqsr, Vep])
@@ -86,10 +85,13 @@ class AnnotateDataset(DatasetStage):
         """
         Expected to generate a matrix table
         """
-        h = get_cohort().alignment_inputs_hash()
         return {
             'tmp_prefix': str(self.tmp_prefix / dataset.name),
-            'mt': dataset.prefix() / 'mt' / f'{h}-{dataset.name}.mt',
+            'mt': (
+                dataset.prefix()
+                / 'mt'
+                / f'{get_workflow().output_version}-{dataset.name}.mt'
+            ),
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -179,32 +181,46 @@ class MtToEs(DatasetStage):
         # we are not importing it on the top level.
         from analysis_runner import dataproc
 
-        script_path = 'cpg_workflows/dataproc_scripts/mt_to_es.py'
-        pyfiles = ['seqr-loading-pipelines/hail_scripts']
-
-        j = dataproc.hail_dataproc_job(
-            get_batch(),
-            f'{script_path} '
+        script = (
+            f'cpg_workflows/dataproc_scripts/mt_to_es.py '
             f'--mt-path {dataset_mt_path} '
             f'--es-index {index_name} '
             f'--done-flag-path {done_flag_path} '
-            f'--es-password {es_password()}',
-            max_age='48h',
-            packages=[
-                'cpg_workflows',
-                'elasticsearch==8.*',
-                'google',
-                'fsspec',
-                'gcloud',
-            ],
-            num_workers=2,
-            num_secondary_workers=0,
-            job_name=f'{dataset.name}: create ES index',
-            depends_on=inputs.get_jobs(dataset),
-            scopes=['cloud-platform'],
-            pyfiles=pyfiles,
-            init=['gs://cpg-reference/hail_dataproc/install_common.sh'],
+            f'--es-password {es_password()}'
         )
+        pyfiles = ['seqr-loading-pipelines/hail_scripts']
+        job_name = f'{dataset.name}: create ES index'
+
+        if cluster_id := get_config()['hail'].get('dataproc', {}).get('cluster_id'):
+            # noinspection PyProtectedMember
+            j = dataproc._add_submit_job(
+                batch=get_batch(),
+                cluster_id=cluster_id,
+                script=script,
+                pyfiles=pyfiles,
+                job_name=job_name,
+                region='australia-southeast1',
+            )
+        else:
+            j = dataproc.hail_dataproc_job(
+                get_batch(),
+                script,
+                max_age='48h',
+                packages=[
+                    'cpg_workflows',
+                    'elasticsearch==8.*',
+                    'google',
+                    'fsspec',
+                    'gcloud',
+                ],
+                num_workers=2,
+                num_secondary_workers=0,
+                job_name=job_name,
+                depends_on=inputs.get_jobs(dataset),
+                scopes=['cloud-platform'],
+                pyfiles=pyfiles,
+                init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
+            )
         j._preemptible = False
         j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}
         jobs = [j]

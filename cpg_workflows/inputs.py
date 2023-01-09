@@ -173,19 +173,21 @@ def _populate_analysis(cohort: Cohort) -> None:
         )
         for sample in dataset.get_samples():
             if (analysis := gvcf_by_sid.get(sample.id)) and analysis.output:
-                if analysis.output != sample.make_gvcf_path().path:
-                    logging.warning(
-                        f'GVCF path {analysis.output} does not match expected '
-                        f'{sample.make_gvcf_path().path}'
-                    )
-                sample.gvcf = analysis.output
+                assert analysis.output == sample.make_gvcf_path().path, (
+                    analysis.output,
+                    sample.make_gvcf_path().path,
+                )
+                sample.gvcf = sample.make_gvcf_path()
+            elif sample.make_gvcf_path().exists():
+                sample.gvcf = sample.make_gvcf_path()
             if (analysis := cram_by_sid.get(sample.id)) and analysis.output:
-                if analysis.output != sample.make_cram_path().path:
-                    logging.warning(
-                        f'CRAM path {analysis.output} does not match expected '
-                        f'{sample.make_cram_path().path}'
-                    )
-                sample.cram = analysis.output
+                assert analysis.output == sample.make_cram_path().path, (
+                    analysis.output,
+                    sample.make_cram_path().path,
+                )
+                sample.cram = sample.make_cram_path()
+            elif sample.make_cram_path().exists():
+                sample.cram = sample.make_cram_path()
 
 
 def _populate_participants(cohort: Cohort) -> None:

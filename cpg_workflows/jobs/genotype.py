@@ -68,7 +68,7 @@ def haplotype_caller(
     scatter_count: int,
     job_attrs: dict[str, str] | None = None,
     output_path: Path | None = None,
-    overwrite: bool = True,
+    overwrite: bool = False,
     dragen_mode: bool = True,
 ) -> list[Job]:
     """
@@ -137,7 +137,7 @@ def _haplotype_caller_one(
     job_attrs: dict | None = None,
     interval: hb.Resource | None = None,
     out_gvcf_path: Path | None = None,
-    overwrite: bool = True,
+    overwrite: bool = False,
     dragen_mode: bool = True,
 ) -> Job:
     """
@@ -220,7 +220,7 @@ def merge_gvcfs_job(
     gvcf_groups: list[hb.Resource],
     job_attrs: dict | None = None,
     out_gvcf_path: Path | None = None,
-    overwrite: bool = True,
+    overwrite: bool = False,
 ) -> Job:
     """
     Combine by-interval GVCFs into a single sample-wide GVCF file.
@@ -264,7 +264,7 @@ def postproc_gvcf(
     gvcf_path: GvcfPath,
     sample_name: str,
     job_attrs: dict | None = None,
-    overwrite: bool = True,
+    overwrite: bool = False,
     output_path: Path | None = None,
     depends_on: list[Job] | None = None,
 ) -> Job:
@@ -300,6 +300,7 @@ def postproc_gvcf(
     reference = fasta_res_group(b)
     noalt_regions = b.read_input(str(reference_path('broad/noalt_bed')))
     gvcf = b.read_input(str(gvcf_path.path))
+    gq_bands = get_config()['workflow']['reblock_gq_bands']
 
     assert isinstance(j.output_gvcf, hb.ResourceGroup)
 
@@ -329,7 +330,7 @@ def postproc_gvcf(
     --reference {reference.base} \\
     -V $GVCF_NODP \\
     -do-qual-approx \\
-    --floor-blocks -GQB 20 -GQB 30 -GQB 40 \\
+    --floor-blocks {' '.join(f'-GQB {b}' for b in gq_bands)} \\
     -O $REBLOCKED \\
     --create-output-variant-index true
 

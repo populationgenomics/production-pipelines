@@ -12,12 +12,13 @@ from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
 from cpg_workflows.workflow import run_workflow, StageDecorator
-from cpg_workflows.stages.large_cohort import LoadVqsr, Frequencies
+from cpg_workflows.stages.large_cohort import LoadVqsr, Frequencies, AncestryPlots
 from cpg_workflows.stages.cram_qc import CramMultiQC
 from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.seqr_loader import MtToEs, AnnotateDataset
 from cpg_workflows.stages.gatk_sv import ClusterBatch
+from cpg_workflows.stages.stripy import Stripy
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
 coloredlogs.install(level='INFO', fmt=fmt)
@@ -25,8 +26,8 @@ coloredlogs.install(level='INFO', fmt=fmt)
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'pre_alignment': [FastQCMultiQC],
-    'seqr_loader': [AnnotateDataset, MtToEs, GvcfMultiQC, CramMultiQC],
-    'large_cohort': [LoadVqsr, Frequencies, GvcfMultiQC, CramMultiQC],
+    'seqr_loader': [AnnotateDataset, MtToEs, GvcfMultiQC, CramMultiQC, Stripy],
+    'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
     'gatk_sv': [ClusterBatch],
 }
 
@@ -37,7 +38,6 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     '--config',
     'config_paths',
     multiple=True,
-    type=click.Path(exists=True),
     help='Add configuration files to the files specified $CPG_CONFIG_PATH.'
     'Configs are merged left to right, meaning the rightmost file has the'
     'highest priority.',
@@ -92,6 +92,10 @@ def main(
 
     wfl_conf_path = to_path(__file__).parent / f'configs/defaults/{workflow}.toml'
     assert wfl_conf_path.exists(), wfl_conf_path
+
+    for path in config_paths:
+        assert to_path(path).exists(), path
+
     config_paths = os.environ['CPG_CONFIG_PATH'].split(',') + list(config_paths)
     # Assuming the defaults is already loaded in __init__.py:
     assert to_path(config_paths[0]) == defaults_config_path

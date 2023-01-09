@@ -212,7 +212,7 @@ Metamist metadata:
 
 ```
 'is_female': bool
-'autosomal_mean_dp': float64
+'var_data_chr20_mean_dp': float64
 'chrX_mean_dp': float64
 'chrX_ploidy': float64
 'chrY_mean_dp': float64
@@ -610,7 +610,7 @@ Check `configs/defaults` for possible configuration parameters. It also provides
 ```toml
 [workflow]
 image_registry_prefix = 'australia-southeast1-docker.pkg.dev/cpg-common/images'
-reference_prefix = 'gs://cpg-reference'
+reference_prefix = 'gs://cpg-common-main/references'
 web_url_template = 'https://{namespace}-web.populationgenomics.org.au/{dataset}'
 
 [images]

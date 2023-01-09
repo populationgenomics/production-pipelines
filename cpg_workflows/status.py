@@ -1,18 +1,24 @@
 """
-Record workflow progress.
+Workflow state provider.
 """
-import logging
-from textwrap import dedent
+import inspect
 from abc import ABC, abstractmethod
+from typing import Callable, Any
 
 from cpg_utils import Path
 from cpg_utils.hail_batch import command, image_path
 from hailtop.batch.job import Job
-from hailtop.batch import Batch, Resource
+from hailtop.batch import Batch
 
 from . import get_cohort
 from .targets import Target, Cohort
 from .metamist import get_metamist, AnalysisStatus, MetamistError, AnalysisType
+
+
+class StateProviderError(Exception):
+    """
+    Error thrown by StatusReporter.
+    """
 
 
 class StateProvider(ABC):
@@ -101,10 +107,11 @@ class StateProvider(ABC):
         b: Batch,
         entry_id: int,
         status: AnalysisStatus,
-        analysis_type: str | None = None,
+        analysis_type: str | None = None,,
         job_attrs: dict | None = None,
         outputs: dict | str | Path | None = None,
         main_output_key: str | None = None,
+        update_analysis_meta: Callable[[str], dict] | None = None,
     ) -> Job:
         """
         Create a Hail Batch job that updates status of analysis. For status=COMPLETED,
@@ -117,7 +124,10 @@ class StateProvider(ABC):
         j = b.new_job(job_name, job_attrs)
         j.image(image_path('cpg_workflows'))
 
-        calc_size_script = None
+        meta_updaters_definitions = ''
+        meta_updaters_funcs: list[Callable[[str], dict]] = []
+        
+        output_path = None
         if outputs:
             if isinstance(outputs, dict):
                 output_path = outputs[main_output_key]
@@ -125,36 +135,68 @@ class StateProvider(ABC):
                 assert isinstance(outputs, str | Path)
                 output_path = outputs
             assert isinstance(output_path, str | Path)
-            calc_size_script = f"""
-        from cloudpathlib import CloudPath
-        meta['size'] = CloudPath('{str(output_path)}').stat().st_size
-        """
-        cmd = dedent(
-            f"""\
-        cat <<EOT >> update.py
-        {calc_size_script}
-        {self.updater_script(entry_id=entry_id, status=status)}
-        EOT
-        python3 update.py
-        """
-        )
+
+            if isinstance(output_path, Path):
+                meta_updaters_funcs.append(_calculate_size)
+            if update_analysis_meta:
+                meta_updaters_funcs.append(update_analysis_meta)
+
+            for func in meta_updaters_funcs:
+                definition = inspect.getsource(func)
+                if not definition.startswith('def '):
+                    raise StateProviderError(
+                        f'Status updater must be a module-level function: {str(func)}'
+                    )
+                meta_updaters_definitions += definition + '\n'
+
+        cmd = f"""
+cat <<EOT >> update.py
+
+from typing import Any, Callable
+
+{meta_updaters_definitions}
+
+{inspect.getsource(self.get_status_updater_function())}
+
+{self.get_status_updater_function().__name__}(
+    analysis_id={entry_id},
+    new_status="{status.value}",
+    updater_funcs=[{', '.join(f.__name__ for f in meta_updaters_funcs)}],
+    output_path={'"' + str(output_path) + '"' if output_path else 'None'},
+)
+
+EOT
+python3 update.py
+"""
+
         j.command(command(cmd, rm_leading_space=False, setup_gcp=True))
         return j
 
     @abstractmethod
-    def updater_script(self, entry_id: int, status: AnalysisStatus) -> str:
+    def get_status_updater_function(self) -> Callable:
         pass
+
+
+def _calculate_size(output_path: str) -> dict[str, Any]:
+    """
+    Self-contained function to calculate size of an object at given path.
+    @param output_path: remote path of the output file
+    @return: dictionary to merge into Analysis.meta
+    """
+    from cloudpathlib import CloudPath
+
+    size = CloudPath(str(output_path)).stat().st_size
+    return dict(size=size)
 
 
 class MetamistStateProvider(StateProvider):
     """
-    Works through creating and updating Metamist's Analysis entries.
+    Job status reporter. Works through creating and updating metamist Analysis entries.
     """
 
     def __init__(self):
         super().__init__()
 
-    @abstractmethod
     def read_state(
         self, cohort: Cohort, run_id: str
     ) -> dict[str, dict[str, AnalysisStatus]]:
@@ -176,20 +218,68 @@ class MetamistStateProvider(StateProvider):
             )
             for sample in dataset.get_samples():
                 if (analysis := gvcf_by_sid.get(sample.id)) and analysis.output:
-                    if analysis.output != sample.make_gvcf_path().path:
-                        logging.warning(
-                            f'GVCF path {analysis.output} does not match expected '
-                            f'{sample.make_gvcf_path().path}'
-                        )
-                    sample.gvcf = analysis.output
+                    assert analysis.output == sample.make_gvcf_path().path, (
+                        analysis.output,
+                        sample.make_gvcf_path().path,
+                    )
+                    sample.gvcf = sample.make_gvcf_path()
+                elif sample.make_gvcf_path().exists():
+                    sample.gvcf = sample.make_gvcf_path()
                 if (analysis := cram_by_sid.get(sample.id)) and analysis.output:
-                    if analysis.output != sample.make_cram_path().path:
-                        logging.warning(
-                            f'CRAM path {analysis.output} does not match expected '
-                            f'{sample.make_cram_path().path}'
-                        )
-                    sample.cram = analysis.output
+                    assert analysis.output == sample.make_cram_path().path, (
+                        analysis.output,
+                        sample.make_cram_path().path,
+                    )
+                    sample.cram = sample.make_cram_path()
+                elif sample.make_cram_path().exists():
+                    sample.cram = sample.make_cram_path()
         return {}
+
+    def get_status_updater_function(self) -> Callable:
+        """
+        Get self-contained function that updates the status of a job.
+        """
+
+        def _update_analysis_status(
+            analysis_id: int,
+            new_status: str,
+            updater_funcs: list[Callable[[str], dict[str, Any]]] | None = None,
+            output_path: str | None = None,
+        ) -> None:
+            """
+            Self-contained function to update Metamist analysis entry.
+            @param analysis_id: ID of Analysis entry
+            @param new_status: new status to assign to the entry
+            @param updater_funcs: list of functions to update the entry's metadata,
+            assuming output_path as input parameter
+            @param output_path: remote path of the output file, to be passed to the updaters
+            """
+            from sample_metadata.apis import AnalysisApi
+            from sample_metadata.models import AnalysisUpdateModel
+            from sample_metadata import exceptions
+            from sample_metadata.model.analysis_status import (
+                AnalysisStatus as MmAnalysisStatus,
+            )
+            import traceback
+
+            meta: dict[str, Any] = dict()
+            if output_path and updater_funcs:
+                for func in updater_funcs or []:
+                    meta |= func(output_path)
+
+            aapi = AnalysisApi()
+            try:
+                aapi.update_analysis_status(
+                    analysis_id=analysis_id,
+                    analysis_update_model=AnalysisUpdateModel(
+                        status=MmAnalysisStatus(new_status),
+                        meta=meta,
+                    ),
+                )
+            except exceptions.ApiException:
+                traceback.print_exc()
+
+        return _update_analysis_status
 
     def record_status(
         self,
@@ -219,37 +309,3 @@ class MetamistStateProvider(StateProvider):
             meta=meta,
             dataset=dataset,
         )
-
-    @abstractmethod
-    def updater_script(self, entry_id: int, status: AnalysisStatus) -> str:
-        return f"""
-        from sample_metadata.apis import AnalysisApi
-        from sample_metadata.models import AnalysisUpdateModel, AnalysisStatus
-        from sample_metadata import exceptions
-        import traceback
-
-        meta = dict()
-        aapi = AnalysisApi()
-        try:
-            aapi.update_analysis_status(
-                analysis_id={entry_id},
-                analysis_update_model=AnalysisUpdateModel(
-                    status=AnalysisStatus('{status.value}'),
-                    meta=meta,
-                ),
-            )
-        except exceptions.ApiException:
-            traceback.print_exc()
-        """
-
-
-class FSStateProvider(StateProvider):
-    """
-    Works through checking stage's outputs existence on the file system.
-    """
-
-
-class JsonFileStateProvider(StateProvider):
-    """
-    Works through updating a JSON file.
-    """

@@ -63,7 +63,7 @@ def subset_vcf(
 
 def gather_vcfs(
     b: hb.Batch,
-    input_vcfs: list[hb.ResourceFile],
+    input_vcfs: list[hb.ResourceGroup],
     out_vcf_path: Path | None = None,
     site_only: bool = False,
     sample_count: int | None = None,
@@ -79,7 +79,7 @@ def gather_vcfs(
 
     @param b: Batch object
     @param input_vcfs: list of Hail Batch ResourceFiles pointing to
-        interval-split VCFs
+        interval-split VCFs indexed with tabix
     @param out_vcf_path: path to permanently write the resulting VCFs
     @param site_only: input VCFs are site-only
     @param sample_count: number of samples used for input VCFs (to determine the
@@ -92,32 +92,22 @@ def gather_vcfs(
     gathered_vcf: hb.ResourceFile
 
     if not can_reuse(out_vcf_path):
-        job_name = f'Gather {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
-        j = b.new_job(job_name, (job_attrs or {}) | {'tool': 'gatk GatherVcfsCloud'})
-        j.image(image_path('gatk'))
-        res = STANDARD.set_resources(
+        job_name = f'Merge {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
+        j = b.new_job(job_name, (job_attrs or {}) | {'tool': 'bcftools merge'})
+        j.image(image_path('bcftools'))
+        STANDARD.set_resources(
             j, storage_gb=storage_for_joint_vcf(sample_count, site_only)
         )
-
-        input_cmdl = ' '.join([f'--input {v}' for v in input_vcfs])
         cmd = f"""
-        # --ignore-safety-checks makes a big performance difference so we include it in 
-        # our invocation. This argument disables expensive checks that the file headers 
-        # contain the same set of genotyped samples and that files are in order 
-        # by position of first record.
-        gatk --java-options -Xms{res.get_java_mem_mb()}m \\
-        GatherVcfsCloud \\
-        --ignore-safety-checks \\
-        --gather-type BLOCK \\
-        {input_cmdl} \\
-        --output $BATCH_TMPDIR/gathered.vcf.gz
-        mv $BATCH_TMPDIR/gathered.vcf.gz {j.output_vcf}
+        bcftools merge {" ".join(vcf["vcf.gz"] for vcf in input_vcfs)} \
+        -Oz -o {j.output_vcf}
         """
         j.command(command(cmd, monitor_space=True))
         if not sort and out_vcf_path:
             b.write_output(j.output_vcf, str(out_vcf_path))
         assert isinstance(j.output_vcf, hb.ResourceFile)
         gathered_vcf = j.output_vcf
+        jobs.append(j)
     else:
         gathered_vcf = b.read_input(str(out_vcf_path))
 

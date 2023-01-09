@@ -4,28 +4,10 @@ Test building Workflow object.
 
 import toml
 from pytest_mock import MockFixture
-
 from cpg_utils import to_path, Path
-from cpg_utils.config import set_config_paths, update_dict
-from cpg_utils.hail_batch import dataset_path
-from cpg_workflows import get_batch
-from cpg_workflows.inputs import get_cohort
-from cpg_workflows.targets import Sample, Cohort
-from cpg_workflows.utils import timestamp
-from cpg_workflows.workflow import (
-    SampleStage,
-    StageInput,
-    StageOutput,
-    CohortStage,
-    stage,
-    run_workflow,
-)
+from . import results_prefix
 
-tmp_dir_path = to_path(__file__).parent / 'results' / timestamp()
-tmp_dir_path = tmp_dir_path.absolute()
-tmp_dir_path.mkdir(parents=True, exist_ok=True)
-
-DEFAULT_CONF = f"""
+TOML = f"""
 [workflow]
 dataset_gcp_project = 'fewgenomes'
 access_level = 'test'
@@ -37,6 +19,12 @@ check_intermediates = false
 check_expected_outputs = false
 path_scheme = 'local'
 
+[storage.default]
+default = '{results_prefix()}'
+
+[storage.fewgenomes]
+default = '{results_prefix()}'
+
 [hail]
 billing_project = 'fewgenomes'
 delete_scratch_on_exit = false
@@ -44,22 +32,24 @@ backend = 'local'
 """
 
 
-def _set_config(dir_path: Path, extra_conf: dict | None = None):
-    d = toml.loads(DEFAULT_CONF)
-    d['workflow']['local_dir'] = str(dir_path)
-    if extra_conf:
-        update_dict(d, extra_conf)
-    config_path = dir_path / 'config.toml'
-    with config_path.open('w') as f:
-        toml.dump(d, f)
-    set_config_paths([str(config_path)])
-
-
 def test_workflow(mocker: MockFixture):
     """
     Testing running a workflow from a mock cohort.
     """
-    _set_config(tmp_dir_path)
+    mocker.patch('cpg_utils.config.get_config', lambda: toml.loads(TOML))
+
+    from cpg_utils.hail_batch import dataset_path
+    from cpg_workflows import get_batch
+    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.targets import Sample, Cohort
+    from cpg_workflows.workflow import (
+        SampleStage,
+        StageInput,
+        StageOutput,
+        CohortStage,
+        stage,
+        run_workflow,
+    )
 
     def mock_create_cohort() -> Cohort:
         c = Cohort()

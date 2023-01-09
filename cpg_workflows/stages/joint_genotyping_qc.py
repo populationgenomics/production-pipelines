@@ -1,6 +1,7 @@
 """
 Stage that summarises QC.
 """
+from typing import Any
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
@@ -12,6 +13,7 @@ from cpg_workflows.workflow import (
     StageInputNotFoundError,
     Cohort,
     SampleStage,
+    get_workflow,
 )
 
 from cpg_workflows.jobs.multiqc import multiqc
@@ -32,8 +34,13 @@ class JointVcfQC(CohortStage):
         """
         Generate a pVCF and a site-only VCF.
         """
-        h = cohort.alignment_inputs_hash()
-        qc_prefix = cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / 'picard'
+        qc_prefix = (
+            cohort.analysis_dataset.prefix()
+            / 'qc'
+            / 'jc'
+            / get_workflow().output_version
+            / 'picard'
+        )
         d = {
             'qc_summary': to_path(f'{qc_prefix}.variant_calling_summary_metrics'),
             'qc_detail': to_path(f'{qc_prefix}.variant_calling_detail_metrics'),
@@ -77,13 +84,12 @@ class JointVcfHappy(SampleStage):
         ):
             return None
 
-        h = get_cohort().alignment_inputs_hash()
         return (
             get_cohort().analysis_dataset.prefix()
             / 'qc'
             / 'jc'
             / 'hap.py'
-            / f'{h}-{sample.id}.summary.csv'
+            / f'{get_workflow().output_version}-{sample.id}.summary.csv'
         )
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
@@ -112,12 +118,24 @@ class JointVcfHappy(SampleStage):
             return self.make_outputs(sample, self.expected_outputs(sample), jobs)
 
 
+def _update_meta(output_path: str) -> dict[str, Any]:
+    from cloudpathlib import CloudPath
+    import json
+
+    with CloudPath(output_path).open() as f:
+        d = json.load(f)
+    return {'multiqc': d['report_general_stats_data']}
+
+
 @stage(
     required_stages=[
         JointVcfQC,
         JointVcfHappy,
     ],
     forced=True,
+    analysis_type='qc',
+    analysis_key='json',
+    update_analysis_meta=_update_meta,
 )
 class JointVcfMultiQC(CohortStage):
     """
@@ -131,15 +149,18 @@ class JointVcfMultiQC(CohortStage):
         if get_config()['workflow'].get('skip_qc', False) is True:
             return {}
 
-        h = cohort.alignment_inputs_hash()
         return {
             'html': cohort.analysis_dataset.web_prefix() / 'qc' / 'jc' / 'multiqc.html',
             'json': cohort.analysis_dataset.prefix()
             / 'qc'
             / 'jc'
-            / h
+            / get_workflow().output_version
             / 'multiqc_data.json',
-            'checks': cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / '.checks',
+            'checks': cohort.analysis_dataset.prefix()
+            / 'qc'
+            / 'jc'
+            / get_workflow().output_version
+            / '.checks',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:

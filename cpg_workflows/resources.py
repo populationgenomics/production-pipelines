@@ -317,6 +317,9 @@ def joint_calling_scatter_count(sample_count: int) -> int:
     Number of partitions for joint-calling jobs (GenotypeGVCFs, VQSR, VEP),
     as a function of the sample number.
     """
+    if scatter_count := get_config()['workflow'].get('scatter_count'):
+        return scatter_count
+
     for _sample_count, scatter_count in {
         4000: 1000,
         3000: 800,

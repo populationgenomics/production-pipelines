@@ -17,6 +17,7 @@ from cpg_utils.config import get_config, set_config_paths
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.status import MetamistStateProvider
 from cpg_workflows.utils import exists
+from cpg_workflows.workflow import get_workflow
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
@@ -30,10 +31,11 @@ COMMANDS = ['analyses', 'qc', 'joint-calling', 'es-index']
 @click.option('--config', 'config_paths', multiple=True)
 def main(command: str, config_paths: list[str]):
     if _env_var := os.environ.get('CPG_CONFIG_PATH'):
-        config_paths += list(_env_var.split(',')) + list(config_paths)
+        config_paths = list(_env_var.split(',')) + list(config_paths)
     set_config_paths(list(config_paths))
 
     sequencing_type = get_config()['workflow']['sequencing_type']
+    wfl = get_workflow()
     cohort = get_cohort()
     status = MetamistStateProvider()
 
@@ -126,8 +128,7 @@ def main(command: str, config_paths: list[str]):
             )
 
     if command == 'joint-calling':
-        h = cohort.alignment_inputs_hash()
-        path = cohort.analysis_dataset.prefix() / 'mt' / f'{h}.mt'
+        path = cohort.analysis_dataset.prefix() / 'mt' / f'{wfl.output_version}.mt'
         if exists(path):
             status.record_status(
                 str(path),
@@ -145,17 +146,17 @@ def main(command: str, config_paths: list[str]):
         names = []
         if sequencing_type == 'genome':
             names = [
-                'acute-care-genome-2022_0815_1644_xkhvx',
-                'validation-genome-2022_0810_2358_474tt',
-                'ravenscroft-arch-genome-2022_0618_1137_4qfyn',
-                'circa-genome-2022_0618_1137_4qfyn',
-                'ohmr3-mendelian-genome-2022_0618_1137_4qfyn',
-                'mito-disease-genome-2022_0618_1137_4qfyn',
-                'perth-neuro-genome-2022_0618_1137_4qfyn',
-                'ohmr4-epilepsy-genome-2022_0618_1137_4qfyn',
-                'hereditary-neuro-genome-2022_0618_1137_4qfyn',
-                'ravenscroft-rdstudy-genome-2022_0618_1137_4qfyn',
-                'heartkids-genome-2022_0618_1137_4qfyn',
+                'acute-care-genome-2022_1111_1947_54vza',
+                # 'validation-genome-2022_0810_2358_474tt',
+                # 'ravenscroft-arch-genome-2022_0618_1137_4qfyn',
+                # 'circa-genome-2022_0618_1137_4qfyn',
+                # 'ohmr3-mendelian-genome-2022_0618_1137_4qfyn',
+                # 'mito-disease-genome-2022_0618_1137_4qfyn',
+                # 'perth-neuro-genome-2022_0618_1137_4qfyn',
+                # 'ohmr4-epilepsy-genome-2022_0618_1137_4qfyn',
+                # 'hereditary-neuro-genome-2022_0618_1137_4qfyn',
+                # 'ravenscroft-rdstudy-genome-2022_0618_1137_4qfyn',
+                # 'heartkids-genome-2022_0618_1137_4qfyn',
             ]
         if sequencing_type == 'exome':
             names = [

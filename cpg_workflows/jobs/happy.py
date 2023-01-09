@@ -37,8 +37,8 @@ def happy(
     if not truth_sample_id:
         return
 
-    truth_vcf_path = reference_path(f'validation/{truth_sample_id}/truth')
-    truth_bed_path = reference_path(f'validation/{truth_sample_id}/regions')
+    truth_vcf_path = reference_path(f'{truth_sample_id}/truth_vcf')
+    truth_bed_path = reference_path(f'{truth_sample_id}/regions_bed')
 
     input_file: str
     if is_gvcf:
@@ -74,7 +74,7 @@ def happy(
     job_name = f'hap.py ({"GVCF" if is_gvcf else "VCF"})'
     job_attrs = (job_attrs or {}) | dict(tool='hap.py')
     j = b.new_job(job_name, job_attrs)
-    j.image(image_path('hap.py'))
+    j.image(image_path('hap-py'))
     reference = fasta_res_group(b)
     res = STANDARD.set_resources(j, fraction=1)
     cmd = f"""\

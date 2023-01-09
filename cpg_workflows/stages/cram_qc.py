@@ -3,7 +3,7 @@ Stages that generates and summarises CRAM QC.
 """
 import logging
 import dataclasses
-from typing import Callable, Optional
+from typing import Callable, Optional, Any
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
@@ -145,7 +145,7 @@ class CramQC(SampleStage):
                     get_batch(),
                     CramPath(cram_path, crai_path),
                     job_attrs=self.get_job_attrs(sample),
-                    overwrite=not get_config()['workflow'].get('check_intermediates'),
+                    overwrite=sample.forced,
                     **out_path_kwargs,
                 )
                 if j:
@@ -233,12 +233,24 @@ class SomalierPedigree(DatasetStage):
             return self.make_outputs(dataset, skipped=True)
 
 
+def _update_meta(output_path: str) -> dict[str, Any]:
+    from cloudpathlib import CloudPath
+    import json
+
+    with CloudPath(output_path).open() as f:
+        d = json.load(f)
+    return {'multiqc': d['report_general_stats_data']}
+
+
 @stage(
     required_stages=[
         CramQC,
         SomalierPedigree,
     ],
     forced=True,
+    analysis_type='qc',
+    analysis_key='json',
+    update_analysis_meta=_update_meta,
 )
 class CramMultiQC(DatasetStage):
     """
