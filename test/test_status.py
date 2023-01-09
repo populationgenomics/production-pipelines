@@ -16,7 +16,6 @@ access_level = 'test'
 dataset = 'fewgenomes'
 driver_image = '<stub>'
 sequencing_type = 'genome'
-status_reporter = 'metamist'
 
 check_inputs = false
 check_intermediates = false
@@ -37,20 +36,23 @@ dry_run = true
 """
 
 
-def _mock_config() -> dict:
-    d: dict = {}
-    for fp in [
-        to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml',
-        to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml',
-    ]:
-        with fp.open():
-            update_dict(d, toml.load(fp))
+def _common(mocker, state_provider='metamist'):
+    def _mock_config() -> dict:
+        d: dict = {}
+        for fp in [
+            to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml',
+            to_path(__file__).parent.parent
+            / 'configs'
+            / 'defaults'
+            / 'seqr_loader.toml',
+        ]:
+            with fp.open():
+                update_dict(d, toml.load(fp))
+        d['workflow']['state_provider'] = state_provider
 
-    update_dict(d, toml.loads(TOML))
-    return d
+        update_dict(d, toml.loads(TOML))
+        return d
 
-
-def _common(mocker):
     mocker.patch('cpg_utils.config.get_config', _mock_config)
 
     def mock_create_new_analysis(_, project, analysis_model) -> int:

@@ -99,6 +99,9 @@ class StateProvider(ABC):
             target=target,
             status=AnalysisStatus.COMPLETED,
             job_attrs=job_attrs,
+            outputs=outputs,
+            main_output_key=main_output_key,
+            update_analysis_meta=update_analysis_meta,
         )
 
         in_progress_j.depends_on(*(prev_jobs or []))
@@ -163,12 +166,11 @@ class StateProvider(ABC):
 cat <<EOT >> update.py
 
 from typing import Any, Callable
+from cpg_workflows.status import {self.__class__.__name__}
 
 {meta_updaters_definitions}
 
-{inspect.getsource(self.get_status_updater_function())}
-
-{self.get_status_updater_function().__name__}(
+{self.__class__.__name__}.update_status(
     entry_id="{entry_id}",
     new_status="{status.value}",
     updater_funcs=[{', '.join(f.__name__ for f in meta_updaters_funcs)}],
@@ -182,8 +184,14 @@ python3 update.py
         j.command(command(cmd, rm_leading_space=False, setup_gcp=True))
         return j
 
+    @staticmethod
     @abstractmethod
-    def get_status_updater_function(self) -> Callable:
+    def update_status(
+        entry_id: str,
+        new_status: str,
+        updater_funcs: list[Callable[[str], dict[str, Any]]] | None = None,
+        output_path: str | None = None,
+    ):
         pass
 
 
@@ -261,51 +269,45 @@ class MetamistStateProvider(StateProvider):
             )
         return entry_id
 
-    def get_status_updater_function(self) -> Callable:
+    @staticmethod
+    def update_status(
+        entry_id: str,
+        new_status: str,
+        updater_funcs: list[Callable[[str], dict[str, Any]]] | None = None,
+        output_path: str | None = None,
+    ) -> None:
         """
-        Get self-contained function that updates the status of a job.
+        Self-contained function to update Metamist analysis entry.
+        @param entry_id: ID of the Analysis entry
+        @param new_status: new status to assign to the entry
+        @param updater_funcs: list of functions to update the entry's metadata,
+        assuming output_path as input parameter
+        @param output_path: remote path of the output file, to be passed to the updaters
         """
+        from sample_metadata.apis import AnalysisApi
+        from sample_metadata.models import AnalysisUpdateModel
+        from sample_metadata import exceptions
+        from sample_metadata.model.analysis_status import (
+            AnalysisStatus as MmAnalysisStatus,
+        )
+        import traceback
 
-        def _update_analysis_status(
-            entry_id: str,
-            new_status: str,
-            updater_funcs: list[Callable[[str], dict[str, Any]]] | None = None,
-            output_path: str | None = None,
-        ) -> None:
-            """
-            Self-contained function to update Metamist analysis entry.
-            @param entry_id: ID of the Analysis entry
-            @param new_status: new status to assign to the entry
-            @param updater_funcs: list of functions to update the entry's metadata,
-            assuming output_path as input parameter
-            @param output_path: remote path of the output file, to be passed to the updaters
-            """
-            from sample_metadata.apis import AnalysisApi
-            from sample_metadata.models import AnalysisUpdateModel
-            from sample_metadata import exceptions
-            from sample_metadata.model.analysis_status import (
-                AnalysisStatus as MmAnalysisStatus,
+        meta: dict[str, Any] = dict()
+        if output_path and updater_funcs:
+            for func in updater_funcs or []:
+                meta |= func(output_path)
+
+        aapi = AnalysisApi()
+        try:
+            aapi.update_analysis_status(
+                analysis_id=int(entry_id),
+                analysis_update_model=AnalysisUpdateModel(
+                    status=MmAnalysisStatus(new_status),
+                    meta=meta,
+                ),
             )
-            import traceback
-
-            meta: dict[str, Any] = dict()
-            if output_path and updater_funcs:
-                for func in updater_funcs or []:
-                    meta |= func(output_path)
-
-            aapi = AnalysisApi()
-            try:
-                aapi.update_analysis_status(
-                    analysis_id=int(entry_id),
-                    analysis_update_model=AnalysisUpdateModel(
-                        status=MmAnalysisStatus(new_status),
-                        meta=meta,
-                    ),
-                )
-            except exceptions.ApiException:
-                traceback.print_exc()
-
-        return _update_analysis_status
+        except exceptions.ApiException:
+            traceback.print_exc()
 
     def record_status(
         self,
@@ -317,7 +319,7 @@ class MetamistStateProvider(StateProvider):
         meta: dict | None = None,
         dataset: str | None = None,
         main_output_key: str | None = None,
-    ) -> int:
+    ):
         """
         Record status as an Analysis entry
         """
@@ -338,7 +340,7 @@ class MetamistStateProvider(StateProvider):
             output_path = outputs[main_output_key]
 
         assert isinstance(output_path, str | Path | None)
-        return get_metamist().create_analysis(
+        analysis_id = get_metamist().create_analysis(
             output=outputs,
             type_=analysis_type,
             status=status,
@@ -346,6 +348,7 @@ class MetamistStateProvider(StateProvider):
             meta=meta,
             dataset=dataset,
         )
+        self.analysis_entry_ids[(stage_name, target.target_id)] = str(analysis_id)
 
 
 class JsonFileStateProvider(StateProvider):
@@ -365,6 +368,9 @@ class JsonFileStateProvider(StateProvider):
     def make_json_path(self, stage_name: str, target: Target) -> Path:
         return self.prefix / f'{stage_name}-{target.target_id}.json'
 
+    def get_entry_id(self, stage_name: str, target: Target) -> str:
+        return str(self.make_json_path(stage_name, target))
+
     def record_status(
         self,
         outputs: dict | str | Path | None,
@@ -376,6 +382,10 @@ class JsonFileStateProvider(StateProvider):
         dataset: str | None = None,
         main_output_key: str | None = None,
     ) -> int:
+        if isinstance(outputs, dict):
+            outputs = {k: str(v) for k, v in outputs.items()}
+        else:
+            outputs = str(outputs)
         d = dict(
             outputs=outputs,
             type=analysis_type,
@@ -386,39 +396,39 @@ class JsonFileStateProvider(StateProvider):
         if dataset:
             d['dataset'] = dataset
 
-        with self.make_json_path(stage_name, target).open('w') as f:
+        path = self.make_json_path(stage_name, target)
+        with path.open('w') as f:
             json.dump(d, f)
             return 0
 
-    def get_status_updater_function(self) -> Callable:
-        path = self.make_json_path(stage_name, target)
+    @staticmethod
+    def update_status(
+        entry_id: str,
+        new_status: str,
+        updater_funcs: list[Callable[[str], dict[str, Any]]] | None = None,
+        output_path: str | None = None,
+    ) -> None:
+        """
+        Self-contained function to update Metamist analysis entry.
+        @param entry_id: ID of the status entry
+        @param new_status: new status to assign to the entry
+        @param updater_funcs: list of functions to update the entry's metadata,
+        assuming output_path as input parameter
+        @param output_path: remote path of the output file, to be passed to the updaters
+        """
+        import json
+        from cpg_utils import to_path
 
-        def _update_analysis_status(
-            entry_id: str,
-            new_status: str,
-            updater_funcs: list[Callable[[str], dict[str, Any]]] | None = None,
-            output_path: str | None = None,
-        ) -> None:
-            """
-            Self-contained function to update Metamist analysis entry.
-            @param entry_id: ID of the status entry
-            @param new_status: new status to assign to the entry
-            @param updater_funcs: list of functions to update the entry's metadata,
-            assuming output_path as input parameter
-            @param output_path: remote path of the output file, to be passed to the updaters
-            """
-            import json
+        path = to_path(entry_id)
 
-            meta: dict[str, Any] = dict()
-            if output_path and updater_funcs:
-                for func in updater_funcs or []:
-                    meta |= func(output_path)
+        meta: dict[str, Any] = dict()
+        if output_path and updater_funcs:
+            for func in updater_funcs or []:
+                meta |= func(output_path)
 
-            with path.open('r') as f:
-                d = json.load(f)
-            d['status'] = new_status
-            d['meta'] |= meta
-            with path.open('w') as f:
-                json.dump(d, f)
-
-        return _update_analysis_status
+        with path.open('r') as f:
+            d = json.load(f)
+        d['status'] = new_status
+        d['meta'] |= meta
+        with path.open('w') as f:
+            json.dump(d, f)

@@ -26,7 +26,12 @@ from cpg_utils.config import get_config
 from cpg_utils import Path
 
 from .batch import get_batch
-from .status import MetamistStateProvider, JsonFileStateProvider, StateProviderError
+from .status import (
+    MetamistStateProvider,
+    JsonFileStateProvider,
+    StateProviderError,
+    StateProvider,
+)
 from .targets import Target, Dataset, Sample, Cohort
 from .utils import exists, timestamp, slugify, ExpectedResultT
 from .inputs import get_cohort
@@ -503,12 +508,14 @@ class Stage(Generic[TargetT], ABC):
                 self.state_provider.wrap_jobs_with_status_updaters(
                     b=get_batch(),
                     outputs=outputs.data,
+                    stage_name=self.name,
                     analysis_type=self.analysis_type,
                     target=target,
                     jobs=outputs.jobs,
                     prev_jobs=inputs.get_jobs(target),
                     meta=outputs.meta,
                     job_attrs=self.get_job_attrs(target),
+                    main_output_key=self.analysis_key,
                     update_analysis_meta=self.update_analysis_meta,
                 )
             except StateProviderError as e:
@@ -813,11 +820,13 @@ class Workflow:
                 description += ' ' + ', '.join(sorted(ds_set))
             get_batch().name = description
 
-        self.state_provider = None
+        self.state_provider: StateProvider
         if get_config()['workflow'].get('state_provider') == 'metamist':
             self.state_provider = MetamistStateProvider()
         else:
-            self.state_provider = JsonFileStateProvider()
+            prefix = self.prefix / 'state' / self.output_version
+            prefix.mkdir(parents=True, exist_ok=True)
+            self.state_provider = JsonFileStateProvider(prefix=prefix)
         self._stages: list[StageDecorator] | None = stages
 
     @property
