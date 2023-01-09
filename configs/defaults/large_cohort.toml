@@ -48,3 +48,15 @@ delete_scratch_on_exit = false
 [references.gnomad]
 tel_and_cent_ht = "gs://cpg-common-main/references/gnomad/v0/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht"
 predetermined_qc_variants = "gs://cpg-common-main/references/gnomad/v0/sample_qc/pre_ld_pruning_qc_variants.ht"
+
+[slack]
+channel = 'workflows-qc'
+token_secret_id = 'slack-seqr-loader-token'
+token_project_id = 'seqr-308602'
+
+[qc_thresholds.genome.min]
+"MEDIAN_COVERAGE" = 10
+"PCT_PF_READS_ALIGNED" = 80
+[qc_thresholds.genome.max]
+"FREEMIX" = 0.04
+"PERCENT_DUPLICATION" = 25

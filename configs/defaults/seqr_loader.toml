@@ -41,7 +41,7 @@ pool_label = 'seqr'
 billing_project = 'seqr'
 
 [slack]
-channel = 'seqr-loader-test'
+channel = 'workflows-qc'
 token_secret_id = 'slack-seqr-loader-token'
 token_project_id = 'seqr-308602'
 

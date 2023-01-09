@@ -105,10 +105,11 @@ def run(
                         if is_fail(val, threshold):
                             line = f'{metric}={val:0.2f}{fail_sign}{threshold:0.2f}'
                             bad_lines_by_sample[sample].append(line)
-                            logging.info(f'⭕ {sample}: {line}')
+                            logging.info(f'❗ {sample}: {line}')
                         else:
                             line = f'{metric}={val:0.2f}{good_sign}{threshold:0.2f}'
                             logging.info(f'✅ {sample}: {line}')
+    logging.info('')
 
     # Constructing Slack message
     if dataset and html_url:
@@ -117,9 +118,9 @@ def run(
         title = 'MultiQC report'
     messages = []
     if bad_lines_by_sample:
-        messages.append(f'{title}')
+        messages.append(f'{title}. {len(bad_lines_by_sample)} samples are flagged:')
         for sample, bad_lines in bad_lines_by_sample.items():
-            messages.append(f'⭕ {sample}: ' + ', '.join(bad_lines))
+            messages.append(f'❗ {sample}: ' + ', '.join(bad_lines))
     else:
         messages.append(f'✅ {title}')
     text = '\n'.join(messages)
