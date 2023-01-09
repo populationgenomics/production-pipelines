@@ -166,7 +166,7 @@ class StateProvider(ABC):
 cat <<EOT >> update.py
 
 from typing import Any, Callable
-from cpg_workflows.status import {self.__class__.__name__}
+from cpg_workflows.state import {self.__class__.__name__}
 
 {meta_updaters_definitions}
 
@@ -327,13 +327,13 @@ class MetamistStateProvider(StateProvider):
         if isinstance(outputs, dict):
             if not main_output_key:
                 raise StateProviderError(
-                    f'Cannot create Analysis: `analysis_key` '
+                    f'Cannot create Analysis: analysis_key '
                     f'must be set with the @stage decorator to select value from '
                     f'the expected_outputs dict: {outputs}'
                 )
             if main_output_key not in outputs:
                 raise StateProviderError(
-                    f'Cannot create Analysis: `analysis_key` '
+                    f'Cannot create Analysis: analysis_key '
                     f'"{main_output_key}" is not found in the expected_outputs '
                     f'dict {outputs}'
                 )
