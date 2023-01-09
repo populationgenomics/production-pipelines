@@ -26,7 +26,7 @@ from cpg_utils.config import get_config
 from cpg_utils import Path
 
 from .batch import get_batch
-from .status import MetamistStateProvider, JsonFileStateProvider, FSStateProvider
+from .status import MetamistStateProvider, JsonFileStateProvider, StateProviderError
 from .targets import Target, Dataset, Sample, Cohort
 from .utils import exists, timestamp, slugify, ExpectedResultT
 from .inputs import get_cohort
@@ -499,37 +499,23 @@ class Stage(Generic[TargetT], ABC):
             and action == Action.QUEUE
             and outputs.data
         ):
-            output: str | Path
-            if isinstance(outputs.data, dict):
-                if not self.analysis_key:
-                    raise WorkflowError(
-                        f'Cannot create Analysis: `analysis_key` '
-                        f'must be set with the @stage decorator to select value from '
-                        f'the expected_outputs dict: {outputs.data}'
-                    )
-                if self.analysis_key not in outputs.data:
-                    raise WorkflowError(
-                        f'Cannot create Analysis for stage {self.name}: `analysis_key` '
-                        f'"{self.analysis_key}" is not found in the expected_outputs '
-                        f'dict {outputs.data}'
-                    )
-                output = outputs.data[self.analysis_key]
-            else:
-                output = outputs.data
+            try:
+                self.state_provider.wrap_jobs_with_status_updaters(
+                    b=get_batch(),
+                    outputs=outputs.data,
+                    analysis_type=self.analysis_type,
+                    target=target,
+                    jobs=outputs.jobs,
+                    prev_jobs=inputs.get_jobs(target),
+                    meta=outputs.meta,
+                    job_attrs=self.get_job_attrs(target),
+                    update_analysis_meta=self.update_analysis_meta,
+                )
+            except StateProviderError as e:
+                raise WorkflowError(
+                    f'Cannot create Analysis for stage {self.name}: {e}'
+                )
 
-            assert isinstance(output, str) or isinstance(output, Path), output
-
-            self.state_provider.wrap_jobs_with_status_updaters(
-                b=get_batch(),
-                output=output,
-                analysis_type=self.analysis_type,
-                target=target,
-                jobs=outputs.jobs,
-                prev_jobs=inputs.get_jobs(target),
-                meta=outputs.meta,
-                job_attrs=self.get_job_attrs(target),
-                update_analysis_meta=self.update_analysis_meta,
-            )
         return outputs
 
     def _get_action(self, target: TargetT) -> Action:
@@ -830,10 +816,8 @@ class Workflow:
         self.state_provider = None
         if get_config()['workflow'].get('state_provider') == 'metamist':
             self.state_provider = MetamistStateProvider()
-        if get_config()['workflow'].get('state_provider') == 'json_file':
-            self.state_provider = JsonFileStateProvider()
         else:
-            self.state_provider = FSStateProvider()
+            self.state_provider = JsonFileStateProvider()
         self._stages: list[StageDecorator] | None = stages
 
     @property

@@ -2,6 +2,7 @@
 Workflow state provider.
 """
 import inspect
+import json
 from abc import ABC, abstractmethod
 from typing import Callable, Any
 
@@ -64,6 +65,7 @@ class StateProvider(ABC):
         meta: dict | None = None,
         job_attrs: dict | None = None,
         main_output_key: str | None = None,
+        update_analysis_meta: Callable[[str], dict] | None = None,
     ) -> list[Job]:
         """
         Record QUEUED status for a stage, and insert jobs that update status to
@@ -72,7 +74,7 @@ class StateProvider(ABC):
         if not jobs:
             return []
 
-        entry_id: int = self.record_status(
+        self.record_status(
             outputs=outputs,
             status=AnalysisStatus.QUEUED,
             stage_name=stage_name,
@@ -85,14 +87,16 @@ class StateProvider(ABC):
         # 2. Queue a job that updates the status to IN_PROGRESS
         in_progress_j = self.add_status_updater_job(
             b,
-            entry_id=entry_id,
+            stage_name=stage_name,
+            target=target,
             status=AnalysisStatus.IN_PROGRESS,
             job_attrs=job_attrs,
         )
         # 2. Queue a job that updates the status to COMPLETED
         completed_j = self.add_status_updater_job(
             b,
-            entry_id=entry_id,
+            stage_name=stage_name,
+            target=target,
             status=AnalysisStatus.COMPLETED,
             job_attrs=job_attrs,
         )
@@ -101,10 +105,15 @@ class StateProvider(ABC):
         completed_j.depends_on(*jobs)
         return [in_progress_j, *jobs, completed_j]
 
+    @abstractmethod
+    def get_entry_id(self, stage_name: str, target: Target) -> str:
+        pass
+
     def add_status_updater_job(
         self,
         b: Batch,
-        entry_id: int,
+        stage_name: str,
+        target: Target,
         status: AnalysisStatus,
         analysis_type: str | None = None,
         job_attrs: dict | None = None,
@@ -148,6 +157,8 @@ class StateProvider(ABC):
                     )
                 meta_updaters_definitions += definition + '\n'
 
+        entry_id = self.get_entry_id(stage_name, target)
+
         cmd = f"""
 cat <<EOT >> update.py
 
@@ -158,7 +169,7 @@ from typing import Any, Callable
 {inspect.getsource(self.get_status_updater_function())}
 
 {self.get_status_updater_function().__name__}(
-    analysis_id={entry_id},
+    entry_id="{entry_id}",
     new_status="{status.value}",
     updater_funcs=[{', '.join(f.__name__ for f in meta_updaters_funcs)}],
     output_path={'"' + str(output_path) + '"' if output_path else 'None'},
@@ -195,6 +206,7 @@ class MetamistStateProvider(StateProvider):
 
     def __init__(self):
         super().__init__()
+        self.analysis_entry_ids: dict[tuple[str, str], str] = {}
 
     def read_state(
         self, cohort: Cohort, run_id: str
@@ -234,20 +246,35 @@ class MetamistStateProvider(StateProvider):
                     sample.cram = sample.make_cram_path()
         return {}
 
+    def get_entry_id(self, stage_name: str, target: Target) -> str:
+        """
+        Get entry ID for a given stage and target.
+        """
+        entry_id = self.analysis_entry_ids.get((stage_name, target.target_id))
+        if not entry_id:
+            raise StateProviderError(f'No entry ID for {stage_name} {target.target_id}')
+        try:
+            int_entry_id = int(entry_id)
+        except ValueError:
+            raise StateProviderError(
+                f'Metamist entry ID must be numerical, got {entry_id}'
+            )
+        return entry_id
+
     def get_status_updater_function(self) -> Callable:
         """
         Get self-contained function that updates the status of a job.
         """
 
         def _update_analysis_status(
-            analysis_id: int,
+            entry_id: str,
             new_status: str,
             updater_funcs: list[Callable[[str], dict[str, Any]]] | None = None,
             output_path: str | None = None,
         ) -> None:
             """
             Self-contained function to update Metamist analysis entry.
-            @param analysis_id: ID of Analysis entry
+            @param entry_id: ID of the Analysis entry
             @param new_status: new status to assign to the entry
             @param updater_funcs: list of functions to update the entry's metadata,
             assuming output_path as input parameter
@@ -269,7 +296,7 @@ class MetamistStateProvider(StateProvider):
             aapi = AnalysisApi()
             try:
                 aapi.update_analysis_status(
-                    analysis_id=analysis_id,
+                    analysis_id=int(entry_id),
                     analysis_update_model=AnalysisUpdateModel(
                         status=MmAnalysisStatus(new_status),
                         meta=meta,
@@ -296,9 +323,20 @@ class MetamistStateProvider(StateProvider):
         """
         output_path: str | Path | None = None
         if isinstance(outputs, dict):
+            if not main_output_key:
+                raise StateProviderError(
+                    f'Cannot create Analysis: `analysis_key` '
+                    f'must be set with the @stage decorator to select value from '
+                    f'the expected_outputs dict: {outputs}'
+                )
+            if main_output_key not in outputs:
+                raise StateProviderError(
+                    f'Cannot create Analysis: `analysis_key` '
+                    f'"{main_output_key}" is not found in the expected_outputs '
+                    f'dict {outputs}'
+                )
             output_path = outputs[main_output_key]
-        elif isinstance(outputs, str | Path):
-            output_path = outputs
+
         assert isinstance(output_path, str | Path | None)
         return get_metamist().create_analysis(
             output=outputs,
@@ -314,3 +352,73 @@ class JsonFileStateProvider(StateProvider):
     """
     Works through updating a JSON file.
     """
+
+    def __init__(self, prefix: Path):
+        super().__init__()
+        self.prefix = prefix
+
+    def read_state(
+        self, cohort: Cohort, run_id: str
+    ) -> dict[str, dict[str, AnalysisStatus]]:
+        pass
+
+    def make_json_path(self, stage_name: str, target: Target) -> Path:
+        return self.prefix / f'{stage_name}-{target.target_id}.json'
+
+    def record_status(
+        self,
+        outputs: dict | str | Path | None,
+        status: AnalysisStatus,
+        stage_name: str,
+        target: Target,
+        analysis_type: str,
+        meta: dict | None = None,
+        dataset: str | None = None,
+        main_output_key: str | None = None,
+    ) -> int:
+        d = dict(
+            outputs=outputs,
+            type=analysis_type,
+            status=status.value,
+            sample_ids=target.get_sample_ids(),
+            meta=meta or {},
+        )
+        if dataset:
+            d['dataset'] = dataset
+
+        with self.make_json_path(stage_name, target).open('w') as f:
+            json.dump(d, f)
+            return 0
+
+    def get_status_updater_function(self) -> Callable:
+        path = self.make_json_path(stage_name, target)
+
+        def _update_analysis_status(
+            entry_id: str,
+            new_status: str,
+            updater_funcs: list[Callable[[str], dict[str, Any]]] | None = None,
+            output_path: str | None = None,
+        ) -> None:
+            """
+            Self-contained function to update Metamist analysis entry.
+            @param entry_id: ID of the status entry
+            @param new_status: new status to assign to the entry
+            @param updater_funcs: list of functions to update the entry's metadata,
+            assuming output_path as input parameter
+            @param output_path: remote path of the output file, to be passed to the updaters
+            """
+            import json
+
+            meta: dict[str, Any] = dict()
+            if output_path and updater_funcs:
+                for func in updater_funcs or []:
+                    meta |= func(output_path)
+
+            with path.open('r') as f:
+                d = json.load(f)
+            d['status'] = new_status
+            d['meta'] |= meta
+            with path.open('w') as f:
+                json.dump(d, f)
+
+        return _update_analysis_status
