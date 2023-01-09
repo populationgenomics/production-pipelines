@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 """
-Checks metrics in MultiQC output, based on thresholds in the `qc_thresholds` 
+Checks metrics in MultiQC output, based on thresholds in the qc_thresholds 
 config section.
 
-Script can send a report to a Slack channel. To enable that, set `SLACK_TOKEN`
-and `SLACK_CHANNEL` environment variables, and add "Seqr Loader" app into 
+Script can send a report to a Slack channel. To enable that, set SLACK_TOKEN
+and SLACK_CHANNEL environment variables, and add "Seqr Loader" app into 
 a channel with:
 
 /invite @Seqr Loader
