@@ -26,6 +26,6 @@ def test_check_multiqc(mocker: MockFixture, caplog):
 
     data_dir = to_path(__file__).parent / 'data' / 'check_multiqc'
     check_multiqc.run(str(data_dir / 'validation_multiqc.json'))
-    for expected_line in ['⭕ CPG243717|NA12878_KCCG: MEDIAN_COVERAGE=8.00<10.00']:
+    for expected_line in ['❗ CPG243717|NA12878_KCCG: MEDIAN_COVERAGE=8.00<10.00']:
         matching_lines = [expected_line in msg for msg in caplog.messages]
         assert any(matching_lines)
