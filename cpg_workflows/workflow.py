@@ -26,7 +26,7 @@ from cpg_utils.config import get_config
 from cpg_utils import Path
 
 from .batch import get_batch
-from .status import (
+from .state import (
     MetamistStateProvider,
     JsonFileStateProvider,
     StateProviderError,

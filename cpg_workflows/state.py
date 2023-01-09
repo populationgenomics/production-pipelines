@@ -262,7 +262,7 @@ class MetamistStateProvider(StateProvider):
         if not entry_id:
             raise StateProviderError(f'No entry ID for {stage_name} {target.target_id}')
         try:
-            int_entry_id = int(entry_id)
+            int(entry_id)
         except ValueError:
             raise StateProviderError(
                 f'Metamist entry ID must be numerical, got {entry_id}'
