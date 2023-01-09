@@ -90,7 +90,7 @@ class StateProvider(ABC):
             stage_name=stage_name,
             target=target,
             status=AnalysisStatus.IN_PROGRESS,
-            job_attrs=job_attrs,
+            job_attrs=(job_attrs or {}) | {'tool': 'update_state'},
         )
         # 2. Queue a job that updates the status to COMPLETED
         completed_j = self.add_status_updater_job(
@@ -98,7 +98,7 @@ class StateProvider(ABC):
             stage_name=stage_name,
             target=target,
             status=AnalysisStatus.COMPLETED,
-            job_attrs=job_attrs,
+            job_attrs=(job_attrs or {}) | {'tool': 'update_state'},
             outputs=outputs,
             main_output_key=main_output_key,
             update_analysis_meta=update_analysis_meta,

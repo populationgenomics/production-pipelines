@@ -820,10 +820,10 @@ class Workflow:
                 description += ' ' + ', '.join(sorted(ds_set))
             get_batch().name = description
 
-        self.state_provider: StateProvider
+        self.state_provider: StateProvider | None = None
         if get_config()['workflow'].get('state_provider') == 'metamist':
             self.state_provider = MetamistStateProvider()
-        else:
+        elif get_config()['workflow'].get('state_provider') == 'json':
             prefix = self.prefix / 'state' / self.output_version
             prefix.mkdir(parents=True, exist_ok=True)
             self.state_provider = JsonFileStateProvider(prefix=prefix)

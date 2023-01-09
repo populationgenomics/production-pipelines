@@ -133,9 +133,9 @@ def test_status_reporter(mocker: MockFixture):
 
     run_workflow(stages=[MyQcStage1, MyQcStage2])
 
-    assert 'metamist' in get_batch().job_by_tool, get_batch().job_by_tool
+    assert 'update_state' in get_batch().job_by_tool, get_batch().job_by_tool
     assert (
-        get_batch().job_by_tool['metamist']['job_n']
+        get_batch().job_by_tool['update_state']['job_n']
         == len(get_cohort().get_samples()) * 4
     )
 
@@ -176,7 +176,7 @@ def test_status_reporter_with_custom_updater(mocker: MockFixture):
 
     run_workflow(stages=[MyQcStage])
 
-    assert 'metamist' in get_batch().job_by_tool, get_batch().job_by_tool
+    assert 'update_state' in get_batch().job_by_tool, get_batch().job_by_tool
 
 
 def test_status_reporter_fails(mocker: MockFixture):
