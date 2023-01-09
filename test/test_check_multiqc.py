@@ -12,7 +12,7 @@ sequencing_type = 'genome'
 
 [qc_thresholds.genome.min]
 "MEDIAN_COVERAGE" = 10
-"PCT_PF_READS_ALIGNED" = 80
+"PCT_PF_READS_ALIGNED" = 0.80
 [qc_thresholds.genome.max]
 "FREEMIX" = 0.04
 "PERCENT_DUPLICATION" = 25
