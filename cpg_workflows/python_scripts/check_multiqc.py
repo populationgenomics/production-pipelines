@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 """
-Checks metrics in MultiQC output, based on thresholds in the `qc_thresholds` 
+Checks metrics in MultiQC output, based on thresholds in the qc_thresholds 
 config section.
 
-Script can send a report to a Slack channel. To enable that, set `SLACK_TOKEN`
-and `SLACK_CHANNEL` environment variables, and add "Seqr Loader" app into 
+Script can send a report to a Slack channel. To enable that, set SLACK_TOKEN
+and SLACK_CHANNEL environment variables, and add "Seqr Loader" app into 
 a channel with:
 
 /invite @Seqr Loader
@@ -13,14 +13,13 @@ a channel with:
 import logging
 import json
 import pprint
-import os
 from collections import defaultdict
 from typing import Optional
 
 import click
 from cpg_utils import to_path
 from cpg_utils.config import get_config
-
+from cpg_workflows.slack import send_message
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
@@ -105,10 +104,11 @@ def run(
                         if is_fail(val, threshold):
                             line = f'{metric}={val:0.2f}{fail_sign}{threshold:0.2f}'
                             bad_lines_by_sample[sample].append(line)
-                            logging.info(f'⭕ {sample}: {line}')
+                            logging.info(f'❗ {sample}: {line}')
                         else:
                             line = f'{metric}={val:0.2f}{good_sign}{threshold:0.2f}'
                             logging.info(f'✅ {sample}: {line}')
+    logging.info('')
 
     # Constructing Slack message
     if dataset and html_url:
@@ -117,31 +117,16 @@ def run(
         title = 'MultiQC report'
     messages = []
     if bad_lines_by_sample:
-        messages.append(f'{title}')
+        messages.append(f'{title}. {len(bad_lines_by_sample)} samples are flagged:')
         for sample, bad_lines in bad_lines_by_sample.items():
-            messages.append(f'⭕ {sample}: ' + ', '.join(bad_lines))
+            messages.append(f'❗ {sample}: ' + ', '.join(bad_lines))
     else:
         messages.append(f'✅ {title}')
     text = '\n'.join(messages)
     logging.info(text)
 
-    slack_channel = get_config().get('slack', {}).get('channel')
-    slack_token = os.environ.get('SLACK_TOKEN')
-    if send_to_slack and slack_token and slack_channel:
-        from slack_sdk.errors import SlackApiError
-        from slack_sdk import WebClient
-
-        slack_client = WebClient(token=slack_token)
-        try:
-            slack_client.api_call(  # pylint: disable=duplicate-code
-                'chat.postMessage',
-                json={
-                    'channel': slack_channel,
-                    'text': text,
-                },
-            )
-        except SlackApiError as err:
-            logging.error(f'Error posting to Slack: {err}')
+    if send_to_slack:
+        send_message(text)
 
 
 if __name__ == '__main__':
