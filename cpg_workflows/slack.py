@@ -18,8 +18,12 @@ from hailtop.batch.job import Job
 
 
 def send_message(text: str):
-    slack_channel = get_config().get('slack', {}).get('channel')
-    if slack_channel:
+    """
+    Send text as a Slack message, reading credentials from the config.
+    """
+    if slack_channel := (
+        os.environ.get('SLACK_CHANNEL') or get_config().get('slack', {}).get('channel')
+    ):
         slack_token = get_token()
         from slack_sdk.errors import SlackApiError
         from slack_sdk import WebClient
