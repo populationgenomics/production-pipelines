@@ -20,9 +20,6 @@ from cpg_workflows.stages.seqr_loader import MtToEs, AnnotateDataset
 from cpg_workflows.stages.gatk_sv import ClusterBatch
 from cpg_workflows.stages.stripy import Stripy
 
-fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
-coloredlogs.install(level='INFO', fmt=fmt)
-
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'pre_alignment': [FastQCMultiQC],
@@ -62,16 +59,25 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     help='Dry run: do not actually communicate with Metamist or Hail Batch, '
     'instead only print a final config and stages to be run',
 )
+@click.option(
+    '--verbose',
+    'verbose',
+    is_flag=True,
+)
 def main(
     workflow: str,
     config_paths: list[str],
     list_workflows: bool,
     list_last_stages: bool,
     dry_run: bool,
+    verbose: bool,
 ):
     """
     Run a Hail Batch workflow specified as a positional command line argument [WORKFLOW]
     """
+    fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
+    coloredlogs.install(level='DEBUG' if verbose else 'INFO', fmt=fmt)
+
     if not workflow and not list_workflows:
         click.echo(
             f'You must specify WORKFLOW as a first positional command line argument.'
