@@ -12,7 +12,7 @@ import traceback
 import unicodedata
 from functools import lru_cache
 from random import choices
-from typing import cast
+from typing import cast, Union
 
 from hailtop.batch import ResourceFile
 
@@ -146,3 +146,6 @@ def rich_sample_id_seds(
             cmd += f'sed -iBAK \'s/{sid}/{rich_sid}/g\' {fname}'
             cmd += '\n'
     return cmd
+
+
+ExpectedResultT = Union[Path, dict[str, Path], dict[str, str], str, None]

@@ -1,6 +1,7 @@
 """
 Test workflow status reporter.
 """
+from typing import Any
 
 import toml
 import pytest
@@ -138,6 +139,45 @@ def test_status_reporter(mocker: MockFixture):
         get_batch().job_by_tool['metamist']['job_n']
         == len(get_cohort().get_samples()) * 4
     )
+
+
+def _update_meta(output_path: str) -> dict[str, Any]:
+    from cloudpathlib import CloudPath
+
+    with CloudPath(output_path).open() as f:
+        return dict(result=f.read().strip())
+
+
+def test_status_reporter_with_custom_updater(mocker: MockFixture):
+    _common(mocker)
+
+    from cpg_utils.hail_batch import dataset_path
+    from cpg_workflows.targets import Sample
+    from cpg_workflows.batch import get_batch
+    from cpg_workflows.workflow import (
+        SampleStage,
+        StageInput,
+        StageOutput,
+        stage,
+        run_workflow,
+    )
+
+    @stage(analysis_type='qc', update_analysis_meta=_update_meta)
+    class MyQcStage(SampleStage):
+        def expected_outputs(self, sample: Sample) -> Path:
+            return to_path(dataset_path(f'{sample.id}.tsv'))
+
+        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+            j = get_batch().new_job(
+                'Echo', self.get_job_attrs(sample) | dict(tool='echo')
+            )
+            j.command(f'echo 42 >> {j.output}')
+            get_batch().write_output(j.output, str(self.expected_outputs(sample)))
+            return self.make_outputs(sample, self.expected_outputs(sample), [j])
+
+    run_workflow(stages=[MyQcStage])
+
+    assert 'metamist' in get_batch().job_by_tool, get_batch().job_by_tool
 
 
 def test_status_reporter_fails(mocker: MockFixture):
