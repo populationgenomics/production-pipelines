@@ -698,3 +698,30 @@ CramQC = ['CPG13409']
 ### Available stages
 
 To see available workflow stages, explore the `cpg_workflows/stages` folder. A stage wrappers for Hail Batch jobs that allow to glue them together into genomics workflows. `cpg_workflows` also provides helper functions that create Hail Batch jobs for different domain-specific applications, e.g. alignment, deduplication, QC, variant calling, creating calling intervals, running VQSR, creating ES index, etc. Those jobs can be called from the `queue_jobs` method of a stage, or in isolation, as they don't need to know about the stage they are called from, but only need a `Batch` object.
+
+
+### Slack QC notifications
+
+Config's `[slack]` section activates QC reports to a Slack channel. For example:
+
+```toml
+[slack]
+channel = 'workflows-qc'
+token_secret_id = 'slack-seqr-loader-token'
+token_project_id = 'seqr-308602'
+```
+
+Would send messages on QC completion to the `workflows-qc` channel, flagging failed samples.
+
+Two scripts send Slack messages: `check_multiqc.py` and `check_pedigree.py`. Note that the MultiQC checks only work when the `qc_thresholds` section is also specified, for example:
+
+```toml
+[qc_thresholds.genome.min]
+"MEDIAN_COVERAGE" = 10
+"PCT_PF_READS_ALIGNED" = 0.80
+[qc_thresholds.genome.max]
+"FREEMIX" = 0.04
+"PERCENT_DUPLICATION" = 25
+```
+
+Thresholds can be adjusted as needed, per workflow or dataset. Note that the metrics names here should match the ones in the MultiQC JSON.
