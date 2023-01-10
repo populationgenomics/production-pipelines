@@ -159,10 +159,13 @@ class AncestryPlots(CohortStage):
         self.out_prefix = get_workflow().web_prefix / 'ancestry'
         self.out_fname_pattern = '{scope}_pc{pci}.{ext}'
 
-    def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.out_prefix / self.out_fname_pattern.format(
-            scope='dataset', pci=1, ext='html'
-        )
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        n_pcs = get_config()['large_cohort']['n_pcs']
+        return {
+            pc_num: self.out_prefix
+            / self.out_fname_pattern.format(scope='dataset', pci=pc_num, ext='html')
+            for pc_num in range(1, n_pcs)
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
