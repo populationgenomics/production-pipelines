@@ -118,7 +118,6 @@ def _update_meta(output_path: str) -> dict[str, Any]:
         GvcfQC,
         GvcfHappy,
     ],
-    forced=True,
     analysis_type='qc',
     analysis_key='json',
     update_analysis_meta=_update_meta,
