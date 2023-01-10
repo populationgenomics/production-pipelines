@@ -4,8 +4,8 @@
 This script parses "somalier relate" (https://github.com/brentp/somalier) outputs,
 and returns a report whether sex and pedigree matches the provided PED file.
 
-Script can send a report to a Slack channel. To enable that, set `SLACK_TOKEN`
-and `SLACK_CHANNEL` environment variables, and add "Seqr Loader" app into 
+Script can send a report to a Slack channel. To enable that, set SLACK_TOKEN
+and SLACK_CHANNEL environment variables, and add "Seqr Loader" app into 
 a channel with:
 
 /invite @Seqr Loader
@@ -21,8 +21,7 @@ import pandas as pd
 from peddy import Ped
 
 from cpg_utils import to_path
-from cpg_utils.config import get_config
-
+from cpg_workflows.slack import send_message
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
@@ -280,23 +279,8 @@ def run(
         title = 'Somalier pedigree report'
     text = '\n'.join([title] + _messages)
 
-    slack_channel = get_config().get('slack', {}).get('channel')
-    slack_token = os.environ.get('SLACK_TOKEN')
-    if send_to_slack and slack_token and slack_channel:
-        from slack_sdk.errors import SlackApiError
-        from slack_sdk import WebClient
-
-        slack_client = WebClient(token=slack_token)
-        try:
-            slack_client.api_call(  # pylint: disable=duplicate-code
-                'chat.postMessage',
-                json={
-                    'channel': slack_channel,
-                    'text': text,
-                },
-            )
-        except SlackApiError as err:
-            logging.error(f'Error posting to Slack: {err}')
+    if send_to_slack:
+        send_message(text)
 
 
 def print_contents(

@@ -13,14 +13,13 @@ a channel with:
 import logging
 import json
 import pprint
-import os
 from collections import defaultdict
 from typing import Optional
 
 import click
 from cpg_utils import to_path
 from cpg_utils.config import get_config
-
+from cpg_workflows.slack import send_message
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
@@ -126,23 +125,8 @@ def run(
     text = '\n'.join(messages)
     logging.info(text)
 
-    slack_channel = get_config().get('slack', {}).get('channel')
-    slack_token = os.environ.get('SLACK_TOKEN')
-    if send_to_slack and slack_token and slack_channel:
-        from slack_sdk.errors import SlackApiError
-        from slack_sdk import WebClient
-
-        slack_client = WebClient(token=slack_token)
-        try:
-            slack_client.api_call(  # pylint: disable=duplicate-code
-                'chat.postMessage',
-                json={
-                    'channel': slack_channel,
-                    'text': text,
-                },
-            )
-        except SlackApiError as err:
-            logging.error(f'Error posting to Slack: {err}')
+    if send_to_slack:
+        send_message(text)
 
 
 if __name__ == '__main__':

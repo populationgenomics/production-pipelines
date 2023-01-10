@@ -7,8 +7,9 @@ into a channel with:
 Make sure `slack/channel`, `slack/token_secret_id`, and `slack/token_project_id`
 configuration values are set.
 """
-
+import os
 from textwrap import dedent
+import logging
 
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
@@ -16,10 +17,32 @@ from cpg_utils.config import get_config
 from hailtop.batch.job import Job
 
 
+def send_message(text: str):
+    slack_channel = get_config().get('slack', {}).get('channel')
+    if slack_channel:
+        slack_token = get_token()
+        from slack_sdk.errors import SlackApiError
+        from slack_sdk import WebClient
+
+        slack_client = WebClient(token=slack_token)
+        try:
+            slack_client.api_call(  # pylint: disable=duplicate-code
+                'chat.postMessage',
+                json={
+                    'channel': slack_channel,
+                    'text': text,
+                },
+            )
+        except SlackApiError as err:
+            logging.error(f'Error posting to Slack: {err}')
+
+
 def get_token() -> str:
     """
     Returns Slack token.
     """
+    if token := os.environ.get('SLACK_TOKEN'):
+        return token
     token_secret_id = get_config()['slack'].get('token_secret_id')
     token_project_id = get_config()['slack'].get('token_project_id')
     if not token_secret_id or not token_project_id:
