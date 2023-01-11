@@ -162,7 +162,7 @@ class AncestryPlots(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         n_pcs = get_config()['large_cohort']['n_pcs']
         return {
-            pc_num: self.out_prefix
+            str(pc_num): self.out_prefix
             / self.out_fname_pattern.format(scope='dataset', pci=pc_num, ext='html')
             for pc_num in range(1, n_pcs)
         }
