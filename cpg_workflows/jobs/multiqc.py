@@ -91,7 +91,7 @@ def multiqc(
     cmd = f"""\
     mkdir inputs
     cat {file_list} | gsutil -m cp -I inputs/
-    
+
     multiqc -f inputs -o output \\
     {f"--replace-names {sample_map_file} " if sample_map_file else ''} \\
     --title "{title} for dataset <b>{dataset.name}</b>" \\
