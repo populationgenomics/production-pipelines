@@ -113,7 +113,7 @@ class FastQC(SampleStage):
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
 
 
-@stage(required_stages=FastQC, forced=True)
+@stage(required_stages=FastQC)
 class FastQCMultiQC(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         if get_config()['workflow'].get('skip_qc', False) is True:
