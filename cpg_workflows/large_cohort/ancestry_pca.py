@@ -111,17 +111,14 @@ def _run_pca_ancestry_analysis(
         raise ValueError(f'The number of PCs must be at least {MIN_N_PCS}, got {n_pcs}')
 
     samples_to_use = mt.count_cols()
-    logging.info(f'Total sample count: {samples_to_use} ({mt.s.collect()})')
+    logging.info(f'Total sample number in the matrix table: {samples_to_use}')
     if sample_to_drop_ht is not None:
         samples_to_drop = sample_to_drop_ht.count()
-        logging.info(
-            f'Determined {samples_to_drop} relateds to drop: '
-            f'{sample_to_drop_ht.s.collect()}'
-        )
+        logging.info(f'Determined {samples_to_drop} relateds to drop')
         samples_to_use -= samples_to_drop
         logging.info(
-            f'Remove relateds from the set of samples used for PCA, got '
-            f'{samples_to_use}'
+            f'Removing the {samples_to_drop} relateds from the list of samples used '
+            f'for PCA, got remaining {samples_to_use} samples'
         )
 
     if samples_to_use < MIN_N_SAMPLES:
