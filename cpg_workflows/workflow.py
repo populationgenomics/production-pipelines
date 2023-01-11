@@ -932,11 +932,16 @@ class Workflow:
                 first_stages_keeps.append(ancestor)
 
         for ls in last_stages:
+            if any(anc in last_stages for anc in nx.ancestors(graph, ls)):
+                # a downstream stage is also in last_stages, so this is not yet
+                # a "real" last stage that we want to run
+                continue
             for ancestor in nx.ancestors(graph, ls):
-                if not stages_d[ancestor].skipped:
-                    logging.info(f'Skipping stage {ancestor} (after last {ls})')
-                    stages_d[ancestor].skipped = True
-                    stages_d[ancestor].assume_outputs_exist = True
+                if stages_d[ancestor].skipped:
+                    continue  # already skipped
+                logging.info(f'Skipping stage {ancestor} (after last {ls})')
+                stages_d[ancestor].skipped = True
+                stages_d[ancestor].assume_outputs_exist = True
 
             for ancestor in nx.descendants(graph, ls):
                 last_stages_keeps.append(ancestor)
