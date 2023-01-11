@@ -92,11 +92,6 @@ def multiqc(
     mkdir inputs
     cat {file_list} | gsutil -m cp -I inputs/
     
-    # Temporary fix for Somalier module before https://github.com/ewels/MultiQC/pull/1670
-    # is merged and released:
-    git clone --single-branch --branch fix-somalier https://github.com/vladsaveliev/MultiQC
-    pip3 install -e MultiQC
-
     multiqc -f inputs -o output \\
     {f"--replace-names {sample_map_file} " if sample_map_file else ''} \\
     --title "{title} for dataset <b>{dataset.name}</b>" \\
