@@ -10,6 +10,10 @@ from gnomad.sample_qc.ancestry import run_pca_with_relateds, assign_population_p
 from cpg_workflows.utils import can_reuse
 
 
+MIN_N_PCS = 3  # for one PC1 vs PC2 plot
+MIN_N_SAMPLES = 10
+
+
 def run(
     dense_mt_path: Path,
     sample_qc_ht_path: Path,
@@ -103,15 +107,35 @@ def _run_pca_ancestry_analysis(
             hl.read_table(str(out_loadings_ht_path)),
         )
 
-    # Adjusting the number of principal components not to exceed the
-    # number of samples
-    samples_to_drop_num = 0 if sample_to_drop_ht is None else sample_to_drop_ht.count()
-    min_n_pcs = 3  # for one PC1 vs PC2 plot
-    n_pcs = min(min_n_pcs, n_pcs, mt.cols().count() - samples_to_drop_num)
+    if n_pcs < MIN_N_PCS:
+        raise ValueError(f'The number of PCs must be at least {MIN_N_PCS}, got {n_pcs}')
 
-    logging.info(f'mt.s: {mt.s.collect()}')
-    if sample_to_drop_ht:
-        logging.info(f'sample_to_drop_ht.s: {sample_to_drop_ht.s.collect()}')
+    samples_to_use = mt.count_cols()
+    logging.info(f'Total sample count: {samples_to_use} ({mt.s.collect()})')
+    if sample_to_drop_ht is not None:
+        samples_to_drop = sample_to_drop_ht.count()
+        logging.info(
+            f'Determined {samples_to_drop} relateds to drop: '
+            f'{sample_to_drop_ht.s.collect()}'
+        )
+        samples_to_use -= samples_to_drop
+        logging.info(
+            f'Remove relateds from the set of samples used for PCA, got '
+            f'{samples_to_use}'
+        )
+
+    if samples_to_use < MIN_N_SAMPLES:
+        raise ValueError(
+            f'The number of samples after removing relateds if too low for the PCA '
+            f'analysis. Got {samples_to_use}, but need at least {MIN_N_SAMPLES}'
+        )
+
+    if n_pcs > samples_to_use:
+        logging.info(
+            'Adjusting the number of PCs not to exceed the number of samples:'
+            f'{n_pcs} -> {samples_to_use}'
+        )
+        n_pcs = samples_to_use
 
     eigenvalues, scores_ht, loadings_ht = run_pca_with_relateds(
         mt, sample_to_drop_ht, n_pcs=n_pcs
