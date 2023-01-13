@@ -29,6 +29,7 @@ dry_run = true
 backend = "local"
 
 [images]
+cpg_workflows = "stub"
 bcftools = "stub"
 bedtools = "stub"
 fastqc = "stub"

@@ -1,6 +1,3 @@
-[images]
-cpg_workflows = 'australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:1.12.0'
-
 [workflow]
 # Datasets to load inputs. If not provided, datasets will be determined
 # automatically based on the input provider implementation:
@@ -43,24 +40,28 @@ cpg_workflows = 'australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workf
 # Description of the workflow (to display in the Batch GUI)
 #description =
 
+# Suffix the workflow outputs location (`get_workflow().prefix`) with this string. 
+# By default, the hash of all input paths will be used.
+#output_version = "0.1"
+
+# Check input file existence (e.g. FASTQ files). When they are missing,
+# the `skip_samples_with_missing_input` option controls whether such
+# samples should be ignored, or it should cause raising an error.
+check_inputs = true
+
 # For the first (not-skipped) stage, if the input for a target does
 # not exist, just skip this target instead of failing. E.g. if the first
 # stage is Align, and `sample.alignment_input` for a sample do not exist,
 # remove this sample, instead of failing. In order words, ignore samples
-# that are missing results from skipped stages
+# that are missing results from skipped stages.
 skip_samples_with_missing_input = false
 
-# Check input file existence (e.g. FASTQ files). If they are missing
-# the --skip-samples-with-missing-input option controls whether such
-# should be ignored, or raise an error
-check_inputs = true
-
 # Within jobs, check all in-job intermediate files for possible reuse.
-# If set to False, will overwrite all intermediates. Used in `utils.can_reuse(path)`
+# If set to False, will overwrite all intermediates. Used by `utils.can_reuse(path)`.
 check_intermediates = true
 
 # Before running a stage, check if input (i.e. expected outputs from required stages) 
-# already exist. If it exists, do not submit stage jobs
+# already exist. If it exists, do not submit stage jobs.
 check_expected_outputs = true
 
 # Limit to data of this sequencing type
