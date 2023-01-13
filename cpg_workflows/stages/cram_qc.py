@@ -154,7 +154,7 @@ class CramQC(SampleStage):
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
 
 
-@stage(required_stages=[CramQC], forced=True)
+@stage(required_stages=[CramQC])
 class SomalierPedigree(DatasetStage):
     """
     Checks pedigree from CRAM fingerprints.
@@ -208,7 +208,7 @@ class SomalierPedigree(DatasetStage):
         else:
             html_url = None
 
-        if any(s.pedigree for s in dataset.get_samples()):
+        if any(s.pedigree.dad or s.pedigree.mom for s in dataset.get_samples()):
             expected_ped_path = dataset.write_ped_file(
                 self.expected_outputs(dataset)['expected_ped']
             )
@@ -247,7 +247,6 @@ def _update_meta(output_path: str) -> dict[str, Any]:
         CramQC,
         SomalierPedigree,
     ],
-    forced=True,
     analysis_type='qc',
     analysis_key='json',
     update_analysis_meta=_update_meta,
