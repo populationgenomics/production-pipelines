@@ -3,7 +3,7 @@ Stages that generates and summarises CRAM QC.
 """
 import logging
 import dataclasses
-from typing import Callable, Optional
+from typing import Callable, Optional, Any
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
@@ -145,7 +145,7 @@ class CramQC(SampleStage):
                     get_batch(),
                     CramPath(cram_path, crai_path),
                     job_attrs=self.get_job_attrs(sample),
-                    overwrite=not get_config()['workflow'].get('check_intermediates'),
+                    overwrite=sample.forced,
                     **out_path_kwargs,
                 )
                 if j:
@@ -154,7 +154,7 @@ class CramQC(SampleStage):
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
 
 
-@stage(required_stages=[CramQC], forced=True)
+@stage(required_stages=[CramQC])
 class SomalierPedigree(DatasetStage):
     """
     Checks pedigree from CRAM fingerprints.
@@ -208,7 +208,7 @@ class SomalierPedigree(DatasetStage):
         else:
             html_url = None
 
-        if any(s.pedigree for s in dataset.get_samples()):
+        if any(s.pedigree.dad or s.pedigree.mom for s in dataset.get_samples()):
             expected_ped_path = dataset.write_ped_file(
                 self.expected_outputs(dataset)['expected_ped']
             )
@@ -233,12 +233,23 @@ class SomalierPedigree(DatasetStage):
             return self.make_outputs(dataset, skipped=True)
 
 
+def _update_meta(output_path: str) -> dict[str, Any]:
+    from cloudpathlib import CloudPath
+    import json
+
+    with CloudPath(output_path).open() as f:
+        d = json.load(f)
+    return {'multiqc': d['report_general_stats_data']}
+
+
 @stage(
     required_stages=[
         CramQC,
         SomalierPedigree,
     ],
-    forced=True,
+    analysis_type='qc',
+    analysis_key='json',
+    update_analysis_meta=_update_meta,
 )
 class CramMultiQC(DatasetStage):
     """

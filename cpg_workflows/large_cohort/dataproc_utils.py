@@ -15,7 +15,6 @@ from cpg_workflows.batch import get_batch
 DATAPROC_PACKAGES = [
     'cpg-utils',
     'click',
-    'gnomad',
     'google',
     'slackclient',
     'fsspec',
@@ -45,12 +44,23 @@ def dataproc_job(
     """
     Submit script as a dataproc job.
     """
-    from cpg_workflows import large_cohort
+    import cpg_workflows
     from cpg_workflows.large_cohort import dataproc_script
 
-    package_path = to_path(large_cohort.__file__).parent
+    package_path = to_path(cpg_workflows.__file__).parent
     script_path = to_path(dataproc_script.__file__)
     rel_script_path = script_path.relative_to(package_path.parent)
+
+    if not to_path(gnomad_path := 'gnomad_methods/gnomad').exists():
+        raise ValueError(
+            f'Cannot find gnomad_methods Git submodule: {gnomad_path}. Make sure '
+            f'you cloned the repo recursively with `git clone --recurse-submodules '
+            f'git@github.com:populationgenomics/production-pipelines.git`.'
+        )
+    pyfiles = [
+        cpg_workflows.__name__,
+        gnomad_path,
+    ]
 
     script = (
         f'{rel_script_path} '
@@ -65,7 +75,7 @@ def dataproc_job(
             batch=get_batch(),
             cluster_id=cluster_id,
             script=script,
-            pyfiles=[large_cohort.__name__],
+            pyfiles=pyfiles,
             job_name=job_name,
             region='australia-southeast1',
         )
@@ -112,6 +122,6 @@ def dataproc_job(
         worker_machine_type='n1-highmem-8' if use_highmem_workers else 'n1-standard-8',
         worker_boot_disk_size=worker_boot_disk_size,
         secondary_worker_boot_disk_size=secondary_worker_boot_disk_size,
-        pyfiles=['large_cohort'],
-        init=['gs://cpg-reference/hail_dataproc/install_common.sh'],
+        pyfiles=pyfiles,
+        init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
     )

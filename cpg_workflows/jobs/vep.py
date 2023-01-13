@@ -166,7 +166,7 @@ def gather_vep_json_to_ht(
             depends_on=depends_on,
             scopes=['cloud-platform'],
             pyfiles=pyfiles,
-            init=['gs://cpg-reference/hail_dataproc/install_common.sh'],
+            init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
         )
         j.attributes = (job_attrs or {}) | {'tool': 'hailctl dataproc'}
     else:
@@ -233,8 +233,8 @@ def vep_one(
     ls {vep_dir}
     ls {vep_dir}/vep
 
-    LOFTEE_PLUGIN_PATH=/root/micromamba/share/ensembl-vep-105.0-1
-    FASTA={vep_dir}/vep/homo_sapiens/105_GRCh38/Homo_sapiens.GRCh38.dna.toplevel.fa.gz
+    LOFTEE_PLUGIN_PATH=$MAMBA_ROOT_PREFIX/share/ensembl-vep
+    FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
 
     vep \\
     --format vcf \\

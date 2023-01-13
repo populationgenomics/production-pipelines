@@ -4,19 +4,9 @@ Test reading inputs into a Cohort object.
 
 import toml
 from pytest_mock import MockFixture
+from . import results_prefix
 
-from cpg_utils import to_path, Path
-from cpg_utils.config import set_config_paths, update_dict
-from cpg_workflows.filetypes import BamPath
-from cpg_workflows.inputs import get_cohort
-from cpg_workflows.targets import Sex
-from cpg_workflows.utils import timestamp
-
-tmp_dir_path = to_path(__file__).parent / 'results' / timestamp()
-tmp_dir_path = tmp_dir_path.absolute()
-tmp_dir_path.mkdir(parents=True, exist_ok=True)
-
-DEFAULT_CONF = f"""
+TOML = f"""
 [workflow]
 dataset_gcp_project = 'fewgenomes'
 access_level = 'test'
@@ -28,6 +18,12 @@ check_intermediates = false
 check_expected_outputs = false
 path_scheme = 'local'
 
+[storage.default]
+default = '{results_prefix()}'
+
+[storage.fewgenomes]
+default = '{results_prefix()}'
+
 [large_cohort]
 pop_meta_field = 'Superpopulation name'
 
@@ -35,25 +31,17 @@ pop_meta_field = 'Superpopulation name'
 billing_project = 'fewgenomes'
 delete_scratch_on_exit = false
 backend = 'local'
+
+[references.broad]
+ref_fasta = 'stub'
 """
-
-
-def _set_config(dir_path: Path, extra_conf: dict | None = None):
-    d = toml.loads(DEFAULT_CONF)
-    d['workflow']['local_dir'] = str(dir_path)
-    if extra_conf:
-        update_dict(d, extra_conf)
-    config_path = dir_path / 'config.toml'
-    with config_path.open('w') as f:
-        toml.dump(d, f)
-    set_config_paths([str(config_path)])
 
 
 def test_cohort(mocker: MockFixture):
     """
     Testing creating a Cohort object from metamist mocks.
     """
-    _set_config(tmp_dir_path)
+    mocker.patch('cpg_utils.config.get_config', lambda: toml.loads(TOML))
 
     def mock_get_samples(  # pylint: disable=unused-argument
         *args, **kwargs
@@ -235,6 +223,10 @@ def test_cohort(mocker: MockFixture):
         'sample_metadata.apis.AnalysisApi.query_analyses',
         mock_query_analyses,
     )
+
+    from cpg_workflows.filetypes import BamPath
+    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.targets import Sex
 
     cohort = get_cohort()
     # the 5th sample doesn't have associated seq/meta/reads

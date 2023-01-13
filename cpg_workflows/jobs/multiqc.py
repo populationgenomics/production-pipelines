@@ -13,6 +13,7 @@ from cpg_utils import to_path
 from cpg_utils.hail_batch import image_path, copy_common_env, command
 from cpg_utils import Path
 from cpg_workflows.resources import STANDARD
+from cpg_workflows.slack import slack_env
 from cpg_workflows.targets import Dataset
 from cpg_workflows.utils import rich_sample_id_seds
 from cpg_workflows.python_scripts import check_multiqc
@@ -90,11 +91,6 @@ def multiqc(
     cmd = f"""\
     mkdir inputs
     cat {file_list} | gsutil -m cp -I inputs/
-    
-    # Temporary fix for Somalier module before https://github.com/ewels/MultiQC/pull/1670
-    # is merged and released:
-    git clone --single-branch --branch fix-somalier https://github.com/vladsaveliev/MultiQC
-    pip3 install -e MultiQC
 
     multiqc -f inputs -o output \\
     {f"--replace-names {sample_map_file} " if sample_map_file else ''} \\

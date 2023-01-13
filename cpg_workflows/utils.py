@@ -12,7 +12,7 @@ import traceback
 import unicodedata
 from functools import lru_cache
 from random import choices
-from typing import cast
+from typing import cast, Union
 
 from hailtop.batch import ResourceFile
 
@@ -67,30 +67,30 @@ def exists_not_cached(path: Path | str, verbose: bool = True) -> bool:
 
 def can_reuse(
     path: list[Path] | Path | str | None,
-    overwrite: bool | None = None,
+    overwrite: bool = False,
 ) -> bool:
     """
-    Checks if `fpath` is good to reuse in the analysis: it exists
-    and `overwrite` is False.
+    Checks if the object at `path` is good to reuse:
+    * overwrite has the default value of False,
+    * check_intermediates has the default value of True,
+    * object exists.
 
-    If `fpath` is a collection, it requires all files in it to exist.
+    If `path` is a collection, it requires all paths to exist.
     """
-    if overwrite is None:
-        overwrite = get_config()['workflow'].get('check_intermediates', True) is False
-
     if overwrite:
+        return False
+
+    if not get_config()['workflow'].get('check_intermediates', True):
         return False
 
     if not path:
         return False
 
-    if isinstance(path, list):
-        return all(can_reuse(fp, overwrite) for fp in path)
-
-    if not exists(path):
+    paths = path if isinstance(path, list) else [path]
+    if not all(exists(fp, overwrite) for fp in paths):
         return False
 
-    logging.debug(f'Reusing existing {path}. Use --overwrite to overwrite')
+    logging.debug(f'Reusing existing {path}')
     return True
 
 
@@ -146,3 +146,6 @@ def rich_sample_id_seds(
             cmd += f'sed -iBAK \'s/{sid}/{rich_sid}/g\' {fname}'
             cmd += '\n'
     return cmd
+
+
+ExpectedResultT = Union[Path, dict[str, Path], dict[str, str], str, None]

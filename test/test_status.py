@@ -1,87 +1,57 @@
 """
 Test workflow status reporter.
 """
+from typing import Any
 
 import toml
 import pytest
 from pytest_mock import MockFixture
-
 from cpg_utils import to_path, Path
-from cpg_utils.config import set_config_paths, update_dict
-from cpg_utils.hail_batch import dataset_path
-from cpg_workflows.inputs import get_cohort
-from cpg_workflows.targets import Sample, Cohort
-from cpg_workflows.utils import timestamp
-from cpg_workflows.batch import get_batch
-from cpg_workflows.workflow import (
-    SampleStage,
-    StageInput,
-    StageOutput,
-    stage,
-    run_workflow,
-    WorkflowError,
-)
+from . import results_prefix, update_dict
 
-tmp_dir_path = to_path(__file__).parent / 'results' / timestamp()
-tmp_dir_path = tmp_dir_path.absolute()
-tmp_dir_path.mkdir(parents=True, exist_ok=True)
-
-DEFAULT_CONF = f"""
+TOML = f"""
 [workflow]
 dataset_gcp_project = 'fewgenomes'
 access_level = 'test'
 dataset = 'fewgenomes'
 driver_image = '<stub>'
 sequencing_type = 'genome'
+status_reporter = 'metamist'
 
 check_inputs = false
 check_intermediates = false
 check_expected_outputs = false
 path_scheme = 'local'
 
+[storage.default]
+default = '{results_prefix()}'
+
+[storage.fewgenomes]
+default = '{results_prefix()}'
+
 [hail]
 billing_project = 'fewgenomes'
 delete_scratch_on_exit = false
 backend = 'local'
+dry_run = true
 """
 
 
-def _set_config(dir_path: Path, extra_conf: dict | None = None):
-    d = toml.loads(DEFAULT_CONF)
-    d['workflow']['local_dir'] = str(dir_path)
-    if extra_conf:
-        update_dict(d, extra_conf)
-    conf_path = dir_path / 'config.toml'
-    with conf_path.open('w') as f:
-        toml.dump(d, f)
+def _mock_config() -> dict:
+    d: dict = {}
+    for fp in [
+        to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml',
+        to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml',
+    ]:
+        with fp.open():
+            update_dict(d, toml.load(fp))
 
-    set_config_paths(
-        [
-            str(p)
-            for p in [
-                to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml',
-                to_path(__file__).parent.parent
-                / 'configs'
-                / 'defaults'
-                / 'seqr_loader.toml',
-                conf_path,
-            ]
-        ]
-    )
+    update_dict(d, toml.loads(TOML))
+    return d
 
 
 def _common(mocker):
-    _set_config(
-        tmp_dir_path,
-        {
-            'workflow': {
-                'status_reporter': 'metamist',
-            },
-            'hail': {
-                'dry_run': True,
-            },
-        },
-    )
+    mocker.patch('cpg_utils.config.get_config', _mock_config)
 
     def mock_create_new_analysis(_, project, analysis_model) -> int:
         print(f'Analysis model in project {project}: {analysis_model}')
@@ -90,6 +60,8 @@ def _common(mocker):
     mocker.patch(
         'sample_metadata.apis.AnalysisApi.create_new_analysis', mock_create_new_analysis
     )
+
+    from cpg_workflows.targets import Cohort
 
     def mock_create_cohort() -> Cohort:
         c = Cohort()
@@ -103,6 +75,18 @@ def _common(mocker):
 
 def test_status_reporter(mocker: MockFixture):
     _common(mocker)
+
+    from cpg_utils.hail_batch import dataset_path
+    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.targets import Sample
+    from cpg_workflows.batch import get_batch
+    from cpg_workflows.workflow import (
+        SampleStage,
+        StageInput,
+        StageOutput,
+        stage,
+        run_workflow,
+    )
 
     @stage(analysis_type='qc')
     class MyQcStage1(SampleStage):
@@ -154,8 +138,58 @@ def test_status_reporter(mocker: MockFixture):
     )
 
 
+def _update_meta(output_path: str) -> dict[str, Any]:
+    from cloudpathlib import CloudPath
+
+    with CloudPath(output_path).open() as f:
+        return dict(result=f.read().strip())
+
+
+def test_status_reporter_with_custom_updater(mocker: MockFixture):
+    _common(mocker)
+
+    from cpg_utils.hail_batch import dataset_path
+    from cpg_workflows.targets import Sample
+    from cpg_workflows.batch import get_batch
+    from cpg_workflows.workflow import (
+        SampleStage,
+        StageInput,
+        StageOutput,
+        stage,
+        run_workflow,
+    )
+
+    @stage(analysis_type='qc', update_analysis_meta=_update_meta)
+    class MyQcStage(SampleStage):
+        def expected_outputs(self, sample: Sample) -> Path:
+            return to_path(dataset_path(f'{sample.id}.tsv'))
+
+        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+            j = get_batch().new_job(
+                'Echo', self.get_job_attrs(sample) | dict(tool='echo')
+            )
+            j.command(f'echo 42 >> {j.output}')
+            get_batch().write_output(j.output, str(self.expected_outputs(sample)))
+            return self.make_outputs(sample, self.expected_outputs(sample), [j])
+
+    run_workflow(stages=[MyQcStage])
+
+    assert 'metamist' in get_batch().job_by_tool, get_batch().job_by_tool
+
+
 def test_status_reporter_fails(mocker: MockFixture):
     _common(mocker)
+
+    from cpg_utils.hail_batch import dataset_path
+    from cpg_workflows.targets import Sample
+    from cpg_workflows.batch import get_batch
+    from cpg_workflows.workflow import (
+        SampleStage,
+        StageInput,
+        StageOutput,
+        stage,
+        run_workflow,
+    )
 
     @stage(analysis_type='qc')
     class MyQcStage(SampleStage):
@@ -179,6 +213,8 @@ def test_status_reporter_fails(mocker: MockFixture):
             )
             print(f'Writing to {self.expected_outputs(sample)["bed"]}')
             return self.make_outputs(sample, self.expected_outputs(sample), [j])
+
+    from cpg_workflows.workflow import WorkflowError
 
     with pytest.raises(WorkflowError):
         run_workflow(stages=[MyQcStage])

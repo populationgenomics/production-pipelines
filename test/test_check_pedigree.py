@@ -2,40 +2,21 @@
 Test Hail Query functions.
 """
 
-import shutil
-import pytest
 import toml
-from cpg_utils import to_path, Path
-from cpg_utils.config import set_config_paths, update_dict
-from cpg_workflows.utils import timestamp
-from cpg_workflows.python_scripts import check_pedigree
+from pytest_mock import MockFixture
+from cpg_utils import to_path
 
-DEFAULT_CONF = """
+TOML = """
 [workflow]
 sequencing_type = 'genome'
 """
 
 
-@pytest.fixture()
-def tmp_dir() -> Path:
-    dir_path = to_path('results') / timestamp()
-    dir_path.mkdir(parents=True, exist_ok=True)
-    yield dir_path
-    shutil.rmtree(dir_path)
+def test_check_pedigree(mocker: MockFixture, caplog):
+    mocker.patch('cpg_utils.config.get_config', lambda: toml.loads(TOML))
 
+    from cpg_workflows.python_scripts import check_pedigree
 
-def _set_config(dir_path: Path, extra_conf: dict | None = None):
-    d = toml.loads(DEFAULT_CONF)
-    if extra_conf:
-        update_dict(d, extra_conf)
-    config_path = dir_path / 'config.toml'
-    with config_path.open('w') as f:
-        toml.dump(d, f)
-    set_config_paths([str(config_path)])
-
-
-def test_check_pedigree(caplog, tmp_dir: Path):
-    _set_config(tmp_dir)
     data_dir = to_path(__file__).parent / 'data' / 'check_pedigree'
     check_pedigree.run(
         somalier_samples_fpath=str(data_dir / 'somalier-samples.tsv'),

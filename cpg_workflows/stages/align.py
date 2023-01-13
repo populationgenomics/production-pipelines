@@ -2,6 +2,7 @@
 Stage that generates a CRAM file.
 """
 import logging
+from cloudpathlib import CloudPath
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
@@ -56,7 +57,7 @@ class Align(SampleStage):
                 sample=sample,
                 output_path=sample.make_cram_path(),
                 job_attrs=self.get_job_attrs(sample),
-                overwrite=not get_config()['workflow'].get('check_intermediates'),
+                overwrite=sample.forced,
                 out_markdup_metrics_path=markdup_metrics_path,
             )
             return self.make_outputs(

@@ -63,24 +63,6 @@ def get_intervals(
             for idx in range(scatter_count)
         ]
 
-    if not source_intervals_path and exists(
-        (
-            existing_split_intervals_prefix := (
-                reference_path('intervals_prefix')
-                / sequencing_type
-                / f'{scatter_count}intervals'
-            )
-        )
-        / '1.interval_list'
-    ):
-        # We already have split intervals for this sequencing_type:
-        return None, [
-            b.read_input(
-                str(existing_split_intervals_prefix / f'{idx + 1}.interval_list')
-            )
-            for idx in range(scatter_count)
-        ]
-
     j = b.new_job(
         f'Make {scatter_count} intervals for {sequencing_type}',
         attributes=(job_attrs or {}) | dict(tool='picard IntervalListTools'),
@@ -137,17 +119,16 @@ def markdup(
     output_path: Path | None = None,
     out_markdup_metrics_path: Path | None = None,
     overwrite: bool = False,
-) -> Job:
+) -> Job | None:
     """
     Make job that runs Picard MarkDuplicates and converts the result to CRAM.
     """
     job_attrs = (job_attrs or {}) | dict(tool='picard_MarkDuplicates')
     j = b.new_job('MarkDuplicates', job_attrs)
     if can_reuse(output_path, overwrite):
-        j.name = f'{j.name} [reuse]'
-        return j
+        return None
 
-    j.image(image_path('picard_samtools'))
+    j.image(image_path('picard'))
     resource = HIGHMEM.request_resources(ncpu=4)
     # enough for input BAM and output CRAM
     resource.attach_disk_storage_gb = 250

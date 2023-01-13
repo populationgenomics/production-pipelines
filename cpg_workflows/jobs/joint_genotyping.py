@@ -79,8 +79,8 @@ def make_joint_genotyping_jobs(
     if intervals_j:
         jobs.append(intervals_j)
 
-    vcfs: list[hb.ResourceFile] = []
-    siteonly_vcfs: list[hb.ResourceFile] = []
+    vcfs: list[hb.ResourceGroup] = []
+    siteonly_vcfs: list[hb.ResourceGroup] = []
 
     # Preparing inputs for GenomicsDB
     genomicsdb_bucket = tmp_bucket / 'genomicsdbs'
@@ -151,17 +151,24 @@ def make_joint_genotyping_jobs(
                 jobs.append(excess_filter_j)
                 if jc_vcf_j:
                     excess_filter_j.depends_on(jc_vcf_j)
-            vcfs.append(excess_filter_jc_vcf['vcf.gz'])
+            vcfs.append(excess_filter_jc_vcf)
         else:
-            vcfs.append(jc_vcf['vcf.gz'])
+            vcfs.append(jc_vcf)
 
-        siteonly_j, siteonly_vcf = _add_make_sitesonly_job(
+        siteonly_j = add_make_sitesonly_job(
             b=b,
             input_vcf=vcfs[idx],
             output_vcf_path=siteonly_jc_vcf_path,
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
-        siteonly_vcfs.append(siteonly_vcf['vcf.gz'])
+        siteonly_vcfs.append(
+            b.read_input_group(
+                **{
+                    'vcf.gz': str(siteonly_jc_vcf_path),
+                    'vcf.gz.tbi': str(siteonly_jc_vcf_path) + '.tbi',
+                }
+            )
+        )
         if siteonly_j:
             jobs.append(siteonly_j)
 
@@ -379,6 +386,10 @@ def _add_joint_genotyper_job(
         cmd += f"""\
     --merge-input-intervals \\
     -G AS_StandardAnnotation
+    
+    if [[ ! -e {j.output_vcf['vcf.gz.tbi']} ]]; then 
+        tabix -p vcf {j.output_vcf['vcf.gz']}
+    fi
     """
     j.command(
         command(cmd, monitor_space=True, setup_gcp=True, define_retry_function=True)
@@ -442,6 +453,10 @@ def _add_excess_het_filter(
     -O {j.output_vcf['vcf.gz']} \\
     -V {input_vcf['vcf.gz']} \\
     2> {j.stderr}
+    
+    if [[ ! -e {j.output_vcf['vcf.gz.tbi']} ]]; then 
+        tabix -p vcf {j.output_vcf['vcf.gz']}
+    fi
     """
         )
     )
@@ -450,12 +465,13 @@ def _add_excess_het_filter(
     return j, j.output_vcf
 
 
-def _add_make_sitesonly_job(
+def add_make_sitesonly_job(
     b: hb.Batch,
-    input_vcf: hb.ResourceFile,
+    input_vcf: hb.ResourceGroup,
     output_vcf_path: Path | None = None,
     job_attrs: dict | None = None,
-) -> tuple[Job | None, hb.ResourceGroup]:
+    storage_gb: int | None = None,
+) -> Job | None:
     """
     Create sites-only VCF with only site-level annotations.
     Speeds up the analysis in the AS-VQSR modeling step.
@@ -463,18 +479,15 @@ def _add_make_sitesonly_job(
     Returns: a Job object with a single output j.sites_only_vcf of type ResourceGroup
     """
     if output_vcf_path and can_reuse(output_vcf_path):
-        return None, b.read_input_group(
-            **{
-                'vcf.gz': str(output_vcf_path),
-                'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
-            }
-        )
+        return None
 
     job_name = 'MakeSitesOnlyVcf'
     job_attrs = (job_attrs or {}) | {'tool': 'gatk MakeSitesOnlyVcf'}
     j = b.new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
     res = STANDARD.set_resources(j, ncpu=2)
+    if storage_gb:
+        j.storage(storage_gb)
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
@@ -487,9 +500,13 @@ def _add_make_sitesonly_job(
     MakeSitesOnlyVcf \\
     -I {input_vcf} \\
     -O {j.output_vcf['vcf.gz']}
+
+    if [[ ! -e {j.output_vcf['vcf.gz.tbi']} ]]; then 
+        tabix -p vcf {j.output_vcf['vcf.gz']}
+    fi
     """
         )
     )
     if output_vcf_path:
         b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
-    return j, j.output_vcf
+    return j

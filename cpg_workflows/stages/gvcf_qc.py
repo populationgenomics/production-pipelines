@@ -2,6 +2,7 @@
 Stages that generates and summarises GVCF QC.
 """
 import logging
+from typing import Any
 
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
@@ -56,7 +57,7 @@ class GvcfQC(SampleStage):
             job_attrs=self.get_job_attrs(sample),
             output_summary_path=self.expected_outputs(sample)['qc_summary'],
             output_detail_path=self.expected_outputs(sample)['qc_detail'],
-            overwrite=not get_config()['workflow'].get('check_intermediates'),
+            overwrite=sample.forced,
         )
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])
 
@@ -103,12 +104,23 @@ class GvcfHappy(SampleStage):
             return self.make_outputs(sample, self.expected_outputs(sample), jobs)
 
 
+def _update_meta(output_path: str) -> dict[str, Any]:
+    from cloudpathlib import CloudPath
+    import json
+
+    with CloudPath(output_path).open() as f:
+        d = json.load(f)
+    return {'multiqc': d['report_general_stats_data']}
+
+
 @stage(
     required_stages=[
         GvcfQC,
         GvcfHappy,
     ],
-    forced=True,
+    analysis_type='qc',
+    analysis_key='json',
+    update_analysis_meta=_update_meta,
 )
 class GvcfMultiQC(DatasetStage):
     """

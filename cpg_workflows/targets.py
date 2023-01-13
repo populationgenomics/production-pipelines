@@ -299,6 +299,19 @@ class Dataset(Target):
             )
         )
 
+    def analysis_prefix(self, **kwargs) -> Path:
+        """
+        Storage path for analysis files.
+        """
+        return to_path(
+            dataset_path(
+                self._seq_type_subdir(),
+                dataset=self.name,
+                category='analysis',
+                **kwargs,
+            )
+        )
+
     def web_prefix(self, **kwargs) -> Path:
         """
         Path for files served by an HTTP server Matches corresponding URLs returns by
@@ -548,28 +561,22 @@ class Sample(Target):
         """
         return self.pedigree.get_ped_dict(use_participant_id)
 
-    def make_cram_path(self, access_level: str | None = None) -> CramPath:
+    def make_cram_path(self) -> CramPath:
         """
         Path to a CRAM file. Not checking its existence here.
         """
-        path = (
-            self.dataset.prefix(access_level=access_level) / 'cram' / f'{self.id}.cram'
-        )
+        path = self.dataset.prefix() / 'cram' / f'{self.id}.cram'
         return CramPath(
             path=path,
             index_path=path.with_suffix('.cram.crai'),
             reference_assembly=reference_path('broad/ref_fasta'),
         )
 
-    def make_gvcf_path(self, access_level: str | None = None) -> GvcfPath:
+    def make_gvcf_path(self) -> GvcfPath:
         """
         Path to a GVCF file. Not checking its existence here.
         """
-        return GvcfPath(
-            self.dataset.prefix(access_level=access_level)
-            / 'gvcf'
-            / f'{self.id}.g.vcf.gz'
-        )
+        return GvcfPath(self.dataset.prefix() / 'gvcf' / f'{self.id}.g.vcf.gz')
 
     @property
     def target_id(self) -> str:
