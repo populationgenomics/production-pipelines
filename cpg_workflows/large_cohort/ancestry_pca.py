@@ -3,15 +3,55 @@ import pickle
 
 import hail as hl
 import pandas as pd
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from gnomad.sample_qc.ancestry import run_pca_with_relateds, assign_population_pcs
 
+from cpg_utils.hail_batch import reference_path
 from cpg_workflows.utils import can_reuse
 
 
 MIN_N_PCS = 3  # for one PC1 vs PC2 plot
 MIN_N_SAMPLES = 10
+
+
+def add_background(
+    dense_mt: hl.MatrixTable,
+    sample_qc_ht: hl.Table,
+    pca_background: dict,
+) -> tuple[hl.MatrixTable, hl.Table]:
+    """
+    Add background dataset samples to the dense MT and sample QC HT.
+    """
+    qc_variants_ht = hl.read_table(
+        str(reference_path('gnomad/predetermined_qc_variants'))
+    )
+    dense_mt = (
+        dense_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
+    )
+    for path in pca_background['datasets']:
+        logging.info(f'Adding background dataset {path}')
+        if to_path(path).suffix == '.mt':
+            mt = hl.read_matrix_table(str(path))
+            mt = hl.split_multi(mt, filter_changed_loci=True)
+            mt = mt.semi_join_rows(qc_variants_ht)
+            mt = mt.densify()
+        elif to_path(path).suffix == '.vds':
+            vds = hl.vds.read_vds(str(path))
+            vds = hl.vds.split_multi(vds, filter_changed_loci=True)
+            vds = hl.vds.filter_variants(vds, qc_variants_ht)
+            mt = hl.vds.to_dense_mt(vds)
+        else:
+            raise ValueError('Background dataset path must be either .mt or .vds')
+
+        ht = mt.cols()
+        if 'pop_field' in pca_background:
+            ht = ht.annotate(pop=ht[pca_background['pop_field']])
+        mt = mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
+        mt = mt.naive_coalesce(5000)
+        dense_mt = dense_mt.union_cols(mt)
+        sample_qc_ht = sample_qc_ht.union(ht)
+    return dense_mt, sample_qc_ht
 
 
 def run(
@@ -37,16 +77,23 @@ def run(
     """
     min_pop_prob = get_config()['large_cohort']['min_pop_prob']
     n_pcs = get_config()['large_cohort']['n_pcs']
-    mt = hl.read_matrix_table(str(dense_mt_path))
+    dense_mt = hl.read_matrix_table(str(dense_mt_path))
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
 
+    if pca_background := get_config()['large_cohort'].get('pca_background', {}):
+        logging.info(
+            f'Adding background datasets using following config: {pca_background}'
+        )
+        dense_mt, sample_qc_ht = add_background(dense_mt, sample_qc_ht, pca_background)
+
     logging.info(
-        f'Running PCA on {mt.count_cols()} samples, {mt.count_rows()} sites, '
+        f'Running PCA on {dense_mt.count_cols()} samples, '
+        f'{dense_mt.count_rows()} sites, '
         f'using {n_pcs} PCs'
     )
     scores_ht, eigenvalues_ht, loadings_ht = _run_pca_ancestry_analysis(
-        mt=mt,
+        mt=dense_mt,
         sample_to_drop_ht=relateds_to_drop_ht,
         n_pcs=n_pcs,
         out_scores_ht_path=out_scores_ht_path,

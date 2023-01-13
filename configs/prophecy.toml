@@ -12,3 +12,7 @@ highmem_workers = true
 
 scatter_count = 20
 output_version = '1.1'
+
+[large_cohort.pca_background]
+datasets = ['gs://cpg-common-main/references/ancestry/oceania_eur.mt']
+pop_field = 'continental_pop'

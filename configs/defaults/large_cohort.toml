@@ -27,6 +27,14 @@ min_pop_prob = 0.5  # minimum random forest probability for population assignmen
 pop_meta_field = 'Superpopulation name'  # metamist's `Participant/meta` field for the
                                          # known population label for the RF training
 
+# Section that specifies background samples for PCA analysis.
+# `datasets` must be a list paths to matrix tables or VDS, and 
+# `pop_field` if defined would specify the column-level field in th datasets
+# to extract the population tag for RF training for ancestry inference.
+#[large_cohort.pca_background]
+#datasets = ['gs://cpg-common-main/references/ancestry/oceania_eur.mt']
+#pop_field = 'continental_pop'
+
 # Parameters for sample QC. The default values for soft filtering taken from gnomAD QC:
 # https://macarthurlab.org/2019/10/16/gnomad-v3-0, with `max_n_snps` and 
 # `max_n_singletons` adjusted based on the results we got for the TOB-WGS project.
