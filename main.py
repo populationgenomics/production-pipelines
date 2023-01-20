@@ -13,6 +13,7 @@ from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
 from cpg_workflows.workflow import run_workflow, StageDecorator
 from cpg_workflows.stages.large_cohort import LoadVqsr, Frequencies, AncestryPlots
+from cpg_workflows.stages.large_cohort import Combiner
 from cpg_workflows.stages.cram_qc import CramMultiQC
 from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 from cpg_workflows.stages.fastqc import FastQCMultiQC
@@ -26,6 +27,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'seqr_loader': [AnnotateDataset, MtToEs, GvcfMultiQC, CramMultiQC, Stripy],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
     'gatk_sv': [ClusterBatch],
+    'generate_vds': [Combiner],
 }
 
 
