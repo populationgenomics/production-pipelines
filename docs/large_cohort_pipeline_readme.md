@@ -26,7 +26,7 @@ analysis-runner --dataset bioheart --description "bioheart larcoh" \
 The detailed description for each stage is as follows:
 ### CramMultiQC Stage
 
-1.  Alignment: the first step is to align the given input files. By default, DRAGMAP is used, with the version matching the tag of the corresponding image used for the alignment job (specified in. [images] within the config file). This then outputs a CRAM file with a corresponding index file (.crai file). 
+1.  Alignment: the first step is to align the given input files. By default, DRAGMAP is used, with the version matching the tag of the corresponding image used for the alignment job (specified in `[images]` within the config file). This then outputs a CRAM file with a corresponding index file (.crai file). 
 <ins>Configurable inputs:</ins>
 	* [workflow].check_intermediates
 	* [workflow].skip_samples_with_missing_input
@@ -34,7 +34,7 @@ The detailed description for each stage is as follows:
 	* [workflow].realign_from_cram_version
 	* [workflow].check_inputs
 	* [workflow].sequencing_type
-	* [workflow].resources.Align.storgae_gb
+	* [workflow].resources.Align.storage_gb
 
 2. CramQC: This step calls a set of tools that process CRAM files for QC purposes. It relies on the jobs `somalier.py`, `picard.py`, `samtools.py`, and `verifybamid.py` to run qc metrics on all samples and is based off of the [Broad Warp pipeline](https://github.com/broadinstitute/warp/tree/master ""). Specifically, the following QC functions are run:
 	1. `somalier.extract`: this generates a fingerprint using [Somalier](https://github.com/brentp/somalier ""), with the output being a `*.somalier` file.
