@@ -1,7 +1,0 @@
-[workflow]
-dataset_gcp_project = 'fewgenomes'
-dataset = 'fewgenomes'
-status_reporter = 'metamist'
-access_level='full'
-[hail]
-billing_project = 'fewgenomes'
