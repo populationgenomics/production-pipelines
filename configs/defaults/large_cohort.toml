@@ -20,7 +20,8 @@ indel_filter_level = 99.0
 
 [large_cohort]
 # Parameters for reladness inference
-max_kin = 0.2  # maximum kin threshold to be considered unrelated in relatedness check
+max_kin = 0.2  # maximum kin threshold to be considered unrelated in relatedness check (second degree)
+# As in hail docs https://hail.is/docs/0.2/methods/relatedness.html, 0.25
 # Parameters for population inference
 n_pcs = 16  # number of principal components for PCA analysis
 min_pop_prob = 0.5  # minimum random forest probability for population assignment
