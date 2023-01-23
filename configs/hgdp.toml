@@ -4,7 +4,7 @@ dataset = 'hgdp'
 sequencing_type = 'genome'
 scatter_count = 20
 # first_stages = ['Combiner']
-last_stages = ['SampleQC','Frequencies']
+last_stages = ['SampleQC']
 output_version = '1.0'
 skip_qc = true
 
