@@ -1,6 +1,6 @@
 [workflow]
-dataset_gcp_project = 'thousand-genomes'
-dataset = 'thousand-genomes'
+dataset_gcp_project = 'hgdp-323802'
+dataset = 'hgdp'
 sequencing_type = 'genome'
 scatter_count = 20
 # first_stages = ['Combiner']
@@ -14,4 +14,4 @@ skip_qc = true
 ref_fasta = 'gs://cpg-common-main/references/hg38/v0/Homo_sapiens_assembly38.fasta'
 
 [hail]
-billing_project = 'thousand-genomes'
+billing_project = 'hgdp'
