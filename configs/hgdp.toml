@@ -7,6 +7,7 @@ scatter_count = 20
 last_stages = ['SampleQC']
 output_version = '1.0'
 skip_qc = true
+skip_samples=['CPG146225', 'CPG147751', 'CPG148858', 'CPG150656', 'CPG195669']
 
 # CRAMs were aligned using an unmasked reference: 
 # gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta
