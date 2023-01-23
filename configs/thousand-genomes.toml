@@ -15,3 +15,6 @@ ref_fasta = 'gs://cpg-common-main/references/hg38/v0/Homo_sapiens_assembly38.fas
 
 [hail]
 billing_project = 'thousand-genomes'
+
+[large_cohort]
+max_kin = 0.12 # Not limiting to second degree 
