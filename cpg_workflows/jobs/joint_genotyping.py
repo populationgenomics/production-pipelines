@@ -498,7 +498,7 @@ def add_make_sitesonly_job(
             f"""
     gatk --java-options -Xms{res.get_java_mem_mb()}m \\
     MakeSitesOnlyVcf \\
-    -I {input_vcf} \\
+    -I {input_vcf['vcf.gz']} \\
     -O {j.output_vcf['vcf.gz']}
 
     if [[ ! -e {j.output_vcf['vcf.gz.tbi']} ]]; then 

@@ -199,13 +199,13 @@ def tabix_vcf(
         j, fraction=1, storage_gb=storage_for_joint_vcf(sample_count, site_only)
     )
     j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+        output_tbi={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
-    assert isinstance(j.output_vcf, hb.ResourceGroup)
+    assert isinstance(j.output_tbi, hb.ResourceGroup)
     cmd = f"""
     mv {vcf} $BATCH_TMPDIR/result.vcf.gz
     tabix -p vcf $BATCH_TMPDIR/result.vcf.gz
-    mv $BATCH_TMPDIR/result.vcf.gz.tbi {j.output_tbi}
+    mv $BATCH_TMPDIR/result.vcf.gz.tbi {j.output_tbi['vcf.gz.tbi']}
     """
 
     j.command(command(cmd, monitor_space=True))
