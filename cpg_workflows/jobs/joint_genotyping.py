@@ -465,7 +465,7 @@ def add_make_sitesonly_job(
     output_vcf_path: Path | None = None,
     job_attrs: dict | None = None,
     storage_gb: int | None = None,
-) -> tuple[Job | None, hb.ResourceGroup | Path]:
+) -> tuple[Job | None, hb.ResourceGroup]:
     """
     Create sites-only VCF with only site-level annotations.
     Speeds up the analysis in the AS-VQSR modeling step.
@@ -473,7 +473,12 @@ def add_make_sitesonly_job(
     Returns: a Job object with a single output j.sites_only_vcf of type ResourceGroup
     """
     if output_vcf_path and can_reuse(output_vcf_path):
-        return None, output_vcf_path
+        return None, b.read_input_group(
+            **{
+                'vcf.gz': str(output_vcf_path),
+                'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
+            }
+        )
 
     job_name = 'MakeSitesOnlyVcf'
     job_attrs = (job_attrs or {}) | {'tool': 'gatk MakeSitesOnlyVcf'}
