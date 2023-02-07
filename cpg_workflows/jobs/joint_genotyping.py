@@ -155,20 +155,14 @@ def make_joint_genotyping_jobs(
         else:
             vcfs.append(jc_vcf)
 
-        siteonly_j = add_make_sitesonly_job(
+        siteonly_j, siteonly_j_vcf = add_make_sitesonly_job(
             b=b,
             input_vcf=vcfs[idx],
             output_vcf_path=siteonly_jc_vcf_path,
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
-        siteonly_vcfs.append(
-            b.read_input_group(
-                **{
-                    'vcf.gz': str(siteonly_jc_vcf_path),
-                    'vcf.gz.tbi': str(siteonly_jc_vcf_path) + '.tbi',
-                }
-            )
-        )
+        # make add_make_sitesonly_job return the vcf file as apointer
+        siteonly_vcfs.append(siteonly_j_vcf)
         if siteonly_j:
             jobs.append(siteonly_j)
 
@@ -471,7 +465,7 @@ def add_make_sitesonly_job(
     output_vcf_path: Path | None = None,
     job_attrs: dict | None = None,
     storage_gb: int | None = None,
-) -> Job | None:
+) -> tuple[Job | None, hb.ResourceGroup | Path]:
     """
     Create sites-only VCF with only site-level annotations.
     Speeds up the analysis in the AS-VQSR modeling step.
@@ -479,7 +473,7 @@ def add_make_sitesonly_job(
     Returns: a Job object with a single output j.sites_only_vcf of type ResourceGroup
     """
     if output_vcf_path and can_reuse(output_vcf_path):
-        return None
+        return None, output_vcf_path
 
     job_name = 'MakeSitesOnlyVcf'
     job_attrs = (job_attrs or {}) | {'tool': 'gatk MakeSitesOnlyVcf'}
@@ -509,4 +503,4 @@ def add_make_sitesonly_job(
     )
     if output_vcf_path:
         b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
-    return j
+    return j, j.output_vcf
