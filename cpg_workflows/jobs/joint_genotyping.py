@@ -465,7 +465,7 @@ def add_make_sitesonly_job(
     output_vcf_path: Path | None = None,
     job_attrs: dict | None = None,
     storage_gb: int | None = None,
-) -> tuple[Job | None, hb.ResourceGroup | Path]:
+) -> tuple[Job | None, hb.ResourceGroup]:
     """
     Create sites-only VCF with only site-level annotations.
     Speeds up the analysis in the AS-VQSR modeling step.
