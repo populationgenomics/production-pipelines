@@ -210,6 +210,6 @@ def tabix_vcf(
 
     j.command(command(cmd, monitor_space=True))
     if out_tbi_path:
-        b.write_output(j.output_tbi, str(out_tbi_path))
+        b.write_output(j.output_tbi['vcf.gz.tbi'], str(out_tbi_path))
 
     return j
