@@ -16,7 +16,6 @@ access_level = 'test'
 dataset = 'fewgenomes'
 driver_image = '<stub>'
 sequencing_type = 'genome'
-status_reporter = 'metamist'
 
 check_inputs = false
 check_intermediates = false
@@ -40,20 +39,23 @@ cpg_workflows = "stub"
 """
 
 
-def _mock_config() -> dict:
-    d: dict = {}
-    for fp in [
-        to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml',
-        to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml',
-    ]:
-        with fp.open():
-            update_dict(d, toml.load(fp))
+def _common(mocker, state_provider='metamist'):
+    def _mock_config() -> dict:
+        d: dict = {}
+        for fp in [
+            to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml',
+            to_path(__file__).parent.parent
+            / 'configs'
+            / 'defaults'
+            / 'seqr_loader.toml',
+        ]:
+            with fp.open():
+                update_dict(d, toml.load(fp))
+        d['workflow']['state_provider'] = state_provider
 
-    update_dict(d, toml.loads(TOML))
-    return d
+        update_dict(d, toml.loads(TOML))
+        return d
 
-
-def _common(mocker):
     mocker.patch('cpg_utils.config.get_config', _mock_config)
 
     def mock_create_new_analysis(_, project, analysis_model) -> int:
@@ -134,9 +136,9 @@ def test_status_reporter(mocker: MockFixture):
 
     run_workflow(stages=[MyQcStage1, MyQcStage2])
 
-    assert 'metamist' in get_batch().job_by_tool, get_batch().job_by_tool
+    assert 'update_state' in get_batch().job_by_tool, get_batch().job_by_tool
     assert (
-        get_batch().job_by_tool['metamist']['job_n']
+        get_batch().job_by_tool['update_state']['job_n']
         == len(get_cohort().get_samples()) * 4
     )
 
@@ -177,7 +179,7 @@ def test_status_reporter_with_custom_updater(mocker: MockFixture):
 
     run_workflow(stages=[MyQcStage])
 
-    assert 'metamist' in get_batch().job_by_tool, get_batch().job_by_tool
+    assert 'update_state' in get_batch().job_by_tool, get_batch().job_by_tool
 
 
 def test_status_reporter_fails(mocker: MockFixture):

@@ -15,7 +15,7 @@ import click
 
 from cpg_utils.config import get_config, set_config_paths
 from cpg_workflows.inputs import get_cohort
-from cpg_workflows.status import MetamistStatusReporter
+from cpg_workflows.status import MetamistStateProvider
 from cpg_workflows.utils import exists
 from cpg_workflows.workflow import get_workflow
 
@@ -37,7 +37,7 @@ def main(command: str, config_paths: list[str]):
     sequencing_type = get_config()['workflow']['sequencing_type']
     wfl = get_workflow()
     cohort = get_cohort()
-    status = MetamistStatusReporter()
+    status = MetamistStateProvider()
 
     if command == 'analyses':
         from sample_metadata.apis import AnalysisApi
@@ -60,7 +60,7 @@ def main(command: str, config_paths: list[str]):
                     continue
 
                 print(f'#{i+1} {sample} {path}')
-                status.create_analysis(
+                status.record_status(
                     str(path),
                     analysis_type='cram',
                     analysis_status='completed',
@@ -70,13 +70,13 @@ def main(command: str, config_paths: list[str]):
                         size=path.stat().st_size,
                         sequencing_type=sequencing_type,
                     ),
-                    project_name=sample.dataset.name,
+                    dataset=sample.dataset.name,
                 )
             if (path := sample.make_gvcf_path().path).exists():
                 print(f'#{i+1} {sample} {path}')
                 if str(path) in existing_paths:
                     continue
-                status.create_analysis(
+                status.record_status(
                     str(path),
                     analysis_type='gvcf',
                     analysis_status='completed',
@@ -86,7 +86,7 @@ def main(command: str, config_paths: list[str]):
                         size=path.stat().st_size,
                         sequencing_type=sequencing_type,
                     ),
-                    project_name=sample.dataset.name,
+                    dataset=sample.dataset.name,
                 )
 
     if command == 'qc':
@@ -114,7 +114,7 @@ def main(command: str, config_paths: list[str]):
                 print(f'{sample.rich_id} not found in MultiQC, skipping')
                 continue
             metrics_d = metrics_by_sample[sample.rich_id]
-            status.create_analysis(
+            status.record_status(
                 str(multiqc_json_path),
                 analysis_type='qc',
                 analysis_status='completed',
@@ -124,13 +124,13 @@ def main(command: str, config_paths: list[str]):
                     sequencing_type=sequencing_type,
                     metrics=metrics_d,
                 ),
-                project_name=sample.dataset.name,
+                dataset=sample.dataset.name,
             )
 
     if command == 'joint-calling':
         path = cohort.analysis_dataset.prefix() / 'mt' / f'{wfl.output_version}.mt'
         if exists(path):
-            status.create_analysis(
+            status.record_status(
                 str(path),
                 analysis_type='joint-calling',
                 analysis_status='completed',
@@ -139,7 +139,7 @@ def main(command: str, config_paths: list[str]):
                 | dict(
                     sequencing_type=sequencing_type,
                 ),
-                project_name='seqr',
+                dataset='seqr',
             )
 
     if command == 'es-index':
@@ -169,7 +169,7 @@ def main(command: str, config_paths: list[str]):
             ds_name = name.split(f'-{sequencing_type}-')[0]
             print(f'Adding {ds_name}')
             dataset = cohort.create_dataset(ds_name)
-            status.create_analysis(
+            status.record_status(
                 str(name),
                 analysis_type='es-index',
                 analysis_status='completed',
@@ -178,7 +178,7 @@ def main(command: str, config_paths: list[str]):
                 | dict(
                     sequencing_type=sequencing_type,
                 ),
-                project_name=ds_name,
+                dataset=ds_name,
             )
 
 

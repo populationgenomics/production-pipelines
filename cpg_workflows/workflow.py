@@ -26,7 +26,12 @@ from cpg_utils.config import get_config
 from cpg_utils import Path
 
 from .batch import get_batch
-from .status import MetamistStatusReporter
+from .state import (
+    MetamistStateProvider,
+    JsonFileStateProvider,
+    StateProviderError,
+    StateProvider,
+)
 from .targets import Target, Dataset, Sample, Cohort
 from .utils import exists, timestamp, slugify, ExpectedResultT
 from .inputs import get_cohort
@@ -337,7 +342,7 @@ class Stage(Generic[TargetT], ABC):
         # Dependencies. Populated in workflow.run(), after we know all stages.
         self.required_stages: list[Stage] = []
 
-        self.status_reporter = get_workflow().status_reporter
+        self.state_provider = get_workflow().state_provider
         # If `analysis_type` is defined, it will be used to create/update Analysis
         # entries in Metamist.
         self.analysis_type = analysis_type
@@ -495,41 +500,29 @@ class Stage(Generic[TargetT], ABC):
         # Adding status reporter jobs
         if (
             self.analysis_type
-            and self.status_reporter
+            and self.state_provider
             and action == Action.QUEUE
             and outputs.data
         ):
-            output: str | Path
-            if isinstance(outputs.data, dict):
-                if not self.analysis_key:
-                    raise WorkflowError(
-                        f'Cannot create Analysis: `analysis_key` '
-                        f'must be set with the @stage decorator to select value from '
-                        f'the expected_outputs dict: {outputs.data}'
-                    )
-                if self.analysis_key not in outputs.data:
-                    raise WorkflowError(
-                        f'Cannot create Analysis for stage {self.name}: `analysis_key` '
-                        f'"{self.analysis_key}" is not found in the expected_outputs '
-                        f'dict {outputs.data}'
-                    )
-                output = outputs.data[self.analysis_key]
-            else:
-                output = outputs.data
+            try:
+                self.state_provider.wrap_jobs_with_status_updaters(
+                    b=get_batch(),
+                    outputs=outputs.data,
+                    stage_name=self.name,
+                    analysis_type=self.analysis_type,
+                    target=target,
+                    jobs=outputs.jobs,
+                    prev_jobs=inputs.get_jobs(target),
+                    meta=outputs.meta,
+                    job_attrs=self.get_job_attrs(target),
+                    main_output_key=self.analysis_key,
+                    update_analysis_meta=self.update_analysis_meta,
+                )
+            except StateProviderError as e:
+                raise WorkflowError(
+                    f'Cannot create Analysis for stage {self.name}: {e}'
+                )
 
-            assert isinstance(output, str) or isinstance(output, Path), output
-
-            self.status_reporter.add_updaters_jobs(
-                b=get_batch(),
-                output=output,
-                analysis_type=self.analysis_type,
-                target=target,
-                jobs=outputs.jobs,
-                prev_jobs=inputs.get_jobs(target),
-                meta=outputs.meta,
-                job_attrs=self.get_job_attrs(target),
-                update_analysis_meta=self.update_analysis_meta,
-            )
         return outputs
 
     def _get_action(self, target: TargetT) -> Action:
@@ -827,9 +820,13 @@ class Workflow:
                 description += ' ' + ', '.join(sorted(ds_set))
             get_batch().name = description
 
-        self.status_reporter = None
-        if get_config()['workflow'].get('status_reporter') == 'metamist':
-            self.status_reporter = MetamistStatusReporter()
+        self.state_provider: StateProvider | None = None
+        if get_config()['workflow'].get('state_provider') == 'metamist':
+            self.state_provider = MetamistStateProvider()
+        elif get_config()['workflow'].get('state_provider') == 'json':
+            prefix = self.prefix / 'state' / self.output_version
+            prefix.mkdir(parents=True, exist_ok=True)
+            self.state_provider = JsonFileStateProvider(prefix=prefix)
         self._stages: list[StageDecorator] | None = stages
 
     @property
