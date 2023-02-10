@@ -1,0 +1,10 @@
+[workflow]
+sequencing_type = 'genome'
+only_samples=["CPG262139"]
+name = 'test'
+dataset_gcp_project = 'fewgenomes'
+dataset = 'fewgenomes'
+status_reporter = 'metamist'
+
+[hail]
+billing_project = 'fewgenomes'
