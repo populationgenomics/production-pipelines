@@ -158,7 +158,9 @@ class Batch(hb.Batch):
                 job.name, job.attributes = self._process_attributes(
                     job.name, job.attributes
                 )
-                if self.pool_label and job._preemptible:
+                # We only have dedicated pools for preemptible machines.
+                # _preemptible defaults to None, so check explicitly for False.
+                if self.pool_label and job._preemptible is not False:
                     job._pool_label = self.pool_label
                 copy_common_env(job)
 

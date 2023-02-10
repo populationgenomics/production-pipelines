@@ -93,13 +93,13 @@ def gather_vcfs(
 
     if not can_reuse(out_vcf_path):
         job_name = f'Merge {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
-        j = b.new_job(job_name, (job_attrs or {}) | {'tool': 'bcftools merge'})
+        j = b.new_job(job_name, (job_attrs or {}) | {'tool': 'bcftools concat'})
         j.image(image_path('bcftools'))
         STANDARD.set_resources(
             j, storage_gb=storage_for_joint_vcf(sample_count, site_only)
         )
         cmd = f"""
-        bcftools merge {" ".join(vcf["vcf.gz"] for vcf in input_vcfs)} \
+        bcftools concat -a {" ".join(vcf["vcf.gz"] for vcf in input_vcfs)} \
         -Oz -o {j.output_vcf}
         """
         j.command(command(cmd, monitor_space=True))
@@ -199,17 +199,17 @@ def tabix_vcf(
         j, fraction=1, storage_gb=storage_for_joint_vcf(sample_count, site_only)
     )
     j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+        output_tbi={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
-    assert isinstance(j.output_vcf, hb.ResourceGroup)
+    assert isinstance(j.output_tbi, hb.ResourceGroup)
     cmd = f"""
     mv {vcf} $BATCH_TMPDIR/result.vcf.gz
     tabix -p vcf $BATCH_TMPDIR/result.vcf.gz
-    mv $BATCH_TMPDIR/result.vcf.gz.tbi {j.output_tbi}
+    mv $BATCH_TMPDIR/result.vcf.gz.tbi {j.output_tbi['vcf.gz.tbi']}
     """
 
     j.command(command(cmd, monitor_space=True))
     if out_tbi_path:
-        b.write_output(j.output_tbi, str(out_tbi_path))
+        b.write_output(j.output_tbi['vcf.gz.tbi'], str(out_tbi_path))
 
     return j

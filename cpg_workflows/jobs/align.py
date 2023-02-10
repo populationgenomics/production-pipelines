@@ -56,7 +56,9 @@ class MarkDupTool(Enum):
 def _get_cram_reference_from_version(cram_version) -> str:
     """
     Get the reference used for the specific cram_version,
-    so that Bazam is able to correctly decompress the reads
+    so that Bazam is able to correctly decompress the reads.
+    Note: Bazam is a tool that can output FASTQ in a form that
+    can stream directly into common aligners such as BWA
     """
     cram_version_map = get_config()['workflow'].get('cram_version_reference', {})
     if cram_version in cram_version_map:
@@ -73,6 +75,8 @@ class MissingAlignmentInputException(Exception):
 
 
 def _get_alignment_input(sample: Sample) -> AlignmentInput:
+    """Given a sample, will return an AlignmentInput object that
+    represents the path to a relevant input (e.g. CRAM/BAM path)"""
     sequencing_type = get_config()['workflow']['sequencing_type']
     alignment_input = sample.alignment_input_by_seq_type.get(sequencing_type)
     if realign_cram_ver := get_config()['workflow'].get('realign_from_cram_version'):
@@ -122,22 +126,23 @@ def align(
     - if the input is 1 fastq pair, submits one alignment job.
 
     - if the input is a set of fastq pairs, submits multiple jobs per each pair,
-      then submits a separate merge job.
+    then submits a separate merge job.
 
     - if the input is a cram/bam
-      - for bwa or bwa-mem2, stream bazam -> bwa.
-        - if number_of_shards_for_realignment is > 1, use bazam to shard inputs
-          and align in parallel, then merge result together.
+        - for bwa or bwa-mem2, stream bazam -> bwa.
 
-      - for dragmap, submit an extra job to extract a pair of fastqs from the cram/bam,
+        - if number_of_shards_for_realignment is > 1, use bazam to shard inputs
+        and align in parallel, then merge result together.
+
+        - for dragmap, submit an extra job to extract a pair of fastqs from the cram/bam,
         because dragmap can't read streamed files from bazam.
 
     - if the markdup tool:
-      - is biobambam2, stream the alignment or merging within the same job.
-      - is picard, submit a separate job with deduplication.
+        - is biobambam2, deduplication and alignment/merging are submitted within the same job.
+        - is picard, deduplication is submitted in a separate job.
 
     - nthreads can be set for smaller test runs on toy instance, so the job
-      doesn't take entire 32-cpu/64-threaded instance.
+    doesn't take entire 32-cpu/64-threaded instance.
     """
     if output_path and can_reuse(output_path.path, overwrite):
         return []
@@ -277,6 +282,8 @@ def align(
 def storage_for_align_job(alignment_input: AlignmentInput) -> int | None:
     """
     Get storage for an alignment job, gb
+    This function pulls the value from the config, otherwise utilises the full capacity of a standard
+    machine. Increases storage if genomes are being handled, and again for unindexed/unsorted CRAM/BAMs.
     """
     storage_gb = None  # avoid attaching extra disk by default
 
@@ -319,6 +326,9 @@ def _align_one(
     Creates a job that (re)aligns reads to hg38. Returns the job object and a command
     separately, and doesn't add the command to the Job object, so stream-sorting
     and/or deduplication can be appended to the command later.
+
+    Note: When this function is called within the align function, DRAGMAP is used as the default
+    tool.
     """
 
     if number_of_shards_for_realignment is not None:
