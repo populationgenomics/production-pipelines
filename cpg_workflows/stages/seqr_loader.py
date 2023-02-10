@@ -136,6 +136,7 @@ def es_password() -> str:
     required_stages=[AnnotateDataset],
     analysis_type='es-index',
     analysis_key='index_name',
+    run_jobs_sequentially=True,
 )
 class MtToEs(DatasetStage):
     """

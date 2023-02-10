@@ -118,7 +118,7 @@ class HailElasticsearchClientV8(HailElasticsearchClient):
 def main(
     mt_path: str,
     es_index: str,
-    done_flag_path: str,
+    done_flag_path: str | None,
     password: str = None,
 ):
     """
@@ -167,8 +167,9 @@ def main(
         write_null_values=True,
     )
     _cleanup(es, es_index, es_shards)
-    with to_path(done_flag_path).open('w') as f:
-        f.write('done')
+    if done_flag_path:
+        with to_path(done_flag_path).open('w') as f:
+            f.write('done')
 
 
 def _annotate_grch37(mt):

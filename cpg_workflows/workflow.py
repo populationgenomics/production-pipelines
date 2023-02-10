@@ -325,6 +325,7 @@ class Stage(Generic[TargetT], ABC):
         skipped: bool = False,
         assume_outputs_exist: bool = False,
         forced: bool = False,
+        run_jobs_sequentially: bool = False,
     ):
         self._name = name
         self.required_stages_classes: list[StageDecorator] = []
@@ -356,6 +357,7 @@ class Stage(Generic[TargetT], ABC):
             'force_stages', []
         )
         self.assume_outputs_exist = assume_outputs_exist
+        self.run_jobs_sequentially = run_jobs_sequentially
 
     @property
     def tmp_prefix(self):
@@ -481,13 +483,15 @@ class Stage(Generic[TargetT], ABC):
         outputs.stage = self
         outputs.meta |= self.get_job_attrs(target)
 
+        # Plugging in job dependencies
+        _prev_jobs: list[Job] = []
         for output_job in outputs.jobs:
             if output_job:
                 for input_job in inputs.get_jobs(target):
-                    assert (
-                        input_job
-                    ), f'Input dependency job for stage: {self}, target: {target}'
                     output_job.depends_on(input_job)
+                    if self.run_jobs_sequentially:
+                        output_job.depends_on(*_prev_jobs)
+                        _prev_jobs.append(output_job)
 
         if outputs.error_msg:
             return outputs
@@ -668,6 +672,7 @@ def stage(
     skipped: bool = False,
     assume_outputs_exist: bool = False,
     forced: bool = False,
+    run_jobs_sequentially: bool = False,
 ) -> Union[StageDecorator, Callable[..., StageDecorator]]:
     """
     Implements a standard class decorator pattern with optional arguments.
@@ -694,6 +699,7 @@ def stage(
     @skipped: always skip this stage.
     @assume_outputs_exist: assume expected outputs of this stage always exist.
     @forced: always force run this stage, regardless of the outputs' existence.
+    @run_jobs_sequentially: run submit jobs for each target sequentially
     """
 
     def decorator_stage(_cls) -> StageDecorator:
@@ -711,6 +717,7 @@ def stage(
                 skipped=skipped,
                 assume_outputs_exist=assume_outputs_exist,
                 forced=forced,
+                run_jobs_sequentially=run_jobs_sequentially,
             )
 
         return wrapper_stage
