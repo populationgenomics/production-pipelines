@@ -30,16 +30,19 @@ COMMANDS = ['analyses', 'qc', 'joint-calling', 'es-index']
 @click.argument('command', type=click.Choice(COMMANDS))
 @click.option('--config', 'config_paths', multiple=True)
 def main(command: str, config_paths: list[str]):
+    print('Populating Metamist')
     if _env_var := os.environ.get('CPG_CONFIG_PATH'):
         config_paths = list(_env_var.split(',')) + list(config_paths)
     set_config_paths(list(config_paths))
 
     sequencing_type = get_config()['workflow']['sequencing_type']
     wfl = get_workflow()
+    print('Populating Cohort')
     cohort = get_cohort()
     status = MetamistStatusReporter()
 
     if command == 'analyses':
+        print('Populating Analyses')
         from sample_metadata.apis import AnalysisApi
         from sample_metadata.models import AnalysisQueryModel, AnalysisStatus
 
