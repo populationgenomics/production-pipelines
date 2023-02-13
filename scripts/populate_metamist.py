@@ -65,7 +65,7 @@ def main(command: str, config_paths: list[str]):
                     continue
 
                 if not path.exists():
-                    print('Path not found at all, skipping.')
+                    print(f'{path} not found at all, skipping.')
                     continue
 
                 print(f'#{i+1} {sample} {path}')
