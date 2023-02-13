@@ -52,9 +52,12 @@ def main(command: str, config_paths: list[str]):
                 status=AnalysisStatus('completed'),
             )
         )
+        print(analyses)
         existing_paths = set(a['output'] for a in analyses)
+        print(existing_paths)
 
         for i, sample in enumerate(cohort.get_samples()):
+            print(i, sample)
             if path := sample.make_cram_path().path:
                 if str(path) in existing_paths:
                     continue
