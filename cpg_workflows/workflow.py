@@ -519,6 +519,12 @@ class Stage(Generic[TargetT], ABC):
 
             assert isinstance(output, str) or isinstance(output, Path), output
 
+            project_name = None
+            if isinstance(target, Sample):
+                project_name = target.dataset.name
+            elif isinstance(target, Dataset):
+                project_name = target.name
+
             self.status_reporter.add_updaters_jobs(
                 b=get_batch(),
                 output=output,
@@ -529,6 +535,7 @@ class Stage(Generic[TargetT], ABC):
                 meta=outputs.meta,
                 job_attrs=self.get_job_attrs(target),
                 update_analysis_meta=self.update_analysis_meta,
+                project_name=project_name,
             )
         return outputs
 

@@ -124,6 +124,7 @@ class MetamistStatusReporter(StatusReporter):
         meta: dict | None = None,
         job_attrs: dict[str, str] | None = None,
         update_analysis_meta: Callable[[str], dict] | None = None,
+        project_name: str | None = None,
     ) -> list[Job]:
         """
         Create "queued" analysis and insert "in_progress" and "completed" updater jobs.
@@ -139,6 +140,7 @@ class MetamistStatusReporter(StatusReporter):
                 analysis_status='queued',
                 target=target,
                 meta=meta,
+                project_name=project_name,
             )
         ) is None:
             raise MetamistError('Failed to create analysis')
