@@ -496,8 +496,13 @@ class Stage(Generic[TargetT], ABC):
                     output_job.depends_on(input_job)
 
         if outputs.error_msg:
+            logging.warning('Early Exit')
             return outputs
 
+        logging.info('Performing Check')
+        logging.info(
+            f'{self.analysis_type}, {self.status_reporter}, {action}, {outputs.data}'
+        )
         # Adding status reporter jobs
         if (
             self.analysis_type
@@ -505,6 +510,7 @@ class Stage(Generic[TargetT], ABC):
             and action == Action.QUEUE
             and outputs.data
         ):
+            logging.info('Entering the if statement to add the status reported job')
             output: str | Path
             if isinstance(outputs.data, dict):
                 if not self.analysis_key:
