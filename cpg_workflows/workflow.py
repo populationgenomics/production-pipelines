@@ -484,7 +484,7 @@ class Stage(Generic[TargetT], ABC):
         outputs.stage = self
         outputs.meta |= self.get_job_attrs(target)
 
-        print('Adding Dependencies')
+        print(f'Adding Dependencies for {outputs.stage}')
         if outputs.stage == 'CramQC':
             print(outputs)
         for output_job in outputs.jobs:
