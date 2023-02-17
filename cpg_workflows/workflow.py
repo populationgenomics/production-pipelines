@@ -465,6 +465,7 @@ class Stage(Generic[TargetT], ABC):
         expected_out = self.expected_outputs(target)
 
         if action == Action.QUEUE:
+            logging.info('Popped in the Queue')
             outputs = self.queue_jobs(target, inputs)
         elif action == Action.REUSE:
             outputs = self.make_outputs(
@@ -473,6 +474,7 @@ class Stage(Generic[TargetT], ABC):
                 reusable=True,
             )
         else:  # Action.SKIP
+            logging.info('Skipping!')
             outputs = None
 
         if not outputs:
