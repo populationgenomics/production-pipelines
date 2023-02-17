@@ -478,11 +478,14 @@ class Stage(Generic[TargetT], ABC):
             outputs = None
 
         if not outputs:
+            print('Early Exit')
             return None
 
         outputs.stage = self
         outputs.meta |= self.get_job_attrs(target)
 
+        print('Adding Dependencies')
+        print(outputs)
         for output_job in outputs.jobs:
             if output_job:
                 for input_job in inputs.get_jobs(target):
