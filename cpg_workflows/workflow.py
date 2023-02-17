@@ -485,7 +485,7 @@ class Stage(Generic[TargetT], ABC):
         outputs.meta |= self.get_job_attrs(target)
 
         print(f'Adding Dependencies for {outputs.stage}')
-        if outputs.stage == 'CramQC':
+        if outputs.stage == 'CramQC [forced] <- [Align]':
             print(outputs)
         for output_job in outputs.jobs:
             if output_job:
@@ -1066,6 +1066,7 @@ class Workflow:
                         f'Stage {stg} failed to queue jobs with errors: '
                         + '\n'.join(errors)
                     )
+                logging.info('We are here friends')
 
                 logging.info(f'')
 
@@ -1147,6 +1148,8 @@ class SampleStage(Stage[Sample], ABC):
                     sample, action
                 )
 
+        logging.info('Output by target')
+        logging.info(output_by_target)
         return output_by_target
 
 
