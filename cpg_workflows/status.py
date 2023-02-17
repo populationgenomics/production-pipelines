@@ -128,9 +128,10 @@ class MetamistStatusReporter(StatusReporter):
         """
         Create "queued" analysis and insert "in_progress" and "completed" updater jobs.
         """
+        print('Adding updaters jobs')
         if not jobs:
+            print('Exiting Early')
             return []
-
         # 1. Create a "queued" analysis
         if (
             aid := self.create_analysis(

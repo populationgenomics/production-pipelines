@@ -149,6 +149,7 @@ class Batch(hb.Batch):
         """
         Execute a batch. Overridden to print pre-submission statistics.
         """
+        logging.info('Running the batch')
         if not self._jobs:
             logging.error('No jobs to submit')
             return
