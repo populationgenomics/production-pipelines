@@ -5,6 +5,7 @@ sequencing_type = 'genome'
 scatter_count = 20
 first_stages = ['CramQC']
 last_stages = ['CramQC']
+force_stages = ['CramQC']
 output_version = '1.0'
 skip_qc = true
 skip_samples = ['CPG88088', 'CPG88435']
