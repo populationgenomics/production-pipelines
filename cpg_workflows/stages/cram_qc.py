@@ -339,6 +339,7 @@ class CramMultiQC(DatasetStage):
             label='CRAM',
             extra_config={'table_columns_visible': {'FastQC': False}},
         )
+        logging.info('Right before the return')
         return self.make_outputs(
             dataset, data=self.expected_outputs(dataset), jobs=jobs
         )

@@ -7,7 +7,7 @@ first_stages = ['CramMultiQC']
 last_stages = ['CramMultiQC']
 force_stages = ['CramMultiQC']
 output_version = '1.0'
-skip_qc = true
+#skip_qc = true
 skip_samples = ['CPG88088', 'CPG88435']
 
 # CRAMs were aligned using an unmasked reference: 
