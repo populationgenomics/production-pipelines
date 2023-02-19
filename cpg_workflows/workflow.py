@@ -468,7 +468,7 @@ class Stage(Generic[TargetT], ABC):
         if action == Action.QUEUE:
             logging.info('Popped in the Queue')
             outputs = self.queue_jobs(target, inputs)
-            print(outputs)
+            print(f'The outputs after popping in the queue for {self} are {outputs}')
         elif action == Action.REUSE:
             outputs = self.make_outputs(
                 target=target,
@@ -486,7 +486,7 @@ class Stage(Generic[TargetT], ABC):
         outputs.stage = self
         outputs.meta |= self.get_job_attrs(target)
 
-        print(f'Adding Dependencies for {outputs.stage}')
+        # print(f'Adding Dependencies for {outputs.stage}')
         if outputs.stage == 'CramQC [forced] <- [Align]':
             print(outputs)
         for output_job in outputs.jobs:
@@ -501,10 +501,10 @@ class Stage(Generic[TargetT], ABC):
             logging.warning('Early Exit')
             return outputs
 
-        logging.info('Performing Check')
-        logging.info(
-            f'{self.analysis_type}, {self.status_reporter}, {action}, {outputs.data}'
-        )
+        # logging.info('Performing Check')
+        # logging.info(
+        #     f'{self.analysis_type}, {self.status_reporter}, {action}, {outputs.data}'
+        # )
         # Adding status reporter jobs
         if (
             self.analysis_type
@@ -543,6 +543,10 @@ class Stage(Generic[TargetT], ABC):
                 meta=outputs.meta,
                 job_attrs=self.get_job_attrs(target),
                 update_analysis_meta=self.update_analysis_meta,
+            )
+        else:
+            logging.info(
+                f'Didnt add job checkout vars {self.analysis_type}, {self.status_reporter}, {action}, {outputs.data}'
             )
         return outputs
 
