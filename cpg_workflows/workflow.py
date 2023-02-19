@@ -341,6 +341,7 @@ class Stage(Generic[TargetT], ABC):
         # If `analysis_type` is defined, it will be used to create/update Analysis
         # entries in Metamist.
         self.analysis_type = analysis_type
+        print(f'When initialising the stage the analysis type is {analysis_type}')
         # If `analysis_key` is defined, it will be used to extract the value for
         # `Analysis.output` if the Stage.expected_outputs() returns a dict.
         self.analysis_key = analysis_key
@@ -467,6 +468,7 @@ class Stage(Generic[TargetT], ABC):
         if action == Action.QUEUE:
             logging.info('Popped in the Queue')
             outputs = self.queue_jobs(target, inputs)
+            print(outputs)
         elif action == Action.REUSE:
             outputs = self.make_outputs(
                 target=target,

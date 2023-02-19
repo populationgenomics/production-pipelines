@@ -263,6 +263,7 @@ class CramMultiQC(DatasetStage):
         if get_config()['workflow'].get('skip_qc', False) is True:
             return {}
         h = dataset.alignment_inputs_hash()
+        print('Generating the expected outputs for CramMultiQC')
         return {
             'html': dataset.web_prefix() / 'qc' / 'cram' / 'multiqc.html',
             'json': dataset.prefix() / 'qc' / 'cram' / h / 'multiqc_data.json',
@@ -274,6 +275,7 @@ class CramMultiQC(DatasetStage):
         Call a function from the `jobs` module using inputs from `cramqc`
         and `somalier` stages.
         """
+        print('Entering Queue Jobs for MultiQC')
         if get_config()['workflow'].get('skip_qc', False) is True:
             return self.make_outputs(dataset)
 
