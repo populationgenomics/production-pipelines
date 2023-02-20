@@ -215,8 +215,7 @@ def _relate(
     somalier relate \\
     $(cat {input_files_file}) \\
     --ped expected.ped \\
-    -o related \\
-    --infer
+    -o related
     ls
     mv related.pairs.tsv {j.output_pairs}
     mv related.samples.tsv {j.output_samples}
