@@ -55,6 +55,7 @@ def qc_functions() -> list[Qc]:
     if get_config()['workflow'].get('skip_qc', False) is True:
         return []
 
+    logging.info('QC Functions')
     qcs = [
         Qc(func=somalier.extract, outs={'somalier': None}),
         Qc(
@@ -112,7 +113,7 @@ def qc_functions() -> list[Qc]:
     return qcs
 
 
-@stage(required_stages=Align)
+@stage(required_stages=Align, analysis_type='qc')
 class CramQC(SampleStage):
     """
     Calling tools that process CRAM for QC purposes.
