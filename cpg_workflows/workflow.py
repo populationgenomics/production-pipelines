@@ -512,8 +512,8 @@ class Stage(Generic[TargetT], ABC):
                 if not all(key in outputs.data for key in self.analysis_keys):
                     raise WorkflowError(
                         f'Cannot create Analysis for stage {self.name}: `analysis_keys` '
-                        f'"{self.analysis_keys}" is not found in the expected_outputs '
-                        f'dict {outputs.data}'
+                        f'"{self.analysis_keys}" is not a subset of the expected_outputs '
+                        f'keys {outputs.data.keys()}'
                     )
 
                 for analysis_key in self.analysis_keys:
