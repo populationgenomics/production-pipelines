@@ -341,7 +341,6 @@ class Stage(Generic[TargetT], ABC):
         # If `analysis_type` is defined, it will be used to create/update Analysis
         # entries in Metamist.
         self.analysis_type = analysis_type
-        print(f'When initialising the stage the analysis type is {analysis_type}')
         # If `analysis_keys` are defined, it will be used to extract the value for
         # `Analysis.output` if the Stage.expected_outputs() returns a dict.
         self.analysis_keys = analysis_keys
