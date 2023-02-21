@@ -112,7 +112,16 @@ def qc_functions() -> list[Qc]:
     return qcs
 
 
-@stage(required_stages=Align)
+@stage(
+    required_stages=Align,
+    analysis_type='qc',
+    analysis_keys=[
+        'somalier',
+        'verify_bamid',
+        'samtools_stats',
+        'alignment_summary_metrics',
+    ],
+)
 class CramQC(SampleStage):
     """
     Calling tools that process CRAM for QC purposes.
@@ -248,7 +257,7 @@ def _update_meta(output_path: str) -> dict[str, Any]:
         SomalierPedigree,
     ],
     analysis_type='qc',
-    analysis_key='json',
+    analysis_keys=['json'],
     update_analysis_meta=_update_meta,
 )
 class CramMultiQC(DatasetStage):

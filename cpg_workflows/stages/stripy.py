@@ -20,7 +20,7 @@ from cpg_workflows.workflow import (
 )
 
 
-@stage(required_stages=Align, analysis_type='web', analysis_key='stripy_html')
+@stage(required_stages=Align, analysis_type='web', analysis_keys=['stripy_html'])
 class Stripy(SampleStage):
     """
     Call stripy to run STR analysis on known pathogenic loci.
