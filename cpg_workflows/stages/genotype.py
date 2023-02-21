@@ -19,7 +19,7 @@ from .. import get_batch
 @stage(
     required_stages=Align,
     analysis_type='gvcf',
-    analysis_key='gvcf',
+    analysis_keys=['gvcf'],
 )
 class Genotype(SampleStage):
     """
