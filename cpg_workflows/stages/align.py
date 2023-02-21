@@ -18,7 +18,7 @@ from cpg_workflows.workflow import (
 )
 
 
-@stage(analysis_type='cram', analysis_key='cram')
+@stage(analysis_type='cram', analysis_keys=['cram'])
 class Align(SampleStage):
     """
     Align or re-align input data to produce a CRAM file

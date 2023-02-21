@@ -320,7 +320,7 @@ class Stage(Generic[TargetT], ABC):
         name: str,
         required_stages: list[StageDecorator] | StageDecorator | None = None,
         analysis_type: str | None = None,
-        analysis_key: str | None = None,
+        analysis_keys: list[str] | None = None,
         update_analysis_meta: Callable[[str], dict] | None = None,
         skipped: bool = False,
         assume_outputs_exist: bool = False,
@@ -342,9 +342,9 @@ class Stage(Generic[TargetT], ABC):
         # entries in Metamist.
         self.analysis_type = analysis_type
         print(f'When initialising the stage the analysis type is {analysis_type}')
-        # If `analysis_key` is defined, it will be used to extract the value for
+        # If `analysis_keys` is defined, it will be used to extract the value for
         # `Analysis.output` if the Stage.expected_outputs() returns a dict.
-        self.analysis_key = analysis_key
+        self.analysis_keys = analysis_keys
         # if `update_analysis_meta` is defined, it is called on the `Analysis.output`
         # field, and result is merged into the `Analysis.meta` dictionary.
         self.update_analysis_meta = update_analysis_meta
@@ -501,10 +501,6 @@ class Stage(Generic[TargetT], ABC):
             logging.warning('Early Exit')
             return outputs
 
-        # logging.info('Performing Check')
-        # logging.info(
-        #     f'{self.analysis_type}, {self.status_reporter}, {action}, {outputs.data}'
-        # )
         # Adding status reporter jobs
         if (
             self.analysis_type
@@ -512,38 +508,43 @@ class Stage(Generic[TargetT], ABC):
             and action == Action.QUEUE
             and outputs.data
         ):
-            logging.info('Entering the if statement to add the status reported job')
-            output: str | Path
+
+            analysis_outputs: list[str | Path] = []
             if isinstance(outputs.data, dict):
-                if not self.analysis_key:
+                if not self.analysis_keys:
                     raise WorkflowError(
-                        f'Cannot create Analysis: `analysis_key` '
+                        f'Cannot create Analysis: `analysis_keys` '
                         f'must be set with the @stage decorator to select value from '
                         f'the expected_outputs dict: {outputs.data}'
                     )
-                if self.analysis_key not in outputs.data:
-                    raise WorkflowError(
-                        f'Cannot create Analysis for stage {self.name}: `analysis_key` '
-                        f'"{self.analysis_key}" is not found in the expected_outputs '
-                        f'dict {outputs.data}'
-                    )
-                output = outputs.data[self.analysis_key]
+                # TODO: Fix this
+                # if self.analysis_keys not in outputs.data:
+                #     raise WorkflowError(
+                #         f'Cannot create Analysis for stage {self.name}: `analysis_keys` '
+                #         f'"{self.analysis_keys}" is not found in the expected_outputs '
+                #         f'dict {outputs.data}'
+                #     )
+
+                for analysis_key in self.analysis_keys:
+                    analysis_outputs.append(outputs.data[analysis_key])
+
+                # analysis_output = outputs.data[self.analysis_keys]
             else:
-                output = outputs.data
+                analysis_outputs.append(outputs.data)
 
-            assert isinstance(output, str) or isinstance(output, Path), output
-
-            self.status_reporter.add_updaters_jobs(
-                b=get_batch(),
-                output=output,
-                analysis_type=self.analysis_type,
-                target=target,
-                jobs=outputs.jobs,
-                prev_jobs=inputs.get_jobs(target),
-                meta=outputs.meta,
-                job_attrs=self.get_job_attrs(target),
-                update_analysis_meta=self.update_analysis_meta,
-            )
+            # assert isinstance(output, str) or isinstance(output, Path), output
+            for analysis_output in analysis_outputs:
+                self.status_reporter.add_updaters_jobs(
+                    b=get_batch(),
+                    output=analysis_output,
+                    analysis_type=self.analysis_type,
+                    target=target,
+                    jobs=outputs.jobs,
+                    prev_jobs=inputs.get_jobs(target),
+                    meta=outputs.meta,
+                    job_attrs=self.get_job_attrs(target),
+                    update_analysis_meta=self.update_analysis_meta,
+                )
         else:
             logging.info(
                 f'Didnt add job checkout vars {self.analysis_type}, {self.status_reporter}, {action}, {outputs.data}'
@@ -680,7 +681,7 @@ def stage(
     cls: Optional[Type['Stage']] = None,
     *,
     analysis_type: str | None = None,
-    analysis_key: str | None = None,
+    analysis_keys: list[str | Path] | None = None,
     update_analysis_meta: Callable[[str], dict] | None = None,
     required_stages: list[StageDecorator] | StageDecorator | None = None,
     skipped: bool = False,
@@ -701,7 +702,7 @@ def stage(
 
     @analysis_type: if defined, will be used to create/update `Analysis` entries
         using the status reporter.
-    @analysis_key: is defined, will be used to extract the value for `Analysis.output`
+    @analysis_keys: is defined, will be used to extract the value for `Analysis.output`
         if the Stage.expected_outputs() returns a dict.
     @update_analysis_meta: if defined, this function is called on the `Analysis.output`
         field, and returns a dictionary to be merged into the `Analysis.meta`
@@ -724,7 +725,7 @@ def stage(
                 name=_cls.__name__,
                 required_stages=required_stages,
                 analysis_type=analysis_type,
-                analysis_key=analysis_key,
+                analysis_keys=analysis_keys,
                 update_analysis_meta=update_analysis_meta,
                 skipped=skipped,
                 assume_outputs_exist=assume_outputs_exist,
