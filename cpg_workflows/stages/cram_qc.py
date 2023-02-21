@@ -144,6 +144,8 @@ class CramQC(SampleStage):
         crai_path = inputs.as_path(sample, Align, 'crai')
 
         jobs = []
+        # This should run if either the stage or the sample is being forced.
+        forced = self.forced or sample.forced
         for qc in qc_functions():
             out_path_kwargs = {
                 f'out_{key}_path': self.expected_outputs(sample)[key]
@@ -154,7 +156,7 @@ class CramQC(SampleStage):
                     get_batch(),
                     CramPath(cram_path, crai_path),
                     job_attrs=self.get_job_attrs(sample),
-                    overwrite=sample.forced,
+                    overwrite=forced,
                     **out_path_kwargs,
                 )
                 if j:
