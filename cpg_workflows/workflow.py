@@ -509,23 +509,23 @@ class Stage(Generic[TargetT], ABC):
                         f'must be set with the @stage decorator to select value from '
                         f'the expected_outputs dict: {outputs.data}'
                     )
-                # TODO: Fix this
-                # if self.analysis_keys not in outputs.data:
-                #     raise WorkflowError(
-                #         f'Cannot create Analysis for stage {self.name}: `analysis_keys` '
-                #         f'"{self.analysis_keys}" is not found in the expected_outputs '
-                #         f'dict {outputs.data}'
-                #     )
+                if not all(key in outputs.data for key in self.analysis_keys):
+                    raise WorkflowError(
+                        f'Cannot create Analysis for stage {self.name}: `analysis_keys` '
+                        f'"{self.analysis_keys}" is not found in the expected_outputs '
+                        f'dict {outputs.data}'
+                    )
 
                 for analysis_key in self.analysis_keys:
                     analysis_outputs.append(outputs.data[analysis_key])
 
-                # analysis_output = outputs.data[self.analysis_keys]
             else:
                 analysis_outputs.append(outputs.data)
 
-            # assert isinstance(output, str) or isinstance(output, Path), output
             for analysis_output in analysis_outputs:
+                assert isinstance(
+                    analysis_output, (str, Path)
+                ), f'{analysis_output} should be a str or Path object'
                 self.status_reporter.add_updaters_jobs(
                     b=get_batch(),
                     output=analysis_output,
