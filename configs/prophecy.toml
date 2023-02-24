@@ -1,12 +1,15 @@
 [workflow]
 input_datasets = ['prophecy']
 sequencing_type = 'genome'
+access_level= 'test'
 
 skip_samples = [
   'CPG216010',  # replaced by CPG262915
   'CPG241299',  # Replaced by CPG262907
 ]
 skip_stages = ['SomalierPedigree']
+first_stages = ['DenseSubset']
+last_stages=['Ancestry']
 skip_samples_with_missing_input = true
 highmem_workers = true
 
@@ -14,5 +17,5 @@ scatter_count = 20
 output_version = '1.1'
 
 [large_cohort.pca_background]
-datasets = ['gs://cpg-common-main/references/ancestry/oceania_eur.mt']
+datasets = ['gs://cpg-hgdp-1kg-test/vds/1-0.vds/']
 pop_field = 'continental_pop'
