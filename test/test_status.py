@@ -109,7 +109,7 @@ def test_status_reporter(mocker: MockFixture):
             print(f'Writing to {self.expected_outputs(sample)}')
             return self.make_outputs(sample, self.expected_outputs(sample), [j])
 
-    @stage(analysis_type='qc', analysis_key='bed')
+    @stage(analysis_type='qc', analysis_keys=['bed'])
     class MyQcStage2(SampleStage):
         """
         Just a sample-level stage.
