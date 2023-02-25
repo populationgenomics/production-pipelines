@@ -112,21 +112,7 @@ def qc_functions() -> list[Qc]:
     return qcs
 
 
-@stage(
-    required_stages=Align,
-    analysis_type='qc',
-    analysis_keys=[
-        'somalier',
-        'verify_bamid',
-        'samtools_stats',
-        'alignment_summary_metrics',
-        'base_distribution_by_cycle_metrics',
-        'insert_size_metrics',
-        'quality_by_cycle_metrics',
-        'quality_yield_metrics',
-        'picard_wgs_metrics',
-    ],
-)
+@stage(required_stages=Align)
 class CramQC(SampleStage):
     """
     Calling tools that process CRAM for QC purposes.
