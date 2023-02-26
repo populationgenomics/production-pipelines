@@ -34,7 +34,7 @@ def _update_meta(output_path: str) -> dict[str, Any]:
     outlier_loci = {}
     with CloudPath(log_path).open() as f:
         for line in f:
-            path, symbol, score = line.split('\t')
+            path, symbol, score = line.strip().split('\t')
             if int(score) > 0:
                 outlier_loci[symbol] = score
 
