@@ -20,7 +20,21 @@ from cpg_workflows.workflow import (
 )
 
 
-@stage(required_stages=Align, analysis_type='web', analysis_keys=['stripy_html'])
+# def _update_meta(output_path: str) -> dict[str, Any]:
+#     from cloudpathlib import CloudPath
+#     import json
+
+#     with CloudPath(output_path).open() as f:
+#         d = json.load(f)
+#     return {'multiqc': d['report_general_stats_data']}
+
+
+@stage(
+    required_stages=Align,
+    analysis_type='web',
+    analysis_keys=['stripy_html, stripy_json'],
+    # update_analysis_meta=_update_meta,
+)
 class Stripy(SampleStage):
     """
     Call stripy to run STR analysis on known pathogenic loci.
