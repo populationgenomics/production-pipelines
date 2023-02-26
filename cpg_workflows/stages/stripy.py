@@ -32,7 +32,7 @@ from cpg_workflows.workflow import (
 @stage(
     required_stages=Align,
     analysis_type='web',
-    analysis_keys=['stripy_html, stripy_json'],
+    analysis_keys=['stripy_html', 'stripy_json'],
     # update_analysis_meta=_update_meta,
 )
 class Stripy(SampleStage):
