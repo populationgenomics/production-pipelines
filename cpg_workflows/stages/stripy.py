@@ -3,6 +3,7 @@ Stage to run STR analysis with STRipy-pipeline.
 
 See https://gitlab.com/andreassh/stripy-pipeline
 """
+from typing import Any
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
@@ -20,20 +21,33 @@ from cpg_workflows.workflow import (
 )
 
 
-# def _update_meta(output_path: str) -> dict[str, Any]:
-#     from cloudpathlib import CloudPath
-#     import json
+def _update_meta(output_path: str) -> dict[str, Any]:
+    """
+    If output_path is stripy.log, add dict of outlier_loci to analysis meta
+    """
+    from cloudpathlib import CloudPath
 
-#     with CloudPath(output_path).open() as f:
-#         d = json.load(f)
-#     return {'multiqc': d['report_general_stats_data']}
+    if not output_path.endswith('.txt'):
+        return {'foo': output_path}
+
+    outlier_loci = {}
+    with CloudPath(output_path).open() as f:
+        for line in f:
+            path, symbol, score = line.split('\t')
+            if int(score) > 0:
+                outlier_loci[symbol] = score
+
+    return {
+        'outlier_loci': outlier_loci,
+        'outliers_detected': bool(outlier_loci),
+    }
 
 
 @stage(
     required_stages=Align,
     analysis_type='web',
-    analysis_keys=['stripy_html', 'stripy_json'],
-    # update_analysis_meta=_update_meta,
+    analysis_keys=['stripy_html', 'stripy_log'],
+    update_analysis_meta=_update_meta,
 )
 class Stripy(SampleStage):
     """
