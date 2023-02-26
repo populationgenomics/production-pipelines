@@ -23,15 +23,16 @@ from cpg_workflows.workflow import (
 
 def _update_meta(output_path: str) -> dict[str, Any]:
     """
-    If output_path is stripy.log, add dict of outlier_loci to analysis meta
+    Add the detected outlier loci to the analysis meta
     """
     from cloudpathlib import CloudPath
 
-    if not output_path.endswith('.txt'):
-        return {'foo': output_path}
+    # Munge html path into log path (As far as I can know I can not pass to
+    # output paths to one analysis object?)
+    log_path = output_path.replace('-web', '').replace('.html', '.log.txt')
 
     outlier_loci = {}
-    with CloudPath(output_path).open() as f:
+    with CloudPath(log_path).open() as f:
         for line in f:
             path, symbol, score = line.split('\t')
             if int(score) > 0:
@@ -40,13 +41,14 @@ def _update_meta(output_path: str) -> dict[str, Any]:
     return {
         'outlier_loci': outlier_loci,
         'outliers_detected': bool(outlier_loci),
+        'log_path': log_path
     }
 
 
 @stage(
     required_stages=Align,
     analysis_type='web',
-    analysis_keys=['stripy_html', 'stripy_log'],
+    analysis_keys=['stripy_html',],
     update_analysis_meta=_update_meta,
 )
 class Stripy(SampleStage):
