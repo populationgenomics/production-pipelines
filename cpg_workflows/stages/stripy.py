@@ -48,7 +48,7 @@ def _update_meta(output_path: str) -> dict[str, Any]:
 @stage(
     required_stages=Align,
     analysis_type='web',
-    analysis_keys=['stripy_html',],
+    analysis_keys=['stripy_html', ],
     update_analysis_meta=_update_meta,
 )
 class Stripy(SampleStage):
