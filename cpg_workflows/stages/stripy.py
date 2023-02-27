@@ -3,6 +3,7 @@ Stage to run STR analysis with STRipy-pipeline.
 
 See https://gitlab.com/andreassh/stripy-pipeline
 """
+from typing import Any
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
@@ -20,7 +21,36 @@ from cpg_workflows.workflow import (
 )
 
 
-@stage(required_stages=Align, analysis_type='web', analysis_keys=['stripy_html'])
+def _update_meta(output_path: str) -> dict[str, Any]:
+    """
+    Add the detected outlier loci to the analysis meta
+    """
+    from cloudpathlib import CloudPath
+
+    # Munge html path into log path (As far as I can know I can not pass to
+    # output paths to one analysis object?)
+    log_path = output_path.replace('-web', '').replace('.html', '.log.txt')
+
+    outlier_loci = {}
+    with CloudPath(log_path).open() as f:
+        for line in f:
+            path, symbol, score = line.strip().split('\t')
+            if int(score) > 0:
+                outlier_loci[symbol] = score
+
+    return {
+        'outlier_loci': outlier_loci,
+        'outliers_detected': bool(outlier_loci),
+        'log_path': log_path
+    }
+
+
+@stage(
+    required_stages=Align,
+    analysis_type='web',
+    analysis_keys=['stripy_html', ],
+    update_analysis_meta=_update_meta,
+)
 class Stripy(SampleStage):
     """
     Call stripy to run STR analysis on known pathogenic loci.
