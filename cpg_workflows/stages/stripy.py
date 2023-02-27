@@ -29,7 +29,7 @@ def _update_meta(output_path: str) -> dict[str, Any]:
 
     # Munge html path into log path (As far as I can know I can not pass to
     # output paths to one analysis object?)
-    log_path = output_path.replace('-web', '').replace('.html', '.log.txt')
+    log_path = output_path.replace('-web/', '-analysis/').replace('.html', '.log.txt')
 
     outlier_loci = {}
     with CloudPath(log_path).open() as f:
