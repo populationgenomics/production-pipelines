@@ -8,7 +8,7 @@ skip_samples = [
   'CPG241299',  # Replaced by CPG262907
 ]
 skip_stages = ['SomalierPedigree']
-first_stages = ['Combiner']
+first_stages = ['Ancestry']
 last_stages=['Ancestry']
 skip_samples_with_missing_input = true
 highmem_workers = true
@@ -17,5 +17,5 @@ scatter_count = 20
 output_version = '1.1'
 
 [large_cohort.pca_background]
-datasets = ['gs://cpg-hgdp-1kg-test/vds/1-0.vds/']
+datasets = ['gs://cpg-hgdp-test/vds/1-0.vds/']
 pop_field = 'continental_pop'
