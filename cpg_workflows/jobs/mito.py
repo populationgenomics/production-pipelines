@@ -27,7 +27,7 @@ def mito_realign(
     """
     if can_reuse(
         [
-            out_path,
+            cram_path,
         ],
         overwrite,
     ):
