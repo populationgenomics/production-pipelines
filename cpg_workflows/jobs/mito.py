@@ -120,7 +120,7 @@ def mito_realign(
         """
     )
 
-    j.command(command(cmd, setup_gcp=True, define_retry_function=True))
+    j.command(command(cmd, define_retry_function=True))
     b.write_output(j.mt_aligned_cram, str(mt_aligned_cram))
 
     return j
