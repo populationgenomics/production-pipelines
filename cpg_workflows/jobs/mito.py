@@ -81,8 +81,8 @@ def mito_realign(
     cmd = dedent(
         f"""\
         bazam -Xmx16g -Dsamjdk.reference_fasta={reference.base} \
-            -n{min(nthreads, 6)} {mounted_cram_path} -L chrM | \
-         bwa mem -p {mt_ref.fasta}  - | \
+            -n{min(nthreads, 6)} -bam {mounted_cram_path} -L chrM | \
+         bwa mem -p {mt_ref.fasta} - | \
          samtools view -bSu - | \
         samtools sort -o {j.mt_aligned_cram}
         """
