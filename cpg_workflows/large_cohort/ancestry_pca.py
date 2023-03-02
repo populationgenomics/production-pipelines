@@ -18,7 +18,6 @@ MIN_N_SAMPLES = 10
 def add_background(
     dense_mt: hl.MatrixTable,
     sample_qc_ht: hl.Table,
-    sample_qc_background: hl.Table,
     pca_background: dict,
 ) -> tuple[hl.MatrixTable, hl.Table]:
     """
@@ -43,6 +42,7 @@ def add_background(
             vds = hl.vds.filter_variants(vds, qc_variants_ht)
             mt = hl.vds.to_dense_mt(vds)
             # annotate mt with metadata info
+            sample_qc_background = hl.read_table(pca_background['metadata_table'])
             mt = mt.annotate_cols(**sample_qc_background[mt.col_key])
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
