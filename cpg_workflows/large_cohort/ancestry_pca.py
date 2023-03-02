@@ -18,6 +18,7 @@ MIN_N_SAMPLES = 10
 def add_background(
     dense_mt: hl.MatrixTable,
     sample_qc_ht: hl.Table,
+    sample_qc_background: hl.Table,
     pca_background: dict,
 ) -> tuple[hl.MatrixTable, hl.Table]:
     """
@@ -41,14 +42,16 @@ def add_background(
             vds = hl.vds.split_multi(vds, filter_changed_loci=True)
             vds = hl.vds.filter_variants(vds, qc_variants_ht)
             mt = hl.vds.to_dense_mt(vds)
+            # annotate mt with metadata info
+            mt = mt.annotate_cols(**sample_qc_background[mt.col_key])
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
 
+        # save metadata info before merging dense and background datasets
         ht = mt.cols()
-        if 'pop_field' in pca_background:
-            ht = ht.annotate(pop=ht[pca_background['pop_field']])
         mt = mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
         mt = mt.naive_coalesce(5000)
+        # combine dense dataset with background population dataset
         dense_mt = dense_mt.union_cols(mt)
         sample_qc_ht = sample_qc_ht.union(ht)
     return dense_mt, sample_qc_ht
