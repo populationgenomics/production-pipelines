@@ -208,7 +208,7 @@ def _relate(
     cmd += f"""
     cat {b.read_input(str(expected_ped_path))} | \
     grep -v Family.ID | \
-    grep -f {samples_ids_file} > expected.ped 
+    grep -f {samples_ids_file} > expected.ped
     """
 
     cmd += f"""
@@ -270,7 +270,7 @@ def extract(
 
     CRAM=$BATCH_TMPDIR/{cram_path.path.name}
     CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
-    
+
     # Retrying copying to avoid google bandwidth limits
     retry_gs_cp {str(cram_path.path)} $CRAM
     retry_gs_cp {str(cram_path.index_path)} $CRAI
@@ -279,6 +279,6 @@ def extract(
 
     mv extracted/*.somalier {j.output_file}
     """
-    j.command(command(cmd, setup_gcp=True, define_retry_function=True))
+    j.command(command(cmd, define_retry_function=True))
     b.write_output(j.output_file, str(out_somalier_path))
     return j
