@@ -25,13 +25,13 @@ def mito_realign(
     """
     Re-align reads to mito genome
     """
-    if can_reuse(
-        [
-            cram_path,
-        ],
-        overwrite,
-    ):
-        return None
+    # if can_reuse(
+    #     [
+    #         cram_path,
+    #     ],
+    #     overwrite,
+    # ):
+    #     return None
 
     job_attrs = job_attrs or {}
     j = b.new_job('mito_realign', job_attrs)
