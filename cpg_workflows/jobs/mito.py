@@ -14,6 +14,30 @@ from cpg_workflows.utils import can_reuse
 from cpg_workflows.targets import Sample
 
 
+# def subset_cram_to_chrM(
+#     b,
+#     sample: Sample,
+#     sample_cram: CramPath,
+#     mt_only_cram: str,
+#     job_attrs: dict | None = None,
+#     overwrite: bool = False,
+# ) -> Job | None:
+#     """
+#     Re-align reads to mito genome
+#     """
+#     cmd = """
+#        gatk PrintReads \
+#         ~{"-R " + ref_fasta} \
+#         -L ~{contig_name} \
+#         --read-filter MateOnSameContigOrNoMappedMateReadFilter \
+#         --read-filter MateUnmappedAndUnmappedReadFilter \
+#         ~{"--gcs-project-for-requester-pays " + requester_pays_project} \
+#         -I ~{input_bam} \
+#         --read-index ~{input_bai} \
+#         -O ~{basename}.bam
+#     """
+
+
 def mito_realign(
     b,
     sample: Sample,
@@ -62,17 +86,17 @@ def mito_realign(
         sa='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.sa',
     )
 
-    # As we are only accessing a tiny chunk of the cram
-    # accessing the cram via cloudfuse is faster than localising the full cram
-    bucket = cram_path.path.drive
-    print(f'bucket = {bucket}')
-    bucket_mount_path = to_path('/bucket')
-    j.cloudfuse(bucket, str(bucket_mount_path), read_only=True)
-    mounted_cram_path = bucket_mount_path / '/'.join(cram_path.path.parts[2:])
-    assert cram_path.index_path  # keep mypy happy as index_path is optional
-    mounted_cram_index_path = bucket_mount_path / '/'.join(
-        cram_path.index_path.parts[2:]
-    )
+    # # As we are only accessing a tiny chunk of the cram
+    # # accessing the cram via cloudfuse is faster than localising the full cram
+    # bucket = cram_path.path.drive
+    # print(f'bucket = {bucket}')
+    # bucket_mount_path = to_path('/bucket')
+    # j.cloudfuse(bucket, str(bucket_mount_path), read_only=True)
+    # mounted_cram_path = bucket_mount_path / '/'.join(cram_path.path.parts[2:])
+    # assert cram_path.index_path  # keep mypy happy as index_path is optional
+    # mounted_cram_index_path = bucket_mount_path / '/'.join(
+    #     cram_path.index_path.parts[2:]
+    # )
 
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
@@ -80,8 +104,16 @@ def mito_realign(
 
     cmd = dedent(
         f"""\
+        CRAM=$BATCH_TMPDIR/{cram_path.path.name}
+        CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
+
+        # Retrying copying to avoid google bandwidth limits
+        retry_gs_cp {str(cram_path.path)} $CRAM
+        retry_gs_cp {str(cram_path.index_path)} $CRAI
+
+
         bazam -Xmx16g -Dsamjdk.reference_fasta={reference.base} \
-            -n{min(nthreads, 6)} -bam {mounted_cram_path} -L chrM | \
+            -n{min(nthreads, 6)} -bam $CRAM -L chrM | \
          bwa mem -p {mt_ref.fasta} - | \
          samtools view -bSu - | \
         samtools sort -o {j.mt_aligned_cram}
