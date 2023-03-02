@@ -36,7 +36,7 @@ def mito_realign(
     job_attrs = job_attrs or {}
     j = b.new_job('mito_realign', job_attrs)
     # j.image(image_path('bwamem2'))
-    j.image(image_path('bwa'))
+    j.image('australia-southeast1-docker.pkg.dev/cpg-common/images/bwa:v0')
 
     reference = fasta_res_group(b)
 
