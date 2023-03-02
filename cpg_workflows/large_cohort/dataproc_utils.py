@@ -18,7 +18,6 @@ DATAPROC_PACKAGES = [
     'google',
     'slackclient',
     'fsspec',
-    'sklearn',
     'gcloud',
     'selenium',
 ]
