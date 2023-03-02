@@ -264,8 +264,8 @@ def _infer_pop_labels(
             known_col='training_pop',
             min_prob=min_prob_,
         )
-        n_mislabeled_samples_ = pop_ht.aggregate(
-            hl.agg.count_where(pop_ht.training_pop != pop_ht.pop)
+        n_mislabeled_samples_ = pop_ht_.aggregate(
+            hl.agg.count_where(pop_ht_.training_pop != pop_ht_.pop)
         )
         return pop_ht_, pops_rf_model_, n_mislabeled_samples_
 
