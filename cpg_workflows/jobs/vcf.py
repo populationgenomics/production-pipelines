@@ -95,11 +95,11 @@ def gather_vcfs(
         job_name = f'Merge {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
         j = b.new_job(job_name, (job_attrs or {}) | {'tool': 'bcftools concat'})
         j.image(image_path('bcftools'))
-        STANDARD.set_resources(
+        res = STANDARD.set_resources(
             j, storage_gb=storage_for_joint_vcf(sample_count, site_only)
         )
         cmd = f"""
-        bcftools concat -a {" ".join(vcf["vcf.gz"] for vcf in input_vcfs)} \
+        bcftools concat --threads {res.get_nthreads() -1 } -a {" ".join(vcf["vcf.gz"] for vcf in input_vcfs)} \
         -Oz -o {j.output_vcf}
         """
         j.command(command(cmd, monitor_space=True))
