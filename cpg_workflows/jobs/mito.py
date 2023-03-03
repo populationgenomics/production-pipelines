@@ -19,7 +19,7 @@ from cpg_workflows.jobs import picard
 def subset_cram_to_chrM(
     b,
     cram_path: CramPath,
-    output_cram_path: Path,
+    output_bam_path: Path,
     job_attrs: dict | None = None,
     overwrite: bool = False,
 ) -> tuple[Job | None, hb.ResourceGroup]:
@@ -34,14 +34,14 @@ def subset_cram_to_chrM(
     # If we can resuse existing output, return the existing cram
     if can_reuse(
         [
-            output_cram_path,
+            output_bam_path,
         ],
         overwrite,
     ):
         return None, b.read_input_group(
             **{
-                'cram': str(output_cram_path),
-                'cram.crai': str(output_cram_path) + '.crai',
+                'bam': str(output_bam_path),
+                'bam.bai': str(output_bam_path) + '.bai',
             }
         )
 
@@ -54,9 +54,9 @@ def subset_cram_to_chrM(
 
     reference = fasta_res_group(b)
     j.declare_resource_group(
-        output_cram={
-            'cram': '{root}.cram',
-            'cram.crai': '{root}.cram.crai',
+        output_bam={
+            'bam': '{root}.bam',
+            'bam.bai': '{root}.bam.bai',
         }
     )
 
@@ -75,16 +75,16 @@ def subset_cram_to_chrM(
             --read-filter MateUnmappedAndUnmappedReadFilter \
             -I $CRAM \
             --read-index $CRAI \
-            -O {j.output_cram.cram}
+            -O {j.output_bam.bam}
 
-        dirname {j.output_cram.cram}
-        ls -l $(dirname {j.output_cram.cram})
+        dirname {j.output_bam.bam}
+        ls -l $(dirname {j.output_bam.cram})
     """
 
     j.command(command(cmd, define_retry_function=True))
-    b.write_output(j.output_cram, str(output_cram_path.with_suffix('')))
+    b.write_output(j.output_bam, str(output_bam_path.with_suffix('')))
 
-    return j, j.output_cram
+    return j, j.output_bam
 
 
 def mito_realign(
@@ -163,7 +163,6 @@ def mito_realign(
 def mito_mutect2(
     b,
     cram_path: CramPath,
-    output_cram_path: Path,
     reference: hb.ResourceGroup,
     max_reads_per_alignment_start: int = 75,
     job_attrs: dict | None = None,
@@ -211,7 +210,49 @@ def mito_mutect2(
     j.command(command(cmd, define_retry_function=True))
     b.write_output(j.output_cram, str(output_cram_path.with_suffix('')))
 
-    return j, j.output_cram
+    return j
+
+def liftover_and_combine_vcfs(
+    b,
+    vcf: hb.ResourceGroup,
+    shifted_vcf: hb.ResourceGroup,
+    reference: hb.ResourceGroup,
+    shift_back_chain: Path
+    job_attrs: dict | None = None,
+    overwrite: bool = False,
+) -> tuple[Job | None, hb.ResourceGroup]:
+    """
+    Lifts over shifted vcf of control region and combines it with the rest of the chrM calls.
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_job('genotype_mito', job_attrs)
+    j.image(image_path('picard'))
+
+    res = STANDARD.request_resources(ncpu=4)
+    res.set_to_job(j)
+
+    j.declare_resource_group(
+        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+
+    cmd = f"""
+        picard LiftoverVcf \
+        I={shifted_vcf.vcf} \
+        O={lifted_vcf} \
+        R={reference.fasta} \
+        CHAIN={shift_back_chain} \
+        REJECT={rejected_vcf}
+
+        picard MergeVcfs \
+        I=~{vcf.vcf} \
+        I=~{lifted_vcf} \
+        O=~{rejected_vcf}.merged.vcf
+    """
+
+    j.command(command(cmd, define_retry_function=True))
+    b.write_output(j.output_cram, str(output_cram_path.with_suffix('')))
+
+    return j
 
 
 def genotype_mito(

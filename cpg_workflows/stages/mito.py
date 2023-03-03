@@ -35,8 +35,7 @@ class AlignAndGenotypeMito(SampleStage):
     def expected_outputs(self, sample: Sample) -> dict[str, Path]:
         # Listing all outputs from Broad WDL here commenting what we chose not to generate
         return {
-    'mito_subset_cram': sample.dataset.prefix() / f'{sample.id}.mito_subset.cram',
-    'mito_subset_crai': sample.dataset.prefix() / f'{sample.id}.mito_subset.cram.crai',
+    'mito_subset_bam': sample.dataset.prefix() / f'{sample.id}.mito_subset.bam',
     'mito_realigned_cram': sample.dataset.prefix() / f'{sample.id}.mito_realign.cram',
     'mito_realigned_crai': sample.dataset.prefix() / f'{sample.id}.mito_realign.cram.crai',
     'mito_shifted_cram': sample.dataset.prefix() / f'{sample.id}.mito_shifted.cram',
@@ -62,36 +61,38 @@ class AlignAndGenotypeMito(SampleStage):
         crai_path = inputs.as_path(sample, Align, 'crai')
 
         jobs = []
-        # Generate minibam
-        # cpg_workflows/jobs/align.py: extract_fastq
-        # sort_cmd
-        # finalise_alignment (mark dups)
 
-        # map twice
-        # collect metrics
-
-        j, subset_cram = mito.subset_cram_to_chrM(
+        # Extract reads mapped to chrM
+        j, subset_bam = mito.subset_cram_to_chrM(
             b=get_batch(),
             cram_path=CramPath(cram_path, crai_path),
-            output_cram_path=self.expected_outputs(sample)['mito_subset_cram'],
+            output_bam_path=self.expected_outputs(sample)['mito_subset_bam'],
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(j)
 
+        # Align to chrM genome using bwa
         jobs += mito.mito_realign(
             b=get_batch(),
-            input_cram=subset_cram,
+            input_cram=subset_bam,
             output_cram_path=self.expected_outputs(sample)['mito_realigned_cram'],
             shifted=False,
             job_attrs=self.get_job_attrs(sample),
         )
 
+        # Align to chrM genome with offset linearisation site to account for
+        # alignment boundry effects at start and end of reff genome
         jobs += mito.mito_realign(
             b=get_batch(),
-            input_cram=subset_cram,
+            input_cram=subset_bam,
             output_cram_path=self.expected_outputs(sample)['mito_shifted_cram'],
             shifted=True,
             job_attrs=self.get_job_attrs(sample),
         )
+
+        # Call variants
+
+
+
 
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
