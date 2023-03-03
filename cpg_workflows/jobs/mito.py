@@ -77,7 +77,8 @@ def subset_cram_to_chrM(
             --read-index $CRAI \
             -O {j.output_cram.cram}
 
-        ls -l
+        dirname {j.output_cram.cram}
+        ls -l $(dirname {j.output_cram.cram})
     """
 
     j.command(command(cmd, define_retry_function=True))
@@ -157,3 +158,124 @@ def mito_realign(
     )
 
     return [j, mkdup_j]
+
+
+def mito_mutect2(
+    b,
+    cram_path: CramPath,
+    output_cram_path: Path,
+    reference: hb.ResourceGroup,
+    max_reads_per_alignment_start: int = 75,
+    job_attrs: dict | None = None,
+    overwrite: bool = False,
+) -> tuple[Job | None, hb.ResourceGroup]:
+    """
+    Call mutect2 on a mito genome
+
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_job('genotype_mito', job_attrs)
+    j.image(image_path('gatk'))
+
+    res = STANDARD.request_resources(ncpu=4)
+    res.set_to_job(j)
+    java_mem_mb = res.get_java_mem_mb()
+
+    j.declare_resource_group(
+        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+
+    cmd = f"""
+        CRAM=$BATCH_TMPDIR/{cram_path.path.name}
+        CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
+
+        # Retrying copying to avoid google bandwidth limits
+        retry_gs_cp {str(cram_path.path)} $CRAM
+        retry_gs_cp {str(cram_path.index_path)} $CRAI
+
+        # We need to create these files regardless, even if they stay empty
+        # touch bamout.bam
+
+        gatk --java-options "-Xmx~{java_mem_mb}m" Mutect2 \
+            -R {reference.fasta} \
+            -I $CRAM \
+            --read-filter MateOnSameContigOrNoMappedMateReadFilter \
+            --read-filter MateUnmappedAndUnmappedReadFilter \
+            -O ~{output_vcf.vcf.gz} \
+            --annotation StrandBiasBySample \
+            --mitochondria-mode \
+            --max-reads-per-alignment-start {max_reads_per_alignment_start} \
+            --max-mnp-distance 0
+    """
+
+    j.command(command(cmd, define_retry_function=True))
+    b.write_output(j.output_cram, str(output_cram_path.with_suffix('')))
+
+    return j, j.output_cram
+
+
+def genotype_mito(
+    b,
+    cram_path: CramPath,
+    shifted_cram_path: CramPath,
+    output_cram_path: Path,
+    job_attrs: dict | None = None,
+    overwrite: bool = False,
+) -> tuple[Job | None, hb.ResourceGroup]:
+    """
+    Genotype mito genome using mutect2
+
+    """
+    # If we can resuse existing output, return the existing cram
+    if can_reuse(
+        [
+            output_cram_path,
+        ],
+        overwrite,
+    ):
+        return None, b.read_input_group(
+            **{
+                'cram': str(output_cram_path),
+                'cram.crai': str(output_cram_path) + '.crai',
+            }
+        )
+
+    job_attrs = job_attrs or {}
+    j = b.new_job('genotype_mito', job_attrs)
+    j.image(image_path('gatk'))
+
+    res = STANDARD.request_resources(ncpu=4)
+    res.set_to_job(j)
+
+    # reference = fasta_res_group(b)
+    # j.declare_resource_group(
+    #     output_cram={
+    #         'cram': '{root}.cram',
+    #         'cram.crai': '{root}.cram.crai',
+    #     }
+    # )
+
+    cmd = f"""
+        CRAM=$BATCH_TMPDIR/{cram_path.path.name}
+        CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
+
+        # Retrying copying to avoid google bandwidth limits
+        retry_gs_cp {str(cram_path.path)} $CRAM
+        retry_gs_cp {str(cram_path.index_path)} $CRAI
+
+        gatk PrintReads \
+            -R {reference.base} \
+            -L chrM \
+            --read-filter MateOnSameContigOrNoMappedMateReadFilter \
+            --read-filter MateUnmappedAndUnmappedReadFilter \
+            -I $CRAM \
+            --read-index $CRAI \
+            -O {j.output_cram.cram}
+
+        ls -l
+    """
+
+    j.command(command(cmd, define_retry_function=True))
+    b.write_output(j.output_cram, str(output_cram_path.with_suffix('')))
+
+    return j, j.output_cram
