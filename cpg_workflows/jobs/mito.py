@@ -148,7 +148,7 @@ def mito_realign(
         b=b,
         sorted_bam=j.raw_cram,
         output_path=mito_aligned_cram,
-        out_markdup_metrics_path=mito_aligned_cram + '.markduplicates-metrics',
+        out_markdup_metrics_path=mito_aligned_cram.with_suffix('.markduplicates-metrics')
     )
 
     return [j, mkdup_j]
