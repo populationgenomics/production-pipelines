@@ -150,8 +150,8 @@ def mito_realign(
     mkdup_j = picard.markdup(
         b=b,
         sorted_bam=j.raw_cram,
-        output_path=mito_aligned_cram,
-        out_markdup_metrics_path=mito_aligned_cram.with_suffix('.markduplicates-metrics')
+        output_path=output_cram_path,
+        out_markdup_metrics_path=output_cram_path.with_suffix('.markduplicates-metrics')
     )
 
     return [j, mkdup_j]
