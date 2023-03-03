@@ -76,6 +76,8 @@ def subset_cram_to_chrM(
             -I $CRAM \
             --read-index $CRAI \
             -O {j.output_cram.cram}
+
+        ls -l
     """
 
     j.command(command(cmd, define_retry_function=True))
