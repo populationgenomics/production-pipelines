@@ -41,6 +41,13 @@ def subset_cram_to_chrM(
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 
+    j.declare_resource_group(
+        output_cram={
+            'cram': '{root}.cram',
+            'cram.crai': '{root}.cram.crai',
+        }
+    )
+
     cmd = f"""
         CRAM=$BATCH_TMPDIR/{cram_path.path.name}
         CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
@@ -56,12 +63,11 @@ def subset_cram_to_chrM(
             --read-filter MateUnmappedAndUnmappedReadFilter \
             -I $CRAM \
             --read-index $CRAI \
-            -O {j.mito_subset_cram}
+            -O {j.output_cram.cram}
     """
 
     j.command(command(cmd, define_retry_function=True))
     b.write_output(j.mito_subset_cram, str(mito_subset_cram))
-    b.write_output(j.mito_subset_crai, str(mito_subset_crai))
 
     return j
 
@@ -142,6 +148,7 @@ def mito_realign(
         b=b,
         sorted_bam=j.raw_cram,
         output_path=mito_aligned_cram,
-        out_markdup_metrics_path=mito_aligned_cram + '.markduplicates-metrics')
+        out_markdup_metrics_path=mito_aligned_cram + '.markduplicates-metrics',
+    )
 
     return [j, mkdup_j]
