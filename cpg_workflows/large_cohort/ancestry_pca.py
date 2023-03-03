@@ -301,7 +301,7 @@ def _infer_pop_labels(
     # Writing the RF model used for inferring sample populations
     pop_rf_file = tmp_prefix / 'pop.RF_fit.pickle'
     if not can_reuse(pop_rf_file):
-        with hl.hadoop_open(pop_rf_file, 'wb') as out:
+        with hl.hadoop_open(str(pop_rf_file), 'wb') as out:
             pickle.dump(pops_rf_model, out)
 
     pop_ht = pop_ht.annotate(is_training=hl.is_defined(training_pop_ht[pop_ht.key]))
