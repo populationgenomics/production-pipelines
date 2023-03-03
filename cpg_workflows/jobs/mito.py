@@ -56,7 +56,7 @@ def subset_cram_to_chrM(
     j.declare_resource_group(
         output_bam={
             'bam': '{root}.bam',
-            'bam.bai': '{root}.bam.bai',
+            'bam.bai': '{root}.bai',
         }
     )
 
