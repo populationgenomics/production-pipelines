@@ -212,12 +212,13 @@ def mito_mutect2(
 
     return j
 
+
 def liftover_and_combine_vcfs(
     b,
     vcf: hb.ResourceGroup,
     shifted_vcf: hb.ResourceGroup,
     reference: hb.ResourceGroup,
-    shift_back_chain: Path
+    shift_back_chain: Path,
     job_attrs: dict | None = None,
     overwrite: bool = False,
 ) -> tuple[Job | None, hb.ResourceGroup]:
@@ -238,15 +239,15 @@ def liftover_and_combine_vcfs(
     cmd = f"""
         picard LiftoverVcf \
         I={shifted_vcf.vcf} \
-        O={lifted_vcf} \
+        O={j.lifted_vcf} \
         R={reference.fasta} \
         CHAIN={shift_back_chain} \
-        REJECT={rejected_vcf}
+        REJECT={j.rejected_vcf}
 
         picard MergeVcfs \
         I=~{vcf.vcf} \
-        I=~{lifted_vcf} \
-        O=~{rejected_vcf}.merged.vcf
+        I=~{j.lifted_vcf} \
+        O=~{j.rejected_vcf}.merged.vcf
     """
 
     j.command(command(cmd, define_retry_function=True))
