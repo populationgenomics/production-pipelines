@@ -70,29 +70,26 @@ class AlignAndGenotypeMito(SampleStage):
         # map twice
         # collect metrics
 
-        j = mito.subset_cram_to_chrM(
+        j, subset_cram = mito.subset_cram_to_chrM(
             b=get_batch(),
             cram_path=CramPath(cram_path, crai_path),
-            mito_subset_cram=self.expected_outputs(sample)['mito_subset_cram'],
-            mito_subset_crai=self.expected_outputs(sample)['mito_subset_crai'],
+            output_cram_path=self.expected_outputs(sample)['mito_subset_cram'],
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(j)
 
         jobs += mito.mito_realign(
             b=get_batch(),
-            cram_path=CramPath(self.expected_outputs(sample)['mito_subset_cram'], self.expected_outputs(sample)['mito_subset_crai']),
-            mito_aligned_cram=self.expected_outputs(sample)['mito_realigned_cram'],
-            mito_aligned_crai=self.expected_outputs(sample)['mito_realigned_crai'],
+            input_cram=subset_cram,
+            output_cram_path=self.expected_outputs(sample)['mito_realigned_cram'],
             shifted=False,
             job_attrs=self.get_job_attrs(sample),
         )
 
         jobs += mito.mito_realign(
             b=get_batch(),
-            cram_path=CramPath(self.expected_outputs(sample)['mito_subset_cram'], self.expected_outputs(sample)['mito_subset_crai']),
-            mito_aligned_cram=self.expected_outputs(sample)['mito_shifted_cram'],
-            mito_aligned_crai=self.expected_outputs(sample)['mito_shifted_crai'],
+            input_cram=subset_cram,
+            output_cram_path=self.expected_outputs(sample)['mito_shifted_cram'],
             shifted=True,
             job_attrs=self.get_job_attrs(sample),
         )

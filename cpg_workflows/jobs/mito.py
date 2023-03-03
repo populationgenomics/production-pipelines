@@ -1,7 +1,7 @@
 """
 Create Hail Batch jobs to run STRipy
 """
-
+import hailtop.batch as hb
 from hailtop.batch.job import Job
 from textwrap import dedent
 
@@ -19,11 +19,10 @@ from cpg_workflows.jobs import picard
 def subset_cram_to_chrM(
     b,
     cram_path: CramPath,
-    mito_subset_cram: str,
-    mito_subset_crai: str,
+    output_cram_path: Path,
     job_attrs: dict | None = None,
     overwrite: bool = False,
-) -> Job | None:
+) -> tuple[Job | None, hb.ResourceGroup]:
     """
     Extract read pairs with at least one read mapping to chrM
 
@@ -32,15 +31,28 @@ def subset_cram_to_chrM(
     NUMT mapping reads are handled
     """
 
+    # If we can resuse existing output, return the existing cram
+    if can_reuse(
+        [
+            output_cram_path,
+        ],
+        overwrite,
+    ):
+        return None, b.read_input_group(
+            **{
+                'cram': str(output_cram_path),
+                'cram.crai': str(output_cram_path) + '.crai',
+            }
+        )
+
     job_attrs = job_attrs or {}
     j = b.new_job('subset_cram_to_chrM', job_attrs)
     j.image(image_path('gatk'))
 
-    reference = fasta_res_group(b)
-
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 
+    reference = fasta_res_group(b)
     j.declare_resource_group(
         output_cram={
             'cram': '{root}.cram',
@@ -67,16 +79,15 @@ def subset_cram_to_chrM(
     """
 
     j.command(command(cmd, define_retry_function=True))
-    b.write_output(j.output_cram, str(mito_subset_cram))
+    b.write_output(j.output_cram, str(output_cram_path.with_suffix('')))
 
-    return j
+    return j, j.output_cram
 
 
 def mito_realign(
     b,
-    cram_path: CramPath,
-    mito_aligned_cram: str,
-    mito_aligned_crai: str,
+    input_cram: hb.ResourceGroup,
+    output_cram_path: Path,
     shifted: bool,
     job_attrs: dict | None = None,
     overwrite: bool = False,
@@ -86,7 +97,7 @@ def mito_realign(
     """
     # if can_reuse(
     #     [
-    #         cram_path,
+    #         output_cram_path,
     #     ],
     #     overwrite,
     # ):
@@ -97,11 +108,10 @@ def mito_realign(
     j.image(image_path('bwa'))
 
     reference = fasta_res_group(b)
-
     if shifted:
         mt_ref = b.read_input_group(
-            dict='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.shifted_by_8000_bases.chrM.dict',
-            fasta='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.shifted_by_8000_bases.chrM.fasta',
+            dict='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.dict',
+            fasta='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta',
             amb='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.amb',
             ann='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.ann',
             bwt='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.bwt',
@@ -127,15 +137,8 @@ def mito_realign(
 
     cmd = dedent(
         f"""\
-        CRAM=$BATCH_TMPDIR/{cram_path.path.name}
-        CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
-
-        # Retrying copying to avoid google bandwidth limits
-        retry_gs_cp {str(cram_path.path)} $CRAM
-        retry_gs_cp {str(cram_path.index_path)} $CRAI
-
         bazam -Xmx16g -Dsamjdk.reference_fasta={reference.base} \
-            -n{min(nthreads, 6)} -bam $CRAM -L chrM | \
+            -n{min(nthreads, 6)} -bam {input_cram.cram} -L chrM | \
          bwa mem -K 100000000 -p -v 3 -t 2 -Y {mt_ref.fasta} - | \
          samtools view -bSu - | \
         samtools sort -o {j.raw_cram}
