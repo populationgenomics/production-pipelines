@@ -78,7 +78,7 @@ def subset_cram_to_chrM(
             -O {j.output_bam.bam}
 
         dirname {j.output_bam.bam}
-        ls -l $(dirname {j.output_bam.cram})
+        ls -l $(dirname {j.output_bam.bam})
     """
 
     j.command(command(cmd, define_retry_function=True))
