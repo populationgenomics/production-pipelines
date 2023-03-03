@@ -67,7 +67,7 @@ def subset_cram_to_chrM(
     """
 
     j.command(command(cmd, define_retry_function=True))
-    b.write_output(j.mito_subset_cram, str(mito_subset_cram))
+    b.write_output(j.output_cram, str(mito_subset_cram))
 
     return j
 
