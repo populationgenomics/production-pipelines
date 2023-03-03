@@ -296,7 +296,7 @@ def _infer_pop_labels(
         pc_cnt = min(hl.min(10, hl.len(pop_ht.pca_scores)).collect())
         pop_ht.transmute(
             **{f'PC{i + 1}': pop_ht.pca_scores[i] for i in range(pc_cnt)}
-        ).export(pop_tsv_file)
+        ).export(str(pop_tsv_file))
 
     # Writing the RF model used for inferring sample populations
     pop_rf_file = tmp_prefix / 'pop.RF_fit.pickle'
