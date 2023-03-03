@@ -74,7 +74,7 @@ class AlignAndGenotypeMito(SampleStage):
         # Align to chrM genome using bwa
         jobs += mito.mito_realign(
             b=get_batch(),
-            input_cram=subset_bam,
+            input_bam=subset_bam,
             output_cram_path=self.expected_outputs(sample)['mito_realigned_cram'],
             shifted=False,
             job_attrs=self.get_job_attrs(sample),
@@ -84,7 +84,7 @@ class AlignAndGenotypeMito(SampleStage):
         # alignment boundry effects at start and end of reff genome
         jobs += mito.mito_realign(
             b=get_batch(),
-            input_cram=subset_bam,
+            input_bam=subset_bam,
             output_cram_path=self.expected_outputs(sample)['mito_shifted_cram'],
             shifted=True,
             job_attrs=self.get_job_attrs(sample),
