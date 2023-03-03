@@ -11,7 +11,7 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_workflows import get_batch
 from cpg_workflows.filetypes import CramPath
-from cpg_workflows.jobs import mito
+from cpg_workflows.jobs import mito, picard
 from cpg_workflows.stages.align import Align
 from cpg_workflows.targets import Sample
 from cpg_workflows.utils import exists
@@ -35,10 +35,12 @@ class AlignAndGenotypeMito(SampleStage):
     def expected_outputs(self, sample: Sample) -> dict[str, Path]:
         # Listing all outputs from Broad WDL here commenting what we chose not to generate
         return {
-    # 'subset_bam': sample.dataset.prefix() / f'{sample.id}.mito.foo',
-    # 'subset_bai': sample.dataset.prefix() / f'{sample.id}.mito.foo',
-    'mt_aligned_cram': sample.dataset.prefix() / f'{sample.id}.mito.cram',
-    # 'mt_aligned_bai': sample.dataset.prefix() / f'{sample.id}.mito.foo',
+    'mito_subset_cram': sample.dataset.prefix() / f'{sample.id}.mito_subset.cram',
+    'mito_subset_crai': sample.dataset.prefix() / f'{sample.id}.mito_subset.cram.crai',
+    'mito_realigned_cram': sample.dataset.prefix() / f'{sample.id}.mito_realign.cram',
+    'mito_realigned_crai': sample.dataset.prefix() / f'{sample.id}.mito_realign.cram.crai',
+    'mito_shifted_cram': sample.dataset.prefix() / f'{sample.id}.mito_shifted.cram',
+    'mito_shifted_crai': sample.dataset.prefix() / f'{sample.id}.mito_shifted.cram.crai',
     'out_vcf': sample.dataset.prefix() /  f'{sample.id}.mito.vcf',
     # 'out_vcf_index': sample.dataset.prefix() / f'{sample.id}.mito.foo',
     # 'split_vcf': sample.dataset.prefix() / f'{sample.id}.mito.foo',
@@ -68,14 +70,31 @@ class AlignAndGenotypeMito(SampleStage):
         # map twice
         # collect metrics
 
-        j = mito.mito_realign(
+        j = mito.subset_cram_to_chrM(
             b=get_batch(),
-            sample=sample,
             cram_path=CramPath(cram_path, crai_path),
-            mt_aligned_cram=self.expected_outputs(sample)['mt_aligned_cram'],
+            mito_subset_cram=self.expected_outputs(sample)['mito_subset_cram'],
+            mito_subset_crai=self.expected_outputs(sample)['mito_subset_crai'],
+            job_attrs=self.get_job_attrs(sample),
+        )
+        jobs.append(j)
+
+        jobs += mito.mito_realign(
+            b=get_batch(),
+            cram_path=CramPath(self.expected_outputs(sample)['mito_subset_cram'], self.expected_outputs(sample)['mito_subset_crai']),
+            mito_aligned_cram=self.expected_outputs(sample)['mito_realigned_cram'],
+            mito_aligned_crai=self.expected_outputs(sample)['mito_realigned_crai'],
+            shifted=False,
             job_attrs=self.get_job_attrs(sample),
         )
 
-        jobs.append(j)
+        jobs += mito.mito_realign(
+            b=get_batch(),
+            cram_path=CramPath(self.expected_outputs(sample)['mito_subset_cram'], self.expected_outputs(sample)['mito_subset_crai']),
+            mito_aligned_cram=self.expected_outputs(sample)['mito_shifted_cram'],
+            mito_aligned_crai=self.expected_outputs(sample)['mito_shifted_crai'],
+            shifted=True,
+            job_attrs=self.get_job_attrs(sample),
+        )
 
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
