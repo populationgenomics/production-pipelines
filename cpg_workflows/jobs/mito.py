@@ -89,7 +89,7 @@ def subset_cram_to_chrM(
 
 def mito_realign(
     b,
-    input_cram: hb.ResourceGroup,
+    input_bam: hb.ResourceGroup,
     output_cram_path: Path,
     shifted: bool,
     job_attrs: dict | None = None,
@@ -141,7 +141,7 @@ def mito_realign(
     cmd = dedent(
         f"""\
         bazam -Xmx16g -Dsamjdk.reference_fasta={reference.base} \
-            -n{min(nthreads, 6)} -bam {input_cram.cram} -L chrM | \
+            -n{min(nthreads, 6)} -bam {input_bam.bam} -L chrM | \
          bwa mem -K 100000000 -p -v 3 -t 2 -Y {mt_ref.fasta} - | \
          samtools view -bSu - | \
         samtools sort -o {j.raw_cram}
