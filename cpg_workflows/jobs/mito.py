@@ -430,28 +430,28 @@ def get_contamination(
 
         grep "SampleID" output-noquotes > headers
         FORMAT_ERROR="Bad contamination file format"
-        if [ `awk '{print $2}' headers` != "Contamination" ]; then
+        if [ `awk '{{print $2}}' headers` != "Contamination" ]; then
             echo $FORMAT_ERROR; exit 1
         fi
-        if [ `awk '{print $6}' headers` != "HgMajor" ]; then
+        if [ `awk '{{print $6}}' headers` != "HgMajor" ]; then
             echo $FORMAT_ERROR; exit 1
         fi
-        if [ `awk '{print $8}' headers` != "HgMinor" ]; then
+        if [ `awk '{{print $8}}' headers` != "HgMinor" ]; then
             echo $FORMAT_ERROR; exit 1
         fi
-        if [ `awk '{print $14}' headers` != "MeanHetLevelMajor" ]; then
+        if [ `awk '{{print $14}}' headers` != "MeanHetLevelMajor" ]; then
             echo $FORMAT_ERROR; exit 1
         fi
-        if [ `awk '{print $15}' headers` != "MeanHetLevelMinor" ]; then
+        if [ `awk '{{print $15}}' headers` != "MeanHetLevelMinor" ]; then
             echo $FORMAT_ERROR; exit 1
         fi
 
         grep -v "SampleID" output-noquotes > output-data
-        awk -F "\t" '{print $2}' output-data > {j.has_contamination}
-        awk -F "\t" '{print $6}' output-data > {j.major_hg}
-        awk -F "\t" '{print $8}' output-data > {j.minor_hg}
-        awk -F "\t" '{print $14}' output-data > {j.major_level}
-        awk -F "\t" '{print $15}' output-data > {j.minor_level}
+        awk -F "\t" '{{print $2}}' output-data > {j.has_contamination}
+        awk -F "\t" '{{print $6}}' output-data > {j.major_hg}
+        awk -F "\t" '{{print $8}}' output-data > {j.minor_hg}
+        awk -F "\t" '{{print $14}}' output-data > {j.major_level}
+        awk -F "\t" '{{print $15}}' output-data > {j.minor_level}
 
         cat {j.has_contamination}
         cat {j.major_hg}
@@ -551,4 +551,44 @@ def genotype_mito(
     )
     jobs.append(get_contamination_j)
 
+    # Filter round 2 - remove contamination
+    second_filter_j = filter_variants(
+        b=b,
+        vcf=initial_filter_j.output_vcf,
+        reference=mito_reff,
+        merged_mutect_stats=merge_stats_J.combined_stats,
+        # alt_allele and vaf config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
+        max_alt_allele_count=4,
+        vaf_filter_threshold=0,
+        run_contamination=True,
+        job_attrs=job_attrs
+    )
+    jobs.append(second_filter_j)
+
     return jobs
+
+
+#   call Filter as FilterContamination {
+#     input:
+#       raw_vcf = InitialFilter.filtered_vcf,
+#       raw_vcf_index = InitialFilter.filtered_vcf_idx,
+#       raw_vcf_stats = MergeStats.stats,
+#       run_contamination = true,
+#       hasContamination = GetContamination.hasContamination,
+#       contamination_major = GetContamination.major_level,
+#       contamination_minor = GetContamination.minor_level,
+#       verifyBamID = verifyBamID,
+#       base_name = base_name,
+#       ref_fasta = mt_fasta,
+#       ref_fai = mt_fasta_index,
+#       ref_dict = mt_dict,
+#       compress = compress_output_vcf,
+#       gatk_override = gatk_override,
+#       gatk_docker_override = gatk_docker_override,
+#       m2_extra_filtering_args = m2_filter_extra_args,
+#       max_alt_allele_count = 4,
+#       vaf_filter_threshold = vaf_filter_threshold,
+#       blacklisted_sites = blacklisted_sites,
+#       blacklisted_sites_index = blacklisted_sites_index,
+#       f_score_beta = f_score_beta,
+#       preemptible_tries = preemptible_tries
