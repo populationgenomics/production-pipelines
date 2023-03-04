@@ -100,7 +100,7 @@ class AlignAndGenotypeMito(SampleStage):
             sample_id=sample.id,
             input_bam=subset_bam,
             output_cram_path=self.expected_outputs(sample)['mito_realigned_cram'],
-            mito_ref=shifted_mito_ref,
+            mito_ref=mito_ref,
             job_attrs=self.get_job_attrs(sample),
         )
 
@@ -128,5 +128,8 @@ class AlignAndGenotypeMito(SampleStage):
             if job:
                 job.depends_on(*[j for j in jobs if j])
         jobs += genotype_jobs
+
+        # InitialFilter
+
 
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)

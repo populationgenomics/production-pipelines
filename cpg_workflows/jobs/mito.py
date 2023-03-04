@@ -231,6 +231,52 @@ def liftover_and_combine_vcfs(
     return j
 
 
+def filter_variants(
+    b,
+    vcf: hb.ResourceGroup,
+    reference: hb.ResourceGroup,
+    job_attrs: dict | None = None,
+    overwrite: bool = False,
+) -> Job:
+    """
+    Mutect2 Filtering for calling Snps and Indels
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_job('filter_variants', job_attrs)
+    j.image(image_path('gatk'))
+
+    res = STANDARD.request_resources(ncpu=4)
+    res.set_to_job(j)
+
+    j.declare_resource_group(
+        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+
+    cmd = f"""
+      gatk --java-options "-Xmx2500m" FilterMutectCalls -V {vcf['vcf.gz']} \
+        -R {reference.fasta} \
+        -O filtered.vcf \
+        --stats {raw_vcf_stats} \
+        {m2_extra_filtering_args} \
+        --max-alt-allele-count {max_alt_allele_count} \
+        --mitochondria-mode \
+        --min-allele-fraction  {vaf_filter_threshold} \
+        --f-score-beta  {f_score_beta} \
+        --contamination-estimate  {max_contamination}
+
+      gatk VariantFiltration -V filtered.vcf \
+        -O ~{output_vcf} \
+        --apply-allele-specific-filters \
+        --mask {blacklisted_sites} \
+        --mask-name "blacklisted_site"
+
+    """
+
+    j.command(command(cmd, define_retry_function=True))
+
+    return j
+
+
 def genotype_mito(
     b,
     cram_path: Path,
