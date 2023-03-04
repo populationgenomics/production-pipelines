@@ -161,7 +161,7 @@ def mito_mutect2(
     java_mem_mb = res.get_java_mem_mb()
 
     j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi', 'vcf.gz.stats': '{root}.vcf.gz.stats'}
     )
 
     cmd = f"""
@@ -220,16 +220,47 @@ def liftover_and_combine_vcfs(
 
     cmd = f"""
         picard LiftoverVcf \
-        I={shifted_vcf['vcf.gz']} \
-        O={j.lifted_vcf['vcf.gz']} \
-        R={reference.base} \
-        CHAIN={shift_back_chain} \
-        REJECT={j.rejected_vcf}.vcf.gz
+            I={shifted_vcf['vcf.gz']} \
+            O={j.lifted_vcf['vcf.gz']} \
+            R={reference.base} \
+            CHAIN={shift_back_chain} \
+            REJECT={j.rejected_vcf}.vcf.gz
 
         picard MergeVcfs \
-        I={vcf['vcf.gz']} \
-        I={j.lifted_vcf['vcf.gz']} \
-        O={j.output_vcf['vcf.gz']}
+            I={vcf['vcf.gz']} \
+            I={j.lifted_vcf['vcf.gz']} \
+            O={j.output_vcf['vcf.gz']}
+    """
+
+    j.command(command(cmd, define_retry_function=True))
+
+    return j
+
+
+def merge_mutect_stats(
+    b,
+    non_shifted_stats: hb.ResourceGroup,
+    shifted_stats: hb.ResourceGroup,
+    job_attrs: dict | None = None,
+) -> Job:
+    """
+    Merge stats files from two mutect runs
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_job('merge_stats', job_attrs)
+    j.image(image_path('picard'))
+
+    res = STANDARD.request_resources(ncpu=4)
+    res.set_to_job(j)
+
+    j.declare_resource_group(
+        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+
+    cmd = f"""
+            gatk MergeMutectStats \
+                --stats {non_shifted_stats['vcf.gz.stats']} --stats {shifted_stats['vcf.gz.stats']} -O {j.combined_stats}
+
     """
 
     j.command(command(cmd, define_retry_function=True))
@@ -241,6 +272,7 @@ def filter_variants(
     b,
     vcf: hb.ResourceGroup,
     reference: hb.ResourceGroup,
+    merged_mutect_stats: hb.ResourceFile,
     max_alt_allele_count: int,
     vaf_filter_threshold: int,
     run_contamination: bool,
@@ -299,7 +331,7 @@ def filter_variants(
       gatk --java-options "-Xmx2500m" FilterMutectCalls -V {vcf['vcf.gz']} \
         -R {reference.base} \
         -O {j.filtered_vcf['vcf.gz']} \
-        --stats {j.raw_stats} \
+        --stats {merged_mutect_stats} \
         --max-alt-allele-count {max_alt_allele_count} \
         --mitochondria-mode \
         --min-allele-fraction  {vaf_filter_threshold} \
@@ -461,11 +493,20 @@ def genotype_mito(
     )
     jobs.append(merge_j)
 
+    # Merge the mutect stats output files (needed for filtering)
+    merge_stats_J = merge_mutect_stats(
+        b=b,
+        non_shifted_stats=call_j.output_vcf,
+        shifted_stats=shifted_call_j.output_vcf,
+    )
+    jobs.append(merge_stats_J)
+
     # Initial round of filtering to exclude blacklist and high alt alleles
     initial_filter_j = filter_variants(
         b=b,
         vcf=merge_j.output_vcf,
         reference=mito_reff,
+        merged_mutect_stats=merge_stats_J.combined_stats,
         # alt_allele and vaf config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
         max_alt_allele_count=4,
         vaf_filter_threshold=0,
