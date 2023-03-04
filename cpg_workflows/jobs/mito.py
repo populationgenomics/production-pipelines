@@ -161,12 +161,10 @@ def mito_mutect2(
     )
 
     cmd = f"""
-        CRAM=$BATCH_TMPDIR/{cram_path.path.name}
-        CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
+        CRAM=$BATCH_TMPDIR/{cram_path.name}
 
         # Retrying copying to avoid google bandwidth limits
-        retry_gs_cp {str(cram_path.path)} $CRAM
-        retry_gs_cp {str(cram_path.index_path)} $CRAI
+        retry_gs_cp {str(cram_path)} $CRAM
 
         # We need to create these files regardless, even if they stay empty
         # touch bamout.bam
@@ -234,8 +232,8 @@ def liftover_and_combine_vcfs(
 
 def genotype_mito(
     b,
-    cram_path: CramPath,
-    shifted_cram_path: CramPath,
+    cram_path: Path,
+    shifted_cram_path: Path,
     output_vcf_path: Path,
     mito_reff: hb.ResourceGroup,
     shifted_mito_reff: hb.ResourceGroup,
