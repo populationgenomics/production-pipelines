@@ -169,7 +169,7 @@ def mito_mutect2(
         # We need to create these files regardless, even if they stay empty
         # touch bamout.bam
 
-        gatk --java-options "-Xmx~{java_mem_mb}m" Mutect2 \
+        gatk --java-options "-Xmx{java_mem_mb}m" Mutect2 \
             -R {reference.fasta} \
             -I $CRAM \
             --read-filter MateOnSameContigOrNoMappedMateReadFilter \
