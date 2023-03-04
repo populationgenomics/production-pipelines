@@ -77,7 +77,7 @@ def get_intervals(
 
     cmd = f"""
     mkdir $BATCH_TMPDIR/out
-    
+
     picard -Xms1000m -Xmx1500m \
     IntervalListTools \
     SCATTER_COUNT={scatter_count} \
@@ -118,6 +118,7 @@ def markdup(
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     out_markdup_metrics_path: Path | None = None,
+    fasta_reference: hb.ResourceGroup | None = None,
     overwrite: bool = False,
 ) -> Job | None:
     """
@@ -139,7 +140,9 @@ def markdup(
             'cram.crai': '{root}.cram.crai',
         }
     )
-    fasta_reference = fasta_res_group(b)
+
+    if fasta_reference is None:
+        fasta_reference = fasta_res_group(b)
 
     assert isinstance(j.output_cram, hb.ResourceGroup)
     cmd = f"""
@@ -148,7 +151,7 @@ def markdup(
     TMP_DIR=$(dirname {j.output_cram.cram})/picard-tmp \\
     ASSUME_SORT_ORDER=coordinate \\
     | samtools view -@{resource.get_nthreads() - 1} -T {fasta_reference.base} -O cram -o {j.output_cram.cram}
-    
+
     samtools index -@{resource.get_nthreads() - 1} {j.output_cram.cram} {j.output_cram['cram.crai']}
     """
     j.command(command(cmd, monitor_space=True))
@@ -209,7 +212,7 @@ def vcf_qc(
     SEQUENCE_DICTIONARY={reference['dict']} \
     TARGET_INTERVALS={intervals_file} \
     GVCF_INPUT={"true" if is_gvcf else "false"}
-    
+
     cp $BATCH_TMPDIR/prefix.variant_calling_summary_metrics {j.summary}
     cp $BATCH_TMPDIR/prefix.variant_calling_detail_metrics {j.detail}
     """
@@ -282,7 +285,7 @@ def picard_collect_metrics(
       PROGRAM=CollectQualityYieldMetrics \\
       METRIC_ACCUMULATION_LEVEL=null \\
       METRIC_ACCUMULATION_LEVEL=SAMPLE
-      
+
     ls $BATCH_TMPDIR/
     cp $BATCH_TMPDIR/prefix.alignment_summary_metrics {j.out_alignment_summary_metrics}
     cp $BATCH_TMPDIR/prefix.base_distribution_by_cycle_metrics {j.out_base_distribution_by_cycle_metrics}
@@ -343,9 +346,9 @@ def picard_hs_metrics(
     retry_gs_cp {str(cram_path.path)} $CRAM
     retry_gs_cp {str(cram_path.index_path)} $CRAI
 
-    # Picard is strict about the interval-list file header - contigs md5s, etc. - and 
-    # if md5s do not match the ref.dict file, picard would crash. So fixing the header 
-    # by converting the interval-list to bed (i.e. effectively dropping the header) 
+    # Picard is strict about the interval-list file header - contigs md5s, etc. - and
+    # if md5s do not match the ref.dict file, picard would crash. So fixing the header
+    # by converting the interval-list to bed (i.e. effectively dropping the header)
     # and back to interval-list (effectively re-adding the header from input ref-dict).
     # VALIDATION_STRINGENCY=SILENT does not help.
     picard IntervalListToBed \\
@@ -355,7 +358,7 @@ def picard_hs_metrics(
     I=$BATCH_TMPDIR/intervals.bed \\
     O=$BATCH_TMPDIR/intervals.interval_list \\
     SD={reference.dict}
-    
+
     picard -Xmx{res.get_java_mem_mb()}m \\
       CollectHsMetrics \\
       INPUT=$CRAM \\

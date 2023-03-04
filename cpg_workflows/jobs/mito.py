@@ -134,7 +134,7 @@ def mito_realign(
         out_markdup_metrics_path=output_cram_path.with_suffix(
             '.markduplicates-metrics'
         ),
-        base_reference=mito_ref
+        fasta_reference=mito_ref
     )
 
     return [j, mkdup_j]
@@ -360,7 +360,7 @@ def genotype_mito(
 
     initial_filter_j = filter_variants(
         b=b,
-        vcf= merge_j.output_vcf,
+        vcf=merge_j.output_vcf,
         reference=mito_reff,
         # config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
         max_alt_allele_count=4,
