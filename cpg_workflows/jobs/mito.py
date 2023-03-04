@@ -248,7 +248,7 @@ def merge_mutect_stats(
     """
     job_attrs = job_attrs or {}
     j = b.new_job('merge_stats', job_attrs)
-    j.image(image_path('picard'))
+    j.image(image_path('gatk'))
 
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
@@ -412,32 +412,52 @@ def get_contamination(
     """
     job_attrs = job_attrs or {}
     j = b.new_job('split_multi_allelics', job_attrs)
-    j.image(image_path('gatk'))
+    # j.image(image_path('haplochecker'))
+    j.image(image_path('us.gcr.io/broad-dsde-methods/haplochecker:haplochecker-0124'))
 
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 
     j.declare_resource_group(
-        split_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
-    j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
 
     cmd = f"""
-        gatk LeftAlignAndTrimVariants \
-            -R {reference.base} \
-            -V {vcf['vcf.gz']} \
-            -O {j.split_vcf['vcf.gz']} \
-            --split-multi-allelics \
-            --dont-trim-alleles \
-            --keep-original-ac
+        PARENT_DIR="$(dirname "{vcf['vcf.gz']}")"
+        java -jar /haplocheckCLI/haplocheckCLI.jar "${PARENT_DIR}"
 
-        gatk SelectVariants \
-            -V {vcf['vcf.gz']} \
-            -O {j.output_vcf['vcf.gz']} \
-            --exclude-filtered
+        sed 's/\"//g' output > output-noquotes
 
+        grep "SampleID" output-noquotes > headers
+        FORMAT_ERROR="Bad contamination file format"
+        if [ `awk '{print $2}' headers` != "Contamination" ]; then
+            echo $FORMAT_ERROR; exit 1
+        fi
+        if [ `awk '{print $6}' headers` != "HgMajor" ]; then
+            echo $FORMAT_ERROR; exit 1
+        fi
+        if [ `awk '{print $8}' headers` != "HgMinor" ]; then
+            echo $FORMAT_ERROR; exit 1
+        fi
+        if [ `awk '{print $14}' headers` != "MeanHetLevelMajor" ]; then
+            echo $FORMAT_ERROR; exit 1
+        fi
+        if [ `awk '{print $15}' headers` != "MeanHetLevelMinor" ]; then
+            echo $FORMAT_ERROR; exit 1
+        fi
+
+        grep -v "SampleID" output-noquotes > output-data
+        awk -F "\t" '{print $2}' output-data > {j.has_contamination}
+        awk -F "\t" '{print $6}' output-data > {j.major_hg}
+        awk -F "\t" '{print $8}' output-data > {j.minor_hg}
+        awk -F "\t" '{print $14}' output-data > {j.major_level}
+        awk -F "\t" '{print $15}' output-data > {j.minor_level}
+
+        cat {j.has_contamination}
+        cat {j.major_hg}
+        cat {j.minor_hg}
+        cat {j.major_level}
+        cat {j.minor_level}
         """
 
     j.command(command(cmd, define_retry_function=True))
@@ -523,9 +543,12 @@ def genotype_mito(
     )
     jobs.append(split_multiallelics_j)
 
-    # Use mito reads to idenitfy level of contamination
-    # get_contamination_j = get_contamination(
-
-    # )
+    # Use mito reads to identify level of contamination
+    get_contamination_j = get_contamination(
+        b=b,
+        vcf=split_multiallelics_j.output_vcf,
+        reference=mito_reff
+    )
+    jobs.append(get_contamination_j)
 
     return jobs
