@@ -182,7 +182,6 @@ def mito_mutect2(
     """
 
     j.command(command(cmd, define_retry_function=True))
-    b.write_output(j.output_cram, str(output_cram_path.with_suffix('')))
 
     return j
 
@@ -225,7 +224,6 @@ def liftover_and_combine_vcfs(
     """
 
     j.command(command(cmd, define_retry_function=True))
-    b.write_output(j.output_cram, str(output_cram_path.with_suffix('')))
 
     return j
 
