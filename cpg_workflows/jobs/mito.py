@@ -235,13 +235,14 @@ def filter_variants(
     b,
     vcf: hb.ResourceGroup,
     reference: hb.ResourceGroup,
+    blacklisted_sites: Path,
     max_alt_allele_count: int,
     vaf_filter_threshold: int,
     f_score_beta: int,
     run_contamination: bool,
-    has_contamination: str,
-    contamination_major: float,
-    contamination_minor: float,
+    has_contamination: str = "",
+    contamination_major: float = 0.0,
+    contamination_minor: float = 0.0,
     verify_bam_id: float = 0.0,
     job_attrs: dict | None = None,
     overwrite: bool = False,
@@ -277,7 +278,7 @@ def filter_variants(
     cmd = f"""
       gatk --java-options "-Xmx2500m" FilterMutectCalls -V {vcf['vcf.gz']} \
         -R {reference.fasta} \
-        -O {output_vcf['vcf.gz']} \
+        -O {j.filtered_vcf} \
         --stats {j.raw_stats} \
         {m2_extra_filtering_args} \
         --max-alt-allele-count {max_alt_allele_count} \
@@ -286,8 +287,8 @@ def filter_variants(
         --f-score-beta  {f_score_beta} \
         --contamination-estimate  {max_contamination}
 
-      gatk VariantFiltration -V filtered.vcf \
-        -O ~{output_vcf} \
+      gatk VariantFiltration -V {j.filtered_vcf} \
+        -O {j.output_vcf['vcf.gz']} \
         --apply-allele-specific-filters \
         --mask {blacklisted_sites} \
         --mask-name "blacklisted_site"

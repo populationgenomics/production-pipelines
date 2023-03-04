@@ -72,6 +72,7 @@ class AlignAndGenotypeMito(SampleStage):
             fai='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.fai',
             pac='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.pac',
             sa='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.sa',
+            shift_back_chain='gs://cpg-common-main/references/hg38/v0/chrM/ShiftBack.chain',
         )
         mito_ref = get_batch().read_input_group(
             dict='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.dict',
@@ -82,7 +83,6 @@ class AlignAndGenotypeMito(SampleStage):
             fai='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.fai',
             pac='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.pac',
             sa='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.sa',
-            shift_back_chain='gs://cpg-common-main/references/hg38/v0/chrM/ShiftBack.chain',
         )
 
         # Extract reads mapped to chrM
