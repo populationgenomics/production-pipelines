@@ -235,6 +235,14 @@ def filter_variants(
     b,
     vcf: hb.ResourceGroup,
     reference: hb.ResourceGroup,
+    max_alt_allele_count: int,
+    vaf_filter_threshold: int,
+    f_score_beta: int,
+    run_contamination: bool,
+    has_contamination: str,
+    contamination_major: float,
+    contamination_minor: float,
+    verify_bam_id: float = 0.0,
     job_attrs: dict | None = None,
     overwrite: bool = False,
 ) -> Job:
@@ -252,11 +260,25 @@ def filter_variants(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
 
+    # Parse contamination levels
+    if run_contamination and has_contamination == "YES":
+        if contamination_major == 0.0:
+            hc_contamination = contamination_minor
+        else:
+            hc_contamination = 1.0 - contamination_major
+    else:
+        hc_contamination = 0.0
+
+    if verify_bam_id > hc_contamination:
+        max_contamination = verify_bam_id
+    else:
+        max_contamination = hc_contamination
+
     cmd = f"""
       gatk --java-options "-Xmx2500m" FilterMutectCalls -V {vcf['vcf.gz']} \
         -R {reference.fasta} \
-        -O filtered.vcf \
-        --stats {raw_vcf_stats} \
+        -O {output_vcf['vcf.gz']} \
+        --stats {j.raw_stats} \
         {m2_extra_filtering_args} \
         --max-alt-allele-count {max_alt_allele_count} \
         --mitochondria-mode \
