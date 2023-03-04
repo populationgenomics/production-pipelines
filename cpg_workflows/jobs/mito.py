@@ -122,7 +122,7 @@ def mito_realign(
             mem -K 100000000 -p -v 3 -t 2 -Y {mito_ref.fasta} \
             -R '@RG\\tID:{sample_id}\\tSM:{sample_id}' \
             - | \
-        samtools view -bSu - | \
+        samtools view -bSu -T {mito_ref.fasta} - | \
         samtools sort -o {j.raw_cram}
         """
     j.command(command(cmd, define_retry_function=True))
@@ -344,5 +344,20 @@ def genotype_mito(
         job_attrs=job_attrs
     )
     jobs.append(merge_j)
+
+
+    # initial_filter_j = filter_variants(
+    #     b=b,
+    #     vcf= merge_j.output_vcf,
+    #     reference=mito_reff,
+    #     blacklisted_sites=blacklisted_sites,
+    #     max_alt_allele_count=max_alt_allele_count,
+    #     vaf_filter_threshold=vaf_filter_threshold,
+    #     f_score_beta=f_score_beta,
+    #     run_contamination=False,
+    #     job_attrs=job_attrs
+    # )
+    # jobs.append(initial_filter_j)
+
 
     return jobs
