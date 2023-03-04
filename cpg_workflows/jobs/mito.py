@@ -212,21 +212,24 @@ def liftover_and_combine_vcfs(
     res.set_to_job(j)
 
     j.declare_resource_group(
+        lifted_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+    j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
 
     cmd = f"""
         picard LiftoverVcf \
         I={shifted_vcf['vcf.gz']} \
-        O={j.lifted_vcf} \
+        O={j.lifted_vcf['vcf.gz']} \
         R={reference.base} \
         CHAIN={shift_back_chain} \
-        REJECT={j.rejected_vcf}
+        REJECT={j.rejected_vcf}.vcf.gz
 
         picard MergeVcfs \
         I={vcf['vcf.gz']} \
-        I={j.lifted_vcf} \
-        O={j.rejected_vcf}.merged.vcf
+        I={j.lifted_vcf['vcf.gz']} \
+        O={j.output_vcf['vcf.gz']}
     """
 
     j.command(command(cmd, define_retry_function=True))
@@ -325,7 +328,55 @@ def split_multi_allelics_and_remove_non_pass_sites(
 ) -> Job:
     """
     split_multi_allelics_and_remove_non_pass_sites
+
     cmd taken from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L600
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_job('split_multi_allelics', job_attrs)
+    j.image(image_path('gatk'))
+
+    res = STANDARD.request_resources(ncpu=4)
+    res.set_to_job(j)
+
+    j.declare_resource_group(
+        split_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+    j.declare_resource_group(
+        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+
+    cmd = f"""
+        gatk LeftAlignAndTrimVariants \
+            -R {reference.base} \
+            -V {vcf['vcf.gz']} \
+            -O {j.split_vcf['vcf.gz']} \
+            --split-multi-allelics \
+            --dont-trim-alleles \
+            --keep-original-ac
+
+        gatk SelectVariants \
+            -V {vcf['vcf.gz']} \
+            -O {j.output_vcf['vcf.gz']} \
+            --exclude-filtered
+
+        """
+
+    j.command(command(cmd, define_retry_function=True))
+
+    return j
+
+def get_contamination(
+    b,
+    vcf: hb.ResourceGroup,
+    reference: hb.ResourceGroup,
+    job_attrs: dict | None = None,
+    overwrite: bool = False,
+) -> Job:
+    """
+    Uses new Haplochecker to estimate levels of contamination in mitochondria
+
+    cmd taken from:
+      https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L239
     """
     job_attrs = job_attrs or {}
     j = b.new_job('split_multi_allelics', job_attrs)
@@ -374,6 +425,9 @@ def genotype_mito(
 ) -> list[Job | None]:
     """
     Genotype mitochondrial genome using mutect2
+
+    Re implementation of the functions from:
+      https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L89
 
     """
 
@@ -427,5 +481,10 @@ def genotype_mito(
         reference=mito_reff,
     )
     jobs.append(split_multiallelics_j)
+
+    # Use mito reads to idenitfy level of contamination
+    get_contamination_j = get_contamination(
+
+    )
 
     return jobs
