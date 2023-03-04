@@ -37,9 +37,7 @@ class AlignAndGenotypeMito(SampleStage):
         return {
             'mito_subset_bam': sample.dataset.prefix() / 'mito' / f'{sample.id}.mito_subset.bam',
             'mito_realigned_cram': sample.dataset.prefix() / 'mito' / f'{sample.id}.mito_realign.cram',
-            'mito_realigned_crai': sample.dataset.prefix() / 'mito' / f'{sample.id}.mito_realign.cram.crai',
             'mito_shifted_cram': sample.dataset.prefix() / 'mito' / f'{sample.id}.mito_shifted.cram',
-            'mito_shifted_crai': sample.dataset.prefix() / 'mito' / f'{sample.id}.mito_shifted.cram.crai',
             'out_vcf': sample.dataset.prefix() / 'mito' /  f'{sample.id}.mito.vcf',
             # 'out_vcf_index': sample.dataset.prefix() / f'{sample.id}.mito.foo',
             # 'split_vcf': sample.dataset.prefix() / f'{sample.id}.mito.foo',
@@ -56,11 +54,36 @@ class AlignAndGenotypeMito(SampleStage):
             # 'contamination': sample.dataset.prefix() / f'{sample.id}.mito.foo',
         }
 
+
+
+
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         cram_path = inputs.as_path(sample, Align, 'cram')
         crai_path = inputs.as_path(sample, Align, 'crai')
 
         jobs = []
+
+        mito_ref = b.read_input_group(
+            dict='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.dict',
+            fasta='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta',
+            amb='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.amb',
+            ann='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.ann',
+            bwt='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.bwt',
+            fai='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.fai',
+            pac='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.pac',
+            sa='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.sa',
+        )
+        shifted_mito_ref = b.read_input_group(
+            dict='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.dict',
+            fasta='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta',
+            amb='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.amb',
+            ann='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.ann',
+            bwt='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.bwt',
+            fai='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.fai',
+            pac='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.pac',
+            sa='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.sa',
+            shift_back_chain='gs://cpg-common-main/references/hg38/v0/chrM/ShiftBack.chain',
+        )
 
         # Extract reads mapped to chrM
         j, subset_bam = mito.subset_cram_to_chrM(
@@ -76,7 +99,7 @@ class AlignAndGenotypeMito(SampleStage):
             b=get_batch(),
             input_bam=subset_bam,
             output_cram_path=self.expected_outputs(sample)['mito_realigned_cram'],
-            shifted=False,
+            mito_ref=shifted_mito_ref,
             job_attrs=self.get_job_attrs(sample),
         )
 
@@ -86,13 +109,18 @@ class AlignAndGenotypeMito(SampleStage):
             b=get_batch(),
             input_bam=subset_bam,
             output_cram_path=self.expected_outputs(sample)['mito_shifted_cram'],
-            shifted=True,
+            mito_ref=shifted_mito_ref,
             job_attrs=self.get_job_attrs(sample),
         )
 
         # Call variants
-
-
-
+        jobs += mito.genotype_mito(
+            b=get_batch(),
+            cram_path=self.expected_outputs(sample)['mito_realigned_cram'],
+            shifted_cram_path=self.expected_outputs(sample)['mito_shifted_cram'],
+            output_vcf_path=self.expected_outputs(sample)['out_vcf'],
+            mito_reff=mito_ref,
+            shifted_mito_reff=shifted_mito_ref,
+        )
 
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)

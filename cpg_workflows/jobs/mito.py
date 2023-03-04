@@ -91,48 +91,24 @@ def mito_realign(
     b,
     input_bam: hb.ResourceGroup,
     output_cram_path: Path,
-    shifted: bool,
+    mito_ref: hb.ResourceGroup,
     job_attrs: dict | None = None,
     overwrite: bool = False,
 ) -> list[Job]:
     """
     Re-align reads to mito genome
     """
-    # if can_reuse(
-    #     [
-    #         output_cram_path,
-    #     ],
-    #     overwrite,
-    # ):
-    #     return None
+    if can_reuse(
+        [
+            output_cram_path,
+        ],
+        overwrite,
+    ):
+        return []
 
     job_attrs = job_attrs or {}
     j = b.new_job('mito_realign', job_attrs)
     j.image(image_path('bwa'))
-
-    reference = fasta_res_group(b)
-    if shifted:
-        mt_ref = b.read_input_group(
-            dict='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.dict',
-            fasta='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta',
-            amb='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.amb',
-            ann='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.ann',
-            bwt='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.bwt',
-            fai='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.fai',
-            pac='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.pac',
-            sa='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.sa',
-        )
-    else:
-        mt_ref = b.read_input_group(
-            dict='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.dict',
-            fasta='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta',
-            amb='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.amb',
-            ann='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.ann',
-            bwt='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.bwt',
-            fai='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.fai',
-            pac='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.pac',
-            sa='gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.sa',
-        )
 
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
@@ -142,7 +118,7 @@ def mito_realign(
         f"""\
         bazam -Xmx16g -Dsamjdk.reference_fasta={reference.base} \
             -n{min(nthreads, 6)} -bam {input_bam.bam} -L chrM | \
-         bwa mem -K 100000000 -p -v 3 -t 2 -Y {mt_ref.fasta} - | \
+         bwa mem -K 100000000 -p -v 3 -t 2 -Y {mito_ref.fasta} - | \
          samtools view -bSu - | \
         samtools sort -o {j.raw_cram}
         """
@@ -167,7 +143,7 @@ def mito_mutect2(
     max_reads_per_alignment_start: int = 75,
     job_attrs: dict | None = None,
     overwrite: bool = False,
-) -> tuple[Job | None, hb.ResourceGroup]:
+) -> Job:
     """
     Call mutect2 on a mito genome
 
@@ -218,10 +194,10 @@ def liftover_and_combine_vcfs(
     vcf: hb.ResourceGroup,
     shifted_vcf: hb.ResourceGroup,
     reference: hb.ResourceGroup,
-    shift_back_chain: Path,
+    shift_back_chain: hb.ResourceFile,
     job_attrs: dict | None = None,
     overwrite: bool = False,
-) -> tuple[Job | None, hb.ResourceGroup]:
+) -> Job:
     """
     Lifts over shifted vcf of control region and combines it with the rest of the chrM calls.
     """
@@ -260,64 +236,43 @@ def genotype_mito(
     b,
     cram_path: CramPath,
     shifted_cram_path: CramPath,
-    output_cram_path: Path,
+    output_vcf_path: Path,
+    mito_reff: hb.ResourceGroup,
+    shifted_mito_reff: hb.ResourceGroup,
     job_attrs: dict | None = None,
     overwrite: bool = False,
-) -> tuple[Job | None, hb.ResourceGroup]:
+) -> list[Job | None]:
     """
     Genotype mito genome using mutect2
 
     """
-    # If we can resuse existing output, return the existing cram
-    if can_reuse(
-        [
-            output_cram_path,
-        ],
-        overwrite,
-    ):
-        return None, b.read_input_group(
-            **{
-                'cram': str(output_cram_path),
-                'cram.crai': str(output_cram_path) + '.crai',
-            }
-        )
 
-    job_attrs = job_attrs or {}
-    j = b.new_job('genotype_mito', job_attrs)
-    j.image(image_path('gatk'))
+    # Call variants
+    call_j = mito_mutect2(
+        b=b,
+        cram_path=cram_path,
+        reference=mito_reff,
+        job_attrs=job_attrs
+    )
 
-    res = STANDARD.request_resources(ncpu=4)
-    res.set_to_job(j)
+    shifted_call_j = mito_mutect2(
+        b=b,
+        cram_path=shifted_cram_path,
+        reference=shifted_mito_reff,
+        job_attrs=job_attrs
 
-    # reference = fasta_res_group(b)
-    # j.declare_resource_group(
-    #     output_cram={
-    #         'cram': '{root}.cram',
-    #         'cram.crai': '{root}.cram.crai',
-    #     }
-    # )
+    )
+    jobs = [call_j, shifted_call_j]
 
-    cmd = f"""
-        CRAM=$BATCH_TMPDIR/{cram_path.path.name}
-        CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
+    # Merge two VCFs
+    merge_j = liftover_and_combine_vcfs(
+        b=b,
+        vcf=call_j.output_vcf,
+        shifted_vcf=shifted_call_j.output_vcf,
+        reference=mito_reff,  # Does this need to be full genome ref?
+        shift_back_chain=shifted_mito_reff.shift_back_chain,
+        job_attrs=job_attrs
+    )
+    jobs.append(merge_j)
 
-        # Retrying copying to avoid google bandwidth limits
-        retry_gs_cp {str(cram_path.path)} $CRAM
-        retry_gs_cp {str(cram_path.index_path)} $CRAI
-
-        gatk PrintReads \
-            -R {reference.base} \
-            -L chrM \
-            --read-filter MateOnSameContigOrNoMappedMateReadFilter \
-            --read-filter MateUnmappedAndUnmappedReadFilter \
-            -I $CRAM \
-            --read-index $CRAI \
-            -O {j.output_cram.cram}
-
-        ls -l
-    """
-
-    j.command(command(cmd, define_retry_function=True))
-    b.write_output(j.output_cram, str(output_cram_path.with_suffix('')))
-
-    return j, j.output_cram
+    return jobs
