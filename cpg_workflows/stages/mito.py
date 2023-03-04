@@ -125,7 +125,8 @@ class AlignAndGenotypeMito(SampleStage):
             shifted_mito_reff=shifted_mito_ref,
         )
         for job in genotype_jobs:
-            job.depends_on(*jobs)
+            if job:
+                job.depends_on(*[j for j in jobs if j])
         jobs += genotype_jobs
 
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
