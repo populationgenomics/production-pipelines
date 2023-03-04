@@ -295,7 +295,7 @@ def filter_variants(
     cmd = f"""
       gatk --java-options "-Xmx2500m" FilterMutectCalls -V {vcf['vcf.gz']} \
         -R {reference.base} \
-        -O {j.filtered_vcf.vcf} \
+        -O {j.filtered_vcf['vcf.gz']} \
         --stats {j.raw_stats} \
         --max-alt-allele-count {max_alt_allele_count} \
         --mitochondria-mode \
@@ -303,7 +303,7 @@ def filter_variants(
         --contamination-estimate  {max_contamination} \
         {f_score_beta_string}
 
-      gatk VariantFiltration -V {j.filtered_vcf.vcf} \
+      gatk VariantFiltration -V {j.filtered_vcf['vcf.gz']} \
         -O {j.output_vcf['vcf.gz']} \
         --apply-allele-specific-filters \
         --mask {j.blacklisted_sites.bed} \
@@ -345,7 +345,7 @@ def split_multi_allelics_and_remove_non_pass_sites(
         gatk LeftAlignAndTrimVariants \
             -R {reference.base} \
             -V {vcf['vcf.gz']} \
-            -O {j.split_vcf.vcf} \
+            -O {j.split_vcf['vcf.gz']} \
             --split-multi-allelics \
             --dont-trim-alleles \
             --keep-original-ac
@@ -362,8 +362,6 @@ def split_multi_allelics_and_remove_non_pass_sites(
     return j
 
 
-
-
 def genotype_mito(
     b,
     cram_path: Path,
@@ -375,11 +373,11 @@ def genotype_mito(
     overwrite: bool = False,
 ) -> list[Job | None]:
     """
-    Genotype mito genome using mutect2
+    Genotype mitochondrial genome using mutect2
 
     """
 
-    # Call variants
+    # Call variants on WT genome
     call_j = mito_mutect2(
         b=b,
         cram_path=cram_path,
@@ -388,6 +386,7 @@ def genotype_mito(
         job_attrs=job_attrs,
     )
 
+    # Call variants in the control region using a shifted reference
     shifted_call_j = mito_mutect2(
         b=b,
         cram_path=shifted_cram_path,
@@ -397,7 +396,7 @@ def genotype_mito(
     )
     jobs = [call_j, shifted_call_j]
 
-    # Merge two VCFs
+    # Merge the wt and shifted VCFs
     merge_j = liftover_and_combine_vcfs(
         b=b,
         vcf=call_j.output_vcf,
@@ -408,7 +407,7 @@ def genotype_mito(
     )
     jobs.append(merge_j)
 
-    # Initial round of filtering
+    # Initial round of filtering to exclude blacklist and high alt alleles
     initial_filter_j = filter_variants(
         b=b,
         vcf=merge_j.output_vcf,
