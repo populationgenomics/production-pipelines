@@ -294,7 +294,7 @@ def filter_variants(
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 
-    j.declare_resource_group(
+    j.read_input_group(
         blacklisted_sites={
             'bed': 'gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.hg38.chrM.bed',
             'idx': 'gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.hg38.chrM.bed.idx',
