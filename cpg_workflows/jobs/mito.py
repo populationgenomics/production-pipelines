@@ -267,6 +267,9 @@ def filter_variants(
     )
 
     j.declare_resource_group(
+        filtered_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+    j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
 
@@ -289,11 +292,10 @@ def filter_variants(
     else:
         f_score_beta_string = ''
 
-
     cmd = f"""
       gatk --java-options "-Xmx2500m" FilterMutectCalls -V {vcf['vcf.gz']} \
         -R {reference.base} \
-        -O {j.filtered_vcf} \
+        -O {j.filtered_vcf.vcf} \
         --stats {j.raw_stats} \
         --max-alt-allele-count {max_alt_allele_count} \
         --mitochondria-mode \
@@ -301,7 +303,7 @@ def filter_variants(
         --contamination-estimate  {max_contamination} \
         {f_score_beta_string}
 
-      gatk VariantFiltration -V {j.filtered_vcf} \
+      gatk VariantFiltration -V {j.filtered_vcf.vcf} \
         -O {j.output_vcf['vcf.gz']} \
         --apply-allele-specific-filters \
         --mask {j.blacklisted_sites.bed} \
@@ -312,6 +314,54 @@ def filter_variants(
     j.command(command(cmd, define_retry_function=True))
 
     return j
+
+
+def split_multi_allelics_and_remove_non_pass_sites(
+    b,
+    vcf: hb.ResourceGroup,
+    reference: hb.ResourceGroup,
+    job_attrs: dict | None = None,
+    overwrite: bool = False,
+) -> Job:
+    """
+    split_multi_allelics_and_remove_non_pass_sites
+    cmd taken from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L600
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_job('split_multi_allelics', job_attrs)
+    j.image(image_path('gatk'))
+
+    res = STANDARD.request_resources(ncpu=4)
+    res.set_to_job(j)
+
+    j.declare_resource_group(
+        split_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+    j.declare_resource_group(
+        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+
+    cmd = f"""
+        gatk LeftAlignAndTrimVariants \
+            -R {reference.base} \
+            -V {vcf['vcf.gz']} \
+            -O {j.split_vcf.vcf} \
+            --split-multi-allelics \
+            --dont-trim-alleles \
+            --keep-original-ac
+
+        gatk SelectVariants \
+            -V {vcf['vcf.gz']} \
+            -O {j.output_vcf['vcf.gz']} \
+            --exclude-filtered
+
+        """
+
+    j.command(command(cmd, define_retry_function=True))
+
+    return j
+
+
 
 
 def genotype_mito(
@@ -358,16 +408,25 @@ def genotype_mito(
     )
     jobs.append(merge_j)
 
+    # Initial round of filtering
     initial_filter_j = filter_variants(
         b=b,
         vcf=merge_j.output_vcf,
         reference=mito_reff,
-        # config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
+        # alt_allele and vaf config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
         max_alt_allele_count=4,
         vaf_filter_threshold=0,
         run_contamination=False,
         job_attrs=job_attrs
     )
     jobs.append(initial_filter_j)
+
+    # SplitMultiAllelicsAndRemoveNonPassSites
+    split_multiallelics_j = split_multi_allelics_and_remove_non_pass_sites(
+        b=b,
+        vcf=initial_filter_j.output_vcf,
+        reference=mito_reff,
+    )
+    jobs.append(split_multiallelics_j)
 
     return jobs
