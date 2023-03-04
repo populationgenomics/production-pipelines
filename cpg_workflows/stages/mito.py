@@ -116,7 +116,7 @@ class AlignAndGenotypeMito(SampleStage):
         )
 
         # Call variants
-        jobs += mito.genotype_mito(
+        genotype_jobs = mito.genotype_mito(
             b=get_batch(),
             cram_path=self.expected_outputs(sample)['mito_realigned_cram'],
             shifted_cram_path=self.expected_outputs(sample)['mito_shifted_cram'],
@@ -124,5 +124,8 @@ class AlignAndGenotypeMito(SampleStage):
             mito_reff=mito_ref,
             shifted_mito_reff=shifted_mito_ref,
         )
+        for job in genotype_jobs:
+            job.depends_on(*jobs)
+        jobs += genotype_jobs
 
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
