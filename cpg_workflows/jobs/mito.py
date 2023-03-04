@@ -118,11 +118,11 @@ def mito_realign(
     cmd = f"""\
         bazam -Xmx16g \
             -n{min(nthreads, 6)} -bam {input_bam.bam} | \
-         bwa
+        bwa \
             mem -K 100000000 -p -v 3 -t 2 -Y {mito_ref.fasta} \
             -R '@RG\\tID:{sample_id}\\tSM:{sample_id}' \
             - | \
-         samtools view -bSu - | \
+        samtools view -bSu - | \
         samtools sort -o {j.raw_cram}
         """
     j.command(command(cmd, define_retry_function=True))
