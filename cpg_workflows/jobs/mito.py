@@ -294,11 +294,9 @@ def filter_variants(
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 
-    j.read_input_group(
-        blacklisted_sites={
-            'bed': 'gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.hg38.chrM.bed',
-            'idx': 'gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.hg38.chrM.bed.idx',
-        }
+    blacklisted_sites = b.read_input_group(
+        bed='gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.hg38.chrM.bed',
+        idx='gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.hg38.chrM.bed.idx',
     )
 
     j.declare_resource_group(
@@ -341,7 +339,7 @@ def filter_variants(
       gatk VariantFiltration -V {j.filtered_vcf['vcf.gz']} \
         -O {j.output_vcf['vcf.gz']} \
         --apply-allele-specific-filters \
-        --mask {j.blacklisted_sites.bed} \
+        --mask {blacklisted_sites.bed} \
         --mask-name "blacklisted_site"
 
     """
