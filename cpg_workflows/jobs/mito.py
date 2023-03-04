@@ -116,7 +116,7 @@ def mito_realign(
     nthreads = res.get_nthreads()
 
     cmd = f"""\
-        bazam -Xmx16g -Dsamjdk.reference_fasta={reference.base} \
+        bazam -Xmx16g -Dsamjdk.reference_fasta={mito_ref.base} \
             -n{min(nthreads, 6)} -bam {input_bam.bam} -L chrM | \
          bwa
             mem -K 100000000 -p -v 3 -t 2 -Y {mito_ref.fasta} \
@@ -139,7 +139,7 @@ def mito_realign(
 
 def mito_mutect2(
     b,
-    cram_path: CramPath,
+    cram_path: Path,
     reference: hb.ResourceGroup,
     max_reads_per_alignment_start: int = 75,
     job_attrs: dict | None = None,
