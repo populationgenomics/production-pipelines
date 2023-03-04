@@ -119,10 +119,10 @@ def mito_realign(
         bazam -Xmx16g \
             -n{min(nthreads, 6)} -bam {input_bam.bam} | \
         bwa \
-            mem -K 100000000 -p -v 3 -t 2 -Y {mito_ref.fasta} \
+            mem -K 100000000 -p -v 3 -t 2 -Y {mito_ref.base} \
             -R '@RG\\tID:{sample_id}\\tSM:{sample_id}' \
             - | \
-        samtools view -bSu -T {mito_ref.fasta} - | \
+        samtools view -bSu -T {mito_ref.base} - | \
         samtools sort -o {j.raw_cram}
         """
     j.command(command(cmd, define_retry_function=True))
@@ -131,7 +131,10 @@ def mito_realign(
         b=b,
         sorted_bam=j.raw_cram,
         output_path=output_cram_path,
-        out_markdup_metrics_path=output_cram_path.with_suffix('.markduplicates-metrics')
+        out_markdup_metrics_path=output_cram_path.with_suffix(
+            '.markduplicates-metrics'
+        ),
+        base_reference=mito_ref
     )
 
     return [j, mkdup_j]
@@ -172,7 +175,7 @@ def mito_mutect2(
         # touch bamout.bam
 
         gatk --java-options "-Xmx{java_mem_mb}m" Mutect2 \
-            -R {reference.fasta} \
+            -R {reference.base} \
             -I $CRAM \
             --read-filter MateOnSameContigOrNoMappedMateReadFilter \
             --read-filter MateUnmappedAndUnmappedReadFilter \
@@ -216,7 +219,7 @@ def liftover_and_combine_vcfs(
         picard LiftoverVcf \
         I={shifted_vcf['vcf.gz']} \
         O={j.lifted_vcf} \
-        R={reference.fasta} \
+        R={reference.base} \
         CHAIN={shift_back_chain} \
         REJECT={j.rejected_vcf}
 
@@ -235,15 +238,14 @@ def filter_variants(
     b,
     vcf: hb.ResourceGroup,
     reference: hb.ResourceGroup,
-    blacklisted_sites: Path,
     max_alt_allele_count: int,
     vaf_filter_threshold: int,
-    f_score_beta: int,
     run_contamination: bool,
     has_contamination: str = "",
     contamination_major: float = 0.0,
     contamination_minor: float = 0.0,
     verify_bam_id: float = 0.0,
+    f_score_beta: int | None = None,
     job_attrs: dict | None = None,
     overwrite: bool = False,
 ) -> Job:
@@ -256,6 +258,13 @@ def filter_variants(
 
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
+
+    j.declare_resource_group(
+        blacklisted_sites={
+            'bed': 'gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.hg38.chrM.bed',
+            'idx': 'gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.hg38.chrM.bed.idx',
+        }
+    )
 
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
@@ -275,22 +284,27 @@ def filter_variants(
     else:
         max_contamination = hc_contamination
 
+    if f_score_beta is not None:
+        f_score_beta_string = f'--f-score-beta  {f_score_beta}'
+    else:
+        f_score_beta_string = ''
+
+
     cmd = f"""
       gatk --java-options "-Xmx2500m" FilterMutectCalls -V {vcf['vcf.gz']} \
-        -R {reference.fasta} \
+        -R {reference.base} \
         -O {j.filtered_vcf} \
         --stats {j.raw_stats} \
-        {m2_extra_filtering_args} \
         --max-alt-allele-count {max_alt_allele_count} \
         --mitochondria-mode \
         --min-allele-fraction  {vaf_filter_threshold} \
-        --f-score-beta  {f_score_beta} \
-        --contamination-estimate  {max_contamination}
+        --contamination-estimate  {max_contamination} \
+        {f_score_beta_string}
 
       gatk VariantFiltration -V {j.filtered_vcf} \
         -O {j.output_vcf['vcf.gz']} \
         --apply-allele-specific-filters \
-        --mask {blacklisted_sites} \
+        --mask {j.blacklisted_sites.bed} \
         --mask-name "blacklisted_site"
 
     """
@@ -321,7 +335,7 @@ def genotype_mito(
         cram_path=cram_path,
         reference=mito_reff,
         region='chrM:576-16024',  # Exclude the control region.
-        job_attrs=job_attrs
+        job_attrs=job_attrs,
     )
 
     shifted_call_j = mito_mutect2(
@@ -329,8 +343,7 @@ def genotype_mito(
         cram_path=shifted_cram_path,
         reference=shifted_mito_reff,
         region='chrM:8025-9144',  # Only call inside the control region.
-        job_attrs=job_attrs
-
+        job_attrs=job_attrs,
     )
     jobs = [call_j, shifted_call_j]
 
@@ -341,23 +354,20 @@ def genotype_mito(
         shifted_vcf=shifted_call_j.output_vcf,
         reference=mito_reff,  # Does this need to be full genome ref?
         shift_back_chain=shifted_mito_reff.shift_back_chain,
-        job_attrs=job_attrs
+        job_attrs=job_attrs,
     )
     jobs.append(merge_j)
 
-
-    # initial_filter_j = filter_variants(
-    #     b=b,
-    #     vcf= merge_j.output_vcf,
-    #     reference=mito_reff,
-    #     blacklisted_sites=blacklisted_sites,
-    #     max_alt_allele_count=max_alt_allele_count,
-    #     vaf_filter_threshold=vaf_filter_threshold,
-    #     f_score_beta=f_score_beta,
-    #     run_contamination=False,
-    #     job_attrs=job_attrs
-    # )
-    # jobs.append(initial_filter_j)
-
+    initial_filter_j = filter_variants(
+        b=b,
+        vcf= merge_j.output_vcf,
+        reference=mito_reff,
+        # config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
+        max_alt_allele_count=4,
+        vaf_filter_threshold=0,
+        run_contamination=False,
+        job_attrs=job_attrs
+    )
+    jobs.append(initial_filter_j)
 
     return jobs
