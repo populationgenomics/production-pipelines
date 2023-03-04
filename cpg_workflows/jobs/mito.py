@@ -413,7 +413,7 @@ def get_contamination(
     job_attrs = job_attrs or {}
     j = b.new_job('split_multi_allelics', job_attrs)
     # j.image(image_path('haplochecker'))
-    j.image(image_path('us.gcr.io/broad-dsde-methods/haplochecker:haplochecker-0124'))
+    j.image('us.gcr.io/broad-dsde-methods/haplochecker:haplochecker-0124')
 
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
@@ -561,6 +561,9 @@ def genotype_mito(
         max_alt_allele_count=4,
         vaf_filter_threshold=0,
         run_contamination=True,
+        # has_contamination: str = "",
+        # contamination_major: float = 0.0,
+        # contamination_minor: float = 0.0,
         job_attrs=job_attrs
     )
     jobs.append(second_filter_j)
