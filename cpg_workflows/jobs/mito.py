@@ -211,16 +211,16 @@ def liftover_and_combine_vcfs(
 
     cmd = f"""
         picard LiftoverVcf \
-        I={shifted_vcf.vcf} \
+        I={shifted_vcf['vcf.gz']} \
         O={j.lifted_vcf} \
         R={reference.fasta} \
         CHAIN={shift_back_chain} \
         REJECT={j.rejected_vcf}
 
         picard MergeVcfs \
-        I=~{vcf.vcf} \
-        I=~{j.lifted_vcf} \
-        O=~{j.rejected_vcf}.merged.vcf
+        I={vcf['vcf.gz']} \
+        I={j.lifted_vcf} \
+        O={j.rejected_vcf}.merged.vcf
     """
 
     j.command(command(cmd, define_retry_function=True))
