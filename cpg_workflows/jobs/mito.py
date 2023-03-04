@@ -424,7 +424,7 @@ def get_contamination(
 
     cmd = f"""
         PARENT_DIR="$(dirname "{vcf['vcf.gz']}")"
-        java -jar /haplocheckCLI/haplocheckCLI.jar "${PARENT_DIR}"
+        java -jar /haplocheckCLI/haplocheckCLI.jar "$PARENT_DIR"
 
         sed 's/\"//g' output > output-noquotes
 
