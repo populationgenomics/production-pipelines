@@ -116,8 +116,8 @@ def mito_realign(
     nthreads = res.get_nthreads()
 
     cmd = f"""\
-        bazam -Xmx16g -Dsamjdk.reference_fasta={mito_ref.fasta} \
-            -n{min(nthreads, 6)} -bam {input_bam.bam} -L chrM | \
+        bazam -Xmx16g \
+            -n{min(nthreads, 6)} -bam {input_bam.bam} | \
          bwa
             mem -K 100000000 -p -v 3 -t 2 -Y {mito_ref.fasta} \
             -R '@RG\\tID:{sample_id}\\tSM:{sample_id}'
