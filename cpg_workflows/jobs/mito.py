@@ -141,16 +141,16 @@ def mito_mutect2(
     b,
     cram_path: Path,
     reference: hb.ResourceGroup,
+    region: str,
     max_reads_per_alignment_start: int = 75,
     job_attrs: dict | None = None,
-    overwrite: bool = False,
 ) -> Job:
     """
     Call mutect2 on a mito genome
 
     """
     job_attrs = job_attrs or {}
-    j = b.new_job('genotype_mito', job_attrs)
+    j = b.new_job('mito_mutect2', job_attrs)
     j.image(image_path('gatk'))
 
     res = STANDARD.request_resources(ncpu=4)
@@ -166,6 +166,7 @@ def mito_mutect2(
 
         # Retrying copying to avoid google bandwidth limits
         retry_gs_cp {str(cram_path)} $CRAM
+        retry_gs_cp {str(cram_path)}.crai $CRAM.crai
 
         # We need to create these files regardless, even if they stay empty
         # touch bamout.bam
@@ -179,7 +180,8 @@ def mito_mutect2(
             --annotation StrandBiasBySample \
             --mitochondria-mode \
             --max-reads-per-alignment-start {max_reads_per_alignment_start} \
-            --max-mnp-distance 0
+            --max-mnp-distance 0 \
+            -L {region}
     """
 
     j.command(command(cmd, define_retry_function=True))
@@ -200,7 +202,7 @@ def liftover_and_combine_vcfs(
     Lifts over shifted vcf of control region and combines it with the rest of the chrM calls.
     """
     job_attrs = job_attrs or {}
-    j = b.new_job('genotype_mito', job_attrs)
+    j = b.new_job('liftover_and_combine_vcfs', job_attrs)
     j.image(image_path('picard'))
 
     res = STANDARD.request_resources(ncpu=4)
@@ -249,6 +251,7 @@ def genotype_mito(
         b=b,
         cram_path=cram_path,
         reference=mito_reff,
+        region='chrM:576-16024',  # Exclude the control region.
         job_attrs=job_attrs
     )
 
@@ -256,6 +259,7 @@ def genotype_mito(
         b=b,
         cram_path=shifted_cram_path,
         reference=shifted_mito_reff,
+        region='chrM:8025-9144',  # Only call inside the control region.
         job_attrs=job_attrs
 
     )
