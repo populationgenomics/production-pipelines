@@ -174,7 +174,7 @@ def mito_mutect2(
             -I $CRAM \
             --read-filter MateOnSameContigOrNoMappedMateReadFilter \
             --read-filter MateUnmappedAndUnmappedReadFilter \
-            -O ~{output_vcf.vcf.gz} \
+            -O {j.output_vcf.vcf.gz} \
             --annotation StrandBiasBySample \
             --mitochondria-mode \
             --max-reads-per-alignment-start {max_reads_per_alignment_start} \
