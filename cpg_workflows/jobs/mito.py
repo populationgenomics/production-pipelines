@@ -483,8 +483,8 @@ def genotype_mito(
     jobs.append(split_multiallelics_j)
 
     # Use mito reads to idenitfy level of contamination
-    get_contamination_j = get_contamination(
+    # get_contamination_j = get_contamination(
 
-    )
+    # )
 
     return jobs
