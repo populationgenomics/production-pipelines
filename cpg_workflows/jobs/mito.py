@@ -276,10 +276,7 @@ def filter_variants(
     max_alt_allele_count: int,
     vaf_filter_threshold: int,
     run_contamination: bool,
-    has_contamination: str = "",
-    contamination_major: float = 0.0,
-    contamination_minor: float = 0.0,
-    verify_bam_id: float = 0.0,
+    contamination_estimate: hb.ResourceFile | None = None,
     f_score_beta: int | None = None,
     job_attrs: dict | None = None,
     overwrite: bool = False,
@@ -306,19 +303,10 @@ def filter_variants(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
 
-    # Parse contamination levels
-    if run_contamination and has_contamination == "YES":
-        if contamination_major == 0.0:
-            hc_contamination = contamination_minor
-        else:
-            hc_contamination = 1.0 - contamination_major
+    if run_contamination:
+        contamination_estimate_string = f'--contamination-estimate  $(cat {contamination_estimate})'
     else:
-        hc_contamination = 0.0
-
-    if verify_bam_id > hc_contamination:
-        max_contamination = verify_bam_id
-    else:
-        max_contamination = hc_contamination
+        contamination_estimate_string = ''
 
     if f_score_beta is not None:
         f_score_beta_string = f'--f-score-beta  {f_score_beta}'
@@ -333,8 +321,7 @@ def filter_variants(
         --max-alt-allele-count {max_alt_allele_count} \
         --mitochondria-mode \
         --min-allele-fraction  {vaf_filter_threshold} \
-        --contamination-estimate  {max_contamination} \
-        {f_score_beta_string}
+        {contamination_estimate_string} {f_score_beta_string}
 
       gatk VariantFiltration -V {j.filtered_vcf['vcf.gz']} \
         -O {j.output_vcf['vcf.gz']} \
@@ -395,30 +382,27 @@ def split_multi_allelics_and_remove_non_pass_sites(
 
     return j
 
+
 def get_contamination(
     b,
     vcf: hb.ResourceGroup,
-    reference: hb.ResourceGroup,
     job_attrs: dict | None = None,
-    overwrite: bool = False,
 ) -> Job:
     """
     Uses new Haplochecker to estimate levels of contamination in mitochondria
 
     cmd taken from:
       https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L239
+
+    CPG version returns results within files rather than strings supported in WDL.
     """
     job_attrs = job_attrs or {}
-    j = b.new_job('split_multi_allelics', job_attrs)
+    j = b.new_job('get_contamination', job_attrs)
     # j.image(image_path('haplochecker'))
     j.image('us.gcr.io/broad-dsde-methods/haplochecker:haplochecker-0124')
 
-    res = STANDARD.request_resources(ncpu=4)
+    res = STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
-
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
 
     cmd = f"""
         PARENT_DIR="$(dirname "{vcf['vcf.gz']}")"
@@ -451,16 +435,103 @@ def get_contamination(
         awk -F "\t" '{{print $14}}' output-data > {j.major_level}
         awk -F "\t" '{{print $15}}' output-data > {j.minor_level}
 
+
+        # Sanity check
+        echo "has_contamination:"
         cat {j.has_contamination}
+
+        echo "major_hg:"
         cat {j.major_hg}
+
+        echo "minor_hg:"
         cat {j.minor_hg}
+
+        echo "major_level:"
         cat {j.major_level}
+
+        echo "minor_level:"
         cat {j.minor_level}
+
+        # Instead of writhing to separate files lets munge it into json
+        cat > {j.haplocheck_json} << EOF
+        {{
+            "has_contamination": "$(awk -F "\t" '{{print $2}}' output-data)",
+            "major_hg": $(awk -F "\t" '{{print $6}}' output-data),
+            "minor_hg": $(awk -F "\t" '{{print $8}}' output-data),
+            "major_level": $(awk -F "\t" '{{print $14}}' output-data),
+            "minor_level": $(awk -F "\t" '{{print $15}}' output-data)
+        }}
+        EOF
         """
 
     j.command(command(cmd, define_retry_function=True))
 
     return j
+
+def get_contamination_dummy(
+    b,
+    vcf: hb.ResourceGroup,
+    job_attrs: dict | None = None,
+) -> Job:
+    """
+    dumy job for testing
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_job('get_contamination_dummy', job_attrs)
+    j.image(image_path('gatk'))
+
+    res = STANDARD.request_resources(ncpu=2)
+    res.set_to_job(j)
+
+    cmd = f"""
+
+        # Instead of writhing to separate files lets munge it into json
+        cat > {j.haplocheck_json} << EOF
+        {{
+            "has_contamination": "YES",
+            "major_hg": "foo",
+            "minor_hg": "bar",
+            "major_level": 0.05,
+            "minor_level": 0.03
+        }}
+        EOF
+        """
+
+    j.command(command(cmd, define_retry_function=True))
+
+    return j
+
+def get_max_contamination(
+    haplocheker_json: hb.ResourceGroup,
+    # verify_bam_id_result: hb.ResourceGroup,
+) -> float:
+    """
+    Parse the output from haplocheker to define the estimated contamination level
+    to use for filtering.
+
+    It should also incorporate the estimate from verify_bam_id if it is available... but it does not yet (TODO).
+
+    Implements the logic from:
+    https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L523-L525
+    """
+    import json
+
+    with open(str(haplocheker_json)) as f:
+        haplocheker = json.load(f)
+
+        if  haplocheker['has_contamination'] == "YES":
+            if haplocheker['contamination_major'] == 0.0:
+                max_contamination = haplocheker['contamination_minor']
+            else:
+                max_contamination = 1.0 - haplocheker['contamination_major']
+        else:
+            max_contamination = 0.0
+
+        # TODO: look at verify_bam_id and integrate that as well
+        # if verify_bam_id > max_contamination:
+        #     max_contamination = verify_bam_id
+
+        return max_contamination
 
 
 def genotype_mito(
@@ -468,6 +539,7 @@ def genotype_mito(
     cram_path: Path,
     shifted_cram_path: Path,
     output_vcf_path: Path,
+    haplochecker_json_path: Path,
     mito_reff: hb.ResourceGroup,
     shifted_mito_reff: hb.ResourceGroup,
     job_attrs: dict | None = None,
@@ -476,9 +548,23 @@ def genotype_mito(
     """
     Genotype mitochondrial genome using mutect2
 
+    outputs:
+     - output_vcf_path: Final vcf for individual.
+     - haplochecker_json_path: Contamination levels determined by haplochecker tool.
+
+
     Re implementation of the functions from:
       https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L89
 
+    This set of jobs:
+        - Calls variants for all regions of chrM except the control region from the cram mapped to the normal reference.
+        - Calls variants for in only the control region from the cram mapped to the shifted reference.
+        - Uses LiftOver to lift the control region variants back to normal chrM coordinate space.
+        - Merges the two vcfs into a single vcf.
+        - Merges the Mutect stats output files from both call sets.
+        - Performs an initial round of variant filtering.
+        - Uses haplotype based analysis to estimate level of MT contamination.
+        - Performs an second round of variant filtering based on the estimated contamination.
     """
 
     # Call variants on WT genome
@@ -542,12 +628,21 @@ def genotype_mito(
     jobs.append(split_multiallelics_j)
 
     # Use mito reads to identify level of contamination
-    get_contamination_j = get_contamination(
+    # get_contamination_j = get_contamination(
+    #     b=b,
+    #     vcf=split_multiallelics_j.output_vcf,
+    # )
+    # jobs.append(get_contamination_j)
+    get_contamination_j = get_contamination_dummy(  ######### LOOK HERE!!!!!!!!!!!
         b=b,
         vcf=split_multiallelics_j.output_vcf,
-        reference=mito_reff
     )
     jobs.append(get_contamination_j)
+
+    # Use haplochecker results to determine final contamination filtering threshold
+    get_max_contamination_j = b.new_python_job()
+    contamination_estimate = get_max_contamination_j.call(get_max_contamination, get_contamination_j.haplocheck_json)
+    jobs.append(get_max_contamination_j)
 
     # Filter round 2 - remove contamination
     second_filter_j = filter_variants(
@@ -559,37 +654,9 @@ def genotype_mito(
         max_alt_allele_count=4,
         vaf_filter_threshold=0,
         run_contamination=True,
-        # has_contamination: str = "",
-        # contamination_major: float = 0.0,
-        # contamination_minor: float = 0.0,
+        contamination_estimate= contamination_estimate.as_str(),
         job_attrs=job_attrs
     )
     jobs.append(second_filter_j)
 
     return jobs
-
-
-#   call Filter as FilterContamination {
-#     input:
-#       raw_vcf = InitialFilter.filtered_vcf,
-#       raw_vcf_index = InitialFilter.filtered_vcf_idx,
-#       raw_vcf_stats = MergeStats.stats,
-#       run_contamination = true,
-#       hasContamination = GetContamination.hasContamination,
-#       contamination_major = GetContamination.major_level,
-#       contamination_minor = GetContamination.minor_level,
-#       verifyBamID = verifyBamID,
-#       base_name = base_name,
-#       ref_fasta = mt_fasta,
-#       ref_fai = mt_fasta_index,
-#       ref_dict = mt_dict,
-#       compress = compress_output_vcf,
-#       gatk_override = gatk_override,
-#       gatk_docker_override = gatk_docker_override,
-#       m2_extra_filtering_args = m2_filter_extra_args,
-#       max_alt_allele_count = 4,
-#       vaf_filter_threshold = vaf_filter_threshold,
-#       blacklisted_sites = blacklisted_sites,
-#       blacklisted_sites_index = blacklisted_sites_index,
-#       f_score_beta = f_score_beta,
-#       preemptible_tries = preemptible_tries
