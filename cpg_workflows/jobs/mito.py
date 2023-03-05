@@ -501,6 +501,7 @@ def get_contamination_dummy(
 
     return j
 
+
 def _get_max_contamination(
     haplocheker_json: hb.ResourceFile,
     # verify_bam_id_result: hb.ResourceGroup,
@@ -555,7 +556,7 @@ def get_max_contamination(
 
     contamination_estimate = j.call(get_max_contamination, haplocheker_json)
 
-    return j, contamination_estimate.as_json
+    return j, contamination_estimate.as_json()
 
 
 def genotype_mito(
