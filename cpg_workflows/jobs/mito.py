@@ -537,7 +537,7 @@ def get_max_contamination(
     haplocheker_json: hb.ResourceFile,
     # verify_bam_id_result: hb.ResourceFile,
     job_attrs: dict | None = None,
-) -> tuple[Job, hb.ResourceFile]
+) -> tuple[Job, hb.ResourceFile]:
     """
     Parse the output from haplocheker to define the estimated contamination level
     to use for filtering.
