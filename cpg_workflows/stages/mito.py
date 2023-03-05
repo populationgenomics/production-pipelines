@@ -38,7 +38,7 @@ class AlignAndGenotypeMito(SampleStage):
             'mito_subset_bam': sample.dataset.prefix() / 'mito' / f'{sample.id}.mito_subset.bam',
             'mito_realigned_cram': sample.dataset.prefix() / 'mito' / f'{sample.id}.mito_realign.cram',
             'mito_shifted_cram': sample.dataset.prefix() / 'mito' / f'{sample.id}.mito_shifted.cram',
-            'out_vcf': sample.dataset.prefix() / 'mito' /  f'{sample.id}.mito.vcf',
+            'out_vcf': sample.dataset.prefix() / 'mito' / f'{sample.id}.mito.vcf',
             # 'out_vcf_index': sample.dataset.prefix() / f'{sample.id}.mito.foo',
             # 'split_vcf': sample.dataset.prefix() / f'{sample.id}.mito.foo',
             # 'split_vcf_index': sample.dataset.prefix() / f'{sample.id}.mito.foo',
@@ -53,8 +53,6 @@ class AlignAndGenotypeMito(SampleStage):
             # 'major_haplogroup': sample.dataset.prefix() / f'{sample.id}.mito.foo',
             # 'contamination': sample.dataset.prefix() / f'{sample.id}.mito.foo',
         }
-
-
 
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
@@ -130,6 +128,4 @@ class AlignAndGenotypeMito(SampleStage):
         jobs += genotype_jobs
 
         # InitialFilter
-
-
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)

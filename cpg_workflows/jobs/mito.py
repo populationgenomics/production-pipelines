@@ -669,6 +669,7 @@ def genotype_mito(
         b=b,
         haplocheker_json=get_contamination_j.haplocheck_json
     )
+    jobs.append(get_max_contamination_j)
 
     # b.new_python_job('get_max_contamination_j', job_attrs)
     # contamination_estimate = get_max_contamination_j.call(get_max_contamination, get_contamination_j.haplocheck_json)
