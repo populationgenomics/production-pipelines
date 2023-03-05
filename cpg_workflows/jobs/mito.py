@@ -501,15 +501,13 @@ def get_contamination_dummy(
 
     return j
 
-def get_max_contamination(
-    haplocheker_json: hb.ResourceGroup,
+def _get_max_contamination(
+    haplocheker_json: hb.ResourceFile,
     # verify_bam_id_result: hb.ResourceGroup,
 ) -> float:
     """
     Parse the output from haplocheker to define the estimated contamination level
     to use for filtering.
-
-    It should also incorporate the estimate from verify_bam_id if it is available... but it does not yet (TODO).
 
     Implements the logic from:
     https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L523-L525
@@ -532,6 +530,32 @@ def get_max_contamination(
         #     max_contamination = verify_bam_id
 
         return max_contamination
+
+
+def get_max_contamination(
+    b,
+    haplocheker_json: hb.ResourceFile,
+    # verify_bam_id_result: hb.ResourceFile,
+    job_attrs: dict | None = None,
+) -> tuple[Job, hb.ResourceFile]
+    """
+    Parse the output from haplocheker to define the estimated contamination level
+    to use for filtering.
+
+    It should also incorporate the estimate from verify_bam_id if it is available... but it does not yet (TODO).
+
+    Implements the logic from:
+    https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L523-L525
+    """
+
+    j = b.new_python_job('get_max_contamination_j', job_attrs)
+    j.image(image_path('cpg_workflows'))
+    res = STANDARD.request_resources(ncpu=2)
+    res.set_to_job(j)
+
+    contamination_estimate = j.call(get_max_contamination, haplocheker_json)
+
+    return j, contamination_estimate.as_json
 
 
 def genotype_mito(
@@ -640,9 +664,14 @@ def genotype_mito(
     jobs.append(get_contamination_j)
 
     # Use haplochecker results to determine final contamination filtering threshold
-    get_max_contamination_j = b.new_python_job('get_max_contamination_j', job_attrs)
-    contamination_estimate = get_max_contamination_j.call(get_max_contamination, get_contamination_j.haplocheck_json)
-    jobs.append(get_max_contamination_j)
+    get_max_contamination_j,  contamination_estimate = get_max_contamination(
+        b=b,
+        haplocheker_json=get_contamination_j.haplocheck_json
+    )
+
+    # b.new_python_job('get_max_contamination_j', job_attrs)
+    # contamination_estimate = get_max_contamination_j.call(get_max_contamination, get_contamination_j.haplocheck_json)
+    # jobs.append(get_max_contamination_j)
 
     # Filter round 2 - remove contamination
     second_filter_j = filter_variants(
@@ -654,7 +683,7 @@ def genotype_mito(
         max_alt_allele_count=4,
         vaf_filter_threshold=0,
         run_contamination=True,
-        contamination_estimate= contamination_estimate.as_str(),
+        contamination_estimate=contamination_estimate,
         job_attrs=job_attrs
     )
     jobs.append(second_filter_j)
