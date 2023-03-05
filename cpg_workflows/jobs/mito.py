@@ -539,7 +539,7 @@ def genotype_mito(
     cram_path: Path,
     shifted_cram_path: Path,
     output_vcf_path: Path,
-    haplochecker_json_path: Path,
+    # haplochecker_json_path: Path,
     mito_reff: hb.ResourceGroup,
     shifted_mito_reff: hb.ResourceGroup,
     job_attrs: dict | None = None,
