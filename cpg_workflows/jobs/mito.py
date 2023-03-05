@@ -640,7 +640,7 @@ def genotype_mito(
     jobs.append(get_contamination_j)
 
     # Use haplochecker results to determine final contamination filtering threshold
-    get_max_contamination_j = b.new_python_job()
+    get_max_contamination_j = b.new_python_job('get_max_contamination_j', job_attrs)
     contamination_estimate = get_max_contamination_j.call(get_max_contamination, get_contamination_j.haplocheck_json)
     jobs.append(get_max_contamination_j)
 
