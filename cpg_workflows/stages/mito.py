@@ -1,5 +1,5 @@
 """
-Stage to call mito genome variants
+Stage to call SNVs in the mitochondrial genome of a single sample.
 
 Reimplemented version of;
 https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/MitochondriaPipeline.wdl
@@ -29,7 +29,33 @@ from cpg_workflows.workflow import (
 )
 class AlignAndGenotypeMito(SampleStage):
     """
-    Re-align and call mitochondrial genome using bwa and mutect2
+    Re-align and call SNVs in the mitochondrial genome of a single sample.
+
+    This is a re-implementation of the broad pipeline as of 03/22 that was used for gnomad v3 and broad seqr:
+    https://github.com/broadinstitute/gatk/blob/330c59a5bcda6a837a545afd2d453361f373fae3/scripts/mitochondria_m2_wdl/MitochondriaPipeline.wdl
+
+    A second stage (not implemented here) will take the per sample outputs of this sage and merge them
+    into a psudo-joint-call set.
+
+    Mitochondrial variant calling is a subtle art with potential for many artifacts resulting from mapping
+    errors and other complexities. To avoid introducing these issues this stage faithfully re-implements
+    as much of the logic, tools and configuration used in the Broad pipeline as possible.
+
+    The main phases of analysis include:
+        - Extraction of reads mapping to chrM from the main sample cram.
+        - Realignment of chrM reads to chrM reference using bwa
+        - Realignment of chrM reads to a "shifted" chrM reference using bwa. The "shifted" reference is the
+            same sequence but with a different linearisation point. This is used to overcome mapping artifacts
+            at the boundary.
+        - Calling of variants from both crams using mutect2
+        - Merging of the two call sets into a single vcf in normal chrM coordinate space.
+        - Variant filtering part 1: Exclude black list of known problem sites and high alt allele counts.
+        - Run haplocheck to estimate contamination (using known mito haplotypes)
+
+    Expected outputs include:
+     - out_vcf: the final filtered vcf for downstream use
+     - haplocheck_metrics: Metrics generated from the haplocheckCLI tool including an estimate of contamination and the predicted
+        mitochondrial haplotype found.
     """
 
     def expected_outputs(self, sample: Sample) -> dict[str, Path]:
@@ -39,11 +65,7 @@ class AlignAndGenotypeMito(SampleStage):
             'mito_realigned_cram': sample.dataset.prefix() / 'mito' / f'{sample.id}.mito_realign.cram',
             'mito_shifted_cram': sample.dataset.prefix() / 'mito' / f'{sample.id}.mito_shifted.cram',
             'out_vcf': sample.dataset.prefix() / 'mito' / f'{sample.id}.mito.vcf',
-            'haplocheck_output': sample.dataset.prefix() / 'mito' / f'{sample.id}.haplocheck.txt',
-            # 'out_vcf_index': sample.dataset.prefix() / f'{sample.id}.mito.foo',
-            # 'split_vcf': sample.dataset.prefix() / f'{sample.id}.mito.foo',
-            # 'split_vcf_index': sample.dataset.prefix() / f'{sample.id}.mito.foo',
-            # 'input_vcf_for_haplochecker': sample.dataset.prefix() / f'{sample.id}.mito.foo',
+            'haplocheck_metrics': sample.dataset.prefix() / 'mito' / f'{sample.id}.haplocheck.txt',
             # 'duplicate_metrics': sample.dataset.prefix() / f'{sample.id}.mito.foo',
             # 'coverage_metrics': sample.dataset.prefix() / f'{sample.id}.mito.foo',
             # 'theoretical_sensitivity_metrics': sample.dataset.prefix() / f'{sample.id}.mito.foo',
