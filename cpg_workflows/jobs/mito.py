@@ -1,17 +1,15 @@
 """
-Create Hail Batch jobs to run STRipy
+Create Hail Batch jobs to run call mitochondrial SNVs
 """
 import hailtop.batch as hb
 from hailtop.batch.job import Job
-from textwrap import dedent
 
-from cpg_utils import Path, to_path
+from cpg_utils import Path
 from cpg_utils.hail_batch import image_path, fasta_res_group
 from cpg_utils.hail_batch import command
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.utils import can_reuse
-from cpg_workflows.targets import Sample
 
 from cpg_workflows.jobs import picard
 
@@ -194,8 +192,8 @@ def mito_mutect2(
 
 def liftover_and_combine_vcfs(
     b,
-    vcf: hb.ResourceGroup,
-    shifted_vcf: hb.ResourceGroup,
+    vcf: hb.Resource,
+    shifted_vcf: hb.Resource,
     reference: hb.ResourceGroup,
     shift_back_chain: hb.ResourceFile,
     job_attrs: dict | None = None,
@@ -239,8 +237,8 @@ def liftover_and_combine_vcfs(
 
 def merge_mutect_stats(
     b,
-    non_shifted_stats: hb.ResourceGroup,
-    shifted_stats: hb.ResourceGroup,
+    non_shifted_stats: hb.Resource,
+    shifted_stats: hb.Resource,
     job_attrs: dict | None = None,
 ) -> Job:
     """
@@ -270,16 +268,15 @@ def merge_mutect_stats(
 
 def filter_variants(
     b,
-    vcf: hb.ResourceGroup,
+    vcf: hb.Resource,
     reference: hb.ResourceGroup,
-    merged_mutect_stats: hb.ResourceFile,
+    merged_mutect_stats: hb.Resource,
     max_alt_allele_count: int,
     vaf_filter_threshold: int,
     run_contamination: bool,
-    contamination_estimate: hb.ResourceFile | None = None,
+    contamination_estimate: hb.Resource | None = None,
     f_score_beta: int | None = None,
     job_attrs: dict | None = None,
-    overwrite: bool = False,
 ) -> Job:
     """
     Mutect2 Filtering for calling Snps and Indels
@@ -338,7 +335,7 @@ def filter_variants(
 
 def split_multi_allelics_and_remove_non_pass_sites(
     b,
-    vcf: hb.ResourceGroup,
+    vcf: hb.Resource,
     reference: hb.ResourceGroup,
     job_attrs: dict | None = None,
     overwrite: bool = False,
@@ -385,7 +382,8 @@ def split_multi_allelics_and_remove_non_pass_sites(
 
 def get_contamination(
     b,
-    vcf: hb.ResourceGroup,
+    vcf: hb.Resource,
+    haplocheck_output: Path,
     job_attrs: dict | None = None,
 ) -> Job:
     """
@@ -398,8 +396,7 @@ def get_contamination(
     """
     job_attrs = job_attrs or {}
     j = b.new_job('get_contamination', job_attrs)
-    # j.image(image_path('haplochecker'))
-    j.image('us.gcr.io/broad-dsde-methods/haplochecker:haplochecker-0124')
+    j.image(image_path('haplocheckcli'))
 
     res = STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
@@ -428,45 +425,39 @@ def get_contamination(
             echo $FORMAT_ERROR; exit 1
         fi
 
+        # Extract values of interest from report (This feels nuts)
         grep -v "SampleID" output-noquotes > output-data
-        awk -F "\t" '{{print $2}}' output-data > {j.has_contamination}
-        awk -F "\t" '{{print $6}}' output-data > {j.major_hg}
-        awk -F "\t" '{{print $8}}' output-data > {j.minor_hg}
-        awk -F "\t" '{{print $14}}' output-data > {j.major_level}
-        awk -F "\t" '{{print $15}}' output-data > {j.minor_level}
+        has_contamination=$(awk -F "\t" '{{print $2}}' output-data)
+        major_level=$(awk -F "\t" '{{print $14}}' output-data)
+        minor_level=$(awk -F "\t" '{{print $15}}' output-data)
 
+        # Boil them down into a single value to use in filter
+        if [ $has_contamination == "YES" ]
+        then
+            echo "contam found"
+            if [ $major_level == "0.0" ]
+            then
+                echo "contamination_major is 0, using minor"
+                max_contamination=$minor_level
+            else
+                echo "here"
+                max_contamination=$(echo "1.0 - $major_level" | bc)
+            fi
+        else
+            echo "contamination not found"
+            max_contamination=0.0
+        fi
 
-        # Sanity check
-        echo "has_contamination:"
-        cat {j.has_contamination}
-
-        echo "major_hg:"
-        cat {j.major_hg}
-
-        echo "minor_hg:"
-        cat {j.minor_hg}
-
-        echo "major_level:"
-        cat {j.major_level}
-
-        echo "minor_level:"
-        cat {j.minor_level}
-
-        # Instead of writhing to separate files lets munge it into json
-        cat > {j.haplocheck_json} << EOF
-        {{
-            "has_contamination": "$(awk -F "\t" '{{print $2}}' output-data)",
-            "major_hg": $(awk -F "\t" '{{print $6}}' output-data),
-            "minor_hg": $(awk -F "\t" '{{print $8}}' output-data),
-            "major_level": $(awk -F "\t" '{{print $14}}' output-data),
-            "minor_level": $(awk -F "\t" '{{print $15}}' output-data)
-        }}
-        EOF
+        # Save to a file to pass to filter
+        echo $max_contamination > {j.max_contamination}
+        cat output > {j.haplocheck_output}
         """
 
     j.command(command(cmd, define_retry_function=True))
+    b.write_output(j.haplocheck_output, str(haplocheck_output))
 
     return j
+
 
 def get_contamination_dummy(
     b,
@@ -564,9 +555,9 @@ def genotype_mito(
     cram_path: Path,
     shifted_cram_path: Path,
     output_vcf_path: Path,
-    # haplochecker_json_path: Path,
     mito_reff: hb.ResourceGroup,
     shifted_mito_reff: hb.ResourceGroup,
+    haplocheck_output: Path,
     job_attrs: dict | None = None,
     overwrite: bool = False,
 ) -> list[Job | None]:
@@ -653,27 +644,12 @@ def genotype_mito(
     jobs.append(split_multiallelics_j)
 
     # Use mito reads to identify level of contamination
-    # get_contamination_j = get_contamination(
-    #     b=b,
-    #     vcf=split_multiallelics_j.output_vcf,
-    # )
-    # jobs.append(get_contamination_j)
-    get_contamination_j = get_contamination_dummy(  ######### LOOK HERE!!!!!!!!!!!
+    get_contamination_j = get_contamination(
         b=b,
         vcf=split_multiallelics_j.output_vcf,
+        haplocheck_output=haplocheck_output
     )
     jobs.append(get_contamination_j)
-
-    # Use haplochecker results to determine final contamination filtering threshold
-    get_max_contamination_j,  contamination_estimate = get_max_contamination(
-        b=b,
-        haplocheker_json=get_contamination_j.haplocheck_json
-    )
-    jobs.append(get_max_contamination_j)
-
-    # b.new_python_job('get_max_contamination_j', job_attrs)
-    # contamination_estimate = get_max_contamination_j.call(get_max_contamination, get_contamination_j.haplocheck_json)
-    # jobs.append(get_max_contamination_j)
 
     # Filter round 2 - remove contamination
     second_filter_j = filter_variants(
@@ -685,7 +661,7 @@ def genotype_mito(
         max_alt_allele_count=4,
         vaf_filter_threshold=0,
         run_contamination=True,
-        contamination_estimate=contamination_estimate,
+        contamination_estimate=get_contamination_j.max_contamination,
         job_attrs=job_attrs
     )
     jobs.append(second_filter_j)

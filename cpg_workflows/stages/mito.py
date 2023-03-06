@@ -39,6 +39,7 @@ class AlignAndGenotypeMito(SampleStage):
             'mito_realigned_cram': sample.dataset.prefix() / 'mito' / f'{sample.id}.mito_realign.cram',
             'mito_shifted_cram': sample.dataset.prefix() / 'mito' / f'{sample.id}.mito_shifted.cram',
             'out_vcf': sample.dataset.prefix() / 'mito' / f'{sample.id}.mito.vcf',
+            'haplocheck_output': sample.dataset.prefix() / 'mito' / f'{sample.id}.haplocheck.txt',
             # 'out_vcf_index': sample.dataset.prefix() / f'{sample.id}.mito.foo',
             # 'split_vcf': sample.dataset.prefix() / f'{sample.id}.mito.foo',
             # 'split_vcf_index': sample.dataset.prefix() / f'{sample.id}.mito.foo',
@@ -121,6 +122,7 @@ class AlignAndGenotypeMito(SampleStage):
             output_vcf_path=self.expected_outputs(sample)['out_vcf'],
             mito_reff=mito_ref,
             shifted_mito_reff=shifted_mito_ref,
+            haplocheck_output=self.expected_outputs(sample)['haplocheck_output']
         )
         for job in genotype_jobs:
             if job:
