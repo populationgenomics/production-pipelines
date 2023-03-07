@@ -42,8 +42,12 @@ def add_background(
             vds = hl.vds.filter_variants(vds, qc_variants_ht)
             mt = hl.vds.to_dense_mt(vds)
             # annotate mt with metadata info
-            sample_qc_background = hl.read_table(pca_background['metadata_table'])
-            mt = mt.annotate_cols(**sample_qc_background[mt.col_key])
+            metadata_tables = []
+            for path in pca_background['metadata_table']:
+                sample_qc_background = hl.read_table(path)
+                metadata_tables.append(sample_qc_background)
+            metadata_tables = hl.Table.union(*metadata_tables)
+            mt = mt.annotate_cols(**metadata_tables[mt.col_key])
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
 
@@ -296,12 +300,12 @@ def _infer_pop_labels(
         pc_cnt = min(hl.min(10, hl.len(pop_ht.pca_scores)).collect())
         pop_ht.transmute(
             **{f'PC{i + 1}': pop_ht.pca_scores[i] for i in range(pc_cnt)}
-        ).export(pop_tsv_file)
+        ).export(str(pop_tsv_file))
 
     # Writing the RF model used for inferring sample populations
     pop_rf_file = tmp_prefix / 'pop.RF_fit.pickle'
     if not can_reuse(pop_rf_file):
-        with hl.hadoop_open(pop_rf_file, 'wb') as out:
+        with hl.hadoop_open(str(pop_rf_file), 'wb') as out:
             pickle.dump(pops_rf_model, out)
 
     pop_ht = pop_ht.annotate(is_training=hl.is_defined(training_pop_ht[pop_ht.key]))
