@@ -434,7 +434,7 @@ def split_multi_allelics(
                 --exclude-filtered
         """
     else:
-        cmd + = f"""
+        cmd += f"""
             mv {j.split_vcf['vcf.gz']} {j.output_vcf['vcf.gz']}
         """
 
