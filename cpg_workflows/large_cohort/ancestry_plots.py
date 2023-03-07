@@ -4,6 +4,7 @@ Plot ancestry PCA analysis results
 
 from collections import Counter
 from typing import List, Iterable
+# from cpg_utils.config import get_config
 
 import pandas as pd
 import numpy as np
@@ -107,25 +108,125 @@ def run(
         _plot_loadings(num_pcs_to_plot, loadings_ht, out_path_pattern=out_path_pattern)
     )
 
-    plots.extend(
-        _plot_pca_without_inference(
-            loadings_ht,
-        )
-    )
+    # plots.extend(
+    #     _plot_pca_without_inference(
+    #         loadings_ht,
+    #     )
+    # )
 
     return plots
 
 
-def _plot_pca_without_inference(out_path_pattern: str):
-    # Return a plot (a figure)
-    if out_path_pattern:
-        html = file_html(plot, CDN, title)
-        plot_filename_html = str(out_path_pattern).format(
-            scope=scope, pci=pc2, ext='html'
-        )
-        with hl.hadoop_open(plot_filename_html, 'w') as f:
-            f.write(html)
-    pass
+# def _plot_pca_without_inference(scores_ht,
+#     variance,
+#     num_pcs_to_plot,
+#     out_path_pattern: str):
+
+#     METADATA_TABLE = 'gs://cpg-hgdp-test/large_cohort/1-0/sample_qc.ht/'
+
+#     metadata = hl.read_table(METADATA_TABLE)
+#     # add metadata info to scores
+#     scores_ht = scores_ht.annotate(study = metadata[scores_ht.s].dataset, continental_pop = metadata[scores_ht.s].pop)
+#     sample_names = scores_ht.s.collect()
+#     labels = scores_ht.study.collect()
+#     # Change 'none' values to dataset name
+#     dataset = get_config()['workflow']['input_datasets']
+#     # join dataset names with underscore, in case there are multiple
+#     dataset = '_'.join(dataset)
+#     labels = [dataset if x is None else x for x in labels]
+#     study = list(set(labels))
+#     tooltips = [('labels', '@label'), ('samples', '@samples')]
+
+#     # plot by study
+#     for i in range(num_pcs_to_plot - 1):
+#         pc1 = i
+#         pc2 = i + 1
+#         plot = figure(
+#             title='Study',
+#             x_axis_label=f'PC{pc1 + 1} ({variance[pc1]})%)',
+#             y_axis_label=f'PC{pc2 + 1} ({variance[pc2]}%)',
+#             tooltips=tooltips,
+#         )
+#         source = ColumnDataSource(
+#             dict(
+#                 x=scores_ht.scores[pc1].collect(),
+#                 y=scores_ht.scores[pc2].collect(),
+#                 label=labels,
+#                 samples=sample_names,
+#             )
+#         )
+#         plot.circle(
+#             'x',
+#             'y',
+#             alpha=0.5,
+#             source=source,
+#             size=4,
+#             color=factor_cmap('label', ['#1b9e77', '#d95f02'], study),
+#             legend_group='label',
+#         )
+#         plot.add_layout(plot.legend[0], 'left')
+#         plot_filename = output_path(f'study_pc{pc2}.png', 'web')
+#         with hl.hadoop_open(plot_filename, 'wb') as f:
+#             get_screenshot_as_png(plot).save(f, format='PNG')
+#         html = file_html(plot, CDN, 'my plot')
+#         plot_filename_html = output_path(f'study_pc{pc2}.html', 'web')
+#         with hl.hadoop_open(plot_filename_html, 'w') as f:
+#             f.write(html)
+
+#     # plot by continental population
+#     labels = scores_ht.continental_pop.collect()
+#     # Change PROPHECY 'none' values to 'PROPHECY'
+#     labels = ['PROPHECY' if x is None else x for x in labels]
+#     continental_population = list(set(labels))
+#     tooltips = [('labels', '@label'), ('samples', '@samples')]
+
+#     for i in range(0, (number_of_pcs - 1)):
+#         pc1 = i
+#         pc2 = i + 1
+#         plot = figure(
+#             title='Continental Population',
+#             x_axis_label=f'PC{pc1 + 1} ({variance[pc1]})%)',
+#             y_axis_label=f'PC{pc2 + 1} ({variance[pc2]}%)',
+#             tooltips=tooltips,
+#         )
+#         source = ColumnDataSource(
+#             dict(
+#                 x=scores_ht.scores[pc1].collect(),
+#                 y=scores_ht.scores[pc2].collect(),
+#                 label=labels,
+#                 samples=sample_names,
+#             )
+#         )
+#         plot.circle(
+#             'x',
+#             'y',
+#             alpha=0.5,
+#             source=source,
+#             size=4,
+#             color=factor_cmap(
+#                 'label', turbo(len(continental_population)), continental_population
+#             ),
+#             legend_group='label',
+#         )
+#         plot.add_layout(plot.legend[0], 'left')
+#         plot_filename = output_path(f'continental_pop_pc{pc2}.png', 'web')
+#         with hl.hadoop_open(plot_filename, 'wb') as f:
+#             get_screenshot_as_png(plot).save(f, format='PNG')
+#         html = file_html(plot, CDN, 'my plot')
+#         plot_filename_html = output_path(f'continental_pop_pc{pc2}.html', 'web')
+#         with hl.hadoop_open(plot_filename_html, 'w') as f:
+#             f.write(html)
+        
+#         ----
+#         # Return a plot (a figure)
+#         if out_path_pattern:
+#             html = file_html(plot, CDN, title)
+#             plot_filename_html = str(out_path_pattern).format(
+#                 scope=scope, pci=pc2, ext='html'
+#             )
+#             with hl.hadoop_open(plot_filename_html, 'w') as f:
+#                 f.write(html)
+#         pass
 
 
 def _plot_pca(
@@ -169,16 +270,16 @@ def _plot_pca(
                 ],
             )
         )
-        plot.scatter(
+        plot.circle(
             'x',
             'y',
             alpha=0.5,
-            marker=factor_mark(
-                'is_training', ['cross', 'circle'], [BG_LABEL, FG_LABEL]
-            ),
+            # marker=factor_mark(
+            #     'is_training', ['cross', 'circle'], [BG_LABEL, FG_LABEL]
+            # ),
             source=source,
             size=4,
-            color=factor_cmap('label', ['#1b9e77', '#d95f02'], unique_labels),
+            color=factor_cmap('label', turbo(len(unique_labels)), unique_labels),
             legend_group='label',
         )
         plot.add_layout(plot.legend[0], 'left')
