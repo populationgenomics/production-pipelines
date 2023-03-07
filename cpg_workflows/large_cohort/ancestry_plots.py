@@ -107,7 +107,25 @@ def run(
         _plot_loadings(num_pcs_to_plot, loadings_ht, out_path_pattern=out_path_pattern)
     )
 
+    plots.extend(
+        _plot_pca_without_inference(
+            loadings_ht,
+        )
+    )
+
     return plots
+
+
+def _plot_pca_without_inference(out_path_pattern: str):
+    # Return a plot (a figure)
+    if out_path_pattern:
+        html = file_html(plot, CDN, title)
+        plot_filename_html = str(out_path_pattern).format(
+            scope=scope, pci=pc2, ext='html'
+        )
+        with hl.hadoop_open(plot_filename_html, 'w') as f:
+            f.write(html)
+    pass
 
 
 def _plot_pca(
