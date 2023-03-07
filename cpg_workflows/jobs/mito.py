@@ -588,7 +588,7 @@ def merge_coverage(
     """
     job_attrs = job_attrs or {}
     j = b.new_job('merge_coverage', job_attrs)
-    j.image(image_path('r'))
+    j.image(image_path('peer'))
 
     res = STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
