@@ -93,7 +93,7 @@ def run(
         logging.info(
             f'Adding background datasets using following config: {pca_background}'
         )
-        dense_mt, sample_qc_ht = add_background(dense_mt, sample_qc_ht, pca_background)
+        dense_mt, sample_qc_ht = add_background(dense_mt, sample_qc_ht)
 
     logging.info(
         f'Running PCA on {dense_mt.count_cols()} samples, '
