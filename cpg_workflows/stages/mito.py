@@ -123,7 +123,6 @@ class AlignAndGenotypeMito(SampleStage):
             non_control_region='gs://cpg-common-main/references/hg38/v0/chrM/non_control_region.chrM.interval_list',
         )
 
-
         jobs = []
 
         # Extract reads mapped to chrM
@@ -230,7 +229,7 @@ class AlignAndGenotypeMito(SampleStage):
             b=get_batch(),
             vcf=initial_filter_j.output_vcf,
             reference=mito_ref,
-            remove_non_pass_sites=True
+            remove_non_pass_sites=True,
         )
         jobs.append(split_multiallelics_j)
 
@@ -282,7 +281,7 @@ class AlignAndGenotypeMito(SampleStage):
             b=get_batch(),
             non_cr_coverage=non_control_region_coverage_j.per_base_coverage,
             shifted_cr_coverage=shifted_control_region_coverage_j.per_base_coverage,
-            merged_coverage=self.expected_outputs(sample)['coverage']
+            merged_coverage=self.expected_outputs(sample)['coverage'],
         )
         jobs.append(merge_coverage_j)
 
@@ -291,11 +290,14 @@ class AlignAndGenotypeMito(SampleStage):
             b=get_batch(),
             vcf=second_filter_j.output_vcf,
             reference=mito_ref,
-            remove_non_pass_sites=False
+            remove_non_pass_sites=False,
         )
         jobs.append(split_multiallelics_j)
 
         # Write the final vcf to the bucket
-        get_batch().write_output(j.split_multiallelics_j.output_vcf, str(out_vcf))
+        get_batch().write_output(
+            split_multiallelics_j.output_vcf,
+            str(self.expected_outputs(sample)['out_vcf']),
+        )
 
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
