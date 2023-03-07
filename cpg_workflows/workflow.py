@@ -499,7 +499,6 @@ class Stage(Generic[TargetT], ABC):
             and action == Action.QUEUE
             and outputs.data
         ):
-
             analysis_outputs: list[str | Path] = []
             if isinstance(outputs.data, dict):
                 if not self.analysis_keys:
@@ -533,6 +532,7 @@ class Stage(Generic[TargetT], ABC):
                     jobs=outputs.jobs,
                     prev_jobs=inputs.get_jobs(target),
                     meta=outputs.meta,
+                    project_name=outputs.meta.get('dataset'),
                     job_attrs=self.get_job_attrs(target),
                     update_analysis_meta=self.update_analysis_meta,
                 )

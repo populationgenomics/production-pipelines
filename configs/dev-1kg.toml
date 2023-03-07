@@ -3,8 +3,8 @@ check_inputs = true
 skip_samples_with_missing_input = false
 check_intermediates = true
 check_expected_outputs = true
-reblock_gq_bands = [ 20, 30, 40,]
-name = "large_cohort"
+reblock_gq_bands = [ 20, 30, 40 ]
+name = "seqr_loader"
 scatter_count = 20
 status_reporter = "metamist"
 access_level = "test"
@@ -18,23 +18,24 @@ force_stages = [ "CramQC", "CramMultiQC" ]
 output_version = "1.0"
 skip_samples = [ "CPG88088", "CPG88435" ]
 ref_fasta = "gs://cpg-common-main/references/hg38/v0/Homo_sapiens_assembly38.fasta"
-​
+
 [hail]
 delete_scratch_on_exit = false
+dry_run = true
 pool_label = "large-cohort"
 billing_project = "thousand-genomes"
 bucket = "cpg-thousand-genomes-hail"
-​
+
 [vqsr]
 snp_filter_level = 99.7
 indel_filter_level = 99.0
-​
+
 [large_cohort]
 max_kin = 0.12
 n_pcs = 16
 min_pop_prob = 0.5
 pop_meta_field = "Superpopulation name"
-​
+
 [references]
 genome_build = "GRCh38"
 vep_mount = "gs://cpg-common-main/references/vep/105.0/mount"
@@ -42,10 +43,10 @@ liftover_38_to_37 = "gs://cpg-common-main/references/liftover/grch38_to_grch37.o
 somalier_sites = "gs://cpg-common-main/references/somalier/sites.hg38.vcf.gz"
 seqr_combined_reference_data = "gs://cpg-common-main/references/seqr/v0/combined_reference_data_grch38.ht"
 seqr_clinvar = "gs://cpg-common-main/references/seqr/v0/clinvar.GRCh38.ht"
-​
+
 [infrastructure]
 members_cache_location = "gs://cpg-members-group-cache"
-​
+
 [images]
 bcftools = "australia-southeast1-docker.pkg.dev/cpg-common/images/bcftools:1.16"
 bedtools = "australia-southeast1-docker.pkg.dev/cpg-common/images/bedtools:2.30.0"
@@ -72,7 +73,7 @@ gangstr = "australia-southeast1-docker.pkg.dev/cpg-common/images/gangstr:2.5.0"
 hipstr = "australia-southeast1-docker.pkg.dev/cpg-common/images/hipstr:v0.6.2"
 bgt = "australia-southeast1-docker.pkg.dev/cpg-common/images/bgt:v1.0"
 cpg_workflows = "australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:1.12.4"
-​
+
 [large_cohort.sample_qc_cutoffs]
 min_coverage = 18
 max_n_snps = 8000000
@@ -80,7 +81,7 @@ min_n_snps = 2400000
 max_n_singletons = 800000
 max_r_duplication = 0.3
 max_r_het_hom = 3.3
-​
+
 [references.gnomad]
 tel_and_cent_ht = "gs://cpg-common-main/references/gnomad/v0/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht"
 predetermined_qc_variants = "gs://cpg-common-main/references/gnomad/v0/sample_qc/pre_ld_pruning_qc_variants.ht"
@@ -91,7 +92,7 @@ hapmap_ht = "gs://cpg-common-main/references/gnomad/v0/hapmap/hapmap_3.3.hg38.ht
 kgp_omni_ht = "gs://cpg-common-main/references/gnomad/v0/kgp/1000G_omni2.5.hg38.ht"
 kgp_hc_ht = "gs://cpg-common-main/references/gnomad/v0/kgp/1000G_phase1.snps.high_confidence.hg38.ht"
 mills_ht = "gs://cpg-common-main/references/gnomad/v0/mills/Mills_and_1000G_gold_standard.indels.hg38.ht"
-​
+
 [references.broad]
 dragmap_prefix = "gs://cpg-common-main/references/hg38/v0/dragen_reference"
 ref_fasta = "gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta"
@@ -121,7 +122,7 @@ exome_contam_ud = "gs://cpg-common-main/references/hg38/v0/contamination-resourc
 exome_contam_bed = "gs://cpg-common-main/references/hg38/v0/contamination-resources/1000g/whole_exome_illumina_coding_v1.Homo_sapiens_assembly38.1000g.contam.bed"
 exome_contam_mu = "gs://cpg-common-main/references/hg38/v0/contamination-resources/1000g/whole_exome_illumina_coding_v1.Homo_sapiens_assembly38.1000g.contam.mu"
 protein_coding_gtf = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/MANE.GRCh38.v0.95.select_ensembl_genomic.gtf"
-​
+
 [references.gatk_sv]
 wham_include_list_bed_file = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/wham_whitelist.bed"
 primary_contigs_list = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/primary_contigs.list"
@@ -156,23 +157,23 @@ model_tar_tmpl = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/r
 ref_panel_PE_file_tmpl = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/tws_SVEvidence/pe/{sample}.pe.txt.gz"
 ref_panel_SR_file_tmpl = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/tws_SVEvidence/sr/{sample}.sr.txt.gz"
 ref_panel_SD_file_tmpl = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/tws_SVEvidence/sd/{sample}.sd.txt.gz"
-​
+
 [references.syndip]
 truth_vcf = "gs://cpg-common-main/references/validation/syndip/full.38.20180222.vcf.gz"
 regions_bed = "gs://cpg-common-main/references/validation/syndip/syndip.b38_20180222.bed"
 truth_mt = "gs://cpg-common-main/references/validation/syndip/syndip.b38_20180222.mt"
 regions_ht = "gs://cpg-common-main/references/validation/syndip/syndip_b38_20180222_hc_regions.ht"
-​
+
 [references.na12878]
 truth_vcf = "gs://cpg-common-main/references/validation/na12878/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_PGandRTGphasetransfer.vcf.gz"
 regions_bed = "gs://cpg-common-main/references/validation/na12878/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed"
 truth_mt = "gs://cpg-common-main/references/validation/na12878/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_PGandRTGphasetransfer.mt"
 regions_ht = "gs://cpg-common-main/references/validation/na12878/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7_hc_regions.ht"
-​
+
 [validation.sample_map]
 HG001_NA12878 = "na12878"
 SYNDIP = "syndip"
-​
+
 [storage.default]
 default = "gs://cpg-thousand-genomes-test"
 web = "gs://cpg-thousand-genomes-test-web"
@@ -180,7 +181,7 @@ analysis = "gs://cpg-thousand-genomes-test-analysis"
 tmp = "gs://cpg-thousand-genomes-test-tmp"
 upload = "gs://cpg-thousand-genomes-test-upload"
 web_url = "https://test-web.populationgenomics.org.au/thousand-genomes"
-​
+
 [storage.thousand-genomes]
 default = "gs://cpg-thousand-genomes-test"
 web = "gs://cpg-thousand-genomes-test-web"

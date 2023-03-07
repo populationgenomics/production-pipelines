@@ -122,6 +122,7 @@ class MetamistStatusReporter(StatusReporter):
         jobs: list[Job] | None = None,
         prev_jobs: list[Job] | None = None,
         meta: dict | None = None,
+        project_name: str | None = None,
         job_attrs: dict[str, str] | None = None,
         update_analysis_meta: Callable[[str], dict] | None = None,
     ) -> list[Job]:
@@ -139,6 +140,7 @@ class MetamistStatusReporter(StatusReporter):
                 analysis_status='queued',
                 target=target,
                 meta=meta,
+                project_name=project_name,
             )
         ) is None:
             raise MetamistError('Failed to create analysis')
