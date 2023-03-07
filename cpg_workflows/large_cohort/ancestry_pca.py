@@ -18,7 +18,6 @@ MIN_N_SAMPLES = 10
 def add_background(
     dense_mt: hl.MatrixTable,
     sample_qc_ht: hl.Table,
-    pca_background: dict,
 ) -> tuple[hl.MatrixTable, hl.Table]:
     """
     Add background dataset samples to the dense MT and sample QC HT.
@@ -31,8 +30,7 @@ def add_background(
     )
     for dataset in get_config()['large_cohort']['pca_background']['datasets']:
         dataset_dict = get_config()['large_cohort']['pca_background'][dataset]
-        path = dataset_dict['vds']
-
+        path = dataset_dict['dataset_path']
         logging.info(f'Adding background dataset {path}')
         if to_path(path).suffix == '.mt':
             mt = hl.read_matrix_table(str(path))
@@ -45,8 +43,8 @@ def add_background(
             vds = hl.vds.filter_variants(vds, qc_variants_ht)
             mt = hl.vds.to_dense_mt(vds)
             # annotate mt with metadata info
-            bles = []
-            for path in pca_background['metadata_table']:
+            metadata_tables = []
+            for path in dataset_dict['metadata_table']:
                 sample_qc_background = hl.read_table(path)
                 metadata_tables.append(sample_qc_background)
             metadata_tables = hl.Table.union(*metadata_tables)
