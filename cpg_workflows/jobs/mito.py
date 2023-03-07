@@ -427,7 +427,7 @@ def split_multi_allelics(
 
         """
     if remove_non_pass_sites:
-        cmd + = f"""
+        cmd += f"""
             gatk SelectVariants \
                 -V {j.split_vcf['vcf.gz']} \
                 -O {j.output_vcf['vcf.gz']} \
