@@ -29,7 +29,10 @@ def add_background(
     dense_mt = (
         dense_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
     )
-    for path in pca_background['datasets']:
+    for dataset in get_config()['large_cohort']['pca_background']['datasets']:
+        dataset_dict = get_config()['large_cohort']['pca_background'][dataset]
+        path = dataset_dict['vds']
+
         logging.info(f'Adding background dataset {path}')
         if to_path(path).suffix == '.mt':
             mt = hl.read_matrix_table(str(path))
@@ -42,7 +45,7 @@ def add_background(
             vds = hl.vds.filter_variants(vds, qc_variants_ht)
             mt = hl.vds.to_dense_mt(vds)
             # annotate mt with metadata info
-            metadata_tables = []
+            bles = []
             for path in pca_background['metadata_table']:
                 sample_qc_background = hl.read_table(path)
                 metadata_tables.append(sample_qc_background)
