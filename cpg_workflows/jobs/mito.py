@@ -235,7 +235,7 @@ def mito_mutect2(
     cmd = f"""
         gatk --java-options "-Xmx{java_mem_mb}m" Mutect2 \
             -R {reference.base} \
-            -I {cram.cram} \
+            -I {cram} \
             --read-filter MateOnSameContigOrNoMappedMateReadFilter \
             --read-filter MateUnmappedAndUnmappedReadFilter \
             -O {j.output_vcf['vcf.gz']} \
