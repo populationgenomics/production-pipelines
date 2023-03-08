@@ -228,7 +228,7 @@ def mito_mutect2(
     cmd = f"""
         gatk --java-options "-Xmx{java_mem_mb}m" Mutect2 \
             -R {reference.base} \
-            -I {cram} \
+            -I {cram.cram} \
             --read-filter MateOnSameContigOrNoMappedMateReadFilter \
             --read-filter MateUnmappedAndUnmappedReadFilter \
             -O {j.output_vcf['vcf.gz']} \
@@ -603,7 +603,6 @@ def coverage_at_every_base(
 
     res = STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
-
 
     cmd = f"""
     picard CollectHsMetrics \
