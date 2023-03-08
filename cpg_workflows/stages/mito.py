@@ -150,13 +150,13 @@ class AlignAndGenotypeMito(SampleStage):
         jobs.append(realign_mkdup_j)
 
         # Collect coverage metrics ( only on non-shifted)
-        realign_mkdup_j = mito.collect_coverage_metrics(
+        coverage_metrics_J = mito.collect_coverage_metrics(
             b=get_batch(),
-            cram=realign_mkdup_j.output_cram.cram,
+            cram=realign_mkdup_j.output_cram,
             reference=mito_ref,
             metrics=self.expected_outputs(sample)['coverage_metrics']
         )
-        jobs.append(realign_mkdup_j)
+        jobs.append(coverage_metrics_J)
 
         # Align extracted reads to "shifted" chrM using bwa
         shifted_realign_j = mito.mito_realign(
