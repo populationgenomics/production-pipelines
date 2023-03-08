@@ -4,12 +4,12 @@ skip_samples_with_missing_input = false
 check_intermediates = true
 check_expected_outputs = true
 reblock_gq_bands = [ 20, 30, 40 ]
-name = "seqr_loader"
+name = "large_cohort"
 scatter_count = 20
 status_reporter = "metamist"
 access_level = "test"
-dataset = "thousand-genomes"
-dataset_gcp_project = "thousand-genomes"
+dataset = "fewgenomes"
+dataset_gcp_project = "fewgenomes"
 driver_image = "australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:latest"
 output_prefix = "force-rerun"
 sequencing_type = "genome"
@@ -23,8 +23,8 @@ ref_fasta = "gs://cpg-common-main/references/hg38/v0/Homo_sapiens_assembly38.fas
 delete_scratch_on_exit = false
 dry_run = true
 pool_label = "large-cohort"
-billing_project = "thousand-genomes"
-bucket = "cpg-thousand-genomes-hail"
+billing_project = "fewgenomes"
+bucket = "cpg-fewgenomes-hail"
 
 [vqsr]
 snp_filter_level = 99.7
@@ -175,17 +175,17 @@ HG001_NA12878 = "na12878"
 SYNDIP = "syndip"
 
 [storage.default]
-default = "gs://cpg-thousand-genomes-test"
-web = "gs://cpg-thousand-genomes-test-web"
-analysis = "gs://cpg-thousand-genomes-test-analysis"
-tmp = "gs://cpg-thousand-genomes-test-tmp"
-upload = "gs://cpg-thousand-genomes-test-upload"
-web_url = "https://test-web.populationgenomics.org.au/thousand-genomes"
+default = "gs://cpg-fewgenomes-test"
+web = "gs://cpg-fewgenomes-test-web"
+analysis = "gs://cpg-fewgenomes-test-analysis"
+tmp = "gs://cpg-fewgenomes-test-tmp"
+upload = "gs://cpg-fewgenomes-test-upload"
+web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
 
-[storage.thousand-genomes]
-default = "gs://cpg-thousand-genomes-test"
-web = "gs://cpg-thousand-genomes-test-web"
-analysis = "gs://cpg-thousand-genomes-test-analysis"
-tmp = "gs://cpg-thousand-genomes-test-tmp"
-upload = "gs://cpg-thousand-genomes-test-upload"
-web_url = "https://test-web.populationgenomics.org.au/thousand-genomes"
+[storage.fewgenomes]
+default = "gs://cpg-fewgenomes-test"
+web = "gs://cpg-fewgenomes-test-web"
+analysis = "gs://cpg-fewgenomes-test-analysis"
+tmp = "gs://cpg-fewgenomes-test-tmp"
+upload = "gs://cpg-fewgenomes-test-upload"
+web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
