@@ -32,8 +32,10 @@ class AlignAndGenotypeMito(SampleStage):
     Re-align and call SNVs in the mitochondrial genome of a single sample.
 
     This is a re-implementation of the broad pipeline as of 03/22 that was used for
-    gnomad v3 and broad seqr:
+    gnomAD v3 and broad seqr:
     https://github.com/broadinstitute/gatk/blob/330c59a5bcda6a837a545afd2d453361f373fae3/scripts/mitochondria_m2_wdl/MitochondriaPipeline.wdl
+    A default config file here:
+    https://raw.githubusercontent.com/broadinstitute/gatk/master/scripts/mitochondria_m2_wdl/ExampleInputsMitochondriaPipeline.json
 
     A second stage (not implemented here) will take the per sample outputs of this sage
     and merge them into a pseudo-joint-call set.
@@ -75,6 +77,15 @@ class AlignAndGenotypeMito(SampleStage):
         theoretical_sensitivity_metrics: CollectWgsMetrics output.
 
     Configuration options:
+    The following are surfaced as configurable parameters in the Broad WDL. Other
+    parameters hardcoded in the WDL are also hardcoded in this pipeline.
+        mito_snv.vaf_filter_threshold: "Hard threshold for filtering low VAF sites"
+        mito_snv.f_score_beta: "F-Score beta balances the filtering strategy between
+            recall and precision. The relative weight of recall to precision."
+
+    Not Implemented:
+        - The Broad wdl allows for use of verifyBamID as a second input for contamination
+            estimation. This has not been implemented yet but is probably a good idea.
 
     """
 
@@ -146,6 +157,7 @@ class AlignAndGenotypeMito(SampleStage):
             b=get_batch(),
             sorted_bam=realign_j.output_cram,
             fasta_reference=mito_ref,
+            job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(realign_mkdup_j)
 
@@ -154,7 +166,8 @@ class AlignAndGenotypeMito(SampleStage):
             b=get_batch(),
             cram=realign_mkdup_j.output_cram,
             reference=mito_ref,
-            metrics=self.expected_outputs(sample)['coverage_metrics']
+            metrics=self.expected_outputs(sample)['coverage_metrics'],
+            job_attrs=self.get_job_attrs(sample)
         )
         jobs.append(coverage_metrics_J)
 
@@ -173,6 +186,7 @@ class AlignAndGenotypeMito(SampleStage):
             b=get_batch(),
             sorted_bam=shifted_realign_j.output_cram,
             fasta_reference=shifted_mito_ref,
+            job_attrs=self.get_job_attrs(sample)
         )
         jobs.append(shifted_mkdup_j)
 
@@ -212,6 +226,7 @@ class AlignAndGenotypeMito(SampleStage):
             b=get_batch(),
             first_stats_file=call_j.output_vcf['vcf.gz.stats'],
             second_stats_file=shifted_call_j.output_vcf['vcf.gz.stats'],
+            job_attrs=self.get_job_attrs(sample)
         )
         jobs.append(merge_stats_J)
 
@@ -221,9 +236,11 @@ class AlignAndGenotypeMito(SampleStage):
             vcf=merge_j.output_vcf,
             reference=mito_ref,
             merged_mutect_stats=merge_stats_J.combined_stats,
-            # alt_allele and vaf config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
+            # alt_allele and vaf config hardcoded in this round of filtering as per
+            # https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
             max_alt_allele_count=4,
             min_allele_fraction=0,
+            f_score_beta=get_config()['mito_snv']['f_score_beta']
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(initial_filter_j)
@@ -235,6 +252,7 @@ class AlignAndGenotypeMito(SampleStage):
             vcf=initial_filter_j.output_vcf,
             reference=mito_ref,
             remove_non_pass_sites=True,
+            job_attrs=self.get_job_attrs(sample)
         )
         jobs.append(split_multiallelics_j)
 
@@ -243,6 +261,7 @@ class AlignAndGenotypeMito(SampleStage):
             b=get_batch(),
             vcf=split_multiallelics_j.output_vcf,
             haplocheck_output=self.expected_outputs(sample)['haplocheck_metrics'],
+            job_attrs=self.get_job_attrs(sample)
         )
         jobs.append(get_contamination_j)
 
@@ -254,7 +273,8 @@ class AlignAndGenotypeMito(SampleStage):
             merged_mutect_stats=merge_stats_J.combined_stats,
             # alt_allele and vaf config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
             max_alt_allele_count=4,
-            min_allele_fraction=0,
+            min_allele_fraction=get_config()['mito_snv']['min_allele_fraction'],
+            f_score_beta=get_config()['mito_snv']['f_score_beta'],
             contamination_estimate=get_contamination_j.max_contamination,
             job_attrs=self.get_job_attrs(sample),
         )
@@ -269,6 +289,7 @@ class AlignAndGenotypeMito(SampleStage):
             cram=realign_j.output_cram,
             intervals_list=intervals.non_control_region,
             reference=mito_ref,
+            job_attrs=self.get_job_attrs(sample)
         )
         jobs.append(non_control_region_coverage_j)
 
@@ -277,6 +298,7 @@ class AlignAndGenotypeMito(SampleStage):
             cram=realign_j.output_cram,
             intervals_list=intervals.control_region_shifted,
             reference=mito_ref,
+            job_attrs=self.get_job_attrs(sample)
         )
         jobs.append(shifted_control_region_coverage_j)
 
@@ -286,6 +308,7 @@ class AlignAndGenotypeMito(SampleStage):
             non_cr_coverage=non_control_region_coverage_j.per_base_coverage,
             shifted_cr_coverage=shifted_control_region_coverage_j.per_base_coverage,
             merged_coverage=self.expected_outputs(sample)['base_level_coverage_metrics'],
+            job_attrs=self.get_job_attrs(sample)
         )
         jobs.append(merge_coverage_j)
 
@@ -295,6 +318,7 @@ class AlignAndGenotypeMito(SampleStage):
             vcf=second_filter_j.output_vcf,
             reference=mito_ref,
             remove_non_pass_sites=False,
+            job_attrs=self.get_job_attrs(sample)
         )
         jobs.append(split_multiallelics_j)
 

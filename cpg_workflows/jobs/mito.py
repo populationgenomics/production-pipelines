@@ -52,21 +52,14 @@ def subset_cram_to_chrM(
         }
     )
 
+    # We are only accessing a fraction fof the genome. Mounting is the best option.
     bucket = cram_path.path.drive
     print(f'bucket = {bucket}')
     bucket_mount_path = to_path('/bucket')
     j.cloudfuse(bucket, str(bucket_mount_path), read_only=True)
     mounted_cram_path = bucket_mount_path / '/'.join(cram_path.path.parts[2:])
-    # assert cram_path.index_path  # keep mypy happy as index_path is optional
-    # mounted_cram_index_path = bucket_mount_path / '/'.join(cram_path.index_path.parts[2:])
 
     cmd = f"""
-        # CRAM=$BATCH_TMPDIR/{cram_path.path.name}
-        # CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
-
-        # # Retrying copying to avoid google bandwidth limits
-        # retry_gs_cp {str(cram_path.path)} $CRAM
-        # retry_gs_cp {str(cram_path.index_path)} $CRAI
 
         gatk PrintReads \
             -R {reference.base} \
@@ -99,8 +92,7 @@ def mito_realign(
         sample_id: CPG sample id for inclusion in RG header
         input_bam: Bam for realignment
 
-    Returns:
-        jobs_list
+    Outputs:
         output_cram: A sorted cram
 
     Bwa command from:
@@ -176,6 +168,7 @@ def collect_coverage_metrics(
             INCLUDE_BQ_HISTOGRAM=true \
             THEORETICAL_SENSITIVITY_OUTPUT={j.theoretical_sensitivity}
 
+            # TODO: build an picard image with R to extract values
             # R --vanilla <<CODE
             # df = read.table("metrics.txt",skip=6,header=TRUE,stringsAsFactors=FALSE,sep='\t',nrows=1)
             # write.table(floor(df[,"MEAN_COVERAGE"]), "mean_coverage.txt", quote=F, col.names=F, row.names=F)
@@ -352,7 +345,7 @@ def merge_mutect_stats(
 
 def filter_variants(
     b,
-    vcf: hb.Resource,
+    vcf: hb.ResourceGroup,
     reference: hb.ResourceGroup,
     merged_mutect_stats: hb.ResourceFile,
     max_alt_allele_count: int,
