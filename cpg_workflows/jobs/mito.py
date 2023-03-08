@@ -52,21 +52,28 @@ def subset_cram_to_chrM(
         }
     )
 
-    cmd = f"""
-        CRAM=$BATCH_TMPDIR/{cram_path.path.name}
-        CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
+    bucket = cram_path.path.drive
+    print(f'bucket = {bucket}')
+    bucket_mount_path = to_path('/bucket')
+    j.cloudfuse(bucket, str(bucket_mount_path), read_only=True)
+    mounted_cram_path = bucket_mount_path / '/'.join(cram_path.path.parts[2:])
+    # assert cram_path.index_path  # keep mypy happy as index_path is optional
+    # mounted_cram_index_path = bucket_mount_path / '/'.join(cram_path.index_path.parts[2:])
 
-        # Retrying copying to avoid google bandwidth limits
-        retry_gs_cp {str(cram_path.path)} $CRAM
-        retry_gs_cp {str(cram_path.index_path)} $CRAI
+    cmd = f"""
+        # CRAM=$BATCH_TMPDIR/{cram_path.path.name}
+        # CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
+
+        # # Retrying copying to avoid google bandwidth limits
+        # retry_gs_cp {str(cram_path.path)} $CRAM
+        # retry_gs_cp {str(cram_path.index_path)} $CRAI
 
         gatk PrintReads \
             -R {reference.base} \
             -L chrM \
             --read-filter MateOnSameContigOrNoMappedMateReadFilter \
             --read-filter MateUnmappedAndUnmappedReadFilter \
-            -I $CRAM \
-            --read-index $CRAI \
+            -I {mounted_cram_path} \
             -O {j.output_bam.bam}
 
     """
@@ -592,7 +599,6 @@ def merge_coverage(
 
     res = STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
-
 
     cmd = f"""
     R --vanilla <<CODE

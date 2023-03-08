@@ -167,7 +167,7 @@ class AlignAndGenotypeMito(SampleStage):
         shifted_mkdup_j = picard.markdup(
             b=get_batch(),
             sorted_bam=shifted_realign_j.output_cram,
-            fasta_reference=mito_ref,
+            fasta_reference=shifted_mito_ref,
         )
         jobs.append(shifted_mkdup_j)
 
