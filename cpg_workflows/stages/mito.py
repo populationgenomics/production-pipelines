@@ -240,7 +240,7 @@ class AlignAndGenotypeMito(SampleStage):
             # https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
             max_alt_allele_count=4,
             min_allele_fraction=0,
-            f_score_beta=get_config()['mito_snv']['f_score_beta']
+            f_score_beta=get_config()['mito_snv']['f_score_beta'],
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(initial_filter_j)
