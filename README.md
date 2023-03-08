@@ -458,20 +458,74 @@ The latter script will print a section for the `gatk-sv.toml` `[images]` section
 
 ### Dev installation
 
-Assuming `python3` points to `python3.10`, set up a virtual environment:
+0. _Optional_ Assuming `python3` points to `python3.10`, set up a virtual environment:
 
-```sh
-python3 -m pip install virtualenv
-virtualenv venv
-source venv/bin/activate
-```
+    ```sh
+    python3 -m pip install virtualenv
+    virtualenv venv
+    source venv/bin/activate
+    ```
 
-Install the package, and the development environment:
+1. Install the package, and the development environment:
 
-```bash
-pip install -e .
-pip install -r requirements-dev.txt
-```
+    ```bash
+    pip install -e .
+    pip install -r requirements-dev.txt
+    ```
+
+
+2. Generate a `dev.toml` config file to mimic the analysis-runner environment. 
+
+- You can generate this with the analysis runner for example 
+
+    ```bash
+    analysis-runner config --dataset thousand-genomes --access-level test --output-dir "1kg" --config configs/genome.toml --config configs/thousand-genomes.toml
+    ``` 
+- Alternatively, you can create your own `dev.toml` file with the config that’s logged in Hail Batch. 
+
+3. In `dev.toml`, ensure the following parameter is set 
+
+    ```toml
+    [hail]
+    dry_run = True 
+    ```
+
+4. Set the environment variable
+
+    `export SM_ENVIRONMENT=PRODUCTION` 
+
+5. Set the google cloud project environment variable appropriately for example 
+
+    `export GOOGLE_CLOUD_PROJECT=thousand-genomes` 
+
+6. Run locally with your debugger of choice. Ensure `dev.toml` is passed as a config  input to [main.py](http://main.py) 
+If using VSCode, you can use the following config in your launch.json. 
+
+    ```json
+    {
+            "name": "Production Pipelines Debug",
+            "type": "python",
+            "request":"launch",
+            "program":"main.py",
+            "console":"integratedTerminal",
+            "python":"/Users/user/path/to/python",
+            "justMyCode": false,
+            "env": {
+                "SM_ENVIRONMENT":"PRODUCTION",
+                "GOOGLE_CLOUD_PROJECT": "thousand-genomes"
+            },
+            "args": [
+                "--config", "configs/dev.toml",
+                "--config","configs/genome.toml",
+                "--config", "configs/thousand-genomes.toml",
+                "large_cohort",
+
+            ]
+
+        }
+    ```
+
+
 
 ### Codebase
 
