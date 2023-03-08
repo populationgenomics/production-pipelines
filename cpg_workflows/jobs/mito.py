@@ -4,7 +4,7 @@ Create Hail Batch jobs to call mitochondrial SNVs
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.hail_batch import image_path, fasta_res_group
 from cpg_utils.hail_batch import command
 from cpg_workflows.resources import STANDARD
