@@ -69,6 +69,10 @@ class AlignAndGenotypeMito(SampleStage):
         out_vcf: the final filtered vcf for downstream use
         haplocheck_metrics: Metrics generated from the haplocheckCLI tool including an
             estimate of contamination and the predicted mitochondrial haplotype found.
+        base_level_coverage_metrics: per base coverage needed to differentiate between
+            0/0 and ./. genotypes until mutect can generate a gVCF.
+        coverage_metrics: CollectWgsMetrics output.
+        theoretical_sensitivity_metrics: CollectWgsMetrics output.
 
     Configuration options:
 
@@ -78,19 +82,11 @@ class AlignAndGenotypeMito(SampleStage):
         main = sample.dataset.prefix()
         analysis = sample.dataset.analysis_prefix()
         return {
-            # Pipeline outputs
             'out_vcf': main / 'mito' / f'{sample.id}.mito.vcf',
             'haplocheck_metrics': analysis / 'mito' / f'{sample.id}.haplocheck.txt',
-            'coverage': main / 'mito' / f'{sample.id}.coverage.tsv',
-            # 'duplicate_metrics': sample.dataset.prefix() / f'{sample.id}.mito.foo',
-            # 'coverage_metrics': sample.dataset.prefix() / f'{sample.id}.mito.foo',
-            # 'theoretical_sensitivity_metrics': sample.dataset.prefix() / f'{sample.id}.mito.foo',
-            # 'contamination_metrics': sample.dataset.prefix() / f'{sample.id}.mito.foo',
-            # 'base_level_coverage_metrics': sample.dataset.prefix() / f'{sample.id}.mito.foo',
-            # 'mean_coverage': sample.dataset.prefix() / f'{sample.id}.mito.foo',
-            # 'median_coverage': sample.dataset.prefix() / f'{sample.id}.mito.foo',
-            # 'major_haplogroup': sample.dataset.prefix() / f'{sample.id}.mito.foo',
-            # 'contamination': sample.dataset.prefix() / f'{sample.id}.mito.foo',
+            'base_level_coverage_metrics': main / 'mito' / f'{sample.id}.base_level_coverage.tsv',
+            'coverage_metrics': main / 'mito' / f'{sample.id}.coverage_metrics.txt',
+            'theoretical_sensitivity_metrics': main / 'mito' / f'{sample.id}.theoretical_sensitivity.txt',
         }
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
@@ -150,6 +146,15 @@ class AlignAndGenotypeMito(SampleStage):
             b=get_batch(),
             sorted_bam=realign_j.output_cram,
             fasta_reference=mito_ref,
+        )
+        jobs.append(realign_mkdup_j)
+
+        # Collect coverage metrics ( only on non-shifted)
+        realign_mkdup_j = mito.collect_coverage_metrics(
+            b=get_batch(),
+            cram=realign_mkdup_j.output_cram,
+            reference=mito_ref,
+            metrics=self.expected_outputs(sample)['coverage_metrics']
         )
         jobs.append(realign_mkdup_j)
 
@@ -259,7 +264,6 @@ class AlignAndGenotypeMito(SampleStage):
         # This is a temporary task to handle "joint calling" until Mutect2 can produce a
         # GVCF. This proivdes coverage at each base so low coverage sites can be
         # considered ./. rather than 0/0.
-        # Generate final output vcf
         non_control_region_coverage_j = mito.coverage_at_every_base(
             b=get_batch(),
             cram=realign_j.output_cram,
@@ -281,7 +285,7 @@ class AlignAndGenotypeMito(SampleStage):
             b=get_batch(),
             non_cr_coverage=non_control_region_coverage_j.per_base_coverage,
             shifted_cr_coverage=shifted_control_region_coverage_j.per_base_coverage,
-            merged_coverage=self.expected_outputs(sample)['coverage'],
+            merged_coverage=self.expected_outputs(sample)['base_level_coverage_metrics'],
         )
         jobs.append(merge_coverage_j)
 

@@ -130,6 +130,68 @@ def mito_realign(
     return j
 
 
+def collect_coverage_metrics(
+    b,
+    cram: hb.ResourceGroup,
+    reference: hb.ResourceGroup,
+    metrics: Path | None = None,
+    theoretical_sensitivity: Path | None = None,
+    read_length_for_optimization: int = 151,
+    coverage_cap: int = 100000,
+    job_attrs: dict | None = None,
+) -> Job:
+    """
+    Run CollectWgsMetrics
+
+    Args:
+        cram: Input Cram
+        reference: reference fastq
+        read_length_for_optimization:  Read length used for optimization only. If this is
+            too small CollectWgsMetrics might fail, but the results are not affected
+            by this number. [Default: 151] [default: 100000 (from wdl)].
+        coverage_cap: Treat positions with coverage exceeding this value as if they had
+            coverage at this value.
+
+    Outputs:
+        metrics: output file
+        theoretical_sensitivity: Undocumented CollectWgsMetrics output?
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_job('collect_coverage_metrics', job_attrs)
+    j.image(image_path('picard'))
+
+    res = STANDARD.request_resources(ncpu=2)
+    res.set_to_job(j)
+
+    cmd = f"""
+        picard \
+            CollectWgsMetrics \
+            INPUT={cram.cram} \
+            VALIDATION_STRINGENCY=SILENT \
+            REFERENCE_SEQUENCE={reference.base} \
+            OUTPUT={j.metrics} \
+            USE_FAST_ALGORITHM=true \
+            READ_LENGTH={read_length_for_optimization} \
+            COVERAGE_CAP={coverage_cap} \
+            INCLUDE_BQ_HISTOGRAM=true \
+            THEORETICAL_SENSITIVITY_OUTPUT={j.theoretical_sensitivity}
+
+            # R --vanilla <<CODE
+            # df = read.table("metrics.txt",skip=6,header=TRUE,stringsAsFactors=FALSE,sep='\t',nrows=1)
+            # write.table(floor(df[,"MEAN_COVERAGE"]), "mean_coverage.txt", quote=F, col.names=F, row.names=F)
+            # write.table(df[,"MEDIAN_COVERAGE"], "median_coverage.txt", quote=F, col.names=F, row.names=F)
+            # CODE
+    """
+
+    j.command(command(cmd))
+    if metrics:
+        b.write_output(j.metrics, str(metrics))
+    if metrics:
+        b.write_output(j.theoretical_sensitivity, str(theoretical_sensitivity))
+
+    return j
+
+
 def mito_mutect2(
     b,
     cram: hb.ResourceGroup,
@@ -354,11 +416,6 @@ def filter_variants(
         )
     else:
         contamination_estimate_string = ''
-
-    if f_score_beta is not None:
-        f_score_beta_string = f'--f-score-beta  {f_score_beta}'
-    else:
-        f_score_beta_string = ''
 
     cmd = f"""
       gatk --java-options "-Xmx2500m" FilterMutectCalls -V {vcf['vcf.gz']} \\
