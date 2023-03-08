@@ -273,7 +273,7 @@ class AlignAndGenotypeMito(SampleStage):
             merged_mutect_stats=merge_stats_J.combined_stats,
             # alt_allele and vaf config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
             max_alt_allele_count=4,
-            min_allele_fraction=get_config()['mito_snv']['min_allele_fraction'],
+            min_allele_fraction=get_config()['mito_snv']['vaf_filter_threshold'],
             f_score_beta=get_config()['mito_snv']['f_score_beta'],
             contamination_estimate=get_contamination_j.max_contamination,
             job_attrs=self.get_job_attrs(sample),
