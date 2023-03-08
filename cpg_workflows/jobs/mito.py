@@ -417,10 +417,10 @@ def split_multi_allelics(
     res.set_to_job(j)
 
     j.declare_resource_group(
-        split_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+        split_vcf={'vcf.gz': '{root}.vcf.gz'}
     )
     j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+        output_vcf={'vcf.gz': '{root}.vcf.gz'}
     )
 
     cmd = f"""
