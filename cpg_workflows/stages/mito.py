@@ -152,7 +152,7 @@ class AlignAndGenotypeMito(SampleStage):
         # Collect coverage metrics ( only on non-shifted)
         realign_mkdup_j = mito.collect_coverage_metrics(
             b=get_batch(),
-            cram=realign_mkdup_j.output_cram,
+            cram=realign_mkdup_j.output_cram.cram,
             reference=mito_ref,
             metrics=self.expected_outputs(sample)['coverage_metrics']
         )
