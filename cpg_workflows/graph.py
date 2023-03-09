@@ -34,11 +34,10 @@ class GraphPlot:
 
         # Colors
         self.colorscale = 'Blugrn'
-        self.skipped_color = '#D3D3D3'
         self.node_color_key = self.partite_key
-        self.grey_color = '#888'
+        self.grey_color = '#999'
         self.dark_emphasis_color = '#0c1f27'
-        self.arrow_opacity = 0.5
+        self.arrow_opacity = 0.8
 
         # Convert any kwargs into attributes
         self.__dict__.update(kwargs)
@@ -118,6 +117,7 @@ class GraphPlot:
             line=dict(width=self.edge_weight, color=self.dark_emphasis_color),
             hoverinfo='none',
             mode='lines',
+            opacity=self.arrow_opacity,
         )
         edge_x, edge_y = self._get_edge_positions(lambda x: not self._edge_filter(x))
         edge_trace_grey = go.Scatter(
@@ -126,6 +126,7 @@ class GraphPlot:
             line=dict(width=self.edge_weight, color=self.grey_color),
             hoverinfo='none',
             mode='lines',
+            opacity=self.arrow_opacity,
         )
 
         node_trace = go.Scatter(
