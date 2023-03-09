@@ -487,7 +487,7 @@ The latter script will print a section for the `gatk-sv.toml` `[images]` section
 
     ```toml
     [hail]
-    dry_run = True 
+    dry_run = true
     ```
 
 4. Set the environment variable
