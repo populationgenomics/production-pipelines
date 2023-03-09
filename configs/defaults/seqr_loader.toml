@@ -24,7 +24,7 @@ use_as_vqsr = true
 
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
-# sensitivities. The tool matches them internally to a VQSLOD score cutoff 
+# sensitivities. The tool matches them internally to a VQSLOD score cutoff
 # based on the model's estimated sensitivity to a set of true variants.
 snp_filter_level = 99.7
 indel_filter_level = 99.0
@@ -55,7 +55,7 @@ password_secret_id = 'seqr-es-password'
 password_project_id = 'seqr-308602'
 
 [stripy]
-# Analysis_type can be "standard" (fast) or "extended" (marginally slower 
+# Analysis_type can be "standard" (fast) or "extended" (marginally slower
 # but also uses unmapped reads for genotying)
 analysis_type = "extended"
 # See https://gitlab.com/andreassh/stripy-pipeline#list-of-loci
@@ -65,3 +65,12 @@ BEAN1,CACNA1A,CBL,CNBP,COMP,DAB1,DIP2B,DMD,DMPK,FMR1,FOXL2,FXN,GIPC1,GLS,\
 HOXA13_1,HOXA13_2,HOXA13_3,HOXD13,JPH3,LRP12,MARCHF6,NIPA1,NOP56,NOTCH2NLC,\
 NUTM2B-AS1,PABPN1,PHOX2B,PPP2R2B,PRDM12,RAPGEF2,RFC1,RUNX2,SAMD12,SOX3,STARD7,TBP,\
 TBX1,TCF4,TNRC6A,XYLT1,YEATS2,ZIC2,ZIC3"""
+
+[mito_snv]
+# Example config for broad wdl found here:
+# https://raw.githubusercontent.com/broadinstitute/gatk/master/scripts/mitochondria_m2_wdl/ExampleInputsMitochondriaPipeline.json
+# f_score_beta is not configured so will use tool default of 1.0
+f_score_beta = 1.0
+# Sarah Stenton from Broad runs this pipline for seqr ingest and indicated they use a
+# threshold of 0.01 for seqr cohorts.
+vaf_filter_threshold = 0.01
