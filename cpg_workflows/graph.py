@@ -5,16 +5,18 @@ Heavily inspired by:
 https://towardsdatascience.com/visualize-hierarchical-data-using-plotly-and-datapane-7e5abe2686e1
 """
 
+from copy import deepcopy
 from typing import Callable
 from itertools import groupby
 
 import networkx as nx
+from plotly.subplots import make_subplots
 import plotly.graph_objs as go
 
 
 class GraphPlot:
     def __init__(self, G: nx.DiGraph, **kwargs):
-        self.G = G
+        self.G = deepcopy(G)
 
         # Text and sizes
         self.title = 'Workflow Graph'
@@ -36,6 +38,7 @@ class GraphPlot:
         self.node_color_key = self.partite_key
         self.grey_color = '#888'
         self.dark_emphasis_color = '#0c1f27'
+        self.arrow_opacity = 0.5
 
         # Convert any kwargs into attributes
         self.__dict__.update(kwargs)
@@ -53,7 +56,50 @@ class GraphPlot:
         # Calculate the depth_order and position
         self._calculate_depth_order(layer_key=self.partite_key, new_key='layer_order')
 
+    def __add__(self, other) -> go.Figure:
+        assert type(self) == type(other)
+
+        fig = make_subplots(rows=1, cols=2)
+
+        for trace in self.create_traces():
+            fig.add_trace(trace, row=1, col=1)
+
+        for trace in other.create_traces():
+            fig.add_trace(trace, row=1, col=2)
+
+        layout = self._get_layout()
+        fig.update_layout(layout)
+        fig.update_yaxes(layout.yaxis)
+        fig.update_xaxes(layout.xaxis)
+
+        fig.layout.update(
+            annotations=self.get_annotations(xref='x1', yref='y1')
+            + other.get_annotations(xref='x2', yref='y2')
+        )
+
+        return fig
+
+    def _get_layout(self):
+        return go.Layout(
+            title=self.title,
+            titlefont_size=self.title_fontsize,
+            showlegend=self.show_legend,
+            hovermode='closest',
+            margin=dict(b=20, l=5, r=5, t=40),
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(
+                showgrid=False,
+                zeroline=False,
+                showticklabels=False,
+                autorange='reversed',
+            ),
+        )
+
     def display_graph(self):
+        fig = self.create_figure()
+        fig.show()
+
+    def create_traces(self) -> go.Figure:
         # Add weight and depth attributes to the nodes
         for node in self.G.nodes:
             self.G.nodes[node]['weight'] = 1
@@ -109,29 +155,16 @@ class GraphPlot:
         node_trace.hovertext = node_hovertext
         node_trace.marker.color = node_color
 
-        # Draw the graph
-        annotations = self._get_annotations()
+        return [edge_trace_dark, edge_trace_grey, node_trace]
 
-        graph = go.Figure(
-            data=[edge_trace_dark, edge_trace_grey, node_trace],
-            layout=go.Layout(
-                title=self.title,
-                titlefont_size=self.title_fontsize,
-                showlegend=self.show_legend,
-                hovermode='closest',
-                margin=dict(b=20, l=5, r=5, t=40),
-                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                yaxis=dict(
-                    showgrid=False,
-                    zeroline=False,
-                    showticklabels=False,
-                    autorange='reversed',
-                ),
-                annotations=annotations,
-            ),
+    def create_figure(self):
+        traces = self.create_traces()
+        fig = go.Figure(
+            data=traces,
+            layout=self._get_layout(),
         )
-
-        graph.show()
+        fig.layout['annotations'] = self.get_annotations()
+        return fig
 
     def _get_node_positions(self):
         positions = map(lambda n: self.G.nodes[n]['pos'], self.G.nodes)
@@ -266,15 +299,15 @@ class GraphPlot:
                 self.G.nodes[node['name']][new_key] = idx
                 self.G.nodes[node['name']]['pos'] = group_pos[idx]
 
-    def _get_annotations(self):
+    def get_annotations(self, xref='x', yref='y'):
         return [
-            dict(
+            go.layout.Annotation(
                 ax=(self.G.nodes[edge[0]]['pos'][0] + self.G.nodes[edge[1]]['pos'][0])
                 / 2,
                 ay=(self.G.nodes[edge[0]]['pos'][1] + self.G.nodes[edge[1]]['pos'][1])
                 / 2,
-                axref='x',
-                ayref='y',
+                axref=xref,
+                ayref=yref,
                 x=(
                     self.G.nodes[edge[1]]['pos'][0] * 3
                     + self.G.nodes[edge[0]]['pos'][0]
@@ -285,14 +318,14 @@ class GraphPlot:
                     + self.G.nodes[edge[0]]['pos'][1]
                 )
                 / 4,
-                xref='x',
-                yref='y',
+                xref=xref,
+                yref=yref,
                 showarrow=True,
                 arrowhead=3,
                 arrowsize=4,
                 arrowwidth=self.edge_weight,
                 arrowcolor=self._get_edge_color(edge),
-                opacity=1,
+                opacity=self.arrow_opacity,
             )
             for edge in self.G.edges
         ]
