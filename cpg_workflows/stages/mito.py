@@ -146,7 +146,7 @@ class RealignMito(SampleStage):
             b=get_batch(),
             sorted_bam=realign_j.output_cram,
             fasta_reference=mito_ref,
-            output_path=self.expected_outputs(sample)['non_shifted_cram']
+            output_path=self.expected_outputs(sample)['non_shifted_cram'],
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(realign_mkdup_j)
@@ -166,7 +166,7 @@ class RealignMito(SampleStage):
             b=get_batch(),
             sorted_bam=shifted_realign_j.output_cram,
             fasta_reference=shifted_mito_ref,
-            output_path=self.expected_outputs(sample)['shifted_cram']
+            output_path=self.expected_outputs(sample)['shifted_cram'],
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(shifted_mkdup_j)
