@@ -962,6 +962,11 @@ class Workflow:
                 _stage.skipped = True
                 _stage.assume_outputs_exist = True
 
+        # Update dag removing skipped stages
+        for stage in stages:
+            if stage.skipped:
+                graph.remove_node(stage.name)
+
     def set_stages(
         self,
         requested_stages: list[StageDecorator],
