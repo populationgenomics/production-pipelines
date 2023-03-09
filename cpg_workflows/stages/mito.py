@@ -148,6 +148,8 @@ class RealignMito(SampleStage):
             fasta_reference=mito_ref,
             output_path=self.expected_outputs(sample)['non_shifted_cram'],
             job_attrs=self.get_job_attrs(sample),
+            overwrite=True
+
         )
         jobs.append(realign_mkdup_j)
 
