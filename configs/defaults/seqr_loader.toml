@@ -69,7 +69,8 @@ TBX1,TCF4,TNRC6A,XYLT1,YEATS2,ZIC2,ZIC3"""
 [mito_snv]
 # Example config for broad wdl found here:
 # https://raw.githubusercontent.com/broadinstitute/gatk/master/scripts/mitochondria_m2_wdl/ExampleInputsMitochondriaPipeline.json
-# f_score_beta and vaf_filter_threshold are not configured so will use tool defaults set
-# here.
+# f_score_beta is not configured so will use tool default of 1.0
 f_score_beta = 1.0
-vaf_filter_threshold = 0.0
+# Sarah Stenton from Broad runs this pipline for seqr ingest and indicated they use a
+# threshold of 0.01 for seqr cohorts.
+vaf_filter_threshold = 0.01
