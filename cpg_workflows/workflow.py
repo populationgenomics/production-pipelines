@@ -12,6 +12,7 @@ Examples of workflows can be found in the `production-workflows` repository.
 """
 
 import functools
+from math import inf
 import networkx as nx
 import logging
 import pathlib
@@ -962,10 +963,12 @@ class Workflow:
                 _stage.skipped = True
                 _stage.assume_outputs_exist = True
 
-        # Update dag removing skipped stages
+        # Update dag
+        nx.set_node_attributes(graph, False, name='skipped')
+
         for stage in stages:
             if stage.skipped:
-                graph.remove_node(stage.name)
+                graph.nodes[stage.name]['skipped'] = True
 
     def set_stages(
         self,
@@ -1000,15 +1003,18 @@ class Workflow:
 
         # Round 2: depth search to find implicit stages.
         depth = 0
+        depths = dict()
         while True:  # might require few iterations to resolve dependencies recursively
             depth += 1
             newly_implicitly_added_d = dict()
             for stg in _stages_d.values():
                 if stg.name in skip_stages:
                     stg.skipped = True
+                    depths[stg.name] = depth
                     continue  # not searching deeper
                 if only_stages and stg.name not in only_stages:
                     stg.skipped = True
+                    depths[stg.name] = depth
 
                 # Iterate dependencies:
                 for reqcls in stg.required_stages_classes:
@@ -1023,10 +1029,16 @@ class Workflow:
                     f'Additional implicit stages: '
                     f'{list(newly_implicitly_added_d.keys())}'
                 )
+                depths.update({k: depth for k in newly_implicitly_added_d.keys()})
                 _stages_d |= newly_implicitly_added_d
             else:
                 # No new implicit stages added, so can stop the depth-search here
                 break
+
+        # Add depth to the remaining
+        missing_stages = set(_stages_d.keys()) - set(depths.keys())
+        for stg in missing_stages:
+            depths[stg] = depth
 
         # Round 3: set "stage.required_stages" fields to each stage.
         for stg in _stages_d.values():
@@ -1041,6 +1053,8 @@ class Workflow:
         for stg in _stages_d.values():
             dag_node2nodes[stg.name] = set(dep.name for dep in stg.required_stages)
         dag = nx.DiGraph(dag_node2nodes)
+        nx.set_node_attributes(dag, depths, name='depth')
+
         try:
             stage_names = list(reversed(list(nx.topological_sort(dag))))
         except nx.NetworkXUnfeasible:
@@ -1048,6 +1062,9 @@ class Workflow:
             raise
         logging.info(f'Stages in order of execution:\n{stage_names}')
         stages = [_stages_d[name] for name in stage_names]
+        nx.set_node_attributes(
+            dag, {s.name: num for num, s in enumerate(stages)}, name='order'
+        )
 
         # Round 5: applying workflow options first_stages and last_stages.
         self._process_first_last_stages(stages, dag, first_stages, last_stages)
@@ -1079,7 +1096,16 @@ class Workflow:
 
                 logging.info(f'')
 
-        # Round 7: exporting workflow to GML standard
+        # Round 7: show the workflow
+        def format_meta(attr: list):
+            return {s: s in attr for s in dag.nodes}
+
+        # First add remaining metadata
+        nx.set_node_attributes(dag, format_meta(skip_stages), name='skip_stages')
+        nx.set_node_attributes(dag, format_meta(only_stages), name='only_stages')
+        nx.set_node_attributes(dag, format_meta(first_stages), name='first_stages')
+        nx.set_node_attributes(dag, format_meta(last_stages), name='last_stages')
+
         if self.show_workflow:
             gp = GraphPlot(dag)
             gp.display_graph()
