@@ -188,7 +188,7 @@ class RealignMito(SampleStage):
         # considered ./. rather than 0/0.
         non_control_region_coverage_j = mito.coverage_at_every_base(
             b=get_batch(),
-            cram=realign_mkdup_j.output_cram.cram,
+            cram=realign_mkdup_j.output_cram,
             intervals_list=intervals.non_control_region,
             reference=mito_ref,
             job_attrs=self.get_job_attrs(sample),
@@ -197,7 +197,7 @@ class RealignMito(SampleStage):
 
         shifted_control_region_coverage_j = mito.coverage_at_every_base(
             b=get_batch(),
-            cram=shifted_mkdup_j.output_cram.cram,
+            cram=shifted_mkdup_j.output_cram,
             intervals_list=intervals.control_region_shifted,
             reference=mito_ref,
             job_attrs=self.get_job_attrs(sample),

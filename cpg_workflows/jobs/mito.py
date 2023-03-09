@@ -606,7 +606,7 @@ def coverage_at_every_base(
 
     cmd = f"""
     picard CollectHsMetrics \
-      I={cram} \
+      I={cram.cram} \
       R={reference.base} \
       PER_BASE_COVERAGE={j.per_base_coverage} \
       O={j.hs_metics_out} \
