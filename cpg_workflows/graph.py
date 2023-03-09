@@ -5,88 +5,79 @@ Heavily inspired by:
 https://towardsdatascience.com/visualize-hierarchical-data-using-plotly-and-datapane-7e5abe2686e1
 """
 
+from typing import Callable
 from itertools import groupby
 
 import networkx as nx
 import plotly.graph_objs as go
 
-DEFAULT_GML_OUTPUT = './.workflow.gml'
-
 
 class GraphPlot:
-    def __init__(self, G: nx.DiGraph):
+    def __init__(self, G: nx.DiGraph, **kwargs):
         self.G = G
 
         # Text and sizes
         self.title = 'Workflow Graph'
-        self.title_fontsize = 16
+        self.title_fontsize = 24
+        self.node_text_position = 'top center'
         self.node_size = 50
-        self.node_border_weight = 2
+        self.node_border_weight = 5
         self.edge_weight = 1
+
+        # Layout
+        self.partite_key = 'layer'
+        self.align = 'horizontal'
+        self.layout_scale = 10
+        self.show_legend = False
 
         # Colors
         self.colorscale = 'Blugrn'
         self.skipped_color = '#D3D3D3'
-        self.edge_color = '#888'
-        self.default_border_color = '#888'
+        self.node_color_key = self.partite_key
+        self.grey_color = '#888'
+        self.dark_emphasis_color = '#0c1f27'
 
-        # Layout
-        self.align = 'horizontal'
+        # Convert any kwargs into attributes
+        self.__dict__.update(kwargs)
 
         # Graph transforms
-
         # Add name as attribute
         nx.set_node_attributes(self.G, {n: n for n in self.G.nodes}, name='name')
 
-        # We invert the depths so that the starting stages have depth 0
-        self._invert_depth()
+        # Reverse all edges
+        self.G = G.reverse()
 
-        # Calculate the depth_order
-        self._calculate_depth_order()
+        # Recalculate the depths using the topological order
+        self._recalculate_depth(new_key=self.partite_key)
 
-        # Create a new attribute for the position:
-        # depth.order
-        # self.partite_key = 'depth'
-        # nx.set_node_attributes(
-        #     self.G,
-        #     {
-        #         n[0]: float(f'{n[1]["depth"]}.{n[1]["order"]}')
-        #         for n in self.G.nodes.items()
-        #     },
-        #     name=self.partite_key,
-        # )
+        # Calculate the depth_order and position
+        self._calculate_depth_order(layer_key=self.partite_key, new_key='layer_order')
 
     def display_graph(self):
-        # Add position info to the graph nodes
-
-        for n, meta in self.G.nodes.items():
-            self.G.nodes[n]['pos'] = (meta['depth_order'], meta['depth'])
-
-        # pos = nx.multipartite_layout(
-        #     self.G, subset_key=self.partite_key, align=self.align
-        # )
-        # pos = nx.kamada_kawai_layout(
-        #     self.G,
-        # )
-        # for n, p in pos.items():
-        #     self.G.nodes[n]['pos'] = p
-
         # Add weight and depth attributes to the nodes
         for node in self.G.nodes:
             self.G.nodes[node]['weight'] = 1
 
         # Now get the node and edge positions
         node_x, node_y = self._get_node_positions()
-        edge_x, edge_y = self._get_edge_positions()
 
         # Get node depths and meta
         node_name, node_hovertext, node_color = self._get_node_data()
 
         # Begin plotting
-        edge_trace = go.Scatter(
+        edge_x, edge_y = self._get_edge_positions(self._edge_filter)
+        edge_trace_dark = go.Scatter(
             x=edge_x,
             y=edge_y,
-            line=dict(width=self.edge_weight, color=self.edge_color),
+            line=dict(width=self.edge_weight, color=self.dark_emphasis_color),
+            hoverinfo='none',
+            mode='lines',
+        )
+        edge_x, edge_y = self._get_edge_positions(lambda x: not self._edge_filter(x))
+        edge_trace_grey = go.Scatter(
+            x=edge_x,
+            y=edge_y,
+            line=dict(width=self.edge_weight, color=self.grey_color),
             hoverinfo='none',
             mode='lines',
         )
@@ -95,7 +86,7 @@ class GraphPlot:
             x=node_x,
             y=node_y,
             mode='markers+text',
-            textposition="bottom center",
+            textposition=self.node_text_position,
             hoverinfo='text',
             marker=dict(
                 showscale=True,
@@ -103,7 +94,9 @@ class GraphPlot:
                 reversescale=True,
                 color=[],
                 size=self.node_size,
-                line_width=self.node_border_weight,
+                line=dict(
+                    color=self._get_border_colors(), width=self.node_border_weight
+                ),
                 colorbar=dict(
                     thickness=15,
                     title='Workflow Depth',
@@ -120,11 +113,11 @@ class GraphPlot:
         annotations = self._get_annotations()
 
         graph = go.Figure(
-            data=[edge_trace, node_trace],
+            data=[edge_trace_dark, edge_trace_grey, node_trace],
             layout=go.Layout(
                 title=self.title,
                 titlefont_size=self.title_fontsize,
-                showlegend=False,
+                showlegend=self.show_legend,
                 hovermode='closest',
                 margin=dict(b=20, l=5, r=5, t=40),
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
@@ -145,11 +138,11 @@ class GraphPlot:
         node_x, node_y = list(map(list, zip(*positions)))
         return node_x, node_y
 
-    def _get_edge_positions(self):
+    def _get_edge_positions(self, filter_fun: Callable):
         # Add position info to the edges
         edge_x = []
         edge_y = []
-        for edge in self.G.edges():
+        for edge in list(filter(filter_fun, self.G.edges())):
             x0, y0 = self.G.nodes[edge[0]]['pos']
             x1, y1 = self.G.nodes[edge[1]]['pos']
             edge_x.append(x0)
@@ -164,61 +157,114 @@ class GraphPlot:
     def _get_node_data(self):
         node_color = list(
             map(
-                lambda n: self.skipped_color if n[1]['skipped'] else n[1]['depth'],
+                lambda n: self._get_node_color(n[0], n[1][self.node_color_key])[0],
                 self.G.nodes.items(),
             )
         )
         node_name = [n for n in self.G.nodes]
+
+        def special_labels(n):
+            _, label = self._get_node_color(n, None)
+            return label + '<br>' if label else ''
+
         node_hovertext = list(
             map(
                 lambda n: (
-                    'Stage: '
+                    special_labels(n[0])
+                    + 'Stage: '
                     + str(n[0])
                     + '<br>'
                     + 'Stage Order: '
                     + str(n[1]['order'])
                     + '<br>'
-                    + 'Depth: '
-                    + str(n[1]['depth'])
+                    + 'Layer: '
+                    + str(n[1]['layer'])
                     + '<br>'
-                    + 'Depth Order: '
-                    + str(n[1]['depth_order'])
+                    + 'Layer Order: '
+                    + str(n[1]['layer_order'])
                 ),
                 self.G.nodes.items(),
             )
         )
         return node_name, node_hovertext, node_color
 
+    def _get_node_color(self, n: str, default: str | int):
+        if self.G.nodes[n]['skip_stages']:
+            return '#5A5A5A', 'Skip stage'
+        elif self.G.nodes[n]['only_stages']:
+            return '#5053f8', 'Only run this stage'
+        elif self.G.nodes[n]['first_stages']:
+            return '#33c584', 'First stage'
+        elif self.G.nodes[n]['last_stages']:
+            return '#e93e2e', 'Last stage'
+        elif self.G.nodes[n]['skipped']:
+            return self.grey_color, 'Skipped'
+        else:
+            return default, None
+
+    def _get_border_color(self, n: str):
+        if self.G.nodes[n]['skipped']:
+            return self.grey_color
+        else:
+            return self.dark_emphasis_color
+
+    def _edge_filter(self, edge):
+        return (
+            not self.G.nodes[edge[0]]['skipped']
+            and not self.G.nodes[edge[1]]['skipped']
+        )
+
+    def _get_edge_color(self, edge):
+        return self.dark_emphasis_color if self._edge_filter(edge) else self.grey_color
+
+    def _get_node_colors(self):
+        return [self._get_node_color(n)[0] for n in self.G.nodes]
+
     def _get_border_colors(self):
-        def get_border_color(n):
-            if self.G.nodes[n]['skip_stages']:
-                return '#5A5A5A'
-            elif self.G.nodes[n]['only_stages']:
-                return '#00008B'
-            elif self.G.nodes[n]['first_stages']:
-                return '#023020'
-            elif self.G.nodes[n]['last_stages']:
-                return '#8B0000'
-            else:
-                return self.default_border_color
+        return [self._get_border_color(n) for n in self.G.nodes]
 
-        return {n: get_border_color(n) for n in self.G.nodes}
+    def _get_edge_colors(self):
+        return [self._get_edge_color(e) for e in self.G.edges]
 
-    def _invert_depth(self):
-        depths = nx.get_node_attributes(self.G, 'depth')
-        max_depth = max(depths.values())
-        new_depths = {stage: abs(max_depth - depth) for stage, depth in depths.items()}
-        nx.set_node_attributes(self.G, new_depths, name='depth')
+    def _recalculate_depth(self, new_key: str):
+        for layer, nodes in enumerate(nx.topological_generations(self.G)):
+            for node in nodes:
+                self.G.nodes[node][new_key] = layer
 
-    def _calculate_depth_order(self):
+    def _calculate_depth_order(self, layer_key: str, new_key: str):
+        # Add position info to the graph nodes
+        pos = nx.multipartite_layout(
+            self.G,
+            subset_key=layer_key,
+            align=self.align,
+            scale=self.layout_scale,
+        )
+        for n, p in pos.items():
+            self.G.nodes[n]['pos'] = p
+
+        # Get all the node meta, add the name as well so we can just pass around values
         nodes = dict(self.G.nodes.items())
         nodes = {n: dict(meta, name=n) for n, meta in nodes.items()}
 
-        by_depth = groupby(nodes.values(), lambda x: x['depth'])
+        # Group by partite_key
+        sorted_nodes = sorted(nodes.values(), key=lambda n: n[layer_key])
+        by_depth = groupby(sorted_nodes, lambda x: x[layer_key])
 
+        # Go through each layer group
         for _, group in by_depth:
-            for depth_order, node in enumerate(sorted(group, key=lambda x: x['order'])):
-                self.G.nodes[node['name']]['depth_order'] = depth_order
+            # Extract nodes and node positions (sorted)
+            group_nodes = list(group)
+            group_pos = sorted([n['pos'] for n in group_nodes], key=lambda p: p[0])
+
+            # Do a layer sort
+            nodes = self._node_layer_sort(group_nodes)
+
+            # Iterate through all running jobs, then skipped
+            # Set layer_order to it's order index in that layer
+            for depth_order, node in enumerate(nodes):
+                idx = depth_order
+                self.G.nodes[node['name']][new_key] = idx
+                self.G.nodes[node['name']]['pos'] = group_pos[idx]
 
     def _get_annotations(self):
         return [
@@ -245,8 +291,35 @@ class GraphPlot:
                 arrowhead=3,
                 arrowsize=4,
                 arrowwidth=self.edge_weight,
-                arrowcolor=self.edge_color,
+                arrowcolor=self._get_edge_color(edge),
                 opacity=1,
             )
             for edge in self.G.edges
         ]
+
+    def _node_layer_sort(self, nodes):
+        layer_num_parity = nodes[0][self.partite_key] % 2
+        degree = self.G.out_degree([n['name'] for n in nodes])
+        deg_order = sorted(
+            nodes, key=lambda n: degree[n['name']], reverse=layer_num_parity
+        )
+
+        # Set largest degree towards the middle
+        return deg_order[len(deg_order) % 2 :: 2] + deg_order[::-2]
+
+        # Sort all non-skipped stages
+        sorted_group = list(
+            sorted(
+                filter(lambda x: not x['skipped'], nodes),
+                key=lambda x: x['order'],
+            )
+        )
+
+        # Then sort all skipped nodes
+        skipped_group = list(
+            sorted(
+                filter(lambda x: x['skipped'], nodes),
+                key=lambda x: x['order'],
+            )
+        )
+        return sorted_group + skipped_group

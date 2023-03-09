@@ -1107,8 +1107,14 @@ class Workflow:
         nx.set_node_attributes(dag, format_meta(last_stages), name='last_stages')
 
         if self.show_workflow:
-            gp = GraphPlot(dag)
+            gp = GraphPlot(dag, title='Full Workflow Graph')
             gp.display_graph()
+
+            # Removed skipped steps for simple graph
+            all_nodes = list(dag.nodes)
+            removed = [dag.remove_node(n) for n in all_nodes if dag.nodes[n]['skipped']]
+            gp2 = GraphPlot(dag, title='Sub-Workflow Graph')
+            gp2.display_graph()
 
     @staticmethod
     def _process_stage_errors(

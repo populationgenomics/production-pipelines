@@ -21,6 +21,7 @@ skip_samples = ["CPG88088", "CPG88435"]
 ref_fasta = "gs://cpg-common-main/references/hg38/v0/Homo_sapiens_assembly38.fasta"
 
 [hail]
+dry_run = true
 delete_scratch_on_exit = false
 pool_label = "large-cohort"
 billing_project = "thousand-genomes"
