@@ -35,6 +35,9 @@ pop_meta_field = 'Superpopulation name'  # metamist's `Participant/meta` field f
 #[large_cohort.pca_background]
 #datasets = ['gs://cpg-common-main/references/ancestry/oceania_eur.mt']
 #pop_field = 'continental_pop'
+# set whether PCA output labels are from given population names, or random forest
+# inferred population labels
+inferred_ancestry = false
 
 # Parameters for sample QC. The default values for soft filtering taken from gnomAD QC:
 # https://macarthurlab.org/2019/10/16/gnomad-v3-0, with `max_n_snps` and 

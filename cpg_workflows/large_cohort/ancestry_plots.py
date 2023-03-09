@@ -4,7 +4,7 @@ Plot ancestry PCA analysis results
 
 from collections import Counter
 from typing import List, Iterable
-# from cpg_utils.config import get_config
+from cpg_utils.config import get_config
 
 import pandas as pd
 import numpy as np
@@ -20,9 +20,21 @@ from cpg_utils import Path
 from cpg_utils.hail_batch import reference_path, genome_build
 
 
+# TODO: can we not hard code these?
 BG_LABEL = 'Provided ancestry (1KG+HGDP)'
 FG_LABEL = 'Inferred ancestry'
 
+# TODO: fix populations (make configurable option for provided or inferred ancestry)
+
+# how I made labels before
+# plot by continental population
+# labels = scores.continental_pop.collect()
+#     # Change 'none' values to dataset name
+#     dataset = get_config()['workflow']['input_datasets']
+#     # join dataset names with underscore, in case there are multiple
+#     dataset = '_'.join(dataset)
+#     labels = [dataset if x is None else x for x in labels]
+#     study = list(set(labels))
 
 def run(
     out_path_pattern: Path,
@@ -31,6 +43,8 @@ def run(
     eigenvalues_ht_path: Path,
     loadings_ht_path: Path,
     inferred_pop_ht_path: Path,
+    # TODO: make this configurable
+    # use_external_id: False
 ):
     """
     Generate plots in HTML format, write for each PC (of n_pcs) and
@@ -44,7 +58,8 @@ def run(
     inferred_pop_ht = hl.read_table(str(inferred_pop_ht_path))
 
     scores_ht = scores_ht.annotate(
-        pop=inferred_pop_ht[scores_ht.s].pop,
+        pop=sample_ht[scores_ht.s].pop,
+        training_pop=inferred_pop_ht[scores_ht.s].pop,
         is_training=inferred_pop_ht[scores_ht.s].is_training,
         dataset=sample_ht[scores_ht.s].dataset,
     ).cache()
@@ -70,6 +85,7 @@ def run(
         )
         return ht_
 
+    # if use_external_id:
     ht = key_by_external_id(scores_ht, sample_ht)
     ht = ht.cache()
 
@@ -84,10 +100,11 @@ def run(
     sample_names = ht.s.collect()
     datasets = ht.dataset.collect()
     is_training = ht.is_training.collect()
-
+    use_inferred = get_config()['large_cohort']['pca_background']['inferred_ancestry']
+    population_label = ht.training_pop.collect() if use_inferred else ht.pop.collect()
     for scope, title, labels in [
         ('dataset', 'Dataset', datasets),
-        ('population', 'Population', ht.pop.collect()),
+        ('population', 'Population', population_label),
     ]:
         plots.extend(
             _plot_pca(
@@ -98,7 +115,7 @@ def run(
                 variance=variance,
                 ht=ht,
                 datasets=datasets,
-                is_training=is_training,
+                # is_training=is_training,
                 sample_names=sample_names,
                 out_path_pattern=out_path_pattern,
             )
@@ -108,126 +125,7 @@ def run(
         _plot_loadings(num_pcs_to_plot, loadings_ht, out_path_pattern=out_path_pattern)
     )
 
-    # plots.extend(
-    #     _plot_pca_without_inference(
-    #         loadings_ht,
-    #     )
-    # )
-
     return plots
-
-
-# def _plot_pca_without_inference(scores_ht,
-#     variance,
-#     num_pcs_to_plot,
-#     out_path_pattern: str):
-
-#     METADATA_TABLE = 'gs://cpg-hgdp-test/large_cohort/1-0/sample_qc.ht/'
-
-#     metadata = hl.read_table(METADATA_TABLE)
-#     # add metadata info to scores
-#     scores_ht = scores_ht.annotate(study = metadata[scores_ht.s].dataset, continental_pop = metadata[scores_ht.s].pop)
-#     sample_names = scores_ht.s.collect()
-#     labels = scores_ht.study.collect()
-#     # Change 'none' values to dataset name
-#     dataset = get_config()['workflow']['input_datasets']
-#     # join dataset names with underscore, in case there are multiple
-#     dataset = '_'.join(dataset)
-#     labels = [dataset if x is None else x for x in labels]
-#     study = list(set(labels))
-#     tooltips = [('labels', '@label'), ('samples', '@samples')]
-
-#     # plot by study
-#     for i in range(num_pcs_to_plot - 1):
-#         pc1 = i
-#         pc2 = i + 1
-#         plot = figure(
-#             title='Study',
-#             x_axis_label=f'PC{pc1 + 1} ({variance[pc1]})%)',
-#             y_axis_label=f'PC{pc2 + 1} ({variance[pc2]}%)',
-#             tooltips=tooltips,
-#         )
-#         source = ColumnDataSource(
-#             dict(
-#                 x=scores_ht.scores[pc1].collect(),
-#                 y=scores_ht.scores[pc2].collect(),
-#                 label=labels,
-#                 samples=sample_names,
-#             )
-#         )
-#         plot.circle(
-#             'x',
-#             'y',
-#             alpha=0.5,
-#             source=source,
-#             size=4,
-#             color=factor_cmap('label', ['#1b9e77', '#d95f02'], study),
-#             legend_group='label',
-#         )
-#         plot.add_layout(plot.legend[0], 'left')
-#         plot_filename = output_path(f'study_pc{pc2}.png', 'web')
-#         with hl.hadoop_open(plot_filename, 'wb') as f:
-#             get_screenshot_as_png(plot).save(f, format='PNG')
-#         html = file_html(plot, CDN, 'my plot')
-#         plot_filename_html = output_path(f'study_pc{pc2}.html', 'web')
-#         with hl.hadoop_open(plot_filename_html, 'w') as f:
-#             f.write(html)
-
-#     # plot by continental population
-#     labels = scores_ht.continental_pop.collect()
-#     # Change PROPHECY 'none' values to 'PROPHECY'
-#     labels = ['PROPHECY' if x is None else x for x in labels]
-#     continental_population = list(set(labels))
-#     tooltips = [('labels', '@label'), ('samples', '@samples')]
-
-#     for i in range(0, (number_of_pcs - 1)):
-#         pc1 = i
-#         pc2 = i + 1
-#         plot = figure(
-#             title='Continental Population',
-#             x_axis_label=f'PC{pc1 + 1} ({variance[pc1]})%)',
-#             y_axis_label=f'PC{pc2 + 1} ({variance[pc2]}%)',
-#             tooltips=tooltips,
-#         )
-#         source = ColumnDataSource(
-#             dict(
-#                 x=scores_ht.scores[pc1].collect(),
-#                 y=scores_ht.scores[pc2].collect(),
-#                 label=labels,
-#                 samples=sample_names,
-#             )
-#         )
-#         plot.circle(
-#             'x',
-#             'y',
-#             alpha=0.5,
-#             source=source,
-#             size=4,
-#             color=factor_cmap(
-#                 'label', turbo(len(continental_population)), continental_population
-#             ),
-#             legend_group='label',
-#         )
-#         plot.add_layout(plot.legend[0], 'left')
-#         plot_filename = output_path(f'continental_pop_pc{pc2}.png', 'web')
-#         with hl.hadoop_open(plot_filename, 'wb') as f:
-#             get_screenshot_as_png(plot).save(f, format='PNG')
-#         html = file_html(plot, CDN, 'my plot')
-#         plot_filename_html = output_path(f'continental_pop_pc{pc2}.html', 'web')
-#         with hl.hadoop_open(plot_filename_html, 'w') as f:
-#             f.write(html)
-        
-#         ----
-#         # Return a plot (a figure)
-#         if out_path_pattern:
-#             html = file_html(plot, CDN, title)
-#             plot_filename_html = str(out_path_pattern).format(
-#                 scope=scope, pci=pc2, ext='html'
-#             )
-#             with hl.hadoop_open(plot_filename_html, 'w') as f:
-#                 f.write(html)
-#         pass
-
 
 def _plot_pca(
     scope,
@@ -244,8 +142,14 @@ def _plot_pca(
 
     cntr: Counter = Counter(labels)
     labels = [f'{x} ({cntr[x]})' for x in labels]
-
     unique_labels = list(Counter(labels).keys())
+    # set colour palette to be turbo, or if only two fields,
+    # colours with larger differentiation
+    if len(unique_labels) == 2:
+        col=factor_cmap('label', ['#1b9e77', '#d95f02'], unique_labels)
+    else:
+        col=factor_cmap('label', turbo(len(unique_labels)), unique_labels)
+
     tooltips = [('labels', '@label'), ('samples', '@samples')]
     plots = []
     for i in range(number_of_pcs - 1):
@@ -265,6 +169,7 @@ def _plot_pca(
                 label=labels,
                 samples=sample_names,
                 dataset=datasets,
+                # TODO: What's happening here?
                 is_training=[
                     {True: BG_LABEL, False: FG_LABEL}.get(v) for v in is_training
                 ],
@@ -278,8 +183,8 @@ def _plot_pca(
             #     'is_training', ['cross', 'circle'], [BG_LABEL, FG_LABEL]
             # ),
             source=source,
-            size=4,
-            color=factor_cmap('label', turbo(len(unique_labels)), unique_labels),
+            size=5,
+            color=col,
             legend_group='label',
         )
         plot.add_layout(plot.legend[0], 'left')

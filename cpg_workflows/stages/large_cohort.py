@@ -126,6 +126,7 @@ class Ancestry(CohortStage):
             eigenvalues=get_workflow().prefix / 'ancestry' / 'eigenvalues.ht',
             loadings=get_workflow().prefix / 'ancestry' / 'loadings.ht',
             inferred_pop=get_workflow().prefix / 'ancestry' / 'inferred_pop.ht',
+            sample_qc_ht=get_workflow().prefix / 'ancestry' / 'sample_qc_ht.ht'
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -146,6 +147,7 @@ class Ancestry(CohortStage):
                 out_eigenvalues_ht_path=self.expected_outputs(cohort)['eigenvalues'],
                 out_loadings_ht_path=self.expected_outputs(cohort)['loadings'],
                 out_inferred_pop_ht_path=self.expected_outputs(cohort)['inferred_pop'],
+                out_sample_qc_ht_path=self.expected_outputs(cohort)['sample_qc_ht']
             ),
             depends_on=inputs.get_jobs(cohort),
         )
@@ -176,7 +178,7 @@ class AncestryPlots(CohortStage):
             function=run,
             function_path_args=dict(
                 out_path_pattern=self.out_prefix / self.out_fname_pattern,
-                sample_qc_ht_path=inputs.as_path(cohort, SampleQC),
+                sample_qc_ht_path=inputs.as_path(cohort, Ancestry, key='sample_qc_ht'),
                 scores_ht_path=inputs.as_path(cohort, Ancestry, key='scores'),
                 eigenvalues_ht_path=inputs.as_path(cohort, Ancestry, key='eigenvalues'),
                 loadings_ht_path=inputs.as_path(cohort, Ancestry, key='loadings'),
