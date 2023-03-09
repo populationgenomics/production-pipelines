@@ -187,7 +187,7 @@ def collect_coverage_metrics(
 
 def mito_mutect2(
     b,
-    cram: hb.ResourceFile,
+    cram: hb.ResourceGroup,
     reference: hb.ResourceGroup,
     region: str,
     max_reads_per_alignment_start: int = 75,
@@ -228,7 +228,7 @@ def mito_mutect2(
     cmd = f"""
         gatk --java-options "-Xmx{java_mem_mb}m" Mutect2 \
             -R {reference.base} \
-            -I {cram} \
+            -I {cram.cram} \
             --read-filter MateOnSameContigOrNoMappedMateReadFilter \
             --read-filter MateUnmappedAndUnmappedReadFilter \
             -O {j.output_vcf['vcf.gz']} \
