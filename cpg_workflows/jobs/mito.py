@@ -246,8 +246,8 @@ def mito_mutect2(
 
 def liftover_and_combine_vcfs(
     b,
-    vcf: hb.Resource,
-    shifted_vcf: hb.Resource,
+    vcf: hb.ResourceGroup,
+    shifted_vcf: hb.ResourceGroup,
     reference: hb.ResourceGroup,
     shift_back_chain: hb.ResourceFile,
     job_attrs: dict | None = None,
@@ -436,7 +436,7 @@ def filter_variants(
 
 def split_multi_allelics(
     b,
-    vcf: hb.Resource,
+    vcf: hb.ResourceGroup,
     reference: hb.ResourceGroup,
     remove_non_pass_sites: bool = False,
     job_attrs: dict | None = None,
@@ -502,7 +502,7 @@ def split_multi_allelics(
 
 def get_contamination(
     b,
-    vcf: hb.Resource,
+    vcf: hb.ResourceGroup,
     haplocheck_output: Path | None,
     job_attrs: dict | None = None,
 ) -> Job:

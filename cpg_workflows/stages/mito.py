@@ -7,6 +7,9 @@ https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/M
 """
 from typing import Any
 
+import hailtop.batch as hb
+from hailtop.batch.job import Job
+
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_workflows import get_batch
@@ -130,6 +133,7 @@ class RealignMito(SampleStage):
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(subset_bam_j)
+        assert isinstance(subset_bam_j.output_bam, hb.ResourceGroup)
 
         # Align extracted reads to chrM using bwa
         realign_j = mito.mito_realign(
@@ -140,6 +144,7 @@ class RealignMito(SampleStage):
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(realign_j)
+        assert isinstance(realign_j.output_cram, hb.ResourceFile)
 
         # Mark duplicates (non-shifted)
         realign_mkdup_j = picard.markdup(
@@ -152,6 +157,8 @@ class RealignMito(SampleStage):
 
         )
         jobs.append(realign_mkdup_j)
+        assert isinstance(realign_mkdup_j, Job)
+        assert isinstance(realign_mkdup_j.output_cram, hb.ResourceGroup)
 
         # Align extracted reads to "shifted" chrM using bwa
         shifted_realign_j = mito.mito_realign(
@@ -162,6 +169,7 @@ class RealignMito(SampleStage):
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(shifted_realign_j)
+        assert isinstance(shifted_realign_j.output_cram, hb.ResourceFile)
 
         # Mark duplicates (shifted)
         shifted_mkdup_j = picard.markdup(
@@ -173,6 +181,8 @@ class RealignMito(SampleStage):
             overwrite=True
         )
         jobs.append(shifted_mkdup_j)
+        assert isinstance(shifted_mkdup_j, Job)
+        assert isinstance(shifted_mkdup_j.output_cram, hb.ResourceGroup)
 
         # Collect coverage metrics (only on non-shifted)
         coverage_metrics_J = mito.collect_coverage_metrics(
@@ -197,6 +207,7 @@ class RealignMito(SampleStage):
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(non_control_region_coverage_j)
+        assert isinstance(non_control_region_coverage_j.per_base_coverage, hb.ResourceFile)
 
         shifted_control_region_coverage_j = mito.coverage_at_every_base(
             b=get_batch(),
@@ -206,6 +217,7 @@ class RealignMito(SampleStage):
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(shifted_control_region_coverage_j)
+        assert isinstance(shifted_control_region_coverage_j.per_base_coverage, hb.ResourceFile)
 
         # Merge coverage stats
         merge_coverage_j = mito.merge_coverage(
@@ -313,6 +325,7 @@ class GenotypeMito(SampleStage):
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(call_j)
+        assert isinstance(call_j.output_vcf, hb.ResourceGroup)
 
         # Call variants in ONLY the control region using the shifted reference
         shifted_call_j = mito.mito_mutect2(
@@ -323,6 +336,7 @@ class GenotypeMito(SampleStage):
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(shifted_call_j)
+        assert isinstance(shifted_call_j.output_vcf, hb.ResourceGroup)
 
         # Merge the wt and shifted VCFs
         merge_j = mito.liftover_and_combine_vcfs(
@@ -334,6 +348,7 @@ class GenotypeMito(SampleStage):
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(merge_j)
+        assert isinstance(merge_j.output_vcf, hb.ResourceGroup)
 
         # Merge the mutect stats output files (needed for filtering)
         merge_stats_J = mito.merge_mutect_stats(
@@ -343,6 +358,7 @@ class GenotypeMito(SampleStage):
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(merge_stats_J)
+        assert isinstance(merge_stats_J.combined_stats, hb.ResourceFile)
 
         # Initial round of filtering to exclude blacklist and high alt alleles
         initial_filter_j = mito.filter_variants(
@@ -358,6 +374,7 @@ class GenotypeMito(SampleStage):
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(initial_filter_j)
+        assert isinstance(initial_filter_j.output_vcf, hb.ResourceGroup)
 
         # SplitMultiAllelics AND remove non-passing sites
         # Output is only used for input to haplocheck
@@ -369,6 +386,7 @@ class GenotypeMito(SampleStage):
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(split_multiallelics_j)
+        assert isinstance(split_multiallelics_j.output_vcf, hb.ResourceGroup)
 
         # Use mito vcf to identify level of contamination
         get_contamination_j = mito.get_contamination(
@@ -378,6 +396,7 @@ class GenotypeMito(SampleStage):
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(get_contamination_j)
+        assert isinstance(get_contamination_j.max_contamination, hb.ResourceFile)
 
         # Filter round 2 - remove variants with VAF below estimated contamination
         second_filter_j = mito.filter_variants(
@@ -393,6 +412,7 @@ class GenotypeMito(SampleStage):
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(second_filter_j)
+        assert isinstance(second_filter_j.output_vcf, hb.ResourceGroup)
 
         # Generate final output vcf
         split_multiallelics_j = mito.split_multi_allelics(
