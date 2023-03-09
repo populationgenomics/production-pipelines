@@ -187,7 +187,7 @@ def collect_coverage_metrics(
 
 def mito_mutect2(
     b,
-    cram: hb.ResourceGroup,
+    cram: hb.ResourceFile,
     reference: hb.ResourceGroup,
     region: str,
     max_reads_per_alignment_start: int = 75,
