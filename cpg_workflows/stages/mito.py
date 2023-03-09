@@ -293,8 +293,8 @@ class GenotypeMito(SampleStage):
         jobs = []
 
         # Get input resources
-        non_shifted_cram = get_batch().read_input(inputs.as_path(sample, RealignMito, 'non_shifted_cram'))
-        shifted_cram = get_batch().read_input(inputs.as_path(sample, RealignMito, 'shifted_cram'))
+        non_shifted_cram = get_batch().read_input(inputs.as_str(sample, RealignMito, 'non_shifted_cram'))
+        shifted_cram = get_batch().read_input(inputs.as_str(sample, RealignMito, 'shifted_cram'))
 
         # Call variants on WT genome
         call_j = mito.mito_mutect2(
