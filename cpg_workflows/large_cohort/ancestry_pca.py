@@ -33,31 +33,31 @@ def add_background(
         path = dataset_dict['dataset_path']
         logging.info(f'Adding background dataset {path}')
         if to_path(path).suffix == '.mt':
-            mt = hl.read_matrix_table(str(path))
-            mt = hl.split_multi(mt, filter_changed_loci=True)
-            mt = mt.semi_join_rows(qc_variants_ht)
-            mt = mt.densify()
+            background_mt = hl.read_matrix_table(str(path))
+            background_mt = hl.split_multi(background_mt, filter_changed_loci=True)
+            background_mt = background_mt.semi_join_rows(qc_variants_ht)
+            background_mt = background_mt.densify()
         elif to_path(path).suffix == '.vds':
-            vds = hl.vds.read_vds(str(path))
-            vds = hl.vds.split_multi(vds, filter_changed_loci=True)
-            vds = hl.vds.filter_variants(vds, qc_variants_ht)
-            mt = hl.vds.to_dense_mt(vds)
-            # annotate mt with metadata info
+            background_vds = hl.vds.read_vds(str(path))
+            background_vds = hl.vds.split_multi(background_vds, filter_changed_loci=True)
+            background_vds = hl.vds.filter_variants(background_vds, qc_variants_ht)
+            background_mt = hl.vds.to_dense_mt(background_vds)
+            # annotate background mt with metadata info derived from SampleQC stage 
             metadata_tables = []
             for path in dataset_dict['metadata_table']:
                 sample_qc_background = hl.read_table(path)
                 metadata_tables.append(sample_qc_background)
             metadata_tables = hl.Table.union(*metadata_tables)
-            mt = mt.annotate_cols(**metadata_tables[mt.col_key])
+            background_mt = background_mt.annotate_cols(**metadata_tables[background_mt.col_key])
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
 
         # save metadata info before merging dense and background datasets
-        ht = mt.cols()
-        mt = mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
-        mt = mt.naive_coalesce(5000)
+        ht = background_mt.cols()
+        background_mt = background_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
+        background_mt = background_mt.naive_coalesce(5000)
         # combine dense dataset with background population dataset
-        dense_mt = dense_mt.union_cols(mt)
+        dense_mt = dense_mt.union_cols(background_mt)
         sample_qc_ht = sample_qc_ht.union(ht)
     return dense_mt, sample_qc_ht
 

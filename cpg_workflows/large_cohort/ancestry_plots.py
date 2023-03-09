@@ -13,7 +13,7 @@ from bokeh.resources import CDN
 from bokeh.embed import file_html
 from bokeh.transform import factor_cmap, factor_mark
 from bokeh.plotting import ColumnDataSource, figure
-from bokeh.palettes import turbo  # flake: disable=F401
+from bokeh.palettes import turbo, d3  # flake: disable=F401
 from bokeh.models import CategoricalColorMapper, HoverTool
 
 from cpg_utils import Path
@@ -77,7 +77,7 @@ def run(
     use_external_id = get_config()['large_cohort']['use_external_id']
     if use_external_id:
         ht = key_by_external_id(scores_ht, sample_ht)
-    ht = ht.cache()
+    ht = scores_ht.cache()
 
     # Use eigenvalues to calculate variance
     eigenvalues = eigenvalues_ht.f0.collect()
@@ -142,6 +142,12 @@ def _plot_pca(
     # count the number of samples for each group and add it to the labels
     labels = [f'{x} ({cntr[x]})' for x in labels]
     unique_labels = list(Counter(labels).keys())
+    # set colour palette to use turbo if less than 4, otherwise use a small colour palette with more 
+    # differentiated colours
+    if len(unique_labels) < 4:
+        palette = d3['Category10'][len(unique_labels)]
+    else:
+        palette = turbo(len(unique_labels))
 
     tooltips = [('labels', '@label'), ('samples', '@samples')]
     plots = []
@@ -176,7 +182,7 @@ def _plot_pca(
             ),
             source=source,
             size=5,
-            color=factor_cmap('label', turbo(len(unique_labels)), unique_labels),
+            color=factor_cmap('label', palette, unique_labels),
             legend_group='label',
         )
         plot.add_layout(plot.legend[0], 'left')
