@@ -20,8 +20,8 @@ from cpg_utils import Path
 from cpg_utils.hail_batch import reference_path, genome_build
 
 
-BG_LABEL = 'Provided ancestry'
-FG_LABEL = 'Inferred ancestry'
+PROVIDED_LABEL = 'Provided ancestry'
+INFERRED_LABEL = 'Inferred ancestry'
 
 
 def run(
@@ -31,8 +31,6 @@ def run(
     eigenvalues_ht_path: Path,
     loadings_ht_path: Path,
     inferred_pop_ht_path: Path,
-    # TODO: make this configurable
-    # use_external_id: False
 ):
     """
     Generate plots in HTML format, write for each PC (of n_pcs) and
@@ -55,7 +53,9 @@ def run(
     def key_by_external_id(ht_, meta_ht=None):
         """
         Assuming ht.s is a CPG id, replaces it with external ID,
-        assuming it's defined in meta_ht.external_id
+        assuming it's defined in meta_ht.external_id. This item is
+        configurable in the large_cohort toml, under use_external_id
+        where the default is false.
         """
         if meta_ht is None:
             meta_ht = ht_
@@ -73,10 +73,13 @@ def run(
         )
         return ht_
 
-    # TODO: if use_external_id:
-    ht = key_by_external_id(scores_ht, sample_ht)
+    # Key samples by their external IDs
+    use_external_id = get_config()['large_cohort']['use_external_id']
+    if use_external_id:
+        ht = key_by_external_id(scores_ht, sample_ht)
     ht = ht.cache()
 
+    # Use eigenvalues to calculate variance
     eigenvalues = eigenvalues_ht.f0.collect()
     eigenvalues_df = pd.to_numeric(eigenvalues)
     variance = np.divide(eigenvalues_df[1:], float(eigenvalues_df.sum())) * 100
@@ -88,6 +91,8 @@ def run(
     sample_names = ht.s.collect()
     datasets = ht.dataset.collect()
     use_inferred = get_config()['large_cohort']['pca_background']['inferred_ancestry']
+    # if the inferred ancestry is set to true in the config, annotate the PCA with the 
+    # inferred population ancestry (calculated in the ancestry_pca.py script
     population_label = ht.training_pop.collect() if use_inferred else ht.pop.collect()
     # Change 'none' values to dataset name
     workflow_dataset = get_config()['workflow']['input_datasets']
@@ -134,15 +139,9 @@ def _plot_pca(
 ):
 
     cntr: Counter = Counter(labels)
+    # count the number of samples for each group and add it to the labels
     labels = [f'{x} ({cntr[x]})' for x in labels]
     unique_labels = list(Counter(labels).keys())
-    # set colour palette to be turbo, or if only two fields,
-    # set colours to be two fields with larger differentiation
-    # TODO: fix colours below
-    # if len(unique_labels) == 2:
-    #     col=factor_cmap('label', ['#1b9e77', '#d95f02'], unique_labels)
-    # else:
-    #     col=factor_cmap('label', turbo(len(unique_labels)), unique_labels)
 
     tooltips = [('labels', '@label'), ('samples', '@samples')]
     plots = []
@@ -164,7 +163,7 @@ def _plot_pca(
                 samples=sample_names,
                 dataset=datasets,
                 is_training=[
-                    {True: BG_LABEL, False: FG_LABEL}.get(v) for v in is_training
+                    {True: PROVIDED_LABEL, False: INFERRED_LABEL}.get(v) for v in is_training
                 ],
             )
         )
@@ -173,7 +172,7 @@ def _plot_pca(
             'y',
             alpha=0.5,
             marker=factor_mark(
-                'is_training', ['cross', 'circle'], [BG_LABEL, FG_LABEL]
+                'is_training', ['cross', 'circle'], [PROVIDED_LABEL, INFERRED_LABEL]
             ),
             source=source,
             size=5,
