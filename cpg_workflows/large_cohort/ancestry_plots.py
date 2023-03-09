@@ -156,7 +156,7 @@ def _plot_pca(
         pc2 = i + 1
         plot = figure(
             title=title,
-            x_axis_label=f'PC{pc1 + 1} ({variance[pc1]})%)',
+            x_axis_label=f'PC{pc1 + 1} ({variance[pc1]}%)',
             y_axis_label=f'PC{pc2 + 1} ({variance[pc2]}%)',
             tooltips=tooltips,
             width=1000,
