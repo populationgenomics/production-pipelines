@@ -20,21 +20,9 @@ from cpg_utils import Path
 from cpg_utils.hail_batch import reference_path, genome_build
 
 
-# TODO: can we not hard code these?
-BG_LABEL = 'Provided ancestry (1KG+HGDP)'
+BG_LABEL = 'Provided ancestry'
 FG_LABEL = 'Inferred ancestry'
 
-# TODO: fix populations (make configurable option for provided or inferred ancestry)
-
-# how I made labels before
-# plot by continental population
-# labels = scores.continental_pop.collect()
-#     # Change 'none' values to dataset name
-#     dataset = get_config()['workflow']['input_datasets']
-#     # join dataset names with underscore, in case there are multiple
-#     dataset = '_'.join(dataset)
-#     labels = [dataset if x is None else x for x in labels]
-#     study = list(set(labels))
 
 def run(
     out_path_pattern: Path,
@@ -85,7 +73,7 @@ def run(
         )
         return ht_
 
-    # if use_external_id:
+    # TODO: if use_external_id:
     ht = key_by_external_id(scores_ht, sample_ht)
     ht = ht.cache()
 
@@ -99,9 +87,14 @@ def run(
 
     sample_names = ht.s.collect()
     datasets = ht.dataset.collect()
-    is_training = ht.is_training.collect()
     use_inferred = get_config()['large_cohort']['pca_background']['inferred_ancestry']
     population_label = ht.training_pop.collect() if use_inferred else ht.pop.collect()
+    # Change 'none' values to dataset name
+    workflow_dataset = get_config()['workflow']['input_datasets']
+    # join dataset names with underscore, in case there are multiple
+    workflow_dataset = '_'.join(workflow_dataset)
+    population_label = [workflow_dataset if x is None else x for x in population_label]
+    is_training = ht.is_training.collect() if use_inferred else [False] * len(ht.is_training.collect())
     for scope, title, labels in [
         ('dataset', 'Dataset', datasets),
         ('population', 'Population', population_label),
@@ -115,7 +108,7 @@ def run(
                 variance=variance,
                 ht=ht,
                 datasets=datasets,
-                # is_training=is_training,
+                is_training=is_training,
                 sample_names=sample_names,
                 out_path_pattern=out_path_pattern,
             )
@@ -144,7 +137,7 @@ def _plot_pca(
     labels = [f'{x} ({cntr[x]})' for x in labels]
     unique_labels = list(Counter(labels).keys())
     # set colour palette to be turbo, or if only two fields,
-    # colours with larger differentiation
+    # set colours to be two fields with larger differentiation
     if len(unique_labels) == 2:
         col=factor_cmap('label', ['#1b9e77', '#d95f02'], unique_labels)
     else:
@@ -169,19 +162,18 @@ def _plot_pca(
                 label=labels,
                 samples=sample_names,
                 dataset=datasets,
-                # TODO: What's happening here?
                 is_training=[
                     {True: BG_LABEL, False: FG_LABEL}.get(v) for v in is_training
                 ],
             )
         )
-        plot.circle(
+        plot.scatter(
             'x',
             'y',
             alpha=0.5,
-            # marker=factor_mark(
-            #     'is_training', ['cross', 'circle'], [BG_LABEL, FG_LABEL]
-            # ),
+            marker=factor_mark(
+                'is_training', ['cross', 'circle'], [BG_LABEL, FG_LABEL]
+            ),
             source=source,
             size=5,
             color=col,
