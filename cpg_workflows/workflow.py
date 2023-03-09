@@ -1003,18 +1003,15 @@ class Workflow:
 
         # Round 2: depth search to find implicit stages.
         depth = 0
-        depths = dict()
         while True:  # might require few iterations to resolve dependencies recursively
             depth += 1
             newly_implicitly_added_d = dict()
             for stg in _stages_d.values():
                 if stg.name in skip_stages:
                     stg.skipped = True
-                    depths[stg.name] = depth
                     continue  # not searching deeper
                 if only_stages and stg.name not in only_stages:
                     stg.skipped = True
-                    depths[stg.name] = depth
 
                 # Iterate dependencies:
                 for reqcls in stg.required_stages_classes:
@@ -1029,16 +1026,10 @@ class Workflow:
                     f'Additional implicit stages: '
                     f'{list(newly_implicitly_added_d.keys())}'
                 )
-                depths.update({k: depth for k in newly_implicitly_added_d.keys()})
                 _stages_d |= newly_implicitly_added_d
             else:
                 # No new implicit stages added, so can stop the depth-search here
                 break
-
-        # Add depth to the remaining
-        missing_stages = set(_stages_d.keys()) - set(depths.keys())
-        for stg in missing_stages:
-            depths[stg] = depth
 
         # Round 3: set "stage.required_stages" fields to each stage.
         for stg in _stages_d.values():
@@ -1053,7 +1044,6 @@ class Workflow:
         for stg in _stages_d.values():
             dag_node2nodes[stg.name] = set(dep.name for dep in stg.required_stages)
         dag = nx.DiGraph(dag_node2nodes)
-        nx.set_node_attributes(dag, depths, name='depth')
 
         try:
             stage_names = list(reversed(list(nx.topological_sort(dag))))
