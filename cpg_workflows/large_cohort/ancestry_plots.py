@@ -138,10 +138,11 @@ def _plot_pca(
     unique_labels = list(Counter(labels).keys())
     # set colour palette to be turbo, or if only two fields,
     # set colours to be two fields with larger differentiation
-    if len(unique_labels) == 2:
-        col=factor_cmap('label', ['#1b9e77', '#d95f02'], unique_labels)
-    else:
-        col=factor_cmap('label', turbo(len(unique_labels)), unique_labels)
+    # TODO: fix colours below
+    # if len(unique_labels) == 2:
+    #     col=factor_cmap('label', ['#1b9e77', '#d95f02'], unique_labels)
+    # else:
+    #     col=factor_cmap('label', turbo(len(unique_labels)), unique_labels)
 
     tooltips = [('labels', '@label'), ('samples', '@samples')]
     plots = []
@@ -176,7 +177,7 @@ def _plot_pca(
             ),
             source=source,
             size=5,
-            color=col,
+            color=factor_cmap('label', turbo(len(unique_labels)), unique_labels),
             legend_group='label',
         )
         plot.add_layout(plot.legend[0], 'left')
