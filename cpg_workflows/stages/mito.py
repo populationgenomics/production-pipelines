@@ -200,7 +200,7 @@ class RealignMito(SampleStage):
             b=get_batch(),
             cram=shifted_mkdup_j.output_cram,
             intervals_list=intervals.control_region_shifted,
-            reference=mito_ref,
+            reference=shifted_mito_ref,
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(shifted_control_region_coverage_j)
