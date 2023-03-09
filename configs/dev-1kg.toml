@@ -1,4 +1,5 @@
 [workflow]
+show_workflow = true
 check_inputs = true
 skip_samples_with_missing_input = false
 check_intermediates = true

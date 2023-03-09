@@ -30,6 +30,7 @@ from .status import MetamistStatusReporter
 from .targets import Target, Dataset, Sample, Cohort
 from .utils import exists, timestamp, slugify, ExpectedResultT
 from .inputs import get_cohort
+from .graph import GraphPlot
 
 
 StageDecorator = Callable[..., 'Stage']
@@ -499,7 +500,6 @@ class Stage(Generic[TargetT], ABC):
             and action == Action.QUEUE
             and outputs.data
         ):
-
             analysis_outputs: list[str | Path] = []
             if isinstance(outputs.data, dict):
                 if not self.analysis_keys:
@@ -810,6 +810,7 @@ class Workflow:
             )
 
         self.dry_run = dry_run or get_config()['workflow'].get('dry_run')
+        self.show_workflow = get_config()['workflow'].get('show_workflow', False)
 
         analysis_dataset = get_config()['workflow']['dataset']
         name = get_config()['workflow'].get('name')
@@ -1072,6 +1073,11 @@ class Workflow:
                     )
 
                 logging.info(f'')
+
+        # Round 7: exporting workflow to GML standard
+        if self.show_workflow:
+            gp = GraphPlot(dag)
+            gp.display_graph()
 
     @staticmethod
     def _process_stage_errors(
