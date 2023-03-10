@@ -125,6 +125,7 @@ def run(
 
     return plots
 
+
 def _plot_pca(
     scope,
     title,

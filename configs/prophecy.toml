@@ -1,7 +1,6 @@
 [workflow]
 input_datasets = ['prophecy']
 sequencing_type = 'genome'
-access_level= 'test'
 
 skip_samples = [
   'CPG216010',  # replaced by CPG262915
