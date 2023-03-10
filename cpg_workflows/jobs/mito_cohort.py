@@ -12,7 +12,7 @@ from cpg_workflows.filetypes import CramPath
 from cpg_workflows.utils import can_reuse
 
 from cpg_workflows.jobs import picard
-
+from cpg_workflows.mito_pipeline_scripts import annotate_coverage as annotate_coverage_script
 
 def split_multi_allelics(
     b,
@@ -87,6 +87,7 @@ def annotate_coverage(
     job_attrs = job_attrs or {}
     j = b.new_job('mito_annotate_coverage', job_attrs)
     # j.image(image_path('haplocheckcli'))
+    # anno_job.image(get_config()['workflows']['driver_image'])
 
     res = STANDARD.request_resources(ncpu=8)
     res.set_to_job(j)
@@ -102,7 +103,7 @@ def annotate_coverage(
         echo "{tsv_string}" > input.tsv
 
         # Run query job
-        cpg_workflows/mito_pipeline_scripts/annotate_coverage.py/annotate_coverage.py \
+        python {annotate_coverage_script.__file__} \
             --input-tsv input.tsv \
             --output-ht {j.out_mt}
             --temp-dir $BATCH_TMPDIR/mt
