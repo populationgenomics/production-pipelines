@@ -62,6 +62,6 @@ def annotate_coverage(
 
     j.command(command(cmd, setup_gcp=True, monitor_space=True))
     # b.write_output(j.outfile, str(coverage_ht.with_suffix('')))
-    b.write_output(j.tsv, str(coverage_ht.with_suffix('')) + '.temp.tsv')
+    b.write_output(j.tsv, 'gs://cpg-acute-care-test/mito/input.temp.tsv')
 
     return j
