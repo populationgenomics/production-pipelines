@@ -4,6 +4,7 @@ Plot ancestry PCA analysis results
 
 from collections import Counter
 from typing import List, Iterable
+from cpg_utils.config import get_config
 
 import pandas as pd
 import numpy as np
@@ -12,15 +13,15 @@ from bokeh.resources import CDN
 from bokeh.embed import file_html
 from bokeh.transform import factor_cmap, factor_mark
 from bokeh.plotting import ColumnDataSource, figure
-from bokeh.palettes import turbo  # flake: disable=F401
+from bokeh.palettes import turbo, d3  # flake: disable=F401
 from bokeh.models import CategoricalColorMapper, HoverTool
 
 from cpg_utils import Path
 from cpg_utils.hail_batch import reference_path, genome_build
 
 
-BG_LABEL = 'Provided ancestry (1KG+HGDP)'
-FG_LABEL = 'Inferred ancestry'
+PROVIDED_LABEL = 'Provided ancestry'
+INFERRED_LABEL = 'Inferred ancestry'
 
 
 def run(
@@ -43,7 +44,8 @@ def run(
     inferred_pop_ht = hl.read_table(str(inferred_pop_ht_path))
 
     scores_ht = scores_ht.annotate(
-        pop=inferred_pop_ht[scores_ht.s].pop,
+        pop=sample_ht[scores_ht.s].pop,
+        training_pop=inferred_pop_ht[scores_ht.s].pop,
         is_training=inferred_pop_ht[scores_ht.s].is_training,
         dataset=sample_ht[scores_ht.s].dataset,
     ).cache()
@@ -51,7 +53,9 @@ def run(
     def key_by_external_id(ht_, meta_ht=None):
         """
         Assuming ht.s is a CPG id, replaces it with external ID,
-        assuming it's defined in meta_ht.external_id
+        assuming it's defined in meta_ht.external_id. This item is
+        configurable in the large_cohort toml, under use_external_id
+        where the default is false.
         """
         if meta_ht is None:
             meta_ht = ht_
@@ -69,9 +73,13 @@ def run(
         )
         return ht_
 
-    ht = key_by_external_id(scores_ht, sample_ht)
-    ht = ht.cache()
+    # Key samples by their external IDs
+    use_external_id = get_config()['large_cohort']['use_external_id']
+    if use_external_id:
+        ht = key_by_external_id(scores_ht, sample_ht)
+    ht = scores_ht.cache()
 
+    # Use eigenvalues to calculate variance
     eigenvalues = eigenvalues_ht.f0.collect()
     eigenvalues_df = pd.to_numeric(eigenvalues)
     variance = np.divide(eigenvalues_df[1:], float(eigenvalues_df.sum())) * 100
@@ -82,11 +90,19 @@ def run(
 
     sample_names = ht.s.collect()
     datasets = ht.dataset.collect()
-    is_training = ht.is_training.collect()
-
+    use_inferred = get_config()['large_cohort']['pca_background']['inferred_ancestry']
+    # if the inferred ancestry is set to true in the config, annotate the PCA with the 
+    # inferred population ancestry (calculated in the ancestry_pca.py script
+    population_label = ht.training_pop.collect() if use_inferred else ht.pop.collect()
+    # Change 'none' values to dataset name
+    workflow_dataset = get_config()['workflow']['input_datasets']
+    # join dataset names with underscore, in case there are multiple
+    workflow_dataset = '_'.join(workflow_dataset)
+    population_label = [workflow_dataset if x is None else x for x in population_label]
+    is_training = ht.is_training.collect() if use_inferred else [False] * len(ht.is_training.collect())
     for scope, title, labels in [
         ('dataset', 'Dataset', datasets),
-        ('population', 'Population', ht.pop.collect()),
+        ('population', 'Population', population_label),
     ]:
         plots.extend(
             _plot_pca(
@@ -124,9 +140,16 @@ def _plot_pca(
 ):
 
     cntr: Counter = Counter(labels)
+    # count the number of samples for each group and add it to the labels
     labels = [f'{x} ({cntr[x]})' for x in labels]
-
     unique_labels = list(Counter(labels).keys())
+    # set colour palette to use turbo if less than 4, otherwise use a small colour palette with more 
+    # differentiated colours
+    if len(unique_labels) < 4:
+        palette = d3['Category10'][len(unique_labels)]
+    else:
+        palette = turbo(len(unique_labels))
+
     tooltips = [('labels', '@label'), ('samples', '@samples')]
     plots = []
     for i in range(number_of_pcs - 1):
@@ -134,7 +157,7 @@ def _plot_pca(
         pc2 = i + 1
         plot = figure(
             title=title,
-            x_axis_label=f'PC{pc1 + 1} ({variance[pc1]})%)',
+            x_axis_label=f'PC{pc1 + 1} ({variance[pc1]}%)',
             y_axis_label=f'PC{pc2 + 1} ({variance[pc2]}%)',
             tooltips=tooltips,
             width=1000,
@@ -147,7 +170,7 @@ def _plot_pca(
                 samples=sample_names,
                 dataset=datasets,
                 is_training=[
-                    {True: BG_LABEL, False: FG_LABEL}.get(v) for v in is_training
+                    {True: PROVIDED_LABEL, False: INFERRED_LABEL}.get(v) for v in is_training
                 ],
             )
         )
@@ -156,11 +179,11 @@ def _plot_pca(
             'y',
             alpha=0.5,
             marker=factor_mark(
-                'is_training', ['cross', 'circle'], [BG_LABEL, FG_LABEL]
+                'is_training', ['cross', 'circle'], [PROVIDED_LABEL, INFERRED_LABEL]
             ),
             source=source,
-            size=4,
-            color=factor_cmap('label', ['#1b9e77', '#d95f02'], unique_labels),
+            size=5,
+            color=factor_cmap('label', palette, unique_labels),
             legend_group='label',
         )
         plot.add_layout(plot.legend[0], 'left')

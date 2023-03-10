@@ -27,6 +27,19 @@ n_pcs = 16  # number of principal components for PCA analysis
 min_pop_prob = 0.5  # minimum random forest probability for population assignment
 pop_meta_field = 'Superpopulation name'  # metamist's `Participant/meta` field for the
                                          # known population label for the RF training
+# whether or not to key samples by their external ID
+use_external_id = false
+
+# Section that specifies background samples for PCA analysis.
+# `datasets` must be a list paths to matrix tables or VDS, and 
+# `pop_field` if defined would specify the column-level field in th datasets
+# to extract the population tag for RF training for ancestry inference.
+[large_cohort.pca_background]
+#datasets = ['gs://cpg-common-main/references/ancestry/oceania_eur.mt']
+#pop_field = 'continental_pop'
+# set whether PCA output labels are from given population names, or random forest
+# inferred population labels
+inferred_ancestry = false
 
 # Parameters for sample QC. The default values for soft filtering taken from gnomAD QC:
 # https://macarthurlab.org/2019/10/16/gnomad-v3-0, with `max_n_snps` and 
@@ -50,4 +63,4 @@ delete_scratch_on_exit = false
 
 [references.gnomad]
 tel_and_cent_ht = "gs://cpg-common-main/references/gnomad/v0/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht"
-predetermined_qc_variants = "gs://cpg-common-main/references/gnomad/v0/sample_qc/pre_ld_pruning_qc_variants.ht"
+predetermined_qc_variants = "gs://cpg-hgdp-1kg-test/vds/pruned_variants.ht"
