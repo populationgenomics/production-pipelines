@@ -4,6 +4,7 @@ Create Hail Batch jobs to call mitochondrial SNVs
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
+from cpg_utils.config import get_config
 from cpg_utils import Path, to_path
 from cpg_utils.hail_batch import image_path, fasta_res_group
 from cpg_utils.hail_batch import command
@@ -11,7 +12,6 @@ from cpg_workflows.resources import STANDARD
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.utils import can_reuse
 
-from cpg_workflows.jobs import picard
 from cpg_workflows.mito_pipeline_scripts import annotate_coverage as annotate_coverage_script
 
 
@@ -28,7 +28,7 @@ def annotate_coverage(
     job_attrs = job_attrs or {}
     j = b.new_job('mito_annotate_coverage', job_attrs)
     # j.image(image_path('haplocheckcli'))
-    # anno_job.image(get_config()['workflows']['driver_image'])
+    j.image(get_config()['workflows']['driver_image'])
 
     res = STANDARD.request_resources(ncpu=8)
     res.set_to_job(j)
