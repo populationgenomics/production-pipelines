@@ -37,7 +37,7 @@ def annotate_coverage(
     # required format: "tsv of participant_id, base_level_coverage_metrics, sample"
     tsv_string = ""
     for sid, path in base_level_coverage_by_sid.items():
-        tsv_string += f'{sid}\t{path}\t{sid}\n'
+        tsv_string += f'{sid}\\t{path}\\t{sid}\\n'
 
     # script needs to write to a .ht path
     j.declare_resource_group(
