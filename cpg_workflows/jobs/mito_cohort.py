@@ -54,14 +54,14 @@ def annotate_coverage(
 
         # Run query job
         # python {annotate_coverage_script.__file__}
-        # python cpg_workflows/mito_pipeline_scripts/annotate_coverage.py \
-        #     --input-tsv input.tsv \
-        #     --output-ht {j.outfile.ht} \
-        #     --temp-dir $BATCH_TMPDIR/mt
+        python cpg_workflows/mito_pipeline_scripts/annotate_coverage.py \
+            --input-tsv input.tsv \
+            --output-ht {j.outfile.ht} \
+            --temp-dir $BATCH_TMPDIR/mt
         """
 
     j.command(command(cmd, setup_gcp=True, monitor_space=True))
-    # b.write_output(j.outfile, str(coverage_ht.with_suffix('')))
+    b.write_output(j.outfile, str(coverage_ht.with_suffix('')))
     b.write_output(j.tsv, 'gs://cpg-acute-care-test/mito/input.temp.tsv')
 
     return j
