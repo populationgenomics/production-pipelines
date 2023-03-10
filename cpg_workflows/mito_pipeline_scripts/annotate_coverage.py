@@ -68,6 +68,8 @@ def multi_way_union_mts(mts: list, temp_dir: str, chunk_size: int) -> hl.MatrixT
                 )
             )
 
+            merged.show(1)
+            print('merged.count():', merged.count())
             # Flatten col annotation from array<struct{__cols: array<struct{s: str}>} to array<struct{s: str}>
             merged = merged.annotate_globals(
                 __cols=hl.flatten(merged.__cols.map(lambda x: x.__cols))
