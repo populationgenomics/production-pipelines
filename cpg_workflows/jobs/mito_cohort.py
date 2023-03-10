@@ -45,7 +45,7 @@ def annotate_coverage(
     )
     cmd = f"""
         # build input file:
-        echo "{tsv_string}" > input.tsv
+        printf "{tsv_string}" > input.tsv
         cp input.tsv {j.tsv}
 
         ls -l
