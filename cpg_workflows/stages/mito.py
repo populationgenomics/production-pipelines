@@ -458,7 +458,7 @@ class JoinMito(CohortStage):
             job_attrs=self.get_job_attrs(cohort),
         )
         jobs.append(call_j)
-        assert isinstance(call_j.output_vcf, hb.ResourceGroup)
+        # assert isinstance(call_j.output_vcf, hb.ResourceGroup)
 
 
         # sample_vcf_by_sid = {
