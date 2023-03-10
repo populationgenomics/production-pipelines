@@ -55,6 +55,6 @@ def annotate_coverage(
         """
 
     j.command(command(cmd, setup_gcp=True, monitor_space=True))
-    b.write_output(j.coverage_ht, str(coverage_ht.with_suffix('')))
+    b.write_output(j.outfile, str(coverage_ht.with_suffix('')))
 
     return j
