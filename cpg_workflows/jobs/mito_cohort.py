@@ -28,7 +28,7 @@ def annotate_coverage(
     job_attrs = job_attrs or {}
     j = b.new_job('mito_annotate_coverage', job_attrs)
     # j.image(image_path('haplocheckcli'))
-    j.image(get_config()['workflows']['driver_image'])
+    j.image(get_config()['workflow']['driver_image'])
 
     res = STANDARD.request_resources(ncpu=8)
     res.set_to_job(j)
