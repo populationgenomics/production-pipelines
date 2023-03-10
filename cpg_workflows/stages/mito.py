@@ -23,6 +23,7 @@ from cpg_workflows.workflow import (
     StageInput,
     StageOutput,
     SampleStage,
+    CohortStage
 )
 
 MITO_REF = {
