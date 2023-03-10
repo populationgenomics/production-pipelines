@@ -437,7 +437,7 @@ class JoinMito(CohortStage):
             # writing into perm location for late debugging
             # convert to str to avoid checking existence
             'tmp_prefix': str(self.tmp_prefix),
-            'coverage_mt': self.prefix / 'mito' / 'coverage.mt',
+            'coverage_ht': self.prefix / 'mito' / 'coverage.ht',
             'mt': self.prefix / 'mito' / 'cohort.mt',
         }
 
@@ -454,7 +454,7 @@ class JoinMito(CohortStage):
         call_j = mito_cohort.annotate_coverage(
             b=get_batch(),
             base_level_coverage_by_sid=base_level_coverage_by_sid,
-            out_mt=self.expected_outputs(cohort)['coverage_mt'],
+            coverage_ht=self.expected_outputs(cohort)['coverage_ht'],
             job_attrs=self.get_job_attrs(cohort),
         )
         jobs.append(call_j)
