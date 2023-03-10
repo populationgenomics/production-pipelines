@@ -14,9 +14,9 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_workflows import get_batch
 from cpg_workflows.filetypes import CramPath
-from cpg_workflows.jobs import mito, picard
+from cpg_workflows.jobs import mito, picard, mito_cohort
 from cpg_workflows.stages.align import Align
-from cpg_workflows.targets import Sample
+from cpg_workflows.targets import Sample, Cohort
 from cpg_workflows.utils import exists
 from cpg_workflows.workflow import (
     stage,
@@ -420,3 +420,69 @@ class GenotypeMito(SampleStage):
         )
 
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
+
+
+@stage(required_stages=[RealignMito, GenotypeMito])
+class JoinMito(CohortStage):
+    """
+    Join and annotate Mito snv and indel calls
+    """
+
+    def expected_outputs(self, cohort: Cohort):
+        """
+        Expected to write a matrix table.
+        """
+        return {
+            # writing into perm location for late debugging
+            # convert to str to avoid checking existence
+            'tmp_prefix': str(self.tmp_prefix),
+            'coverage_mt': self.prefix / 'mito' / 'coverage.mt',
+            'mt': self.prefix / 'mito' / 'cohort.mt',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        """
+        Uses analysis-runner's dataproc helper to run hail query scripts
+        """
+        jobs = []
+        base_level_coverage_by_sid = {
+            sample.id: inputs.as_path(target=sample, stage=RealignMito, key='base_level_coverage_metrics')
+            for sample in cohort.get_samples()
+        }
+
+        call_j = mito_cohort.annotate_coverage(
+            b=get_batch(),
+            base_level_coverage_by_sid=base_level_coverage_by_sid,
+            out_mt=self.expected_outputs(cohort)['coverage_mt'],
+            job_attrs=self.get_job_attrs(cohort),
+        )
+        jobs.append(call_j)
+        assert isinstance(call_j.output_vcf, hb.ResourceGroup)
+
+
+        # sample_vcf_by_sid = {
+        #     sample.id: inputs.as_path(target=sample, stage=GenotypeMito, key='out_vcf')
+        #     for sample in cohort.get_samples()
+        # }
+
+
+        # checkpoint_prefix = (
+        #     to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
+        # )
+
+        # jobs = annotate_cohort_jobs(
+        #     b=get_batch(),
+        #     vcf_path=vcf_path,
+        #     siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
+        #     vep_ht_path=vep_ht_path,
+        #     out_mt_path=self.expected_outputs(cohort)['mt'],
+        #     checkpoint_prefix=checkpoint_prefix,
+        #     job_attrs=self.get_job_attrs(cohort),
+        #     depends_on=inputs.get_jobs(cohort),
+        # )
+
+        return self.make_outputs(
+            cohort,
+            data=self.expected_outputs(cohort),
+            jobs=jobs,
+        )

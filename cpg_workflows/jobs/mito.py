@@ -11,8 +11,6 @@ from cpg_workflows.resources import STANDARD
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.utils import can_reuse
 
-from cpg_workflows.jobs import picard
-
 
 def subset_cram_to_chrM(
     b,
