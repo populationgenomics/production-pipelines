@@ -417,7 +417,7 @@ class GenotypeMito(SampleStage):
         # Write the final vcf to the bucket
         get_batch().write_output(
             split_multiallelics_j.output_vcf,
-            str(self.expected_outputs(sample)['out_vcf'].with_suffix('')),
+            str(self.expected_outputs(sample)['out_vcf']).replace('.vcf.gz', ''),
         )
 
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
