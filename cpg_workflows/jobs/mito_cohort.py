@@ -47,6 +47,10 @@ def annotate_coverage(
         # build input file:
         echo "{tsv_string}" > input.tsv
 
+        ls -l
+
+        ls -l /
+
         # Run query job
         python {annotate_coverage_script.__file__} \
             --input-tsv input.tsv \

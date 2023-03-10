@@ -284,7 +284,7 @@ class GenotypeMito(SampleStage):
         main = sample.dataset.prefix()
         analysis = sample.dataset.analysis_prefix()
         return {
-            'out_vcf': main / 'mito' / f'{sample.id}.mito.vcf',
+            'out_vcf': main / 'mito' / f'{sample.id}.mito.vcf.gz',
             'haplocheck_metrics': analysis / 'mito' / f'{sample.id}.haplocheck.txt',
         }
 
@@ -417,7 +417,7 @@ class GenotypeMito(SampleStage):
         # Write the final vcf to the bucket
         get_batch().write_output(
             split_multiallelics_j.output_vcf,
-            str(self.expected_outputs(sample)['out_vcf']),
+            str(self.expected_outputs(sample)['out_vcf'].with_suffix('')),
         )
 
         return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
