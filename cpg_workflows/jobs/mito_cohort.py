@@ -48,16 +48,14 @@ def annotate_coverage(
         printf "{tsv_string}" > input.tsv
         cp input.tsv {j.tsv}
 
-        ls -l
-
-        ls -l /
+        mkdir -p $BATCH_TMPDIR/mito/
 
         # Run query job
         # python {annotate_coverage_script.__file__}
         python cpg_workflows/mito_pipeline_scripts/annotate_coverage.py \
             --input-tsv input.tsv \
             --output-ht {j.outfile.ht} \
-            --temp-dir $BATCH_TMPDIR/mt
+            --temp-dir $BATCH_TMPDIR/mito/
         """
 
     j.command(command(cmd, setup_gcp=True, monitor_space=True))
