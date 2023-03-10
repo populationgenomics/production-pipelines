@@ -55,7 +55,7 @@ def annotate_coverage(
         # python {annotate_coverage_script.__file__}
         python cpg_workflows/mito_pipeline_scripts/annotate_coverage.py \
             --input-tsv input.tsv \
-            --output-ht {j.outfile.ht}
+            --output-ht {j.outfile.ht} \
             --temp-dir $BATCH_TMPDIR/mt
         """
 
