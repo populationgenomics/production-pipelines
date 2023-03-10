@@ -154,7 +154,7 @@ def test_large_cohort(mocker: MockFixture):
     inferred_pop_ht_path = res_pref / 'inferred_pop.ht'
     ancestry_pca.run(
         dense_mt_path=dense_mt_path,
-        sample_qc_ht_path=sample_qc_ht_path,
+        out_sample_qc_ht_path=sample_qc_ht_path,
         relateds_to_drop_ht_path=relateds_to_drop_ht_path,
         tmp_prefix=res_pref / 'tmp',
         out_scores_ht_path=scores_ht_path,
