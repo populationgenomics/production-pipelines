@@ -37,6 +37,7 @@ def multi_way_union_mts(mts: list, temp_dir: str, chunk_size: int) -> hl.MatrixT
     staging = [mt.localize_entries("__entries", "__cols") for mt in mts]
     stage = 0
     while len(staging) > 1:
+        logger.info(f"len(staging): {len(staging)}")
         # Calculate the number of jobs to run based on the chunk size
         n_jobs = int(math.ceil(len(staging) / chunk_size))
         info(f"multi_way_union_mts: stage {stage}: {n_jobs} total jobs")
@@ -68,13 +69,13 @@ def multi_way_union_mts(mts: list, temp_dir: str, chunk_size: int) -> hl.MatrixT
                 )
             )
 
-            merged.show(1)
-            print('merged.count():', merged.count())
+            merged.show(10)
+            logger.info(f"merged.count(): {merged.count()}")
             # Flatten col annotation from array<struct{__cols: array<struct{s: str}>} to array<struct{s: str}>
             merged = merged.annotate_globals(
                 __cols=hl.flatten(merged.__cols.map(lambda x: x.__cols))
             )
-
+            merged.show(10)
             next_stage.append(
                 merged.checkpoint(
                     os.path.join(temp_dir, f"stage_{stage}_job_{i}.ht"), overwrite=True
@@ -123,6 +124,7 @@ def main(args):  # noqa: D103
             line = line.rstrip()
             items = line.split("\t")
             participant_id, base_level_coverage_metrics, sample = items[0:3]
+            logger.info(f"starting import of {base_level_coverage_metrics}")
             mt = hl.import_matrix_table(
                 base_level_coverage_metrics,
                 delimiter="\t",
@@ -132,6 +134,8 @@ def main(args):  # noqa: D103
             mt = mt.rename({"x": "coverage"})
             mt = mt.key_cols_by(s=sample)
             mt_list.append(mt)
+            logger.info(f"Finished import of {base_level_coverage_metrics}")
+
 
     logger.info("Joining individual coverage mts...")
     out_dir = dirname(output_ht)
