@@ -59,7 +59,7 @@ def multi_way_union_mts(mts: list, temp_dir: str, chunk_size: int) -> hl.MatrixT
                         lambda i: hl.coalesce(
                             merged.__entries[i].__entries,
                             hl.range(hl.len(merged.__cols[i].__cols)).map(
-                                lambda j: hl.null(
+                                lambda j: hl.missing(
                                     merged.__entries.__entries.dtype.element_type.element_type
                                 )
                             ),
