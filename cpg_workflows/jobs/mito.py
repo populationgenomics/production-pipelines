@@ -713,7 +713,7 @@ def parse_contamination_results(
         return max_contamination
 
     contamination_level = j.call(
-        parse_contamination_worker, str(haplocheck_output), str(verifybamid_output)
+        parse_contamination_worker, haplocheck_output, verifybamid_output
     )
 
     return j, contamination_level

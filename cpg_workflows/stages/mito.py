@@ -250,7 +250,7 @@ class GenotypeMito(SampleStage):
     https://raw.githubusercontent.com/broadinstitute/gatk/master/scripts/mitochondria_m2_wdl/ExampleInputsMitochondriaPipeline.json
     Mitochondrial variant calling is a subtle art with potential for artifacts resulting
     from mapping errors and other complexities such as NUMTs. In an attempt to avoid these
-    issues, this stage has blind faith in the Broad pipeline and faithfully re-implements
+    issues, this stage has blind faith in the gnomAD pipeline and faithfully re-implements
     as much of the logic, tools and configuration as possible.
     The main phases of analysis include:
         - Calling of variants from non-shifted cram using mutect2
