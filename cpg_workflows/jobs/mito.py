@@ -647,30 +647,6 @@ def get_contamination(
     return j
 
 
-def parse_contamination(
-    b,
-    haplocheck_output: Path | None,
-    job_attrs: dict | None = None,
-) -> tuple[Job, PythonResult]:
-    """
-    Try (again) to get haplocheck_output post processing done with a python job...
-    """
-    job_attrs = job_attrs or {}
-    j = b.new_python_job('get_final_contamination', job_attrs)
-    # j.image(image_path('haplocheckcli'))
-    j.image(get_config()['workflow']['driver_image'])
-
-    res = STANDARD.request_resources(ncpu=2)
-    res.set_to_job(j)
-
-    contamination_level = j.call(parse_contamination_worker, haplocheck_output)
-    # contamination_level = j.call(myfunc.get_final_contamination, 'foo')
-    # b.write_output(contamination.as_str(), 'output/hello-alice.txt')
-    b.run()
-
-    return j, contamination_level
-
-
 def parse_contamination_worker(
     haplocheck_report: str, verifybamid_report: str = "", out_path: str = ""
 ):
@@ -718,3 +694,27 @@ def parse_contamination_worker(
         with open(out_path, 'w') as out:
             print(max_contamination, file=out)
     return max_contamination
+
+
+def parse_contamination(
+    b,
+    haplocheck_output: Path | None,
+    job_attrs: dict | None = None,
+) -> tuple[Job, PythonResult]:
+    """
+    Try (again) to get haplocheck_output post processing done with a python job...
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_python_job('get_final_contamination', job_attrs)
+    # j.image(image_path('haplocheckcli'))
+    j.image(get_config()['workflow']['driver_image'])
+
+    res = STANDARD.request_resources(ncpu=2)
+    res.set_to_job(j)
+
+    contamination_level = j.call(parse_contamination_worker, haplocheck_output)
+    # contamination_level = j.call(myfunc.get_final_contamination, 'foo')
+    # b.write_output(contamination.as_str(), 'output/hello-alice.txt')
+    b.run()
+
+    return j, contamination_level
