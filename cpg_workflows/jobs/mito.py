@@ -17,6 +17,7 @@ from cpg_workflows.jobs import picard
 
 # from cpg_workflows.mito_pipeline_scripts import get_final_contamination
 
+
 def subset_cram_to_chrM(
     b,
     cram_path: CramPath,
@@ -195,10 +196,7 @@ def coverage_at_every_base(
     intervals_list: hb.ResourceFile,
     job_attrs: dict | None = None,
 ) -> Job:
-    """
-
-
-    """
+    """ """
     job_attrs = job_attrs or {}
     j = b.new_job('coverage_at_every_base', job_attrs)
     j.image(image_path('picard'))
@@ -536,12 +534,8 @@ def split_multi_allelics(
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 
-    j.declare_resource_group(
-        split_vcf={'vcf.gz': '{root}.vcf.gz'}
-    )
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz'}
-    )
+    j.declare_resource_group(split_vcf={'vcf.gz': '{root}.vcf.gz'})
+    j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz'})
 
     cmd = f"""
         gatk LeftAlignAndTrimVariants \
@@ -647,43 +641,50 @@ def get_contamination(
     return j
 
 
-
-
-
-def parse_contamination(
+def parse_contamination_results(
     b,
-    haplocheck_output: Path | None,
+    haplocheck_output: hb.ResourceFile,
+    verifybamid_output: hb.ResourceFile | None = None,
     job_attrs: dict | None = None,
 ) -> tuple[Job, PythonResult]:
     """
     Try (again) to get haplocheck_output post processing done with a python job...
+
+    Inputs:
+        haplocheck_report: native output from haplocheckCLI
+        verifybamid_output: [optional] native output from verifyBamID
+
+        Based on logic here:
+        https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL523-L524
+
+
     """
     job_attrs = job_attrs or {}
-    j = b.new_python_job('get_final_contamination', job_attrs)
-    # j.image(image_path('haplocheckcli'))
+    j = b.new_python_job('parse_contamination_results', job_attrs)
     j.image(get_config()['workflow']['driver_image'])
 
     res = STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
 
+    # Hmmmm. So, the only way I can get this function to the execution node seems
+    # to be by defining it locally within the job function. If I move it out to the same
+    # scope as the job funtion (or anywhere else) hail seems to try to find it in the
+    #  version of production_pipelines installed in the node (and it is not there unless
+    # I publish a new image).
+    # Someone please tell me there is a better way?
     def parse_contamination_worker(
-        haplocheck_report: str, verifybamid_report: str = "", out_path: str = ""
-    ):
+        haplocheck_report: str, verifybamid_report: str | None
+    ) -> float:
         """
-        Process haplocheckCLI and verifyBamIDoutputs to get contamination level as a
-        single float
-
-        Based on logic here:
-        https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL523-L524
-
+        Process haplocheckCLI and verifyBamID outputs to get contamination level as a
+        single float.
         """
         cleaned_lines = []
         with open(haplocheck_report) as haplocheck:
             # Split line on tabs and strip double quotes
             for line in haplocheck:
                 cleaned_lines.append([x.strip('"') for x in line.strip().split('\t')])
-        # print(cleaned_lines)
-        # Reformat into a nice dict
+        # sanity check and reformat
         assert len(cleaned_lines) == 2, "haplocheck report is unexpected format"
         assert len(cleaned_lines[0]) == 17, "haplocheck report is unexpected format"
         report = dict(zip(cleaned_lines[0], cleaned_lines[1]))
@@ -709,14 +710,10 @@ def parse_contamination(
             if verifybamid_estimate > max_contamination:
                 max_contamination = verifybamid_estimate
 
-        if out_path:
-            with open(out_path, 'w') as out:
-                print(max_contamination, file=out)
         return max_contamination
 
-    contamination_level = j.call(parse_contamination_worker, haplocheck_output)
-    # contamination_level = j.call(myfunc.get_final_contamination, 'foo')
-    # b.write_output(contamination.as_str(), 'output/hello-alice.txt')
-    b.run()
+    contamination_level = j.call(
+        parse_contamination_worker, str(haplocheck_output), str(verifybamid_output)
+    )
 
     return j, contamination_level
