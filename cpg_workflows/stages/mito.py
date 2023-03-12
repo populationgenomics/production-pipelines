@@ -236,7 +236,8 @@ class RealignMito(SampleStage):
 
 
 @stage(
-    required_stages=[RealignMito,CramQC]
+    # required_stages=[RealignMito,CramQC]
+    required_stages=[RealignMito]
     # TODO: add suitable analysis types
 )
 class GenotypeMito(SampleStage):
