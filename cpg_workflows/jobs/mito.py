@@ -14,7 +14,7 @@ from cpg_workflows.utils import can_reuse
 
 from cpg_workflows.jobs import picard
 
-from cpg_workflows.mito_pipeline_scripts import get_final_contamination as myfunc
+from cpg_workflows.mito_pipeline_scripts import get_final_contamination
 
 def subset_cram_to_chrM(
     b,
@@ -655,15 +655,14 @@ def parse_contamination(
     Try (again) to get haplocheck_output post processing done with a python job...
     """
     job_attrs = job_attrs or {}
-    j = b.new_job('get_final_contamination', job_attrs)
+    j = b.new_python_job('get_final_contamination', job_attrs)
     # j.image(image_path('haplocheckcli'))
 
     res = STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
 
-    # contamination_level = j.call(get_final_contamination.get_final_contamination, str(haplocheck_output))
-    print('cas',type(myfunc.get_final_contamination))
-    contamination_level = j.call(myfunc.get_final_contamination, 'foo')
+    contamination_level = j.call(get_final_contamination.get_final_contamination, haplocheck_output)
+    # contamination_level = j.call(myfunc.get_final_contamination, 'foo')
     # b.write_output(contamination.as_str(), 'output/hello-alice.txt')
     b.run()
 
