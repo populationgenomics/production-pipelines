@@ -406,7 +406,7 @@ class GenotypeMito(SampleStage):
             min_allele_fraction=get_config()['mito_snv']['vaf_filter_threshold'],
             f_score_beta=get_config()['mito_snv']['f_score_beta'],
             # contamination_estimate=get_contamination_j.max_contamination,
-            contamination_estimate=contamination_level.as_str,
+            contamination_estimate=contamination_level.as_str(),
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(second_filter_j)
