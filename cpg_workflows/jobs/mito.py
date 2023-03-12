@@ -5,6 +5,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 from hailtop.batch.resource import PythonResult
 
+from cpg_utils.config import get_config
 from cpg_utils import Path, to_path
 from cpg_utils.hail_batch import image_path, fasta_res_group
 from cpg_utils.hail_batch import command
@@ -657,6 +658,7 @@ def parse_contamination(
     job_attrs = job_attrs or {}
     j = b.new_python_job('get_final_contamination', job_attrs)
     # j.image(image_path('haplocheckcli'))
+    j.image(get_config()['workflow']['driver_image'])
 
     res = STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
