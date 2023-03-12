@@ -74,3 +74,5 @@ f_score_beta = 1.0
 # Sarah Stenton from Broad runs this pipline for seqr ingest and indicated they use a
 # threshold of 0.01 for seqr cohorts.
 vaf_filter_threshold = 0.01
+# use verifybamid for contamination estimate
+use_verifybamid = false
