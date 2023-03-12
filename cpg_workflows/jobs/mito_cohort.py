@@ -35,7 +35,7 @@ def annotate_coverage(
 
     # generate tsv string to use as input file
     # required format: "tsv of participant_id, base_level_coverage_metrics, sample"
-    tsv_string = ""
+    tsv_string = "#participant_id\\tpath\\tsample_id"
     for sid, path in base_level_coverage_by_sid.items():
         tsv_string += f'{sid}\\t{path}\\t{sid}\\n'
 

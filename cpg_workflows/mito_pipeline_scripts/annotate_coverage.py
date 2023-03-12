@@ -1,5 +1,5 @@
 """
-    File copied almsot wholesail from the gnomad-mitochondria repo 10/03/23
+    File copied almost wholesail from the gnomad-mitochondria repo 10/03/23
     https://github.com/broadinstitute/gnomad-mitochondria/blob/31b81dfb1e679e37b21f432bda22bdb15c55779e/gnomad_mitochondria/pipeline/annotate_coverage.py#L1
 """
 
@@ -13,7 +13,6 @@ import sys
 import hail as hl
 
 from os.path import dirname
-from gnomad.utils.slack import slack_notifications
 from hail.utils.java import info
 
 logging.basicConfig(
@@ -96,8 +95,8 @@ def multi_way_union_mts(mts: list, temp_dir: str, chunk_size: int) -> hl.MatrixT
 
 def main(args):  # noqa: D103
 
-    from cpg_utils.hail_batch import init_batch
-    init_batch()
+    # from cpg_utils.hail_batch import init_batch
+    # init_batch()
 
     input_tsv = args.input_tsv
     output_ht = args.output_ht
@@ -119,7 +118,8 @@ def main(args):  # noqa: D103
         "Reading in individual coverage files as matrix tables and adding to a list of matrix tables..."
     )
     with hl.hadoop_open(input_tsv, "r") as f:
-        next(f)
+        header = next(f)
+        assert header.startswith('#'), f'Expected a header starting with "#", found: {header}'
         for line in f:
             line = line.rstrip()
             items = line.split("\t")
@@ -191,12 +191,6 @@ if __name__ == "__main__":
         required=True,
     )
     parser.add_argument(
-        "--slack-token", help="Slack token that allows integration with slack",
-    )
-    parser.add_argument(
-        "--slack-channel", help="Slack channel to post results and notifications to",
-    )
-    parser.add_argument(
         "--chunk-size",
         help="Chunk size to use for combining VCFs (the number of individual VCFs that should be combined at a time)",
         type=int,
@@ -208,9 +202,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Both a slack token and slack channel must be supplied to receive notifications on slack
-    if args.slack_channel and args.slack_token:
-        with slack_notifications(args.slack_token, args.slack_channel):
-            main(args)
-    else:
-        main(args)
+    main(args)
