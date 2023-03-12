@@ -14,7 +14,7 @@ from cpg_workflows.utils import can_reuse
 
 from cpg_workflows.jobs import picard
 
-from cpg_workflows.mito_pipeline_scripts import get_final_contamination
+from cpg_workflows.mito_pipeline_scripts import get_final_contamination as myfunc
 
 def subset_cram_to_chrM(
     b,
@@ -662,8 +662,8 @@ def parse_contamination(
     res.set_to_job(j)
 
     # contamination_level = j.call(get_final_contamination.get_final_contamination, str(haplocheck_output))
-    print('cas',type(get_final_contamination.get_final_contamination))
-    contamination_level = j.call(get_final_contamination.get_final_contamination, 'foo')
+    print('cas',type(myfunc.get_final_contamination))
+    contamination_level = j.call(myfunc.get_final_contamination, 'foo')
     # b.write_output(contamination.as_str(), 'output/hello-alice.txt')
     b.run()
 
