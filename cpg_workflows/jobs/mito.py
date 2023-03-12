@@ -661,7 +661,8 @@ def parse_contamination(
     res = STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
 
-    contamination_level = j.call(get_final_contamination.get_final_contamination, str(haplocheck_output))
+    # contamination_level = j.call(get_final_contamination.get_final_contamination, str(haplocheck_output))
+    contamination_level = j.call(get_final_contamination.get_final_contamination, 'foo')
     # b.write_output(contamination.as_str(), 'output/hello-alice.txt')
     b.run()
 
