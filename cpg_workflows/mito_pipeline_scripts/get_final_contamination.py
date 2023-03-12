@@ -2,10 +2,10 @@
 import click
 
 
-@click.command()
-@click.argument('haplocheck_report')
-@click.option('--verifyBamID', 'verifybamid_report', default="")
-@click.option('-o', '--out', 'out_path', default="")
+# @click.command()
+# @click.argument('haplocheck_report')
+# @click.option('--verifyBamID', 'verifybamid_report', default="")
+# @click.option('-o', '--out', 'out_path', default="")
 def get_final_contamination(
     haplocheck_report: str, verifybamid_report: str = "", out_path: str = ""
 ):
