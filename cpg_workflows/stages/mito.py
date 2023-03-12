@@ -305,9 +305,12 @@ class GenotypeMito(SampleStage):
             cram=str(inputs.as_path(sample, RealignMito, 'shifted_cram')),
             crai=str(inputs.as_path(sample, RealignMito, 'shifted_cram')) + '.crai',
             )
-        verifybamid_output = get_batch().read_input(
-            str(inputs.as_path(sample, CramQC, 'verify_bamid')),
-            )
+        if get_config()['mito_snv']['use_verifybamid']:
+            verifybamid_output = get_batch().read_input(
+                str(inputs.as_path(sample, CramQC, 'verify_bamid')),
+                )
+        else:
+            verifybamid_output = None
 
         # Call variants on WT genome
         call_j = mito.mito_mutect2(
