@@ -3,6 +3,7 @@ Create Hail Batch jobs to call mitochondrial SNVs
 """
 import hailtop.batch as hb
 from hailtop.batch.job import Job
+from hailtop.batch.resource import PythonResult
 
 from cpg_utils import Path, to_path
 from cpg_utils.hail_batch import image_path, fasta_res_group
@@ -13,6 +14,7 @@ from cpg_workflows.utils import can_reuse
 
 from cpg_workflows.jobs import picard
 
+from cpg_workflows.mito_pipeline_scripts import get_final_contamination
 
 def subset_cram_to_chrM(
     b,
@@ -594,46 +596,47 @@ def get_contamination(
     cmd = f"""
         PARENT_DIR="$(dirname "{vcf['vcf.gz']}")"
         java -jar /haplocheckCLI.jar "$PARENT_DIR"
-        sed 's/\"//g' output > output-noquotes
-        grep "SampleID" output-noquotes > headers
-        FORMAT_ERROR="Bad contamination file format"
-        if [ `awk '{{print $2}}' headers` != "Contamination" ]; then
-            echo $FORMAT_ERROR; exit 1
-        fi
-        if [ `awk '{{print $6}}' headers` != "HgMajor" ]; then
-            echo $FORMAT_ERROR; exit 1
-        fi
-        if [ `awk '{{print $8}}' headers` != "HgMinor" ]; then
-            echo $FORMAT_ERROR; exit 1
-        fi
-        if [ `awk '{{print $14}}' headers` != "MeanHetLevelMajor" ]; then
-            echo $FORMAT_ERROR; exit 1
-        fi
-        if [ `awk '{{print $15}}' headers` != "MeanHetLevelMinor" ]; then
-            echo $FORMAT_ERROR; exit 1
-        fi
-        # Extract values of interest from report (This feels nuts)
-        grep -v "SampleID" output-noquotes > output-data
-        has_contamination=$(awk -F "\t" '{{print $2}}' output-data)
-        major_level=$(awk -F "\t" '{{print $14}}' output-data)
-        minor_level=$(awk -F "\t" '{{print $15}}' output-data)
-        # Boil them down into a single value to use in filter
-        # Float arithmetic using strings... what could go wrong?
-        if [ $has_contamination == "YES" ]
-        then
-            if [ $major_level == "0.0" ]
-            then
-                max_contamination=$minor_level
-            else
-                max_contamination=$(echo "1.0 - $major_level" | bc)
-            fi
-        else
-            max_contamination=0.0
-        fi
-        # Save to a file to pass to filter
-        echo "Estimated contamination = $max_contamination"
-        echo $max_contamination > {j.max_contamination}
-        cat output > {j.haplocheck_output}
+        cp output {j.haplocheck_output}
+
+        # sed 's/\"//g' output > output-noquotes
+        # grep "SampleID" output-noquotes > headers
+        # FORMAT_ERROR="Bad contamination file format"
+        # if [ `awk '{{print $2}}' headers` != "Contamination" ]; then
+        #     echo $FORMAT_ERROR; exit 1
+        # fi
+        # if [ `awk '{{print $6}}' headers` != "HgMajor" ]; then
+        #     echo $FORMAT_ERROR; exit 1
+        # fi
+        # if [ `awk '{{print $8}}' headers` != "HgMinor" ]; then
+        #     echo $FORMAT_ERROR; exit 1
+        # fi
+        # if [ `awk '{{print $14}}' headers` != "MeanHetLevelMajor" ]; then
+        #     echo $FORMAT_ERROR; exit 1
+        # fi
+        # if [ `awk '{{print $15}}' headers` != "MeanHetLevelMinor" ]; then
+        #     echo $FORMAT_ERROR; exit 1
+        # fi
+        # # Extract values of interest from report (This feels nuts)
+        # grep -v "SampleID" output-noquotes > output-data
+        # has_contamination=$(awk -F "\t" '{{print $2}}' output-data)
+        # major_level=$(awk -F "\t" '{{print $14}}' output-data)
+        # minor_level=$(awk -F "\t" '{{print $15}}' output-data)
+        # # Boil them down into a single value to use in filter
+        # # Float arithmetic using strings... what could go wrong?
+        # if [ $has_contamination == "YES" ]
+        # then
+        #     if [ $major_level == "0.0" ]
+        #     then
+        #         max_contamination=$minor_level
+        #     else
+        #         max_contamination=$(echo "1.0 - $major_level" | bc)
+        #     fi
+        # else
+        #     max_contamination=0.0
+        # fi
+        # # Save to a file to pass to filter
+        # echo "Estimated contamination = $max_contamination"
+        # echo $max_contamination > {j.max_contamination}
         """
 
     j.command(command(cmd, define_retry_function=True))
@@ -641,3 +644,25 @@ def get_contamination(
         b.write_output(j.haplocheck_output, str(haplocheck_output))
 
     return j
+
+
+def parse_contamination(
+    b,
+    haplocheck_output: Path | None,
+    job_attrs: dict | None = None,
+) -> tuple[Job, PythonResult]:
+    """
+    Try (again) to get haplocheck_output post processing done with a python job...
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_job('get_final_contamination', job_attrs)
+    # j.image(image_path('haplocheckcli'))
+
+    res = STANDARD.request_resources(ncpu=2)
+    res.set_to_job(j)
+
+    contamination_level = j.call(get_final_contamination.get_final_contamination, haplocheck_output)
+    # b.write_output(contamination.as_str(), 'output/hello-alice.txt')
+    b.run()
+
+    return j, contamination_level

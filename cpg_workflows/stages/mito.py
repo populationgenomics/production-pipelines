@@ -387,6 +387,14 @@ class GenotypeMito(SampleStage):
         jobs.append(get_contamination_j)
         assert isinstance(get_contamination_j.max_contamination, hb.ResourceFile)
 
+        parse_contamination_j, contamination_level = mito.parse_contamination(
+            b=get_batch(),
+            haplocheck_output=self.expected_outputs(sample)['haplocheck_metrics'],
+            job_attrs=self.get_job_attrs(sample),
+        )
+        jobs.append(parse_contamination_j)
+        # assert isinstance(get_contamination_j.max_contamination, hb.ResourceFile)
+
         # Filter round 2 - remove variants with VAF below estimated contamination
         second_filter_j = mito.filter_variants(
             b=get_batch(),
@@ -397,7 +405,8 @@ class GenotypeMito(SampleStage):
             max_alt_allele_count=4,
             min_allele_fraction=get_config()['mito_snv']['vaf_filter_threshold'],
             f_score_beta=get_config()['mito_snv']['f_score_beta'],
-            contamination_estimate=get_contamination_j.max_contamination,
+            # contamination_estimate=get_contamination_j.max_contamination,
+            contamination_estimate=contamination_level.as_str,
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(second_filter_j)
