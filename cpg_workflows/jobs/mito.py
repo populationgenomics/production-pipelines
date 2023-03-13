@@ -3,13 +3,17 @@ Create Hail Batch jobs to call mitochondrial SNVs
 """
 import hailtop.batch as hb
 from hailtop.batch.job import Job
+from hailtop.batch.resource import PythonResult
 
+from cpg_utils.config import get_config
 from cpg_utils import Path, to_path
 from cpg_utils.hail_batch import image_path, fasta_res_group
 from cpg_utils.hail_batch import command
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.utils import can_reuse
+
+from cpg_workflows.jobs import picard
 
 
 def subset_cram_to_chrM(
@@ -190,10 +194,7 @@ def coverage_at_every_base(
     intervals_list: hb.ResourceFile,
     job_attrs: dict | None = None,
 ) -> Job:
-    """
-
-
-    """
+    """ """
     job_attrs = job_attrs or {}
     j = b.new_job('coverage_at_every_base', job_attrs)
     j.image(image_path('picard'))
@@ -531,12 +532,8 @@ def split_multi_allelics(
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 
-    j.declare_resource_group(
-        split_vcf={'vcf.gz': '{root}.vcf.gz'}
-    )
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz'}
-    )
+    j.declare_resource_group(split_vcf={'vcf.gz': '{root}.vcf.gz'})
+    j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz'})
 
     cmd = f"""
         gatk LeftAlignAndTrimVariants \
@@ -577,8 +574,7 @@ def get_contamination(
         vcf: input vcf of passing variants with multi-allelics split.
         haplocheck_output: Path to write results file.
     Outputs:
-        max_contamination: ResourceFile containing a single float of final contamination
-            estimate for sample.
+        haplocheck_output: ResourceFile containing HaplocheckerCLI tsv report.
     Cmd from:
       https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L239
     """
@@ -592,46 +588,7 @@ def get_contamination(
     cmd = f"""
         PARENT_DIR="$(dirname "{vcf['vcf.gz']}")"
         java -jar /haplocheckCLI.jar "$PARENT_DIR"
-        sed 's/\"//g' output > output-noquotes
-        grep "SampleID" output-noquotes > headers
-        FORMAT_ERROR="Bad contamination file format"
-        if [ `awk '{{print $2}}' headers` != "Contamination" ]; then
-            echo $FORMAT_ERROR; exit 1
-        fi
-        if [ `awk '{{print $6}}' headers` != "HgMajor" ]; then
-            echo $FORMAT_ERROR; exit 1
-        fi
-        if [ `awk '{{print $8}}' headers` != "HgMinor" ]; then
-            echo $FORMAT_ERROR; exit 1
-        fi
-        if [ `awk '{{print $14}}' headers` != "MeanHetLevelMajor" ]; then
-            echo $FORMAT_ERROR; exit 1
-        fi
-        if [ `awk '{{print $15}}' headers` != "MeanHetLevelMinor" ]; then
-            echo $FORMAT_ERROR; exit 1
-        fi
-        # Extract values of interest from report (This feels nuts)
-        grep -v "SampleID" output-noquotes > output-data
-        has_contamination=$(awk -F "\t" '{{print $2}}' output-data)
-        major_level=$(awk -F "\t" '{{print $14}}' output-data)
-        minor_level=$(awk -F "\t" '{{print $15}}' output-data)
-        # Boil them down into a single value to use in filter
-        # Float arithmetic using strings... what could go wrong?
-        if [ $has_contamination == "YES" ]
-        then
-            if [ $major_level == "0.0" ]
-            then
-                max_contamination=$minor_level
-            else
-                max_contamination=$(echo "1.0 - $major_level" | bc)
-            fi
-        else
-            max_contamination=0.0
-        fi
-        # Save to a file to pass to filter
-        echo "Estimated contamination = $max_contamination"
-        echo $max_contamination > {j.max_contamination}
-        cat output > {j.haplocheck_output}
+        mv output {j.haplocheck_output}
         """
 
     j.command(command(cmd, define_retry_function=True))
@@ -639,3 +596,82 @@ def get_contamination(
         b.write_output(j.haplocheck_output, str(haplocheck_output))
 
     return j
+
+
+def parse_contamination_results(
+    b,
+    haplocheck_output: hb.ResourceFile,
+    verifybamid_output: hb.ResourceFile | None = None,
+    job_attrs: dict | None = None,
+) -> tuple[Job, PythonResult]:
+    """
+    Post process halpocheck and (optionaly) verifybamid reports to determin single value
+    for estimated contamination that can be used for variant filtering.
+
+    Inputs:
+        haplocheck_report: native output from haplocheckCLI
+        verifybamid_output: [optional] native output from verifyBamID
+
+        Based on logic here:
+        https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL523-L524
+
+
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_python_job('parse_contamination_results', job_attrs)
+    j.image(get_config()['workflow']['driver_image'])
+
+    res = STANDARD.request_resources(ncpu=2)
+    res.set_to_job(j)
+
+    # Hmmmm. So, the only way I can get this function to the execution node seems
+    # to be by defining it locally within the job function. If I move it out to the same
+    # scope as the job funtion (or anywhere else) hail seems to try to find it in the
+    #  version of production_pipelines installed in the node (and it is not there unless
+    # I publish a new image).
+    # Someone please tell me there is a better way?
+    def parse_contamination_worker(
+        haplocheck_report: str, verifybamid_report: str | None
+    ) -> float:
+        """
+        Process haplocheckCLI and verifyBamID outputs to get contamination level as a
+        single float.
+        """
+        cleaned_lines = []
+        with open(haplocheck_report) as haplocheck:
+            # Split line on tabs and strip double quotes
+            for line in haplocheck:
+                cleaned_lines.append([x.strip('"') for x in line.strip().split('\t')])
+        # sanity check and reformat
+        assert len(cleaned_lines) == 2, "haplocheck report is unexpected format"
+        assert len(cleaned_lines[0]) == 17, "haplocheck report is unexpected format"
+        report = dict(zip(cleaned_lines[0], cleaned_lines[1]))
+
+        # Determine final contamination level
+        if report['Contamination'] == 'YES':
+            if float(report['MeanHetLevelMajor']) == 0:
+                max_contamination = float(report['MeanHetLevelMinor'])
+            else:
+                max_contamination = 1.0 - float(report['MeanHetLevelMajor'])
+        else:
+            max_contamination = 0.0
+
+        # If verifybamid_report is provided, chose the higher of the two
+        if verifybamid_report:
+            with open(verifybamid_report) as verifybamid:
+                lines = [line.split('\t') for line in verifybamid.readlines()]
+                assert len(lines) == 2
+                report = dict(zip(lines[0], lines[1]))
+
+            verifybamid_estimate = float(report['FREEMIX'])
+
+            if verifybamid_estimate > max_contamination:
+                max_contamination = verifybamid_estimate
+
+        return max_contamination
+
+    contamination_level = j.call(
+        parse_contamination_worker, haplocheck_output, verifybamid_output
+    )
+
+    return j, contamination_level
