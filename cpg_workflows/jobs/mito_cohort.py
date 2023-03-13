@@ -187,6 +187,9 @@ def annotate_coverage2(
 
     def annotate_coverage_worker(inputs: list, output_ht: str , temp_dir: str = "", chunk_size: int = 100, overwrite=True):
 
+        from cpg_utils.hail_batch import init_batch
+        init_batch()
+
         if overwrite is False and hl.hadoop_exists(output_ht):
             logger.warning(
                 "Overwrite is set to False but file already exists at %s, script will run but output will not be written",
