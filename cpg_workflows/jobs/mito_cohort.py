@@ -204,7 +204,7 @@ def annotate_coverage2(
             participant_id, base_level_coverage_metrics, sample = line[0:3]
             logger.info(f"starting import of {base_level_coverage_metrics}")
             mt = hl.import_matrix_table(
-                base_level_coverage_metrics,
+                str(base_level_coverage_metrics),
                 delimiter="\t",
                 row_fields={"chrom": hl.tstr, "pos": hl.tint, "target": hl.tstr},
                 row_key=["chrom", "pos"],
