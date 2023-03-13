@@ -13,7 +13,7 @@ skip_samples_with_missing_input = true
 highmem_workers = true
 
 scatter_count = 20
-output_version = '1.1'
+output_version = 'v1.1'
 
 [large_cohort.pca_background]
 datasets = ['hgdp-1kg-main']
