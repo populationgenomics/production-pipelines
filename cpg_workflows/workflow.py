@@ -1106,8 +1106,9 @@ class Workflow:
             gp2 = GraphPlot(dag, title='Sub-Workflow Graph')
             # gp2.display_graph()
 
-            fig = gp + gp2
-            fig.show()
+            # fig = gp + gp2
+            # fig.show()
+            gp.display_graph()
 
     @staticmethod
     def _process_stage_errors(

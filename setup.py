@@ -16,6 +16,7 @@ setup(
         'cpg-utils',
         'analysis-runner>=2.36.4',
         'hail',
+        'ipywidgets>=7.0.0',
         'networkx',
         'sample-metadata>=5.0.1',
         'pandas',

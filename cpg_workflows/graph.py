@@ -6,10 +6,13 @@ https://towardsdatascience.com/visualize-hierarchical-data-using-plotly-and-data
 """
 
 import os
+import re
+
 from copy import deepcopy
 from typing import Callable
 from itertools import groupby
 
+import webbrowser
 import networkx as nx
 from plotly.subplots import make_subplots
 import plotly.graph_objs as go
@@ -22,7 +25,7 @@ class GraphPlot:
 
         script_location = os.path.dirname(os.path.abspath(__file__))
         self.stages_folder = os.path.abspath(f'{script_location}/stages/')
-        self.links = {n: self._get_node_file_link(n) for n in G.nodes}
+        self.node_locaitons = self._get_node_file_locations()
 
         # Text and sizes
         self.title = 'Workflow Graph'
@@ -175,15 +178,24 @@ class GraphPlot:
         node_trace.marker.color = node_color
         node_trace.marker.colorbar
 
+        # Add trace callbacks
+        def node_click(trace, points, state):
+            name = points.name
+            url = self.get_node_file_location(name)
+            webbrowser.open_new_tab(url)
+
+        node_trace.on_click(node_click)
+
         return [edge_trace_dark, edge_trace_grey, node_trace]
 
     def create_figure(self):
         traces = self.create_traces()
-        fig = go.Figure(
+        fig = go.FigureWidget(
             data=traces,
             layout=self._get_layout(),
         )
         fig.layout['annotations'] = self.get_annotations()
+
         return fig
 
     def _get_node_positions(self):
@@ -389,11 +401,27 @@ class GraphPlot:
         layer = set([val for node, val in layer.items() if node in nodes])
         return min(layer), max(layer)
 
-    def _get_node_file_link(self, node: str):
-        def normalize(string: str):
-            return string.lower().replace('-', '').replace('_', '').replace('.py', '')
+    def _get_node_file_locations(self) -> dict:
+        def file_search(file: str, regex: re.Pattern):
+            matches = {}
+            for i, line in enumerate(open(file, 'r')):
+                for match in re.finditer(regex, line):
+                    matches[match.group(1)] = {
+                        'line': i + 1,
+                        'file': 'file:///' + file.lstrip('/'),
+                    }
+
+            return matches
 
         files = os.scandir(self.stages_folder)
-        files = {normalize(os.path.basename(f)): f for f in files}
-        print(files)
-        
+        files = [f.path for f in files if f.is_file()]
+
+        # Search these files for all of the Stage classes
+        pattern = re.compile('class\s+(.+)\s*\(.*Stage\)')
+        all_matches = [file_search(f, pattern) for f in files]
+        all_matches = {k: v for d in all_matches for k, v in d.items()}
+
+        return all_matches
+
+    def get_node_file_location(self, node: str) -> dict:
+        return self.node_locaitons.get(node)
