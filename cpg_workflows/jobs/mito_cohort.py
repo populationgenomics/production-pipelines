@@ -201,7 +201,7 @@ def annotate_coverage2(
             "Reading in individual coverage files as matrix tables and adding to a list of matrix tables..."
         )
         for line in inputs:
-            participant_id, base_level_coverage_metrics, sample = items[0:3]
+            participant_id, base_level_coverage_metrics, sample = line[0:3]
             logger.info(f"starting import of {base_level_coverage_metrics}")
             mt = hl.import_matrix_table(
                 base_level_coverage_metrics,
