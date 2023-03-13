@@ -169,9 +169,10 @@ def annotate_coverage2(
                 )
                 merged.show(10)
                 next_stage.append(
-                    merged.checkpoint(
-                        os.path.join(temp_dir, f"stage_{stage}_job_{i}.ht"), overwrite=True
-                    )
+                    merged
+                    # merged.checkpoint(
+                    #     os.path.join(temp_dir, f"stage_{stage}_job_{i}.ht"), overwrite=True
+                    # )
                 )
             info(f"Completed stage {stage}")
             stage += 1
@@ -179,10 +180,8 @@ def annotate_coverage2(
             staging.extend(next_stage)
 
         # Unlocalize the entries, and unfilter the filtered entries and populate fields with missing values
-        result = staging[0].checkpoint(j.cp1, overwrite=True)
-
         return (
-            result
+            staging[0]
             ._unlocalize_entries("__entries", "__cols", list(mts[0].col_key))
             .unfilter_entries()
         )
