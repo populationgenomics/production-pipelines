@@ -91,9 +91,9 @@ def annotate_coverage2(
         inputs.append((sid, path, sid))
 
     # script needs to write to a .ht path
-    j.declare_resource_group(
-        outfile={'ht': '{root}.ht'}
-    )
+    # j.declare_resource_group(
+    #     outfile={'ht': '{root}.ht'}
+    # )
 
     ##################
     # Sticking all nested functions here...
@@ -251,7 +251,8 @@ def annotate_coverage2(
     ##################
 
     annotate_coverage_out = j.call(
-        annotate_coverage_worker, inputs, j.outfile.ht
+        annotate_coverage_worker, inputs, j.outfile
     )
+    j.outfile.add_extension('.ht')
 
     return j, annotate_coverage_out
