@@ -16,6 +16,7 @@ from cpg_workflows import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import mito, picard
 from cpg_workflows.stages.align import Align
+from cpg_workflows.stages.cram_qc import CramQC
 from cpg_workflows.targets import Sample
 from cpg_workflows.utils import exists
 from cpg_workflows.workflow import (
@@ -235,7 +236,8 @@ class RealignMito(SampleStage):
 
 
 @stage(
-    required_stages=RealignMito,
+    # required_stages=[RealignMito,CramQC]
+    required_stages=[RealignMito]
     # TODO: add suitable analysis types
 )
 class GenotypeMito(SampleStage):
@@ -248,7 +250,7 @@ class GenotypeMito(SampleStage):
     https://raw.githubusercontent.com/broadinstitute/gatk/master/scripts/mitochondria_m2_wdl/ExampleInputsMitochondriaPipeline.json
     Mitochondrial variant calling is a subtle art with potential for artifacts resulting
     from mapping errors and other complexities such as NUMTs. In an attempt to avoid these
-    issues, this stage has blind faith in the Broad pipeline and faithfully re-implements
+    issues, this stage has blind faith in the gnomAD pipeline and faithfully re-implements
     as much of the logic, tools and configuration as possible.
     The main phases of analysis include:
         - Calling of variants from non-shifted cram using mutect2
@@ -304,6 +306,12 @@ class GenotypeMito(SampleStage):
             cram=str(inputs.as_path(sample, RealignMito, 'shifted_cram')),
             crai=str(inputs.as_path(sample, RealignMito, 'shifted_cram')) + '.crai',
             )
+        if get_config()['mito_snv']['use_verifybamid']:
+            verifybamid_output = get_batch().read_input(
+                str(inputs.as_path(sample, CramQC, 'verify_bamid')),
+                )
+        else:
+            verifybamid_output = None
 
         # Call variants on WT genome
         call_j = mito.mito_mutect2(
@@ -377,7 +385,7 @@ class GenotypeMito(SampleStage):
         jobs.append(split_multiallelics_j)
         assert isinstance(split_multiallelics_j.output_vcf, hb.ResourceGroup)
 
-        # Use mito vcf to identify level of contamination
+        # Estimate level of contamination from mito reads
         get_contamination_j = mito.get_contamination(
             b=get_batch(),
             vcf=split_multiallelics_j.output_vcf,
@@ -385,15 +393,16 @@ class GenotypeMito(SampleStage):
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(get_contamination_j)
-        assert isinstance(get_contamination_j.max_contamination, hb.ResourceFile)
+        assert isinstance(get_contamination_j.haplocheck_output, hb.ResourceFile)
 
-        parse_contamination_j, contamination_level = mito.parse_contamination(
+        # Parse contamination estimate reports
+        parse_contamination_j, contamination_level = mito.parse_contamination_results(
             b=get_batch(),
-            haplocheck_output=self.expected_outputs(sample)['haplocheck_metrics'],
+            haplocheck_output=get_contamination_j.haplocheck_output,
+            verifybamid_output=verifybamid_output,
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(parse_contamination_j)
-        # assert isinstance(get_contamination_j.max_contamination, hb.ResourceFile)
 
         # Filter round 2 - remove variants with VAF below estimated contamination
         second_filter_j = mito.filter_variants(
@@ -406,7 +415,7 @@ class GenotypeMito(SampleStage):
             min_allele_fraction=get_config()['mito_snv']['vaf_filter_threshold'],
             f_score_beta=get_config()['mito_snv']['f_score_beta'],
             # contamination_estimate=get_contamination_j.max_contamination,
-            contamination_estimate=contamination_level.as_str,
+            contamination_estimate=contamination_level.as_str(),
             job_attrs=self.get_job_attrs(sample),
         )
         jobs.append(second_filter_j)
