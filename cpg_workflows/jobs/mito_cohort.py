@@ -179,8 +179,10 @@ def annotate_coverage2(
             staging.extend(next_stage)
 
         # Unlocalize the entries, and unfilter the filtered entries and populate fields with missing values
+        result = staging[0].checkpoint(j.cp1, overwrite=overwrite)
+
         return (
-            staging[0]
+            result
             ._unlocalize_entries("__entries", "__cols", list(mts[0].col_key))
             .unfilter_entries()
         )
