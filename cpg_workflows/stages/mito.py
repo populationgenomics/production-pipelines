@@ -468,13 +468,20 @@ class JoinMito(CohortStage):
             for sample in cohort.get_samples()
         }
 
-        call_j = mito_cohort.annotate_coverage(
+        # foo_j = mito_cohort.example_job(
+        #     b=get_batch(),
+        #     job_attrs=self.get_job_attrs(cohort),
+        # )
+        # jobs.append(foo_j)
+
+        call_j = mito_cohort.annotate_coverage2(
             b=get_batch(),
             base_level_coverage_by_sid=base_level_coverage_by_sid,
             coverage_ht=self.expected_outputs(cohort)['coverage_ht'],
             job_attrs=self.get_job_attrs(cohort),
         )
         jobs.append(call_j)
+
         # assert isinstance(call_j.output_vcf, hb.ResourceGroup)
 
 
