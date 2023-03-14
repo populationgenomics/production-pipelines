@@ -55,7 +55,7 @@ def main(dockers_json_url: str, dry_run: bool):
             subprocess.run(cmd, shell=True, check=True)
         else:
             print(cmd)
-        config_section[key] = f'sv/{image_name}'
+        config_section[key] = cpg_ar_path
 
     print()
     print('TOML [images] config section:')
