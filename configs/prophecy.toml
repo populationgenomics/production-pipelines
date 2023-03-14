@@ -11,6 +11,7 @@ first_stages = ['AncestryPlots']
 last_stages=['AncestryPlots']
 skip_samples_with_missing_input = true
 highmem_workers = true
+force_stages = ['AncestryPlots']
 
 scatter_count = 20
 output_version = 'v1.1'
