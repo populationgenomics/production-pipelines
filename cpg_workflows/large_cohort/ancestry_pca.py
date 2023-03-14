@@ -39,22 +39,30 @@ def add_background(
             background_mt = background_mt.densify()
         elif to_path(path).suffix == '.vds':
             background_vds = hl.vds.read_vds(str(path))
-            background_vds = hl.vds.split_multi(background_vds, filter_changed_loci=True)
+            background_vds = hl.vds.split_multi(
+                background_vds, filter_changed_loci=True
+            )
             background_vds = hl.vds.filter_variants(background_vds, qc_variants_ht)
             background_mt = hl.vds.to_dense_mt(background_vds)
-            # annotate background mt with metadata info derived from SampleQC stage 
+            # annotate background mt with metadata info derived from SampleQC stage
             metadata_tables = []
             for path in dataset_dict['metadata_table']:
                 sample_qc_background = hl.read_table(path)
                 metadata_tables.append(sample_qc_background)
             metadata_tables = hl.Table.union(*metadata_tables)
-            background_mt = background_mt.annotate_cols(**metadata_tables[background_mt.col_key])
+            background_mt = background_mt.annotate_cols(
+                **metadata_tables[background_mt.col_key]
+            )
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
 
         # save metadata info before merging dense and background datasets
         ht = background_mt.cols()
-        background_mt = background_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
+        background_mt = (
+            background_mt.select_cols()
+            .select_rows()
+            .select_entries('GT', 'GQ', 'DP', 'AD')
+        )
         background_mt = background_mt.naive_coalesce(5000)
         # combine dense dataset with background population dataset
         dense_mt = dense_mt.union_cols(background_mt)
@@ -151,7 +159,7 @@ def _run_pca_ancestry_analysis(
     """
     logging.info('Running PCA ancestry analysis')
     if all(
-        not fp or can_reuse(fp)
+        not fp or can_reuse(fp, overwrite=True)
         for fp in [
             out_scores_ht_path,
             out_eigenvalues_ht_path,
@@ -237,7 +245,7 @@ def _infer_pop_labels(
         ... (prob_*: float64 for each population label)
     """
     out_ht_path = out_ht_path or tmp_prefix / 'inferred_pop.ht'
-    if can_reuse(out_ht_path):
+    if can_reuse(out_ht_path, overwrite=True):
         return hl.read_table(str(out_ht_path))
 
     if training_pop_ht.count() < 2:
@@ -299,7 +307,7 @@ def _infer_pop_labels(
 
     # Writing a tab delimited file indicating inferred sample populations
     pop_tsv_file = tmp_prefix / 'RF_pop_assignments.txt.gz'
-    if not can_reuse(pop_tsv_file):
+    if not can_reuse(pop_tsv_file, overwrite=True):
         pc_cnt = min(hl.min(10, hl.len(pop_ht.pca_scores)).collect())
         pop_ht.transmute(
             **{f'PC{i + 1}': pop_ht.pca_scores[i] for i in range(pc_cnt)}
@@ -307,7 +315,7 @@ def _infer_pop_labels(
 
     # Writing the RF model used for inferring sample populations
     pop_rf_file = tmp_prefix / 'pop.RF_fit.pickle'
-    if not can_reuse(pop_rf_file):
+    if not can_reuse(pop_rf_file, overwrite=True):
         with hl.hadoop_open(str(pop_rf_file), 'wb') as out:
             pickle.dump(pops_rf_model, out)
 
