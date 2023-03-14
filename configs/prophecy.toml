@@ -13,11 +13,11 @@ skip_samples_with_missing_input = true
 highmem_workers = true
 
 scatter_count = 20
-output_version = '1.1'
+output_version = 'v1.1'
 
 [large_cohort.pca_background]
-datasets = ['hgdp-1kg-test']
+datasets = ['hgdp-1kg-main']
 
-[large_cohort.pca_background.hgdp-1kg-test]
-dataset_path = 'gs://cpg-hgdp-1kg-test/vds/v1-0.vds/'
-metadata_table = ['gs://cpg-hgdp-test/large_cohort/1-0/sample_qc.ht', 'gs://cpg-thousand-genomes-test/large_cohort/1-0/sample_qc.ht/']
+[large_cohort.pca_background.hgdp-1kg-main]
+dataset_path = 'gs://cpg-hgdp-1kg-main/vds/v1-0.vds/'
+metadata_table = ['gs://cpg-hgdp-main/large_cohort/1-0/sample_qc.ht', 'gs://cpg-thousand-genomes-main/large_cohort/1-0/sample_qc.ht/']

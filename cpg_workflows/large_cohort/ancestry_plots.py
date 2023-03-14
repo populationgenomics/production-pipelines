@@ -143,11 +143,6 @@ def _plot_pca(
     # count the number of samples for each group and add it to the labels
     labels = [f'{x} ({cntr[x]})' for x in labels]
     unique_labels = list(Counter(labels).keys())
-    # set colour palette to use turbo if less than 4, otherwise use a small colour palette with more 
-    # differentiated colours
-    # if len(unique_labels) < 4:
-    #     palette = d3['Category10'][len(unique_labels)]
-    # else:
     palette = turbo(len(unique_labels))
 
     tooltips = [('labels', '@label'), ('samples', '@samples')]
