@@ -149,6 +149,8 @@ def _plot_pca(
     background_name = ''
     if background_pops:
         background_name = '_'.join(background_pops).replace("-", "_")
+        # replace test or main for 'background', for clarity
+        background_name = background_name.replace('test', 'background').replace('main', 'background')
 
     tooltips = [('labels', '@label'), ('samples', '@samples')]
     plots = []
@@ -206,6 +208,8 @@ def _plot_loadings(number_of_pcs, loadings_ht, out_path_pattern=None):
     background_name = ''
     if background_pops:
         background_name = '_'.join(background_pops).replace("-", "_")
+        # replace test or main for 'background', for clarity
+        background_name = background_name.replace('test', 'background').replace('main', 'background')
     gtf_ht = hl.experimental.import_gtf(
         str(reference_path('broad/protein_coding_gtf')),
         reference_genome=genome_build(),

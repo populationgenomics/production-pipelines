@@ -168,6 +168,8 @@ class AncestryPlots(CohortStage):
         background_name = ''
         if background_pops:
             background_name = '_'.join(background_pops).replace("-", "_")
+            # replace test or main for 'background', for clarity
+            background_name = background_name.replace('test', 'background').replace('main', 'background')
         return {
             str(pc_num): self.out_prefix
             / self.out_fname_pattern.format(scope='dataset', pci=pc_num, background_name=background_name, ext='html')
