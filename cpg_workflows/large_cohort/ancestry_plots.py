@@ -183,10 +183,16 @@ def _plot_pca(
         )
         plot.add_layout(plot.legend[0], 'left')
         plots.append(plot)
+
+        # if there is a background population, add this to the output name
+        background_pops = get_config()['large_cohort']['pca_background']['datasets']
+        if background_pops:
+            background_name = '_'.join(background_pops).replace("-", "_")
+
         if out_path_pattern:
             html = file_html(plot, CDN, title)
             plot_filename_html = str(out_path_pattern).format(
-                scope=scope, pci=pc2, ext='html'
+                scope=scope, pci=pc2, background_name=background_name, ext='html'
             )
             with hl.hadoop_open(plot_filename_html, 'w') as f:
                 f.write(html)
