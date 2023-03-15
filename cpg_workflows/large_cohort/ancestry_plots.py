@@ -144,6 +144,10 @@ def _plot_pca(
     labels = [f'{x} ({cntr[x]})' for x in labels]
     unique_labels = list(Counter(labels).keys())
     palette = turbo(len(unique_labels))
+    # if there is a background population, add this to the output name
+    background_pops = get_config()['large_cohort']['pca_background']['datasets']
+    if background_pops:
+        background_name = '_'.join(background_pops).replace("-", "_")
 
     tooltips = [('labels', '@label'), ('samples', '@samples')]
     plots = []
@@ -183,11 +187,6 @@ def _plot_pca(
         )
         plot.add_layout(plot.legend[0], 'left')
         plots.append(plot)
-
-        # if there is a background population, add this to the output name
-        background_pops = get_config()['large_cohort']['pca_background']['datasets']
-        if background_pops:
-            background_name = '_'.join(background_pops).replace("-", "_")
 
         if out_path_pattern:
             html = file_html(plot, CDN, title)
