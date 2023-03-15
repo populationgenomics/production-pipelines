@@ -145,8 +145,8 @@ def _plot_pca(
     unique_labels = list(Counter(labels).keys())
     palette = turbo(len(unique_labels))
     # if there is a background population, add this to the output name
-    background_pops = get_config()['large_cohort'].get('pca_background', {}).get('datasets')
-    ['']['datasets']
+    background_pops = get_config()['large_cohort']['pca_background'].get('datasets')
+    background_name = ''
     if background_pops:
         background_name = '_'.join(background_pops).replace("-", "_")
 
