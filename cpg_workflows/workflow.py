@@ -1098,17 +1098,14 @@ class Workflow:
 
         if self.show_workflow:
             gp = GraphPlot(dag, title='Full Workflow Graph')
-            # gp.display_graph()
 
             # Removed skipped steps for simple graph
             all_nodes = list(dag.nodes)
             _ = [dag.remove_node(n) for n in all_nodes if dag.nodes[n]['skipped']]
             gp2 = GraphPlot(dag, title='Sub-Workflow Graph')
-            # gp2.display_graph()
 
-            # fig = gp + gp2
-            # fig.show()
-            gp.display_graph()
+            fig = gp + gp2
+            fig.show()
 
     @staticmethod
     def _process_stage_errors(
@@ -1157,14 +1154,19 @@ class SampleStage(Stage[Sample], ABC):
                 f'via workflow.skip_datasets`'
             )
             return output_by_target
+
+        warn_msg = (
+            f'usable (active=True) samples found. Check logs above for '
+            f'possible reasons samples were skipped (e.g. all samples ignored '
+            f'via `workflow.skip_samples` in config, or they all missing stage '
+            f'inputs and `workflow.skip_samples_with_missing_input=true` is set)'
+        )
+
         if not cohort.get_samples():
             logging.warning(
                 f'{len(cohort.get_samples())}/'
                 f'{len(cohort.get_samples(only_active=False))} '
-                f'usable (active=True) samples found. Check logs above for '
-                f'possible reasons samples were skipped (e.g. all samples ignored '
-                f'via `workflow.skip_samples` in config, or they all missing stage '
-                f'inputs and `workflow.skip_samples_with_missing_input=true` is set)'
+                f'{warn_msg}'
             )
             return output_by_target
 
@@ -1174,10 +1176,7 @@ class SampleStage(Stage[Sample], ABC):
                     f'{dataset}: '
                     f'{len(dataset.get_samples())}/'
                     f'{len(dataset.get_samples(only_active=False))} '
-                    f'usable (active=True) samples found. Check logs above for '
-                    f'possible reasons samples were skipped (e.g. all samples ignored '
-                    f'via `workflow.skip_samples` in config, or they all missing stage '
-                    f'inputs and `workflow.skip_samples_with_missing_input=true` is set)'
+                    f'{warn_msg}'
                 )
                 continue
 
