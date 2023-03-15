@@ -167,7 +167,7 @@ class AncestryPlots(CohortStage):
         plot_name = get_config()['large_cohort'].get('pca_plot_name')
         pca_suffix = ''
         if plot_name:
-            pca_suffix = plot_name.replace("-", "_")
+            pca_suffix = plot_name.replace('-', '_')
         return {
             str(pc_num): self.out_prefix
             / self.out_fname_pattern.format(scope='dataset', pci=pc_num, pca_suffix=pca_suffix, ext='html')

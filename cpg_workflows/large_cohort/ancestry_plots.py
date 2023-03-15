@@ -148,7 +148,7 @@ def _plot_pca(
     plot_name = get_config()['large_cohort'].get('pca_plot_name')
     pca_suffix = ''
     if plot_name:
-        pca_suffix = plot_name.replace("-", "_")
+        pca_suffix = plot_name.replace('-', '_')
 
     tooltips = [('labels', '@label'), ('samples', '@samples')]
     plots = []
@@ -205,7 +205,7 @@ def _plot_loadings(number_of_pcs, loadings_ht, out_path_pattern=None):
     plot_name = get_config()['large_cohort'].get('pca_plot_name')
     pca_suffix = ''
     if plot_name:
-        pca_suffix = plot_name.replace("-", "_")
+        pca_suffix = plot_name.replace('-', '_')
     gtf_ht = hl.experimental.import_gtf(
         str(reference_path('broad/protein_coding_gtf')),
         reference_genome=genome_build(),
