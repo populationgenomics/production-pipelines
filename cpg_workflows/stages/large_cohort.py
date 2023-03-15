@@ -159,13 +159,18 @@ class AncestryPlots(CohortStage):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.out_prefix = get_workflow().web_prefix / 'ancestry'
-        self.out_fname_pattern = '{scope}_pc{pci}.{ext}'
+        self.out_fname_pattern = '{scope}_pc{pci}_{pca_suffix}.{ext}'
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         n_pcs = get_config()['large_cohort']['n_pcs']
+        # if there is a pca_plot_name given, add this to the output name
+        plot_name = get_config()['large_cohort'].get('pca_plot_name')
+        pca_suffix = ''
+        if plot_name:
+            pca_suffix = plot_name.replace('-', '_')
         return {
             str(pc_num): self.out_prefix
-            / self.out_fname_pattern.format(scope='dataset', pci=pc_num, ext='html')
+            / self.out_fname_pattern.format(scope='dataset', pci=pc_num, pca_suffix=pca_suffix, ext='html')
             for pc_num in range(1, n_pcs)
         }
 
