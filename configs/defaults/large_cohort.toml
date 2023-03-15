@@ -29,6 +29,7 @@ pop_meta_field = 'Superpopulation name'  # metamist's `Participant/meta` field f
                                          # known population label for the RF training
 # whether or not to key samples by their external ID
 use_external_id = false
+pca_plot_name = 'hgdp_1kg_prophecy_sites'
 
 # Section that specifies background samples for PCA analysis.
 # `datasets` must be a list paths to matrix tables or VDS, and 
@@ -63,4 +64,4 @@ delete_scratch_on_exit = false
 
 [references.gnomad]
 tel_and_cent_ht = "gs://cpg-common-main/references/gnomad/v0/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht"
-predetermined_qc_variants = "gs://cpg-hgdp-1kg-main/pruned_variants.ht"
+predetermined_qc_variants = "gs://cpg-prophecy-main/sites_table/v1-1/pruned_variants.ht/"

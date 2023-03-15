@@ -144,13 +144,11 @@ def _plot_pca(
     labels = [f'{x} ({cntr[x]})' for x in labels]
     unique_labels = list(Counter(labels).keys())
     palette = turbo(len(unique_labels))
-    # if there is a background population, add this to the output name
-    background_pops = get_config()['large_cohort']['pca_background'].get('datasets')
-    background_name = ''
-    if background_pops:
-        background_name = '_'.join(background_pops).replace("-", "_")
-        # replace test or main for 'background', for clarity
-        background_name = background_name.replace('test', 'background').replace('main', 'background')
+    # if there is a pca_plot_name given, add this to the output name
+    plot_name = get_config()['large_cohort'].get('pca_plot_name')
+    pca_suffix = ''
+    if plot_name:
+        pca_suffix = plot_name.replace("-", "_")
 
     tooltips = [('labels', '@label'), ('samples', '@samples')]
     plots = []
@@ -194,7 +192,7 @@ def _plot_pca(
         if out_path_pattern:
             html = file_html(plot, CDN, title)
             plot_filename_html = str(out_path_pattern).format(
-                scope=scope, pci=pc2, background_name=background_name, ext='html'
+                scope=scope, pci=pc2, pca_suffix=pca_suffix, ext='html'
             )
             with hl.hadoop_open(plot_filename_html, 'w') as f:
                 f.write(html)
@@ -203,13 +201,11 @@ def _plot_pca(
 
 def _plot_loadings(number_of_pcs, loadings_ht, out_path_pattern=None):
     plots = []
-    # if there is a background population, add this to the output name
-    background_pops = get_config()['large_cohort']['pca_background'].get('datasets')
-    background_name = ''
-    if background_pops:
-        background_name = '_'.join(background_pops).replace("-", "_")
-        # replace test or main for 'background', for clarity
-        background_name = background_name.replace('test', 'background').replace('main', 'background')
+    # if there is a pca_plot_name given, add this to the output name
+    plot_name = get_config()['large_cohort'].get('pca_plot_name')
+    pca_suffix = ''
+    if plot_name:
+        pca_suffix = plot_name.replace("-", "_")
     gtf_ht = hl.experimental.import_gtf(
         str(reference_path('broad/protein_coding_gtf')),
         reference_genome=genome_build(),
@@ -230,7 +226,7 @@ def _plot_loadings(number_of_pcs, loadings_ht, out_path_pattern=None):
         if out_path_pattern:
             html = file_html(plot, CDN, 'my plot')
             plot_filename_html = str(out_path_pattern).format(
-                scope='loadings', pci=pc, background_name=background_name, ext='html'
+                scope='loadings', pci=pc, pca_suffix=pca_suffix, ext='html'
             )
             with hl.hadoop_open(plot_filename_html, 'w') as f:
                 f.write(html)
