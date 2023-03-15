@@ -165,7 +165,7 @@ def test_large_cohort(mocker: MockFixture):
         out_sample_qc_ht_path=sample_qc_ht_path,
     )
     ancestry_plots.run(
-        out_path_pattern=res_pref / 'plots' / '{scope}_pc{pci}_{background_name}.{ext}',
+        out_path_pattern=res_pref / 'plots' / '{scope}_pc{pci}{background_name}.{ext}',
         sample_qc_ht_path=sample_qc_ht_path,
         scores_ht_path=scores_ht_path,
         eigenvalues_ht_path=eigenvalues_ht_path,
