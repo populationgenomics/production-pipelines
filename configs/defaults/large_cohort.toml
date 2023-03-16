@@ -64,4 +64,4 @@ delete_scratch_on_exit = false
 
 [references.gnomad]
 tel_and_cent_ht = "gs://cpg-common-main/references/gnomad/v0/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht"
-predetermined_qc_variants = "gs://cpg-prophecy-main/sites_table/v1-1/pruned_variants.ht/"
+predetermined_qc_variants = "gs://cpg-prophecy-test/sites_table/v1-0/pruned_variants_10percent.ht/"
