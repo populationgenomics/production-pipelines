@@ -2,8 +2,8 @@
 name = 'large_cohort'
 scatter_count_genotype = 50
 status_reporter = 'metamist'
-# define reference fasta
-ref_fasta='gs://gcp-public-data--broad-references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
+# define reference fasta. If not specified here, the reference file is pulled from [references.broad][ref_fasta]
+ref_fasta='gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
 
 # Realign CRAM when available, instead of using FASTQ.
 # The parameter value should correspond to CRAM version
