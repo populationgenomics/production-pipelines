@@ -41,7 +41,7 @@ def genotype(
         output_path=hc_gvcf_path,
         cram_path=cram_path,
         tmp_prefix=tmp_prefix,
-        scatter_count=50,
+        scatter_count=get_config()['workflow'].get('scatter_count_genotype'),
         overwrite=overwrite,
         dragen_mode=dragen_mode,
     )

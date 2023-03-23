@@ -1,7 +1,9 @@
 [workflow]
 name = 'large_cohort'
-scatter_count = 50
+scatter_count_genotype = 50
 status_reporter = 'metamist'
+# define reference fasta
+ref_fasta='gs://gcp-public-data--broad-references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
 
 # Realign CRAM when available, instead of using FASTQ.
 # The parameter value should correspond to CRAM version
@@ -52,6 +54,10 @@ min_n_snps = 2400000  # minimum number of SNPs for a sample
 max_n_singletons = 800000  # maximum number of unique SNPs for a sample
 max_r_duplication = 0.3  # maximum rate of duplicated reads (from picard metrics)
 max_r_het_hom = 3.3  # maximum rate of heterozygous to homozygous SNPs
+
+[large_cohort.cram_qc]
+assume_sorted = true
+num_pcs = 4
 
 [hail]
 pool_label = 'large-cohort'
