@@ -257,6 +257,8 @@ def picard_collect_metrics(
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
     reference = fasta_res_group(b)
+    # define variable for whether picard output is sorted or not
+    sorted_output = get_config()['large_cohort']['cram_qc']['assume_sorted']
 
     assert cram_path.index_path
     cmd = f"""\
@@ -272,7 +274,7 @@ def picard_collect_metrics(
       INPUT=$CRAM \\
       REFERENCE_SEQUENCE={reference.base} \\
       OUTPUT=$BATCH_TMPDIR/prefix \\
-      ASSUME_SORTED=true \\
+      ASSUME_SORTED={sorted_output} \\
       PROGRAM=null \\
       VALIDATION_STRINGENCY=SILENT \\
       PROGRAM=CollectAlignmentSummaryMetrics \\
