@@ -258,7 +258,7 @@ def picard_collect_metrics(
     res.set_to_job(j)
     reference = fasta_res_group(b)
     # define variable for whether picard output is sorted or not
-    sorted_output = get_config()['large_cohort']['cram_qc']['assume_sorted']
+    sorted_output = get_config()['cramqc']['assume_sorted']
 
     assert cram_path.index_path
     cmd = f"""\

@@ -41,7 +41,7 @@ def verifybamid(
     contam_bed = reference_path(f'broad/{sequencing_type}_contam_bed')
     contam_mu = reference_path(f'broad/{sequencing_type}_contam_mu')
     # define number of PCs used in estimation of contamination
-    num_pcs = get_config()['large_cohort']['cram_qc']['num_pcs']
+    num_pcs = get_config()['cramqc']['num_pcs']
     if sequencing_type == 'exome':
         extra_opts = '--max-depth 1000'
     else:
