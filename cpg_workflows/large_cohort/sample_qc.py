@@ -76,7 +76,7 @@ def initialise_sample_table() -> hl.Table:
     ]
     if not entries:
         raise ValueError('No samples with GVCFs found')
-    t = 'array<struct{s: str, external_id: str, dataset: str, gvcf: str, sex: int, pop: str}>'
+    t = 'array<struct{s: str, external_id: str, dataset: str, gvcf: str, sex: int, training_pop: str, superpopulation: str, population: str}>'
     ht = hl.Table.parallelize(hl.literal(entries, t), key='s')
     return ht
 
