@@ -25,7 +25,7 @@ default = '{results_prefix()}'
 default = '{results_prefix()}'
 
 [large_cohort]
-pop_meta_field = 'Superpopulation name'
+training_pop = 'Superpopulation name'
 
 [hail]
 billing_project = 'fewgenomes'

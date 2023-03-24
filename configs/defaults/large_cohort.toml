@@ -27,7 +27,7 @@ max_kin = 0.2  # maximum kin threshold to be considered unrelated in relatedness
 # Parameters for population inference
 n_pcs = 16  # number of principal components for PCA analysis
 min_pop_prob = 0.5  # minimum random forest probability for population assignment
-pop_meta_field = 'Superpopulation name'  # metamist's `Participant/meta` field for the
+training_pop = 'Superpopulation name'  # metamist's `Participant/meta` field for the
                                          # known population label for the RF training
 # whether or not to key samples by their external ID
 use_external_id = false
