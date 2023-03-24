@@ -7,11 +7,11 @@ skip_samples = [
   'CPG241299',  # Replaced by CPG262907
 ]
 skip_stages = ['SomalierPedigree', 'SampleQC', 'MakeSiteOnlyVcf', 'Vqsr','LoadVqsr']
-first_stages = ['DenseSubset']
+first_stages = ['Ancestry']
 last_stages=['AncestryPlots']
 skip_samples_with_missing_input = true
 highmem_workers = true
-force_stages = ['DenseSubset', 'Ancestry', 'AncestryPlots']
+force_stages = ['Ancestry', 'AncestryPlots']
 
 scatter_count = 20
 output_version = 'v1.1'

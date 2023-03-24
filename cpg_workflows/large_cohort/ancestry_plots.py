@@ -44,8 +44,9 @@ def run(
     inferred_pop_ht = hl.read_table(str(inferred_pop_ht_path))
 
     scores_ht = scores_ht.annotate(
-        pop=sample_ht[scores_ht.s].pop,
-        training_pop=inferred_pop_ht[scores_ht.s].pop,
+        superpopulation=sample_ht[scores_ht.s].superpopulation,
+        population=sample_ht[scores_ht.s].population,
+        training_pop=inferred_pop_ht[scores_ht.s].training_pop,
         is_training=inferred_pop_ht[scores_ht.s].is_training,
         dataset=sample_ht[scores_ht.s].dataset,
     ).cache()

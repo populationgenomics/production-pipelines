@@ -59,7 +59,7 @@ def initialise_sample_table() -> hl.Table:
     """
     Export the cohort into a sample-level Hail Table.
     """
-    pop_meta_field = get_config()['large_cohort'].get('pop_meta_field')
+    training_pop = get_config()['large_cohort'].get('training_pop')
     entries = [
         {
             's': s.id,
@@ -67,7 +67,9 @@ def initialise_sample_table() -> hl.Table:
             'dataset': s.dataset.name,
             'gvcf': str(s.gvcf.path),
             'sex': s.pedigree.sex.value,
-            'pop': s.meta.get(pop_meta_field) if pop_meta_field else None,
+            'training_pop': s.meta.get(training_pop) if training_pop else None,
+            'superpopulation': s.meta.get('Superpopulation name'),
+            'population': s.meta.get('Population name'),
         }
         for s in get_cohort().get_samples()
         if s.gvcf
