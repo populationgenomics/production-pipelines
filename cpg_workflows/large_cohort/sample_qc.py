@@ -19,7 +19,7 @@ def run(
     out_sample_qc_ht_path: Path,
     tmp_prefix: Path,
 ):
-    if can_reuse(out_sample_qc_ht_path):
+    if can_reuse(out_sample_qc_ht_path, overwrite=True):
         return hl.read_table(str(out_sample_qc_ht_path))
 
     ht = initialise_sample_table()
@@ -33,7 +33,7 @@ def run(
 
     # Run Hail sample-QC stats:
     sqc_ht_path = tmp_prefix / 'sample_qc.ht'
-    if can_reuse(sqc_ht_path):
+    if can_reuse(sqc_ht_path, overwrite=True):
         sqc_ht = hl.read_table(str(sqc_ht_path))
     else:
         # Filter to autosomes:
@@ -90,7 +90,7 @@ def impute_sex(
     Impute sex based on coverage.
     """
     checkpoint_path = tmp_prefix / 'sample_qc' / 'sex.ht'
-    if can_reuse(str(checkpoint_path)):
+    if can_reuse(str(checkpoint_path), overwrite=True):
         sex_ht = hl.read_table(str(checkpoint_path))
         return ht.annotate(**sex_ht[ht.s])
 
