@@ -486,7 +486,7 @@ def add_make_sitesonly_job(
     j.image(image_path('gatk'))
     res = STANDARD.set_resources(j, ncpu=2)
     if storage_gb:
-        j.storage(f'{storage_gb}Gi')
+        j.storage(f'{storage_gb}G')
     j.declare_resource_group(
         output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
