@@ -12,7 +12,7 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config, ConfigError
-from cpg_utils.hail_batch import command, reference_path, image_path, genome_build
+from cpg_utils.hail_batch import command, reference_path, image_path
 from cpg_workflows.batch import make_job_name, Batch, get_batch
 from cpg_workflows.workflow import (
     stage,
