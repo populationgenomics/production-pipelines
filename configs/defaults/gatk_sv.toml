@@ -4,35 +4,17 @@ dataset_gcp_project = 'seqr-308602'
 dataset = 'seqr'
 
 [images]
-cnmops_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/cnmops:2022-06-10-v0.23-beta-9c6fbf56'
-condense_counts_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-36-g88b0578'
-gatk_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-36-g88b0578'
-gatk_docker_pesr_override = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-36-g88b0578'
-genomes_in_the_cloud_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/genomes-in-the-cloud:2.3.2-1510681135'
-linux_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/ubuntu1804'
-manta_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/manta:8645aa'
-scramble_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/scramble:1.0.2'
-samtools_cloud_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/samtools-cloud:2022-06-10-v0.23-beta-9c6fbf56'
-sv_base_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-base:2022-06-10-v0.23-beta-9c6fbf56'
-sv_base_mini_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-base-mini:2022-06-10-v0.23-beta-9c6fbf56'
-sv_pipeline_base_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-pipeline:2022-08-08-v0.24-beta-79d76bc9'
-sv_pipeline_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-pipeline:2022-08-08-v0.24-beta-79d76bc9'
-sv_pipeline_hail_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-pipeline:2022-08-08-v0.24-beta-79d76bc9'
-sv_pipeline_updates_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-pipeline:2022-08-08-v0.24-beta-79d76bc9'
-sv_pipeline_qc_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-pipeline:2022-08-08-v0.24-beta-79d76bc9'
-sv_pipeline_rdtest_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-pipeline:2022-08-08-v0.24-beta-79d76bc9'
-wham_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/wham:8645aa'
-igv_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/igv:mw-xz-fixes-2-b1be6a9'
-duphold_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/duphold:mw-xz-fixes-2-b1be6a9'
-vapor_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/vapor:header-hash-2fc8f12'
-cloud_sdk_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/cloud-sdk'
-pangenie_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/pangenie:vj-127571f'
-sv-base-virtual-env = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-base-virtual-env:2022-06-10-v0.23-beta-9c6fbf56'
-cnmops-virtual-env = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/cnmops-virtual-env:2022-06-10-v0.23-beta-9c6fbf56'
-sv-pipeline-virtual-env = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-pipeline-virtual-env:2022-06-10-v0.23-beta-9c6fbf56'
-samtools-cloud-virtual-env = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/samtools-cloud-virtual-env:2022-06-10-v0.23-beta-9c6fbf56'
-sv_utils_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-utils:805d18b'
-gq_recalibrator_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:93d635a7ea'
+samtools-cloud-virtual-env = "australia-southeast1-docker.pkg.dev/cpg-common/images/samtools-cloud-virtual-env:v0.27.0"
+sv-base-mini = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-base-mini:v0.27.0"
+sv-base-virtual-env = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-base-virtual-env:v0.27.0"
+cnmops-virtual-env = "australia-southeast1-docker.pkg.dev/cpg-common/images/cnmops-virtual-env:v0.27.0"
+samtools-cloud = "australia-southeast1-docker.pkg.dev/cpg-common/images/samtools-cloud:v0.27.0"
+sv-pipeline-virtual-env = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-pipeline-virtual-env:v0.27.0"
+sv-utils-env = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-utils-env:v0.27.0"
+sv-base = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-base:v0.27.0"
+sv-utils = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-utils:v0.27.0"
+cnmops = "australia-southeast1-docker.pkg.dev/cpg-common/images/cnmops:v0.27.0"
+sv-pipeline = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-pipeline:v0.27.0"
 
 [references.broad]
 unpadded_intervals_file = 'hg38.even.handcurated.20k.intervals'
