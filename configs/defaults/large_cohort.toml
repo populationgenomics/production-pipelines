@@ -34,7 +34,7 @@ min_pop_prob = 0.5  # minimum random forest probability for population assignmen
 training_pop = 'Superpopulation name'  # metamist's `Participant/meta` field for the
                                          # known population label for the RF training
 # whether or not to key samples by their external ID
-use_external_id = false
+use_external_id = true
 pca_plot_name = 'hgdp_1kg_sites'
 
 # Section that specifies background samples for PCA analysis.
