@@ -34,7 +34,7 @@ def run(
 ):
     """
     Generate plots in HTML format, write for each PC (of n_pcs) and
-    scope ("dataset", "population") plus for loadings) into
+    scope ("dataset", "superpopulation", "population") plus for loadings into
     file paths defined by `out_path_pattern`.
     """
     sample_ht = hl.read_table(str(sample_qc_ht_path))
@@ -44,8 +44,9 @@ def run(
     inferred_pop_ht = hl.read_table(str(inferred_pop_ht_path))
 
     scores_ht = scores_ht.annotate(
-        pop=sample_ht[scores_ht.s].pop,
-        training_pop=inferred_pop_ht[scores_ht.s].pop,
+        superpopulation=sample_ht[scores_ht.s].superpopulation,
+        population=sample_ht[scores_ht.s].population,
+        training_pop=inferred_pop_ht[scores_ht.s].training_pop,
         is_training=inferred_pop_ht[scores_ht.s].is_training,
         dataset=sample_ht[scores_ht.s].dataset,
     ).cache()
@@ -93,15 +94,18 @@ def run(
     use_inferred = get_config()['large_cohort']['pca_background']['inferred_ancestry']
     # if the inferred ancestry is set to true in the config, annotate the PCA with the 
     # inferred population ancestry (calculated in the ancestry_pca.py script
-    population_label = ht.training_pop.collect() if use_inferred else ht.pop.collect()
+    superpopulation_label = ht.training_pop.collect() if use_inferred else ht.superpopulation.collect()
+    population_label = ht.training_pop.collect() if use_inferred else ht.population.collect()
     # Change 'none' values to dataset name
     workflow_dataset = get_config()['workflow']['input_datasets']
     # join dataset names with underscore, in case there are multiple
     workflow_dataset = '_'.join(workflow_dataset)
+    superpopulation_label = [workflow_dataset if x is None else x for x in superpopulation_label]
     population_label = [workflow_dataset if x is None else x for x in population_label]
     is_training = ht.is_training.collect() if use_inferred else [False] * len(ht.is_training.collect())
     for scope, title, labels in [
         ('dataset', 'Dataset', datasets),
+        ('superpopulation', 'Superpopulation', superpopulation_label),
         ('population', 'Population', population_label),
     ]:
         plots.extend(
@@ -321,32 +325,3 @@ def manhattan_loadings(
     ]
 
     return p
-
-
-def remove_duplicates(x: Iterable) -> List:
-    """
-    Removes duplicates from a list, keeps order
-    """
-    return list(dict.fromkeys(x))
-
-
-def summarize_datasets_by_pop(ht):
-    """
-    Make labels that split samples for a population by dataset
-    """
-    cnts_by_pop = dict()
-    data = ht.select('pop', 'dataset').collect()
-    for d in data:
-        if d.pop not in cnts_by_pop:
-            cnts_by_pop[d.pop] = dict()
-        if d.dataset not in cnts_by_pop[d.pop]:
-            cnts_by_pop[d.pop][d.dataset] = 0
-        cnts_by_pop[d.pop][d.dataset] += 1
-
-    summary_by_pop = {
-        pop: ', '.join(f'{dataset}: {cnt}' for dataset, cnt in sorted(ds_d.items()))
-        for pop, ds_d in cnts_by_pop.items()
-    }
-    summary_by_pop = {k: v for k, v in summary_by_pop.items() if k}
-    summary_by_pop = hl.literal(summary_by_pop)
-    return summary_by_pop

@@ -19,7 +19,7 @@ def run(
     out_sample_qc_ht_path: Path,
     tmp_prefix: Path,
 ):
-    if can_reuse(out_sample_qc_ht_path):
+    if can_reuse(out_sample_qc_ht_path, overwrite=True):
         return hl.read_table(str(out_sample_qc_ht_path))
 
     ht = initialise_sample_table()
@@ -33,7 +33,7 @@ def run(
 
     # Run Hail sample-QC stats:
     sqc_ht_path = tmp_prefix / 'sample_qc.ht'
-    if can_reuse(sqc_ht_path):
+    if can_reuse(sqc_ht_path, overwrite=True):
         sqc_ht = hl.read_table(str(sqc_ht_path))
     else:
         # Filter to autosomes:
@@ -59,7 +59,7 @@ def initialise_sample_table() -> hl.Table:
     """
     Export the cohort into a sample-level Hail Table.
     """
-    pop_meta_field = get_config()['large_cohort'].get('pop_meta_field')
+    training_pop = get_config()['large_cohort'].get('training_pop')
     entries = [
         {
             's': s.id,
@@ -67,14 +67,16 @@ def initialise_sample_table() -> hl.Table:
             'dataset': s.dataset.name,
             'gvcf': str(s.gvcf.path),
             'sex': s.pedigree.sex.value,
-            'pop': s.meta.get(pop_meta_field) if pop_meta_field else None,
+            'training_pop': s.meta.get(training_pop) if training_pop else None,
+            'superpopulation': s.meta.get('Superpopulation name'),
+            'population': s.meta.get('Population name'),
         }
         for s in get_cohort().get_samples()
         if s.gvcf
     ]
     if not entries:
         raise ValueError('No samples with GVCFs found')
-    t = 'array<struct{s: str, external_id: str, dataset: str, gvcf: str, sex: int, pop: str}>'
+    t = 'array<struct{s: str, external_id: str, dataset: str, gvcf: str, sex: int, training_pop: str, superpopulation: str, population: str}>'
     ht = hl.Table.parallelize(hl.literal(entries, t), key='s')
     return ht
 
@@ -88,7 +90,7 @@ def impute_sex(
     Impute sex based on coverage.
     """
     checkpoint_path = tmp_prefix / 'sample_qc' / 'sex.ht'
-    if can_reuse(str(checkpoint_path)):
+    if can_reuse(str(checkpoint_path), overwrite=True):
         sex_ht = hl.read_table(str(checkpoint_path))
         return ht.annotate(**sex_ht[ht.s])
 
