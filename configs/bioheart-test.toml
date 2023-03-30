@@ -6,5 +6,9 @@ scatter_count = 5
 # leave this to true, since one sample doesn't have sequencing data
 skip_samples_with_missing_input = true
 
+# Run for Somalier only
+first_stages = ['SomalierPedigree']
+last_stages = ['SomalierPedigree']
+
 vds_version = '0.1'
 output_version = '0.2'
