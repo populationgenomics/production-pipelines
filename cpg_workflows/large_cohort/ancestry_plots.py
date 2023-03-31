@@ -76,9 +76,7 @@ def run(
 
     # Key samples by their external IDs
     use_external_id = get_config()['large_cohort']['use_external_id']
-    if use_external_id:
-        ht = key_by_external_id(scores_ht, sample_ht)
-    ht = scores_ht.cache()
+    ht = key_by_external_id(scores_ht, sample_ht) if use_external_id else scores_ht.cache()
 
     # Use eigenvalues to calculate variance
     eigenvalues = eigenvalues_ht.f0.collect()
