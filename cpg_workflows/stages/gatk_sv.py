@@ -174,14 +174,14 @@ class GatherSampleEvidence(SampleStage):
 
         # SV evidence
         # split reads:
-        ending_by_key['sr'] = 'sr.txt.gz'
-        ending_by_key['sr_index'] = 'sr.txt.gz.tbi'
+        ending_by_key['pesr_split'] = 'sr.txt.gz'
+        ending_by_key['pesr_split_index'] = 'sr.txt.gz.tbi'
         # discordant paired end reads:
-        ending_by_key['pe'] = 'pe.txt.gz'
-        ending_by_key['pe_index'] = 'pe.txt.gz.tbi'
+        ending_by_key['pesr_disc'] = 'pe.txt.gz'
+        ending_by_key['pesr_disc_index'] = 'pe.txt.gz.tbi'
         # site depth:
-        ending_by_key['sd'] = 'sd.txt.gz'
-        ending_by_key['sd_index'] = 'sd.txt.gz.tbi'
+        ending_by_key['pesr_sd'] = 'sd.txt.gz'
+        ending_by_key['pesr_sd_index'] = 'sd.txt.gz.tbi'
 
         for key, ending in ending_by_key.items():
             stage_name = self.name.lower()
