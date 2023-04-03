@@ -221,7 +221,6 @@ class GatherSampleEvidence(SampleStage):
                 'wham_docker',
                 'manta_docker',
                 'scramble_docker',
-                'sv_pipeline_base_docker',
                 'gatk_docker_pesr_override',
             ]
         )
@@ -308,7 +307,6 @@ class EvidenceQC(DatasetStage):
                 'sv_base_mini_docker',
                 'sv_base_docker',
                 'sv_pipeline_docker',
-                'sv_pipeline_qc_docker',
             ]
         )
 
@@ -450,7 +448,6 @@ class GatherBatchEvidence(DatasetStage):
                 'sv_base_mini_docker',
                 'sv_base_docker',
                 'sv_pipeline_docker',
-                'sv_pipeline_qc_docker',
                 'linux_docker',
                 'condense_counts_docker',
                 'gatk_docker',
@@ -530,8 +527,7 @@ class ClusterBatch(DatasetStage):
                 'sv_base_mini_docker',
                 'sv_pipeline_docker',
                 'gatk_docker',
-                'linux_docker',
-                'sv_pipeline_base_docker',
+                'linux_docker'
             ]
         )
 
@@ -610,10 +606,8 @@ class GenerateBatchMetrics(DatasetStage):
         input_dict |= get_images(
             [
                 'sv_pipeline_docker',
-                'sv_pipeline_rdtest_docker',
                 'sv_base_mini_docker',
                 'sv_base_docker',
-                'sv_pipeline_base_docker',
                 'linux_docker',
             ]
         )
@@ -695,7 +689,6 @@ class FilterBatch(DatasetStage):
 
         input_dict |= get_images(
             [
-                'sv_pipeline_base_docker',
                 'sv_pipeline_docker',
                 'sv_base_mini_docker',
                 'linux_docker',
