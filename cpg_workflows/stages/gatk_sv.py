@@ -220,8 +220,7 @@ class GatherSampleEvidence(SampleStage):
                 'cloud_sdk_docker',
                 'wham_docker',
                 'manta_docker',
-                'scramble_docker',
-                'gatk_docker_pesr_override',
+                'scramble_docker'
             ]
         )
         input_dict |= get_references(
