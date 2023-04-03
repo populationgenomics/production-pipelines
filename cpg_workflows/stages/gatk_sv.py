@@ -405,9 +405,9 @@ class GatherBatchEvidence(DatasetStage):
             'samples': sids,
             'ped_file': str(make_combined_ped(dataset)),
             'counts': [str(input_by_sid[sid]['coverage_counts']) for sid in sids],
-            'SR_files': [str(input_by_sid[sid]['sr']) for sid in sids],
-            'PE_files': [str(input_by_sid[sid]['pe']) for sid in sids],
-            'SD_files': [str(input_by_sid[sid]['sd']) for sid in sids],
+            'SR_files': [str(input_by_sid[sid]['pesr_split']) for sid in sids],
+            'PE_files': [str(input_by_sid[sid]['pesr_disc']) for sid in sids],
+            'SD_files': [str(input_by_sid[sid]['pesr_sd']) for sid in sids],
         }
         for caller in SV_CALLERS:
             input_dict[f'{caller}_vcfs'] = [
@@ -434,8 +434,12 @@ class GatherBatchEvidence(DatasetStage):
                 'mei_bed',
             ]
         )
+        ref_fasta = to_path(
+            get_config()['workflow'].get('ref_fasta')
+            or reference_path('broad/ref_fasta')
+        )
         input_dict |= {
-            'ref_dict': str(reference_path(f'broad/ref_fasta').with_suffix('.dict')),
+            'ref_dict': str(ref_fasta.with_suffix('.dict')),
         }
 
         # reference panel gCNV models
@@ -450,7 +454,6 @@ class GatherBatchEvidence(DatasetStage):
                 'linux_docker',
                 'condense_counts_docker',
                 'gatk_docker',
-                'gcnv_gatk_docker',
                 'cnmops_docker',
             ]
         )
