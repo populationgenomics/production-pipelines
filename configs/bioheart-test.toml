@@ -9,6 +9,7 @@ skip_samples_with_missing_input = true
 # Run for Somalier only
 first_stages = ['SomalierPedigree']
 last_stages = ['SomalierPedigree']
+force_stages = ['SomalierPedigree']
 
 vds_version = '0.1'
 output_version = '0.2'
