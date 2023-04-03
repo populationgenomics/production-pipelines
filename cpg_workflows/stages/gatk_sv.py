@@ -25,7 +25,7 @@ from cpg_workflows.workflow import (
 )
 
 
-GATK_SV_COMMIT = '33a3fe79d8370c96c94d35afbba6b532902b0fd4'
+GATK_SV_COMMIT = '7d2af00ba3d9bc704bc25e4b393a9b08b7c88dd2'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 
 
