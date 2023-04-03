@@ -120,9 +120,9 @@ def get_ref_panel(keys: list[str] | None = None) -> dict:
         k: v
         for k, v in {
             'ref_panel_samples': get_config()['sv_ref_panel']['ref_panel_samples'],
-            'ref_ped_file': str(reference_path('gatk_sv/ped_file')),
-            'ref_panel_vcf': str(reference_path('gatk_sv/clean_vcf')),
-            'qc_definitions': str(reference_path('gatk_sv/qc_definitions')),
+            # 'ref_ped_file': str(reference_path('gatk_sv/ped_file')),  # just called ped_file
+            # 'ref_panel_vcf': str(reference_path('gatk_sv/clean_vcf')),  # no record of this
+            # 'qc_definitions': str(reference_path('gatk_sv/qc_definitions')),  # no record of this
             'ref_panel_bincov_matrix': str(
                 reference_path('gatk_sv/ref_panel_bincov_matrix')
             ),
