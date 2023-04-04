@@ -520,8 +520,6 @@ class Stage(Generic[TargetT], ABC):
             else:
                 analysis_outputs.append(outputs.data)
 
-            assert isinstance(output, str) or isinstance(output, Path), output
-
             project_name = None
             if isinstance(target, Sample):
                 project_name = target.dataset.name
@@ -542,6 +540,7 @@ class Stage(Generic[TargetT], ABC):
                     meta=outputs.meta,
                     job_attrs=self.get_job_attrs(target),
                     update_analysis_meta=self.update_analysis_meta,
+                    project_name=project_name,
                 )
 
         return outputs
