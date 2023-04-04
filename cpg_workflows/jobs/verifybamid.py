@@ -40,6 +40,8 @@ def verifybamid(
     contam_ud = reference_path(f'broad/{sequencing_type}_contam_ud')
     contam_bed = reference_path(f'broad/{sequencing_type}_contam_bed')
     contam_mu = reference_path(f'broad/{sequencing_type}_contam_mu')
+    # define number of PCs used in estimation of contamination
+    num_pcs = get_config()['cramqc']['num_pcs']
     if sequencing_type == 'exome':
         extra_opts = '--max-depth 1000'
     else:
@@ -57,7 +59,7 @@ def verifybamid(
     /root/micromamba/share/verifybamid2-2.0.1-8/VerifyBamID \
     --NumThread {res.get_nthreads()} \
     --Verbose \
-    --NumPC 4 \
+    --NumPC {num_pcs} \
     --Output OUTPUT \
     --BamFile $CRAM \
     --Reference {reference.base} \

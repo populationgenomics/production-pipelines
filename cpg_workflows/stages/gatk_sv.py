@@ -11,7 +11,7 @@ from analysis_runner.cromwell import (
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
+from cpg_utils.config import get_config, ConfigError
 from cpg_utils.hail_batch import command, reference_path, image_path, genome_build
 from cpg_workflows.batch import make_job_name, Batch, get_batch
 from cpg_workflows.workflow import (
@@ -23,6 +23,7 @@ from cpg_workflows.workflow import (
     Sample,
     Dataset,
 )
+
 
 GATK_SV_COMMIT = 'b59a8b070da48ceed475814117787cf80cace170'
 SV_CALLERS = ['manta', 'wham', 'scramble']
@@ -51,6 +52,8 @@ def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str
         try:
             res[key] = str(reference_path(f'gatk_sv/{ref_d_key}'))
         except KeyError:
+            res[key] = str(reference_path(f'broad/{ref_d_key}'))
+        except ConfigError:
             res[key] = str(reference_path(f'broad/{ref_d_key}'))
 
     return res

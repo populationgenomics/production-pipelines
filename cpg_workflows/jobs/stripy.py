@@ -43,7 +43,7 @@ def stripy(
     reference = fasta_res_group(b)
 
     # Stripy accesses a relatively small number of discrete regions from each cram
-    # accessing the cram via cloudfuse is faster than localising the full cram   
+    # accessing the cram via cloudfuse is faster than localising the full cram
     bucket = cram_path.path.drive
     print(f'bucket = {bucket}')
     bucket_mount_path = to_path('/bucket')
@@ -55,21 +55,21 @@ def stripy(
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 
-    if sample.pedigree.sex:
+    if sample.pedigree.sex and str(sample.pedigree.sex).lower() != 'unknown':
         sex_argument = f'--sex {str(sample.pedigree.sex).lower()}'
     else:
         sex_argument = ''
 
     cmd = f"""\
-    # Increase logging to max verbosity and output json results. Needs to be passed as a config file so doing a 
+    # Increase logging to max verbosity and output json results. Needs to be passed as a config file so doing a
     # quick an dirty edit of the default config on the fly and cat to the job log.
     sed 's/"log_flag_threshold": 1/"log_flag_threshold": -1/' config.json \
         | sed 's/"output_json": false/"output_json": true/' \
         > $BATCH_TMPDIR/config.json
     cat $BATCH_TMPDIR/config.json
 
-    ln -s {mounted_cram_path} {sample.id}__{sample.external_id}.cram 
-    ln -s {mounted_cram_index_path} {sample.id}__{sample.external_id}.crai 
+    ln -s {mounted_cram_path} {sample.id}__{sample.external_id}.cram
+    ln -s {mounted_cram_index_path} {sample.id}__{sample.external_id}.crai
 
     python3 stri.py \\
         --genome hg38 \\
@@ -83,7 +83,7 @@ def stripy(
         --locus {target_loci}
 
     ls $BATCH_TMPDIR/
-  
+
     cp $BATCH_TMPDIR/{sample.id}__{sample.external_id}.cram.html {j.out_path}
     cp $BATCH_TMPDIR/{sample.id}__{sample.external_id}.cram.json {j.json_path}
 

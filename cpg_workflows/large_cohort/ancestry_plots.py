@@ -4,6 +4,7 @@ Plot ancestry PCA analysis results
 
 from collections import Counter
 from typing import List, Iterable
+from cpg_utils.config import get_config
 
 import pandas as pd
 import numpy as np
@@ -12,15 +13,15 @@ from bokeh.resources import CDN
 from bokeh.embed import file_html
 from bokeh.transform import factor_cmap, factor_mark
 from bokeh.plotting import ColumnDataSource, figure
-from bokeh.palettes import turbo  # flake: disable=F401
+from bokeh.palettes import turbo, d3  # flake: disable=F401
 from bokeh.models import CategoricalColorMapper, HoverTool
 
 from cpg_utils import Path
 from cpg_utils.hail_batch import reference_path, genome_build
 
 
-BG_LABEL = 'Provided ancestry (1KG+HGDP)'
-FG_LABEL = 'Inferred ancestry'
+PROVIDED_LABEL = 'Provided ancestry'
+INFERRED_LABEL = 'Inferred ancestry'
 
 
 def run(
@@ -33,7 +34,7 @@ def run(
 ):
     """
     Generate plots in HTML format, write for each PC (of n_pcs) and
-    scope ("dataset", "population") plus for loadings) into
+    scope ("dataset", "superpopulation", "population") plus for loadings into
     file paths defined by `out_path_pattern`.
     """
     sample_ht = hl.read_table(str(sample_qc_ht_path))
@@ -43,7 +44,9 @@ def run(
     inferred_pop_ht = hl.read_table(str(inferred_pop_ht_path))
 
     scores_ht = scores_ht.annotate(
-        pop=inferred_pop_ht[scores_ht.s].pop,
+        superpopulation=sample_ht[scores_ht.s].superpopulation,
+        population=sample_ht[scores_ht.s].population,
+        training_pop=inferred_pop_ht[scores_ht.s].training_pop,
         is_training=inferred_pop_ht[scores_ht.s].is_training,
         dataset=sample_ht[scores_ht.s].dataset,
     ).cache()
@@ -51,7 +54,9 @@ def run(
     def key_by_external_id(ht_, meta_ht=None):
         """
         Assuming ht.s is a CPG id, replaces it with external ID,
-        assuming it's defined in meta_ht.external_id
+        assuming it's defined in meta_ht.external_id. This item is
+        configurable in the large_cohort toml, under use_external_id
+        where the default is false.
         """
         if meta_ht is None:
             meta_ht = ht_
@@ -69,9 +74,11 @@ def run(
         )
         return ht_
 
-    ht = key_by_external_id(scores_ht, sample_ht)
-    ht = ht.cache()
+    # Key samples by their external IDs
+    use_external_id = get_config()['large_cohort']['use_external_id']
+    ht = key_by_external_id(scores_ht, sample_ht) if use_external_id else scores_ht.cache()
 
+    # Use eigenvalues to calculate variance
     eigenvalues = eigenvalues_ht.f0.collect()
     eigenvalues_df = pd.to_numeric(eigenvalues)
     variance = np.divide(eigenvalues_df[1:], float(eigenvalues_df.sum())) * 100
@@ -82,11 +89,22 @@ def run(
 
     sample_names = ht.s.collect()
     datasets = ht.dataset.collect()
-    is_training = ht.is_training.collect()
-
+    use_inferred = get_config()['large_cohort']['pca_background']['inferred_ancestry']
+    # if the inferred ancestry is set to true in the config, annotate the PCA with the 
+    # inferred population ancestry (calculated in the ancestry_pca.py script
+    superpopulation_label = ht.training_pop.collect() if use_inferred else ht.superpopulation.collect()
+    population_label = ht.training_pop.collect() if use_inferred else ht.population.collect()
+    # Change 'none' values to dataset name
+    workflow_dataset = get_config()['workflow']['input_datasets']
+    # join dataset names with underscore, in case there are multiple
+    workflow_dataset = '_'.join(workflow_dataset)
+    superpopulation_label = [workflow_dataset if x is None else x for x in superpopulation_label]
+    population_label = [workflow_dataset if x is None else x for x in population_label]
+    is_training = ht.is_training.collect() if use_inferred else [False] * len(ht.is_training.collect())
     for scope, title, labels in [
         ('dataset', 'Dataset', datasets),
-        ('population', 'Population', ht.pop.collect()),
+        ('superpopulation', 'Superpopulation', superpopulation_label),
+        ('population', 'Population', population_label),
     ]:
         plots.extend(
             _plot_pca(
@@ -124,9 +142,16 @@ def _plot_pca(
 ):
 
     cntr: Counter = Counter(labels)
+    # count the number of samples for each group and add it to the labels
     labels = [f'{x} ({cntr[x]})' for x in labels]
-
     unique_labels = list(Counter(labels).keys())
+    palette = turbo(len(unique_labels))
+    # if there is a pca_plot_name given, add this to the output name
+    plot_name = get_config()['large_cohort'].get('pca_plot_name')
+    pca_suffix = ''
+    if plot_name:
+        pca_suffix = plot_name.replace('-', '_')
+
     tooltips = [('labels', '@label'), ('samples', '@samples')]
     plots = []
     for i in range(number_of_pcs - 1):
@@ -134,7 +159,7 @@ def _plot_pca(
         pc2 = i + 1
         plot = figure(
             title=title,
-            x_axis_label=f'PC{pc1 + 1} ({variance[pc1]})%)',
+            x_axis_label=f'PC{pc1 + 1} ({variance[pc1]}%)',
             y_axis_label=f'PC{pc2 + 1} ({variance[pc2]}%)',
             tooltips=tooltips,
             width=1000,
@@ -147,7 +172,7 @@ def _plot_pca(
                 samples=sample_names,
                 dataset=datasets,
                 is_training=[
-                    {True: BG_LABEL, False: FG_LABEL}.get(v) for v in is_training
+                    {True: PROVIDED_LABEL, False: INFERRED_LABEL}.get(v) for v in is_training
                 ],
             )
         )
@@ -156,19 +181,20 @@ def _plot_pca(
             'y',
             alpha=0.5,
             marker=factor_mark(
-                'is_training', ['cross', 'circle'], [BG_LABEL, FG_LABEL]
+                'is_training', ['cross', 'circle'], [PROVIDED_LABEL, INFERRED_LABEL]
             ),
             source=source,
-            size=4,
-            color=factor_cmap('label', ['#1b9e77', '#d95f02'], unique_labels),
+            size=5,
+            color=factor_cmap('label', palette, unique_labels),
             legend_group='label',
         )
         plot.add_layout(plot.legend[0], 'left')
         plots.append(plot)
+
         if out_path_pattern:
             html = file_html(plot, CDN, title)
             plot_filename_html = str(out_path_pattern).format(
-                scope=scope, pci=pc2, ext='html'
+                scope=scope, pci=pc2, pca_suffix=pca_suffix, ext='html'
             )
             with hl.hadoop_open(plot_filename_html, 'w') as f:
                 f.write(html)
@@ -177,6 +203,11 @@ def _plot_pca(
 
 def _plot_loadings(number_of_pcs, loadings_ht, out_path_pattern=None):
     plots = []
+    # if there is a pca_plot_name given, add this to the output name
+    plot_name = get_config()['large_cohort'].get('pca_plot_name')
+    pca_suffix = ''
+    if plot_name:
+        pca_suffix = plot_name.replace('-', '_')
     gtf_ht = hl.experimental.import_gtf(
         str(reference_path('broad/protein_coding_gtf')),
         reference_genome=genome_build(),
@@ -197,7 +228,7 @@ def _plot_loadings(number_of_pcs, loadings_ht, out_path_pattern=None):
         if out_path_pattern:
             html = file_html(plot, CDN, 'my plot')
             plot_filename_html = str(out_path_pattern).format(
-                scope='loadings', pci=pc, ext='html'
+                scope='loadings', pci=pc, pca_suffix=pca_suffix, ext='html'
             )
             with hl.hadoop_open(plot_filename_html, 'w') as f:
                 f.write(html)
@@ -292,32 +323,3 @@ def manhattan_loadings(
     ]
 
     return p
-
-
-def remove_duplicates(x: Iterable) -> List:
-    """
-    Removes duplicates from a list, keeps order
-    """
-    return list(dict.fromkeys(x))
-
-
-def summarize_datasets_by_pop(ht):
-    """
-    Make labels that split samples for a population by dataset
-    """
-    cnts_by_pop = dict()
-    data = ht.select('pop', 'dataset').collect()
-    for d in data:
-        if d.pop not in cnts_by_pop:
-            cnts_by_pop[d.pop] = dict()
-        if d.dataset not in cnts_by_pop[d.pop]:
-            cnts_by_pop[d.pop][d.dataset] = 0
-        cnts_by_pop[d.pop][d.dataset] += 1
-
-    summary_by_pop = {
-        pop: ', '.join(f'{dataset}: {cnt}' for dataset, cnt in sorted(ds_d.items()))
-        for pop, ds_d in cnts_by_pop.items()
-    }
-    summary_by_pop = {k: v for k, v in summary_by_pop.items() if k}
-    summary_by_pop = hl.literal(summary_by_pop)
-    return summary_by_pop

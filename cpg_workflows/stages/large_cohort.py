@@ -126,6 +126,7 @@ class Ancestry(CohortStage):
             eigenvalues=get_workflow().prefix / 'ancestry' / 'eigenvalues.ht',
             loadings=get_workflow().prefix / 'ancestry' / 'loadings.ht',
             inferred_pop=get_workflow().prefix / 'ancestry' / 'inferred_pop.ht',
+            sample_qc_ht=get_workflow().prefix / 'ancestry' / 'sample_qc_ht.ht'
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -146,6 +147,7 @@ class Ancestry(CohortStage):
                 out_eigenvalues_ht_path=self.expected_outputs(cohort)['eigenvalues'],
                 out_loadings_ht_path=self.expected_outputs(cohort)['loadings'],
                 out_inferred_pop_ht_path=self.expected_outputs(cohort)['inferred_pop'],
+                out_sample_qc_ht_path=self.expected_outputs(cohort)['sample_qc_ht']
             ),
             depends_on=inputs.get_jobs(cohort),
         )
@@ -157,13 +159,18 @@ class AncestryPlots(CohortStage):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.out_prefix = get_workflow().web_prefix / 'ancestry'
-        self.out_fname_pattern = '{scope}_pc{pci}.{ext}'
+        self.out_fname_pattern = '{scope}_pc{pci}_{pca_suffix}.{ext}'
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         n_pcs = get_config()['large_cohort']['n_pcs']
+        # if there is a pca_plot_name given, add this to the output name
+        plot_name = get_config()['large_cohort'].get('pca_plot_name')
+        pca_suffix = ''
+        if plot_name:
+            pca_suffix = plot_name.replace('-', '_')
         return {
             str(pc_num): self.out_prefix
-            / self.out_fname_pattern.format(scope='dataset', pci=pc_num, ext='html')
+            / self.out_fname_pattern.format(scope='dataset', pci=pc_num, pca_suffix=pca_suffix, ext='html')
             for pc_num in range(1, n_pcs)
         }
 
@@ -176,7 +183,7 @@ class AncestryPlots(CohortStage):
             function=run,
             function_path_args=dict(
                 out_path_pattern=self.out_prefix / self.out_fname_pattern,
-                sample_qc_ht_path=inputs.as_path(cohort, SampleQC),
+                sample_qc_ht_path=inputs.as_path(cohort, Ancestry, key='sample_qc_ht'),
                 scores_ht_path=inputs.as_path(cohort, Ancestry, key='scores'),
                 eigenvalues_ht_path=inputs.as_path(cohort, Ancestry, key='eigenvalues'),
                 loadings_ht_path=inputs.as_path(cohort, Ancestry, key='loadings'),
