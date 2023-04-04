@@ -18,7 +18,7 @@ from cpg_utils.hail_batch import (
 )
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.python_scripts import check_pedigree
-from cpg_workflows.resources import STANDARD
+from cpg_workflows.resources import STANDARD, storage_for_cram_job
 from cpg_workflows.targets import Dataset
 from cpg_workflows.utils import can_reuse, rich_sample_id_seds
 
@@ -256,9 +256,7 @@ def extract(
         raise ValueError(
             f'CRAM for somalier is required to have CRAI index ({cram_path})'
         )
-    storage_gb = None  # avoid extra disk by default
-    if get_config()['workflow']['sequencing_type'] == 'genome':
-        storage_gb = 100
+    storage_gb = storage_for_cram_job()
     STANDARD.set_resources(j, ncpu=4, storage_gb=storage_gb)
 
     ref = fasta_res_group(b)
