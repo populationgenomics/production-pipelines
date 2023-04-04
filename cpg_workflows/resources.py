@@ -299,7 +299,7 @@ class JobResource:
         return self
 
 
-def storage_for_cram_qc_job() -> int | None:
+def storage_for_cram_job() -> int | None:
     """
     Get storage request for a CRAM QC processing job, gb
     """

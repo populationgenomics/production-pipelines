@@ -7,7 +7,7 @@ from cpg_utils import Path
 from cpg_utils.hail_batch import command
 from cpg_workflows.utils import can_reuse
 from cpg_workflows.filetypes import CramPath
-from cpg_workflows.resources import STANDARD, storage_for_cram_qc_job
+from cpg_workflows.resources import STANDARD, storage_for_cram_job
 
 from hailtop.batch.job import Job
 
@@ -33,7 +33,7 @@ def verifybamid(
     j = b.new_job('VerifyBamID', job_attrs)
     j.image(image_path('verifybamid'))
     res = STANDARD.request_resources(ncpu=4)
-    res.attach_disk_storage_gb = storage_for_cram_qc_job()
+    res.attach_disk_storage_gb = storage_for_cram_job()
     res.set_to_job(j)
     reference = fasta_res_group(b)
     sequencing_type = get_config()['workflow']['sequencing_type']

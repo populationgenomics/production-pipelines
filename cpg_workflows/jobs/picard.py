@@ -12,7 +12,7 @@ from cpg_utils.hail_batch import command
 from cpg_workflows.resources import (
     HIGHMEM,
     STANDARD,
-    storage_for_cram_qc_job,
+    storage_for_cram_job,
     storage_for_joint_vcf,
 )
 from cpg_workflows.filetypes import CramPath
@@ -254,7 +254,7 @@ def picard_collect_metrics(
     j = b.new_job('Picard CollectMultipleMetrics', job_attrs)
     j.image(image_path('picard'))
     res = STANDARD.request_resources(ncpu=2)
-    res.attach_disk_storage_gb = storage_for_cram_qc_job()
+    res.attach_disk_storage_gb = storage_for_cram_job()
     res.set_to_job(j)
     reference = fasta_res_group(b)
     # define variable for whether picard output is sorted or not
@@ -329,7 +329,7 @@ def picard_hs_metrics(
     sequencing_type = get_config()['workflow']['sequencing_type']
     assert sequencing_type == 'exome'
     res = STANDARD.request_resources(ncpu=2)
-    res.attach_disk_storage_gb = storage_for_cram_qc_job()
+    res.attach_disk_storage_gb = storage_for_cram_job()
     res.set_to_job(j)
     reference = fasta_res_group(b)
     interval_file = b.read_input(
@@ -398,7 +398,7 @@ def picard_wgs_metrics(
     sequencing_type = get_config()['workflow']['sequencing_type']
     assert sequencing_type == 'genome'
     res = STANDARD.request_resources(ncpu=2)
-    res.attach_disk_storage_gb = storage_for_cram_qc_job()
+    res.attach_disk_storage_gb = storage_for_cram_job()
     res.set_to_job(j)
     reference = fasta_res_group(b)
     interval_file = b.read_input(
