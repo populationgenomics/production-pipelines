@@ -499,7 +499,6 @@ class Stage(Generic[TargetT], ABC):
             and action == Action.QUEUE
             and outputs.data
         ):
-
             analysis_outputs: list[str | Path] = []
             if isinstance(outputs.data, dict):
                 if not self.analysis_keys:
@@ -521,6 +520,14 @@ class Stage(Generic[TargetT], ABC):
             else:
                 analysis_outputs.append(outputs.data)
 
+            project_name = None
+            if isinstance(target, Sample):
+                project_name = target.dataset.name
+            elif isinstance(target, Dataset):
+                project_name = target.name
+            elif isinstance(target, Cohort):
+                project_name = target.analysis_dataset.name
+
             for analysis_output in analysis_outputs:
                 assert isinstance(
                     analysis_output, (str, Path)
@@ -535,11 +542,9 @@ class Stage(Generic[TargetT], ABC):
                     meta=outputs.meta,
                     job_attrs=self.get_job_attrs(target),
                     update_analysis_meta=self.update_analysis_meta,
+                    project_name=project_name,
                 )
-        else:
-            logging.info(
-                f'Didnt add job checkout vars {self.analysis_type}, {self.status_reporter}, {action}, {outputs.data}'
-            )
+
         return outputs
 
     def _get_action(self, target: TargetT) -> Action:
