@@ -501,25 +501,31 @@ class ClusterBatch(DatasetStage):
         """
         batch_evidence_d = inputs.as_dict(dataset, GatherBatchEvidence)
 
+        ref_fasta = to_path(
+            get_config()['workflow'].get('ref_fasta')
+            or reference_path('broad/ref_fasta')
+        )
+
         input_dict: dict[str, Any] = {
             'batch': dataset.name,
-            'del_bed': str(batch_evidence_d[f'merged_dels']),
-            'dup_bed': str(batch_evidence_d[f'merged_dups']),
+            'del_bed': str(batch_evidence_d['merged_dels']),
+            'dup_bed': str(batch_evidence_d['merged_dups']),
             'ped_file': str(make_combined_ped(dataset)),
-        }
-        for caller in SV_CALLERS:
-            input_dict[f'{caller}_vcf_tar'] = str(
-                batch_evidence_d[f'std_{caller}_vcf_tar']
-            )
-
-        input_dict |= {
             'depth_exclude_overlap_fraction': 0.5,
             'depth_interval_overlap': 0.8,
             'depth_clustering_algorithm': 'SINGLE_LINKAGE',
             'pesr_interval_overlap': 0.1,
             'pesr_breakend_window': 300,
             'pesr_clustering_algorithm': 'SINGLE_LINKAGE',
+            'reference_fasta': str(ref_fasta),
+            'reference_fasta_fai': str(ref_fasta) + '.fai',
+            'reference_dict': str(ref_fasta.with_suffix('.dict')),
         }
+
+        for caller in SV_CALLERS:
+            input_dict[f'{caller}_vcf_tar'] = str(
+                batch_evidence_d[f'std_{caller}_vcf_tar']
+            )
 
         input_dict |= get_images(
             [
@@ -537,15 +543,6 @@ class ClusterBatch(DatasetStage):
                 {'pesr_exclude_intervals': 'pesr_exclude_list'},
             ]
         )
-        ref_fasta = to_path(
-            get_config()['workflow'].get('ref_fasta')
-            or reference_path('broad/ref_fasta')
-        )
-        input_dict |= {
-            'reference_fasta': str(ref_fasta),
-            'reference_fasta_fai': str(ref_fasta) + '.fai',
-            'reference_dict': str(ref_fasta.with_suffix('.dict')),
-        }
 
         expected_d = self.expected_outputs(dataset)
         jobs = add_gatk_sv_jobs(
