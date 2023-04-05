@@ -525,6 +525,8 @@ class Stage(Generic[TargetT], ABC):
                 project_name = target.dataset.name
             elif isinstance(target, Dataset):
                 project_name = target.name
+            elif isinstance(target, Cohort):
+                project_name = target.analysis_dataset.name
 
             for analysis_output in analysis_outputs:
                 assert isinstance(
