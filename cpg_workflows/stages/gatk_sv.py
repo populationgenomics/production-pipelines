@@ -563,7 +563,7 @@ class GenerateBatchMetrics(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict:
         """
-        Metrics file
+        Metrics files
         """
 
         ending_by_key = {
