@@ -1,6 +1,4 @@
 [workflow]
-#dataset_gcp_project = 'acute-care-321904'
-#dataset = 'acute-care'
 input_datasets = ['broad-rgp']
 access_level = 'test'
 
@@ -16,26 +14,45 @@ access_level = 'test'
 # samtools view -H gs://cpg-acute-care-test/cram/CPG262543.cram | less
 ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
 
-#[hail]
-#billing_project = 'acute-care'
-
 [images]
-cloud_sdk_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/cloud-sdk"
+cpg_workflows = "australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:3ea08a9958b5f12c89f629046e5236cef8c15231"
 cnmops_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/cnmops:v0.27.0"
 cnmops_virtual_env = "australia-southeast1-docker.pkg.dev/cpg-common/images/cnmops-virtual-env:v0.27.0"
-gatk_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-36-g88b0578'
-gatk_docker_pesr_override = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-36-g88b0578'
-genomes_in_the_cloud_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/genomes-in-the-cloud:2.3.2-1510681135'
-manta_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/manta:8645aa'
 samtools_cloud_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/samtools-cloud:v0.27.0"
 samtools_cloud_virtual_env = "australia-southeast1-docker.pkg.dev/cpg-common/images/samtools-cloud-virtual-env:v0.27.0"
-scramble_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/scramble:1.0.2'
 sv_base_mini_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-base-mini:v0.27.0"
 sv_base_virtual_env = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-base-virtual-env:v0.27.0"
 sv_pipeline_virtual_env = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-pipeline-virtual-env:v0.27.0"
 sv_utils_env = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-utils-env:v0.27.0"
 sv_base = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-base:v0.27.0"
+sv_base_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-base:v0.27.0"
 sv_utils = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-utils:v0.27.0"
 sv_pipeline_base_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-pipeline:v0.27.0"
 sv_pipeline_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-pipeline:v0.27.0"
-wham_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/wham:8645aa'
+sv_pipeline_qc_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-pipeline:v0.27.0"
+
+# external (not built by the gatk-sv repo)
+cloud_sdk_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/cloud-sdk"
+condense_counts_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-57-g9e03432"
+duphold_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/duphold:mw-xz-fixes-2-b1be6a9"
+gatk_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-57-g9e03432"
+gatk_docker_concordance = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:mw-sv-concordance-937c81"
+gatk_docker_pesr_override = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-57-g9e03432"
+genomes_in_the_cloud_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/genomes-in-the-cloud:2.3.2-1510681135"
+gq_recalibrator_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:0a7e1d86f"
+igv_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/igv:mw-xz-fixes-2-b1be6a9"
+manta_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/manta:5994670"
+pangenie_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/pangenie:vj-127571f"
+scramble_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/scramble:1.0.2"
+str = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/str:5994670"
+vapor_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/vapor:header-hash-2fc8f12"
+wham_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/wham:5994670"
+
+# really external
+linux_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/ubuntu1804"
+
+[references.broad]
+unpadded_intervals_file = 'gs://cpg-common-main/references/hg38/v0/hg38.even.handcurated.20k.intervals'
+
+[references.gatk_sv]
+rmsk = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.randomForest_blacklist.withRepMask.bed.gz"
