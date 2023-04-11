@@ -90,7 +90,7 @@ def annotate_cohort(
     logging.info('Annotating with seqr-loader fields: round 1')
 
     # Add potentially missing fields
-    if not all(attr in mt.row_value for attr in ['AC', 'AF', 'AN']):
+    if not all(attr in mt.info for attr in ['AC', 'AF', 'AN']):
         mt = hl.variant_qc(mt)
         mt = mt.annotate_rows(
             info=mt.info.annotate(AN=mt.variant_qc.AN, AF=mt.variant_qc.AF, AC=mt.variant_qc.AC)
