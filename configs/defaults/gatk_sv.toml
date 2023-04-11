@@ -25,7 +25,7 @@ sv_pipeline_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-p
 wham_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/wham:8645aa'
 
 [references.broad]
-unpadded_intervals_file = 'hg38.even.handcurated.20k.intervals'
+unpadded_intervals_file = 'gs://cpg-common-main/references/hg38/v0/hg38.even.handcurated.20k.intervals'
 
 [references.gatk_sv]
 wham_include_list_bed_file = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/wham_whitelist.bed"
@@ -44,7 +44,7 @@ allosome_file = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/re
 cnmops_exclude_list = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/GRCh38_Nmask.bed"
 cytoband = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/cytobands_hg38.bed.gz"
 mei_bed = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/mei_hg38.bed.gz"
-rmsk = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/randomForest_blacklist.withRepMask.bed.gz"
+rmsk = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.randomForest_blacklist.withRepMask.bed.gz"
 segdups = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.SD_gaps_Cen_Tel_Heter_Satellite_lumpy.blacklist.sorted.merged.bed.gz"
 seed_cutoffs = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/seed_cutoff.txt"
 pesr_exclude_list = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/PESR.encode.peri_all.repeats.delly.hg38.blacklist.sorted.bed.gz"
