@@ -27,41 +27,6 @@ wham_docker = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/wham:864
 [references.broad]
 unpadded_intervals_file = 'gs://cpg-common-main/references/hg38/v0/hg38.even.handcurated.20k.intervals'
 
-[references.gatk_sv]
-wham_include_list_bed_file = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/wham_whitelist.bed"
-primary_contigs_list = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/primary_contigs.list"
-primary_contigs_fai = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/contig.fai"
-preprocessed_intervals = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/preprocessed_intervals.interval_list"
-manta_region_bed = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/primary_contigs_plus_mito.bed.gz"
-melt_standard_vcf_header = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/melt_standard_vcf_header.txt"
-genome_file = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.genome"
-wgd_scoring_mask = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/wgd_scoring_mask.hg38.gnomad_v3.bed"
-allosomal_contigs = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/allosome.fai"
-contig_ploidy_priors = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.contig_ploidy_priors_homo_sapiens.tsv"
-inclusion_bed = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38_primary_contigs.bed"
-autosome_file = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/autosome.fai"
-allosome_file = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/allosome.fai"
-cnmops_exclude_list = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/GRCh38_Nmask.bed"
-cytoband = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/cytobands_hg38.bed.gz"
-mei_bed = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/mei_hg38.bed.gz"
-rmsk = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.randomForest_blacklist.withRepMask.bed.gz"
-segdups = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.SD_gaps_Cen_Tel_Heter_Satellite_lumpy.blacklist.sorted.merged.bed.gz"
-seed_cutoffs = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/seed_cutoff.txt"
-pesr_exclude_list = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/PESR.encode.peri_all.repeats.delly.hg38.blacklist.sorted.bed.gz"
-depth_exclude_list = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/depth_blacklist.sorted.bed.gz"
-bin_exclude = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/bin_exclude.hg38.gatkcov.bed.gz"
-empty_file = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/empty.file"
-protein_coding_gtf = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/MANE.GRCh38.v0.95.select_ensembl_genomic.gtf"
-ped_file = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/1KG/v1/ped/1kg_ref_panel_v1.ped"
-clean_vcf = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/1KG/v1/calls/ref_panel_1kg_v1.cleaned.vcf.gz"
-ref_panel_bincov_matrix = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/1KG/v1/merged_evidence/ref_panel_1kg_v1.bincov.bed.gz"
-qc_definitions = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/1KG/v2/single_sample.qc_definitions.tsv"
-contig_ploidy_model_tar = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/1KG/v2/gcnv/ref_panel_1kg_v2-contig-ploidy-model.tar.gz"
-model_tar_tmpl = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/1KG/v2/gcnv/model_files/ref_panel_1kg_v2-gcnv-model-shard-{shard}.tar.gz"
-ref_panel_PE_file_tmpl = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/tws_SVEvidence/pe/{sample}.pe.txt.gz"
-ref_panel_SR_file_tmpl = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/tws_SVEvidence/sr/{sample}.sr.txt.gz"
-ref_panel_SD_file_tmpl = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/tws_SVEvidence/sd/{sample}.sd.txt.gz"
-
 [references.broad.sv.resources]
 wham_include_list_bed_file = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/wham_whitelist.bed'
 primary_contigs_list = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/primary_contigs.list'
