@@ -91,12 +91,18 @@ def annotate_cohort(
 
     # Add potentially missing fields
     if not all(attr in mt.info for attr in ['AC', 'AF', 'AN']):
-        logging.info('Adding AC/AF/AN attributes manually')
-        mt = hl.variant_qc(mt)
-        mt = mt.annotate_rows(
-            info=mt.info.annotate(AN=mt.variant_qc.AN, AF=mt.variant_qc.AF, AC=mt.variant_qc.AC)
-        )
-        mt = mt.drop('variant_qc')
+        if mt.count_cols() == 0:
+            logging.info('No samples in the Matrix Table, adding dummy values')
+            mt = mt.annotate_rows(info=mt.info.annotate(AN=[1], AF=[0.01], AC=1))
+        else:
+            logging.info('Adding AC/AF/AN attributes from variant_qc')
+            mt = hl.variant_qc(mt)
+            mt = mt.annotate_rows(
+                info=mt.info.annotate(
+                    AN=mt.variant_qc.AN, AF=mt.variant_qc.AF, AC=mt.variant_qc.AC
+                )
+            )
+            mt = mt.drop('variant_qc')
 
     # don't fail if the AC/AF attributes are an inappropriate type
     for attr in ['AC', 'AF']:
