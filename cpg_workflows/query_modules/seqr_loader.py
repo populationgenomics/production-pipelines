@@ -93,7 +93,7 @@ def annotate_cohort(
     if not all(attr in mt.info for attr in ['AC', 'AF', 'AN']):
         if mt.count_cols() == 0:
             logging.info('No samples in the Matrix Table, adding dummy values')
-            mt = mt.annotate_rows(info=mt.info.annotate(AN=[1], AF=[0.01], AC=1))
+            mt = mt.annotate_rows(info=mt.info.annotate(AN=1, AF=[0.01], AC=[1]))
         else:
             logging.info('Adding AC/AF/AN attributes from variant_qc')
             mt = hl.variant_qc(mt)
