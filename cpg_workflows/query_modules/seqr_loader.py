@@ -90,12 +90,18 @@ def annotate_cohort(
     logging.info('Annotating with seqr-loader fields: round 1')
 
     # Add potentially missing fields
-    if not all(attr in mt.info for attr in ['AC', 'AF', 'AN']):
+    all_attr_found = all(attr in mt.info for attr in ['AC', 'AF', 'AN'])
+    logging.info(f'All AC/AF/AN attributes found: {all_attr_found}')
+    if not all_attr_found:
+        logging.info('Adding AC/AF/AN attributes manually')
         mt = hl.variant_qc(mt)
         mt = mt.annotate_rows(
             info=mt.info.annotate(AN=mt.variant_qc.AN, AF=mt.variant_qc.AF, AC=mt.variant_qc.AC)
         )
         mt = mt.drop('variant_qc')
+    else:
+        logging.info('AC/AF/AN attributes already present')
+        logging.info(mt.info)
 
     # don't fail if the AC/AF attributes are an inappropriate type
     for attr in ['AC', 'AF']:
