@@ -60,7 +60,7 @@ def annotate_cohort(
     # and hl.split_multi_hts can handle multiallelic VEP field.
     vep_ht = hl.read_table(str(vep_ht_path))
     logging.info(f'Adding VEP annotations into the Matrix Table from {vep_ht_path}')
-    mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
+    mt = mt.annotate_rows(vep=vep_ht[mt.locus, mt.alleles].vep)
 
     # Splitting multi-allelics. We do not handle AS info fields here - we handle
     # them when loading VQSR instead, and populate entire "info" from VQSR.
