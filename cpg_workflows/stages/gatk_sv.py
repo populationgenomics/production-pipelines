@@ -117,7 +117,11 @@ def add_gatk_sv_jobs(
     cmds = []
     for key, resource in output_dict.items():
         out_path = expected_out_dict[key]
-        cmds.append(f'gsutil cp $(cat {resource}) {out_path}')
+        if isinstance(resource, list):
+            for source, dest in zip(resource, out_path):
+                cmds.append(f'gsutil cp $(cat {source}) {dest}')
+        else:
+            cmds.append(f'gsutil cp $(cat {resource}) {out_path}')
     copy_j.command(command(cmds, setup_gcp=True))
     return [submit_j, copy_j]
 
@@ -684,8 +688,14 @@ class FilterBatch(DatasetStage):
         ending_by_key['outlier_samples_excluded_file'] = '.outliers.samples.list'
         ending_by_key['batch_samples_postOutlierExclusion_file'] = '.outliers_excluded.samples.list'
 
-        ending_by_key['sv_counts'] = [f'.{caller}.with_evidence.svcounts.txt' for caller in SV_CALLERS + ['depth']]
-        ending_by_key['sv_count_plots'] = [f'.{caller}.with_evidence.all_SVTYPEs.counts_per_sample.png' for caller in SV_CALLERS + ['depth']]
+        ending_by_key['sv_counts'] = [
+            f'.{caller}.with_evidence.svcounts.txt'
+            for caller in SV_CALLERS + ['depth']
+        ]
+        ending_by_key['sv_count_plots'] = [
+            f'.{caller}.with_evidence.all_SVTYPEs.counts_per_sample.png'
+            for caller in SV_CALLERS + ['depth']
+        ]
         d: dict[str, Path | list[Path]] = {}
         for key, ending in ending_by_key.items():
             if isinstance(ending, str):
