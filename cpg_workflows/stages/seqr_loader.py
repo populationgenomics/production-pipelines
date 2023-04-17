@@ -3,6 +3,7 @@
 """
 Hail Query stages for the Seqr loader workflow.
 """
+from typing import Any
 
 from cpg_utils import to_path, Path
 from cpg_utils.cloud import read_secret
@@ -74,7 +75,22 @@ class AnnotateCohort(CohortStage):
         )
 
 
-@stage(required_stages=[AnnotateCohort])
+def _update_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, Any]:
+    """
+    Add meta.type to custom analysis object
+
+    TODO: Replace this once dynamic analysis types land in metamist.
+    """
+    return {'type': 'annotated-dataset-callset'}
+
+
+@stage(
+    required_stages=[AnnotateCohort],
+    analysis_type='custom',
+    update_analysis_meta=_update_meta,
+)
 class AnnotateDataset(DatasetStage):
     """
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
