@@ -90,6 +90,7 @@ def _update_meta(
     required_stages=[AnnotateCohort],
     analysis_type='custom',
     update_analysis_meta=_update_meta,
+    analysis_keys=['mt'],
 )
 class AnnotateDataset(DatasetStage):
     """
