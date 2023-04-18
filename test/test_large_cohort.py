@@ -5,15 +5,12 @@ Test large-cohort workflow.
 import toml
 from os.path import exists
 from cpg_utils import to_path
-from cpg_utils.hail_batch import reference_path
 from pytest_mock import MockFixture
 from . import results_prefix, update_dict
 
 ref_prefix = to_path(__file__).parent / 'data/large_cohort/reference'
 gnomad_prefix = ref_prefix / 'gnomad/v0'
 broad_prefix = ref_prefix / 'hg38/v0'
-# get configurable sample_qc path from config file
-predetermined_qc_variants = str(reference_path('gnomad/predetermined_qc_variants'))
 
 TOML = f"""
 [workflow]
@@ -62,7 +59,7 @@ hapmap_ht = "{gnomad_prefix}/hapmap/hapmap_3.3.hg38.ht"
 kgp_omni_ht = "{gnomad_prefix}/kgp/1000G_omni2.5.hg38.ht"
 kgp_hc_ht = "{gnomad_prefix}/kgp/1000G_phase1.snps.high_confidence.hg38.ht"
 mills_ht = "{gnomad_prefix}/mills/Mills_and_1000G_gold_standard.indels.hg38.ht"
-predetermined_qc_variants = "{predetermined_qc_variants}"
+predetermined_qc_variants = "{gnomad_prefix}/sample_qc/pre_ld_pruning_qc_variants.ht"
 
 [references.broad]
 genome_calling_interval_lists = "{broad_prefix}/wgs_calling_regions.hg38.interval_list"
