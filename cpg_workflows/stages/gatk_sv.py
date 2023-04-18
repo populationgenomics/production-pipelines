@@ -796,7 +796,6 @@ class GenotypeBatch(DatasetStage):
             'batch': dataset.name,
             'ped_file': make_combined_ped(dataset),
             'ref_dict': str(ref_fasta.with_suffix('.dict')),
-            'ref_fasta': str(ref_fasta),
             'n_per_split': 5000,
             'n_RD_genotype_bins': 100000,
             'coveragefile': batchevidence_d['merged_bincov'],  # unsure
