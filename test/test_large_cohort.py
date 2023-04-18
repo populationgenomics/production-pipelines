@@ -146,6 +146,7 @@ def test_large_cohort(mocker: MockFixture):
     eigenvalues_ht_path = res_pref / 'eigenvalues.ht'
     loadings_ht_path = res_pref / 'loadings.ht'
     inferred_pop_ht_path = res_pref / 'inferred_pop.ht'
+    ancestry_sample_qc_ht_path = res_pref / 'ancestry_sample_qc.ht'
 
     ancestry_pca.run(
         dense_mt_path=dense_mt_path,
@@ -156,11 +157,11 @@ def test_large_cohort(mocker: MockFixture):
         out_eigenvalues_ht_path=eigenvalues_ht_path,
         out_loadings_ht_path=loadings_ht_path,
         out_inferred_pop_ht_path=inferred_pop_ht_path,
-        out_sample_qc_ht_path=sample_qc_ht_path,
+        out_sample_qc_ht_path=ancestry_sample_qc_ht_path,
     )
     ancestry_plots.run(
         out_path_pattern=res_pref / 'plots' / '{scope}_pc{pci}_{pca_suffix}.{ext}',
-        sample_qc_ht_path=sample_qc_ht_path,
+        sample_qc_ht_path=ancestry_sample_qc_ht_path,
         scores_ht_path=scores_ht_path,
         eigenvalues_ht_path=eigenvalues_ht_path,
         loadings_ht_path=loadings_ht_path,
