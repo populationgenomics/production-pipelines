@@ -98,7 +98,8 @@ def run(
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
 
-    if pca_background := get_config()['large_cohort'].get('pca_background', {}):
+    pca_background = get_config()['large_cohort'].get('pca_background', {})
+    if 'datasets' in pca_background:
         logging.info(
             f'Adding background datasets using following config: {pca_background}'
         )
