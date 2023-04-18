@@ -83,12 +83,13 @@ def add_gatk_sv_jobs(
     for key, value in expected_out_dict.items():
         if isinstance(value, list):
             outputs_to_collect[key] = CromwellOutputType.array_path(
-                name=f'{wfl_name}.{key}',
-                length=len(value)
+                name=f'{wfl_name}.{key}', length=len(value)
             )
             pass
         else:
-            outputs_to_collect[key] = CromwellOutputType.single_path(f'{wfl_name}.{key}')
+            outputs_to_collect[key] = CromwellOutputType.single_path(
+                f'{wfl_name}.{key}'
+            )
 
     driver_image = driver_image or image_path('cpg_workflows')
 
@@ -231,7 +232,7 @@ class GatherSampleEvidence(SampleStage):
                 'cloud_sdk_docker',
                 'wham_docker',
                 'manta_docker',
-                'scramble_docker'
+                'scramble_docker',
             ]
         )
         input_dict |= get_references(
@@ -539,12 +540,7 @@ class ClusterBatch(DatasetStage):
             )
 
         input_dict |= get_images(
-            [
-                'sv_base_mini_docker',
-                'sv_pipeline_docker',
-                'gatk_docker',
-                'linux_docker'
-            ]
+            ['sv_base_mini_docker', 'sv_pipeline_docker', 'gatk_docker', 'linux_docker']
         )
 
         input_dict |= get_references(
@@ -669,28 +665,26 @@ class FilterBatch(DatasetStage):
         * Filtered depth-only call VCF with outlier samples excluded
         * Random forest cutoffs file
         * PED file with outlier samples excluded"""
-
-        ending_by_key = {
-            'metrics_file_clusterbatch': '.metrics.tsv',
+        ending_by_key: dict = {
+            'metrics_file_filterbatch': '.metrics.tsv',
+            'filtered_pesr_vcf': '.filtered-pesr-merged.vcf.gz',
+            'cutoffs': '.cutoffs',
+            'scores': '.updated_scores',
+            'RF_intermediate_files': '.RF_intermediate_files.tar.gz',
+            'outlier_samples_excluded_file': '.outliers.samples.list',
+            'batch_samples_postOutlierExclusion_file': '.outliers_excluded.samples.list',
         }
         for caller in SV_CALLERS + ['depth']:
             ending_by_key[f'filtered_{caller}_vcf'] = f'.filtered-{caller}.vcf.gz'
 
             # unsure why, scramble doesn't export this file
             if caller != 'scramble':
-                ending_by_key[f'sites_filtered_{caller}_vcf'] = f'.sites-filtered-{caller}.vcf.gz'
-
-        ending_by_key['metrics_file_filterbatch'] = '.metrics.tsv'
-        ending_by_key['filtered_pesr_vcf'] = '.filtered-pesr-merged.vcf.gz'
-        ending_by_key['cutoffs'] = '.cutoffs'
-        ending_by_key['scores'] = '.updated_scores'
-        ending_by_key['RF_intermediate_files'] = '.RF_intermediate_files.tar.gz'
-        ending_by_key['outlier_samples_excluded_file'] = '.outliers.samples.list'
-        ending_by_key['batch_samples_postOutlierExclusion_file'] = '.outliers_excluded.samples.list'
+                ending_by_key[
+                    f'sites_filtered_{caller}_vcf'
+                ] = f'.sites-filtered-{caller}.vcf.gz'
 
         ending_by_key['sv_counts'] = [
-            f'.{caller}.with_evidence.svcounts.txt'
-            for caller in SV_CALLERS + ['depth']
+            f'.{caller}.with_evidence.svcounts.txt' for caller in SV_CALLERS + ['depth']
         ]
         ending_by_key['sv_count_plots'] = [
             f'.{caller}.with_evidence.all_SVTYPEs.counts_per_sample.png'
@@ -702,7 +696,13 @@ class FilterBatch(DatasetStage):
                 fname = f'{dataset.name}{ending}'
                 d[key] = dataset.prefix() / 'gatk_sv' / self.name.lower() / fname
             elif isinstance(ending, list):
-                d[key] = [dataset.prefix() / 'gatk_sv' / self.name.lower() / f'{dataset.name}{e}' for e in ending]
+                d[key] = [
+                    dataset.prefix()
+                    / 'gatk_sv'
+                    / self.name.lower()
+                    / f'{dataset.name}{e}'
+                    for e in ending
+                ]
         return d
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
