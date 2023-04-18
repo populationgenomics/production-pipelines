@@ -805,6 +805,8 @@ class GenotypeBatch(DatasetStage):
             'splitfile': batchevidence_d['merged_SR'],
             'splitfile_index': batchevidence_d['merged_SR_index'],
             'medianfile': batchevidence_d['median_cov'],
+            'rf_cutoffs': filterbatch_d['cutoffs'],
+            'reference_build': 'hg38'
         }
 
         for mode in ['pesr', 'depth']:
@@ -821,7 +823,8 @@ class GenotypeBatch(DatasetStage):
         input_dict |= get_references(
             [
                 'primary_contigs_list',
-                'bin_exclude'
+                'bin_exclude',
+                'seed_cutoffs',
             ]
         )
 
