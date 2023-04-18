@@ -178,5 +178,5 @@ def test_large_cohort(mocker: MockFixture):
     )
 
     assert exists(vds_path)
-    assert exists(res_pref / 'plots' / 'dataset_pc1.html')
+    assert exists(res_pref / 'plots' / 'dataset_pc1_hgdp_1kg_sites.html')
     assert exists(siteonly_vcf_path)
