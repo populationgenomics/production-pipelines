@@ -822,6 +822,7 @@ class GenotypeBatch(DatasetStage):
         input_dict |= get_references(
             [
                 'primary_contigs_list',
+                'bin_exclude'
             ]
         )
 
