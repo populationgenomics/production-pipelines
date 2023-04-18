@@ -41,6 +41,32 @@ StageDecorator = Callable[..., 'Stage']
 TargetT = TypeVar('TargetT', bound=Target)
 
 
+def path_walk(expected, collected: set) -> set:
+    """
+    recursive walk of expected_out
+    Args:
+        expected (): any type
+        collected ():
+
+    Returns:
+        a list of all collected nodes
+    """
+    print(collected)
+    if expected is None:
+        return collected
+    if isinstance(expected, dict):
+        for value in expected.values():
+            collected.update(path_walk(value, collected))
+    if isinstance(expected, (list, set)):
+        for value in expected:
+            collected.update(path_walk(value, collected))
+    if isinstance(expected, str, ):
+        return collected
+    if isinstance(expected, Path):
+        collected.add(expected)
+    return collected
+
+
 class WorkflowError(Exception):
     """
     Error raised by workflow and stage implementation.
@@ -638,24 +664,7 @@ class Stage(Generic[TargetT], ABC):
             return True, None
 
         if get_config()['workflow'].get('check_expected_outputs'):
-            paths = []
-            if isinstance(expected_out, dict):
-                for _, v in expected_out.items():
-                    if isinstance(expected_out, list):
-                        for v in expected_out:
-                            if not isinstance(v, str):
-                                paths.append(v)
-                    elif not isinstance(v, str):
-                        paths.append(v)
-            # allow for Cromwell array outputs
-            elif isinstance(expected_out, list):
-                for v in expected_out:
-                    if not isinstance(v, str):
-                        paths.append(v)
-            elif isinstance(expected_out, str):
-                pass
-            else:
-                paths.append(expected_out)
+            paths = path_walk(expected_out, set())
             first_missing_path = next((p for p in paths if not exists(p)), None)
             if not paths:
                 return False, None
