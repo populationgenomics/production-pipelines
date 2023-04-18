@@ -665,6 +665,7 @@ class Stage(Generic[TargetT], ABC):
 
         if get_config()['workflow'].get('check_expected_outputs'):
             paths = path_walk(expected_out, set())
+            print(paths)
             first_missing_path = next((p for p in paths if not exists(p)), None)
             if not paths:
                 return False, None
