@@ -639,8 +639,14 @@ class Stage(Generic[TargetT], ABC):
 
         if get_config()['workflow'].get('check_expected_outputs'):
             paths = []
+            print(expected_out)
             if isinstance(expected_out, dict):
                 for _, v in expected_out.items():
+                    if not isinstance(v, str):
+                        paths.append(v)
+            # allow for Cromwell array outputs
+            elif isinstance(expected_out, list):
+                for v in expected_out:
                     if not isinstance(v, str):
                         paths.append(v)
             elif isinstance(expected_out, str):
