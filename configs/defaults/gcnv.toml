@@ -1,0 +1,6 @@
+[workflow]
+intervals_path = 'gs://cpg-common-main/references/hg38/v0/exome_calling_regions.v1.interval_list'
+ploidy_priors = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.contig_ploidy_priors_homo_sapiens.tsv'
+
+[images]
+gatk = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-57-g9e03432'
