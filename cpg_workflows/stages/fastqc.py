@@ -156,3 +156,33 @@ class FastQCMultiQC(DatasetStage):
         return self.make_outputs(
             dataset, data=self.expected_outputs(dataset), jobs=jobs
         )
+
+
+@stage
+class ValidateFastq(SampleStage):
+    """
+    Use fqlib to validate fastq
+    """
+
+    def expected_outputs(self, sample: Sample) -> dict[str, Path] | None:
+        """
+        """
+        outs: dict[str, Path] = {}
+        return outs
+
+    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+        sequencing_type = get_config()['workflow']['sequencing_type']
+        alignment_input = sample.alignment_input_by_seq_type.get(sequencing_type)
+
+        jobs = []
+        if isinstance(alignment_input, FastqPairs):
+            for pair in alignment_input:
+                j = fastqc.validate_fastq(
+                    b=get_batch(),
+                    fastq_pair=pair,
+                    job_attrs=self.get_job_attrs(sample),
+                )
+                # j.name = f'{j.name}{fqc_out.suffix}'
+                jobs.append(j)
+
+        return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
