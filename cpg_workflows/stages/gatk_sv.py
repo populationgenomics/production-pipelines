@@ -795,7 +795,6 @@ class GenotypeBatch(DatasetStage):
         input_dict: dict[str, Any] = {
             'batch': dataset.name,
             'ped_file': make_combined_ped(dataset),
-            'ref_dict': str(ref_fasta.with_suffix('.dict')),
             'n_per_split': 5000,
             'n_RD_genotype_bins': 100000,
             'coveragefile': batchevidence_d['merged_bincov'],  # unsure
@@ -806,6 +805,8 @@ class GenotypeBatch(DatasetStage):
             'splitfile_index': batchevidence_d['merged_SR_index'],
             'medianfile': batchevidence_d['median_cov'],
             'rf_cutoffs': filterbatch_d['cutoffs'],
+            # instead of pulling from reference:
+            'ref_dict': str(ref_fasta.with_suffix('.dict')),
             'reference_build': 'hg38'
         }
 
@@ -825,6 +826,7 @@ class GenotypeBatch(DatasetStage):
                 'primary_contigs_list',
                 'bin_exclude',
                 'seed_cutoffs',
+                'pesr_exclude_list'
             ]
         )
 
