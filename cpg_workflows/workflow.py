@@ -44,14 +44,17 @@ TargetT = TypeVar('TargetT', bound=Target)
 def path_walk(expected, collected: set) -> set:
     """
     recursive walk of expected_out
+    if the object is iterable, walk it
+    this gets around the issue with nested lists and dicts
+    mainly around the use of Array outputs from Cromwell
+
     Args:
-        expected (): any type
-        collected ():
+        expected (Any): any type of object containing Paths
+        collected (set): all collected paths so far
 
     Returns:
         a list of all collected nodes
     """
-    print(collected)
     if expected is None:
         return collected
     if isinstance(expected, dict):
@@ -665,7 +668,6 @@ class Stage(Generic[TargetT], ABC):
 
         if get_config()['workflow'].get('check_expected_outputs'):
             paths = path_walk(expected_out, set())
-            print(paths)
             first_missing_path = next((p for p in paths if not exists(p)), None)
             if not paths:
                 return False, None

@@ -809,8 +809,8 @@ class GenotypeBatch(DatasetStage):
         }
 
         for mode in ['pesr', 'depth']:
-            input_dict[f'batch_{mode}_vcf'] = filterbatch_d[f'batch_{mode}_vcf']
-            input_dict[f'cohort_{mode}_vcf'] = filterbatch_d[f'cohort_{mode}_vcf']
+            input_dict[f'batch_{mode}_vcf'] = filterbatch_d[f'filtered_{mode}_vcf']
+            input_dict[f'cohort_{mode}_vcf'] = filterbatch_d[f'filtered_{mode}_vcf']
 
         input_dict |= get_images(
             [
