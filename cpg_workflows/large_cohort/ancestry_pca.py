@@ -250,10 +250,11 @@ def _infer_pop_labels(
 
     if training_pop_ht.count() < 2:
         logging.warning(
-            'Need at least 2 samples with known `population` label to run PCA'
+            'Need at least 2 samples with known `population` label to run PCA '
             'and assign population labels to remaining samples'
         )
         pop_ht = scores_ht.annotate(
+            training_pop=hl.missing(hl.tstr),
             pop='Other',
             is_training=False,
             pca_scores=scores_ht.scores,
