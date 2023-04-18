@@ -745,10 +745,10 @@ class FilterBatch(DatasetStage):
         return self.make_outputs(dataset, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=[FilterBatch])
+@stage(required_stages=[FilterBatch, GatherBatchEvidence])
 class GenotypeBatch(DatasetStage):
     """
-    Genotypes a batch of samples across unfiltered variants combined across all batches.
+    Genotypes a batch of samples across filtered variants combined across all batches.
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict:
@@ -759,10 +759,81 @@ class GenotypeBatch(DatasetStage):
         List of SR pass variants
         List of SR fail variants
         """
-        return {}
+        ending_by_key = {
+            'sr_bothside_pass': '.genotype_SR_part2_bothside_pass.txt',
+            'sr_background_fail': '.genotype_SR_part2_background_fail.txt',
+            'trained_PE_metrics': '.pe_metric_file.txt',
+            'trained_SR_metrics': '.sr_metric_file.txt',
+            'regeno_coverage_medians': '.regeno.coverage_medians_merged.bed',
+            'metrics_file_genotypebatch': '.metrics.tsv',
+        }
+
+        # really unsure about this bit - it looks like both inputs are
+        # the same prior output? TrainRDGenotyping.pesr/depth_sepcutoff
+        for mode in ['pesr', 'depth']:
+            ending_by_key |= {
+                f'trained_genotype_{mode}_pesr_sepcutoff': '.pesr_sepcutoff.txt',
+                f'trained_genotype_{mode}_depth_sepcutoff': '.depth_sepcutoff.txt',
+                f'genotyped_{mode}_vcf': f'.genotyped.vcf.gz',
+            }
+        d: dict[str, Path] = {}
+        for key, ending in ending_by_key.items():
+            fname = f'{dataset.name}{ending}'
+            d[key] = dataset.prefix() / 'gatk_sv' / self.name.lower() / fname
+        return d
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
-        pass
+
+        filterbatch_d = inputs.as_dict(dataset, FilterBatch)
+        batchevidence_d = inputs.as_dict(dataset, GatherBatchEvidence)
+
+        ref_fasta = to_path(
+            get_config()['workflow'].get('ref_fasta')
+            or reference_path('broad/ref_fasta')
+        )
+
+        input_dict: dict[str, Any] = {
+            'batch': dataset.name,
+            'ped_file': make_combined_ped(dataset),
+            'ref_dict': str(ref_fasta.with_suffix('.dict')),
+            'ref_fasta': str(ref_fasta),
+            'n_per_split': 5000,
+            'n_RD_genotype_bins': 100000,
+            'coveragefile': batchevidence_d['merged_bincov'],  # unsure
+            'coveragefile_index': batchevidence_d['merged_bincov_index'],  # unsure
+            'discfile': batchevidence_d['merged_PE'],
+            'discfile_index': batchevidence_d['merged_PE_index'],
+            'splitfile': batchevidence_d['merged_SR'],
+            'splitfile_index': batchevidence_d['merged_SR_index'],
+            'medianfile': batchevidence_d['median_cov'],
+        }
+
+        for mode in ['pesr', 'depth']:
+            input_dict[f'batch_{mode}_vcf'] = filterbatch_d[f'batch_{mode}_vcf']
+            input_dict[f'cohort_{mode}_vcf'] = filterbatch_d[f'cohort_{mode}_vcf']
+
+        input_dict |= get_images(
+            [
+                'sv_pipeline_docker',
+                'sv_base_mini_docker',
+                'linux_docker',
+            ]
+        )
+        input_dict |= get_references(
+            [
+                'primary_contigs_list',
+            ]
+        )
+
+        expected_d = self.expected_outputs(dataset)
+        jobs = add_gatk_sv_jobs(
+            batch=get_batch(),
+            dataset=dataset,
+            wfl_name=self.name,
+            input_dict=input_dict,
+            expected_out_dict=expected_d,
+        )
+        return self.make_outputs(dataset, data=expected_d, jobs=jobs)
 
 
 @stage(required_stages=GenotypeBatch)

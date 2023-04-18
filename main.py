@@ -17,7 +17,13 @@ from cpg_workflows.stages.cram_qc import CramMultiQC
 from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.seqr_loader import MtToEs, AnnotateDataset
-from cpg_workflows.stages.gatk_sv import ClusterBatch, GatherBatchEvidence, GenerateBatchMetrics, FilterBatch
+from cpg_workflows.stages.gatk_sv import (
+    ClusterBatch,
+    GatherBatchEvidence,
+    GenerateBatchMetrics,
+    GenotypeBatch,
+    FilterBatch,
+)
 from cpg_workflows.stages.stripy import Stripy
 
 
@@ -25,7 +31,13 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'pre_alignment': [FastQCMultiQC],
     'seqr_loader': [AnnotateDataset, MtToEs, GvcfMultiQC, CramMultiQC, Stripy],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
-    'gatk_sv': [GatherBatchEvidence, ClusterBatch, GenerateBatchMetrics, FilterBatch],
+    'gatk_sv': [
+        GatherBatchEvidence,
+        ClusterBatch,
+        GenerateBatchMetrics,
+        FilterBatch,
+        GenotypeBatch,
+    ],
 }
 
 
