@@ -7,6 +7,7 @@ import os
 
 import hail as hl
 
+from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import reference_path, genome_build
 from hail_scripts.computed_fields import vep, variant_id
@@ -27,13 +28,15 @@ def annotate_cohort(
     annotations.
     """
 
-    def _read(path):
+    def _read(path: str | Path):
+        if not isinstance(path, str):
+            path = str(path)
         if path.strip('/').endswith('.ht'):
             t = hl.read_table(str(path))
         else:
             assert path.strip('/').endswith('.mt')
             t = hl.read_matrix_table(str(path))
-        logging.info(f'Read checkpoint {path}')
+        logging.info(f'Read data from {path}')
         return t
 
     def _checkpoint(t, file_name):
@@ -42,9 +45,8 @@ def annotate_cohort(
             if can_reuse(path):
                 t = _read(str(path))
             else:
-                t.write(str(path), overwrite=True)
+                t.checkpoint(str(path), overwrite=True)
                 logging.info(f'Wrote checkpoint {path}')
-                t = _read(str(path))
         return t
 
     mt = hl.import_vcf(
@@ -58,9 +60,9 @@ def annotate_cohort(
     logging.info(f'Loading VEP Table from {vep_ht_path}')
     # Annotate VEP. Do ti before splitting multi, because we run VEP on unsplit VCF,
     # and hl.split_multi_hts can handle multiallelic VEP field.
-    vep_ht = hl.read_table(str(vep_ht_path))
+    vep_ht = _read(vep_ht_path)
     logging.info(f'Adding VEP annotations into the Matrix Table from {vep_ht_path}')
-    mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
+    mt = mt.annotate_rows(vep=vep_ht[mt.locus, mt.alleles].vep)
 
     # Splitting multi-allelics. We do not handle AS info fields here - we handle
     # them when loading VQSR instead, and populate entire "info" from VQSR.
@@ -84,15 +86,27 @@ def annotate_cohort(
         )
         mt = _checkpoint(mt, 'mt-vep-split-vqsr.mt')
 
-    ref_ht = hl.read_table(str(reference_path('seqr_combined_reference_data')))
-    clinvar_ht = hl.read_table(str(reference_path('seqr_clinvar')))
-
-    logging.info('Annotating with seqr-loader fields: round 1')
+    # Add potentially missing fields
+    if not all(attr in mt.info for attr in ['AC', 'AF', 'AN']):
+        if mt.count_cols() == 0:
+            logging.info('No samples in the Matrix Table, adding dummy values')
+            mt = mt.annotate_rows(info=mt.info.annotate(AN=1, AF=[0.01], AC=[1]))
+        else:
+            logging.info('Adding AC/AF/AN attributes from variant_qc')
+            mt = hl.variant_qc(mt)
+            mt = mt.annotate_rows(
+                info=mt.info.annotate(
+                    AN=mt.variant_qc.AN, AF=mt.variant_qc.AF, AC=mt.variant_qc.AC
+                )
+            )
+            mt = mt.drop('variant_qc')
 
     # don't fail if the AC/AF attributes are an inappropriate type
     for attr in ['AC', 'AF']:
         if not isinstance(mt.info[attr], hl.ArrayExpression):
             mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [mt.info[attr]]}))
+
+    logging.info('Annotating with computed fields: round 1')
 
     mt = mt.annotate_rows(
         AC=mt.info.AC[mt.a_index - 1],
@@ -115,11 +129,19 @@ def annotate_cohort(
         alt=mt.alleles[1],
         xpos=variant_id.get_expr_for_xpos(mt.locus),
         xstart=variant_id.get_expr_for_xpos(mt.locus),
-        xstop=variant_id.get_expr_for_xpos(mt.locus) + hl.len(mt.alleles[0]) - 1,
+        xstop=variant_id.get_expr_for_xpos(mt.locus) + hl.len(mt.alleles[0]) - 1
+    )
+    mt = _checkpoint(mt, 'mt-vep-split-hail-methods.mt')
+
+    logging.info('Annotating with seqr-loader aggregate data')
+
+    ref_ht = _read(reference_path('seqr_combined_reference_data'))
+    clinvar_ht = _read(reference_path('seqr_clinvar'))
+    mt = mt.annotate_rows(
         clinvar_data=clinvar_ht[mt.row_key],
         ref_data=ref_ht[mt.row_key],
     )
-    mt = _checkpoint(mt, 'mt-vep-split-vqsr-round1.mt')
+    mt = _checkpoint(mt, 'mt-vep-split-external-data.mt')
 
     logging.info(
         'Annotating with seqr-loader fields: round 2 '
