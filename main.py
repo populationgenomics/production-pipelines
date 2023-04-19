@@ -23,6 +23,7 @@ from cpg_workflows.stages.gatk_sv import (
     GenerateBatchMetrics,
     GenotypeBatch,
     FilterBatch,
+    MakeCohortVcf
 )
 from cpg_workflows.stages.stripy import Stripy
 
@@ -37,6 +38,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         GenerateBatchMetrics,
         FilterBatch,
         GenotypeBatch,
+        MakeCohortVcf
     ],
 }
 

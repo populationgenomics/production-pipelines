@@ -841,18 +841,133 @@ class GenotypeBatch(DatasetStage):
         return self.make_outputs(dataset, data=expected_d, jobs=jobs)
 
 
+# @stage(required_stages=GenotypeBatch)
+# class RegenotypeCNVs(DatasetStage):
+#     """
+#     Optional, Re-genotypes probable mosaic variants across multiple batches.
+#     """
+#
+#     def expected_outputs(self, dataset: Dataset) -> dict:
+#         pass
+#
+#     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+#         pass
+
+
 @stage(required_stages=GenotypeBatch)
 class MakeCohortVcf(DatasetStage):
     """
     Combines variants across multiple batches, resolves complex variants, re-genotypes,
     and performs final VCF clean-up.
+
+    If RegenotypeCNVs is run, this stage will use the output of that stage as input.
+    Otherwise, it will use the output of GenotypeBatch.
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict:
-        pass
+        """
+
+        Args:
+            dataset ():
+
+        Returns:
+
+        """
+        ending_by_key = {
+            'vcf': '.cleaned.vcf.gz',
+            'vcf_index': '.cleaned.vcf.gz.tbi',
+            'vcf_qc': '.cleaned_SV_VCF_QC_output.tar.gz',
+            'cluster_vcf': '.combine_batches.vcf.gz',
+            'cluster_vcf_index': '.combine_batches.vcf.gz.tbi',
+            'complex_resolve_vcf': '.complex_resolve.vcf.gz',
+            'complex_resolve_vcf_index': '.complex_resolve.vcf.gz.tbi',
+            'complex_genotype_vcf': '.complex_genotype.vcf.gz',
+            'complex_genotype_vcf_index': '.complex_genotype.vcf.gz.tbi',
+            'metrics_file_makecohortvcf': '.metrics.tsv'
+        }
+        d: dict[str, Path] = {}
+        for key, ending in ending_by_key.items():
+            fname = f'{dataset.name}{ending}'
+            d[key] = dataset.prefix() / 'gatk_sv' / self.name.lower() / fname
+        return d
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
-        pass
+        """
+
+        Args:
+            dataset ():
+            inputs ():
+
+        Returns:
+
+        """
+        batchevidence_d = inputs.as_dict(dataset, GatherBatchEvidence)
+        clusterbatch_d = inputs.as_dict(dataset, ClusterBatch)
+        genotypebatch_d = inputs.as_dict(dataset, GenotypeBatch)
+
+        ref_fasta = to_path(
+            get_config()['workflow'].get('ref_fasta')
+            or reference_path('broad/ref_fasta')
+        )
+        input_dict: dict[str, Any] = {
+            'cohort_name': dataset.name,
+            'batch': dataset.name,
+            'ped_file': make_combined_ped(dataset),
+            'ref_dict': str(ref_fasta.with_suffix('.dict')),
+            'chr_x': 'chrX',
+            'chr_y': 'chrY',
+            'min_sr_background_fail_batches': 0.5,
+            'max_shard_size_resolve': 500,
+            'max_shards_per_chrom_clean_vcf_step1': 200,
+            'min_records_per_shard_clean_vcf_step1': 5000,
+            'clean_vcf1b_records_per_shard': 10000,
+            'samples_per_clean_vcf_step2_shard': 100,
+            'clean_vcf5_records_per_shard': 5000,
+            'random_seed': 0,
+            # different name? correct in config
+            'allosome_fai': get_references(['allosome_file'])['allosome_file'],
+            # gotta manage these two in an array
+            'raw_sr_background_pass_files': [genotypebatch_d['sr_bothside_pass']],
+            'raw_sr_background_fail_files': [genotypebatch_d['sr_background_fail']],
+            'pesr_vcfs': [genotypebatch_d['genotyped_pesr_vcf']],
+            'disc_files': [batchevidence_d['merged_PE']],
+            'bincov_files': [batchevidence_d['merged_bincov']],
+            'rf_cutoff_files': [clusterbatch_d['cutoffs']],
+            'depth_gt_rd_sep_files': [genotypebatch_d['trained_genotype_depth_depth_sepcutoff']],
+            'depth_vcfs': [genotypebatch_d['genotyped_depth_vcf']],
+        }
+
+        input_dict |= get_references(
+            [
+                'bin_exclude',
+                'contig_list',
+                'cytobands',
+                'mei_bed',
+                'seed_cutoffs',
+                'depth_exclude_list',
+                'pesr_exclude_list',
+                'empty_file',
+                'primary_contigs_list'
+            ]
+        )
+        
+        # images!
+        input_dict |= get_images(
+            [
+                'sv_pipeline_docker',
+                'sv_base_mini_docker',
+                'linux_docker',
+            ]
+        )
+        expected_d = self.expected_outputs(dataset)
+        jobs = add_gatk_sv_jobs(
+            batch=get_batch(),
+            dataset=dataset,
+            wfl_name=self.name,
+            input_dict=input_dict,
+            expected_out_dict=expected_d,
+        )
+        return self.make_outputs(dataset, data=expected_d, jobs=jobs)
 
 
 @stage(required_stages=MakeCohortVcf)
