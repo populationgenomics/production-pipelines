@@ -938,7 +938,6 @@ class MakeCohortVcf(DatasetStage):
         input_dict |= get_references(
             [
                 'bin_exclude',
-                'cytobands',
                 'mei_bed',
                 'seed_cutoffs',
                 'depth_exclude_list',
@@ -947,7 +946,8 @@ class MakeCohortVcf(DatasetStage):
                 # same attr, two names
                 'primary_contigs_list',
                 {'contig_list': 'primary_contigs_list'},
-                {'allosome_fai': 'allosome_file'}
+                {'allosome_fai': 'allosome_file'},
+                {'cytobands': 'cytoband'},
             ]
         )
         
