@@ -57,13 +57,21 @@ class StatusReporter(ABC):
 
 def _calculate_size(output_path: str) -> dict[str, Any]:
     """
-    Self-contained function to calculate size of an object at given path.
+    Self-contained function to calculate size of an object at given path. If output_path
+    is a directory (e.g. a hail matrix table) the size check is skipped.
+
     @param output_path: remote path of the output file
     @return: dictionary to merge into Analysis.meta
     """
     from cloudpathlib import CloudPath
 
-    size = CloudPath(str(output_path)).stat().st_size
+    output_cloudpath = CloudPath(str(output_path))
+
+    # Skip size checks for hail outputs (directories)
+    if output_cloudpath.is_dir():
+        return {}
+
+    size = output_cloudpath.stat().st_size
     return dict(size=size)
 
 
