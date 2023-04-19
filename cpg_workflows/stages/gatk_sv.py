@@ -918,7 +918,7 @@ class MakeCohortVcf(DatasetStage):
         )
         input_dict: dict[str, Any] = {
             'cohort_name': dataset.name,
-            'batch': dataset.name,
+            'batches': [dataset.name],
             'ped_file': make_combined_ped(dataset),
             'ref_dict': str(ref_fasta.with_suffix('.dict')),
             'chr_x': 'chrX',
@@ -932,7 +932,7 @@ class MakeCohortVcf(DatasetStage):
             'clean_vcf5_records_per_shard': 5000,
             'random_seed': 0,
             # gotta manage these two in an array
-            'raw_sr_background_pass_files': [genotypebatch_d['sr_bothside_pass']],
+            'raw_sr_bothside_pass_files': [genotypebatch_d['sr_bothside_pass']],
             'raw_sr_background_fail_files': [genotypebatch_d['sr_background_fail']],
             'pesr_vcfs': [genotypebatch_d['genotyped_pesr_vcf']],
             'disc_files': [batchevidence_d['merged_PE']],
@@ -940,6 +940,7 @@ class MakeCohortVcf(DatasetStage):
             'rf_cutoff_files': [filterbatch_d['cutoffs']],
             'depth_gt_rd_sep_files': [genotypebatch_d['trained_genotype_depth_depth_sepcutoff']],
             'depth_vcfs': [genotypebatch_d['genotyped_depth_vcf']],
+            'median_coverage_files': [batchevidence_d['median_cov']],
         }
 
         input_dict |= get_references(
@@ -955,6 +956,7 @@ class MakeCohortVcf(DatasetStage):
                 {'contig_list': 'primary_contigs_list'},
                 {'allosome_fai': 'allosome_file'},
                 {'cytobands': 'cytoband'},
+                {'pe_exclude_list': 'pesr_exclude_list'},
             ]
         )
         
