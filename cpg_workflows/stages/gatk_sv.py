@@ -1003,4 +1003,39 @@ class AnnotateVcf(DatasetStage):
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
-        pass
+
+        make_vcf_d = inputs.as_dict(dataset, MakeCohortVcf)
+
+        input_dict: dict[str, Any] = {
+            'prefix': dataset.name,
+            'vcf': make_vcf_d['vcf'],
+            'vcf_idx': make_vcf_d['vcf_index'],
+            'ped_file': make_combined_ped(dataset),
+            'sv_per_shard': 5000,
+            'max_shards_per_chrom_step1': 200,
+            'min_records_per_shard_step1': 5000
+        }
+        input_dict |= get_references(
+            [
+                'protein_coding_gtf',
+                {'contig_list': 'primary_contigs_list'},
+            ]
+        )
+
+        # images!
+        input_dict |= get_images(
+            [
+                'sv_pipeline_docker',
+                'sv_base_mini_docker',
+                'gatk_docker',
+            ]
+        )
+        expected_d = self.expected_outputs(dataset)
+        jobs = add_gatk_sv_jobs(
+            batch=get_batch(),
+            dataset=dataset,
+            wfl_name=self.name,
+            input_dict=input_dict,
+            expected_out_dict=expected_d,
+        )
+        return self.make_outputs(dataset, data=expected_d, jobs=jobs)

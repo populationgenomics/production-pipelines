@@ -15,7 +15,7 @@ access_level = 'test'
 ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
 
 [images]
-cpg_workflows = "australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:272a32a6a2f16ecead7fa2a2864b6d95f17bf35a"
+cpg_workflows = "australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:pr-345"
 cnmops_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/cnmops:v0.27.0"
 cnmops_virtual_env = "australia-southeast1-docker.pkg.dev/cpg-common/images/cnmops-virtual-env:v0.27.0"
 samtools_cloud_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/samtools-cloud:v0.27.0"
