@@ -65,7 +65,7 @@ def _calculate_size(output_path: str) -> dict[str, Any]:
     """
     from cloudpathlib import CloudPath
 
-    output_cloudpath =  CloudPath(str(output_path))
+    output_cloudpath = CloudPath(str(output_path))
 
     # Skip size checks for hail outputs (directories)
     if output_cloudpath.is_dir():
