@@ -95,7 +95,8 @@ def run(
     superpopulation_label = ht.training_pop.collect() if use_inferred else ht.superpopulation.collect()
     population_label = ht.training_pop.collect() if use_inferred else ht.population.collect()
     # Change 'none' values to dataset name
-    workflow_dataset = get_config()['workflow']['input_datasets']
+    analysis_dataset_name = get_config()['workflow']['dataset']
+    workflow_dataset = get_config()['workflow'].get('input_datasets', [analysis_dataset_name])
     # join dataset names with underscore, in case there are multiple
     workflow_dataset = '_'.join(workflow_dataset)
     superpopulation_label = [workflow_dataset if x is None else x for x in superpopulation_label]
