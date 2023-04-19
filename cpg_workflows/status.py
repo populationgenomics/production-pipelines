@@ -71,7 +71,7 @@ def _calculate_size(output_path: str) -> dict[str, Any]:
     if output_cloudpath.is_dir():
         return {}
 
-    size = CloudPath(str(output_path)).stat().st_size
+    size = output_cloudpath.stat().st_size
     return dict(size=size)
 
 
