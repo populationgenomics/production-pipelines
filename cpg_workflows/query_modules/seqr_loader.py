@@ -138,9 +138,10 @@ def annotate_cohort(
     ref_ht = _read(reference_path('seqr_combined_reference_data'))
     clinvar_ht = _read(reference_path('seqr_clinvar'))
     mt = mt.annotate_rows(
-        clinvar_data=clinvar_ht[mt.row_key],
-        ref_data=ref_ht[mt.row_key],
+        clinvar_data=clinvar_ht[mt.locus, mt.alleles],
+        ref_data=ref_ht[mt.locus, mt.alleles],
     )
+    mt.describe()
     mt = _checkpoint(mt, 'mt-vep-split-external-data.mt')
 
     logging.info(
