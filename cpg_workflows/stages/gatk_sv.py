@@ -854,7 +854,7 @@ class GenotypeBatch(DatasetStage):
 #         pass
 
 
-@stage(required_stages=[ClusterBatch, GenotypeBatch, GatherBatchEvidence])
+@stage(required_stages=[FilterBatch, GenotypeBatch, GatherBatchEvidence])
 class MakeCohortVcf(DatasetStage):
     """
     Combines variants across multiple batches, resolves complex variants, re-genotypes,
@@ -902,7 +902,7 @@ class MakeCohortVcf(DatasetStage):
 
         """
         batchevidence_d = inputs.as_dict(dataset, GatherBatchEvidence)
-        clusterbatch_d = inputs.as_dict(dataset, ClusterBatch)
+        filterbatch_d = inputs.as_dict(dataset, FilterBatch)
         genotypebatch_d = inputs.as_dict(dataset, GenotypeBatch)
 
         ref_fasta = to_path(
@@ -932,7 +932,7 @@ class MakeCohortVcf(DatasetStage):
             'pesr_vcfs': [genotypebatch_d['genotyped_pesr_vcf']],
             'disc_files': [batchevidence_d['merged_PE']],
             'bincov_files': [batchevidence_d['merged_bincov']],
-            'rf_cutoff_files': [clusterbatch_d['cutoffs']],
+            'rf_cutoff_files': [filterbatch_d['cutoffs']],
             'depth_gt_rd_sep_files': [genotypebatch_d['trained_genotype_depth_depth_sepcutoff']],
             'depth_vcfs': [genotypebatch_d['genotyped_depth_vcf']],
         }
