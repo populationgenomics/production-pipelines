@@ -66,7 +66,7 @@ def add_gatk_sv_jobs(
     # "dict" is invariant (supports updating), "Mapping" is covariant (read-only)
     # we have to support inputs of type dict[str, str], so using Mapping here:
     input_dict: dict[str, Any],
-    expected_out_dict: dict[str, Path],
+    expected_out_dict: dict[str, Path | list[Path]],
     sample_id: str | None = None,
     driver_image: str | None = None,
 ) -> list[Job]:
@@ -93,6 +93,16 @@ def add_gatk_sv_jobs(
 
     driver_image = driver_image or image_path('cpg_workflows')
 
+    # pre-process input_dict
+    new_dict: dict = {}
+    for key, value in input_dict:
+        if isinstance(value, Path):
+            new_dict[f'{wfl_name}.{key}'] = str(value)
+        elif isinstance(value, (list, set)):
+            new_dict[f'{wfl_name}.{key}'] = [str(v) for v in value]
+        else:
+            new_dict[f'{wfl_name}.{key}'] = value
+
     job_prefix = make_job_name(wfl_name, sample=sample_id, dataset=dataset.name)
     submit_j, output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
         b=batch,
@@ -105,10 +115,7 @@ def add_gatk_sv_jobs(
         workflow=f'{wfl_name}.wdl',
         libs=['.'],
         output_prefix=output_prefix,
-        input_dict={
-            f'{wfl_name}.{k}': str(v) if isinstance(v, Path) else v
-            for k, v in input_dict.items()
-        },
+        input_dict=new_dict,
         outputs_to_collect=outputs_to_collect,
         driver_image=driver_image,
     )
