@@ -854,7 +854,7 @@ class GenotypeBatch(DatasetStage):
 #         pass
 
 
-@stage(required_stages=GenotypeBatch)
+@stage(required_stages=[ClusterBatch, GenotypeBatch, GatherBatchEvidence])
 class MakeCohortVcf(DatasetStage):
     """
     Combines variants across multiple batches, resolves complex variants, re-genotypes,
