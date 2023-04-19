@@ -95,7 +95,7 @@ def add_gatk_sv_jobs(
 
     # pre-process input_dict
     new_dict: dict = {}
-    for key, value in input_dict:
+    for key, value in input_dict.items():
         if isinstance(value, Path):
             new_dict[f'{wfl_name}.{key}'] = str(value)
         elif isinstance(value, (list, set)):
