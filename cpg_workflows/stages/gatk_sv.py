@@ -947,9 +947,7 @@ class MakeCohortVcf(DatasetStage):
             [
                 'bin_exclude',
                 'mei_bed',
-                'seed_cutoffs',
                 'depth_exclude_list',
-                'pesr_exclude_list',
                 'empty_file',
                 # same attr, two names
                 'primary_contigs_list',
