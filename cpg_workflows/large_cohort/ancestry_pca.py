@@ -98,7 +98,8 @@ def run(
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
 
-    if pca_background := get_config()['large_cohort'].get('pca_background', {}):
+    pca_background = get_config()['large_cohort'].get('pca_background', {})
+    if 'datasets' in pca_background:
         logging.info(
             f'Adding background datasets using following config: {pca_background}'
         )
@@ -249,10 +250,11 @@ def _infer_pop_labels(
 
     if training_pop_ht.count() < 2:
         logging.warning(
-            'Need at least 2 samples with known `population` label to run PCA'
+            'Need at least 2 samples with known `population` label to run PCA '
             'and assign population labels to remaining samples'
         )
         pop_ht = scores_ht.annotate(
+            training_pop=hl.missing(hl.tstr),
             pop='Other',
             is_training=False,
             pca_scores=scores_ht.scores,
