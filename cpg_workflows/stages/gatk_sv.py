@@ -782,6 +782,7 @@ class GenotypeBatch(DatasetStage):
                 f'trained_genotype_{mode}_pesr_sepcutoff': '.pesr_sepcutoff.txt',
                 f'trained_genotype_{mode}_depth_sepcutoff': '.depth_sepcutoff.txt',
                 f'genotyped_{mode}_vcf': f'.genotyped.vcf.gz',
+                f'genotyped_{mode}_vcf_index': f'.genotyped.vcf.gz.tbi',
             }
         d: dict[str, Path] = {}
         for key, ending in ending_by_key.items():
@@ -939,6 +940,7 @@ class MakeCohortVcf(DatasetStage):
             'bincov_files': [batchevidence_d['merged_bincov']],
             'rf_cutoff_files': [filterbatch_d['cutoffs']],
             'depth_gt_rd_sep_files': [genotypebatch_d['trained_genotype_depth_depth_sepcutoff']],
+            # not explicit, but these VCFs require indices
             'depth_vcfs': [genotypebatch_d['genotyped_depth_vcf']],
             'median_coverage_files': [batchevidence_d['median_cov']],
         }
