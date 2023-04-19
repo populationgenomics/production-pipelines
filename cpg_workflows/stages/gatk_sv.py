@@ -924,8 +924,6 @@ class MakeCohortVcf(DatasetStage):
             'samples_per_clean_vcf_step2_shard': 100,
             'clean_vcf5_records_per_shard': 5000,
             'random_seed': 0,
-            # different name? correct in config
-            'allosome_fai': get_references(['allosome_file'])['allosome_file'],
             # gotta manage these two in an array
             'raw_sr_background_pass_files': [genotypebatch_d['sr_bothside_pass']],
             'raw_sr_background_fail_files': [genotypebatch_d['sr_background_fail']],
@@ -940,14 +938,16 @@ class MakeCohortVcf(DatasetStage):
         input_dict |= get_references(
             [
                 'bin_exclude',
-                'contig_list',
                 'cytobands',
                 'mei_bed',
                 'seed_cutoffs',
                 'depth_exclude_list',
                 'pesr_exclude_list',
                 'empty_file',
-                'primary_contigs_list'
+                # same attr, two names
+                'primary_contigs_list',
+                {'contig_list': 'primary_contigs_list'},
+                {'allosome_fai': 'allosome_file'}
             ]
         )
         
