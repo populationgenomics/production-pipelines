@@ -44,6 +44,7 @@ jobs:
         run: |
           pip show aiodns
           pip show aiohttp
+          pip show aiohttp_session
           pip show google-auth
           pip show hail
           pip show pycares
