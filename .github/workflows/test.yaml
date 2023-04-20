@@ -45,7 +45,7 @@ jobs:
           pip show aiodns aiohttp aiohttp_session google-auth hail pycares
 
       - name: Run unit tests
-        timeout-minutes: 5
+        timeout-minutes: 3
         run: |
           PYTHONPATH=$PWD/gnomad_methods:$PWD/seqr-loading-pipelines \
           python -m pytest -s test/test_${{ matrix.suffix }}.py
