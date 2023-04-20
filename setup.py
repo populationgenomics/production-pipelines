@@ -16,7 +16,6 @@ setup(
         'cpg-utils',
         'analysis-runner>=2.36.4',
         'hail',
-        'aiohttp_session>=2.7,<2.13',
         'networkx',
         'sample-metadata>=5.0.1',
         'pandas',

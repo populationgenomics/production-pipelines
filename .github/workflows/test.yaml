@@ -42,15 +42,15 @@ jobs:
       - name: Debug
         continue-on-error: true
         run: |
-          pip show aiodns
-          pip show aiohttp
-          pip show aiohttp_session
-          pip show google-auth
-          pip show hail
-          pip show pycares
+          pip show aiodns aiohttp aiohttp_session google-auth hail pycares
+
+      - name: Remove aiodns
+        continue-on-error: true
+        run: |
+          pip uninstall -y aiodns
 
       - name: Run unit tests
-        timeout-minutes: 20
+        timeout-minutes: 5
         run: |
           PYTHONPATH=$PWD/gnomad_methods:$PWD/seqr-loading-pipelines \
           python -m pytest test/test_${{ matrix.suffix }}.py
