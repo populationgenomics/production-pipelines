@@ -44,13 +44,8 @@ jobs:
         run: |
           pip show aiodns aiohttp aiohttp_session google-auth hail pycares
 
-      - name: Remove borkers
-        continue-on-error: true
-        run: |
-          pip uninstall -y aiodns pycares
-
       - name: Run unit tests
         timeout-minutes: 5
         run: |
           PYTHONPATH=$PWD/gnomad_methods:$PWD/seqr-loading-pipelines \
-          python -m pytest test/test_${{ matrix.suffix }}.py
+          python -m pytest -s test/test_${{ matrix.suffix }}.py

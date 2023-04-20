@@ -3,6 +3,7 @@ Test seqr-loader workflow.
 """
 from unittest.mock import mock_open
 
+import sys
 import toml
 from cpg_utils import to_path
 from pytest_mock import MockFixture
@@ -168,6 +169,8 @@ def test_seqr_loader_dry(mocker: MockFixture):
     mocker.patch('cpg_utils.config.get_config', _mock_config)
     mocker.patch('cpg_workflows.inputs.create_cohort', _mock_cohort)
 
+    print('Hello 1', file=sys.stderr)
+
     def mock_exists(*args, **kwargs) -> bool:
         return False
 
@@ -194,28 +197,42 @@ def test_seqr_loader_dry(mocker: MockFixture):
     )
     mocker.patch('sample_metadata.apis.AnalysisApi.update_analysis_status', do_nothing)
 
+    print('Hello 2', file=sys.stderr)
     from cpg_workflows.batch import get_batch
+    print('Hello 3', file=sys.stderr)
     from cpg_workflows.inputs import get_cohort
+    print('Hello 4', file=sys.stderr)
     from cpg_workflows.stages.cram_qc import CramMultiQC
+    print('Hello 5', file=sys.stderr)
     from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
+    print('Hello 6', file=sys.stderr)
     from cpg_workflows.stages.joint_genotyping_qc import JointVcfQC
+    print('Hello 7', file=sys.stderr)
     from cpg_workflows.workflow import get_workflow
+    print('Hello 8', file=sys.stderr)
     from cpg_workflows.stages.seqr_loader import MtToEs
+    print('Hello 9', file=sys.stderr)
 
     get_workflow().run(stages=[MtToEs, GvcfMultiQC, CramMultiQC, JointVcfQC])
 
+    print('Hello 10', file=sys.stderr)
     assert (
         get_batch().job_by_tool['gatk HaplotypeCaller']['job_n']
         == len(get_cohort().get_samples()) * 50
     )
+    print('Hello 11', file=sys.stderr)
     assert get_batch().job_by_tool['picard MergeVcfs']['job_n'] == len(
         get_cohort().get_samples()
     )
+    print('Hello 12', file=sys.stderr)
     assert get_batch().job_by_tool['gatk ReblockGVCF']['job_n'] == len(
         get_cohort().get_samples()
     )
+    print('Hello 13', file=sys.stderr)
     assert (
         get_batch().job_by_tool['picard CollectVariantCallingMetrics']['job_n']
         == len(get_cohort().get_samples()) + 1
     )
+    print('Hello 14', file=sys.stderr)
     assert get_batch().job_by_tool['gatk GenomicsDBImport']['job_n'] == 50
+    print('Hello 15', file=sys.stderr)
