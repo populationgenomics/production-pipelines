@@ -15,7 +15,7 @@ setup(
     install_requires=[
         'cpg-utils',
         'analysis-runner>=2.36.4',
-        'hail',
+        'hail==0.2.112',
         'networkx',
         'sample-metadata>=5.0.1',
         'pandas',
