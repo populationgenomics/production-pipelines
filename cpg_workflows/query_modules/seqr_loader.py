@@ -54,8 +54,9 @@ def annotate_cohort(
         reference_genome=genome_build(),
         skip_invalid_loci=True,
         force_bgz=True,
+        block_size=20,
     )
-    logging.info(f'Importing VCF {vcf_path}')
+    logging.info(f'Importing VCF {vcf_path} with {mt.n_partitions()} partitions')
 
     logging.info(f'Loading VEP Table from {vep_ht_path}')
     # Annotate VEP. Do ti before splitting multi, because we run VEP on unsplit VCF,
