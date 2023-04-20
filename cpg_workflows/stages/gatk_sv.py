@@ -885,12 +885,13 @@ class MakeCohortVcf(DatasetStage):
             'vcf': '.cleaned.vcf.gz',
             'vcf_index': '.cleaned.vcf.gz.tbi',
             'vcf_qc': '.cleaned_SV_VCF_QC_output.tar.gz',
-            'cluster_vcf': '.combine_batches.vcf.gz',
-            'cluster_vcf_index': '.combine_batches.vcf.gz.tbi',
-            'complex_resolve_vcf': '.complex_resolve.vcf.gz',
-            'complex_resolve_vcf_index': '.complex_resolve.vcf.gz.tbi',
-            'complex_genotype_vcf': '.complex_genotype.vcf.gz',
-            'complex_genotype_vcf_index': '.complex_genotype.vcf.gz.tbi',
+            # if merge_intermediate_vcfs is enabled
+            # 'cluster_vcf': '.combine_batches.vcf.gz',
+            # 'cluster_vcf_index': '.combine_batches.vcf.gz.tbi',
+            # 'complex_resolve_vcf': '.complex_resolve.vcf.gz',
+            # 'complex_resolve_vcf_index': '.complex_resolve.vcf.gz.tbi',
+            # 'complex_genotype_vcf': '.complex_genotype.vcf.gz',
+            # 'complex_genotype_vcf_index': '.complex_genotype.vcf.gz.tbi',
             'metrics_file_makecohortvcf': '.metrics.tsv'
         }
         d: dict[str, Path] = {}
