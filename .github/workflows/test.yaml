@@ -44,10 +44,10 @@ jobs:
         run: |
           pip show aiodns aiohttp aiohttp_session google-auth hail pycares
 
-      - name: Remove aiodns
+      - name: Remove borkers
         continue-on-error: true
         run: |
-          pip uninstall -y aiodns
+          pip uninstall -y aiodns pycares
 
       - name: Run unit tests
         timeout-minutes: 5
