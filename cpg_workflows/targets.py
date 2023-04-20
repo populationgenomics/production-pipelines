@@ -416,7 +416,7 @@ class Dataset(Target):
 
         if not get_config()['workflow'].get('dry_run', False):
             with out_path.open('w') as fp:
-                df.to_csv(fp, sep='\t', index=False)
+                df.to_csv(fp, sep='\t', index=False, header=False)
         return out_path
 
 
