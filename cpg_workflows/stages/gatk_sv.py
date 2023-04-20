@@ -997,11 +997,16 @@ class AnnotateVcf(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict:
-        vcf_path = str(self.tmp_prefix / 'sv' / f'{dataset.name}.vcf.gz')
-        return {
-            'vcf': vcf_path,
-            'tbi': vcf_path + '.tbi',
+        # vcf_path = str(self.tmp_prefix / 'sv' / f'{dataset.name}.vcf.gz')
+        ending_by_key = {
+            'output_vcf': '.annotated.vcf.gz',
+            'output_vcf_idx': '.annotated.vcf.gz.tbi',
         }
+        d: dict[str, Path] = {}
+        for key, ending in ending_by_key.items():
+            fname = f'{dataset.name}{ending}'
+            d[key] = dataset.prefix() / 'gatk_sv' / self.name.lower() / fname
+        return d
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
 
