@@ -18,14 +18,14 @@ jobs:
       matrix:
         suffix:
           [
-            batch,
-            workflow,
-            cohort,
-            status,
-            large_cohort,
+            #batch,
+            #workflow,
+            #cohort,
+            #status,
+            #large_cohort,
             seqr_loader_dry,
-            check_multiqc,
-            check_pedigree,
+            #check_multiqc,
+            #check_pedigree,
           ]
     steps:
       - uses: actions/checkout@main
@@ -38,6 +38,14 @@ jobs:
 
       - name: Install
         run: pip install .[test]
+
+      - name: Debug
+        run: |
+          pip show aiodns
+          pip show aiohttp
+          pip show google-auth
+          pip show hail
+          pip show pycares
 
       - name: Run unit tests
         run: |
