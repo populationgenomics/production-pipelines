@@ -40,6 +40,7 @@ jobs:
         run: pip install .[test]
 
       - name: Debug
+        continue-on-error: true
         run: |
           pip show aiodns
           pip show aiohttp
@@ -48,6 +49,7 @@ jobs:
           pip show pycares
 
       - name: Run unit tests
+        timeout-minutes: 20
         run: |
           PYTHONPATH=$PWD/gnomad_methods:$PWD/seqr-loading-pipelines \
           python -m pytest test/test_${{ matrix.suffix }}.py
