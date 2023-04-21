@@ -194,6 +194,7 @@ class Batch(hb.Batch):
             if 'wait' in kwargs:
                 del kwargs['wait']
         print('Hello do super run', file=sys.stderr)
+        kwargs.setdefault('verbose', True)
         bob = super().run(**kwargs)
         print('Hello done super run', file=sys.stderr)
         return bob
