@@ -8,6 +8,7 @@ import tempfile
 import logging
 import uuid
 from typing import Optional
+import trace
 
 import hailtop.batch as hb
 import toml
@@ -194,8 +195,9 @@ class Batch(hb.Batch):
             if 'wait' in kwargs:
                 del kwargs['wait']
         print('Hello do super run', file=sys.stderr)
-        kwargs.setdefault('verbose', True)
-        bob = super().run(**kwargs)
+        # kwargs.setdefault('verbose', True)
+        tracer = trace.Trace(trace=False, countfuncs=True, timing=True, ignoremods=['pathlib', 'decoder', 'mock', 'toml', 'google.protobuf'])
+        bob = tracer.runfunc(super().run, **kwargs)
         print('Hello done super run', file=sys.stderr)
         return bob
 

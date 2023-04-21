@@ -890,7 +890,8 @@ class Workflow:
         print('Hello pre-run', file=sys.stderr)
         if not self.dry_run:
             print('Hello pre-run non-dry', file=sys.stderr)
-            get_batch().run(wait=wait, verbose=True)
+            # get_batch().run(wait=wait, verbose=True)
+            get_batch().run(wait=wait)
         else:
             print('Hello pre-run it was dry', file=sys.stderr)
         print('Hello post-run', file=sys.stderr)
