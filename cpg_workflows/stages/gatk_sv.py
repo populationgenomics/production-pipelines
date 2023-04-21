@@ -29,6 +29,7 @@ GATK_SV_COMMIT = 'a73237cf9d9e321df3aa81c890def7b504a25c7f'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 _FASTA = None
 
+
 def get_fasta() -> Path:
     """
     find or return the fasta to use
