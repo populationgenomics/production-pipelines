@@ -2,6 +2,7 @@
 Extending the Hail's `Batch` class.
 """
 
+import sys
 import os
 import tempfile
 import logging
@@ -192,7 +193,10 @@ class Batch(hb.Batch):
             # Local backend does not support "wait"
             if 'wait' in kwargs:
                 del kwargs['wait']
-        return super().run(**kwargs)
+        print('Hello do super run', file=sys.stderr)
+        bob = super().run(**kwargs)
+        print('Hello done super run', file=sys.stderr)
+        return bob
 
 
 def make_job_name(

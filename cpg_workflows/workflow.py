@@ -11,6 +11,7 @@ stages together by resolving dependencies between different levels accordingly.
 Examples of workflows can be found in the `production-workflows` repository.
 """
 
+import sys
 import functools
 import networkx as nx
 import logging
@@ -886,13 +887,13 @@ class Workflow:
             raise WorkflowError('No stages added')
         self.set_stages(_stages)
 
-        print("Hello pre-run")
+        print('Hello pre-run', file=sys.stderr)
         if not self.dry_run:
-            print("Hello pre-run non-dry")
+            print('Hello pre-run non-dry', file=sys.stderr)
             get_batch().run(wait=wait, verbose=True)
         else:
-            print("Hello pre-run it was dry")
-        print("Hello post-run")
+            print('Hello pre-run it was dry', file=sys.stderr)
+        print('Hello post-run', file=sys.stderr)
 
     @staticmethod
     def _process_first_last_stages(
