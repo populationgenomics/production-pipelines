@@ -215,7 +215,7 @@ def test_seqr_loader_dry(mocker: MockFixture):
     print('Hello 9', file=sys.stderr)
 
     tracer = trace.Trace(trace=False, countfuncs=True, timing=True, ignoremods=['pathlib', 'decoder', 'mock', 'toml', 'google.protobuf'])
-    tracer.runfunc(get_workflow().run, verbose=True, stages=[MtToEs, GvcfMultiQC, CramMultiQC, JointVcfQC])
+    tracer.runfunc(get_workflow().run, stages=[MtToEs, GvcfMultiQC, CramMultiQC, JointVcfQC])
 
     print('Hello 10', file=sys.stderr)
     assert (

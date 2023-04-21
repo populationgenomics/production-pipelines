@@ -886,8 +886,13 @@ class Workflow:
             raise WorkflowError('No stages added')
         self.set_stages(_stages)
 
+        print("Hello pre-run")
         if not self.dry_run:
-            get_batch().run(wait=wait)
+            print("Hello pre-run non-dry")
+            get_batch().run(wait=wait, verbose=True)
+        else:
+            print("Hello pre-run it was dry")
+        print("Hello post-run")
 
     @staticmethod
     def _process_first_last_stages(
