@@ -85,7 +85,6 @@ def add_gatk_sv_jobs(
             outputs_to_collect[key] = CromwellOutputType.array_path(
                 name=f'{wfl_name}.{key}', length=len(value)
             )
-            pass
         else:
             outputs_to_collect[key] = CromwellOutputType.single_path(
                 f'{wfl_name}.{key}'
