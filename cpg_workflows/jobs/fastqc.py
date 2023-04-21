@@ -81,6 +81,8 @@ def validate_fastq(
 
     fq lint {fastq_pair.r1} {fastq_pair.r2}
 
+    ls -l
+
     """
     j.command(command(cmd,))
     return j

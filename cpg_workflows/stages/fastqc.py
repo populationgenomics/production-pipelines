@@ -167,7 +167,7 @@ class ValidateFastq(SampleStage):
     def expected_outputs(self, sample: Sample) -> dict[str, Path] | None:
         """
         """
-        outs: dict[str, Path] = {}
+        outs: dict[str, Path] = {'out': 'foo'}
         return outs
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
