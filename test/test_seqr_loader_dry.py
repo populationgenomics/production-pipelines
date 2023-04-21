@@ -170,8 +170,6 @@ def test_seqr_loader_dry(mocker: MockFixture):
     mocker.patch('cpg_utils.config.get_config', _mock_config)
     mocker.patch('cpg_workflows.inputs.create_cohort', _mock_cohort)
 
-    print('Hello 1', file=sys.stderr)
-
     def mock_exists(*args, **kwargs) -> bool:
         return False
 
@@ -198,24 +196,18 @@ def test_seqr_loader_dry(mocker: MockFixture):
     )
     mocker.patch('sample_metadata.apis.AnalysisApi.update_analysis_status', do_nothing)
 
-    print('Hello 2', file=sys.stderr)
     from cpg_workflows.batch import get_batch
-    print('Hello 3', file=sys.stderr)
     from cpg_workflows.inputs import get_cohort
-    print('Hello 4', file=sys.stderr)
     from cpg_workflows.stages.cram_qc import CramMultiQC
-    print('Hello 5', file=sys.stderr)
     from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
-    print('Hello 6', file=sys.stderr)
     from cpg_workflows.stages.joint_genotyping_qc import JointVcfQC
-    print('Hello 7', file=sys.stderr)
     from cpg_workflows.workflow import get_workflow
-    print('Hello 8', file=sys.stderr)
     from cpg_workflows.stages.seqr_loader import MtToEs
     print('Hello 9', file=sys.stderr)
 
-    tracer = trace.Trace(trace=False, countfuncs=True, timing=True, ignoremods=['pathlib', 'decoder', 'mock', 'toml', 'google.protobuf'])
-    tracer.runfunc(get_workflow().run, stages=[MtToEs, GvcfMultiQC, CramMultiQC, JointVcfQC])
+    #tracer = trace.Trace(trace=False, countfuncs=True, timing=True, ignoremods=['pathlib', 'decoder', 'mock', 'toml', 'google.protobuf'])
+    #tracer.runfunc(get_workflow().run, stages=[MtToEs, GvcfMultiQC, CramMultiQC, JointVcfQC])
+    get_workflow().run(stages=[MtToEs, GvcfMultiQC, CramMultiQC, JointVcfQC])
 
     print('Hello 10', file=sys.stderr)
     assert (
