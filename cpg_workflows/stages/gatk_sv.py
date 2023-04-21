@@ -27,6 +27,22 @@ from cpg_workflows.workflow import (
 
 GATK_SV_COMMIT = 'a73237cf9d9e321df3aa81c890def7b504a25c7f'
 SV_CALLERS = ['manta', 'wham', 'scramble']
+_FASTA = None
+
+def get_fasta() -> Path:
+    """
+    find or return the fasta to use
+
+    Returns:
+
+    """
+    global _FASTA
+    if _FASTA is None:
+        _FASTA = to_path(
+            get_config()['workflow'].get('ref_fasta')
+            or reference_path('broad/ref_fasta')
+        )
+    return _FASTA
 
 
 def get_images(keys: list[str]) -> dict[str, str]:
@@ -251,14 +267,11 @@ class GatherSampleEvidence(SampleStage):
                 {'sd_locs_vcf': 'dbsnp_vcf'},
             ]
         )
-        ref_fasta = to_path(
-            get_config()['workflow'].get('ref_fasta')
-            or reference_path('broad/ref_fasta')
-        )
+
         input_dict |= {
-            'reference_fasta': str(ref_fasta),
-            'reference_index': str(ref_fasta) + '.fai',
-            'reference_dict': str(ref_fasta.with_suffix('.dict')),
+            'reference_fasta': str(get_fasta()),
+            'reference_index': str(get_fasta()) + '.fai',
+            'reference_dict': str(get_fasta().with_suffix('.dict')),
         }
         input_dict['reference_version'] = '38'
 
@@ -449,12 +462,9 @@ class GatherBatchEvidence(DatasetStage):
                 'mei_bed',
             ]
         )
-        ref_fasta = to_path(
-            get_config()['workflow'].get('ref_fasta')
-            or reference_path('broad/ref_fasta')
-        )
+
         input_dict |= {
-            'ref_dict': str(ref_fasta.with_suffix('.dict')),
+            'ref_dict': str(get_fasta().with_suffix('.dict')),
         }
 
         # reference panel gCNV models
@@ -519,11 +529,6 @@ class ClusterBatch(DatasetStage):
         """
         batch_evidence_d = inputs.as_dict(dataset, GatherBatchEvidence)
 
-        ref_fasta = to_path(
-            get_config()['workflow'].get('ref_fasta')
-            or reference_path('broad/ref_fasta')
-        )
-
         input_dict: dict[str, Any] = {
             'batch': dataset.name,
             'del_bed': str(batch_evidence_d['merged_dels']),
@@ -535,9 +540,9 @@ class ClusterBatch(DatasetStage):
             'pesr_interval_overlap': 0.1,
             'pesr_breakend_window': 300,
             'pesr_clustering_algorithm': 'SINGLE_LINKAGE',
-            'reference_fasta': str(ref_fasta),
-            'reference_fasta_fai': str(ref_fasta) + '.fai',
-            'reference_dict': str(ref_fasta.with_suffix('.dict')),
+            'reference_fasta': str(get_fasta()),
+            'reference_fasta_fai': str(get_fasta()) + '.fai',
+            'reference_dict': str(get_fasta().with_suffix('.dict')),
         }
 
         for caller in SV_CALLERS:
@@ -630,12 +635,8 @@ class GenerateBatchMetrics(DatasetStage):
                 {'allosome_contigs': 'allosome_file'},
             ]
         )
-        ref_fasta = to_path(
-            get_config()['workflow'].get('ref_fasta')
-            or reference_path('broad/ref_fasta')
-        )
         input_dict |= {
-            'ref_dict': str(ref_fasta.with_suffix('.dict')),
+            'ref_dict': str(get_fasta().with_suffix('.dict')),
         }
 
         expected_d = self.expected_outputs(dataset)
@@ -794,11 +795,6 @@ class GenotypeBatch(DatasetStage):
         filterbatch_d = inputs.as_dict(dataset, FilterBatch)
         batchevidence_d = inputs.as_dict(dataset, GatherBatchEvidence)
 
-        ref_fasta = to_path(
-            get_config()['workflow'].get('ref_fasta')
-            or reference_path('broad/ref_fasta')
-        )
-
         input_dict: dict[str, Any] = {
             'batch': dataset.name,
             'ped_file': make_combined_ped(dataset),
@@ -813,7 +809,7 @@ class GenotypeBatch(DatasetStage):
             'medianfile': batchevidence_d['median_cov'],
             'rf_cutoffs': filterbatch_d['cutoffs'],
             # instead of pulling from reference:
-            'ref_dict': str(ref_fasta.with_suffix('.dict')),
+            'ref_dict': str(get_fasta().with_suffix('.dict')),
             'reference_build': 'hg38'
         }
 
@@ -913,15 +909,11 @@ class MakeCohortVcf(DatasetStage):
         filterbatch_d = inputs.as_dict(dataset, FilterBatch)
         genotypebatch_d = inputs.as_dict(dataset, GenotypeBatch)
 
-        ref_fasta = to_path(
-            get_config()['workflow'].get('ref_fasta')
-            or reference_path('broad/ref_fasta')
-        )
         input_dict: dict[str, Any] = {
             'cohort_name': dataset.name,
             'batches': [dataset.name],
             'ped_file': make_combined_ped(dataset),
-            'ref_dict': str(ref_fasta.with_suffix('.dict')),
+            'ref_dict': str(get_fasta().with_suffix('.dict')),
             'chr_x': 'chrX',
             'chr_y': 'chrY',
             'min_sr_background_fail_batches': 0.5,
