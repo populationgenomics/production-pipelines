@@ -93,14 +93,14 @@ def add_gatk_sv_jobs(
     driver_image = driver_image or image_path('cpg_workflows')
 
     # pre-process input_dict
-    new_dict: dict = {}
+    paths_as_strings: dict = {}
     for key, value in input_dict.items():
         if isinstance(value, Path):
-            new_dict[f'{wfl_name}.{key}'] = str(value)
+            paths_as_strings[f'{wfl_name}.{key}'] = str(value)
         elif isinstance(value, (list, set)):
-            new_dict[f'{wfl_name}.{key}'] = [str(v) for v in value]
+            paths_as_strings[f'{wfl_name}.{key}'] = [str(v) for v in value]
         else:
-            new_dict[f'{wfl_name}.{key}'] = value
+            paths_as_strings[f'{wfl_name}.{key}'] = value
 
     job_prefix = make_job_name(wfl_name, sample=sample_id, dataset=dataset.name)
     submit_j, output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
@@ -114,7 +114,7 @@ def add_gatk_sv_jobs(
         workflow=f'{wfl_name}.wdl',
         libs=['.'],
         output_prefix=output_prefix,
-        input_dict=new_dict,
+        input_dict=paths_as_strings,
         outputs_to_collect=outputs_to_collect,
         driver_image=driver_image,
     )
