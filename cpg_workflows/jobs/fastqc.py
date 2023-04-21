@@ -75,7 +75,8 @@ def validate_fastq(
     Use fqlib to validate fastq file
     """
     j = b.new_job('validate_fastq', (job_attrs or {}) | {'tool': 'fq'})
-    j.image(image_path('fq'))
+    # j.image(image_path('fq'))
+    j.image('australia-southeast1-docker.pkg.dev/cpg-common/images/fq:0.10.0')
 
     cmd = f"""\
 
