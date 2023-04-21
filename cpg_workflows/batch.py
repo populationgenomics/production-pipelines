@@ -8,7 +8,6 @@ import tempfile
 import logging
 import uuid
 from typing import Optional
-import trace
 
 import hailtop.batch as hb
 import toml
@@ -19,6 +18,10 @@ from cpg_utils.hail_batch import (
     copy_common_env,
     dataset_path,
 )
+
+def bobprofile(frame, event, arg):
+    if event == 'call':
+        print(f'Called {frame.f_code.co_name} in {frame.f_code.co_filename}', file=sys.stderr)
 
 
 _batch: Optional['Batch'] = None
@@ -196,8 +199,9 @@ class Batch(hb.Batch):
                 del kwargs['wait']
         print('Hello do super run', file=sys.stderr)
         # kwargs.setdefault('verbose', True)
-        tracer = trace.Trace(trace=False, countfuncs=True, timing=True, ignoremods=['pathlib', 'decoder', 'mock', 'toml', 'google.protobuf'])
-        bob = tracer.runfunc(super().run, **kwargs)
+        sys.setprofile(bobprofile)
+        bob = super().run(**kwargs)
+        sys.setprofile(None)
         print('Hello done super run', file=sys.stderr)
         return bob
 
