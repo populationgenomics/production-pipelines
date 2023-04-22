@@ -10,11 +10,7 @@ from hailtop.batch.job import Job
 from cpg_utils import Path
 from cpg_utils.hail_batch import command
 from cpg_utils.hail_batch import image_path
-from cpg_workflows.filetypes import (
-    BamPath,
-    FastqPath,
-    FastqPair
-)
+from cpg_workflows.filetypes import BamPath, FastqPath, FastqPair
 from cpg_workflows.resources import STANDARD
 
 
@@ -68,22 +64,35 @@ def fastqc(
 
 def validate_fastq(
     b: hb.Batch,
-    fastq_pair:  FastqPair,
+    fastq_pair: FastqPair,
     job_attrs: dict | None = None,
 ) -> Job:
     """
     Use fqlib to validate fastq file
     """
     j = b.new_job('validate_fastq', (job_attrs or {}) | {'tool': 'fq'})
+
+    # TODO: revert
     # j.image(image_path('fq'))
     j.image('australia-southeast1-docker.pkg.dev/cpg-common/images/fq:0.10.0')
 
+    fastq_rg = b.read_input_group(
+        **{
+            'r1.fastq.gz': str(fastq_pair.r1),
+            'r2.fastq.gz': str(fastq_pair.r2),
+        }
+    )
+
     cmd = f"""\
 
-    fq lint {fastq_pair.r1} {fastq_pair.r2}
+    fq lint {fastq_rg['r1.fastq.gz']} {fastq_rg['r2.fastq.gz']}
 
     ls -l
 
     """
-    j.command(command(cmd,))
+    j.command(
+        command(
+            cmd,
+        )
+    )
     return j
