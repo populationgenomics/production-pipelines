@@ -71,6 +71,7 @@ def validate_fastq(
     Use fqlib to validate fastq file
     """
     j = b.new_job('validate_fastq', (job_attrs or {}) | {'tool': 'fq'})
+    STANDARD.set_resources(j, ncpu=4, storage_gb=100)
 
     # TODO: revert
     # j.image(image_path('fq'))
