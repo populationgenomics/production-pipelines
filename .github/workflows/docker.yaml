@@ -21,7 +21,7 @@ jobs:
       CLOUDSDK_CORE_DISABLE_PROMPTS: 1
       IMAGE_NAME: australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows
     steps:
-    - uses: actions/checkout@main
+    - uses: actions/checkout@v3
       with:
         submodules: recursive
 
