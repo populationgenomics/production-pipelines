@@ -53,7 +53,16 @@ def path_walk(expected, collected: set) -> set:
         collected (set): all collected paths so far
 
     Returns:
-        a list of all collected nodes
+        a set of all collected Path nodes
+
+    Examples:
+
+    >>> path_walk({'a': {'b': {'c': Path('d')}}}, set())
+    {Path('d')}
+    >>> path_walk({'a': {'b': {'c': [Path('d'), Path('e')]}}}, set())
+    {Path('d'), Path('e')}
+    >>> path_walk({'a': Path('b'),'c': {'d': 'e'}, {'f': Path('g')}}, set())
+    {Path('b'), Path('g')}
     """
     if expected is None:
         return collected
@@ -63,7 +72,7 @@ def path_walk(expected, collected: set) -> set:
     if isinstance(expected, (list, set)):
         for value in expected:
             collected.update(path_walk(value, collected))
-    if isinstance(expected, str, ):
+    if isinstance(expected, str):
         return collected
     if isinstance(expected, Path):
         collected.add(expected)

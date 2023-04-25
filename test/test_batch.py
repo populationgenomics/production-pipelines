@@ -41,7 +41,7 @@ def test_batch_job(mocker: MockFixture):
     from cpg_workflows.batch import get_batch
 
     b = get_batch('Test batch job')
-    j1 = b.new_job('Jo b1')
+    j1 = b.new_job('Job 1')
     text = 'success'
     cmd = f"""\
     echo {text} > {j1.output}
