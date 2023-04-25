@@ -143,9 +143,9 @@ def add_gatk_sv_jobs(
         out_path = expected_out_dict[key]
         if isinstance(resource, list):
             for source, dest in zip(resource, out_path):
-                cmds.append(f'gsutil cp $(cat {source}) {dest}')
+                cmds.append(f'gsutil cp "$(cat {source})" "{dest}"')
         else:
-            cmds.append(f'gsutil cp $(cat {resource}) {out_path}')
+            cmds.append(f'gsutil cp "$(cat {resource})" "{out_path}"')
     copy_j.command(command(cmds, setup_gcp=True))
     return [submit_j, copy_j]
 
@@ -155,9 +155,6 @@ def get_ref_panel(keys: list[str] | None = None) -> dict:
         k: v
         for k, v in {
             'ref_panel_samples': get_config()['sv_ref_panel']['ref_panel_samples'],
-            # 'ref_ped_file': str(reference_path('gatk_sv/ped_file')),  # just called ped_file
-            # 'ref_panel_vcf': str(reference_path('gatk_sv/clean_vcf')),  # no record of this
-            # 'qc_definitions': str(reference_path('gatk_sv/qc_definitions')),  # no record of this
             'ref_panel_bincov_matrix': str(
                 reference_path('gatk_sv/ref_panel_bincov_matrix')
             ),
@@ -243,6 +240,10 @@ class GatherSampleEvidence(SampleStage):
             # samtools as a URL (in CramToBam.wdl) and it would fail to read it as
             # GCS_OAUTH_TOKEN is not set.
             'requester_pays_crams': True,
+            'reference_fasta': str(get_fasta()),
+            'reference_index': str(get_fasta()) + '.fai',
+            'reference_dict': str(get_fasta().with_suffix('.dict')),
+            'reference_version': '38'
         }
 
         input_dict |= get_images(
@@ -268,13 +269,6 @@ class GatherSampleEvidence(SampleStage):
                 {'sd_locs_vcf': 'dbsnp_vcf'},
             ]
         )
-
-        input_dict |= {
-            'reference_fasta': str(get_fasta()),
-            'reference_index': str(get_fasta()) + '.fai',
-            'reference_dict': str(get_fasta().with_suffix('.dict')),
-        }
-        input_dict['reference_version'] = '38'
 
         expected_d = self.expected_outputs(sample)
 
@@ -437,20 +431,20 @@ class GatherBatchEvidence(DatasetStage):
             'SR_files': [str(input_by_sid[sid]['pesr_split']) for sid in sids],
             'PE_files': [str(input_by_sid[sid]['pesr_disc']) for sid in sids],
             'SD_files': [str(input_by_sid[sid]['pesr_sd']) for sid in sids],
-        }
-        for caller in SV_CALLERS:
-            input_dict[f'{caller}_vcfs'] = [
-                str(input_by_sid[sid][f'{caller}_vcf']) for sid in sids
-            ]
-
-        input_dict |= {
             'ref_copy_number_autosomal_contigs': 2,
             'allosomal_contigs': ['chrX', 'chrY'],
             'gcnv_qs_cutoff': 30,
             'min_svsize': 50,
             'run_matrix_qc': True,
             'matrix_qc_distance': 1000000,
+            'ref_dict': str(get_fasta().with_suffix('.dict')),
         }
+
+        for caller in SV_CALLERS:
+            input_dict[f'{caller}_vcfs'] = [
+                str(input_by_sid[sid][f'{caller}_vcf']) for sid in sids
+            ]
+
         input_dict |= get_references(
             [
                 'genome_file',
@@ -463,10 +457,6 @@ class GatherBatchEvidence(DatasetStage):
                 'mei_bed',
             ]
         )
-
-        input_dict |= {
-            'ref_dict': str(get_fasta().with_suffix('.dict')),
-        }
 
         # reference panel gCNV models
         input_dict |= get_ref_panel()
@@ -613,6 +603,7 @@ class GenerateBatchMetrics(DatasetStage):
             'SR_split_size': 1000,
             'common_cnv_size_cutoff': 5000,
             'ped_file': make_combined_ped(dataset),
+            'ref_dict': str(get_fasta().with_suffix('.dict')),
         }
 
         for caller in SV_CALLERS + ['depth']:
@@ -636,9 +627,6 @@ class GenerateBatchMetrics(DatasetStage):
                 {'allosome_contigs': 'allosome_file'},
             ]
         )
-        input_dict |= {
-            'ref_dict': str(get_fasta().with_suffix('.dict')),
-        }
 
         expected_d = self.expected_outputs(dataset)
         jobs = add_gatk_sv_jobs(
@@ -925,7 +913,6 @@ class MakeCohortVcf(DatasetStage):
             'samples_per_clean_vcf_step2_shard': 100,
             'clean_vcf5_records_per_shard': 5000,
             'random_seed': 0,
-            # gotta manage these two in an array
             'raw_sr_bothside_pass_files': [genotypebatch_d['sr_bothside_pass']],
             'raw_sr_background_fail_files': [genotypebatch_d['sr_background_fail']],
             'pesr_vcfs': [genotypebatch_d['genotyped_pesr_vcf']],
