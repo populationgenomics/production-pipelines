@@ -401,6 +401,7 @@ class Dataset(Target):
     ) -> Path:
         """
         Create a PED file for all samples
+        PED is written with no header line to be strict specification compliant
         """
         datas = []
         for sample in self.get_samples():
