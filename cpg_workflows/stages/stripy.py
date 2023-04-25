@@ -41,14 +41,16 @@ def _update_meta(output_path: str) -> dict[str, Any]:
     return {
         'outlier_loci': outlier_loci,
         'outliers_detected': bool(outlier_loci),
-        'log_path': log_path
+        'log_path': log_path,
     }
 
 
 @stage(
     required_stages=Align,
     analysis_type='web',
-    analysis_keys=['stripy_html', ],
+    analysis_keys=[
+        'stripy_html',
+    ],
     update_analysis_meta=_update_meta,
 )
 class Stripy(SampleStage):
@@ -57,17 +59,21 @@ class Stripy(SampleStage):
     """
 
     def expected_outputs(self, sample: Sample) -> dict[str, Path]:
-        return {
-            'stripy_html': sample.dataset.web_prefix()
-            / 'stripy'
-            / f'{sample.id}.stripy.html',
-            'stripy_json': sample.dataset.analysis_prefix()
-            / 'stripy'
-            / f'{sample.id}.stripy.json',
-            'stripy_log': sample.dataset.analysis_prefix()
-            / 'stripy'
-            / f'{sample.id}.stripy.log.txt',
-        }
+        # Only run stripy on genomes
+        if get_config()['workflow'].get('sequencing_type') == 'genome':
+            return {
+                'stripy_html': sample.dataset.web_prefix()
+                / 'stripy'
+                / f'{sample.id}.stripy.html',
+                'stripy_json': sample.dataset.analysis_prefix()
+                / 'stripy'
+                / f'{sample.id}.stripy.json',
+                'stripy_log': sample.dataset.analysis_prefix()
+                / 'stripy'
+                / f'{sample.id}.stripy.log.txt',
+            }
+        else:
+            return {}
 
     def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
         cram_path = inputs.as_path(sample, Align, 'cram')
