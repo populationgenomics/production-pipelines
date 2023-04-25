@@ -60,9 +60,12 @@ def annotate_cohort(
     logging.info(f'Loading VEP Table from {vep_ht_path}')
     # Annotate VEP. Do ti before splitting multi, because we run VEP on unsplit VCF,
     # and hl.split_multi_hts can handle multiallelic VEP field.
+    # TODO - check this is true - the VEP data is joined on an incomplete
+    # TODO - key, so there are examples where the annotation is applied to
+    # TODO - the wrong allele.
     vep_ht = _read(vep_ht_path)
     logging.info(f'Adding VEP annotations into the Matrix Table from {vep_ht_path}')
-    mt = mt.annotate_rows(vep=vep_ht[mt.locus, mt.alleles].vep)
+    mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
 
     # Splitting multi-allelics. We do not handle AS info fields here - we handle
     # them when loading VQSR instead, and populate entire "info" from VQSR.
@@ -106,7 +109,10 @@ def annotate_cohort(
         if not isinstance(mt.info[attr], hl.ArrayExpression):
             mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [mt.info[attr]]}))
 
-    logging.info('Annotating with computed fields: round 1')
+    logging.info('Annotating with seqr-loader fields: round 1')
+
+    ref_ht = _read(reference_path('seqr_combined_reference_data'))
+    clinvar_ht = _read(reference_path('seqr_clinvar'))
 
     mt = mt.annotate_rows(
         AC=mt.info.AC[mt.a_index - 1],
@@ -129,19 +135,11 @@ def annotate_cohort(
         alt=mt.alleles[1],
         xpos=variant_id.get_expr_for_xpos(mt.locus),
         xstart=variant_id.get_expr_for_xpos(mt.locus),
-        xstop=variant_id.get_expr_for_xpos(mt.locus) + hl.len(mt.alleles[0]) - 1
-    )
-    mt = _checkpoint(mt, 'mt-vep-split-hail-methods.mt')
-
-    logging.info('Annotating with seqr-loader aggregate data')
-
-    ref_ht = _read(reference_path('seqr_combined_reference_data'))
-    clinvar_ht = _read(reference_path('seqr_clinvar'))
-    mt = mt.annotate_rows(
+        xstop=variant_id.get_expr_for_xpos(mt.locus) + hl.len(mt.alleles[0]) - 1,
         clinvar_data=clinvar_ht[mt.row_key],
         ref_data=ref_ht[mt.row_key],
     )
-    mt = _checkpoint(mt, 'mt-vep-split-external-data.mt')
+    mt = _checkpoint(mt, 'mt-vep-split-vqsr-round1.mt')
 
     logging.info(
         'Annotating with seqr-loader fields: round 2 '
