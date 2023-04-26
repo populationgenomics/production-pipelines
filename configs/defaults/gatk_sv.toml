@@ -40,6 +40,7 @@ scramble_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/scra
 str = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/str:5994670"
 vapor_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/vapor:header-hash-2fc8f12"
 wham_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/wham:5994670"
+linux_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/ubuntu1804"
 
 [references.broad]
 unpadded_intervals_file = 'gs://cpg-common-main/references/hg38/v0/hg38.even.handcurated.20k.intervals'
