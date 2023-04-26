@@ -13,7 +13,6 @@ from cpg_utils import to_path
 from cpg_utils.hail_batch import image_path, copy_common_env, command
 from cpg_utils import Path
 from cpg_workflows.resources import STANDARD
-from cpg_workflows.slack import slack_env
 from cpg_workflows.targets import Dataset
 from cpg_workflows.utils import rich_sample_id_seds
 from cpg_workflows.python_scripts import check_multiqc
