@@ -768,10 +768,10 @@ class GenotypeBatch(DatasetStage):
         # the same prior output? TrainRDGenotyping.pesr/depth_sepcutoff
         for mode in ['pesr', 'depth']:
             ending_by_key |= {
-                f'trained_genotype_{mode}_pesr_sepcutoff': '.pesr_sepcutoff.txt',
-                f'trained_genotype_{mode}_depth_sepcutoff': '.depth_sepcutoff.txt',
-                f'genotyped_{mode}_vcf': f'.genotyped.vcf.gz',
-                f'genotyped_{mode}_vcf_index': f'.genotyped.vcf.gz.tbi',
+                f'trained_genotype_{mode}_pesr_sepcutoff': f'.{mode}.pesr_sepcutoff.txt',
+                f'trained_genotype_{mode}_depth_sepcutoff': f'.{mode}.depth_sepcutoff.txt',
+                f'genotyped_{mode}_vcf': f'.{mode}.vcf.gz',
+                f'genotyped_{mode}_vcf_index': f'.{mode}.vcf.gz.tbi',
             }
         d: dict[str, Path] = {}
         for key, ending in ending_by_key.items():
@@ -913,16 +913,16 @@ class MakeCohortVcf(DatasetStage):
             'samples_per_clean_vcf_step2_shard': 100,
             'clean_vcf5_records_per_shard': 5000,
             'random_seed': 0,
-            'raw_sr_bothside_pass_files': [genotypebatch_d['sr_bothside_pass']],
-            'raw_sr_background_fail_files': [genotypebatch_d['sr_background_fail']],
+            # not explicit, but these VCFs require indices
             'pesr_vcfs': [genotypebatch_d['genotyped_pesr_vcf']],
+            'depth_vcfs': [genotypebatch_d['genotyped_depth_vcf']],
             'disc_files': [batchevidence_d['merged_PE']],
             'bincov_files': [batchevidence_d['merged_bincov']],
-            'rf_cutoff_files': [filterbatch_d['cutoffs']],
+            'raw_sr_bothside_pass_files': [genotypebatch_d['sr_bothside_pass']],
+            'raw_sr_background_fail_files': [genotypebatch_d['sr_background_fail']],
             'depth_gt_rd_sep_files': [genotypebatch_d['trained_genotype_depth_depth_sepcutoff']],
-            # not explicit, but these VCFs require indices
-            'depth_vcfs': [genotypebatch_d['genotyped_depth_vcf']],
             'median_coverage_files': [batchevidence_d['median_cov']],
+            'rf_cutoff_files': [filterbatch_d['cutoffs']],
         }
 
         input_dict |= get_references(
@@ -939,7 +939,7 @@ class MakeCohortVcf(DatasetStage):
                 {'pe_exclude_list': 'pesr_exclude_list'},
             ]
         )
-        
+
         # images!
         input_dict |= get_images(
             [
