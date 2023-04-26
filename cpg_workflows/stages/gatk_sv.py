@@ -46,10 +46,25 @@ def get_fasta() -> Path:
     return _FASTA
 
 
-def get_images(keys: list[str]) -> dict[str, str]:
+def get_images(keys: list[str], allow_missing=False) -> dict[str, str]:
     """
     Dict of WDL inputs with docker image paths.
+
+    Args:
+        keys (list): all the images to get
+        allow_missing (bool): if False, require all query keys to be found
+
+    Returns:
+        dict of image keys to image paths
+        or AssertionError
     """
+
+    if not allow_missing:
+        image_keys = get_config()['images'].keys()
+        query_keys = set(keys)
+        if not query_keys.issubset(image_keys):
+            raise KeyError(f'Unknown image keys: {query_keys - image_keys}')
+
     return {k: image_path(k) for k in get_config()['images'].keys() if k in keys}
 
 

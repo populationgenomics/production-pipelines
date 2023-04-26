@@ -75,6 +75,8 @@ def path_walk(expected, collected: set) -> set:
     if isinstance(expected, str):
         return collected
     if isinstance(expected, Path):
+        if expected in collected:
+            raise ValueError(f'Duplicate path {expected} in expected_out')
         collected.add(expected)
     return collected
 
