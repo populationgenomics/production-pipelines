@@ -26,7 +26,7 @@ jobs:
           submodules: recursive
 
       - name: gcloud auth
-        uses: "google-github-actions/auth@v0"
+        uses: google-github-actions/auth@v0
         with:
           credentials_json: ${{ secrets.GH_IMAGES_DEPLOYER_JSON }}
 
