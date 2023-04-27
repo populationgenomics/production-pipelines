@@ -127,13 +127,8 @@ def test_path_walk():
 
     exp = {
         'a': to_path('this.txt'),
-        'b': [
-            to_path('that.txt'),
-            {
-                'c': to_path('the_other.txt')
-            }
-        ],
-        'd': 'string.txt'
+        'b': [to_path('that.txt'), {'c': to_path('the_other.txt')}],
+        'd': 'string.txt',
     }
     act = path_walk(exp, set())
     assert act == {to_path('this.txt'), to_path('that.txt'), to_path('the_other.txt')}

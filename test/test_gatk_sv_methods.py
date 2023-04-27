@@ -6,7 +6,12 @@ import pytest
 
 from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
-from cpg_workflows.stages.gatk_sv import image_path, get_images, get_fasta, get_references
+from cpg_workflows.stages.gatk_sv import (
+    image_path,
+    get_images,
+    get_fasta,
+    get_references,
+)
 
 
 TOML = """
@@ -86,29 +91,15 @@ def test_get_references(tmp_path):
     with open(tmp_path / 'config.toml', 'w') as fh:
         fh.write(TOML)
     set_config_paths([str(tmp_path / 'config.toml')])
-    assert get_references(
-        [
-            'sv_reference',
-            'broad_reference'
-        ]
-    ) == {
+    assert get_references(['sv_reference', 'broad_reference']) == {
         'sv_reference': 'gatk_sv_content',
-        'broad_reference': 'broad_content'
+        'broad_reference': 'broad_content',
     }
-    assert get_references([
-        {'sneaky': 'sv_reference'},
-        'broad_reference'
-    ]
-    ) == {
+    assert get_references([{'sneaky': 'sv_reference'}, 'broad_reference']) == {
         'sneaky': 'gatk_sv_content',
-        'broad_reference': 'broad_content'
+        'broad_reference': 'broad_content',
     }
-    assert get_references([
-        {'sneaky': 'sv_reference'},
-        'weasel.broad_reference'
-    ]
-    ) == {
+    assert get_references([{'sneaky': 'sv_reference'}, 'weasel.broad_reference']) == {
         'sneaky': 'gatk_sv_content',
-        'weasel.broad_reference': 'broad_content'
+        'weasel.broad_reference': 'broad_content',
     }
-
