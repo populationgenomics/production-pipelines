@@ -41,14 +41,18 @@ cpg_workflows = "stub"
 
 
 def _common(mocker, tmp_path):
-
     with open(tmp_path / 'config.toml', 'w') as fh:
         fh.write(TOML)
     set_config_paths(
         [
             str(to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml'),
-            str(to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml'),
-            str(tmp_path / 'config.toml')
+            str(
+                to_path(__file__).parent.parent
+                / 'configs'
+                / 'defaults'
+                / 'seqr_loader.toml'
+            ),
+            str(tmp_path / 'config.toml'),
         ]
     )
 
@@ -75,7 +79,7 @@ def _common(mocker, tmp_path):
 
 
 def test_status_reporter(mocker: MockFixture, tmp_path):
-    _common(mocker,tmp_path)
+    _common(mocker, tmp_path)
 
     from cpg_utils.hail_batch import dataset_path
     from cpg_workflows.inputs import get_cohort

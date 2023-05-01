@@ -13,7 +13,6 @@ sequencing_type = 'genome'
 
 
 def test_check_pedigree(caplog, tmp_path):
-
     from cpg_workflows.python_scripts import check_pedigree
 
     with open(tmp_path / 'config.toml', 'w') as fh:
@@ -25,7 +24,7 @@ def test_check_pedigree(caplog, tmp_path):
         somalier_samples_fpath=str(data_dir / 'somalier-samples.tsv'),
         somalier_pairs_fpath=str(data_dir / 'somalier-pairs.tsv'),
         expected_ped_fpath=str(data_dir / 'samples.ped'),
-        send_to_slack=False
+        send_to_slack=False,
     )
     for expected_line in [
         '4/51 PED samples with mismatching sex',

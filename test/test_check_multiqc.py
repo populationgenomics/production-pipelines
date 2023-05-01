@@ -21,7 +21,6 @@ sequencing_type = 'genome'
 
 
 def test_check_multiqc(caplog, tmp_path):
-
     with open(tmp_path / 'config.toml', 'w') as fh:
         fh.write(TOML)
     set_config_paths([str(tmp_path / 'config.toml')])
