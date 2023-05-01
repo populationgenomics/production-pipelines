@@ -579,6 +579,12 @@ class Sample(Target):
         """
         return GvcfPath(self.dataset.prefix() / 'gvcf' / f'{self.id}.g.vcf.gz')
 
+    def make_sv_evidence_path(self) -> Path:
+        """
+        Path to the evidence root for GATK-SV evidence files.
+        """
+        return self.dataset.prefix() / 'sv_evidence'
+
     @property
     def target_id(self) -> str:
         """Unique target ID"""

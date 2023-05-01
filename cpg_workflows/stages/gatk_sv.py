@@ -23,6 +23,7 @@ from cpg_workflows.workflow import (
     Sample,
     Dataset,
 )
+from cpg_workflows.stages.gatk_sv_single_sample import GatherSampleEvidence, EvidenceQC
 
 
 GATK_SV_COMMIT = 'a73237cf9d9e321df3aa81c890def7b504a25c7f'
@@ -33,9 +34,6 @@ _FASTA = None
 def get_fasta() -> Path:
     """
     find or return the fasta to use
-
-    Returns:
-
     """
     global _FASTA
     if _FASTA is None:
@@ -195,178 +193,6 @@ def get_ref_panel(keys: list[str] | None = None) -> dict:
         }.items()
         if not keys or k in keys
     }
-
-
-@stage
-class GatherSampleEvidence(SampleStage):
-    """
-    https://github.com/broadinstitute/gatk-sv#gathersampleevidence
-    https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherSampleEvidence.wdl
-    """
-
-    def expected_outputs(self, sample: Sample) -> dict[str, Path]:
-        """
-        Expected to produce coverage counts, a VCF for each variant caller,
-        and a txt for each type of SV evidence (SR, PE, SD).
-        """
-        d: dict[str, Path] = dict()
-
-        # Coverage counts
-        ending_by_key = {'coverage_counts': 'coverage_counts.tsv.gz'}
-
-        # Caller's VCFs
-        for caller in SV_CALLERS:
-            ending_by_key[f'{caller}_vcf'] = f'{caller}.vcf.gz'
-            ending_by_key[f'{caller}_index'] = f'{caller}.vcf.gz.tbi'
-
-        # SV evidence
-        # split reads:
-        ending_by_key['pesr_split'] = 'sr.txt.gz'
-        ending_by_key['pesr_split_index'] = 'sr.txt.gz.tbi'
-        # discordant paired end reads:
-        ending_by_key['pesr_disc'] = 'pe.txt.gz'
-        ending_by_key['pesr_disc_index'] = 'pe.txt.gz.tbi'
-        # site depth:
-        ending_by_key['pesr_sd'] = 'sd.txt.gz'
-        ending_by_key['pesr_sd_index'] = 'sd.txt.gz.tbi'
-
-        for key, ending in ending_by_key.items():
-            stage_name = self.name.lower()
-            fname = f'{sample.id}.{ending}'  # the dot separator is critical here!!
-            # it's critical to separate the ending with a dot above: `*.sr.txt.gz`,
-            # `*.pe.txt.gz`, and `*.sd.txt.gz`. These files are passed to
-            # `gatk PrintSVEvidence`, that would determine file format based on the
-            # file name. It would strongly expect the files to end exactly with either
-            # `.sr.txt.gz`, `.pe.txt.gz`, or `.sd.txt.gz`, otherwise it would fail with
-            # "A USER ERROR has occurred: Cannot read file:///cromwell_root/... because
-            # no suitable codecs found".
-            d[key] = sample.dataset.prefix() / 'gatk_sv' / stage_name / fname
-        return d
-
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
-        """Add jobs to batch"""
-        assert sample.cram, sample
-
-        input_dict: dict[str, Any] = {
-            'bam_or_cram_file': str(sample.cram),
-            'bam_or_cram_index': str(sample.cram) + '.crai',
-            'sample_id': sample.id,
-            # This option forces CRAM localisation, otherwise it would be passed to
-            # samtools as a URL (in CramToBam.wdl) and it would fail to read it as
-            # GCS_OAUTH_TOKEN is not set.
-            'requester_pays_crams': True,
-            'reference_fasta': str(get_fasta()),
-            'reference_index': str(get_fasta()) + '.fai',
-            'reference_dict': str(get_fasta().with_suffix('.dict')),
-            'reference_version': '38'
-        }
-
-        input_dict |= get_images(
-            [
-                'sv_pipeline_docker',
-                'sv_base_mini_docker',
-                'samtools_cloud_docker',
-                'gatk_docker',
-                'genomes_in_the_cloud_docker',
-                'cloud_sdk_docker',
-                'wham_docker',
-                'manta_docker',
-                'scramble_docker',
-            ]
-        )
-        input_dict |= get_references(
-            [
-                'primary_contigs_fai',
-                'primary_contigs_list',
-                'preprocessed_intervals',
-                'manta_region_bed',
-                'wham_include_list_bed_file',
-                {'sd_locs_vcf': 'dbsnp_vcf'},
-            ]
-        )
-
-        expected_d = self.expected_outputs(sample)
-
-        jobs = add_gatk_sv_jobs(
-            batch=get_batch(),
-            dataset=sample.dataset,
-            wfl_name=self.name,
-            input_dict=input_dict,
-            expected_out_dict=expected_d,
-            sample_id=sample.id,
-        )
-        return self.make_outputs(sample, data=expected_d, jobs=jobs)
-
-
-@stage(required_stages=GatherSampleEvidence)
-class EvidenceQC(DatasetStage):
-    """
-    https://github.com/broadinstitute/gatk-sv#evidenceqc
-    """
-
-    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        """
-        Expected to return a bunch of batch-level summary files.
-        """
-        d: dict[str, Path] = dict()
-        fname_by_key = {
-            'ploidy_matrix': 'ploidy_matrix.bed.gz',
-            'ploidy_plots': 'ploidy_plots.tar.gz',
-            'WGD_dist': 'WGD_score_distributions.pdf',
-            'WGD_matrix': 'WGD_scoring_matrix_output.bed.gz',
-            'WGD_scores': 'WGD_scores.txt.gz',
-            'bincov_matrix': 'RD.txt.gz',
-            'bincov_matrix_index': 'RD.txt.gz.tbi',
-            'bincov_median': f'{dataset.name}_medianCov.transposed.bed'
-        }
-        for caller in SV_CALLERS:
-            for k in ['low', 'high']:
-                fname_by_key[f'{caller}_qc_{k}'] = f'{caller}_QC.outlier.{k}'
-
-        for key, fname in fname_by_key.items():
-            d[key] = dataset.prefix() / 'gatk_sv' / self.name.lower() / fname
-        return d
-
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        d = inputs.as_dict_by_target(GatherSampleEvidence)
-
-        sids = dataset.get_sample_ids()
-
-        input_dict: dict[str, Any] = {
-            'batch': dataset.name,
-            'samples': sids,
-            'run_vcf_qc': True,  # generates <caller>_qc_low/<caller>_qc_high
-            'counts': [str(d[sid]['coverage_counts']) for sid in sids],
-        }
-        for caller in SV_CALLERS:
-            input_dict[f'{caller}_vcfs'] = [
-                str(d[sid][f'{caller}_vcf']) for sid in sids
-            ]
-
-        input_dict |= get_images(
-            [
-                'sv_base_mini_docker',
-                'sv_base_docker',
-                'sv_pipeline_docker',
-            ]
-        )
-
-        input_dict |= get_references(
-            [
-                'genome_file',
-                'wgd_scoring_mask',
-            ]
-        )
-
-        expected_d = self.expected_outputs(dataset)
-        jobs = add_gatk_sv_jobs(
-            batch=get_batch(),
-            dataset=dataset,
-            wfl_name=self.name,
-            input_dict=input_dict,
-            expected_out_dict=expected_d,
-        )
-        return self.make_outputs(dataset, data=expected_d, jobs=jobs)
 
 
 def make_combined_ped(dataset: Dataset) -> Path:
