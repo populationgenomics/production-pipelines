@@ -50,10 +50,7 @@ class GatherSampleEvidence(SampleStage):
         no suitable codecs found".
         """
         d: dict[str, Path] = {
-            'coverage_counts': sample.dataset.prefix()
-            / 'gatk_sv'
-            / self.name.lower()
-            / f'{sample.id}.coverage_counts.tsv.gz',
+            'coverage_counts': sample.make_sv_evidence_path() / f'{sample.id}.coverage_counts.tsv.gz',
             # split reads
             'pesr_split': sample.make_sv_evidence_path() / f'{sample.id}.sr.txt.gz',
             'pesr_split_index': sample.make_sv_evidence_path()
