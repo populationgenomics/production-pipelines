@@ -3,11 +3,11 @@ Test workflow status reporter.
 """
 from typing import Any
 
-import toml
 import pytest
 from pytest_mock import MockFixture
 from cpg_utils import to_path, Path
-from . import results_prefix, update_dict
+from cpg_utils.config import set_config_paths
+from . import results_prefix
 
 TOML = f"""
 [workflow]
@@ -40,21 +40,19 @@ cpg_workflows = "stub"
 """
 
 
-def _mock_config() -> dict:
-    d: dict = {}
-    for fp in [
-        to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml',
-        to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml',
-    ]:
-        with fp.open():
-            update_dict(d, toml.load(fp))
+def _common(mocker, tmp_path):
 
-    update_dict(d, toml.loads(TOML))
-    return d
+    with open(tmp_path / 'config.toml', 'w') as fh:
+        fh.write(TOML)
+    set_config_paths(
+        [
+            str(to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml'),
+            str(to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml'),
+            str(tmp_path / 'config.toml')
+        ]
+    )
 
-
-def _common(mocker):
-    mocker.patch('cpg_utils.config.get_config', _mock_config)
+    # mocker.patch('cpg_utils.config.get_config', _mock_config)
 
     def mock_create_new_analysis(_, project, analysis_model) -> int:
         print(f'Analysis model in project {project}: {analysis_model}')
@@ -76,8 +74,8 @@ def _common(mocker):
     mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
 
 
-def test_status_reporter(mocker: MockFixture):
-    _common(mocker)
+def test_status_reporter(mocker: MockFixture, tmp_path):
+    _common(mocker,tmp_path)
 
     from cpg_utils.hail_batch import dataset_path
     from cpg_workflows.inputs import get_cohort
@@ -148,8 +146,8 @@ def _update_meta(output_path: str) -> dict[str, Any]:
         return dict(result=f.read().strip())
 
 
-def test_status_reporter_with_custom_updater(mocker: MockFixture):
-    _common(mocker)
+def test_status_reporter_with_custom_updater(mocker: MockFixture, tmp_path):
+    _common(mocker, tmp_path)
 
     from cpg_utils.hail_batch import dataset_path
     from cpg_workflows.targets import Sample
@@ -180,8 +178,8 @@ def test_status_reporter_with_custom_updater(mocker: MockFixture):
     assert 'metamist' in get_batch().job_by_tool, get_batch().job_by_tool
 
 
-def test_status_reporter_fails(mocker: MockFixture):
-    _common(mocker)
+def test_status_reporter_fails(mocker: MockFixture, tmp_path):
+    _common(mocker, tmp_path)
 
     from cpg_utils.hail_batch import dataset_path
     from cpg_workflows.targets import Sample

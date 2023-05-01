@@ -2,8 +2,8 @@
 Test reading inputs into a Cohort object.
 """
 
-import toml
 from pytest_mock import MockFixture
+from cpg_utils.config import set_config_paths
 from . import results_prefix
 
 TOML = f"""
@@ -37,11 +37,14 @@ ref_fasta = 'stub'
 """
 
 
-def test_cohort(mocker: MockFixture):
+def test_cohort(mocker: MockFixture, tmp_path):
     """
     Testing creating a Cohort object from metamist mocks.
     """
-    mocker.patch('cpg_utils.config.get_config', lambda: toml.loads(TOML))
+
+    with open(tmp_path / 'config.toml', 'w') as fh:
+        fh.write(TOML)
+    set_config_paths([str(tmp_path / 'config.toml')])
 
     def mock_get_samples(  # pylint: disable=unused-argument
         *args, **kwargs
