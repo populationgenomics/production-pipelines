@@ -17,13 +17,10 @@ from cpg_workflows.workflow import (
     Dataset,
 )
 
-
 from cpg_workflows.stages.gatk_sv import (
     add_gatk_sv_jobs,
     SV_CALLERS,
     get_references,
-    get_ref_panel,
-    make_combined_ped,
     get_fasta,
     get_images,
 )
@@ -150,6 +147,7 @@ class EvidenceQC(DatasetStage):
             'WGD_scores': 'WGD_scores.txt.gz',
             'bincov_matrix': 'RD.txt.gz',
             'bincov_matrix_index': 'RD.txt.gz.tbi',
+            'bincov_median': f'{dataset.name}_medianCov.transposed.bed'
         }
         for caller in SV_CALLERS:
             for k in ['low', 'high']:
