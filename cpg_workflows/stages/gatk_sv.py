@@ -16,11 +16,9 @@ from cpg_utils.hail_batch import command, reference_path, image_path
 from cpg_workflows.batch import make_job_name, Batch, get_batch
 from cpg_workflows.workflow import (
     stage,
-    SampleStage,
     StageOutput,
     DatasetStage,
     StageInput,
-    Sample,
     Dataset,
 )
 from cpg_workflows.stages.gatk_sv_single_sample import GatherSampleEvidence, EvidenceQC

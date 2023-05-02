@@ -199,3 +199,17 @@ class EvidenceQC(DatasetStage):
             expected_out_dict=expected_d,
         )
         return self.make_outputs(dataset, data=expected_d, jobs=jobs)
+
+
+@stage(required_stages=EvidenceQC)
+class KMeansCluster(DatasetStage):
+    """
+    uses the values generated in EvidenceQC, does some clustering
+
+    """
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+
+        pass
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        pass
