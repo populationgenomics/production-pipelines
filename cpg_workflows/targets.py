@@ -401,6 +401,7 @@ class Dataset(Target):
     ) -> Path:
         """
         Create a PED file for all samples
+        PED is written with no header line to be strict specification compliant
         """
         datas = []
         for sample in self.get_samples():
@@ -416,7 +417,7 @@ class Dataset(Target):
 
         if not get_config()['workflow'].get('dry_run', False):
             with out_path.open('w') as fp:
-                df.to_csv(fp, sep='\t', index=False)
+                df.to_csv(fp, sep='\t', index=False, header=False)
         return out_path
 
 

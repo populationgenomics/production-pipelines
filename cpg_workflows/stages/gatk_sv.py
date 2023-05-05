@@ -12,7 +12,7 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config, ConfigError
-from cpg_utils.hail_batch import command, reference_path, image_path, genome_build
+from cpg_utils.hail_batch import command, reference_path, image_path
 from cpg_workflows.batch import make_job_name, Batch, get_batch
 from cpg_workflows.workflow import (
     stage,
@@ -25,14 +25,46 @@ from cpg_workflows.workflow import (
 )
 
 
-GATK_SV_COMMIT = 'b59a8b070da48ceed475814117787cf80cace170'
+GATK_SV_COMMIT = 'a73237cf9d9e321df3aa81c890def7b504a25c7f'
 SV_CALLERS = ['manta', 'wham', 'scramble']
+_FASTA = None
 
 
-def get_images(keys: list[str]) -> dict[str, str]:
+def get_fasta() -> Path:
+    """
+    find or return the fasta to use
+
+    Returns:
+
+    """
+    global _FASTA
+    if _FASTA is None:
+        _FASTA = to_path(
+            get_config()['workflow'].get('ref_fasta')
+            or reference_path('broad/ref_fasta')
+        )
+    return _FASTA
+
+
+def get_images(keys: list[str], allow_missing=False) -> dict[str, str]:
     """
     Dict of WDL inputs with docker image paths.
+
+    Args:
+        keys (list): all the images to get
+        allow_missing (bool): if False, require all query keys to be found
+
+    Returns:
+        dict of image keys to image paths
+        or AssertionError
     """
+
+    if not allow_missing:
+        image_keys = get_config()['images'].keys()
+        query_keys = set(keys)
+        if not query_keys.issubset(image_keys):
+            raise KeyError(f'Unknown image keys: {query_keys - image_keys}')
+
     return {k: image_path(k) for k in get_config()['images'].keys() if k in keys}
 
 
@@ -66,7 +98,7 @@ def add_gatk_sv_jobs(
     # "dict" is invariant (supports updating), "Mapping" is covariant (read-only)
     # we have to support inputs of type dict[str, str], so using Mapping here:
     input_dict: dict[str, Any],
-    expected_out_dict: dict[str, Path],
+    expected_out_dict: dict[str, Path | list[Path]],
     sample_id: str | None = None,
     driver_image: str | None = None,
 ) -> list[Job]:
@@ -80,10 +112,27 @@ def add_gatk_sv_jobs(
         output_prefix = join(output_prefix, sample_id)
 
     outputs_to_collect = dict()
-    for key in expected_out_dict.keys():
-        outputs_to_collect[key] = CromwellOutputType.single_path(f'{wfl_name}.{key}')
+    for key, value in expected_out_dict.items():
+        if isinstance(value, list):
+            outputs_to_collect[key] = CromwellOutputType.array_path(
+                name=f'{wfl_name}.{key}', length=len(value)
+            )
+        else:
+            outputs_to_collect[key] = CromwellOutputType.single_path(
+                f'{wfl_name}.{key}'
+            )
 
     driver_image = driver_image or image_path('cpg_workflows')
+
+    # pre-process input_dict
+    paths_as_strings: dict = {}
+    for key, value in input_dict.items():
+        if isinstance(value, Path):
+            paths_as_strings[f'{wfl_name}.{key}'] = str(value)
+        elif isinstance(value, (list, set)):
+            paths_as_strings[f'{wfl_name}.{key}'] = [str(v) for v in value]
+        else:
+            paths_as_strings[f'{wfl_name}.{key}'] = value
 
     job_prefix = make_job_name(wfl_name, sample=sample_id, dataset=dataset.name)
     submit_j, output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
@@ -97,10 +146,7 @@ def add_gatk_sv_jobs(
         workflow=f'{wfl_name}.wdl',
         libs=['.'],
         output_prefix=output_prefix,
-        input_dict={
-            f'{wfl_name}.{k}': str(v) if isinstance(v, Path) else v
-            for k, v in input_dict.items()
-        },
+        input_dict=paths_as_strings,
         outputs_to_collect=outputs_to_collect,
         driver_image=driver_image,
     )
@@ -110,7 +156,11 @@ def add_gatk_sv_jobs(
     cmds = []
     for key, resource in output_dict.items():
         out_path = expected_out_dict[key]
-        cmds.append(f'gsutil cp $(cat {resource}) {out_path}')
+        if isinstance(resource, list):
+            for source, dest in zip(resource, out_path):
+                cmds.append(f'gsutil cp "$(cat {source})" "{dest}"')
+        else:
+            cmds.append(f'gsutil cp "$(cat {resource})" "{out_path}"')
     copy_j.command(command(cmds, setup_gcp=True))
     return [submit_j, copy_j]
 
@@ -120,9 +170,6 @@ def get_ref_panel(keys: list[str] | None = None) -> dict:
         k: v
         for k, v in {
             'ref_panel_samples': get_config()['sv_ref_panel']['ref_panel_samples'],
-            'ref_ped_file': str(reference_path('gatk_sv/ped_file')),
-            'ref_panel_vcf': str(reference_path('gatk_sv/clean_vcf')),
-            'qc_definitions': str(reference_path('gatk_sv/qc_definitions')),
             'ref_panel_bincov_matrix': str(
                 reference_path('gatk_sv/ref_panel_bincov_matrix')
             ),
@@ -174,14 +221,14 @@ class GatherSampleEvidence(SampleStage):
 
         # SV evidence
         # split reads:
-        ending_by_key['sr'] = 'sr.txt.gz'
-        ending_by_key['sr_index'] = 'sr.txt.gz.tbi'
+        ending_by_key['pesr_split'] = 'sr.txt.gz'
+        ending_by_key['pesr_split_index'] = 'sr.txt.gz.tbi'
         # discordant paired end reads:
-        ending_by_key['pe'] = 'pe.txt.gz'
-        ending_by_key['pe_index'] = 'pe.txt.gz.tbi'
+        ending_by_key['pesr_disc'] = 'pe.txt.gz'
+        ending_by_key['pesr_disc_index'] = 'pe.txt.gz.tbi'
         # site depth:
-        ending_by_key['sd'] = 'sd.txt.gz'
-        ending_by_key['sd_index'] = 'sd.txt.gz.tbi'
+        ending_by_key['pesr_sd'] = 'sd.txt.gz'
+        ending_by_key['pesr_sd_index'] = 'sd.txt.gz.tbi'
 
         for key, ending in ending_by_key.items():
             stage_name = self.name.lower()
@@ -208,6 +255,10 @@ class GatherSampleEvidence(SampleStage):
             # samtools as a URL (in CramToBam.wdl) and it would fail to read it as
             # GCS_OAUTH_TOKEN is not set.
             'requester_pays_crams': True,
+            'reference_fasta': str(get_fasta()),
+            'reference_index': str(get_fasta()) + '.fai',
+            'reference_dict': str(get_fasta().with_suffix('.dict')),
+            'reference_version': '38'
         }
 
         input_dict |= get_images(
@@ -221,8 +272,6 @@ class GatherSampleEvidence(SampleStage):
                 'wham_docker',
                 'manta_docker',
                 'scramble_docker',
-                'sv_pipeline_base_docker',
-                'gatk_docker_pesr_override',
             ]
         )
         input_dict |= get_references(
@@ -235,16 +284,6 @@ class GatherSampleEvidence(SampleStage):
                 {'sd_locs_vcf': 'dbsnp_vcf'},
             ]
         )
-        ref_fasta = to_path(
-            get_config()['workflow'].get('ref_fasta')
-            or reference_path('broad/ref_fasta')
-        )
-        input_dict |= {
-            'reference_fasta': str(ref_fasta),
-            'reference_index': str(ref_fasta) + '.fai',
-            'reference_dict': str(ref_fasta.with_suffix('.dict')),
-        }
-        input_dict['reference_version'] = '38'
 
         expected_d = self.expected_outputs(sample)
 
@@ -278,6 +317,7 @@ class EvidenceQC(DatasetStage):
             'WGD_scores': 'WGD_scores.txt.gz',
             'bincov_matrix': 'RD.txt.gz',
             'bincov_matrix_index': 'RD.txt.gz.tbi',
+            'bincov_median': f'{dataset.name}_medianCov.transposed.bed'
         }
         for caller in SV_CALLERS:
             for k in ['low', 'high']:
@@ -308,7 +348,6 @@ class EvidenceQC(DatasetStage):
                 'sv_base_mini_docker',
                 'sv_base_docker',
                 'sv_pipeline_docker',
-                'sv_pipeline_qc_docker',
             ]
         )
 
@@ -405,23 +444,23 @@ class GatherBatchEvidence(DatasetStage):
             'samples': sids,
             'ped_file': str(make_combined_ped(dataset)),
             'counts': [str(input_by_sid[sid]['coverage_counts']) for sid in sids],
-            'SR_files': [str(input_by_sid[sid]['sr']) for sid in sids],
-            'PE_files': [str(input_by_sid[sid]['pe']) for sid in sids],
-            'SD_files': [str(input_by_sid[sid]['sd']) for sid in sids],
-        }
-        for caller in SV_CALLERS:
-            input_dict[f'{caller}_vcfs'] = [
-                str(input_by_sid[sid][f'{caller}_vcf']) for sid in sids
-            ]
-
-        input_dict |= {
+            'SR_files': [str(input_by_sid[sid]['pesr_split']) for sid in sids],
+            'PE_files': [str(input_by_sid[sid]['pesr_disc']) for sid in sids],
+            'SD_files': [str(input_by_sid[sid]['pesr_sd']) for sid in sids],
             'ref_copy_number_autosomal_contigs': 2,
             'allosomal_contigs': ['chrX', 'chrY'],
             'gcnv_qs_cutoff': 30,
             'min_svsize': 50,
             'run_matrix_qc': True,
             'matrix_qc_distance': 1000000,
+            'ref_dict': str(get_fasta().with_suffix('.dict')),
         }
+
+        for caller in SV_CALLERS:
+            input_dict[f'{caller}_vcfs'] = [
+                str(input_by_sid[sid][f'{caller}_vcf']) for sid in sids
+            ]
+
         input_dict |= get_references(
             [
                 'genome_file',
@@ -434,9 +473,6 @@ class GatherBatchEvidence(DatasetStage):
                 'mei_bed',
             ]
         )
-        input_dict |= {
-            'ref_dict': str(reference_path(f'broad/ref_fasta').with_suffix('.dict')),
-        }
 
         # reference panel gCNV models
         input_dict |= get_ref_panel()
@@ -446,11 +482,9 @@ class GatherBatchEvidence(DatasetStage):
                 'sv_base_mini_docker',
                 'sv_base_docker',
                 'sv_pipeline_docker',
-                'sv_pipeline_qc_docker',
                 'linux_docker',
                 'condense_counts_docker',
                 'gatk_docker',
-                'gcnv_gatk_docker',
                 'cnmops_docker',
             ]
         )
@@ -504,32 +538,27 @@ class ClusterBatch(DatasetStage):
 
         input_dict: dict[str, Any] = {
             'batch': dataset.name,
-            'del_bed': str(batch_evidence_d[f'merged_dels']),
-            'dup_bed': str(batch_evidence_d[f'merged_dups']),
+            'del_bed': str(batch_evidence_d['merged_dels']),
+            'dup_bed': str(batch_evidence_d['merged_dups']),
             'ped_file': str(make_combined_ped(dataset)),
-        }
-        for caller in SV_CALLERS:
-            input_dict[f'{caller}_vcf_tar'] = str(
-                batch_evidence_d[f'std_{caller}_vcf_tar']
-            )
-
-        input_dict |= {
             'depth_exclude_overlap_fraction': 0.5,
             'depth_interval_overlap': 0.8,
             'depth_clustering_algorithm': 'SINGLE_LINKAGE',
             'pesr_interval_overlap': 0.1,
             'pesr_breakend_window': 300,
             'pesr_clustering_algorithm': 'SINGLE_LINKAGE',
+            'reference_fasta': str(get_fasta()),
+            'reference_fasta_fai': str(get_fasta()) + '.fai',
+            'reference_dict': str(get_fasta().with_suffix('.dict')),
         }
 
+        for caller in SV_CALLERS:
+            input_dict[f'{caller}_vcf_tar'] = str(
+                batch_evidence_d[f'std_{caller}_vcf_tar']
+            )
+
         input_dict |= get_images(
-            [
-                'sv_base_mini_docker',
-                'sv_pipeline_docker',
-                'gatk_docker',
-                'linux_docker',
-                'sv_pipeline_base_docker',
-            ]
+            ['sv_base_mini_docker', 'sv_pipeline_docker', 'gatk_docker', 'linux_docker']
         )
 
         input_dict |= get_references(
@@ -539,15 +568,6 @@ class ClusterBatch(DatasetStage):
                 {'pesr_exclude_intervals': 'pesr_exclude_list'},
             ]
         )
-        ref_fasta = to_path(
-            get_config()['workflow'].get('ref_fasta')
-            or reference_path('broad/ref_fasta')
-        )
-        input_dict |= {
-            'reference_fasta': str(ref_fasta),
-            'reference_fasta_fai': str(ref_fasta) + '.fai',
-            'reference_dict': str(ref_fasta.with_suffix('.dict')),
-        }
 
         expected_d = self.expected_outputs(dataset)
         jobs = add_gatk_sv_jobs(
@@ -568,7 +588,7 @@ class GenerateBatchMetrics(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict:
         """
-        Metrics file
+        Metrics files
         """
 
         ending_by_key = {
@@ -599,6 +619,7 @@ class GenerateBatchMetrics(DatasetStage):
             'SR_split_size': 1000,
             'common_cnv_size_cutoff': 5000,
             'ped_file': make_combined_ped(dataset),
+            'ref_dict': str(get_fasta().with_suffix('.dict')),
         }
 
         for caller in SV_CALLERS + ['depth']:
@@ -607,10 +628,8 @@ class GenerateBatchMetrics(DatasetStage):
         input_dict |= get_images(
             [
                 'sv_pipeline_docker',
-                'sv_pipeline_rdtest_docker',
                 'sv_base_mini_docker',
                 'sv_base_docker',
-                'sv_pipeline_base_docker',
                 'linux_docker',
             ]
         )
@@ -624,13 +643,6 @@ class GenerateBatchMetrics(DatasetStage):
                 {'allosome_contigs': 'allosome_file'},
             ]
         )
-        ref_fasta = to_path(
-            get_config()['workflow'].get('ref_fasta')
-            or reference_path('broad/ref_fasta')
-        )
-        input_dict |= {
-            'ref_dict': str(ref_fasta.with_suffix('.dict')),
-        }
 
         expected_d = self.expected_outputs(dataset)
         jobs = add_gatk_sv_jobs(
@@ -665,14 +677,44 @@ class FilterBatch(DatasetStage):
         * Filtered depth-only call VCF with outlier samples excluded
         * Random forest cutoffs file
         * PED file with outlier samples excluded"""
-        ending_by_key = {
-            'done': '.done',
+        ending_by_key: dict = {
+            'metrics_file_filterbatch': '.metrics.tsv',
+            'filtered_pesr_vcf': '.filtered-pesr-merged.vcf.gz',
+            'cutoffs': '.cutoffs',
+            'scores': '.updated_scores',
+            'RF_intermediate_files': '.RF_intermediate_files.tar.gz',
+            'outlier_samples_excluded_file': '.outliers.samples.list',
+            'batch_samples_postOutlierExclusion_file': '.outliers_excluded.samples.list',
         }
+        for caller in SV_CALLERS + ['depth']:
+            ending_by_key[f'filtered_{caller}_vcf'] = f'.filtered-{caller}.vcf.gz'
 
-        d: dict[str, Path] = {}
+            # unsure why, scramble doesn't export this file
+            if caller != 'scramble':
+                ending_by_key[
+                    f'sites_filtered_{caller}_vcf'
+                ] = f'.sites-filtered-{caller}.vcf.gz'
+
+        ending_by_key['sv_counts'] = [
+            f'.{caller}.with_evidence.svcounts.txt' for caller in SV_CALLERS + ['depth']
+        ]
+        ending_by_key['sv_count_plots'] = [
+            f'.{caller}.with_evidence.all_SVTYPEs.counts_per_sample.png'
+            for caller in SV_CALLERS + ['depth']
+        ]
+        d: dict[str, Path | list[Path]] = {}
         for key, ending in ending_by_key.items():
-            fname = f'{dataset.name}{ending}'
-            d[key] = dataset.prefix() / 'gatk_sv' / self.name.lower() / fname
+            if isinstance(ending, str):
+                fname = f'{dataset.name}{ending}'
+                d[key] = dataset.prefix() / 'gatk_sv' / self.name.lower() / fname
+            elif isinstance(ending, list):
+                d[key] = [
+                    dataset.prefix()
+                    / 'gatk_sv'
+                    / self.name.lower()
+                    / f'{dataset.name}{e}'
+                    for e in ending
+                ]
         return d
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -692,7 +734,6 @@ class FilterBatch(DatasetStage):
 
         input_dict |= get_images(
             [
-                'sv_pipeline_base_docker',
                 'sv_pipeline_docker',
                 'sv_base_mini_docker',
                 'linux_docker',
@@ -716,10 +757,10 @@ class FilterBatch(DatasetStage):
         return self.make_outputs(dataset, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=[FilterBatch])
+@stage(required_stages=[FilterBatch, GatherBatchEvidence])
 class GenotypeBatch(DatasetStage):
     """
-    Genotypes a batch of samples across unfiltered variants combined across all batches.
+    Genotypes a batch of samples across filtered variants combined across all batches.
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict:
@@ -730,24 +771,208 @@ class GenotypeBatch(DatasetStage):
         List of SR pass variants
         List of SR fail variants
         """
-        return {}
+        ending_by_key = {
+            'sr_bothside_pass': '.genotype_SR_part2_bothside_pass.txt',
+            'sr_background_fail': '.genotype_SR_part2_background_fail.txt',
+            'trained_PE_metrics': '.pe_metric_file.txt',
+            'trained_SR_metrics': '.sr_metric_file.txt',
+            'regeno_coverage_medians': '.regeno.coverage_medians_merged.bed',
+            'metrics_file_genotypebatch': '.metrics.tsv',
+        }
+
+        # really unsure about this bit - it looks like both inputs are
+        # the same prior output? TrainRDGenotyping.pesr/depth_sepcutoff
+        for mode in ['pesr', 'depth']:
+            ending_by_key |= {
+                f'trained_genotype_{mode}_pesr_sepcutoff': f'.{mode}.pesr_sepcutoff.txt',
+                f'trained_genotype_{mode}_depth_sepcutoff': f'.{mode}.depth_sepcutoff.txt',
+                f'genotyped_{mode}_vcf': f'.{mode}.vcf.gz',
+                f'genotyped_{mode}_vcf_index': f'.{mode}.vcf.gz.tbi',
+            }
+        d: dict[str, Path] = {}
+        for key, ending in ending_by_key.items():
+            fname = f'{dataset.name}{ending}'
+            d[key] = dataset.prefix() / 'gatk_sv' / self.name.lower() / fname
+        return d
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
-        pass
+
+        filterbatch_d = inputs.as_dict(dataset, FilterBatch)
+        batchevidence_d = inputs.as_dict(dataset, GatherBatchEvidence)
+
+        input_dict: dict[str, Any] = {
+            'batch': dataset.name,
+            'ped_file': make_combined_ped(dataset),
+            'n_per_split': 5000,
+            'n_RD_genotype_bins': 100000,
+            'coveragefile': batchevidence_d['merged_bincov'],  # unsure
+            'coveragefile_index': batchevidence_d['merged_bincov_index'],  # unsure
+            'discfile': batchevidence_d['merged_PE'],
+            'discfile_index': batchevidence_d['merged_PE_index'],
+            'splitfile': batchevidence_d['merged_SR'],
+            'splitfile_index': batchevidence_d['merged_SR_index'],
+            'medianfile': batchevidence_d['median_cov'],
+            'rf_cutoffs': filterbatch_d['cutoffs'],
+            # instead of pulling from reference:
+            'ref_dict': str(get_fasta().with_suffix('.dict')),
+            'reference_build': 'hg38'
+        }
+
+        for mode in ['pesr', 'depth']:
+            input_dict[f'batch_{mode}_vcf'] = filterbatch_d[f'filtered_{mode}_vcf']
+            input_dict[f'cohort_{mode}_vcf'] = filterbatch_d[f'filtered_{mode}_vcf']
+
+        input_dict |= get_images(
+            [
+                'sv_pipeline_docker',
+                'sv_base_mini_docker',
+                'linux_docker',
+            ]
+        )
+        input_dict |= get_references(
+            [
+                'primary_contigs_list',
+                'bin_exclude',
+                'seed_cutoffs',
+                'pesr_exclude_list'
+            ]
+        )
+
+        expected_d = self.expected_outputs(dataset)
+        jobs = add_gatk_sv_jobs(
+            batch=get_batch(),
+            dataset=dataset,
+            wfl_name=self.name,
+            input_dict=input_dict,
+            expected_out_dict=expected_d,
+        )
+        return self.make_outputs(dataset, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=GenotypeBatch)
+# @stage(required_stages=GenotypeBatch)
+# class RegenotypeCNVs(DatasetStage):
+#     """
+#     Optional, Re-genotypes probable mosaic variants across multiple batches.
+#     """
+#
+#     def expected_outputs(self, dataset: Dataset) -> dict:
+#         pass
+#
+#     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+#         pass
+
+
+@stage(required_stages=[FilterBatch, GenotypeBatch, GatherBatchEvidence])
 class MakeCohortVcf(DatasetStage):
     """
     Combines variants across multiple batches, resolves complex variants, re-genotypes,
     and performs final VCF clean-up.
+
+    If RegenotypeCNVs is run, this stage will use the output of that stage as input.
+    Otherwise, it will use the output of GenotypeBatch.
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict:
-        pass
+        """
+
+        Args:
+            dataset ():
+
+        Returns:
+
+        """
+        ending_by_key = {
+            'vcf': '.cleaned.vcf.gz',
+            'vcf_index': '.cleaned.vcf.gz.tbi',
+            'vcf_qc': '.cleaned_SV_VCF_QC_output.tar.gz',
+            # if merge_intermediate_vcfs is enabled
+            # 'cluster_vcf': '.combine_batches.vcf.gz',
+            # 'cluster_vcf_index': '.combine_batches.vcf.gz.tbi',
+            # 'complex_resolve_vcf': '.complex_resolve.vcf.gz',
+            # 'complex_resolve_vcf_index': '.complex_resolve.vcf.gz.tbi',
+            # 'complex_genotype_vcf': '.complex_genotype.vcf.gz',
+            # 'complex_genotype_vcf_index': '.complex_genotype.vcf.gz.tbi',
+            'metrics_file_makecohortvcf': '.metrics.tsv'
+        }
+        d: dict[str, Path] = {}
+        for key, ending in ending_by_key.items():
+            fname = f'{dataset.name}{ending}'
+            d[key] = dataset.prefix() / 'gatk_sv' / self.name.lower() / fname
+        return d
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
-        pass
+        """
+
+        Args:
+            dataset ():
+            inputs ():
+
+        Returns:
+
+        """
+        batchevidence_d = inputs.as_dict(dataset, GatherBatchEvidence)
+        filterbatch_d = inputs.as_dict(dataset, FilterBatch)
+        genotypebatch_d = inputs.as_dict(dataset, GenotypeBatch)
+
+        input_dict: dict[str, Any] = {
+            'cohort_name': dataset.name,
+            'batches': [dataset.name],
+            'ped_file': make_combined_ped(dataset),
+            'ref_dict': str(get_fasta().with_suffix('.dict')),
+            'chr_x': 'chrX',
+            'chr_y': 'chrY',
+            'min_sr_background_fail_batches': 0.5,
+            'max_shard_size_resolve': 500,
+            'max_shards_per_chrom_clean_vcf_step1': 200,
+            'min_records_per_shard_clean_vcf_step1': 5000,
+            'clean_vcf1b_records_per_shard': 10000,
+            'samples_per_clean_vcf_step2_shard': 100,
+            'clean_vcf5_records_per_shard': 5000,
+            'random_seed': 0,
+            # not explicit, but these VCFs require indices
+            'pesr_vcfs': [genotypebatch_d['genotyped_pesr_vcf']],
+            'depth_vcfs': [genotypebatch_d['genotyped_depth_vcf']],
+            'disc_files': [batchevidence_d['merged_PE']],
+            'bincov_files': [batchevidence_d['merged_bincov']],
+            'raw_sr_bothside_pass_files': [genotypebatch_d['sr_bothside_pass']],
+            'raw_sr_background_fail_files': [genotypebatch_d['sr_background_fail']],
+            'depth_gt_rd_sep_files': [genotypebatch_d['trained_genotype_depth_depth_sepcutoff']],
+            'median_coverage_files': [batchevidence_d['median_cov']],
+            'rf_cutoff_files': [filterbatch_d['cutoffs']],
+        }
+
+        input_dict |= get_references(
+            [
+                'bin_exclude',
+                'mei_bed',
+                'depth_exclude_list',
+                'empty_file',
+                # same attr, two names
+                'primary_contigs_list',
+                {'contig_list': 'primary_contigs_list'},
+                {'allosome_fai': 'allosome_file'},
+                {'cytobands': 'cytoband'},
+                {'pe_exclude_list': 'pesr_exclude_list'},
+            ]
+        )
+
+        # images!
+        input_dict |= get_images(
+            [
+                'sv_pipeline_docker',
+                'sv_base_mini_docker',
+                'linux_docker',
+            ]
+        )
+        expected_d = self.expected_outputs(dataset)
+        jobs = add_gatk_sv_jobs(
+            batch=get_batch(),
+            dataset=dataset,
+            wfl_name=self.name,
+            input_dict=input_dict,
+            expected_out_dict=expected_d,
+        )
+        return self.make_outputs(dataset, data=expected_d, jobs=jobs)
 
 
 @stage(required_stages=MakeCohortVcf)
@@ -767,11 +992,51 @@ class AnnotateVcf(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict:
-        vcf_path = str(self.tmp_prefix / 'sv' / f'{dataset.name}.vcf.gz')
-        return {
-            'vcf': vcf_path,
-            'tbi': vcf_path + '.tbi',
+        # vcf_path = str(self.tmp_prefix / 'sv' / f'{dataset.name}.vcf.gz')
+        ending_by_key = {
+            'output_vcf': '.annotated.vcf.gz',
+            'output_vcf_idx': '.annotated.vcf.gz.tbi',
         }
+        d: dict[str, Path] = {}
+        for key, ending in ending_by_key.items():
+            fname = f'{dataset.name}{ending}'
+            d[key] = dataset.prefix() / 'gatk_sv' / self.name.lower() / fname
+        return d
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
-        pass
+
+        make_vcf_d = inputs.as_dict(dataset, MakeCohortVcf)
+
+        input_dict: dict[str, Any] = {
+            'prefix': dataset.name,
+            'vcf': make_vcf_d['vcf'],
+            'vcf_idx': make_vcf_d['vcf_index'],
+            'ped_file': make_combined_ped(dataset),
+            'sv_per_shard': 5000,
+            'max_shards_per_chrom_step1': 200,
+            'min_records_per_shard_step1': 5000
+        }
+        input_dict |= get_references(
+            [
+                'protein_coding_gtf',
+                {'contig_list': 'primary_contigs_list'},
+            ]
+        )
+
+        # images!
+        input_dict |= get_images(
+            [
+                'sv_pipeline_docker',
+                'sv_base_mini_docker',
+                'gatk_docker',
+            ]
+        )
+        expected_d = self.expected_outputs(dataset)
+        jobs = add_gatk_sv_jobs(
+            batch=get_batch(),
+            dataset=dataset,
+            wfl_name=self.name,
+            input_dict=input_dict,
+            expected_out_dict=expected_d,
+        )
+        return self.make_outputs(dataset, data=expected_d, jobs=jobs)

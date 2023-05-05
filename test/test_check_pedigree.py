@@ -2,9 +2,9 @@
 Test Hail Query functions.
 """
 
-import toml
-from pytest_mock import MockFixture
 from cpg_utils import to_path
+from cpg_utils.config import set_config_paths
+
 
 TOML = """
 [workflow]
@@ -12,16 +12,19 @@ sequencing_type = 'genome'
 """
 
 
-def test_check_pedigree(mocker: MockFixture, caplog):
-    mocker.patch('cpg_utils.config.get_config', lambda: toml.loads(TOML))
-
+def test_check_pedigree(caplog, tmp_path):
     from cpg_workflows.python_scripts import check_pedigree
+
+    with open(tmp_path / 'config.toml', 'w') as fh:
+        fh.write(TOML)
+    set_config_paths([str(tmp_path / 'config.toml')])
 
     data_dir = to_path(__file__).parent / 'data' / 'check_pedigree'
     check_pedigree.run(
         somalier_samples_fpath=str(data_dir / 'somalier-samples.tsv'),
         somalier_pairs_fpath=str(data_dir / 'somalier-pairs.tsv'),
         expected_ped_fpath=str(data_dir / 'samples.ped'),
+        send_to_slack=False,
     )
     for expected_line in [
         '4/51 PED samples with mismatching sex',

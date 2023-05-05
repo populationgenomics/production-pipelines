@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  VERSION: 1.13.1
+  VERSION: 1.13.2
 
 jobs:
   docker:
@@ -43,10 +43,12 @@ jobs:
         run: |
           docker build . -f Dockerfile --tag $IMAGE_NAME:${{ github.sha }}
 
-      - name: push
+      - name: push PR
+        if: ${{ github.event_name == 'pull_request' }}
         run: |
-          docker push $IMAGE_NAME:${{ github.sha }}
-
+          docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:pr-${{ github.event.number }}
+          docker push $IMAGE_NAME:pr-${{ github.event.number }}
+        
       - name: push latest
         if: ${{ github.event_name != 'pull_request' }}
         run: |

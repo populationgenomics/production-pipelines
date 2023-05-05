@@ -41,6 +41,46 @@ StageDecorator = Callable[..., 'Stage']
 TargetT = TypeVar('TargetT', bound=Target)
 
 
+def path_walk(expected, collected: set) -> set:
+    """
+    recursive walk of expected_out
+    if the object is iterable, walk it
+    this gets around the issue with nested lists and dicts
+    mainly around the use of Array outputs from Cromwell
+
+    Args:
+        expected (Any): any type of object containing Paths
+        collected (set): all collected paths so far
+
+    Returns:
+        a set of all collected Path nodes
+
+    Examples:
+
+    >>> path_walk({'a': {'b': {'c': Path('d')}}}, set())
+    {Path('d')}
+    >>> path_walk({'a': {'b': {'c': [Path('d'), Path('e')]}}}, set())
+    {Path('d'), Path('e')}
+    >>> path_walk({'a': Path('b'),'c': {'d': 'e'}, {'f': Path('g')}}, set())
+    {Path('b'), Path('g')}
+    """
+    if expected is None:
+        return collected
+    if isinstance(expected, dict):
+        for value in expected.values():
+            collected.update(path_walk(value, collected))
+    if isinstance(expected, (list, set)):
+        for value in expected:
+            collected.update(path_walk(value, collected))
+    if isinstance(expected, str):
+        return collected
+    if isinstance(expected, Path):
+        if expected in collected:
+            raise ValueError(f'Duplicate path {expected} in expected_out')
+        collected.add(expected)
+    return collected
+
+
 class WorkflowError(Exception):
     """
     Error raised by workflow and stage implementation.
@@ -638,15 +678,7 @@ class Stage(Generic[TargetT], ABC):
             return True, None
 
         if get_config()['workflow'].get('check_expected_outputs'):
-            paths = []
-            if isinstance(expected_out, dict):
-                for _, v in expected_out.items():
-                    if not isinstance(v, str):
-                        paths.append(v)
-            elif isinstance(expected_out, str):
-                pass
-            else:
-                paths.append(expected_out)
+            paths = path_walk(expected_out, set())
             first_missing_path = next((p for p in paths if not exists(p)), None)
             if not paths:
                 return False, None

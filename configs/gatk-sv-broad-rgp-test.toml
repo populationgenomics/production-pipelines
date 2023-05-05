@@ -1,7 +1,5 @@
 [workflow]
-dataset_gcp_project = 'acute-care-321904'
-dataset = 'acute-care'
-input_datasets = ['acute-care']
+input_datasets = ['broad-rgp']
 access_level = 'test'
 
 # CRAMs were aligned using an unmasked reference: 
@@ -16,5 +14,5 @@ access_level = 'test'
 # samtools view -H gs://cpg-acute-care-test/cram/CPG262543.cram | less
 ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
 
-[hail]
-billing_project = 'acute-care'
+[references.gatk_sv]
+rmsk = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.randomForest_blacklist.withRepMask.bed.gz"

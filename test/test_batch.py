@@ -2,9 +2,8 @@
 Test initialising Batch object.
 """
 
-import toml
-from pytest_mock import MockFixture
 from cpg_utils import to_path
+from cpg_utils.config import set_config_paths
 from . import results_prefix
 
 TOML = f"""
@@ -31,17 +30,20 @@ backend = 'local'
 """
 
 
-def test_batch_job(mocker: MockFixture):
+def test_batch_job(tmp_path):
     """
     Test creating a job and running a batch.
     """
-    mocker.patch('cpg_utils.config.get_config', lambda: toml.loads(TOML))
+
+    with open(tmp_path / 'config.toml', 'w') as fh:
+        fh.write(TOML)
+    set_config_paths([str(tmp_path / 'config.toml')])
 
     from cpg_utils.hail_batch import dataset_path, command
     from cpg_workflows.batch import get_batch
 
     b = get_batch('Test batch job')
-    j1 = b.new_job('Jo b1')
+    j1 = b.new_job('Job 1')
     text = 'success'
     cmd = f"""\
     echo {text} > {j1.output}

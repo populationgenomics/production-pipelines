@@ -2,10 +2,15 @@
 Test building Workflow object.
 """
 
-import toml
-from pytest_mock import MockFixture
+
+from unittest import mock
 from cpg_utils import to_path, Path
+from cpg_utils.config import set_config_paths
 from . import results_prefix
+
+from cpg_workflows.targets import Sample, Cohort
+from cpg_workflows.workflow import path_walk
+
 
 TOML = f"""
 [workflow]
@@ -32,16 +37,27 @@ backend = 'local'
 """
 
 
-def test_workflow(mocker: MockFixture):
+def mock_create_cohort() -> Cohort:
+    c = Cohort()
+    ds = c.create_dataset('my_dataset')
+    ds.add_sample('CPG01', external_id='SAMPLE1')
+    ds.add_sample('CPG02', external_id='SAMPLE2')
+    return c
+
+
+@mock.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
+def test_workflow(tmp_path):
     """
     Testing running a workflow from a mock cohort.
     """
-    mocker.patch('cpg_utils.config.get_config', lambda: toml.loads(TOML))
+
+    with open(tmp_path / 'config.toml', 'w') as fh:
+        fh.write(TOML)
+    set_config_paths([str(tmp_path / 'config.toml')])
 
     from cpg_utils.hail_batch import dataset_path
     from cpg_workflows import get_batch
     from cpg_workflows.inputs import get_cohort
-    from cpg_workflows.targets import Sample, Cohort
     from cpg_workflows.workflow import (
         SampleStage,
         StageInput,
@@ -50,15 +66,6 @@ def test_workflow(mocker: MockFixture):
         stage,
         run_workflow,
     )
-
-    def mock_create_cohort() -> Cohort:
-        c = Cohort()
-        ds = c.create_dataset('my_dataset')
-        ds.add_sample('CPG01', external_id='SAMPLE1')
-        ds.add_sample('CPG02', external_id='SAMPLE2')
-        return c
-
-    mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
 
     output_path = to_path(dataset_path('cohort.tsv'))
 
@@ -108,3 +115,20 @@ def test_workflow(mocker: MockFixture):
         result = f.read()
         print(result)
         assert result.split() == ['CPG01_done', 'CPG02_done'], result
+
+
+def test_path_walk():
+    """
+    tests the recursive path walk to find all stage outputs
+    the recursive method can unpack any nested structure
+    end result is a set of all Paths
+    Note: Strings in this dict are not turned into Paths
+    """
+
+    exp = {
+        'a': to_path('this.txt'),
+        'b': [to_path('that.txt'), {'c': to_path('the_other.txt')}],
+        'd': 'string.txt',
+    }
+    act = path_walk(exp, set())
+    assert act == {to_path('this.txt'), to_path('that.txt'), to_path('the_other.txt')}
