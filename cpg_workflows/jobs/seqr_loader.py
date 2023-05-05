@@ -224,11 +224,11 @@ def cohort_to_vcf_job(
     Take the single-dataset MT, and write to a VCF
 
     Args:
-        b ():
-        mt_path ():
-        out_vcf_path ():
-        job_attrs ():
-        depends_on ():
+        b (hb.Batch): the batch to add jobs into
+        mt_path (str): path of the AnnotateDataset MT
+        out_vcf_path (str): path to write new VCF to
+        job_attrs (dict):
+        depends_on (hb.Job|list[hb.Job]): jobs to depend on
 
     Returns:
         this single Job
