@@ -218,7 +218,8 @@ def cohort_to_vcf_job(
     mt_path: Path,
     out_vcf_path: Path,
     job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None):
+    depends_on: list[Job] | None = None
+):
     """
     Take the single-dataset MT, and write to a VCF
 

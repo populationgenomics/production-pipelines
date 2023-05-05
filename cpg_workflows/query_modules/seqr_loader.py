@@ -227,7 +227,7 @@ def subset_mt_to_samples(mt_path, sample_ids, out_mt_path):
     logging.info(f'Written {out_mt_path}')
 
 
-def vcf_from_mt_subset(mt_path:str , out_vcf_path: str):
+def vcf_from_mt_subset(mt_path: str, out_vcf_path: str):
     """
     Read the MT in, and write out to a VCF
     If we wanted to translate sample IDs to external samples
