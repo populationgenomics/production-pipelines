@@ -18,7 +18,7 @@ from cpg_workflows.workflow import (
     Dataset,
     get_workflow,
 )
-from cpg_workflows.jobs.seqr_loader import annotate_cohort_jobs, annotate_dataset_jobs
+from cpg_workflows.jobs.seqr_loader import annotate_cohort_jobs, annotate_dataset_jobs, cohort_to_vcf_job
 
 from .joint_genotyping import JointGenotyping
 from .vep import Vep
@@ -86,6 +86,17 @@ def _update_meta(
     return {'type': 'annotated-dataset-callset'}
 
 
+def _dataset_vcf_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, Any]:
+    """
+    Add meta.type to custom analysis object
+
+    TODO: Replace this once dynamic analysis types land in metamist.
+    """
+    return {'type': 'dataset-vcf'}
+
+
 @stage(
     required_stages=[AnnotateCohort],
     analysis_type='custom',
@@ -134,6 +145,62 @@ class AnnotateDataset(DatasetStage):
 
         return self.make_outputs(
             dataset, data=self.expected_outputs(dataset), jobs=jobs
+        )
+
+
+@stage(
+    required_stages=[AnnotateDataset],
+    analysis_type='custom',
+    update_analysis_meta=_dataset_vcf_meta,
+    analysis_keys=['vcf'],
+)
+class DatasetVCF(DatasetStage):
+    """
+    Take the per-dataset MT and write out as a VCF
+    only applies to a small subset of cohorts
+    """
+
+    def expected_outputs(self, dataset: Dataset):
+        """
+        Expected to generate a VCF from the single-dataset MT
+        """
+        return {
+            'vcf': (
+                dataset.prefix()
+                / 'vcf'
+                / f'{get_workflow().output_version}-{dataset.name}.vcf.bgz'
+            ),
+            'index': (
+                dataset.prefix()
+                / 'vcf'
+                / f'{get_workflow().output_version}-{dataset.name}.vcf.bgz.tbi'
+            )
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """
+        Uses analysis-runner's dataproc helper to run a hail query script
+        only run this on manually defined list of cohorts
+        """
+        assert dataset.cohort
+
+        # only run this selectively, most datasets it's not required
+        eligible_datasets = get_config()['workflow']['write_vcf']
+        if dataset.name not in eligible_datasets:
+            return None
+
+        mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateDataset, key='mt')
+
+        job = cohort_to_vcf_job(
+            b=get_batch(),
+            mt_path=mt_path,
+            out_vcf_path=self.expected_outputs(dataset)['vcf'],
+            job_attrs=self.get_job_attrs(dataset),
+            depends_on=inputs.get_jobs(dataset),
+        )
+
+        return self.make_outputs(
+            dataset, data=self.expected_outputs(dataset), jobs=job
         )
 
 
