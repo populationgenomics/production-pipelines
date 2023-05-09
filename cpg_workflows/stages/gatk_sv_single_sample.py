@@ -16,6 +16,7 @@ from cpg_workflows.workflow import (
     Sample,
     Dataset,
 )
+from cpg_workflows.jobs import sample_batching
 
 from cpg_workflows.stages.gatk_sv import (
     add_gatk_sv_jobs,
@@ -24,6 +25,7 @@ from cpg_workflows.stages.gatk_sv import (
     get_fasta,
     get_images,
 )
+from cpg_utils.config import get_config
 
 
 @stage
@@ -200,14 +202,21 @@ class EvidenceQC(DatasetStage):
 
 
 @stage(required_stages=EvidenceQC)
-class KMeansCluster(DatasetStage):
+class CreateSampleBatches(DatasetStage):
     """
     uses the values generated in EvidenceQC, does some clustering
-
     """
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-
-        pass
+        return {'batch_json': dataset.prefix() / 'gatk_sv' / self.name.lower() / 'batches.json'}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        pass
+
+        evidence_files = inputs.as_dict_by_target(EvidenceQC)
+        expected = self.expected_outputs(dataset)
+
+        # I think this can just be a PythonJob?
+        py_job = get_batch().new_python_job('create_sample_batches')
+        py_job.image(get_config()['workflow']['driver_image'])
+        py_job.call(sample_batching.partition_batches, evidence_files['qc_table'], expected['batch_json'])
+
+        return self.make_outputs(dataset, data=expected, jobs=py_job)
