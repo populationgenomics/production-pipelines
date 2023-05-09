@@ -86,6 +86,17 @@ def _update_meta(
     return {'type': 'annotated-dataset-callset'}
 
 
+def _dataset_vcf_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, Any]:
+    """
+    Add meta.type to custom analysis object
+
+    TODO: Replace this once dynamic analysis types land in metamist.
+    """
+    return {'type': 'dataset-vcf'}
+
+
 @stage(
     required_stages=[AnnotateCohort],
     analysis_type='custom',
@@ -140,7 +151,7 @@ class AnnotateDataset(DatasetStage):
 @stage(
     required_stages=[AnnotateDataset],
     analysis_type='custom',
-    update_analysis_meta=_update_meta,
+    update_analysis_meta=_dataset_vcf_meta,
     analysis_keys=['vcf'],
 )
 class DatasetVCF(DatasetStage):
