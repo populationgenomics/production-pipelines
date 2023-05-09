@@ -40,8 +40,8 @@ def main(command: str, config_paths: list[str]):
     status = MetamistStatusReporter()
 
     if command == 'analyses':
-        from sample_metadata.apis import AnalysisApi
-        from sample_metadata.models import AnalysisQueryModel, AnalysisStatus
+        from metamist.apis import AnalysisApi
+        from metamist.models import AnalysisQueryModel, AnalysisStatus
 
         analyses = AnalysisApi().query_analyses(
             AnalysisQueryModel(

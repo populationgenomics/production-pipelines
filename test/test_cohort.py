@@ -199,31 +199,31 @@ def test_cohort(mocker: MockFixture, tmp_path):
         return []
 
     mocker.patch(
-        'sample_metadata.apis.SampleApi.get_samples',
+        'metamist.apis.SampleApi.get_samples',
         mock_get_samples,
     )
     mocker.patch(
-        'sample_metadata.apis.SequenceApi.get_sequences_by_sample_ids',
+        'metamist.apis.SequenceApi.get_sequences_by_sample_ids',
         get_sequences_by_sample_ids,
     )
     mocker.patch(
-        'sample_metadata.apis.ParticipantApi.get_external_participant_id_to_internal_sample_id',
+        'metamist.apis.ParticipantApi.get_external_participant_id_to_internal_sample_id',
         mock_get_external_participant_id_to_internal_sample_id,
     )
     mocker.patch(
-        'sample_metadata.apis.ParticipantApi.get_participants',
+        'metamist.apis.ParticipantApi.get_participants',
         mock_get_participants,
     )
     mocker.patch(
-        'sample_metadata.apis.FamilyApi.get_families',
+        'metamist.apis.FamilyApi.get_families',
         mock_get_families,
     )
     mocker.patch(
-        'sample_metadata.apis.FamilyApi.get_pedigree',
+        'metamist.apis.FamilyApi.get_pedigree',
         mock_get_pedigree,
     )
     mocker.patch(
-        'sample_metadata.apis.AnalysisApi.query_analyses',
+        'metamist.apis.AnalysisApi.query_analyses',
         mock_query_analyses,
     )
 

@@ -10,7 +10,7 @@ this issue.
 import logging
 import time
 
-from sample_metadata.apis import FamilyApi
+from metamist.apis import FamilyApi
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)

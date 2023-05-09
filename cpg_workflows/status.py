@@ -89,10 +89,10 @@ def _update_analysis_status(
     assuming output_path as input parameter
     @param output_path: remote path of the output file, to be passed to the updaters
     """
-    from sample_metadata.apis import AnalysisApi
-    from sample_metadata.models import AnalysisUpdateModel
-    from sample_metadata import exceptions
-    from sample_metadata.model.analysis_status import AnalysisStatus as MmAnalysisStatus
+    from metamist.apis import AnalysisApi
+    from metamist.models import AnalysisUpdateModel
+    from metamist import exceptions
+    from metamist.model.analysis_status import AnalysisStatus as MmAnalysisStatus
     import traceback
 
     meta: dict[str, Any] = dict()

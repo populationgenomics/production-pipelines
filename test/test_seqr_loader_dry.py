@@ -189,10 +189,10 @@ def test_seqr_loader_dry(mocker: MockFixture):
         'cpg_workflows.stages.seqr_loader.es_password', lambda: 'test-password'
     )
     mocker.patch(
-        'sample_metadata.apis.AnalysisApi.create_new_analysis',
+        'metamist.apis.AnalysisApi.create_new_analysis',
         mock_create_new_analysis,
     )
-    mocker.patch('sample_metadata.apis.AnalysisApi.update_analysis_status', do_nothing)
+    mocker.patch('metamist.apis.AnalysisApi.update_analysis_status', do_nothing)
 
     from cpg_workflows.batch import get_batch
     from cpg_workflows.inputs import get_cohort

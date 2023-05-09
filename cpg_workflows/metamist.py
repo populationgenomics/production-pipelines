@@ -10,15 +10,15 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from sample_metadata import models
-from sample_metadata.apis import (
+from metamist import models
+from metamist.apis import (
     SampleApi,
     SequenceApi,
     AnalysisApi,
     ParticipantApi,
     FamilyApi,
 )
-from sample_metadata.exceptions import ApiException
+from metamist.exceptions import ApiException
 
 from cpg_utils.config import get_config
 from cpg_utils import Path, to_path
