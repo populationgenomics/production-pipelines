@@ -317,7 +317,8 @@ class EvidenceQC(DatasetStage):
             'WGD_scores': 'WGD_scores.txt.gz',
             'bincov_matrix': 'RD.txt.gz',
             'bincov_matrix_index': 'RD.txt.gz.tbi',
-            'bincov_median': f'{dataset.name}_medianCov.transposed.bed'
+            'bincov_median': f'{dataset.name}_medianCov.transposed.bed',
+            'qc_table': '.evidence_qc_table.tsv'
         }
         for caller in SV_CALLERS:
             for k in ['low', 'high']:
