@@ -214,7 +214,7 @@ def make_combined_ped(dataset: Dataset) -> Path:
     return combined_ped_path
 
 
-@stage(required_stages=[GatherSampleEvidence])
+@stage()
 class GatherBatchEvidence(DatasetStage):
     """
     This requires restriction by Samples, and runs separately from
@@ -262,18 +262,16 @@ class GatherBatchEvidence(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """Add jobs to Batch"""
-        sids = dataset.get_sample_ids()
-
-        input_by_sid = inputs.as_dict_by_target(stage=GatherSampleEvidence)
+        samples = dataset.get_samples(only_active=True)
 
         input_dict: dict[str, Any] = {
             'batch': dataset.name,
-            'samples': sids,
+            'samples': [sam.id for sam in samples],
             'ped_file': str(make_combined_ped(dataset)),
-            'counts': [str(input_by_sid[sid]['coverage_counts']) for sid in sids],
-            'SR_files': [str(input_by_sid[sid]['pesr_split']) for sid in sids],
-            'PE_files': [str(input_by_sid[sid]['pesr_disc']) for sid in sids],
-            'SD_files': [str(input_by_sid[sid]['pesr_sd']) for sid in sids],
+            'counts': [str(sample.make_sv_evidence_path() / f'{sample.id}.coverage_counts.tsv.gz') for sample in samples],
+            'SR_files': [str(sample.make_sv_evidence_path() / f'{sample.id}.sr.txt.gz') for sample in samples],
+            'PE_files': [str(sample.make_sv_evidence_path() / f'{sample.id}.pe.txt.gz') for sample in samples],
+            'SD_files': [str(sample.make_sv_evidence_path() / f'{sample.id}.sd.txt.gz') for sample in samples],
             'ref_copy_number_autosomal_contigs': 2,
             'allosomal_contigs': ['chrX', 'chrY'],
             'gcnv_qs_cutoff': 30,
@@ -285,7 +283,7 @@ class GatherBatchEvidence(DatasetStage):
 
         for caller in SV_CALLERS:
             input_dict[f'{caller}_vcfs'] = [
-                str(input_by_sid[sid][f'{caller}_vcf']) for sid in sids
+                str(sample.make_sv_evidence_path() / f'{sample.id}.{caller}.vcf.gz') for sample in samples
             ]
 
         input_dict |= get_references(
