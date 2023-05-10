@@ -21,7 +21,7 @@ from cpg_workflows.workflow import (
     StageInput,
     Dataset,
 )
-from cpg_workflows.stages.gatk_sv_single_sample import GatherSampleEvidence, EvidenceQC
+from cpg_workflows.stages.gatk_sv_single_sample import GatherSampleEvidence
 
 
 GATK_SV_COMMIT = 'a73237cf9d9e321df3aa81c890def7b504a25c7f'
@@ -214,9 +214,12 @@ def make_combined_ped(dataset: Dataset) -> Path:
     return combined_ped_path
 
 
-@stage(required_stages=[GatherSampleEvidence, EvidenceQC])
+@stage(required_stages=[GatherSampleEvidence])
 class GatherBatchEvidence(DatasetStage):
     """
+    This requires restriction by Samples, and runs separately from
+    the initial variant calling and EvidenceQC
+
     https://github.com/broadinstitute/gatk-sv#gather-batch-evidence
     https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherBatchEvidence.wdl
     """

@@ -81,7 +81,7 @@ def batch_samples(
             raise ValueError('Batch size is too small for number of samples')
         n_per_batch = n_per_cov // batches_per_cov
 
-    # Split samples by sex, then by coverage, and order by WGD within each subset
+    # Split samples by sex, then roughly by coverage
     md_sex = {
         'male': md[~isfemale].sort_values(by='median_coverage'),
         'female': md[isfemale].sort_values(by='median_coverage'),
@@ -92,6 +92,7 @@ def batch_samples(
     i_vals = range(batches_per_cov)
     batches = {}
     for cov in range(cov_bins):
+        # Order by WGD within each subset
         submds = {
             sex: np.array_split(
                 md_sex_cov[sex][cov].sort_values(by='wgd_score'), batches_per_cov

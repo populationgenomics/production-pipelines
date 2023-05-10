@@ -168,7 +168,7 @@ class EvidenceQC(DatasetStage):
         input_dict: dict[str, Any] = {
             'batch': dataset.name,
             'samples': sids,
-            'run_vcf_qc': True,  # generates <caller>_qc_low/<caller>_qc_high
+            'run_vcf_qc': True,
             'counts': [str(d[sid]['coverage_counts']) for sid in sids],
         }
         for caller in SV_CALLERS:

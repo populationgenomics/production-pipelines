@@ -1,0 +1,87 @@
+[workflow]
+name = 'gatk_sv'
+dataset_gcp_project = 'seqr-308602'
+dataset = 'seqr'
+ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
+
+[images]
+
+cpg_workflows = "australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:pr-345"
+
+# built by the GATk-SV repo
+cnmops_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/cnmops:v0.27.0"
+cnmops_virtual_env = "australia-southeast1-docker.pkg.dev/cpg-common/images/cnmops-virtual-env:v0.27.0"
+samtools_cloud_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/samtools-cloud:v0.27.0"
+samtools_cloud_virtual_env = "australia-southeast1-docker.pkg.dev/cpg-common/images/samtools-cloud-virtual-env:v0.27.0"
+sv_base_mini_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-base-mini:v0.27.0"
+sv_base_virtual_env = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-base-virtual-env:v0.27.0"
+sv_pipeline_virtual_env = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-pipeline-virtual-env:v0.27.0"
+sv_utils_env = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-utils-env:v0.27.0"
+sv_base = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-base:v0.27.0"
+sv_base_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-base:v0.27.0"
+sv_utils = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-utils:v0.27.0"
+sv_pipeline_base_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-pipeline:v0.27.0"
+sv_pipeline_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-pipeline:v0.27.0"
+sv_pipeline_qc_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-pipeline:v0.27.0"
+
+# external (not built by the gatk-sv repo)
+cloud_sdk_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/cloud-sdk"
+condense_counts_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-57-g9e03432"
+duphold_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/duphold:mw-xz-fixes-2-b1be6a9"
+gatk_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-57-g9e03432"
+gatk_docker_concordance = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:mw-sv-concordance-937c81"
+gatk_docker_pesr_override = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-57-g9e03432"
+genomes_in_the_cloud_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/genomes-in-the-cloud:2.3.2-1510681135"
+gq_recalibrator_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:0a7e1d86f"
+igv_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/igv:mw-xz-fixes-2-b1be6a9"
+manta_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/manta:5994670"
+pangenie_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/pangenie:vj-127571f"
+scramble_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/scramble:1.0.2"
+str = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/str:5994670"
+vapor_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/vapor:header-hash-2fc8f12"
+wham_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/wham:5994670"
+linux_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/ubuntu1804"
+
+[references.broad]
+unpadded_intervals_file = 'gs://cpg-common-main/references/hg38/v0/hg38.even.handcurated.20k.intervals'
+
+[references.broad.sv.resources]
+wham_include_list_bed_file = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/wham_whitelist.bed'
+primary_contigs_list = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/primary_contigs.list'
+primary_contigs_fai = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/contig.fai'
+preprocessed_intervals = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/preprocessed_intervals.interval_list'
+manta_region_bed = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/primary_contigs_plus_mito.bed.gz'
+melt_standard_vcf_header = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/melt_standard_vcf_header.txt'
+genome_file = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.genome'
+wgd_scoring_mask = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/wgd_scoring_mask.hg38.gnomad_v3.bed'
+allosomal_contigs = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/allosome.fai'
+contig_ploidy_priors = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.contig_ploidy_priors_homo_sapiens.tsv'
+inclusion_bed = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38_primary_contigs.bed'
+autosome_file = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/autosome.fai'
+allosome_file = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/allosome.fai'
+cnmops_exclude_list = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/GRCh38_Nmask.bed'
+cytoband = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/cytobands_hg38.bed.gz'
+mei_bed = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/mei_hg38.bed.gz'
+rmsk = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.randomForest_blacklist.withRepMask.bed.gz'
+segdups = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.SD_gaps_Cen_Tel_Heter_Satellite_lumpy.blacklist.sorted.merged.bed.gz'
+seed_cutoffs = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/seed_cutoff.txt'
+pesr_exclude_list = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/PESR.encode.peri_all.repeats.delly.hg38.blacklist.sorted.bed.gz'
+depth_exclude_list = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/depth_blacklist.sorted.bed.gz'
+bin_exclude = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/bin_exclude.hg38.gatkcov.bed.gz'
+empty_file = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/empty.file'
+protein_coding_gtf = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/MANE.GRCh38.v0.95.select_ensembl_genomic.gtf'
+
+[references.broad.sv.ref_panel]
+ped_file = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/1KG/v1/ped/1kg_ref_panel_v1.ped'
+clean_vcf = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/1KG/v1/calls/ref_panel_1kg_v1.cleaned.vcf.gz'
+ref_panel_bincov_matrix = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/1KG/v1/merged_evidence/ref_panel_1kg_v1.bincov.bed.gz'
+qc_definitions = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/1KG/v2/single_sample.qc_definitions.tsv'
+contig_ploidy_model_tar = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/1KG/v2/gcnv/ref_panel_1kg_v2-contig-ploidy-model.tar.gz'
+model_tar_tmpl = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/1KG/v2/gcnv/model_files/ref_panel_1kg_v2-gcnv-model-shard-{shard}.tar.gz'
+ref_panel_PE_file_tmpl = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/tws_SVEvidence/pe/{sample}.pe.txt.gz'
+ref_panel_SR_file_tmpl = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/tws_SVEvidence/sr/{sample}.sr.txt.gz'
+ref_panel_SD_file_tmpl = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/tws_SVEvidence/sd/{sample}.sd.txt.gz'
+
+[sv_ref_panel]
+ref_panel_samples = ['HG00096', 'HG00129', 'HG00140', 'HG00150', 'HG00187', 'HG00239', 'HG00277', 'HG00288', 'HG00337', 'HG00349', 'HG00375', 'HG00410', 'HG00457', 'HG00557', 'HG00599', 'HG00625', 'HG00701', 'HG00740', 'HG00844', 'HG01060', 'HG01085', 'HG01112', 'HG01275', 'HG01325', 'HG01344', 'HG01356', 'HG01384', 'HG01393', 'HG01396', 'HG01474', 'HG01507', 'HG01572', 'HG01607', 'HG01709', 'HG01747', 'HG01790', 'HG01794', 'HG01799', 'HG01861', 'HG01874', 'HG01880', 'HG01885', 'HG01958', 'HG01982', 'HG02002', 'HG02010', 'HG02019', 'HG02020', 'HG02069', 'HG02085', 'HG02186', 'HG02221', 'HG02235', 'HG02272', 'HG02275', 'HG02299', 'HG02332', 'HG02367', 'HG02374', 'HG02489', 'HG02490', 'HG02491', 'HG02586', 'HG02588', 'HG02611', 'HG02620', 'HG02642', 'HG02648', 'HG02658', 'HG02855', 'HG02953', 'HG03007', 'HG03009', 'HG03085', 'HG03099', 'HG03100', 'HG03111', 'HG03369', 'HG03370', 'HG03436', 'HG03449', 'HG03472', 'HG03476', 'HG03556', 'HG03604', 'HG03649', 'HG03684', 'HG03694', 'HG03709', 'HG03722', 'HG03727', 'HG03744', 'HG03756', 'HG03789', 'HG03850', 'HG03864', 'HG03872', 'HG03888', 'HG04118', 'HG04158', 'HG04161', 'HG04183', 'NA06984', 'NA10847', 'NA11894', 'NA12340', 'NA12489', 'NA12872', 'NA18499', 'NA18507', 'NA18530', 'NA18539', 'NA18549', 'NA18553', 'NA18560', 'NA18638', 'NA18923', 'NA18941', 'NA18945', 'NA18956', 'NA18995', 'NA19001', 'NA19035', 'NA19062', 'NA19102', 'NA19143', 'NA19184', 'NA19350', 'NA19351', 'NA19377', 'NA19443', 'NA19449', 'NA19661', 'NA19678', 'NA19679', 'NA19684', 'NA19746', 'NA19795', 'NA19818', 'NA19913', 'NA20126', 'NA20320', 'NA20321', 'NA20346', 'NA20509', 'NA20510', 'NA20522', 'NA20752', 'NA20764', 'NA20802', 'NA20845', 'NA20869', 'NA20895', 'NA21102', 'NA21122', 'NA21133']
+model_tar_cnt = 285
