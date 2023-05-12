@@ -11,10 +11,10 @@ from cpg_workflows.workflow import (
     stage,
     SampleStage,
     StageOutput,
-    DatasetStage,
     StageInput,
     Sample,
-    Dataset,
+    Cohort,
+    CohortStage
 )
 from cpg_workflows.jobs import sample_batching
 
@@ -131,16 +131,15 @@ class GatherSampleEvidence(SampleStage):
 
 
 @stage(required_stages=GatherSampleEvidence)
-class EvidenceQC(DatasetStage):
+class EvidenceQC(CohortStage):
     """
     https://github.com/broadinstitute/gatk-sv#evidenceqc
     """
 
-    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         """
         Expected to return a bunch of batch-level summary files.
         """
-        d: dict[str, Path] = dict()
         fname_by_key = {
             'ploidy_matrix': 'ploidy_matrix.bed.gz',
             'ploidy_plots': 'ploidy_plots.tar.gz',
@@ -149,24 +148,21 @@ class EvidenceQC(DatasetStage):
             'WGD_scores': 'WGD_scores.txt.gz',
             'bincov_matrix': 'RD.txt.gz',
             'bincov_matrix_index': 'RD.txt.gz.tbi',
-            'bincov_median': f'{dataset.name}_medianCov.transposed.bed',
-            'qc_table': f'{dataset.name}_evidence_qc_table.tsv'
+            'bincov_median': 'medianCov.transposed.bed',
+            'qc_table': 'evidence_qc_table.tsv'
         }
         for caller in SV_CALLERS:
             for k in ['low', 'high']:
                 fname_by_key[f'{caller}_qc_{k}'] = f'{caller}_QC.outlier.{k}'
 
-        for key, fname in fname_by_key.items():
-            d[key] = dataset.prefix() / 'gatk_sv' / self.name.lower() / fname
-        return d
+        return {k: self.prefix / fname for k, fname in fname_by_key.items()}
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         d = inputs.as_dict_by_target(GatherSampleEvidence)
-
-        sids = dataset.get_sample_ids()
+        sids = cohort.get_sample_ids()
 
         input_dict: dict[str, Any] = {
-            'batch': dataset.name,
+            'batch': cohort.analysis_dataset,
             'samples': sids,
             'run_vcf_qc': True,
             'counts': [str(d[sid]['coverage_counts']) for sid in sids],
@@ -191,33 +187,37 @@ class EvidenceQC(DatasetStage):
             ]
         )
 
-        expected_d = self.expected_outputs(dataset)
+        expected_d = self.expected_outputs(cohort)
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
-            dataset=dataset,
+            dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
         )
-        return self.make_outputs(dataset, data=expected_d, jobs=jobs)
+        return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
 @stage(required_stages=EvidenceQC)
-class CreateSampleBatches(DatasetStage):
+class CreateSampleBatches(CohortStage):
     """
     uses the values generated in EvidenceQC, does some clustering
     """
-    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'batch_json': dataset.prefix() / 'gatk_sv' / self.name.lower() / 'batches.json'}
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {'batch_json': self.prefix / 'batches.json'}
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
 
         evidence_files = inputs.as_dict_by_target(EvidenceQC)
-        expected = self.expected_outputs(dataset)
+        expected = self.expected_outputs(cohort)
 
         # I think this can just be a PythonJob?
         py_job = get_batch().new_python_job('create_sample_batches')
         py_job.image(get_config()['workflow']['driver_image'])
-        py_job.call(sample_batching.partition_batches, evidence_files['qc_table'], expected['batch_json'])
+        py_job.call(
+            sample_batching.partition_batches,
+            evidence_files['qc_table'],
+            expected['batch_json']
+        )
 
-        return self.make_outputs(dataset, data=expected, jobs=py_job)
+        return self.make_outputs(cohort, data=expected, jobs=py_job)
