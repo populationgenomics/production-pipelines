@@ -14,7 +14,7 @@ from cpg_workflows.workflow import (
     StageInput,
     Sample,
     Cohort,
-    CohortStage
+    CohortStage,
 )
 from cpg_workflows.jobs import sample_batching
 
@@ -49,7 +49,8 @@ class GatherSampleEvidence(SampleStage):
         no suitable codecs found".
         """
         d: dict[str, Path] = {
-            'coverage_counts': sample.make_sv_evidence_path() / f'{sample.id}.coverage_counts.tsv.gz',
+            'coverage_counts': sample.make_sv_evidence_path()
+            / f'{sample.id}.coverage_counts.tsv.gz',
             # split reads
             'pesr_split': sample.make_sv_evidence_path() / f'{sample.id}.sr.txt.gz',
             'pesr_split_index': sample.make_sv_evidence_path()
@@ -149,7 +150,7 @@ class EvidenceQC(CohortStage):
             'bincov_matrix': 'RD.txt.gz',
             'bincov_matrix_index': 'RD.txt.gz.tbi',
             'bincov_median': 'medianCov.transposed.bed',
-            'qc_table': 'evidence_qc_table.tsv'
+            'qc_table': 'evidence_qc_table.tsv',
         }
         for caller in SV_CALLERS:
             for k in ['low', 'high']:
@@ -203,11 +204,11 @@ class CreateSampleBatches(CohortStage):
     """
     uses the values generated in EvidenceQC, does some clustering
     """
+
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {'batch_json': self.prefix / 'batches.json'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-
         evidence_files = inputs.as_dict_by_target(EvidenceQC)
         expected = self.expected_outputs(cohort)
 
@@ -217,7 +218,7 @@ class CreateSampleBatches(CohortStage):
         py_job.call(
             sample_batching.partition_batches,
             evidence_files['qc_table'],
-            expected['batch_json']
+            expected['batch_json'],
         )
 
         return self.make_outputs(cohort, data=expected, jobs=py_job)

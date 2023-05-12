@@ -129,7 +129,6 @@ class Cohort(Target):
         """Unique target ID"""
         return self.name
 
-
     def write_ped_file(
         self, out_path: Path | None = None, use_participant_id: bool = False
     ) -> Path:
@@ -147,13 +146,16 @@ class Cohort(Target):
         df = pd.DataFrame(datas)
 
         if out_path is None:
-            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.alignment_inputs_hash()}.ped'
+            out_path = (
+                self.analysis_dataset.tmp_prefix()
+                / 'ped'
+                / f'{self.alignment_inputs_hash()}.ped'
+            )
 
         if not get_config()['workflow'].get('dry_run', False):
             with out_path.open('w') as fp:
                 df.to_csv(fp, sep='\t', index=False, header=False)
         return out_path
-
 
     def get_datasets(self, only_active: bool = True) -> list['Dataset']:
         """

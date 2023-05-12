@@ -20,7 +20,7 @@ def batch_samples(
     batch_size: int = 200,
     min_batch_size: int = 100,
     max_batch_size: int = 300,
-    cov_bins: int = 1
+    cov_bins: int = 1,
 ):
     """
     Batch samples by coverage, dosage bias, and chrX ploidy

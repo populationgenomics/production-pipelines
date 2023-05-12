@@ -21,7 +21,12 @@ from cpg_workflows.workflow import (
     StageInput,
     Dataset,
     Cohort,
-    CohortStage
+)
+
+from cpg_workflows.stages.gatk_sv.gatk_multisample_1 import (
+    FilterBatch,
+    GenotypeBatch,
+    GatherBatchEvidence,
 )
 
 GATK_SV_COMMIT = 'a73237cf9d9e321df3aa81c890def7b504a25c7f'
@@ -251,7 +256,7 @@ class MakeCohortVcf(DatasetStage):
             # 'complex_resolve_vcf_index': '.complex_resolve.vcf.gz.tbi',
             # 'complex_genotype_vcf': '.complex_genotype.vcf.gz',
             # 'complex_genotype_vcf_index': '.complex_genotype.vcf.gz.tbi',
-            'metrics_file_makecohortvcf': '.metrics.tsv'
+            'metrics_file_makecohortvcf': '.metrics.tsv',
         }
         d: dict[str, Path] = {}
         for key, ending in ending_by_key.items():
@@ -295,7 +300,9 @@ class MakeCohortVcf(DatasetStage):
             'bincov_files': [batchevidence_d['merged_bincov']],
             'raw_sr_bothside_pass_files': [genotypebatch_d['sr_bothside_pass']],
             'raw_sr_background_fail_files': [genotypebatch_d['sr_background_fail']],
-            'depth_gt_rd_sep_files': [genotypebatch_d['trained_genotype_depth_depth_sepcutoff']],
+            'depth_gt_rd_sep_files': [
+                genotypebatch_d['trained_genotype_depth_depth_sepcutoff']
+            ],
             'median_coverage_files': [batchevidence_d['median_cov']],
             'rf_cutoff_files': [filterbatch_d['cutoffs']],
         }
@@ -363,7 +370,6 @@ class AnnotateVcf(DatasetStage):
         return d
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
-
         make_vcf_d = inputs.as_dict(dataset, MakeCohortVcf)
 
         input_dict: dict[str, Any] = {
@@ -373,7 +379,7 @@ class AnnotateVcf(DatasetStage):
             'ped_file': make_combined_ped(dataset),
             'sv_per_shard': 5000,
             'max_shards_per_chrom_step1': 200,
-            'min_records_per_shard_step1': 5000
+            'min_records_per_shard_step1': 5000,
         }
         input_dict |= get_references(
             [
