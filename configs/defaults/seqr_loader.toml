@@ -22,6 +22,8 @@ use_as_vqsr = true
 # create indices for all input datasets.
 #create_es_index_for_datasets = []
 
+write_vcf = ["udn-aus", "validation"]
+
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
 # sensitivities. The tool matches them internally to a VQSLOD score cutoff 
