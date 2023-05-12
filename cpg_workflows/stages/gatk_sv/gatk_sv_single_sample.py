@@ -18,7 +18,7 @@ from cpg_workflows.workflow import (
 )
 from cpg_workflows.jobs import sample_batching
 
-from cpg_workflows.stages.gatk_sv import (
+from cpg_workflows.stages.gatk_sv.gatk_sv import (
     add_gatk_sv_jobs,
     SV_CALLERS,
     get_references,
@@ -155,7 +155,7 @@ class EvidenceQC(CohortStage):
             for k in ['low', 'high']:
                 fname_by_key[f'{caller}_qc_{k}'] = f'{caller}_QC.outlier.{k}'
 
-        return {k: self.prefix / fname for k, fname in fname_by_key.items()}
+        return {key: self.prefix / fname for key, fname in fname_by_key.items()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         d = inputs.as_dict_by_target(GatherSampleEvidence)
