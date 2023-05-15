@@ -13,21 +13,8 @@ from hailtop.batch.job import Job
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config, ConfigError
 from cpg_utils.hail_batch import command, reference_path, image_path
-from cpg_workflows.batch import make_job_name, Batch, get_batch
-from cpg_workflows.workflow import (
-    stage,
-    StageOutput,
-    DatasetStage,
-    StageInput,
-    Dataset,
-    Cohort,
-)
-
-from cpg_workflows.stages.gatk_sv.gatk_multisample_1 import (
-    FilterBatch,
-    GenotypeBatch,
-    GatherBatchEvidence,
-)
+from cpg_workflows.batch import make_job_name, Batch
+from cpg_workflows.workflow import Dataset, Cohort
 
 GATK_SV_COMMIT = 'a73237cf9d9e321df3aa81c890def7b504a25c7f'
 SV_CALLERS = ['manta', 'wham', 'scramble']
