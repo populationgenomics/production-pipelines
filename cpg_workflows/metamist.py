@@ -13,12 +13,14 @@ from typing import Optional
 from metamist import models
 from metamist.apis import (
     SampleApi,
-    SequenceApi,
+    # SequenceApi,
     AnalysisApi,
     ParticipantApi,
     FamilyApi,
 )
 from metamist.exceptions import ApiException
+
+from metamist.graphql import gql, query, validate
 
 from cpg_utils.config import get_config
 from cpg_utils import Path, to_path
@@ -155,7 +157,7 @@ class Metamist:
         self.default_dataset: str = get_config()['workflow']['dataset']
         self.sapi = SampleApi()
         self.aapi = AnalysisApi()
-        self.seqapi = SequenceApi()
+        # self.seqapi = SequenceApi()
         self.papi = ParticipantApi()
         self.fapi = FamilyApi()
 
@@ -180,6 +182,28 @@ class Metamist:
             skip_samples=skip_samples,
             only_samples=only_samples,
         )
+
+        get_sequencing_groups_query = gql(
+            """
+        query MyQuery($metamist_proj: String!) {
+            project(name: $metamist_proj) {
+                sequencingGroups {
+                    id
+                    meta
+                    platform
+                    technology
+                    type
+                }
+            }
+        }
+        """
+        )
+
+        validate(get_sequencing_groups_query, use_local_schema=True)
+        sequencing_group_entries = query(
+            get_sequencing_groups_query, {'metamist_proj': [metamist_proj]}
+        )
+
         return sample_entries
 
     def get_sequence_entries_by_sid(
