@@ -11,13 +11,7 @@ from typing import Any
 
 from cpg_utils import Path
 from cpg_workflows.batch import get_batch
-from cpg_workflows.workflow import (
-    stage,
-    StageOutput,
-    StageInput,
-    Cohort,
-    CohortStage
-)
+from cpg_workflows.workflow import stage, StageOutput, StageInput, Cohort, CohortStage
 
 from cpg_workflows.stages.gatk_sv.gatk_sv import (
     add_gatk_sv_jobs,
@@ -26,9 +20,8 @@ from cpg_workflows.stages.gatk_sv.gatk_sv import (
     get_references,
     get_ref_panel,
     make_combined_ped,
-    SV_CALLERS
+    SV_CALLERS,
 )
-
 
 
 @stage
@@ -42,7 +35,7 @@ class GatherBatchEvidence(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        d: dict[str, Path] = dict()
+        """create the output paths for GatherBatchEvidence"""
         ending_by_key = {
             'cnmops_dup': 'DUP.header.bed.gz',
             'cnmops_dup_index': 'DUP.header.bed.gz.tbi',
@@ -82,10 +75,25 @@ class GatherBatchEvidence(CohortStage):
             'batch': cohort.name,
             'samples': [sam.id for sam in samples],
             'ped_file': str(make_combined_ped(cohort, self.prefix)),
-            'counts': [str(sample.make_sv_evidence_path() / f'{sample.id}.coverage_counts.tsv.gz') for sample in samples],
-            'SR_files': [str(sample.make_sv_evidence_path() / f'{sample.id}.sr.txt.gz') for sample in samples],
-            'PE_files': [str(sample.make_sv_evidence_path() / f'{sample.id}.pe.txt.gz') for sample in samples],
-            'SD_files': [str(sample.make_sv_evidence_path() / f'{sample.id}.sd.txt.gz') for sample in samples],
+            'counts': [
+                str(
+                    sample.make_sv_evidence_path()
+                    / f'{sample.id}.coverage_counts.tsv.gz'
+                )
+                for sample in samples
+            ],
+            'SR_files': [
+                str(sample.make_sv_evidence_path() / f'{sample.id}.sr.txt.gz')
+                for sample in samples
+            ],
+            'PE_files': [
+                str(sample.make_sv_evidence_path() / f'{sample.id}.pe.txt.gz')
+                for sample in samples
+            ],
+            'SD_files': [
+                str(sample.make_sv_evidence_path() / f'{sample.id}.sd.txt.gz')
+                for sample in samples
+            ],
             'ref_copy_number_autosomal_contigs': 2,
             'allosomal_contigs': ['chrX', 'chrY'],
             'gcnv_qs_cutoff': 30,
@@ -97,7 +105,8 @@ class GatherBatchEvidence(CohortStage):
 
         for caller in SV_CALLERS:
             input_dict[f'{caller}_vcfs'] = [
-                str(sample.make_sv_evidence_path() / f'{sample.id}.{caller}.vcf.gz') for sample in samples
+                str(sample.make_sv_evidence_path() / f'{sample.id}.{caller}.vcf.gz')
+                for sample in samples
             ]
 
         input_dict |= get_references(
@@ -416,7 +425,6 @@ class GenotypeBatch(CohortStage):
         return {key: self.prefix / fname for key, fname in ending_by_key.items()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-
         filterbatch_d = inputs.as_dict(cohort, FilterBatch)
         batchevidence_d = inputs.as_dict(cohort, GatherBatchEvidence)
 
@@ -433,9 +441,8 @@ class GenotypeBatch(CohortStage):
             'splitfile_index': batchevidence_d['merged_SR_index'],
             'medianfile': batchevidence_d['median_cov'],
             'rf_cutoffs': filterbatch_d['cutoffs'],
-            # instead of pulling from reference:
             'ref_dict': str(get_fasta().with_suffix('.dict')),
-            'reference_build': 'hg38'
+            'reference_build': 'hg38',
         }
 
         for mode in ['pesr', 'depth']:
@@ -450,12 +457,7 @@ class GenotypeBatch(CohortStage):
             ]
         )
         input_dict |= get_references(
-            [
-                'primary_contigs_list',
-                'bin_exclude',
-                'seed_cutoffs',
-                'pesr_exclude_list'
-            ]
+            ['primary_contigs_list', 'bin_exclude', 'seed_cutoffs', 'pesr_exclude_list']
         )
 
         expected_d = self.expected_outputs(cohort)
