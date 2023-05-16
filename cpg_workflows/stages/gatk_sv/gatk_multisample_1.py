@@ -78,21 +78,21 @@ class GatherBatchEvidence(CohortStage):
             'ped_file': str(make_combined_ped(cohort, self.prefix)),
             'counts': [
                 str(
-                    sample.make_sv_evidence_path()
+                    sample.make_sv_evidence_path
                     / f'{sample.id}.coverage_counts.tsv.gz'
                 )
                 for sample in samples
             ],
             'SR_files': [
-                str(sample.make_sv_evidence_path() / f'{sample.id}.sr.txt.gz')
+                str(sample.make_sv_evidence_path / f'{sample.id}.sr.txt.gz')
                 for sample in samples
             ],
             'PE_files': [
-                str(sample.make_sv_evidence_path() / f'{sample.id}.pe.txt.gz')
+                str(sample.make_sv_evidence_path / f'{sample.id}.pe.txt.gz')
                 for sample in samples
             ],
             'SD_files': [
-                str(sample.make_sv_evidence_path() / f'{sample.id}.sd.txt.gz')
+                str(sample.make_sv_evidence_path / f'{sample.id}.sd.txt.gz')
                 for sample in samples
             ],
             'ref_copy_number_autosomal_contigs': 2,
@@ -106,7 +106,7 @@ class GatherBatchEvidence(CohortStage):
 
         for caller in SV_CALLERS:
             input_dict[f'{caller}_vcfs'] = [
-                str(sample.make_sv_evidence_path() / f'{sample.id}.{caller}.vcf.gz')
+                str(sample.make_sv_evidence_path / f'{sample.id}.{caller}.vcf.gz')
                 for sample in samples
             ]
 
