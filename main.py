@@ -17,6 +17,7 @@ from cpg_workflows.stages.cram_qc import CramMultiQC
 from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.seqr_loader import MtToEs, AnnotateDataset, DatasetVCF
+from cpg_workflows.stages.gatk_sv.gatk_multisample_1 import FilterBatch, GenotypeBatch, MergeBatchSites
 from cpg_workflows.stages.gatk_sv.gatk_multisample_2 import AnnotateVcf
 from cpg_workflows.stages.gatk_sv.gatk_sv_single_sample import CreateSampleBatches
 from cpg_workflows.stages.stripy import Stripy
@@ -26,8 +27,9 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'pre_alignment': [FastQCMultiQC],
     'seqr_loader': [DatasetVCF, AnnotateDataset, MtToEs, GvcfMultiQC, CramMultiQC, Stripy],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
-    'gatk_singlesample': [AnnotateVcf],
-    'gatk_multisample_1': [CreateSampleBatches],
+    'gatk_singlesample': [CreateSampleBatches],
+    'gatk_multisample_1': [FilterBatch, GenotypeBatch],
+    'gatk_sandwich': [MergeBatchSites],  # stage to run between FilterBatch & GenotypeBatch
     'gatk_multisample_2': [AnnotateVcf],
 }
 

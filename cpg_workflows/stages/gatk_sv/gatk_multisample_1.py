@@ -10,6 +10,7 @@ across batches between FilterBatch and GenotypeBatch
 from typing import Any
 
 from cpg_utils import Path
+from cpg_utils.config import get_config
 from cpg_workflows.batch import get_batch
 from cpg_workflows.workflow import stage, StageOutput, StageInput, Cohort, CohortStage
 
@@ -313,17 +314,20 @@ class FilterBatch(CohortStage):
         * Filtered SV (non-depth-only a.k.a. "PESR") VCF with outlier samples excluded
         * Filtered depth-only call VCF with outlier samples excluded
         * Random forest cutoffs file
-        * PED file with outlier samples excluded"""
+        * PED file with outlier samples excluded
+        """
+
         ending_by_key: dict = {
             'metrics_file_filterbatch': 'metrics.tsv',
-            'filtered_pesr_vcf': 'filtered-pesr-merged.vcf.gz',
+            'filtered_pesr_vcf': 'filtered_pesr_merged.vcf.gz',
+            'filtered_depth_vcf': 'filtered_depth_merged.vcf.gz',
             'cutoffs': 'cutoffs',
             'scores': 'updated_scores',
             'RF_intermediate_files': 'RF_intermediate_files.tar.gz',
             'outlier_samples_excluded_file': 'outliers.samples.list',
             'batch_samples_postOutlierExclusion_file': 'outliers_excluded.samples.list',
         }
-        for caller in SV_CALLERS + ['depth']:
+        for caller in SV_CALLERS:
             ending_by_key[f'filtered_{caller}_vcf'] = f'filtered-{caller}.vcf.gz'
 
             # unsure why, scramble doesn't export this file
@@ -376,6 +380,57 @@ class FilterBatch(CohortStage):
             ]
         )
 
+        expected_d = self.expected_outputs(cohort)
+        jobs = add_gatk_sv_jobs(
+            batch=get_batch(),
+            dataset=cohort.analysis_dataset,
+            wfl_name=self.name,
+            input_dict=input_dict,
+            expected_out_dict=expected_d,
+        )
+        return self.make_outputs(cohort, data=expected_d, jobs=jobs)
+
+
+@stage
+class MergeBatchSites(CohortStage):
+    """
+    I'm adding these here as it logically sits between FilterBatch and GenotypeBatch
+    Though it runs independently, with input and output for this stage communicated
+    via config (at least until the more complex batching/cohort logic comes along)
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict:
+        """
+        generate them there outputs
+        """
+        return {
+            'cohort_pesr_vcf': self.prefix / 'cohort_pesr.vcf.gz',
+            'cohort_depth_vcf': self.prefix / 'cohort_depth.vcf.gz',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        """
+        geberate the required jerbs
+        """
+
+        batch_names = get_config()['workflow']['batch_names']
+        batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_multisample_1'
+        pesr_vcfs = [
+            batch_prefix / batch_name / 'FilterBatch' / 'filtered_pesr_merged.vcf.gz'
+            for batch_name in batch_names
+        ]
+        depth_vcfs = [
+            batch_prefix / batch_name / 'FilterBatch' / 'filtered_depth_merged.vcf.gz'
+            for batch_name in batch_names
+        ]
+
+        input_dict: dict[str, Any] = {
+            'batch': cohort.name,
+            'cohort': cohort.name,
+            'depth_vcfs': depth_vcfs,
+            'pesr_vcfs': pesr_vcfs,
+        }
+        input_dict |= get_images(['sv_pipeline_docker'])
         expected_d = self.expected_outputs(cohort)
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
@@ -445,16 +500,15 @@ class GenotypeBatch(CohortStage):
             'reference_build': 'hg38',
         }
 
+        # pull out the merged VCF from MergeBatchSites
         for mode in ['pesr', 'depth']:
             input_dict[f'batch_{mode}_vcf'] = filterbatch_d[f'filtered_{mode}_vcf']
-            input_dict[f'cohort_{mode}_vcf'] = filterbatch_d[f'filtered_{mode}_vcf']
+            input_dict[f'cohort_{mode}_vcf'] = get_config()['workflow'][
+                f'cohort_{mode}_vcf'
+            ]
 
         input_dict |= get_images(
-            [
-                'sv_pipeline_docker',
-                'sv_base_mini_docker',
-                'linux_docker',
-            ]
+            ['sv_pipeline_docker', 'sv_base_mini_docker', 'linux_docker']
         )
         input_dict |= get_references(
             ['primary_contigs_list', 'bin_exclude', 'seed_cutoffs', 'pesr_exclude_list']

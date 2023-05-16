@@ -50,10 +50,9 @@ class MakeCohortVcf(CohortStage):
         This is a little bit spicy. Instead of taking a direct dependency on the
         previous stage, we use the output hash to find all the previous batches
 
-        This shouldn't be done, but i'm shoving it here for completion
+        Replacing this nasty mess with nested/fancy cohorts would be ace
         """
 
-        # hmmmmmm, what to do here...
         batch_names = get_config()['workflow']['batch_names']
         batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_multisample_1'
         pesr_vcfs = [

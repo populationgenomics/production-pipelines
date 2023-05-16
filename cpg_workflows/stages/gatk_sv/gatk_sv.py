@@ -1,6 +1,8 @@
 """
-Driver for computing structural variants from GATK-SV from WGS data.
+Common methods for all GATK-SV workflows
 """
+
+
 from os.path import join
 from typing import Any
 
@@ -15,6 +17,7 @@ from cpg_utils.config import get_config, ConfigError
 from cpg_utils.hail_batch import command, reference_path, image_path
 from cpg_workflows.batch import make_job_name, Batch
 from cpg_workflows.workflow import Dataset, Cohort
+
 
 GATK_SV_COMMIT = 'a73237cf9d9e321df3aa81c890def7b504a25c7f'
 SV_CALLERS = ['manta', 'wham', 'scramble']
@@ -198,16 +201,3 @@ def make_combined_ped(cohort: Cohort, prefix: Path) -> Path:
         with reference_path('gatk_sv/ped_file').open() as f:
             out.write(f.read())
     return combined_ped_path
-
-
-# @stage(required_stages=GenotypeBatch)
-# class RegenotypeCNVs(DatasetStage):
-#     """
-#     Optional, Re-genotypes probable mosaic variants across multiple batches.
-#     """
-#
-#     def expected_outputs(self, dataset: Dataset) -> dict:
-#         pass
-#
-#     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
-#         pass

@@ -1,0 +1,7 @@
+[workflow]
+name = 'gatk_sandwich'
+dataset_gcp_project = 'seqr-308602'
+dataset = 'seqr'
+
+[images]
+sv_pipeline_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv-pipeline:v0.27.0"
