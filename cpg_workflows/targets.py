@@ -607,6 +607,7 @@ class Sample(Target):
         """
         return GvcfPath(self.dataset.prefix() / 'gvcf' / f'{self.id}.g.vcf.gz')
 
+    @property
     def make_sv_evidence_path(self) -> Path:
         """
         Path to the evidence root for GATK-SV evidence files.

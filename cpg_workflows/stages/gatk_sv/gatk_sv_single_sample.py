@@ -49,29 +49,29 @@ class GatherSampleEvidence(SampleStage):
         no suitable codecs found".
         """
         d: dict[str, Path] = {
-            'coverage_counts': sample.make_sv_evidence_path()
+            'coverage_counts': sample.make_sv_evidence_path
             / f'{sample.id}.coverage_counts.tsv.gz',
             # split reads
-            'pesr_split': sample.make_sv_evidence_path() / f'{sample.id}.sr.txt.gz',
-            'pesr_split_index': sample.make_sv_evidence_path()
+            'pesr_split': sample.make_sv_evidence_path / f'{sample.id}.sr.txt.gz',
+            'pesr_split_index': sample.make_sv_evidence_path
             / f'{sample.id}.sr.txt.gz.tbi',
             # site depth
-            'pesr_sd': sample.make_sv_evidence_path() / f'{sample.id}.sd.txt.gz',
-            'pesr_sd_index': sample.make_sv_evidence_path()
+            'pesr_sd': sample.make_sv_evidence_path / f'{sample.id}.sd.txt.gz',
+            'pesr_sd_index': sample.make_sv_evidence_path
             / f'{sample.id}.sd.txt.gz.tbi',
             # discordant paired reads
-            'pesr_disc': sample.make_sv_evidence_path() / f'{sample.id}.pe.txt.gz',
-            'pesr_disc_index': sample.make_sv_evidence_path()
+            'pesr_disc': sample.make_sv_evidence_path / f'{sample.id}.pe.txt.gz',
+            'pesr_disc_index': sample.make_sv_evidence_path
             / f'{sample.id}.pe.txt.gz.tbi',
         }
 
         # Caller's VCFs
         for caller in SV_CALLERS:
             d[f'{caller}_vcf'] = (
-                sample.make_sv_evidence_path() / f'{sample.id}.{caller}.vcf.gz'
+                sample.make_sv_evidence_path / f'{sample.id}.{caller}.vcf.gz'
             )
             d[f'{caller}_index'] = (
-                sample.make_sv_evidence_path() / f'{sample.id}.{caller}.vcf.gz.tbi'
+                sample.make_sv_evidence_path / f'{sample.id}.{caller}.vcf.gz.tbi'
             )
 
         return d
