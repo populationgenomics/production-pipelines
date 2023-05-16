@@ -22,7 +22,7 @@ from cpg_utils.hail_batch import (
 _batch: Optional['Batch'] = None
 
 
-def get_batch(name: str | None = None) -> 'Batch':
+def get_batch(name: str | None = None, default_python_image: str | None = None) -> 'Batch':
     global _batch
     backend: hb.Backend
     if _batch is None:
@@ -45,6 +45,7 @@ def get_batch(name: str | None = None) -> 'Batch':
             cancel_after_n_failures=get_config()['hail'].get('cancel_after_n_failures'),
             default_timeout=get_config()['hail'].get('default_timeout'),
             default_memory=get_config()['hail'].get('default_memory'),
+            default_python_image=default_python_image or get_config()['workflow']['driver_image'],
         )
     return _batch
 
