@@ -99,9 +99,9 @@ def batch_samples(
             )
             for sex in SEX_VALS
         }
-        submds = [pd.concat([submds['male'][i], submds['female'][i]]) for i in i_vals]
+        submd_arrays = [pd.concat([submds['male'][i], submds['female'][i]]) for i in i_vals]
         for i in i_vals:
-            batches[f'c{cov}b{i}'] = submds[i].ID.tolist()
+            batches[f'c{cov}b{i}'] = submd_arrays[i].ID.tolist()
 
     return batches
 
