@@ -78,8 +78,7 @@ class GatherBatchEvidence(CohortStage):
             'ped_file': str(make_combined_ped(cohort, self.prefix)),
             'counts': [
                 str(
-                    sample.make_sv_evidence_path
-                    / f'{sample.id}.coverage_counts.tsv.gz'
+                    sample.make_sv_evidence_path / f'{sample.id}.coverage_counts.tsv.gz'
                 )
                 for sample in samples
             ],

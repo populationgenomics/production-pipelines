@@ -181,12 +181,7 @@ class EvidenceQC(CohortStage):
             ]
         )
 
-        input_dict |= get_references(
-            [
-                'genome_file',
-                'wgd_scoring_mask',
-            ]
-        )
+        input_dict |= get_references(['genome_file', 'wgd_scoring_mask'])
 
         expected_d = self.expected_outputs(cohort)
         jobs = add_gatk_sv_jobs(
