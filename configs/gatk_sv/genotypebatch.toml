@@ -1,3 +1,5 @@
 [workflow]
-cohort_depth_vcf = []
-cohort_pesr_vcf = []
+only_stages = ['GenotypeBatch']
+# this will be a single VCF, combined across multiple sub-cohort VCF outputs
+cohort_depth_vcf = 'gs://cpg-broad-rgp-test/gatk_sv/b1b0be5754cfebd117b2a0e50b2d4087fe1af6_100/MergeBatchSites/cohort_depth.vcf.gz'
+cohort_pesr_vcf = 'gs://cpg-broad-rgp-test/gatk_sv/b1b0be5754cfebd117b2a0e50b2d4087fe1af6_100/MergeBatchSites/cohort_pesr.vcf.gz'
