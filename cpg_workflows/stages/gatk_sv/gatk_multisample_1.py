@@ -319,14 +319,13 @@ class FilterBatch(CohortStage):
         ending_by_key: dict = {
             'metrics_file_filterbatch': 'metrics.tsv',
             'filtered_pesr_vcf': 'filtered_pesr_merged.vcf.gz',
-            'filtered_depth_vcf': 'filtered_depth_merged.vcf.gz',
             'cutoffs': 'cutoffs',
             'scores': 'updated_scores',
             'RF_intermediate_files': 'RF_intermediate_files.tar.gz',
             'outlier_samples_excluded_file': 'outliers.samples.list',
             'batch_samples_postOutlierExclusion_file': 'outliers_excluded.samples.list',
         }
-        for caller in SV_CALLERS:
+        for caller in SV_CALLERS + ['depth']:
             ending_by_key[f'filtered_{caller}_vcf'] = f'filtered-{caller}.vcf.gz'
 
             # unsure why, scramble doesn't export this file
@@ -419,7 +418,7 @@ class MergeBatchSites(CohortStage):
             for batch_name in batch_names
         ]
         depth_vcfs = [
-            batch_prefix / batch_name / 'FilterBatch' / 'filtered_depth_merged.vcf.gz'
+            batch_prefix / batch_name / 'FilterBatch' / 'filtered-depth.vcf.gz'
             for batch_name in batch_names
         ]
 
