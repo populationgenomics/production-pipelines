@@ -204,7 +204,7 @@ class CreateSampleBatches(CohortStage):
         return {'batch_json': self.prefix / 'batches.json'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        evidence_files = inputs.as_dict_by_target(EvidenceQC)
+        evidence_files = inputs.as_dict(cohort, EvidenceQC)
         expected = self.expected_outputs(cohort)
 
         # I think this can just be a PythonJob?
