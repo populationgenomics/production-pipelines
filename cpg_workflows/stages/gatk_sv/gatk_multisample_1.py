@@ -423,7 +423,6 @@ class MergeBatchSites(CohortStage):
         ]
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
             'cohort': cohort.name,
             'depth_vcfs': depth_vcfs,
             'pesr_vcfs': pesr_vcfs,
