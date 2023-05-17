@@ -14,7 +14,7 @@ from cpg_utils.config import get_config
 from cpg_workflows.batch import get_batch
 from cpg_workflows.workflow import stage, StageOutput, StageInput, Cohort, CohortStage
 
-from cpg_workflows.stages.gatk_sv.gatk_sv import (
+from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     add_gatk_sv_jobs,
     get_fasta,
     get_images,
@@ -408,7 +408,7 @@ class MergeBatchSites(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
-        generate a MergBatchSites job
+        generate a MergeBatchSites job
         """
 
         batch_names = get_config()['workflow']['batch_names']

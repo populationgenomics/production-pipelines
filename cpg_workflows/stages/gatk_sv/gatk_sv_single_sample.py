@@ -18,7 +18,7 @@ from cpg_workflows.workflow import (
 )
 from cpg_workflows.jobs import sample_batching
 
-from cpg_workflows.stages.gatk_sv.gatk_sv import (
+from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     add_gatk_sv_jobs,
     SV_CALLERS,
     get_references,

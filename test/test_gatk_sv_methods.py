@@ -6,7 +6,7 @@ import pytest
 
 from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
-from cpg_workflows.stages.gatk_sv.gatk_sv import (
+from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     image_path,
     get_images,
     get_fasta,

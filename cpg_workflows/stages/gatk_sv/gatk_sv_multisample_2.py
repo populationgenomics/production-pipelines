@@ -10,7 +10,7 @@ from cpg_utils.config import get_config
 from cpg_workflows.batch import get_batch
 from cpg_workflows.workflow import stage, StageOutput, StageInput, Cohort, CohortStage
 
-from cpg_workflows.stages.gatk_sv.gatk_sv import (
+from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     add_gatk_sv_jobs,
     get_fasta,
     get_images,
