@@ -12,6 +12,7 @@ dataset_gcp_project = 'fewgenomes'
 access_level = 'test'
 dataset = 'fewgenomes'
 sequencing_type = 'genome'
+driver_image = 'test'
 
 check_inputs = false
 check_intermediates = false
