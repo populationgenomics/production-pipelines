@@ -17,6 +17,7 @@ TOML = f"""
 dataset_gcp_project = 'fewgenomes'
 access_level = 'test'
 dataset = 'fewgenomes'
+driver_image = 'test'
 sequencing_type = 'genome'
 
 check_inputs = false
