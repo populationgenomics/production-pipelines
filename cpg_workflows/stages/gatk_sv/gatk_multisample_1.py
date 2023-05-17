@@ -409,7 +409,7 @@ class MergeBatchSites(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
-        geberate the required jerbs
+        generate a MergBatchSites job
         """
 
         batch_names = get_config()['workflow']['batch_names']
@@ -466,8 +466,6 @@ class GenotypeBatch(CohortStage):
             'metrics_file_genotypebatch': 'metrics.tsv',
         }
 
-        # really unsure about this bit - it looks like both inputs are
-        # the same prior output? TrainRDGenotyping.pesr/depth_sepcutoff
         for mode in ['pesr', 'depth']:
             ending_by_key |= {
                 f'trained_genotype_{mode}_pesr_sepcutoff': f'{mode}.pesr_sepcutoff.txt',
