@@ -163,7 +163,7 @@ class EvidenceQC(CohortStage):
         sids = cohort.get_sample_ids()
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.analysis_dataset,
+            'batch': cohort.name,
             'samples': sids,
             'run_vcf_qc': True,
             'counts': [str(d[sid]['coverage_counts']) for sid in sids],
