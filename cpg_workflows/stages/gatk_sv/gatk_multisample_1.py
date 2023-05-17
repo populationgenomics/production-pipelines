@@ -412,7 +412,7 @@ class MergeBatchSites(CohortStage):
         """
 
         batch_names = get_config()['workflow']['batch_names']
-        batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_multisample_1'
+        batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
         pesr_vcfs = [
             batch_prefix / batch_name / 'FilterBatch' / 'filtered_pesr_merged.vcf.gz'
             for batch_name in batch_names
