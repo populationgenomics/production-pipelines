@@ -14,6 +14,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'cpg-utils',
+        'cyvcf2==0.30.18',
         'analysis-runner>=2.40.7',
         'hail',
         'networkx',
