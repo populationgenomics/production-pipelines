@@ -164,7 +164,7 @@ def _haplotype_caller_one(
     storage_gb = None  # avoid extra disk by default
     if get_config()['workflow']['sequencing_type'] == 'genome':
         storage_gb = 100
-    job_res = HIGHMEM.request_resources(ncpu=2)
+    job_res = HIGHMEM.request_resources(ncpu=1)
     # enough for input CRAM and output GVCF
     job_res.attach_disk_storage_gb = storage_gb
     job_res.set_to_job(j)
@@ -318,7 +318,7 @@ def postproc_gvcf(
     # in the resulting merged blocks. It would pick the highest INFO/DP when merging
     # multiple blocks, so a variant in a small homopolymer region (surrounded by
     # long DP=0 areas), that attracted piles of low-MQ reads with INFO/DP=1000
-    # will translate into a long GQ<20 block with the same FORMAT/DP=1000, 
+    # will translate into a long GQ<20 block with the same FORMAT/DP=1000,
     # which is wrong, because most of this block has no reads.
     bcftools view $GVCF \\
     | bcftools annotate -x INFO/DP \\
