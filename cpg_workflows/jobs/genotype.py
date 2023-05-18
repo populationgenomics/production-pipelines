@@ -164,7 +164,7 @@ def _haplotype_caller_one(
     storage_gb = None  # avoid extra disk by default
     if get_config()['workflow']['sequencing_type'] == 'genome':
         storage_gb = 100
-    job_res = HIGHMEM.request_resources(ncpu=1)
+    job_res = STANDARD.request_resources(ncpu=1)
     # enough for input CRAM and output GVCF
     job_res.attach_disk_storage_gb = storage_gb
     job_res.set_to_job(j)
