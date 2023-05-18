@@ -28,7 +28,7 @@ class MachineType:
     Hail Batch machine type on GCP
     """
 
-    min_cpu: int = 2
+    min_cpu: int = 1
     threads_on_cpu = 2  # hyper-threading
 
     def __init__(
