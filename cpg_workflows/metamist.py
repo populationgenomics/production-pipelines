@@ -201,8 +201,9 @@ class Metamist:
 
         validate(get_sequencing_groups_query, use_local_schema=True)
         sequencing_group_entries = query(
-            get_sequencing_groups_query, {'metamist_proj': [metamist_proj]}
+            get_sequencing_groups_query, {'metamist_proj': metamist_proj}
         )
+        return sequencing_group_entries
 
         return sample_entries
 
