@@ -163,26 +163,26 @@ class Metamist:
 
     def get_sg_entries(self, dataset_name: str) -> list[dict]:
         """
-        Retrieve sample entries for a dataset, in the context of access level
+        Retrieve sequencing group entries for a dataset, in the context of access level
         and filtering options.
         """
         metamist_proj = dataset_name
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        skip_samples = get_config()['workflow'].get('skip_samples', [])
-        only_samples = get_config()['workflow'].get('only_samples', [])
+        skip_sgs = get_config()['workflow'].get('skip_samples', [])
+        only_sgs = get_config()['workflow'].get('only_samples', [])
 
-        if only_samples and skip_samples:
+        if only_sgs and skip_sgs:
             raise MetamistError(
                 'Cannot specify both only_samples and skip_samples in config'
             )
 
         get_sequencing_groups_query = gql(
             """
-        query MyQuery($metamist_proj: String!, $only_samples: [String!]!, $skip_samples: [String!]!) {
+        query MyQuery($metamist_proj: String!, $only_sgs: [String!]!, $skip_sgs: [String!]!) {
             project(name: $metamist_proj) {
-                sequencingGroups(id: { in_: $only_samples, nin: $skip_samples }) {
+                sequencingGroups(id: { in_: $only_sgs, nin: $skip_sgs }) {
                     id
                     meta
                     platform
@@ -202,8 +202,8 @@ class Metamist:
             get_sequencing_groups_query,
             {
                 'metamist_proj': metamist_proj,
-                'only_samples': only_samples,
-                'skip_samples': skip_samples,
+                'only_sgs': only_sgs,
+                'skip_sgs': skip_sgs,
             },
         )
         sequencing_groups = sequencing_group_entries['project']['sequencingGroups']
