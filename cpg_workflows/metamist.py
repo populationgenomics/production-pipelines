@@ -161,7 +161,7 @@ class Metamist:
         self.papi = ParticipantApi()
         self.fapi = FamilyApi()
 
-    def get_sample_entries(self, dataset_name: str) -> list[dict]:
+    def get_sg_entries(self, dataset_name: str) -> list[dict]:
         """
         Retrieve sample entries for a dataset, in the context of access level
         and filtering options.
@@ -173,26 +173,24 @@ class Metamist:
         skip_samples = get_config()['workflow'].get('skip_samples', [])
         only_samples = get_config()['workflow'].get('only_samples', [])
 
-        sample_entries = self.sapi.get_samples(
-            body_get_samples={'project_ids': [metamist_proj]}
-        )
-        sample_entries = _filter_sample_entries(
-            sample_entries,
-            dataset_name,
-            skip_samples=skip_samples,
-            only_samples=only_samples,
-        )
+        if only_samples and skip_samples:
+            raise MetamistError(
+                'Cannot specify both only_samples and skip_samples in config'
+            )
 
         get_sequencing_groups_query = gql(
             """
-        query MyQuery($metamist_proj: String!) {
+        query MyQuery($metamist_proj: String!, $only_samples: [String!]!, $skip_samples: [String!]!) {
             project(name: $metamist_proj) {
-                sequencingGroups {
+                sequencingGroups(id: { in_: $only_samples, nin: $skip_samples }) {
                     id
                     meta
                     platform
                     technology
                     type
+                    sample {
+                        externalId
+                    }
                 }
             }
         }
@@ -201,11 +199,15 @@ class Metamist:
 
         validate(get_sequencing_groups_query, use_local_schema=True)
         sequencing_group_entries = query(
-            get_sequencing_groups_query, {'metamist_proj': metamist_proj}
+            get_sequencing_groups_query,
+            {
+                'metamist_proj': metamist_proj,
+                'only_samples': only_samples,
+                'skip_samples': skip_samples,
+            },
         )
-        return sequencing_group_entries
-
-        return sample_entries
+        sequencing_groups = sequencing_group_entries['project']['sequencingGroups']
+        return sequencing_groups
 
     def get_sequence_entries_by_sid(
         self,
@@ -690,30 +692,3 @@ class Sequence:
                 )
 
             return fastq_pairs
-
-
-def _filter_sample_entries(
-    entries: list[dict[str, str]],
-    dataset_name: str,
-    skip_samples: list[str] | None = None,
-    only_samples: list[str] | None = None,
-) -> list[dict]:
-    """
-    Apply the only_samples and skip_samples filters to sample entries.
-    """
-
-    filtered_entries = []
-    for entry in entries:
-        cpgid = entry['id']
-        extid = entry['external_id']
-        if only_samples:
-            if cpgid in only_samples or extid in only_samples:
-                logging.info(f'Picking sample: {dataset_name}|{cpgid}|{extid}')
-            else:
-                continue
-        if skip_samples:
-            if cpgid in skip_samples or extid in skip_samples:
-                logging.info(f'Skipping sample: {dataset_name}|{cpgid}|{extid}')
-                continue
-        filtered_entries.append(entry)
-    return filtered_entries

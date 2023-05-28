@@ -35,12 +35,12 @@ def create_cohort() -> Cohort:
     cohort = Cohort()
     for dataset_name in dataset_names:
         dataset = cohort.create_dataset(dataset_name)
-        logging.info(f'Getting samples for dataset {dataset_name}')
-        sample_entries = get_metamist().get_sample_entries(dataset_name)
-        for entry in sample_entries:
+        logging.info(f'Getting sequencing groups for dataset {dataset_name}')
+        sequencing_group_entries = get_metamist().get_sg_entries(dataset_name)
+        for entry in sequencing_group_entries:
             dataset.add_sample(
                 id=str(entry['id']),
-                external_id=str(entry['external_id']),
+                external_id=str(entry['sample']['externalId']),
                 meta=entry.get('meta', {}),
             )
 
