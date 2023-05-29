@@ -155,7 +155,6 @@ class Metamist:
 
     def __init__(self):
         self.default_dataset: str = get_config()['workflow']['dataset']
-        self.sapi = SampleApi()
         self.aapi = AnalysisApi()
         # self.seqapi = SequenceApi()
         self.papi = ParticipantApi()
@@ -172,6 +171,7 @@ class Metamist:
 
         skip_sgs = get_config()['workflow'].get('skip_samples', [])
         only_sgs = get_config()['workflow'].get('only_samples', [])
+        sequencing_type = get_config()['workflow'].get('sequencing_type')
 
         if only_sgs and skip_sgs:
             raise MetamistError(
@@ -180,9 +180,9 @@ class Metamist:
 
         get_sequencing_groups_query = gql(
             """
-        query MyQuery($metamist_proj: String!, $only_sgs: [String!]!, $skip_sgs: [String!]!) {
+        query MyQuery($metamist_proj: String!, $only_sgs: [String!]!, $skip_sgs: [String!]!, $sequencing_type: String!) {
             project(name: $metamist_proj) {
-                sequencingGroups(id: { in_: $only_sgs, nin: $skip_sgs }) {
+                sequencingGroups(id: { in_: $only_sgs, nin: $skip_sgs}, type:  {eq: $sequencing_type}) {
                     id
                     meta
                     platform
@@ -190,6 +190,11 @@ class Metamist:
                     type
                     sample {
                         externalId
+                    }
+                    assays {
+                        id
+                        meta
+                        type
                     }
                 }
             }
@@ -204,6 +209,7 @@ class Metamist:
                 'metamist_proj': metamist_proj,
                 'only_sgs': only_sgs,
                 'skip_sgs': skip_sgs,
+                'sequencing_type': sequencing_type,
             },
         )
         sequencing_groups = sequencing_group_entries['project']['sequencingGroups']
@@ -278,6 +284,7 @@ class Metamist:
             traceback.print_exc()
         analysis.status = status
 
+    # NOTE: This isn't used anywhere.
     def find_joint_calling_analysis(
         self,
         sample_ids: list[str],
@@ -307,7 +314,7 @@ class Metamist:
 
     def get_analyses_by_sid(
         self,
-        sample_ids: list[str],
+        sg_ids: list[str],
         analysis_type: AnalysisType,
         analysis_status: AnalysisStatus = AnalysisStatus.COMPLETED,
         meta: dict | None = None,
@@ -334,7 +341,7 @@ class Metamist:
         datas = self.aapi.query_analyses(
             models.AnalysisQueryModel(
                 projects=[metamist_proj],
-                sample_ids=sample_ids,
+                sample_ids=sg_ids,
                 type=models.AnalysisType(analysis_type.value),
                 status=models.AnalysisStatus(analysis_status.value),
                 meta=meta,
@@ -531,7 +538,7 @@ class Metamist:
 
 
 @dataclass
-class Sequence:
+class Assay:
     """
     Metamist "Sequence" entry.
 
@@ -550,30 +557,50 @@ class Sequence:
         data: dict,
         check_existence: bool = False,
         parse_reads: bool = True,
-    ) -> 'Sequence':
+    ) -> 'Assay':
         """
         Create from a dictionary.
         """
-        req_keys = ['id', 'sample_id', 'meta']
-        if any(k not in data for k in req_keys):
-            for key in req_keys:
-                if key not in data:
-                    logging.error(f'"Sequence" data does not have {key}: {data}')
-            raise ValueError(f'Cannot parse metamist Sequence {data}')
+        # TODO: Add a check for meta in assays
+        # Ok basically we just need to rejig this function to take the new input.
 
-        sample_id = str(data['sample_id'])
+        # Ok, so we need to pull out the id, sample_id, meta and type.
+        # req_keys = ['id', 'type', 'assays']
+        # if any(k not in data for k in req_keys):
+        #     for key in req_keys:
+        #         if key not in data:
+        #             logging.error(f'"Sequence" data does not have {key}: {data}')
+        #     raise ValueError(f'Cannot parse metamist Sequence {data}')
+
+        sg_keys = ['id', 'type', 'assays']
+        assay_keys = ['meta', 'id']
+
+        missing_sg_keys = [key for key in sg_keys if data.get(key) is None]
+        missing_assay_keys = [
+            key
+            for assay in data.get('assays', [])
+            for key in assay_keys
+            if key not in assay
+        ]
+
+        if missing_sg_keys or missing_assay_keys:
+            raise ValueError(
+                f'Cannot parse metamist Sequence {data}. Missing keys: {missing_sg_keys + missing_assay_keys}'
+            )
+
+        sg_id = str(data['id'])
         sequencing_type = str(data['type'])
         assert sequencing_type, data
-        mm_seq = Sequence(
-            id=str(data['id']),
-            sample_id=sample_id,
-            meta=data['meta'],
+        mm_seq = Assay(
+            id=str(data['assays'][0]['id']),
+            sample_id=sg_id,
+            meta=data['assays'][0]['meta'],
             sequencing_type=sequencing_type,
         )
         if parse_reads:
-            mm_seq.alignment_input = Sequence.parse_reads(
-                sample_id=sample_id,
-                meta=data['meta'],
+            mm_seq.alignment_input = Assay.parse_reads(
+                sample_id=sg_id,
+                meta=data['assays'][0]['meta'],
                 check_existence=check_existence,
             )
         return mm_seq
@@ -658,37 +685,37 @@ class Sequence:
 
         else:
             fastq_pairs = FastqPairs()
-            for lane_pair in reads_data:
-                if len(lane_pair) != 2:
-                    raise ValueError(
-                        f'Sequence data for sample {sample_id} is incorrectly '
-                        f'formatted. Expecting 2 entries per lane (R1 and R2 fastqs), '
-                        f'but got {len(lane_pair)}. '
-                        f'Read data: {pprint.pformat(reads_data)}'
-                    )
-                if get_config()['workflow']['access_level'] == 'test':
-                    lane_pair[0]['location'] = lane_pair[0]['location'].replace(
-                        '-main-upload/', '-test-upload/'
-                    )
-                    lane_pair[1]['location'] = lane_pair[1]['location'].replace(
-                        '-main-upload/', '-test-upload/'
-                    )
-                if check_existence and not exists(lane_pair[0]['location']):
-                    raise MetamistError(
-                        f'{sample_id}: ERROR: read 1 file does not exist: '
-                        f'{lane_pair[0]["location"]}'
-                    )
-                if check_existence and not exists(lane_pair[1]['location']):
-                    raise MetamistError(
-                        f'{sample_id}: ERROR: read 2 file does not exist: '
-                        f'{lane_pair[1]["location"]}'
-                    )
 
-                fastq_pairs.append(
-                    FastqPair(
-                        to_path(lane_pair[0]['location']),
-                        to_path(lane_pair[1]['location']),
-                    )
+            if len(reads_data) != 2:
+                raise ValueError(
+                    f'Sequence data for sample {sample_id} is incorrectly '
+                    f'formatted. Expecting 2 entries per lane (R1 and R2 fastqs), '
+                    f'but got {len(lane_pair)}. '
+                    f'Read data: {pprint.pformat(reads_data)}'
                 )
+            # if get_config()['workflow']['access_level'] == 'test':
+            #     lane_pair[0]['location'] = lane_pair[0]['location'].replace(
+            #         '-main-upload/', '-test-upload/'
+            #     )
+            #     lane_pair[1]['location'] = lane_pair[1]['location'].replace(
+            #         '-main-upload/', '-test-upload/'
+            #     )
+            if check_existence and not exists(reads_data[0]['location']):
+                raise MetamistError(
+                    f'{sample_id}: ERROR: read 1 file does not exist: '
+                    f'{reads_data[0]["location"]}'
+                )
+            if check_existence and not exists(reads_data[1]['location']):
+                raise MetamistError(
+                    f'{sample_id}: ERROR: read 2 file does not exist: '
+                    f'{reads_data[1]["location"]}'
+                )
+
+            fastq_pairs.append(
+                FastqPair(
+                    to_path(reads_data[0]['location']),
+                    to_path(reads_data[1]['location']),
+                )
+            )
 
             return fastq_pairs

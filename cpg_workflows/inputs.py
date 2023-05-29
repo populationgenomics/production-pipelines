@@ -6,8 +6,8 @@ import logging
 
 from cpg_utils.config import get_config, update_dict
 
-from .metamist import get_metamist, Sequence, AnalysisType, MetamistError
-from .targets import Cohort, Sex, PedigreeInfo
+from .metamist import get_metamist, Assay, AnalysisType, MetamistError
+from .targets import Cohort, Sex, PedigreeInfo, Sample
 
 
 _cohort: Cohort | None = None
@@ -38,11 +38,14 @@ def create_cohort() -> Cohort:
         logging.info(f'Getting sequencing groups for dataset {dataset_name}')
         sequencing_group_entries = get_metamist().get_sg_entries(dataset_name)
         for entry in sequencing_group_entries:
-            dataset.add_sample(
+            sample = dataset.add_sample(
                 id=str(entry['id']),
                 external_id=str(entry['sample']['externalId']),
                 meta=entry.get('meta', {}),
             )
+            _populate_alignment_inputs_new(sample, entry)
+            # TODO: Add checks here,logging samples without sequences
+            # Check there is only one sequencing group per type.
 
     if not cohort.get_datasets():
         msg = 'No datasets populated'
@@ -52,9 +55,11 @@ def create_cohort() -> Cohort:
             msg += ' (after picking samples)'
         raise MetamistError(msg)
 
-    if sequencing_type := get_config()['workflow'].get('sequencing_type'):
-        _populate_alignment_inputs(cohort, sequencing_type)
-        _filter_sequencing_type(cohort, sequencing_type)
+    # NOTE: Are there cases where there isn't a sequencing_type?
+    # TODO: Think about this.
+    # if sequencing_type := get_config()['workflow'].get('sequencing_type'):
+    # _populate_alignment_inputs(cohort, sequencing_type)
+    # _filter_sequencing_type(cohort, sequencing_type)
     _populate_analysis(cohort)
     _populate_participants(cohort)
     if get_config()['workflow'].get('read_pedigree', True):
@@ -63,28 +68,62 @@ def create_cohort() -> Cohort:
     return cohort
 
 
-def _filter_sequencing_type(cohort: Cohort, sequencing_type: str):
-    """
-    Filtering to the samples with only requested sequencing types.
-    """
-    for s in cohort.get_samples():
-        if not s.seq_by_type:
-            s.active = False
-            continue
+# def _filter_sequencing_type(cohort: Cohort, sequencing_type: str):
+#     """
+#     Filtering to the samples with only requested sequencing types.
+#     """
+#     for s in cohort.get_samples():
+#         if not s.seq_by_type:
+#             s.active = False
+#             continue
 
-        if s.alignment_input_by_seq_type:
-            avail_types = list(s.seq_by_type.keys())
-            s.alignment_input_by_seq_type = {
-                k: v
-                for k, v in s.alignment_input_by_seq_type.items()
-                if k == sequencing_type
-            }
-            if not bool(s.alignment_input_by_seq_type):
-                logging.warning(
-                    f'{s}: skipping because no inputs with data type '
-                    f'"{sequencing_type}" found in {avail_types}'
-                )
-                s.active = False
+#         if s.alignment_input_by_seq_type:
+#             avail_types = list(s.seq_by_type.keys())
+#             s.alignment_input_by_seq_type = {
+#                 k: v
+#                 for k, v in s.alignment_input_by_seq_type.items()
+#                 if k == sequencing_type
+#             }
+#             if not bool(s.alignment_input_by_seq_type):
+#                 logging.warning(
+#                     f'{s}: skipping because no inputs with data type '
+#                     f'"{sequencing_type}" found in {avail_types}'
+#                 )
+#                 s.active = False
+
+
+def _populate_alignment_inputs_new(
+    sample: Sample,
+    sequencing_group: dict,
+    check_existence: bool = False,
+) -> None:
+    """
+    Populate sequencing inputs for a sequencing group
+    """
+
+    # TODO: Clean this up a little so the right parameters are ready
+    entry = sequencing_group
+    if len(entry['assays']) != 1:
+        raise MetamistError(f'This is not good.')
+
+    assay_entry = entry['assays'][0]
+    print(assay_entry)
+
+    assay = Assay.parse(entry, parse_reads=False)
+
+    sample.assays['sequencing_type'] = assay
+
+    if entry['assays'][0].get('meta', {}).get('reads'):
+        alignment_input = Assay.parse_reads(
+            sample_id=sample.id,
+            meta=entry['assays'][0]['meta'],
+            check_existence=check_existence,
+        )
+
+    assay.alignment_input = alignment_input
+    sample.alignment_input_by_seq_type[assay.sequencing_type] = alignment_input
+
+    return None
 
 
 def _populate_alignment_inputs(
@@ -120,20 +159,20 @@ def _populate_alignment_inputs(
     sid_wo_reads = set()
     for sample in cohort.get_samples():
         for entry in seq_entries_by_sid.get(sample.id, []):
-            seq = Sequence.parse(entry, parse_reads=False)
+            seq = Assay.parse(entry, parse_reads=False)
             if seq.sequencing_type in sample.seq_by_type:
                 raise MetamistError(
                     f'{sample}: found more than one associated sequencing entry with '
                     f'sequencing type: {seq.sequencing_type}. Make sure there is only '
                     f'one data source of sequencing type per sample.'
                 )
-            sample.seq_by_type[seq.sequencing_type] = seq
+            sample.assays[seq.sequencing_type] = seq
 
             if not entry.get('meta', {}).get('reads'):
                 sid_wo_reads.add(sample.id)
                 continue
 
-            alignment_input = Sequence.parse_reads(
+            alignment_input = Assay.parse_reads(
                 sample_id=sample.id,
                 meta=entry['meta'],
                 check_existence=check_existence,

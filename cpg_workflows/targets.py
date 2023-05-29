@@ -20,7 +20,7 @@ from .filetypes import (
     GvcfPath,
     FastqPairs,
 )
-from .metamist import Sequence
+from .metamist import Assay
 
 
 class Target:
@@ -465,7 +465,7 @@ class Sample(Target):
         sex: Sex | None = None,
         pedigree: Optional['PedigreeInfo'] = None,
         alignment_input_by_seq_type: dict[str, AlignmentInput] | None = None,
-        seq_by_type: dict[str, Sequence] | None = None,
+        assays: dict[str, Assay] | None = None,
         forced: bool = False,
     ):
         super().__init__()
@@ -484,7 +484,7 @@ class Sample(Target):
         self.alignment_input_by_seq_type: dict[str, AlignmentInput] = (
             alignment_input_by_seq_type or dict()
         )
-        self.seq_by_type: dict[str, Sequence] = seq_by_type or dict()
+        self.assays: dict[str, Assay] = assays or dict()
         self.forced = forced
         self.active = True
         # Only set if the file exists / found in Metamist:

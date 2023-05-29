@@ -878,6 +878,7 @@ class Workflow:
         if get_config()['workflow'].get('status_reporter') == 'metamist':
             self.status_reporter = MetamistStatusReporter()
         self._stages: list[StageDecorator] | None = stages
+        self.queued_stages: list[StageDecorator] = []
 
     @property
     def output_version(self) -> str:
@@ -1109,6 +1110,9 @@ class Workflow:
                     )
 
                 logging.info(f'')
+        else:
+            self.queued_stages = [stg for stg in _stages_d.values() if not stg.skipped]
+            print(self.queued_stages)
 
     @staticmethod
     def _process_stage_errors(
