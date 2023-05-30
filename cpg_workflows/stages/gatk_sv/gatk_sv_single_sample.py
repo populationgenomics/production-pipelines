@@ -20,15 +20,16 @@ from cpg_workflows.jobs import sample_batching
 
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     add_gatk_sv_jobs,
-    SV_CALLERS,
-    get_references,
     get_fasta,
     get_images,
+    get_references,
+    _sv_individual_meta,
+    SV_CALLERS,
 )
 from cpg_utils.config import get_config
 
 
-@stage
+@stage(analysis_type='sv', update_analysis_meta=_sv_individual_meta)
 class GatherSampleEvidence(SampleStage):
     """
     https://github.com/broadinstitute/gatk-sv#gathersampleevidence
@@ -194,7 +195,7 @@ class EvidenceQC(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=EvidenceQC)
+@stage(required_stages=EvidenceQC, analysis_type='sv', analysis_keys=['batch_json'])
 class CreateSampleBatches(CohortStage):
     """
     uses the values generated in EvidenceQC, does some clustering

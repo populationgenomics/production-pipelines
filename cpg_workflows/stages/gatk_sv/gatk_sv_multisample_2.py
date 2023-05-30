@@ -16,6 +16,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_images,
     get_references,
     make_combined_ped,
+    _sv_batch_meta,
 )
 
 
@@ -162,7 +163,12 @@ class MakeCohortVcf(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=MakeCohortVcf)
+@stage(
+    required_stages=MakeCohortVcf,
+    analysis_type='sv',
+    analysis_keys=['output_vcf'],
+    update_analysis_meta=_sv_batch_meta,
+)
 class AnnotateVcf(CohortStage):
     """
     Add annotations, such as the inferred function and allele frequencies of variants,

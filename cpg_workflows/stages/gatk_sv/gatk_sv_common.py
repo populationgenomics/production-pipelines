@@ -24,6 +24,24 @@ SV_CALLERS = ['manta', 'wham', 'scramble']
 _FASTA = None
 
 
+def _sv_batch_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, Any]:
+    """
+    Callable, add meta.type to custom analysis object
+    """
+    return {'type': 'gatk-sv-batch-calls'}
+
+
+def _sv_individual_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, Any]:
+    """
+    Callable, add meta.type to custom analysis object
+    """
+    return {'type': 'gatk-sv-sequence-group-calls'}
+
+
 def get_fasta() -> Path:
     """
     find or return the fasta to use
