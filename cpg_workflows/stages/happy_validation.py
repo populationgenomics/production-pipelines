@@ -71,9 +71,8 @@ class ValidationMtToVcf(SampleStage):
 
 @stage(
     required_stages=ValidationMtToVcf,
-    analysis_type='custom',
-    update_analysis_meta=_sg_vcf_meta,
-    analysis_keys=['vcf'],
+    analysis_type='qc',
+    analysis_keys=['happy_csv'],
 )
 class ValidationHappyOnVcf(SampleStage):
 
