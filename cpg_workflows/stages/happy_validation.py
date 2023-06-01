@@ -5,10 +5,6 @@ Content relating to the hap.py validation process
 """
 
 
-from typing import Any
-
-from cpg_utils import to_path, Path
-from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
 from cpg_workflows.workflow import (
     stage,
@@ -16,10 +12,6 @@ from cpg_workflows.workflow import (
     Sample,
     StageInput,
     StageOutput,
-    CohortStage,
-    DatasetStage,
-    Cohort,
-    Dataset,
     get_workflow,
 )
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, _sg_vcf_meta
@@ -133,4 +125,3 @@ class ValidationHappyOnVcf(SampleStage):
         )
 
         return self.make_outputs(sample, data=exp_outputs, jobs=job)
-
