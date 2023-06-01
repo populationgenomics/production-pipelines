@@ -158,21 +158,8 @@ def run_happy_on_vcf(
     # region: stratification BED files
     if stratification := get_config()['stratification']:
         strat_folder = to_path(stratification)
-        assert (
-            strat_folder.exists()
-        ), f'{stratification} does not exist, or was not accessible'
-
-        definitions = strat_folder / 'definition.tsv'
-        assert (
-            definitions.exists()
-        ), f'the region file {str(definitions)} does not exist'
-
-        strat_bed_files = list(strat_folder.glob('*.bed*'))
-        assert len(strat_bed_files) > 0, 'No bed files in the stratified BED folder'
-
-        # create a dictionary to pass to input generation
-        strat_dict = {'definition.tsv': str(definitions)}
-        strat_dict.update({file.name: str(file) for file in strat_bed_files})
+        strat_dict = {file.name: str(file) for file in strat_folder.glob('*')}
+        assert ('definition.tsv' in strat_dict, f'definition.tsv file does not exist')
         batch_beds = b.read_input_group(**strat_dict)
         command += f'--stratification {batch_beds["definition.tsv"]}'
     # endregion
