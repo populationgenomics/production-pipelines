@@ -19,11 +19,20 @@ from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.seqr_loader import MtToEs, AnnotateDataset, DatasetVCF
 from cpg_workflows.stages.gatk_sv import AnnotateVcf
 from cpg_workflows.stages.stripy import Stripy
+from cpg_workflows.stages.happy_validation import ValidationParseHappy
 
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'pre_alignment': [FastQCMultiQC],
-    'seqr_loader': [DatasetVCF, AnnotateDataset, MtToEs, GvcfMultiQC, CramMultiQC, Stripy],
+    'seqr_loader': [
+        DatasetVCF,
+        AnnotateDataset,
+        MtToEs,
+        GvcfMultiQC,
+        CramMultiQC,
+        Stripy,
+        ValidationParseHappy
+    ],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
     'gatk_sv': [AnnotateVcf],
 }
