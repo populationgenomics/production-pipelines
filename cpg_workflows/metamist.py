@@ -365,8 +365,6 @@ class Metamist:
             },
         )
 
-        print(analyses)
-
         analysis_per_sid: dict[str, Analysis] = dict()
 
         for analysis in analyses['project']['analyses']:
@@ -384,31 +382,6 @@ class Metamist:
             f'found {len(analysis_per_sid)}'
         )
         return analysis_per_sid
-
-        # logging.info(
-        #     f'Querying {analysis_type} analysis entries for {metamist_proj}...'
-        # )
-        # meta = meta or {}
-        # meta['sequencing_type'] = get_config()['workflow']['sequencing_type']
-
-        # datas = self.aapi.query_analyses(
-        #     models.AnalysisQueryModel(
-        #         projects=[metamist_proj],
-        #         sample_ids=sg_ids,
-        #         type=models.AnalysisType(analysis_type.value),
-        #         status=models.AnalysisStatus(analysis_status.value),
-        #         meta=meta,
-        #     )
-        # )
-
-        # for data in datas:
-        #     a = Analysis.parse(data)
-        #     if not a:
-        #         continue
-        #     assert a.status == AnalysisStatus.COMPLETED, data
-        #     assert a.type == analysis_type, data
-        #     assert len(a.sample_ids) == 1, data
-        #     analysis_per_sid[list(a.sample_ids)[0]] = a
 
     def create_analysis(
         self,
@@ -610,15 +583,6 @@ class Assay:
         Create from a dictionary.
         """
         # TODO: Add a check for meta in assays
-        # Ok basically we just need to rejig this function to take the new input.
-
-        # Ok, so we need to pull out the id, sample_id, meta and type.
-        # req_keys = ['id', 'type', 'assays']
-        # if any(k not in data for k in req_keys):
-        #     for key in req_keys:
-        #         if key not in data:
-        #             logging.error(f'"Sequence" data does not have {key}: {data}')
-        #     raise ValueError(f'Cannot parse metamist Sequence {data}')
 
         sg_keys = ['id', 'type', 'assays']
         assay_keys = ['meta', 'id']
@@ -741,13 +705,6 @@ class Assay:
                     f'but got {len(reads_data)}. '
                     f'Read data: {pprint.pformat(reads_data)}'
                 )
-            # if get_config()['workflow']['access_level'] == 'test':
-            #     lane_pair[0]['location'] = lane_pair[0]['location'].replace(
-            #         '-main-upload/', '-test-upload/'
-            #     )
-            #     lane_pair[1]['location'] = lane_pair[1]['location'].replace(
-            #         '-main-upload/', '-test-upload/'
-            #     )
             if check_existence and not exists(reads_data[0]['location']):
                 raise MetamistError(
                     f'{sample_id}: ERROR: read 1 file does not exist: '
