@@ -97,6 +97,17 @@ def _dataset_vcf_meta(
     return {'type': 'dataset-vcf'}
 
 
+def _sg_vcf_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, Any]:
+    """
+    Add meta.type to custom analysis object
+
+    TODO: Replace this once dynamic analysis types land in metamist.
+    """
+    return {'type': 'dataset-vcf'}
+
+
 @stage(
     required_stages=[AnnotateCohort],
     analysis_type='custom',
@@ -182,14 +193,13 @@ class DatasetVCF(DatasetStage):
         Uses analysis-runner's dataproc helper to run a hail query script
         only run this on manually defined list of cohorts
         """
-        assert dataset.cohort
 
         # only run this selectively, most datasets it's not required
         eligible_datasets = get_config()['workflow']['write_vcf']
         if dataset.name not in eligible_datasets:
             return None
 
-        mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateDataset, key='mt')
+        mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset, key='mt')
 
         job = cohort_to_vcf_job(
             b=get_batch(),
