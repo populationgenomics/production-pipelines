@@ -10,9 +10,9 @@ def single_sample_vcf_from_dataset_vcf(input_mt: str, sample_id: str, out_path: 
     takes the validation datatset VCF, filters to single sample
     removes variants not relevant to this sample, and writes to VCF
     Args:
-        input_mt ():
-        sample_id ():
-        out_path ():
+        input_mt (str): where to read the MT
+        sample_id (str): this Sequencing Group ID
+        out_path (str): where to write the VCF to
     """
     # read full MT
     mt = hl.read_matrix_table(input_mt)
@@ -28,4 +28,3 @@ def single_sample_vcf_from_dataset_vcf(input_mt: str, sample_id: str, out_path: 
     mt = mt.filter_rows(mt.filters.length() == 0)
 
     hl.export_vcf(mt, out_path, tabix=True)
-
