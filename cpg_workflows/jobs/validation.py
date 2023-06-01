@@ -2,13 +2,43 @@
 jobs relating to the validation steps of the pipeline
 """
 
+import json
+from csv import DictReader
 
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
+from sample_metadata.apis import AnalysisApi
+from sample_metadata.model.analysis_model import AnalysisModel
+from sample_metadata.model.analysis_status import AnalysisStatus
+from sample_metadata.model.analysis_type import AnalysisType
+
+from cpg_workflows.workflow import Sample
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import fasta_res_group, image_path, query_command
+
+
+SUMMARY_KEYS = {
+    'TRUTH.TOTAL': 'true_variants',
+    'METRIC.Recall': 'recall',
+    'METRIC.Precision': 'precision',
+}
+
+
+def get_sample_truth_data(sample_id: str):
+    """
+
+    Args:
+        sample_id (str):
+
+    Returns:
+        The sample-specific truth data from config
+    """
+
+    ref_data = get_config()['references'][sample_id]
+    assert all(key in ref_data for key in ['vcf', 'index', 'bed'])
+    return ref_data
 
 
 def validation_mt_to_vcf_job(
@@ -17,7 +47,7 @@ def validation_mt_to_vcf_job(
     sample_id: str,
     out_vcf_path: Path,
     job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None
+    depends_on: list[Job] | None = None,
 ):
     """
     Take the single-dataset MT, and write to a VCF
@@ -61,7 +91,7 @@ def run_happy_on_vcf(
     sample_ext_id: str,
     out_prefix: str,
     job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None
+    depends_on: list[Job] | None = None,
 ):
     """
     Run hap.py on the for this single-sample VCF
@@ -89,10 +119,8 @@ def run_happy_on_vcf(
     # region: read input data into batch
     vcf_input = b.read_input_group(vcf=vcf_path, index=f'{vcf_path}.tbi')
 
-    ref_data = get_config()['references'][sample_ext_id]
-    assert all(key in ref_data for key in ['vcf', 'index', 'bed'])
-
     # read in sample-specific truth data from config
+    ref_data = get_sample_truth_data(sample_ext_id)
     truth_input = b.read_input_group(
         vcf=ref_data['vcf'], index=ref_data['index'], bed=ref_data['bed']
     )
@@ -153,3 +181,75 @@ def run_happy_on_vcf(
 
     b.write_output(happy_j.output, out_prefix)
     return happy_j
+
+
+def parse_and_post_results(
+    b: Batch,
+    vcf_path: str,
+    sample: Sample,
+    happy_results: dict,
+    out_file: Path,
+    job_attrs: dict | None = None,
+    depends_on: list[Job] | None = None,
+):
+    """
+    read the Hap.py results, and update Metamist
+    Args:
+        b (): the batch to create jobs in
+        vcf_path (str): path to the single-sample VCF
+        sample (Sample):
+        happy_results (dict): all results from the hap.py stage
+        out_file (Path): where to write the JSON file
+        job_attrs ():
+        depends_on ():
+
+    Returns:
+        this job
+    """
+
+    results_j = b.new_job(f'Parse {sample.id} Happy results', (job_attrs or {}))
+    if depends_on:
+        results_j.depends_on(*depends_on)
+
+    ref_data = get_sample_truth_data(sample_id=sample.external_id)
+    happy_csv = happy_results['happy_csv']
+
+    # populate a dictionary of results for this sample
+    summary_data = {
+        'type': 'validation_result',
+        'query_vcf': vcf_path,
+        'truth_vcf': ref_data['vcf'],
+        'truth_bed': ref_data['bed'],
+    }
+
+    if stratification := get_config()['stratification']:
+        summary_data['stratified'] = stratification
+
+    # read in the summary CSV file
+    with happy_csv.open() as handle:
+        summary_reader = DictReader(handle)
+        for line in summary_reader:
+            if line['Filter'] != 'PASS' or line['Subtype'] != '*':
+                continue
+
+            summary_key = f'{line["Type"]}_{line["Subset"]}'
+            for sub_key, sub_value in SUMMARY_KEYS.items():
+                summary_data[f'{summary_key}::{sub_value}'] = str(line[sub_key])
+
+    with out_file.open('w', encoding='utf-8') as handle:
+        json.dump(summary_data, handle)
+
+    # post results to metamist
+    AnalysisApi().create_new_analysis(
+        project=get_config()['workflow']['dataset'],
+        analysis_model=AnalysisModel(
+            sample_ids=[sample.id],
+            type=AnalysisType('qc'),
+            status=AnalysisStatus('completed'),
+            output=str(happy_csv.parent),
+            meta=summary_data,
+            active=True,
+        ),
+    )
+
+    return results_j
