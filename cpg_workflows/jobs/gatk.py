@@ -4,9 +4,17 @@ from hailtop.batch.job import Job
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, fasta_res_group, image_path
+from cpg_workflows.utils import can_reuse
 
 
 def preprocess_intervals(b, intervals_path, job_attrs, output_path):
+    if can_reuse(output_path):
+        return []
+
+    job_attrs = (job_attrs or {}) | {
+        'tool': 'gatk PreprocessIntervals',
+    }
+
     j = b.new_job('Preprocess intervals', job_attrs)
     j.image(image_path('gatk'))
 
@@ -36,15 +44,23 @@ def preprocess_intervals(b, intervals_path, job_attrs, output_path):
 
 
 def collect_read_counts(b, sample, intervals, job_attrs, output_path):
+    if can_reuse(output_path):
+        return []
+
+    job_attrs = (job_attrs or {}) | {
+        'tool': 'gatk CollectReadCounts',
+    }
+
     j = b.new_job(f'Collect gCNV counts for {sample.id}', job_attrs)
     j.image(image_path('gatk'))
 
     reference = fasta_res_group(b)
+    cram_path = sample.make_cram_path()
     cmd = f"""
     gatk CollectReadCounts \\
       --reference {reference.base} --intervals {intervals} \\
       --interval-merging-rule OVERLAPPING_ONLY \\
-      --input {sample.bam} --read-index {sample.bai} \\
+      --input {str(cram_path.path)} --read-index {str(cram_path.index_path)} \\
       --output {j.gcnv_counts}
     """
 
@@ -54,6 +70,10 @@ def collect_read_counts(b, sample, intervals, job_attrs, output_path):
 
 
 def determine_ploidy(b, cohort_name, ploidy_priors, inputs, job_attrs, output_dir):
+    job_attrs = (job_attrs or {}) | {
+        'tool': 'gatk DetermineGermlineContigPloidy',
+    }
+
     j = b.new_job('Determine ploidy for {cohort_name}', job_attrs)
     j.image(image_path('gatk'))
 
