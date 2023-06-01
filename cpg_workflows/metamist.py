@@ -141,7 +141,7 @@ class Analysis:
             id=int(data['id']),
             type=AnalysisType.parse(data['type']),
             status=AnalysisStatus.parse(data['status']),
-            sample_ids=set(data.get('sample_ids', [])),
+            sample_ids=set([s['id'] for s in data['sequencingGroups']]),
             output=output,
             meta=data.get('meta') or {},
         )
@@ -190,6 +190,12 @@ class Metamist:
                     type
                     sample {
                         externalId
+                        participant {
+                            id
+                            externalId
+                            reportedSex
+                            meta
+                        }
                     }
                     assays {
                         id
@@ -330,37 +336,79 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
+        get_analyses_query = gql(
+            """
+            query MyQuery($metamist_proj: String!, $analysis_type: String!, $analysis_status: AnalysisStatus!) {
+                project(name: $metamist_proj) {
+                    analyses (active: {eq: true}, type: {eq: $analysis_type}, status: {eq: $analysis_status}) {
+                        id
+                        type
+                        meta
+                        output
+                        status
+                        sequencingGroups {
+                            id
+                        }
+                    }
+                }
+            }
+        """
+        )
+
+        validate(get_analyses_query, use_local_schema=True)
+        analyses = query(
+            get_analyses_query,
+            {
+                'metamist_proj': metamist_proj,
+                'analysis_type': analysis_type.value,
+                'analysis_status': analysis_status.name,
+            },
+        )
+
+        print(analyses)
+
         analysis_per_sid: dict[str, Analysis] = dict()
 
-        logging.info(
-            f'Querying {analysis_type} analysis entries for {metamist_proj}...'
-        )
-        meta = meta or {}
-        meta['sequencing_type'] = get_config()['workflow']['sequencing_type']
-
-        datas = self.aapi.query_analyses(
-            models.AnalysisQueryModel(
-                projects=[metamist_proj],
-                sample_ids=sg_ids,
-                type=models.AnalysisType(analysis_type.value),
-                status=models.AnalysisStatus(analysis_status.value),
-                meta=meta,
-            )
-        )
-
-        for data in datas:
-            a = Analysis.parse(data)
+        for analysis in analyses['project']['analyses']:
+            a = Analysis.parse(analysis)
             if not a:
                 continue
-            assert a.status == AnalysisStatus.COMPLETED, data
-            assert a.type == analysis_type, data
-            assert len(a.sample_ids) == 1, data
+
+            assert a.status == AnalysisStatus.COMPLETED, analysis
+            assert a.type == analysis_type, analysis
+            assert len(a.sample_ids) == 1, analysis
             analysis_per_sid[list(a.sample_ids)[0]] = a
+
         logging.info(
             f'Querying {analysis_type} analysis entries for {metamist_proj}: '
             f'found {len(analysis_per_sid)}'
         )
         return analysis_per_sid
+
+        # logging.info(
+        #     f'Querying {analysis_type} analysis entries for {metamist_proj}...'
+        # )
+        # meta = meta or {}
+        # meta['sequencing_type'] = get_config()['workflow']['sequencing_type']
+
+        # datas = self.aapi.query_analyses(
+        #     models.AnalysisQueryModel(
+        #         projects=[metamist_proj],
+        #         sample_ids=sg_ids,
+        #         type=models.AnalysisType(analysis_type.value),
+        #         status=models.AnalysisStatus(analysis_status.value),
+        #         meta=meta,
+        #     )
+        # )
+
+        # for data in datas:
+        #     a = Analysis.parse(data)
+        #     if not a:
+        #         continue
+        #     assert a.status == AnalysisStatus.COMPLETED, data
+        #     assert a.type == analysis_type, data
+        #     assert len(a.sample_ids) == 1, data
+        #     analysis_per_sid[list(a.sample_ids)[0]] = a
 
     def create_analysis(
         self,
@@ -690,7 +738,7 @@ class Assay:
                 raise ValueError(
                     f'Sequence data for sample {sample_id} is incorrectly '
                     f'formatted. Expecting 2 entries per lane (R1 and R2 fastqs), '
-                    f'but got {len(lane_pair)}. '
+                    f'but got {len(reads_data)}. '
                     f'Read data: {pprint.pformat(reads_data)}'
                 )
             # if get_config()['workflow']['access_level'] == 'test':
