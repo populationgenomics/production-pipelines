@@ -1,34 +1,12 @@
 import logging
-import os
-import string
-from functools import lru_cache
-from random import choices
-import time
-from cpg_utils import to_path
+from pathlib import Path
+from typing import Any
+
+import toml
+from cpg_utils.config import set_config_paths
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
-
-
-@lru_cache
-def results_prefix() -> str:
-    """
-    Output directory for the test results.
-    """
-    path = (
-        to_path(__file__).parent
-        / 'results'
-        / os.getenv(
-            'TEST_TIMESTAMP',
-            # Generate a timestamp string. Don't import `timestamp` from `cpg_utils`,
-            # as it would break mocking in some tests.
-            time.strftime('%Y_%m%d_%H%M')
-            + '_'
-            + ''.join(choices(string.ascii_uppercase + string.digits, k=5)),
-        )
-    ).absolute()
-    path.mkdir(parents=True, exist_ok=True)
-    return str(path)
 
 
 def update_dict(d1: dict, d2: dict) -> None:
@@ -42,3 +20,15 @@ def update_dict(d1: dict, d2: dict) -> None:
             update_dict(v1, v2)
         else:
             d1[k] = v2
+
+
+def set_config(config: str | dict[str, Any], path: Path, merge_with: list[Path] = []):
+    with path.open('w') as f:
+        if isinstance(config, dict):
+            toml.dump(config, f)
+        else:
+            f.write(config)
+
+        f.flush()
+
+    set_config_paths([*[str(s) for s in merge_with], str(path)])
