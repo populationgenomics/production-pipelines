@@ -1,32 +1,7 @@
 """
 Test building stages DAG.
 """
-
 from cpg_utils import to_path, Path
-
-TOML = f"""
-[workflow]
-dataset_gcp_project = 'fewgenomes'
-access_level = 'test'
-dataset = 'fewgenomes'
-sequencing_type = 'genome'
-
-check_inputs = false
-check_intermediates = false
-check_expected_outputs = true
-
-[storage.default]
-default = '/tmp/stub'
-
-[storage.fewgenomes]
-default = '/tmp/stub'
-
-[hail]
-billing_project = 'fewgenomes'
-delete_scratch_on_exit = false
-backend = 'local'
-dry_run = true
-"""
 
 
 def _mock_cohort():
