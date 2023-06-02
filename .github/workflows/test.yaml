@@ -13,21 +13,6 @@ jobs:
     defaults:
       run:
         shell: bash -l {0}
-    strategy:
-      fail-fast: false
-      matrix:
-        suffix:
-          [
-            batch,
-            workflow,
-            cohort,
-            status,
-            large_cohort,
-            seqr_loader_dry,
-            check_multiqc,
-            check_pedigree,
-            gatk_sv_methods
-          ]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -44,4 +29,4 @@ jobs:
         timeout-minutes: 20
         run: |
           PYTHONPATH=$PWD/gnomad_methods:$PWD/seqr-loading-pipelines \
-          python -m pytest test/test_${{ matrix.suffix }}.py
+          pytest test
