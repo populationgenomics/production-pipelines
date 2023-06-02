@@ -19,6 +19,7 @@ def test_skip_stages(mocker: MockFixture, tmp_path):
     access_level = 'test'
     dataset = 'fewgenomes'
     sequencing_type = 'genome'
+    driver_image = 'stub'
 
     check_inputs = false
     check_intermediates = false
