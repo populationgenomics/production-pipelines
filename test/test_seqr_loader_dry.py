@@ -164,7 +164,7 @@ def selective_mock_open(*args, **kwargs):
             return open(str(args[0]), **kwargs)
         return open(*args, **kwargs)
     else:
-        return mock_open(read_data="<stub>")(*args, **kwargs)
+        return mock_open(read_data='<stub>')(*args, **kwargs)
 
 
 def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
