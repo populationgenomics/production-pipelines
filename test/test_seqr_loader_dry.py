@@ -158,10 +158,6 @@ def _mock_cohort():
 def selective_mock_open(*args, **kwargs):
     if str(args[0]).endswith('.toml'):
         # Don't mock calls to load a config file
-        if isinstance(args[0], Path):
-            if len(args) > 1:
-                return open(str(args[0]), *args[1:], **kwargs)
-            return open(str(args[0]), **kwargs)
         return open(*args, **kwargs)
     else:
         return mock_open(read_data='<stub>')(*args, **kwargs)
