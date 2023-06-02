@@ -24,7 +24,7 @@ def test_first_stages(mocker: MockFixture, tmp_path):
 
     check_inputs = false
     check_intermediates = false
-    check_expected_outputs = false
+    check_expected_outputs = true
 
     first_stages = ['B2']
 

@@ -24,9 +24,7 @@ def test_last_stages(mocker: MockFixture, tmp_path):
 
     check_inputs = false
     check_intermediates = false
-
-    # Skip stages with outputs that already exist
-    check_expected_outputs = false
+    check_expected_outputs = true
 
     last_stages = ['B2']
 
