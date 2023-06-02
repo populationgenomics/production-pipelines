@@ -17,6 +17,7 @@ def test_batch_job(tmp_path):
     access_level = 'test'
     dataset = 'fewgenomes'
     sequencing_type = 'genome'
+    driver_image = 'test'
 
     check_inputs = false
     check_intermediates = false
