@@ -879,7 +879,7 @@ class Workflow:
             self.status_reporter = MetamistStatusReporter()
         self._stages: list[StageDecorator] | None = stages
 
-        self.queued_stages: list[StageDecorator] = []
+        self.queued_stages: list[Stage] = []
 
     @property
     def output_version(self) -> str:
@@ -1113,7 +1113,7 @@ class Workflow:
                 logging.info(f'')
         else:
             self.queued_stages = [stg for stg in _stages_d.values() if not stg.skipped]
-            logging.info(f"Queued stages: {self.queued_stages}")
+            logging.info(f'Queued stages: {self.queued_stages}')
 
     @staticmethod
     def _process_stage_errors(
