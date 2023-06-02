@@ -3,38 +3,8 @@ Test reading inputs into a Cohort object.
 """
 
 from pytest_mock import MockFixture
-from cpg_utils.config import set_config_paths
-from . import results_prefix
 
-TOML = f"""
-[workflow]
-dataset_gcp_project = 'fewgenomes'
-access_level = 'test'
-dataset = 'fewgenomes'
-sequencing_type = 'genome'
-
-check_inputs = false
-check_intermediates = false
-check_expected_outputs = false
-path_scheme = 'local'
-
-[storage.default]
-default = '{results_prefix()}'
-
-[storage.fewgenomes]
-default = '{results_prefix()}'
-
-[large_cohort]
-training_pop = 'Superpopulation name'
-
-[hail]
-billing_project = 'fewgenomes'
-delete_scratch_on_exit = false
-backend = 'local'
-
-[references.broad]
-ref_fasta = 'stub'
-"""
+from . import set_config
 
 
 def test_cohort(mocker: MockFixture, tmp_path):
@@ -42,9 +12,37 @@ def test_cohort(mocker: MockFixture, tmp_path):
     Testing creating a Cohort object from metamist mocks.
     """
 
-    with open(tmp_path / 'config.toml', 'w') as fh:
-        fh.write(TOML)
-    set_config_paths([str(tmp_path / 'config.toml')])
+    conf = f"""
+    [workflow]
+    dataset_gcp_project = 'fewgenomes'
+    access_level = 'test'
+    dataset = 'fewgenomes'
+    sequencing_type = 'genome'
+
+    check_inputs = false
+    check_intermediates = false
+    check_expected_outputs = false
+    path_scheme = 'local'
+
+    [storage.default]
+    default = '{tmp_path}'
+
+    [storage.fewgenomes]
+    default = '{tmp_path}'
+
+    [large_cohort]
+    training_pop = 'Superpopulation name'
+
+    [hail]
+    billing_project = 'fewgenomes'
+    delete_scratch_on_exit = false
+    backend = 'local'
+
+    [references.broad]
+    ref_fasta = 'stub'
+    """
+
+    set_config(conf, tmp_path / 'config.toml')
 
     def mock_get_samples(  # pylint: disable=unused-argument
         *args, **kwargs
