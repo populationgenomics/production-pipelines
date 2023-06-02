@@ -22,7 +22,9 @@ def update_dict(d1: dict, d2: dict) -> None:
             d1[k] = v2
 
 
-def set_config(config: str | dict[str, Any], path: Path, merge_with: list[Path] = []):
+def set_config(
+    config: str | dict[str, Any], path: Path, merge_with: list[Path] | None = None
+):
     with path.open('w') as f:
         if isinstance(config, dict):
             toml.dump(config, f)
@@ -31,4 +33,4 @@ def set_config(config: str | dict[str, Any], path: Path, merge_with: list[Path] 
 
         f.flush()
 
-    set_config_paths([*[str(s) for s in merge_with], str(path)])
+    set_config_paths([*[str(s) for s in (merge_with or [])], str(path)])
