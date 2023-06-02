@@ -17,7 +17,7 @@ def pre_and_post_test():
 
     # Clear pre-existing state before running a new workflow. Must use setattr
     # for this to work so ignore flake8 B010.
-    setattr(cpg_utils.config, '_config', None)  # noqa: flake8
+    setattr(cpg_utils.config, '_config', None)  # noqa: B010
     setattr(cpg_workflows.batch, '_batch', None)  # noqa: B010
     setattr(cpg_workflows.workflow, '_workflow', None)  # noqa: B010
     setattr(cpg_workflows.inputs, '_cohort', None)  # noqa: B010
