@@ -19,6 +19,7 @@ def test_the_thing():
     access_level = 'test'
     dataset = 'fewgenomes'
     sequencing_type = 'genome'
+    driver_image = 'stub'
     """
 ```
 
@@ -62,6 +63,7 @@ def test_the_thing(tmp_path: Path):
     access_level = 'test'
     dataset = 'fewgenomes'
     sequencing_type = 'genome'
+    driver_image = 'stub'
 
     [storage.default]
     default = {tmp_dir}
@@ -93,6 +95,7 @@ def default_config() -> dict[str, Any]:
             "access_level": "test",
             "dataset": "fewgenomes",
             "sequencing_type": "genome",
+            "driver_image": 'stub'
         },
     }
 ```
