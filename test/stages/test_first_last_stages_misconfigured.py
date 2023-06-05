@@ -3,8 +3,9 @@ Test building stages DAG.
 """
 import pytest
 from pytest_mock import MockFixture
-from . import run_workflow
+
 from .. import set_config
+from . import run_workflow
 
 
 def test_first_last_stages_misconfigured(mocker: MockFixture, tmp_path):

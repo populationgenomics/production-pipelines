@@ -1,7 +1,7 @@
 """
 Test building stages DAG.
 """
-from cpg_utils import to_path, Path
+from cpg_utils import Path, to_path
 
 
 def _mock_cohort():
@@ -17,14 +17,15 @@ def run_workflow(mocker):
     mocker.patch('cpg_workflows.inputs.create_cohort', _mock_cohort)
 
     from cpg_utils.hail_batch import dataset_path
+
     from cpg_workflows.targets import Sample
     from cpg_workflows.workflow import (
         SampleStage,
         StageInput,
         StageOutput,
-        stage,
-        run_workflow,
         get_batch,
+        run_workflow,
+        stage,
     )
 
     class TestStage(SampleStage):

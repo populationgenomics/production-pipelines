@@ -5,11 +5,10 @@ Test large-cohort workflow.
 from os.path import exists
 from pathlib import Path
 
-import toml
 from cpg_utils import to_path
 from pytest_mock import MockFixture
 
-from . import set_config, update_dict
+from . import set_config
 
 ref_prefix = to_path(__file__).parent / 'data/large_cohort/reference'
 gnomad_prefix = ref_prefix / 'gnomad/v0'

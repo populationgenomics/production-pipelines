@@ -2,8 +2,9 @@
 Test building stages DAG.
 """
 from pytest_mock import MockFixture
-from . import run_workflow
+
 from .. import set_config
+from . import run_workflow
 
 
 def test_skip_stages(mocker: MockFixture, tmp_path):

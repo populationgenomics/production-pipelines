@@ -4,9 +4,10 @@ Test seqr-loader workflow.
 from pathlib import Path
 from unittest.mock import mock_open
 
-from cpg_utils import to_path, config
+from cpg_utils import to_path
 from pytest_mock import MockFixture
-from . import update_dict, set_config
+
+from . import set_config
 
 TOML = """
 [workflow]
@@ -122,8 +123,8 @@ SEQR_LOADER_CONFIG = Path(
 
 
 def _mock_cohort():
-    from cpg_workflows.targets import Cohort
     from cpg_workflows.filetypes import BamPath, FastqPair, FastqPairs
+    from cpg_workflows.targets import Cohort
 
     cohort = Cohort()
     ds = cohort.create_dataset('test-input-dataset')
@@ -207,8 +208,8 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
     from cpg_workflows.stages.cram_qc import CramMultiQC
     from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
     from cpg_workflows.stages.joint_genotyping_qc import JointVcfQC
-    from cpg_workflows.workflow import get_workflow
     from cpg_workflows.stages.seqr_loader import MtToEs
+    from cpg_workflows.workflow import get_workflow
 
     get_workflow().run(stages=[MtToEs, GvcfMultiQC, CramMultiQC, JointVcfQC])
 
