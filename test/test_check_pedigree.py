@@ -3,8 +3,8 @@ Test Hail Query functions.
 """
 
 from cpg_utils import to_path
-from cpg_utils.config import set_config_paths
 
+from . import set_config
 
 TOML = """
 [workflow]
@@ -15,9 +15,7 @@ sequencing_type = 'genome'
 def test_check_pedigree(caplog, tmp_path):
     from cpg_workflows.python_scripts import check_pedigree
 
-    with open(tmp_path / 'config.toml', 'w') as fh:
-        fh.write(TOML)
-    set_config_paths([str(tmp_path / 'config.toml')])
+    set_config(TOML, tmp_path / 'config.toml')
 
     data_dir = to_path(__file__).parent / 'data' / 'check_pedigree'
     check_pedigree.run(

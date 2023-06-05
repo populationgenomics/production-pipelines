@@ -3,43 +3,41 @@ Test initialising Batch object.
 """
 
 from cpg_utils import to_path
-from cpg_utils.config import set_config_paths
-from . import results_prefix
 
-TOML = f"""
-[workflow]
-dataset_gcp_project = 'fewgenomes'
-access_level = 'test'
-dataset = 'fewgenomes'
-sequencing_type = 'genome'
-
-check_inputs = false
-check_intermediates = false
-check_expected_outputs = false
-
-[storage.default]
-default = '{results_prefix()}'
-
-[storage.fewgenomes]
-default = '{results_prefix()}'
-
-[hail]
-billing_project = 'fewgenomes'
-delete_scratch_on_exit = false
-backend = 'local'
-"""
+from . import set_config
 
 
 def test_batch_job(tmp_path):
     """
     Test creating a job and running a batch.
     """
+    config = f"""
+    [workflow]
+    dataset_gcp_project = 'fewgenomes'
+    access_level = 'test'
+    dataset = 'fewgenomes'
+    sequencing_type = 'genome'
+    driver_image = 'test'
 
-    with open(tmp_path / 'config.toml', 'w') as fh:
-        fh.write(TOML)
-    set_config_paths([str(tmp_path / 'config.toml')])
+    check_inputs = false
+    check_intermediates = false
+    check_expected_outputs = false
 
-    from cpg_utils.hail_batch import dataset_path, command
+    [storage.default]
+    default = '{tmp_path}'
+
+    [storage.fewgenomes]
+    default = '{tmp_path}'
+
+    [hail]
+    billing_project = 'fewgenomes'
+    delete_scratch_on_exit = false
+    backend = 'local'
+    """
+    set_config(config, tmp_path / 'config.toml')
+
+    from cpg_utils.hail_batch import command, dataset_path
+
     from cpg_workflows.batch import get_batch
 
     b = get_batch('Test batch job')

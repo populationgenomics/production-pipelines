@@ -1,15 +1,16 @@
 """
 Test workflow status reporter.
 """
+from pathlib import Path
 from typing import Any
 
 import pytest
+from cpg_utils import to_path
 from pytest_mock import MockFixture
-from cpg_utils import to_path, Path
-from cpg_utils.config import set_config_paths
-from . import results_prefix
 
-TOML = f"""
+from . import set_config
+
+TOML = """
 [workflow]
 dataset_gcp_project = 'fewgenomes'
 access_level = 'test'
@@ -24,10 +25,10 @@ check_expected_outputs = false
 path_scheme = 'local'
 
 [storage.default]
-default = '{results_prefix()}'
+default = '{directory}'
 
 [storage.fewgenomes]
-default = '{results_prefix()}'
+default = '{directory}'
 
 [hail]
 billing_project = 'fewgenomes'
@@ -41,22 +42,21 @@ cpg_workflows = "stub"
 
 
 def _common(mocker, tmp_path):
-    with open(tmp_path / 'config.toml', 'w') as fh:
-        fh.write(TOML)
-    set_config_paths(
-        [
-            str(to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml'),
-            str(
+    conf = TOML.format(directory=tmp_path)
+
+    set_config(
+        conf,
+        tmp_path / 'config.toml',
+        merge_with=[
+            Path(to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml'),
+            Path(
                 to_path(__file__).parent.parent
                 / 'configs'
                 / 'defaults'
                 / 'seqr_loader.toml'
             ),
-            str(tmp_path / 'config.toml'),
-        ]
+        ],
     )
-
-    # mocker.patch('cpg_utils.config.get_config', _mock_config)
 
     def mock_create_new_analysis(_, project, analysis_model) -> int:
         print(f'Analysis model in project {project}: {analysis_model}')
@@ -82,15 +82,16 @@ def test_status_reporter(mocker: MockFixture, tmp_path):
     _common(mocker, tmp_path)
 
     from cpg_utils.hail_batch import dataset_path
+
+    from cpg_workflows.batch import get_batch
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.targets import Sample
-    from cpg_workflows.batch import get_batch
     from cpg_workflows.workflow import (
         SampleStage,
         StageInput,
         StageOutput,
-        stage,
         run_workflow,
+        stage,
     )
 
     @stage(analysis_type='qc')
@@ -154,14 +155,15 @@ def test_status_reporter_with_custom_updater(mocker: MockFixture, tmp_path):
     _common(mocker, tmp_path)
 
     from cpg_utils.hail_batch import dataset_path
-    from cpg_workflows.targets import Sample
+
     from cpg_workflows.batch import get_batch
+    from cpg_workflows.targets import Sample
     from cpg_workflows.workflow import (
         SampleStage,
         StageInput,
         StageOutput,
-        stage,
         run_workflow,
+        stage,
     )
 
     @stage(analysis_type='qc', update_analysis_meta=_update_meta)
@@ -186,14 +188,15 @@ def test_status_reporter_fails(mocker: MockFixture, tmp_path):
     _common(mocker, tmp_path)
 
     from cpg_utils.hail_batch import dataset_path
-    from cpg_workflows.targets import Sample
+
     from cpg_workflows.batch import get_batch
+    from cpg_workflows.targets import Sample
     from cpg_workflows.workflow import (
         SampleStage,
         StageInput,
         StageOutput,
-        stage,
         run_workflow,
+        stage,
     )
 
     @stage(analysis_type='qc')
