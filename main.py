@@ -19,7 +19,7 @@ from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.seqr_loader import MtToEs, AnnotateDataset, DatasetVCF
 from cpg_workflows.stages.gatk_sv import AnnotateVcf
 from cpg_workflows.stages.stripy import Stripy
-from cpg_workflows.stages.gcnv import CollectReadCounts
+from cpg_workflows.stages.gcnv import DeterminePloidy
 
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
@@ -27,7 +27,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'seqr_loader': [DatasetVCF, AnnotateDataset, MtToEs, GvcfMultiQC, CramMultiQC, Stripy],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
     'gatk_sv': [AnnotateVcf],
-    'gcnv': [CollectReadCounts],
+    'gcnv': [DeterminePloidy],
 }
 
 
