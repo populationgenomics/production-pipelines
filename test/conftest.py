@@ -14,12 +14,12 @@ import cpg_workflows.workflow
 def pre_and_post_test():
     # Set a dummy google cloud project to avoid errors when running tests for tests
     # that use the google cloud.
-    os.environ["GOOGLE_CLOUD_PROJECT"] = "dummy-project-for-tests"
+    os.environ['GOOGLE_CLOUD_PROJECT'] = 'dummy-project-for-tests'
 
     yield
 
     # Clear the dummy google cloud project
-    os.environ.pop("GOOGLE_CLOUD_PROJECT")
+    os.environ.pop('GOOGLE_CLOUD_PROJECT')
 
     # Reset config paths to defaults
     cpg_utils.config.set_config_paths([])
