@@ -144,7 +144,9 @@ def partition_batches(
         raise ValueError('Insufficient samples found for batch generation')
 
     # generate the batches
-    batches = batch_samples(md=md, min_batch_size=min_batch_size, max_batch_size=max_batch_size)
+    batches = batch_samples(
+        md=md, min_batch_size=min_batch_size, max_batch_size=max_batch_size
+    )
 
     # write out the batches to GCP
     logging.info(batches)

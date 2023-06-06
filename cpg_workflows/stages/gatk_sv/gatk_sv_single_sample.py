@@ -218,7 +218,7 @@ class CreateSampleBatches(CohortStage):
             evidence_files['qc_table'],
             expected['batch_json'],
             min_batch_size,
-            max_batch_size
+            max_batch_size,
         )
 
         return self.make_outputs(cohort, data=expected, jobs=py_job)
