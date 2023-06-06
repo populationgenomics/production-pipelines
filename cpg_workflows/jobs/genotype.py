@@ -252,10 +252,7 @@ def merge_gvcfs_job(
         # if the output was recoverable, read into the batch
         if isinstance(gvcf_group, str):
             gvcf_group = b.read_input_group(
-                **{
-                    "g.vcf.gz": gvcf_group,
-                    "g.vcf.gz.tbi": gvcf_group
-                }
+                **{"g.vcf.gz": gvcf_group, "g.vcf.gz.tbi": gvcf_group}
             )
         input_cmd += f'INPUT={gvcf_group["g.vcf.gz"]} '
 
