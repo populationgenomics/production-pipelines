@@ -151,7 +151,7 @@ def _haplotype_caller_one(
 
     if utils.can_reuse(out_gvcf_path, overwrite):
         j.name = f'{j.name} [reuse]'
-        return j, out_gvcf_path
+        return j, str(out_gvcf_path)
 
     j.image(image_path('gatk'))
 
