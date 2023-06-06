@@ -13,12 +13,25 @@ from cpg_utils import to_path
 
 
 SEX_VALS = {'male', 'female'}
-PCR_VALS = {'PCRPLUS', 'PCRMINUS'}
 
 
 def batch_samples(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
     """
-    Batch samples by coverage, dosage bias, and chrX ploidy
+    Batch samples by coverage, and chrX ploidy
+
+    Starts with a base assumption of one batch, increasing the batch count
+    until min < batch size < max
+
+    When an appropriate number of batches is found, the samples are split
+    by sex (assigned by inferred X ploidy), then all samples are ordered
+    by median coverage.
+
+    Using numpy.array_split, the ordered male & female sample lists are split
+    into equal sized sub-lists, then the sub-lists are combined into batches.
+    This groups lowest coverage male and female samples into a single batch,
+    continuing up to the highest coverage batch.
+
+    This method maintains a consistent sex ratio across all batches
 
     Args:
         md (str): DataFrame of metadata
@@ -26,30 +39,32 @@ def batch_samples(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict
         max_batch_size (int): maximum batch size
 
     Returns:
-        A list of batches, each with samples to fit into each batch
+        A list of batches, each with samples
+        Each batch self-documents its size and male/female ratio
         {
-            ID: {
+            batch_ID: {
                 'samples': [sample1, sample2, ...],
-                'male/female': float,
+                'mf_ratio': float,
                 'size': int,
+                'coverage_medians': [float, float, ...],
             }
         }
     """
 
     # Split samples based on >= 2 copies of chrX vs. < 2 copies
-    isfemale = md.chrX_CopyNumber_rounded >= 2
-    ismale = md.chrX_CopyNumber_rounded == 1
+    is_female = md.chrX_CopyNumber_rounded >= 2
+    is_male = md.chrX_CopyNumber_rounded == 1
 
-    # Calculate approximate number of batches
+    # region: Calculate approximate number of batches
     n_samples = len(md)
 
-    # allow for shortcut?
+    # shortcut return if the total samples is a valid batch
     if min_batch_size <= n_samples <= max_batch_size:
         logging.info(f'Number of samples ({n_samples}) is within range of batch sizes')
         return [
             {
                 'samples': md.ID.tolist(),
-                'mf_ratio': ismale / isfemale,
+                'mf_ratio': is_male / is_female,
                 'size': n_samples,
             }
         ]
@@ -63,6 +78,7 @@ def batch_samples(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict
     while n_per_batch > max_batch_size:
         cov_bins += 1
         n_per_batch = n_samples // cov_bins
+    # endregion
 
     logging.info(
         f"""
@@ -75,8 +91,8 @@ def batch_samples(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict
 
     # Split samples by sex, then roughly by coverage
     md_sex = {
-        'male': md[~isfemale].sort_values(by='median_coverage'),
-        'female': md[isfemale].sort_values(by='median_coverage'),
+        'male': md[~is_female].sort_values(by='median_coverage'),
+        'female': md[is_female].sort_values(by='median_coverage'),
     }
 
     # array split each sex proportionally
@@ -92,6 +108,7 @@ def batch_samples(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict
                 'size': len(sample_ids),
                 'mf_ratio': len(md_sex_cov['male'][cov])
                 / len(md_sex_cov['female'][cov]),
+                'coverage_medians': sample_ids.median_coverage.tolist(),
             }
         )
 
@@ -122,18 +139,16 @@ def partition_batches(
     md = pd.read_csv(metadata_file, sep='\t', low_memory=False)
     md.columns = [x.replace('#', '') for x in md.columns]
 
-    # split 'em up into inferred PCR +/-
-    for pcr in PCR_VALS:
-        pcr_state_samples = md[(md.inferred_pcr_status == pcr)]
-        if len(pcr_state_samples) < min_batch_size:
-            logging.info(f'Insufficient samples found for PCR status {pcr}')
-            continue
+    # check that we have enough samples to batch
+    if len(md) < min_batch_size:
+        raise ValueError('Insufficient samples found for batch generation')
 
-        batches = batch_samples(pcr_state_samples, min_batch_size, max_batch_size)
+    # generate the batches
+    batches = batch_samples(md=md, min_batch_size=min_batch_size, max_batch_size=max_batch_size)
 
-        # write out the batches to GCP
-        logging.info(batches)
+    # write out the batches to GCP
+    logging.info(batches)
 
-        # write the batch JSON out to a file, inc. PCR state
-        with to_path(output_json.format(pcr)).open('w') as handle:
-            json.dump(batches, handle, indent=4)
+    # write the batch JSON out to a file, inc. PCR state
+    with to_path(output_json).open('w') as handle:
+        json.dump(batches, handle, indent=4)

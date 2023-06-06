@@ -202,8 +202,7 @@ class CreateSampleBatches(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        # output path will be formatted with PCRPLUS/PCRMINUS
-        return {'batch_json': self.prefix / '{}_batches.json'}
+        return {'batch_json': self.prefix / 'batches.json'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         evidence_files = inputs.as_dict(cohort, EvidenceQC)
