@@ -146,6 +146,14 @@ def _haplotype_caller_one(
     """
     job_name = 'HaplotypeCaller'
     j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk HaplotypeCaller'))
+
+    j.declare_resource_group(
+        output_gvcf={
+            'g.vcf.gz': '{root}-' + sample_name + '.g.vcf.gz',
+            'g.vcf.gz.tbi': '{root}-' + sample_name + '.g.vcf.gz.tbi',
+        }
+    )
+
     if utils.can_reuse(out_gvcf_path, overwrite):
         j.name = f'{j.name} [reuse]'
         return j
@@ -162,20 +170,19 @@ def _haplotype_caller_one(
     # of a Hail worker (2 cores), plus with the `highmem` instance that would
     # give enough memory: 13G. That's not going to give enough disk storage, so we
     # are explicitly requesting more storage.
-    storage_gb = None  # avoid extra disk by default
+    #
+    # Based on an audit of RD crams on 19/05/23, 99% of crams are <34Gb. Will set the
+    # default to 40Gb for genomes then use a run specific confg to run the rare
+    # sample that will fail from this limit.
     if get_config()['workflow']['sequencing_type'] == 'genome':
-        storage_gb = 100
+        storage_gb = get_config()['workflow'].get('haplotypecaller_storage_gb', 40)
+    else:
+        storage_gb = None  # avoid extra disk for exomes
+
     job_res = HIGHMEM.request_resources(ncpu=2)
     # enough for input CRAM and output GVCF
     job_res.attach_disk_storage_gb = storage_gb
     job_res.set_to_job(j)
-
-    j.declare_resource_group(
-        output_gvcf={
-            'g.vcf.gz': '{root}-' + sample_name + '.g.vcf.gz',
-            'g.vcf.gz.tbi': '{root}-' + sample_name + '.g.vcf.gz.tbi',
-        }
-    )
 
     reference = fasta_res_group(b)
 
