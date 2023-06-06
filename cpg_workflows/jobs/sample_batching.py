@@ -16,15 +16,12 @@ SEX_VALS = {'male', 'female'}
 PCR_VALS = {'PCRPLUS', 'PCRMINUS'}
 
 
-def batch_samples(
-    md: pd.DataFrame, batch_size, min_batch_size, max_batch_size
-) -> list[dict]:
+def batch_samples(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
     """
     Batch samples by coverage, dosage bias, and chrX ploidy
 
     Args:
         md (str): DataFrame of metadata
-        batch_size (int): preferred batch size
         min_batch_size (int): minimum batch size
         max_batch_size (int): maximum batch size
 
@@ -137,9 +134,7 @@ def partition_batches(
             logging.info(f'Insufficient samples found for PCR status {pcr}')
             continue
 
-        batches = batch_samples(
-            pcr_state_samples, batch_size, min_batch_size, max_batch_size
-        )
+        batches = batch_samples(pcr_state_samples, min_batch_size, max_batch_size)
 
         # write out the batches to GCP
         logging.info(batches)

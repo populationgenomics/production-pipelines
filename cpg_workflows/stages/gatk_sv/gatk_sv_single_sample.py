@@ -208,7 +208,6 @@ class CreateSampleBatches(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         evidence_files = inputs.as_dict(cohort, EvidenceQC)
         expected = self.expected_outputs(cohort)
-        ideal_batch_size = get_config()['workflow'].get('ideal_batch_size', 150)
         min_batch_size = get_config()['workflow'].get('min_batch_size', 100)
         max_batch_size = get_config()['workflow'].get('max_batch_size', 300)
 
@@ -219,7 +218,6 @@ class CreateSampleBatches(CohortStage):
             sample_batching.partition_batches,
             evidence_files['qc_table'],
             expected['batch_json'],
-            ideal_batch_size,
             min_batch_size,
             max_batch_size
         )
