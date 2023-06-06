@@ -92,32 +92,35 @@ def haplotype_caller(
             if intervals_j:
                 jobs.append(intervals_j)
 
-        hc_jobs = []
+        hc_fragments = []
         # Splitting variant calling by intervals
         for idx in range(scatter_count):
             assert intervals[idx], intervals
-            j = _haplotype_caller_one(
+            # give each fragment a tmp location
+            fragment = tmp_prefix / 'haplotypecaller' / f'{idx}_{sample_name}.g.vcf.gz'
+            j, result = _haplotype_caller_one(
                 b,
                 sample_name=sample_name,
                 cram_path=cram_path,
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
                 interval=intervals[idx],
+                out_gvcf_path=fragment,
                 dragen_mode=dragen_mode,
                 overwrite=overwrite,
             )
-            hc_jobs.append(j)
-        jobs.extend(hc_jobs)
+            hc_fragments.append(result)
+            jobs.append(j)
         merge_j = merge_gvcfs_job(
             b=b,
             sample_name=sample_name,
-            gvcf_groups=[j.output_gvcf for j in hc_jobs],
+            gvcf_groups=hc_fragments,
             job_attrs=job_attrs,
             out_gvcf_path=output_path,
             overwrite=overwrite,
         )
         jobs.append(merge_j)
     else:
-        hc_j = _haplotype_caller_one(
+        hc_j, _result = _haplotype_caller_one(
             b,
             sample_name=sample_name,
             job_attrs=job_attrs,
@@ -139,15 +142,16 @@ def _haplotype_caller_one(
     out_gvcf_path: Path | None = None,
     overwrite: bool = False,
     dragen_mode: bool = True,
-) -> Job:
+) -> tuple[Job, str | hb.ResourceGroup]:
     """
     Add one GATK HaplotypeCaller job on an interval.
     """
     job_name = 'HaplotypeCaller'
     j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk HaplotypeCaller'))
+
     if utils.can_reuse(out_gvcf_path, overwrite):
         j.name = f'{j.name} [reuse]'
-        return j
+        return j, out_gvcf_path
 
     j.image(image_path('gatk'))
 
@@ -211,13 +215,13 @@ def _haplotype_caller_one(
     )
     if out_gvcf_path:
         b.write_output(j.output_gvcf, str(out_gvcf_path).replace('.g.vcf.gz', ''))
-    return j
+    return (j, j.output_gvcf)
 
 
 def merge_gvcfs_job(
     b: hb.Batch,
     sample_name: str,
-    gvcf_groups: list[hb.Resource],
+    gvcf_groups: list[str | hb.Resource],
     job_attrs: dict | None = None,
     out_gvcf_path: Path | None = None,
     overwrite: bool = False,
@@ -245,7 +249,14 @@ def merge_gvcfs_job(
 
     input_cmd = ''
     for gvcf_group in gvcf_groups:
-        assert isinstance(gvcf_group, hb.ResourceGroup)
+        # if the output was recoverable, read into the batch
+        if isinstance(gvcf_group, str):
+            gvcf_group = b.read_input_group(
+                **{
+                    "g.vcf.gz": gvcf_group,
+                    "g.vcf.gz.tbi": gvcf_group
+                }
+            )
         input_cmd += f'INPUT={gvcf_group["g.vcf.gz"]} '
 
     assert isinstance(j.output_gvcf, hb.ResourceGroup)
