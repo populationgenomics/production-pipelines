@@ -48,7 +48,7 @@ class StatusReporter(ABC):
         analysis_status: str,
         target: Target,
         meta: dict | None = None,
-        project_name: str = None,
+        project_name: str | None = None,
     ) -> int | None:
         """
         Record analysis entry.
@@ -184,7 +184,7 @@ class MetamistStatusReporter(StatusReporter):
         analysis_status: str,
         target: Target,
         meta: dict | None = None,
-        project_name: str = None,
+        project_name: str | None = None,
     ) -> int | None:
         """Record analysis entry"""
         return get_metamist().create_analysis(
