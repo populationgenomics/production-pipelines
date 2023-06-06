@@ -240,7 +240,7 @@ def vcf_from_mt_subset(mt_path: str, out_vcf_path: str):
 
     mt = hl.read_matrix_table(str(mt_path))
     logging.info(f'Dataset MT dimensions: {mt.count()}')
-    hl.export_vcf(mt, out_vcf_path, parallel='header_per_shard', tabix=True)
+    hl.export_vcf(mt, out_vcf_path, tabix=True)
     logging.info(f'Written {out_vcf_path}')
 
 
