@@ -39,7 +39,7 @@ def preprocess_intervals(b, intervals_path, job_attrs, output_path):
         raise ValueError('workflow/sequencing_type must be one of: "exome", "genome"')
 
     j.command(command(cmd))
-    b.write_output(j.preprocessed_intervals, output_path)
+    b.write_output(j.preprocessed_intervals, str(output_path))
     return [j]
 
 
@@ -65,7 +65,7 @@ def collect_read_counts(b, sample, intervals, job_attrs, output_path):
     """
 
     j.command(command(cmd, setup_gcp=True))
-    b.write_output(j.gcnv_counts, output_path)
+    b.write_output(j.gcnv_counts, str(output_path))
     return [j]
 
 
@@ -74,7 +74,7 @@ def determine_ploidy(b, cohort_name, ploidy_priors, inputs, job_attrs, output_di
         'tool': 'gatk DetermineGermlineContigPloidy',
     }
 
-    j = b.new_job('Determine ploidy for {cohort_name}', job_attrs)
+    j = b.new_job(f'Determine ploidy for {cohort_name}', job_attrs)
     j.image(image_path('gatk'))
 
     input_args = ' '.join([f'--input {f}' for f in inputs])
