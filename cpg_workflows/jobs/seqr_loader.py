@@ -226,7 +226,7 @@ def cohort_to_vcf_job(
     Args:
         b (hb.Batch): the batch to add jobs into
         mt_path (str): path of the AnnotateDataset MT
-        out_vcf_path (str): path to write new VCF to
+        out_vcf_path (Path): path to write new VCF to
         job_attrs (dict):
         depends_on (hb.Job|list[hb.Job]): jobs to depend on
 
@@ -244,7 +244,7 @@ def cohort_to_vcf_job(
             seqr_loader,
             seqr_loader.vcf_from_mt_subset.__name__,
             str(mt_path),
-            out_vcf_path,
+            str(out_vcf_path),
             setup_gcp=True,
         )
     )
