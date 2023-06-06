@@ -103,6 +103,7 @@ def haplotype_caller(
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
                 interval=intervals[idx],
                 dragen_mode=dragen_mode,
+                out_gvcf_path=tmp_prefix / f'gvcf_parts/{sample_name}_{idx}_of_{scatter_count}.g.vcf.gz',
                 overwrite=overwrite,
             )
             hc_jobs.append(j)
@@ -318,7 +319,7 @@ def postproc_gvcf(
     # in the resulting merged blocks. It would pick the highest INFO/DP when merging
     # multiple blocks, so a variant in a small homopolymer region (surrounded by
     # long DP=0 areas), that attracted piles of low-MQ reads with INFO/DP=1000
-    # will translate into a long GQ<20 block with the same FORMAT/DP=1000, 
+    # will translate into a long GQ<20 block with the same FORMAT/DP=1000,
     # which is wrong, because most of this block has no reads.
     bcftools view $GVCF \\
     | bcftools annotate -x INFO/DP \\
