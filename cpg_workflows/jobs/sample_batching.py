@@ -99,11 +99,7 @@ def batch_samples(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict
 
 
 def partition_batches(
-    metadata_file: str,
-    output_json: str,
-    batch_size: int,
-    min_batch_size: int,
-    max_batch_size: int,
+    metadata_file: str, output_json: str, min_batch_size: int, max_batch_size: int
 ):
     """
     Runs this process
@@ -115,7 +111,6 @@ def partition_batches(
     Args:
         metadata_file (str): path to the metadata file
         output_json (str): location to write the batched samples out
-        batch_size (int): preferred batch size
         min_batch_size (int): minimum batch size
         max_batch_size (int): maximum batch size
     """
