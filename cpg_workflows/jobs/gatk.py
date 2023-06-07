@@ -23,18 +23,21 @@ def preprocess_intervals(b, intervals_path, job_attrs, output_path):
     sequencing_type = get_config()['workflow']['sequencing_type']
     reference = fasta_res_group(b)
 
+    exclude_intervals = ' '.join([f'--exclude-intervals {i}' for i in get_config()['workflow'].get('exclude_intervals', [])])
+
     if sequencing_type == 'exome':
         cmd = f"""
-        gatk PreprocessIntervals --reference {reference.base} --intervals {intervals_path} \\
-            --padding 250 --bin-length 0 --interval-merging-rule OVERLAPPING_ONLY \\
-            --output {j.preprocessed_intervals}
+        gatk PreprocessIntervals \\
+          --reference {reference.base} --intervals {intervals_path} {exclude_intervals} \\
+          --padding 250 --bin-length 0 --interval-merging-rule OVERLAPPING_ONLY \\
+          --output {j.preprocessed_intervals}
         """
 
     elif sequencing_type == 'genome':
         cmd = f"""
         gatk PreprocessIntervals --reference {reference.base} \\
-            --interval-merging-rule OVERLAPPING_ONLY --padding 0 \\
-            --output {j.preprocessed_intervals}
+          --interval-merging-rule OVERLAPPING_ONLY --padding 0 \\
+          --output {j.preprocessed_intervals}
         """
 
     else:
