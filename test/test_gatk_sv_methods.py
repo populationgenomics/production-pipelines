@@ -3,7 +3,6 @@ Test GATK-SV accessory functions.
 """
 
 import pytest
-import numpy as np
 import pandas as pd
 
 from cpg_utils import to_path

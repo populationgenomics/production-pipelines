@@ -116,7 +116,11 @@ def batch_samples(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict
 
 
 def partition_batches(
-    metadata_file: str, output_json: str, min_batch_size: int, max_batch_size: int
+    metadata_file: str,
+    sample_ids: list[str],
+    output_json: str,
+    min_batch_size: int,
+    max_batch_size: int,
 ):
     """
     Runs this process
@@ -127,6 +131,7 @@ def partition_batches(
 
     Args:
         metadata_file (str): path to the metadata file
+        sample_ids (list[str]): sample IDs to consider
         output_json (str): location to write the batched samples out
         min_batch_size (int): minimum batch size
         max_batch_size (int): maximum batch size
@@ -139,7 +144,12 @@ def partition_batches(
     md = pd.read_csv(metadata_file, sep='\t', low_memory=False)
     md.columns = [x.replace('#', '') for x in md.columns]
 
+    # filter to the PCR-state samples we're interested in
+    # surely there's a neater way to do this...
+    md = md[np.array([sam in sample_ids for sam in md.ID.tolist()])]
+
     # check that we have enough samples to batch
+    # should have already been checked prior to Stage starting
     if len(md) < min_batch_size:
         raise ValueError('Insufficient samples found for batch generation')
 
