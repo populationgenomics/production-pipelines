@@ -188,7 +188,9 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
 
     mocker.patch('pathlib.Path.open', selective_mock_open)
     # functions like get_intervals checks file existence
-    mocker.patch('cloudpathlib.cloudpath.CloudPath.exists', mock_exists)
+    mocker.patch('cpg_workflows.workflow.list_all_parent_dirs', lambda *args: {})
+    mocker.patch('cpg_workflows.workflow.list_of_all_dir_contents', lambda *args: {})
+    mocker.patch('cpg_workflows.workflow.exists_on_pre_collected', lambda *args: False)
     # cloudfuse (used in Vep) doesn't work with LocalBackend
     mocker.patch('hailtop.batch.job.Job.cloudfuse', do_nothing)
     # always_run (used in MtToEs -> hail_dataproc_job) doesn't work with LocalBackend

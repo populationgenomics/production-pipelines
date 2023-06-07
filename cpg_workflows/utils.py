@@ -20,6 +20,18 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 
 
+def exists_on_pre_collected(test: set[Path], known: set[Path]) -> Path | None:
+    """
+    Check if a path exists in a set of known paths.
+
+    This is useful when checking if a path exists in a set of paths that were
+    already collected. This method has been included to permit simple mocking
+    """
+    for path in test:
+        if path not in known:
+            return path
+    return None
+
 @lru_cache
 def exists(path: Path | str, verbose: bool = True) -> bool:
     """

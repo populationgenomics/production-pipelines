@@ -44,6 +44,10 @@ def test_force_stages(mocker: MockFixture, tmp_path):
     """
 
     mocker.patch('cpg_workflows.utils.exists_not_cached', lambda *args: True)
+    # dummy mocking to avoid file system scanning
+    mocker.patch('cpg_workflows.workflow.list_all_parent_dirs', lambda *args: {})
+    mocker.patch('cpg_workflows.workflow.list_of_all_dir_contents', lambda *args: {})
+    mocker.patch('cpg_workflows.workflow.exists_on_pre_collected', lambda *args: None)
     set_config(conf, tmp_path / 'config.toml')
     run_workflow(mocker)
 

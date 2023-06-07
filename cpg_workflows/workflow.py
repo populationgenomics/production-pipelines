@@ -28,7 +28,7 @@ from cpg_utils import Path
 from .batch import get_batch
 from .status import MetamistStatusReporter
 from .targets import Target, Dataset, Sample, Cohort
-from .utils import exists, timestamp, slugify, ExpectedResultT
+from .utils import exists, exists_on_pre_collected, timestamp, slugify, ExpectedResultT
 from .inputs import get_cohort
 
 
@@ -728,9 +728,8 @@ class Stage(Generic[TargetT], ABC):
 
             # check against the pre-scanned files if possible
             if existing_outputs:
-                first_missing_path = next(
-                    (p for p in paths if p not in existing_outputs), None
-                )
+
+                first_missing_path = exists_on_pre_collected(paths, existing_outputs)
             # otherwise individual .exists() tests
             else:
                 first_missing_path = next((p for p in paths if not exists(p)), None)
