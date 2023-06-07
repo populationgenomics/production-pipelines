@@ -9,7 +9,7 @@ prefixing `test_` to your file name.
 prefixing `test_` to your function name.
 
 3. Inside your test function or at the top of your test file, define an inline 
-workflow configration TOML file. For example:
+workflow configuration TOML file. For example:
 
 ```python
 def test_the_thing():
@@ -46,8 +46,8 @@ This method will save your config to specified path and add it to the `CPG_CONFI
 environment variable, which is used by production pipelines to configure various 
 workflow components. The `merge_with` paths are also added in a way such that merging of 
 configurations occurs from right to left; the values in the left configurations are 
-overriden by values in the right. Your config will be merged last so that it will 
-override existing config parameters in the `merge_with` configrations.
+overridden by values in the right. Your config will be merged last so that it will 
+override existing config parameters in the `merge_with` configurations.
 
 5. Pytest can supply a tmp directory for you automatically if your test function accepts 
 and argument named `tmp_path`. This directory and all of its contents are deleted after 
