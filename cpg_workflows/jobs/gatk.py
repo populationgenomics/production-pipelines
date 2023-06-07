@@ -1,3 +1,5 @@
+from os.path import basename
+
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
@@ -87,10 +89,15 @@ def determine_ploidy(b, cohort_name, ploidy_priors, inputs, job_attrs, output_di
         input_args += f' --input $BATCH_TMPDIR/s{n}.counts.hdf5'
         n += 1
 
+    # --contig-ploidy-priors argument must be a local file
+    tmp_ploidy_priors = f'$BATCH_TMPDIR/{basename(str(ploidy_priors))}'
+
     cmd += f"""
+    retry_gs_cp {ploidy_priors} {tmp_ploidy_priors}
+
     gatk DetermineGermlineContigPloidy \\
       --interval-merging-rule OVERLAPPING_ONLY \\
-      --contig-ploidy-priors {ploidy_priors} \\
+      --contig-ploidy-priors {tmp_ploidy_priors} \\
       {input_args} \\
       --output $BATCH_TMPDIR --output-prefix {cohort_name}
     """
