@@ -55,112 +55,112 @@ def test_cohort(mocker: MockFixture, tmp_path):
             {'id': 'CPG04', 'external_id': 'SAMPLE4'},
         ]
 
-    def get_sequences_by_sample_ids(  # pylint: disable=unused-argument
-        *args, **kwargs
-    ) -> dict:
-        return {
-            'CPG00': [
-                {
-                    'id': 0,
-                    'sample_id': 'CPG00',
-                    'type': 'genome',
-                    'status': 'completed',
-                    'meta': {'reads': [{'location': 'file.bam'}], 'reads_type': 'bam'},
-                },
-                {
-                    'id': 1,
-                    'sample_id': 'CPG00',
-                    'type': 'exome',
-                    'status': 'completed',
-                    'meta': {'reads': [{'location': 'file.bam'}], 'reads_type': 'bam'},
-                },
-            ],
-            'CPG01': [
-                {
-                    'id': 2,
-                    'sample_id': 'CPG01',
-                    'type': 'genome',
-                    'status': 'completed',
-                    'meta': {
-                        'reads': [
-                            [
-                                {'location': 'file.R1.fq.gz'},
-                                {'location': 'file.R2.fq.gz'},
-                            ]
-                        ],
-                        'reads_type': 'fastq',
-                    },
-                }
-            ],
-            'CPG02': [
-                {
-                    'id': 3,
-                    'sample_id': 'CPG02',
-                    'type': 'genome',
-                    'status': 'completed',
-                    'meta': {'reads': [{'location': 'file.bam'}], 'reads_type': 'bam'},
-                }
-            ],
-            'CPG03': [
-                {
-                    'id': 4,
-                    'sample_id': 'CPG03',
-                    'type': 'genome',
-                    'status': 'completed',
-                    'meta': {'reads': [{'location': 'file.bam'}], 'reads_type': 'bam'},
-                }
-            ],
-            'CPG04': [
-                {
-                    'id': 5,
-                    'sample_id': 'CPG04',
-                    'type': 'genome',
-                    'status': 'incomplete',
-                    'meta': {},
-                }
-            ],
-        }
+    # def get_sequences_by_sample_ids(  # pylint: disable=unused-argument
+    #     *args, **kwargs
+    # ) -> dict:
+    #     return {
+    #         'CPG00': [
+    #             {
+    #                 'id': 0,
+    #                 'sample_id': 'CPG00',
+    #                 'type': 'genome',
+    #                 'status': 'completed',
+    #                 'meta': {'reads': [{'location': 'file.bam'}], 'reads_type': 'bam'},
+    #             },
+    #             {
+    #                 'id': 1,
+    #                 'sample_id': 'CPG00',
+    #                 'type': 'exome',
+    #                 'status': 'completed',
+    #                 'meta': {'reads': [{'location': 'file.bam'}], 'reads_type': 'bam'},
+    #             },
+    #         ],
+    #         'CPG01': [
+    #             {
+    #                 'id': 2,
+    #                 'sample_id': 'CPG01',
+    #                 'type': 'genome',
+    #                 'status': 'completed',
+    #                 'meta': {
+    #                     'reads': [
+    #                         [
+    #                             {'location': 'file.R1.fq.gz'},
+    #                             {'location': 'file.R2.fq.gz'},
+    #                         ]
+    #                     ],
+    #                     'reads_type': 'fastq',
+    #                 },
+    #             }
+    #         ],
+    #         'CPG02': [
+    #             {
+    #                 'id': 3,
+    #                 'sample_id': 'CPG02',
+    #                 'type': 'genome',
+    #                 'status': 'completed',
+    #                 'meta': {'reads': [{'location': 'file.bam'}], 'reads_type': 'bam'},
+    #             }
+    #         ],
+    #         'CPG03': [
+    #             {
+    #                 'id': 4,
+    #                 'sample_id': 'CPG03',
+    #                 'type': 'genome',
+    #                 'status': 'completed',
+    #                 'meta': {'reads': [{'location': 'file.bam'}], 'reads_type': 'bam'},
+    #             }
+    #         ],
+    #         'CPG04': [
+    #             {
+    #                 'id': 5,
+    #                 'sample_id': 'CPG04',
+    #                 'type': 'genome',
+    #                 'status': 'incomplete',
+    #                 'meta': {},
+    #             }
+    #         ],
+    #     }
 
-    def mock_get_external_participant_id_to_internal_sample_id(  # pylint: disable=unused-argument
-        *args, **kwargs
-    ) -> list[list]:
-        return [
-            ['PART0', 'CPG00'],
-            ['PART1', 'CPG01'],
-            ['PART2', 'CPG02'],
-            ['PART3', 'CPG03'],
-            ['PART4', 'CPG04'],
-        ]
+    # def mock_get_external_participant_id_to_internal_sample_id(  # pylint: disable=unused-argument
+    #     *args, **kwargs
+    # ) -> list[list]:
+    #     return [
+    #         ['PART0', 'CPG00'],
+    #         ['PART1', 'CPG01'],
+    #         ['PART2', 'CPG02'],
+    #         ['PART3', 'CPG03'],
+    #         ['PART4', 'CPG04'],
+    #     ]
 
-    def mock_get_participants(  # pylint: disable=unused-argument
-        *args, **kwargs
-    ) -> list[dict]:
-        return [
-            {
-                'external_id': 'PART0',
-                'reported_sex': 1,
-                'meta': {
-                    'Superpopulation name': 'Africa',
-                },
-            },
-            {
-                'external_id': 'PART1',
-                'reported_sex': 2,
-                'meta': {
-                    'Dummy': 'dummy',
-                },
-            },
-            {
-                'external_id': 'PART2',
-                'reported_sex': 0,
-            },
-            {
-                'external_id': 'PART3',
-            },
-            {
-                'external_id': 'PART4',
-            },
-        ]
+    # def mock_get_participants(  # pylint: disable=unused-argument
+    #     *args, **kwargs
+    # ) -> list[dict]:
+    #     return [
+    #         {
+    #             'external_id': 'PART0',
+    #             'reported_sex': 1,
+    #             'meta': {
+    #                 'Superpopulation name': 'Africa',
+    #             },
+    #         },
+    #         {
+    #             'external_id': 'PART1',
+    #             'reported_sex': 2,
+    #             'meta': {
+    #                 'Dummy': 'dummy',
+    #             },
+    #         },
+    #         {
+    #             'external_id': 'PART2',
+    #             'reported_sex': 0,
+    #         },
+    #         {
+    #             'external_id': 'PART3',
+    #         },
+    #         {
+    #             'external_id': 'PART4',
+    #         },
+    #     ]
 
     def mock_get_families(*args, **kwargs):  # pylint: disable=unused-argument
         return [{'id': 1}, {'id': 2}]
@@ -200,18 +200,18 @@ def test_cohort(mocker: MockFixture, tmp_path):
         'metamist.apis.SampleApi.get_samples',
         mock_get_samples,
     )
-    mocker.patch(
-        'metamist.apis.SequenceApi.get_sequences_by_sample_ids',
-        get_sequences_by_sample_ids,
-    )
-    mocker.patch(
-        'metamist.apis.ParticipantApi.get_external_participant_id_to_internal_sample_id',
-        mock_get_external_participant_id_to_internal_sample_id,
-    )
-    mocker.patch(
-        'metamist.apis.ParticipantApi.get_participants',
-        mock_get_participants,
-    )
+    # mocker.patch(
+    #     'metamist.apis.SequenceApi.get_sequences_by_sample_ids',
+    #     get_sequences_by_sample_ids,
+    # )
+    # mocker.patch(
+    #     'metamist.apis.ParticipantApi.get_external_participant_id_to_internal_sample_id',
+    #     mock_get_external_participant_id_to_internal_sample_id,
+    # )
+    # mocker.patch(
+    #     'metamist.apis.ParticipantApi.get_participants',
+    #     mock_get_participants,
+    # )
     mocker.patch(
         'metamist.apis.FamilyApi.get_families',
         mock_get_families,
