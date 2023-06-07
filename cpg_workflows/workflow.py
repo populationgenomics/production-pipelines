@@ -41,6 +41,33 @@ StageDecorator = Callable[..., 'Stage']
 TargetT = TypeVar('TargetT', bound=Target)
 
 
+def list_all_parent_dirs(all_outputs: set[Path]) -> set[Path]:
+    """
+    take all possible outputs, find unique parent directories
+
+    Args:
+        all_outputs (set[Path]): all possible outputs across multiple stages
+
+    Returns:
+        a set of all unique parent directories
+    """
+    return {output.parent for output in all_outputs}
+
+
+def list_of_all_dir_contents(locations: set[Path]) -> set[Path]:
+    """
+    take a collection of parent directories and identify their contents
+
+    Args:
+        locations (set[Path]): all places to look
+
+    Returns:
+        set of all files across all locations
+    """
+
+    return {file for location in locations for file in location.iterdir()}
+
+
 def path_walk(expected, collected: set) -> set:
     """
     recursive walk of expected_out
@@ -64,6 +91,9 @@ def path_walk(expected, collected: set) -> set:
     >>> path_walk({'a': Path('b'),'c': {'d': 'e'}, {'f': Path('g')}}, set())
     {Path('b'), Path('g')}
     """
+    if collected is None:
+        collected = set()
+
     if expected is None:
         return collected
     if isinstance(expected, dict):
@@ -587,7 +617,9 @@ class Stage(Generic[TargetT], ABC):
 
         return outputs
 
-    def _get_action(self, target: TargetT) -> Action:
+    def _get_action(
+        self, target: TargetT, existing_files: set[Path] | None = None
+    ) -> Action:
         """
         Based on stage parameters and expected outputs existence, determines what
         to do with the target: queue, skip or reuse, etc..
@@ -607,7 +639,9 @@ class Stage(Generic[TargetT], ABC):
                 return Action.SKIP
 
         expected_out = self.expected_outputs(target)
-        reusable, first_missing_path = self._is_reusable(expected_out)
+        reusable, first_missing_path = self._is_reusable(
+            expected_out, existing_outputs=existing_files
+        )
 
         if self.skipped:
             if reusable and not first_missing_path:
@@ -668,7 +702,17 @@ class Stage(Generic[TargetT], ABC):
         logging.info(f'{self.name}: {target} [QUEUE]')
         return Action.QUEUE
 
-    def _is_reusable(self, expected_out: ExpectedResultT) -> tuple[bool, Path | None]:
+    def _is_reusable(
+        self, expected_out: ExpectedResultT, existing_outputs: set[Path] | None = None
+    ) -> tuple[bool, Path | None]:
+        """
+        Checks if the outputs of prior stages already exists, and can be reused
+        Args:
+            expected_out ():
+
+        Returns:
+
+        """
         if self.assume_outputs_exist:
             return True, None
 
@@ -679,9 +723,18 @@ class Stage(Generic[TargetT], ABC):
 
         if get_config()['workflow'].get('check_expected_outputs'):
             paths = path_walk(expected_out, set())
-            first_missing_path = next((p for p in paths if not exists(p)), None)
             if not paths:
                 return False, None
+
+            # check against the pre-scanned files if possible
+            if existing_outputs:
+                first_missing_path = next(
+                    (p for p in paths if p not in existing_outputs), None
+                )
+            # otherwise individual .exists() tests
+            else:
+                first_missing_path = next((p for p in paths if not exists(p)), None)
+
             if first_missing_path:
                 return False, first_missing_path
             return True, None
@@ -849,9 +902,8 @@ class Workflow:
         self.dry_run = dry_run or get_config()['workflow'].get('dry_run')
 
         analysis_dataset = get_config()['workflow']['dataset']
-        name = get_config()['workflow'].get('name')
-        description = get_config()['workflow'].get('description')
-        name = name or description or analysis_dataset
+        name = get_config()['workflow'].get('name', analysis_dataset)
+        description = get_config()['workflow'].get('description', name)
         self.name = slugify(name)
 
         self._output_version: str | None = None
@@ -863,7 +915,6 @@ class Workflow:
         )
 
         # Description
-        description = description or name
         if self._output_version:
             description += f': output_version={self._output_version}'
         description += f': run_timestamp={self.run_timestamp}'
@@ -901,9 +952,11 @@ class Workflow:
         """
         Prepare a unique path for the workflow with this name and this input data.
         """
-        prefix = get_cohort().analysis_dataset.prefix(category=category) / self.name
-        prefix /= self.output_version
-        return prefix
+        return (
+            get_cohort().analysis_dataset.prefix(category=category)
+            / self.name
+            / self.output_version
+        )
 
     def run(
         self,
@@ -981,11 +1034,13 @@ class Workflow:
                 first_stages_keeps.append(ancestor)
 
         for ls in last_stages:
-            if any(anc in last_stages for anc in nx.ancestors(graph, ls)):
+            # ancestors of this last_stage
+            ancestors = nx.ancestors(graph, ls)
+            if any(anc in last_stages for anc in ancestors):
                 # a downstream stage is also in last_stages, so this is not yet
                 # a "real" last stage that we want to run
                 continue
-            for ancestor in nx.ancestors(graph, ls):
+            for ancestor in ancestors:
                 if stages_d[ancestor].skipped:
                     continue  # already skipped
                 logging.info(f'Skipping stage {ancestor} (after last {ls})')
@@ -1042,6 +1097,7 @@ class Workflow:
                     continue  # not searching deeper
                 if only_stages and stg.name not in only_stages:
                     stg.skipped = True
+                    # todo assume output exists for skipped stages?
 
                 # Iterate dependencies:
                 for reqcls in stg.required_stages_classes:
@@ -1187,8 +1243,18 @@ class SampleStage(Stage[Sample], ABC):
                 continue
 
             logging.info(f'Dataset {dataset}:')
+            # collect all expected outputs across all samples
+            # find all directories which will be checked
+            # list outputs in advance
+            all_outputs = set()
             for sample in dataset.get_samples():
-                action = self._get_action(sample)
+                all_outputs = path_walk(self.expected_outputs(sample), all_outputs)
+            all_parents = list_all_parent_dirs(all_outputs)
+            existing_files = list_of_all_dir_contents(all_parents)
+
+            # evaluate_stuff en masse
+            for sample in dataset.get_samples():
+                action = self._get_action(sample, existing_files=existing_files)
                 output_by_target[sample.target_id] = self._queue_jobs_with_checks(
                     sample, action
                 )
