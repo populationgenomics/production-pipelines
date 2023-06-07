@@ -32,6 +32,7 @@ def exists_on_pre_collected(test: set[Path], known: set[Path]) -> Path | None:
             return path
     return None
 
+
 @lru_cache
 def exists(path: Path | str, verbose: bool = True) -> bool:
     """
