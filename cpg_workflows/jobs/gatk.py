@@ -78,7 +78,16 @@ def determine_ploidy(b, cohort_name, ploidy_priors, inputs, job_attrs, output_di
     j.image(image_path('gatk_gcnv'))
 
     input_args = ' '.join([f'--input {f}' for f in inputs])
-    cmd = f"""
+
+    cmd = ''
+    input_args = ''
+    n = 1
+    for f in inputs:
+        cmd += f'retry_gs_cp {f} $BATCH_TMPDIR/s{n}.counts.hdf5\n'
+        input_args += f' --input $BATCH_TMPDIR/s{n}.counts.hdf5'
+        n += 1
+
+    cmd += f"""
     gatk DetermineGermlineContigPloidy \\
       --interval-merging-rule OVERLAPPING_ONLY \\
       --contig-ploidy-priors {ploidy_priors} \\
@@ -89,5 +98,5 @@ def determine_ploidy(b, cohort_name, ploidy_priors, inputs, job_attrs, output_di
     #   tar czf ~{cohort_name}-contig-ploidy-model.tar.gz -C ~{output_dir_}/~{cohort_name}-model .
     #   tar czf ~{cohort_name}-contig-ploidy-calls.tar.gz -C ~{output_dir_}/~{cohort_name}-calls .
 
-    j.command(command(cmd, setup_gcp=True))
+    j.command(command(cmd, setup_gcp=True, define_retry_function=True))
     return [j]
