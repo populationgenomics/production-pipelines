@@ -1246,7 +1246,7 @@ class SampleStage(Stage[Sample], ABC):
             # collect all expected outputs across all samples
             # find all directories which will be checked
             # list outputs in advance
-            all_outputs = set()
+            all_outputs: set[Path] = set()
             for sample in dataset.get_samples():
                 all_outputs = path_walk(self.expected_outputs(sample), all_outputs)
             all_parents = list_all_parent_dirs(all_outputs)
