@@ -16,7 +16,7 @@ def preprocess_intervals(b, intervals_path, job_attrs, output_path):
     }
 
     j = b.new_job('Preprocess intervals', job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk_gcnv'))
 
     sequencing_type = get_config()['workflow']['sequencing_type']
     reference = fasta_res_group(b)
@@ -52,7 +52,7 @@ def collect_read_counts(b, sample, intervals, job_attrs, output_path):
     }
 
     j = b.new_job(f'Collect gCNV counts for {sample.id}', job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk_gcnv'))
 
     reference = fasta_res_group(b)
     cram_path = sample.make_cram_path()
@@ -75,7 +75,7 @@ def determine_ploidy(b, cohort_name, ploidy_priors, inputs, job_attrs, output_di
     }
 
     j = b.new_job(f'Determine ploidy for {cohort_name}', job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk_gcnv'))
 
     input_args = ' '.join([f'--input {f}' for f in inputs])
     cmd = f"""
