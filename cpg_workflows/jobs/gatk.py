@@ -74,7 +74,20 @@ def collect_read_counts(b, sample, intervals, job_attrs, output_path):
     return [j]
 
 
-def determine_ploidy(b, cohort_name, ploidy_priors, inputs, job_attrs, output_dir):
+def determine_ploidy(b: hb.Batch, cohort_name: str, ploidy_priors: str, inputs: list[Path], job_attrs: dict, output_dir):
+    """
+
+    Args:
+        b (hb.Batch):
+        cohort_name (str):
+        ploidy_priors (str): file from config
+        inputs (list[Path]): CollectReadCounts results for each Sample
+        job_attrs (dict):
+        output_dir (Path):
+
+    Returns:
+
+    """
     job_attrs = (job_attrs or {}) | {
         'tool': 'gatk DetermineGermlineContigPloidy',
     }
@@ -82,28 +95,33 @@ def determine_ploidy(b, cohort_name, ploidy_priors, inputs, job_attrs, output_di
     j = b.new_job(f'Determine ploidy for {cohort_name}', job_attrs)
     j.image(image_path('gatk_gcnv'))
 
-    input_args = ' '.join([f'--input {f}' for f in inputs])
-
-    cmd = ''
     input_args = ''
-    n = 1
     for f in inputs:
-        cmd += f'retry_gs_cp {f} $BATCH_TMPDIR/s{n}.counts.hdf5\n'
-        input_args += f' --input $BATCH_TMPDIR/s{n}.counts.hdf5'
-        n += 1
+        sample_input = b.read_input(str(f))
+        input_args += f' --input {sample_input}'
 
     # --contig-ploidy-priors argument must be a local file
-    tmp_ploidy_priors = f'$BATCH_TMPDIR/{basename(str(ploidy_priors))}'
+    ploidy_prior = b.read_input(ploidy_priors)
 
-    cmd += f"""
-    retry_gs_cp {ploidy_priors} {tmp_ploidy_priors}
+    # define output locations in advance
+    j.declare_resource_group(
+        contig_model={
+            '-calls.tar.gz': '{root}-calls.tar.gz',
+            '-model.tar.gz': '{root}-model.tar.gz'
+        }
+    )
 
+    cmd = f"""
     gatk DetermineGermlineContigPloidy \\
       --interval-merging-rule OVERLAPPING_ONLY \\
-      --contig-ploidy-priors {tmp_ploidy_priors} \\
+      --contig-ploidy-priors {ploidy_prior} \\
       {input_args} \\
-      --output $BATCH_TMPDIR --output-prefix {cohort_name}
+      --output $BATCH_TMPDIR --output-prefix {j.contig_model}
     """
+
+    # writes outputs to cloud location, subbing in {root} for output_dir
+    b.write_output(j.contig_model, str(output_dir))
+
     # TODO maybe add --intervals {intervals_path}
     #   tar czf ~{cohort_name}-contig-ploidy-model.tar.gz -C ~{output_dir_}/~{cohort_name}-model .
     #   tar czf ~{cohort_name}-contig-ploidy-calls.tar.gz -C ~{output_dir_}/~{cohort_name}-calls .

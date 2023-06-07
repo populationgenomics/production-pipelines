@@ -71,6 +71,6 @@ class DeterminePloidy(DatasetStage):
             get_config()['workflow'].get('ploidy_priors'),
             [inputs.as_path(s, CollectReadCounts, 'gcnv_counts') for s in dataset.get_samples()],
             self.get_job_attrs(dataset),
-            self._file_dir(dataset)
+            self._file_dir(dataset) / f'{dataset.name}-contig-ploidy'
         )
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
