@@ -216,10 +216,12 @@ class CreateSampleBatches(CohortStage):
         min_batch_size = get_config()['workflow'].get('min_batch_size', 100)
         max_batch_size = get_config()['workflow'].get('max_batch_size', 300)
 
+        all_jobs = []
+
         for status, samples in [('PCRMINUS', pcr_neg), ('PCRPLUS', pcr_plus)]:
             if len(samples) < min_batch_size:
                 logging.info(f'Too few {status} samples to form batches')
-                return
+                continue
 
             # I think this can just be a PythonJob?
             py_job = get_batch().new_python_job(f'create_{status}_sample_batches')
@@ -232,5 +234,6 @@ class CreateSampleBatches(CohortStage):
                 min_batch_size,
                 max_batch_size,
             )
+            all_jobs.append(py_job)
 
-        return self.make_outputs(cohort, data=expected, jobs=py_job)
+        return self.make_outputs(cohort, data=expected, jobs=all_jobs)
