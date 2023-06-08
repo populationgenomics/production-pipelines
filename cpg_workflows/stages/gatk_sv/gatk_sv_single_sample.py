@@ -201,13 +201,13 @@ class CreateSampleBatches(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {'batch_json': self.prefix / '{pcr_status}_batches.json'}
+        return {'batch_json': self.prefix / 'pcr_{pcr_status}_batches.json'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         expected = self.expected_outputs(cohort)
         pcr_plus, pcr_neg = [], []
         for sample in cohort.get_samples():
-            if sample.meta.get('pcr_status', 'unknown') == 'PCR-':
+            if sample.meta.get('pcr_status', 'unknown') == 'negative':
                 pcr_neg.append(sample.id)
             else:
                 pcr_plus.append(sample.id)
@@ -218,7 +218,7 @@ class CreateSampleBatches(CohortStage):
 
         all_jobs = []
 
-        for status, samples in [('PCRMINUS', pcr_neg), ('PCRPLUS', pcr_plus)]:
+        for status, samples in [('negative', pcr_neg), ('positive', pcr_plus)]:
             if len(samples) < min_batch_size:
                 logging.info(f'Too few {status} samples to form batches')
                 continue
