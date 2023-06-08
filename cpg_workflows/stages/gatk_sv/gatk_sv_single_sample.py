@@ -1,8 +1,7 @@
 """
 single-sample components of the GATK SV workflow
 """
-
-
+import logging
 from typing import Any
 
 from cpg_utils import Path
@@ -202,19 +201,39 @@ class CreateSampleBatches(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {'batch_json': self.prefix / 'batches.json'}
+        return {'batch_json': self.prefix / 'pcr_{pcr_status}_batches.json'}
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        evidence_files = inputs.as_dict(cohort, EvidenceQC)
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         expected = self.expected_outputs(cohort)
+        pcr_plus, pcr_neg = [], []
+        for sample in cohort.get_samples():
+            if sample.meta.get('pcr_status', 'unknown') == 'negative':
+                pcr_neg.append(sample.id)
+            else:
+                pcr_plus.append(sample.id)
 
-        # I think this can just be a PythonJob?
-        py_job = get_batch().new_python_job('create_sample_batches')
-        py_job.image(get_config()['workflow']['driver_image'])
-        py_job.call(
-            sample_batching.partition_batches,
-            evidence_files['qc_table'],
-            expected['batch_json'],
-        )
+        # get those settings
+        min_batch_size = get_config()['workflow'].get('min_batch_size', 100)
+        max_batch_size = get_config()['workflow'].get('max_batch_size', 300)
 
-        return self.make_outputs(cohort, data=expected, jobs=py_job)
+        all_jobs = []
+
+        for status, samples in [('negative', pcr_neg), ('positive', pcr_plus)]:
+            if len(samples) < min_batch_size:
+                logging.info(f'Too few {status} samples to form batches')
+                continue
+
+            # I think this can just be a PythonJob?
+            py_job = get_batch().new_python_job(f'create_{status}_sample_batches')
+            py_job.image(get_config()['workflow']['driver_image'])
+            py_job.call(
+                sample_batching.partition_batches,
+                inputs.as_dict(cohort, EvidenceQC)['qc_table'],
+                samples,
+                expected['batch_json'],
+                min_batch_size,
+                max_batch_size,
+            )
+            all_jobs.append(py_job)
+
+        return self.make_outputs(cohort, data=expected, jobs=all_jobs)
