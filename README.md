@@ -47,7 +47,7 @@ To run the Seqr Loader workflow on the dataset called `validation`, create a con
 input_datasets = ['validation']
 sequencing_type = 'genome'
 create_es_index_for_datasets = ['validation']
-skip_samples = [
+skip_sgs = [
     'CPG243717',  # NA12878_KCCG low coverage (8x)
 ]
 ```
@@ -112,7 +112,7 @@ analysis-runner \
 
 For exomes, replace `configs/genome.toml` with `configs/exome.toml`, or set `sequencing_type = 'exome'` in the `workflow` section.
 
-The section `workflows/input_datasets` in `configs/seqr-main.toml` specified the list of all projects to be processed, excluding samples specified in the `workflows/skip_samples` section.
+The section `workflows/input_datasets` in `configs/seqr-main.toml` specified the list of all projects to be processed, excluding sequencing groups specified in the `workflows/skip_sgs` section.
 
 QC reports for each dataset would be exposed on a web server, e.g. for `validation` genomes, the URL would be https://main-web.populationgenomics.org.au/validation/qc/cram/multiqc.html, and for exomes, it will  be https://main-web.populationgenomics.org.au/validation/exome/qc/cram/multiqc.html.
 
@@ -590,7 +590,7 @@ The library implicitly reads configuration using the `cpg_utils.config.get_confi
 [workflow]
 sequencing_type = 'genome'
 only_datasets = ['hgdp', 'thousand-genomes']
-skip_samples = ['CPG202994', 'CPG203000']
+skip_sgs = ['CPG202994', 'CPG203000']
 skip_stages = ['Align']
 check_inputs = true  # checks e.g. if fastq for align stage exist
 check_intermediates = false  # explitic calls to can_reuse(path) will return False 
@@ -717,7 +717,7 @@ You can also call the method `cpg_workflows.utils.can_reuse(path)` explicitly wi
 
 You can also start the pipeline from a specific stage with `workflow/first_stages` (it would skip all previous stages, but still check immediately required inputs for the first stage). `workflow/last_stages` would stop the workflow after the stages specified. `workflow/only_stages` would execute only stages specified, ignoring dependencies.
 
-You can also force the pipeline to skip certain samples with `workflow/skip_samples`, pick only certain samples with `workfpow/only_samples`, force re-processing of certain samples with `workflow/force_samples`. `workflow/skip_datasets` and `workflow/only_datasets` are available, and more fine-grained combination of `skip_samples` and `skip_stages`: 
+You can also force the pipeline to skip certain sequencing groups with `workflow/skip_sgs`, pick only certain samples with `workfpow/only_samples`, force re-processing of certain samples with `workflow/force_samples`. `workflow/skip_datasets` and `workflow/only_datasets` are available, and more fine-grained combination of `skip_sgs` and `skip_stages`: 
 
 ```toml
 [workflow.skip_samples_stages]

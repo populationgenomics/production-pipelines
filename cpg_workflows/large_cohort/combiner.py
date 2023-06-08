@@ -43,7 +43,7 @@ def _check_gvcfs(samples: list[Sample]) -> list[Sample]:
                 else:
                     raise ValueError(
                         f'Sample {sample} is missing GVCF. '
-                        f'Use workflow/skip_samples = [] or '
+                        f'Use workflow/skip_sgs = [] or '
                         f'workflow/skip_samples_with_missing_input '
                         f'to control behaviour'
                     )
