@@ -50,7 +50,7 @@ def create_cohort() -> Cohort:
                 meta=metadata,
             )
 
-            if reported_sex := entry['sample']['participant'].get('reported_sex'):
+            if reported_sex := entry['sample']['participant'].get('reportedSex'):
                 sample.pedigree.sex = Sex.parse(reported_sex)
 
             _populate_alignment_inputs_new(sample, entry)
@@ -90,19 +90,19 @@ def _populate_alignment_inputs_new(
     assay_entry = entry['assays'][0]
     print(assay_entry)
 
-    assay = Assay.parse(entry, parse_reads=False)
+    assay = Assay.parse(assay_entry, sample.id, parse_reads=False)
 
-    sample.assays['sequencing_type'] = assay
+    sample.assays[assay.assay_type] = assay
 
-    if entry['assays'][0].get('meta', {}).get('reads'):
+    if assay_entry.get('meta', {}).get('reads'):
         alignment_input = Assay.parse_reads(
             sample_id=sample.id,
-            meta=entry['assays'][0]['meta'],
+            meta=assay_entry['meta'],
             check_existence=check_existence,
         )
 
     assay.alignment_input = alignment_input
-    sample.alignment_input_by_seq_type[assay.sequencing_type] = alignment_input
+    sample.alignment_input_by_seq_type[sequencing_group['type']] = alignment_input
 
     # TODO: Include some additional logging here about sequences without reads etc.
 

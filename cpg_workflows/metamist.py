@@ -541,49 +541,40 @@ class Assay:
     id: str
     sample_id: str
     meta: dict
-    sequencing_type: str
+    assay_type: str
     alignment_input: AlignmentInput | None = None
 
     @staticmethod
     def parse(
         data: dict,
+        sg_id: str,
         check_existence: bool = False,
         parse_reads: bool = True,
     ) -> 'Assay':
         """
         Create from a dictionary.
         """
-        # TODO: Add a check for meta in assays
 
-        sg_keys = ['id', 'type', 'assays']
-        assay_keys = ['meta', 'id']
+        assay_keys = ['id', 'type', 'meta']
+        missing_keys = [key for key in assay_keys if data.get(key) is None]
 
-        missing_sg_keys = [key for key in sg_keys if data.get(key) is None]
-        missing_assay_keys = [
-            key
-            for assay in data.get('assays', [])
-            for key in assay_keys
-            if key not in assay
-        ]
-
-        if missing_sg_keys or missing_assay_keys:
+        if missing_keys:
             raise ValueError(
                 f'Cannot parse metamist Sequence {data}. Missing keys: {missing_sg_keys + missing_assay_keys}'
             )
 
-        sg_id = str(data['id'])
-        sequencing_type = str(data['type'])
-        assert sequencing_type, data
+        assay_type = str(data['type'])
+        assert assay_type, data
         mm_seq = Assay(
-            id=str(data['assays'][0]['id']),
+            id=str(data['id']),
             sample_id=sg_id,
-            meta=data['assays'][0]['meta'],
-            sequencing_type=sequencing_type,
+            meta=data['meta'],
+            assay_type=assay_type,
         )
         if parse_reads:
             mm_seq.alignment_input = Assay.parse_reads(
                 sample_id=sg_id,
-                meta=data['assays'][0]['meta'],
+                meta=data['meta'],
                 check_existence=check_existence,
             )
         return mm_seq
