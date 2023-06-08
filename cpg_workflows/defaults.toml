@@ -6,8 +6,8 @@
 # Datasets to skip:
 #skip_datasets = []
 
-# Samples to skip:
-#skip_samples = []
+# Sequencing groups to skip:
+#skip_sgs = []
 
 # Only process the following samples:
 #only_samples = []

@@ -26,7 +26,7 @@ input_datasets = [
     'validation',
 ]
 
-skip_samples = [
+skip_sgs = [
     'CPG11783',   # acute-care, no FASTQ data
     # 'CPG253328',  # perth-neuro, contamination rate 32% # put back in see https://github.com/populationgenomics/seqr-private/issues/41#issuecomment-1336537385
     'CPG13409',   # perth-neuro, coverage ~0x

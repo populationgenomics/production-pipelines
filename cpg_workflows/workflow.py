@@ -1169,7 +1169,7 @@ class SampleStage(Stage[Sample], ABC):
                 f'{len(cohort.get_samples(only_active=False))} '
                 f'usable (active=True) samples found. Check logs above for '
                 f'possible reasons samples were skipped (e.g. all samples ignored '
-                f'via `workflow.skip_samples` in config, or they all missing stage '
+                f'via `workflow.skip_sgs` in config, or they all missing stage '
                 f'inputs and `workflow.skip_samples_with_missing_input=true` is set)'
             )
             return output_by_target
@@ -1182,7 +1182,7 @@ class SampleStage(Stage[Sample], ABC):
                     f'{len(dataset.get_samples(only_active=False))} '
                     f'usable (active=True) samples found. Check logs above for '
                     f'possible reasons samples were skipped (e.g. all samples ignored '
-                    f'via `workflow.skip_samples` in config, or they all missing stage '
+                    f'via `workflow.skip_sgs` in config, or they all missing stage '
                     f'inputs and `workflow.skip_samples_with_missing_input=true` is set)'
                 )
                 continue
