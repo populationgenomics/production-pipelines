@@ -61,7 +61,7 @@ def create_cohort() -> Cohort:
         msg = 'No datasets populated'
         if 'skip_sgs' in get_config()['workflow']:
             msg += ' (after skipping sequencing groups)'
-        if 'only_samples' in get_config()['workflow']:
+        if 'only_sgs' in get_config()['workflow']:
             msg += ' (after picking samples)'
         raise MetamistError(msg)
 

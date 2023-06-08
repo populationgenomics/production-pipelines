@@ -9,8 +9,8 @@
 # Sequencing groups to skip:
 #skip_sgs = []
 
-# Only process the following samples:
-#only_samples = []
+# Only process the following sequencing groups:
+#only_sgs = []
 
 # Process the following samples even if outputs exist:
 #force_samples = []

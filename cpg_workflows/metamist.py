@@ -170,13 +170,11 @@ class Metamist:
             metamist_proj += '-test'
 
         skip_sgs = get_config()['workflow'].get('skip_sgs', [])
-        only_sgs = get_config()['workflow'].get('only_samples', [])
+        only_sgs = get_config()['workflow'].get('only_sgs', [])
         sequencing_type = get_config()['workflow'].get('sequencing_type')
 
         if only_sgs and skip_sgs:
-            raise MetamistError(
-                'Cannot specify both only_samples and skip_sgs in config'
-            )
+            raise MetamistError('Cannot specify both only_sgs and skip_sgs in config')
 
         get_sequencing_groups_query = gql(
             """
