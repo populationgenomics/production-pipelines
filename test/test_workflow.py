@@ -113,7 +113,6 @@ def test_workflow(tmp_path):
     print(f'Checking result in {output_path}:')
     with output_path.open() as f:
         result = f.read()
-        print(result)
         assert result.split() == ['CPG01_done', 'CPG02_done'], result
 
 
@@ -130,5 +129,5 @@ def test_path_walk():
         'b': [to_path('that.txt'), {'c': to_path('the_other.txt')}],
         'd': 'string.txt',
     }
-    act = path_walk(exp, set())
+    act = path_walk(exp)
     assert act == {to_path('this.txt'), to_path('that.txt'), to_path('the_other.txt')}

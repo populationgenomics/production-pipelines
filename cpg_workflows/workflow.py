@@ -28,7 +28,7 @@ from cpg_utils import Path
 from .batch import get_batch
 from .status import MetamistStatusReporter
 from .targets import Target, Dataset, Sample, Cohort
-from .utils import exists, exists_on_pre_collected, timestamp, slugify, ExpectedResultT
+from .utils import exists, missing_from_pre_collected, timestamp, slugify, ExpectedResultT
 from .inputs import get_cohort
 
 
@@ -68,7 +68,7 @@ def list_of_all_dir_contents(locations: set[Path]) -> set[Path]:
     return {file for location in locations for file in location.iterdir()}
 
 
-def path_walk(expected, collected: set) -> set:
+def path_walk(expected, collected: set | None = None) -> set[Path]:
     """
     recursive walk of expected_out
     if the object is iterable, walk it
@@ -84,11 +84,11 @@ def path_walk(expected, collected: set) -> set:
 
     Examples:
 
-    >>> path_walk({'a': {'b': {'c': Path('d')}}}, set())
+    >>> path_walk({'a': {'b': {'c': Path('d')}}})
     {Path('d')}
-    >>> path_walk({'a': {'b': {'c': [Path('d'), Path('e')]}}}, set())
+    >>> path_walk({'a': {'b': {'c': [Path('d'), Path('e')]}}})
     {Path('d'), Path('e')}
-    >>> path_walk({'a': Path('b'),'c': {'d': 'e'}, {'f': Path('g')}}, set())
+    >>> path_walk({'a': Path('b'),'c': {'d': 'e'}, {'f': Path('g')}})
     {Path('b'), Path('g')}
     """
     if collected is None:
@@ -706,12 +706,15 @@ class Stage(Generic[TargetT], ABC):
         self, expected_out: ExpectedResultT, existing_outputs: set[Path] | None = None
     ) -> tuple[bool, Path | None]:
         """
-        Checks if the outputs of prior stages already exists, and can be reused
+        Checks if the outputs of prior stages already exist, and can be reused
         Args:
-            expected_out ():
+            expected_out (ExpectedResultT): expected outputs of a stage
+            existing_outputs (optional[set[Path]]): pre-scanned directory contents
 
         Returns:
-
+            tuple[bool, Path | None]:
+                bool: True if the outputs can be reused, False otherwise
+                Path | None: first missing path, if any
         """
         if self.assume_outputs_exist:
             return True, None
@@ -722,15 +725,15 @@ class Stage(Generic[TargetT], ABC):
             return True, None
 
         if get_config()['workflow'].get('check_expected_outputs'):
-            paths = path_walk(expected_out, set())
+            paths = path_walk(expected_out)
             if not paths:
                 return False, None
 
             # check against the pre-scanned files if possible
             if existing_outputs:
+                first_missing_path = missing_from_pre_collected(paths, existing_outputs)
 
-                first_missing_path = exists_on_pre_collected(paths, existing_outputs)
-            # otherwise individual .exists() tests
+            # fall back to individual .exists() tests
             else:
                 first_missing_path = next((p for p in paths if not exists(p)), None)
 
