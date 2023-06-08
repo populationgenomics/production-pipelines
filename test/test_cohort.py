@@ -7,6 +7,113 @@ from pytest_mock import MockFixture
 from . import set_config
 
 
+def mock_get_sgs(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argument
+    return [
+        {
+            'id': 'CPGLCL17',
+            'meta': {'sg_meta': 'is_fun'},
+            'platform': 'illumina',
+            'type': 'genome',
+            'sample': {
+                'externalId': 'NA12340',
+                'participant': {
+                    'id': 1,
+                    'externalId': '8',
+                    'reportedSex': 'Male',
+                    'meta': {'participant_meta': 'is_here'},
+                },
+            },
+            'assays': [
+                {
+                    'id': 1,
+                    'meta': {
+                        'platform': '30x Illumina PCR-Free',
+                        'concentration': '25',
+                        'fluid_x_tube_id': '220405_FS28',
+                        'reference_genome': 'Homo sapiens (b37d5)',
+                        'volume': '100',
+                        'reads_type': 'fastq',
+                        'batch': '1',
+                        'reads': [
+                            {
+                                'location': 'gs://cpg-fewgenomes-main/HG3FMDSX3_2_220405_FS28_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R1.fastq.gz',
+                                'basename': 'HG3FMDSX3_2_220405_FS28_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R1.fastq.gz',
+                                'class': 'File',
+                                'checksum': None,
+                                'size': 1070968,
+                                'datetime_added': None,
+                            },
+                            {
+                                'location': 'gs://cpg-fewgenomes-main/HG3FMDSX3_2_220405_FS28_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R2.fastq.gz',
+                                'basename': 'HG3FMDSX3_2_220405_FS28_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R2.fastq.gz',
+                                'class': 'File',
+                                'checksum': None,
+                                'size': 1123158,
+                                'datetime_added': None,
+                            },
+                        ],
+                        'sequencing_type': 'genome',
+                        'sequencing_technology': 'short-read',
+                        'sequencing_platform': 'illumina',
+                    },
+                    'type': 'sequencing',
+                }
+            ],
+        },
+        {
+            'id': 'CPGLCL25',
+            'meta': {'sample_meta': 'is_fun'},
+            'platform': 'illumina',
+            'type': 'genome',
+            'sample': {
+                'externalId': 'NA12489',
+                'participant': {
+                    'id': 2,
+                    'externalId': '14',
+                    'reportedSex': None,
+                    'meta': {'participant_metadata': 'number_fourteen'},
+                },
+            },
+            'assays': [
+                {
+                    'id': 2,
+                    'meta': {
+                        'platform': '30x Illumina PCR-Free',
+                        'concentration': '25',
+                        'fluid_x_tube_id': '220405_FS29',
+                        'reference_genome': 'Homo sapiens (b37d5)',
+                        'volume': '100',
+                        'reads_type': 'fastq',
+                        'batch': '1',
+                        'reads': [
+                            {
+                                'location': 'gs://cpg-fewgenomes-main/HG3FMDSX3_2_220405_FS29_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R1.fastq.gz',
+                                'basename': 'HG3FMDSX3_2_220405_FS29_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R1.fastq.gz',
+                                'class': 'File',
+                                'checksum': None,
+                                'size': 997128,
+                                'datetime_added': None,
+                            },
+                            {
+                                'location': 'gs://cpg-fewgenomes-main/HG3FMDSX3_2_220405_FS29_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R2.fastq.gz',
+                                'basename': 'HG3FMDSX3_2_220405_FS29_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R2.fastq.gz',
+                                'class': 'File',
+                                'checksum': None,
+                                'size': 1035385,
+                                'datetime_added': None,
+                            },
+                        ],
+                        'sequencing_type': 'genome',
+                        'sequencing_technology': 'short-read',
+                        'sequencing_platform': 'illumina',
+                    },
+                    'type': 'sequencing',
+                }
+            ],
+        },
+    ]
+
+
 def test_cohort(mocker: MockFixture, tmp_path):
     """
     Testing creating a Cohort object from metamist mocks.
@@ -59,114 +166,8 @@ def test_cohort(mocker: MockFixture, tmp_path):
         mock_get_pedigree,
     )
 
-    def mock_get_sgs(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argument
-        return [
-            {
-                'id': 'CPGLCL17',
-                'meta': {'sg_meta': 'is_fun'},
-                'platform': 'illumina',
-                'type': 'genome',
-                'sample': {
-                    'externalId': 'NA12340',
-                    'participant': {
-                        'id': 1,
-                        'externalId': '8',
-                        'reportedSex': 'Male',
-                        'meta': {'participant_meta': 'is_here'},
-                    },
-                },
-                'assays': [
-                    {
-                        'id': 1,
-                        'meta': {
-                            'platform': '30x Illumina PCR-Free',
-                            'concentration': '25',
-                            'fluid_x_tube_id': '220405_FS28686864',
-                            'reference_genome': 'Homo sapiens (b37d5)',
-                            'volume': '100',
-                            'reads_type': 'fastq',
-                            'batch': '1',
-                            'reads': [
-                                {
-                                    'location': 'gs://cpg-fewgenomes-main/HG3FMDSX3_2_220405_FS28686864_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R1.fastq.gz',
-                                    'basename': 'HG3FMDSX3_2_220405_FS28686864_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R1.fastq.gz',
-                                    'class': 'File',
-                                    'checksum': None,
-                                    'size': 1070968,
-                                    'datetime_added': None,
-                                },
-                                {
-                                    'location': 'gs://cpg-fewgenomes-main/HG3FMDSX3_2_220405_FS28686864_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R2.fastq.gz',
-                                    'basename': 'HG3FMDSX3_2_220405_FS28686864_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R2.fastq.gz',
-                                    'class': 'File',
-                                    'checksum': None,
-                                    'size': 1123158,
-                                    'datetime_added': None,
-                                },
-                            ],
-                            'sequencing_type': 'genome',
-                            'sequencing_technology': 'short-read',
-                            'sequencing_platform': 'illumina',
-                        },
-                        'type': 'sequencing',
-                    }
-                ],
-            },
-            {
-                'id': 'CPGLCL25',
-                'meta': {'sample_meta': 'is_fun'},
-                'platform': 'illumina',
-                'type': 'genome',
-                'sample': {
-                    'externalId': 'NA12489',
-                    'participant': {
-                        'id': 2,
-                        'externalId': '14',
-                        'reportedSex': None,
-                        'meta': {'participant_metadata': 'number_fourteen'},
-                    },
-                },
-                'assays': [
-                    {
-                        'id': 2,
-                        'meta': {
-                            'platform': '30x Illumina PCR-Free',
-                            'concentration': '25',
-                            'fluid_x_tube_id': '220405_FS28689999',
-                            'reference_genome': 'Homo sapiens (b37d5)',
-                            'volume': '100',
-                            'reads_type': 'fastq',
-                            'batch': '1',
-                            'reads': [
-                                {
-                                    'location': 'gs://cpg-fewgenomes-main/HG3FMDSX3_2_220405_FS28689999_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R1.fastq.gz',
-                                    'basename': 'HG3FMDSX3_2_220405_FS28689999_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R1.fastq.gz',
-                                    'class': 'File',
-                                    'checksum': None,
-                                    'size': 997128,
-                                    'datetime_added': None,
-                                },
-                                {
-                                    'location': 'gs://cpg-fewgenomes-main/HG3FMDSX3_2_220405_FS28689999_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R2.fastq.gz',
-                                    'basename': 'HG3FMDSX3_2_220405_FS28689999_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R2.fastq.gz',
-                                    'class': 'File',
-                                    'checksum': None,
-                                    'size': 1035385,
-                                    'datetime_added': None,
-                                },
-                            ],
-                            'sequencing_type': 'genome',
-                            'sequencing_technology': 'short-read',
-                            'sequencing_platform': 'illumina',
-                        },
-                        'type': 'sequencing',
-                    }
-                ],
-            },
-        ]
-
     def mock_get_analysis_by_sgs(*args, **kwargs) -> list[dict]:
-        return {}
+        return [{}]
 
     mocker.patch('cpg_workflows.metamist.Metamist.get_sg_entries', mock_get_sgs)
     mocker.patch(
@@ -204,7 +205,7 @@ def test_cohort(mocker: MockFixture, tmp_path):
     # Test Assay Population
     assert test_sg.assays['sequencing'].sample_id == 'CPGLCL17'
     assert test_sg.assays['sequencing'].id == '1'
-    assert test_sg.assays['sequencing'].meta['fluid_x_tube_id'] == '220405_FS28686864'
+    assert test_sg.assays['sequencing'].meta['fluid_x_tube_id'] == '220405_FS28'
     assert (
         test_sg.alignment_input_by_seq_type['genome']
         == test_sg.assays['sequencing'].alignment_input
