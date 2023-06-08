@@ -66,6 +66,7 @@ def batch_samples(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict
                 'samples': md.ID.tolist(),
                 'mf_ratio': is_male / is_female,
                 'size': n_samples,
+                'coverage_medians': md.median_coverage.tolist(),
             }
         ]
 
