@@ -352,7 +352,7 @@ class Action(Enum):
 class Stage(Generic[TargetT], ABC):
     """
     Abstract class for a workflow stage. Parametrised by specific Target subclass,
-    i.e. SampleStage(Stage[Sample]) should only be able to work on Sample(Target).
+    i.e. SequencingGroup(Stage[Sample]) should only be able to work on Sample(Target).
     """
 
     def __init__(
@@ -722,7 +722,7 @@ def stage(
     a constructor method. E.g.
 
     @stage(required_stages=[Align])
-    class GenotypeSample(SampleStage):
+    class GenotypeSample(SequencingGroupStage):
         def expected_outputs(self, sample: Sample):
             ...
         def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
@@ -782,12 +782,12 @@ def skip(
 
     @skip
     @stage
-    class MyStage1(SampleStage):
+    class MyStage1(SequencingGroupStage):
         ...
 
     @skip
     @stage(assume_outputs_exist=True)
-    class MyStage2(SampleStage):
+    class MyStage2(SequencingGroupStage):
         ...
     """
 
@@ -1130,9 +1130,9 @@ class Workflow:
         ]
 
 
-class SampleStage(Stage[Sample], ABC):
+class SequencingGroupStage(Stage[Sample], ABC):
     """
-    Sample-level stage.
+    Sequencing Group level stage.
     """
 
     @abstractmethod

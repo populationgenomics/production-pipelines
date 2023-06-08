@@ -25,7 +25,7 @@ from cpg_workflows.workflow import (
     stage,
     StageInput,
     StageOutput,
-    SampleStage,
+    SequencingGroupStage,
     DatasetStage,
     StageInputNotFoundError,
 )
@@ -113,7 +113,7 @@ def qc_functions() -> list[Qc]:
 
 
 @stage(required_stages=Align)
-class CramQC(SampleStage):
+class CramQC(SequencingGroupStage):
     """
     Calling tools that process CRAM for QC purposes.
     """

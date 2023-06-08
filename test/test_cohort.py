@@ -166,8 +166,8 @@ def test_cohort(mocker: MockFixture, tmp_path):
         mock_get_pedigree,
     )
 
-    def mock_get_analysis_by_sgs(*args, **kwargs) -> list[dict]:
-        return [{}]
+    def mock_get_analysis_by_sgs(*args, **kwargs) -> dict:
+        return {}
 
     mocker.patch('cpg_workflows.metamist.Metamist.get_sg_entries', mock_get_sgs)
     mocker.patch(

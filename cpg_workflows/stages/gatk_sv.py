@@ -16,7 +16,7 @@ from cpg_utils.hail_batch import command, reference_path, image_path
 from cpg_workflows.batch import make_job_name, Batch, get_batch
 from cpg_workflows.workflow import (
     stage,
-    SampleStage,
+    SequencingGroupStage,
     StageOutput,
     DatasetStage,
     StageInput,
@@ -198,7 +198,7 @@ def get_ref_panel(keys: list[str] | None = None) -> dict:
 
 
 @stage
-class GatherSampleEvidence(SampleStage):
+class GatherSampleEvidence(SequencingGroupStage):
     """
     https://github.com/broadinstitute/gatk-sv#gathersampleevidence
     https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherSampleEvidence.wdl
@@ -258,7 +258,7 @@ class GatherSampleEvidence(SampleStage):
             'reference_fasta': str(get_fasta()),
             'reference_index': str(get_fasta()) + '.fai',
             'reference_dict': str(get_fasta().with_suffix('.dict')),
-            'reference_version': '38'
+            'reference_version': '38',
         }
 
         input_dict |= get_images(
@@ -318,7 +318,7 @@ class EvidenceQC(DatasetStage):
             'bincov_matrix': 'RD.txt.gz',
             'bincov_matrix_index': 'RD.txt.gz.tbi',
             'bincov_median': f'{dataset.name}_medianCov.transposed.bed',
-            'qc_table': f'{dataset.name}_evidence_qc_table.tsv'
+            'qc_table': f'{dataset.name}_evidence_qc_table.tsv',
         }
         for caller in SV_CALLERS:
             for k in ['low', 'high']:
@@ -797,7 +797,6 @@ class GenotypeBatch(DatasetStage):
         return d
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
-
         filterbatch_d = inputs.as_dict(dataset, FilterBatch)
         batchevidence_d = inputs.as_dict(dataset, GatherBatchEvidence)
 
@@ -816,7 +815,7 @@ class GenotypeBatch(DatasetStage):
             'rf_cutoffs': filterbatch_d['cutoffs'],
             # instead of pulling from reference:
             'ref_dict': str(get_fasta().with_suffix('.dict')),
-            'reference_build': 'hg38'
+            'reference_build': 'hg38',
         }
 
         for mode in ['pesr', 'depth']:
@@ -831,12 +830,7 @@ class GenotypeBatch(DatasetStage):
             ]
         )
         input_dict |= get_references(
-            [
-                'primary_contigs_list',
-                'bin_exclude',
-                'seed_cutoffs',
-                'pesr_exclude_list'
-            ]
+            ['primary_contigs_list', 'bin_exclude', 'seed_cutoffs', 'pesr_exclude_list']
         )
 
         expected_d = self.expected_outputs(dataset)
@@ -893,7 +887,7 @@ class MakeCohortVcf(DatasetStage):
             # 'complex_resolve_vcf_index': '.complex_resolve.vcf.gz.tbi',
             # 'complex_genotype_vcf': '.complex_genotype.vcf.gz',
             # 'complex_genotype_vcf_index': '.complex_genotype.vcf.gz.tbi',
-            'metrics_file_makecohortvcf': '.metrics.tsv'
+            'metrics_file_makecohortvcf': '.metrics.tsv',
         }
         d: dict[str, Path] = {}
         for key, ending in ending_by_key.items():
@@ -937,7 +931,9 @@ class MakeCohortVcf(DatasetStage):
             'bincov_files': [batchevidence_d['merged_bincov']],
             'raw_sr_bothside_pass_files': [genotypebatch_d['sr_bothside_pass']],
             'raw_sr_background_fail_files': [genotypebatch_d['sr_background_fail']],
-            'depth_gt_rd_sep_files': [genotypebatch_d['trained_genotype_depth_depth_sepcutoff']],
+            'depth_gt_rd_sep_files': [
+                genotypebatch_d['trained_genotype_depth_depth_sepcutoff']
+            ],
             'median_coverage_files': [batchevidence_d['median_cov']],
             'rf_cutoff_files': [filterbatch_d['cutoffs']],
         }
@@ -1005,7 +1001,6 @@ class AnnotateVcf(DatasetStage):
         return d
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
-
         make_vcf_d = inputs.as_dict(dataset, MakeCohortVcf)
 
         input_dict: dict[str, Any] = {
@@ -1015,7 +1010,7 @@ class AnnotateVcf(DatasetStage):
             'ped_file': make_combined_ped(dataset),
             'sv_per_shard': 5000,
             'max_shards_per_chrom_step1': 200,
-            'min_records_per_shard_step1': 5000
+            'min_records_per_shard_step1': 5000,
         }
         input_dict |= get_references(
             [

@@ -17,7 +17,7 @@ from cpg_workflows.workflow import (
     stage,
     StageInput,
     StageOutput,
-    SampleStage,
+    SequencingGroupStage,
     DatasetStage,
     StageInputNotFoundError,
 )
@@ -26,7 +26,7 @@ from cpg_workflows.jobs.picard import vcf_qc
 
 
 @stage(required_stages=Genotype)
-class GvcfQC(SampleStage):
+class GvcfQC(SequencingGroupStage):
     """
     Calling tools that process GVCF for QC purposes.
     """
@@ -63,7 +63,7 @@ class GvcfQC(SampleStage):
 
 
 @stage(required_stages=Genotype)
-class GvcfHappy(SampleStage):
+class GvcfHappy(SequencingGroupStage):
     """
     Run Happy to validate a GVCF for samples where a truth callset is available.
     """

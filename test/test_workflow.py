@@ -60,7 +60,7 @@ def test_workflow(tmp_path):
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.workflow import (
         CohortStage,
-        SampleStage,
+        SequencingGroupStage,
         StageInput,
         StageOutput,
         run_workflow,
@@ -72,7 +72,7 @@ def test_workflow(tmp_path):
     assert len(get_cohort().get_samples()) == 2
 
     @stage
-    class MySampleStage(SampleStage):
+    class MySequencingGroupStage(SequencingGroupStage):
         """
         Just a sample-level stage.
         """
@@ -87,7 +87,7 @@ def test_workflow(tmp_path):
             print(f'Writing to {self.expected_outputs(sample)}')
             return self.make_outputs(sample, self.expected_outputs(sample))
 
-    @stage(required_stages=MySampleStage)
+    @stage(required_stages=MySequencingGroupStage)
     class MyCohortStage(CohortStage):
         """
         Just a cohort-level stage.
@@ -97,7 +97,7 @@ def test_workflow(tmp_path):
             return output_path
 
         def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-            path_by_sample = inputs.as_path_by_target(MySampleStage)
+            path_by_sample = inputs.as_path_by_target(MySequencingGroupStage)
             assert len(path_by_sample) == len(cohort.get_samples())
             j = get_batch().new_job('Cohort job', self.get_job_attrs(cohort))
             j.command(f'touch {j.output}')

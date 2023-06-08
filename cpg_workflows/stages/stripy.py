@@ -17,7 +17,7 @@ from cpg_workflows.workflow import (
     stage,
     StageInput,
     StageOutput,
-    SampleStage,
+    SequencingGroupStage,
 )
 
 
@@ -41,17 +41,19 @@ def _update_meta(output_path: str) -> dict[str, Any]:
     return {
         'outlier_loci': outlier_loci,
         'outliers_detected': bool(outlier_loci),
-        'log_path': log_path
+        'log_path': log_path,
     }
 
 
 @stage(
     required_stages=Align,
     analysis_type='web',
-    analysis_keys=['stripy_html', ],
+    analysis_keys=[
+        'stripy_html',
+    ],
     update_analysis_meta=_update_meta,
 )
-class Stripy(SampleStage):
+class Stripy(SequencingGroupStage):
     """
     Call stripy to run STR analysis on known pathogenic loci.
     """

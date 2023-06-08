@@ -85,7 +85,7 @@ def test_status_reporter(mocker: MockFixture, tmp_path):
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.targets import Sample
     from cpg_workflows.workflow import (
-        SampleStage,
+        SequencingGroupStage,
         StageInput,
         StageOutput,
         run_workflow,
@@ -93,7 +93,7 @@ def test_status_reporter(mocker: MockFixture, tmp_path):
     )
 
     @stage(analysis_type='qc')
-    class MyQcStage1(SampleStage):
+    class MyQcStage1(SequencingGroupStage):
         """
         Just a sample-level stage.
         """
@@ -111,7 +111,7 @@ def test_status_reporter(mocker: MockFixture, tmp_path):
             return self.make_outputs(sample, self.expected_outputs(sample), [j])
 
     @stage(analysis_type='qc', analysis_keys=['bed'])
-    class MyQcStage2(SampleStage):
+    class MyQcStage2(SequencingGroupStage):
         """
         Just a sample-level stage.
         """
@@ -157,7 +157,7 @@ def test_status_reporter_with_custom_updater(mocker: MockFixture, tmp_path):
     from cpg_workflows.batch import get_batch
     from cpg_workflows.targets import Sample
     from cpg_workflows.workflow import (
-        SampleStage,
+        SequencingGroupStage,
         StageInput,
         StageOutput,
         run_workflow,
@@ -165,7 +165,7 @@ def test_status_reporter_with_custom_updater(mocker: MockFixture, tmp_path):
     )
 
     @stage(analysis_type='qc', update_analysis_meta=_update_meta)
-    class MyQcStage(SampleStage):
+    class MyQcStage(SequencingGroupStage):
         def expected_outputs(self, sample: Sample) -> Path:
             return to_path(dataset_path(f'{sample.id}.tsv'))
 
@@ -190,7 +190,7 @@ def test_status_reporter_fails(mocker: MockFixture, tmp_path):
     from cpg_workflows.batch import get_batch
     from cpg_workflows.targets import Sample
     from cpg_workflows.workflow import (
-        SampleStage,
+        SequencingGroupStage,
         StageInput,
         StageOutput,
         run_workflow,
@@ -198,7 +198,7 @@ def test_status_reporter_fails(mocker: MockFixture, tmp_path):
     )
 
     @stage(analysis_type='qc')
-    class MyQcStage(SampleStage):
+    class MyQcStage(SequencingGroupStage):
         """
         Just a sample-level stage.
         """

@@ -13,7 +13,7 @@ from cpg_workflows.workflow import (
     stage,
     StageInput,
     StageOutput,
-    SampleStage,
+    SequencingGroupStage,
     DatasetStage,
 )
 from cpg_workflows.jobs import fastqc
@@ -75,7 +75,7 @@ def _collect_fastq_outs(sample) -> list[OneFastqc]:
 
 
 @stage
-class FastQC(SampleStage):
+class FastQC(SequencingGroupStage):
     """
     Run FASTQC on all paths in alignment inputs.
     """

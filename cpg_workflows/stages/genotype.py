@@ -10,7 +10,7 @@ from cpg_workflows.workflow import (
     stage,
     StageInput,
     StageOutput,
-    SampleStage,
+    SequencingGroupStage,
 )
 from .align import Align
 from .. import get_batch
@@ -21,7 +21,7 @@ from .. import get_batch
     analysis_type='gvcf',
     analysis_keys=['gvcf'],
 )
-class Genotype(SampleStage):
+class Genotype(SequencingGroupStage):
     """
     Use HaplotypeCaller to genotype individual samples (i.e. CRAM -> GVCF).
     """

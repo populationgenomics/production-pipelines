@@ -20,7 +20,7 @@ def run_workflow(mocker):
 
     from cpg_workflows.targets import Sample
     from cpg_workflows.workflow import (
-        SampleStage,
+        SequencingGroupStage,
         StageInput,
         StageOutput,
         get_batch,
@@ -28,7 +28,7 @@ def run_workflow(mocker):
         stage,
     )
 
-    class TestStage(SampleStage):
+    class TestStage(SequencingGroupStage):
         def expected_outputs(self, sample: Sample) -> Path:
             return to_path(dataset_path(f'{sample.id}_{self.name}.tsv'))
 

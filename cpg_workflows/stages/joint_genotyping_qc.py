@@ -12,7 +12,7 @@ from cpg_workflows.workflow import (
     CohortStage,
     StageInputNotFoundError,
     Cohort,
-    SampleStage,
+    SequencingGroupStage,
     get_workflow,
 )
 
@@ -69,7 +69,7 @@ class JointVcfQC(CohortStage):
 
 
 @stage(required_stages=JointGenotyping)
-class JointVcfHappy(SampleStage):
+class JointVcfHappy(SequencingGroupStage):
     """
     Run Happy to validate validation samples in joint VCF
     """

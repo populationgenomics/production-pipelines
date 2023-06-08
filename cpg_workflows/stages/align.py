@@ -14,12 +14,12 @@ from cpg_workflows.workflow import (
     stage,
     StageInput,
     StageOutput,
-    SampleStage,
+    SequencingGroupStage,
 )
 
 
 @stage(analysis_type='cram', analysis_keys=['cram'])
-class Align(SampleStage):
+class Align(SequencingGroupStage):
     """
     Align or re-align input data to produce a CRAM file
     """
