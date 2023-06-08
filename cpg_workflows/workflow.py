@@ -878,8 +878,6 @@ class Workflow:
         if get_config()['workflow'].get('status_reporter') == 'metamist':
             self.status_reporter = MetamistStatusReporter()
         self._stages: list[StageDecorator] | None = stages
-        self.queued_stages: list[StageDecorator] = []
-
         self.queued_stages: list[Stage] = []
 
     @property
