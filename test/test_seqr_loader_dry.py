@@ -183,7 +183,7 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
     def do_nothing(*args, **kwargs):
         return None
 
-    def mock_create_new_analysis(*args, **kwargs) -> int:
+    def mock_create_analysis(*args, **kwargs) -> int:
         return 1
 
     mocker.patch('pathlib.Path.open', selective_mock_open)
@@ -198,10 +198,10 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
         'cpg_workflows.stages.seqr_loader.es_password', lambda: 'test-password'
     )
     mocker.patch(
-        'metamist.apis.AnalysisApi.create_new_analysis',
-        mock_create_new_analysis,
+        'metamist.apis.AnalysisApi.create_analysis',
+        mock_create_analysis,
     )
-    mocker.patch('metamist.apis.AnalysisApi.update_analysis_status', do_nothing)
+    mocker.patch('metamist.apis.AnalysisApi.update_analysis', do_nothing)
 
     from cpg_workflows.batch import get_batch
     from cpg_workflows.inputs import get_cohort

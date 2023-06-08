@@ -253,7 +253,7 @@ class Metamist:
         Update "status" of an Analysis entry.
         """
         try:
-            self.aapi.update_analysis_status(
+            self.aapi.update_analysis(
                 analysis.id,
                 models.AnalysisUpdateModel(status=models.AnalysisStatus(status.value)),
             )
@@ -376,17 +376,15 @@ class Metamist:
         if isinstance(status, AnalysisStatus):
             status = status.value
 
-        am = models.AnalysisModel(
-            type=models.AnalysisType(type_),
+        am = models.Analysis(
+            type=type_,
             status=models.AnalysisStatus(status),
             output=str(output),
             sample_ids=list(sample_ids),
             meta=meta or {},
         )
         try:
-            aid = self.aapi.create_new_analysis(
-                project=metamist_proj, analysis_model=am
-            )
+            aid = self.aapi.create_analysis(project=metamist_proj, analysis_model=am)
         except ApiException:
             traceback.print_exc()
             return None

@@ -92,7 +92,7 @@ def _update_analysis_status(
     from metamist.apis import AnalysisApi
     from metamist.models import AnalysisUpdateModel
     from metamist import exceptions
-    from metamist.model.analysis_status import AnalysisStatus as MmAnalysisStatus
+    from metamist.models import AnalysisStatus as MmAnalysisStatus
     import traceback
 
     meta: dict[str, Any] = dict()
@@ -102,7 +102,7 @@ def _update_analysis_status(
 
     aapi = AnalysisApi()
     try:
-        aapi.update_analysis_status(
+        aapi.update_analysis(
             analysis_id=analysis_id,
             analysis_update_model=AnalysisUpdateModel(
                 status=MmAnalysisStatus(new_status.value),

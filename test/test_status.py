@@ -58,13 +58,11 @@ def _common(mocker, tmp_path):
         ],
     )
 
-    def mock_create_new_analysis(_, project, analysis_model) -> int:
+    def mock_create_analysis(_, project, analysis_model) -> int:
         print(f'Analysis model in project {project}: {analysis_model}')
         return 1  # metamist "analysis" entry ID
 
-    mocker.patch(
-        'metamist.apis.AnalysisApi.create_new_analysis', mock_create_new_analysis
-    )
+    mocker.patch('metamist.apis.AnalysisApi.create_analysis', mock_create_analysis)
 
     from cpg_workflows.targets import Cohort
 
