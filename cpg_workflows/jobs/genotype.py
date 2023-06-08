@@ -36,7 +36,8 @@ def genotype(
 
     # collect all the real jobs - [reuse] jobs substituted for None
     jobs = [
-        job for job in haplotype_caller(
+        job
+        for job in haplotype_caller(
             b=b,
             sample_name=sample_name,
             job_attrs=job_attrs,
@@ -46,7 +47,8 @@ def genotype(
             scatter_count=get_config()['workflow'].get('scatter_count_genotype', 50),
             overwrite=overwrite,
             dragen_mode=dragen_mode,
-        ) if job is not None
+        )
+        if job is not None
     ]
     postproc_j = postproc_gvcf(
         b=b,
@@ -109,7 +111,11 @@ def haplotype_caller(
         for idx in range(scatter_count):
             assert intervals[idx], intervals
             # give each fragment a tmp location
-            fragment = tmp_prefix / 'haplotypecaller' / f'{idx}_of_{scatter_count}_{sample_name}.g.vcf.gz'
+            fragment = (
+                tmp_prefix
+                / 'haplotypecaller'
+                / f'{idx}_of_{scatter_count}_{sample_name}.g.vcf.gz'
+            )
             j, result = _haplotype_caller_one(
                 b,
                 sample_name=sample_name,
