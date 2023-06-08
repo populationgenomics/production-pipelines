@@ -558,7 +558,7 @@ class Assay:
 
         if missing_keys:
             raise ValueError(
-                f'Cannot parse metamist Sequence {data}. Missing keys: {missing_sg_keys + missing_assay_keys}'
+                f'Cannot parse metamist Sequence {data}. Missing keys: {missing_keys}'
             )
 
         assay_type = str(data['type'])
