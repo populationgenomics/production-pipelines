@@ -59,7 +59,7 @@ def genotype(
         overwrite=overwrite,
     )
 
-    # bit chaotic here now, only keep elements which are not None
+    # only keep elements which are not None
     # if both exist, set the dependency
     if postproc_j and jobs:
         postproc_j.depends_on(*jobs)
@@ -83,13 +83,13 @@ def haplotype_caller(
     output_path: Path | None = None,
     overwrite: bool = False,
     dragen_mode: bool = True,
-) -> list[Job] | None:
+) -> list[Job | None]:
     """
     Run GATK Haplotype Caller in parallel, split by intervals.
     """
     if utils.can_reuse(output_path, overwrite):
         logging.info(f'Reusing HaplotypeCaller {output_path}, job attrs: {job_attrs}')
-        return None
+        return [None]
 
     jobs: list[Job] = []
 
