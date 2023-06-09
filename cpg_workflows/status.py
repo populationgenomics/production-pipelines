@@ -213,7 +213,7 @@ class MetamistStatusReporter(StatusReporter):
         try:
             analysis_id_int = int(analysis_id)
         except ValueError:
-            raise MetamistError('Analysis ID for sample-metadata must be int')
+            raise MetamistError('Analysis ID must be int')
 
         job_name = f'Update status to {status.value}'
         if analysis_type:

@@ -1,5 +1,5 @@
 """
-Helpers to communicate with the sample-metadata database.
+Helpers to communicate with the metamist database.
 """
 
 import logging
@@ -78,9 +78,9 @@ class AnalysisType(Enum):
     https://github.com/populationgenomics/sample-metadata/blob/dev/models/enums
     /analysis.py#L4-L11
 
-    Re-defined in a separate module to decouple from the main sample-metadata module,
+    Re-defined in a separate module to decouple from the main metamist module,
     so decorators can use `@stage(analysis_type=AnalysisType.QC)` without importing
-    the sample-metadata package.
+    the metamist package.
     """
 
     QC = 'qc'
@@ -108,7 +108,7 @@ class Analysis:
     """
     Metamist DB Analysis entry.
 
-    See the sample-metadata package for more details:
+    See the metamist package for more details:
     https://github.com/populationgenomics/sample-metadata
     """
 
