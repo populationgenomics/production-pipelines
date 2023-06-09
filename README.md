@@ -720,7 +720,7 @@ You can also start the pipeline from a specific stage with `workflow/first_stage
 You can also force the pipeline to skip certain sequencing groups with `workflow/skip_sgs`, pick only certain samples with `workflow/only_sgs`, force re-processing of certain samples with `workflow/force_samples`. `workflow/skip_datasets` and `workflow/only_datasets` are available, and more fine-grained combination of `skip_sgs` and `skip_stages`: 
 
 ```toml
-[workflow.skip_samples_stages]
+[workflow.skip_stages_for_sgs]
 CramQC = ['CPG13409']
 ```
 

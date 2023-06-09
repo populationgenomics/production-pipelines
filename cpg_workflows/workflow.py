@@ -597,12 +597,12 @@ class Stage(Generic[TargetT], ABC):
             return Action.QUEUE
 
         if (
-            d := get_config()['workflow'].get('skip_samples_stages')
+            d := get_config()['workflow'].get('skip_stages_for_sgs')
         ) and self.name in d:
             skip_targets = d[self.name]
             if target.target_id in skip_targets:
                 logging.info(
-                    f'{self.name}: {target} [SKIP] (is in workflow/skip_samples_stages)'
+                    f'{self.name}: {target} [SKIP] (is in workflow/skip_stages_for_sgs)'
                 )
                 return Action.SKIP
 
