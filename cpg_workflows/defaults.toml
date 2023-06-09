@@ -45,7 +45,7 @@
 #output_version = "0.1"
 
 # Check input file existence (e.g. FASTQ files). When they are missing,
-# the `skip_samples_with_missing_input` option controls whether such
+# the `skip_sgs_with_missing_input` option controls whether such
 # samples should be ignored, or it should cause raising an error.
 check_inputs = true
 
@@ -54,7 +54,7 @@ check_inputs = true
 # stage is Align, and `sample.alignment_input` for a sample do not exist,
 # remove this sample, instead of failing. In order words, ignore samples
 # that are missing results from skipped stages.
-skip_samples_with_missing_input = false
+skip_sgs_with_missing_input = false
 
 # Within jobs, check all in-job intermediate files for possible reuse.
 # If set to False, will overwrite all intermediates. Used by `utils.can_reuse(path)`.

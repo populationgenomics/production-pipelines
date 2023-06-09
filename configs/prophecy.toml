@@ -9,7 +9,7 @@ skip_sgs = [
 skip_stages = ['SomalierPedigree', 'SampleQC', 'MakeSiteOnlyVcf', 'Vqsr','LoadVqsr']
 first_stages = ['Ancestry']
 last_stages=['AncestryPlots']
-skip_samples_with_missing_input = true
+skip_sgs_with_missing_input = true
 highmem_workers = true
 force_stages = ['Ancestry', 'AncestryPlots']
 

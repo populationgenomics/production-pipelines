@@ -4,7 +4,7 @@ sequencing_type = 'genome'
 scatter_count = 5
 
 # leave this to true, since one sample doesn't have sequencing data
-skip_samples_with_missing_input = true
+skip_sgs_with_missing_input = true
 
 vds_version = '0.1'
 output_version = '0.2'
