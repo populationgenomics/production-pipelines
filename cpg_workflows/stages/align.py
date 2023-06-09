@@ -66,7 +66,7 @@ class Align(SequencingGroupStage):
                 sample, data=self.expected_outputs(sample), jobs=jobs
             )
         except MissingAlignmentInputException:
-            if get_config()['workflow'].get('skip_samples_with_missing_input'):
+            if get_config()['workflow'].get('skip_sgs_with_missing_input'):
                 logging.error(f'No alignment inputs, skipping sample {sample}')
                 sample.active = False
                 return self.make_outputs(sample, skipped=True)  # return empty output

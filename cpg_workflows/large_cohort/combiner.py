@@ -19,7 +19,7 @@ def _check_gvcfs(samples: list[SequencingGroup]) -> list[SequencingGroup]:
         if not sample.gvcf and exists(sample.make_gvcf_path().path):
             sample.gvcf = sample.make_gvcf_path()
         if not sample.gvcf:
-            if get_config()['workflow'].get('skip_samples_with_missing_input', False):
+            if get_config()['workflow'].get('skip_sgs_with_missing_input', False):
                 logging.warning(f'Skipping {sample} which is missing GVCF')
                 sample.active = False
                 continue
@@ -27,15 +27,13 @@ def _check_gvcfs(samples: list[SequencingGroup]) -> list[SequencingGroup]:
                 raise ValueError(
                     f'SequencingGroup {sample} is missing GVCF. '
                     f'Use workflow/skip_sgs = [] or '
-                    f'workflow/skip_samples_with_missing_input '
+                    f'workflow/skip_sgs_with_missing_input '
                     f'to control behaviour'
                 )
 
         if get_config()['workflow'].get('check_inputs', True):
             if not exists(sample.gvcf.path):
-                if get_config()['workflow'].get(
-                    'skip_samples_with_missing_input', False
-                ):
+                if get_config()['workflow'].get('skip_sgs_with_missing_input', False):
                     logging.warning(
                         f'Skipping {sample} that is missing GVCF {sample.gvcf.path}'
                     )
@@ -44,7 +42,7 @@ def _check_gvcfs(samples: list[SequencingGroup]) -> list[SequencingGroup]:
                     raise ValueError(
                         f'SequencingGroup {sample} is missing GVCF. '
                         f'Use workflow/skip_sgs = [] or '
-                        f'workflow/skip_samples_with_missing_input '
+                        f'workflow/skip_sgs_with_missing_input '
                         f'to control behaviour'
                     )
     return [s for s in samples if s.active]

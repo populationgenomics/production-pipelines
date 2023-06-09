@@ -232,7 +232,7 @@ class StageInput:
                 + (
                     'Check the logs if all samples were missing inputs from previous '
                     'stages, and consider changing `workflow/first_stage`'
-                    if get_config()['workflow'].get('skip_samples_with_missing_input')
+                    if get_config()['workflow'].get('skip_sgs_with_missing_input')
                     else ''
                 )
             )
@@ -615,17 +615,17 @@ class Stage(Generic[TargetT], ABC):
                     f'{self.name}: {target} [REUSE] (stage skipped, and outputs exist)'
                 )
                 return Action.REUSE
-            if get_config()['workflow'].get('skip_samples_with_missing_input'):
+            if get_config()['workflow'].get('skip_sgs_with_missing_input'):
                 logging.warning(
                     f'{self.name}: {target} [SKIP] (stage is required, '
                     f'but is marked as "skipped", '
-                    f'workflow/skip_samples_with_missing_input=true '
+                    f'workflow/skip_sgs_with_missing_input=true '
                     f'and some expected outputs for the target do not exist: '
                     f'{first_missing_path}'
                 )
-                # `workflow/skip_samples_with_missing_input` means that we can ignore
-                # samples/datasets that have missing results from skipped stages.
-                # This is our case, so indicating that this sample/dataset should
+                # `workflow/skip_sgs_with_missing_input` means that we can ignore
+                # sgs/datasets that have missing results from skipped stages.
+                # This is our case, so indicating that this sg/dataset should
                 # be ignored:
                 target.active = False
                 return Action.SKIP
@@ -1170,7 +1170,7 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
                 f'usable (active=True) samples found. Check logs above for '
                 f'possible reasons samples were skipped (e.g. all samples ignored '
                 f'via `workflow.skip_sgs` in config, or they all missing stage '
-                f'inputs and `workflow.skip_samples_with_missing_input=true` is set)'
+                f'inputs and `workflow.skip_sgs_with_missing_input=true` is set)'
             )
             return output_by_target
 
@@ -1183,7 +1183,7 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
                     f'usable (active=True) samples found. Check logs above for '
                     f'possible reasons samples were skipped (e.g. all samples ignored '
                     f'via `workflow.skip_sgs` in config, or they all missing stage '
-                    f'inputs and `workflow.skip_samples_with_missing_input=true` is set)'
+                    f'inputs and `workflow.skip_sgs_with_missing_input=true` is set)'
                 )
                 continue
 
