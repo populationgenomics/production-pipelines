@@ -713,11 +713,11 @@ df -h; du -sh $BATCH_TMPDIR
 You can also call the method `cpg_workflows.utils.can_reuse(path)` explicitly within the code called from `queue_jobs()`. 
 `workflow/check_intermediates = true` controls whether `can_reuse()` checks the object(s), or always returns `False`.
 
-`workflow/check_inputs = true` controls whether inputs to the first stage in the pipeline should be checked for existence, e.g. alignment inputs for an `Align` stage. `skip_sgs_with_missing_input` controls the behaviour if those inputs are missing: where skip such samples, or stop the workflow.
+`workflow/check_inputs = true` controls whether inputs to the first stage in the pipeline should be checked for existence, e.g. alignment inputs for an `Align` stage. `skip_sgs_with_missing_input` controls the behaviour if those inputs are missing: where skip such sequencing groups, or stop the workflow.
 
 You can also start the pipeline from a specific stage with `workflow/first_stages` (it would skip all previous stages, but still check immediately required inputs for the first stage). `workflow/last_stages` would stop the workflow after the stages specified. `workflow/only_stages` would execute only stages specified, ignoring dependencies.
 
-You can also force the pipeline to skip certain sequencing groups with `workflow/skip_sgs`, pick only certain samples with `workflow/only_sgs`, force re-processing of certain samples with `workflow/force_samples`. `workflow/skip_datasets` and `workflow/only_datasets` are available, and more fine-grained combination of `skip_sgs` and `skip_stages`: 
+You can also force the pipeline to skip certain sequencing groups with `workflow/skip_sgs`, pick only certain samples with `workflow/only_sgs`, force re-processing of certain sequencing groups with `workflow/force_sgs`. `workflow/skip_datasets` and `workflow/only_datasets` are available, and more fine-grained combination of `skip_sgs` and `skip_stages`: 
 
 ```toml
 [workflow.skip_stages_for_sgs]

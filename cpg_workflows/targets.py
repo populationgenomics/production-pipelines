@@ -354,11 +354,9 @@ class Dataset(Target):
             )
             return self._sample_by_id[id]
 
-        force_samples = get_config()['workflow'].get('force_samples', set())
+        force_sgs = get_config()['workflow'].get('force_sgs', set())
         forced = (
-            id in force_samples
-            or external_id in force_samples
-            or participant_id in force_samples
+            id in force_sgs or external_id in force_sgs or participant_id in force_sgs
         )
 
         s = SequencingGroup(
