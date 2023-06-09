@@ -112,7 +112,7 @@ def run_happy_on_vcf(
     happy_j = b.new_job(
         f'Run Happy on {sample_ext_id} VCF', (job_attrs or {}) | {'tool': 'hap.py'}
     )
-    happy_j.image(image_path('happy')).memory('100Gi').storage('100Gi').cpu(4)
+    happy_j.image(image_path('hap-py')).memory('100Gi').storage('100Gi').cpu(4)
     if depends_on:
         happy_j.depends_on(*depends_on)
 
