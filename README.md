@@ -567,7 +567,7 @@ class JointCalling(CohortStage):
         # acts on a sequencing_group, we use a method `as_path_by_target` that returns
         # a dictionary index by sequencing group ID:
         gvcf_path_by_sg = inputs.as_path_by_target(Genotype)
-        assert len(gvcf_path_by_sg) == len(cohort.get_samples())
+        assert len(gvcf_path_by_sg) == len(cohort.get_sequencing_groups())
         jobs = ...
         return self.make_outputs(cohort, self.expected_outputs(cohort), jobs)
 ```

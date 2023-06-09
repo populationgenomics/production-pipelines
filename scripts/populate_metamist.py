@@ -51,7 +51,7 @@ def main(command: str, config_paths: list[str]):
         )
         existing_paths = set(a['output'] for a in analyses)
 
-        for i, sample in enumerate(cohort.get_samples()):
+        for i, sample in enumerate(cohort.get_sequencing_groups()):
             if path := sample.make_cram_path().path:
                 if str(path) in existing_paths:
                     continue
@@ -108,7 +108,7 @@ def main(command: str, config_paths: list[str]):
                     metrics_by_sample[sid] = metrics_d
                 metrics_by_sample[sid] |= metrics_d
 
-        for i, sample in enumerate(cohort.get_samples()):
+        for i, sample in enumerate(cohort.get_sequencing_groups()):
             print(f'#{i+1} {sample}')
             if sample.rich_id not in metrics_by_sample:
                 print(f'{sample.rich_id} not found in MultiQC, skipping')

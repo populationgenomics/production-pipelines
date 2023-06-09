@@ -191,7 +191,7 @@ class SomalierPedigree(DatasetStage):
         """
         verifybamid_by_sid = {}
         somalier_path_by_sid = {}
-        for sample in dataset.get_samples():
+        for sample in dataset.get_sequencing_groups():
             if get_config().get('somalier', {}).get('exclude_high_contamination'):
                 verify_bamid_path = inputs.as_path(
                     stage=CramQC, target=sample, key='verify_bamid'
@@ -212,7 +212,9 @@ class SomalierPedigree(DatasetStage):
         else:
             html_url = None
 
-        if any(s.pedigree.dad or s.pedigree.mom for s in dataset.get_samples()):
+        if any(
+            s.pedigree.dad or s.pedigree.mom for s in dataset.get_sequencing_groups()
+        ):
             expected_ped_path = dataset.write_ped_file(
                 self.expected_outputs(dataset)['expected_ped']
             )
@@ -304,7 +306,7 @@ class CramMultiQC(DatasetStage):
         ending_to_trim = set()  # endings to trim to get sample names
         modules_to_trim_endings = set()
 
-        for sample in dataset.get_samples():
+        for sample in dataset.get_sequencing_groups():
             for qc in qc_functions():
                 for key, out in qc.outs.items():
                     if not out:

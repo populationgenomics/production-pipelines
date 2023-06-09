@@ -49,7 +49,7 @@ class JointGenotyping(CohortStage):
             sample.id: GvcfPath(
                 inputs.as_path(target=sample, stage=Genotype, key='gvcf')
             )
-            for sample in cohort.get_samples()
+            for sample in cohort.get_sequencing_groups()
         }
 
         not_found_gvcfs: list[str] = []
@@ -66,7 +66,7 @@ class JointGenotyping(CohortStage):
         jobs = []
         vcf_path = self.expected_outputs(cohort)['vcf']
         siteonly_vcf_path = self.expected_outputs(cohort)['siteonly']
-        scatter_count = joint_calling_scatter_count(len(cohort.get_samples()))
+        scatter_count = joint_calling_scatter_count(len(cohort.get_sequencing_groups()))
         out_siteonly_vcf_part_paths = [
             to_path(
                 self.expected_outputs(cohort)['siteonly_part_pattern'].format(idx=idx)

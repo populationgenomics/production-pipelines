@@ -215,16 +215,16 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
 
     assert (
         get_batch().job_by_tool['gatk HaplotypeCaller']['job_n']
-        == len(get_cohort().get_samples()) * 50
+        == len(get_cohort().get_sequencing_groups()) * 50
     )
     assert get_batch().job_by_tool['picard MergeVcfs']['job_n'] == len(
-        get_cohort().get_samples()
+        get_cohort().get_sequencing_groups()
     )
     assert get_batch().job_by_tool['gatk ReblockGVCF']['job_n'] == len(
-        get_cohort().get_samples()
+        get_cohort().get_sequencing_groups()
     )
     assert (
         get_batch().job_by_tool['picard CollectVariantCallingMetrics']['job_n']
-        == len(get_cohort().get_samples()) + 1
+        == len(get_cohort().get_sequencing_groups()) + 1
     )
     assert get_batch().job_by_tool['gatk GenomicsDBImport']['job_n'] == 50

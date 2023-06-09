@@ -69,7 +69,7 @@ def create_cohort() -> Cohort:
     _populate_analysis(cohort)
     if get_config()['workflow'].get('read_pedigree', True):
         _populate_pedigree(cohort)
-    assert cohort.get_samples()
+    assert cohort.get_sequencing_groups()
     return cohort
 
 
@@ -124,7 +124,7 @@ def _populate_analysis(cohort: Cohort) -> None:
             analysis_type=AnalysisType.CRAM,
             dataset=dataset.name,
         )
-        for sample in dataset.get_samples():
+        for sample in dataset.get_sequencing_groups():
             if (analysis := gvcf_by_sid.get(sample.id)) and analysis.output:
                 assert analysis.output == sample.make_gvcf_path().path, (
                     analysis.output,
@@ -148,7 +148,7 @@ def _populate_pedigree(cohort: Cohort) -> None:
     Populate pedigree data for samples.
     """
     sample_by_participant_id = dict()
-    for s in cohort.get_samples():
+    for s in cohort.get_sequencing_groups():
         sample_by_participant_id[s.participant_id] = s
 
     for dataset in cohort.get_datasets():
@@ -160,7 +160,7 @@ def _populate_pedigree(cohort: Cohort) -> None:
             ped_entry_by_participant_id[part_id] = ped_entry
 
         sids_wo_ped = []
-        for sample in dataset.get_samples():
+        for sample in dataset.get_sequencing_groups():
             if sample.participant_id not in ped_entry_by_participant_id:
                 sids_wo_ped.append(sample.id)
                 continue
@@ -183,5 +183,5 @@ def _populate_pedigree(cohort: Cohort) -> None:
         if sids_wo_ped:
             logging.warning(
                 f'No pedigree data found for '
-                f'{len(sids_wo_ped)}/{len(dataset.get_samples())} samples'
+                f'{len(sids_wo_ped)}/{len(dataset.get_sequencing_groups())} samples'
             )

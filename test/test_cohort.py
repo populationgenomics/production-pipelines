@@ -184,19 +184,19 @@ def test_cohort(mocker: MockFixture, tmp_path):
     assert cohort
 
     # Testing Cohort Information
-    assert len(cohort.get_samples()) == 2
+    assert len(cohort.get_sequencing_groups()) == 2
     assert cohort.get_sample_ids() == ['CPGLCL17', 'CPGLCL25']
-    print(cohort.get_samples()[0])
+    print(cohort.get_sequencing_groups()[0])
 
-    for sg in cohort.get_samples():
+    for sg in cohort.get_sequencing_groups():
         assert sg.dataset.name == 'fewgenomes'
         assert not sg.forced
         assert sg.cram is None
         assert sg.gvcf is None
 
     # Test SequenceGroup Population
-    test_sg = cohort.get_samples()[0]
-    test_sg2 = cohort.get_samples()[1]
+    test_sg = cohort.get_sequencing_groups()[0]
+    test_sg2 = cohort.get_sequencing_groups()[1]
     assert test_sg.id == 'CPGLCL17'
     assert test_sg.external_id == 'NA12340'
     assert test_sg.participant_id == '8'

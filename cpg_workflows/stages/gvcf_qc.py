@@ -163,7 +163,7 @@ class GvcfMultiQC(DatasetStage):
         paths = []
         ending_to_trim = set()  # endings to trim to get sample names
 
-        for sample in dataset.get_samples():
+        for sample in dataset.get_sequencing_groups():
             for _stage, key in [
                 (GvcfQC, 'qc_detail'),
                 (GvcfHappy, None),

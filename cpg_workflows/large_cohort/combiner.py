@@ -71,7 +71,7 @@ def run(out_vds_path: Path, tmp_prefix: Path, *sample_ids) -> hl.vds.VariantData
     if can_reuse(out_vds_path):
         return hl.vds.read_vds(str(out_vds_path))
 
-    samples = get_cohort().get_samples()
+    samples = get_cohort().get_sequencing_groups()
     if sample_ids:
         samples = [s for s in samples if s in sample_ids]
 

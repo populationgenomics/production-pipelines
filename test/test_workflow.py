@@ -69,7 +69,7 @@ def test_workflow(tmp_path):
 
     output_path = to_path(dataset_path('cohort.tsv'))
 
-    assert len(get_cohort().get_samples()) == 2
+    assert len(get_cohort().get_sequencing_groups()) == 2
 
     @stage
     class MySequencingGroupStage(SequencingGroupStage):
@@ -100,7 +100,7 @@ def test_workflow(tmp_path):
 
         def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
             path_by_sample = inputs.as_path_by_target(MySequencingGroupStage)
-            assert len(path_by_sample) == len(cohort.get_samples())
+            assert len(path_by_sample) == len(cohort.get_sequencing_groups())
             j = get_batch().new_job('Cohort job', self.get_job_attrs(cohort))
             j.command(f'touch {j.output}')
             for _, sample_result_path in path_by_sample.items():

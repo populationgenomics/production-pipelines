@@ -25,12 +25,12 @@ def main():
     df = pd.DataFrame(
         [
             {'s': s.id, 'gvcf': s.make_gvcf_path()}
-            for s in get_cohort().get_samples()
+            for s in get_cohort().get_sequencing_groups()
             if s.make_gvcf_path().exists()
         ]
     )
     logging.info(
-        f'Found {len(df)}/{len(get_cohort().get_samples())} samples '
+        f'Found {len(df)}/{len(get_cohort().get_sequencing_groups())} samples '
         f'in {get_config()["workflow"]["dataset"]} with GVCFs'
     )
 

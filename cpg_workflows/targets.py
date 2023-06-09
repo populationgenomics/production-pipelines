@@ -34,7 +34,9 @@ class Target:
         # If not set, exclude from the workflow:
         self.active: bool = True
 
-    def get_samples(self, only_active: bool = True) -> list['SequencingGroup']:
+    def get_sequencing_groups(
+        self, only_active: bool = True
+    ) -> list['SequencingGroup']:
         """
         Get flat list of all samples corresponding to this target.
         """
@@ -44,7 +46,7 @@ class Target:
         """
         Get flat list of all sample IDs corresponding to this target.
         """
-        return [s.id for s in self.get_samples(only_active=only_active)]
+        return [s.id for s in self.get_sequencing_groups(only_active=only_active)]
 
     def alignment_inputs_hash(self) -> str:
         """
@@ -60,7 +62,7 @@ class Target:
                             for alignment_input in s.alignment_input_by_seq_type.values()
                         )
                     )
-                    for s in self.get_samples()
+                    for s in self.get_sequencing_groups()
                     if s.alignment_input_by_seq_type
                 ]
             )
@@ -105,7 +107,11 @@ class Target:
         """
         Map if internal IDs to participant or external IDs, if the latter is provided.
         """
-        return {s.id: s.rich_id for s in self.get_samples() if s.participant_id != s.id}
+        return {
+            s.id: s.rich_id
+            for s in self.get_sequencing_groups()
+            if s.participant_id != s.id
+        }
 
 
 class Cohort(Target):
@@ -136,7 +142,9 @@ class Cohort(Target):
         """
         datasets = [ds for k, ds in self._datasets_by_name.items()]
         if only_active:
-            datasets = [ds for ds in datasets if ds.active and ds.get_samples()]
+            datasets = [
+                ds for ds in datasets if ds.active and ds.get_sequencing_groups()
+            ]
         return datasets
 
     def get_dataset_by_name(
@@ -149,14 +157,16 @@ class Cohort(Target):
         ds_by_name = {d.name: d for d in self.get_datasets(only_active)}
         return ds_by_name.get(name)
 
-    def get_samples(self, only_active: bool = True) -> list['SequencingGroup']:
+    def get_sequencing_groups(
+        self, only_active: bool = True
+    ) -> list['SequencingGroup']:
         """
         Gets a flat list of all samples from all datasets.
         Include only "active" samples (unless only_active is False)
         """
         all_samples = []
         for ds in self.get_datasets(only_active=False):
-            all_samples.extend(ds.get_samples(only_active=only_active))
+            all_samples.extend(ds.get_sequencing_groups(only_active=only_active))
         return all_samples
 
     def add_dataset(self, dataset: 'Dataset') -> 'Dataset':
@@ -208,7 +218,7 @@ class Cohort(Target):
         """
         Export to a parsable TSV file
         """
-        assert self.get_samples()
+        assert self.get_sequencing_groups()
         tsv_path = self.analysis_dataset.tmp_prefix() / 'samples.tsv'
         df = pd.DataFrame(
             {
@@ -218,7 +228,7 @@ class Cohort(Target):
                 'continental_pop': s.meta.get('continental_pop') or '-',
                 'subcontinental_pop': s.meta.get('subcontinental_pop') or '-',
             }
-            for s in self.get_samples()
+            for s in self.get_sequencing_groups()
         ).set_index('s', drop=False)
         with to_path(tsv_path).open('w') as f:
             df.to_csv(f, index=False, sep='\t', na_rep='NA')
@@ -259,10 +269,10 @@ class Dataset(Target):
         return self.name
 
     def __repr__(self):
-        return f'Dataset("{self.name}", {len(self.get_samples())} samples)'
+        return f'Dataset("{self.name}", {len(self.get_sequencing_groups())} samples)'
 
     def __str__(self):
-        return f'{self.name} ({len(self.get_samples())} samples)'
+        return f'{self.name} ({len(self.get_sequencing_groups())} samples)'
 
     def _seq_type_subdir(self) -> str:
         """
@@ -373,7 +383,9 @@ class Dataset(Target):
         self._sample_by_id[id] = s
         return s
 
-    def get_samples(self, only_active: bool = True) -> list['SequencingGroup']:
+    def get_sequencing_groups(
+        self, only_active: bool = True
+    ) -> list['SequencingGroup']:
         """
         Get dataset's samples. Include only "active" samples, unless only_active=False
         """
@@ -404,7 +416,7 @@ class Dataset(Target):
         PED is written with no header line to be strict specification compliant
         """
         datas = []
-        for sample in self.get_samples():
+        for sample in self.get_sequencing_groups():
             datas.append(
                 sample.pedigree.get_ped_dict(use_participant_id=use_participant_id)
             )
@@ -584,7 +596,9 @@ class SequencingGroup(Target):
         """Unique target ID"""
         return self.id
 
-    def get_samples(self, only_active: bool = True) -> list['SequencingGroup']:
+    def get_sequencing_groups(
+        self, only_active: bool = True
+    ) -> list['SequencingGroup']:
         """
         Implementing the abstract method.
         """

@@ -142,7 +142,7 @@ def test_status_reporter(mocker: MockFixture, tmp_path):
     assert 'metamist' in get_batch().job_by_tool, get_batch().job_by_tool
     assert (
         get_batch().job_by_tool['metamist']['job_n']
-        == len(get_cohort().get_samples()) * 4
+        == len(get_cohort().get_sequencing_groups()) * 4
     )
 
 

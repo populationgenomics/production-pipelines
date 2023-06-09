@@ -202,7 +202,7 @@ class StageInput:
         assert output.stage is not None, output
         if not output.target.active:
             return
-        if not output.target.get_samples():
+        if not output.target.get_sequencing_groups():
             return
         if not output.data and not output.jobs:
             return
@@ -1163,10 +1163,10 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
                 f'via workflow.skip_datasets`'
             )
             return output_by_target
-        if not cohort.get_samples():
+        if not cohort.get_sequencing_groups():
             logging.warning(
-                f'{len(cohort.get_samples())}/'
-                f'{len(cohort.get_samples(only_active=False))} '
+                f'{len(cohort.get_sequencing_groups())}/'
+                f'{len(cohort.get_sequencing_groups(only_active=False))} '
                 f'usable (active=True) samples found. Check logs above for '
                 f'possible reasons samples were skipped (e.g. all samples ignored '
                 f'via `workflow.skip_sgs` in config, or they all missing stage '
@@ -1175,11 +1175,11 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
             return output_by_target
 
         for dataset in datasets:
-            if not dataset.get_samples():
+            if not dataset.get_sequencing_groups():
                 logging.warning(
                     f'{dataset}: '
-                    f'{len(dataset.get_samples())}/'
-                    f'{len(dataset.get_samples(only_active=False))} '
+                    f'{len(dataset.get_sequencing_groups())}/'
+                    f'{len(dataset.get_sequencing_groups(only_active=False))} '
                     f'usable (active=True) samples found. Check logs above for '
                     f'possible reasons samples were skipped (e.g. all samples ignored '
                     f'via `workflow.skip_sgs` in config, or they all missing stage '
@@ -1188,7 +1188,7 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
                 continue
 
             logging.info(f'Dataset {dataset}:')
-            for sample in dataset.get_samples():
+            for sample in dataset.get_sequencing_groups():
                 action = self._get_action(sample)
                 output_by_target[sample.target_id] = self._queue_jobs_with_checks(
                     sample, action
