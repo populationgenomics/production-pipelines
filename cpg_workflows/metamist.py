@@ -12,8 +12,6 @@ from typing import Optional
 
 from metamist import models
 from metamist.apis import (
-    SampleApi,
-    # SequenceApi,
     AnalysisApi,
     ParticipantApi,
     FamilyApi,
@@ -108,7 +106,7 @@ class AnalysisType(Enum):
 @dataclass
 class Analysis:
     """
-    Sample metadata DB Analysis entry.
+    Metamist DB Analysis entry.
 
     See the sample-metadata package for more details:
     https://github.com/populationgenomics/sample-metadata

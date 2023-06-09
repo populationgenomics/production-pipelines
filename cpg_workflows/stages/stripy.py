@@ -11,8 +11,7 @@ from cpg_workflows import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import stripy
 from cpg_workflows.stages.align import Align
-from cpg_workflows.targets import Sample
-from cpg_workflows.utils import exists
+from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.workflow import (
     stage,
     StageInput,
@@ -58,7 +57,7 @@ class Stripy(SequencingGroupStage):
     Call stripy to run STR analysis on known pathogenic loci.
     """
 
-    def expected_outputs(self, sample: Sample) -> dict[str, Path]:
+    def expected_outputs(self, sample: SequencingGroup) -> dict[str, Path]:
         return {
             'stripy_html': sample.dataset.web_prefix()
             / 'stripy'
@@ -71,7 +70,9 @@ class Stripy(SequencingGroupStage):
             / f'{sample.id}.stripy.log.txt',
         }
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(
+        self, sample: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         cram_path = inputs.as_path(sample, Align, 'cram')
         crai_path = inputs.as_path(sample, Align, 'crai')
 

@@ -503,7 +503,7 @@ To facilitate re-engineering WARP workflows and creating workflows scratch, we i
 
 This library provides an abstraction interface on top of Hail Batch jobs, namely a `Stage` abstract class, parametrised by the `Target` abstract class, representing what target this stage works with. 
 
-For example, a stage that performs read alignment to produce a CRAM file, would be derived from `SequencingGroupStage`, and be parametrised by `Sample`, and a stage that performs joint-calling would be derived from `CohortStage`, parametrised by `Cohort`.
+For example, a stage that performs read alignment to produce a CRAM file, would be derived from `SequencingGroupStage`, and be parametrised by `SequencingGroup`, and a stage that performs joint-calling would be derived from `CohortStage`, parametrised by `Cohort`.
 
 Each `Stage` final implementation must declare paths to the outputs it would write in the `expected_outputs()` method. It must also define how jobs are added into Hail Batch using the `queue_jobs()` method.
 
@@ -511,15 +511,15 @@ For example, out "Align" stage that runs BWA might look like as following:
 
 ```python
 from cpg_utils import Path
-from cpg_workflows.workflow import stage, SequencingGroupStage, Sample, StageInput, StageOutput
+from cpg_workflows.workflow import stage, SequencingGroupStage, SequencingGroup, StageInput, StageOutput
 from cpg_workflows.batch import get_batch
 
 @stage
 class Align(SequencingGroupStage):
-    def expected_outputs(self, sample: Sample) -> Path:
+    def expected_outputs(self, sample: SequencingGroup) -> Path:
         return sample.make_cram_path().path
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(self, sample: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         j = get_batch().new_job('BWA', self.get_job_attrs(sample))
         j.command(f'bwa ... > {j.output}')
         get_batch().write_output(j.output, str(self.expected_outputs(sample)))
@@ -533,17 +533,17 @@ Stages can depend on each other (i.e. they form a directed acyclic graph), which
 
 ```python
 from cpg_utils import Path
-from cpg_workflows.workflow import stage, SequencingGroupStage, Sample, StageInput, StageOutput
+from cpg_workflows.workflow import stage, SequencingGroupStage, SequencingGroup, StageInput, StageOutput
 
 Align = ...
 
 
 @stage(required_stages=Align)
 class Genotype(SequencingGroupStage):
-    def expected_outputs(self, sample: Sample) -> Path:
+    def expected_outputs(self, sample: SequencingGroup) -> Path:
         return sample.make_gvcf_path().path
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(self, sample: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         jobs = ...
         return self.make_outputs(sample, self.expected_outputs(sample), jobs)
 ```

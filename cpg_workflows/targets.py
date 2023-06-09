@@ -1,5 +1,5 @@
 """
-Targets for workflow stages: Sample, Dataset, Cohort.
+Targets for workflow stages: SequencingGroup, Dataset, Cohort.
 """
 
 import hashlib
@@ -34,7 +34,7 @@ class Target:
         # If not set, exclude from the workflow:
         self.active: bool = True
 
-    def get_samples(self, only_active: bool = True) -> list['Sample']:
+    def get_samples(self, only_active: bool = True) -> list['SequencingGroup']:
         """
         Get flat list of all samples corresponding to this target.
         """
@@ -149,7 +149,7 @@ class Cohort(Target):
         ds_by_name = {d.name: d for d in self.get_datasets(only_active)}
         return ds_by_name.get(name)
 
-    def get_samples(self, only_active: bool = True) -> list['Sample']:
+    def get_samples(self, only_active: bool = True) -> list['SequencingGroup']:
         """
         Gets a flat list of all samples from all datasets.
         Include only "active" samples (unless only_active is False)
@@ -241,7 +241,7 @@ class Dataset(Target):
         cohort: Cohort | None = None,
     ):
         super().__init__()
-        self._sample_by_id: dict[str, Sample] = {}
+        self._sample_by_id: dict[str, SequencingGroup] = {}
         self.name = name
         self.cohort = cohort
         self.active = True
@@ -344,12 +344,14 @@ class Dataset(Target):
         sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
         alignment_input_by_seq_type: dict[str, AlignmentInput] | None = None,
-    ) -> 'Sample':
+    ) -> 'SequencingGroup':
         """
         Create a new sample and add it to the dataset.
         """
         if id in self._sample_by_id:
-            logging.debug(f'Sample {id} already exists in the dataset {self.name}')
+            logging.debug(
+                f'SequencingGroup {id} already exists in the dataset {self.name}'
+            )
             return self._sample_by_id[id]
 
         force_samples = get_config()['workflow'].get('force_samples', set())
@@ -359,7 +361,7 @@ class Dataset(Target):
             or participant_id in force_samples
         )
 
-        s = Sample(
+        s = SequencingGroup(
             id=id,
             dataset=self,
             external_id=external_id,
@@ -373,7 +375,7 @@ class Dataset(Target):
         self._sample_by_id[id] = s
         return s
 
-    def get_samples(self, only_active: bool = True) -> list['Sample']:
+    def get_samples(self, only_active: bool = True) -> list['SequencingGroup']:
         """
         Get dataset's samples. Include only "active" samples, unless only_active=False
         """
@@ -450,9 +452,9 @@ class Sex(Enum):
         return self.name
 
 
-class Sample(Target):
+class SequencingGroup(Target):
     """
-    Represents a Sample.
+    Represents a sequencing group.
     """
 
     def __init__(
@@ -505,7 +507,7 @@ class Sample(Target):
             ),
             'pedigree': self.pedigree,
         }
-        retval = f'Sample({self.dataset.name}/{self.id}'
+        retval = f'SequencingGroup({self.dataset.name}/{self.id}'
         if self._external_id:
             retval += f'|{self._external_id}'
         return retval + ''.join(f', {k}={v}' for k, v in values.items())
@@ -523,7 +525,7 @@ class Sample(Target):
                 ai_tag += f'{len(alignment_input)}FQS'
 
         ext_id = f'|{self._external_id}' if self._external_id else ''
-        return f'Sample({self.dataset.name}/{self.id}{ext_id}{ai_tag})'
+        return f'SequencingGroup({self.dataset.name}/{self.id}{ext_id}{ai_tag})'
 
     @property
     def participant_id(self) -> str:
@@ -584,7 +586,7 @@ class Sample(Target):
         """Unique target ID"""
         return self.id
 
-    def get_samples(self, only_active: bool = True) -> list['Sample']:
+    def get_samples(self, only_active: bool = True) -> list['SequencingGroup']:
         """
         Implementing the abstract method.
         """
@@ -618,12 +620,12 @@ class PedigreeInfo:
     Pedigree relationships with other samples in the cohort, and other PED data
     """
 
-    sample: Sample
+    sample: SequencingGroup
     sex: Sex = Sex.UNKNOWN
     fam_id: str | None = None
     phenotype: str | int = 0
-    dad: Sample | None = None
-    mom: Sample | None = None
+    dad: SequencingGroup | None = None
+    mom: SequencingGroup | None = None
 
     def get_ped_dict(self, use_participant_id: bool = False) -> dict[str, str]:
         """
@@ -631,7 +633,7 @@ class PedigreeInfo:
         a PED file entry.
         """
 
-        def _get_id(_s: Sample | None) -> str:
+        def _get_id(_s: SequencingGroup | None) -> str:
             if _s is None:
                 return '0'
             if use_participant_id:

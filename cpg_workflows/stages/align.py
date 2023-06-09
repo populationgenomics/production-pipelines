@@ -10,7 +10,7 @@ from cpg_workflows import get_batch
 from cpg_workflows.jobs import align
 from cpg_workflows.jobs.align import MissingAlignmentInputException
 from cpg_workflows.workflow import (
-    Sample,
+    SequencingGroup,
     stage,
     StageInput,
     StageOutput,
@@ -24,7 +24,7 @@ class Align(SequencingGroupStage):
     Align or re-align input data to produce a CRAM file
     """
 
-    def expected_outputs(self, sample: Sample) -> dict[str, Path]:
+    def expected_outputs(self, sample: SequencingGroup) -> dict[str, Path]:
         """
         Stage is expected to generate a CRAM file and a corresponding index.
         """
@@ -33,7 +33,9 @@ class Align(SequencingGroupStage):
             'crai': sample.make_cram_path().index_path,
         }
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(
+        self, sample: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         """
         Using the "align" function implemented in the `jobs` module.
         Checks the `realign_from_cram_version` pipeline config argument, and

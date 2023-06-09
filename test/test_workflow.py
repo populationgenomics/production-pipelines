@@ -7,7 +7,7 @@ from unittest import mock
 
 from cpg_utils import Path, to_path
 
-from cpg_workflows.targets import Cohort, Sample
+from cpg_workflows.targets import Cohort, SequencingGroup
 from cpg_workflows.workflow import path_walk
 
 from . import set_config
@@ -77,11 +77,13 @@ def test_workflow(tmp_path):
         Just a sample-level stage.
         """
 
-        def expected_outputs(self, sample: Sample) -> Path:
+        def expected_outputs(self, sample: SequencingGroup) -> Path:
             return to_path(dataset_path(f'{sample.id}.tsv'))
 
-        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
-            j = get_batch().new_job('Sample job', self.get_job_attrs(sample))
+        def queue_jobs(
+            self, sample: SequencingGroup, inputs: StageInput
+        ) -> StageOutput | None:
+            j = get_batch().new_job('SequencingGroup job', self.get_job_attrs(sample))
             j.command(f'echo {sample.id}_done >> {j.output}')
             get_batch().write_output(j.output, str(self.expected_outputs(sample)))
             print(f'Writing to {self.expected_outputs(sample)}')

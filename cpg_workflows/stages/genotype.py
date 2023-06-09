@@ -6,7 +6,7 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_workflows.jobs import genotype
 from cpg_workflows.workflow import (
-    Sample,
+    SequencingGroup,
     stage,
     StageInput,
     StageOutput,
@@ -26,7 +26,7 @@ class Genotype(SequencingGroupStage):
     Use HaplotypeCaller to genotype individual samples (i.e. CRAM -> GVCF).
     """
 
-    def expected_outputs(self, sample: Sample) -> dict[str, Path]:
+    def expected_outputs(self, sample: SequencingGroup) -> dict[str, Path]:
         """
         Generate a GVCF and corresponding TBI index.
         """
@@ -35,7 +35,9 @@ class Genotype(SequencingGroupStage):
             'tbi': sample.make_gvcf_path().tbi_path,
         }
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(
+        self, sample: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         """
         Use function from the jobs module
         """

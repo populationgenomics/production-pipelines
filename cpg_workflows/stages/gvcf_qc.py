@@ -13,7 +13,7 @@ from cpg_workflows.jobs.multiqc import multiqc
 from cpg_workflows.stages.genotype import Genotype
 from cpg_workflows.targets import Dataset
 from cpg_workflows.workflow import (
-    Sample,
+    SequencingGroup,
     stage,
     StageInput,
     StageOutput,
@@ -31,7 +31,7 @@ class GvcfQC(SequencingGroupStage):
     Calling tools that process GVCF for QC purposes.
     """
 
-    def expected_outputs(self, sample: Sample) -> dict[str, Path]:
+    def expected_outputs(self, sample: SequencingGroup) -> dict[str, Path]:
         """
         Generate a GVCF and corresponding TBI index, as well as QC.
         """
@@ -44,7 +44,9 @@ class GvcfQC(SequencingGroupStage):
             }
         return outs
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(
+        self, sample: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         """
         Use function from the jobs module
         """
@@ -68,7 +70,7 @@ class GvcfHappy(SequencingGroupStage):
     Run Happy to validate a GVCF for samples where a truth callset is available.
     """
 
-    def expected_outputs(self, sample: Sample) -> Path | None:
+    def expected_outputs(self, sample: SequencingGroup) -> Path | None:
         """
         Parsed by MultiQC: '*.summary.csv'
         https://multiqc.info/docs/#hap.py
@@ -85,7 +87,9 @@ class GvcfHappy(SequencingGroupStage):
             / f'{sample.id}.summary.csv'
         )
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(
+        self, sample: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         """Queue jobs"""
         gvcf_path = inputs.as_path(sample, Genotype, 'gvcf')
 

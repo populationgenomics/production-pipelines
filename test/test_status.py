@@ -83,7 +83,7 @@ def test_status_reporter(mocker: MockFixture, tmp_path):
 
     from cpg_workflows.batch import get_batch
     from cpg_workflows.inputs import get_cohort
-    from cpg_workflows.targets import Sample
+    from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
         SequencingGroupStage,
         StageInput,
@@ -98,10 +98,12 @@ def test_status_reporter(mocker: MockFixture, tmp_path):
         Just a sample-level stage.
         """
 
-        def expected_outputs(self, sample: Sample) -> Path:
+        def expected_outputs(self, sample: SequencingGroup) -> Path:
             return to_path(dataset_path(f'{sample.id}.tsv'))
 
-        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+        def queue_jobs(
+            self, sample: SequencingGroup, inputs: StageInput
+        ) -> StageOutput | None:
             j = get_batch().new_job(
                 'Echo', self.get_job_attrs(sample) | dict(tool='echo')
             )
@@ -116,13 +118,15 @@ def test_status_reporter(mocker: MockFixture, tmp_path):
         Just a sample-level stage.
         """
 
-        def expected_outputs(self, sample: Sample) -> dict:
+        def expected_outputs(self, sample: SequencingGroup) -> dict:
             return {
                 'bed': to_path(dataset_path(f'{sample.id}.bed')),
                 'tsv': to_path(dataset_path(f'{sample.id}.tsv')),
             }
 
-        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+        def queue_jobs(
+            self, sample: SequencingGroup, inputs: StageInput
+        ) -> StageOutput | None:
             j = get_batch().new_job(
                 'Echo', self.get_job_attrs(sample) | dict(tool='echo')
             )
@@ -155,7 +159,7 @@ def test_status_reporter_with_custom_updater(mocker: MockFixture, tmp_path):
     from cpg_utils.hail_batch import dataset_path
 
     from cpg_workflows.batch import get_batch
-    from cpg_workflows.targets import Sample
+    from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
         SequencingGroupStage,
         StageInput,
@@ -166,10 +170,12 @@ def test_status_reporter_with_custom_updater(mocker: MockFixture, tmp_path):
 
     @stage(analysis_type='qc', update_analysis_meta=_update_meta)
     class MyQcStage(SequencingGroupStage):
-        def expected_outputs(self, sample: Sample) -> Path:
+        def expected_outputs(self, sample: SequencingGroup) -> Path:
             return to_path(dataset_path(f'{sample.id}.tsv'))
 
-        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+        def queue_jobs(
+            self, sample: SequencingGroup, inputs: StageInput
+        ) -> StageOutput | None:
             j = get_batch().new_job(
                 'Echo', self.get_job_attrs(sample) | dict(tool='echo')
             )
@@ -188,7 +194,7 @@ def test_status_reporter_fails(mocker: MockFixture, tmp_path):
     from cpg_utils.hail_batch import dataset_path
 
     from cpg_workflows.batch import get_batch
-    from cpg_workflows.targets import Sample
+    from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
         SequencingGroupStage,
         StageInput,
@@ -203,13 +209,15 @@ def test_status_reporter_fails(mocker: MockFixture, tmp_path):
         Just a sample-level stage.
         """
 
-        def expected_outputs(self, sample: Sample) -> dict:
+        def expected_outputs(self, sample: SequencingGroup) -> dict:
             return {
                 'bed': dataset_path(f'{sample.id}.bed'),
                 'tsv': dataset_path(f'{sample.id}.tsv'),
             }
 
-        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+        def queue_jobs(
+            self, sample: SequencingGroup, inputs: StageInput
+        ) -> StageOutput | None:
             j = get_batch().new_job(
                 'Echo', self.get_job_attrs(sample) | dict(tool='echo')
             )

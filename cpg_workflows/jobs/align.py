@@ -14,7 +14,7 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from cpg_utils.hail_batch import command
-from cpg_workflows.targets import Sample
+from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.filetypes import (
     AlignmentInput,
     FastqPairs,
@@ -74,7 +74,7 @@ class MissingAlignmentInputException(Exception):
     pass
 
 
-def _get_alignment_input(sample: Sample) -> AlignmentInput:
+def _get_alignment_input(sample: SequencingGroup) -> AlignmentInput:
     """Given a sample, will return an AlignmentInput object that
     represents the path to a relevant input (e.g. CRAM/BAM path)"""
     sequencing_type = get_config()['workflow']['sequencing_type']
@@ -112,7 +112,7 @@ def _get_alignment_input(sample: Sample) -> AlignmentInput:
 
 def align(
     b,
-    sample: Sample,
+    sample: SequencingGroup,
     job_attrs: dict | None = None,
     output_path: CramPath | None = None,
     out_markdup_metrics_path: Path | None = None,

@@ -11,12 +11,12 @@ from hailtop.batch import ResourceGroup
 
 from cpg_utils.hail_batch import command
 from cpg_workflows.resources import STANDARD
-from cpg_workflows.targets import Sample
+from cpg_workflows.targets import SequencingGroup
 
 
 def happy(
     b,
-    sample: Sample,
+    sample: SequencingGroup,
     vcf_or_gvcf: ResourceGroup,
     is_gvcf: bool,
     job_attrs: dict,

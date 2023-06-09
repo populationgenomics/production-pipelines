@@ -10,12 +10,12 @@ from cpg_utils.hail_batch import command
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.utils import can_reuse
-from cpg_workflows.targets import Sample
+from cpg_workflows.targets import SequencingGroup
 
 
 def stripy(
     b,
-    sample: Sample,
+    sample: SequencingGroup,
     cram_path: CramPath,
     target_loci: str,
     out_path: Path,
@@ -50,7 +50,9 @@ def stripy(
     j.cloudfuse(bucket, str(bucket_mount_path), read_only=True)
     mounted_cram_path = bucket_mount_path / '/'.join(cram_path.path.parts[2:])
     assert cram_path.index_path  # keep mypy happy as index_path is optional
-    mounted_cram_index_path = bucket_mount_path / '/'.join(cram_path.index_path.parts[2:])
+    mounted_cram_index_path = bucket_mount_path / '/'.join(
+        cram_path.index_path.parts[2:]
+    )
 
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)

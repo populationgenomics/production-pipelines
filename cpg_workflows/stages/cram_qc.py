@@ -19,7 +19,7 @@ from cpg_workflows.jobs.picard import (
 from cpg_workflows.jobs.samtools import samtools_stats
 from cpg_workflows.jobs.verifybamid import verifybamid
 from cpg_workflows.stages.align import Align
-from cpg_workflows.targets import Sample, Dataset
+from cpg_workflows.targets import SequencingGroup, Dataset
 from cpg_workflows.utils import exists
 from cpg_workflows.workflow import (
     stage,
@@ -118,7 +118,7 @@ class CramQC(SequencingGroupStage):
     Calling tools that process CRAM for QC purposes.
     """
 
-    def expected_outputs(self, sample: Sample) -> dict[str, Path]:
+    def expected_outputs(self, sample: SequencingGroup) -> dict[str, Path]:
         outs = {}
         for qc in qc_functions():
             for key, out in qc.outs.items():
@@ -130,7 +130,9 @@ class CramQC(SequencingGroupStage):
                     )
         return outs
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(
+        self, sample: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         cram_path = inputs.as_path(sample, Align, 'cram')
         crai_path = inputs.as_path(sample, Align, 'crai')
 

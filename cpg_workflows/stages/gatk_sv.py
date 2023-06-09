@@ -20,7 +20,7 @@ from cpg_workflows.workflow import (
     StageOutput,
     DatasetStage,
     StageInput,
-    Sample,
+    SequencingGroup,
     Dataset,
 )
 
@@ -204,7 +204,7 @@ class GatherSampleEvidence(SequencingGroupStage):
     https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherSampleEvidence.wdl
     """
 
-    def expected_outputs(self, sample: Sample) -> dict[str, Path]:
+    def expected_outputs(self, sample: SequencingGroup) -> dict[str, Path]:
         """
         Expected to produce coverage counts, a VCF for each variant caller,
         and a txt for each type of SV evidence (SR, PE, SD).
@@ -243,7 +243,7 @@ class GatherSampleEvidence(SequencingGroupStage):
             d[key] = sample.dataset.prefix() / 'gatk_sv' / stage_name / fname
         return d
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sample: SequencingGroup, inputs: StageInput) -> StageOutput:
         """Add jobs to batch"""
         assert sample.cram, sample
 

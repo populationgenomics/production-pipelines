@@ -7,7 +7,7 @@ import logging
 from cpg_utils.config import get_config, update_dict
 
 from .metamist import get_metamist, Assay, AnalysisType, MetamistError
-from .targets import Cohort, Sex, PedigreeInfo, Sample
+from .targets import Cohort, Sex, PedigreeInfo, SequencingGroup
 
 
 _cohort: Cohort | None = None
@@ -74,7 +74,7 @@ def create_cohort() -> Cohort:
 
 
 def _populate_alignment_inputs_new(
-    sample: Sample,
+    sample: SequencingGroup,
     sequencing_group: dict,
     check_existence: bool = False,
 ) -> None:

@@ -18,7 +18,7 @@ def run_workflow(mocker):
 
     from cpg_utils.hail_batch import dataset_path
 
-    from cpg_workflows.targets import Sample
+    from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
         SequencingGroupStage,
         StageInput,
@@ -29,10 +29,12 @@ def run_workflow(mocker):
     )
 
     class TestStage(SequencingGroupStage):
-        def expected_outputs(self, sample: Sample) -> Path:
+        def expected_outputs(self, sample: SequencingGroup) -> Path:
             return to_path(dataset_path(f'{sample.id}_{self.name}.tsv'))
 
-        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+        def queue_jobs(
+            self, sample: SequencingGroup, inputs: StageInput
+        ) -> StageOutput | None:
             j = get_batch().new_job(self.name, attributes=self.get_job_attrs(sample))
             return self.make_outputs(sample, self.expected_outputs(sample), j)
 

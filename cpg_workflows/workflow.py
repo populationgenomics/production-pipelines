@@ -4,7 +4,7 @@ in a declarative fashion.
 
 A `Stage` object is responsible for creating Hail Batch jobs and declaring outputs
 (files or metamist analysis objects) that are expected to be produced. Each stage
-acts on a `Target`, which can be of the following a `Sample`, a `Dataset` (a container
+acts on a `Target`, which can be of the following a `SequencingGroup`, a `Dataset` (a container
 for samples), or a `Cohort` (all input datasets together). A `Workflow` object plugs
 stages together by resolving dependencies between different levels accordingly.
 
@@ -27,7 +27,7 @@ from cpg_utils import Path
 
 from .batch import get_batch
 from .status import MetamistStatusReporter
-from .targets import Target, Dataset, Sample, Cohort
+from .targets import Target, Dataset, SequencingGroup, Cohort
 from .utils import exists, timestamp, slugify, ExpectedResultT
 from .inputs import get_cohort
 
@@ -352,7 +352,7 @@ class Action(Enum):
 class Stage(Generic[TargetT], ABC):
     """
     Abstract class for a workflow stage. Parametrised by specific Target subclass,
-    i.e. SequencingGroup(Stage[Sample]) should only be able to work on Sample(Target).
+    i.e. SequencingGroup(Stage[SequencingGroup]) should only be able to work on SequencingGroup(Target).
     """
 
     def __init__(
@@ -561,7 +561,7 @@ class Stage(Generic[TargetT], ABC):
                 analysis_outputs.append(outputs.data)
 
             project_name = None
-            if isinstance(target, Sample):
+            if isinstance(target, SequencingGroup):
                 project_name = target.dataset.name
             elif isinstance(target, Dataset):
                 project_name = target.name
@@ -723,9 +723,9 @@ def stage(
 
     @stage(required_stages=[Align])
     class GenotypeSample(SequencingGroupStage):
-        def expected_outputs(self, sample: Sample):
+        def expected_outputs(self, sample: SequencingGroup):
             ...
-        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+        def queue_jobs(self, sample: SequencingGroup, inputs: StageInput) -> StageOutput:
             ...
 
     @analysis_type: if defined, will be used to create/update `Analysis` entries
@@ -1128,19 +1128,21 @@ class Workflow:
         ]
 
 
-class SequencingGroupStage(Stage[Sample], ABC):
+class SequencingGroupStage(Stage[SequencingGroup], ABC):
     """
     Sequencing Group level stage.
     """
 
     @abstractmethod
-    def expected_outputs(self, sample: Sample) -> ExpectedResultT:
+    def expected_outputs(self, sample: SequencingGroup) -> ExpectedResultT:
         """
         Override to declare expected output paths.
         """
 
     @abstractmethod
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(
+        self, sample: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         """
         Override to add Hail Batch jobs.
         """

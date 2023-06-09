@@ -21,7 +21,7 @@ from cpg_workflows.jobs.picard import vcf_qc
 from .joint_genotyping import JointGenotyping
 from .. import get_cohort, get_batch
 from ..jobs.happy import happy
-from ..targets import Sample
+from ..targets import SequencingGroup
 
 
 @stage(required_stages=JointGenotyping)
@@ -74,7 +74,7 @@ class JointVcfHappy(SequencingGroupStage):
     Run Happy to validate validation samples in joint VCF
     """
 
-    def expected_outputs(self, sample: Sample) -> Path | None:
+    def expected_outputs(self, sample: SequencingGroup) -> Path | None:
         """
         Parsed by MultiQC: '*.summary.csv'
         https://multiqc.info/docs/#hap.py
@@ -92,7 +92,9 @@ class JointVcfHappy(SequencingGroupStage):
             / f'{get_workflow().output_version}-{sample.id}.summary.csv'
         )
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(
+        self, sample: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         """Queue jobs"""
         assert sample.dataset.cohort
         vcf_path = inputs.as_path(

@@ -7,11 +7,11 @@ from cpg_utils.hail_batch import genome_build
 import hail as hl
 
 from cpg_workflows.inputs import get_cohort
-from cpg_workflows.targets import Sample
+from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import can_reuse, exists
 
 
-def _check_gvcfs(samples: list[Sample]) -> list[Sample]:
+def _check_gvcfs(samples: list[SequencingGroup]) -> list[SequencingGroup]:
     """
     Making sure each sample has a GVCF
     """
@@ -25,7 +25,7 @@ def _check_gvcfs(samples: list[Sample]) -> list[Sample]:
                 continue
             else:
                 raise ValueError(
-                    f'Sample {sample} is missing GVCF. '
+                    f'SequencingGroup {sample} is missing GVCF. '
                     f'Use workflow/skip_sgs = [] or '
                     f'workflow/skip_samples_with_missing_input '
                     f'to control behaviour'
@@ -42,7 +42,7 @@ def _check_gvcfs(samples: list[Sample]) -> list[Sample]:
                     sample.active = False
                 else:
                     raise ValueError(
-                        f'Sample {sample} is missing GVCF. '
+                        f'SequencingGroup {sample} is missing GVCF. '
                         f'Use workflow/skip_sgs = [] or '
                         f'workflow/skip_samples_with_missing_input '
                         f'to control behaviour'

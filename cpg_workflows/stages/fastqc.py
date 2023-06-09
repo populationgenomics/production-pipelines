@@ -8,7 +8,7 @@ from cpg_utils.config import get_config
 from cpg_workflows import get_batch
 from cpg_workflows.filetypes import BamPath, FastqPairs
 from cpg_workflows.workflow import (
-    Sample,
+    SequencingGroup,
     Dataset,
     stage,
     StageInput,
@@ -80,7 +80,7 @@ class FastQC(SequencingGroupStage):
     Run FASTQC on all paths in alignment inputs.
     """
 
-    def expected_outputs(self, sample: Sample) -> dict[str, Path] | None:
+    def expected_outputs(self, sample: SequencingGroup) -> dict[str, Path] | None:
         """
         Generates one FASTQC HTML report per "sequence" path
         (a FASTQ path, or a BAM path depending on the inputs type).
@@ -93,7 +93,9 @@ class FastQC(SequencingGroupStage):
             }
         return outs
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(
+        self, sample: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         if not (fqc_outs := _collect_fastq_outs(sample)):
             return self.make_outputs(sample, skipped=True)
 
