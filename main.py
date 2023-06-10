@@ -23,7 +23,14 @@ from cpg_workflows.stages.stripy import Stripy
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'pre_alignment': [FastQCMultiQC],
-    'seqr_loader': [DatasetVCF, AnnotateDataset, MtToEs, GvcfMultiQC, CramMultiQC, Stripy],
+    'seqr_loader': [
+        DatasetVCF,
+        AnnotateDataset,
+        MtToEs,
+        GvcfMultiQC,
+        CramMultiQC,
+        Stripy,
+    ],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
     'gatk_sv': [AnnotateVcf],
 }
@@ -91,7 +98,7 @@ def main(
     if list_last_stages:
         click.echo(
             f'Available last stages that can be listed with '
-            f'workflow/last_stages for the workflow "{workflow}":'
+            f'workflow/last_stages for the current workflow "{workflow}":'
         )
         click.echo(f'{", ".join(s.__name__ for s in WORKFLOWS[workflow])}')
         return
