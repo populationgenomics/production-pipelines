@@ -7,21 +7,7 @@ from cpg_utils import to_path
 from . import set_config
 
 from pathlib import Path
-from cpg_utils import to_path
 from pytest_mock import MockFixture
-
-from cpg_utils.hail_batch import dataset_path
-
-from cpg_workflows.batch import get_batch
-from cpg_workflows.inputs import get_cohort
-from cpg_workflows.targets import SequencingGroup
-from cpg_workflows.workflow import (
-    SequencingGroupStage,
-    StageInput,
-    StageOutput,
-    run_workflow,
-    stage,
-)
 from cpg_workflows.targets import Cohort
 
 CONFIG = """
@@ -123,48 +109,65 @@ def mock_create_cohort() -> Cohort:
     return c
 
 
-@stage(analysis_type='qc')
-class MyQcStage1(SequencingGroupStage):
-    """
-    A dummy SequencingGroup Stage.
-    """
-
-    def expected_outputs(self, sample: SequencingGroup) -> Path:
-        return to_path(dataset_path(f'{sample.id}.tsv'))
-
-    def queue_jobs(
-        self, sample: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
-        j = get_batch().new_job('Echo', self.get_job_attrs(sample) | dict(tool='echo'))
-        j.command(f'echo {sample.id}_done >> {j.output}')
-        get_batch().write_output(j.output, str(self.expected_outputs(sample)))
-        print(f'Writing to {self.expected_outputs(sample)}')
-        return self.make_outputs(sample, self.expected_outputs(sample), [j])
-
-
-@stage(analysis_type='qc', analysis_keys=['bed'])
-class MyQcStage2(SequencingGroupStage):
-    """
-    A dummy SequencingGroup stage.
-    """
-
-    def expected_outputs(self, sample: SequencingGroup) -> dict:
-        return {
-            'bed': to_path(dataset_path(f'{sample.id}.bed')),
-            'tsv': to_path(dataset_path(f'{sample.id}.tsv')),
-        }
-
-    def queue_jobs(
-        self, sample: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
-        j = get_batch().new_job('Echo', self.get_job_attrs(sample) | dict(tool='echo'))
-        j.command(f'echo {sample.id}_done >> {j.output}')
-        get_batch().write_output(j.output, str(self.expected_outputs(sample)['bed']))
-        print(f'Writing to {self.expected_outputs(sample)["bed"]}')
-        return self.make_outputs(sample, self.expected_outputs(sample), [j])
-
-
 def test_attributes(mocker: MockFixture, tmp_path):
+    from cpg_utils.hail_batch import dataset_path
+
+    from cpg_workflows.batch import get_batch
+    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.targets import SequencingGroup
+    from cpg_workflows.workflow import (
+        SequencingGroupStage,
+        StageInput,
+        StageOutput,
+        run_workflow,
+        stage,
+    )
+
+    @stage(analysis_type='qc')
+    class MyQcStage1(SequencingGroupStage):
+        """
+        Just a sample-level stage.
+        """
+
+        def expected_outputs(self, sample: SequencingGroup) -> Path:
+            return to_path(dataset_path(f'{sample.id}.tsv'))
+
+        def queue_jobs(
+            self, sample: SequencingGroup, inputs: StageInput
+        ) -> StageOutput | None:
+            j = get_batch().new_job(
+                'Echo', self.get_job_attrs(sample) | dict(tool='echo')
+            )
+            j.command(f'echo {sample.id}_done >> {j.output}')
+            get_batch().write_output(j.output, str(self.expected_outputs(sample)))
+            print(f'Writing to {self.expected_outputs(sample)}')
+            return self.make_outputs(sample, self.expected_outputs(sample), [j])
+
+    @stage(analysis_type='qc', analysis_keys=['bed'])
+    class MyQcStage2(SequencingGroupStage):
+        """
+        Just a sample-level stage.
+        """
+
+        def expected_outputs(self, sample: SequencingGroup) -> dict:
+            return {
+                'bed': to_path(dataset_path(f'{sample.id}.bed')),
+                'tsv': to_path(dataset_path(f'{sample.id}.tsv')),
+            }
+
+        def queue_jobs(
+            self, sample: SequencingGroup, inputs: StageInput
+        ) -> StageOutput | None:
+            j = get_batch().new_job(
+                'Echo', self.get_job_attrs(sample) | dict(tool='echo')
+            )
+            j.command(f'echo {sample.id}_done >> {j.output}')
+            get_batch().write_output(
+                j.output, str(self.expected_outputs(sample)['bed'])
+            )
+            print(f'Writing to {self.expected_outputs(sample)["bed"]}')
+            return self.make_outputs(sample, self.expected_outputs(sample), [j])
+
     mocker.patch('metamist.apis.AnalysisApi.create_analysis', mock_create_analysis)
     mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
 
@@ -206,8 +209,8 @@ def test_attributes(mocker: MockFixture, tmp_path):
         )
 
     # Check that the job_by_stage and job_by_tool dicts are correct
-    for stage, job in get_batch().job_by_stage.items():
-        assert stage in [s.__name__ for s in workflow_stages]
+    for stg, job in get_batch().job_by_stage.items():
+        assert stg in [s.__name__ for s in workflow_stages]
         assert job['sequencing_groups'] == {'CPG01', 'CPG02'}
 
     for tool, job in get_batch().job_by_tool.items():
