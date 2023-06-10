@@ -41,8 +41,8 @@ backend = 'local'
 def mock_create_cohort() -> Cohort:
     c = Cohort()
     ds = c.create_dataset('my_dataset')
-    ds.add_sample('CPG01', external_id='SAMPLE1')
-    ds.add_sample('CPG02', external_id='SAMPLE2')
+    ds.add_sequencing_group('CPG01', external_id='SAMPLE1')
+    ds.add_sequencing_group('CPG02', external_id='SAMPLE2')
     return c
 
 

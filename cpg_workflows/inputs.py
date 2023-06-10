@@ -43,7 +43,7 @@ def create_cohort() -> Cohort:
             metadata = entry.get('meta', {})
             update_dict(metadata, entry['sample']['participant'].get('meta', {}))
 
-            sample = dataset.add_sample(
+            sample = dataset.add_sequencing_group(
                 id=str(entry['id']),
                 external_id=str(entry['sample']['externalId']),
                 participant_id=entry['sample']['participant'].get('externalId'),

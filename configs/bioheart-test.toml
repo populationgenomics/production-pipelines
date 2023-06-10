@@ -3,7 +3,7 @@ input_datasets = ['bioheart']
 sequencing_type = 'genome'
 scatter_count = 5
 
-# leave this to true, since one sample doesn't have sequencing data
+# leave this to true, since one sequencing group doesn't have assay data
 skip_sgs_with_missing_input = true
 
 vds_version = '0.1'

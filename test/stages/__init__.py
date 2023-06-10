@@ -9,7 +9,7 @@ def _mock_cohort():
 
     c = Cohort()
     ds = c.create_dataset('my_dataset')
-    ds.add_sample('CPG01', external_id='SAMPLE1')
+    ds.add_sequencing_group('CPG01', external_id='SAMPLE1')
     return c
 
 

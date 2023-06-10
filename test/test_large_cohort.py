@@ -87,7 +87,7 @@ def _mock_cohort():
     assert len(found_gvcf_paths) > 0, gvcf_root
     for gvcf_path in found_gvcf_paths:
         sample_id = gvcf_path.name.split('.')[0]
-        sample = dataset.add_sample(
+        sample = dataset.add_sequencing_group(
             id=sample_id, external_id=sample_id.replace('CPG', 'EXT')
         )
         sample.gvcf = GvcfPath(gvcf_path)

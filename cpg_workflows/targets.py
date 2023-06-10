@@ -204,7 +204,7 @@ class Cohort(Target):
         Attributes for Hail Batch job.
         """
         return {
-            'samples': self.get_sample_ids(),
+            'sequencing_groups': self.get_sample_ids(),
             'datasets': [d.name for d in self.get_datasets()],
         }
 
@@ -345,7 +345,7 @@ class Dataset(Target):
             dataset=self.name,
         )
 
-    def add_sample(
+    def add_sequencing_group(
         self,
         id: str,  # pylint: disable=redefined-builtin
         external_id: str | None = None,
@@ -399,7 +399,7 @@ class Dataset(Target):
         """
         return {
             'dataset': self.name,
-            'samples': self.get_sample_ids(),
+            'sequencing_groups': self.get_sample_ids(),
         }
 
     def get_job_prefix(self) -> str:
@@ -612,7 +612,7 @@ class SequencingGroup(Target):
         """
         attrs = {
             'dataset': self.dataset.name,
-            'sample': self.id,
+            'sequencing_group': self.id,
         }
         _participant_id: str | None = self._participant_id or self._external_id
         if _participant_id:

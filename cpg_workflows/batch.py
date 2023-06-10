@@ -22,7 +22,9 @@ from cpg_utils.hail_batch import (
 _batch: Optional['Batch'] = None
 
 
-def get_batch(name: str | None = None, default_python_image: str | None = None) -> 'Batch':
+def get_batch(
+    name: str | None = None, default_python_image: str | None = None
+) -> 'Batch':
     global _batch
     backend: hb.Backend
     if _batch is None:
@@ -45,7 +47,8 @@ def get_batch(name: str | None = None, default_python_image: str | None = None) 
             cancel_after_n_failures=get_config()['hail'].get('cancel_after_n_failures'),
             default_timeout=get_config()['hail'].get('default_timeout'),
             default_memory=get_config()['hail'].get('default_memory'),
-            default_python_image=default_python_image or get_config()['workflow']['driver_image'],
+            default_python_image=default_python_image
+            or get_config()['workflow']['driver_image'],
         )
     return _batch
 
@@ -101,9 +104,9 @@ class Batch(hb.Batch):
         attributes = attributes or {}
         stage = attributes.get('stage')
         dataset = attributes.get('dataset')
-        sample = attributes.get('sample')
+        sample = attributes.get('sequencing_group')
         participant_id = attributes.get('participant_id')
-        samples: set[str] = set(attributes.get('samples') or [])
+        samples: set[str] = set(attributes.get('sequencing_groups') or [])
         if sample:
             samples.add(sample)
         part = attributes.get('part')
@@ -128,21 +131,21 @@ class Batch(hb.Batch):
         )
 
         if label not in self.job_by_label:
-            self.job_by_label[label] = {'job_n': 0, 'samples': set()}
+            self.job_by_label[label] = {'job_n': 0, 'sequencing_groups': set()}
         self.job_by_label[label]['job_n'] += 1
-        self.job_by_label[label]['samples'] |= samples
+        self.job_by_label[label]['sequencing_groups'] |= samples
 
         if stage not in self.job_by_stage:
-            self.job_by_stage[stage] = {'job_n': 0, 'samples': set()}
+            self.job_by_stage[stage] = {'job_n': 0, 'sequencing_groups': set()}
         self.job_by_stage[stage]['job_n'] += 1
-        self.job_by_stage[stage]['samples'] |= samples
+        self.job_by_stage[stage]['sequencing_groups'] |= samples
 
         if tool not in self.job_by_tool:
-            self.job_by_tool[tool] = {'job_n': 0, 'samples': set()}
+            self.job_by_tool[tool] = {'job_n': 0, 'sequencing_groups': set()}
         self.job_by_tool[tool]['job_n'] += 1
-        self.job_by_tool[tool]['samples'] |= samples
+        self.job_by_tool[tool]['sequencing_groups'] |= samples
 
-        attributes['samples'] = list(sorted(list(samples)))
+        attributes['sequencing_groups'] = list(sorted(list(samples)))
         fixed_attrs = {k: str(v) for k, v in attributes.items()}
         return name, fixed_attrs
 
@@ -173,9 +176,11 @@ class Batch(hb.Batch):
                     msg = f'{stat["job_n"]} job'
                     if stat['job_n'] > 1:
                         msg += 's'
-                    if len(stat['samples']) > 0:
-                        msg += f' for {len(stat["samples"])} sample'
-                        if len(stat['samples']) > 1:
+                    if len(stat['sequencing_groups']) > 0:
+                        msg += (
+                            f' for {len(stat["sequencing_groups"])} sequencing groups'
+                        )
+                        if len(stat['sequencing_groups']) > 1:
                             msg += 's'
                     logging.info(f'  {label}: {msg}')
 
