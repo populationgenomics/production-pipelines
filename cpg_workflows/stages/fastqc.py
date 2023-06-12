@@ -137,11 +137,11 @@ class FastQCMultiQC(DatasetStage):
         paths = []  # FASTQC zip outputs to parse with MultiQC
         sample_id_map = {}  # MultiQC would use names of FASTQ files as sample names,
         # we need to collect a map to rename them to proper internal/external IDs
-        for sample in dataset.get_sequencing_groups():
-            for fqc_out in _collect_fastq_outs(sample):
+        for sequencing_group in dataset.get_sequencing_groups():
+            for fqc_out in _collect_fastq_outs(sequencing_group):
                 paths.append(fqc_out.out_zip)
                 fq_name = fqc_out.input_path.name.removesuffix('.gz').split('.')[0]
-                sample_id_map[fq_name] = f'{sample.rich_id}{fqc_out.suffix}'
+                sample_id_map[fq_name] = f'{sequencing_group.rich_id}{fqc_out.suffix}'
 
         jobs = multiqc(
             get_batch(),

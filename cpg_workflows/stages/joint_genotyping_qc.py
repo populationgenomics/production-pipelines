@@ -183,14 +183,14 @@ class JointVcfMultiQC(CohortStage):
 
         paths.append(inputs.as_path(cohort, JointVcfQC, 'qc_detail'))
 
-        for sample in cohort.get_sequencing_groups():
+        for sequencing_group in cohort.get_sequencing_groups():
             try:
-                path = inputs.as_path(sample, JointVcfHappy)
+                path = inputs.as_path(sequencing_group, JointVcfHappy)
             except StageInputNotFoundError:
                 pass
             else:
                 paths.append(path)
-                ending_to_trim.add(path.name.replace(sample.id, ''))
+                ending_to_trim.add(path.name.replace(sequencing_group.id, ''))
 
         jobs = multiqc(
             get_batch(),

@@ -46,10 +46,10 @@ class JointGenotyping(CohortStage):
         Submit jobs.
         """
         gvcf_by_sid = {
-            sample.id: GvcfPath(
-                inputs.as_path(target=sample, stage=Genotype, key='gvcf')
+            sequencing_group.id: GvcfPath(
+                inputs.as_path(target=sequencing_group, stage=Genotype, key='gvcf')
             )
-            for sample in cohort.get_sequencing_groups()
+            for sequencing_group in cohort.get_sequencing_groups()
         }
 
         not_found_gvcfs: list[str] = []

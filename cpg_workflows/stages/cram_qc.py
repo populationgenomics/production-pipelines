@@ -308,22 +308,22 @@ class CramMultiQC(DatasetStage):
         ending_to_trim = set()  # endings to trim to get sample names
         modules_to_trim_endings = set()
 
-        for sample in dataset.get_sequencing_groups():
+        for sequencing_group in dataset.get_sequencing_groups():
             for qc in qc_functions():
                 for key, out in qc.outs.items():
                     if not out:
                         continue
                     try:
-                        path = inputs.as_path(sample, CramQC, key)
+                        path = inputs.as_path(sequencing_group, CramQC, key)
                     except StageInputNotFoundError:  # allow missing inputs
                         logging.warning(
-                            f'Output CramQc/"{key}" not found for {sample}, '
+                            f'Output CramQc/"{key}" not found for {sequencing_group}, '
                             f'it will be silently excluded from MultiQC'
                         )
                         continue
                     modules_to_trim_endings.add(out.multiqc_key)
                     paths.append(path)
-                    ending_to_trim.add(path.name.replace(sample.id, ''))
+                    ending_to_trim.add(path.name.replace(sequencing_group.id, ''))
 
         if not paths:
             logging.warning('No CRAM QC found to aggregate with MultiQC')

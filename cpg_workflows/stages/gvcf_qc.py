@@ -163,22 +163,22 @@ class GvcfMultiQC(DatasetStage):
         paths = []
         ending_to_trim = set()  # endings to trim to get sample names
 
-        for sample in dataset.get_sequencing_groups():
+        for sequencing_group in dataset.get_sequencing_groups():
             for _stage, key in [
                 (GvcfQC, 'qc_detail'),
                 (GvcfHappy, None),
             ]:
                 try:
-                    path = inputs.as_path(sample, _stage, key)
+                    path = inputs.as_path(sequencing_group, _stage, key)
                 except StageInputNotFoundError:  # allow missing inputs
                     if _stage != GvcfHappy:
                         logging.warning(
-                            f'Output {_stage.__name__}/"{key}" not found for {sample}, '
+                            f'Output {_stage.__name__}/"{key}" not found for {sequencing_group}, '
                             f'it will be silently excluded from MultiQC'
                         )
                 else:
                     paths.append(path)
-                    ending_to_trim.add(path.name.replace(sample.id, ''))
+                    ending_to_trim.add(path.name.replace(sequencing_group.id, ''))
 
         if not paths:
             logging.warning('No GVCF QC found to aggregate with MultiQC')
