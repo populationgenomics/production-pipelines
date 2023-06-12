@@ -43,7 +43,7 @@ def create_cohort() -> Cohort:
             metadata = entry.get('meta', {})
             update_dict(metadata, entry['sample']['participant'].get('meta', {}))
 
-            sample = dataset.add_sequencing_group(
+            sequencing_group = dataset.add_sequencing_group(
                 id=str(entry['id']),
                 external_id=str(entry['sample']['externalId']),
                 participant_id=entry['sample']['participant'].get('externalId'),
@@ -51,9 +51,9 @@ def create_cohort() -> Cohort:
             )
 
             if reported_sex := entry['sample']['participant'].get('reportedSex'):
-                sample.pedigree.sex = Sex.parse(reported_sex)
+                sequencing_group.pedigree.sex = Sex.parse(reported_sex)
 
-            _populate_alignment_inputs_new(sample, entry)
+            _populate_alignment_inputs(sequencing_group, entry)
             # TODO: Add checks here,logging samples without sequences
             # Check there is only one sequencing group per type.
 
@@ -62,7 +62,7 @@ def create_cohort() -> Cohort:
         if 'skip_sgs' in get_config()['workflow']:
             msg += ' (after skipping sequencing groups)'
         if 'only_sgs' in get_config()['workflow']:
-            msg += ' (after picking samples)'
+            msg += ' (after picking sequencing groups)'
         raise MetamistError(msg)
 
     # NOTE: Are there cases where there isn't a sequencing_type?
@@ -73,36 +73,35 @@ def create_cohort() -> Cohort:
     return cohort
 
 
-def _populate_alignment_inputs_new(
-    sample: SequencingGroup,
-    sequencing_group: dict,
+def _populate_alignment_inputs(
+    sequencing_group: SequencingGroup,
+    entry: dict,
     check_existence: bool = False,
 ) -> None:
     """
     Populate sequencing inputs for a sequencing group
     """
 
-    # TODO: Clean this up a little so the right parameters are ready
-    entry = sequencing_group
     if len(entry['assays']) != 1:
-        raise MetamistError(f'This is not good.')
+        raise MetamistError(
+            f'Only one active assay per sequencing group allowed. Found {len(entry["assays"])}'
+        )
 
     assay_entry = entry['assays'][0]
-    print(assay_entry)
 
-    assay = Assay.parse(assay_entry, sample.id, parse_reads=False)
+    assay = Assay.parse(assay_entry, sequencing_group.id, parse_reads=False)
 
-    sample.assays[assay.assay_type] = assay
+    sequencing_group.assays[assay.assay_type] = assay
 
     if assay_entry.get('meta', {}).get('reads'):
         alignment_input = Assay.parse_reads(
-            sample_id=sample.id,
+            sample_id=sequencing_group.id,
             meta=assay_entry['meta'],
             check_existence=check_existence,
         )
 
     assay.alignment_input = alignment_input
-    sample.alignment_input_by_seq_type[sequencing_group['type']] = alignment_input
+    sequencing_group.alignment_input_by_seq_type[entry['type']] = alignment_input
 
     # TODO: Include some additional logging here about sequences without reads etc.
 
