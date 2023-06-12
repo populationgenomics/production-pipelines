@@ -18,7 +18,11 @@ from cpg_workflows.workflow import (
     Dataset,
     get_workflow,
 )
-from cpg_workflows.jobs.seqr_loader import annotate_cohort_jobs, annotate_dataset_jobs, cohort_to_vcf_job
+from cpg_workflows.jobs.seqr_loader import (
+    annotate_cohort_jobs,
+    annotate_dataset_jobs,
+    cohort_to_vcf_job,
+)
 
 from .joint_genotyping import JointGenotyping
 from .vep import Vep
@@ -136,7 +140,7 @@ class AnnotateDataset(DatasetStage):
         jobs = annotate_dataset_jobs(
             b=get_batch(),
             mt_path=mt_path,
-            sample_ids=dataset.get_sample_ids(),
+            sample_ids=dataset.get_sequencing_group_ids(),
             out_mt_path=self.expected_outputs(dataset)['mt'],
             tmp_prefix=checkpoint_prefix,
             job_attrs=self.get_job_attrs(dataset),
@@ -174,7 +178,7 @@ class DatasetVCF(DatasetStage):
                 dataset.prefix()
                 / 'vcf'
                 / f'{get_workflow().output_version}-{dataset.name}.vcf.bgz.tbi'
-            )
+            ),
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -198,9 +202,7 @@ class DatasetVCF(DatasetStage):
             depends_on=inputs.get_jobs(dataset),
         )
 
-        return self.make_outputs(
-            dataset, data=self.expected_outputs(dataset), jobs=job
-        )
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=job)
 
 
 def es_password() -> str:

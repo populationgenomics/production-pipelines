@@ -115,12 +115,12 @@ def _populate_analysis(cohort: Cohort) -> None:
     """
     for dataset in cohort.get_datasets():
         gvcf_by_sid = get_metamist().get_analyses_by_sid(
-            dataset.get_sample_ids(),
+            dataset.get_sequencing_group_ids(),
             analysis_type=AnalysisType.GVCF,
             dataset=dataset.name,
         )
         cram_by_sid = get_metamist().get_analyses_by_sid(
-            dataset.get_sample_ids(),
+            dataset.get_sequencing_group_ids(),
             analysis_type=AnalysisType.CRAM,
             dataset=dataset.name,
         )

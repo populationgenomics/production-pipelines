@@ -42,9 +42,9 @@ class Target:
         """
         raise NotImplementedError
 
-    def get_sample_ids(self, only_active: bool = True) -> list[str]:
+    def get_sequencing_group_ids(self, only_active: bool = True) -> list[str]:
         """
-        Get flat list of all sample IDs corresponding to this target.
+        Get flat list of all sequencing group IDs corresponding to this target.
         """
         return [s.id for s in self.get_sequencing_groups(only_active=only_active)]
 
@@ -68,7 +68,7 @@ class Target:
             )
         )
         h = hashlib.sha256(s.encode()).hexdigest()[:38]
-        return f'{h}_{len(self.get_sample_ids())}'
+        return f'{h}_{len(self.get_sequencing_group_ids())}'
 
     @property
     def target_id(self) -> str:
@@ -204,7 +204,7 @@ class Cohort(Target):
         Attributes for Hail Batch job.
         """
         return {
-            'sequencing_groups': self.get_sample_ids(),
+            'sequencing_groups': self.get_sequencing_group_ids(),
             'datasets': [d.name for d in self.get_datasets()],
         }
 
@@ -399,7 +399,7 @@ class Dataset(Target):
         """
         return {
             'dataset': self.name,
-            'sequencing_groups': self.get_sample_ids(),
+            'sequencing_groups': self.get_sequencing_group_ids(),
         }
 
     def get_job_prefix(self) -> str:

@@ -333,7 +333,7 @@ class EvidenceQC(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         d = inputs.as_dict_by_target(GatherSampleEvidence)
 
-        sids = dataset.get_sample_ids()
+        sids = dataset.get_sequencing_group_ids()
 
         input_dict: dict[str, Any] = {
             'batch': dataset.name,
@@ -438,7 +438,7 @@ class GatherBatchEvidence(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """Add jobs to Batch"""
-        sids = dataset.get_sample_ids()
+        sids = dataset.get_sequencing_group_ids()
 
         input_by_sid = inputs.as_dict_by_target(stage=GatherSampleEvidence)
 

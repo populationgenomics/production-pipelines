@@ -185,8 +185,7 @@ def test_cohort(mocker: MockFixture, tmp_path):
 
     # Testing Cohort Information
     assert len(cohort.get_sequencing_groups()) == 2
-    assert cohort.get_sample_ids() == ['CPGLCL17', 'CPGLCL25']
-    print(cohort.get_sequencing_groups()[0])
+    assert cohort.get_sequencing_group_ids() == ['CPGLCL17', 'CPGLCL25']
 
     for sg in cohort.get_sequencing_groups():
         assert sg.dataset.name == 'fewgenomes'

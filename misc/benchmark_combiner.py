@@ -41,7 +41,7 @@ def main():
         for n_samples in N_SAMPLES:
             label = f'nsamples-{n_samples}-nworkers-{n_workers}'
             out_vds_path = out_prefix / label / 'combined.vds'
-            sample_ids = get_cohort().get_sample_ids()[:n_samples]
+            sample_ids = get_cohort().get_sequencing_group_ids()[:n_samples]
 
             from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
             from cpg_workflows.large_cohort.combiner import run

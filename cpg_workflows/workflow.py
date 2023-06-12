@@ -324,11 +324,11 @@ class StageInput:
         Get list of jobs that the next stage would depend on.
         """
         all_jobs: list[Job] = []
-        these_samples = target.get_sample_ids()
+        these_samples = target.get_sequencing_group_ids()
         for stage_, outputs_by_target in self._outputs_by_target_by_stage.items():
             for target_, output in outputs_by_target.items():
                 if output:
-                    those_samples = output.target.get_sample_ids()
+                    those_samples = output.target.get_sequencing_group_ids()
                     samples_intersect = set(these_samples) & set(those_samples)
                     if samples_intersect:
                         for j in output.jobs:

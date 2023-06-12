@@ -57,7 +57,7 @@ def pedigree(
         b=b,
         somalier_path_by_sid=somalier_path_by_sid,
         verifybamid_by_sid=verifybamid_by_sid,
-        sample_ids=dataset.get_sample_ids(),
+        sample_ids=dataset.get_sequencing_group_ids(),
         rich_id_map=dataset.rich_id_map(),
         expected_ped_path=expected_ped_path,
         label=label,
