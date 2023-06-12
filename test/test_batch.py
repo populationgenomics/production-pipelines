@@ -119,6 +119,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
         SequencingGroupStage,
         StageInput,
         StageOutput,
+        StageDecorator,
         run_workflow,
         stage,
     )
@@ -173,7 +174,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
 
     set_config(CONFIG, tmp_path / 'config.toml')
 
-    workflow_stages = [MyQcStage1, MyQcStage2]
+    workflow_stages: list[StageDecorator] = [MyQcStage1, MyQcStage2]
     run_workflow(stages=workflow_stages)
 
     # Check that the correct number of jobs were created
