@@ -217,33 +217,6 @@ class Metamist:
         sequencing_groups = sequencing_group_entries['project']['sequencingGroups']
         return sequencing_groups
 
-    # def get_sequence_entries_by_sid(
-    #     self,
-    #     sample_ids: list[str],
-    #     sequencing_type: str,
-    # ) -> dict[str, list[dict]]:
-    #     """
-    #     Retrieve sample entries for a dataset, in the context of sample IDs
-    #     and sequencing type.
-    #     """
-    #     entries_by_sid = defaultdict(list)
-
-    #     entries = self.seqapi.get_sequences_by_sample_ids(sample_ids)
-    #     if isinstance(entries, list):
-    #         entries_list: list[dict] = entries
-    #         for entry in entries_list:
-    #             if str(entry['type']) == sequencing_type:
-    #                 entries_by_sid[entry['sample_id']].append(entry)
-    #     else:
-    #         assert isinstance(entries, dict)
-    #         entries_dict: dict[str, list[dict]] = entries
-    #         for sample_id, sample_sequences in entries_dict.items():
-    #             for seq in sample_sequences:
-    #                 if str(seq['type']) == sequencing_type:
-    #                     entries_by_sid[sample_id].append(seq)
-
-    #     return entries_by_sid
-
     def update_analysis(self, analysis: Analysis, status: AnalysisStatus):
         """
         Update "status" of an Analysis entry.
@@ -260,7 +233,7 @@ class Metamist:
     # NOTE: This isn't used anywhere.
     def find_joint_calling_analysis(
         self,
-        sample_ids: list[str],
+        sequencing_group_ids: list[str],
         dataset: str | None = None,
     ) -> Analysis | None:
         """
@@ -281,7 +254,7 @@ class Metamist:
             return None
         assert a.type == AnalysisType.JOINT_CALLING, data
         assert a.status == AnalysisStatus.COMPLETED, data
-        if a.sample_ids != set(sample_ids):
+        if a.sample_ids != set(sequencing_group_ids):
             return None
         return a
 
@@ -355,7 +328,7 @@ class Metamist:
         output: Path | str,
         type_: str | AnalysisType,
         status: str | AnalysisStatus,
-        sample_ids: list[str],
+        sequencing_group_ids: list[str],
         dataset: str | None = None,
         meta: dict | None = None,
     ) -> int | None:
@@ -376,7 +349,7 @@ class Metamist:
             type=type_,
             status=models.AnalysisStatus(status),
             output=str(output),
-            sample_ids=list(sample_ids),
+            sample_ids=list(sequencing_group_ids),
             meta=meta or {},
         )
         try:
@@ -391,9 +364,10 @@ class Metamist:
             )
             return aid
 
+    # NOTE: I don't think this function is used anywhere ~ vivbak 12/06/2023
     def process_existing_analysis(
         self,
-        sample_ids: list[str],
+        sequencing_group_ids: list[str],
         completed_analysis: Analysis | None,
         analysis_type: str,
         expected_output_fpath: Path,
@@ -406,7 +380,7 @@ class Metamist:
 
         Returns the path to the output if it can be reused, otherwise None.
 
-        @param sample_ids: sample IDs to pull the analysis for
+        @param sequencing_group_ids: sequencing_group_ids IDs to pull the analysis for
         @param completed_analysis: existing completed analysis of this type for these
         samples
         @param analysis_type: cram, gvcf, joint_calling
@@ -416,14 +390,14 @@ class Metamist:
         @return: path to the output if it can be reused, otherwise None
         """
         label = f'type={analysis_type}'
-        if len(sample_ids) > 1:
-            label += f' for {", ".join(sample_ids)}'
+        if len(sequencing_group_ids) > 1:
+            label += f' for {", ".join(sequencing_group_ids)}'
 
         found_output_fpath: Path | None = None
         if not completed_analysis:
             logging.warning(
                 f'Not found completed analysis {label} for '
-                f'{f"sample {sample_ids}" if len(sample_ids) == 1 else f"{len(sample_ids)} samples" }'
+                f'{f"sequencing group {sequencing_group_ids}" if len(sequencing_group_ids) == 1 else f"{len(sequencing_group_ids)} sequencing_groups" }'
             )
         elif not completed_analysis.output:
             logging.error(
@@ -472,7 +446,7 @@ class Metamist:
                 type_=analysis_type,
                 output=expected_output_fpath,
                 status='completed',
-                sample_ids=sample_ids,
+                sequencing_group_ids=sequencing_group_ids,
                 dataset=dataset or self.default_dataset,
             )
             return expected_output_fpath

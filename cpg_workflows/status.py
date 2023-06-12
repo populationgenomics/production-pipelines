@@ -191,7 +191,7 @@ class MetamistStatusReporter(StatusReporter):
             output=output,
             type_=analysis_type,
             status=analysis_status,
-            sample_ids=target.get_sequencing_group_ids(),
+            sequencing_group_ids=target.get_sequencing_group_ids(),
             meta=meta,
             dataset=project_name,
         )
