@@ -74,14 +74,14 @@ class JointVcfHappy(SequencingGroupStage):
     Run Happy to validate validation samples in joint VCF
     """
 
-    def expected_outputs(self, sample: SequencingGroup) -> Path | None:
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> Path | None:
         """
         Parsed by MultiQC: '*.summary.csv'
         https://multiqc.info/docs/#hap.py
         """
-        if sample.participant_id not in get_config().get('validation', {}).get(
-            'sample_map', {}
-        ):
+        if sequencing_group.participant_id not in get_config().get(
+            'validation', {}
+        ).get('sample_map', {}):
             return None
 
         return (
@@ -89,21 +89,21 @@ class JointVcfHappy(SequencingGroupStage):
             / 'qc'
             / 'jc'
             / 'hap.py'
-            / f'{get_workflow().output_version}-{sample.id}.summary.csv'
+            / f'{get_workflow().output_version}-{sequencing_group.id}.summary.csv'
         )
 
     def queue_jobs(
-        self, sample: SequencingGroup, inputs: StageInput
+        self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
         """Queue jobs"""
-        assert sample.dataset.cohort
+        assert sequencing_group.dataset.cohort
         vcf_path = inputs.as_path(
-            target=sample.dataset.cohort, stage=JointGenotyping, key='vcf'
+            target=sequencing_group.dataset.cohort, stage=JointGenotyping, key='vcf'
         )
 
         jobs = happy(
             b=get_batch(),
-            sample=sample,
+            sequencing_group=sequencing_group,
             vcf_or_gvcf=get_batch().read_input_group(
                 **{
                     'vcf.gz': str(vcf_path),
@@ -111,13 +111,15 @@ class JointVcfHappy(SequencingGroupStage):
                 }
             ),
             is_gvcf=False,
-            job_attrs=self.get_job_attrs(sample),
-            output_path=self.expected_outputs(sample),
+            job_attrs=self.get_job_attrs(sequencing_group),
+            output_path=self.expected_outputs(sequencing_group),
         )
         if not jobs:
-            return self.make_outputs(sample)
+            return self.make_outputs(sequencing_group)
         else:
-            return self.make_outputs(sample, self.expected_outputs(sample), jobs)
+            return self.make_outputs(
+                sequencing_group, self.expected_outputs(sequencing_group), jobs
+            )
 
 
 def _update_meta(output_path: str) -> dict[str, Any]:

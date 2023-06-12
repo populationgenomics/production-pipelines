@@ -206,7 +206,7 @@ class GatherSampleEvidence(SequencingGroupStage):
     https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherSampleEvidence.wdl
     """
 
-    def expected_outputs(self, sample: SequencingGroup) -> dict[str, Path]:
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         """
         Expected to produce coverage counts, a VCF for each variant caller,
         and a txt for each type of SV evidence (SR, PE, SD).
@@ -234,7 +234,7 @@ class GatherSampleEvidence(SequencingGroupStage):
 
         for key, ending in ending_by_key.items():
             stage_name = self.name.lower()
-            fname = f'{sample.id}.{ending}'  # the dot separator is critical here!!
+            fname = f'{sequencing_group.id}.{ending}'  # the dot separator is critical here!!
             # it's critical to separate the ending with a dot above: `*.sr.txt.gz`,
             # `*.pe.txt.gz`, and `*.sd.txt.gz`. These files are passed to
             # `gatk PrintSVEvidence`, that would determine file format based on the
@@ -242,17 +242,19 @@ class GatherSampleEvidence(SequencingGroupStage):
             # `.sr.txt.gz`, `.pe.txt.gz`, or `.sd.txt.gz`, otherwise it would fail with
             # "A USER ERROR has occurred: Cannot read file:///cromwell_root/... because
             # no suitable codecs found".
-            d[key] = sample.dataset.prefix() / 'gatk_sv' / stage_name / fname
+            d[key] = sequencing_group.dataset.prefix() / 'gatk_sv' / stage_name / fname
         return d
 
-    def queue_jobs(self, sample: SequencingGroup, inputs: StageInput) -> StageOutput:
+    def queue_jobs(
+        self, sequencing_group: SequencingGroup, inputs: StageInput
+    ) -> StageOutput:
         """Add jobs to batch"""
-        assert sample.cram, sample
+        assert sequencing_group.cram, sequencing_group
 
         input_dict: dict[str, Any] = {
-            'bam_or_cram_file': str(sample.cram),
-            'bam_or_cram_index': str(sample.cram) + '.crai',
-            'sample_id': sample.id,
+            'bam_or_cram_file': str(sequencing_group.cram),
+            'bam_or_cram_index': str(sequencing_group.cram) + '.crai',
+            'sample_id': sequencing_group.id,
             # This option forces CRAM localisation, otherwise it would be passed to
             # samtools as a URL (in CramToBam.wdl) and it would fail to read it as
             # GCS_OAUTH_TOKEN is not set.
@@ -287,17 +289,17 @@ class GatherSampleEvidence(SequencingGroupStage):
             ]
         )
 
-        expected_d = self.expected_outputs(sample)
+        expected_d = self.expected_outputs(sequencing_group)
 
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
-            dataset=sample.dataset,
+            dataset=sequencing_group.dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            sample_id=sample.id,
+            sample_id=sequencing_group.id,
         )
-        return self.make_outputs(sample, data=expected_d, jobs=jobs)
+        return self.make_outputs(sequencing_group, data=expected_d, jobs=jobs)
 
 
 @stage(required_stages=GatherSampleEvidence)

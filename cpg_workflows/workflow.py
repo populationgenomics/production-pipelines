@@ -723,9 +723,9 @@ def stage(
 
     @stage(required_stages=[Align])
     class GenotypeSample(SequencingGroupStage):
-        def expected_outputs(self, sample: SequencingGroup):
+        def expected_outputs(self, sequencing_group: SequencingGroup):
             ...
-        def queue_jobs(self, sample: SequencingGroup, inputs: StageInput) -> StageOutput:
+        def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
             ...
 
     @analysis_type: if defined, will be used to create/update `Analysis` entries
@@ -1134,14 +1134,14 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
     """
 
     @abstractmethod
-    def expected_outputs(self, sample: SequencingGroup) -> ExpectedResultT:
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> ExpectedResultT:
         """
         Override to declare expected output paths.
         """
 
     @abstractmethod
     def queue_jobs(
-        self, sample: SequencingGroup, inputs: StageInput
+        self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
         """
         Override to add Hail Batch jobs.

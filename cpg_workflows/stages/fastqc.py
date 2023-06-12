@@ -80,13 +80,15 @@ class FastQC(SequencingGroupStage):
     Run FASTQC on all paths in alignment inputs.
     """
 
-    def expected_outputs(self, sample: SequencingGroup) -> dict[str, Path] | None:
+    def expected_outputs(
+        self, sequencing_group: SequencingGroup
+    ) -> dict[str, Path] | None:
         """
         Generates one FASTQC HTML report per "sequence" path
         (a FASTQ path, or a BAM path depending on the inputs type).
         """
         outs: dict[str, Path] = {}
-        for fq_out in _collect_fastq_outs(sample):
+        for fq_out in _collect_fastq_outs(sequencing_group):
             outs |= {
                 f'html{fq_out.suffix}': fq_out.out_html,
                 f'zip{fq_out.suffix}': fq_out.out_zip,
@@ -94,10 +96,10 @@ class FastQC(SequencingGroupStage):
         return outs
 
     def queue_jobs(
-        self, sample: SequencingGroup, inputs: StageInput
+        self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
-        if not (fqc_outs := _collect_fastq_outs(sample)):
-            return self.make_outputs(sample, skipped=True)
+        if not (fqc_outs := _collect_fastq_outs(sequencing_group)):
+            return self.make_outputs(sequencing_group, skipped=True)
 
         jobs = []
         for fqc_out in fqc_outs:
@@ -106,13 +108,15 @@ class FastQC(SequencingGroupStage):
                 output_html_path=fqc_out.out_html,
                 output_zip_path=fqc_out.out_zip,
                 input_path=fqc_out.input_path,
-                job_attrs=self.get_job_attrs(sample),
+                job_attrs=self.get_job_attrs(sequencing_group),
                 subsample=False,
             )
             j.name = f'{j.name}{fqc_out.suffix}'
             jobs.append(j)
 
-        return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
+        return self.make_outputs(
+            sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs
+        )
 
 
 @stage(required_stages=FastQC)

@@ -118,44 +118,49 @@ class CramQC(SequencingGroupStage):
     Calling tools that process CRAM for QC purposes.
     """
 
-    def expected_outputs(self, sample: SequencingGroup) -> dict[str, Path]:
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         outs = {}
         for qc in qc_functions():
             for key, out in qc.outs.items():
                 if key == 'somalier':
-                    outs[key] = sample.make_cram_path().somalier_path
+                    outs[key] = sequencing_group.make_cram_path().somalier_path
                 elif out:
                     outs[key] = (
-                        sample.dataset.prefix() / 'qc' / key / f'{sample.id}{out.suf}'
+                        sequencing_group.dataset.prefix()
+                        / 'qc'
+                        / key
+                        / f'{sequencing_group.id}{out.suf}'
                     )
         return outs
 
     def queue_jobs(
-        self, sample: SequencingGroup, inputs: StageInput
+        self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
-        cram_path = inputs.as_path(sample, Align, 'cram')
-        crai_path = inputs.as_path(sample, Align, 'crai')
+        cram_path = inputs.as_path(sequencing_group, Align, 'cram')
+        crai_path = inputs.as_path(sequencing_group, Align, 'crai')
 
         jobs = []
         # This should run if either the stage or the sample is being forced.
-        forced = self.forced or sample.forced
+        forced = self.forced or sequencing_group.forced
         for qc in qc_functions():
             out_path_kwargs = {
-                f'out_{key}_path': self.expected_outputs(sample)[key]
+                f'out_{key}_path': self.expected_outputs(sequencing_group)[key]
                 for key in qc.outs.keys()
             }
             if qc.func:
                 j = qc.func(  # type: ignore
                     get_batch(),
                     CramPath(cram_path, crai_path),
-                    job_attrs=self.get_job_attrs(sample),
+                    job_attrs=self.get_job_attrs(sequencing_group),
                     overwrite=forced,
                     **out_path_kwargs,
                 )
                 if j:
                     jobs.append(j)
 
-        return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
+        return self.make_outputs(
+            sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs
+        )
 
 
 @stage(required_stages=[CramQC])

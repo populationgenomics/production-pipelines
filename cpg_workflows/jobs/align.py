@@ -74,18 +74,18 @@ class MissingAlignmentInputException(Exception):
     pass
 
 
-def _get_alignment_input(sample: SequencingGroup) -> AlignmentInput:
-    """Given a sample, will return an AlignmentInput object that
+def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
+    """Given a sequencing group, will return an AlignmentInput object that
     represents the path to a relevant input (e.g. CRAM/BAM path)"""
     sequencing_type = get_config()['workflow']['sequencing_type']
-    alignment_input = sample.alignment_input_by_seq_type.get(sequencing_type)
+    alignment_input = sequencing_group.alignment_input_by_seq_type.get(sequencing_type)
     if realign_cram_ver := get_config()['workflow'].get('realign_from_cram_version'):
         if (
             path := (
-                sample.dataset.prefix()
+                sequencing_group.dataset.prefix()
                 / 'cram'
                 / realign_cram_ver
-                / f'{sample.id}.cram'
+                / f'{sequencing_group.id}.cram'
             )
         ).exists():
             logging.info(f'Realigning from {realign_cram_ver} CRAM {path}')
@@ -96,14 +96,14 @@ def _get_alignment_input(sample: SequencingGroup) -> AlignmentInput:
 
     if not alignment_input:
         raise MissingAlignmentInputException(
-            f'No alignment inputs found for sample {sample}'
+            f'No alignment inputs found for sequencing group {sequencing_group}'
             + (f': {alignment_input}' if alignment_input else '')
         )
 
     if get_config()['workflow'].get('check_inputs', True):
         if not alignment_input.exists():
             raise MissingAlignmentInputException(
-                f'Alignment inputs for sample {sample} do not exist '
+                f'Alignment inputs for sequencing group {sequencing_group} do not exist '
                 + (f': {alignment_input}' if alignment_input else '')
             )
 
@@ -112,7 +112,7 @@ def _get_alignment_input(sample: SequencingGroup) -> AlignmentInput:
 
 def align(
     b,
-    sample: SequencingGroup,
+    sequencing_group: SequencingGroup,
     job_attrs: dict | None = None,
     output_path: CramPath | None = None,
     out_markdup_metrics_path: Path | None = None,
@@ -147,7 +147,7 @@ def align(
     if output_path and can_reuse(output_path.path, overwrite):
         return []
 
-    alignment_input = _get_alignment_input(sample)
+    alignment_input = _get_alignment_input(sequencing_group)
 
     base_job_name = 'Align'
     if extra_label:
@@ -183,7 +183,7 @@ def align(
             job_name=base_job_name,
             alignment_input=alignment_input,
             requested_nthreads=requested_nthreads,
-            sample_name=sample.id,
+            sample_name=sequencing_group.id,
             job_attrs=job_attrs,
             aligner=aligner,
             should_sort=False,
@@ -204,7 +204,7 @@ def align(
                     job_name=base_job_name,
                     alignment_input=pair,
                     requested_nthreads=requested_nthreads,
-                    sample_name=sample.id,
+                    sample_name=sequencing_group.id,
                     job_attrs=job_attrs,
                     aligner=aligner,
                     should_sort=True,
@@ -222,7 +222,7 @@ def align(
                     b=b,
                     job_name=base_job_name,
                     alignment_input=alignment_input,
-                    sample_name=sample.id,
+                    sample_name=sequencing_group.id,
                     job_attrs=job_attrs,
                     aligner=aligner,
                     requested_nthreads=requested_nthreads,

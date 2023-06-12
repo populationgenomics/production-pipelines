@@ -15,7 +15,7 @@ from cpg_workflows.targets import SequencingGroup
 
 def stripy(
     b,
-    sample: SequencingGroup,
+    sequencing_group: SequencingGroup,
     cram_path: CramPath,
     target_loci: str,
     out_path: Path,
@@ -57,8 +57,11 @@ def stripy(
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 
-    if sample.pedigree.sex and str(sample.pedigree.sex).lower() != 'unknown':
-        sex_argument = f'--sex {str(sample.pedigree.sex).lower()}'
+    if (
+        sequencing_group.pedigree.sex
+        and str(sequencing_group.pedigree.sex).lower() != 'unknown'
+    ):
+        sex_argument = f'--sex {str(sequencing_group.pedigree.sex).lower()}'
     else:
         sex_argument = ''
 
@@ -70,15 +73,15 @@ def stripy(
         > $BATCH_TMPDIR/config.json
     cat $BATCH_TMPDIR/config.json
 
-    ln -s {mounted_cram_path} {sample.id}__{sample.external_id}.cram
-    ln -s {mounted_cram_index_path} {sample.id}__{sample.external_id}.crai
+    ln -s {mounted_cram_path} {sequencing_group.id}__{sequencing_group.external_id}.cram
+    ln -s {mounted_cram_index_path} {sequencing_group.id}__{sequencing_group.external_id}.crai
 
     python3 stri.py \\
         --genome hg38 \\
         --reference {reference.base} \\
         {sex_argument} \
         --output $BATCH_TMPDIR/ \\
-        --input {sample.id}__{sample.external_id}.cram  \\
+        --input {sequencing_group.id}__{sequencing_group.external_id}.cram  \\
         --logflags {j.log_path} \\
         --config $BATCH_TMPDIR/config.json \\
         --analysis {analysis_type} \\
@@ -86,8 +89,8 @@ def stripy(
 
     ls $BATCH_TMPDIR/
 
-    cp $BATCH_TMPDIR/{sample.id}__{sample.external_id}.cram.html {j.out_path}
-    cp $BATCH_TMPDIR/{sample.id}__{sample.external_id}.cram.json {j.json_path}
+    cp $BATCH_TMPDIR/{sequencing_group.id}__{sequencing_group.external_id}.cram.html {j.out_path}
+    cp $BATCH_TMPDIR/{sequencing_group.id}__{sequencing_group.external_id}.cram.json {j.json_path}
 
     """
 

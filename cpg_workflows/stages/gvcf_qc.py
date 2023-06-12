@@ -31,13 +31,13 @@ class GvcfQC(SequencingGroupStage):
     Calling tools that process GVCF for QC purposes.
     """
 
-    def expected_outputs(self, sample: SequencingGroup) -> dict[str, Path]:
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         """
         Generate a GVCF and corresponding TBI index, as well as QC.
         """
         outs: dict[str, Path] = {}
         if get_config()['workflow'].get('skip_qc', False) is False:
-            qc_prefix = sample.dataset.prefix() / 'qc' / sample.id
+            qc_prefix = sequencing_group.dataset.prefix() / 'qc' / sequencing_group.id
             outs |= {
                 'qc_summary': to_path(f'{qc_prefix}.variant_calling_summary_metrics'),
                 'qc_detail': to_path(f'{qc_prefix}.variant_calling_detail_metrics'),
@@ -45,23 +45,25 @@ class GvcfQC(SequencingGroupStage):
         return outs
 
     def queue_jobs(
-        self, sample: SequencingGroup, inputs: StageInput
+        self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
         """
         Use function from the jobs module
         """
-        gvcf_path = inputs.as_path(sample, Genotype, 'gvcf')
+        gvcf_path = inputs.as_path(sequencing_group, Genotype, 'gvcf')
 
         j = vcf_qc(
             b=get_batch(),
             vcf_or_gvcf=GvcfPath(gvcf_path).resource_group(get_batch()),
             is_gvcf=True,
-            job_attrs=self.get_job_attrs(sample),
-            output_summary_path=self.expected_outputs(sample)['qc_summary'],
-            output_detail_path=self.expected_outputs(sample)['qc_detail'],
-            overwrite=sample.forced,
+            job_attrs=self.get_job_attrs(sequencing_group),
+            output_summary_path=self.expected_outputs(sequencing_group)['qc_summary'],
+            output_detail_path=self.expected_outputs(sequencing_group)['qc_detail'],
+            overwrite=sequencing_group.forced,
         )
-        return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=[j])
+        return self.make_outputs(
+            sequencing_group, data=self.expected_outputs(sequencing_group), jobs=[j]
+        )
 
 
 @stage(required_stages=Genotype)
@@ -70,42 +72,44 @@ class GvcfHappy(SequencingGroupStage):
     Run Happy to validate a GVCF for samples where a truth callset is available.
     """
 
-    def expected_outputs(self, sample: SequencingGroup) -> Path | None:
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> Path | None:
         """
         Parsed by MultiQC: '*.summary.csv'
         https://multiqc.info/docs/#hap.py
         """
-        if sample.participant_id not in get_config().get('validation', {}).get(
-            'sample_map', {}
-        ):
+        if sequencing_group.participant_id not in get_config().get(
+            'validation', {}
+        ).get('sample_map', {}):
             return None
         return (
-            sample.dataset.prefix()
+            sequencing_group.dataset.prefix()
             / 'qc'
             / 'gvcf'
             / 'hap.py'
-            / f'{sample.id}.summary.csv'
+            / f'{sequencing_group.id}.summary.csv'
         )
 
     def queue_jobs(
-        self, sample: SequencingGroup, inputs: StageInput
+        self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
         """Queue jobs"""
-        gvcf_path = inputs.as_path(sample, Genotype, 'gvcf')
+        gvcf_path = inputs.as_path(sequencing_group, Genotype, 'gvcf')
 
         jobs = happy(
             b=get_batch(),
-            sample=sample,
+            sequencing_group=sequencing_group,
             vcf_or_gvcf=GvcfPath(gvcf_path).resource_group(get_batch()),
             is_gvcf=True,
-            job_attrs=self.get_job_attrs(sample),
-            output_path=self.expected_outputs(sample),
+            job_attrs=self.get_job_attrs(sequencing_group),
+            output_path=self.expected_outputs(sequencing_group),
         )
 
         if not jobs:
-            return self.make_outputs(sample)
+            return self.make_outputs(sequencing_group)
         else:
-            return self.make_outputs(sample, self.expected_outputs(sample), jobs)
+            return self.make_outputs(
+                sequencing_group, self.expected_outputs(sequencing_group), jobs
+            )
 
 
 def _update_meta(output_path: str) -> dict[str, Any]:
