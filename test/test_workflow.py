@@ -4,15 +4,15 @@ Test building Workflow object.
 
 
 from unittest import mock
-from cpg_utils import to_path, Path
-from cpg_utils.config import set_config_paths
-from . import results_prefix
 
-from cpg_workflows.targets import Sample, Cohort
+from cpg_utils import Path, to_path
+
+from cpg_workflows.targets import Cohort, Sample
 from cpg_workflows.workflow import path_walk
 
+from . import set_config
 
-TOML = f"""
+TOML = """
 [workflow]
 dataset_gcp_project = 'fewgenomes'
 access_level = 'test'
@@ -26,10 +26,10 @@ check_expected_outputs = false
 path_scheme = 'local'
 
 [storage.default]
-default = '{results_prefix()}'
+default = "{directory}"
 
 [storage.fewgenomes]
-default = '{results_prefix()}'
+default = "{directory}"
 
 [hail]
 billing_project = 'fewgenomes'
@@ -51,21 +51,20 @@ def test_workflow(tmp_path):
     """
     Testing running a workflow from a mock cohort.
     """
-
-    with open(tmp_path / 'config.toml', 'w') as fh:
-        fh.write(TOML)
-    set_config_paths([str(tmp_path / 'config.toml')])
+    conf = TOML.format(directory=tmp_path)
+    set_config(conf, tmp_path / 'config.toml')
 
     from cpg_utils.hail_batch import dataset_path
+
     from cpg_workflows import get_batch
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.workflow import (
+        CohortStage,
         SampleStage,
         StageInput,
         StageOutput,
-        CohortStage,
-        stage,
         run_workflow,
+        stage,
     )
 
     output_path = to_path(dataset_path('cohort.tsv'))
@@ -114,7 +113,6 @@ def test_workflow(tmp_path):
     print(f'Checking result in {output_path}:')
     with output_path.open() as f:
         result = f.read()
-        print(result)
         assert result.split() == ['CPG01_done', 'CPG02_done'], result
 
 
@@ -131,5 +129,5 @@ def test_path_walk():
         'b': [to_path('that.txt'), {'c': to_path('the_other.txt')}],
         'd': 'string.txt',
     }
-    act = path_walk(exp, set())
+    act = path_walk(exp)
     assert act == {to_path('this.txt'), to_path('that.txt'), to_path('the_other.txt')}

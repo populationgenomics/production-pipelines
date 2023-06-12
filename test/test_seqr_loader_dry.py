@@ -1,26 +1,27 @@
 """
 Test seqr-loader workflow.
 """
+from pathlib import Path
 from unittest.mock import mock_open
 
-import toml
 from cpg_utils import to_path
 from pytest_mock import MockFixture
-from . import results_prefix, update_dict
 
-TOML = f"""
+from . import set_config
+
+TOML = """
 [workflow]
 dataset_gcp_project = "test-analysis-dataset-1234"
 dataset = "test-analysis-dataset"
 access_level = "test"
 sequencing_type = "genome"
 driver_image = "<stub>"
-skip_stages = [ "Align",]
+skip_stages = ["Align"]
 check_inputs = false
 check_intermediates = false
 check_expected_outputs = false
 path_scheme = "local"
-local_dir = "{results_prefix}"
+local_dir = "{directory}"
 
 [hail]
 billing_project = "test-analysis-dataset"
@@ -53,24 +54,24 @@ seqr_combined_reference_data = "stub"
 seqr_clinvar = "stub"
 
 [storage.default]
-default = '{results_prefix()}'
-web = "{results_prefix()}-web"
-analysis = "{results_prefix()}-analysis"
-tmp = "{results_prefix()}-test-tmp"
+default = "{directory}"
+web = "{directory}-web"
+analysis = "{directory}-analysis"
+tmp = "{directory}-test-tmp"
 web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
 
 [storage.test-input-dataset]
-default = "{results_prefix()}"
-web = "{results_prefix()}-web"
-analysis = "{results_prefix()}-analysis"
-tmp = "{results_prefix()}-test-tmp"
+default = "{directory}"
+web = "{directory}-web"
+analysis = "{directory}-analysis"
+tmp = "{directory}-test-tmp"
 web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
 
 [storage.test-analysis-dataset]
-default = "{results_prefix()}"
-web = "{results_prefix()}-web"
-analysis = "{results_prefix()}-analysis"
-tmp = "{results_prefix()}-test-tmp"
+default = "{directory}"
+web = "{directory}-web"
+analysis = "{directory}-analysis"
+tmp = "{directory}-test-tmp"
 web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
 
 [references.broad]
@@ -113,23 +114,17 @@ kgp_hc_ht = "stub"
 mills_ht = "stub"
 """
 
-
-def _mock_config() -> dict:
-    d: dict = {}
-    for fp in [
-        to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml',
-        to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml',
-    ]:
-        with fp.open():
-            update_dict(d, toml.load(fp))
-
-    update_dict(d, toml.loads(TOML))
-    return d
+DEFAULT_CONFIG = Path(
+    to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml'
+)
+SEQR_LOADER_CONFIG = Path(
+    to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml'
+)
 
 
 def _mock_cohort():
-    from cpg_workflows.targets import Cohort
     from cpg_workflows.filetypes import BamPath, FastqPair, FastqPairs
+    from cpg_workflows.targets import Cohort
 
     cohort = Cohort()
     ds = cohort.create_dataset('test-input-dataset')
@@ -161,15 +156,26 @@ def _mock_cohort():
     return cohort
 
 
-def test_seqr_loader_dry(mocker: MockFixture):
+def selective_mock_open(*args, **kwargs):
+    if str(args[0]).endswith('.toml'):
+        # Don't mock calls to load a config file
+        return open(*args, **kwargs)
+    else:
+        return mock_open(read_data='<stub>')(*args, **kwargs)
+
+
+def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
     """
     Test entire seqr-loader in a dry mode.
     """
-    mocker.patch('cpg_utils.config.get_config', _mock_config)
-    mocker.patch('cpg_workflows.inputs.create_cohort', _mock_cohort)
+    conf = TOML.format(directory=str(tmp_path))
+    set_config(
+        conf,
+        tmp_path / 'config.toml',
+        merge_with=[DEFAULT_CONFIG, SEQR_LOADER_CONFIG],
+    )
 
-    def mock_exists(*args, **kwargs) -> bool:
-        return False
+    mocker.patch('cpg_workflows.inputs.create_cohort', _mock_cohort)
 
     def do_nothing(*args, **kwargs):
         return None
@@ -177,9 +183,11 @@ def test_seqr_loader_dry(mocker: MockFixture):
     def mock_create_new_analysis(*args, **kwargs) -> int:
         return 1
 
-    mocker.patch('pathlib.Path.open', mock_open(read_data='<stub>'))
+    mocker.patch('pathlib.Path.open', selective_mock_open)
     # functions like get_intervals checks file existence
-    mocker.patch('cloudpathlib.cloudpath.CloudPath.exists', mock_exists)
+    mocker.patch('cpg_workflows.workflow.list_all_parent_dirs', lambda *args: {})
+    mocker.patch('cpg_workflows.workflow.list_of_all_dir_contents', lambda *args: {})
+    mocker.patch('cpg_workflows.workflow.missing_from_pre_collected', lambda *args: None)
     # cloudfuse (used in Vep) doesn't work with LocalBackend
     mocker.patch('hailtop.batch.job.Job.cloudfuse', do_nothing)
     # always_run (used in MtToEs -> hail_dataproc_job) doesn't work with LocalBackend
@@ -199,8 +207,8 @@ def test_seqr_loader_dry(mocker: MockFixture):
     from cpg_workflows.stages.cram_qc import CramMultiQC
     from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
     from cpg_workflows.stages.joint_genotyping_qc import JointVcfQC
-    from cpg_workflows.workflow import get_workflow
     from cpg_workflows.stages.seqr_loader import MtToEs
+    from cpg_workflows.workflow import get_workflow
 
     get_workflow().run(stages=[MtToEs, GvcfMultiQC, CramMultiQC, JointVcfQC])
 

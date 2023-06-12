@@ -21,11 +21,20 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_1 import FilterBatch, Geno
 from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_2 import AnnotateVcf
 from cpg_workflows.stages.gatk_sv.gatk_sv_single_sample import CreateSampleBatches
 from cpg_workflows.stages.stripy import Stripy
+from cpg_workflows.stages.happy_validation import ValidationParseHappy
 
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'pre_alignment': [FastQCMultiQC],
-    'seqr_loader': [DatasetVCF, AnnotateDataset, MtToEs, GvcfMultiQC, CramMultiQC, Stripy],
+    'seqr_loader': [
+        DatasetVCF,
+        AnnotateDataset,
+        MtToEs,
+        GvcfMultiQC,
+        CramMultiQC,
+        Stripy,
+        ValidationParseHappy
+    ],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
     'gatk_sv_singlesample': [CreateSampleBatches],
     'gatk_sv_multisample_1': [FilterBatch, GenotypeBatch],

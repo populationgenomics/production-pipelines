@@ -97,6 +97,17 @@ def _dataset_vcf_meta(
     return {'type': 'dataset-vcf'}
 
 
+def _sg_vcf_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, Any]:
+    """
+    Add meta.type to custom analysis object
+
+    TODO: Replace this once dynamic analysis types land in metamist.
+    """
+    return {'type': 'dataset-vcf'}
+
+
 @stage(
     required_stages=[AnnotateCohort],
     analysis_type='custom',

@@ -4,8 +4,8 @@ Test Hail Query functions.
 
 
 from cpg_utils import to_path
-from cpg_utils.config import set_config_paths
 
+from . import set_config
 
 TOML = """
 [workflow]
@@ -21,9 +21,7 @@ sequencing_type = 'genome'
 
 
 def test_check_multiqc(caplog, tmp_path):
-    with open(tmp_path / 'config.toml', 'w') as fh:
-        fh.write(TOML)
-    set_config_paths([str(tmp_path / 'config.toml')])
+    set_config(TOML, tmp_path / 'config.toml')
 
     from cpg_workflows.python_scripts import check_multiqc
 

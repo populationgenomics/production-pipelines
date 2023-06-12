@@ -12,9 +12,12 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     image_path,
     get_images,
     get_fasta,
+    get_images,
     get_references,
+    image_path,
 )
 
+from . import set_config
 
 TOML = """
 [workflow]
@@ -37,10 +40,7 @@ def test_get_images(tmp_path):
     """
     check that the image return works correctly
     """
-
-    with open(tmp_path / 'config.toml', 'w') as fh:
-        fh.write(TOML)
-    set_config_paths([str(tmp_path / 'config.toml')])
+    set_config(TOML, tmp_path / 'config.toml')
 
     assert image_path('first') == 'first/image'
     assert image_path('second') == 'second/image'
@@ -52,10 +52,7 @@ def test_get_images_missing_allowed(tmp_path):
     """
     check that the image return works correctly
     """
-
-    with open(tmp_path / 'config.toml', 'w') as fh:
-        fh.write(TOML)
-    set_config_paths([str(tmp_path / 'config.toml')])
+    set_config(TOML, tmp_path / 'config.toml')
 
     assert image_path('first') == 'first/image'
     assert image_path('second') == 'second/image'
@@ -67,10 +64,7 @@ def test_get_images_invalid(tmp_path):
     """
     check for failure when a requested key is missing
     """
-
-    with open(tmp_path / 'config.toml', 'w') as fh:
-        fh.write(TOML)
-    set_config_paths([str(tmp_path / 'config.toml')])
+    set_config(TOML, tmp_path / 'config.toml')
 
     assert image_path('first') == 'first/image'
     assert image_path('second') == 'second/image'
@@ -82,6 +76,8 @@ def test_get_fasta(tmp_path):
     """
     check that the fasta return works correctly
     """
+    set_config(TOML, tmp_path / 'config.toml')
+
     assert get_fasta() == to_path('this/is/the/ref.fasta')
 
 
@@ -89,10 +85,8 @@ def test_get_references(tmp_path):
     """
     check that the reference return works correctly
     """
+    set_config(TOML, tmp_path / 'config.toml')
 
-    with open(tmp_path / 'config.toml', 'w') as fh:
-        fh.write(TOML)
-    set_config_paths([str(tmp_path / 'config.toml')])
     assert get_references(['sv_reference', 'broad_reference']) == {
         'sv_reference': 'gatk_sv_content',
         'broad_reference': 'broad_content',
