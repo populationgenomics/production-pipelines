@@ -134,7 +134,9 @@ def add_gatk_sv_jobs(
         else:
             paths_as_strings[f'{wfl_name}.{key}'] = value
 
-    job_prefix = make_job_name(wfl_name, sample=sample_id, dataset=dataset.name)
+    job_prefix = make_job_name(
+        wfl_name, sequencing_group=sample_id, dataset=dataset.name
+    )
     submit_j, output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
         b=batch,
         job_prefix=job_prefix,

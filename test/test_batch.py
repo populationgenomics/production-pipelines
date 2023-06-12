@@ -208,6 +208,10 @@ def test_attributes(mocker: MockFixture, tmp_path):
             job.attributes['sequencing_groups'] == "['CPG01']"
             or job.attributes['sequencing_groups'] == "['CPG02']"
         )
+        # test job name
+        assert job.name.startswith(
+            f'{get_cohort().get_datasets()[0].name}/{job.attributes["sequencing_group"]}/{job.attributes["participant_id"]}'
+        )
 
     # Check that the job_by_stage and job_by_tool dicts are correct
     for stg, job in get_batch().job_by_stage.items():
