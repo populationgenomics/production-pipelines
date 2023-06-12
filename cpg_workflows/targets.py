@@ -38,7 +38,7 @@ class Target:
         self, only_active: bool = True
     ) -> list['SequencingGroup']:
         """
-        Get flat list of all samples corresponding to this target.
+        Get flat list of all sequencing groups corresponding to this target.
         """
         raise NotImplementedError
 
@@ -116,7 +116,7 @@ class Target:
 
 class Cohort(Target):
     """
-    Represents a "cohort" target - all samples from all datasets in the workflow.
+    Represents a "cohort" target - all sequencing groups from all datasets in the workflow.
     Analysis dataset name is required and will be used as the default name for the
     cohort.
     """
@@ -161,13 +161,15 @@ class Cohort(Target):
         self, only_active: bool = True
     ) -> list['SequencingGroup']:
         """
-        Gets a flat list of all samples from all datasets.
-        Include only "active" samples (unless only_active is False)
+        Gets a flat list of all sequencing groups from all datasets.
+        Include only "active" sequencing groups (unless only_active is False)
         """
-        all_samples = []
+        all_sequencing_groups = []
         for ds in self.get_datasets(only_active=False):
-            all_samples.extend(ds.get_sequencing_groups(only_active=only_active))
-        return all_samples
+            all_sequencing_groups.extend(
+                ds.get_sequencing_groups(only_active=only_active)
+            )
+        return all_sequencing_groups
 
     def add_dataset(self, dataset: 'Dataset') -> 'Dataset':
         """
@@ -412,13 +414,15 @@ class Dataset(Target):
         self, out_path: Path | None = None, use_participant_id: bool = False
     ) -> Path:
         """
-        Create a PED file for all samples
+        Create a PED file for all sequencing groups
         PED is written with no header line to be strict specification compliant
         """
         datas = []
-        for sample in self.get_sequencing_groups():
+        for sequencing_group in self.get_sequencing_groups():
             datas.append(
-                sample.pedigree.get_ped_dict(use_participant_id=use_participant_id)
+                sequencing_group.pedigree.get_ped_dict(
+                    use_participant_id=use_participant_id
+                )
             )
         if not datas:
             raise ValueError(f'No pedigree data found for {self.name}')
@@ -487,7 +491,7 @@ class SequencingGroup(Target):
         self._participant_id = participant_id
         self.meta: dict = meta or dict()
         self.pedigree: PedigreeInfo = pedigree or PedigreeInfo(
-            sample=self,
+            sequencing_group=self,
             fam_id=self.participant_id,
             sex=sex or Sex.UNKNOWN,
         )
@@ -632,7 +636,7 @@ class PedigreeInfo:
     Pedigree relationships with other samples in the cohort, and other PED data
     """
 
-    sample: SequencingGroup
+    sequencing_group: SequencingGroup
     sex: Sex = Sex.UNKNOWN
     fam_id: str | None = None
     phenotype: str | int = 0
@@ -653,8 +657,8 @@ class PedigreeInfo:
             return _s.id
 
         return {
-            'Family.ID': self.fam_id or self.sample.participant_id,
-            'Individual.ID': _get_id(self.sample),
+            'Family.ID': self.fam_id or self.sequencing_group.participant_id,
+            'Individual.ID': _get_id(self.sequencing_group),
             'Father.ID': _get_id(self.dad),
             'Mother.ID': _get_id(self.mom),
             'Sex': str(self.sex.value),

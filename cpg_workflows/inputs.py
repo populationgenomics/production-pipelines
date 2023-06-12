@@ -123,23 +123,26 @@ def _populate_analysis(cohort: Cohort) -> None:
             analysis_type=AnalysisType.CRAM,
             dataset=dataset.name,
         )
-        for sample in dataset.get_sequencing_groups():
-            if (analysis := gvcf_by_sid.get(sample.id)) and analysis.output:
-                assert analysis.output == sample.make_gvcf_path().path, (
+
+        # NOTE: This logic will be simplified to remove existence checks overwriting metamist
+        # in a later PR.
+        for sequencing_group in dataset.get_sequencing_groups():
+            if (analysis := gvcf_by_sid.get(sequencing_group.id)) and analysis.output:
+                assert analysis.output == sequencing_group.make_gvcf_path().path, (
                     analysis.output,
-                    sample.make_gvcf_path().path,
+                    sequencing_group.make_gvcf_path().path,
                 )
-                sample.gvcf = sample.make_gvcf_path()
-            elif sample.make_gvcf_path().exists():
-                sample.gvcf = sample.make_gvcf_path()
-            if (analysis := cram_by_sid.get(sample.id)) and analysis.output:
-                assert analysis.output == sample.make_cram_path().path, (
+                sequencing_group.gvcf = sequencing_group.make_gvcf_path()
+            elif sequencing_group.make_gvcf_path().exists():
+                sequencing_group.gvcf = sequencing_group.make_gvcf_path()
+            if (analysis := cram_by_sid.get(sequencing_group.id)) and analysis.output:
+                assert analysis.output == sequencing_group.make_cram_path().path, (
                     analysis.output,
-                    sample.make_cram_path().path,
+                    sequencing_group.make_cram_path().path,
                 )
-                sample.cram = sample.make_cram_path()
-            elif sample.make_cram_path().exists():
-                sample.cram = sample.make_cram_path()
+                sequencing_group.cram = sequencing_group.make_cram_path()
+            elif sequencing_group.make_cram_path().exists():
+                sequencing_group.cram = sequencing_group.make_cram_path()
 
 
 def _populate_pedigree(cohort: Cohort) -> None:
@@ -159,20 +162,20 @@ def _populate_pedigree(cohort: Cohort) -> None:
             ped_entry_by_participant_id[part_id] = ped_entry
 
         sids_wo_ped = []
-        for sample in dataset.get_sequencing_groups():
-            if sample.participant_id not in ped_entry_by_participant_id:
-                sids_wo_ped.append(sample.id)
+        for sequencing_group in dataset.get_sequencing_groups():
+            if sequencing_group.participant_id not in ped_entry_by_participant_id:
+                sids_wo_ped.append(sequencing_group.id)
                 continue
 
-            ped_entry = ped_entry_by_participant_id[sample.participant_id]
+            ped_entry = ped_entry_by_participant_id[sequencing_group.participant_id]
             maternal_sample = sample_by_participant_id.get(
                 str(ped_entry['maternal_id'])
             )
             paternal_sample = sample_by_participant_id.get(
                 str(ped_entry['paternal_id'])
             )
-            sample.pedigree = PedigreeInfo(
-                sample=sample,
+            sequencing_group.pedigree = PedigreeInfo(
+                sequencing_group=sequencing_group,
                 fam_id=ped_entry['family_id'],
                 mom=maternal_sample,
                 dad=paternal_sample,
@@ -182,5 +185,5 @@ def _populate_pedigree(cohort: Cohort) -> None:
         if sids_wo_ped:
             logging.warning(
                 f'No pedigree data found for '
-                f'{len(sids_wo_ped)}/{len(dataset.get_sequencing_groups())} samples'
+                f'{len(sids_wo_ped)}/{len(dataset.get_sequencing_groups())} sequencing groups'
             )

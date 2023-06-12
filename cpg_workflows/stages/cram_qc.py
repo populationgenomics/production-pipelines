@@ -191,20 +191,22 @@ class SomalierPedigree(DatasetStage):
         """
         verifybamid_by_sid = {}
         somalier_path_by_sid = {}
-        for sample in dataset.get_sequencing_groups():
+        for sequencing_group in dataset.get_sequencing_groups():
             if get_config().get('somalier', {}).get('exclude_high_contamination'):
                 verify_bamid_path = inputs.as_path(
-                    stage=CramQC, target=sample, key='verify_bamid'
+                    stage=CramQC, target=sequencing_group, key='verify_bamid'
                 )
                 if not exists(verify_bamid_path):
                     logging.warning(
                         f'VerifyBAMID results {verify_bamid_path} do not exist for '
-                        f'{sample}, somalier pedigree estimations might be affected'
+                        f'{sequencing_group}, somalier pedigree estimations might be affected'
                     )
                 else:
-                    verifybamid_by_sid[sample.id] = verify_bamid_path
-            somalier_path = inputs.as_path(stage=CramQC, target=sample, key='somalier')
-            somalier_path_by_sid[sample.id] = somalier_path
+                    verifybamid_by_sid[sequencing_group.id] = verify_bamid_path
+            somalier_path = inputs.as_path(
+                stage=CramQC, target=sequencing_group, key='somalier'
+            )
+            somalier_path_by_sid[sequencing_group.id] = somalier_path
 
         html_path = self.expected_outputs(dataset)['html']
         if base_url := dataset.web_url():

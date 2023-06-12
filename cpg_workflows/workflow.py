@@ -1188,11 +1188,11 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
                 continue
 
             logging.info(f'Dataset {dataset}:')
-            for sample in dataset.get_sequencing_groups():
-                action = self._get_action(sample)
-                output_by_target[sample.target_id] = self._queue_jobs_with_checks(
-                    sample, action
-                )
+            for sequencing_group in dataset.get_sequencing_groups():
+                action = self._get_action(sequencing_group)
+                output_by_target[
+                    sequencing_group.target_id
+                ] = self._queue_jobs_with_checks(sequencing_group, action)
 
         return output_by_target
 
