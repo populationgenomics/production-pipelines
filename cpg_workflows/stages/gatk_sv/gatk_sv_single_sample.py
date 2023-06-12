@@ -197,7 +197,9 @@ class EvidenceQC(CohortStage):
 @stage(required_stages=EvidenceQC, analysis_type='sv', analysis_keys=['batch_json'])
 class CreateSampleBatches(CohortStage):
     """
-    uses the values generated in EvidenceQC, does some clustering
+    uses the values generated in EvidenceQC
+    splits the samples into batches based on median coverage,
+    PCR +/- status, and Sex
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
@@ -205,12 +207,18 @@ class CreateSampleBatches(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         expected = self.expected_outputs(cohort)
-        pcr_plus, pcr_neg = [], []
-        for sample in cohort.get_samples():
-            if sample.meta.get('pcr_status', 'unknown') == 'negative':
-                pcr_neg.append(sample.id)
-            else:
-                pcr_plus.append(sample.id)
+
+        # PCR +/- logic is only relevant to exomes
+        if get_config()['workflow'].get('sequencing_type') != 'genome':
+            sample_types = {'exome': [sam.id for sam in cohort.get_samples()]}
+        # within exomes, divide into PCR- and all other samples
+        else:
+            sample_types = {'positive': [], 'negative': []}
+            for sample in cohort.get_samples():
+                if sample.meta.get('pcr_status', 'unknown') == 'negative':
+                    sample_types['negative'].append(sample.id)
+                else:
+                    sample_types['positive'].append(sample.id)
 
         # get those settings
         min_batch_size = get_config()['workflow'].get('min_batch_size', 100)
@@ -218,12 +226,14 @@ class CreateSampleBatches(CohortStage):
 
         all_jobs = []
 
-        for status, samples in [('negative', pcr_neg), ('positive', pcr_plus)]:
-            if len(samples) < min_batch_size:
+        for status, samples in sample_types.items():
+            if not samples:
+                logging.info(f'No {status} samples found')
+                continue
+            elif len(samples) < min_batch_size:
                 logging.info(f'Too few {status} samples to form batches')
                 continue
-
-            # I think this can just be a PythonJob?
+            logging.info(f'Creating {status} sample batches')
             py_job = get_batch().new_python_job(f'create_{status}_sample_batches')
             py_job.image(get_config()['workflow']['driver_image'])
             py_job.call(
