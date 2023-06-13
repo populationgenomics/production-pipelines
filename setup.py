@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 setup(
     name='cpg-workflows',
     # This tag is automatically updated by bumpversion
-    version='1.13.5',
+    version='1.14.0',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -14,6 +14,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'cpg-utils',
+        'cyvcf2==0.30.18',
         'analysis-runner>=2.40.7',
         'hail',
         'networkx',
