@@ -95,47 +95,53 @@ def test_status_reporter(mocker: MockFixture, tmp_path):
     @stage(analysis_type='qc')
     class MyQcStage1(SequencingGroupStage):
         """
-        Just a sample-level stage.
+        Just a sequencing-group-level stage.
         """
 
-        def expected_outputs(self, sample: SequencingGroup) -> Path:
-            return to_path(dataset_path(f'{sample.id}.tsv'))
+        def expected_outputs(self, sequencing_group: SequencingGroup) -> Path:
+            return to_path(dataset_path(f'{sequencing_group.id}.tsv'))
 
         def queue_jobs(
-            self, sample: SequencingGroup, inputs: StageInput
+            self, sequencing_group: SequencingGroup, inputs: StageInput
         ) -> StageOutput | None:
             j = get_batch().new_job(
-                'Echo', self.get_job_attrs(sample) | dict(tool='echo')
+                'Echo', self.get_job_attrs(sequencing_group) | dict(tool='echo')
             )
-            j.command(f'echo {sample.id}_done >> {j.output}')
-            get_batch().write_output(j.output, str(self.expected_outputs(sample)))
-            print(f'Writing to {self.expected_outputs(sample)}')
-            return self.make_outputs(sample, self.expected_outputs(sample), [j])
+            j.command(f'echo {sequencing_group.id}_done >> {j.output}')
+            get_batch().write_output(
+                j.output, str(self.expected_outputs(sequencing_group))
+            )
+            print(f'Writing to {self.expected_outputs(sequencing_group)}')
+            return self.make_outputs(
+                sequencing_group, self.expected_outputs(sequencing_group), [j]
+            )
 
     @stage(analysis_type='qc', analysis_keys=['bed'])
     class MyQcStage2(SequencingGroupStage):
         """
-        Just a sample-level stage.
+        Just a sequencing-group-level stage.
         """
 
-        def expected_outputs(self, sample: SequencingGroup) -> dict:
+        def expected_outputs(self, sequencing_group: SequencingGroup) -> dict:
             return {
-                'bed': to_path(dataset_path(f'{sample.id}.bed')),
-                'tsv': to_path(dataset_path(f'{sample.id}.tsv')),
+                'bed': to_path(dataset_path(f'{sequencing_group.id}.bed')),
+                'tsv': to_path(dataset_path(f'{sequencing_group.id}.tsv')),
             }
 
         def queue_jobs(
-            self, sample: SequencingGroup, inputs: StageInput
+            self, sequencing_group: SequencingGroup, inputs: StageInput
         ) -> StageOutput | None:
             j = get_batch().new_job(
-                'Echo', self.get_job_attrs(sample) | dict(tool='echo')
+                'Echo', self.get_job_attrs(sequencing_group) | dict(tool='echo')
             )
-            j.command(f'echo {sample.id}_done >> {j.output}')
+            j.command(f'echo {sequencing_group.id}_done >> {j.output}')
             get_batch().write_output(
-                j.output, str(self.expected_outputs(sample)['bed'])
+                j.output, str(self.expected_outputs(sequencing_group)['bed'])
             )
-            print(f'Writing to {self.expected_outputs(sample)["bed"]}')
-            return self.make_outputs(sample, self.expected_outputs(sample), [j])
+            print(f'Writing to {self.expected_outputs(sequencing_group)["bed"]}')
+            return self.make_outputs(
+                sequencing_group, self.expected_outputs(sequencing_group), [j]
+            )
 
     run_workflow(stages=[MyQcStage1, MyQcStage2])
 
@@ -170,18 +176,22 @@ def test_status_reporter_with_custom_updater(mocker: MockFixture, tmp_path):
 
     @stage(analysis_type='qc', update_analysis_meta=_update_meta)
     class MyQcStage(SequencingGroupStage):
-        def expected_outputs(self, sample: SequencingGroup) -> Path:
-            return to_path(dataset_path(f'{sample.id}.tsv'))
+        def expected_outputs(self, sequencing_group: SequencingGroup) -> Path:
+            return to_path(dataset_path(f'{sequencing_group.id}.tsv'))
 
         def queue_jobs(
-            self, sample: SequencingGroup, inputs: StageInput
+            self, sequencing_group: SequencingGroup, inputs: StageInput
         ) -> StageOutput | None:
             j = get_batch().new_job(
-                'Echo', self.get_job_attrs(sample) | dict(tool='echo')
+                'Echo', self.get_job_attrs(sequencing_group) | dict(tool='echo')
             )
             j.command(f'echo 42 >> {j.output}')
-            get_batch().write_output(j.output, str(self.expected_outputs(sample)))
-            return self.make_outputs(sample, self.expected_outputs(sample), [j])
+            get_batch().write_output(
+                j.output, str(self.expected_outputs(sequencing_group))
+            )
+            return self.make_outputs(
+                sequencing_group, self.expected_outputs(sequencing_group), [j]
+            )
 
     run_workflow(stages=[MyQcStage])
 
@@ -206,27 +216,29 @@ def test_status_reporter_fails(mocker: MockFixture, tmp_path):
     @stage(analysis_type='qc')
     class MyQcStage(SequencingGroupStage):
         """
-        Just a sample-level stage.
+        Just a sequencing-group-level stage.
         """
 
-        def expected_outputs(self, sample: SequencingGroup) -> dict:
+        def expected_outputs(self, sequencing_group: SequencingGroup) -> dict:
             return {
-                'bed': dataset_path(f'{sample.id}.bed'),
-                'tsv': dataset_path(f'{sample.id}.tsv'),
+                'bed': dataset_path(f'{sequencing_group.id}.bed'),
+                'tsv': dataset_path(f'{sequencing_group.id}.tsv'),
             }
 
         def queue_jobs(
-            self, sample: SequencingGroup, inputs: StageInput
+            self, sequencing_group: SequencingGroup, inputs: StageInput
         ) -> StageOutput | None:
             j = get_batch().new_job(
-                'Echo', self.get_job_attrs(sample) | dict(tool='echo')
+                'Echo', self.get_job_attrs(sequencing_group) | dict(tool='echo')
             )
-            j.command(f'echo {sample.id}_done >> {j.output}')
+            j.command(f'echo {sequencing_group.id}_done >> {j.output}')
             get_batch().write_output(
-                j.output, str(self.expected_outputs(sample)['bed'])
+                j.output, str(self.expected_outputs(sequencing_group)['bed'])
             )
-            print(f'Writing to {self.expected_outputs(sample)["bed"]}')
-            return self.make_outputs(sample, self.expected_outputs(sample), [j])
+            print(f'Writing to {self.expected_outputs(sequencing_group)["bed"]}')
+            return self.make_outputs(
+                sequencing_group, self.expected_outputs(sequencing_group), [j]
+            )
 
     from cpg_workflows.workflow import WorkflowError
 

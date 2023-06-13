@@ -77,17 +77,23 @@ def test_workflow(tmp_path):
         Just a sample-level stage.
         """
 
-        def expected_outputs(self, sample: SequencingGroup) -> Path:
-            return to_path(dataset_path(f'{sample.id}.tsv'))
+        def expected_outputs(self, sequencing_group: SequencingGroup) -> Path:
+            return to_path(dataset_path(f'{sequencing_group.id}.tsv'))
 
         def queue_jobs(
-            self, sample: SequencingGroup, inputs: StageInput
+            self, sequencing_group: SequencingGroup, inputs: StageInput
         ) -> StageOutput | None:
-            j = get_batch().new_job('SequencingGroup job', self.get_job_attrs(sample))
-            j.command(f'echo {sample.id}_done >> {j.output}')
-            get_batch().write_output(j.output, str(self.expected_outputs(sample)))
-            print(f'Writing to {self.expected_outputs(sample)}')
-            return self.make_outputs(sample, self.expected_outputs(sample))
+            j = get_batch().new_job(
+                'SequencingGroup job', self.get_job_attrs(sequencing_group)
+            )
+            j.command(f'echo {sequencing_group.id}_done >> {j.output}')
+            get_batch().write_output(
+                j.output, str(self.expected_outputs(sequencing_group))
+            )
+            print(f'Writing to {self.expected_outputs(sequencing_group)}')
+            return self.make_outputs(
+                sequencing_group, self.expected_outputs(sequencing_group)
+            )
 
     @stage(required_stages=MySequencingGroupStage)
     class MyCohortStage(CohortStage):
