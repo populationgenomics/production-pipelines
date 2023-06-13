@@ -115,7 +115,7 @@ class Analysis:
     id: int
     type: AnalysisType
     status: AnalysisStatus
-    sample_ids: set[str]
+    sequencing_group_ids: set[str]
     output: Path | None
     meta: dict
 
@@ -139,7 +139,7 @@ class Analysis:
             id=int(data['id']),
             type=AnalysisType.parse(data['type']),
             status=AnalysisStatus.parse(data['status']),
-            sample_ids=set([s['id'] for s in data['sequencingGroups']]),
+            sequencing_group_ids=set([s['id'] for s in data['sequencingGroups']]),
             output=output,
             meta=data.get('meta') or {},
         )
@@ -237,7 +237,7 @@ class Metamist:
         dataset: str | None = None,
     ) -> Analysis | None:
         """
-        Query the DB to find the last completed joint-calling analysis for the samples.
+        Query the DB to find the last completed joint-calling analysis for the sequencing groups.
         """
         metamist_proj = dataset or self.default_dataset
         if get_config()['workflow']['access_level'] == 'test':
@@ -254,7 +254,7 @@ class Metamist:
             return None
         assert a.type == AnalysisType.JOINT_CALLING, data
         assert a.status == AnalysisStatus.COMPLETED, data
-        if a.sample_ids != set(sequencing_group_ids):
+        if a.sequencing_group_ids != set(sequencing_group_ids):
             return None
         return a
 
@@ -267,9 +267,9 @@ class Metamist:
         dataset: str | None = None,
     ) -> dict[str, Analysis]:
         """
-        Query the DB to find the last completed analysis for the type, sample ids,
-        and sequencing type, one Analysis object per sample. Assumes the analysis
-        is defined for a single sample (that is, analysis_type=cram|gvcf|qc).
+        Query the DB to find the last completed analysis for the type, sequencing group ids,
+        and sequencing type, one Analysis object per sequencing group. Assumes the analysis
+        is defined for a single sequencing group (that is, analysis_type=cram|gvcf|qc).
         """
         dataset = dataset or self.default_dataset
         metamist_proj = dataset or self.default_dataset
@@ -314,8 +314,8 @@ class Metamist:
 
             assert a.status == AnalysisStatus.COMPLETED, analysis
             assert a.type == analysis_type, analysis
-            assert len(a.sample_ids) == 1, analysis
-            analysis_per_sid[list(a.sample_ids)[0]] = a
+            assert len(a.sequencing_group_ids) == 1, analysis
+            analysis_per_sid[list(a.sequencing_group_ids)[0]] = a
 
         logging.info(
             f'Querying {analysis_type} analysis entries for {metamist_proj}: '
@@ -349,7 +349,7 @@ class Metamist:
             type=type_,
             status=models.AnalysisStatus(status),
             output=str(output),
-            sample_ids=list(sequencing_group_ids),
+            sequencing_group_ids=list(sequencing_group_ids),
             meta=meta or {},
         )
         try:
@@ -382,7 +382,7 @@ class Metamist:
 
         @param sequencing_group_ids: sequencing_group_ids IDs to pull the analysis for
         @param completed_analysis: existing completed analysis of this type for these
-        samples
+        sequencing groups
         @param analysis_type: cram, gvcf, joint_calling
         @param expected_output_fpath: where the workflow expects the analysis output
         file to sit on the bucket (will invalidate the analysis when it doesn't match)
@@ -507,7 +507,7 @@ class Assay:
     """
 
     id: str
-    sample_id: str
+    sequencing_group_id: str
     meta: dict
     assay_type: str
     alignment_input: AlignmentInput | None = None
@@ -535,7 +535,7 @@ class Assay:
         assert assay_type, data
         mm_seq = Assay(
             id=str(data['id']),
-            sample_id=sg_id,
+            sequencing_group_id=sg_id,
             meta=data['meta'],
             assay_type=assay_type,
         )
@@ -632,7 +632,7 @@ class Assay:
 
             if len(reads_data) != 2:
                 raise ValueError(
-                    f'Sequence data for sample {sequence_group_id} is incorrectly '
+                    f'Sequence data for sequence group {sequence_group_id} is incorrectly '
                     f'formatted. Expecting 2 entries per lane (R1 and R2 fastqs), '
                     f'but got {len(reads_data)}. '
                     f'Read data: {pprint.pformat(reads_data)}'

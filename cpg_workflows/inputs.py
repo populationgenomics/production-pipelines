@@ -1,5 +1,5 @@
 """
-Metamist wrapper to get input samples.
+Metamist wrapper to get input sequencing groups.
 """
 
 import logging
@@ -54,7 +54,7 @@ def create_cohort() -> Cohort:
                 sequencing_group.pedigree.sex = Sex.parse(reported_sex)
 
             _populate_alignment_inputs(sequencing_group, entry)
-            # TODO: Add checks here,logging samples without sequences
+            # TODO: Add checks here,logging sgs without sequences
             # Check there is only one sequencing group per type.
 
     if not cohort.get_datasets():
@@ -147,11 +147,11 @@ def _populate_analysis(cohort: Cohort) -> None:
 
 def _populate_pedigree(cohort: Cohort) -> None:
     """
-    Populate pedigree data for samples.
+    Populate pedigree data for sequencing groups.
     """
-    sample_by_participant_id = dict()
-    for s in cohort.get_sequencing_groups():
-        sample_by_participant_id[s.participant_id] = s
+    sg_by_participant_id = dict()
+    for sg in cohort.get_sequencing_groups():
+        sg_by_participant_id[sg.participant_id] = sg
 
     for dataset in cohort.get_datasets():
         logging.info(f'Reading pedigree for dataset {dataset}')
@@ -161,19 +161,15 @@ def _populate_pedigree(cohort: Cohort) -> None:
             part_id = str(ped_entry['individual_id'])
             ped_entry_by_participant_id[part_id] = ped_entry
 
-        sids_wo_ped = []
+        sgids_wo_ped = []
         for sequencing_group in dataset.get_sequencing_groups():
             if sequencing_group.participant_id not in ped_entry_by_participant_id:
-                sids_wo_ped.append(sequencing_group.id)
+                sgids_wo_ped.append(sequencing_group.id)
                 continue
 
             ped_entry = ped_entry_by_participant_id[sequencing_group.participant_id]
-            maternal_sample = sample_by_participant_id.get(
-                str(ped_entry['maternal_id'])
-            )
-            paternal_sample = sample_by_participant_id.get(
-                str(ped_entry['paternal_id'])
-            )
+            maternal_sample = sg_by_participant_id.get(str(ped_entry['maternal_id']))
+            paternal_sample = sg_by_participant_id.get(str(ped_entry['paternal_id']))
             sequencing_group.pedigree = PedigreeInfo(
                 sequencing_group=sequencing_group,
                 fam_id=ped_entry['family_id'],
@@ -182,8 +178,8 @@ def _populate_pedigree(cohort: Cohort) -> None:
                 sex=Sex.parse(str(ped_entry['sex'])),
                 phenotype=ped_entry['affected'] or '0',
             )
-        if sids_wo_ped:
+        if sgids_wo_ped:
             logging.warning(
                 f'No pedigree data found for '
-                f'{len(sids_wo_ped)}/{len(dataset.get_sequencing_groups())} sequencing groups'
+                f'{len(sgids_wo_ped)}/{len(dataset.get_sequencing_groups())} sequencing groups'
             )

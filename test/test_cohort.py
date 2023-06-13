@@ -202,7 +202,7 @@ def test_cohort(mocker: MockFixture, tmp_path):
     assert test_sg.meta == {'sg_meta': 'is_fun', 'participant_meta': 'is_here'}
 
     # Test Assay Population
-    assert test_sg.assays['sequencing'].sample_id == 'CPGLCL17'
+    assert test_sg.assays['sequencing'].sequencing_group_id == 'CPGLCL17'
     assert test_sg.assays['sequencing'].id == '1'
     assert test_sg.assays['sequencing'].meta['fluid_x_tube_id'] == '220405_FS28'
     assert (
@@ -213,3 +213,11 @@ def test_cohort(mocker: MockFixture, tmp_path):
     assert test_sg.participant_id == '8'
     assert test_sg.pedigree.sex == Sex.MALE
     assert test_sg2.pedigree.sex == Sex.UNKNOWN
+
+    # Test _sequencing_group_by_id attribute
+    assert cohort.get_datasets()[0]._sequencing_group_by_id.keys() == {
+        'CPGLCL17',
+        'CPGLCL25',
+    }
+    assert cohort.get_datasets()[0]._sequencing_group_by_id['CPGLCL17'].id == 'CPGLCL17'
+    assert cohort.get_datasets()[0]._sequencing_group_by_id['CPGLCL25'].id == 'CPGLCL25'

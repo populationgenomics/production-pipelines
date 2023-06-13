@@ -13,7 +13,7 @@ from cpg_workflows.utils import can_reuse, exists
 
 def _check_gvcfs(sequencing_groups: list[SequencingGroup]) -> list[SequencingGroup]:
     """
-    Making sure each sample has a GVCF
+    Making sure each sequencing group has a GVCF
     """
     for sequencing_group in sequencing_groups:
         if not sequencing_group.gvcf and exists(sequencing_group.make_gvcf_path().path):
@@ -60,22 +60,24 @@ def check_duplicates(iterable):
     return duplicates
 
 
-def run(out_vds_path: Path, tmp_prefix: Path, *sample_ids) -> hl.vds.VariantDataset:
+def run(
+    out_vds_path: Path, tmp_prefix: Path, *sequencing_group_ids
+) -> hl.vds.VariantDataset:
     """
     run VDS combiner, assuming we are on a cluster.
     @param out_vds_path: output path for VDS
     @param tmp_prefix: tmp path for intermediate fields
-    @param sample_ids: optional list of samples to subset from get_cohort()
+    @param sequencing_group_ids: optional list of sequencing groups to subset from get_cohort()
     @return: VDS object
     """
     if can_reuse(out_vds_path):
         return hl.vds.read_vds(str(out_vds_path))
 
-    samples = get_cohort().get_sequencing_groups()
-    if sample_ids:
-        samples = [s for s in samples if s in sample_ids]
+    sequencing_groups = get_cohort().get_sequencing_groups()
+    if sequencing_group_ids:
+        sequencing_groups = [s for s in sequencing_groups if s in sequencing_group_ids]
 
-    samples = _check_gvcfs(samples)
+    sequencing_groups = _check_gvcfs(sequencing_groups)
 
     params = get_config().get('combiner', {})
 
@@ -99,25 +101,27 @@ def run(out_vds_path: Path, tmp_prefix: Path, *sample_ids) -> hl.vds.VariantData
             'must be one of: "exome", "genome"'
         )
 
-    sample_names = [s.id for s in samples]
+    sequencing_group_names = [s.id for s in sequencing_groups]
     logging.info(
-        f'Combining {len(samples)} samples: '
-        f'{", ".join(sample_names)}, using parameters: '
+        f'Combining {len(sequencing_groups)} sequencing groups: '
+        f'{", ".join(sequencing_group_names)}, using parameters: '
         f'{params}'
     )
 
-    gvcf_paths = [str(s.gvcf.path) for s in samples if s.gvcf]
+    gvcf_paths = [str(s.gvcf.path) for s in sequencing_groups if s.gvcf]
     if not gvcf_paths:
-        raise ValueError('No samples with GVCFs found')
+        raise ValueError('No sequencing groups with GVCFs found')
 
-    logging.info(f'Combining {len(sample_names)} samples: {", ".join(sample_names)}')
+    logging.info(
+        f'Combining {len(sequencing_group_names)} sequencing groups: {", ".join(sequencing_group_names)}'
+    )
 
-    check_duplicates(sample_names)
+    check_duplicates(sequencing_group_names)
     check_duplicates(gvcf_paths)
 
     combiner = hl.vds.new_combiner(
         gvcf_paths=gvcf_paths,
-        gvcf_sample_names=sample_names,
+        gvcf_sample_names=sequencing_group_names,
         # Header must be used with gvcf_sample_names, otherwise gvcf_sample_names
         # will be ignored. The first gvcf path works fine as a header because it will
         # be only read until the last line that begins with "#":

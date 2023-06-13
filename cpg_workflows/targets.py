@@ -253,7 +253,7 @@ class Dataset(Target):
         cohort: Cohort | None = None,
     ):
         super().__init__()
-        self._sample_by_id: dict[str, SequencingGroup] = {}
+        self._sequencing_group_by_id: dict[str, SequencingGroup] = {}
         self.name = name
         self.cohort = cohort
         self.active = True
@@ -271,10 +271,10 @@ class Dataset(Target):
         return self.name
 
     def __repr__(self):
-        return f'Dataset("{self.name}", {len(self.get_sequencing_groups())} samples)'
+        return f'Dataset("{self.name}", {len(self.get_sequencing_groups())} sequencing groups)'
 
     def __str__(self):
-        return f'{self.name} ({len(self.get_sequencing_groups())} samples)'
+        return f'{self.name} ({len(self.get_sequencing_groups())} sequencing groups)'
 
     def _seq_type_subdir(self) -> str:
         """
@@ -360,11 +360,11 @@ class Dataset(Target):
         """
         Create a new sample and add it to the dataset.
         """
-        if id in self._sample_by_id:
+        if id in self._sequencing_group_by_id:
             logging.debug(
                 f'SequencingGroup {id} already exists in the dataset {self.name}'
             )
-            return self._sample_by_id[id]
+            return self._sequencing_group_by_id[id]
 
         force_sgs = get_config()['workflow'].get('force_sgs', set())
         forced = (
@@ -382,7 +382,7 @@ class Dataset(Target):
             alignment_input_by_seq_type=alignment_input_by_seq_type,
             forced=forced,
         )
-        self._sample_by_id[id] = s
+        self._sequencing_group_by_id[id] = s
         return s
 
     def get_sequencing_groups(
@@ -392,7 +392,9 @@ class Dataset(Target):
         Get dataset's samples. Include only "active" samples, unless only_active=False
         """
         return [
-            s for sid, s in self._sample_by_id.items() if (s.active or not only_active)
+            s
+            for sid, s in self._sequencing_group_by_id.items()
+            if (s.active or not only_active)
         ]
 
     def get_job_attrs(self) -> dict:
@@ -544,7 +546,7 @@ class SequencingGroup(Target):
     @property
     def participant_id(self) -> str:
         """
-        Get ID of participant corresponding to this sample,
+        Get ID of participant corresponding to this sequencing group,
         or substitute it with external ID.
         """
         return self._participant_id or self.external_id
@@ -633,7 +635,7 @@ class SequencingGroup(Target):
 @dataclass
 class PedigreeInfo:
     """
-    Pedigree relationships with other samples in the cohort, and other PED data
+    Pedigree relationships with other sequencing groups in the cohort, and other PED data
     """
 
     sequencing_group: SequencingGroup
@@ -645,7 +647,7 @@ class PedigreeInfo:
 
     def get_ped_dict(self, use_participant_id: bool = False) -> dict[str, str]:
         """
-        Returns a dictionary of pedigree fields for this sample, corresponding
+        Returns a dictionary of pedigree fields for this sequencing group, corresponding
         a PED file entry.
         """
 
