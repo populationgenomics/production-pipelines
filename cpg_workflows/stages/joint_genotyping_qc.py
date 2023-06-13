@@ -204,7 +204,7 @@ class JointVcfMultiQC(CohortStage):
             out_html_url=html_url,
             out_checks_path=checks_path,
             job_attrs=self.get_job_attrs(cohort),
-            sample_id_map=cohort.rich_id_map(),
+            sequencing_group_id_map=cohort.rich_id_map(),
             extra_config={'table_columns_visible': {'Picard': True}},
             dataset=cohort.analysis_dataset,
             label='Joint VCF',

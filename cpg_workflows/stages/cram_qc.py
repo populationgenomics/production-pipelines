@@ -140,7 +140,7 @@ class CramQC(SequencingGroupStage):
         crai_path = inputs.as_path(sequencing_group, Align, 'crai')
 
         jobs = []
-        # This should run if either the stage or the sample is being forced.
+        # This should run if either the stage or the sequencing group is being forced.
         forced = self.forced or sequencing_group.forced
         for qc in qc_functions():
             out_path_kwargs = {
@@ -346,7 +346,7 @@ class CramMultiQC(DatasetStage):
             out_html_url=html_url,
             out_checks_path=checks_path,
             job_attrs=self.get_job_attrs(dataset),
-            sample_id_map=dataset.rich_id_map(),
+            sequencing_group_id_map=dataset.rich_id_map(),
             label='CRAM',
             extra_config={'table_columns_visible': {'FastQC': False}},
         )

@@ -74,7 +74,7 @@ def test_workflow(tmp_path):
     @stage
     class MySequencingGroupStage(SequencingGroupStage):
         """
-        Just a sample-level stage.
+        Just a sequencing-group-level stage.
         """
 
         def expected_outputs(self, sequencing_group: SequencingGroup) -> Path:
@@ -105,12 +105,12 @@ def test_workflow(tmp_path):
             return output_path
 
         def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-            path_by_sample = inputs.as_path_by_target(MySequencingGroupStage)
-            assert len(path_by_sample) == len(cohort.get_sequencing_groups())
+            path_by_sg = inputs.as_path_by_target(MySequencingGroupStage)
+            assert len(path_by_sg) == len(cohort.get_sequencing_groups())
             j = get_batch().new_job('Cohort job', self.get_job_attrs(cohort))
             j.command(f'touch {j.output}')
-            for _, sample_result_path in path_by_sample.items():
-                input_file = get_batch().read_input(str(sample_result_path))
+            for _, sg_result_path in path_by_sg.items():
+                input_file = get_batch().read_input(str(sg_result_path))
                 j.command(f'cat {input_file} >> {j.output}')
             get_batch().write_output(j.output, str(self.expected_outputs(cohort)))
             print(f'Writing to {self.expected_outputs(cohort)}')

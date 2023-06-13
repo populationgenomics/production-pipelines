@@ -205,7 +205,7 @@ class GvcfMultiQC(DatasetStage):
             out_html_url=html_url,
             out_checks_path=checks_path,
             job_attrs=self.get_job_attrs(dataset),
-            sample_id_map=dataset.rich_id_map(),
+            sequencing_group_id_map=dataset.rich_id_map(),
             extra_config={'table_columns_visible': {'Picard': True}},
             label='GVCF',
         )
