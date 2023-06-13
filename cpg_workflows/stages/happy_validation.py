@@ -4,7 +4,7 @@
 Content relating to the hap.py validation process
 """
 
-
+import logging
 from cpg_utils.config import get_config
 from cpg_workflows.workflow import (
     stage,
@@ -147,6 +147,7 @@ class ValidationParseHappy(SampleStage):
 
         # only keep the samples with reference data
         if sample.external_id not in get_config()['references']:
+            logging.info(f'Skipping {sample} as it is not a reference sample')
             return None
 
         # get the input vcf for this sequence group
@@ -154,14 +155,14 @@ class ValidationParseHappy(SampleStage):
         happy_results = inputs.as_dict_by_target(stage=ValidationHappyOnVcf)[sample.id]
 
         exp_outputs = self.expected_outputs(sample)
-        job = parse_and_post_results(
-            b=get_batch(),
-            vcf_path=str(input_vcf),
-            sample=sample,
-            happy_results=happy_results,
-            out_file=exp_outputs['json_summary'],
-            job_attrs=self.get_job_attrs(sample),
-            depends_on=inputs.get_jobs(sample),
-        )
 
-        return self.make_outputs(sample, data=exp_outputs, jobs=job)
+        py_job = get_batch().new_python_job(f'parse_{sample}_happy_result')
+        py_job.image(get_config()['workflow']['driver_image'])
+        py_job.call(
+            parse_and_post_results,
+            vcf_path=str(input_vcf),
+            sample_id=sample.external_id,
+            happy_results=happy_results,
+            out_file=exp_outputs['json_summary']
+        )
+        return self.make_outputs(sample, data=exp_outputs, jobs=py_job)

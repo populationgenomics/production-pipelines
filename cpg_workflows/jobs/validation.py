@@ -171,34 +171,26 @@ def run_happy_on_vcf(
 
 
 def parse_and_post_results(
-    b: Batch,
     vcf_path: str,
-    sample: Sample,
+    sample_id: str,
     happy_results: dict,
-    out_file: Path,
-    job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None,
+    out_file: Path
 ):
     """
-    read the Hap.py results, and update Metamist
+    Read the Hap.py results, and update Metamist
+    This whole method is called as a scheduled PythonJob
+
     Args:
-        b (): the batch to create jobs in
         vcf_path (str): path to the single-sample VCF
-        sample (Sample):
+        sample_id (str): external sample ID
         happy_results (dict): all results from the hap.py stage
         out_file (Path): where to write the JSON file
-        job_attrs ():
-        depends_on ():
 
     Returns:
         this job
     """
 
-    results_j = b.new_job(f'Parse {sample.id} Happy results', (job_attrs or {}))
-    if depends_on:
-        results_j.depends_on(*depends_on)
-
-    ref_data = get_sample_truth_data(sample_id=sample.external_id)
+    ref_data = get_sample_truth_data(sample_id=sample_id)
     happy_csv = happy_results['happy_csv']
 
     # populate a dictionary of results for this sample
@@ -238,5 +230,3 @@ def parse_and_post_results(
             active=True,
         ),
     )
-
-    return results_j
