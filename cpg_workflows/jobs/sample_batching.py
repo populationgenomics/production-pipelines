@@ -146,8 +146,7 @@ def partition_batches(
     md.columns = [x.replace('#', '') for x in md.columns]
 
     # filter to the PCR-state samples we're interested in
-    # surely there's a neater way to do this...
-    md = md[np.array([sam in sample_ids for sam in md.ID.tolist()])]
+    md = md.query('ID in @sample_ids')
 
     # check that we have enough samples to batch
     # should have already been checked prior to Stage starting
