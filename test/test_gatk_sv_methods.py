@@ -6,11 +6,8 @@ import pytest
 import pandas as pd
 
 from cpg_utils import to_path
-from cpg_utils.config import set_config_paths
 from cpg_workflows.jobs.sample_batching import batch_samples
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
-    image_path,
-    get_images,
     get_fasta,
     get_images,
     get_references,
