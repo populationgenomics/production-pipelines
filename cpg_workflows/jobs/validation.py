@@ -222,7 +222,7 @@ def parse_and_post_results(
     AnalysisApi().create_new_analysis(
         project=get_config()['workflow']['dataset'],
         analysis_model=AnalysisModel(
-            sample_ids=[sample.id],
+            sample_ids=[sample_id],
             type=AnalysisType('qc'),
             status=AnalysisStatus('completed'),
             output=str(happy_csv.parent),
