@@ -43,9 +43,9 @@ def get_sample_truth_data(sample_id: str):
 
 def validation_mt_to_vcf_job(
     b: Batch,
-    mt_path: Path,
+    mt_path: str,
     sample_id: str,
-    out_vcf_path: Path,
+    out_vcf_path: str,
     job_attrs: dict | None = None,
     depends_on: list[Job] | None = None,
 ):
@@ -73,7 +73,7 @@ def validation_mt_to_vcf_job(
         query_command(
             validation,
             validation.single_sample_vcf_from_dataset_vcf.__name__,
-            str(mt_path),
+            mt_path,
             sample_id,
             out_vcf_path,
             setup_gcp=True,

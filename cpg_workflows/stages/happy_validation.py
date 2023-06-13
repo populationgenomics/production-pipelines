@@ -61,9 +61,9 @@ class ValidationMtToVcf(SampleStage):
 
         job = validation_mt_to_vcf_job(
             b=get_batch(),
-            mt_path=mt_path,
+            mt_path=str(mt_path),
             sample_id=sample.id,
-            out_vcf_path=exp_outputs['vcf'],
+            out_vcf_path=str(exp_outputs['vcf']),
             job_attrs=self.get_job_attrs(sample),
             depends_on=inputs.get_jobs(sample),
         )
