@@ -144,7 +144,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
             print(f'Writing to {self.expected_outputs(sample)}')
             return self.make_outputs(sample, self.expected_outputs(sample), [j])
 
-    @stage(analysis_type='qc', analysis_keys=['bed'])
+    @stage(analysis_type='qc', analysis_keys=['bed'], required_stages=[MyQcStage1])
     class MyQcStage2(SequencingGroupStage):
         """
         Just a sample-level stage.

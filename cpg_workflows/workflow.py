@@ -5,7 +5,7 @@ in a declarative fashion.
 A `Stage` object is responsible for creating Hail Batch jobs and declaring outputs
 (files or metamist analysis objects) that are expected to be produced. Each stage
 acts on a `Target`, which can be of the following a `SequencingGroup`, a `Dataset` (a container
-for samples), or a `Cohort` (all input datasets together). A `Workflow` object plugs
+for sequencing groups), or a `Cohort` (all input datasets together). A `Workflow` object plugs
 stages together by resolving dependencies between different levels accordingly.
 
 Examples of workflows can be found in the `production-workflows` repository.
@@ -230,7 +230,7 @@ class StageInput:
                 f'No inputs from {stage.__name__} for {self.stage.name} found '
                 + 'after skipping targets with missing inputs. '
                 + (
-                    'Check the logs if all samples were missing inputs from previous '
+                    'Check the logs if all sequencing groups were missing inputs from previous '
                     'stages, and consider changing `workflow/first_stage`'
                     if get_config()['workflow'].get('skip_sgs_with_missing_input')
                     else ''
@@ -324,13 +324,15 @@ class StageInput:
         Get list of jobs that the next stage would depend on.
         """
         all_jobs: list[Job] = []
-        these_samples = target.get_sequencing_group_ids()
+        target_sequencing_groups = target.get_sequencing_group_ids()
         for stage_, outputs_by_target in self._outputs_by_target_by_stage.items():
             for target_, output in outputs_by_target.items():
                 if output:
-                    those_samples = output.target.get_sequencing_group_ids()
-                    samples_intersect = set(these_samples) & set(those_samples)
-                    if samples_intersect:
+                    output_sequencing_groups = output.target.get_sequencing_group_ids()
+                    sequencing_groups_intersect = set(target_sequencing_groups) & set(
+                        output_sequencing_groups
+                    )
+                    if sequencing_groups_intersect:
                         for j in output.jobs:
                             assert (
                                 j
@@ -832,7 +834,7 @@ def run_workflow(
 
 class Workflow:
     """
-    Encapsulates a Hail Batch object, stages, and a cohort of datasets of samples.
+    Encapsulates a Hail Batch object, stages, and a cohort of datasets of sequencing groups.
     Responsible for orchestrating stages.
     """
 
@@ -1167,8 +1169,8 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
             logging.warning(
                 f'{len(cohort.get_sequencing_groups())}/'
                 f'{len(cohort.get_sequencing_groups(only_active=False))} '
-                f'usable (active=True) samples found. Check logs above for '
-                f'possible reasons samples were skipped (e.g. all samples ignored '
+                f'usable (active=True) sequencing groups found. Check logs above for '
+                f'possible reasons sequencing groups were skipped (e.g. all sequencing groups ignored '
                 f'via `workflow.skip_sgs` in config, or they all missing stage '
                 f'inputs and `workflow.skip_sgs_with_missing_input=true` is set)'
             )
@@ -1180,8 +1182,8 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
                     f'{dataset}: '
                     f'{len(dataset.get_sequencing_groups())}/'
                     f'{len(dataset.get_sequencing_groups(only_active=False))} '
-                    f'usable (active=True) samples found. Check logs above for '
-                    f'possible reasons samples were skipped (e.g. all samples ignored '
+                    f'usable (active=True) sequencing groups found. Check logs above for '
+                    f'possible reasons sequencing groups were skipped (e.g. all sequencing groups ignored '
                     f'via `workflow.skip_sgs` in config, or they all missing stage '
                     f'inputs and `workflow.skip_sgs_with_missing_input=true` is set)'
                 )

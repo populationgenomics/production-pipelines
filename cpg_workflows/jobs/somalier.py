@@ -20,7 +20,7 @@ from cpg_workflows.filetypes import CramPath
 from cpg_workflows.python_scripts import check_pedigree
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.targets import Dataset
-from cpg_workflows.utils import can_reuse, rich_sample_id_seds
+from cpg_workflows.utils import can_reuse, rich_sequencing_group_id_seds
 
 # We want to exclude contaminated samples from relatedness checks. Somalier is not
 # designed to work with contaminated samples, and in a presence of contamination it
@@ -128,7 +128,7 @@ def _check_pedigree(
     script_path = to_path(check_pedigree.__file__)
     script_name = script_path.name
     cmd = f"""\
-    {rich_sample_id_seds(rich_id_map, [str(samples_file), str(pairs_file), str(expected_ped)])
+    {rich_sequencing_group_id_seds(rich_id_map, [str(samples_file), str(pairs_file), str(expected_ped)])
     if rich_id_map else ''}
     python3 {script_name} \\
     --somalier-samples {samples_file} \\
@@ -220,7 +220,7 @@ def _relate(
     ls
     mv related.pairs.tsv {j.output_pairs}
     mv related.samples.tsv {j.output_samples}
-    {rich_sample_id_seds(rich_id_map, ['related.html'])}
+    {rich_sequencing_group_id_seds(rich_id_map, ['related.html'])}
     mv related.html {j.output_html}
     """
     if out_html_url:

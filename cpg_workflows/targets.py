@@ -358,7 +358,7 @@ class Dataset(Target):
         alignment_input_by_seq_type: dict[str, AlignmentInput] | None = None,
     ) -> 'SequencingGroup':
         """
-        Create a new sample and add it to the dataset.
+        Create a new sequencing group and add it to the dataset.
         """
         if id in self._sequencing_group_by_id:
             logging.debug(
@@ -389,7 +389,7 @@ class Dataset(Target):
         self, only_active: bool = True
     ) -> list['SequencingGroup']:
         """
-        Get dataset's samples. Include only "active" samples, unless only_active=False
+        Get dataset's sequencing groups. Include only "active" sequencing groups, unless only_active=False
         """
         return [
             s
@@ -575,7 +575,7 @@ class SequencingGroup(Target):
 
     def get_ped_dict(self, use_participant_id: bool = False) -> dict[str, str]:
         """
-        Returns a dictionary of pedigree fields for this sample, corresponding
+        Returns a dictionary of pedigree fields for this sequencing group, corresponding
         a PED file entry.
         """
         return self.pedigree.get_ped_dict(use_participant_id)

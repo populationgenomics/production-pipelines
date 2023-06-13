@@ -14,7 +14,7 @@ from cpg_utils.hail_batch import image_path, copy_common_env, command
 from cpg_utils import Path
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.targets import Dataset
-from cpg_workflows.utils import rich_sample_id_seds
+from cpg_workflows.utils import rich_sequencing_group_id_seds
 from cpg_workflows.python_scripts import check_multiqc
 
 
@@ -154,7 +154,7 @@ def check_report_job(
     script_path = to_path(check_multiqc.__file__)
     script_name = script_path.name
     cmd = f"""\
-    {rich_sample_id_seds(rich_id_map, [multiqc_json_file])
+    {rich_sequencing_group_id_seds(rich_id_map, [multiqc_json_file])
     if rich_id_map else ''}
 
     python3 {script_name} \\
