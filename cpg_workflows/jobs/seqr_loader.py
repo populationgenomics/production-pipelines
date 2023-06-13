@@ -103,7 +103,7 @@ def annotate_cohort_jobs(
 def annotate_dataset_jobs(
     b: Batch,
     mt_path: Path,
-    sample_ids: list[str],
+    sequencing_group_ids: list[str],
     out_mt_path: Path,
     tmp_prefix: Path,
     job_attrs: dict | None = None,
@@ -117,7 +117,7 @@ def annotate_dataset_jobs(
     sample_ids_list_path = tmp_prefix / 'sample-list.txt'
     if not get_config()['workflow'].get('dry_run', False):
         with sample_ids_list_path.open('w') as f:
-            f.write(','.join(sample_ids))
+            f.write(','.join(sequencing_group_ids))
 
     subset_mt_path = tmp_prefix / 'cohort-subset.mt'
 
@@ -179,13 +179,13 @@ def annotate_dataset_jobs(
             f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
         )
         subset_j.image(image_path('cpg_workflows'))
-        assert sample_ids
+        assert sequencing_group_ids
         subset_j.command(
             query_command(
                 seqr_loader,
                 seqr_loader.subset_mt_to_samples.__name__,
                 str(mt_path),
-                sample_ids,
+                sequencing_group_ids,
                 str(subset_mt_path),
                 setup_gcp=True,
             )
@@ -218,7 +218,7 @@ def cohort_to_vcf_job(
     mt_path: Path,
     out_vcf_path: Path,
     job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None
+    depends_on: list[Job] | None = None,
 ):
     """
     Take the single-dataset MT, and write to a VCF

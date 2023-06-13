@@ -57,7 +57,7 @@ def pedigree(
         b=b,
         somalier_path_by_sid=somalier_path_by_sid,
         verifybamid_by_sid=verifybamid_by_sid,
-        sample_ids=dataset.get_sequencing_group_ids(),
+        sequencing_group_ids=dataset.get_sequencing_group_ids(),
         rich_id_map=dataset.rich_id_map(),
         expected_ped_path=expected_ped_path,
         label=label,
@@ -160,7 +160,7 @@ def _check_pedigree(
 def _relate(
     b: Batch,
     somalier_path_by_sid: dict[str, Path],
-    sample_ids: list[str],
+    sequencing_group_ids: list[str],
     rich_id_map: dict[str, str],
     expected_ped_path: Path,
     label: str | None,
@@ -179,14 +179,14 @@ def _relate(
     j.image(image_path('somalier'))
     # Size of one somalier file is 212K, so we add another G only if the number of
     # samples is >4k
-    STANDARD.set_resources(j, storage_gb=1 + len(sample_ids) // 4000 * 1)
+    STANDARD.set_resources(j, storage_gb=1 + len(sequencing_group_ids) // 4000 * 1)
 
     cmd = ''
     input_files_file = '$BATCH_TMPDIR/input_files.list'
     samples_ids_file = '$BATCH_TMPDIR/sample_ids.list'
     cmd += f'touch {input_files_file}'
     cmd += f'touch {samples_ids_file}'
-    for sample_id in sample_ids:
+    for sample_id in sequencing_group_ids:
         if verifybamid_by_sid:
             if sample_id not in verifybamid_by_sid:
                 continue

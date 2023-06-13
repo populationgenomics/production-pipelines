@@ -18,7 +18,7 @@ from cpg_workflows import get_cohort, get_batch
 
 # benchmark matrix:
 N_WORKERS = [10, 30, 20, 40, 50]
-N_SAMPLES = [100, 200, 300, 400, 500]
+N_SEQUENCING_GROUPS = [100, 200, 300, 400, 500]
 
 
 def main():
@@ -30,7 +30,7 @@ def main():
         ]
     )
     logging.info(
-        f'Found {len(df)}/{len(get_cohort().get_sequencing_groups())} samples '
+        f'Found {len(df)}/{len(get_cohort().get_sequencing_groups())} sequencing groups '
         f'in {get_config()["workflow"]["dataset"]} with GVCFs'
     )
 
@@ -38,22 +38,24 @@ def main():
     tmp_prefix = to_path(dataset_path('benchmark-combiner', category='tmp'))
 
     for n_workers in N_WORKERS:
-        for n_samples in N_SAMPLES:
-            label = f'nsamples-{n_samples}-nworkers-{n_workers}'
+        for n_sequencing_groups in N_SEQUENCING_GROUPS:
+            label = f'nseqgroups-{n_sequencing_groups}-nworkers-{n_workers}'
             out_vds_path = out_prefix / label / 'combined.vds'
-            sample_ids = get_cohort().get_sequencing_group_ids()[:n_samples]
+            sequencing_group_ids = get_cohort().get_sequencing_group_ids()[
+                :n_sequencing_groups
+            ]
 
             from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
             from cpg_workflows.large_cohort.combiner import run
 
             dataproc_job(
-                job_name=f'Combine {n_samples} GVCFs on {n_workers} workers',
+                job_name=f'Combine {n_sequencing_groups} GVCFs on {n_workers} workers',
                 function=run,
                 function_path_args=dict(
                     out_vds_path=out_vds_path,
                     tmp_prefix=tmp_prefix,
                 ),
-                function_str_args=sample_ids,
+                function_str_args=sequencing_group_ids,
                 autoscaling_policy=(
                     get_config()['hail']
                     .get('dataproc', {})
