@@ -44,7 +44,7 @@ class Genotype(SequencingGroupStage):
         jobs = genotype.genotype(
             b=get_batch(),
             output_path=self.expected_outputs(sequencing_group)['gvcf'],
-            sample_name=sequencing_group.id,
+            sequencing_group_name=sequencing_group.id,
             cram_path=sequencing_group.make_cram_path(),
             tmp_prefix=self.tmp_prefix / sequencing_group.id,
             overwrite=sequencing_group.forced,

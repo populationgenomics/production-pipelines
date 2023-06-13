@@ -183,7 +183,7 @@ def align(
             job_name=base_job_name,
             alignment_input=alignment_input,
             requested_nthreads=requested_nthreads,
-            sample_name=sequencing_group.id,
+            sequencing_group_name=sequencing_group.id,
             job_attrs=job_attrs,
             aligner=aligner,
             should_sort=False,
@@ -204,7 +204,7 @@ def align(
                     job_name=base_job_name,
                     alignment_input=pair,
                     requested_nthreads=requested_nthreads,
-                    sample_name=sequencing_group.id,
+                    sequencing_group_name=sequencing_group.id,
                     job_attrs=job_attrs,
                     aligner=aligner,
                     should_sort=True,
@@ -222,7 +222,7 @@ def align(
                     b=b,
                     job_name=base_job_name,
                     alignment_input=alignment_input,
-                    sample_name=sequencing_group.id,
+                    sequencing_group_name=sequencing_group.id,
                     job_attrs=job_attrs,
                     aligner=aligner,
                     requested_nthreads=requested_nthreads,
@@ -315,7 +315,7 @@ def _align_one(
     job_name: str,
     alignment_input: FastqPair | CramPath | BamPath,
     requested_nthreads: int,
-    sample_name: str,
+    sequencing_group_name: str,
     job_attrs: dict | None = None,
     aligner: Aligner = Aligner.BWA,
     number_of_shards_for_realignment: int | None = None,
@@ -360,7 +360,7 @@ def _align_one(
         if number_of_shards_for_realignment and number_of_shards_for_realignment > 1:
             assert shard_number is not None and shard_number >= 0, (
                 shard_number,
-                sample_name,
+                sequencing_group_name,
             )
             shard_param = f' -s {shard_number + 1},{number_of_shards_for_realignment}'
         else:
@@ -434,7 +434,7 @@ def _align_one(
             j.image(image_path('bwa'))
             index_exts = BWA_INDEX_EXTS
         bwa_reference = fasta_res_group(b, index_exts)
-        rg_line = f'@RG\\tID:{sample_name}\\tSM:{sample_name}'
+        rg_line = f'@RG\\tID:{sequencing_group_name}\\tSM:{sequencing_group_name}'
         # BWA command options:
         # -K   process INT input bases in each batch regardless of nThreads (for reproducibility)
         # -p   smart pairing (ignoring in2.fq)
@@ -463,7 +463,7 @@ def _align_one(
         cmd = f"""\
         {prepare_fastq_cmd}
         dragen-os -r {dragmap_index} {input_params} \\
-            --RGID {sample_name} --RGSM {sample_name}
+            --RGID {sequencing_group_name} --RGSM {sequencing_group_name}
         """
 
     else:

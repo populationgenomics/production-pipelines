@@ -1,5 +1,5 @@
 """
-CRAM to GVCF: create Hail Batch jobs to genotype individual samples.
+CRAM to GVCF: create Hail Batch jobs to genotype individual sequencing groups.
 """
 
 import logging
@@ -19,7 +19,7 @@ from .picard import get_intervals
 
 def genotype(
     b: hb.Batch,
-    sample_name: str,
+    sequencing_group_name: str,
     tmp_prefix: Path,
     cram_path: CramPath,
     job_attrs: dict[str, str] | None = None,
@@ -30,13 +30,13 @@ def genotype(
     """
     Takes a CRAM file and runs GATK tools to make a GVCF.
     """
-    hc_gvcf_path = tmp_prefix / 'haplotypecaller' / f'{sample_name}.g.vcf.gz'
+    hc_gvcf_path = tmp_prefix / 'haplotypecaller' / f'{sequencing_group_name}.g.vcf.gz'
     if utils.can_reuse(output_path, overwrite):
         return []
 
     jobs = haplotype_caller(
         b=b,
-        sample_name=sample_name,
+        sequencing_group_name=sequencing_group_name,
         job_attrs=job_attrs,
         output_path=hc_gvcf_path,
         cram_path=cram_path,
@@ -48,7 +48,7 @@ def genotype(
     postproc_j = postproc_gvcf(
         b=b,
         gvcf_path=GvcfPath(hc_gvcf_path),
-        sample_name=sample_name,
+        sequencing_group_name=sequencing_group_name,
         job_attrs=job_attrs,
         output_path=output_path,
         overwrite=overwrite,
@@ -62,7 +62,7 @@ intervals: list[hb.ResourceFile] | None = None
 
 def haplotype_caller(
     b: hb.Batch,
-    sample_name: str,
+    sequencing_group_name: str,
     cram_path: CramPath,
     tmp_prefix: Path,
     scatter_count: int,
@@ -98,7 +98,7 @@ def haplotype_caller(
             assert intervals[idx], intervals
             j = _haplotype_caller_one(
                 b,
-                sample_name=sample_name,
+                sequencing_group_name=sequencing_group_name,
                 cram_path=cram_path,
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
                 interval=intervals[idx],
@@ -109,7 +109,7 @@ def haplotype_caller(
         jobs.extend(hc_jobs)
         merge_j = merge_gvcfs_job(
             b=b,
-            sample_name=sample_name,
+            sequencing_group_name=sequencing_group_name,
             gvcf_groups=[j.output_gvcf for j in hc_jobs],
             job_attrs=job_attrs,
             out_gvcf_path=output_path,
@@ -119,7 +119,7 @@ def haplotype_caller(
     else:
         hc_j = _haplotype_caller_one(
             b,
-            sample_name=sample_name,
+            sequencing_group_name=sequencing_group_name,
             job_attrs=job_attrs,
             cram_path=cram_path,
             out_gvcf_path=output_path,
@@ -132,7 +132,7 @@ def haplotype_caller(
 
 def _haplotype_caller_one(
     b: hb.Batch,
-    sample_name: str,
+    sequencing_group_name: str,
     cram_path: CramPath,
     job_attrs: dict | None = None,
     interval: hb.Resource | None = None,
@@ -171,8 +171,8 @@ def _haplotype_caller_one(
 
     j.declare_resource_group(
         output_gvcf={
-            'g.vcf.gz': '{root}-' + sample_name + '.g.vcf.gz',
-            'g.vcf.gz.tbi': '{root}-' + sample_name + '.g.vcf.gz.tbi',
+            'g.vcf.gz': '{root}-' + sequencing_group_name + '.g.vcf.gz',
+            'g.vcf.gz.tbi': '{root}-' + sequencing_group_name + '.g.vcf.gz.tbi',
         }
     )
 
@@ -181,8 +181,8 @@ def _haplotype_caller_one(
     assert isinstance(j.output_gvcf, hb.ResourceGroup)
 
     cmd = f"""\
-    CRAM=$BATCH_TMPDIR/{sample_name}.cram
-    CRAI=$BATCH_TMPDIR/{sample_name}.cram.crai
+    CRAM=$BATCH_TMPDIR/{sequencing_group_name}.cram
+    CRAI=$BATCH_TMPDIR/{sequencing_group_name}.cram.crai
 
     # Retrying copying to avoid google bandwidth limits
     retry_gs_cp {str(cram_path.path)} $CRAM
@@ -216,14 +216,14 @@ def _haplotype_caller_one(
 
 def merge_gvcfs_job(
     b: hb.Batch,
-    sample_name: str,
+    sequencing_group_name: str,
     gvcf_groups: list[hb.Resource],
     job_attrs: dict | None = None,
     out_gvcf_path: Path | None = None,
     overwrite: bool = False,
 ) -> Job:
     """
-    Combine by-interval GVCFs into a single sample-wide GVCF file.
+    Combine by-interval GVCFs into a single sequencing group wide GVCF file.
     """
     job_name = f'Merge {len(gvcf_groups)} GVCFs'
     j = b.new_job(job_name, (job_attrs or {}) | dict(tool='picard MergeVcfs'))
@@ -238,8 +238,8 @@ def merge_gvcfs_job(
     j.storage(f'{len(gvcf_groups) * 1.5 + 2}G')
     j.declare_resource_group(
         output_gvcf={
-            'g.vcf.gz': '{root}-' + sample_name + '.g.vcf.gz',
-            'g.vcf.gz.tbi': '{root}-' + sample_name + '.g.vcf.gz.tbi',
+            'g.vcf.gz': '{root}-' + sequencing_group_name + '.g.vcf.gz',
+            'g.vcf.gz.tbi': '{root}-' + sequencing_group_name + '.g.vcf.gz.tbi',
         }
     )
 
@@ -262,7 +262,7 @@ def merge_gvcfs_job(
 def postproc_gvcf(
     b: hb.Batch,
     gvcf_path: GvcfPath,
-    sample_name: str,
+    sequencing_group_name: str,
     job_attrs: dict | None = None,
     overwrite: bool = False,
     output_path: Path | None = None,
@@ -274,9 +274,11 @@ def postproc_gvcf(
     2. Subsets GVCF to main, not-alt chromosomes to avoid downstream errors.
     3. Removes the DS INFO field that is added to some HGDP GVCFs to avoid errors
        from Hail about mismatched INFO annotations
-    4. Renames the GVCF sample name to use CPG ID.
+    4. Renames the GVCF sequencing group name to use CPG ID.
     """
-    logging.info(f'Adding GVCF postproc job for sample {sample_name}, gvcf {gvcf_path}')
+    logging.info(
+        f'Adding GVCF postproc job for sequencing group {sequencing_group_name}, gvcf {gvcf_path}'
+    )
     job_name = 'Postproc GVCF'
     j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk ReblockGVCF'))
     if utils.can_reuse(output_path, overwrite):
@@ -306,8 +308,8 @@ def postproc_gvcf(
 
     cmd = f"""\
     GVCF={gvcf}
-    GVCF_NODP=$BATCH_TMPDIR/{sample_name}-nodp.g.vcf.gz
-    REBLOCKED=$BATCH_TMPDIR/{sample_name}-reblocked.g.vcf.gz
+    GVCF_NODP=$BATCH_TMPDIR/{sequencing_group_name}-nodp.g.vcf.gz
+    REBLOCKED=$BATCH_TMPDIR/{sequencing_group_name}-reblocked.g.vcf.gz
 
     # Reindexing just to make sure the index is not corrupted
     bcftools index --tbi $GVCF
@@ -338,7 +340,7 @@ def postproc_gvcf(
 
     bcftools view $REBLOCKED -T {noalt_regions} \\
     | bcftools annotate -x INFO/DS \\
-    | bcftools reheader -s <(echo "$EXISTING_SN {sample_name}") \\
+    | bcftools reheader -s <(echo "$EXISTING_SN {sequencing_group_name}") \\
     | bcftools view -Oz -o {j.output_gvcf['g.vcf.gz']}
 
     tabix -p vcf {j.output_gvcf['g.vcf.gz']}
