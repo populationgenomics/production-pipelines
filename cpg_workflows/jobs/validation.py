@@ -112,7 +112,7 @@ def run_happy_on_vcf(
     happy_j = b.new_job(
         f'Run Happy on {sample_ext_id} VCF', (job_attrs or {}) | {'tool': 'hap.py'}
     )
-    happy_j.image(image_path('happy')).memory('100Gi').storage('100Gi').cpu(4)
+    happy_j.image(image_path('hap-py')).memory('100Gi').storage('100Gi').cpu(4)
     if depends_on:
         happy_j.depends_on(*depends_on)
 
@@ -156,7 +156,7 @@ def run_happy_on_vcf(
     )
 
     # region: stratification BED files
-    if stratification := get_config()['stratification']:
+    if stratification := get_config()['references']['stratification']:
         strat_folder = to_path(stratification)
         strat_dict = {file.name: str(file) for file in strat_folder.glob('*')}
         assert 'definition.tsv' in strat_dict, f'definition.tsv file does not exist'
@@ -209,7 +209,7 @@ def parse_and_post_results(
         'truth_bed': ref_data['bed'],
     }
 
-    if stratification := get_config()['stratification']:
+    if stratification := get_config()['references']['stratification']:
         summary_data['stratified'] = stratification
 
     # read in the summary CSV file

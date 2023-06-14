@@ -127,7 +127,7 @@ class ValidationHappyOnVcf(SampleStage):
         return self.make_outputs(sample, data=exp_outputs, jobs=job)
 
 
-@stage(required_stages=ValidationHappyOnVcf)
+@stage(required_stages=[ValidationMtToVcf, ValidationHappyOnVcf])
 class ValidationParseHappy(SampleStage):
     def expected_outputs(self, sample: Sample):
         return {
