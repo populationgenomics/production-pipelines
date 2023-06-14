@@ -168,7 +168,7 @@ def vcf_qc(
     b: hb.Batch,
     vcf_or_gvcf: hb.ResourceGroup,
     is_gvcf: bool,
-    sample_count: int | None = None,
+    sequencing_group_count: int | None = None,
     job_attrs: dict | None = None,
     output_summary_path: Path | None = None,
     output_detail_path: Path | None = None,
@@ -183,7 +183,11 @@ def vcf_qc(
     job_attrs = (job_attrs or {}) | {'tool': 'picard CollectVariantCallingMetrics'}
     j = b.new_job('CollectVariantCallingMetrics', job_attrs)
     j.image(image_path('picard'))
-    storage_gb = 20 if is_gvcf else storage_for_joint_vcf(sample_count, site_only=False)
+    storage_gb = (
+        20
+        if is_gvcf
+        else storage_for_joint_vcf(sequencing_group_count, site_only=False)
+    )
     res = STANDARD.set_resources(j, storage_gb=storage_gb, mem_gb=3)
     reference = fasta_res_group(b)
     dbsnp_vcf = b.read_input_group(

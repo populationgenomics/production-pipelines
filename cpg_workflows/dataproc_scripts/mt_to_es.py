@@ -203,7 +203,7 @@ def elasticsearch_row(mt: hl.MatrixTable):
 
 def _mt_num_shards(mt):
     """
-    Calculate the number of shards from the number of variants and samples.
+    Calculate the number of shards from the number of variants and sequencing groups.
     """
     denominator = 1.4 * 10**9
     calculated_num_shards = math.ceil((mt.count_rows() * mt.count_cols()) / denominator)

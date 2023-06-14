@@ -45,7 +45,7 @@ class JointGenotyping(CohortStage):
         """
         Submit jobs.
         """
-        gvcf_by_sid = {
+        gvcf_by_sgid = {
             sequencing_group.id: GvcfPath(
                 inputs.as_path(target=sequencing_group, stage=Genotype, key='gvcf')
             )
@@ -53,10 +53,10 @@ class JointGenotyping(CohortStage):
         }
 
         not_found_gvcfs: list[str] = []
-        for sid, gvcf_path in gvcf_by_sid.items():
+        for sgid, gvcf_path in gvcf_by_sgid.items():
             if gvcf_path is None:
-                logging.error(f'Joint genotyping: could not find GVCF for {sid}')
-                not_found_gvcfs.append(sid)
+                logging.error(f'Joint genotyping: could not find GVCF for {sgid}')
+                not_found_gvcfs.append(sgid)
         if not_found_gvcfs:
             raise WorkflowError(
                 f'Joint genotyping: could not find {len(not_found_gvcfs)} '
@@ -79,7 +79,7 @@ class JointGenotyping(CohortStage):
             out_vcf_path=vcf_path,
             out_siteonly_vcf_path=siteonly_vcf_path,
             tmp_bucket=to_path(self.expected_outputs(cohort)['tmp_prefix']),
-            gvcf_by_sid=gvcf_by_sid,
+            gvcf_by_sgid=gvcf_by_sgid,
             tool=joint_genotyping.JointGenotyperTool.GnarlyGenotyper
             if get_config()['workflow'].get('use_gnarly', False)
             else joint_genotyping.JointGenotyperTool.GenotypeGVCFs,

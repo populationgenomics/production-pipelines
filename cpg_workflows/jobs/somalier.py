@@ -22,8 +22,8 @@ from cpg_workflows.resources import STANDARD
 from cpg_workflows.targets import Dataset
 from cpg_workflows.utils import can_reuse, rich_sequencing_group_id_seds
 
-# We want to exclude contaminated samples from relatedness checks. Somalier is not
-# designed to work with contaminated samples, and in a presence of contamination it
+# We want to exclude contaminated sequencing groups from relatedness checks. Somalier is not
+# designed to work with contaminated sequencing groups, and in a presence of contamination it
 # can generate a lot of false positive families.
 MAX_FREEMIX = 0.04
 
@@ -86,6 +86,7 @@ def pedigree(
     return [relate_j, check_j]
 
 
+# NOTE: I don't think this function is used anywhere vivbak 14-07-2023
 def _make_sample_map(dataset: Dataset):
     """
     Creating sample map to remap internal IDs to participant IDs
@@ -178,37 +179,37 @@ def _relate(
     j = b.new_job(title, (job_attrs or {}) | dict(tool='somalier'))
     j.image(image_path('somalier'))
     # Size of one somalier file is 212K, so we add another G only if the number of
-    # samples is >4k
+    # sequencing groups is >4k
     STANDARD.set_resources(j, storage_gb=1 + len(sequencing_group_ids) // 4000 * 1)
 
     cmd = ''
     input_files_file = '$BATCH_TMPDIR/input_files.list'
-    samples_ids_file = '$BATCH_TMPDIR/sample_ids.list'
+    sequencing_groups_ids_file = '$BATCH_TMPDIR/sample_ids.list'
     cmd += f'touch {input_files_file}'
-    cmd += f'touch {samples_ids_file}'
-    for sample_id in sequencing_group_ids:
+    cmd += f'touch {sequencing_groups_ids_file}'
+    for sequencing_group_id in sequencing_group_ids:
         if verifybamid_by_sid:
-            if sample_id not in verifybamid_by_sid:
+            if sequencing_group_id not in verifybamid_by_sid:
                 continue
-            somalier_file = b.read_input(str(somalier_path_by_sid[sample_id]))
+            somalier_file = b.read_input(str(somalier_path_by_sid[sequencing_group_id]))
             cmd += f"""
-            FREEMIX=$(cat {b.read_input(str(verifybamid_by_sid[sample_id]))} | tail -n1 | cut -f7)
+            FREEMIX=$(cat {b.read_input(str(verifybamid_by_sid[sequencing_group_id]))} | tail -n1 | cut -f7)
             if [[ $(echo "$FREEMIX > {MAX_FREEMIX}" | bc) -eq 0 ]]; then \
             echo "{somalier_file}" >> {input_files_file}; \
-            echo "{sample_id}" >> {samples_ids_file}; \
+            echo "{sequencing_group_id}" >> {sequencing_groups_ids_file}; \
             fi
             """
         else:
-            somalier_file = b.read_input(str(somalier_path_by_sid[sample_id]))
+            somalier_file = b.read_input(str(somalier_path_by_sid[sequencing_group_id]))
             cmd += f"""
             echo "{somalier_file}" >> {input_files_file}
-            echo "{sample_id}" >> {samples_ids_file}
+            echo "{sequencing_group_id}" >> {sequencing_groups_ids_file}
             """
 
     cmd += f"""
     cat {b.read_input(str(expected_ped_path))} | \
     grep -v Family.ID | \
-    grep -f {samples_ids_file} > expected.ped 
+    grep -f {sequencing_groups_ids_file} > expected.ped 
     """
 
     cmd += f"""

@@ -23,7 +23,7 @@ from .. import get_batch
 )
 class Genotype(SequencingGroupStage):
     """
-    Use HaplotypeCaller to genotype individual samples (i.e. CRAM -> GVCF).
+    Use HaplotypeCaller to genotype individual sequencing groups (i.e. CRAM -> GVCF).
     """
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:

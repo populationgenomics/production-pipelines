@@ -113,12 +113,12 @@ def _populate_analysis(cohort: Cohort) -> None:
     Populate Analysis entries.
     """
     for dataset in cohort.get_datasets():
-        gvcf_by_sid = get_metamist().get_analyses_by_sid(
+        gvcf_by_sgid = get_metamist().get_analyses_by_sid(
             dataset.get_sequencing_group_ids(),
             analysis_type=AnalysisType.GVCF,
             dataset=dataset.name,
         )
-        cram_by_sid = get_metamist().get_analyses_by_sid(
+        cram_by_sgid = get_metamist().get_analyses_by_sid(
             dataset.get_sequencing_group_ids(),
             analysis_type=AnalysisType.CRAM,
             dataset=dataset.name,
@@ -127,7 +127,7 @@ def _populate_analysis(cohort: Cohort) -> None:
         # NOTE: This logic will be simplified to remove existence checks overwriting metamist
         # in a later PR.
         for sequencing_group in dataset.get_sequencing_groups():
-            if (analysis := gvcf_by_sid.get(sequencing_group.id)) and analysis.output:
+            if (analysis := gvcf_by_sgid.get(sequencing_group.id)) and analysis.output:
                 assert analysis.output == sequencing_group.make_gvcf_path().path, (
                     analysis.output,
                     sequencing_group.make_gvcf_path().path,
@@ -135,7 +135,7 @@ def _populate_analysis(cohort: Cohort) -> None:
                 sequencing_group.gvcf = sequencing_group.make_gvcf_path()
             elif sequencing_group.make_gvcf_path().exists():
                 sequencing_group.gvcf = sequencing_group.make_gvcf_path()
-            if (analysis := cram_by_sid.get(sequencing_group.id)) and analysis.output:
+            if (analysis := cram_by_sgid.get(sequencing_group.id)) and analysis.output:
                 assert analysis.output == sequencing_group.make_cram_path().path, (
                     analysis.output,
                     sequencing_group.make_cram_path().path,

@@ -717,7 +717,7 @@ You can also call the method `cpg_workflows.utils.can_reuse(path)` explicitly wi
 
 You can also start the pipeline from a specific stage with `workflow/first_stages` (it would skip all previous stages, but still check immediately required inputs for the first stage). `workflow/last_stages` would stop the workflow after the stages specified. `workflow/only_stages` would execute only stages specified, ignoring dependencies.
 
-You can also force the pipeline to skip certain sequencing groups with `workflow/skip_sgs`, pick only certain samples with `workflow/only_sgs`, force re-processing of certain sequencing groups with `workflow/force_sgs`. `workflow/skip_datasets` and `workflow/only_datasets` are available, and more fine-grained combination of `skip_sgs` and `skip_stages`: 
+You can also force the pipeline to skip certain sequencing groups with `workflow/skip_sgs`, pick only certain sequencing groups with `workflow/only_sgs`, force re-processing of certain sequencing groups with `workflow/force_sgs`. `workflow/skip_datasets` and `workflow/only_datasets` are available, and more fine-grained combination of `skip_sgs` and `skip_stages`: 
 
 ```toml
 [workflow.skip_stages_for_sgs]
