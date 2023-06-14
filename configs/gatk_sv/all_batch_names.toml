@@ -1,0 +1,5 @@
+[workflow]
+# this will be used when running:
+# - MergeBatchSites (sandwich stage)
+# - MakeCohortVCF (multisample 2)
+batch_names = ['b1b0be5754cfebd117b2a0e50b2d4087fe1af6_100']

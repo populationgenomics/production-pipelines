@@ -34,17 +34,22 @@ def genotype(
     if utils.can_reuse(output_path, overwrite):
         return []
 
-    jobs = haplotype_caller(
-        b=b,
-        sequencing_group_name=sequencing_group_name,
-        job_attrs=job_attrs,
-        output_path=hc_gvcf_path,
-        cram_path=cram_path,
-        tmp_prefix=tmp_prefix,
-        scatter_count=get_config()['workflow'].get('scatter_count_genotype', 50),
-        overwrite=overwrite,
-        dragen_mode=dragen_mode,
-    )
+    # collect all the real jobs - [reuse] jobs substituted for None
+    jobs = [
+        job
+        for job in haplotype_caller(
+            b=b,
+            sequencing_group_name=sequencing_group_name,
+            job_attrs=job_attrs,
+            output_path=hc_gvcf_path,
+            cram_path=cram_path,
+            tmp_prefix=tmp_prefix,
+            scatter_count=get_config()['workflow'].get('scatter_count_genotype', 50),
+            overwrite=overwrite,
+            dragen_mode=dragen_mode,
+        )
+        if job is not None
+    ]
     postproc_j = postproc_gvcf(
         b=b,
         gvcf_path=GvcfPath(hc_gvcf_path),
@@ -53,8 +58,16 @@ def genotype(
         output_path=output_path,
         overwrite=overwrite,
     )
-    postproc_j.depends_on(*jobs)
-    return jobs + [postproc_j]
+
+    # only keep elements which are not None
+    # if both exist, set the dependency
+    if postproc_j and jobs:
+        postproc_j.depends_on(*jobs)
+
+    if postproc_j:
+        jobs.append(postproc_j)
+
+    return jobs
 
 
 intervals: list[hb.ResourceFile] | None = None
@@ -70,12 +83,13 @@ def haplotype_caller(
     output_path: Path | None = None,
     overwrite: bool = False,
     dragen_mode: bool = True,
-) -> list[Job]:
+) -> list[Job | None]:
     """
     Run GATK Haplotype Caller in parallel, split by intervals.
     """
     if utils.can_reuse(output_path, overwrite):
-        return [b.new_job('HaplotypeCaller [reuse]', job_attrs)]
+        logging.info(f'Reusing HaplotypeCaller {output_path}, job attrs: {job_attrs}')
+        return [None]
 
     jobs: list[Job] = []
 
@@ -92,32 +106,44 @@ def haplotype_caller(
             if intervals_j:
                 jobs.append(intervals_j)
 
-        hc_jobs = []
+        hc_fragments = []
         # Splitting variant calling by intervals
         for idx in range(scatter_count):
             assert intervals[idx], intervals
-            j = _haplotype_caller_one(
+            # give each fragment a tmp location
+            fragment = (
+                tmp_prefix
+                / 'haplotypecaller'
+                / f'{idx}_of_{scatter_count}_{sequencing_group_name}.g.vcf.gz'
+            )
+            j, result = _haplotype_caller_one(
                 b,
                 sequencing_group_name=sequencing_group_name,
                 cram_path=cram_path,
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
                 interval=intervals[idx],
+                out_gvcf_path=fragment,
                 dragen_mode=dragen_mode,
                 overwrite=overwrite,
             )
-            hc_jobs.append(j)
-        jobs.extend(hc_jobs)
+            hc_fragments.append(result)
+
+            # only consider jobs which weren't scheduled for [reuse]
+            if j is not None:
+                jobs.append(j)
+
         merge_j = merge_gvcfs_job(
             b=b,
             sequencing_group_name=sequencing_group_name,
-            gvcf_groups=[j.output_gvcf for j in hc_jobs],
+            gvcf_groups=hc_fragments,
             job_attrs=job_attrs,
             out_gvcf_path=output_path,
             overwrite=overwrite,
         )
-        jobs.append(merge_j)
+        if merge_j:
+            jobs.append(merge_j)
     else:
-        hc_j = _haplotype_caller_one(
+        hc_j, _result = _haplotype_caller_one(
             b,
             sequencing_group_name=sequencing_group_name,
             job_attrs=job_attrs,
@@ -125,7 +151,8 @@ def haplotype_caller(
             out_gvcf_path=output_path,
             overwrite=overwrite,
         )
-        jobs.append(hc_j)
+        if hc_j:
+            jobs.append(hc_j)
 
     return jobs
 
@@ -139,16 +166,17 @@ def _haplotype_caller_one(
     out_gvcf_path: Path | None = None,
     overwrite: bool = False,
     dragen_mode: bool = True,
-) -> Job:
+) -> tuple[Job, hb.ResourceGroup] | tuple[None, str]:
     """
     Add one GATK HaplotypeCaller job on an interval.
     """
     job_name = 'HaplotypeCaller'
-    j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk HaplotypeCaller'))
-    if utils.can_reuse(out_gvcf_path, overwrite):
-        j.name = f'{j.name} [reuse]'
-        return j
 
+    if utils.can_reuse(out_gvcf_path, overwrite):
+        logging.info(f'Reusing HaplotypeCaller {out_gvcf_path}, job attrs: {job_attrs}')
+        return None, str(out_gvcf_path)
+
+    j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk HaplotypeCaller'))
     j.image(image_path('gatk'))
 
     # Enough storage to localize CRAMs (can't pass GCS URL to CRAM to gatk directly
@@ -211,25 +239,26 @@ def _haplotype_caller_one(
     )
     if out_gvcf_path:
         b.write_output(j.output_gvcf, str(out_gvcf_path).replace('.g.vcf.gz', ''))
-    return j
+    return j, j.output_gvcf
 
 
 def merge_gvcfs_job(
     b: hb.Batch,
     sequencing_group_name: str,
-    gvcf_groups: list[hb.Resource],
+    gvcf_groups: list[str | hb.Resource],
     job_attrs: dict | None = None,
     out_gvcf_path: Path | None = None,
     overwrite: bool = False,
-) -> Job:
+) -> Job | None:
     """
     Combine by-interval GVCFs into a single sequencing group wide GVCF file.
     """
     job_name = f'Merge {len(gvcf_groups)} GVCFs'
-    j = b.new_job(job_name, (job_attrs or {}) | dict(tool='picard MergeVcfs'))
     if utils.can_reuse(out_gvcf_path, overwrite):
-        j.name = f'{j.name} [reuse]'
-        return j
+        logging.info(f'Reusing {job_name} {out_gvcf_path}, job attrs: {job_attrs}')
+        return None
+
+    j = b.new_job(job_name, (job_attrs or {}) | dict(tool='picard MergeVcfs'))
 
     j.image(image_path('picard'))
     j.cpu(2)
@@ -245,7 +274,11 @@ def merge_gvcfs_job(
 
     input_cmd = ''
     for gvcf_group in gvcf_groups:
-        assert isinstance(gvcf_group, hb.ResourceGroup)
+        # if the output was recoverable, read into the batch
+        if isinstance(gvcf_group, str):
+            gvcf_group = b.read_input_group(
+                **{'g.vcf.gz': gvcf_group, 'g.vcf.gz.tbi': f'{gvcf_group}.tbi'}
+            )
         input_cmd += f'INPUT={gvcf_group["g.vcf.gz"]} '
 
     assert isinstance(j.output_gvcf, hb.ResourceGroup)
@@ -267,7 +300,7 @@ def postproc_gvcf(
     overwrite: bool = False,
     output_path: Path | None = None,
     depends_on: list[Job] | None = None,
-) -> Job:
+) -> Job | None:
     """
     1. Runs ReblockGVCF to annotate with allele-specific VCF INFO fields
     required for recalibration, and reduce the number of GVCF blocking bins to 2.
@@ -280,10 +313,11 @@ def postproc_gvcf(
         f'Adding GVCF postproc job for sequencing group {sequencing_group_name}, gvcf {gvcf_path}'
     )
     job_name = 'Postproc GVCF'
-    j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk ReblockGVCF'))
     if utils.can_reuse(output_path, overwrite):
-        return b.new_job(job_name + ' [reuse]', job_attrs)
+        logging.info(f'Reusing {output_path} output for {job_name}. {job_attrs}')
+        return None
 
+    j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk ReblockGVCF'))
     j.image(image_path('gatk'))
 
     # We need at least 2 CPU, so on 16-core instance it would be 8 jobs,
@@ -320,7 +354,7 @@ def postproc_gvcf(
     # in the resulting merged blocks. It would pick the highest INFO/DP when merging
     # multiple blocks, so a variant in a small homopolymer region (surrounded by
     # long DP=0 areas), that attracted piles of low-MQ reads with INFO/DP=1000
-    # will translate into a long GQ<20 block with the same FORMAT/DP=1000, 
+    # will translate into a long GQ<20 block with the same FORMAT/DP=1000,
     # which is wrong, because most of this block has no reads.
     bcftools view $GVCF \\
     | bcftools annotate -x INFO/DP \\

@@ -3,7 +3,6 @@ Utility functions and constants.
 """
 
 import logging
-import math
 import re
 import string
 import sys
@@ -18,6 +17,25 @@ from hailtop.batch import ResourceFile
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
+
+
+def missing_from_pre_collected(test: set[Path], known: set[Path]) -> Path | None:
+    """
+    Check if a path exists in a set of known paths.
+
+    This is useful when checking if a path exists in a set of paths that were
+    already collected. This method has been included to permit simple mocking
+
+    Args:
+        test (set[Path]): all the files we want to check
+        known (set[Path]): all the files we know about
+
+    Returns:
+        Path | None: the first path that is missing from the known set, or None
+            Path is arbitrary, as the set is unordered
+            None indicates No missing files
+    """
+    return next((p for p in test if p not in known), None)
 
 
 @lru_cache
