@@ -220,7 +220,7 @@ class CreateSampleBatches(CohortStage):
             sequencing_group_types = {
                 'exome': [sg.id for sg in cohort.get_sequencing_groups()]
             }
-        # within exomes, divide into PCR- and all other samples
+        # within exomes, divide into PCR- and all other sequencing groups
         else:
             sequencing_group_types = {'positive': [], 'negative': []}
             for sequencing_group in cohort.get_sequencing_groups():

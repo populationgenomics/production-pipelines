@@ -10,36 +10,6 @@ from pathlib import Path
 from pytest_mock import MockFixture
 from cpg_workflows.targets import Cohort
 
-CONFIG = """
-[workflow]
-dataset_gcp_project = 'fewgenomes'
-access_level = 'test'
-dataset = 'fewgenomes'
-driver_image = '<stub>'
-sequencing_type = 'genome'
-status_reporter = 'metamist'
-
-check_inputs = false
-check_intermediates = false
-check_expected_outputs = false
-path_scheme = 'local'
-
-[storage.default]
-default = '{directory}'
-
-[storage.fewgenomes]
-default = '{directory}'
-
-[hail]
-billing_project = 'fewgenomes'
-delete_scratch_on_exit = false
-backend = 'local'
-dry_run = true
-
-[images]
-cpg_workflows = "stub"
-"""
-
 
 def test_batch_job(tmp_path):
     """
@@ -110,6 +80,36 @@ def mock_create_cohort() -> Cohort:
 
 
 def test_attributes(mocker: MockFixture, tmp_path):
+    config = f"""
+    [workflow]
+    dataset_gcp_project = 'fewgenomes'
+    access_level = 'test'
+    dataset = 'fewgenomes'
+    driver_image = '<stub>'
+    sequencing_type = 'genome'
+    status_reporter = 'metamist'
+
+    check_inputs = false
+    check_intermediates = false
+    check_expected_outputs = false
+    path_scheme = 'local'
+
+    [storage.default]
+    default = '{tmp_path}'
+
+    [storage.fewgenomes]
+    default = '{tmp_path}'
+
+    [hail]
+    billing_project = 'fewgenomes'
+    delete_scratch_on_exit = false
+    backend = 'local'
+    dry_run = true
+
+    [images]
+    cpg_workflows = "stub"
+    """
+
     from cpg_utils.hail_batch import dataset_path
 
     from cpg_workflows.batch import get_batch
@@ -178,7 +178,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
     mocker.patch('metamist.apis.AnalysisApi.create_analysis', mock_create_analysis)
     mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
 
-    set_config(CONFIG, tmp_path / 'config.toml')
+    set_config(config, tmp_path / 'config.toml')
 
     workflow_stages: list[StageDecorator] = [MyQcStage1, MyQcStage2]
     run_workflow(stages=workflow_stages)
