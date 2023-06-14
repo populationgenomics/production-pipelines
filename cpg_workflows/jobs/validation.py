@@ -8,11 +8,7 @@ from csv import DictReader
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
-# TODO: This needs to be updated, but perhaps just adjust, see comment below.
-from sample_metadata.apis import AnalysisApi
-from sample_metadata.model.analysis_model import AnalysisModel
-from sample_metadata.model.analysis_status import AnalysisStatus
-from sample_metadata.model.analysis_type import AnalysisType
+from metamist import get_metamist, AnalysisStatus
 
 from cpg_workflows.workflow import SequencingGroup
 from cpg_utils import to_path, Path
@@ -229,18 +225,15 @@ def parse_and_post_results(
     with out_file.open('w', encoding='utf-8') as handle:
         json.dump(summary_data, handle)
 
-    # TODO: Can we change this, to use the metamist.py functions instead? vivbak 14/06/2023
-    # post results to metamist
-    AnalysisApi().create_new_analysis(
-        project=get_config()['workflow']['dataset'],
-        analysis_model=AnalysisModel(
-            sequencing_group_ids=[sequencing_group.id],
-            type=AnalysisType('qc'),
-            status=AnalysisStatus('completed'),
-            output=str(happy_csv.parent),
-            meta=summary_data,
-            active=True,
-        ),
+    # NOTE: This change is untested.
+
+    get_metamist().create_analysis(
+        dataset=get_config()['workflow']['dataset'],
+        status=AnalysisStatus('completed'),
+        sequencing_group_ids=[sequencing_group.id],
+        type='qc',
+        output=str(happy_csv.parent),
+        meta=summary_data,
     )
 
     return results_j
