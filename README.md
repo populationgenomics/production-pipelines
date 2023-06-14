@@ -36,7 +36,7 @@ As well as:
 * [Somalier](https://github.com/brentp/somalier) pedigree checks
 * [MultiQC](https://github.com/ewels/MultiQC) QC reporting.
 
-The workflow uses Metamist as a source of FASTQ, CRAMs, and sample/participant metadata, and TOML configs for extended configuration (dataset and sequence groups, Hail Batch parameters, Elasticsearch credentials, QC thresholds).
+The workflow uses Metamist as a source of FASTQ, CRAMs, and sample/participant metadata, and TOML configs for extended configuration (dataset and sequencing groups, Hail Batch parameters, Elasticsearch credentials, QC thresholds).
 
 ### Example usage
 
@@ -70,7 +70,7 @@ For more options available for seqr-loader configuration, check the seqr-loader 
 
 ### Seqr production load invocation
 
-`configs/seqr-main.toml` provides relevant configuration defaults for a CPG production seqr-loader run. Specifically, in contains the list of datasets to query from Metamist and joint-call together, and a list of blacklisted sequence groups in those datasets. Another handy configs, `configs/genome.toml` or `configs/exome.toml`, can be passed to subset sequence groups to WGS or WES specifically. To use along with `configs/seqr-main.toml`, of these two must be provided, as the seqr-loader can work on only one type of data at a time. 
+`configs/seqr-main.toml` provides relevant configuration defaults for a CPG production seqr-loader run. Specifically, in contains the list of datasets to query from Metamist and joint-call together, and a list of blacklisted sequencing groups in those datasets. Another handy configs, `configs/genome.toml` or `configs/exome.toml`, can be passed to subset sequencing groups to WGS or WES specifically. To use along with `configs/seqr-main.toml`, of these two must be provided, as the seqr-loader can work on only one type of data at a time. 
 
 For example, to load the genome data:
 
@@ -85,7 +85,7 @@ analysis-runner \
   seqr_loader
 ```
 
-### Stage selection example: only align Seqr sequence groups
+### Stage selection example: only align Seqr sequencing groups
 
 Seqr Loader can be used partially, controlled by `workflows/first_stages`, `workflows/last_stages`, and `workflows/only_stages` parameters.
 

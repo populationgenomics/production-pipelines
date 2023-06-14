@@ -95,7 +95,7 @@ def _populate_alignment_inputs(
 
     if assay_entry.get('meta', {}).get('reads'):
         alignment_input = Assay.parse_reads(
-            sequence_group_id=sequencing_group.id,
+            sequencing_group_id=sequencing_group.id,
             meta=assay_entry['meta'],
             check_existence=check_existence,
         )

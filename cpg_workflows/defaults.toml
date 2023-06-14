@@ -30,7 +30,7 @@
 # Force stage rerun
 #force_stages = []
 
-# Map of stages to lists of sequence groups, to skip for specific stages
+# Map of stages to lists of sequencing groups, to skip for specific stages
 #[workflow.skip_stages_for_sgs]
 #CramQC = ['CPG13409']
 

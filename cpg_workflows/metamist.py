@@ -541,7 +541,7 @@ class Assay:
         )
         if parse_reads:
             mm_seq.alignment_input = Assay.parse_reads(
-                sequence_group_id=sg_id,
+                sequencing_group_id=sg_id,
                 meta=data['meta'],
                 check_existence=check_existence,
             )
@@ -549,7 +549,7 @@ class Assay:
 
     @staticmethod
     def parse_reads(  # pylint: disable=too-many-return-statements
-        sequence_group_id: str,
+        sequencing_group_id: str,
         meta: dict,
         check_existence: bool,
     ) -> AlignmentInput:
@@ -563,35 +563,35 @@ class Assay:
         reference_assembly = meta.get('reference_assembly', {}).get('location')
 
         if not reads_data:
-            raise MetamistError(f'{sequence_group_id}: no "meta/reads" field in meta')
+            raise MetamistError(f'{sequencing_group_id}: no "meta/reads" field in meta')
         if not reads_type:
             raise MetamistError(
-                f'{sequence_group_id}: no "meta/reads_type" field in meta'
+                f'{sequencing_group_id}: no "meta/reads_type" field in meta'
             )
         supported_types = ('fastq', 'bam', 'cram')
         if reads_type not in supported_types:
             raise MetamistError(
-                f'{sequence_group_id}: ERROR: "reads_type" is expected to be one of '
+                f'{sequencing_group_id}: ERROR: "reads_type" is expected to be one of '
                 f'{supported_types}'
             )
 
         if reads_type in ('bam', 'cram'):
             if len(reads_data) > 1:
                 raise MetamistError(
-                    f'{sequence_group_id}: supporting only single bam/cram input'
+                    f'{sequencing_group_id}: supporting only single bam/cram input'
                 )
 
             location = reads_data[0]['location']
             if not (location.endswith('.cram') or location.endswith('.bam')):
                 raise MetamistError(
-                    f'{sequence_group_id}: ERROR: expected the file to have an extension '
+                    f'{sequencing_group_id}: ERROR: expected the file to have an extension '
                     f'.cram or .bam, got: {location}'
                 )
             if get_config()['workflow']['access_level'] == 'test':
                 location = location.replace('-main-upload/', '-test-upload/')
             if check_existence and not exists(location):
                 raise MetamistError(
-                    f'{sequence_group_id}: ERROR: index file does not exist: {location}'
+                    f'{sequencing_group_id}: ERROR: index file does not exist: {location}'
                 )
 
             # Index:
@@ -605,7 +605,7 @@ class Assay:
                     and not index_location.endswith('.bai')
                 ):
                     raise MetamistError(
-                        f'{sequence_group_id}: ERROR: expected the index file to have an extension '
+                        f'{sequencing_group_id}: ERROR: expected the index file to have an extension '
                         f'.crai or .bai, got: {index_location}'
                     )
                 if get_config()['workflow']['access_level'] == 'test':
@@ -614,7 +614,7 @@ class Assay:
                     )
                 if check_existence and not exists(index_location):
                     raise MetamistError(
-                        f'{sequence_group_id}: ERROR: index file does not exist: {index_location}'
+                        f'{sequencing_group_id}: ERROR: index file does not exist: {index_location}'
                     )
 
             if location.endswith('.cram'):
@@ -632,19 +632,19 @@ class Assay:
 
             if len(reads_data) != 2:
                 raise ValueError(
-                    f'Sequence data for sequence group {sequence_group_id} is incorrectly '
+                    f'Sequence data for sequencing group {sequencing_group_id} is incorrectly '
                     f'formatted. Expecting 2 entries per lane (R1 and R2 fastqs), '
                     f'but got {len(reads_data)}. '
                     f'Read data: {pprint.pformat(reads_data)}'
                 )
             if check_existence and not exists(reads_data[0]['location']):
                 raise MetamistError(
-                    f'{sequence_group_id}: ERROR: read 1 file does not exist: '
+                    f'{sequencing_group_id}: ERROR: read 1 file does not exist: '
                     f'{reads_data[0]["location"]}'
                 )
             if check_existence and not exists(reads_data[1]['location']):
                 raise MetamistError(
-                    f'{sequence_group_id}: ERROR: read 2 file does not exist: '
+                    f'{sequencing_group_id}: ERROR: read 2 file does not exist: '
                     f'{reads_data[1]["location"]}'
                 )
 
