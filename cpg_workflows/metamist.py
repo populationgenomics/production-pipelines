@@ -32,6 +32,54 @@ from cpg_workflows.filetypes import (
     FastqPairs,
 )
 
+GET_SEQUENCNG_GROUPS_QUERY = gql(
+    """
+        query MyQuery($metamist_proj: String!, $only_sgs: [String!]!, $skip_sgs: [String!]!, $sequencing_type: String!) {
+            project(name: $metamist_proj) {
+                sequencingGroups(id: { in_: $only_sgs, nin: $skip_sgs}, type:  {eq: $sequencing_type}) {
+                    id
+                    meta
+                    platform
+                    technology
+                    type
+                    sample {
+                        externalId
+                        participant {
+                            id
+                            externalId
+                            reportedSex
+                            meta
+                        }
+                    }
+                    assays {
+                        id
+                        meta
+                        type
+                    }
+                }
+            }
+        }
+        """
+)
+
+GET_ANALYSES_QUERY = gql(
+    """
+            query MyQuery($metamist_proj: String!, $analysis_type: String!, $analysis_status: AnalysisStatus!) {
+                project(name: $metamist_proj) {
+                    analyses (active: {eq: true}, type: {eq: $analysis_type}, status: {eq: $analysis_status}) {
+                        id
+                        type
+                        meta
+                        output
+                        status
+                        sequencingGroups {
+                            id
+                        }
+                    }
+                }
+            }
+        """
+)
 
 _metamist: Optional['Metamist'] = None
 
@@ -174,39 +222,9 @@ class Metamist:
         if only_sgs and skip_sgs:
             raise MetamistError('Cannot specify both only_sgs and skip_sgs in config')
 
-        get_sequencing_groups_query = gql(
-            """
-        query MyQuery($metamist_proj: String!, $only_sgs: [String!]!, $skip_sgs: [String!]!, $sequencing_type: String!) {
-            project(name: $metamist_proj) {
-                sequencingGroups(id: { in_: $only_sgs, nin: $skip_sgs}, type:  {eq: $sequencing_type}) {
-                    id
-                    meta
-                    platform
-                    technology
-                    type
-                    sample {
-                        externalId
-                        participant {
-                            id
-                            externalId
-                            reportedSex
-                            meta
-                        }
-                    }
-                    assays {
-                        id
-                        meta
-                        type
-                    }
-                }
-            }
-        }
-        """
-        )
-
         # validate(get_sequencing_groups_query, use_local_schema=True)
         sequencing_group_entries = query(
-            get_sequencing_groups_query,
+            GET_SEQUENCNG_GROUPS_QUERY,
             {
                 'metamist_proj': metamist_proj,
                 'only_sgs': only_sgs,
@@ -276,28 +294,9 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        get_analyses_query = gql(
-            """
-            query MyQuery($metamist_proj: String!, $analysis_type: String!, $analysis_status: AnalysisStatus!) {
-                project(name: $metamist_proj) {
-                    analyses (active: {eq: true}, type: {eq: $analysis_type}, status: {eq: $analysis_status}) {
-                        id
-                        type
-                        meta
-                        output
-                        status
-                        sequencingGroups {
-                            id
-                        }
-                    }
-                }
-            }
-        """
-        )
-
         # validate(get_analyses_query, use_local_schema=True)
         analyses = query(
-            get_analyses_query,
+            GET_ANALYSES_QUERY,
             {
                 'metamist_proj': metamist_proj,
                 'analysis_type': analysis_type.value,

@@ -4,6 +4,7 @@ Test reading inputs into a Cohort object.
 
 from pytest_mock import MockFixture
 import logging
+import re
 
 from . import set_config
 from cloudpathlib import CloudPath
@@ -630,9 +631,9 @@ def test_mixed_reads(mocker: MockFixture, tmp_path, caplog):
     # )
 
     assert test_none.alignment_input_by_seq_type == {}
-    assert (
-        'WARNING  root:inputs.py:103 No reads found for sequencing group CPG200 of type genome'
-        in caplog.text
+    assert re.search(
+        r'WARNING\s+root:inputs\.py:\d+\s+No reads found for sequencing group CPG200 of type genome',
+        caplog.text,
     )
 
 
