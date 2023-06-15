@@ -11,7 +11,7 @@ from hailtop.batch import Batch
 from metamist import get_metamist, AnalysisStatus
 
 from cpg_workflows.workflow import SequencingGroup
-from cpg_utils import to_path, Path
+from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import fasta_res_group, image_path, query_command
 
@@ -25,12 +25,13 @@ SUMMARY_KEYS = {
 
 def get_sample_truth_data(sequencing_group_id: str):
     """
+    retrieve the reference truth specific to this individual
 
     Args:
         sequencing_group_id (str):
 
     Returns:
-        The sample-specific truth data from config
+        The specific truth data from config
     """
 
     ref_data = get_config()['references'][sequencing_group_id]

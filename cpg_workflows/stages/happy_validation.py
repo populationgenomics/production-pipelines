@@ -107,6 +107,7 @@ class ValidationHappyOnVcf(SequencingGroupStage):
 
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
+            logging.info(f'Skipping {sequencing_group.id}; not in the reference set')
             return None
 
         # get the input vcf for this sequence group
@@ -154,7 +155,7 @@ class ValidationParseHappy(SequencingGroupStage):
         # only run this on validation sequencing groups
         if sequencing_group.dataset.name != 'validation':
             return None
-        
+
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
             logging.info(f'Skipping {sequencing_group.id}; not in the reference set')
@@ -171,7 +172,7 @@ class ValidationParseHappy(SequencingGroupStage):
         exp_outputs = self.expected_outputs(sequencing_group)
 
         py_job = get_batch().new_python_job(
-          f'parse_{sequencing_group.id}_happy_result', 
+          f'parse_{sequencing_group.id}_happy_result',
           (self.get_job_attrs(sequencing_group) or {}) | {'tool': 'hap.py'}
         )
         py_job.image(get_config()['workflow']['driver_image'])
@@ -186,4 +187,4 @@ class ValidationParseHappy(SequencingGroupStage):
         if dependencies := inputs.get_jobs(sequencing_group):
             py_job.depends_on(*dependencies)
 
-        return self.make_outputs(sequencing_group, data=exp_outputs, jobs=job)
+        return self.make_outputs(sequencing_group, data=exp_outputs, jobs=py_job)
