@@ -204,7 +204,7 @@ class Metamist:
         """
         )
 
-        validate(get_sequencing_groups_query, use_local_schema=True)
+        # validate(get_sequencing_groups_query, use_local_schema=True)
         sequencing_group_entries = query(
             get_sequencing_groups_query,
             {
@@ -295,7 +295,7 @@ class Metamist:
         """
         )
 
-        validate(get_analyses_query, use_local_schema=True)
+        # validate(get_analyses_query, use_local_schema=True)
         analyses = query(
             get_analyses_query,
             {
