@@ -172,8 +172,8 @@ class ValidationParseHappy(SequencingGroupStage):
         exp_outputs = self.expected_outputs(sequencing_group)
 
         py_job = get_batch().new_python_job(
-          f'parse_{sequencing_group.id}_happy_result',
-          (self.get_job_attrs(sequencing_group) or {}) | {'tool': 'hap.py'}
+            f'parse_{sequencing_group.id}_happy_result',
+            (self.get_job_attrs(sequencing_group) or {}) | {'tool': 'hap.py'},
         )
         py_job.image(get_config()['workflow']['driver_image'])
         py_job.call(
@@ -181,7 +181,7 @@ class ValidationParseHappy(SequencingGroupStage):
             vcf_path=str(input_vcf),
             sequencing_group_id=sequencing_group.external_id,
             happy_results=str(happy_results),
-            out_file=str(exp_outputs['json_summary'])
+            out_file=str(exp_outputs['json_summary']),
         )
         # set dependencies if applicable
         if dependencies := inputs.get_jobs(sequencing_group):
