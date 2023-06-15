@@ -63,7 +63,6 @@ def create_cohort() -> Cohort:
             msg += ' (after picking sequencing groups)'
         raise MetamistError(msg)
 
-    # NOTE: Are there cases where there isn't a sequencing_type?
     _populate_analysis(cohort)
     if get_config()['workflow'].get('read_pedigree', True):
         _populate_pedigree(cohort)

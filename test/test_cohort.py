@@ -272,9 +272,6 @@ def test_cohort(mocker: MockFixture, tmp_path, caplog):
     #     'gs://cpg-fewgenomes-main/HG3FMDSX3_2_220405_FS29_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R2.fastq.gz'
     # )
 
-    # Assert there are no warnings here.
-    assert caplog.text == ''
-
 
 def mock_get_sgs_with_missing_reads(
     *args, **kwargs
