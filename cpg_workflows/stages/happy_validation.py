@@ -4,7 +4,7 @@
 Content relating to the hap.py validation process
 """
 
-
+import logging
 from cpg_utils.config import get_config
 from cpg_workflows.workflow import (
     stage,
@@ -65,9 +65,9 @@ class ValidationMtToVcf(SequencingGroupStage):
 
         job = validation_mt_to_vcf_job(
             b=get_batch(),
-            mt_path=mt_path,
+            mt_path=str(mt_path),
             sequencing_group_id=sequencing_group.id,
-            out_vcf_path=exp_outputs['vcf'],
+            out_vcf_path=str(exp_outputs['vcf']),
             job_attrs=self.get_job_attrs(sequencing_group),
             depends_on=inputs.get_jobs(sequencing_group),
         )
@@ -107,6 +107,7 @@ class ValidationHappyOnVcf(SequencingGroupStage):
 
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
+            logging.info(f'Skipping {sequencing_group.id}; not in the reference set')
             return None
 
         # get the input vcf for this sequence group
@@ -126,7 +127,7 @@ class ValidationHappyOnVcf(SequencingGroupStage):
         job = run_happy_on_vcf(
             b=get_batch(),
             vcf_path=str(input_vcf),
-            sample_ext_id=sequencing_group.external_id,
+            sequencing_group_ext_id=sequencing_group.external_id,
             out_prefix=str(output_prefix),
             job_attrs=self.get_job_attrs(sequencing_group),
             depends_on=inputs.get_jobs(sequencing_group),
@@ -157,6 +158,7 @@ class ValidationParseHappy(SequencingGroupStage):
 
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
+            logging.info(f'Skipping {sequencing_group.id}; not in the reference set')
             return None
 
         # get the input vcf for this sequence group
@@ -168,14 +170,22 @@ class ValidationParseHappy(SequencingGroupStage):
         ]
 
         exp_outputs = self.expected_outputs(sequencing_group)
-        job = parse_and_post_results(
-            b=get_batch(),
-            vcf_path=str(input_vcf),
-            sequencing_group=sequencing_group,
-            happy_results=happy_results,
-            out_file=exp_outputs['json_summary'],
-            job_attrs=self.get_job_attrs(sequencing_group),
-            depends_on=inputs.get_jobs(sequencing_group),
-        )
 
-        return self.make_outputs(sequencing_group, data=exp_outputs, jobs=job)
+        py_job = get_batch().new_python_job(
+            f'parse_{sequencing_group.id}_happy_result',
+            (self.get_job_attrs(sequencing_group) or {}) | {'tool': 'hap.py'},
+        )
+        py_job.image(get_config()['workflow']['driver_image'])
+        py_job.call(
+            parse_and_post_results,
+            vcf_path=str(input_vcf),
+            sequencing_group_id=sequencing_group.id,
+            sequencing_group_ext_id=sequencing_group.external_id,
+            happy_results=str(happy_results),
+            out_file=str(exp_outputs['json_summary']),
+        )
+        # set dependencies if applicable
+        if dependencies := inputs.get_jobs(sequencing_group):
+            py_job.depends_on(*dependencies)
+
+        return self.make_outputs(sequencing_group, data=exp_outputs, jobs=py_job)
