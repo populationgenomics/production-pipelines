@@ -40,8 +40,8 @@ def main(command: str, config_paths: list[str]):
     status = MetamistStatusReporter()
 
     if command == 'analyses':
-        from sample_metadata.apis import AnalysisApi
-        from sample_metadata.models import AnalysisQueryModel, AnalysisStatus
+        from metamist.apis import AnalysisApi
+        from metamist.models import AnalysisQueryModel, AnalysisStatus
 
         analyses = AnalysisApi().query_analyses(
             AnalysisQueryModel(
@@ -51,42 +51,42 @@ def main(command: str, config_paths: list[str]):
         )
         existing_paths = set(a['output'] for a in analyses)
 
-        for i, sample in enumerate(cohort.get_samples()):
-            if path := sample.make_cram_path().path:
+        for i, sg in enumerate(cohort.get_sequencing_groups()):
+            if path := sg.make_cram_path().path:
                 if str(path) in existing_paths:
                     continue
 
                 if not path.exists():
                     continue
 
-                print(f'#{i+1} {sample} {path}')
+                print(f'#{i+1} {sg} {path}')
                 status.create_analysis(
                     str(path),
                     analysis_type='cram',
                     analysis_status='completed',
-                    target=sample,
-                    meta=sample.get_job_attrs()
+                    target=sg,
+                    meta=sg.get_job_attrs()
                     | dict(
                         size=path.stat().st_size,
                         sequencing_type=sequencing_type,
                     ),
-                    project_name=sample.dataset.name,
+                    project_name=sg.dataset.name,
                 )
-            if (path := sample.make_gvcf_path().path).exists():
-                print(f'#{i+1} {sample} {path}')
+            if (path := sg.make_gvcf_path().path).exists():
+                print(f'#{i+1} {sg} {path}')
                 if str(path) in existing_paths:
                     continue
                 status.create_analysis(
                     str(path),
                     analysis_type='gvcf',
                     analysis_status='completed',
-                    target=sample,
-                    meta=sample.get_job_attrs()
+                    target=sg,
+                    meta=sg.get_job_attrs()
                     | dict(
                         size=path.stat().st_size,
                         sequencing_type=sequencing_type,
                     ),
-                    project_name=sample.dataset.name,
+                    project_name=sg.dataset.name,
                 )
 
     if command == 'qc':
@@ -101,30 +101,30 @@ def main(command: str, config_paths: list[str]):
         with multiqc_json_path.open() as f:
             data = json.load(f)
 
-        metrics_by_sample: defaultdict[str, dict] = defaultdict()
-        for sample_d in data['report_general_stats_data']:
-            for sid, metrics_d in sample_d.items():
-                if sid not in metrics_by_sample:
-                    metrics_by_sample[sid] = metrics_d
-                metrics_by_sample[sid] |= metrics_d
+        metrics_by_sequencing_group: defaultdict[str, dict] = defaultdict()
+        for sequencing_group_d in data['report_general_stats_data']:
+            for sid, metrics_d in sequencing_group_d.items():
+                if sid not in metrics_by_sequencing_group:
+                    metrics_by_sequencing_group[sid] = metrics_d
+                metrics_by_sequencing_group[sid] |= metrics_d
 
-        for i, sample in enumerate(cohort.get_samples()):
-            print(f'#{i+1} {sample}')
-            if sample.rich_id not in metrics_by_sample:
-                print(f'{sample.rich_id} not found in MultiQC, skipping')
+        for i, sequencing_group in enumerate(cohort.get_sequencing_groups()):
+            print(f'#{i+1} {sequencing_group}')
+            if sequencing_group.rich_id not in metrics_by_sequencing_group:
+                print(f'{sequencing_group.rich_id} not found in MultiQC, skipping')
                 continue
-            metrics_d = metrics_by_sample[sample.rich_id]
+            metrics_d = metrics_by_sequencing_group[sequencing_group.rich_id]
             status.create_analysis(
                 str(multiqc_json_path),
                 analysis_type='qc',
                 analysis_status='completed',
-                target=sample,
-                meta=sample.get_job_attrs()
+                target=sequencing_group,
+                meta=sequencing_group.get_job_attrs()
                 | dict(
                     sequencing_type=sequencing_type,
                     metrics=metrics_d,
                 ),
-                project_name=sample.dataset.name,
+                project_name=sequencing_group.dataset.name,
             )
 
     if command == 'joint-calling':

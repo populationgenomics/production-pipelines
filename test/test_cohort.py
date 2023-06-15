@@ -7,6 +7,113 @@ from pytest_mock import MockFixture
 from . import set_config
 
 
+def mock_get_sgs(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argument
+    return [
+        {
+            'id': 'CPGLCL17',
+            'meta': {'sg_meta': 'is_fun'},
+            'platform': 'illumina',
+            'type': 'genome',
+            'sample': {
+                'externalId': 'NA12340',
+                'participant': {
+                    'id': 1,
+                    'externalId': '8',
+                    'reportedSex': 'Male',
+                    'meta': {'participant_meta': 'is_here'},
+                },
+            },
+            'assays': [
+                {
+                    'id': 1,
+                    'meta': {
+                        'platform': '30x Illumina PCR-Free',
+                        'concentration': '25',
+                        'fluid_x_tube_id': '220405_FS28',
+                        'reference_genome': 'Homo sapiens (b37d5)',
+                        'volume': '100',
+                        'reads_type': 'fastq',
+                        'batch': '1',
+                        'reads': [
+                            {
+                                'location': 'gs://cpg-fewgenomes-main/HG3FMDSX3_2_220405_FS28_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R1.fastq.gz',
+                                'basename': 'HG3FMDSX3_2_220405_FS28_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R1.fastq.gz',
+                                'class': 'File',
+                                'checksum': None,
+                                'size': 1070968,
+                                'datetime_added': None,
+                            },
+                            {
+                                'location': 'gs://cpg-fewgenomes-main/HG3FMDSX3_2_220405_FS28_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R2.fastq.gz',
+                                'basename': 'HG3FMDSX3_2_220405_FS28_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R2.fastq.gz',
+                                'class': 'File',
+                                'checksum': None,
+                                'size': 1123158,
+                                'datetime_added': None,
+                            },
+                        ],
+                        'sequencing_type': 'genome',
+                        'sequencing_technology': 'short-read',
+                        'sequencing_platform': 'illumina',
+                    },
+                    'type': 'sequencing',
+                }
+            ],
+        },
+        {
+            'id': 'CPGLCL25',
+            'meta': {'sample_meta': 'is_fun'},
+            'platform': 'illumina',
+            'type': 'genome',
+            'sample': {
+                'externalId': 'NA12489',
+                'participant': {
+                    'id': 2,
+                    'externalId': '14',
+                    'reportedSex': None,
+                    'meta': {'participant_metadata': 'number_fourteen'},
+                },
+            },
+            'assays': [
+                {
+                    'id': 2,
+                    'meta': {
+                        'platform': '30x Illumina PCR-Free',
+                        'concentration': '25',
+                        'fluid_x_tube_id': '220405_FS29',
+                        'reference_genome': 'Homo sapiens (b37d5)',
+                        'volume': '100',
+                        'reads_type': 'fastq',
+                        'batch': '1',
+                        'reads': [
+                            {
+                                'location': 'gs://cpg-fewgenomes-main/HG3FMDSX3_2_220405_FS29_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R1.fastq.gz',
+                                'basename': 'HG3FMDSX3_2_220405_FS29_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R1.fastq.gz',
+                                'class': 'File',
+                                'checksum': None,
+                                'size': 997128,
+                                'datetime_added': None,
+                            },
+                            {
+                                'location': 'gs://cpg-fewgenomes-main/HG3FMDSX3_2_220405_FS29_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R2.fastq.gz',
+                                'basename': 'HG3FMDSX3_2_220405_FS29_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R2.fastq.gz',
+                                'class': 'File',
+                                'checksum': None,
+                                'size': 1035385,
+                                'datetime_added': None,
+                            },
+                        ],
+                        'sequencing_type': 'genome',
+                        'sequencing_technology': 'short-read',
+                        'sequencing_platform': 'illumina',
+                    },
+                    'type': 'sequencing',
+                }
+            ],
+        },
+    ]
+
+
 def test_cohort(mocker: MockFixture, tmp_path):
     """
     Testing creating a Cohort object from metamist mocks.
@@ -44,214 +151,73 @@ def test_cohort(mocker: MockFixture, tmp_path):
 
     set_config(conf, tmp_path / 'config.toml')
 
-    def mock_get_samples(  # pylint: disable=unused-argument
-        *args, **kwargs
-    ) -> list[dict]:
-        return [
-            {'id': 'CPG00', 'external_id': 'SAMPLE0'},
-            {'id': 'CPG01', 'external_id': 'SAMPLE1'},
-            {'id': 'CPG02', 'external_id': 'SAMPLE2'},
-            {'id': 'CPG03', 'external_id': 'SAMPLE3'},
-            {'id': 'CPG04', 'external_id': 'SAMPLE4'},
-        ]
-
-    def get_sequences_by_sample_ids(  # pylint: disable=unused-argument
-        *args, **kwargs
-    ) -> dict:
-        return {
-            'CPG00': [
-                {
-                    'id': 0,
-                    'sample_id': 'CPG00',
-                    'type': 'genome',
-                    'status': 'completed',
-                    'meta': {'reads': [{'location': 'file.bam'}], 'reads_type': 'bam'},
-                },
-                {
-                    'id': 1,
-                    'sample_id': 'CPG00',
-                    'type': 'exome',
-                    'status': 'completed',
-                    'meta': {'reads': [{'location': 'file.bam'}], 'reads_type': 'bam'},
-                },
-            ],
-            'CPG01': [
-                {
-                    'id': 2,
-                    'sample_id': 'CPG01',
-                    'type': 'genome',
-                    'status': 'completed',
-                    'meta': {
-                        'reads': [
-                            [
-                                {'location': 'file.R1.fq.gz'},
-                                {'location': 'file.R2.fq.gz'},
-                            ]
-                        ],
-                        'reads_type': 'fastq',
-                    },
-                }
-            ],
-            'CPG02': [
-                {
-                    'id': 3,
-                    'sample_id': 'CPG02',
-                    'type': 'genome',
-                    'status': 'completed',
-                    'meta': {'reads': [{'location': 'file.bam'}], 'reads_type': 'bam'},
-                }
-            ],
-            'CPG03': [
-                {
-                    'id': 4,
-                    'sample_id': 'CPG03',
-                    'type': 'genome',
-                    'status': 'completed',
-                    'meta': {'reads': [{'location': 'file.bam'}], 'reads_type': 'bam'},
-                }
-            ],
-            'CPG04': [
-                {
-                    'id': 5,
-                    'sample_id': 'CPG04',
-                    'type': 'genome',
-                    'status': 'incomplete',
-                    'meta': {},
-                }
-            ],
-        }
-
-    def mock_get_external_participant_id_to_internal_sample_id(  # pylint: disable=unused-argument
-        *args, **kwargs
-    ) -> list[list]:
-        return [
-            ['PART0', 'CPG00'],
-            ['PART1', 'CPG01'],
-            ['PART2', 'CPG02'],
-            ['PART3', 'CPG03'],
-            ['PART4', 'CPG04'],
-        ]
-
-    def mock_get_participants(  # pylint: disable=unused-argument
-        *args, **kwargs
-    ) -> list[dict]:
-        return [
-            {
-                'external_id': 'PART0',
-                'reported_sex': 1,
-                'meta': {
-                    'Superpopulation name': 'Africa',
-                },
-            },
-            {
-                'external_id': 'PART1',
-                'reported_sex': 2,
-                'meta': {
-                    'Dummy': 'dummy',
-                },
-            },
-            {
-                'external_id': 'PART2',
-                'reported_sex': 0,
-            },
-            {
-                'external_id': 'PART3',
-            },
-            {
-                'external_id': 'PART4',
-            },
-        ]
-
     def mock_get_families(*args, **kwargs):  # pylint: disable=unused-argument
-        return [{'id': 1}, {'id': 2}]
+        return []
 
     def mock_get_pedigree(*args, **kwargs):  # pylint: disable=unused-argument
-        return [
-            {
-                'family_id': 1,
-                'individual_id': 'PART1',
-                'maternal_id': 'PART2',
-                'paternal_id': 0,
-                'affected': 2,
-                'sex': 2,
-            },
-            {
-                'family_id': 1,
-                'individual_id': 'PART2',
-                'maternal_id': 0,
-                'paternal_id': 0,
-                'affected': 1,
-                'sex': 2,
-            },
-            {
-                'family_id': 2,
-                'individual_id': 'PART3',
-                'maternal_id': 0,
-                'paternal_id': 0,
-                'affected': 0,
-                'sex': 0,
-            },
-        ]
-
-    def mock_query_analyses(*args, **kwargs):  # pylint: disable=unused-argument
         return []
 
     mocker.patch(
-        'sample_metadata.apis.SampleApi.get_samples',
-        mock_get_samples,
-    )
-    mocker.patch(
-        'sample_metadata.apis.SequenceApi.get_sequences_by_sample_ids',
-        get_sequences_by_sample_ids,
-    )
-    mocker.patch(
-        'sample_metadata.apis.ParticipantApi.get_external_participant_id_to_internal_sample_id',
-        mock_get_external_participant_id_to_internal_sample_id,
-    )
-    mocker.patch(
-        'sample_metadata.apis.ParticipantApi.get_participants',
-        mock_get_participants,
-    )
-    mocker.patch(
-        'sample_metadata.apis.FamilyApi.get_families',
+        'metamist.apis.FamilyApi.get_families',
         mock_get_families,
     )
     mocker.patch(
-        'sample_metadata.apis.FamilyApi.get_pedigree',
+        'metamist.apis.FamilyApi.get_pedigree',
         mock_get_pedigree,
     )
+
+    def mock_get_analysis_by_sgs(*args, **kwargs) -> dict:
+        return {}
+
+    mocker.patch('cpg_workflows.metamist.Metamist.get_sg_entries', mock_get_sgs)
     mocker.patch(
-        'sample_metadata.apis.AnalysisApi.query_analyses',
-        mock_query_analyses,
+        'cpg_workflows.metamist.Metamist.get_analyses_by_sid', mock_get_analysis_by_sgs
     )
 
-    from cpg_workflows.filetypes import BamPath
+    # from cpg_workflows.filetypes import BamPath
     from cpg_workflows.inputs import get_cohort
+
     from cpg_workflows.targets import Sex
 
     cohort = get_cohort()
-    # the 5th sample doesn't have associated seq/meta/reads
-    assert len(cohort.get_samples()) == 5
-    assert cohort.get_sample_ids() == ['CPG00', 'CPG01', 'CPG02', 'CPG03', 'CPG04']
-    assert cohort.get_samples()[0].id == 'CPG00'
-    assert isinstance(
-        cohort.get_samples()[0].alignment_input_by_seq_type['genome'], BamPath
+
+    assert cohort
+
+    # Testing Cohort Information
+    assert len(cohort.get_sequencing_groups()) == 2
+    assert cohort.get_sequencing_group_ids() == ['CPGLCL17', 'CPGLCL25']
+
+    for sg in cohort.get_sequencing_groups():
+        assert sg.dataset.name == 'fewgenomes'
+        assert not sg.forced
+        assert sg.cram is None
+        assert sg.gvcf is None
+
+    # Test SequenceGroup Population
+    test_sg = cohort.get_sequencing_groups()[0]
+    test_sg2 = cohort.get_sequencing_groups()[1]
+    assert test_sg.id == 'CPGLCL17'
+    assert test_sg.external_id == 'NA12340'
+    assert test_sg.participant_id == '8'
+    assert test_sg.meta == {'sg_meta': 'is_fun', 'participant_meta': 'is_here'}
+
+    # Test Assay Population
+    assert test_sg.assays['sequencing'].sequencing_group_id == 'CPGLCL17'
+    assert test_sg.assays['sequencing'].id == '1'
+    assert test_sg.assays['sequencing'].meta['fluid_x_tube_id'] == '220405_FS28'
+    assert (
+        test_sg.alignment_input_by_seq_type['genome']
+        == test_sg.assays['sequencing'].alignment_input
     )
-    assert isinstance(
-        cohort.get_samples()[0].alignment_input_by_seq_type['genome'], BamPath
-    )
-    assert cohort.get_samples()[0].meta['Superpopulation name'] == 'Africa'
-    assert cohort.get_samples()[0].pedigree.sex == Sex.MALE
-    assert cohort.get_samples()[0].pedigree.mom is None
-    assert cohort.get_samples()[0].pedigree.dad is None
-    assert cohort.get_samples()[1].pedigree.sex == Sex.FEMALE
-    assert cohort.get_samples()[1].pedigree.mom == cohort.get_samples()[2]
-    assert cohort.get_samples()[1].pedigree.dad is None
-    assert cohort.get_samples()[1].pedigree.phenotype == 2
-    assert cohort.get_samples()[2].pedigree.sex == Sex.FEMALE
-    assert cohort.get_samples()[2].pedigree.mom is None
-    assert cohort.get_samples()[2].pedigree.dad is None
-    assert cohort.get_samples()[3].pedigree.sex == Sex.UNKNOWN
-    assert cohort.get_samples()[3].pedigree.mom is None
-    assert cohort.get_samples()[3].pedigree.dad is None
-    assert cohort.get_samples()[4].seq_by_type['genome'].alignment_input is None
+
+    assert test_sg.participant_id == '8'
+    assert test_sg.pedigree.sex == Sex.MALE
+    assert test_sg2.pedigree.sex == Sex.UNKNOWN
+
+    # Test _sequencing_group_by_id attribute
+    assert cohort.get_datasets()[0]._sequencing_group_by_id.keys() == {
+        'CPGLCL17',
+        'CPGLCL25',
+    }
+    assert cohort.get_datasets()[0]._sequencing_group_by_id['CPGLCL17'].id == 'CPGLCL17'
+    assert cohort.get_datasets()[0]._sequencing_group_by_id['CPGLCL25'].id == 'CPGLCL25'

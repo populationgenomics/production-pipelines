@@ -8,10 +8,10 @@ from cpg_utils import Path
 from cpg_workflows.batch import get_batch
 from cpg_workflows.workflow import (
     stage,
-    SampleStage,
+    SequencingGroupStage,
     StageOutput,
     StageInput,
-    Sample,
+    SequencingGroup,
     Cohort,
     CohortStage,
 )
@@ -29,13 +29,13 @@ from cpg_utils.config import get_config
 
 
 @stage(analysis_type='sv', update_analysis_meta=_sv_individual_meta)
-class GatherSampleEvidence(SampleStage):
+class GatherSampleEvidence(SequencingGroupStage):
     """
     https://github.com/broadinstitute/gatk-sv#gathersampleevidence
     https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherSampleEvidence.wdl
     """
 
-    def expected_outputs(self, sample: Sample) -> dict[str, Path]:
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         """
         Expected to produce coverage counts, a VCF for each variant caller,
         and a txt for each type of SV evidence (SR, PE, SD).
@@ -49,41 +49,48 @@ class GatherSampleEvidence(SampleStage):
         no suitable codecs found".
         """
         d: dict[str, Path] = {
-            'coverage_counts': sample.make_sv_evidence_path
-            / f'{sample.id}.coverage_counts.tsv.gz',
+            'coverage_counts': sequencing_group.make_sv_evidence_path
+            / f'{sequencing_group.id}.coverage_counts.tsv.gz',
             # split reads
-            'pesr_split': sample.make_sv_evidence_path / f'{sample.id}.sr.txt.gz',
-            'pesr_split_index': sample.make_sv_evidence_path
-            / f'{sample.id}.sr.txt.gz.tbi',
+            'pesr_split': sequencing_group.make_sv_evidence_path
+            / f'{sequencing_group.id}.sr.txt.gz',
+            'pesr_split_index': sequencing_group.make_sv_evidence_path
+            / f'{sequencing_group.id}.sr.txt.gz.tbi',
             # site depth
-            'pesr_sd': sample.make_sv_evidence_path / f'{sample.id}.sd.txt.gz',
-            'pesr_sd_index': sample.make_sv_evidence_path
-            / f'{sample.id}.sd.txt.gz.tbi',
+            'pesr_sd': sequencing_group.make_sv_evidence_path
+            / f'{sequencing_group.id}.sd.txt.gz',
+            'pesr_sd_index': sequencing_group.make_sv_evidence_path
+            / f'{sequencing_group.id}.sd.txt.gz.tbi',
             # discordant paired reads
-            'pesr_disc': sample.make_sv_evidence_path / f'{sample.id}.pe.txt.gz',
-            'pesr_disc_index': sample.make_sv_evidence_path
-            / f'{sample.id}.pe.txt.gz.tbi',
+            'pesr_disc': sequencing_group.make_sv_evidence_path
+            / f'{sequencing_group.id}.pe.txt.gz',
+            'pesr_disc_index': sequencing_group.make_sv_evidence_path
+            / f'{sequencing_group.id}.pe.txt.gz.tbi',
         }
 
         # Caller's VCFs
         for caller in SV_CALLERS:
             d[f'{caller}_vcf'] = (
-                sample.make_sv_evidence_path / f'{sample.id}.{caller}.vcf.gz'
+                sequencing_group.make_sv_evidence_path
+                / f'{sequencing_group.id}.{caller}.vcf.gz'
             )
             d[f'{caller}_index'] = (
-                sample.make_sv_evidence_path / f'{sample.id}.{caller}.vcf.gz.tbi'
+                sequencing_group.make_sv_evidence_path
+                / f'{sequencing_group.id}.{caller}.vcf.gz.tbi'
             )
 
         return d
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+    def queue_jobs(
+        self, sequencing_group: SequencingGroup, inputs: StageInput
+    ) -> StageOutput:
         """Add jobs to batch"""
-        assert sample.cram, sample
+        assert sequencing_group.cram, sequencing_group
 
         input_dict: dict[str, Any] = {
-            'bam_or_cram_file': str(sample.cram),
-            'bam_or_cram_index': str(sample.cram) + '.crai',
-            'sample_id': sample.id,
+            'bam_or_cram_file': str(sequencing_group.cram),
+            'bam_or_cram_index': str(sequencing_group.cram) + '.crai',
+            'sample_id': sequencing_group.id,
             # This option forces CRAM localisation, otherwise it would be passed to
             # samtools as a URL (in CramToBam.wdl) and it would fail to read it as
             # GCS_OAUTH_TOKEN is not set.
@@ -118,17 +125,17 @@ class GatherSampleEvidence(SampleStage):
             ]
         )
 
-        expected_d = self.expected_outputs(sample)
+        expected_d = self.expected_outputs(sequencing_group)
 
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
-            dataset=sample.dataset,
+            dataset=sequencing_group.dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            sample_id=sample.id,
+            sequencing_group_id=sequencing_group.id,
         )
-        return self.make_outputs(sample, data=expected_d, jobs=jobs)
+        return self.make_outputs(sequencing_group, data=expected_d, jobs=jobs)
 
 
 @stage(required_stages=GatherSampleEvidence)
@@ -160,17 +167,17 @@ class EvidenceQC(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         d = inputs.as_dict_by_target(GatherSampleEvidence)
-        sids = cohort.get_sample_ids()
+        sgids = cohort.get_sequencing_group_ids()
 
         input_dict: dict[str, Any] = {
             'batch': cohort.name,
-            'samples': sids,
+            'samples': sgids,
             'run_vcf_qc': True,
-            'counts': [str(d[sid]['coverage_counts']) for sid in sids],
+            'counts': [str(d[sid]['coverage_counts']) for sid in sgids],
         }
         for caller in SV_CALLERS:
             input_dict[f'{caller}_vcfs'] = [
-                str(d[sid][f'{caller}_vcf']) for sid in sids
+                str(d[sid][f'{caller}_vcf']) for sid in sgids
             ]
 
         input_dict |= get_images(
@@ -198,7 +205,7 @@ class EvidenceQC(CohortStage):
 class CreateSampleBatches(CohortStage):
     """
     uses the values generated in EvidenceQC
-    splits the samples into batches based on median coverage,
+    splits the sequencing groups into batches based on median coverage,
     PCR +/- status, and Sex
     """
 
@@ -210,15 +217,17 @@ class CreateSampleBatches(CohortStage):
 
         # PCR +/- logic is only relevant to exomes
         if get_config()['workflow'].get('sequencing_type') != 'genome':
-            sample_types = {'exome': [sam.id for sam in cohort.get_samples()]}
-        # within exomes, divide into PCR- and all other samples
+            sequencing_group_types = {
+                'exome': [sg.id for sg in cohort.get_sequencing_groups()]
+            }
+        # within exomes, divide into PCR- and all other sequencing groups
         else:
-            sample_types = {'positive': [], 'negative': []}
-            for sample in cohort.get_samples():
-                if sample.meta.get('pcr_status', 'unknown') == 'negative':
-                    sample_types['negative'].append(sample.id)
+            sequencing_group_types = {'positive': [], 'negative': []}
+            for sequencing_group in cohort.get_sequencing_groups():
+                if sequencing_group.meta.get('pcr_status', 'unknown') == 'negative':
+                    sequencing_group_types['negative'].append(sequencing_group.id)
                 else:
-                    sample_types['positive'].append(sample.id)
+                    sequencing_group_types['positive'].append(sequencing_group.id)
 
         # get those settings
         min_batch_size = get_config()['workflow'].get('min_batch_size', 100)
@@ -226,20 +235,20 @@ class CreateSampleBatches(CohortStage):
 
         all_jobs = []
 
-        for status, samples in sample_types.items():
-            if not samples:
-                logging.info(f'No {status} samples found')
+        for status, sequencing_groups in sequencing_group_types.items():
+            if not sequencing_groups:
+                logging.info(f'No {status} sequencing groups found')
                 continue
-            elif len(samples) < min_batch_size:
-                logging.info(f'Too few {status} samples to form batches')
+            elif len(sequencing_groups) < min_batch_size:
+                logging.info(f'Too few {status} sequencing groups to form batches')
                 continue
-            logging.info(f'Creating {status} sample batches')
+            logging.info(f'Creating {status} sequencing group batches')
             py_job = get_batch().new_python_job(f'create_{status}_sample_batches')
             py_job.image(get_config()['workflow']['driver_image'])
             py_job.call(
                 sample_batching.partition_batches,
                 inputs.as_dict(cohort, EvidenceQC)['qc_table'],
-                samples,
+                sequencing_groups,
                 expected['batch_json'],
                 min_batch_size,
                 max_batch_size,

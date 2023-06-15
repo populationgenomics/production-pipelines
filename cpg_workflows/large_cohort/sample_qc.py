@@ -71,7 +71,7 @@ def initialise_sample_table() -> hl.Table:
             'superpopulation': s.meta.get('Superpopulation name'),
             'population': s.meta.get('Population name'),
         }
-        for s in get_cohort().get_samples()
+        for s in get_cohort().get_sequencing_groups()
         if s.gvcf
     ]
     if not entries:

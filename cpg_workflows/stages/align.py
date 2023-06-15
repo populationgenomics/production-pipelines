@@ -10,30 +10,32 @@ from cpg_workflows import get_batch
 from cpg_workflows.jobs import align
 from cpg_workflows.jobs.align import MissingAlignmentInputException
 from cpg_workflows.workflow import (
-    Sample,
+    SequencingGroup,
     stage,
     StageInput,
     StageOutput,
-    SampleStage,
+    SequencingGroupStage,
 )
 
 
 @stage(analysis_type='cram', analysis_keys=['cram'])
-class Align(SampleStage):
+class Align(SequencingGroupStage):
     """
     Align or re-align input data to produce a CRAM file
     """
 
-    def expected_outputs(self, sample: Sample) -> dict[str, Path]:
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         """
         Stage is expected to generate a CRAM file and a corresponding index.
         """
         return {
-            'cram': sample.make_cram_path().path,
-            'crai': sample.make_cram_path().index_path,
+            'cram': sequencing_group.make_cram_path().path,
+            'crai': sequencing_group.make_cram_path().index_path,
         }
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(
+        self, sequencing_group: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         """
         Using the "align" function implemented in the `jobs` module.
         Checks the `realign_from_cram_version` pipeline config argument, and
@@ -45,30 +47,36 @@ class Align(SampleStage):
         # the deduplication rate metric. However, we still want to save markduplicates
         # metrics just in case, as they are more detailed.
         markdup_metrics_path = (
-            sample.dataset.prefix()
+            sequencing_group.dataset.prefix()
             / 'qc'
             / 'markduplicates_metrics'
-            / f'{sample.id}.markduplicates-metrics'
+            / f'{sequencing_group.id}.markduplicates-metrics'
         )
 
         try:
             jobs = align.align(
                 b=get_batch(),
-                sample=sample,
-                output_path=sample.make_cram_path(),
-                job_attrs=self.get_job_attrs(sample),
-                overwrite=sample.forced,
+                sequencing_group=sequencing_group,
+                output_path=sequencing_group.make_cram_path(),
+                job_attrs=self.get_job_attrs(sequencing_group),
+                overwrite=sequencing_group.forced,
                 out_markdup_metrics_path=markdup_metrics_path,
             )
             return self.make_outputs(
-                sample, data=self.expected_outputs(sample), jobs=jobs
+                sequencing_group,
+                data=self.expected_outputs(sequencing_group),
+                jobs=jobs,
             )
         except MissingAlignmentInputException:
-            if get_config()['workflow'].get('skip_samples_with_missing_input'):
-                logging.error(f'No alignment inputs, skipping sample {sample}')
-                sample.active = False
-                return self.make_outputs(sample, skipped=True)  # return empty output
+            if get_config()['workflow'].get('skip_sgs_with_missing_input'):
+                logging.error(
+                    f'No alignment inputs, skipping sequencing group {sequencing_group}'
+                )
+                sequencing_group.active = False
+                return self.make_outputs(
+                    sequencing_group, skipped=True
+                )  # return empty output
             else:
                 return self.make_outputs(
-                    target=sample, error_msg=f'No alignment input found'
+                    target=sequencing_group, error_msg=f'No alignment input found'
                 )

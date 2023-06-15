@@ -89,10 +89,10 @@ def _update_analysis_status(
     assuming output_path as input parameter
     @param output_path: remote path of the output file, to be passed to the updaters
     """
-    from sample_metadata.apis import AnalysisApi
-    from sample_metadata.models import AnalysisUpdateModel
-    from sample_metadata import exceptions
-    from sample_metadata.model.analysis_status import AnalysisStatus as MmAnalysisStatus
+    from metamist.apis import AnalysisApi
+    from metamist.models import AnalysisUpdateModel
+    from metamist import exceptions
+    from metamist.models import AnalysisStatus as MmAnalysisStatus
     import traceback
 
     meta: dict[str, Any] = dict()
@@ -102,7 +102,7 @@ def _update_analysis_status(
 
     aapi = AnalysisApi()
     try:
-        aapi.update_analysis_status(
+        aapi.update_analysis(
             analysis_id=analysis_id,
             analysis_update_model=AnalysisUpdateModel(
                 status=MmAnalysisStatus(new_status.value),
@@ -191,7 +191,7 @@ class MetamistStatusReporter(StatusReporter):
             output=output,
             type_=analysis_type,
             status=analysis_status,
-            sample_ids=target.get_sample_ids(),
+            sequencing_group_ids=target.get_sequencing_group_ids(),
             meta=meta,
             dataset=project_name,
         )
@@ -213,7 +213,7 @@ class MetamistStatusReporter(StatusReporter):
         try:
             analysis_id_int = int(analysis_id)
         except ValueError:
-            raise MetamistError('Analysis ID for sample-metadata must be int')
+            raise MetamistError('Analysis ID must be int')
 
         job_name = f'Update status to {status.value}'
         if analysis_type:

@@ -19,13 +19,13 @@ from cpg_workflows.jobs.picard import (
 from cpg_workflows.jobs.samtools import samtools_stats
 from cpg_workflows.jobs.verifybamid import verifybamid
 from cpg_workflows.stages.align import Align
-from cpg_workflows.targets import Sample, Dataset
+from cpg_workflows.targets import SequencingGroup, Dataset
 from cpg_workflows.utils import exists
 from cpg_workflows.workflow import (
     stage,
     StageInput,
     StageOutput,
-    SampleStage,
+    SequencingGroupStage,
     DatasetStage,
     StageInputNotFoundError,
 )
@@ -113,47 +113,54 @@ def qc_functions() -> list[Qc]:
 
 
 @stage(required_stages=Align)
-class CramQC(SampleStage):
+class CramQC(SequencingGroupStage):
     """
     Calling tools that process CRAM for QC purposes.
     """
 
-    def expected_outputs(self, sample: Sample) -> dict[str, Path]:
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         outs = {}
         for qc in qc_functions():
             for key, out in qc.outs.items():
                 if key == 'somalier':
-                    outs[key] = sample.make_cram_path().somalier_path
+                    outs[key] = sequencing_group.make_cram_path().somalier_path
                 elif out:
                     outs[key] = (
-                        sample.dataset.prefix() / 'qc' / key / f'{sample.id}{out.suf}'
+                        sequencing_group.dataset.prefix()
+                        / 'qc'
+                        / key
+                        / f'{sequencing_group.id}{out.suf}'
                     )
         return outs
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
-        cram_path = inputs.as_path(sample, Align, 'cram')
-        crai_path = inputs.as_path(sample, Align, 'crai')
+    def queue_jobs(
+        self, sequencing_group: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
+        cram_path = inputs.as_path(sequencing_group, Align, 'cram')
+        crai_path = inputs.as_path(sequencing_group, Align, 'crai')
 
         jobs = []
-        # This should run if either the stage or the sample is being forced.
-        forced = self.forced or sample.forced
+        # This should run if either the stage or the sequencing group is being forced.
+        forced = self.forced or sequencing_group.forced
         for qc in qc_functions():
             out_path_kwargs = {
-                f'out_{key}_path': self.expected_outputs(sample)[key]
+                f'out_{key}_path': self.expected_outputs(sequencing_group)[key]
                 for key in qc.outs.keys()
             }
             if qc.func:
                 j = qc.func(  # type: ignore
                     get_batch(),
                     CramPath(cram_path, crai_path),
-                    job_attrs=self.get_job_attrs(sample),
+                    job_attrs=self.get_job_attrs(sequencing_group),
                     overwrite=forced,
                     **out_path_kwargs,
                 )
                 if j:
                     jobs.append(j)
 
-        return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
+        return self.make_outputs(
+            sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs
+        )
 
 
 @stage(required_stages=[CramQC])
@@ -189,20 +196,22 @@ class SomalierPedigree(DatasetStage):
         """
         verifybamid_by_sid = {}
         somalier_path_by_sid = {}
-        for sample in dataset.get_samples():
+        for sequencing_group in dataset.get_sequencing_groups():
             if get_config().get('somalier', {}).get('exclude_high_contamination'):
                 verify_bamid_path = inputs.as_path(
-                    stage=CramQC, target=sample, key='verify_bamid'
+                    stage=CramQC, target=sequencing_group, key='verify_bamid'
                 )
                 if not exists(verify_bamid_path):
                     logging.warning(
                         f'VerifyBAMID results {verify_bamid_path} do not exist for '
-                        f'{sample}, somalier pedigree estimations might be affected'
+                        f'{sequencing_group}, somalier pedigree estimations might be affected'
                     )
                 else:
-                    verifybamid_by_sid[sample.id] = verify_bamid_path
-            somalier_path = inputs.as_path(stage=CramQC, target=sample, key='somalier')
-            somalier_path_by_sid[sample.id] = somalier_path
+                    verifybamid_by_sid[sequencing_group.id] = verify_bamid_path
+            somalier_path = inputs.as_path(
+                stage=CramQC, target=sequencing_group, key='somalier'
+            )
+            somalier_path_by_sid[sequencing_group.id] = somalier_path
 
         html_path = self.expected_outputs(dataset)['html']
         if base_url := dataset.web_url():
@@ -210,7 +219,9 @@ class SomalierPedigree(DatasetStage):
         else:
             html_url = None
 
-        if any(s.pedigree.dad or s.pedigree.mom for s in dataset.get_samples()):
+        if any(
+            s.pedigree.dad or s.pedigree.mom for s in dataset.get_sequencing_groups()
+        ):
             expected_ped_path = dataset.write_ped_file(
                 self.expected_outputs(dataset)['expected_ped']
             )
@@ -302,22 +313,22 @@ class CramMultiQC(DatasetStage):
         ending_to_trim = set()  # endings to trim to get sample names
         modules_to_trim_endings = set()
 
-        for sample in dataset.get_samples():
+        for sequencing_group in dataset.get_sequencing_groups():
             for qc in qc_functions():
                 for key, out in qc.outs.items():
                     if not out:
                         continue
                     try:
-                        path = inputs.as_path(sample, CramQC, key)
+                        path = inputs.as_path(sequencing_group, CramQC, key)
                     except StageInputNotFoundError:  # allow missing inputs
                         logging.warning(
-                            f'Output CramQc/"{key}" not found for {sample}, '
+                            f'Output CramQc/"{key}" not found for {sequencing_group}, '
                             f'it will be silently excluded from MultiQC'
                         )
                         continue
                     modules_to_trim_endings.add(out.multiqc_key)
                     paths.append(path)
-                    ending_to_trim.add(path.name.replace(sample.id, ''))
+                    ending_to_trim.add(path.name.replace(sequencing_group.id, ''))
 
         if not paths:
             logging.warning('No CRAM QC found to aggregate with MultiQC')
@@ -335,7 +346,7 @@ class CramMultiQC(DatasetStage):
             out_html_url=html_url,
             out_checks_path=checks_path,
             job_attrs=self.get_job_attrs(dataset),
-            sample_id_map=dataset.rich_id_map(),
+            sequencing_group_id_map=dataset.rich_id_map(),
             label='CRAM',
             extra_config={'table_columns_visible': {'FastQC': False}},
         )

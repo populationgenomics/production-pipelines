@@ -70,29 +70,39 @@ class GatherBatchEvidence(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """Add jobs to Batch"""
-        samples = cohort.get_samples(only_active=True)
+        sequencing_groups = cohort.get_sequencing_groups(only_active=True)
 
         input_dict: dict[str, Any] = {
             'batch': cohort.name,
-            'samples': [sam.id for sam in samples],
+            'samples': [sg.id for sg in sequencing_groups],
             'ped_file': str(make_combined_ped(cohort, self.prefix)),
             'counts': [
                 str(
-                    sample.make_sv_evidence_path / f'{sample.id}.coverage_counts.tsv.gz'
+                    sequencing_group.make_sv_evidence_path
+                    / f'{sequencing_group.id}.coverage_counts.tsv.gz'
                 )
-                for sample in samples
+                for sequencing_group in sequencing_groups
             ],
             'SR_files': [
-                str(sample.make_sv_evidence_path / f'{sample.id}.sr.txt.gz')
-                for sample in samples
+                str(
+                    sequencing_group.make_sv_evidence_path
+                    / f'{sequencing_group.id}.sr.txt.gz'
+                )
+                for sequencing_group in sequencing_groups
             ],
             'PE_files': [
-                str(sample.make_sv_evidence_path / f'{sample.id}.pe.txt.gz')
-                for sample in samples
+                str(
+                    sequencing_group.make_sv_evidence_path
+                    / f'{sequencing_group.id}.pe.txt.gz'
+                )
+                for sequencing_group in sequencing_groups
             ],
             'SD_files': [
-                str(sample.make_sv_evidence_path / f'{sample.id}.sd.txt.gz')
-                for sample in samples
+                str(
+                    sequencing_group.make_sv_evidence_path
+                    / f'{sequencing_group.id}.sd.txt.gz'
+                )
+                for sequencing_group in sequencing_groups
             ],
             'ref_copy_number_autosomal_contigs': 2,
             'allosomal_contigs': ['chrX', 'chrY'],
@@ -105,8 +115,11 @@ class GatherBatchEvidence(CohortStage):
 
         for caller in SV_CALLERS:
             input_dict[f'{caller}_vcfs'] = [
-                str(sample.make_sv_evidence_path / f'{sample.id}.{caller}.vcf.gz')
-                for sample in samples
+                str(
+                    sequencing_group.make_sv_evidence_path
+                    / f'{sequencing_group.id}.{caller}.vcf.gz'
+                )
+                for sequencing_group in sequencing_groups
             ]
 
         input_dict |= get_references(

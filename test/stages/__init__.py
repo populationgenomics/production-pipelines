@@ -9,7 +9,7 @@ def _mock_cohort():
 
     c = Cohort()
     ds = c.create_dataset('my_dataset')
-    ds.add_sample('CPG01', external_id='SAMPLE1')
+    ds.add_sequencing_group('CPG01', external_id='SAMPLE1')
     return c
 
 
@@ -18,9 +18,9 @@ def run_workflow(mocker):
 
     from cpg_utils.hail_batch import dataset_path
 
-    from cpg_workflows.targets import Sample
+    from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
-        SampleStage,
+        SequencingGroupStage,
         StageInput,
         StageOutput,
         get_batch,
@@ -28,13 +28,19 @@ def run_workflow(mocker):
         stage,
     )
 
-    class TestStage(SampleStage):
-        def expected_outputs(self, sample: Sample) -> Path:
-            return to_path(dataset_path(f'{sample.id}_{self.name}.tsv'))
+    class TestStage(SequencingGroupStage):
+        def expected_outputs(self, sequencing_group: SequencingGroup) -> Path:
+            return to_path(dataset_path(f'{sequencing_group.id}_{self.name}.tsv'))
 
-        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
-            j = get_batch().new_job(self.name, attributes=self.get_job_attrs(sample))
-            return self.make_outputs(sample, self.expected_outputs(sample), j)
+        def queue_jobs(
+            self, sequencing_group: SequencingGroup, inputs: StageInput
+        ) -> StageOutput | None:
+            j = get_batch().new_job(
+                self.name, attributes=self.get_job_attrs(sequencing_group)
+            )
+            return self.make_outputs(
+                sequencing_group, self.expected_outputs(sequencing_group), j
+            )
 
     @stage
     class A(TestStage):

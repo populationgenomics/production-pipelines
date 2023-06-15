@@ -11,19 +11,19 @@ from hailtop.batch import ResourceGroup
 
 from cpg_utils.hail_batch import command
 from cpg_workflows.resources import STANDARD
-from cpg_workflows.targets import Sample
+from cpg_workflows.targets import SequencingGroup
 
 
 def happy(
     b,
-    sample: Sample,
+    sequencing_group: SequencingGroup,
     vcf_or_gvcf: ResourceGroup,
     is_gvcf: bool,
     job_attrs: dict,
     output_path: Path | None = None,
 ):
     """
-    Run hap.py validation/concordance stats on a sample GVCF or joint VCF.
+    Run hap.py validation/concordance stats on a sequencing group GVCF or joint VCF.
     """
     if 'validation' not in get_config():
         logging.warning(
@@ -32,7 +32,10 @@ def happy(
         return
 
     truth_sample_id = (
-        get_config().get('validation', {}).get('sample_map').get(sample.participant_id)
+        get_config()
+        .get('validation', {})
+        .get('sample_map')
+        .get(sequencing_group.participant_id)
     )
     if not truth_sample_id:
         return
@@ -46,7 +49,7 @@ def happy(
         prepy_params = '--convert-gvcf-to-vcf --filter-nonref'
         extract_sample_cmd = ''
     else:
-        input_file = f'$BATCH_TMPDIR/{sample.id}.vcf.gz'
+        input_file = f'$BATCH_TMPDIR/{sequencing_group.id}.vcf.gz'
         prepy_params = ''
         # For multi-sample joint-called VCF, we need to extract our target sample.
         # we also want to strip FORMAT/AD and potentially other problematic fields,
@@ -54,7 +57,7 @@ def happy(
         # https://github.com/Illumina/hap.py/blob/master/src/python/Tools/bcftools.py#L189
         # ...but not done for vcf.
         extract_sample_cmd = f"""
-        bcftools view -s {sample.id} \
+        bcftools view -s {sequencing_group.id} \
         {vcf_or_gvcf['vcf.gz']} -Ou | \
         bcftools annotate -x INFO,^FORMAT/GT,FORMAT/DP,FORMAT/GQ \
         -Oz -o {input_file}
