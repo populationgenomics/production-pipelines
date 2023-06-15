@@ -38,8 +38,6 @@ def create_cohort() -> Cohort:
         logging.info(f'Getting sequencing groups for dataset {dataset_name}')
         sequencing_group_entries = get_metamist().get_sg_entries(dataset_name)
         for entry in sequencing_group_entries:
-            # TODO: Add participant external ID here
-            # Add pedigree sex.
             metadata = entry.get('meta', {})
             update_dict(metadata, entry['sample']['participant'].get('meta', {}))
 
@@ -99,11 +97,12 @@ def _populate_alignment_inputs(
             meta=assay_entry['meta'],
             check_existence=check_existence,
         )
-
-    assay.alignment_input = alignment_input
-    sequencing_group.alignment_input_by_seq_type[entry['type']] = alignment_input
-
-    # TODO: Include some additional logging here about sequences without reads etc.
+        assay.alignment_input = alignment_input
+        sequencing_group.alignment_input_by_seq_type[entry['type']] = alignment_input
+    else:
+        logging.warning(
+            f'No reads found for sequencing group {sequencing_group.id} of type {entry["type"]}'
+        )
 
     return None
 
