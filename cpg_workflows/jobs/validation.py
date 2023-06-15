@@ -8,7 +8,7 @@ from csv import DictReader
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
-from metamist import get_metamist, AnalysisStatus
+from ..metamist import get_metamist, AnalysisStatus
 
 from cpg_workflows.workflow import SequencingGroup
 from cpg_utils import to_path, Path
@@ -231,7 +231,7 @@ def parse_and_post_results(
         dataset=get_config()['workflow']['dataset'],
         status=AnalysisStatus('completed'),
         sequencing_group_ids=[sequencing_group.id],
-        type='qc',
+        type_='qc',
         output=str(happy_csv.parent),
         meta=summary_data,
     )
