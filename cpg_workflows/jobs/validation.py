@@ -170,7 +170,8 @@ def run_happy_on_vcf(
 
 def parse_and_post_results(
     vcf_path: str,
-    sequencing_group: SequencingGroup,
+    sequencing_group_id: str,
+    sequencing_group_ext_id: str,
     happy_results: dict,
     out_file: str
 ):
@@ -180,14 +181,15 @@ def parse_and_post_results(
 
     Args:
         vcf_path (str): path to the single-sample VCF
-        sequencing_group (SequencingGroup):
+        sequencing_group_id (str): the SG ID
+        sequencing_group_ext_id (str): the SG external ID
         happy_results (dict): all results from the hap.py stage
         out_file (str): where to write the JSON file
 
     Returns:
         this job
     """
-    ref_data = get_sample_truth_data(sequencing_group_id=sequencing_group.external_id)
+    ref_data = get_sample_truth_data(sequencing_group_id=sequencing_group_ext_id)
     happy_csv = happy_results['happy_csv']
 
     # populate a dictionary of results for this sequencing group
@@ -219,7 +221,7 @@ def parse_and_post_results(
     get_metamist().create_analysis(
         dataset=get_config()['workflow']['dataset'],
         status=AnalysisStatus('completed'),
-        sequencing_group_ids=[sequencing_group.id],
+        sequencing_group_ids=[sequencing_group_id],
         type='qc',
         output=str(happy_csv.parent),
         meta=summary_data,
