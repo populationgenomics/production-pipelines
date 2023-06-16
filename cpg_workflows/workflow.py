@@ -1064,6 +1064,42 @@ class Workflow:
                 _stage.skipped = True
                 _stage.assume_outputs_exist = True
 
+    @staticmethod
+    def _process_only_stages(
+        stages: list[Stage], graph: nx.DiGraph, only_stages: list[str]
+    ):
+        if not only_stages:
+            return
+
+        stages_d = {s.name: s for s in stages}
+        stage_names = list(stg.name for stg in stages)
+        lower_names = {s.lower() for s in stage_names}
+
+        for s_name in only_stages:
+            if s_name.lower() not in lower_names:
+                raise WorkflowError(
+                    f'Value in workflow/only_stages "{s_name}" must be a stage '
+                    f'name or a subset of stages from the available list: '
+                    f'{", ".join(stage_names)}'
+                )
+
+        # We want to run stages appearing in only_stages, and check outputs of
+        # their immediately direct ancestors, but skip everything else.
+        required_stages: set[str] = set()
+        for os in only_stages:
+            rs = nx.descendants_at_distance(graph, os, 1)
+            required_stages |= set(rs)
+
+        for stage in stages:
+            # Skip stage not in only_stages, and assume output exist...
+            if stage.name not in only_stages:
+                stage.skipped = True
+                stage.assume_outputs_exist = True
+
+        # ...unless stage is a direct parent to any stage in only_stages
+        for stage in required_stages:
+            stages_d[stage].assume_outputs_exist = False
+
     def set_stages(
         self,
         requested_stages: list[StageDecorator],
@@ -1156,7 +1192,10 @@ class Workflow:
         stages = [_stages_d[name] for name in stage_names]
 
         # Round 5: applying workflow options first_stages and last_stages.
-        self._process_first_last_stages(stages, dag, first_stages, last_stages)
+        if first_stages or last_stages:
+            self._process_first_last_stages(stages, dag, first_stages, last_stages)
+        elif only_stages:
+            self._process_only_stages(stages, dag, only_stages)
 
         if not (final_set_of_stages := [s.name for s in stages if not s.skipped]):
             raise WorkflowError('No stages to run')
