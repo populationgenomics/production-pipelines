@@ -28,7 +28,13 @@ from cpg_utils import Path
 from .batch import get_batch
 from .status import MetamistStatusReporter
 from .targets import Target, Dataset, Sample, Cohort
-from .utils import exists, missing_from_pre_collected, timestamp, slugify, ExpectedResultT
+from .utils import (
+    exists,
+    missing_from_pre_collected,
+    timestamp,
+    slugify,
+    ExpectedResultT,
+)
 from .inputs import get_cohort
 
 
@@ -1072,6 +1078,14 @@ class Workflow:
         first_stages = get_config()['workflow'].get('first_stages', [])
         last_stages = get_config()['workflow'].get('last_stages', [])
 
+        # Only allow one of only_stages or first_stages/last_stages as they seem
+        # to be mutually exclusive.
+        if only_stages and (first_stages or last_stages or skip_stages):
+            raise WorkflowError(
+                "Workflow config parameter 'only_stages' is incompatible with "
+                + "'first_stages', 'last_stages' and/or 'skip_stages'"
+            )
+
         logging.info(
             f'End stages for the workflow "{self.name}": '
             f'{[cls.__name__ for cls in requested_stages]}'
@@ -1098,9 +1112,9 @@ class Workflow:
                 if stg.name in skip_stages:
                     stg.skipped = True
                     continue  # not searching deeper
+
                 if only_stages and stg.name not in only_stages:
                     stg.skipped = True
-                    # todo assume output exists for skipped stages?
 
                 # Iterate dependencies:
                 for reqcls in stg.required_stages_classes:
