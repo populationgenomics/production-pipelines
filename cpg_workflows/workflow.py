@@ -1097,8 +1097,8 @@ class Workflow:
                 stage.assume_outputs_exist = True
 
         # ...unless stage is a direct parent to any stage in only_stages
-        for stage in required_stages:
-            stages_d[stage].assume_outputs_exist = False
+        for stage_name in required_stages:
+            stages_d[stage_name].assume_outputs_exist = False
 
     def set_stages(
         self,

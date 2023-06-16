@@ -1,7 +1,7 @@
 """
 Test building stages DAG.
 """
-from typing import Callable
+from typing import Callable, Type
 
 from cpg_utils import Path, to_path
 from cpg_utils.hail_batch import dataset_path
@@ -75,9 +75,9 @@ class C2(TestStage):
 def run_workflow(
     mocker,
     cohort_mocker: Callable[..., Cohort] = mock_cohort,
-    stages: list[TestStage] | None = None,
+    stages: list[Type[TestStage]] | None = None,
 ):
     mocker.patch('cpg_workflows.inputs.create_cohort', cohort_mocker)
 
     stages = stages or [C, C2]
-    _run_workflow(stages)
+    _run_workflow(stages)  # type: ignore
