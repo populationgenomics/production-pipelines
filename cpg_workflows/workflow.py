@@ -1188,21 +1188,26 @@ class Workflow:
         except nx.NetworkXUnfeasible:
             logging.error('Circular dependencies found between stages')
             raise
+
         logging.info(f'Stages in order of execution:\n{stage_names}')
         stages = [_stages_d[name] for name in stage_names]
 
         # Round 5: applying workflow options first_stages and last_stages.
         if first_stages or last_stages:
+            logging.info('Applying workflow/first_stages and workflow/last_stages')
             self._process_first_last_stages(stages, dag, first_stages, last_stages)
         elif only_stages:
+            logging.info('Applying workflow/only_stages')
             self._process_only_stages(stages, dag, only_stages)
 
         if not (final_set_of_stages := [s.name for s in stages if not s.skipped]):
             raise WorkflowError('No stages to run')
+
         logging.info(
-            f'Final list of stages after applying workflow/first_stages and '
-            f'workflow/last_stages stages:\n{final_set_of_stages}'
+            f'Final list of stages after applying stage configuration options:\n'
+            f'{final_set_of_stages}'
         )
+
         required_skipped_stages = [s for s in stages if s.skipped]
         if required_skipped_stages:
             logging.info(
