@@ -1083,20 +1083,20 @@ class Workflow:
                     f'{", ".join(stage_names)}'
                 )
 
-        # We want to run stages appearing in only_stages, and check outputs of
-        # their immediately direct ancestors, but skip everything else.
+        # We want to run stages only appearing in only_stages, and check outputs of
+        # imediate predecessor stages, but skip everything else.
         required_stages: set[str] = set()
         for os in only_stages:
             rs = nx.descendants_at_distance(graph, os, 1)
             required_stages |= set(rs)
 
         for stage in stages:
-            # Skip stage not in only_stages, and assume output exist...
+            # Skip stage not in only_stages, and assume outputs exist...
             if stage.name not in only_stages:
                 stage.skipped = True
                 stage.assume_outputs_exist = True
 
-        # ...unless stage is a direct parent to any stage in only_stages
+        # ...unless stage is directly required by any stage in only_stages
         for stage_name in required_stages:
             stages_d[stage_name].assume_outputs_exist = False
 
