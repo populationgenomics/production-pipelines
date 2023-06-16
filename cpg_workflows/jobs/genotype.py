@@ -189,6 +189,15 @@ def _haplotype_caller_one(
     # of a Hail worker (2 cores), plus with the `highmem` instance that would
     # give enough memory: 13G. That's not going to give enough disk storage, so we
     # are explicitly requesting more storage.
+    #
+    # Based on an audit of RD crams on 19/05/23, 99% of crams are <34Gb. Will set the
+    # default to 40Gb for genomes then use a run specific confg to run the rare
+    # sequencing group that will fail from this limit.
+    if get_config()['workflow']['sequencing_type'] == 'genome':
+        storage_gb = get_config()['workflow'].get('haplotypecaller_storage_gb', 40)
+    else:
+        storage_gb = None  # avoid extra disk for exomes
+
     storage_gb = None  # avoid extra disk by default
     if get_config()['workflow']['sequencing_type'] == 'genome':
         storage_gb = 100
@@ -262,8 +271,8 @@ def merge_gvcfs_job(
 
     j.image(image_path('picard'))
     j.cpu(2)
-    java_mem = 7
-    j.memory('standard')  # ~ 4G/core ~ 7.5G
+    java_mem = 11
+    j.memory('highmem')  # ~ 6G/core ~ 12G
     j.storage(f'{len(gvcf_groups) * 1.5 + 2}G')
     j.declare_resource_group(
         output_gvcf={
@@ -286,7 +295,7 @@ def merge_gvcfs_job(
     picard -Xms{java_mem}g \
     MergeVcfs {input_cmd} OUTPUT={j.output_gvcf['g.vcf.gz']}
     """
-    j.command(command(cmd, monitor_space=True))
+    j.command(command(cmd))
     if out_gvcf_path:
         b.write_output(j.output_gvcf, str(out_gvcf_path).replace('.g.vcf.gz', ''))
     return j

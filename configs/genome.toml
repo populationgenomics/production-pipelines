@@ -1,2 +1,3 @@
 [workflow]
 sequencing_type = 'genome'
+haplotypecaller_storage_gb = 40
