@@ -34,7 +34,6 @@ backend = 'local'
 """
 
 config_paths = [
-    'configs/dev.toml',
     'configs/genome.toml',
 ]
 
