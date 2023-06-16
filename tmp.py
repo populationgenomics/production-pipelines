@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from cpg_workflows.metamist import get_metamist
 from cpg_utils.config import set_config_paths
 import os
