@@ -192,7 +192,7 @@ def _haplotype_caller_one(
     #
     # Based on an audit of RD crams on 19/05/23, 99% of crams are <34Gb. Will set the
     # default to 40Gb for genomes then use a run specific confg to run the rare
-    # sample that will fail from this limit.
+    # sequencing group that will fail from this limit.
     if get_config()['workflow']['sequencing_type'] == 'genome':
         storage_gb = get_config()['workflow'].get('haplotypecaller_storage_gb', 40)
     else:
