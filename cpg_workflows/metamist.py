@@ -379,7 +379,7 @@ class Metamist:
             meta=meta or {},
         )
         try:
-            aid = self.aapi.create_analysis(project=metamist_proj, analysis_model=am)
+            aid = self.aapi.create_analysis(project=metamist_proj, analysis=am)
         except ApiException:
             traceback.print_exc()
             return None
