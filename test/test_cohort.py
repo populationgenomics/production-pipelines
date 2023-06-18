@@ -157,22 +157,14 @@ def mock_get_analysis_by_sgs(*args, **kwargs) -> dict:
     return {}
 
 
-def mock_get_families(*args, **kwargs):  # pylint: disable=unused-argument
-    return [
-        {
-            'id': 1,
-            'external_id': 'FAM1',
-            'project': 1,
-            'description': None,
-            'coded_phenotype': None,
-        }
-    ]
+def mock_get_family_ids(*args, **kwargs):  # pylint: disable=unused-argument
+    return [123, 124]
 
 
 def mock_get_pedigree(*args, **kwargs):  # pylint: disable=unused-argument
     return [
         {
-            'family_id': 'FAM1',
+            'family_id': 123,
             'individual_id': '8',
             'paternal_id': None,
             'maternal_id': None,
@@ -180,7 +172,7 @@ def mock_get_pedigree(*args, **kwargs):  # pylint: disable=unused-argument
             'affected': 1,
         },
         {
-            'family_id': 'FAM1',
+            'family_id': 124,
             'individual_id': '14',
             'paternal_id': None,
             'maternal_id': None,
@@ -196,14 +188,18 @@ def test_cohort(mocker: MockFixture, tmp_path, caplog):
     """
     set_config(_cohort_config(tmp_path), tmp_path / 'config.toml')
 
-    mocker.patch(
-        'metamist.apis.FamilyApi.get_families',
-        mock_get_families,
-    )
-    mocker.patch(
-        'metamist.apis.FamilyApi.get_pedigree',
-        mock_get_pedigree,
-    )
+    # mocker.patch(
+    #     'metamist.apis.FamilyApi.get_families',
+    #     mock_get_families,
+    # )
+
+    mocker.patch('cpg_workflows.metamist.Metamist.get_family_ids', mock_get_family_ids)
+
+    # mocker.patch(
+    #     'metamist.apis.FamilyApi.get_pedigree',
+    #     mock_get_pedigree,
+    # )
+    mocker.patch('cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree)
 
     mocker.patch('cpg_workflows.metamist.Metamist.get_sg_entries', mock_get_sgs)
     mocker.patch(
@@ -371,14 +367,19 @@ def test_missing_reads(mocker: MockFixture, tmp_path):
     """
     set_config(_cohort_config(tmp_path), tmp_path / 'config.toml')
 
-    mocker.patch(
-        'metamist.apis.FamilyApi.get_families',
-        mock_get_families,
-    )
-    mocker.patch(
-        'metamist.apis.FamilyApi.get_pedigree',
-        mock_get_pedigree,
-    )
+    # mocker.patch(
+    #     'metamist.apis.FamilyApi.get_families',
+    #     mock_get_families,
+    # )
+
+    mocker.patch('cpg_workflows.metamist.Metamist.get_family_ids', mock_get_family_ids)
+
+    # mocker.patch(
+    #     'metamist.apis.FamilyApi.get_pedigree',
+    #     mock_get_pedigree,
+    # )
+
+    mocker.patch('cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree)
 
     mocker.patch(
         'cpg_workflows.metamist.Metamist.get_sg_entries',
@@ -593,14 +594,19 @@ def test_mixed_reads(mocker: MockFixture, tmp_path, caplog):
     caplog.set_level(logging.WARNING)
     set_config(_cohort_config(tmp_path), tmp_path / 'config.toml')
 
-    mocker.patch(
-        'metamist.apis.FamilyApi.get_families',
-        mock_get_families,
-    )
-    mocker.patch(
-        'metamist.apis.FamilyApi.get_pedigree',
-        mock_get_pedigree,
-    )
+    # mocker.patch(
+    #     'metamist.apis.FamilyApi.get_families',
+    #     mock_get_families,
+    # )
+
+    mocker.patch('cpg_workflows.metamist.Metamist.get_family_ids', mock_get_family_ids)
+
+    # mocker.patch(
+    #     'metamist.apis.FamilyApi.get_pedigree',
+    #     mock_get_pedigree,
+    # )
+
+    mocker.patch('cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree)
 
     mocker.patch(
         'cpg_workflows.metamist.Metamist.get_sg_entries',
@@ -738,13 +744,21 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
     caplog.set_level(logging.WARNING)
     set_config(_cohort_config(tmp_path), tmp_path / 'config.toml')
 
+    # mocker.patch(
+    #     'metamist.apis.FamilyApi.get_families',
+    #     mock_get_families_empty,
+    # )
+
     mocker.patch(
-        'metamist.apis.FamilyApi.get_families',
-        mock_get_families_empty,
+        'cpg_workflows.metamist.Metamist.get_family_ids', mock_get_families_empty
     )
+    # mocker.patch(
+    #     'metamist.apis.FamilyApi.get_pedigree',
+    #     mock_get_pedigree_empty,
+    # )
+
     mocker.patch(
-        'metamist.apis.FamilyApi.get_pedigree',
-        mock_get_pedigree_empty,
+        'cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree_empty
     )
 
     mocker.patch(

@@ -81,6 +81,28 @@ GET_ANALYSES_QUERY = gql(
         """
 )
 
+GET_PEDIGREE_QUERY = gql(
+    """
+        query MyQuery($metamist_proj: String!){
+            project(name: $metamist_proj) {
+                pedigree(replaceWithFamilyExternalIds: false)
+            }
+        }
+    """
+)
+
+GET_FAMILY_IDS_QUERY = gql(
+    """
+        query MyQuery($metamist_proj: String!){
+            project(name: $metamist_proj) {
+                families {
+                    id
+                }
+            }
+        }
+    """
+)
+
 _metamist: Optional['Metamist'] = None
 
 
@@ -463,6 +485,22 @@ class Metamist:
             )
             return None
 
+    def get_family_ids(self, dataset: str | None = None) -> list[int]:
+        metamist_proj = dataset or self.default_dataset
+        if get_config()['workflow']['access_level'] == 'test':
+            metamist_proj += '-test'
+
+        family_entries = query(
+            GET_FAMILY_IDS_QUERY,
+            {
+                'metamist_proj': metamist_proj,
+            },
+        )
+
+        family_ids = family_entries['project']['families']
+
+        return [family['id'] for family in family_ids]
+
     def get_ped_entries(self, dataset: str | None = None) -> list[dict[str, str]]:
         """
         Retrieve PED lines for a specified SM project, with external participant IDs.
@@ -471,34 +509,46 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        entries = self.fapi.get_families(metamist_proj)
-        family_ids = [entry['id'] for entry in entries]
+        # entries = self.fapi.get_families(metamist_proj)
+        # family_ids = [entry['id'] for entry in entries]
 
-        # Since `fapi.get_pedigree` is a GET endpoint, it is limited by the length of
-        # the request string. It would stall with the number of families above ~600.
-        # To mitigate this, we split the input into chunks. 500 families should be
-        # a safe number of families in one chunk.
-        def _chunks(seq, size):
-            return (seq[pos : pos + size] for pos in range(0, len(seq), size))
+        family_ids = self.get_family_ids(dataset=dataset)
 
-        ped_entries = []
-        chunk_size = 500
-        for i, fam_ids_chunk in enumerate(_chunks(family_ids, chunk_size)):
-            logging.info(
-                f'Running fapi.get_pedigree on families #{i * chunk_size + 1}..'
-                f'{i * chunk_size + 1 + len(fam_ids_chunk) - 1} '
-                f'(out of {len(family_ids)})'
-            )
-            ped_entries.extend(
-                self.fapi.get_pedigree(
-                    internal_family_ids=fam_ids_chunk,
-                    export_type='json',
-                    project=metamist_proj,
-                    replace_with_participant_external_ids=True,
-                )
-            )
+        entries = query(GET_PEDIGREE_QUERY, {'metamist_proj': metamist_proj})
 
-        return ped_entries
+        pedgiree_entries = entries['project']['pedigree']
+
+        filtered_peds = [
+            ped for ped in pedgiree_entries if ped['family_id'] in family_ids
+        ]
+
+        return filtered_peds
+
+        # # Since `fapi.get_pedigree` is a GET endpoint, it is limited by the length of
+        # # the request string. It would stall with the number of families above ~600.
+        # # To mitigate this, we split the input into chunks. 500 families should be
+        # # a safe number of families in one chunk.
+        # def _chunks(seq, size):
+        #     return (seq[pos : pos + size] for pos in range(0, len(seq), size))
+
+        # ped_entries = []
+        # chunk_size = 500
+        # for i, fam_ids_chunk in enumerate(_chunks(family_ids, chunk_size)):
+        #     logging.info(
+        #         f'Running fapi.get_pedigree on families #{i * chunk_size + 1}..'
+        #         f'{i * chunk_size + 1 + len(fam_ids_chunk) - 1} '
+        #         f'(out of {len(family_ids)})'
+        #     )
+        #     ped_entries.extend(
+        #         self.fapi.get_pedigree(
+        #             internal_family_ids=fam_ids_chunk,
+        #             export_type='json',
+        #             project=metamist_proj,
+        #             replace_with_participant_external_ids=True,
+        #         )
+        #     )
+
+        # return ped_entries
 
 
 @dataclass
