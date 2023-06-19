@@ -134,7 +134,7 @@ def markdup(
     resource.attach_disk_storage_gb = 250
 
     # check for a memory override for impossible samples
-    if (memory_override := get_config()['workflow'].get('exceptional_markdup_mem_gb')) is not None:
+    if (memory_override := get_config()['resource_overrides'].get('picard')) is not None:
         assert isinstance(memory_override, int)
         # Hail will select the right number of CPUs based on RAM request
         j.memory(f'{memory_override}G')
