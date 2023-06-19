@@ -1,4 +1,4 @@
-FROM australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:latest
+FROM australia-southeast1-docker.pkg.dev/cpg-common/images/driver-metamist-dev:latest
 
 COPY README.md .
 COPY setup.py .
