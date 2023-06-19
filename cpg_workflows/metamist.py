@@ -83,7 +83,7 @@ GET_ANALYSES_QUERY = gql(
 
 GET_PEDIGREE_QUERY = gql(
     """
-        query PedgireeQuery($metamist_proj: String!){
+        query PedigreeQuery($metamist_proj: String!){
             project(name: $metamist_proj) {
                 pedigree(replaceWithFamilyExternalIds: false)
             }

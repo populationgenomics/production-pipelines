@@ -52,8 +52,6 @@ def create_cohort() -> Cohort:
                 sequencing_group.pedigree.sex = Sex.parse(reported_sex)
 
             _populate_alignment_inputs(sequencing_group, entry)
-            # TODO: Add checks here,logging sgs without sequences
-            # Check there is only one sequencing group per type.
 
     if not cohort.get_datasets():
         msg = 'No datasets populated'
