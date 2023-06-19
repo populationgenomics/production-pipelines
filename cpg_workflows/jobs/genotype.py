@@ -267,8 +267,8 @@ def merge_gvcfs_job(
     j.storage(f'{len(gvcf_groups) * 1.5 + 2}G')
     j.declare_resource_group(
         output_gvcf={
-            'g.vcf.gz': '{root}-' + sequencing_group_name + '.g.vcf.gz',
-            'g.vcf.gz.tbi': '{root}-' + sequencing_group_name + '.g.vcf.gz.tbi',
+            'g.vcf.gz': '{{root}}-{sequencing_group_name}.g.vcf.gz',
+            'g.vcf.gz.tbi': '{{root}}-{sequencing_group_name}.g.vcf.gz.tbi',
         }
     )
 
