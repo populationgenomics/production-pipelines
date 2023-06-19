@@ -34,7 +34,7 @@ def happy(
     truth_sample_id = (
         get_config()
         .get('validation', {})
-        .get('sample_map')
+        .get('sample_map', {})
         .get(sequencing_group.participant_id)
     )
     if not truth_sample_id:
