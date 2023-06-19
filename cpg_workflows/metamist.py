@@ -244,11 +244,6 @@ class Metamist:
         if only_sgs and skip_sgs:
             raise MetamistError('Cannot specify both only_sgs and skip_sgs in config')
 
-        print(
-            f'Running query {GET_SEQUENCNG_GROUPS_QUERY} with variables:{metamist_proj}, {only_sgs}, {skip_sgs}, {sequencing_type}'
-        )
-
-        # validate(get_sequencing_groups_query, use_local_schema=True)
         sequencing_group_entries = query(
             GET_SEQUENCNG_GROUPS_QUERY,
             {
@@ -258,7 +253,7 @@ class Metamist:
                 'sequencing_type': sequencing_type,
             },
         )
-        print(f'Returning {sequencing_group_entries}')
+
         sequencing_groups = sequencing_group_entries['project']['sequencingGroups']
         return sequencing_groups
 
@@ -321,7 +316,6 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        # validate(get_analyses_query, use_local_schema=True)
         analyses = query(
             GET_ANALYSES_QUERY,
             {
