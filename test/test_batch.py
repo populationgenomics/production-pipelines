@@ -66,8 +66,8 @@ def test_batch_job(tmp_path):
         assert fh.read().strip() == text
 
 
-def mock_create_analysis(_, project, analysis_model) -> int:
-    print(f'Analysis model in project {project}: {analysis_model}')
+def mock_create_analysis(_, project, analysis) -> int:
+    print(f'Analysis model in project {project}: {analysis}')
     return 1  # metamist "analysis" entry ID
 
 

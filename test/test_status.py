@@ -58,8 +58,8 @@ def _common(mocker, tmp_path):
         ],
     )
 
-    def mock_create_analysis(_, project, analysis_model) -> int:
-        print(f'Analysis model in project {project}: {analysis_model}')
+    def mock_create_analysis(_, project, analysis) -> int:
+        print(f'Analysis model in project {project}: {analysis}')
         return 1  # metamist "analysis" entry ID
 
     mocker.patch('metamist.apis.AnalysisApi.create_analysis', mock_create_analysis)
