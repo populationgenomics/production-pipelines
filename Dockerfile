@@ -1,5 +1,6 @@
-FROM australia-southeast1-docker.pkg.dev/cpg-common/images/driver-metamist-dev:latest
+FROM australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:latest
 
+RUN pip install metamist 
 COPY README.md .
 COPY setup.py .
 COPY cpg_workflows cpg_workflows
