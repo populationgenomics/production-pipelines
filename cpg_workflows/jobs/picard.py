@@ -133,7 +133,7 @@ def markdup(
     # enough for input BAM and output CRAM
     resource.attach_disk_storage_gb = 250
 
-    # check for a memory override for impossible samples
+    # check for a memory override for impossible sequencing groups
     if (memory_override := get_config()['resource_overrides'].get('picard')) is not None:
         assert isinstance(memory_override, int)
         # Hail will select the right number of CPUs based on RAM request
