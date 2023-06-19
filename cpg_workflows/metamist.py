@@ -34,7 +34,7 @@ from cpg_workflows.filetypes import (
 
 GET_SEQUENCNG_GROUPS_QUERY = gql(
     """
-        query MyQuery($metamist_proj: String!, $only_sgs: [String!]!, $skip_sgs: [String!]!, $sequencing_type: String!) {
+        query SGQuery($metamist_proj: String!, $only_sgs: [String!]!, $skip_sgs: [String!]!, $sequencing_type: String!) {
             project(name: $metamist_proj) {
                 sequencingGroups(id: { in_: $only_sgs, nin: $skip_sgs}, type:  {eq: $sequencing_type}) {
                     id
@@ -64,7 +64,7 @@ GET_SEQUENCNG_GROUPS_QUERY = gql(
 
 GET_ANALYSES_QUERY = gql(
     """
-            query MyQuery($metamist_proj: String!, $analysis_type: String!, $analysis_status: AnalysisStatus!) {
+            query AnalysesQuery($metamist_proj: String!, $analysis_type: String!, $analysis_status: AnalysisStatus!) {
                 project(name: $metamist_proj) {
                     analyses (active: {eq: true}, type: {eq: $analysis_type}, status: {eq: $analysis_status}) {
                         id
@@ -83,7 +83,7 @@ GET_ANALYSES_QUERY = gql(
 
 GET_PEDIGREE_QUERY = gql(
     """
-        query MyQuery($metamist_proj: String!){
+        query PedgireeQuery($metamist_proj: String!){
             project(name: $metamist_proj) {
                 pedigree(replaceWithFamilyExternalIds: false)
             }
@@ -93,7 +93,7 @@ GET_PEDIGREE_QUERY = gql(
 
 GET_FAMILY_IDS_QUERY = gql(
     """
-        query MyQuery($metamist_proj: String!){
+        query FamilyIDsQuery($metamist_proj: String!){
             project(name: $metamist_proj) {
                 families {
                     id
@@ -509,9 +509,6 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        # entries = self.fapi.get_families(metamist_proj)
-        # family_ids = [entry['id'] for entry in entries]
-
         family_ids = self.get_family_ids(dataset=dataset)
 
         entries = query(GET_PEDIGREE_QUERY, {'metamist_proj': metamist_proj})
@@ -523,32 +520,6 @@ class Metamist:
         ]
 
         return filtered_peds
-
-        # # Since `fapi.get_pedigree` is a GET endpoint, it is limited by the length of
-        # # the request string. It would stall with the number of families above ~600.
-        # # To mitigate this, we split the input into chunks. 500 families should be
-        # # a safe number of families in one chunk.
-        # def _chunks(seq, size):
-        #     return (seq[pos : pos + size] for pos in range(0, len(seq), size))
-
-        # ped_entries = []
-        # chunk_size = 500
-        # for i, fam_ids_chunk in enumerate(_chunks(family_ids, chunk_size)):
-        #     logging.info(
-        #         f'Running fapi.get_pedigree on families #{i * chunk_size + 1}..'
-        #         f'{i * chunk_size + 1 + len(fam_ids_chunk) - 1} '
-        #         f'(out of {len(family_ids)})'
-        #     )
-        #     ped_entries.extend(
-        #         self.fapi.get_pedigree(
-        #             internal_family_ids=fam_ids_chunk,
-        #             export_type='json',
-        #             project=metamist_proj,
-        #             replace_with_participant_external_ids=True,
-        #         )
-        #     )
-
-        # return ped_entries
 
 
 @dataclass
