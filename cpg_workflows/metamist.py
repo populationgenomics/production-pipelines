@@ -13,8 +13,6 @@ from typing import Optional
 from metamist import models
 from metamist.apis import (
     AnalysisApi,
-    ParticipantApi,
-    FamilyApi,
 )
 from metamist.exceptions import ApiException
 
@@ -224,9 +222,6 @@ class Metamist:
     def __init__(self):
         self.default_dataset: str = get_config()['workflow']['dataset']
         self.aapi = AnalysisApi()
-        # self.seqapi = SequenceApi()
-        self.papi = ParticipantApi()
-        self.fapi = FamilyApi()
 
     def get_sg_entries(self, dataset_name: str) -> list[dict]:
         """
