@@ -144,12 +144,16 @@ def markdup(
     assert isinstance(j.output_cram, hb.ResourceGroup)
     cmd = f"""
     picard MarkDuplicates -Xms{resource.get_java_mem_mb()}M \\
-    I={sorted_bam} O=/dev/stdout M={j.markdup_metrics} \\
+    I={sorted_bam} O={j.output_bam} M={j.markdup_metrics} \\
     TMP_DIR=$(dirname {j.output_cram.cram})/picard-tmp \\
-    ASSUME_SORT_ORDER=coordinate \\
-    | samtools view -@{resource.get_nthreads() - 1} -T {fasta_reference.base} -O cram -o {j.output_cram.cram}
-    
-    samtools index -@{resource.get_nthreads() - 1} {j.output_cram.cram} {j.output_cram['cram.crai']}
+    ASSUME_SORT_ORDER=coordinate
+    echo "MarkDuplicates finished successfully"
+    samtools view --write-index -@{resource.get_nthreads() - 1} \\
+    -T {fasta_reference.base} \\
+    -O cram \\
+    -o {j.output_cram.cram} \\
+    {j.output_bam}
+    echo "samtools view finished successfully" 
     """
     j.command(command(cmd, monitor_space=True))
 
