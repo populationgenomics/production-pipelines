@@ -678,7 +678,7 @@ Other jobs: 171
 The Batch instance also constructs the job name if the names of a sample and a dataset are provided as attributes, e.g.:
 
 ```bash
->>> j = b.new_job('My job', dict(sample='CPG196535', dataset='fewgenomes'))
+>>> j = b.new_job('My job', dict(sequencing_group='CPG196535', dataset='fewgenomes'))
 >>> print(j.name)
 fewgenomes/CPG196535: My job
 ```
