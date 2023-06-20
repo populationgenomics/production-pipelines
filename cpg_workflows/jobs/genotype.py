@@ -193,14 +193,17 @@ def _haplotype_caller_one(
     # Based on an audit of RD crams on 19/05/23, 99% of crams are <34Gb. Will set the
     # default to 40Gb for genomes then use a run specific confg to run the rare
     # sequencing group that will fail from this limit.
-    if get_config()['workflow']['sequencing_type'] == 'genome':
-        storage_gb = get_config()['workflow'].get('haplotypecaller_storage_gb', 40)
+    if (
+        haplo_storage := get_config()['resource_overrides'].get(
+            'haplotypecaller_storage'
+        )
+    ) is not None:
+        storage_gb = haplo_storage
+    elif get_config()['workflow']['sequencing_type'] == 'genome':
+        storage_gb = 40
     else:
         storage_gb = None  # avoid extra disk for exomes
 
-    storage_gb = None  # avoid extra disk by default
-    if get_config()['workflow']['sequencing_type'] == 'genome':
-        storage_gb = 100
     job_res = HIGHMEM.request_resources(ncpu=2)
     # enough for input CRAM and output GVCF
     job_res.attach_disk_storage_gb = storage_gb
