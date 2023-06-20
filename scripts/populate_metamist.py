@@ -19,6 +19,9 @@ from cpg_workflows.status import MetamistStatusReporter
 from cpg_workflows.utils import exists
 from cpg_workflows.workflow import get_workflow
 
+from metamist.apis import AnalysisApi
+from metamist.models import AnalysisQueryModel, AnalysisStatus
+
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -40,9 +43,6 @@ def main(command: str, config_paths: list[str]):
     status = MetamistStatusReporter()
 
     if command == 'analyses':
-        from metamist.apis import AnalysisApi
-        from metamist.models import AnalysisQueryModel, AnalysisStatus
-
         analyses = AnalysisApi().query_analyses(
             AnalysisQueryModel(
                 projects=[d.name for d in cohort.get_datasets()],
@@ -59,7 +59,7 @@ def main(command: str, config_paths: list[str]):
                 if not path.exists():
                     continue
 
-                print(f'#{i+1} {sg} {path}')
+                logging.info(f'#{i+1} {sg} {path}')
                 status.create_analysis(
                     str(path),
                     analysis_type='cram',
@@ -73,7 +73,7 @@ def main(command: str, config_paths: list[str]):
                     project_name=sg.dataset.name,
                 )
             if (path := sg.make_gvcf_path().path).exists():
-                print(f'#{i+1} {sg} {path}')
+                logging.info(f'#{i+1} {sg} {path}')
                 if str(path) in existing_paths:
                     continue
                 status.create_analysis(
@@ -109,9 +109,11 @@ def main(command: str, config_paths: list[str]):
                 metrics_by_sequencing_group[sid] |= metrics_d
 
         for i, sequencing_group in enumerate(cohort.get_sequencing_groups()):
-            print(f'#{i+1} {sequencing_group}')
+            logging.info(f'#{i+1} {sequencing_group}')
             if sequencing_group.rich_id not in metrics_by_sequencing_group:
-                print(f'{sequencing_group.rich_id} not found in MultiQC, skipping')
+                logging.info(
+                    f'{sequencing_group.rich_id} not found in MultiQC, skipping'
+                )
                 continue
             metrics_d = metrics_by_sequencing_group[sequencing_group.rich_id]
             status.create_analysis(
@@ -167,7 +169,7 @@ def main(command: str, config_paths: list[str]):
             ]
         for name in names:
             ds_name = name.split(f'-{sequencing_type}-')[0]
-            print(f'Adding {ds_name}')
+            logging.info(f'Adding {ds_name}')
             dataset = cohort.create_dataset(ds_name)
             status.create_analysis(
                 str(name),
