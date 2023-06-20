@@ -17,6 +17,7 @@ setup(
         'cyvcf2==0.30.18',
         'analysis-runner>=2.40.7',
         'hail',
+        'ipywidgets>=7.0.0',
         'networkx',
         'sample-metadata>=5.0.1',
         'pandas',

@@ -138,3 +138,6 @@ dockers/cpg_pipes
 
 .vscode/
 notebooks
+
+# Ignore hidden . files
+.*

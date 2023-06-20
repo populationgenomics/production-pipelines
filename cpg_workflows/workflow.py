@@ -12,6 +12,7 @@ Examples of workflows can be found in the `production-workflows` repository.
 """
 
 import functools
+from math import inf
 import networkx as nx
 import logging
 import pathlib
@@ -30,6 +31,7 @@ from .status import MetamistStatusReporter
 from .targets import Target, Dataset, Sample, Cohort
 from .utils import exists, missing_from_pre_collected, timestamp, slugify, ExpectedResultT
 from .inputs import get_cohort
+from .graph import GraphPlot
 
 
 StageDecorator = Callable[..., 'Stage']
@@ -903,6 +905,7 @@ class Workflow:
             )
 
         self.dry_run = dry_run or get_config()['workflow'].get('dry_run')
+        self.show_workflow = get_config()['workflow'].get('show_workflow', False)
 
         analysis_dataset = get_config()['workflow']['dataset']
         name = get_config()['workflow'].get('name', analysis_dataset)
@@ -1058,6 +1061,13 @@ class Workflow:
                 _stage.skipped = True
                 _stage.assume_outputs_exist = True
 
+        # Update dag
+        nx.set_node_attributes(graph, False, name='skipped')
+
+        for stage in stages:
+            if stage.skipped:
+                graph.nodes[stage.name]['skipped'] = True
+
     def set_stages(
         self,
         requested_stages: list[StageDecorator],
@@ -1133,6 +1143,7 @@ class Workflow:
         for stg in _stages_d.values():
             dag_node2nodes[stg.name] = set(dep.name for dep in stg.required_stages)
         dag = nx.DiGraph(dag_node2nodes)
+
         try:
             stage_names = list(reversed(list(nx.topological_sort(dag))))
         except nx.NetworkXUnfeasible:
@@ -1140,6 +1151,9 @@ class Workflow:
             raise
         logging.info(f'Stages in order of execution:\n{stage_names}')
         stages = [_stages_d[name] for name in stage_names]
+        nx.set_node_attributes(
+            dag, {s.name: num for num, s in enumerate(stages)}, name='order'
+        )
 
         # Round 5: applying workflow options first_stages and last_stages.
         self._process_first_last_stages(stages, dag, first_stages, last_stages)
@@ -1173,6 +1187,27 @@ class Workflow:
         else:
             self.queued_stages = [stg for stg in _stages_d.values() if not stg.skipped]
             logging.info(f'Queued stages: {self.queued_stages}')
+
+        # Round 7: show the workflow
+        def format_meta(attr: list):
+            return {s: s in attr for s in dag.nodes}
+
+        # First add remaining metadata
+        nx.set_node_attributes(dag, format_meta(skip_stages), name='skip_stages')
+        nx.set_node_attributes(dag, format_meta(only_stages), name='only_stages')
+        nx.set_node_attributes(dag, format_meta(first_stages), name='first_stages')
+        nx.set_node_attributes(dag, format_meta(last_stages), name='last_stages')
+
+        if self.show_workflow:
+            gp = GraphPlot(dag, title='Full Workflow Graph')
+
+            # Removed skipped steps for simple graph
+            all_nodes = list(dag.nodes)
+            _ = [dag.remove_node(n) for n in all_nodes if dag.nodes[n]['skipped']]
+            gp2 = GraphPlot(dag, title='Sub-Workflow Graph')
+
+            fig = gp + gp2
+            fig.show()
 
     @staticmethod
     def _process_stage_errors(
@@ -1221,14 +1256,19 @@ class SampleStage(Stage[Sample], ABC):
                 f'via workflow.skip_datasets`'
             )
             return output_by_target
+
+        warn_msg = (
+            f'usable (active=True) samples found. Check logs above for '
+            f'possible reasons samples were skipped (e.g. all samples ignored '
+            f'via `workflow.skip_samples` in config, or they all missing stage '
+            f'inputs and `workflow.skip_samples_with_missing_input=true` is set)'
+        )
+
         if not cohort.get_samples():
             logging.warning(
                 f'{len(cohort.get_samples())}/'
                 f'{len(cohort.get_samples(only_active=False))} '
-                f'usable (active=True) samples found. Check logs above for '
-                f'possible reasons samples were skipped (e.g. all samples ignored '
-                f'via `workflow.skip_samples` in config, or they all missing stage '
-                f'inputs and `workflow.skip_samples_with_missing_input=true` is set)'
+                f'{warn_msg}'
             )
             return output_by_target
 
@@ -1238,10 +1278,7 @@ class SampleStage(Stage[Sample], ABC):
                     f'{dataset}: '
                     f'{len(dataset.get_samples())}/'
                     f'{len(dataset.get_samples(only_active=False))} '
-                    f'usable (active=True) samples found. Check logs above for '
-                    f'possible reasons samples were skipped (e.g. all samples ignored '
-                    f'via `workflow.skip_samples` in config, or they all missing stage '
-                    f'inputs and `workflow.skip_samples_with_missing_input=true` is set)'
+                    f'{warn_msg}'
                 )
                 continue
 
