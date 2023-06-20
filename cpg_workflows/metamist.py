@@ -30,7 +30,7 @@ from cpg_workflows.filetypes import (
     FastqPairs,
 )
 
-GET_SEQUENCNG_GROUPS_QUERY = gql(
+GET_SEQUENCING_GROUPS_QUERY = gql(
     """
         query SGQuery($metamist_proj: String!, $only_sgs: [String!]!, $skip_sgs: [String!]!, $sequencing_type: String!) {
             project(name: $metamist_proj) {
@@ -62,20 +62,20 @@ GET_SEQUENCNG_GROUPS_QUERY = gql(
 
 GET_ANALYSES_QUERY = gql(
     """
-            query AnalysesQuery($metamist_proj: String!, $analysis_type: String!, $analysis_status: AnalysisStatus!) {
-                project(name: $metamist_proj) {
-                    analyses (active: {eq: true}, type: {eq: $analysis_type}, status: {eq: $analysis_status}) {
+        query AnalysesQuery($metamist_proj: String!, $analysis_type: String!, $analysis_status: AnalysisStatus!) {
+            project(name: $metamist_proj) {
+                analyses (active: {eq: true}, type: {eq: $analysis_type}, status: {eq: $analysis_status}) {
+                    id
+                    type
+                    meta
+                    output
+                    status
+                    sequencingGroups {
                         id
-                        type
-                        meta
-                        output
-                        status
-                        sequencingGroups {
-                            id
-                        }
                     }
                 }
             }
+        }
         """
 )
 
@@ -89,17 +89,6 @@ GET_PEDIGREE_QUERY = gql(
     """
 )
 
-GET_FAMILY_IDS_QUERY = gql(
-    """
-        query FamilyIDsQuery($metamist_proj: String!){
-            project(name: $metamist_proj) {
-                families {
-                    id
-                }
-            }
-        }
-    """
-)
 
 _metamist: Optional['Metamist'] = None
 
@@ -240,7 +229,7 @@ class Metamist:
             raise MetamistError('Cannot specify both only_sgs and skip_sgs in config')
 
         sequencing_group_entries = query(
-            GET_SEQUENCNG_GROUPS_QUERY,
+            GET_SEQUENCING_GROUPS_QUERY,
             {
                 'metamist_proj': metamist_proj,
                 'only_sgs': only_sgs,
@@ -293,7 +282,7 @@ class Metamist:
             return None
         return a
 
-    def get_analyses_by_sid(
+    def get_analyses_by_sgid(
         self,
         sg_ids: list[str],
         analysis_type: AnalysisType,
@@ -327,7 +316,7 @@ class Metamist:
             if not a:
                 continue
 
-            assert a.status == AnalysisStatus.COMPLETED, analysis
+            assert a.status == analysis_status, analysis
             assert a.type == analysis_type, analysis
             assert len(a.sequencing_group_ids) == 1, analysis
             analysis_per_sid[list(a.sequencing_group_ids)[0]] = a
@@ -474,22 +463,6 @@ class Metamist:
             )
             return None
 
-    def get_family_ids(self, dataset: str | None = None) -> list[int]:
-        metamist_proj = dataset or self.default_dataset
-        if get_config()['workflow']['access_level'] == 'test':
-            metamist_proj += '-test'
-
-        family_entries = query(
-            GET_FAMILY_IDS_QUERY,
-            {
-                'metamist_proj': metamist_proj,
-            },
-        )
-
-        family_ids = family_entries['project']['families']
-
-        return [family['id'] for family in family_ids]
-
     def get_ped_entries(self, dataset: str | None = None) -> list[dict[str, str]]:
         """
         Retrieve PED lines for a specified SM project, with external participant IDs.
@@ -498,17 +471,11 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        family_ids = self.get_family_ids(dataset=dataset)
-
         entries = query(GET_PEDIGREE_QUERY, {'metamist_proj': metamist_proj})
 
-        pedgiree_entries = entries['project']['pedigree']
+        pedigree_entries = entries['project']['pedigree']
 
-        filtered_peds = [
-            ped for ped in pedgiree_entries if ped['family_id'] in family_ids
-        ]
-
-        return filtered_peds
+        return pedigree_entries
 
 
 @dataclass
