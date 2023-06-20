@@ -133,6 +133,14 @@ def markdup(
     # enough for input BAM and output CRAM
     resource.attach_disk_storage_gb = 250
     resource.set_to_job(j)
+
+    # check for a memory override for impossible sequencing groups
+    # if RAM is overridden, update the memory resource setting
+    if (memory_override := get_config()['resource_overrides'].get('picard')) is not None:
+        assert isinstance(memory_override, int)
+        # Hail will select the right number of CPUs based on RAM request
+        j.memory(f'{memory_override}G')
+
     j.declare_resource_group(
         output_cram={
             'cram': '{root}.cram',
@@ -144,12 +152,16 @@ def markdup(
     assert isinstance(j.output_cram, hb.ResourceGroup)
     cmd = f"""
     picard MarkDuplicates -Xms{resource.get_java_mem_mb()}M \\
-    I={sorted_bam} O=/dev/stdout M={j.markdup_metrics} \\
+    I={sorted_bam} O={j.temp_bam} M={j.markdup_metrics} \\
     TMP_DIR=$(dirname {j.output_cram.cram})/picard-tmp \\
-    ASSUME_SORT_ORDER=coordinate \\
-    | samtools view -@{resource.get_nthreads() - 1} -T {fasta_reference.base} -O cram -o {j.output_cram.cram}
-    
-    samtools index -@{resource.get_nthreads() - 1} {j.output_cram.cram} {j.output_cram['cram.crai']}
+    ASSUME_SORT_ORDER=coordinate
+    echo "MarkDuplicates finished successfully"
+    samtools view --write-index -@{resource.get_nthreads() - 1} \\
+    -T {fasta_reference.base} \\
+    -O cram \\
+    -o {j.output_cram.cram} \\
+    {j.temp_bam}
+    echo "samtools view finished successfully" 
     """
     j.command(command(cmd, monitor_space=True))
 
