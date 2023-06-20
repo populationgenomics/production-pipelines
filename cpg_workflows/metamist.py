@@ -523,7 +523,7 @@ class Assay:
         if parse_reads:
             mm_seq.alignment_input = Assay.parse_reads(
                 sequencing_group_id=sg_id,
-                meta=data['meta'],
+                assay_meta=data['meta'],
                 check_existence=check_existence,
             )
         return mm_seq
@@ -531,7 +531,7 @@ class Assay:
     @staticmethod
     def parse_reads(  # pylint: disable=too-many-return-statements
         sequencing_group_id: str,
-        meta: dict,
+        assay_meta: dict,
         check_existence: bool,
     ) -> AlignmentInput:
         """
@@ -539,9 +539,9 @@ class Assay:
         `check_existence`: check if fastq/crams exist on buckets.
         Default value is pulled from self.metamist and can be overridden.
         """
-        reads_data = meta.get('reads')
-        reads_type = meta.get('reads_type')
-        reference_assembly = meta.get('reference_assembly', {}).get('location')
+        reads_data = assay_meta.get('reads')
+        reads_type = assay_meta.get('reads_type')
+        reference_assembly = assay_meta.get('reference_assembly', {}).get('location')
 
         if not reads_data:
             raise MetamistError(f'{sequencing_group_id}: no "meta/reads" field in meta')
