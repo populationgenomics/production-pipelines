@@ -1253,7 +1253,7 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
                 and dataset.name.lower() not in self.only_datasets
             ):
                 logging.warning(
-                    f'Skipping dataset {dataset} for Stage {self.name} '
+                    f'Skipping dataset {dataset} for SequencinggGroupStage {self.name} '
                     f'as it is not in only_datasets'
                 )
                 continue
@@ -1326,7 +1326,18 @@ class DatasetStage(Stage, ABC):
                 f'via workflow.skip_datasets`'
             )
             return output_by_target
+
         for dataset_i, dataset in enumerate(datasets):
+            if (
+                self.only_datasets is not None
+                and dataset.name.lower() not in self.only_datasets
+            ):
+                logging.warning(
+                    f'Skipping dataset {dataset} for DatasetStage {self.name} '
+                    f'as it is not in only_datasets'
+                )
+                continue
+
             action = self._get_action(dataset)
             logging.info(f'{self.name}: #{dataset_i + 1}/{dataset} [{action.name}]')
             output_by_target[dataset.target_id] = self._queue_jobs_with_checks(
