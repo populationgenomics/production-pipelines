@@ -404,6 +404,7 @@ class Stage(Generic[TargetT], ABC):
         skipped: bool = False,
         assume_outputs_exist: bool = False,
         forced: bool = False,
+        only_datasets: list[str] | None = None,
     ):
         self._name = name
         self.required_stages_classes: list[StageDecorator] = []
@@ -435,6 +436,7 @@ class Stage(Generic[TargetT], ABC):
             'force_stages', []
         )
         self.assume_outputs_exist = assume_outputs_exist
+        self.only_datasets = only_datasets
 
     @property
     def tmp_prefix(self):
@@ -779,6 +781,7 @@ def stage(
     skipped: bool = False,
     assume_outputs_exist: bool = False,
     forced: bool = False,
+    only_datasets: list[str] | None = None
 ) -> Union[StageDecorator, Callable[..., StageDecorator]]:
     """
     Implements a standard class decorator pattern with optional arguments.
@@ -805,6 +808,7 @@ def stage(
     @skipped: always skip this stage.
     @assume_outputs_exist: assume expected outputs of this stage always exist.
     @forced: always force run this stage, regardless of the outputs' existence.
+    @only_datasets: only run this stage for the given datasets.
     """
 
     def decorator_stage(_cls) -> StageDecorator:
@@ -822,6 +826,7 @@ def stage(
                 skipped=skipped,
                 assume_outputs_exist=assume_outputs_exist,
                 forced=forced,
+                only_datasets=only_datasets
             )
 
         return wrapper_stage
@@ -1242,6 +1247,15 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
             return output_by_target
 
         for dataset in datasets:
+
+            # allow full skipping if this stage isn't intended for this dataset
+            if self.only_datasets is not None and dataset.name not in self.only_datasets:
+                logging.warning(
+                    f'Skipping dataset {dataset} for Stage {self.name} '
+                    f'as it is not in only_datasets'
+                )
+                continue
+
             if not dataset.get_sequencing_groups():
                 logging.warning(
                     f'{dataset}: '

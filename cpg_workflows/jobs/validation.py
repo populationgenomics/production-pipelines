@@ -45,7 +45,6 @@ def validation_mt_to_vcf_job(
     sequencing_group_id: str,
     out_vcf_path: str,
     job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None,
 ):
     """
     Take the single-dataset MT, and write to a VCF
@@ -56,7 +55,6 @@ def validation_mt_to_vcf_job(
         sequencing_group_id (str): sequencing group name
         out_vcf_path (str): path to write new VCF to
         job_attrs (dict):
-        depends_on (hb.Job|list[hb.Job]): jobs to depend on
 
     Returns:
         this single Job
@@ -77,8 +75,6 @@ def validation_mt_to_vcf_job(
             setup_gcp=True,
         )
     )
-    if depends_on:
-        vcf_j.depends_on(*depends_on)
 
     return vcf_j
 
@@ -89,7 +85,6 @@ def run_happy_on_vcf(
     sequencing_group_ext_id: str,
     out_prefix: str,
     job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None,
 ):
     """
     Run hap.py on the for this single-sample VCF
@@ -101,7 +96,6 @@ def run_happy_on_vcf(
         sequencing_group_ext_id (str): external ID to find reference data
         out_prefix (str): where to export happy outputs
         job_attrs ():
-        depends_on ():
 
     Returns:
         This Job or None
@@ -112,8 +106,6 @@ def run_happy_on_vcf(
         (job_attrs or {}) | {'tool': 'hap.py'},
     )
     happy_j.image(image_path('hap-py')).memory('100Gi').storage('100Gi').cpu(4)
-    if depends_on:
-        happy_j.depends_on(*depends_on)
 
     # region: read input data into batch
     vcf_input = b.read_input_group(vcf=vcf_path, index=f'{vcf_path}.tbi')
