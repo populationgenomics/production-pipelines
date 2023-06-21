@@ -93,7 +93,10 @@ def _make_sample_map(dataset: Dataset):
     """
     sample_map_fpath = dataset.tmp_prefix() / 'pedigree' / 'sample_map.tsv'
     df = pd.DataFrame(
-        [{'id': s.id, 'pid': s.participant_id} for s in dataset.get_sequencing_groups()]
+        [
+            {'id': sg.id, 'pid': sg.participant_id}
+            for sg in dataset.get_sequencing_groups()
+        ]
     )
     if not get_config()['workflow'].get('dry_run', False):
         with sample_map_fpath.open('w') as fp:

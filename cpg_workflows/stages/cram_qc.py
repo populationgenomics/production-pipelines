@@ -220,7 +220,7 @@ class SomalierPedigree(DatasetStage):
             html_url = None
 
         if any(
-            s.pedigree.dad or s.pedigree.mom for s in dataset.get_sequencing_groups()
+            sg.pedigree.dad or sg.pedigree.mom for sg in dataset.get_sequencing_groups()
         ):
             expected_ped_path = dataset.write_ped_file(
                 self.expected_outputs(dataset)['expected_ped']
