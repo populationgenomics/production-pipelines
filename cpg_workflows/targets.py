@@ -532,7 +532,7 @@ class SequencingGroup(Target):
         self.alignment_input_by_seq_type: dict[str, AlignmentInput] = (
             alignment_input_by_seq_type or dict()
         )
-        self.assays: dict[str, Assay] = assays or dict()
+        self.assays: dict[str, Assay] = assays or {}
         self.forced = forced
         self.active = True
         # Only set if the file exists / found in Metamist:
