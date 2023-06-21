@@ -24,6 +24,17 @@ use_as_vqsr = true
 
 write_vcf = ["udn-aus"]
 
+[resource_overrides]
+# Override default resource requirements for unusually large seq data without
+# demanding higher resources for all operations as standard. Examples below
+
+# picard override (int), GB to use in MarkDuplicates
+#picard = 100
+
+# haplotype caller overrides, see production-pipelines PR#381
+# defaults in code are 40 for genomes, none for exomes
+#haplotypecaller_storage = 80
+
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
 # sensitivities. The tool matches them internally to a VQSLOD score cutoff 
