@@ -391,7 +391,7 @@ class Action(Enum):
 class Stage(Generic[TargetT], ABC):
     """
     Abstract class for a workflow stage. Parametrised by specific Target subclass,
-    i.e. SequencingGroup(Stage[SequencingGroup]) should only be able to work on SequencingGroup(Target).
+    i.e. SequencingGroupStage(Stage[SequencingGroup]) should only be able to work on SequencingGroup(Target).
     """
 
     def __init__(
