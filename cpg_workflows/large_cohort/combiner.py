@@ -25,7 +25,7 @@ def _check_gvcfs(sequencing_groups: list[SequencingGroup]) -> list[SequencingGro
                 continue
             else:
                 raise ValueError(
-                    f'SequencingGroup {sequencing_group} is missing GVCF. '
+                    f'Sequencing group {sequencing_group} is missing GVCF. '
                     f'Use workflow/skip_sgs = [] or '
                     f'workflow/skip_sgs_with_missing_input '
                     f'to control behaviour'
