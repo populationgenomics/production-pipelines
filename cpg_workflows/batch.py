@@ -176,11 +176,9 @@ class Batch(hb.Batch):
                     msg = f'{stat["job_n"]} job'
                     if stat['job_n'] > 1:
                         msg += 's'
-                    if len(stat['sequencing_groups']) > 0:
-                        msg += (
-                            f' for {len(stat["sequencing_groups"])} sequencing group'
-                        )
-                        if len(stat['sequencing_groups']) > 1:
+                    if (sg_count := len(stat['sequencing_groups'])) > 0:
+                        msg += f' for {sg_count} sequencing group'
+                        if sg_count > 1:
                             msg += 's'
                     logging.info(f'  {label}: {msg}')
 
