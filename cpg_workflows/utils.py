@@ -159,9 +159,9 @@ def rich_sequencing_group_id_seds(
     @return: bash command that does replacement
     """
     cmd = ''
-    for sid, rich_sid in rich_id_map.items():
+    for sgid, rich_sgid in rich_id_map.items():
         for fname in file_names:
-            cmd += f'sed -iBAK \'s/{sid}/{rich_sid}/g\' {fname}'
+            cmd += f'sed -iBAK \'s/{sgid}/{rich_sgid}/g\' {fname}'
             cmd += '\n'
     return cmd
 
