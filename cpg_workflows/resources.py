@@ -320,7 +320,7 @@ def joint_calling_scatter_count(sequencing_group_count: int) -> int:
     if scatter_count := get_config()['workflow'].get('scatter_count'):
         return scatter_count
 
-    for _sequencing_group_count, scatter_count in {
+    for threshold, scatter_count in {
         4000: 1000,
         3000: 800,
         2000: 600,
@@ -328,7 +328,7 @@ def joint_calling_scatter_count(sequencing_group_count: int) -> int:
         500: 200,
         250: 100,
     }.items():
-        if sequencing_group_count >= _sequencing_group_count:
+        if sequencing_group_count >= threshold:
             return scatter_count
     return 50
 
