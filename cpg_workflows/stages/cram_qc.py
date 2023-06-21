@@ -194,8 +194,8 @@ class SomalierPedigree(DatasetStage):
         """
         Checks calls job from the pedigree module
         """
-        verifybamid_by_sid = {}
-        somalier_path_by_sid = {}
+        verifybamid_by_sgid = {}
+        somalier_path_by_sgid = {}
         for sequencing_group in dataset.get_sequencing_groups():
             if get_config().get('somalier', {}).get('exclude_high_contamination'):
                 verify_bamid_path = inputs.as_path(
@@ -207,11 +207,11 @@ class SomalierPedigree(DatasetStage):
                         f'{sequencing_group}, somalier pedigree estimations might be affected'
                     )
                 else:
-                    verifybamid_by_sid[sequencing_group.id] = verify_bamid_path
+                    verifybamid_by_sgid[sequencing_group.id] = verify_bamid_path
             somalier_path = inputs.as_path(
                 stage=CramQC, target=sequencing_group, key='somalier'
             )
-            somalier_path_by_sid[sequencing_group.id] = somalier_path
+            somalier_path_by_sgid[sequencing_group.id] = somalier_path
 
         html_path = self.expected_outputs(dataset)['html']
         if base_url := dataset.web_url():
@@ -229,8 +229,8 @@ class SomalierPedigree(DatasetStage):
                 b=get_batch(),
                 dataset=dataset,
                 expected_ped_path=expected_ped_path,
-                somalier_path_by_sid=somalier_path_by_sid,
-                verifybamid_by_sid=verifybamid_by_sid,
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                verifybamid_by_sgid=verifybamid_by_sgid,
                 out_samples_path=self.expected_outputs(dataset)['samples'],
                 out_pairs_path=self.expected_outputs(dataset)['pairs'],
                 out_html_path=html_path,

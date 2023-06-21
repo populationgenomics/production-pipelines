@@ -32,13 +32,13 @@ def pedigree(
     b,
     dataset: Dataset,
     expected_ped_path: Path,
-    somalier_path_by_sid: dict[str, Path],
+    somalier_path_by_sgid: dict[str, Path],
     out_samples_path: Path,
     out_pairs_path: Path,
     out_html_path: Path,
     out_html_url: str | None = None,
     out_checks_path: Path | None = None,
-    verifybamid_by_sid: dict[str, Path | str] | None = None,
+    verifybamid_by_sgid: dict[str, Path | str] | None = None,
     label: str | None = None,
     job_attrs: dict | None = None,
     send_to_slack: bool = True,
@@ -51,12 +51,12 @@ def pedigree(
     Returns a job, a path to a fixed PED file if able to recover, and a path to a file
     with relatedness information for each sample pair
 
-    somalier_path_by_sid should be a dict of paths to .somalier fingerprints.
+    somalier_path_by_sgid should be a dict of paths to .somalier fingerprints.
     """
     relate_j = _relate(
         b=b,
-        somalier_path_by_sid=somalier_path_by_sid,
-        verifybamid_by_sid=verifybamid_by_sid,
+        somalier_path_by_sgid=somalier_path_by_sgid,
+        verifybamid_by_sgid=verifybamid_by_sgid,
         sequencing_group_ids=dataset.get_sequencing_group_ids(),
         rich_id_map=dataset.rich_id_map(),
         expected_ped_path=expected_ped_path,
@@ -160,7 +160,7 @@ def _check_pedigree(
 
 def _relate(
     b: Batch,
-    somalier_path_by_sid: dict[str, Path],
+    somalier_path_by_sgid: dict[str, Path],
     sequencing_group_ids: list[str],
     rich_id_map: dict[str, str],
     expected_ped_path: Path,
@@ -169,7 +169,7 @@ def _relate(
     out_pairs_path: Path,
     out_html_path: Path,
     out_html_url: str | None = None,
-    verifybamid_by_sid: dict[str, Path] | None = None,
+    verifybamid_by_sgid: dict[str, Path] | None = None,
     job_attrs: dict | None = None,
 ) -> Job:
     title = 'Somalier relate'
@@ -188,19 +188,23 @@ def _relate(
     cmd += f'touch {input_files_file}'
     cmd += f'touch {sequencing_groups_ids_file}'
     for sequencing_group_id in sequencing_group_ids:
-        if verifybamid_by_sid:
-            if sequencing_group_id not in verifybamid_by_sid:
+        if verifybamid_by_sgid:
+            if sequencing_group_id not in verifybamid_by_sgid:
                 continue
-            somalier_file = b.read_input(str(somalier_path_by_sid[sequencing_group_id]))
+            somalier_file = b.read_input(
+                str(somalier_path_by_sgid[sequencing_group_id])
+            )
             cmd += f"""
-            FREEMIX=$(cat {b.read_input(str(verifybamid_by_sid[sequencing_group_id]))} | tail -n1 | cut -f7)
+            FREEMIX=$(cat {b.read_input(str(verifybamid_by_sgid[sequencing_group_id]))} | tail -n1 | cut -f7)
             if [[ $(echo "$FREEMIX > {MAX_FREEMIX}" | bc) -eq 0 ]]; then \
             echo "{somalier_file}" >> {input_files_file}; \
             echo "{sequencing_group_id}" >> {sequencing_groups_ids_file}; \
             fi
             """
         else:
-            somalier_file = b.read_input(str(somalier_path_by_sid[sequencing_group_id]))
+            somalier_file = b.read_input(
+                str(somalier_path_by_sgid[sequencing_group_id])
+            )
             cmd += f"""
             echo "{somalier_file}" >> {input_files_file}
             echo "{sequencing_group_id}" >> {sequencing_groups_ids_file}
