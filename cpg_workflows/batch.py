@@ -178,7 +178,7 @@ class Batch(hb.Batch):
                         msg += 's'
                     if len(stat['sequencing_groups']) > 0:
                         msg += (
-                            f' for {len(stat["sequencing_groups"])} sequencing groups'
+                            f' for {len(stat["sequencing_groups"])} sequencing group'
                         )
                         if len(stat['sequencing_groups']) > 1:
                             msg += 's'
