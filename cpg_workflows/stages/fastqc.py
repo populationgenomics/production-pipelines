@@ -142,11 +142,11 @@ class FastQCMultiQC(DatasetStage):
         else:
             html_url = None
 
-        paths = []  # FASTQC zip outputs to parse with MultiQC
-        sequencing_group_id_map = (
-            {}
-        )  # So MultiQC doesn't use FASTQ files names as identfiers.
+        paths = []
+        # FASTQC zip outputs to parse with MultiQC.
+        # So MultiQC doesn't use FASTQ files names as identifiers
         # we need to collect a map to rename them to proper internal/external IDs
+        sequencing_group_id_map = {}
         for sequencing_group in dataset.get_sequencing_groups():
             for fqc_out in _collect_fastq_outs(sequencing_group):
                 paths.append(fqc_out.out_zip)
