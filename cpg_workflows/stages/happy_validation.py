@@ -14,7 +14,7 @@ from cpg_workflows.workflow import (
     StageOutput,
     get_workflow,
 )
-from cpg_workflows.stages.seqr_loader import AnnotateDataset, _sg_vcf_meta
+from cpg_workflows.stages.seqr_loader import _sg_vcf_meta
 from cpg_workflows.jobs.validation import (
     validation_mt_to_vcf_job,
     run_happy_on_vcf,
@@ -24,7 +24,6 @@ from .. import get_batch
 
 
 @stage(
-    required_stages=AnnotateDataset,
     analysis_type='custom',
     update_analysis_meta=_sg_vcf_meta,
     analysis_keys=['vcf'],
@@ -49,18 +48,19 @@ class ValidationMtToVcf(SequencingGroupStage):
     def queue_jobs(
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
-        # only run this on validation sequencing groups
-        if sequencing_group.dataset.name != 'validation':
-            return None
 
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
             return None
 
-        # get the input mt for this dataset
-        mt_path = inputs.as_path(
-            target=sequencing_group.dataset, stage=AnnotateDataset, key='mt'
+        # generate the MT path from config
+        input_hash = get_config()['inputs']['sample_hash']
+        mt_path = (
+            sequencing_group.dataset.prefix() /
+            'mt' /
+            f'{input_hash}-{sequencing_group.dataset.name}.mt'
         )
+
         exp_outputs = self.expected_outputs(sequencing_group)
 
         job = validation_mt_to_vcf_job(
@@ -68,8 +68,7 @@ class ValidationMtToVcf(SequencingGroupStage):
             mt_path=str(mt_path),
             sequencing_group_id=sequencing_group.id,
             out_vcf_path=str(exp_outputs['vcf']),
-            job_attrs=self.get_job_attrs(sequencing_group),
-            depends_on=inputs.get_jobs(sequencing_group),
+            job_attrs=self.get_job_attrs(sequencing_group)
         )
 
         return self.make_outputs(sequencing_group, data=exp_outputs, jobs=job)
@@ -101,9 +100,6 @@ class ValidationHappyOnVcf(SequencingGroupStage):
     def queue_jobs(
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
-        # only run this on validation sequencing groups
-        if sequencing_group.dataset.name != 'validation':
-            return None
 
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
@@ -129,8 +125,7 @@ class ValidationHappyOnVcf(SequencingGroupStage):
             vcf_path=str(input_vcf),
             sequencing_group_ext_id=sequencing_group.external_id,
             out_prefix=str(output_prefix),
-            job_attrs=self.get_job_attrs(sequencing_group),
-            depends_on=inputs.get_jobs(sequencing_group),
+            job_attrs=self.get_job_attrs(sequencing_group)
         )
 
         return self.make_outputs(sequencing_group, data=exp_outputs, jobs=job)
@@ -152,9 +147,6 @@ class ValidationParseHappy(SequencingGroupStage):
     def queue_jobs(
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
-        # only run this on validation sequencing groups
-        if sequencing_group.dataset.name != 'validation':
-            return None
 
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
@@ -184,8 +176,5 @@ class ValidationParseHappy(SequencingGroupStage):
             happy_results=str(happy_results),
             out_file=str(exp_outputs['json_summary']),
         )
-        # set dependencies if applicable
-        if dependencies := inputs.get_jobs(sequencing_group):
-            py_job.depends_on(*dependencies)
 
         return self.make_outputs(sequencing_group, data=exp_outputs, jobs=py_job)

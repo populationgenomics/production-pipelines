@@ -25,7 +25,11 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_1 import (
 from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_2 import AnnotateVcf
 from cpg_workflows.stages.gatk_sv.gatk_sv_single_sample import CreateSampleBatches
 from cpg_workflows.stages.stripy import Stripy
-from cpg_workflows.stages.happy_validation import ValidationParseHappy
+from cpg_workflows.stages.happy_validation import (
+    ValidationMtToVcf,
+    ValidationHappyOnVcf,
+    ValidationParseHappy
+)
 
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
@@ -37,8 +41,8 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         GvcfMultiQC,
         CramMultiQC,
         Stripy,
-        ValidationParseHappy,
     ],
+    'validation': [ValidationMtToVcf, ValidationHappyOnVcf, ValidationParseHappy],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
     'gatk_sv_singlesample': [CreateSampleBatches],
     'gatk_sv_multisample_1': [FilterBatch, GenotypeBatch],
