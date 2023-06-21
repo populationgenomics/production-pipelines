@@ -1,10 +1,5 @@
 [workflow]
+input_datasets = ['validation']
 name = 'hap.py_validation'
 dataset = 'validation'
 status_reporter = 'metamist'
-
-[inputs]
-# update this hash to point to the latest MT generated
-# i.e. "fa2b24d025f5542fc3bfaf8fc963e5032f1f81_1980"
-# in gs://cpg-validation-main/mt/fa2b24d025f5542fc3bfaf8fc963e5032f1f81_1980-validation.mt
-sample_hash = 'sample_hash'
