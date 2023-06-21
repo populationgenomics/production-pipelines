@@ -781,7 +781,7 @@ def stage(
     skipped: bool = False,
     assume_outputs_exist: bool = False,
     forced: bool = False,
-    only_datasets: list[str] | None = None
+    only_datasets: list[str] | None = None,
 ) -> Union[StageDecorator, Callable[..., StageDecorator]]:
     """
     Implements a standard class decorator pattern with optional arguments.
@@ -826,7 +826,7 @@ def stage(
                 skipped=skipped,
                 assume_outputs_exist=assume_outputs_exist,
                 forced=forced,
-                only_datasets=only_datasets
+                only_datasets=only_datasets,
             )
 
         return wrapper_stage
@@ -1247,9 +1247,11 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
             return output_by_target
 
         for dataset in datasets:
-
             # allow full skipping if this stage isn't intended for this dataset
-            if self.only_datasets is not None and dataset.name not in self.only_datasets:
+            if (
+                self.only_datasets is not None
+                and dataset.name.lower() not in self.only_datasets
+            ):
                 logging.warning(
                     f'Skipping dataset {dataset} for Stage {self.name} '
                     f'as it is not in only_datasets'

@@ -28,7 +28,7 @@ from .. import get_batch
     analysis_type='custom',
     update_analysis_meta=_sg_vcf_meta,
     analysis_keys=['vcf'],
-    only_datasets=['validation']
+    only_datasets=['validation'],
 )
 class ValidationMtToVcf(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup):
@@ -50,7 +50,6 @@ class ValidationMtToVcf(SequencingGroupStage):
     def queue_jobs(
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
-
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
             return None
@@ -66,7 +65,7 @@ class ValidationMtToVcf(SequencingGroupStage):
             mt_path=str(mt_path),
             sequencing_group_id=sequencing_group.id,
             out_vcf_path=str(exp_outputs['vcf']),
-            job_attrs=self.get_job_attrs(sequencing_group)
+            job_attrs=self.get_job_attrs(sequencing_group),
         )
 
         return self.make_outputs(sequencing_group, data=exp_outputs, jobs=job)
@@ -76,7 +75,7 @@ class ValidationMtToVcf(SequencingGroupStage):
     required_stages=ValidationMtToVcf,
     analysis_type='qc',
     analysis_keys=['happy_csv'],
-    only_datasets=['validation']
+    only_datasets=['validation'],
 )
 class ValidationHappyOnVcf(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup):
@@ -99,7 +98,6 @@ class ValidationHappyOnVcf(SequencingGroupStage):
     def queue_jobs(
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
-
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
             logging.info(f'Skipping {sequencing_group.id}; not in the reference set')
@@ -132,7 +130,7 @@ class ValidationHappyOnVcf(SequencingGroupStage):
 
 @stage(
     required_stages=[ValidationMtToVcf, ValidationHappyOnVcf],
-    only_datasets=['validation']
+    only_datasets=['validation'],
 )
 class ValidationParseHappy(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup):
@@ -149,7 +147,6 @@ class ValidationParseHappy(SequencingGroupStage):
     def queue_jobs(
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
-
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
             logging.info(f'Skipping {sequencing_group.id}; not in the reference set')
