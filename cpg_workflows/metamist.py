@@ -612,7 +612,6 @@ def parse_reads(  # pylint: disable=too-many-return-statements
         fastq_pairs = FastqPairs()
 
         for lane_pair in reads_data:
-            print(lane_pair)
             if len(lane_pair) != 2:
                 raise ValueError(
                     f'Sequence data for sequencing group {sequencing_group_id} is incorrectly '
