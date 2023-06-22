@@ -24,6 +24,10 @@ indel_filter_level = 99.0
 assume_sorted = true
 num_pcs = 4
 
+[resource_overrides]
+# Override default resource requirements for unusually large seq data without
+# demanding higher resources for all operations as standard. Examples below
+
 [large_cohort]
 # Parameters for reladness inference
 max_kin = 0.2  # maximum kin threshold to be considered unrelated in relatedness check (second degree)
