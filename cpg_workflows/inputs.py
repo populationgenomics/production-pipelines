@@ -6,7 +6,7 @@ import logging
 
 from cpg_utils.config import get_config, update_dict
 
-from .metamist import get_metamist, Assay, AnalysisType, MetamistError
+from .metamist import get_metamist, Assay, AnalysisType, MetamistError, parse_reads
 from .targets import Cohort, Sex, PedigreeInfo, SequencingGroup
 
 
@@ -68,6 +68,20 @@ def create_cohort() -> Cohort:
     return cohort
 
 
+def _combine_assay_meta(assays: list[Assay]) -> dict:
+    """
+    Combine assay meta from multiple assays
+    """
+    assays_meta: dict = {}
+    for assay in assays:
+        for key, value in assay.meta.items():
+            if key == 'reads':
+                assays_meta.setdefault(key, []).append(value)
+            else:
+                assays_meta[key] = value
+    return assays_meta
+
+
 def _populate_alignment_inputs(
     sequencing_group: SequencingGroup,
     entry: dict,
@@ -76,25 +90,26 @@ def _populate_alignment_inputs(
     """
     Populate sequencing inputs for a sequencing group
     """
+    assays: list[Assay] = []
+    for assay in entry['assays']:
+        _assay = Assay.parse(assay, sequencing_group.id, run_parse_reads=False)
+        assays.append(_assay)
 
-    if len(entry['assays']) != 1:
-        raise MetamistError(
-            f'Only one active assay per sequencing group allowed. Found {len(entry["assays"])}'
-        )
+    # Check only one assay type per sequencing group
+    assert len(set([assay.assay_type for assay in assays])) == 1
+    sequencing_group.assays[assays[0].assay_type] = tuple(assays)
 
-    assay_entry = entry['assays'][0]
+    if len(entry['assays']) > 1:
+        _assay_meta = _combine_assay_meta(assays)
+    else:
+        _assay_meta = assays[0].meta
 
-    assay = Assay.parse(assay_entry, sequencing_group.id, parse_reads=False)
-
-    sequencing_group.assays[assay.assay_type] = assay
-
-    if assay_entry.get('meta', {}).get('reads'):
-        alignment_input = Assay.parse_reads(
+    if _assay_meta.get('reads'):
+        alignment_input = parse_reads(
             sequencing_group_id=sequencing_group.id,
-            assay_meta=assay_entry['meta'],
+            assay_meta=_assay_meta,
             check_existence=check_existence,
         )
-        assay.alignment_input = alignment_input
         sequencing_group.alignment_input_by_seq_type[entry['type']] = alignment_input
     else:
         logging.warning(
