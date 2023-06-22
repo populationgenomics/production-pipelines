@@ -103,6 +103,8 @@ def _populate_alignment_inputs(
         _assay_meta = _combine_assay_meta(assays)
     else:
         _assay_meta = assays[0].meta
+        if _assay_meta.get('reads'):
+            _assay_meta['reads'] = [_assay_meta['reads']]
 
     if _assay_meta.get('reads'):
         alignment_input = parse_reads(
