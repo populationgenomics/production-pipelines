@@ -170,11 +170,11 @@ class ValidationParseHappy(SequencingGroupStage):
         py_job.image(get_config()['workflow']['driver_image'])
         py_job.call(
             parse_and_post_results,
-            str(input_vcf),
-            sequencing_group.id,
-            sequencing_group.external_id,
-            str(happy_results),
-            str(exp_outputs['json_summary']),
+            vcf_path=str(input_vcf),
+            sequencing_group_id=sequencing_group.id,
+            sequencing_group_ext_id=sequencing_group.external_id,
+            happy_results=happy_results,
+            out_file=str(exp_outputs['json_summary']),
         )
 
         return self.make_outputs(sequencing_group, data=exp_outputs, jobs=py_job)
