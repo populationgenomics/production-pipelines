@@ -128,14 +128,14 @@ def _mock_cohort():
 
     cohort = Cohort()
     ds = cohort.create_dataset('test-input-dataset')
-    ds.add_sample(
+    ds.add_sequencing_group(
         'CPG01',
         'SAMPLE1',
         alignment_input_by_seq_type={
             'genome': BamPath('gs://test-input-dataset-upload/sample1.bam')
         },
     )
-    ds.add_sample(
+    ds.add_sequencing_group(
         'CPG02',
         'SAMPLE2',
         alignment_input_by_seq_type={
@@ -180,7 +180,7 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
     def do_nothing(*args, **kwargs):
         return None
 
-    def mock_create_new_analysis(*args, **kwargs) -> int:
+    def mock_create_analysis(*args, **kwargs) -> int:
         return 1
 
     mocker.patch('pathlib.Path.open', selective_mock_open)
@@ -197,10 +197,10 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
         'cpg_workflows.stages.seqr_loader.es_password', lambda: 'test-password'
     )
     mocker.patch(
-        'sample_metadata.apis.AnalysisApi.create_new_analysis',
-        mock_create_new_analysis,
+        'metamist.apis.AnalysisApi.create_analysis',
+        mock_create_analysis,
     )
-    mocker.patch('sample_metadata.apis.AnalysisApi.update_analysis_status', do_nothing)
+    mocker.patch('metamist.apis.AnalysisApi.update_analysis', do_nothing)
 
     from cpg_workflows.batch import get_batch
     from cpg_workflows.inputs import get_cohort
@@ -214,16 +214,16 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
 
     assert (
         get_batch().job_by_tool['gatk HaplotypeCaller']['job_n']
-        == len(get_cohort().get_samples()) * 50
+        == len(get_cohort().get_sequencing_groups()) * 50
     )
     assert get_batch().job_by_tool['picard MergeVcfs']['job_n'] == len(
-        get_cohort().get_samples()
+        get_cohort().get_sequencing_groups()
     )
     assert get_batch().job_by_tool['gatk ReblockGVCF']['job_n'] == len(
-        get_cohort().get_samples()
+        get_cohort().get_sequencing_groups()
     )
     assert (
         get_batch().job_by_tool['picard CollectVariantCallingMetrics']['job_n']
-        == len(get_cohort().get_samples()) + 1
+        == len(get_cohort().get_sequencing_groups()) + 1
     )
     assert get_batch().job_by_tool['gatk GenomicsDBImport']['job_n'] == 50

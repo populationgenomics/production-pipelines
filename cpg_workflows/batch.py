@@ -22,7 +22,9 @@ from cpg_utils.hail_batch import (
 _batch: Optional['Batch'] = None
 
 
-def get_batch(name: str | None = None, default_python_image: str | None = None) -> 'Batch':
+def get_batch(
+    name: str | None = None, default_python_image: str | None = None
+) -> 'Batch':
     global _batch
     backend: hb.Backend
     if _batch is None:
@@ -45,7 +47,8 @@ def get_batch(name: str | None = None, default_python_image: str | None = None) 
             cancel_after_n_failures=get_config()['hail'].get('cancel_after_n_failures'),
             default_timeout=get_config()['hail'].get('default_timeout'),
             default_memory=get_config()['hail'].get('default_memory'),
-            default_python_image=default_python_image or get_config()['workflow']['driver_image'],
+            default_python_image=default_python_image
+            or get_config()['workflow']['driver_image'],
         )
     return _batch
 
@@ -101,11 +104,11 @@ class Batch(hb.Batch):
         attributes = attributes or {}
         stage = attributes.get('stage')
         dataset = attributes.get('dataset')
-        sample = attributes.get('sample')
+        sequencing_group = attributes.get('sequencing_group')
         participant_id = attributes.get('participant_id')
-        samples: set[str] = set(attributes.get('samples') or [])
-        if sample:
-            samples.add(sample)
+        sequencing_groups: set[str] = set(attributes.get('sequencing_groups') or [])
+        if sequencing_group:
+            sequencing_groups.add(sequencing_group)
         part = attributes.get('part')
         label = attributes.get('label', name)
         tool = attributes.get('tool')
@@ -114,35 +117,35 @@ class Batch(hb.Batch):
 
         assert isinstance(stage, str | None)
         assert isinstance(dataset, str | None)
-        assert isinstance(sample, str | None)
+        assert isinstance(sequencing_group, str | None)
         assert isinstance(participant_id, str | None)
         assert isinstance(part, str | None)
         assert isinstance(label, str | None)
 
         name = make_job_name(
             name=name,
-            sample=sample,
+            sequencing_group=sequencing_group,
             participant_id=participant_id,
             dataset=dataset,
             part=part,
         )
 
         if label not in self.job_by_label:
-            self.job_by_label[label] = {'job_n': 0, 'samples': set()}
+            self.job_by_label[label] = {'job_n': 0, 'sequencing_groups': set()}
         self.job_by_label[label]['job_n'] += 1
-        self.job_by_label[label]['samples'] |= samples
+        self.job_by_label[label]['sequencing_groups'] |= sequencing_groups
 
         if stage not in self.job_by_stage:
-            self.job_by_stage[stage] = {'job_n': 0, 'samples': set()}
+            self.job_by_stage[stage] = {'job_n': 0, 'sequencing_groups': set()}
         self.job_by_stage[stage]['job_n'] += 1
-        self.job_by_stage[stage]['samples'] |= samples
+        self.job_by_stage[stage]['sequencing_groups'] |= sequencing_groups
 
         if tool not in self.job_by_tool:
-            self.job_by_tool[tool] = {'job_n': 0, 'samples': set()}
+            self.job_by_tool[tool] = {'job_n': 0, 'sequencing_groups': set()}
         self.job_by_tool[tool]['job_n'] += 1
-        self.job_by_tool[tool]['samples'] |= samples
+        self.job_by_tool[tool]['sequencing_groups'] |= sequencing_groups
 
-        attributes['samples'] = list(sorted(list(samples)))
+        attributes['sequencing_groups'] = list(sorted(list(sequencing_groups)))
         fixed_attrs = {k: str(v) for k, v in attributes.items()}
         return name, fixed_attrs
 
@@ -173,9 +176,9 @@ class Batch(hb.Batch):
                     msg = f'{stat["job_n"]} job'
                     if stat['job_n'] > 1:
                         msg += 's'
-                    if len(stat['samples']) > 0:
-                        msg += f' for {len(stat["samples"])} sample'
-                        if len(stat['samples']) > 1:
+                    if (sg_count := len(stat['sequencing_groups'])) > 0:
+                        msg += f' for {sg_count} sequencing group'
+                        if sg_count > 1:
                             msg += 's'
                     logging.info(f'  {label}: {msg}')
 
@@ -198,7 +201,7 @@ class Batch(hb.Batch):
 
 def make_job_name(
     name: str,
-    sample: str | None = None,
+    sequencing_group: str | None = None,
     participant_id: str | None = None,
     dataset: str | None = None,
     part: str | None = None,
@@ -206,10 +209,10 @@ def make_job_name(
     """
     Extend the descriptive job name to reflect job attributes.
     """
-    if sample and participant_id:
-        sample = f'{sample}/{participant_id}'
-    if sample and dataset:
-        name = f'{dataset}/{sample}: {name}'
+    if sequencing_group and participant_id:
+        sequencing_group = f'{sequencing_group}/{participant_id}'
+    if sequencing_group and dataset:
+        name = f'{dataset}/{sequencing_group}: {name}'
     elif dataset:
         name = f'{dataset}: {name}'
     if part:

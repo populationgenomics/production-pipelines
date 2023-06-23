@@ -1,13 +1,13 @@
 """
-Metamist wrapper to get input samples.
+Metamist wrapper to get input sequencing groups.
 """
 
 import logging
 
 from cpg_utils.config import get_config, update_dict
 
-from .metamist import get_metamist, Sequence, AnalysisType, MetamistError
-from .targets import Cohort, Sex, PedigreeInfo
+from .metamist import get_metamist, Assay, AnalysisType, MetamistError, parse_reads
+from .targets import Cohort, Sex, PedigreeInfo, SequencingGroup
 
 
 _cohort: Cohort | None = None
@@ -35,125 +35,90 @@ def create_cohort() -> Cohort:
     cohort = Cohort()
     for dataset_name in dataset_names:
         dataset = cohort.create_dataset(dataset_name)
-        logging.info(f'Getting samples for dataset {dataset_name}')
-        sample_entries = get_metamist().get_sample_entries(dataset_name)
-        for entry in sample_entries:
-            dataset.add_sample(
+        logging.info(f'Getting sequencing groups for dataset {dataset_name}')
+        sequencing_group_entries = get_metamist().get_sg_entries(dataset_name)
+        for entry in sequencing_group_entries:
+            metadata = entry.get('meta', {})
+            update_dict(metadata, entry['sample']['participant'].get('meta', {}))
+
+            sequencing_group = dataset.add_sequencing_group(
                 id=str(entry['id']),
-                external_id=str(entry['external_id']),
-                meta=entry.get('meta', {}),
+                external_id=str(entry['sample']['externalId']),
+                participant_id=entry['sample']['participant'].get('externalId'),
+                meta=metadata,
             )
+
+            if reported_sex := entry['sample']['participant'].get('reportedSex'):
+                sequencing_group.pedigree.sex = Sex.parse(reported_sex)
+
+            _populate_alignment_inputs(sequencing_group, entry)
 
     if not cohort.get_datasets():
         msg = 'No datasets populated'
-        if 'skip_samples' in get_config()['workflow']:
-            msg += ' (after skipping samples)'
-        if 'only_samples' in get_config()['workflow']:
-            msg += ' (after picking samples)'
+        if 'skip_sgs' in get_config()['workflow']:
+            msg += ' (after skipping sequencing groups)'
+        if 'only_sgs' in get_config()['workflow']:
+            msg += ' (after picking sequencing groups)'
         raise MetamistError(msg)
 
-    if sequencing_type := get_config()['workflow'].get('sequencing_type'):
-        _populate_alignment_inputs(cohort, sequencing_type)
-        _filter_sequencing_type(cohort, sequencing_type)
     _populate_analysis(cohort)
-    _populate_participants(cohort)
     if get_config()['workflow'].get('read_pedigree', True):
         _populate_pedigree(cohort)
-    assert cohort.get_samples()
+    assert cohort.get_sequencing_groups()
     return cohort
 
 
-def _filter_sequencing_type(cohort: Cohort, sequencing_type: str):
+def _combine_assay_meta(assays: list[Assay]) -> dict:
     """
-    Filtering to the samples with only requested sequencing types.
+    Combine assay meta from multiple assays
     """
-    for s in cohort.get_samples():
-        if not s.seq_by_type:
-            s.active = False
-            continue
-
-        if s.alignment_input_by_seq_type:
-            avail_types = list(s.seq_by_type.keys())
-            s.alignment_input_by_seq_type = {
-                k: v
-                for k, v in s.alignment_input_by_seq_type.items()
-                if k == sequencing_type
-            }
-            if not bool(s.alignment_input_by_seq_type):
-                logging.warning(
-                    f'{s}: skipping because no inputs with data type '
-                    f'"{sequencing_type}" found in {avail_types}'
-                )
-                s.active = False
+    assays_meta: dict = {}
+    for assay in assays:
+        for key, value in assay.meta.items():
+            if key == 'reads':
+                assays_meta.setdefault(key, []).append(value)
+            else:
+                assays_meta[key] = value
+    return assays_meta
 
 
 def _populate_alignment_inputs(
-    cohort: Cohort,
-    sequencing_type: str,
+    sequencing_group: SequencingGroup,
+    entry: dict,
     check_existence: bool = False,
 ) -> None:
     """
-    Populate sequencing inputs for samples.
+    Populate sequencing inputs for a sequencing group
     """
-    assert cohort.get_sample_ids()
+    assays: list[Assay] = []
+    for assay in entry['assays']:
+        _assay = Assay.parse(assay, sequencing_group.id, run_parse_reads=False)
+        assays.append(_assay)
 
-    seq_entries_by_sid = get_metamist().get_sequence_entries_by_sid(
-        cohort.get_sample_ids(), sequencing_type=sequencing_type
-    )
+    # Check only one assay type per sequencing group
+    assert len(set([assay.assay_type for assay in assays])) == 1
+    sequencing_group.assays[assays[0].assay_type] = tuple(assays)
 
-    # Log sequences without samples, this is a pretty common thing,
-    # but useful to log to easier track down samples not processed
-    if sids_wo_seq := [
-        sid for sid in cohort.get_sample_ids() if sid not in seq_entries_by_sid
-    ]:
-        logging.info(
-            f'No {sequencing_type} sequencing data found for '
-            f'{len(sids_wo_seq)}/{len(cohort.get_samples())} samples:'
+    if len(entry['assays']) > 1:
+        _assay_meta = _combine_assay_meta(assays)
+    else:
+        _assay_meta = assays[0].meta
+        if _assay_meta.get('reads'):
+            _assay_meta['reads'] = [_assay_meta['reads']]
+
+    if _assay_meta.get('reads'):
+        alignment_input = parse_reads(
+            sequencing_group_id=sequencing_group.id,
+            assay_meta=_assay_meta,
+            check_existence=check_existence,
         )
-        for ds in cohort.get_datasets():
-            ds_sids_wo_seq = [sid for sid in sids_wo_seq if sid in ds.get_sample_ids()]
-            logging.info(
-                f'\t{ds.name}, {len(ds_sids_wo_seq)}/{len(ds.get_samples())} samples: '
-                f'{", ".join(ds_sids_wo_seq)}'
-            )
-
-    sid_wo_reads = set()
-    for sample in cohort.get_samples():
-        for entry in seq_entries_by_sid.get(sample.id, []):
-            seq = Sequence.parse(entry, parse_reads=False)
-            if seq.sequencing_type in sample.seq_by_type:
-                raise MetamistError(
-                    f'{sample}: found more than one associated sequencing entry with '
-                    f'sequencing type: {seq.sequencing_type}. Make sure there is only '
-                    f'one data source of sequencing type per sample.'
-                )
-            sample.seq_by_type[seq.sequencing_type] = seq
-
-            if not entry.get('meta', {}).get('reads'):
-                sid_wo_reads.add(sample.id)
-                continue
-
-            alignment_input = Sequence.parse_reads(
-                sample_id=sample.id,
-                meta=entry['meta'],
-                check_existence=check_existence,
-            )
-            seq.alignment_input = alignment_input
-            sample.alignment_input_by_seq_type[seq.sequencing_type] = alignment_input
-
-    if sid_wo_reads:
+        sequencing_group.alignment_input_by_seq_type[entry['type']] = alignment_input
+    else:
         logging.warning(
-            f'Found {len(sid_wo_reads)}/{len(cohort.get_samples())} samples with '
-            f'no meta/reads in corresponding sequence entries'
+            f'No reads found for sequencing group {sequencing_group.id} of type {entry["type"]}'
         )
-        for ds in cohort.get_datasets():
-            ds_sid_wo_reads = [
-                sid for sid in sid_wo_reads if sid in ds.get_sample_ids()
-            ]
-            logging.warning(
-                f'\t{ds.name}, {len(ds_sid_wo_reads)}/{len(ds.get_samples())} samples: '
-                f'{", ".join(ds_sid_wo_reads)}'
-            )
+
+    return None
 
 
 def _populate_analysis(cohort: Cohort) -> None:
@@ -161,61 +126,45 @@ def _populate_analysis(cohort: Cohort) -> None:
     Populate Analysis entries.
     """
     for dataset in cohort.get_datasets():
-        gvcf_by_sid = get_metamist().get_analyses_by_sid(
-            dataset.get_sample_ids(),
+        gvcf_by_sgid = get_metamist().get_analyses_by_sgid(
+            dataset.get_sequencing_group_ids(),
             analysis_type=AnalysisType.GVCF,
             dataset=dataset.name,
         )
-        cram_by_sid = get_metamist().get_analyses_by_sid(
-            dataset.get_sample_ids(),
+        cram_by_sgid = get_metamist().get_analyses_by_sgid(
+            dataset.get_sequencing_group_ids(),
             analysis_type=AnalysisType.CRAM,
             dataset=dataset.name,
         )
-        for sample in dataset.get_samples():
-            if (analysis := gvcf_by_sid.get(sample.id)) and analysis.output:
-                assert analysis.output == sample.make_gvcf_path().path, (
+
+        # NOTE: This logic will be simplified to remove existence checks overwriting metamist
+        # in a later PR.
+        for sequencing_group in dataset.get_sequencing_groups():
+            if (analysis := gvcf_by_sgid.get(sequencing_group.id)) and analysis.output:
+                assert analysis.output == sequencing_group.make_gvcf_path().path, (
                     analysis.output,
-                    sample.make_gvcf_path().path,
+                    sequencing_group.make_gvcf_path().path,
                 )
-                sample.gvcf = sample.make_gvcf_path()
-            elif sample.make_gvcf_path().exists():
-                sample.gvcf = sample.make_gvcf_path()
-            if (analysis := cram_by_sid.get(sample.id)) and analysis.output:
-                assert analysis.output == sample.make_cram_path().path, (
+                sequencing_group.gvcf = sequencing_group.make_gvcf_path()
+            elif sequencing_group.make_gvcf_path().exists():
+                sequencing_group.gvcf = sequencing_group.make_gvcf_path()
+            if (analysis := cram_by_sgid.get(sequencing_group.id)) and analysis.output:
+                assert analysis.output == sequencing_group.make_cram_path().path, (
                     analysis.output,
-                    sample.make_cram_path().path,
+                    sequencing_group.make_cram_path().path,
                 )
-                sample.cram = sample.make_cram_path()
-            elif sample.make_cram_path().exists():
-                sample.cram = sample.make_cram_path()
-
-
-def _populate_participants(cohort: Cohort) -> None:
-    """
-    Populate Participant entries.
-    """
-    for dataset in cohort.get_datasets():
-        logging.info(f'Reading participants IDs for dataset {dataset}')
-
-        participant_entry_by_sid = get_metamist().get_participant_entries_by_sid(
-            dataset.name
-        )
-
-        for sample in dataset.get_samples():
-            if entry := participant_entry_by_sid.get(sample.id):
-                sample.participant_id = entry['external_id']
-                if reported_sex := entry.get('reported_sex'):
-                    sample.pedigree.sex = Sex.parse(reported_sex)
-                update_dict(sample.meta, entry.get('meta', {}))
+                sequencing_group.cram = sequencing_group.make_cram_path()
+            elif sequencing_group.make_cram_path().exists():
+                sequencing_group.cram = sequencing_group.make_cram_path()
 
 
 def _populate_pedigree(cohort: Cohort) -> None:
     """
-    Populate pedigree data for samples.
+    Populate pedigree data for sequencing groups.
     """
-    sample_by_participant_id = dict()
-    for s in cohort.get_samples():
-        sample_by_participant_id[s.participant_id] = s
+    sg_by_participant_id = dict()
+    for sg in cohort.get_sequencing_groups():
+        sg_by_participant_id[sg.participant_id] = sg
 
     for dataset in cohort.get_datasets():
         logging.info(f'Reading pedigree for dataset {dataset}')
@@ -225,29 +174,25 @@ def _populate_pedigree(cohort: Cohort) -> None:
             part_id = str(ped_entry['individual_id'])
             ped_entry_by_participant_id[part_id] = ped_entry
 
-        sids_wo_ped = []
-        for sample in dataset.get_samples():
-            if sample.participant_id not in ped_entry_by_participant_id:
-                sids_wo_ped.append(sample.id)
+        sgids_wo_ped = []
+        for sequencing_group in dataset.get_sequencing_groups():
+            if sequencing_group.participant_id not in ped_entry_by_participant_id:
+                sgids_wo_ped.append(sequencing_group.id)
                 continue
 
-            ped_entry = ped_entry_by_participant_id[sample.participant_id]
-            maternal_sample = sample_by_participant_id.get(
-                str(ped_entry['maternal_id'])
-            )
-            paternal_sample = sample_by_participant_id.get(
-                str(ped_entry['paternal_id'])
-            )
-            sample.pedigree = PedigreeInfo(
-                sample=sample,
+            ped_entry = ped_entry_by_participant_id[sequencing_group.participant_id]
+            maternal_sg = sg_by_participant_id.get(str(ped_entry['maternal_id']))
+            paternal_sg = sg_by_participant_id.get(str(ped_entry['paternal_id']))
+            sequencing_group.pedigree = PedigreeInfo(
+                sequencing_group=sequencing_group,
                 fam_id=ped_entry['family_id'],
-                mom=maternal_sample,
-                dad=paternal_sample,
+                mom=maternal_sg,
+                dad=paternal_sg,
                 sex=Sex.parse(str(ped_entry['sex'])),
                 phenotype=ped_entry['affected'] or '0',
             )
-        if sids_wo_ped:
+        if sgids_wo_ped:
             logging.warning(
                 f'No pedigree data found for '
-                f'{len(sids_wo_ped)}/{len(dataset.get_samples())} samples'
+                f'{len(sgids_wo_ped)}/{len(dataset.get_sequencing_groups())} sequencing groups'
             )

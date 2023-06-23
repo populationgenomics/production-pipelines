@@ -18,7 +18,7 @@ setup(
         'analysis-runner>=2.40.7',
         'hail',
         'networkx',
-        'sample-metadata>=5.0.1',
+        'metamist>=6.0.4',
         'pandas',
         'peddy',
         'fsspec',

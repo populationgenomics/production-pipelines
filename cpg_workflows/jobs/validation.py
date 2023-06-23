@@ -8,13 +8,10 @@ from csv import DictReader
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
-from sample_metadata.apis import AnalysisApi
-from sample_metadata.model.analysis_model import AnalysisModel
-from sample_metadata.model.analysis_status import AnalysisStatus
-from sample_metadata.model.analysis_type import AnalysisType
+from ..metamist import get_metamist, AnalysisStatus
 
-from cpg_workflows.workflow import Sample
-from cpg_utils import to_path, Path
+from cpg_workflows.workflow import SequencingGroup
+from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import fasta_res_group, image_path, query_command
 
@@ -26,26 +23,27 @@ SUMMARY_KEYS = {
 }
 
 
-def get_sample_truth_data(sample_id: str):
+def get_sample_truth_data(sequencing_group_id: str):
     """
+    retrieve the reference truth specific to this individual
 
     Args:
-        sample_id (str):
+        sequencing_group_id (str):
 
     Returns:
-        The sample-specific truth data from config
+        The specific truth data from config
     """
 
-    ref_data = get_config()['references'][sample_id]
+    ref_data = get_config()['references'][sequencing_group_id]
     assert all(key in ref_data for key in ['vcf', 'index', 'bed'])
     return ref_data
 
 
 def validation_mt_to_vcf_job(
     b: Batch,
-    mt_path: Path,
-    sample_id: str,
-    out_vcf_path: Path,
+    mt_path: str,
+    sequencing_group_id: str,
+    out_vcf_path: str,
     job_attrs: dict | None = None,
     depends_on: list[Job] | None = None,
 ):
@@ -55,7 +53,7 @@ def validation_mt_to_vcf_job(
     Args:
         b (hb.Batch): the batch to add jobs into
         mt_path (str): path of the AnnotateDataset MT
-        sample_id (str): sample name
+        sequencing_group_id (str): sequencing group name
         out_vcf_path (str): path to write new VCF to
         job_attrs (dict):
         depends_on (hb.Job|list[hb.Job]): jobs to depend on
@@ -73,8 +71,8 @@ def validation_mt_to_vcf_job(
         query_command(
             validation,
             validation.single_sample_vcf_from_dataset_vcf.__name__,
-            str(mt_path),
-            sample_id,
+            mt_path,
+            sequencing_group_id,
             out_vcf_path,
             setup_gcp=True,
         )
@@ -88,7 +86,7 @@ def validation_mt_to_vcf_job(
 def run_happy_on_vcf(
     b: Batch,
     vcf_path: str,
-    sample_ext_id: str,
+    sequencing_group_ext_id: str,
     out_prefix: str,
     job_attrs: dict | None = None,
     depends_on: list[Job] | None = None,
@@ -100,7 +98,7 @@ def run_happy_on_vcf(
     Args:
         b (): the batch to create a new job in
         vcf_path (str): path to the single-sample VCF
-        sample_ext_id (str): external ID to find reference data
+        sequencing_group_ext_id (str): external ID to find reference data
         out_prefix (str): where to export happy outputs
         job_attrs ():
         depends_on ():
@@ -110,7 +108,8 @@ def run_happy_on_vcf(
     """
 
     happy_j = b.new_job(
-        f'Run Happy on {sample_ext_id} VCF', (job_attrs or {}) | {'tool': 'hap.py'}
+        f'Run Happy on {sequencing_group_ext_id} VCF',
+        (job_attrs or {}) | {'tool': 'hap.py'},
     )
     happy_j.image(image_path('hap-py')).memory('100Gi').storage('100Gi').cpu(4)
     if depends_on:
@@ -120,7 +119,7 @@ def run_happy_on_vcf(
     vcf_input = b.read_input_group(vcf=vcf_path, index=f'{vcf_path}.tbi')
 
     # read in sample-specific truth data from config
-    ref_data = get_sample_truth_data(sample_ext_id)
+    ref_data = get_sample_truth_data(sequencing_group_ext_id)
     truth_input = b.read_input_group(
         vcf=ref_data['vcf'], index=ref_data['index'], bed=ref_data['bed']
     )
@@ -171,37 +170,30 @@ def run_happy_on_vcf(
 
 
 def parse_and_post_results(
-    b: Batch,
     vcf_path: str,
-    sample: Sample,
+    sequencing_group_id: str,
+    sequencing_group_ext_id: str,
     happy_results: dict,
-    out_file: Path,
-    job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None,
+    out_file: str,
 ):
     """
-    read the Hap.py results, and update Metamist
+    Read the Hap.py results, and update Metamist
+    This whole method is called as a scheduled PythonJob
+
     Args:
-        b (): the batch to create jobs in
         vcf_path (str): path to the single-sample VCF
-        sample (Sample):
+        sequencing_group_id (str): the SG ID
+        sequencing_group_ext_id (str): the SG external ID
         happy_results (dict): all results from the hap.py stage
-        out_file (Path): where to write the JSON file
-        job_attrs ():
-        depends_on ():
+        out_file (str): where to write the JSON file
 
     Returns:
         this job
     """
-
-    results_j = b.new_job(f'Parse {sample.id} Happy results', (job_attrs or {}))
-    if depends_on:
-        results_j.depends_on(*depends_on)
-
-    ref_data = get_sample_truth_data(sample_id=sample.external_id)
+    ref_data = get_sample_truth_data(sequencing_group_id=sequencing_group_ext_id)
     happy_csv = happy_results['happy_csv']
 
-    # populate a dictionary of results for this sample
+    # populate a dictionary of results for this sequencing group
     summary_data = {
         'type': 'validation_result',
         'query_vcf': vcf_path,
@@ -223,20 +215,15 @@ def parse_and_post_results(
             for sub_key, sub_value in SUMMARY_KEYS.items():
                 summary_data[f'{summary_key}::{sub_value}'] = str(line[sub_key])
 
-    with out_file.open('w', encoding='utf-8') as handle:
+    with to_path(out_file).open('w', encoding='utf-8') as handle:
         json.dump(summary_data, handle)
 
-    # post results to metamist
-    AnalysisApi().create_new_analysis(
-        project=get_config()['workflow']['dataset'],
-        analysis_model=AnalysisModel(
-            sample_ids=[sample.id],
-            type=AnalysisType('qc'),
-            status=AnalysisStatus('completed'),
-            output=str(happy_csv.parent),
-            meta=summary_data,
-            active=True,
-        ),
+    # NOTE: This change is untested.
+    get_metamist().create_analysis(
+        dataset=get_config()['workflow']['dataset'],
+        status=AnalysisStatus('completed'),
+        sequencing_group_ids=[sequencing_group_id],
+        type_='qc',
+        output=str(happy_csv.parent),
+        meta=summary_data,
     )
-
-    return results_j

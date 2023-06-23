@@ -2,10 +2,16 @@
 input_datasets = ['validation']
 sequencing_type = 'genome'
 create_es_index_for_datasets = ['validation']
-skip_samples = [
+skip_sgs = [
     'CPG243717',  # NA12878_KCCG low coverage (8x)
 ]
 
 check_inputs = false
 check_intermediates = false
 check_expected_outputs = false
+
+[inputs]
+# update this hash to point to the latest MT generated
+# i.e. "fa2b24d025f5542fc3bfaf8fc963e5032f1f81_1980"
+# in gs://cpg-validation-main/mt/fa2b24d025f5542fc3bfaf8fc963e5032f1f81_1980-validation.mt
+sample_hash = 'sample_hash'

@@ -17,11 +17,19 @@ from cpg_workflows.stages.cram_qc import CramMultiQC
 from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.seqr_loader import MtToEs, AnnotateDataset, DatasetVCF
-from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_1 import FilterBatch, GenotypeBatch, MergeBatchSites
+from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_1 import (
+    FilterBatch,
+    GenotypeBatch,
+    MergeBatchSites,
+)
 from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_2 import AnnotateVcf
 from cpg_workflows.stages.gatk_sv.gatk_sv_single_sample import CreateSampleBatches
 from cpg_workflows.stages.stripy import Stripy
-from cpg_workflows.stages.happy_validation import ValidationParseHappy
+from cpg_workflows.stages.happy_validation import (
+    ValidationMtToVcf,
+    ValidationHappyOnVcf,
+    ValidationParseHappy
+)
 
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
@@ -33,12 +41,14 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         GvcfMultiQC,
         CramMultiQC,
         Stripy,
-        ValidationParseHappy
     ],
+    'validation': [ValidationMtToVcf, ValidationHappyOnVcf, ValidationParseHappy],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
     'gatk_sv_singlesample': [CreateSampleBatches],
     'gatk_sv_multisample_1': [FilterBatch, GenotypeBatch],
-    'gatk_sv_sandwich': [MergeBatchSites],  # stage to run between FilterBatch & GenotypeBatch
+    'gatk_sv_sandwich': [
+        MergeBatchSites
+    ],  # stage to run between FilterBatch & GenotypeBatch
     'gatk_sv_multisample_2': [AnnotateVcf],
 }
 
@@ -105,7 +115,7 @@ def main(
     if list_last_stages:
         click.echo(
             f'Available last stages that can be listed with '
-            f'workflow/last_stages for the workflow "{workflow}":'
+            f'workflow/last_stages for the current workflow "{workflow}":'
         )
         click.echo(f'{", ".join(s.__name__ for s in WORKFLOWS[workflow])}')
         return

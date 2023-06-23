@@ -24,6 +24,10 @@ indel_filter_level = 99.0
 assume_sorted = true
 num_pcs = 4
 
+[resource_overrides]
+# Override default resource requirements for unusually large seq data without
+# demanding higher resources for all operations as standard. Examples below
+
 [large_cohort]
 # Parameters for reladness inference
 max_kin = 0.2  # maximum kin threshold to be considered unrelated in relatedness check (second degree)
@@ -33,7 +37,7 @@ n_pcs = 16  # number of principal components for PCA analysis
 min_pop_prob = 0.5  # minimum random forest probability for population assignment
 training_pop = 'Superpopulation name'  # metamist's `Participant/meta` field for the
                                          # known population label for the RF training
-# whether or not to key samples by their external ID
+# whether or not to key sequencing groups by their external ID
 use_external_id = true
 pca_plot_name = 'hgdp_1kg_sites'
 
