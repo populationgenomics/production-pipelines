@@ -19,7 +19,7 @@ from cpg_workflows.batch import make_job_name, Batch
 from cpg_workflows.workflow import Dataset, Cohort
 
 
-GATK_SV_COMMIT = 'a73237cf9d9e321df3aa81c890def7b504a25c7f'
+GATK_SV_COMMIT = 'ecab760a23868ad667dfed39429759a214295d51'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 _FASTA = None
 
@@ -108,7 +108,7 @@ def add_gatk_sv_jobs(
     # we have to support inputs of type dict[str, str], so using Mapping here:
     input_dict: dict[str, Any],
     expected_out_dict: dict[str, Path | list[Path]],
-    sample_id: str | None = None,
+    sequencing_group_id: str | None = None,
     driver_image: str | None = None,
 ) -> list[Job]:
     """
@@ -117,8 +117,8 @@ def add_gatk_sv_jobs(
     # Where Cromwell writes the output.
     # Will be different from paths in expected_out_dict:
     output_prefix = f'gatk_sv/output/{wfl_name}/{dataset.name}'
-    if sample_id:
-        output_prefix = join(output_prefix, sample_id)
+    if sequencing_group_id:
+        output_prefix = join(output_prefix, sequencing_group_id)
 
     outputs_to_collect = dict()
     for key, value in expected_out_dict.items():
@@ -143,7 +143,9 @@ def add_gatk_sv_jobs(
         else:
             paths_as_strings[f'{wfl_name}.{key}'] = value
 
-    job_prefix = make_job_name(wfl_name, sample=sample_id, dataset=dataset.name)
+    job_prefix = make_job_name(
+        wfl_name, sequencing_group=sequencing_group_id, dataset=dataset.name
+    )
     submit_j, output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
         b=batch,
         job_prefix=job_prefix,

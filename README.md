@@ -36,7 +36,7 @@ As well as:
 * [Somalier](https://github.com/brentp/somalier) pedigree checks
 * [MultiQC](https://github.com/ewels/MultiQC) QC reporting.
 
-The workflow uses Metamist as a source of FASTQ, CRAMs, and sample/participant metadata, and TOML configs for extended configuration (dataset and samples, Hail Batch parameters, Elasticsearch credentials, QC thresholds).
+The workflow uses Metamist as a source of FASTQ, CRAMs, and sample/participant metadata, and TOML configs for extended configuration (dataset and sequencing groups, Hail Batch parameters, Elasticsearch credentials, QC thresholds).
 
 ### Example usage
 
@@ -47,7 +47,7 @@ To run the Seqr Loader workflow on the dataset called `validation`, create a con
 input_datasets = ['validation']
 sequencing_type = 'genome'
 create_es_index_for_datasets = ['validation']
-skip_samples = [
+skip_sgs = [
     'CPG243717',  # NA12878_KCCG low coverage (8x)
 ]
 ```
@@ -70,7 +70,7 @@ For more options available for seqr-loader configuration, check the seqr-loader 
 
 ### Seqr production load invocation
 
-`configs/seqr-main.toml` provides relevant configuration defaults for a CPG production seqr-loader run. Specifically, in contains the list of datasets to query from Metamist and joint-call together, and a list of blacklisted samples in those datasets. Another handy configs, `configs/genome.toml` or `configs/exome.toml`, can be passed to subset samples to WGS or WES specifically. To use along with `configs/seqr-main.toml`, of these two must be provided, as the seqr-loader can work on only one type of data at a time. 
+`configs/seqr-main.toml` provides relevant configuration defaults for a CPG production seqr-loader run. Specifically, in contains the list of datasets to query from Metamist and joint-call together, and a list of blacklisted sequencing groups in those datasets. Another handy configs, `configs/genome.toml` or `configs/exome.toml`, can be passed to subset sequencing groups to WGS or WES specifically. To use along with `configs/seqr-main.toml`, of these two must be provided, as the seqr-loader can work on only one type of data at a time. 
 
 For example, to load the genome data:
 
@@ -85,7 +85,7 @@ analysis-runner \
   seqr_loader
 ```
 
-### Stage selection example: only align Seqr samples
+### Stage selection example: only align Seqr sequencing groups
 
 Seqr Loader can be used partially, controlled by `workflows/first_stages`, `workflows/last_stages`, and `workflows/only_stages` parameters.
 
@@ -112,7 +112,7 @@ analysis-runner \
 
 For exomes, replace `configs/genome.toml` with `configs/exome.toml`, or set `sequencing_type = 'exome'` in the `workflow` section.
 
-The section `workflows/input_datasets` in `configs/seqr-main.toml` specified the list of all projects to be processed, excluding samples specified in the `workflows/skip_samples` section.
+The section `workflows/input_datasets` in `configs/seqr-main.toml` specified the list of all projects to be processed, excluding sequencing groups specified in the `workflows/skip_sgs` section.
 
 QC reports for each dataset would be exposed on a web server, e.g. for `validation` genomes, the URL would be https://main-web.populationgenomics.org.au/validation/qc/cram/multiqc.html, and for exomes, it will  be https://main-web.populationgenomics.org.au/validation/exome/qc/cram/multiqc.html.
 
@@ -503,7 +503,7 @@ To facilitate re-engineering WARP workflows and creating workflows scratch, we i
 
 This library provides an abstraction interface on top of Hail Batch jobs, namely a `Stage` abstract class, parametrised by the `Target` abstract class, representing what target this stage works with. 
 
-For example, a stage that performs read alignment to produce a CRAM file, would be derived from `SampleStage`, and be parametrised by `Sample`, and a stage that performs joint-calling would be derived from `CohortStage`, parametrised by `Cohort`.
+For example, a stage that performs read alignment to produce a CRAM file, would be derived from `SequencingGroupStage`, and be parametrised by `SequencingGroup`, and a stage that performs joint-calling would be derived from `CohortStage`, parametrised by `Cohort`.
 
 Each `Stage` final implementation must declare paths to the outputs it would write in the `expected_outputs()` method. It must also define how jobs are added into Hail Batch using the `queue_jobs()` method.
 
@@ -511,41 +511,41 @@ For example, out "Align" stage that runs BWA might look like as following:
 
 ```python
 from cpg_utils import Path
-from cpg_workflows.workflow import stage, SampleStage, Sample, StageInput, StageOutput
+from cpg_workflows.workflow import stage, SequencingGroupStage, SequencingGroup, StageInput, StageOutput
 from cpg_workflows.batch import get_batch
 
 @stage
-class Align(SampleStage):
-    def expected_outputs(self, sample: Sample) -> Path:
-        return sample.make_cram_path().path
+class Align(SequencingGroupStage):
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> Path:
+        return sequencing_group.make_cram_path().path
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
-        j = get_batch().new_job('BWA', self.get_job_attrs(sample))
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        j = get_batch().new_job('BWA', self.get_job_attrs(sequencing_group))
         j.command(f'bwa ... > {j.output}')
-        get_batch().write_output(j.output, str(self.expected_outputs(sample)))
+        get_batch().write_output(j.output, str(self.expected_outputs(sequencing_group)))
         # Construct StageOutput object, where we pass a path to the results, 
-        return self.make_outputs(sample, self.expected_outputs(sample), [j])
+        return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), [j])
 ```
 
 The `queue_jobs()` method is expected to return an output of type `StageOutput`: you can call `self.make_outputs()` to construct that object.
 
-Stages can depend on each other (i.e. they form a directed acyclic graph), which is specified using a parameter `required_stages` to the `@stage` class decorator, and the `inputs` parameter in `queue_jobs()` to get the output of a previous stage. E.g. our sample genotyping stage might look like this:
+Stages can depend on each other (i.e. they form a directed acyclic graph), which is specified using a parameter `required_stages` to the `@stage` class decorator, and the `inputs` parameter in `queue_jobs()` to get the output of a previous stage. E.g. our sequencing group genotyping stage might look like this:
 
 ```python
 from cpg_utils import Path
-from cpg_workflows.workflow import stage, SampleStage, Sample, StageInput, StageOutput
+from cpg_workflows.workflow import stage, SequencingGroupStage, SequencingGroup, StageInput, StageOutput
 
 Align = ...
 
 
 @stage(required_stages=Align)
-class Genotype(SampleStage):
-    def expected_outputs(self, sample: Sample) -> Path:
-        return sample.make_gvcf_path().path
+class Genotype(SequencingGroupStage):
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> Path:
+        return sequencing_group.make_gvcf_path().path
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         jobs = ...
-        return self.make_outputs(sample, self.expected_outputs(sample), jobs)
+        return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs)
 ```
 
 Stage of different levels can depend on each other, and the library will resolve that correctly. E.g. joint calling stage that takes GVCF outputs to produce a cohort-level VCF would look like this:
@@ -564,10 +564,10 @@ class JointCalling(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         # Get outputs from previous stage. Because the Genotype stage
-        # acts on a sample, we use a method `as_path_by_target` that returns
-        # a dictionary index by sample ID:
-        gvcf_path_by_sample = inputs.as_path_by_target(Genotype)
-        assert len(gvcf_path_by_sample) == len(cohort.get_samples())
+        # acts on a sequencing_group, we use a method `as_path_by_target` that returns
+        # a dictionary index by sequencing group ID:
+        gvcf_path_by_sg = inputs.as_path_by_target(Genotype)
+        assert len(gvcf_path_by_sg) == len(cohort.get_sequencing_groups())
         jobs = ...
         return self.make_outputs(cohort, self.expected_outputs(cohort), jobs)
 ```
@@ -590,7 +590,7 @@ The library implicitly reads configuration using the `cpg_utils.config.get_confi
 [workflow]
 sequencing_type = 'genome'
 only_datasets = ['hgdp', 'thousand-genomes']
-skip_samples = ['CPG202994', 'CPG203000']
+skip_sgs = ['CPG202994', 'CPG203000']
 skip_stages = ['Align']
 check_inputs = true  # checks e.g. if fastq for align stage exist
 check_intermediates = false  # explitic calls to can_reuse(path) will return False 
@@ -678,7 +678,7 @@ Other jobs: 171
 The Batch instance also constructs the job name if the names of a sample and a dataset are provided as attributes, e.g.:
 
 ```bash
->>> j = b.new_job('My job', dict(sample='CPG196535', dataset='fewgenomes'))
+>>> j = b.new_job('My job', dict(sequencing_group='CPG196535', dataset='fewgenomes'))
 >>> print(j.name)
 fewgenomes/CPG196535: My job
 ```
@@ -713,14 +713,14 @@ df -h; du -sh $BATCH_TMPDIR
 You can also call the method `cpg_workflows.utils.can_reuse(path)` explicitly within the code called from `queue_jobs()`. 
 `workflow/check_intermediates = true` controls whether `can_reuse()` checks the object(s), or always returns `False`.
 
-`workflow/check_inputs = true` controls whether inputs to the first stage in the pipeline should be checked for existence, e.g. alignment inputs for an `Align` stage. `skip_samples_with_missing_input` controls the behaviour if those inputs are missing: where skip such samples, or stop the workflow.
+`workflow/check_inputs = true` controls whether inputs to the first stage in the pipeline should be checked for existence, e.g. alignment inputs for an `Align` stage. `skip_sgs_with_missing_input` controls the behaviour if those inputs are missing: where skip such sequencing groups, or stop the workflow.
 
 You can also start the pipeline from a specific stage with `workflow/first_stages` (it would skip all previous stages, but still check immediately required inputs for the first stage). `workflow/last_stages` would stop the workflow after the stages specified. `workflow/only_stages` would execute only stages specified, ignoring dependencies.
 
-You can also force the pipeline to skip certain samples with `workflow/skip_samples`, pick only certain samples with `workfpow/only_samples`, force re-processing of certain samples with `workflow/force_samples`. `workflow/skip_datasets` and `workflow/only_datasets` are available, and more fine-grained combination of `skip_samples` and `skip_stages`: 
+You can also force the pipeline to skip certain sequencing groups with `workflow/skip_sgs`, pick only certain sequencing groups with `workflow/only_sgs`, force re-processing of certain sequencing groups with `workflow/force_sgs`. `workflow/skip_datasets` and `workflow/only_datasets` are available, and more fine-grained combination of `skip_sgs` and `skip_stages`: 
 
 ```toml
-[workflow.skip_samples_stages]
+[workflow.skip_stages_for_sgs]
 CramQC = ['CPG13409']
 ```
 

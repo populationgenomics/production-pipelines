@@ -6,11 +6,11 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_workflows.jobs import genotype
 from cpg_workflows.workflow import (
-    Sample,
+    SequencingGroup,
     stage,
     StageInput,
     StageOutput,
-    SampleStage,
+    SequencingGroupStage,
 )
 from .align import Align
 from .. import get_batch
@@ -21,31 +21,35 @@ from .. import get_batch
     analysis_type='gvcf',
     analysis_keys=['gvcf'],
 )
-class Genotype(SampleStage):
+class Genotype(SequencingGroupStage):
     """
-    Use HaplotypeCaller to genotype individual samples (i.e. CRAM -> GVCF).
+    Use HaplotypeCaller to genotype individual sequencing groups (i.e. CRAM -> GVCF).
     """
 
-    def expected_outputs(self, sample: Sample) -> dict[str, Path]:
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         """
         Generate a GVCF and corresponding TBI index.
         """
         return {
-            'gvcf': sample.make_gvcf_path().path,
-            'tbi': sample.make_gvcf_path().tbi_path,
+            'gvcf': sequencing_group.make_gvcf_path().path,
+            'tbi': sequencing_group.make_gvcf_path().tbi_path,
         }
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(
+        self, sequencing_group: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         """
         Use function from the jobs module
         """
         jobs = genotype.genotype(
             b=get_batch(),
-            output_path=self.expected_outputs(sample)['gvcf'],
-            sample_name=sample.id,
-            cram_path=sample.make_cram_path(),
-            tmp_prefix=self.tmp_prefix / sample.id,
-            overwrite=sample.forced,
-            job_attrs=self.get_job_attrs(sample),
+            output_path=self.expected_outputs(sequencing_group)['gvcf'],
+            sequencing_group_name=sequencing_group.id,
+            cram_path=sequencing_group.make_cram_path(),
+            tmp_prefix=self.tmp_prefix / sequencing_group.id,
+            overwrite=sequencing_group.forced,
+            job_attrs=self.get_job_attrs(sequencing_group),
         )
-        return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
+        return self.make_outputs(
+            sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs
+        )

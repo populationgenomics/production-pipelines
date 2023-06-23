@@ -4,8 +4,8 @@ in a declarative fashion.
 
 A `Stage` object is responsible for creating Hail Batch jobs and declaring outputs
 (files or metamist analysis objects) that are expected to be produced. Each stage
-acts on a `Target`, which can be of the following a `Sample`, a `Dataset` (a container
-for samples), or a `Cohort` (all input datasets together). A `Workflow` object plugs
+acts on a `Target`, which can be of the following a `SequencingGroup`, a `Dataset` (a container
+for sequencing groups), or a `Cohort` (all input datasets together). A `Workflow` object plugs
 stages together by resolving dependencies between different levels accordingly.
 
 Examples of workflows can be found in the `production-workflows` repository.
@@ -27,7 +27,7 @@ from cpg_utils import Path
 
 from .batch import get_batch
 from .status import MetamistStatusReporter
-from .targets import Target, Dataset, Sample, Cohort
+from .targets import Target, Dataset, SequencingGroup, Cohort
 from .utils import (
     exists,
     missing_from_pre_collected,
@@ -238,7 +238,7 @@ class StageInput:
         assert output.stage is not None, output
         if not output.target.active:
             return
-        if not output.target.get_samples():
+        if not output.target.get_sequencing_groups():
             return
         if not output.data and not output.jobs:
             return
@@ -266,9 +266,9 @@ class StageInput:
                 f'No inputs from {stage.__name__} for {self.stage.name} found '
                 + 'after skipping targets with missing inputs. '
                 + (
-                    'Check the logs if all samples were missing inputs from previous '
+                    'Check the logs if all sequencing groups were missing inputs from previous '
                     'stages, and consider changing `workflow/first_stage`'
-                    if get_config()['workflow'].get('skip_samples_with_missing_input')
+                    if get_config()['workflow'].get('skip_sgs_with_missing_input')
                     else ''
                 )
             )
@@ -361,13 +361,15 @@ class StageInput:
         Get list of jobs that the next stage would depend on.
         """
         all_jobs: list[Job] = []
-        these_samples = target.get_sample_ids()
+        target_sequencing_groups = target.get_sequencing_group_ids()
         for stage_, outputs_by_target in self._outputs_by_target_by_stage.items():
             for target_, output in outputs_by_target.items():
                 if output:
-                    those_samples = output.target.get_sample_ids()
-                    samples_intersect = set(these_samples) & set(those_samples)
-                    if samples_intersect:
+                    output_sequencing_groups = output.target.get_sequencing_group_ids()
+                    sequencing_groups_intersect = set(target_sequencing_groups) & set(
+                        output_sequencing_groups
+                    )
+                    if sequencing_groups_intersect:
                         for j in output.jobs:
                             assert (
                                 j
@@ -389,7 +391,7 @@ class Action(Enum):
 class Stage(Generic[TargetT], ABC):
     """
     Abstract class for a workflow stage. Parametrised by specific Target subclass,
-    i.e. SampleStage(Stage[Sample]) should only be able to work on Sample(Target).
+    i.e. SequencingGroupStage(Stage[SequencingGroup]) should only be able to work on SequencingGroup(Target).
     """
 
     def __init__(
@@ -598,7 +600,7 @@ class Stage(Generic[TargetT], ABC):
                 analysis_outputs.append(outputs.data)
 
             project_name = None
-            if isinstance(target, Sample):
+            if isinstance(target, SequencingGroup):
                 project_name = target.dataset.name
             elif isinstance(target, Dataset):
                 project_name = target.name
@@ -636,12 +638,12 @@ class Stage(Generic[TargetT], ABC):
             return Action.QUEUE
 
         if (
-            d := get_config()['workflow'].get('skip_samples_stages')
+            d := get_config()['workflow'].get('skip_stages_for_sgs')
         ) and self.name in d:
             skip_targets = d[self.name]
             if target.target_id in skip_targets:
                 logging.info(
-                    f'{self.name}: {target} [SKIP] (is in workflow/skip_samples_stages)'
+                    f'{self.name}: {target} [SKIP] (is in workflow/skip_stages_for_sgs)'
                 )
                 return Action.SKIP
 
@@ -656,17 +658,17 @@ class Stage(Generic[TargetT], ABC):
                     f'{self.name}: {target} [REUSE] (stage skipped, and outputs exist)'
                 )
                 return Action.REUSE
-            if get_config()['workflow'].get('skip_samples_with_missing_input'):
+            if get_config()['workflow'].get('skip_sgs_with_missing_input'):
                 logging.warning(
                     f'{self.name}: {target} [SKIP] (stage is required, '
                     f'but is marked as "skipped", '
-                    f'workflow/skip_samples_with_missing_input=true '
+                    f'workflow/skip_sgs_with_missing_input=true '
                     f'and some expected outputs for the target do not exist: '
                     f'{first_missing_path}'
                 )
-                # `workflow/skip_samples_with_missing_input` means that we can ignore
-                # samples/datasets that have missing results from skipped stages.
-                # This is our case, so indicating that this sample/dataset should
+                # `workflow/skip_sgs_with_missing_input` means that we can ignore
+                # sgs/datasets that have missing results from skipped stages.
+                # This is our case, so indicating that this sg/dataset should
                 # be ignored:
                 target.active = False
                 return Action.SKIP
@@ -784,10 +786,10 @@ def stage(
     a constructor method. E.g.
 
     @stage(required_stages=[Align])
-    class GenotypeSample(SampleStage):
-        def expected_outputs(self, sample: Sample):
+    class GenotypeSample(SequencingGroupStage):
+        def expected_outputs(self, sequencing_group: SequencingGroup):
             ...
-        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput:
+        def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
             ...
 
     @analysis_type: if defined, will be used to create/update `Analysis` entries
@@ -844,12 +846,12 @@ def skip(
 
     @skip
     @stage
-    class MyStage1(SampleStage):
+    class MyStage1(SequencingGroupStage):
         ...
 
     @skip
     @stage(assume_outputs_exist=True)
-    class MyStage2(SampleStage):
+    class MyStage2(SequencingGroupStage):
         ...
     """
 
@@ -894,7 +896,7 @@ def run_workflow(
 
 class Workflow:
     """
-    Encapsulates a Hail Batch object, stages, and a cohort of datasets of samples.
+    Encapsulates a Hail Batch object, stages, and a cohort of datasets of sequencing groups.
     Responsible for orchestrating stages.
     """
 
@@ -938,7 +940,6 @@ class Workflow:
         if get_config()['workflow'].get('status_reporter') == 'metamist':
             self.status_reporter = MetamistStatusReporter()
         self._stages: list[StageDecorator] | None = stages
-
         self.queued_stages: list[Stage] = []
 
     @property
@@ -1246,19 +1247,21 @@ class Workflow:
         ]
 
 
-class SampleStage(Stage[Sample], ABC):
+class SequencingGroupStage(Stage[SequencingGroup], ABC):
     """
-    Sample-level stage.
+    Sequencing Group level stage.
     """
 
     @abstractmethod
-    def expected_outputs(self, sample: Sample) -> ExpectedResultT:
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> ExpectedResultT:
         """
         Override to declare expected output paths.
         """
 
     @abstractmethod
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(
+        self, sequencing_group: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         """
         Override to add Hail Batch jobs.
         """
@@ -1279,27 +1282,27 @@ class SampleStage(Stage[Sample], ABC):
                 f'via workflow.skip_datasets`'
             )
             return output_by_target
-        if not cohort.get_samples():
+        if not cohort.get_sequencing_groups():
             logging.warning(
-                f'{len(cohort.get_samples())}/'
-                f'{len(cohort.get_samples(only_active=False))} '
-                f'usable (active=True) samples found. Check logs above for '
-                f'possible reasons samples were skipped (e.g. all samples ignored '
-                f'via `workflow.skip_samples` in config, or they all missing stage '
-                f'inputs and `workflow.skip_samples_with_missing_input=true` is set)'
+                f'{len(cohort.get_sequencing_groups())}/'
+                f'{len(cohort.get_sequencing_groups(only_active=False))} '
+                f'usable (active=True) sequencing groups found. Check logs above for '
+                f'possible reasons sequencing groups were skipped (e.g. all sequencing groups ignored '
+                f'via `workflow.skip_sgs` in config, or they all missing stage '
+                f'inputs and `workflow.skip_sgs_with_missing_input=true` is set)'
             )
             return output_by_target
 
         for dataset in datasets:
-            if not dataset.get_samples():
+            if not dataset.get_sequencing_groups():
                 logging.warning(
                     f'{dataset}: '
-                    f'{len(dataset.get_samples())}/'
-                    f'{len(dataset.get_samples(only_active=False))} '
-                    f'usable (active=True) samples found. Check logs above for '
-                    f'possible reasons samples were skipped (e.g. all samples ignored '
-                    f'via `workflow.skip_samples` in config, or they all missing stage '
-                    f'inputs and `workflow.skip_samples_with_missing_input=true` is set)'
+                    f'{len(dataset.get_sequencing_groups())}/'
+                    f'{len(dataset.get_sequencing_groups(only_active=False))} '
+                    f'usable (active=True) sequencing groups found. Check logs above for '
+                    f'possible reasons sequencing groups were skipped (e.g. all sequencing groups ignored '
+                    f'via `workflow.skip_sgs` in config, or they all missing stage '
+                    f'inputs and `workflow.skip_sgs_with_missing_input=true` is set)'
                 )
                 continue
 
@@ -1308,17 +1311,21 @@ class SampleStage(Stage[Sample], ABC):
             # find all directories which will be checked
             # list outputs in advance
             all_outputs: set[Path] = set()
-            for sample in dataset.get_samples():
-                all_outputs = path_walk(self.expected_outputs(sample), all_outputs)
+            for sequencing_group in dataset.get_sequencing_groups():
+                all_outputs = path_walk(
+                    self.expected_outputs(sequencing_group), all_outputs
+                )
             all_parents = list_all_parent_dirs(all_outputs)
             existing_files = list_of_all_dir_contents(all_parents)
 
             # evaluate_stuff en masse
-            for sample in dataset.get_samples():
-                action = self._get_action(sample, existing_files=existing_files)
-                output_by_target[sample.target_id] = self._queue_jobs_with_checks(
-                    sample, action
+            for sequencing_group in dataset.get_sequencing_groups():
+                action = self._get_action(
+                    sequencing_group, existing_files=existing_files
                 )
+                output_by_target[
+                    sequencing_group.target_id
+                ] = self._queue_jobs_with_checks(sequencing_group, action)
 
         return output_by_target
 

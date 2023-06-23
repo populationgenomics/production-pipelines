@@ -6,9 +6,9 @@ from typing import Callable, Type
 from cpg_utils import Path, to_path
 from cpg_utils.hail_batch import dataset_path
 
-from cpg_workflows.targets import Sample, Cohort
+from cpg_workflows.targets import SequencingGroup, Cohort
 from cpg_workflows.workflow import (
-    SampleStage,
+    SequencingGroupStage,
     StageInput,
     StageOutput,
     get_batch,
@@ -19,10 +19,10 @@ from cpg_workflows.workflow import (
 
 def mock_cohort() -> Cohort:
     c = Cohort()
-
+    
     ds = c.create_dataset('my_dataset')
-    ds.add_sample('CPG01', external_id='SAMPLE1')
-
+    ds.add_sequencing_group('CPG01', external_id='SAMPLE1')
+    
     return c
 
 
@@ -54,6 +54,21 @@ class C(TestStage):
 @stage(required_stages=C)
 class D(TestStage):
     pass
+
+  
+class TestStage(SequencingGroupStage):
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> Path:
+        return to_path(dataset_path(f'{sequencing_group.id}_{self.name}.tsv'))
+
+    def queue_jobs(
+        self, sequencing_group: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
+        j = get_batch().new_job(
+            self.name, attributes=self.get_job_attrs(sequencing_group)
+        )
+        return self.make_outputs(
+            sequencing_group, self.expected_outputs(sequencing_group), j
+        )
 
 
 # A2 -> B2 -> C2

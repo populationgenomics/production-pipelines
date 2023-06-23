@@ -308,7 +308,7 @@ def make_vqsr_jobs(
         b=b,
         input_vcfs=interval_snps_applied_vcfs,
         site_only=True,
-        sample_count=gvcf_count,
+        sequencing_group_count=gvcf_count,
         job_attrs=job_attrs,
         out_vcf_path=gathered_vcf_path,
     )

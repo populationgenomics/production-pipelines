@@ -34,7 +34,7 @@ class JointGenotyperTool(Enum):
 
 def make_joint_genotyping_jobs(
     b: hb.Batch,
-    gvcf_by_sid: dict[str, GvcfPath],
+    gvcf_by_sgid: dict[str, GvcfPath],
     out_vcf_path: Path,
     out_siteonly_vcf_path: Path,
     tmp_bucket: Path,
@@ -52,12 +52,12 @@ def make_joint_genotyping_jobs(
     Adds samples to the GenomicsDB and runs joint genotyping on them.
     Outputs a multi-sample VCF under `output_vcf_path`.
     """
-    if len(gvcf_by_sid) == 0:
+    if len(gvcf_by_sgid) == 0:
         raise ValueError(
             'Provided samples collection for joint calling should contain '
             'at least one active sample'
         )
-    scatter_count = scatter_count or joint_calling_scatter_count(len(gvcf_by_sid))
+    scatter_count = scatter_count or joint_calling_scatter_count(len(gvcf_by_sgid))
 
     all_output_paths = [out_vcf_path, out_siteonly_vcf_path]
     if out_siteonly_vcf_part_paths:
@@ -86,13 +86,13 @@ def make_joint_genotyping_jobs(
     genomicsdb_bucket = tmp_bucket / 'genomicsdbs'
     sample_map_bucket_path = genomicsdb_bucket / 'sample_map.csv'
     df = pd.DataFrame(
-        [{'id': sid, 'path': str(path)} for sid, path in gvcf_by_sid.items()]
+        [{'id': sid, 'path': str(path)} for sid, path in gvcf_by_sgid.items()]
     )
     if not get_config()['workflow'].get('dry_run', False):
         with sample_map_bucket_path.open('w') as fp:
             df.to_csv(fp, index=False, header=False, sep='\t')
 
-    do_filter_excesshet = len(gvcf_by_sid) >= 1000 and do_filter_excesshet
+    do_filter_excesshet = len(gvcf_by_sgid) >= 1000 and do_filter_excesshet
 
     for idx, interval in enumerate(intervals):
         genomicsdb_path = (
@@ -139,7 +139,7 @@ def make_joint_genotyping_jobs(
                 jc_vcf_j.depends_on(import_gvcfs_j)
 
         # For small callsets, we don't apply the ExcessHet filtering anyway
-        if len(gvcf_by_sid) >= 1000 and do_filter_excesshet:
+        if len(gvcf_by_sgid) >= 1000 and do_filter_excesshet:
             excess_filter_j, excess_filter_jc_vcf = _add_excess_het_filter(
                 b,
                 input_vcf=jc_vcf,
@@ -173,7 +173,7 @@ def make_joint_genotyping_jobs(
                 b,
                 input_vcfs=vcfs,
                 site_only=False,
-                sample_count=len(gvcf_by_sid),
+                sequencing_group_count=len(gvcf_by_sgid),
                 job_attrs=job_attrs,
                 out_vcf_path=out_vcf_path,
             )

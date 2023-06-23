@@ -126,7 +126,7 @@ class Ancestry(CohortStage):
             eigenvalues=get_workflow().prefix / 'ancestry' / 'eigenvalues.ht',
             loadings=get_workflow().prefix / 'ancestry' / 'loadings.ht',
             inferred_pop=get_workflow().prefix / 'ancestry' / 'inferred_pop.ht',
-            sample_qc_ht=get_workflow().prefix / 'ancestry' / 'sample_qc_ht.ht'
+            sample_qc_ht=get_workflow().prefix / 'ancestry' / 'sample_qc_ht.ht',
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -147,7 +147,7 @@ class Ancestry(CohortStage):
                 out_eigenvalues_ht_path=self.expected_outputs(cohort)['eigenvalues'],
                 out_loadings_ht_path=self.expected_outputs(cohort)['loadings'],
                 out_inferred_pop_ht_path=self.expected_outputs(cohort)['inferred_pop'],
-                out_sample_qc_ht_path=self.expected_outputs(cohort)['sample_qc_ht']
+                out_sample_qc_ht_path=self.expected_outputs(cohort)['sample_qc_ht'],
             ),
             depends_on=inputs.get_jobs(cohort),
         )
@@ -170,7 +170,9 @@ class AncestryPlots(CohortStage):
             pca_suffix = plot_name.replace('-', '_')
         return {
             str(pc_num): self.out_prefix
-            / self.out_fname_pattern.format(scope='dataset', pci=pc_num, pca_suffix=pca_suffix, ext='html')
+            / self.out_fname_pattern.format(
+                scope='dataset', pci=pc_num, pca_suffix=pca_suffix, ext='html'
+            )
             for pc_num in range(1, n_pcs)
         }
 
@@ -245,7 +247,7 @@ class Vqsr(CohortStage):
         jobs = vqsr.make_vqsr_jobs(
             b=get_batch(),
             input_siteonly_vcf_path=vcf_path,
-            gvcf_count=len(cohort.get_samples()),
+            gvcf_count=len(cohort.get_sequencing_groups()),
             out_path=self.expected_outputs(cohort)['vcf'],
             tmp_prefix=self.tmp_prefix,
             use_as_annotations=get_config()['workflow'].get('use_as_vqsr', True),

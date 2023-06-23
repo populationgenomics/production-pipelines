@@ -66,7 +66,7 @@ def gather_vcfs(
     input_vcfs: list[hb.ResourceGroup],
     out_vcf_path: Path | None = None,
     site_only: bool = False,
-    sample_count: int | None = None,
+    sequencing_group_count: int | None = None,
     job_attrs: dict | None = None,
     sort: bool = False,
 ) -> list[Job]:
@@ -82,7 +82,7 @@ def gather_vcfs(
         interval-split VCFs indexed with tabix
     @param out_vcf_path: path to permanently write the resulting VCFs
     @param site_only: input VCFs are site-only
-    @param sample_count: number of samples used for input VCFs (to determine the
+    @param sequencing_group_count: number of sequencing groups used for input VCFs (to determine the
         storage size)
     @param job_attrs: Hail Batch job attributes dictionary
     @param sort: whether to sort VCF before tabixing (computationally expensive,
@@ -96,7 +96,7 @@ def gather_vcfs(
         j = b.new_job(job_name, (job_attrs or {}) | {'tool': 'bcftools concat'})
         j.image(image_path('bcftools'))
         res = STANDARD.set_resources(
-            j, storage_gb=storage_for_joint_vcf(sample_count, site_only)
+            j, storage_gb=storage_for_joint_vcf(sequencing_group_count, site_only)
         )
         cmd = f"""
         bcftools concat --threads {res.get_nthreads() -1 } -a {" ".join(vcf["vcf.gz"] for vcf in input_vcfs)} \
@@ -120,7 +120,7 @@ def gather_vcfs(
                     vcf=gathered_vcf,
                     out_vcf_path=out_vcf_path,
                     job_attrs=job_attrs,
-                    sample_count=sample_count,
+                    sequencing_group_count=sequencing_group_count,
                     site_only=site_only,
                 )
             )
@@ -131,7 +131,7 @@ def gather_vcfs(
                     vcf=gathered_vcf,
                     out_tbi_path=out_tbi_path,
                     job_attrs=job_attrs,
-                    sample_count=sample_count,
+                    sequencing_group_count=sequencing_group_count,
                     site_only=site_only,
                 )
             )
@@ -144,7 +144,7 @@ def sort_vcf(
     out_vcf_path: Path | None = None,
     job_attrs: dict | None = None,
     site_only: bool = False,
-    sample_count: int | None = None,
+    sequencing_group_count: int | None = None,
 ) -> Job | None:
     """
     Sort and index VCF.
@@ -155,7 +155,7 @@ def sort_vcf(
     job_attrs = (job_attrs or {}) | {'tool': 'bcftools sort'}
     j = b.new_job('Sort gathered VCF', job_attrs)
     j.image(image_path('bcftools'))
-    if storage_gb := storage_for_joint_vcf(sample_count, site_only):
+    if storage_gb := storage_for_joint_vcf(sequencing_group_count, site_only):
         storage_gb *= 2  # sort needs extra tmp space
     STANDARD.set_resources(j, fraction=1, storage_gb=storage_gb)
 
@@ -184,7 +184,7 @@ def tabix_vcf(
     out_tbi_path: Path | None = None,
     job_attrs: dict | None = None,
     site_only: bool = False,
-    sample_count: int | None = None,
+    sequencing_group_count: int | None = None,
 ) -> Job | None:
     """
     Index VCF, assuming it's sorted.
@@ -196,7 +196,9 @@ def tabix_vcf(
     j = b.new_job('Tabix sorted VCF', job_attrs)
     j.image(image_path('bcftools'))
     STANDARD.set_resources(
-        j, fraction=1, storage_gb=storage_for_joint_vcf(sample_count, site_only)
+        j,
+        fraction=1,
+        storage_gb=storage_for_joint_vcf(sequencing_group_count, site_only),
     )
     j.declare_resource_group(
         output_tbi={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}

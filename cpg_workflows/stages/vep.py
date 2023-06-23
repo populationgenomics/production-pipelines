@@ -39,7 +39,7 @@ class Vep(CohortStage):
         """
         Submit jobs.
         """
-        scatter_count = joint_calling_scatter_count(len(cohort.get_samples()))
+        scatter_count = joint_calling_scatter_count(len(cohort.get_sequencing_groups()))
         input_siteonly_vcf_part_paths = [
             to_path(
                 inputs.as_str(

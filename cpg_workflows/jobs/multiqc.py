@@ -14,7 +14,7 @@ from cpg_utils.hail_batch import image_path, copy_common_env, command
 from cpg_utils import Path
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.targets import Dataset
-from cpg_workflows.utils import rich_sample_id_seds
+from cpg_workflows.utils import rich_sequencing_group_id_seds
 from cpg_workflows.python_scripts import check_multiqc
 
 
@@ -31,7 +31,7 @@ def multiqc(
     ending_to_trim: set[str] | None = None,
     modules_to_trim_endings: set[str] | None = None,
     job_attrs: dict | None = None,
-    sample_id_map: dict[str, str] | None = None,
+    sequencing_group_id_map: dict[str, str] | None = None,
     extra_config: dict | None = None,
 ) -> list[Job]:
     """
@@ -45,10 +45,10 @@ def multiqc(
     @param out_html_url: URL corresponding to the HTML report
     @param out_checks_path: flag indicating that QC checks were done
     @param label: To add to the report's, Batch job's, and Slack message's titles
-    @param ending_to_trim: trim these endings from input files to get sample names
+    @param ending_to_trim: trim these endings from input files to get sequencing group names
     @param modules_to_trim_endings: list of modules for which trim the endings
     @param job_attrs: attributes to add to Hail Batch job
-    @param sample_id_map: sample ID map for bulk sample renaming:
+    @param sequencing_group_id_map: sequencing group ID map for bulk sequencing group renaming:
         (https://multiqc.info/docs/#bulk-sample-renaming-in-reports)
     @param extra_config: extra config to pass to MultiQC
     @return: job objects
@@ -72,10 +72,10 @@ def multiqc(
         ', '.join(list(modules_to_trim_endings)) if modules_to_trim_endings else ''
     )
 
-    if sample_id_map:
+    if sequencing_group_id_map:
         sample_map_path = tmp_prefix / 'rename-sample-map.tsv'
         if not get_config()['workflow'].get('dry_run', False):
-            _write_sample_id_map(sample_id_map, sample_map_path)
+            _write_sg_id_map(sequencing_group_id_map, sample_map_path)
         sample_map_file = b.read_input(str(sample_map_path))
     else:
         sample_map_file = None
@@ -154,7 +154,7 @@ def check_report_job(
     script_path = to_path(check_multiqc.__file__)
     script_name = script_path.name
     cmd = f"""\
-    {rich_sample_id_seds(rich_id_map, [multiqc_json_file])
+    {rich_sequencing_group_id_seds(rich_id_map, [multiqc_json_file])
     if rich_id_map else ''}
 
     python3 {script_name} \\
@@ -181,10 +181,10 @@ def check_report_job(
     return check_j
 
 
-def _write_sample_id_map(sample_map: dict[str, str], out_path: Path):
+def _write_sg_id_map(sequencing_group_map: dict[str, str], out_path: Path):
     """
-    Configuring MultiQC to support bulk sample rename. `sample_map` is a dictionary
-    of sample IDs. The map doesn't have to have records for all samples.
+    Configuring MultiQC to support bulk sequencing group rename. `sequencing_group_map` is a dictionary
+    of sequencing group IDs. The map doesn't have to have records for all sequencing groups.
     Example:
     {
         'SID1': 'Patient1',
@@ -193,5 +193,5 @@ def _write_sample_id_map(sample_map: dict[str, str], out_path: Path):
     https://multiqc.info/docs/#bulk-sample-renaming-in-reports
     """
     with out_path.open('w') as fh:
-        for sid, new_sid in sample_map.items():
-            fh.write('\t'.join([sid, new_sid]) + '\n')
+        for sgid, new_sgid in sequencing_group_map.items():
+            fh.write('\t'.join([sgid, new_sgid]) + '\n')
