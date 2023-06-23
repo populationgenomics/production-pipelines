@@ -1065,6 +1065,42 @@ class Workflow:
                 _stage.skipped = True
                 _stage.assume_outputs_exist = True
 
+    @staticmethod
+    def _process_only_stages(
+        stages: list[Stage], graph: nx.DiGraph, only_stages: list[str]
+    ):
+        if not only_stages:
+            return
+
+        stages_d = {s.name: s for s in stages}
+        stage_names = list(stg.name for stg in stages)
+        lower_names = {s.lower() for s in stage_names}
+
+        for s_name in only_stages:
+            if s_name.lower() not in lower_names:
+                raise WorkflowError(
+                    f'Value in workflow/only_stages "{s_name}" must be a stage '
+                    f'name or a subset of stages from the available list: '
+                    f'{", ".join(stage_names)}'
+                )
+
+        # We want to run stages only appearing in only_stages, and check outputs of
+        # imediate predecessor stages, but skip everything else.
+        required_stages: set[str] = set()
+        for os in only_stages:
+            rs = nx.descendants_at_distance(graph, os, 1)
+            required_stages |= set(rs)
+
+        for stage in stages:
+            # Skip stage not in only_stages, and assume outputs exist...
+            if stage.name not in only_stages:
+                stage.skipped = True
+                stage.assume_outputs_exist = True
+
+        # ...unless stage is directly required by any stage in only_stages
+        for stage_name in required_stages:
+            stages_d[stage_name].assume_outputs_exist = False
+
     def set_stages(
         self,
         requested_stages: list[StageDecorator],
@@ -1078,6 +1114,14 @@ class Workflow:
         only_stages = get_config()['workflow'].get('only_stages', [])
         first_stages = get_config()['workflow'].get('first_stages', [])
         last_stages = get_config()['workflow'].get('last_stages', [])
+
+        # Only allow one of only_stages or first_stages/last_stages as they seem
+        # to be mutually exclusive.
+        if only_stages and (first_stages or last_stages or skip_stages):
+            raise WorkflowError(
+                "Workflow config parameter 'only_stages' is incompatible with "
+                + "'first_stages', 'last_stages' and/or 'skip_stages'"
+            )
 
         logging.info(
             f'End stages for the workflow "{self.name}": '
@@ -1105,9 +1149,9 @@ class Workflow:
                 if stg.name in skip_stages:
                     stg.skipped = True
                     continue  # not searching deeper
+
                 if only_stages and stg.name not in only_stages:
                     stg.skipped = True
-                    # todo assume output exists for skipped stages?
 
                 # Iterate dependencies:
                 for reqcls in stg.required_stages_classes:
@@ -1145,18 +1189,26 @@ class Workflow:
         except nx.NetworkXUnfeasible:
             logging.error('Circular dependencies found between stages')
             raise
+
         logging.info(f'Stages in order of execution:\n{stage_names}')
         stages = [_stages_d[name] for name in stage_names]
 
         # Round 5: applying workflow options first_stages and last_stages.
-        self._process_first_last_stages(stages, dag, first_stages, last_stages)
+        if first_stages or last_stages:
+            logging.info('Applying workflow/first_stages and workflow/last_stages')
+            self._process_first_last_stages(stages, dag, first_stages, last_stages)
+        elif only_stages:
+            logging.info('Applying workflow/only_stages')
+            self._process_only_stages(stages, dag, only_stages)
 
         if not (final_set_of_stages := [s.name for s in stages if not s.skipped]):
             raise WorkflowError('No stages to run')
+
         logging.info(
-            f'Final list of stages after applying workflow/first_stages and '
-            f'workflow/last_stages stages:\n{final_set_of_stages}'
+            f'Final list of stages after applying stage configuration options:\n'
+            f'{final_set_of_stages}'
         )
+
         required_skipped_stages = [s for s in stages if s.skipped]
         if required_skipped_stages:
             logging.info(
