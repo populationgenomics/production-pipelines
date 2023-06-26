@@ -56,9 +56,9 @@ class ValidationMtToVcf(SequencingGroupStage):
         # generate the MT path from config
         input_hash = get_config()['inputs']['sample_hash']
         mt_path = (
-            sequencing_group.dataset.prefix() /
-            'mt' /
-            f'{input_hash}-{sequencing_group.dataset.name}.mt'
+            sequencing_group.dataset.prefix()
+            / 'mt'
+            / f'{input_hash}-{sequencing_group.dataset.name}.mt'
         )
 
         exp_outputs = self.expected_outputs(sequencing_group)
@@ -68,7 +68,7 @@ class ValidationMtToVcf(SequencingGroupStage):
             mt_path=str(mt_path),
             sequencing_group_id=sequencing_group.id,
             out_vcf_path=str(exp_outputs['vcf']),
-            job_attrs=self.get_job_attrs(sequencing_group)
+            job_attrs=self.get_job_attrs(sequencing_group),
         )
 
         return self.make_outputs(sequencing_group, data=exp_outputs, jobs=job)
@@ -125,7 +125,7 @@ class ValidationHappyOnVcf(SequencingGroupStage):
             vcf_path=str(input_vcf),
             sequencing_group_ext_id=sequencing_group.external_id,
             out_prefix=str(output_prefix),
-            job_attrs=self.get_job_attrs(sequencing_group)
+            job_attrs=self.get_job_attrs(sequencing_group),
         )
 
         return self.make_outputs(sequencing_group, data=exp_outputs, jobs=job)
@@ -157,9 +157,11 @@ class ValidationParseHappy(SequencingGroupStage):
         input_vcf = inputs.as_path(
             target=sequencing_group, stage=ValidationMtToVcf, key='vcf'
         )
-        happy_results = inputs.as_dict_by_target(stage=ValidationHappyOnVcf)[
-            sequencing_group.id
-        ]
+        happy_csv = str(
+            inputs.as_dict_by_target(stage=ValidationHappyOnVcf)[sequencing_group.id][
+                'happy_csv'
+            ]
+        )
 
         exp_outputs = self.expected_outputs(sequencing_group)
 
@@ -173,7 +175,7 @@ class ValidationParseHappy(SequencingGroupStage):
             vcf_path=str(input_vcf),
             sequencing_group_id=sequencing_group.id,
             sequencing_group_ext_id=sequencing_group.external_id,
-            happy_results=happy_results,
+            happy_results=happy_csv,
             out_file=str(exp_outputs['json_summary']),
         )
 
