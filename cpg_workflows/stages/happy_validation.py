@@ -173,7 +173,7 @@ class ValidationParseHappy(SequencingGroupStage):
             vcf_path=str(input_vcf),
             sequencing_group_id=sequencing_group.id,
             sequencing_group_ext_id=sequencing_group.external_id,
-            happy_results=str(happy_results),
+            happy_results=happy_results,
             out_file=str(exp_outputs['json_summary']),
         )
 
