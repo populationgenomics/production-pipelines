@@ -192,7 +192,7 @@ def parse_and_post_results(
     """
 
     # handler for the CSV file
-    happy_csv = to_path(happy_csv)
+    happy_handle = to_path(happy_csv)
 
     ref_data = get_sample_truth_data(sequencing_group_id=sequencing_group_ext_id)
 
@@ -208,7 +208,7 @@ def parse_and_post_results(
         summary_data['stratified'] = stratification
 
     # read in the summary CSV file
-    with happy_csv.open() as handle:
+    with happy_handle.open() as handle:
         summary_reader = DictReader(handle)
         for line in summary_reader:
             if line['Filter'] != 'PASS' or line['Subtype'] != '*':
@@ -226,6 +226,6 @@ def parse_and_post_results(
         status=AnalysisStatus('completed'),
         sequencing_group_ids=[sequencing_group_id],
         type_='qc',
-        output=str(happy_csv.parent),
+        output=str(happy_handle.parent),
         meta=summary_data,
     )
