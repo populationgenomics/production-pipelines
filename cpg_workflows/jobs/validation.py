@@ -173,7 +173,7 @@ def parse_and_post_results(
     vcf_path: str,
     sequencing_group_id: str,
     sequencing_group_ext_id: str,
-    happy_results: dict,
+    happy_csv: str,
     out_file: str,
 ):
     """
@@ -184,14 +184,17 @@ def parse_and_post_results(
         vcf_path (str): path to the single-sample VCF
         sequencing_group_id (str): the SG ID
         sequencing_group_ext_id (str): the SG external ID
-        happy_results (dict): all results from the hap.py stage
+        happy_csv (str): CSV results from Hap.py
         out_file (str): where to write the JSON file
 
     Returns:
         this job
     """
+
+    # handler for the CSV file
+    happy_handle = to_path(happy_csv)
+
     ref_data = get_sample_truth_data(sequencing_group_id=sequencing_group_ext_id)
-    happy_csv = happy_results['happy_csv']
 
     # populate a dictionary of results for this sequencing group
     summary_data = {
@@ -205,7 +208,7 @@ def parse_and_post_results(
         summary_data['stratified'] = stratification
 
     # read in the summary CSV file
-    with happy_csv.open() as handle:
+    with happy_handle.open() as handle:
         summary_reader = DictReader(handle)
         for line in summary_reader:
             if line['Filter'] != 'PASS' or line['Subtype'] != '*':
@@ -218,12 +221,11 @@ def parse_and_post_results(
     with to_path(out_file).open('w', encoding='utf-8') as handle:
         json.dump(summary_data, handle)
 
-    # NOTE: This change is untested.
     get_metamist().create_analysis(
         dataset=get_config()['workflow']['dataset'],
         status=AnalysisStatus('completed'),
         sequencing_group_ids=[sequencing_group_id],
         type_='qc',
-        output=str(happy_csv.parent),
+        output=str(happy_handle.parent),
         meta=summary_data,
     )
