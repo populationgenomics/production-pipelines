@@ -158,14 +158,6 @@ class ValidationParseHappy(SequencingGroupStage):
         )
 
         exp_outputs = self.expected_outputs(sequencing_group)
-        print(exp_outputs)
-        print(
-            str(input_vcf),
-            sequencing_group.id,
-            sequencing_group.external_id,
-            happy_csv,
-            str(exp_outputs['json_summary']),
-        )
 
         py_job = get_batch().new_python_job(
             f'parse_{sequencing_group.id}_happy_result',
