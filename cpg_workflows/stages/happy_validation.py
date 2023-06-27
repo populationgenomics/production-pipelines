@@ -163,6 +163,7 @@ class ValidationParseHappy(SequencingGroupStage):
         )
 
         exp_outputs = self.expected_outputs(sequencing_group)
+        print(exp_outputs)
         print(
             str(input_vcf),
             sequencing_group.id,
