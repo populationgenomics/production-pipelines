@@ -88,13 +88,13 @@ class ValidationHappyOnVcf(SequencingGroupStage):
             / sequencing_group.id
         )
         return {
-            'vcf': output_prefix / 'happy.vcf.bgz',
-            'index': output_prefix / 'happy.vcf.bgz.tbi',
-            'happy_csv': output_prefix / 'happy_extended.csv',
-            'happy_roc': output_prefix / 'happy_roc.all.csv.gz',
-            'happy_metrics': output_prefix / 'happy_metrics.json.gz',
-            'happy_runinfo': output_prefix / 'happy_runinfo.json',
-            'happy_summary': output_prefix / 'summary.csv',
+            'vcf': output_prefix / '.happy.vcf.bgz',
+            'index': output_prefix / '.happy.vcf.bgz.tbi',
+            'happy_csv': output_prefix / '.happy_extended.csv',
+            'happy_roc': output_prefix / '.happy_roc.all.csv.gz',
+            'happy_metrics': output_prefix / '.happy_metrics.json.gz',
+            'happy_runinfo': output_prefix / '.happy_runinfo.json',
+            'happy_summary': output_prefix / '.summary.csv',
         }
 
     def queue_jobs(
@@ -139,8 +139,7 @@ class ValidationParseHappy(SequencingGroupStage):
                 sequencing_group.dataset.prefix()
                 / 'validation'
                 / get_workflow().output_version
-                / sequencing_group.id,
-                'happy_summary.json',
+                / f'{sequencing_group.id}.happy_summary.json',
             )
         }
 
@@ -175,7 +174,7 @@ class ValidationParseHappy(SequencingGroupStage):
             vcf_path=str(input_vcf),
             sequencing_group_id=sequencing_group.id,
             sequencing_group_ext_id=sequencing_group.external_id,
-            happy_results=happy_csv,
+            happy_csv=happy_csv,
             out_file=str(exp_outputs['json_summary']),
         )
 
