@@ -48,7 +48,6 @@ class ValidationMtToVcf(SequencingGroupStage):
     def queue_jobs(
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
-
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
             return None
@@ -100,7 +99,6 @@ class ValidationHappyOnVcf(SequencingGroupStage):
     def queue_jobs(
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
-
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
             logging.info(f'Skipping {sequencing_group.id}; not in the reference set')
@@ -135,18 +133,15 @@ class ValidationHappyOnVcf(SequencingGroupStage):
 class ValidationParseHappy(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup):
         return {
-            'json_summary': (
-                sequencing_group.dataset.prefix()
-                / 'validation'
-                / get_workflow().output_version
-                / f'{sequencing_group.id}.happy_summary.json',
-            )
+            'json_summary': sequencing_group.dataset.prefix()
+            / 'validation'
+            / get_workflow().output_version
+            / f'{sequencing_group.id}.happy_summary.json',
         }
 
     def queue_jobs(
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
-
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
             logging.info(f'Skipping {sequencing_group.id}; not in the reference set')
