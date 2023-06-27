@@ -48,7 +48,6 @@ class ValidationMtToVcf(SequencingGroupStage):
     def queue_jobs(
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
-
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
             return None
@@ -88,19 +87,18 @@ class ValidationHappyOnVcf(SequencingGroupStage):
             / sequencing_group.id
         )
         return {
-            'vcf': output_prefix / '.happy.vcf.bgz',
-            'index': output_prefix / '.happy.vcf.bgz.tbi',
-            'happy_csv': output_prefix / '.happy_extended.csv',
-            'happy_roc': output_prefix / '.happy_roc.all.csv.gz',
-            'happy_metrics': output_prefix / '.happy_metrics.json.gz',
-            'happy_runinfo': output_prefix / '.happy_runinfo.json',
-            'happy_summary': output_prefix / '.summary.csv',
+            'vcf': f'{output_prefix}.happy.vcf.bgz',
+            'index': f'{output_prefix}.happy.vcf.bgz.tbi',
+            'happy_csv': f'{output_prefix}.happy_extended.csv',
+            'happy_roc': f'{output_prefix}.happy_roc.all.csv.gz',
+            'happy_metrics': f'{output_prefix}.happy_metrics.json.gz',
+            'happy_runinfo': f'{output_prefix}.happy_runinfo.json',
+            'happy_summary': f'{output_prefix}.summary.csv',
         }
 
     def queue_jobs(
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
-
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
             logging.info(f'Skipping {sequencing_group.id}; not in the reference set')
@@ -135,18 +133,15 @@ class ValidationHappyOnVcf(SequencingGroupStage):
 class ValidationParseHappy(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup):
         return {
-            'json_summary': (
-                sequencing_group.dataset.prefix()
-                / 'validation'
-                / get_workflow().output_version
-                / f'{sequencing_group.id}.happy_summary.json',
-            )
+            'json_summary': sequencing_group.dataset.prefix()
+            / 'validation'
+            / get_workflow().output_version
+            / f'{sequencing_group.id}.happy_summary.json',
         }
 
     def queue_jobs(
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
-
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
             logging.info(f'Skipping {sequencing_group.id}; not in the reference set')
@@ -171,11 +166,11 @@ class ValidationParseHappy(SequencingGroupStage):
         py_job.image(get_config()['workflow']['driver_image'])
         py_job.call(
             parse_and_post_results,
-            vcf_path=str(input_vcf),
-            sequencing_group_id=sequencing_group.id,
-            sequencing_group_ext_id=sequencing_group.external_id,
-            happy_csv=happy_csv,
-            out_file=str(exp_outputs['json_summary']),
+            str(input_vcf),
+            sequencing_group.id,
+            sequencing_group.external_id,
+            happy_csv,
+            str(exp_outputs['json_summary']),
         )
 
         return self.make_outputs(sequencing_group, data=exp_outputs, jobs=py_job)
