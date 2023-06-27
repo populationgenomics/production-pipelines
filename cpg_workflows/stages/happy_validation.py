@@ -88,13 +88,13 @@ class ValidationHappyOnVcf(SequencingGroupStage):
             / sequencing_group.id
         )
         return {
-            'vcf': output_prefix / '.happy.vcf.bgz',
-            'index': output_prefix / '.happy.vcf.bgz.tbi',
-            'happy_csv': output_prefix / '.happy_extended.csv',
-            'happy_roc': output_prefix / '.happy_roc.all.csv.gz',
-            'happy_metrics': output_prefix / '.happy_metrics.json.gz',
-            'happy_runinfo': output_prefix / '.happy_runinfo.json',
-            'happy_summary': output_prefix / '.summary.csv',
+            'vcf': f'{output_prefix}.happy.vcf.bgz',
+            'index': f'{output_prefix}.happy.vcf.bgz.tbi',
+            'happy_csv': f'{output_prefix}.happy_extended.csv',
+            'happy_roc': f'{output_prefix}.happy_roc.all.csv.gz',
+            'happy_metrics': f'{output_prefix}.happy_metrics.json.gz',
+            'happy_runinfo': f'{output_prefix}.happy_runinfo.json',
+            'happy_summary': f'{output_prefix}.summary.csv',
         }
 
     def queue_jobs(
@@ -163,6 +163,13 @@ class ValidationParseHappy(SequencingGroupStage):
         )
 
         exp_outputs = self.expected_outputs(sequencing_group)
+        print(
+            str(input_vcf),
+            sequencing_group.id,
+            sequencing_group.external_id,
+            happy_csv,
+            str(exp_outputs['json_summary']),
+        )
 
         py_job = get_batch().new_python_job(
             f'parse_{sequencing_group.id}_happy_result',
