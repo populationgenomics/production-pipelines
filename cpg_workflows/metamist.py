@@ -318,6 +318,10 @@ class Metamist:
 
             assert a.status == analysis_status, analysis
             assert a.type == analysis_type, analysis
+            if len(a.sequencing_group_ids) < 1:
+                logging.warning(f'Analysis has no sequencing group ids. {analysis}')
+                continue
+
             assert len(a.sequencing_group_ids) == 1, analysis
             analysis_per_sid[list(a.sequencing_group_ids)[0]] = a
 
