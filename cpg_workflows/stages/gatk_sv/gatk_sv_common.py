@@ -160,6 +160,7 @@ def add_gatk_sv_jobs(
         input_dict=paths_as_strings,
         outputs_to_collect=outputs_to_collect,
         driver_image=driver_image,
+        copy_outputs_to_gcp=False
     )
 
     copy_j = batch.new_job(f'{job_prefix}: copy outputs')
