@@ -15,7 +15,7 @@ setup(
     install_requires=[
         'cpg-utils',
         'cyvcf2==0.30.18',
-        'analysis-runner>=2.40.7',
+        'analysis-runner>=2.41.2',
         'hail',
         'networkx',
         'metamist>=6.0.4',
