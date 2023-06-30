@@ -1,0 +1,10 @@
+[resource_overrides]
+
+# location for any required resource overrides
+
+[resource_overrides.GatherSampleEvidence]
+
+# resource overrides for the GatherSampleEvidence stage
+
+[resource_overrides.GatherSampleEvidence.runtime_attr_wham]
+mem_gb = 7
