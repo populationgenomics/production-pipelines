@@ -130,3 +130,24 @@ def test_batch_samples():
         )
         assert mean_of_medians > cov
         cov = mean_of_medians
+
+
+def test_batch_samples_single_chunk():
+    """
+    use some dummy data to check that the batch_samples function works
+    check for an appropriate size for each batch
+    assert that each batch in turn has a higher mean coverage
+    """
+
+    # loading and formatting done in partition_batches function
+    qc_table = to_path(__file__).parent / 'data' / 'gatk_sv' / 'evidence_qc.tsv'
+    qc_df = pd.read_csv(qc_table, sep='\t')
+    qc_df.columns = [x.replace('#', '') for x in qc_df.columns]
+
+    # parameters to use
+    min_size = 2
+    max_size = 500
+
+    # generate batches
+    batches = batch_samples(qc_df, min_size, max_size)
+    assert len(batches) == 1
