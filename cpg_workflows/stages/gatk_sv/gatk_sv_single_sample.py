@@ -158,8 +158,8 @@ class EvidenceQC(CohortStage):
             'WGD_dist': 'WGD_score_distributions.pdf',
             'WGD_matrix': 'WGD_scoring_matrix_output.bed.gz',
             'WGD_scores': 'WGD_scores.txt.gz',
-            'bincov_matrix': 'RD.txt.gz',
-            'bincov_matrix_index': 'RD.txt.gz.tbi',
+            'bincov_matrix': f'{self.name}.RD.txt.gz',
+            'bincov_matrix_index': f'{self.name}.RD.txt.gz.tbi',
             'bincov_median': 'medianCov.transposed.bed',
             'qc_table': 'evidence_qc_table.tsv',
         }
