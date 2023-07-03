@@ -87,11 +87,11 @@ class MakeCohortVcf(CohortStage):
             for batch_name in batch_names
         ]
         bincov_files = [
-            batch_prefix / batch_name / 'GatherBatchEvidence' / f'{self.name}.RD.txt.gz'
+            batch_prefix / batch_name / 'GatherBatchEvidence' / 'GatherBatchEvidence.RD.txt.gz'
             for batch_name in batch_names
         ]
         disc_files = [
-            batch_prefix / batch_name / 'GatherBatchEvidence' / f'{self.name}.pe.txt.gz'
+            batch_prefix / batch_name / 'GatherBatchEvidence' / 'GatherBatchEvidence.pe.txt.gz'
             for batch_name in batch_names
         ]
         median_cov_files = [

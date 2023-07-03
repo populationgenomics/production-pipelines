@@ -33,6 +33,14 @@ class GatherBatchEvidence(CohortStage):
 
     https://github.com/broadinstitute/gatk-sv#gather-batch-evidence
     https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherBatchEvidence.wdl
+    
+    it's critical to separate the ending with a dot, e.g.: `*.sr.txt.gz`,
+    These files are passed to `gatk PrintSVEvidence`, that determines file
+    format based on the file name.
+    It would strongly expect the files to end exactly with either
+    `.sr.txt.gz`, `.pe.txt.gz`, or `.sd.txt.gz`, otherwise it would fail with
+    "A USER ERROR has occurred: Cannot read file:///cromwell_root/... because
+    no suitable codecs found".
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
