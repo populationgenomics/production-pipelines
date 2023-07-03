@@ -1,5 +1,5 @@
 """
-Test initialising Batch object.
+Testing Alignment Job
 """
 
 from cpg_utils import to_path
