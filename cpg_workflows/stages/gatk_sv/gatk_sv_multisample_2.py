@@ -26,8 +26,20 @@ class MakeCohortVcf(CohortStage):
     Combines variants across multiple batches, resolves complex variants, re-genotypes,
     and performs final VCF clean-up.
 
-    If RegenotypeCNVs is run, this stage will use the output of that stage as input.
-    Otherwise, it will use the output of GenotypeBatch.
+    This Stage is the first in the gatk_sv_multisample_2 workflow. Using Analysis-Runner,
+    include two additional config files:
+
+    - configs/gatk_sv/use_for_all_workflows.toml
+        - contains all required images and references
+    - configs/gatk_sv/all_batch_names.toml
+        - add all sub-cohort hashes to the batch_names list
+    - A custom config with all combined SGs in workflow.only_sgs
+
+    Once this becomes a more frequently run process, we'll have to investigate whether
+    we want to include ALL prior batches, or just the batches which were run in the
+    earlier pipeline steps this time around. That may depend on how much these stages
+    cost, and whether generating the final cross-batch VCF/ES-index is possible from
+    several component joint calls, or we require one single joint call across all SGs
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict:
