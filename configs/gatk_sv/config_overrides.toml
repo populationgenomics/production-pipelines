@@ -7,4 +7,4 @@
 # resource overrides for the GatherSampleEvidence stage
 
 [resource_overrides.GatherSampleEvidence.runtime_attr_wham]
-mem_gb = 7
+mem_gb = 7.5

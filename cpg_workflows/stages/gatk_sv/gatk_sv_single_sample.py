@@ -48,6 +48,7 @@ class GatherSampleEvidence(SequencingGroupStage):
         "A USER ERROR has occurred: Cannot read file:///cromwell_root/... because
         no suitable codecs found".
         """
+
         d: dict[str, Path] = {
             'coverage_counts': sequencing_group.make_sv_evidence_path
             / f'{sequencing_group.id}.coverage_counts.tsv.gz',
@@ -211,6 +212,16 @@ class CreateSampleBatches(CohortStage):
     uses the values generated in EvidenceQC
     splits the sequencing groups into batches based on median coverage,
     PCR +/- status, and Sex
+
+    The output of this Stage will contain the distinct SG batches to use for the
+    following series of Stages. For now, standard practice is to create a separate
+    minimal configuration file for each sub-batch, containing the list of SG IDs
+    as the `only_sgs` key. The gatk_sv_multisample_1 and gatk_sv_sandwich WFs are
+    then run separately for each sub-batch, with the active SGs controlled via the
+    config contents.
+
+    When we move to custom cohorts, the output of this stage will be used as input
+    when generating a custom Metamist cohort per sub-batch.
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
