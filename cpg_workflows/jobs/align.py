@@ -397,8 +397,8 @@ def _align_one(
             rm -rf $BATCH_TMPDIR/sort_tmp
 
             # bazam requires an index at foo.crai (not foo.cram.crai) so we must set the
-            # path explicitly. We can not access the localized cram files basename via the
-            # Input ResourceGroup so using bash magic to strip the trailing "m" and add an
+            # path explicitly. We can not access the localized cram file's basename via the
+            # Input ResourceGroup so using shell magic to strip the trailing "m" and add an
             # "i" to the alignment_path. This should work for both .cram and .bam files.
             alignment_path="{group[alignment_input.ext]}"
             samtools index -@{nthreads - 1} $alignment_path  ${{alignment_path%m}}i
