@@ -15,7 +15,7 @@ def run(
     and return a dense MatrixTable with split multiallelics.
     @return: filtered and densified MatrixTable.
     """
-    if can_reuse(out_dense_mt_path):
+    if can_reuse(out_dense_mt_path, overwrite=True):
         return hl.read_matrix_table(str(out_dense_mt_path))
 
     vds = hl.vds.read_vds(str(vds_path))

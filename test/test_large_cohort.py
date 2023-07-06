@@ -2,23 +2,19 @@
 Test large-cohort workflow.
 """
 
-import os
-import string
-import time
-from random import choices
-import logging
 from os.path import exists
+from pathlib import Path
 
-import toml
-from cpg_utils import to_path, Path
+from cpg_utils import to_path
 from pytest_mock import MockFixture
-from . import results_prefix, update_dict
+
+from . import set_config
 
 ref_prefix = to_path(__file__).parent / 'data/large_cohort/reference'
 gnomad_prefix = ref_prefix / 'gnomad/v0'
 broad_prefix = ref_prefix / 'hg38/v0'
 
-TOML = f"""
+TOML = """
 [workflow]
 dataset_gcp_project = "thousand-genomes"
 dataset = "thousand-genomes"
@@ -34,23 +30,23 @@ billing_project = "thousand-genomes"
 query_backend = "spark_local"
 
 [combiner]
-intervals = [ "chr20:start-end", "chrX:start-end", "chrY:start-end",]
+intervals = ["chr20:start-end", "chrX:start-end", "chrY:start-end"]
 
 [references]
 genome_build = "GRCh38"
 
 [storage.default]
-default = "{results_prefix()}"
-web = "{results_prefix()}-web"
-analysis = "{results_prefix()}-analysis"
-tmp = "{results_prefix()}-test-tmp"
+default = "{directory}"
+web = "{directory}-web"
+analysis = "{directory}-analysis"
+tmp = "{directory}-test-tmp"
 web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
 
 [storage.thousand-genomes]
-default = "{results_prefix()}"
-web = "{results_prefix()}-web"
-analysis = "{results_prefix()}-analysis"
-tmp = "{results_prefix()}-test-tmp"
+default = "{directory}"
+web = "{directory}-web"
+analysis = "{directory}-analysis"
+tmp = "{directory}-test-tmp"
 web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
 
 [large_cohort.sample_qc_cutoffs]
@@ -72,18 +68,12 @@ genome_calling_interval_lists = "{broad_prefix}/wgs_calling_regions.hg38.interva
 protein_coding_gtf = "{broad_prefix}/sv-resources/resources/v1/MANE.GRCh38.v0.95.select_ensembl_genomic.gtf"
 """
 
-
-def _mock_config() -> dict:
-    d: dict = {}
-    for fp in [
-        to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml',
-        to_path(__file__).parent.parent / 'configs' / 'defaults' / 'large_cohort.toml',
-    ]:
-        with fp.open():
-            update_dict(d, toml.load(fp))
-
-    update_dict(d, toml.loads(TOML))
-    return d
+DEFAULT_CONFIG = Path(
+    to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml'
+)
+LARGE_COHORT_CONFIG = Path(
+    to_path(__file__).parent.parent / 'configs' / 'defaults' / 'large_cohort.toml'
+)
 
 
 def _mock_cohort():
@@ -96,33 +86,47 @@ def _mock_cohort():
     found_gvcf_paths = list(gvcf_root.glob('*.g.vcf.gz'))
     assert len(found_gvcf_paths) > 0, gvcf_root
     for gvcf_path in found_gvcf_paths:
-        sample_id = gvcf_path.name.split('.')[0]
-        sample = dataset.add_sample(
-            id=sample_id, external_id=sample_id.replace('CPG', 'EXT')
+        sequencing_group_id = gvcf_path.name.split('.')[0]
+        sequencing_group = dataset.add_sequencing_group(
+            id=sequencing_group_id,
+            external_id=sequencing_group_id.replace('CPG', 'EXT'),
         )
-        sample.gvcf = GvcfPath(gvcf_path)
+        sequencing_group.gvcf = GvcfPath(gvcf_path)
     return cohort
 
 
-def test_large_cohort(mocker: MockFixture):
+def test_large_cohort(mocker: MockFixture, tmp_path):
     """
     Run entire workflow in a local mode.
     """
-    mocker.patch('cpg_utils.config.get_config', _mock_config)
+    conf = TOML.format(
+        directory=str(tmp_path),
+        gnomad_prefix=gnomad_prefix,
+        broad_prefix=broad_prefix,
+    )
+    set_config(
+        conf,
+        tmp_path / 'config.toml',
+        merge_with=[DEFAULT_CONFIG, LARGE_COHORT_CONFIG],
+    )
+
     mocker.patch('cpg_workflows.inputs.create_cohort', _mock_cohort)
 
-    from cpg_workflows.large_cohort import combiner
-    from cpg_workflows.large_cohort import ancestry_pca
-    from cpg_workflows.large_cohort import sample_qc
-    from cpg_workflows.large_cohort import dense_subset
-    from cpg_workflows.large_cohort import relatedness
-    from cpg_workflows.large_cohort import ancestry_plots
-    from cpg_workflows.large_cohort import site_only_vcf
     from cpg_utils.hail_batch import start_query_context
+
+    from cpg_workflows.large_cohort import (
+        ancestry_pca,
+        ancestry_plots,
+        combiner,
+        dense_subset,
+        relatedness,
+        sample_qc,
+        site_only_vcf,
+    )
 
     start_query_context()
 
-    res_pref = to_path(results_prefix())
+    res_pref = tmp_path
     vds_path = res_pref / 'v01.vds'
     combiner.run(out_vds_path=vds_path, tmp_prefix=res_pref / 'tmp')
 
@@ -152,6 +156,8 @@ def test_large_cohort(mocker: MockFixture):
     eigenvalues_ht_path = res_pref / 'eigenvalues.ht'
     loadings_ht_path = res_pref / 'loadings.ht'
     inferred_pop_ht_path = res_pref / 'inferred_pop.ht'
+    ancestry_sample_qc_ht_path = res_pref / 'ancestry_sample_qc.ht'
+
     ancestry_pca.run(
         dense_mt_path=dense_mt_path,
         sample_qc_ht_path=sample_qc_ht_path,
@@ -161,10 +167,11 @@ def test_large_cohort(mocker: MockFixture):
         out_eigenvalues_ht_path=eigenvalues_ht_path,
         out_loadings_ht_path=loadings_ht_path,
         out_inferred_pop_ht_path=inferred_pop_ht_path,
+        out_sample_qc_ht_path=ancestry_sample_qc_ht_path,
     )
     ancestry_plots.run(
-        out_path_pattern=res_pref / 'plots' / '{scope}_pc{pci}.{ext}',
-        sample_qc_ht_path=sample_qc_ht_path,
+        out_path_pattern=res_pref / 'plots' / '{scope}_pc{pci}_{pca_suffix}.{ext}',
+        sample_qc_ht_path=ancestry_sample_qc_ht_path,
         scores_ht_path=scores_ht_path,
         eigenvalues_ht_path=eigenvalues_ht_path,
         loadings_ht_path=loadings_ht_path,
@@ -181,5 +188,5 @@ def test_large_cohort(mocker: MockFixture):
     )
 
     assert exists(vds_path)
-    assert exists(res_pref / 'plots' / 'dataset_pc1.html')
+    assert exists(res_pref / 'plots' / 'dataset_pc1_hgdp_1kg_sites.html')
     assert exists(siteonly_vcf_path)

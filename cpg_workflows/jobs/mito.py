@@ -79,7 +79,7 @@ def subset_cram_to_chrM(
 
 def mito_realign(
     b,
-    sample_id: str,
+    sequencing_group_id: str,
     input_bam: hb.ResourceGroup,
     mito_ref: hb.ResourceGroup,
     job_attrs: dict | None = None,
@@ -91,7 +91,7 @@ def mito_realign(
     mapping.
 
     Args:
-        sample_id: CPG sample id for inclusion in RG header
+        sequencing_group_id: CPG sequencing_group id for inclusion in RG header
         input_bam: Bam for realignment
 
     Outputs:
@@ -114,7 +114,7 @@ def mito_realign(
             -n{min(nthreads, 6)} -bam {input_bam.bam} | \
         bwa \
             mem -K 100000000 -p -v 3 -t 2 -Y {mito_ref.base} \
-            -R '@RG\\tID:{sample_id}\\tSM:{sample_id}' \
+            -R '@RG\\tID:{sequencing_group_id}\\tSM:{sequencing_group_id}' \
             - | \
         samtools view -bSu -T {mito_ref.base} - | \
         samtools sort -o {j.output_cram}

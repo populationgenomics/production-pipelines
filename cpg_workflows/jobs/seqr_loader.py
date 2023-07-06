@@ -103,7 +103,7 @@ def annotate_cohort_jobs(
 def annotate_dataset_jobs(
     b: Batch,
     mt_path: Path,
-    sample_ids: list[str],
+    sequencing_group_ids: list[str],
     out_mt_path: Path,
     tmp_prefix: Path,
     job_attrs: dict | None = None,
@@ -117,7 +117,7 @@ def annotate_dataset_jobs(
     sample_ids_list_path = tmp_prefix / 'sample-list.txt'
     if not get_config()['workflow'].get('dry_run', False):
         with sample_ids_list_path.open('w') as f:
-            f.write(','.join(sample_ids))
+            f.write(','.join(sequencing_group_ids))
 
     subset_mt_path = tmp_prefix / 'cohort-subset.mt'
 
@@ -179,13 +179,13 @@ def annotate_dataset_jobs(
             f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
         )
         subset_j.image(image_path('cpg_workflows'))
-        assert sample_ids
+        assert sequencing_group_ids
         subset_j.command(
             query_command(
                 seqr_loader,
                 seqr_loader.subset_mt_to_samples.__name__,
                 str(mt_path),
-                sample_ids,
+                sequencing_group_ids,
                 str(subset_mt_path),
                 setup_gcp=True,
             )
@@ -211,3 +211,44 @@ def annotate_dataset_jobs(
         jobs = [subset_j, annotate_j]
 
     return jobs
+
+
+def cohort_to_vcf_job(
+    b: Batch,
+    mt_path: Path,
+    out_vcf_path: Path,
+    job_attrs: dict | None = None,
+    depends_on: list[Job] | None = None,
+):
+    """
+    Take the single-dataset MT, and write to a VCF
+
+    Args:
+        b (hb.Batch): the batch to add jobs into
+        mt_path (str): path of the AnnotateDataset MT
+        out_vcf_path (Path): path to write new VCF to
+        job_attrs (dict):
+        depends_on (hb.Job|list[hb.Job]): jobs to depend on
+
+    Returns:
+        this single Job
+    """
+    from cpg_workflows.query_modules import seqr_loader
+
+    vcf_j = b.new_job(
+        f'VCF from dataset MT', (job_attrs or {}) | {'tool': 'hail query'}
+    )
+    vcf_j.image(image_path('cpg_workflows'))
+    vcf_j.command(
+        query_command(
+            seqr_loader,
+            seqr_loader.vcf_from_mt_subset.__name__,
+            str(mt_path),
+            str(out_vcf_path),
+            setup_gcp=True,
+        )
+    )
+    if depends_on:
+        vcf_j.depends_on(*depends_on)
+
+    return vcf_j

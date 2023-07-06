@@ -57,13 +57,21 @@ class StatusReporter(ABC):
 
 def _calculate_size(output_path: str) -> dict[str, Any]:
     """
-    Self-contained function to calculate size of an object at given path.
+    Self-contained function to calculate size of an object at given path. If output_path
+    is a directory (e.g. a hail matrix table) the size check is skipped.
+
     @param output_path: remote path of the output file
     @return: dictionary to merge into Analysis.meta
     """
     from cloudpathlib import CloudPath
 
-    size = CloudPath(str(output_path)).stat().st_size
+    output_cloudpath = CloudPath(str(output_path))
+
+    # Skip size checks for hail outputs (directories)
+    if output_cloudpath.is_dir():
+        return {}
+
+    size = output_cloudpath.stat().st_size
     return dict(size=size)
 
 
@@ -81,10 +89,10 @@ def _update_analysis_status(
     assuming output_path as input parameter
     @param output_path: remote path of the output file, to be passed to the updaters
     """
-    from sample_metadata.apis import AnalysisApi
-    from sample_metadata.models import AnalysisUpdateModel
-    from sample_metadata import exceptions
-    from sample_metadata.model.analysis_status import AnalysisStatus as MmAnalysisStatus
+    from metamist.apis import AnalysisApi
+    from metamist.models import AnalysisUpdateModel
+    from metamist import exceptions
+    from metamist.models import AnalysisStatus as MmAnalysisStatus
     import traceback
 
     meta: dict[str, Any] = dict()
@@ -94,7 +102,7 @@ def _update_analysis_status(
 
     aapi = AnalysisApi()
     try:
-        aapi.update_analysis_status(
+        aapi.update_analysis(
             analysis_id=analysis_id,
             analysis_update_model=AnalysisUpdateModel(
                 status=MmAnalysisStatus(new_status.value),
@@ -124,6 +132,7 @@ class MetamistStatusReporter(StatusReporter):
         meta: dict | None = None,
         job_attrs: dict[str, str] | None = None,
         update_analysis_meta: Callable[[str], dict] | None = None,
+        project_name: str | None = None,
     ) -> list[Job]:
         """
         Create "queued" analysis and insert "in_progress" and "completed" updater jobs.
@@ -139,6 +148,7 @@ class MetamistStatusReporter(StatusReporter):
                 analysis_status='queued',
                 target=target,
                 meta=meta,
+                project_name=project_name,
             )
         ) is None:
             raise MetamistError('Failed to create analysis')
@@ -181,7 +191,7 @@ class MetamistStatusReporter(StatusReporter):
             output=output,
             type_=analysis_type,
             status=analysis_status,
-            sample_ids=target.get_sample_ids(),
+            sequencing_group_ids=target.get_sequencing_group_ids(),
             meta=meta,
             dataset=project_name,
         )
@@ -203,7 +213,7 @@ class MetamistStatusReporter(StatusReporter):
         try:
             analysis_id_int = int(analysis_id)
         except ValueError:
-            raise MetamistError('Analysis ID for sample-metadata must be int')
+            raise MetamistError('Analysis ID must be int')
 
         job_name = f'Update status to {status.value}'
         if analysis_type:

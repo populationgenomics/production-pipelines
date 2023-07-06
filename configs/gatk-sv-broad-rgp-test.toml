@@ -1,0 +1,18 @@
+[workflow]
+input_datasets = ['broad-rgp']
+access_level = 'test'
+
+# CRAMs were aligned using an unmasked reference: 
+# gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta
+# we need to use the same reference to access CRAMs.
+# EDIT the above comment is completely wrong?
+# see https://github.com/populationgenomics/production-pipelines/issues/206
+# see https://github.com/populationgenomics/production-pipelines/issues/208
+
+# Genomes were aligned using a masked reference, check with
+# export GCS_OAUTH_TOKEN=$(gcloud auth application-default print-access-token)
+# samtools view -H gs://cpg-acute-care-test/cram/CPG262543.cram | less
+ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
+
+[references.gatk_sv]
+rmsk = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.randomForest_blacklist.withRepMask.bed.gz"
