@@ -266,7 +266,7 @@ def merge_coverage(
 
       non_control_region = read.table("{non_cr_coverage}", header=T)
       combined_table = rbind(beginning, non_control_region, end)
-      write.table(combined_table, "{j.merged_coverage}", row.names=F, col.names=T, quote=F, sep="\\t")
+      write.table(combined_table, "{j.merged_coverage}", row.names=F, col.names=T, quote=F, sep="\\\\t")
 
     CODE
     """
