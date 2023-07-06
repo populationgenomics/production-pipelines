@@ -465,8 +465,8 @@ class JoinMito(CohortStage):
         """
         jobs = []
         base_level_coverage_by_sid = {
-            sample.id: inputs.as_path(target=sample, stage=RealignMito, key='base_level_coverage_metrics')
-            for sample in cohort.get_samples()
+            sequencing_group.id: inputs.as_path(target=sequencing_group, stage=RealignMito, key='base_level_coverage_metrics')
+            for sequencing_group in cohort.get_sequencing_groups()
         }
 
         call_j = mito_cohort.annotate_coverage(
@@ -479,9 +479,9 @@ class JoinMito(CohortStage):
         # assert isinstance(call_j.output_vcf, hb.ResourceGroup)
 
 
-        # sample_vcf_by_sid = {
-        #     sample.id: inputs.as_path(target=sample, stage=GenotypeMito, key='out_vcf')
-        #     for sample in cohort.get_samples()
+        # sequencing_group_vcf_by_sid = {
+        #     sequencing_group.id: inputs.as_path(target=sequencing_group, stage=GenotypeMito, key='out_vcf')
+        #     for sequencing_group in cohort.get_sequencing_groups()
         # }
 
 
