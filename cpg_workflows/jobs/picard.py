@@ -134,6 +134,14 @@ def markdup(
     # enough for input BAM and output CRAM
     resource.attach_disk_storage_gb = 250
     resource.set_to_job(j)
+
+    # check for a memory override for impossible sequencing groups
+    # if RAM is overridden, update the memory resource setting
+    if (memory_override := get_config()['resource_overrides'].get('picard')) is not None:
+        assert isinstance(memory_override, int)
+        # Hail will select the right number of CPUs based on RAM request
+        j.memory(f'{memory_override}G')
+
     j.declare_resource_group(
         output_cram={
             'cram': '{root}.cram',
@@ -147,12 +155,17 @@ def markdup(
     assert isinstance(j.output_cram, hb.ResourceGroup)
     cmd = f"""
     picard MarkDuplicates -Xms{resource.get_java_mem_mb()}M \\
-    I={sorted_bam} O=/dev/stdout M={j.markdup_metrics} \\
+    I={sorted_bam} O={j.temp_bam} M={j.markdup_metrics} \\
     TMP_DIR=$(dirname {j.output_cram.cram})/picard-tmp \\
-    ASSUME_SORT_ORDER=coordinate \\
-    | samtools view -@{resource.get_nthreads() - 1} -T {fasta_reference.base} -O cram -o {j.output_cram.cram}
+    ASSUME_SORT_ORDER=coordinate
+    echo "MarkDuplicates finished successfully"
+    samtools view --write-index -@{resource.get_nthreads() - 1} \\
+    -T {fasta_reference.base} \\
+    -O cram \\
+    -o {j.output_cram.cram} \\
+    {j.temp_bam}
 
-    samtools index -@{resource.get_nthreads() - 1} {j.output_cram.cram} {j.output_cram['cram.crai']}
+    echo "samtools view finished successfully"
     """
     j.command(command(cmd, monitor_space=True))
 
@@ -171,7 +184,7 @@ def vcf_qc(
     b: hb.Batch,
     vcf_or_gvcf: hb.ResourceGroup,
     is_gvcf: bool,
-    sample_count: int | None = None,
+    sequencing_group_count: int | None = None,
     job_attrs: dict | None = None,
     output_summary_path: Path | None = None,
     output_detail_path: Path | None = None,
@@ -186,7 +199,11 @@ def vcf_qc(
     job_attrs = (job_attrs or {}) | {'tool': 'picard CollectVariantCallingMetrics'}
     j = b.new_job('CollectVariantCallingMetrics', job_attrs)
     j.image(image_path('picard'))
-    storage_gb = 20 if is_gvcf else storage_for_joint_vcf(sample_count, site_only=False)
+    storage_gb = (
+        20
+        if is_gvcf
+        else storage_for_joint_vcf(sequencing_group_count, site_only=False)
+    )
     res = STANDARD.set_resources(j, storage_gb=storage_gb, mem_gb=3)
     reference = fasta_res_group(b)
     dbsnp_vcf = b.read_input_group(
@@ -260,6 +277,8 @@ def picard_collect_metrics(
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
     reference = fasta_res_group(b)
+    # define variable for whether picard output is sorted or not
+    sorted_output = get_config()['cramqc']['assume_sorted']
 
     assert cram_path.index_path
     cmd = f"""\
@@ -275,7 +294,7 @@ def picard_collect_metrics(
       INPUT=$CRAM \\
       REFERENCE_SEQUENCE={reference.base} \\
       OUTPUT=$BATCH_TMPDIR/prefix \\
-      ASSUME_SORTED=true \\
+      ASSUME_SORTED={sorted_output} \\
       PROGRAM=null \\
       VALIDATION_STRINGENCY=SILENT \\
       PROGRAM=CollectAlignmentSummaryMetrics \\

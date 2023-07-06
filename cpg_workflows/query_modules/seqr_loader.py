@@ -227,6 +227,23 @@ def subset_mt_to_samples(mt_path, sample_ids, out_mt_path):
     logging.info(f'Written {out_mt_path}')
 
 
+def vcf_from_mt_subset(mt_path: str, out_vcf_path: str):
+    """
+    Read the MT in, and write out to a VCF
+    If we wanted to translate sample IDs to external samples
+    then we could do that here, otherwise rely on VCF re-heading
+
+    Args:
+        mt_path (str): path of the single-dataset MT to read in
+        out_vcf_path (str): path of the vcf.bgz to generate
+    """
+
+    mt = hl.read_matrix_table(str(mt_path))
+    logging.info(f'Dataset MT dimensions: {mt.count()}')
+    hl.export_vcf(mt, out_vcf_path, tabix=True)
+    logging.info(f'Written {out_vcf_path}')
+
+
 def annotate_dataset_mt(mt_path, out_mt_path, checkpoint_prefix):
     """
     Add dataset-level annotations.

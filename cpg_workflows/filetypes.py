@@ -63,8 +63,8 @@ class CramOrBamPath(AlignmentInput, ABC):
 
     def __repr__(self) -> str:
         """
-        >>> repr(CramPath('gs://bucket/sample.cram', 'gs://bucket/sample.cram.crai'))
-        'CRAM(gs://bucket/sample.cram+.cram.crai)'
+        >>> repr(CramPath('gs://bucket/sequencing_group.cram', 'gs://bucket/sequencing_group.cram.crai'))
+        'CRAM(gs://bucket/sequencing_group.cram+.cram.crai)'
         """
         res = str(self.path)
         if self.index_path:
@@ -222,8 +222,8 @@ class FastqPair(AlignmentInput):
         """
         Glob string to find all FASTQ files.
 
-        >>> str(FastqPair('gs://sample_R1.fq.gz', 'gs://sample_R2.fq.gz'))
-        'gs://sample_R{1,2}.fq.gz'
+        >>> str(FastqPair('gs://sequencing_group_R1.fq.gz', 'gs://sequencing_group_R2.fq.gz'))
+        'gs://sequencing_group_R{1,2}.fq.gz'
         """
         return ''.join(
             f'{{{",".join(sorted(set(chars)))}}}' if len(set(chars)) > 1 else chars[0]
@@ -233,7 +233,7 @@ class FastqPair(AlignmentInput):
 
 class FastqPairs(list[FastqPair], AlignmentInput):
     """
-    Multiple FASTQ file pairs belonging to the same sample
+    Multiple FASTQ file pairs belonging to the same sequencing_group
     (e.g. multiple lanes or top-ups).
     """
 
@@ -247,12 +247,12 @@ class FastqPairs(list[FastqPair], AlignmentInput):
         """
         Glob string to find all FASTQ files.
 
-        >>> repr(FastqPairs([FastqPair('gs://sample_R1.fq.gz', 'gs://sample_R2.fq.gz')]))
-        'gs://sample_R{1,2}.fq.gz'
-        >>> p1 = FastqPair('gs://sample_L2_R1.fq.gz', 'gs://sample_L2_R2.fq.gz')
-        >>> p2 = FastqPair('gs://sample_L1_R1.fq.gz', 'gs://sample_L1_R2.fq.gz')
+        >>> repr(FastqPairs([FastqPair('gs://sequencing_group_R1.fq.gz', 'gs://sequencing_group_R2.fq.gz')]))
+        'gs://sequencing_group_R{1,2}.fq.gz'
+        >>> p1 = FastqPair('gs://sequencing_group_L2_R1.fq.gz', 'gs://sequencing_group_L2_R2.fq.gz')
+        >>> p2 = FastqPair('gs://sequencing_group_L1_R1.fq.gz', 'gs://sequencing_group_L1_R2.fq.gz')
         >>> repr(FastqPairs([p1, p2]))
-        'gs://sample_L{1,2}_R{1,2}.fq.gz'
+        'gs://sequencing_group_L{1,2}_R{1,2}.fq.gz'
         """
         return ''.join(
             f'{{{",".join(sorted(set(chars)))}}}' if len(set(chars)) > 1 else chars[0]

@@ -312,15 +312,15 @@ def storage_for_cram_qc_job() -> int | None:
     return storage_gb
 
 
-def joint_calling_scatter_count(sample_count: int) -> int:
+def joint_calling_scatter_count(sequencing_group_count: int) -> int:
     """
     Number of partitions for joint-calling jobs (GenotypeGVCFs, VQSR, VEP),
-    as a function of the sample number.
+    as a function of the sequencing group number.
     """
     if scatter_count := get_config()['workflow'].get('scatter_count'):
         return scatter_count
 
-    for _sample_count, scatter_count in {
+    for threshold, scatter_count in {
         4000: 1000,
         3000: 800,
         2000: 600,
@@ -328,20 +328,20 @@ def joint_calling_scatter_count(sample_count: int) -> int:
         500: 200,
         250: 100,
     }.items():
-        if sample_count >= _sample_count:
+        if sequencing_group_count >= threshold:
             return scatter_count
     return 50
 
 
 def storage_for_joint_vcf(
-    sample_count: int | None, site_only: bool = True
+    sequencing_group_count: int | None, site_only: bool = True
 ) -> int | None:
     """
     Storage enough to fit and process a joint-called VCF
     """
-    if not sample_count:
+    if not sequencing_group_count:
         return None
-    gb_per_sample = 1
+    gb_per_sequencing_group = 1
     if not site_only:
-        gb_per_sample = 4
-    return gb_per_sample * sample_count
+        gb_per_sequencing_group = 4
+    return gb_per_sequencing_group * sequencing_group_count

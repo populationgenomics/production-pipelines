@@ -11,13 +11,12 @@ from cpg_workflows import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import stripy
 from cpg_workflows.stages.align import Align
-from cpg_workflows.targets import Sample
-from cpg_workflows.utils import exists
+from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.workflow import (
     stage,
     StageInput,
     StageOutput,
-    SampleStage,
+    SequencingGroupStage,
 )
 
 
@@ -41,50 +40,56 @@ def _update_meta(output_path: str) -> dict[str, Any]:
     return {
         'outlier_loci': outlier_loci,
         'outliers_detected': bool(outlier_loci),
-        'log_path': log_path
+        'log_path': log_path,
     }
 
 
 @stage(
     required_stages=Align,
     analysis_type='web',
-    analysis_keys=['stripy_html', ],
+    analysis_keys=[
+        'stripy_html',
+    ],
     update_analysis_meta=_update_meta,
 )
-class Stripy(SampleStage):
+class Stripy(SequencingGroupStage):
     """
     Call stripy to run STR analysis on known pathogenic loci.
     """
 
-    def expected_outputs(self, sample: Sample) -> dict[str, Path]:
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         return {
-            'stripy_html': sample.dataset.web_prefix()
+            'stripy_html': sequencing_group.dataset.web_prefix()
             / 'stripy'
-            / f'{sample.id}.stripy.html',
-            'stripy_json': sample.dataset.analysis_prefix()
+            / f'{sequencing_group.id}.stripy.html',
+            'stripy_json': sequencing_group.dataset.analysis_prefix()
             / 'stripy'
-            / f'{sample.id}.stripy.json',
-            'stripy_log': sample.dataset.analysis_prefix()
+            / f'{sequencing_group.id}.stripy.json',
+            'stripy_log': sequencing_group.dataset.analysis_prefix()
             / 'stripy'
-            / f'{sample.id}.stripy.log.txt',
+            / f'{sequencing_group.id}.stripy.log.txt',
         }
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
-        cram_path = inputs.as_path(sample, Align, 'cram')
-        crai_path = inputs.as_path(sample, Align, 'crai')
+    def queue_jobs(
+        self, sequencing_group: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
+        cram_path = inputs.as_path(sequencing_group, Align, 'cram')
+        crai_path = inputs.as_path(sequencing_group, Align, 'crai')
 
         jobs = []
         j = stripy.stripy(
             b=get_batch(),
-            sample=sample,
+            sequencing_group=sequencing_group,
             cram_path=CramPath(cram_path, crai_path),
             target_loci=get_config()['stripy']['target_loci'],
-            log_path=self.expected_outputs(sample)['stripy_log'],
+            log_path=self.expected_outputs(sequencing_group)['stripy_log'],
             analysis_type=get_config()['stripy']['analysis_type'],
-            out_path=self.expected_outputs(sample)['stripy_html'],
-            json_path=self.expected_outputs(sample)['stripy_json'],
-            job_attrs=self.get_job_attrs(sample),
+            out_path=self.expected_outputs(sequencing_group)['stripy_html'],
+            json_path=self.expected_outputs(sequencing_group)['stripy_json'],
+            job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(j)
 
-        return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
+        return self.make_outputs(
+            sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs
+        )

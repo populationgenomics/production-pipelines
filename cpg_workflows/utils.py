@@ -3,7 +3,6 @@ Utility functions and constants.
 """
 
 import logging
-import math
 import re
 import string
 import sys
@@ -18,6 +17,25 @@ from hailtop.batch import ResourceFile
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
+
+
+def missing_from_pre_collected(test: set[Path], known: set[Path]) -> Path | None:
+    """
+    Check if a path exists in a set of known paths.
+
+    This is useful when checking if a path exists in a set of paths that were
+    already collected. This method has been included to permit simple mocking
+
+    Args:
+        test (set[Path]): all the files we want to check
+        known (set[Path]): all the files we know about
+
+    Returns:
+        Path | None: the first path that is missing from the known set, or None
+            Path is arbitrary, as the set is unordered
+            None indicates No missing files
+    """
+    return next((p for p in test if p not in known), None)
 
 
 @lru_cache
@@ -127,23 +145,23 @@ def slugify(line: str):
     return line
 
 
-def rich_sample_id_seds(
+def rich_sequencing_group_id_seds(
     rich_id_map: dict[str, str],
     file_names: list[str | ResourceFile],
 ) -> str:
     """
-    Helper function to add seds into a command that would extend samples IDs
+    Helper function to add seds into a command that would extend sequencing group IDs
     in each file in `file_names` with an external ID, only if external ID is
     different from the original.
 
-    @param rich_id_map: map used to replace samples, e.g. {'CPG1': 'CPG1|EXTID'}
+    @param rich_id_map: map used to replace sequencing groups, e.g. {'CPG1': 'CPG1|EXTID'}
     @param file_names: file names and Hail Batch Resource files where to replace IDs
     @return: bash command that does replacement
     """
     cmd = ''
-    for sid, rich_sid in rich_id_map.items():
+    for sgid, rich_sgid in rich_id_map.items():
         for fname in file_names:
-            cmd += f'sed -iBAK \'s/{sid}/{rich_sid}/g\' {fname}'
+            cmd += f'sed -iBAK \'s/{sgid}/{rich_sgid}/g\' {fname}'
             cmd += '\n'
     return cmd
 

@@ -46,8 +46,10 @@ class Vqsr(CohortStage):
         jobs = vqsr.make_vqsr_jobs(
             b=get_batch(),
             input_siteonly_vcf_path=siteonly_vcf_path,
-            scatter_count=joint_calling_scatter_count(len(cohort.get_samples())),
-            gvcf_count=len(cohort.get_samples()),
+            scatter_count=joint_calling_scatter_count(
+                len(cohort.get_sequencing_groups())
+            ),
+            gvcf_count=len(cohort.get_sequencing_groups()),
             out_path=self.expected_outputs(cohort)['siteonly'],
             tmp_prefix=to_path(self.expected_outputs(cohort)['tmp_prefix']),
             use_as_annotations=get_config()['workflow'].get('use_as_vqsr', True),

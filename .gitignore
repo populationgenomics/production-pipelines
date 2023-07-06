@@ -109,6 +109,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# dotenv
+.envrc
+
 # Spyder project settings
 .spyderproject
 .spyproject

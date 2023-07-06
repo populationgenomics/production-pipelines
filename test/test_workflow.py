@@ -2,16 +2,22 @@
 Test building Workflow object.
 """
 
-import toml
-from pytest_mock import MockFixture
-from cpg_utils import to_path, Path
-from . import results_prefix
 
-TOML = f"""
+from unittest import mock
+
+from cpg_utils import Path, to_path
+
+from cpg_workflows.targets import Cohort, SequencingGroup
+from cpg_workflows.workflow import path_walk
+
+from . import set_config
+
+TOML = """
 [workflow]
 dataset_gcp_project = 'fewgenomes'
 access_level = 'test'
 dataset = 'fewgenomes'
+driver_image = 'test'
 sequencing_type = 'genome'
 
 check_inputs = false
@@ -20,10 +26,10 @@ check_expected_outputs = false
 path_scheme = 'local'
 
 [storage.default]
-default = '{results_prefix()}'
+default = "{directory}"
 
 [storage.fewgenomes]
-default = '{results_prefix()}'
+default = "{directory}"
 
 [hail]
 billing_project = 'fewgenomes'
@@ -32,55 +38,64 @@ backend = 'local'
 """
 
 
-def test_workflow(mocker: MockFixture):
+def mock_create_cohort() -> Cohort:
+    c = Cohort()
+    ds = c.create_dataset('my_dataset')
+    ds.add_sequencing_group('CPG01', external_id='SAMPLE1')
+    ds.add_sequencing_group('CPG02', external_id='SAMPLE2')
+    return c
+
+
+@mock.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
+def test_workflow(tmp_path):
     """
     Testing running a workflow from a mock cohort.
     """
-    mocker.patch('cpg_utils.config.get_config', lambda: toml.loads(TOML))
+    conf = TOML.format(directory=tmp_path)
+    set_config(conf, tmp_path / 'config.toml')
 
     from cpg_utils.hail_batch import dataset_path
+
     from cpg_workflows import get_batch
     from cpg_workflows.inputs import get_cohort
-    from cpg_workflows.targets import Sample, Cohort
     from cpg_workflows.workflow import (
-        SampleStage,
+        CohortStage,
+        SequencingGroupStage,
         StageInput,
         StageOutput,
-        CohortStage,
-        stage,
         run_workflow,
+        stage,
     )
-
-    def mock_create_cohort() -> Cohort:
-        c = Cohort()
-        ds = c.create_dataset('my_dataset')
-        ds.add_sample('CPG01', external_id='SAMPLE1')
-        ds.add_sample('CPG02', external_id='SAMPLE2')
-        return c
-
-    mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
 
     output_path = to_path(dataset_path('cohort.tsv'))
 
-    assert len(get_cohort().get_samples()) == 2
+    assert len(get_cohort().get_sequencing_groups()) == 2
 
     @stage
-    class MySampleStage(SampleStage):
+    class MySequencingGroupStage(SequencingGroupStage):
         """
-        Just a sample-level stage.
+        Just a sequencing-group-level stage.
         """
 
-        def expected_outputs(self, sample: Sample) -> Path:
-            return to_path(dataset_path(f'{sample.id}.tsv'))
+        def expected_outputs(self, sequencing_group: SequencingGroup) -> Path:
+            return to_path(dataset_path(f'{sequencing_group.id}.tsv'))
 
-        def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
-            j = get_batch().new_job('Sample job', self.get_job_attrs(sample))
-            j.command(f'echo {sample.id}_done >> {j.output}')
-            get_batch().write_output(j.output, str(self.expected_outputs(sample)))
-            print(f'Writing to {self.expected_outputs(sample)}')
-            return self.make_outputs(sample, self.expected_outputs(sample))
+        def queue_jobs(
+            self, sequencing_group: SequencingGroup, inputs: StageInput
+        ) -> StageOutput | None:
+            j = get_batch().new_job(
+                'SequencingGroup job', self.get_job_attrs(sequencing_group)
+            )
+            j.command(f'echo {sequencing_group.id}_done >> {j.output}')
+            get_batch().write_output(
+                j.output, str(self.expected_outputs(sequencing_group))
+            )
+            print(f'Writing to {self.expected_outputs(sequencing_group)}')
+            return self.make_outputs(
+                sequencing_group, self.expected_outputs(sequencing_group)
+            )
 
-    @stage(required_stages=MySampleStage)
+    @stage(required_stages=MySequencingGroupStage)
     class MyCohortStage(CohortStage):
         """
         Just a cohort-level stage.
@@ -90,12 +105,12 @@ def test_workflow(mocker: MockFixture):
             return output_path
 
         def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-            path_by_sample = inputs.as_path_by_target(MySampleStage)
-            assert len(path_by_sample) == len(cohort.get_samples())
+            path_by_sg = inputs.as_path_by_target(MySequencingGroupStage)
+            assert len(path_by_sg) == len(cohort.get_sequencing_groups())
             j = get_batch().new_job('Cohort job', self.get_job_attrs(cohort))
             j.command(f'touch {j.output}')
-            for _, sample_result_path in path_by_sample.items():
-                input_file = get_batch().read_input(str(sample_result_path))
+            for _, sg_result_path in path_by_sg.items():
+                input_file = get_batch().read_input(str(sg_result_path))
                 j.command(f'cat {input_file} >> {j.output}')
             get_batch().write_output(j.output, str(self.expected_outputs(cohort)))
             print(f'Writing to {self.expected_outputs(cohort)}')
@@ -106,5 +121,21 @@ def test_workflow(mocker: MockFixture):
     print(f'Checking result in {output_path}:')
     with output_path.open() as f:
         result = f.read()
-        print(result)
         assert result.split() == ['CPG01_done', 'CPG02_done'], result
+
+
+def test_path_walk():
+    """
+    tests the recursive path walk to find all stage outputs
+    the recursive method can unpack any nested structure
+    end result is a set of all Paths
+    Note: Strings in this dict are not turned into Paths
+    """
+
+    exp = {
+        'a': to_path('this.txt'),
+        'b': [to_path('that.txt'), {'c': to_path('the_other.txt')}],
+        'd': 'string.txt',
+    }
+    act = path_walk(exp)
+    assert act == {to_path('this.txt'), to_path('that.txt'), to_path('the_other.txt')}

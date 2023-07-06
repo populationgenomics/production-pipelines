@@ -1,7 +1,7 @@
 [workflow]
 input_datasets = ['acute-care']
 access_level = 'test'
-only_samples = [
+only_sgs = [
     'CPG202994',
     'CPG203000',
     'CPG203018',
