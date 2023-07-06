@@ -45,18 +45,18 @@ class JointGenotyping(CohortStage):
         """
         Submit jobs.
         """
-        gvcf_by_sid = {
-            sample.id: GvcfPath(
-                inputs.as_path(target=sample, stage=Genotype, key='gvcf')
+        gvcf_by_sgid = {
+            sequencing_group.id: GvcfPath(
+                inputs.as_path(target=sequencing_group, stage=Genotype, key='gvcf')
             )
-            for sample in cohort.get_samples()
+            for sequencing_group in cohort.get_sequencing_groups()
         }
 
         not_found_gvcfs: list[str] = []
-        for sid, gvcf_path in gvcf_by_sid.items():
+        for sgid, gvcf_path in gvcf_by_sgid.items():
             if gvcf_path is None:
-                logging.error(f'Joint genotyping: could not find GVCF for {sid}')
-                not_found_gvcfs.append(sid)
+                logging.error(f'Joint genotyping: could not find GVCF for {sgid}')
+                not_found_gvcfs.append(sgid)
         if not_found_gvcfs:
             raise WorkflowError(
                 f'Joint genotyping: could not find {len(not_found_gvcfs)} '
@@ -66,7 +66,7 @@ class JointGenotyping(CohortStage):
         jobs = []
         vcf_path = self.expected_outputs(cohort)['vcf']
         siteonly_vcf_path = self.expected_outputs(cohort)['siteonly']
-        scatter_count = joint_calling_scatter_count(len(cohort.get_samples()))
+        scatter_count = joint_calling_scatter_count(len(cohort.get_sequencing_groups()))
         out_siteonly_vcf_part_paths = [
             to_path(
                 self.expected_outputs(cohort)['siteonly_part_pattern'].format(idx=idx)
@@ -79,7 +79,7 @@ class JointGenotyping(CohortStage):
             out_vcf_path=vcf_path,
             out_siteonly_vcf_path=siteonly_vcf_path,
             tmp_bucket=to_path(self.expected_outputs(cohort)['tmp_prefix']),
-            gvcf_by_sid=gvcf_by_sid,
+            gvcf_by_sgid=gvcf_by_sgid,
             tool=joint_genotyping.JointGenotyperTool.GnarlyGenotyper
             if get_config()['workflow'].get('use_gnarly', False)
             else joint_genotyping.JointGenotyperTool.GenotypeGVCFs,

@@ -7,7 +7,7 @@ scatter_count = 20
 last_stages = ['DenseSubset']
 output_version = '1.0'
 skip_qc = true
-skip_samples = ['CPG88088', 'CPG88435']
+skip_sgs = ['CPG88088', 'CPG88435']
 
 # CRAMs were aligned using an unmasked reference: 
 # gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta

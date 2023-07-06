@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Test Metamist's get_pedigree which might get stuck for too many samples, as it uses
+Test Metamist's get_pedigree which might get stuck for too many sequencing groups, as it uses
 a GET request with a limit on the URL string length. This script was used to determine
 parameters for the hack in `cpg_workflows.metamist.get_ped_entries()` to get around
 this issue.
@@ -10,7 +10,7 @@ this issue.
 import logging
 import time
 
-from sample_metadata.apis import FamilyApi
+from metamist.apis import FamilyApi
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)

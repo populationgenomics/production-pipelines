@@ -1,7 +1,9 @@
 [workflow]
 name = 'large_cohort'
-scatter_count = 50
+scatter_count_genotype = 50
 status_reporter = 'metamist'
+# define reference fasta. If not specified here, the reference file is pulled from [references.broad][ref_fasta]
+ref_fasta='gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
 
 # Realign CRAM when available, instead of using FASTQ.
 # The parameter value should correspond to CRAM version
@@ -18,6 +20,14 @@ status_reporter = 'metamist'
 snp_filter_level = 99.7
 indel_filter_level = 99.0
 
+[cramqc]
+assume_sorted = true
+num_pcs = 4
+
+[resource_overrides]
+# Override default resource requirements for unusually large seq data without
+# demanding higher resources for all operations as standard. Examples below
+
 [large_cohort]
 # Parameters for reladness inference
 max_kin = 0.2  # maximum kin threshold to be considered unrelated in relatedness check (second degree)
@@ -25,8 +35,22 @@ max_kin = 0.2  # maximum kin threshold to be considered unrelated in relatedness
 # Parameters for population inference
 n_pcs = 16  # number of principal components for PCA analysis
 min_pop_prob = 0.5  # minimum random forest probability for population assignment
-pop_meta_field = 'Superpopulation name'  # metamist's `Participant/meta` field for the
+training_pop = 'Superpopulation name'  # metamist's `Participant/meta` field for the
                                          # known population label for the RF training
+# whether or not to key sequencing groups by their external ID
+use_external_id = true
+pca_plot_name = 'hgdp_1kg_sites'
+
+# Section that specifies background samples for PCA analysis.
+# `datasets` must be a list paths to matrix tables or VDS, and 
+# `pop_field` if defined would specify the column-level field in th datasets
+# to extract the population tag for RF training for ancestry inference.
+[large_cohort.pca_background]
+#datasets = ['gs://cpg-common-main/references/ancestry/oceania_eur.mt']
+#pop_field = 'continental_pop'
+# set whether PCA output labels are from given population names, or random forest
+# inferred population labels
+inferred_ancestry = false
 
 # Parameters for sample QC. The default values for soft filtering taken from gnomAD QC:
 # https://macarthurlab.org/2019/10/16/gnomad-v3-0, with `max_n_snps` and 
@@ -50,4 +74,4 @@ delete_scratch_on_exit = false
 
 [references.gnomad]
 tel_and_cent_ht = "gs://cpg-common-main/references/gnomad/v0/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht"
-predetermined_qc_variants = "gs://cpg-common-main/references/gnomad/v0/sample_qc/pre_ld_pruning_qc_variants.ht"
+predetermined_qc_variants = "gs://cpg-hgdp-1kg-test/vds/pruned_variants.ht/"

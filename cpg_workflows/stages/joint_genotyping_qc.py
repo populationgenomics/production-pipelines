@@ -12,7 +12,7 @@ from cpg_workflows.workflow import (
     CohortStage,
     StageInputNotFoundError,
     Cohort,
-    SampleStage,
+    SequencingGroupStage,
     get_workflow,
 )
 
@@ -21,7 +21,7 @@ from cpg_workflows.jobs.picard import vcf_qc
 from .joint_genotyping import JointGenotyping
 from .. import get_cohort, get_batch
 from ..jobs.happy import happy
-from ..targets import Sample
+from ..targets import SequencingGroup
 
 
 @stage(required_stages=JointGenotyping)
@@ -69,19 +69,19 @@ class JointVcfQC(CohortStage):
 
 
 @stage(required_stages=JointGenotyping)
-class JointVcfHappy(SampleStage):
+class JointVcfHappy(SequencingGroupStage):
     """
     Run Happy to validate validation samples in joint VCF
     """
 
-    def expected_outputs(self, sample: Sample) -> Path | None:
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> Path | None:
         """
         Parsed by MultiQC: '*.summary.csv'
         https://multiqc.info/docs/#hap.py
         """
-        if sample.participant_id not in get_config().get('validation', {}).get(
-            'sample_map', {}
-        ):
+        if sequencing_group.participant_id not in get_config().get(
+            'validation', {}
+        ).get('sample_map', {}):
             return None
 
         return (
@@ -89,19 +89,21 @@ class JointVcfHappy(SampleStage):
             / 'qc'
             / 'jc'
             / 'hap.py'
-            / f'{get_workflow().output_version}-{sample.id}.summary.csv'
+            / f'{get_workflow().output_version}-{sequencing_group.id}.summary.csv'
         )
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(
+        self, sequencing_group: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         """Queue jobs"""
-        assert sample.dataset.cohort
+        assert sequencing_group.dataset.cohort
         vcf_path = inputs.as_path(
-            target=sample.dataset.cohort, stage=JointGenotyping, key='vcf'
+            target=sequencing_group.dataset.cohort, stage=JointGenotyping, key='vcf'
         )
 
         jobs = happy(
             b=get_batch(),
-            sample=sample,
+            sequencing_group=sequencing_group,
             vcf_or_gvcf=get_batch().read_input_group(
                 **{
                     'vcf.gz': str(vcf_path),
@@ -109,13 +111,15 @@ class JointVcfHappy(SampleStage):
                 }
             ),
             is_gvcf=False,
-            job_attrs=self.get_job_attrs(sample),
-            output_path=self.expected_outputs(sample),
+            job_attrs=self.get_job_attrs(sequencing_group),
+            output_path=self.expected_outputs(sequencing_group),
         )
         if not jobs:
-            return self.make_outputs(sample)
+            return self.make_outputs(sequencing_group)
         else:
-            return self.make_outputs(sample, self.expected_outputs(sample), jobs)
+            return self.make_outputs(
+                sequencing_group, self.expected_outputs(sequencing_group), jobs
+            )
 
 
 def _update_meta(output_path: str) -> dict[str, Any]:
@@ -181,14 +185,14 @@ class JointVcfMultiQC(CohortStage):
 
         paths.append(inputs.as_path(cohort, JointVcfQC, 'qc_detail'))
 
-        for sample in cohort.get_samples():
+        for sequencing_group in cohort.get_sequencing_groups():
             try:
-                path = inputs.as_path(sample, JointVcfHappy)
+                path = inputs.as_path(sequencing_group, JointVcfHappy)
             except StageInputNotFoundError:
                 pass
             else:
                 paths.append(path)
-                ending_to_trim.add(path.name.replace(sample.id, ''))
+                ending_to_trim.add(path.name.replace(sequencing_group.id, ''))
 
         jobs = multiqc(
             get_batch(),
@@ -200,7 +204,7 @@ class JointVcfMultiQC(CohortStage):
             out_html_url=html_url,
             out_checks_path=checks_path,
             job_attrs=self.get_job_attrs(cohort),
-            sample_id_map=cohort.rich_id_map(),
+            sequencing_group_id_map=cohort.rich_id_map(),
             extra_config={'table_columns_visible': {'Picard': True}},
             dataset=cohort.analysis_dataset,
             label='Joint VCF',

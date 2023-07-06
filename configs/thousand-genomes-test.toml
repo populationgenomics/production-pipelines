@@ -1,0 +1,22 @@
+[workflow]
+dataset_gcp_project = 'thousand-genomes'
+dataset = 'thousand-genomes'
+sequencing_type = 'genome'
+scatter_count = 20
+output_version = '1.0'
+skip_qc = true
+skip_sgs = ['CPG88088', 'CPG88435']
+first_stages = ['SampleQC']
+last_stages=['SampleQC']
+force_stages = ['SampleQC']
+
+# CRAMs were aligned using an unmasked reference: 
+# gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta
+# we need to use the same reference to access CRAMs.
+ref_fasta = 'gs://cpg-common-main/references/hg38/v0/Homo_sapiens_assembly38.fasta'
+
+[hail]
+billing_project = 'thousand-genomes'
+
+[large_cohort]
+max_kin = 0.12 # Not limiting to second degree 
