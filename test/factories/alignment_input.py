@@ -14,6 +14,13 @@ class ReferenceGenome(Enum):
     GRCh38 = "GRCh38"
 
 
+def _remove_trailing_slash(path: str | Path) -> str:
+    path = str(path)
+    if path.endswith("/"):
+        path = path[:-1]
+    return path
+
+
 def _create(file: Path):
     if isinstance(file, CloudPath):
         raise ValueError("Tests do not support writing to cloud buckets right now.")
@@ -53,7 +60,8 @@ def create_fastq_pair_input(
     Returns:
         FastqPair
     """
-    prefix = f"{location}/{prefix}".replace("//", "/")
+    location = _remove_trailing_slash(location)
+    prefix = f"{location}/{prefix}"
 
     r1 = f"{prefix}_R1.fastq"
     r2 = f"{prefix}_R2.fastq"
@@ -105,9 +113,7 @@ def create_fastq_pairs_input(
     Returns:
         FastqPairs
     """
-
     pairs = FastqPairs()
-
     for i in range(n):
         pairs.append(
             create_fastq_pair_input(
@@ -150,8 +156,8 @@ def create_bam_input(
     Returns:
         BamPath
     """
-
-    prefix = f"{location}/{prefix}".replace("//", "/")
+    location = _remove_trailing_slash(location)
+    prefix = f"{location}/{prefix}"
 
     path = to_path(f"{prefix}.bam")
     index_path = to_path(f"{prefix}.bam.bai")
@@ -189,8 +195,8 @@ def create_reference_assembly(
     Returns:
         Path
     """
-
-    prefix = f"{location}/{prefix}".replace("//", "/")
+    location = _remove_trailing_slash(location)
+    prefix = f"{location}/{prefix}"
     path = to_path(f"{prefix}.fa")
 
     if create:
@@ -237,8 +243,8 @@ def create_cram_input(
     Returns:
         CramPath
     """
-
-    prefix = f"{location}/{prefix}".replace("//", "/")
+    location = _remove_trailing_slash(location)
+    prefix = f"{location}/{prefix}"
 
     path = to_path(f"{prefix}.cram")
     index_path = to_path(f"{prefix}.cram.crai")
