@@ -42,8 +42,9 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         GvcfMultiQC,
         CramMultiQC,
         Stripy,
+        RealignMito
     ],
-    'validation': [ValidationMtToVcf, ValidationHappyOnVcf, ValidationParseHappy, RealignMito],
+    'validation': [ValidationMtToVcf, ValidationHappyOnVcf, ValidationParseHappy],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
     'gatk_sv_singlesample': [CreateSampleBatches],
     'gatk_sv_multisample_1': [FilterBatch, GenotypeBatch],
