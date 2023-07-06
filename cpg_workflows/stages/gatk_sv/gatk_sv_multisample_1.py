@@ -23,6 +23,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     make_combined_ped,
     SV_CALLERS,
 )
+from cpg_workflows.workflow import get_workflow
 
 
 @stage
@@ -89,7 +90,7 @@ class GatherBatchEvidence(CohortStage):
         sequencing_groups = cohort.get_sequencing_groups(only_active=True)
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': get_workflow().output_version,
             'samples': [sg.id for sg in sequencing_groups],
             'ped_file': str(make_combined_ped(cohort, self.prefix)),
             'counts': [
@@ -209,7 +210,7 @@ class ClusterBatch(CohortStage):
         batch_evidence_d = inputs.as_dict(cohort, GatherBatchEvidence)
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': get_workflow().output_version,
             'del_bed': str(batch_evidence_d['merged_dels']),
             'dup_bed': str(batch_evidence_d['merged_dups']),
             'ped_file': str(make_combined_ped(cohort, self.prefix)),
@@ -273,7 +274,7 @@ class GenerateBatchMetrics(CohortStage):
         gatherbatchevidence_d = inputs.as_dict(cohort, GatherBatchEvidence)
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': get_workflow().output_version,
             'baf_metrics': gatherbatchevidence_d['merged_BAF'],
             'discfile': gatherbatchevidence_d['merged_PE'],
             'coveragefile': gatherbatchevidence_d['merged_bincov'],
@@ -373,7 +374,7 @@ class FilterBatch(CohortStage):
         clusterbatch_d = inputs.as_dict(cohort, ClusterBatch)
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': get_workflow().output_version,
             'ped_file': make_combined_ped(cohort, self.prefix),
             'evidence_metrics': metrics_d['metrics'],
             'evidence_metrics_common': metrics_d['metrics_common'],
@@ -523,7 +524,7 @@ class GenotypeBatch(CohortStage):
         batchevidence_d = inputs.as_dict(cohort, GatherBatchEvidence)
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': get_workflow().output_version,
             'ped_file': make_combined_ped(cohort, self.prefix),
             'n_per_split': 5000,
             'n_RD_genotype_bins': 100000,
