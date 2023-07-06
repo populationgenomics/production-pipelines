@@ -33,7 +33,7 @@ class CramOrBamPath(AlignmentInput, ABC):
         self,
         path: str | Path,
         index_path: str | Path | None = None,
-        reference_assembly: str | None = None,
+        reference_assembly: str | Path | None = None,
     ):
         self.path = to_path(path)
         self.index_path: Path | None = None
