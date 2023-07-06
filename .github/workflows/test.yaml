@@ -13,26 +13,12 @@ jobs:
     defaults:
       run:
         shell: bash -l {0}
-    strategy:
-      fail-fast: false
-      matrix:
-        suffix:
-          [
-            batch,
-            workflow,
-            cohort,
-            status,
-            large_cohort,
-            seqr_loader_dry,
-            check_multiqc,
-            check_pedigree,
-          ]
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v3
         with:
           submodules: 'true'
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
@@ -40,6 +26,7 @@ jobs:
         run: pip install .[test]
 
       - name: Run unit tests
+        timeout-minutes: 20
         run: |
           PYTHONPATH=$PWD/gnomad_methods:$PWD/seqr-loading-pipelines \
-          python -m pytest test/test_${{ matrix.suffix }}.py
+          pytest test

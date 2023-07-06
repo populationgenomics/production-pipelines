@@ -14,7 +14,7 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from cpg_utils.hail_batch import command
-from cpg_workflows.targets import Sample
+from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.filetypes import (
     AlignmentInput,
     FastqPairs,
@@ -74,18 +74,18 @@ class MissingAlignmentInputException(Exception):
     pass
 
 
-def _get_alignment_input(sample: Sample) -> AlignmentInput:
-    """Given a sample, will return an AlignmentInput object that
+def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
+    """Given a sequencing group, will return an AlignmentInput object that
     represents the path to a relevant input (e.g. CRAM/BAM path)"""
     sequencing_type = get_config()['workflow']['sequencing_type']
-    alignment_input = sample.alignment_input_by_seq_type.get(sequencing_type)
+    alignment_input = sequencing_group.alignment_input_by_seq_type.get(sequencing_type)
     if realign_cram_ver := get_config()['workflow'].get('realign_from_cram_version'):
         if (
             path := (
-                sample.dataset.prefix()
+                sequencing_group.dataset.prefix()
                 / 'cram'
                 / realign_cram_ver
-                / f'{sample.id}.cram'
+                / f'{sequencing_group.id}.cram'
             )
         ).exists():
             logging.info(f'Realigning from {realign_cram_ver} CRAM {path}')
@@ -96,14 +96,14 @@ def _get_alignment_input(sample: Sample) -> AlignmentInput:
 
     if not alignment_input:
         raise MissingAlignmentInputException(
-            f'No alignment inputs found for sample {sample}'
+            f'No alignment inputs found for sequencing group {sequencing_group}'
             + (f': {alignment_input}' if alignment_input else '')
         )
 
     if get_config()['workflow'].get('check_inputs', True):
         if not alignment_input.exists():
             raise MissingAlignmentInputException(
-                f'Alignment inputs for sample {sample} do not exist '
+                f'Alignment inputs for sequencing group {sequencing_group} do not exist '
                 + (f': {alignment_input}' if alignment_input else '')
             )
 
@@ -112,7 +112,7 @@ def _get_alignment_input(sample: Sample) -> AlignmentInput:
 
 def align(
     b,
-    sample: Sample,
+    sequencing_group: SequencingGroup,
     job_attrs: dict | None = None,
     output_path: CramPath | None = None,
     out_markdup_metrics_path: Path | None = None,
@@ -147,7 +147,7 @@ def align(
     if output_path and can_reuse(output_path.path, overwrite):
         return []
 
-    alignment_input = _get_alignment_input(sample)
+    alignment_input = _get_alignment_input(sequencing_group)
 
     base_job_name = 'Align'
     if extra_label:
@@ -183,7 +183,7 @@ def align(
             job_name=base_job_name,
             alignment_input=alignment_input,
             requested_nthreads=requested_nthreads,
-            sample_name=sample.id,
+            sequencing_group_name=sequencing_group.id,
             job_attrs=job_attrs,
             aligner=aligner,
             should_sort=False,
@@ -204,7 +204,7 @@ def align(
                     job_name=base_job_name,
                     alignment_input=pair,
                     requested_nthreads=requested_nthreads,
-                    sample_name=sample.id,
+                    sequencing_group_name=sequencing_group.id,
                     job_attrs=job_attrs,
                     aligner=aligner,
                     should_sort=True,
@@ -222,7 +222,7 @@ def align(
                     b=b,
                     job_name=base_job_name,
                     alignment_input=alignment_input,
-                    sample_name=sample.id,
+                    sequencing_group_name=sequencing_group.id,
                     job_attrs=job_attrs,
                     aligner=aligner,
                     requested_nthreads=requested_nthreads,
@@ -315,7 +315,7 @@ def _align_one(
     job_name: str,
     alignment_input: FastqPair | CramPath | BamPath,
     requested_nthreads: int,
-    sample_name: str,
+    sequencing_group_name: str,
     job_attrs: dict | None = None,
     aligner: Aligner = Aligner.BWA,
     number_of_shards_for_realignment: int | None = None,
@@ -360,7 +360,7 @@ def _align_one(
         if number_of_shards_for_realignment and number_of_shards_for_realignment > 1:
             assert shard_number is not None and shard_number >= 0, (
                 shard_number,
-                sample_name,
+                sequencing_group_name,
             )
             shard_param = f' -s {shard_number + 1},{number_of_shards_for_realignment}'
         else:
@@ -382,6 +382,7 @@ def _align_one(
         group = alignment_input.resource_group(b)
 
         if not alignment_input.index_path:
+
             sort_index_input_cmd = dedent(
                 f"""
             mkdir -p $BATCH_TMPDIR/sorted
@@ -391,11 +392,16 @@ def _align_one(
             -@{nthreads - 1} \
             -T $BATCH_TMPDIR/sort_tmp \
             > $BATCH_TMPDIR/sorted.{alignment_input.ext}
-            
+
             mv $BATCH_TMPDIR/sorted.{alignment_input.ext} {group[alignment_input.ext]}
             rm -rf $BATCH_TMPDIR/sort_tmp
-            
-            samtools index -@{nthreads - 1} {group[alignment_input.ext]}
+
+            # bazam requires an index at foo.crai (not foo.cram.crai) so we must set the
+            # path explicitly. We can not access the localized cram file's basename via the
+            # Input ResourceGroup so using shell magic to strip the trailing "m" and add an
+            # "i" to the alignment_path. This should work for both .cram and .bam files.
+            alignment_path="{group[alignment_input.ext]}"
+            samtools index -@{nthreads - 1} $alignment_path  ${{alignment_path%m}}i
             """
             )
 
@@ -434,7 +440,7 @@ def _align_one(
             j.image(image_path('bwa'))
             index_exts = BWA_INDEX_EXTS
         bwa_reference = fasta_res_group(b, index_exts)
-        rg_line = f'@RG\\tID:{sample_name}\\tSM:{sample_name}'
+        rg_line = f'@RG\\tID:{sequencing_group_name}\\tSM:{sequencing_group_name}'
         # BWA command options:
         # -K   process INT input bases in each batch regardless of nThreads (for reproducibility)
         # -p   smart pairing (ignoring in2.fq)
@@ -463,7 +469,7 @@ def _align_one(
         cmd = f"""\
         {prepare_fastq_cmd}
         dragen-os -r {dragmap_index} {input_params} \\
-            --RGID {sample_name} --RGSM {sample_name}
+            --RGID {sequencing_group_name} --RGSM {sequencing_group_name}
         """
 
     else:
@@ -530,7 +536,7 @@ def extract_fastq(
     samtools fastq -@{res.get_nthreads() - 1} \
     -1 $BATCH_TMPDIR/R1.fq.gz -2 $BATCH_TMPDIR/R2.fq.gz \
     -0 /dev/null -s /dev/null -n
-    # Can't write directly to j.fq1 and j.fq2 because samtools-fastq requires the 
+    # Can't write directly to j.fq1 and j.fq2 because samtools-fastq requires the
     # file names to end with ".gz" in order to create compressed outputs.
     mv $BATCH_TMPDIR/R1.fq.gz {j.fq1}
     mv $BATCH_TMPDIR/R2.fq.gz {j.fq2}
@@ -592,8 +598,8 @@ def finalise_alignment(
         SO=coordinate M={j.markdup_metrics} outputformat=sam \\
         tmpfile=$(dirname {j.output_cram.cram})/bamsormadup-tmp \\
         | samtools view -@{min(nthreads, 6) - 1} -T {reference.base} \\
-        -Ocram -o {j.output_cram.cram}       
-        
+        -Ocram -o {j.output_cram.cram}
+
         samtools index -@{nthreads - 1} {j.output_cram.cram} \\
         {j.output_cram["cram.crai"]}
         """.strip()
