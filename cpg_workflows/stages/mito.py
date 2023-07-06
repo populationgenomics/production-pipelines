@@ -239,9 +239,9 @@ class RealignMito(SequencingGroupStage):
     required_stages=[RealignMito,CramQC]
     # TODO: add suitable analysis types
 )
-class GenotypeMito(SampleStage):
+class GenotypeMito(SequencingGroupStage):
     """
-    Call SNVs in the mitochondrial genome of a single sample.
+    Call SNVs in the mitochondrial genome of a single sequencing_group.
     This is a re-implementation of the broad pipeline as of 03/22 that was used for
     gnomAD v3 and broad seqr:
     https://github.com/broadinstitute/gatk/blob/330c59a5bcda6a837a545afd2d453361f373fae3/scripts/mitochondria_m2_wdl/MitochondriaPipeline.wdl
@@ -264,7 +264,7 @@ class GenotypeMito(SampleStage):
     Mitochondrial reference indexes and filtering black lists were copied from Broad
     (gs://gcp-public-data--broad-references/hg38/v0/chrM/).
     Requires:
-        Sample cram from Align stage.
+        sequencing_group cram from Align stage.
     Outputs:
         out_vcf: the final filtered vcf for downstream use
         haplocheck_metrics: Metrics generated from the haplocheckCLI tool including an
@@ -280,15 +280,15 @@ class GenotypeMito(SampleStage):
             estimation. This has not been implemented yet but is probably a good idea.
     """
 
-    def expected_outputs(self, sample: Sample) -> dict[str, Path]:
-        main = sample.dataset.prefix()
-        analysis = sample.dataset.analysis_prefix()
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
+        main = sequencing_group.dataset.prefix()
+        analysis = sequencing_group.dataset.analysis_prefix()
         return {
-            'out_vcf': main / 'mito' / f'{sample.id}.mito.vcf',
-            'haplocheck_metrics': analysis / 'mito' / f'{sample.id}.haplocheck.txt',
+            'out_vcf': main / 'mito' / f'{sequencing_group.id}.mito.vcf',
+            'haplocheck_metrics': analysis / 'mito' / f'{sequencing_group.id}.haplocheck.txt',
         }
 
-    def queue_jobs(self, sample: Sample, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
 
         # Mitochondrial specific reference files.
         mito_ref = get_batch().read_input_group(**MITO_REF)
@@ -298,16 +298,16 @@ class GenotypeMito(SampleStage):
 
         # Get input resources
         non_shifted_cram = get_batch().read_input_group(
-            cram=str(inputs.as_path(sample, RealignMito, 'non_shifted_cram')),
-            crai=str(inputs.as_path(sample, RealignMito, 'non_shifted_cram')) + '.crai',
+            cram=str(inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram')),
+            crai=str(inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram')) + '.crai',
             )
         shifted_cram = get_batch().read_input_group(
-            cram=str(inputs.as_path(sample, RealignMito, 'shifted_cram')),
-            crai=str(inputs.as_path(sample, RealignMito, 'shifted_cram')) + '.crai',
+            cram=str(inputs.as_path(sequencing_group, RealignMito, 'shifted_cram')),
+            crai=str(inputs.as_path(sequencing_group, RealignMito, 'shifted_cram')) + '.crai',
             )
         if get_config()['mito_snv']['use_verifybamid']:
             verifybamid_output = get_batch().read_input(
-                str(inputs.as_path(sample, CramQC, 'verify_bamid')),
+                str(inputs.as_path(sequencing_group, CramQC, 'verify_bamid')),
                 )
         else:
             verifybamid_output = None
@@ -318,7 +318,7 @@ class GenotypeMito(SampleStage):
             cram=non_shifted_cram,
             reference=mito_ref,
             region='chrM:576-16024',  # Exclude the control region.
-            job_attrs=self.get_job_attrs(sample),
+            job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(call_j)
         assert isinstance(call_j.output_vcf, hb.ResourceGroup)
@@ -329,7 +329,7 @@ class GenotypeMito(SampleStage):
             cram=shifted_cram,
             reference=shifted_mito_ref,
             region='chrM:8025-9144',  # Only call inside the control region.
-            job_attrs=self.get_job_attrs(sample),
+            job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(shifted_call_j)
         assert isinstance(shifted_call_j.output_vcf, hb.ResourceGroup)
@@ -341,7 +341,7 @@ class GenotypeMito(SampleStage):
             shifted_vcf=shifted_call_j.output_vcf,
             reference=mito_ref,
             shift_back_chain=shifted_mito_ref.shift_back_chain,
-            job_attrs=self.get_job_attrs(sample),
+            job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(merge_j)
         assert isinstance(merge_j.output_vcf, hb.ResourceGroup)
@@ -351,7 +351,7 @@ class GenotypeMito(SampleStage):
             b=get_batch(),
             first_stats_file=call_j.output_vcf['vcf.gz.stats'],
             second_stats_file=shifted_call_j.output_vcf['vcf.gz.stats'],
-            job_attrs=self.get_job_attrs(sample),
+            job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(merge_stats_J)
         assert isinstance(merge_stats_J.combined_stats, hb.ResourceFile)
@@ -367,7 +367,7 @@ class GenotypeMito(SampleStage):
             max_alt_allele_count=4,
             min_allele_fraction=0,
             f_score_beta=get_config()['mito_snv']['f_score_beta'],
-            job_attrs=self.get_job_attrs(sample),
+            job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(initial_filter_j)
         assert isinstance(initial_filter_j.output_vcf, hb.ResourceGroup)
@@ -379,7 +379,7 @@ class GenotypeMito(SampleStage):
             vcf=initial_filter_j.output_vcf,
             reference=mito_ref,
             remove_non_pass_sites=True,
-            job_attrs=self.get_job_attrs(sample),
+            job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(split_multiallelics_j)
         assert isinstance(split_multiallelics_j.output_vcf, hb.ResourceGroup)
@@ -388,8 +388,8 @@ class GenotypeMito(SampleStage):
         get_contamination_j = mito.get_contamination(
             b=get_batch(),
             vcf=split_multiallelics_j.output_vcf,
-            haplocheck_output=self.expected_outputs(sample)['haplocheck_metrics'],
-            job_attrs=self.get_job_attrs(sample),
+            haplocheck_output=self.expected_outputs(sequencing_group)['haplocheck_metrics'],
+            job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(get_contamination_j)
         assert isinstance(get_contamination_j.haplocheck_output, hb.ResourceFile)
@@ -399,7 +399,7 @@ class GenotypeMito(SampleStage):
             b=get_batch(),
             haplocheck_output=get_contamination_j.haplocheck_output,
             verifybamid_output=verifybamid_output,
-            job_attrs=self.get_job_attrs(sample),
+            job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(parse_contamination_j)
 
@@ -415,7 +415,7 @@ class GenotypeMito(SampleStage):
             f_score_beta=get_config()['mito_snv']['f_score_beta'],
             # contamination_estimate=get_contamination_j.max_contamination,
             contamination_estimate=contamination_level.as_str(),
-            job_attrs=self.get_job_attrs(sample),
+            job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(second_filter_j)
         assert isinstance(second_filter_j.output_vcf, hb.ResourceGroup)
@@ -426,14 +426,14 @@ class GenotypeMito(SampleStage):
             vcf=second_filter_j.output_vcf,
             reference=mito_ref,
             remove_non_pass_sites=False,
-            job_attrs=self.get_job_attrs(sample),
+            job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(split_multiallelics_j)
 
         # Write the final vcf to the bucket
         get_batch().write_output(
             split_multiallelics_j.output_vcf,
-            str(self.expected_outputs(sample)['out_vcf']),
+            str(self.expected_outputs(sequencing_group)['out_vcf']),
         )
 
-        return self.make_outputs(sample, data=self.expected_outputs(sample), jobs=jobs)
+        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
