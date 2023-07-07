@@ -22,7 +22,8 @@ The GATK-SV workflows are run with Full permissions, as they seem to try and del
 escalated permissions.
 
 The config file `configs/gatk_sv/use_for_all_workflows.toml` contains locations of all docker images to pull from our
-infrastructure, and should be included with all workflows.
+infrastructure, and should be included with all workflows. It also contains instruction to log analysis entries to 
+metamist.
 
 ## Sequencing Group Groups
 
