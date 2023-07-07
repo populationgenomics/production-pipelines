@@ -475,7 +475,7 @@ class JoinMito(CohortStage):
         # )
         # jobs.append(foo_j)
 
-        call_j = mito_cohort.annotate_coverage2(
+        call_j = mito_cohort.annotate_coverage(
             b=get_batch(),
             base_level_coverage_by_sid=base_level_coverage_by_sid,
             coverage_ht=self.expected_outputs(cohort)['coverage_ht'],

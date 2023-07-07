@@ -23,57 +23,18 @@ def annotate_coverage(
     job_attrs: dict | None = None,
 ) -> Job:
     """
-    Combine individual mitochondria coverage files and outputs a hail table with coverage annotations
-    """
-    job_attrs = job_attrs or {}
-    j = b.new_job('mito_annotate_coverage', job_attrs)
-    # j.image(image_path('haplocheckcli'))
-    j.image(get_config()['workflow']['driver_image'])
+    Implementation of Broad script here: https://github.com/broadinstitute/gnomad-mitochondria/blob/main/gnomad_mitochondria/pipeline/annotate_coverage.py
 
-    res = STANDARD.request_resources(ncpu=8)
-    res.set_to_job(j)
+    Combines the per base coverage files from each sequence group into a mt(MatrixTable), ht(HailTable), and tsv file, and will also calculate the following aggregate statistics per base:
+        Mean coverage
+        Median coverage
+        Fraction of samples with > 100x coverage
+        Fraction of samples with > 10000x coverage
 
-    # generate tsv string to use as input file
-    # required format: "tsv of participant_id, base_level_coverage_metrics, sample"
-    tsv_string = "#participant_id\\tpath\\tsample_id"
-    for sid, path in base_level_coverage_by_sid.items():
-        tsv_string += f'{sid}\\t{path}\\t{sid}\\n'
+        Required inputs:
+            base_level_coverage_by_sid: dict of path to tab-delimited coverage file for each sequence group.
+            coverage_ht: path to write output ht
 
-    # script needs to write to a .ht path
-    j.declare_resource_group(
-        outfile={'ht': '{root}.ht'}
-    )
-    cmd = f"""
-        # build input file:
-        printf "{tsv_string}" > input.tsv
-        cp input.tsv {j.tsv}
-
-        mkdir -p $BATCH_TMPDIR/mito/
-
-        # Run query job
-        # python {annotate_coverage_script.__file__}
-        python cpg_workflows/mito_pipeline_scripts/annotate_coverage.py \
-            --input-tsv input.tsv \
-            --output-ht {j.outfile.ht} \
-            --temp-dir $BATCH_TMPDIR/mito/
-        """
-
-    j.command(command(cmd, setup_gcp=True, monitor_space=True))
-    b.write_output(j.outfile, str(coverage_ht.with_suffix('')))
-    b.write_output(j.tsv, 'gs://cpg-acute-care-test/mito/input.temp.tsv')
-
-    return j
-
-
-def annotate_coverage2(
-    b,
-    base_level_coverage_by_sid: dict[str, Path],
-    coverage_ht: Path,
-    # haplocheck_output: Path | None,
-    job_attrs: dict | None = None,
-) -> Job:
-    """
-    Try using python job....
     """
     job_attrs = job_attrs or {}
     j = b.new_python_job('mito_annotate_coverage', job_attrs)
@@ -219,7 +180,6 @@ def annotate_coverage2(
             logger.info(f"Finished import of {base_level_coverage_metrics}")
 
         logger.info("Joining individual coverage mts...")
-        out_dir = dirname(output_ht)
 
         cov_mt = multi_way_union_mts(mt_list, temp_dir, chunk_size)
         n_samples = cov_mt.count_cols()
@@ -241,15 +201,19 @@ def annotate_coverage2(
         output_tsv = re.sub(r"\.ht$", ".tsv", output_ht)
         output_samples = re.sub(r"\.ht$", "_sample_level.txt", output_ht)
 
-        logger.info("Writing sample level coverage...")
+        logger.info(f"Writing sample level coverage to {output_samples}")
         sample_mt = cov_mt.key_rows_by(pos=cov_mt.locus.position)
-        # sample_mt.coverage.export(str(output_samples))
+        sample_mt.coverage.export(str(output_samples))
 
-        logger.info("Writing coverage mt and ht...")
-        # cov_mt.write(output_mt, overwrite=overwrite)
+        logger.info("Writing coverage mt to {output_mt}")
+        cov_mt.write(output_mt, overwrite=overwrite)
+
         cov_ht = cov_mt.rows()
+        logger.info("Writing coverage ht to {output_ht}")
         cov_ht = cov_ht.checkpoint(output_ht, overwrite=overwrite)
-        # cov_ht.export(str(output_tsv))
+
+        logger.info("Writing coverage tsv to {output_tsv}")
+        cov_ht.export(str(output_tsv))
 
     ##################
     ##################
@@ -258,6 +222,5 @@ def annotate_coverage2(
         # annotate_coverage_worker, inputs, j.outfile
         annotate_coverage_worker, inputs, str(coverage_ht)
     )
-    # j.outfile.add_extension('.ht')
 
     return j, annotate_coverage_out
