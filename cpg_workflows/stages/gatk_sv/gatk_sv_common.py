@@ -146,6 +146,10 @@ def add_gatk_sv_jobs(
     job_prefix = make_job_name(
         wfl_name, sequencing_group=sequencing_group_id, dataset=dataset.name
     )
+
+    # config toggle decides if outputs are copied out
+    copy_outputs = get_config()['workflow'].get('copy_outputs', False)
+
     submit_j, output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
         b=batch,
         job_prefix=job_prefix,
@@ -160,7 +164,7 @@ def add_gatk_sv_jobs(
         input_dict=paths_as_strings,
         outputs_to_collect=outputs_to_collect,
         driver_image=driver_image,
-        copy_outputs_to_gcp=False
+        copy_outputs_to_gcp=copy_outputs
     )
 
     copy_j = batch.new_job(f'{job_prefix}: copy outputs')

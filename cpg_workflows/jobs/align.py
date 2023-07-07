@@ -382,6 +382,7 @@ def _align_one(
         group = alignment_input.resource_group(b)
 
         if not alignment_input.index_path:
+
             sort_index_input_cmd = dedent(
                 f"""
             mkdir -p $BATCH_TMPDIR/sorted
@@ -391,11 +392,16 @@ def _align_one(
             -@{nthreads - 1} \
             -T $BATCH_TMPDIR/sort_tmp \
             > $BATCH_TMPDIR/sorted.{alignment_input.ext}
-            
+
             mv $BATCH_TMPDIR/sorted.{alignment_input.ext} {group[alignment_input.ext]}
             rm -rf $BATCH_TMPDIR/sort_tmp
-            
-            samtools index -@{nthreads - 1} {group[alignment_input.ext]}
+
+            # bazam requires an index at foo.crai (not foo.cram.crai) so we must set the
+            # path explicitly. We can not access the localized cram file's basename via the
+            # Input ResourceGroup so using shell magic to strip the trailing "m" and add an
+            # "i" to the alignment_path. This should work for both .cram and .bam files.
+            alignment_path="{group[alignment_input.ext]}"
+            samtools index -@{nthreads - 1} $alignment_path  ${{alignment_path%m}}i
             """
             )
 
@@ -530,7 +536,7 @@ def extract_fastq(
     samtools fastq -@{res.get_nthreads() - 1} \
     -1 $BATCH_TMPDIR/R1.fq.gz -2 $BATCH_TMPDIR/R2.fq.gz \
     -0 /dev/null -s /dev/null -n
-    # Can't write directly to j.fq1 and j.fq2 because samtools-fastq requires the 
+    # Can't write directly to j.fq1 and j.fq2 because samtools-fastq requires the
     # file names to end with ".gz" in order to create compressed outputs.
     mv $BATCH_TMPDIR/R1.fq.gz {j.fq1}
     mv $BATCH_TMPDIR/R2.fq.gz {j.fq2}
@@ -592,8 +598,8 @@ def finalise_alignment(
         SO=coordinate M={j.markdup_metrics} outputformat=sam \\
         tmpfile=$(dirname {j.output_cram.cram})/bamsormadup-tmp \\
         | samtools view -@{min(nthreads, 6) - 1} -T {reference.base} \\
-        -Ocram -o {j.output_cram.cram}       
-        
+        -Ocram -o {j.output_cram.cram}
+
         samtools index -@{nthreads - 1} {j.output_cram.cram} \\
         {j.output_cram["cram.crai"]}
         """.strip()

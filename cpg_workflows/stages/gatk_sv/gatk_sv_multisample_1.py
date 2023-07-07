@@ -22,17 +22,35 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_ref_panel,
     make_combined_ped,
     SV_CALLERS,
+    _sv_batch_meta
 )
+from cpg_workflows.workflow import get_workflow
 
 
 @stage
 class GatherBatchEvidence(CohortStage):
     """
-    This requires restriction by Samples, and runs separately from
-    the initial variant calling and EvidenceQC
+    This is the first Stage in the multisample GATK-SV workflow, running on a
+    controlled subset of SGs as determined by the output of CreateSampleBatches.
+
+    Using Analysis-Runner, include three additional config files:
+
+    - configs/gatk_sv/stop_at_filter_batch.toml
+        - this contains the instruction to stop prior to FilterBatch
+    - configs/gatk_sv/use_for_all_workflows.toml
+        - contains all required images and references
+    - A custom config with the specific cohort in workflow.only_sgs
 
     https://github.com/broadinstitute/gatk-sv#gather-batch-evidence
     https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherBatchEvidence.wdl
+    
+    it's critical to separate the ending with a dot, e.g.: `*.sr.txt.gz`,
+    These files are passed to `gatk PrintSVEvidence`, that determines file
+    format based on the file name.
+    It would strongly expect the files to end exactly with either
+    `.sr.txt.gz`, `.pe.txt.gz`, or `.sd.txt.gz`, otherwise it would fail with
+    "A USER ERROR has occurred: Cannot read file:///cromwell_root/... because
+    no suitable codecs found".
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
@@ -46,14 +64,14 @@ class GatherBatchEvidence(CohortStage):
             'cnmops_large_del_index': 'DEL.large.bed.gz.tb',
             'cnmops_large_dup': 'DUP.large.bed.gz',
             'cnmops_large_dup_index': 'DUP.large.bed.gz.tbi',
-            'merged_SR': 'sr.txt.gz',
-            'merged_SR_index': 'sr.txt.gz.tbi',
-            'merged_PE': 'pe.txt.gz',
-            'merged_PE_index': 'pe.txt.gz.tbi',
-            'merged_BAF': 'baf.txt.gz',
-            'merged_BAF_index': 'baf.txt.gz.tbi',
-            'merged_bincov': 'RD.txt.gz',
-            'merged_bincov_index': 'RD.txt.gz.tbi',
+            'merged_SR': f'{self.name}.sr.txt.gz',
+            'merged_SR_index': f'{self.name}.sr.txt.gz.tbi',
+            'merged_PE': f'{self.name}.pe.txt.gz',
+            'merged_PE_index': f'{self.name}.pe.txt.gz.tbi',
+            'merged_BAF': f'{self.name}.baf.txt.gz',
+            'merged_BAF_index': f'{self.name}.baf.txt.gz.tbi',
+            'merged_bincov': f'{self.name}.RD.txt.gz',
+            'merged_bincov_index': f'{self.name}.RD.txt.gz.tbi',
             'SR_stats': 'SR.QC_matrix.txt',
             'PE_stats': 'PE.QC_matrix.txt',
             'BAF_stats': 'BAF.QC_matrix.txt',
@@ -73,7 +91,7 @@ class GatherBatchEvidence(CohortStage):
         sequencing_groups = cohort.get_sequencing_groups(only_active=True)
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': get_workflow().output_version,
             'samples': [sg.id for sg in sequencing_groups],
             'ped_file': str(make_combined_ped(cohort, self.prefix)),
             'counts': [
@@ -193,7 +211,7 @@ class ClusterBatch(CohortStage):
         batch_evidence_d = inputs.as_dict(cohort, GatherBatchEvidence)
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': get_workflow().output_version,
             'del_bed': str(batch_evidence_d['merged_dels']),
             'dup_bed': str(batch_evidence_d['merged_dups']),
             'ped_file': str(make_combined_ped(cohort, self.prefix)),
@@ -257,7 +275,7 @@ class GenerateBatchMetrics(CohortStage):
         gatherbatchevidence_d = inputs.as_dict(cohort, GatherBatchEvidence)
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': get_workflow().output_version,
             'baf_metrics': gatherbatchevidence_d['merged_BAF'],
             'discfile': gatherbatchevidence_d['merged_PE'],
             'coveragefile': gatherbatchevidence_d['merged_bincov'],
@@ -308,17 +326,7 @@ class GenerateBatchMetrics(CohortStage):
 @stage(required_stages=[GenerateBatchMetrics, ClusterBatch])
 class FilterBatch(CohortStage):
     """
-    Filters poor quality variants and filters outlier samples. This workflow can
-    be run all at once with the WDL at wdl/FilterBatch.wdl, or it can be run in three
-    steps to enable tuning of outlier filtration cutoffs. The three sub-workflows are:
-
-    * FilterBatchSites: Per-batch variant filtration
-    * PlotSVCountsPerSample: Visualize SV counts per sample per type to help choose an
-      IQR cutoff for outlier filtering, and preview outlier samples for a given cutoff
-    * FilterBatchSamples: Per-batch outlier sample filtration; provide an appropriate
-      outlier_cutoff_nIQR based on the SV count plots and outlier previews from step 2.
-      Note that not removing high outliers can result in increased compute cost and
-      a higher false positive rate in later steps.
+    Filters poor quality variants and filters outlier samples.
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict:
@@ -367,7 +375,7 @@ class FilterBatch(CohortStage):
         clusterbatch_d = inputs.as_dict(cohort, ClusterBatch)
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': get_workflow().output_version,
             'ped_file': make_combined_ped(cohort, self.prefix),
             'evidence_metrics': metrics_d['metrics'],
             'evidence_metrics_common': metrics_d['metrics_common'],
@@ -405,9 +413,24 @@ class FilterBatch(CohortStage):
 @stage
 class MergeBatchSites(CohortStage):
     """
-    I'm adding these here as it logically sits between FilterBatch and GenotypeBatch
-    Though it runs independently, with input and output for this stage communicated
-    via config (at least until the more complex batching/cohort logic comes along)
+    This Stage runs separately between GenerateBatchMetrics and FilterBatch
+    This takes the component VCFs from individual batches and merges them into
+    a single VCF (one for PESR and one for depth-only calls).
+
+    The single-stage workflow used here is gatk_sv_sandwich.
+
+    This only has to be run once for all sub-cohorts, and technically doesn't
+    need to be associated with a group of SGs. However, including one (via the
+    config containing `only_sgs`) allows us to keep the output VCFs within the
+    output structure generated by previous stages in this run.
+
+    Using Analysis-Runner, include three additional config files:
+    - configs/gatk_sv/all_batch_names.toml
+        - add all sub-cohort hashes to the batch_names list
+        - for ongoing future runs, we may want to include ALL prior hashes
+    - configs/gatk_sv/use_for_all_workflows.toml
+        - contains all required images and references
+    - A custom config with a specific cohort in workflow.only_sgs
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict:
@@ -452,12 +475,27 @@ class MergeBatchSites(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=[FilterBatch, GatherBatchEvidence])
+@stage(
+    required_stages=[FilterBatch, GatherBatchEvidence],
+    analysis_type='sv',
+    analysis_keys=[f'genotyped_{mode}_vcf' for mode in ['pesr', 'depth']],
+    update_analysis_meta=_sv_batch_meta
+)
 class GenotypeBatch(CohortStage):
     """
     Genotypes a batch of samples across filtered variants combined across all batches.
-    This requires a separate stage shoved in between FilterBatch and GenotypeBatch
-    to aggregate all the filterBatch outputs across all sub-batches
+    In the current WF setup, this Stage is run only once MergeBatchSites (via the WF
+    `gatk_sv_sandwich`) has completed, and a pair of VCFs containing all merged
+    FilterBatch outputs individual batches has been generated.
+
+    Using Analysis-Runner, include three additional config files:
+
+    - configs/gatk_sv/genotypebatch.toml
+        - this contains the instruction to only run GenotypeBatch
+        - update the cohort_depth_vcf and cohort_pesr_vcf values
+    - configs/gatk_sv/use_for_all_workflows.toml
+        - contains all required images and references
+    - A custom config with the specific cohort in workflow.only_sgs
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict:
@@ -492,7 +530,7 @@ class GenotypeBatch(CohortStage):
         batchevidence_d = inputs.as_dict(cohort, GatherBatchEvidence)
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': get_workflow().output_version,
             'ped_file': make_combined_ped(cohort, self.prefix),
             'n_per_split': 5000,
             'n_RD_genotype_bins': 100000,

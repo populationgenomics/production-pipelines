@@ -28,7 +28,11 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
 from cpg_utils.config import get_config
 
 
-@stage(analysis_type='sv', update_analysis_meta=_sv_individual_meta)
+@stage(
+    analysis_keys=[f'{caller}_vcf' for caller in SV_CALLERS],
+    analysis_type='sv',
+    update_analysis_meta=_sv_individual_meta
+)
 class GatherSampleEvidence(SequencingGroupStage):
     """
     https://github.com/broadinstitute/gatk-sv#gathersampleevidence
@@ -48,6 +52,7 @@ class GatherSampleEvidence(SequencingGroupStage):
         "A USER ERROR has occurred: Cannot read file:///cromwell_root/... because
         no suitable codecs found".
         """
+
         d: dict[str, Path] = {
             'coverage_counts': sequencing_group.make_sv_evidence_path
             / f'{sequencing_group.id}.coverage_counts.tsv.gz',
@@ -158,8 +163,8 @@ class EvidenceQC(CohortStage):
             'WGD_dist': 'WGD_score_distributions.pdf',
             'WGD_matrix': 'WGD_scoring_matrix_output.bed.gz',
             'WGD_scores': 'WGD_scores.txt.gz',
-            'bincov_matrix': 'RD.txt.gz',
-            'bincov_matrix_index': 'RD.txt.gz.tbi',
+            'bincov_matrix': f'{self.name}.RD.txt.gz',
+            'bincov_matrix_index': f'{self.name}.RD.txt.gz.tbi',
             'bincov_median': 'medianCov.transposed.bed',
             'qc_table': 'evidence_qc_table.tsv',
         }
@@ -211,6 +216,16 @@ class CreateSampleBatches(CohortStage):
     uses the values generated in EvidenceQC
     splits the sequencing groups into batches based on median coverage,
     PCR +/- status, and Sex
+
+    The output of this Stage will contain the distinct SG batches to use for the
+    following series of Stages. For now, standard practice is to create a separate
+    minimal configuration file for each sub-batch, containing the list of SG IDs
+    as the `only_sgs` key. The gatk_sv_multisample_1 and gatk_sv_sandwich WFs are
+    then run separately for each sub-batch, with the active SGs controlled via the
+    config contents.
+
+    When we move to custom cohorts, the output of this stage will be used as input
+    when generating a custom Metamist cohort per sub-batch.
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
