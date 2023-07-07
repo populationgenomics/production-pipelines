@@ -179,7 +179,7 @@ analysis-runner \
 ## MakeCohortVCF + AnnotateVCF
 
 The final stage of GATK-SV takes all the jointly genotyped data from the separate batches and combines them to create
-a singel VCF file, which is annotated with functional and AF annotations. This runs on all samples together, using the
+a single VCF file, which is annotated with functional and AF annotations. This runs on all samples together, using the
 `only_sgs` variable from the Single sample workflow.
 
 ```commandline
