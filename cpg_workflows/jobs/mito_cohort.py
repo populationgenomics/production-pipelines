@@ -243,13 +243,13 @@ def annotate_coverage2(
 
         logger.info("Writing sample level coverage...")
         sample_mt = cov_mt.key_rows_by(pos=cov_mt.locus.position)
-        sample_mt.coverage.export(str(output_samples))
+        # sample_mt.coverage.export(str(output_samples))
 
         logger.info("Writing coverage mt and ht...")
         cov_mt.write(output_mt, overwrite=overwrite)
         cov_ht = cov_mt.rows()
         cov_ht = cov_ht.checkpoint(output_ht, overwrite=overwrite)
-        cov_ht.export(str(output_tsv))
+        # cov_ht.export(str(output_tsv))
 
     ##################
     ##################
