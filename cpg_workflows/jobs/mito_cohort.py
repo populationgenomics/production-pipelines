@@ -201,18 +201,18 @@ def annotate_coverage(
         output_tsv = re.sub(r"\.ht$", ".tsv", output_ht)
         output_samples = re.sub(r"\.ht$", "_sample_level.txt", output_ht)
 
-        logger.info(f"Writing sample level coverage to {output_samples}")
+        print(f"Writing sample level coverage to {output_samples}")
         sample_mt = cov_mt.key_rows_by(pos=cov_mt.locus.position)
         sample_mt.coverage.export(str(output_samples))
 
-        logger.info("Writing coverage mt to {output_mt}")
+        print("Writing coverage mt to {output_mt}")
         cov_mt.write(output_mt, overwrite=overwrite)
 
         cov_ht = cov_mt.rows()
-        logger.info("Writing coverage ht to {output_ht}")
+        print("Writing coverage ht to {output_ht}")
         cov_ht = cov_ht.checkpoint(output_ht, overwrite=overwrite)
 
-        logger.info("Writing coverage tsv to {output_tsv}")
+        print("Writing coverage tsv to {output_tsv}")
         cov_ht.export(str(output_tsv))
 
     ##################
