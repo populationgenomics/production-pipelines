@@ -246,7 +246,7 @@ def annotate_coverage2(
         # sample_mt.coverage.export(str(output_samples))
 
         logger.info("Writing coverage mt and ht...")
-        cov_mt.write(output_mt, overwrite=overwrite)
+        # cov_mt.write(output_mt, overwrite=overwrite)
         cov_ht = cov_mt.rows()
         cov_ht = cov_ht.checkpoint(output_ht, overwrite=overwrite)
         # cov_ht.export(str(output_tsv))
