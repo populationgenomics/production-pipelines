@@ -255,8 +255,9 @@ def annotate_coverage2(
     ##################
 
     annotate_coverage_out = j.call(
-        annotate_coverage_worker, inputs, j.outfile
+        # annotate_coverage_worker, inputs, j.outfile
+        annotate_coverage_worker, inputs, str(coverage_ht)
     )
-    j.outfile.add_extension('.ht')
+    # j.outfile.add_extension('.ht')
 
     return j, annotate_coverage_out
