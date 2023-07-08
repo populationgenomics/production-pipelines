@@ -476,7 +476,7 @@ class JoinMito(CohortStage):
         }
 
         vcf_path_by_sgid = {
-            sequencing_group.id: inputs.as_path(target=sequencing_group, stage=GenotypeMito, key='out_vcf')
+            sequencing_group.id: str(inputs.as_path(target=sequencing_group, stage=GenotypeMito, key='out_vcf'))
             for sequencing_group in cohort.get_sequencing_groups()
         }
 
