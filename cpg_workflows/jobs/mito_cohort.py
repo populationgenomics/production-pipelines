@@ -633,7 +633,7 @@ def combine_vcfs(
         vcf_path_by_sgid,
         coverage_mt_path,
         artifact_prone_sites_path,
-        checkpoint_prefix,
+        str(checkpoint_prefix),
         combined_vcf_mt_path,
         chunk_size,
         minimum_homref_coverage,
