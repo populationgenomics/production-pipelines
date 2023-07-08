@@ -10,7 +10,7 @@ from typing import Any
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_workflows import get_batch
 from cpg_workflows.filetypes import CramPath
@@ -456,7 +456,8 @@ class JoinMito(CohortStage):
             # convert to str to avoid checking existence
             'tmp_prefix': str(self.tmp_prefix),
             'coverage_ht': self.prefix / 'mito' / 'coverage.ht',
-            'mt': self.prefix / 'mito' / 'cohort.mt',
+            'coverage_mt': self.prefix / 'mito' / 'coverage.mt',
+            'cohort_mt': self.prefix / 'mito' / 'cohort.mt',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -464,37 +465,42 @@ class JoinMito(CohortStage):
         Uses analysis-runner's dataproc helper to run hail query scripts
         """
         jobs = []
-        base_level_coverage_by_sid = {
+
+        checkpoint_prefix = (
+            to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
+        )
+
+        base_level_coverage_by_sgid = {
             sequencing_group.id: inputs.as_path(target=sequencing_group, stage=RealignMito, key='base_level_coverage_metrics')
             for sequencing_group in cohort.get_sequencing_groups()
         }
 
-        # foo_j = mito_cohort.example_job(
-        #     b=get_batch(),
-        #     job_attrs=self.get_job_attrs(cohort),
-        # )
-        # jobs.append(foo_j)
+        vcf_path_by_sgid = {
+            sequencing_group.id: inputs.as_path(target=sequencing_group, stage=GenotypeMito, key='out_vcf')
+            for sequencing_group in cohort.get_sequencing_groups()
+        }
 
-        call_j = mito_cohort.annotate_coverage(
+        annotate_coverage_j = mito_cohort.annotate_coverage(
             b=get_batch(),
-            base_level_coverage_by_sid=base_level_coverage_by_sid,
+            base_level_coverage_by_sgid=base_level_coverage_by_sgid,
             coverage_ht=self.expected_outputs(cohort)['coverage_ht'],
             job_attrs=self.get_job_attrs(cohort),
+            checkpoint_prefix=checkpoint_prefix
         )
-        jobs.append(call_j)
-
-        # assert isinstance(call_j.output_vcf, hb.ResourceGroup)
+        jobs.append(annotate_coverage_j)
 
 
-        # sequencing_group_vcf_by_sid = {
-        #     sequencing_group.id: inputs.as_path(target=sequencing_group, stage=GenotypeMito, key='out_vcf')
-        #     for sequencing_group in cohort.get_sequencing_groups()
-        # }
+        combine_vcfs_j = mito_cohort.combine_vcfs(
+            b=get_batch(),
+            vcf_path_by_sgid=vcf_path_by_sgid,
+            coverage_mt_path=self.expected_outputs(cohort)['coverage_mt'],
+            artifact_prone_sites_path=to_path('gs://cpg-common-test/mito/artifact_prone_sites.bed'),
+            combined_vcf_mt_path=self.expected_outputs(cohort)['cohort_mt'],
+            checkpoint_prefix=checkpoint_prefix,
+            job_attrs=self.get_job_attrs(cohort),
+        )
+        jobs.append(combine_vcfs_j)
 
-
-        # checkpoint_prefix = (
-        #     to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
-        # )
 
         # jobs = annotate_cohort_jobs(
         #     b=get_batch(),
