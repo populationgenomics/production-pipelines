@@ -227,7 +227,7 @@ def annotate_coverage(
         cov_ht.export(str(output_tsv))
 
     # Call the worker job
-    j.call(annotate_coverage_worker, inputs, str(coverage_ht))
+    j.call(annotate_coverage_worker, inputs, str(coverage_ht), checkpoint_prefix)
 
     return j
 
