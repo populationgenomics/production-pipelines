@@ -286,7 +286,7 @@ class GenotypeMito(SequencingGroupStage):
         main = sequencing_group.dataset.prefix()
         analysis = sequencing_group.dataset.analysis_prefix()
         return {
-            'out_vcf': main / 'mito' / f'{sequencing_group.id}.mito.vcf.gz',
+            'out_vcf': main / 'mito' / f'{sequencing_group.id}.mito.vcf.bgz',
             'haplocheck_metrics': analysis / 'mito' / f'{sequencing_group.id}.haplocheck.txt',
         }
 
@@ -435,7 +435,7 @@ class GenotypeMito(SequencingGroupStage):
         # Write the final vcf to the bucket
         get_batch().write_output(
             split_multiallelics_j.output_vcf,
-            str(self.expected_outputs(sequencing_group)['out_vcf']).replace('.vcf.gz', ''),
+            str(self.expected_outputs(sequencing_group)['out_vcf']).replace('.vcf.bgz', ''),
         )
 
         return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
