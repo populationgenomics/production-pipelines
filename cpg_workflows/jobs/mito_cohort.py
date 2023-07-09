@@ -562,6 +562,10 @@ def combine_vcfs(
         output_mt_path: Path to export final mt. Base also used to generate .vcf.bgz
 
         """
+        from cpg_utils.hail_batch import init_batch
+
+        init_batch()
+
 
         logger.info("Combining VCFs...")
         combined_mt_checkpoint = checkpoint_prefix + 'combined_vcfs.mt'
