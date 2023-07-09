@@ -351,8 +351,8 @@ class GenotypeMito(SequencingGroupStage):
         # Merge the mutect stats output files (needed for filtering)
         merge_stats_J = mito.merge_mutect_stats(
             b=get_batch(),
-            first_stats_file=call_j.output_vcf['vcf.gz.stats'],
-            second_stats_file=shifted_call_j.output_vcf['vcf.gz.stats'],
+            first_stats_file=call_j.output_vcf['vcf.bgz.stats'],
+            second_stats_file=shifted_call_j.output_vcf['vcf.bgz.stats'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(merge_stats_J)

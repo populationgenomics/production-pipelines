@@ -307,9 +307,9 @@ def mito_mutect2(
 
     j.declare_resource_group(
         output_vcf={
-            'vcf.gz': '{root}.vcf.gz',
-            'vcf.gz.tbi': '{root}.vcf.gz.tbi',
-            'vcf.gz.stats': '{root}.vcf.gz.stats',
+            'vcf.bgz': '{root}.vcf.bgz',
+            'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
+            'vcf.bgz.stats': '{root}.vcf.bgz.stats',
         }
     )
 
@@ -319,7 +319,7 @@ def mito_mutect2(
             -I {cram.cram} \
             --read-filter MateOnSameContigOrNoMappedMateReadFilter \
             --read-filter MateUnmappedAndUnmappedReadFilter \
-            -O {j.output_vcf['vcf.gz']} \
+            -O {j.output_vcf['vcf.bgz']} \
             --annotation StrandBiasBySample \
             --mitochondria-mode \
             --max-reads-per-alignment-start {max_reads_per_alignment_start} \
@@ -348,7 +348,7 @@ def liftover_and_combine_vcfs(
         reference: resource group for wt chrM reference.
         shift_back_chain: chain file provided with shifted genome.
     Outputs:
-        output_vcf: Merged vcf.gz in standard hg38 coordinate space.
+        output_vcf: Merged vcf.bgz in standard hg38 coordinate space.
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL360-L415C2
     """
@@ -360,23 +360,23 @@ def liftover_and_combine_vcfs(
     res.set_to_job(j)
 
     j.declare_resource_group(
-        lifted_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+        lifted_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
     )
     j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+        output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
     )
 
     cmd = f"""
         picard LiftoverVcf \
-            I={shifted_vcf['vcf.gz']} \
-            O={j.lifted_vcf['vcf.gz']} \
+            I={shifted_vcf['vcf.bgz']} \
+            O={j.lifted_vcf['vcf.bgz']} \
             R={reference.base} \
             CHAIN={shift_back_chain} \
-            REJECT={j.rejected_vcf}.vcf.gz
+            REJECT={j.rejected_vcf}.vcf.bgz
         picard MergeVcfs \
-            I={vcf['vcf.gz']} \
-            I={j.lifted_vcf['vcf.gz']} \
-            O={j.output_vcf['vcf.gz']}
+            I={vcf['vcf.bgz']} \
+            I={j.lifted_vcf['vcf.bgz']} \
+            O={j.output_vcf['vcf.bgz']}
     """
 
     j.command(command(cmd))
@@ -408,7 +408,7 @@ def merge_mutect_stats(
     res.set_to_job(j)
 
     j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+        output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
     )
 
     cmd = f"""
@@ -470,10 +470,10 @@ def filter_variants(
     )
 
     j.declare_resource_group(
-        filtered_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+        filtered_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
     )
     j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+        output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
     )
 
     if contamination_estimate:
@@ -484,17 +484,17 @@ def filter_variants(
         contamination_estimate_string = ''
 
     cmd = f"""
-      gatk --java-options "-Xmx2500m" FilterMutectCalls -V {vcf['vcf.gz']} \\
+      gatk --java-options "-Xmx2500m" FilterMutectCalls -V {vcf['vcf.bgz']} \\
         -R {reference.base} \\
-        -O {j.filtered_vcf['vcf.gz']} \\
+        -O {j.filtered_vcf['vcf.bgz']} \\
         --stats {merged_mutect_stats} \\
         --max-alt-allele-count {max_alt_allele_count} \\
         --mitochondria-mode \\
         --min-allele-fraction  {min_allele_fraction} \\
         --f-score-beta  {f_score_beta} \\
         {contamination_estimate_string}
-      gatk VariantFiltration -V {j.filtered_vcf['vcf.gz']} \\
-        -O {j.output_vcf['vcf.gz']} \\
+      gatk VariantFiltration -V {j.filtered_vcf['vcf.bgz']} \\
+        -O {j.output_vcf['vcf.bgz']} \\
         --apply-allele-specific-filters \\
         --mask {blacklisted_sites.bed} \\
         --mask-name "blacklisted_site"
@@ -532,14 +532,14 @@ def split_multi_allelics(
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 
-    j.declare_resource_group(split_vcf={'vcf.gz': '{root}.vcf.gz'})
-    j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz'})
+    j.declare_resource_group(split_vcf={'vcf.bgz': '{root}.vcf.bgz'})
+    j.declare_resource_group(output_vcf={'vcf.bgz': '{root}.vcf.bgz'})
 
     cmd = f"""
         gatk LeftAlignAndTrimVariants \
             -R {reference.base} \
-            -V {vcf['vcf.gz']} \
-            -O {j.split_vcf['vcf.gz']} \
+            -V {vcf['vcf.bgz']} \
+            -O {j.split_vcf['vcf.bgz']} \
             --split-multi-allelics \
             --dont-trim-alleles \
             --keep-original-ac
@@ -547,13 +547,13 @@ def split_multi_allelics(
     if remove_non_pass_sites:
         cmd += f"""
             gatk SelectVariants \
-                -V {j.split_vcf['vcf.gz']} \
-                -O {j.output_vcf['vcf.gz']} \
+                -V {j.split_vcf['vcf.bgz']} \
+                -O {j.output_vcf['vcf.bgz']} \
                 --exclude-filtered
         """
     else:
         cmd += f"""
-            mv {j.split_vcf['vcf.gz']} {j.output_vcf['vcf.gz']}
+            mv {j.split_vcf['vcf.bgz']} {j.output_vcf['vcf.bgz']}
         """
 
     j.command(command(cmd, define_retry_function=True))
@@ -586,7 +586,7 @@ def get_contamination(
     res.set_to_job(j)
 
     cmd = f"""
-        PARENT_DIR="$(dirname "{vcf['vcf.gz']}")"
+        PARENT_DIR="$(dirname "{vcf['vcf.bgz']}")"
         java -jar /haplocheckCLI.jar "$PARENT_DIR"
         mv output {j.haplocheck_output}
         """
