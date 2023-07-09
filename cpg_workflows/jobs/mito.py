@@ -533,6 +533,7 @@ def split_multi_allelics(
     res.set_to_job(j)
 
     j.declare_resource_group(split_vcf={'vcf.gz': '{root}.vcf.gz'})
+    # Downstream hail steps prefer explicit .bgz suffix
     j.declare_resource_group(output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
 
     cmd = f"""
