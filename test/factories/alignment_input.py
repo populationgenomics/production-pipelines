@@ -9,11 +9,6 @@ from cpg_workflows.filetypes import BamPath, CramPath, FastqPair, FastqPairs
 # TODO: Support writing contents to file?
 
 
-class ReferenceGenome(Enum):
-    GRCh37 = "GRCh37"
-    GRCh38 = "GRCh38"
-
-
 def _remove_trailing_slash(path: str | Path) -> str:
     path = str(path)
     if path.endswith("/"):
@@ -33,7 +28,7 @@ def _create(file: Path):
 
 def create_fastq_pair_input(
     location: str | Path,
-    prefix: str = "SAMPLE",
+    prefix: str = "SAMPLE1",
     gzipped: bool = True,
     create: bool = False,
 ) -> FastqPair:
@@ -48,7 +43,7 @@ def create_fastq_pair_input(
             File location either locally or in a cloud bucket.
 
         prefix (str, optional):
-            String to prefix R1 and R2 file names with. Defaults to "SAMPLE".
+            String to prefix R1 and R2 file names with. Defaults to "SAMPLE1".
 
         create (bool, optional):
             Create the files on disk if `True`. No support for writing to cloud buckets
@@ -81,7 +76,7 @@ def create_fastq_pair_input(
 
 def create_fastq_pairs_input(
     location: str | Path,
-    prefix: str = "SAMPLE",
+    prefix: str = "SAMPLE1",
     gzipped: bool = True,
     n: int = 2,
     create: bool = False,
@@ -98,7 +93,7 @@ def create_fastq_pairs_input(
             exist.
 
         prefix (str, optional):
-            String to prefix R1 and R2 file names with. Defaults to "SAMPLE".
+            String to prefix R1 and R2 file names with. Defaults to "SAMPLE1".
 
         gzipped (bool, optional):
             Adds `'.gz'` extension if `True`. Defaults to True.
@@ -129,7 +124,7 @@ def create_fastq_pairs_input(
 
 def create_bam_input(
     location: str | Path,
-    prefix: str = "SAMPLE",
+    prefix: str = "SAMPLE1",
     index: bool = True,
     create: bool = False,
 ) -> BamPath:
@@ -144,7 +139,7 @@ def create_bam_input(
             exist.
 
         prefix (str, optional):
-            String to prefix bam and bai names with. Defaults to "SAMPLE".
+            String to prefix bam and bai names with. Defaults to "SAMPLE1".
 
         index (bool, optional):
             Also set path to an index file. Defaults to True.
@@ -171,13 +166,11 @@ def create_bam_input(
 
 
 def create_reference_assembly(
-    location: str | Path,
-    prefix: str = ReferenceGenome.GRCh38.value,
-    create: bool = False,
+    location: str | Path, name: str = "GRCh38.fa", create: bool = False
 ) -> Path:
     """
     Create a reference assembly file for testing. The file will be named as follows:
-    `'{location}/{prefix}.fa'`. If `create` is `True`, the file will be created on disk
+    `'{location}/{name}'`. If `create` is `True`, the file will be created on disk
     with no contents.
 
     Args:
@@ -185,8 +178,8 @@ def create_reference_assembly(
             File location either locally or in a cloud bucket. It does not need to
             exist.
 
-        prefix (str, optional):
-            String to prefix file name with. Defaults to "GRCh38".
+        name (str, optional):
+            File name. Defaults to "GRCh38.fa".
 
         create (bool, optional):
             Create the files on disk if `True`. No support for writing to cloud buckets
@@ -196,8 +189,7 @@ def create_reference_assembly(
         Path
     """
     location = _remove_trailing_slash(location)
-    prefix = f"{location}/{prefix}"
-    path = to_path(f"{prefix}.fa")
+    path = to_path(f"{location}/{name}")
 
     if create:
         _create(path)
@@ -207,9 +199,9 @@ def create_reference_assembly(
 
 def create_cram_input(
     location: str | Path,
-    prefix: str = "SAMPLE",
+    prefix: str = "SAMPLE1",
     index: bool = True,
-    reference_assembly: Optional[ReferenceGenome | Path] = ReferenceGenome.GRCh38,
+    reference_assembly: Optional[str | Path] = "GRCh38.fa",
     create: bool = False,
 ) -> CramPath:
     """
@@ -221,17 +213,17 @@ def create_cram_input(
         location (str):
             File location either locally or in a cloud bucket. It does not need to
             exist. Will be also used to set the location of the reference assembly if
-            `reference_assembly` is a `ReferenceGenome` enum.
+            `reference_assembly` is a `str`.
 
         prefix (str, optional):
-            String to prefix cram and crai file names with. Defaults to "SAMPLE".
+            String to prefix cram and crai file names with. Defaults to "SAMPLE1".
 
-        reference_assembly (ReferenceGenome | Path, optional):
-            Reference assembly file or `ReferenceGenome` enum. If `ReferenceGenome` enum
-            is provided, the corresponding reference assembly path will be set to
-            `'{location}/(GRCh37|GRCh38).fa'` and created if `create` is `True`. If
-            `None`, no reference assembly will be set. Defaults to
-            `ReferenceGenome.GRCh38`.
+        reference_assembly (str | Path, optional):
+            Path to a fasta file or a string representing a file name without a path.
+            If a `str` is provided, the corresponding reference assembly path will be
+            set to `'{location}/{reference_assembly}'` and created if `create` is
+            `True`. If `None`, no reference assembly will be set. Defaults to
+            "GRCh38.fa".
 
         index (bool, optional):
             Also set path to an index file. Defaults to True.
@@ -249,10 +241,10 @@ def create_cram_input(
     path = to_path(f"{prefix}.cram")
     index_path = to_path(f"{prefix}.cram.crai")
 
-    if isinstance(reference_assembly, ReferenceGenome):
+    if isinstance(reference_assembly, str):
         reference_assembly = create_reference_assembly(
             location=location,
-            prefix=reference_assembly.value,
+            name=reference_assembly,
             create=create,
         )
 
