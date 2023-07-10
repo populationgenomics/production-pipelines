@@ -588,6 +588,7 @@ def get_contamination(
     res.set_to_job(j)
 
     cmd = f"""
+        mv {vcf['vcf.bgz']} {vcf}.vcf.gz
         PARENT_DIR="$(dirname "{vcf['vcf.bgz']}")"
         java -jar /haplocheckCLI.jar "$PARENT_DIR"
         mv output {j.haplocheck_output}
