@@ -88,8 +88,8 @@ def get_output_dict(sequencing_group: SequencingGroup) -> dict[str, Path]:
         r1_id = f'{io_pair.id}_R1'
         r2_id = f'{io_pair.id}_R2'
         out_dict.update({
-            f'{r1_id}': io_pair.output_pair.r1,
-            f'{r2_id}': io_pair.output_pair.r2,
+            f'fastq_{r1_id}': io_pair.output_pair.r1,
+            f'fastq_{r2_id}': io_pair.output_pair.r2,
         })
     return out_dict
 
