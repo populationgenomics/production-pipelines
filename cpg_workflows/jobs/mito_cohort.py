@@ -384,7 +384,7 @@ def combine_vcfs(
             # Use GRCh38 reference as most external resources added in downstream scripts use GRCh38 contig names
             # (although note that the actual sequences of the mitochondria in both GRCh38 and GRCh38 are the same)
             mt = mt.key_rows_by(
-                locus=hl.locus("MT", mt.locus.position, reference_genome="GRCh38"),
+                locus=hl.locus("chrM", mt.locus.position, reference_genome="GRCh38"),
                 alleles=mt.alleles,
             )
             mt = mt.key_cols_by(s=sample)
@@ -436,7 +436,7 @@ def combine_vcfs(
         # Note: the mitochondrial reference genome is the same for GRCh38 and GRCh38
         coverages = hl.read_matrix_table(coverage_mt_path)
         coverages = coverages.key_rows_by(
-            locus=hl.locus("MT", coverages.locus.position, reference_genome="GRCh38")
+            locus=hl.locus("chrM", coverages.locus.position, reference_genome="GRCh38")
         )
 
         mt = mt.annotate_entries(
@@ -477,9 +477,9 @@ def combine_vcfs(
         # Create a region annotation containing the interval that the variant overlaps (for SNP will be one position, but will be longer for deletions based on the length of the deletion)
         mt = mt.annotate_rows(
             region=hl.interval(
-                hl.locus("MT", mt.locus.position, reference_genome="GRCh38"),
+                hl.locus("chrM", mt.locus.position, reference_genome="GRCh38"),
                 hl.locus(
-                    "MT",
+                    "chrM",
                     mt.locus.position + hl.len(mt.alleles[0]) - 1,
                     reference_genome="GRCh38",
                 ),
