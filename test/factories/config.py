@@ -143,8 +143,15 @@ class HailConfig(DictionaryMixin):
 @dataclass(kw_only=True)
 class StorageConfig(DictionaryMixin):
     """
-    Technically `cpg_utils` can pull from any storgekey in the config, but these are
-    the keys that we generally stick with.
+    Technically `cpg_utils` can pull from any storge key in a workflow config, but
+    these are the keys that we generally stick with. For example:
+
+    [storage.fewgenomes]
+    default = "gs://cpg-fewgenomes-main"
+    web = "gs://cpg-fewgenomes-main-web"
+    analysis = "gs://cpg-fewgenomes-main-analysis"
+    tmp = "gs://cpg-fewgenomes-main-tmp"
+    web_url = "https://main-web.populationgenomics.org.au/fewgenomes"
     """
 
     default: Optional[str | Path] = None
