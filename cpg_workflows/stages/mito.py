@@ -494,7 +494,7 @@ class JoinMito(CohortStage):
             b=get_batch(),
             vcf_path_by_sgid=vcf_path_by_sgid,
             coverage_mt_path=self.expected_outputs(cohort)['coverage_mt'],
-            artifact_prone_sites_path=to_path('gs://cpg-common-test/mito/artifact_prone_sites.bed'),
+            artifact_prone_sites_path=to_path('gs://cpg-common-test/mito/artifact_prone_sites.hg38.bed'),
             combined_vcf_mt_path=self.expected_outputs(cohort)['cohort_mt'],
             checkpoint_prefix=checkpoint_prefix,
             job_attrs=self.get_job_attrs(cohort),
