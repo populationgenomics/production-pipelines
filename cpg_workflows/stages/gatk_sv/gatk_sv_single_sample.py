@@ -131,7 +131,7 @@ class GatherSampleEvidence(SequencingGroupStage):
         )
 
         # find any additional arguments to pass to Cromwell
-        if override := get_config()['resource_overrides'].get('GatherSampleEvidence'):
+        if override := get_config().get('resource_overrides', {}).get('GatherSampleEvidence'):
             input_dict |= override
 
         expected_d = self.expected_outputs(sequencing_group)
