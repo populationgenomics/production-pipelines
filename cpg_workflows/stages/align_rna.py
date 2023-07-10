@@ -3,7 +3,6 @@ Align RNA-seq reads to the genome using STAR.
 """
 
 import logging
-from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_workflows import get_batch
 from cpg_workflows.targets import SequencingGroup
