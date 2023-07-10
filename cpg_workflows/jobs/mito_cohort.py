@@ -1,20 +1,12 @@
 """
 Create Hail Batch jobs to call mitochondrial SNVs
 """
-import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils.config import get_config
-from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import image_path, fasta_res_group
-from cpg_utils.hail_batch import command
+from cpg_utils import Path
 from cpg_workflows.resources import STANDARD
-from cpg_workflows.filetypes import CramPath
-from cpg_workflows.utils import can_reuse
 
-from cpg_workflows.mito_pipeline_scripts import (
-    annotate_coverage as annotate_coverage_script,
-)
 
 
 def annotate_coverage(
@@ -389,10 +381,10 @@ def combine_vcfs(
                 TLOD=mt.info["TLOD"][0],
                 FT=hl.if_else(hl.len(mt.filters) == 0, {"PASS"}, mt.filters),
             )
-            # Use GRCh37 reference as most external resources added in downstream scripts use GRCh37 contig names
-            # (although note that the actual sequences of the mitochondria in both GRCh37 and GRCh38 are the same)
+            # Use GRCh38 reference as most external resources added in downstream scripts use GRCh38 contig names
+            # (although note that the actual sequences of the mitochondria in both GRCh38 and GRCh38 are the same)
             mt = mt.key_rows_by(
-                locus=hl.locus("MT", mt.locus.position, reference_genome="GRCh37"),
+                locus=hl.locus("MT", mt.locus.position, reference_genome="GRCh38"),
                 alleles=mt.alleles,
             )
             mt = mt.key_cols_by(s=sample)
@@ -440,11 +432,11 @@ def combine_vcfs(
         :param minimum_homref_coverage: Minimum depth of coverage required to call a genotype homoplasmic reference rather than missing
         :return: MatrixTable with missing genotypes converted to homref depending on coverage
         """
-        # Convert coverage to build GRCh37 to match contig names
-        # Note: the mitochondrial reference genome is the same for GRCh38 and GRCh37
+        # Convert coverage to build GRCh38 to match contig names
+        # Note: the mitochondrial reference genome is the same for GRCh38 and GRCh38
         coverages = hl.read_matrix_table(coverage_mt_path)
         coverages = coverages.key_rows_by(
-            locus=hl.locus("MT", coverages.locus.position, reference_genome="GRCh37")
+            locus=hl.locus("MT", coverages.locus.position, reference_genome="GRCh38")
         )
 
         mt = mt.annotate_entries(
@@ -479,17 +471,17 @@ def combine_vcfs(
         :return: MatrixTable with artifact_prone_sites filter
         """
         # Apply "artifact_prone_site" filter to any SNP or deletion that spans a known problematic site
-        bed = hl.import_bed(artifact_prone_sites_path)
+        bed = hl.import_bed(artifact_prone_sites_path, reference_genome="GRCh38")
         bed = bed.annotate(target="artifact")
 
         # Create a region annotation containing the interval that the variant overlaps (for SNP will be one position, but will be longer for deletions based on the length of the deletion)
         mt = mt.annotate_rows(
             region=hl.interval(
-                hl.locus("MT", mt.locus.position, reference_genome="GRCh37"),
+                hl.locus("MT", mt.locus.position, reference_genome="GRCh38"),
                 hl.locus(
                     "MT",
                     mt.locus.position + hl.len(mt.alleles[0]) - 1,
-                    reference_genome="GRCh37",
+                    reference_genome="GRCh38",
                 ),
                 includes_end=True,
             )
