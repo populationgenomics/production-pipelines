@@ -41,7 +41,7 @@ from metamist.graphql import gql, query
 
 
 # CPG IDs matching this RE are probably NAGIM, so they need to be avoided
-pat = re.compile('CPG2[\d]{5}')
+pat = re.compile(r'CPG2[\d]{5}')
 
 # SG IDs marked as 'to be avoided' elsewhere in pipeline configs
 # some of these may be out of date
@@ -228,8 +228,8 @@ def main(target_count: int, out_path: str):
     #     dataset_name = proj_data['dataset']
 
     # prepare something to catch all the SG IDs
-    all_sgs_to_run = set()
-    datasets = set()
+    all_sgs_to_run: set[str] = set()
+    datasets: set[str] = set()
 
     analysed_samples = find_prior_analyses()
     for dataset_name in [
