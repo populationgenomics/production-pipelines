@@ -273,7 +273,7 @@ def main(target_count: int, out_path: str):
         toml.dump(
             {
                 'workflows': {
-                    'datasets': list(datasets),
+                    'input_datasets': list(datasets),
                     'only_sgs': list(all_sgs_to_run),
                 }
             },
