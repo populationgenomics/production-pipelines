@@ -123,7 +123,8 @@ class Trim(SequencingGroupStage):
                     overwrite=sequencing_group.forced,
                     extra_label=f'fastq_pair_{io_pair.id}'
                 )
-                jobs.append(j)
+                if j:
+                    jobs.append(j)
             except trim.MissingFastqInputException:
                 if get_config()['workflow'].get('skip_samples_with_missing_input'):
                     logging.error(f'No FASTQ inputs, skipping sample {sequencing_group}')
