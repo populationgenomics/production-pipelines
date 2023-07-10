@@ -1,9 +1,10 @@
+from dataclasses import asdict, dataclass
 from typing import Any, Optional
-from dataclasses import dataclass, asdict
 
 import toml
+from cpg_utils import Path
 
-from .types import SequencingType, SequencingGroupId, DatasetId, StageName
+from .types import DatasetId, SequencingGroupId, SequencingType, StageName
 
 
 def _remove_none_values(d: dict[str, Any]) -> dict[str, Any]:
@@ -15,6 +16,15 @@ def _remove_none_values(d: dict[str, Any]) -> dict[str, Any]:
         for key, value in d.items()
         if value is not None
     }
+
+
+class TomlAnyPathEncoder(toml.TomlEncoder):
+    """Support for CPG path objects in TOML"""
+
+    def dump_value(self, v):
+        if isinstance(v, Path):
+            v = str(v)
+        return super().dump_value(v)
 
 
 @dataclass
@@ -47,7 +57,7 @@ class WorkflowConfig(DictionaryMixin):
     # ---- Core
     dataset: DatasetId = "test"
     access_level: str = "test"
-    dataset_gcp_project: str = "dummy-project-for-tests"
+    dataset_gcp_project: str = "dummy-project-for-tests"  # Possibly unused
     sequencing_type: SequencingType = "genome"
     # Description of the workflow (to display in the Batch GUI)
     description: Optional[str] = None
@@ -55,7 +65,7 @@ class WorkflowConfig(DictionaryMixin):
     name: Optional[str] = None
     input_datasets: Optional[list[DatasetId]] = None
     output_version: Optional[str] = None
-    ref_fasta: Optional[str] = None
+    ref_fasta: Optional[str | Path] = None
     skip_qc: Optional[bool] = None
     status_reporter: Optional[str] = None
     path_scheme: Optional[str] = None  # Possibly unused
@@ -107,8 +117,8 @@ class WorkflowConfig(DictionaryMixin):
 
     # ---- Other
     realign_from_cram_version: Optional[str] = None
-    cram_version_reference: Optional[dict[str, str]] = None
-    intervals_path: Optional[str] = None
+    cram_version_reference: Optional[dict[str, str | Path]] = None
+    intervals_path: Optional[str | Path] = None
     reblock_gq_bands: Optional[list[int]] = None
     create_es_index_for_datasets: Optional[list[str]] = None
     scatter_count: Optional[int] = None
@@ -131,11 +141,11 @@ class HailConfig(DictionaryMixin):
 
 @dataclass(kw_only=True)
 class StorageConfig(DictionaryMixin):
-    default: Optional[str] = None
-    analysis: Optional[str] = None
-    tmp: Optional[str] = None
-    web: Optional[str] = None
-    web_url: Optional[str] = None
+    default: Optional[str | Path] = None
+    analysis: Optional[str | Path] = None
+    tmp: Optional[str | Path] = None
+    web: Optional[str | Path] = None
+    web_url: Optional[str | Path] = None
 
 
 def create_config(
@@ -183,4 +193,4 @@ def create_config(
     if as_dict:
         return config
 
-    return toml.dumps(config)
+    return toml.dumps(config, encoder=TomlAnyPathEncoder())
