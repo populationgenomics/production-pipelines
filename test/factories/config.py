@@ -57,11 +57,12 @@ class WorkflowConfig(DictionaryMixin):
     # ---- Core
     dataset: DatasetId = 'test'
     access_level: str = 'test'
-    dataset_gcp_project: str = 'dummy-project-for-tests'  # Possibly unused
     sequencing_type: SequencingType = 'genome'
+    # Possibly unused, or used by cpg_utils somewhere?
+    dataset_gcp_project: Optional[str] = None
     # Description of the workflow (to display in the Batch GUI)
     description: Optional[str] = None
-    # Name of the workflow (to prefix output paths)
+    # Name of the workflow passed to Hail Batch instance
     name: Optional[str] = None
     input_datasets: Optional[list[DatasetId]] = None
     output_version: Optional[str] = None
