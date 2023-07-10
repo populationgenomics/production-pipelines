@@ -1,80 +1,186 @@
-from typing import Any
+from typing import Any, Optional
+from dataclasses import dataclass, asdict
 
 import toml
 
-from .types import SequencingType
+from .types import SequencingType, SequencingGroupId, DatasetId, StageName
+
+
+def _remove_none_values(d: dict[str, Any]) -> dict[str, Any]:
+    """
+    Recursively remove keys with None values from a dictionary.
+    """
+    return {
+        key: (_remove_none_values(value) if isinstance(value, dict) else value)
+        for key, value in d.items()
+        if value is not None
+    }
+
+
+@dataclass
+class DictionaryMixin:
+    """Mixin to convert dataclass to dictionary."""
+
+    def as_dict(self, keep_keys_with_none: bool = False) -> dict:
+        """
+        Return dataclass as a dictionary.
+
+        Args:
+            keep_keys_with_none (bool, optional): Remove keys which map to `None`.
+            Defaults to False.
+
+        Returns:
+            dict[str, Any]
+        """
+        config = asdict(self)
+        if not keep_keys_with_none:
+            config = _remove_none_values(config)
+        return config
+
+
+@dataclass(kw_only=True)
+class WorkflowConfig(DictionaryMixin):
+    """
+    See `<root>/cpg_workflows/defaults.toml` for a description of these options.
+    """
+
+    # ---- Core
+    dataset: DatasetId = "test"
+    access_level: str = "test"
+    dataset_gcp_project: str = "dummy-project-for-tests"
+    sequencing_type: SequencingType = "genome"
+    # Description of the workflow (to display in the Batch GUI)
+    description: Optional[str] = None
+    # Name of the workflow (to prefix output paths)
+    name: Optional[str] = None
+    input_datasets: Optional[list[DatasetId]] = None
+    output_version: Optional[str] = None
+    ref_fasta: Optional[str] = None
+    skip_qc: Optional[bool] = None
+    status_reporter: Optional[str] = None
+    path_scheme: Optional[str] = None  # Possibly unused
+    local_dir: Optional[str] = None  # Possibly unused
+
+    # ---- Stage specific resources
+    resources: Optional[dict[StageName, dict[str, Any]]] = None
+
+    # ---- Technical
+    driver_image: Optional[str] = None
+    dry_run: Optional[bool] = None
+    highmem_workers: Optional[bool] = None
+
+    # ---- Checks
+    # Check input file existence (e.g. FASTQ files). When they are missing,
+    # the `skip_sgs_with_missing_input` option controls whether such
+    # sequencing groups should be ignored, or it should cause raising an error.
+    check_inputs: Optional[bool] = None
+    # Within jobs, check all in-job intermediate files for possible reuse.
+    # If set to False, will overwrite all intermediates. Used by `utils.can_reuse(path)`.
+    check_intermediates: Optional[bool] = None
+    # Before running a stage, check if its inputs (i.e.the expected outputs from
+    # all required stages) already exist. If it exists, do not submit stage jobs.
+    check_expected_outputs: Optional[bool] = None
+
+    # ---- Stages
+    first_stages: Optional[list[StageName]] = None
+    last_stages: Optional[list[StageName]] = None
+    only_stages: Optional[list[StageName]] = None
+    skip_stages: Optional[list[StageName]] = None
+    force_stages: Optional[list[StageName]] = None
+    allow_missing_outputs_for_stages: Optional[list[StageName]] = None
+
+    # ---- Dataset options
+    skip_datasets: Optional[list[DatasetId]] = None
+
+    # ---- Sequencing group options
+    skip_sgs: Optional[list[SequencingGroupId]] = None
+    only_sgs: Optional[list[SequencingGroupId]] = None
+    force_sgs: Optional[list[SequencingGroupId]] = None
+    skip_stages_for_sgs: Optional[dict[StageName, list[SequencingGroupId]]] = None
+    # For the first (not-skipped) stage, if the input for a sequencing group does not
+    # exist, skip this instance instead of failing. For example, if the first stage is
+    # Align, and `sequencing_group.alignment_input` for a sequencing group does not
+    # exist, remove this sequencing group (i.e the `active` attiribute will be set to
+    # `False`), instead of failing. In other words, ignore sequencing groups that are
+    # missing results from skipped stages that the non-skipped stage might require.
+    skip_sgs_with_missing_input: Optional[bool] = None
+
+    # ---- Other
+    realign_from_cram_version: Optional[str] = None
+    cram_version_reference: Optional[dict[str, str]] = None
+    intervals_path: Optional[str] = None
+    reblock_gq_bands: Optional[list[int]] = None
+    create_es_index_for_datasets: Optional[list[str]] = None
+    scatter_count: Optional[int] = None
+    scatter_count_genotype: Optional[int] = None
+    vds_version: Optional[str] = None
+    use_gnarly: Optional[bool] = None
+    use_as_vqsr: Optional[bool] = None
+    write_vcf: Optional[list[str]] = None
+
+
+@dataclass(kw_only=True)
+class HailConfig(DictionaryMixin):
+    dry_run: bool = True
+    backend: str = "local"
+    query_backend: Optional[str] = None
+    billing_project: Optional[str] = None
+    pool_label: Optional[str] = None
+    delete_scratch_on_exit: Optional[bool] = None
+
+
+@dataclass(kw_only=True)
+class StorageConfig(DictionaryMixin):
+    default: Optional[str] = None
+    analysis: Optional[str] = None
+    tmp: Optional[str] = None
+    web: Optional[str] = None
+    web_url: Optional[str] = None
 
 
 def create_config(
-    dataset: str = "test",
-    dataset_gcp_project: str = "local-test",
-    access_level: str = "test",
-    sequencing_type: SequencingType = "genome",
-    check_inputs: bool = False,
-    cram_version_reference: dict[str, str] | None = None,
-    realign_from_cram_version: str = "",
-    workflow_resources: dict[str, Any] | None = None,
-    images: dict[str, str] | None = None,
-    references: dict[str, str | dict[str, str]] | None = None,
-    resource_overrides: dict[str, Any] | None = None,
-    storage: dict[str, dict[str, str]] | None = None,
+    workflow: WorkflowConfig = WorkflowConfig(),
+    hail: HailConfig = HailConfig(),
+    images: Optional[dict[str, str]] = None,
+    storage: Optional[dict[str, StorageConfig]] = None,
+    as_dict: bool = False,
+    keep_dict_keys_with_none: bool = False,
     **other,
-) -> str:
-    config = f"""
-    [workflow]
-    dataset_gcp_project = "{dataset_gcp_project}"
-    access_level = "{access_level}"
-    dataset = "{dataset}"
-    sequencing_type = "{sequencing_type}"
-    realign_from_cram_version = "{realign_from_cram_version}"
-    check_inputs = {str(check_inputs).lower()}
-
-    [hail]
-    dry_run = true
-    backend = "local"
-
-    [images]
-    :images
-
-    :references
-
-    [cram_version_reference]
-    :cram_ref_map
-
-    [resource_overrides]
-    :resource_overrides
-    
-    [workflow.resources.Align]
-    :align_resources
-
-    :storage
-
-    :other
+) -> str | dict[str, Any]:
     """
-    if not references:
-        references = {
-            "broad": {
-                "dragmap_prefix": "gs://a-cpg-bucket/dragen_reference/",
-                "ref_fasta": "gs://a-cpg-bucket/hg38.fasta",
-            }
-        }
+    Utility to create either a config `dict` or TOML string. There is subect to change
+    as configration is refactored. There is a `**other` argument to allow for a
+    catch-all for configuration fields which are not present here s explicit keyword
+    arguments. If `keep_dict_keys_with_none` and `as_dict` are `True`, keys which map
+    to `None` will be kept in the output dictionary.
 
-    if not images:
-        images = {
-            "dragmap": "dragmap_image:1.3.0",
-            "biobambam2": "biobambam2_image:2.0.87",
-            "picard": "picard_image:2.27.4",
-            "samtools": "samtools_image:1.11",
-        }
+    Returns:
+        str | dict[str, Any]
+    """
 
-    config = config.replace(":cram_ref_map", toml.dumps(cram_version_reference or {}))
-    config = config.replace(":align_resources", toml.dumps(workflow_resources or {}))
-    config = config.replace(":references", toml.dumps({"references": references}))
-    config = config.replace(":images", toml.dumps(images))
-    config = config.replace(":storage", toml.dumps(storage or {}))
-    config = config.replace(":resource_overrides", toml.dumps(resource_overrides or {}))
+    # Inform user of incorrect usage of `keep_dict_keys_with_none`, since TOML will
+    # remove keys which map to `None` by default, and I don't want to override that
+    # behaviour right now.
+    if keep_dict_keys_with_none and not as_dict:
+        raise ValueError(
+            "'keep_dict_keys_with_none' can only be set to 'True' if "
+            + "'as_dict' is also 'True'"
+        )
 
-    # Catch all for all other config sections
-    config = config.replace(":other", toml.dumps(other))
+    config = {
+        "workflow": workflow.as_dict(keep_dict_keys_with_none),
+        "hail": hail.as_dict(keep_dict_keys_with_none),
+        "images": images,
+        "storage": storage,
+        **other,
+    }
 
-    return config
+    # Treating None as distinct from an empty dict because we want to be able to
+    # test what happens if keys are missing from a potentially empty section.
+    if not keep_dict_keys_with_none:
+        config = _remove_none_values(config)
+
+    if as_dict:
+        return config
+
+    return toml.dumps(config)
