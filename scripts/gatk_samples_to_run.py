@@ -46,15 +46,15 @@ pat = re.compile('CPG2[\d]{5}')
 # SG IDs marked as 'to be avoided' elsewhere in pipeline configs
 # some of these may be out of date
 REMOVE = [
-    "CPG291633",
-    "CPG291625",
-    "CPG291617",
-    "CPG291591",
-    "CPG291609",
-    "CPG291583",
-    "CPG291567",
-    "CPG291559",
-    "CPG291575",
+    'CPG291633',
+    'CPG291625',
+    'CPG291617',
+    'CPG291591',
+    'CPG291609',
+    'CPG291583',
+    'CPG291567',
+    'CPG291559',
+    'CPG291575',
     'CPG11783',  # acute-care, no FASTQ data
     # 'CPG253328',  # perth-neuro, contamination rate 32% # put back in see https://github.com/populationgenomics/seqr-private/issues/41#issuecomment-1336537385
     'CPG13409',  # perth-neuro, coverage ~0x
