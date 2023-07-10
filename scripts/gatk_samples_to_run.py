@@ -41,7 +41,7 @@ from metamist.graphql import gql, query
 
 
 # CPG IDs matching this RE are probably NAGIM, so they need to be avoided
-pat = re.compile(r'CPG2[\d]{5}')
+pat = re.compile(r'CPG2\d{5}')
 
 # SG IDs marked as 'to be avoided' elsewhere in pipeline configs
 # some of these may be out of date
