@@ -25,7 +25,7 @@ When the SGs are being pulled from the metamist results, they are skipped if:
 - the SG ID is present in the list of IDs to avoid
 
 Assumptions:
-- NAGIM samples still have dodgy headers ('CPG2[\d]{5}' regex avoids)
+- NAGIM samples still have dodgy headers (regex pattern avoids)
 - Genomes, not Exomes
 - 'to be avoided' sample list from other configs (may be out of date)
 - pull SGs into analysis as whole family groups
