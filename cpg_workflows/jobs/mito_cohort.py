@@ -501,32 +501,33 @@ def combine_vcfs(
         )
         mt_temp = mt_temp.key_rows_by(mt_temp.region)
 
-        # Need to account for cases where the start and end of the variant interval don't fall within a bed interval, but start before and after the interval (the bed interval falls completely within the variant interval)
-        bed_temp = bed.annotate(
-            contained_mt_alleles=mt_temp.index_rows(
-                bed.interval.start, all_matches=True
-            ).variant
-        )
+        # TODO: all all_matches=True is not supported on service back end so will need to reimplement this logic.
+        # # Need to account for cases where the start and end of the variant interval don't fall within a bed interval, but start before and after the interval (the bed interval falls completely within the variant interval)
+        # bed_temp = bed.annotate(
+        #     contained_mt_alleles=mt_temp.index_rows(
+        #         bed.interval.start, all_matches=True
+        #     ).variant
+        # )
 
-        # Explode so that each allele is on its own row and create locus and allele annotations
-        bed_temp = bed_temp.explode(bed_temp.contained_mt_alleles).rename(
-            {"contained_mt_alleles": "contained_mt_allele"}
-        )
-        bed_temp = bed_temp.annotate(
-            locus=bed_temp.contained_mt_allele.locus,
-            alleles=bed_temp.contained_mt_allele.alleles,
-        )
-        bed_temp = bed_temp.key_by(bed_temp.locus, bed_temp.alleles)
+        # # Explode so that each allele is on its own row and create locus and allele annotations
+        # bed_temp = bed_temp.explode(bed_temp.contained_mt_alleles).rename(
+        #     {"contained_mt_alleles": "contained_mt_allele"}
+        # )
+        # bed_temp = bed_temp.annotate(
+        #     locus=bed_temp.contained_mt_allele.locus,
+        #     alleles=bed_temp.contained_mt_allele.alleles,
+        # )
+        # bed_temp = bed_temp.key_by(bed_temp.locus, bed_temp.alleles)
 
-        # Annotate back onto the original mt cases where the bed interval falls completely within the variant interval
-        mt = mt.annotate_rows(start_and_end_span=bed_temp[mt.locus, mt.alleles].target)
+        # # Annotate back onto the original mt cases where the bed interval falls completely within the variant interval
+        # mt = mt.annotate_rows(start_and_end_span=bed_temp[mt.locus, mt.alleles].target)
 
         # Add artifact-prone site filter to any SNP/deletion that starts within, ends within, or completely overlaps an artifact-prone site
         mt = mt.annotate_rows(
             filters=hl.if_else(
                 (hl.len(mt.start_overlaps) > 0)
-                | (hl.len(mt.end_overlaps) > 0)
-                | (hl.is_defined(mt.start_and_end_span)),
+                | (hl.len(mt.end_overlaps) > 0),
+                # | (hl.is_defined(mt.start_and_end_span)),
                 {"artifact_prone_site"},
                 {"PASS"},
             )
