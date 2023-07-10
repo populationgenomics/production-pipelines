@@ -11,14 +11,14 @@ from cpg_workflows.filetypes import BamPath, CramPath, FastqPair, FastqPairs
 
 def _remove_trailing_slash(path: str | Path) -> str:
     path = str(path)
-    if path.endswith("/"):
+    if path.endswith('/'):
         path = path[:-1]
     return path
 
 
 def _create(file: Path):
     if isinstance(file, CloudPath):
-        raise ValueError("Tests do not support writing to cloud buckets right now.")
+        raise ValueError('Tests do not support writing to cloud buckets right now.')
 
     if not file.parent.exists():
         file.parent.mkdir(parents=True)
@@ -28,7 +28,7 @@ def _create(file: Path):
 
 def create_fastq_pair_input(
     location: str | Path,
-    prefix: str = "SAMPLE1",
+    prefix: str = 'SAMPLE1',
     gzipped: bool = True,
     create: bool = False,
 ) -> FastqPair:
@@ -43,7 +43,7 @@ def create_fastq_pair_input(
             File location either locally or in a cloud bucket.
 
         prefix (str, optional):
-            String to prefix R1 and R2 file names with. Defaults to "SAMPLE1".
+            String to prefix R1 and R2 file names with. Defaults to 'SAMPLE1'.
 
         create (bool, optional):
             Create the files on disk if `True`. No support for writing to cloud buckets
@@ -56,13 +56,13 @@ def create_fastq_pair_input(
         FastqPair
     """
     location = _remove_trailing_slash(location)
-    prefix = f"{location}/{prefix}"
+    prefix = f'{location}/{prefix}'
 
-    r1 = f"{prefix}_R1.fastq"
-    r2 = f"{prefix}_R2.fastq"
+    r1 = f'{prefix}_R1.fastq'
+    r2 = f'{prefix}_R2.fastq'
     if gzipped:
-        r1 += ".gz"
-        r2 += ".gz"
+        r1 += '.gz'
+        r2 += '.gz'
 
     r1 = to_path(r1)
     r2 = to_path(r2)
@@ -76,7 +76,7 @@ def create_fastq_pair_input(
 
 def create_fastq_pairs_input(
     location: str | Path,
-    prefix: str = "SAMPLE1",
+    prefix: str = 'SAMPLE1',
     gzipped: bool = True,
     n: int = 2,
     create: bool = False,
@@ -93,7 +93,7 @@ def create_fastq_pairs_input(
             exist.
 
         prefix (str, optional):
-            String to prefix R1 and R2 file names with. Defaults to "SAMPLE1".
+            String to prefix R1 and R2 file names with. Defaults to 'SAMPLE1'.
 
         gzipped (bool, optional):
             Adds `'.gz'` extension if `True`. Defaults to True.
@@ -113,7 +113,7 @@ def create_fastq_pairs_input(
         pairs.append(
             create_fastq_pair_input(
                 location=location,
-                prefix=f"{prefix}_L{i+1}",
+                prefix=f'{prefix}_L{i+1}',
                 gzipped=gzipped,
                 create=create,
             )
@@ -124,7 +124,7 @@ def create_fastq_pairs_input(
 
 def create_bam_input(
     location: str | Path,
-    prefix: str = "SAMPLE1",
+    prefix: str = 'SAMPLE1',
     index: bool = True,
     create: bool = False,
 ) -> BamPath:
@@ -139,7 +139,7 @@ def create_bam_input(
             exist.
 
         prefix (str, optional):
-            String to prefix bam and bai names with. Defaults to "SAMPLE1".
+            String to prefix bam and bai names with. Defaults to 'SAMPLE1'.
 
         index (bool, optional):
             Also set path to an index file. Defaults to True.
@@ -152,10 +152,10 @@ def create_bam_input(
         BamPath
     """
     location = _remove_trailing_slash(location)
-    prefix = f"{location}/{prefix}"
+    prefix = f'{location}/{prefix}'
 
-    path = to_path(f"{prefix}.bam")
-    index_path = to_path(f"{prefix}.bam.bai")
+    path = to_path(f'{prefix}.bam')
+    index_path = to_path(f'{prefix}.bam.bai')
 
     if create:
         _create(path)
@@ -166,7 +166,7 @@ def create_bam_input(
 
 
 def create_reference_assembly(
-    location: str | Path, name: str = "GRCh38.fa", create: bool = False
+    location: str | Path, name: str = 'GRCh38.fa', create: bool = False
 ) -> Path:
     """
     Create a reference assembly file for testing. The file will be named as follows:
@@ -179,7 +179,7 @@ def create_reference_assembly(
             exist.
 
         name (str, optional):
-            File name. Defaults to "GRCh38.fa".
+            File name. Defaults to 'GRCh38.fa'.
 
         create (bool, optional):
             Create the files on disk if `True`. No support for writing to cloud buckets
@@ -189,7 +189,7 @@ def create_reference_assembly(
         Path
     """
     location = _remove_trailing_slash(location)
-    path = to_path(f"{location}/{name}")
+    path = to_path(f'{location}/{name}')
 
     if create:
         _create(path)
@@ -199,9 +199,9 @@ def create_reference_assembly(
 
 def create_cram_input(
     location: str | Path,
-    prefix: str = "SAMPLE1",
+    prefix: str = 'SAMPLE1',
     index: bool = True,
-    reference_assembly: Optional[str | Path] = "GRCh38.fa",
+    reference_assembly: Optional[str | Path] = 'GRCh38.fa',
     create: bool = False,
 ) -> CramPath:
     """
@@ -216,14 +216,14 @@ def create_cram_input(
             `reference_assembly` is a `str`.
 
         prefix (str, optional):
-            String to prefix cram and crai file names with. Defaults to "SAMPLE1".
+            String to prefix cram and crai file names with. Defaults to 'SAMPLE1'.
 
         reference_assembly (str | Path, optional):
             Path to a fasta file or a string representing a file name without a path.
             If a `str` is provided, the corresponding reference assembly path will be
             set to `'{location}/{reference_assembly}'` and created if `create` is
             `True`. If `None`, no reference assembly will be set. Defaults to
-            "GRCh38.fa".
+            'GRCh38.fa'.
 
         index (bool, optional):
             Also set path to an index file. Defaults to True.
@@ -236,10 +236,10 @@ def create_cram_input(
         CramPath
     """
     location = _remove_trailing_slash(location)
-    prefix = f"{location}/{prefix}"
+    prefix = f'{location}/{prefix}'
 
-    path = to_path(f"{prefix}.cram")
-    index_path = to_path(f"{prefix}.cram.crai")
+    path = to_path(f'{prefix}.cram')
+    index_path = to_path(f'{prefix}.cram.crai')
 
     if isinstance(reference_assembly, str):
         reference_assembly = create_reference_assembly(

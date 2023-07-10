@@ -9,36 +9,37 @@ from .types import SequencingType
 
 
 def create_sequencing_group(
-    id: str = "CPG123456",
-    external_id: str = "SAMPLE1",
+    id: str = 'CPG123456',
+    external_id: str = 'SAMPLE1',
     participant_id: str | None = None,
-    dataset: str | Dataset = "test",
+    dataset: str | Dataset = 'test',
     meta: dict | None = None,
     sex: Sex | None = None,
     pedigree: Optional[PedigreeInfo] = None,
-    sequencing_type: SequencingType = "genome",
+    sequencing_type: SequencingType = 'genome',
     alignment_input: Optional[FastqPair | FastqPairs | CramPath | BamPath] = None,
     assays: dict[str, tuple[Assay, ...]] | None = None,
     forced: bool = False,
 ) -> SequencingGroup:
-    """Creates a new sequencing group with the specified parameters.
+    """
+    Creates a new sequencing group with the specified parameters.
 
     Args:
         id (str):
-            The ID of the sequencing group. Defaults to "CPG01".
+            The ID of the sequencing group. Defaults to 'CPG123456'.
 
         external_id (str):
-            The external ID of the sequencing group. Defaults to "SAMPLE1".
+            The external ID of the sequencing group. Defaults to 'SAMPLE1'.
 
         participant_id (str, optional):
             The participant ID of the sequencing group. Defaults to None.
 
         dataset (str or Dataset):
-            The dataset associated with the sequencing group. Defaults to "dummy".
+            The dataset associated with the sequencing group. Defaults to 'dummy'.
 
         sequencing_type (SequencingType):
             The type of sequencing performed used as the key in the property
-            `alignment_input_by_seq_type` on the new instance. Defaults to "genome".
+            `alignment_input_by_seq_type` on the new instance. Defaults to 'genome'.
 
         alignment_input (FastqPair | FastqPairs | CramPath | BamPath, optional):
             The alignment input data. Defaults to None. If None, the property

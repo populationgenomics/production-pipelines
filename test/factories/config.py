@@ -55,10 +55,10 @@ class WorkflowConfig(DictionaryMixin):
     """
 
     # ---- Core
-    dataset: DatasetId = "test"
-    access_level: str = "test"
-    dataset_gcp_project: str = "dummy-project-for-tests"  # Possibly unused
-    sequencing_type: SequencingType = "genome"
+    dataset: DatasetId = 'test'
+    access_level: str = 'test'
+    dataset_gcp_project: str = 'dummy-project-for-tests'  # Possibly unused
+    sequencing_type: SequencingType = 'genome'
     # Description of the workflow (to display in the Batch GUI)
     description: Optional[str] = None
     # Name of the workflow (to prefix output paths)
@@ -132,7 +132,7 @@ class WorkflowConfig(DictionaryMixin):
 @dataclass(kw_only=True)
 class HailConfig(DictionaryMixin):
     dry_run: bool = True
-    backend: str = "local"
+    backend: str = 'local'
     query_backend: Optional[str] = None
     billing_project: Optional[str] = None
     pool_label: Optional[str] = None
@@ -149,8 +149,8 @@ class StorageConfig(DictionaryMixin):
 
 
 def create_config(
-    workflow: WorkflowConfig = WorkflowConfig(),
-    hail: HailConfig = HailConfig(),
+    workflow: WorkflowConfig = WorkflowConfig(),  # noqa: B008
+    hail: HailConfig = HailConfig(),  # noqa: B008
     images: Optional[dict[str, str]] = None,
     storage: Optional[dict[str, StorageConfig]] = None,
     as_dict: bool = False,
@@ -178,10 +178,10 @@ def create_config(
         )
 
     config = {
-        "workflow": workflow.as_dict(keep_dict_keys_with_none),
-        "hail": hail.as_dict(keep_dict_keys_with_none),
-        "images": images,
-        "storage": storage,
+        'workflow': workflow.as_dict(keep_dict_keys_with_none),
+        'hail': hail.as_dict(keep_dict_keys_with_none),
+        'images': images,
+        'storage': storage,
         **other,
     }
 
