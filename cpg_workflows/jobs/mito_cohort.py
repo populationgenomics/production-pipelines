@@ -635,10 +635,10 @@ def combine_vcfs(
     j.call(
         combine_vcfs_worker,
         vcf_path_by_sgid,
-        coverage_mt_path,
-        artifact_prone_sites_path,
+        str(coverage_mt_path),
+        str(artifact_prone_sites_path),
         str(checkpoint_prefix),
-        combined_vcf_mt_path,
+        str(combined_vcf_mt_path),
         chunk_size,
         minimum_homref_coverage,
     )
