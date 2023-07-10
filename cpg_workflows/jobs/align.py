@@ -82,6 +82,9 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
     if realign_cram_ver := get_config()['workflow'].get('realign_from_cram_version'):
         if (
             path := (
+                # TODO: This will always pull from a dataset's 'default' storage key...
+                # ... Is this intentional? Seems like it should be synced with the
+                # 'access-level' workflow config.
                 sequencing_group.dataset.prefix()
                 / 'cram'
                 / realign_cram_ver
@@ -147,6 +150,10 @@ def align(
     if output_path and can_reuse(output_path.path, overwrite):
         return []
 
+    # NOTE: If re-aligning from CRAM, the function call below returns a new CramPath
+    # based on the [storage.<dataqset>] config key, ignoring the sequencing_group's
+    # alignment input. The `index_path` attribute is set to `None` on this new instance
+    # so `sharded_bazam` will be False. Not sure if this is a bug or intended behaviour?
     alignment_input = _get_alignment_input(sequencing_group)
 
     base_job_name = 'Align'
@@ -382,7 +389,6 @@ def _align_one(
         group = alignment_input.resource_group(b)
 
         if not alignment_input.index_path:
-
             # Explicitly set the index path so bazam can find it.
             if isinstance(alignment_input, CramPath):
                 index_path = group[alignment_input.ext].removesuffix('.cram') + '.crai'
