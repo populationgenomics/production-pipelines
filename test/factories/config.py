@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 import toml
 from cpg_utils import Path
@@ -142,6 +142,11 @@ class HailConfig(DictionaryMixin):
 
 @dataclass(kw_only=True)
 class StorageConfig(DictionaryMixin):
+    """
+    Technically `cpg_utils` can pull from any storgekey in the config, but these are
+    the keys that we generally stick with.
+    """
+
     default: Optional[str | Path] = None
     analysis: Optional[str | Path] = None
     tmp: Optional[str | Path] = None
@@ -150,23 +155,66 @@ class StorageConfig(DictionaryMixin):
 
 
 def create_config(
-    workflow: WorkflowConfig = WorkflowConfig(),  # noqa: B008
-    hail: HailConfig = HailConfig(),  # noqa: B008
-    images: Optional[dict[str, str]] = None,
-    storage: Optional[dict[str, StorageConfig]] = None,
+    workflow: Optional[
+        WorkflowConfig | dict[str, Any]
+    ] = WorkflowConfig(),  # noqa: B008
+    hail: Optional[HailConfig | dict[str, Any]] = HailConfig(),  # noqa: B008
+    images: Optional[dict[str, str | Path]] = None,
+    storage: Optional[dict[DatasetId, StorageConfig]] = None,
     as_dict: bool = False,
     keep_dict_keys_with_none: bool = False,
     **other,
 ) -> str | dict[str, Any]:
     """
     Utility to create either a config `dict` or TOML string. There is subect to change
-    as configration is refactored. There is a `**other` argument to allow for a
-    catch-all for configuration fields which are not present here s explicit keyword
-    arguments. If `keep_dict_keys_with_none` and `as_dict` are `True`, keys which map
-    to `None` will be kept in the output dictionary.
+    as configration is refactored. There is an `**other` argument to allow a catch-all
+    for any configuration section which are not present heres explicit keyword
+    arguments. Other config keys not represented here that appear in other config
+    TOML files:
+
+        - references, references.broad, references.gnomad, references.gatk_sv
+        - validation.sample_map
+        - combiner
+        - large_cohort
+        - sv_ref_panel
+        - vqsr
+        - cramqc
+        - qc_thresholds
+        - elasticsearch
+        - slack
+        - stripy
+
+    Lastly, if `keep_dict_keys_with_none` and `as_dict` are `True`, keys which map
+    to `None` will be kept in the output `dict`, otherwise they are removed. Note that
+    TOML removes keys with `None` values by default, so `keep_dict_keys_with_none`
+    will have no effect if `as_dict` is `False`.
+
+    Args:
+        workflow (Optional[WorkflowConfig | dict[str, Any]], optional):
+            A `WorkflowConfig` dataclass instance, or your own `dict` with workflow
+            configuration options. Defaults to the default `WorkflowConfig` dataclass
+            instance.
+        hail (Optional[HailConfig | dict[str, Any]], optional):
+            A `HailConfig` dataclass instance, or your own `dict` with hail
+            configuration options. Defaults to the default `HailConfig` dataclass
+            instance.
+        storage (Optional[dict[str, StorageConfig]], optional):
+            Storage paths for a dataset. Each dataset's storage configuration can
+            theoretically accept any key, but we typically use 'default', 'tmp', 'web',
+            'analysis', 'web_url' paths. Defaults to `None`.
+        as_dict (bool, optional):
+            Return configuration as a `dict`. Defaults to `False`.
+        keep_dict_keys_with_none (bool, optional):
+            Remove keys from return `dict` that point to `None` values. Defaults to
+            `False`.
+
+    Raises:
+        ValueError: If using `keep_dict_keys_with_none` and `as_dict` is `False`. This
+        is because TOML will remove keys which map to `None` by default, and we're not
+        overriding that behaviour right now.
 
     Returns:
-        str | dict[str, Any]
+        str | dict[str, Any]:
     """
 
     # Inform user of incorrect usage of `keep_dict_keys_with_none`, since TOML will
@@ -178,9 +226,17 @@ def create_config(
             + "'as_dict' is also 'True'"
         )
 
+    workflow_conf = workflow
+    if isinstance(workflow, WorkflowConfig):
+        workflow_conf = workflow.as_dict(keep_dict_keys_with_none)
+
+    hail_conf = hail
+    if isinstance(hail, HailConfig):
+        hail_conf = hail.as_dict(keep_dict_keys_with_none)
+
     config = {
-        'workflow': workflow.as_dict(keep_dict_keys_with_none),
-        'hail': hail.as_dict(keep_dict_keys_with_none),
+        'workflow': workflow_conf,
+        'hail': hail_conf,
         'images': images,
         'storage': storage,
         **other,
