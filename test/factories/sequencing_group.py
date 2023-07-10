@@ -3,18 +3,23 @@ from typing import Optional
 
 
 from cpg_workflows.filetypes import BamPath, CramPath, FastqPair, FastqPairs
-from cpg_workflows.targets import Dataset, SequencingGroup
+from cpg_workflows.targets import Dataset, SequencingGroup, Sex, PedigreeInfo, Assay
 
 from .types import SequencingType
 
 
 def create_sequencing_group(
-    id: str = "CPG01",
+    id: str = "CPG123456",
     external_id: str = "SAMPLE1",
     participant_id: str | None = None,
-    dataset: str | Dataset = "dummy",
+    dataset: str | Dataset = "test",
+    meta: dict | None = None,
+    sex: Sex | None = None,
+    pedigree: Optional[PedigreeInfo] = None,
     sequencing_type: SequencingType = "genome",
     alignment_input: Optional[FastqPair | FastqPairs | CramPath | BamPath] = None,
+    assays: dict[str, tuple[Assay, ...]] | None = None,
+    forced: bool = False,
 ) -> SequencingGroup:
     """Creates a new sequencing group with the specified parameters.
 
@@ -51,6 +56,11 @@ def create_sequencing_group(
         external_id=external_id,
         participant_id=participant_id,
         dataset=dataset,
+        meta=meta,
+        sex=sex,
+        pedigree=pedigree,
+        assays=assays,
+        forced=forced,
         alignment_input_by_seq_type=(
             {sequencing_type: alignment_input} if alignment_input else None
         ),
