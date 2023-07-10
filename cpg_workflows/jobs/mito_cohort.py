@@ -533,7 +533,8 @@ def combine_vcfs(
             )
         )
 
-        mt = mt.drop("region", "start_overlaps", "end_overlaps", "start_and_end_span")
+        # mt = mt.drop("region", "start_overlaps", "end_overlaps", "start_and_end_span")
+        mt = mt.drop("region", "start_overlaps", "end_overlaps")
 
         return mt
 
