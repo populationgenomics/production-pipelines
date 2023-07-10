@@ -576,8 +576,9 @@ def combine_vcfs(
             combined_mt, coverage_mt_path, minimum_homref_coverage
         )
 
-        logger.info("Applying artifact_prone_site fiter...")
-        combined_mt = apply_mito_artifact_filter(combined_mt, artifact_prone_sites_path)
+        # TODO: add this back when we can get it working
+        # logger.info("Applying artifact_prone_site fiter...")
+        # combined_mt = apply_mito_artifact_filter(combined_mt, artifact_prone_sites_path)
 
         logger.info("Writing combined MT and VCF...")
         # Set the file names for output files
