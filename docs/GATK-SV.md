@@ -198,6 +198,17 @@ analysis-runner \
 
 ## Even More Batches
 
-In theory, every sub-batch ID previously analysed can be combined at the Sandwich stage, and for the gatk_sv_multisample_2
-workflow, to create a union joint-call across every SG analysed so far. This might become increasingly expensive to
-re-compute.
+Each time a new batch of SGs is added, the following amendments should be made:
+
+- the config containing multiple batch IDs should be updated to contain all previous batch IDs
+
+```commandline
+gsutil ls "gs://cpg-seqr-main/gatk_sv/*/FilterBatch" | sed -E "s/\/FilterBatch.+//g" |  awk -F/ '{print $NF}' | sort | uniq 
+```
+
+- the GenotypeBatch stage should be re-run for all previous batches separately using the new MergeBatchSites output files
+- the MakeCohortVCF + AnnotateVcf stage should be run using the new GenotypeBatch output files
+
+This will become increasingly difficult to maintain, as the SGs will all need to be included in the final config to make
+sure that the analysis entries in metamist are correctly annotated as relating to all analysed SGs. As with all things, 
+custom/named cohorts will make all this much simpler.
