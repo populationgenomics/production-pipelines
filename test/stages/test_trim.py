@@ -175,13 +175,8 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
         for s in sample_list
         if isinstance(s.alignment_input_by_seq_type.get('rna'), FastqPairs)
     ]
-    n_trim_jobs_list.extend([
-        1
-        for s in sample_list
-        if isinstance(s.alignment_input_by_seq_type.get('rna'), FastqPair)
-    ])
     n_trim_jobs = sum(n_trim_jobs_list)
-    assert len(trim_job) == n_trim_jobs
+    assert trim_job['job_n'] == n_trim_jobs
 
     output_path = dataset_path('cmd.txt')
     output_path_parent = os.path.dirname(output_path)
