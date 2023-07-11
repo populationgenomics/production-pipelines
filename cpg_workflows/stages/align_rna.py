@@ -47,7 +47,7 @@ def get_alignment_inputs(sequencing_group: SequencingGroup, inputs: StageInput) 
             input_fastq_pairs_dict[prefix]['R1'],
             input_fastq_pairs_dict[prefix]['R2'],
         )
-        for prefix in input_fastq_pairs
+        for prefix in input_fastq_pairs_dict
     ])
     return input_fastq_pairs
 
@@ -82,11 +82,14 @@ class AlignRNA(SequencingGroupStage):
             path=_exp_out['bam'],
             index_path=_exp_out['bai'],
         )
+        jobs = []
         try:
             jobs = align_rna.align(
                 b=get_batch(),
-                input_fastq_pairs=input_fastq_pairs,
+                fastq_pairs=input_fastq_pairs,
                 output_bam=output_bam,
+                sample_name=sequencing_group.id,
+                genome_dir=get_config()['references'].get('star_ref_dir'),
                 job_attrs=self.get_job_attrs(sequencing_group),
                 overwrite=sequencing_group.forced,
             )
