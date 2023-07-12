@@ -15,6 +15,9 @@ from cpg_workflows.filetypes import (
 from cpg_workflows.workflow import (
     SequencingGroup,
 )
+from dataclasses import dataclass
+from enum import Enum
+
 
 class MissingFastqInputException(Exception):
     """Raise if alignment input is missing"""
@@ -26,6 +29,43 @@ class InvalidSequencingTypeException(Exception):
     pass
 
 
+@dataclass
+class AdapterSequence:
+    """
+    A class to represent an adapter sequence.
+    """
+
+    sequence: str
+    name: str | None = None
+
+
+@dataclass
+class AdapterPair:
+    """
+    A class to represent a pair of adapter sequences.
+    """
+
+    r1: AdapterSequence
+    r2: AdapterSequence
+
+
+class AdapterPairs(Enum):
+    """
+    A class to represent a set of adapter pairs.
+    """
+
+    ILLUMINA_TRUSEQ = AdapterPair(
+        r1=AdapterSequence(
+            sequence='AGATCGGAAGAGCACACGTCTGAACTCCAGTCA',
+            name='TruSeq Adapter Index 1',
+        ),
+        r2=AdapterSequence(
+            sequence='AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT',
+            name='TruSeq Adapter Index 2',
+        ),
+    )
+
+
 class Cutadapt:
     """
     Construct a cutadapt command for trimming FASTQs.
@@ -35,28 +75,27 @@ class Cutadapt:
         self,
         input_fastq_pair: FastqPair,
         output_fastq_pair: FastqPair,
-        adapterR13p: str | None = None,
-        adapterR23p: str | None = None,
-        adapterR15p: str | None = None,
-        adapterR25p: str | None = None,
-        quality_trim: int | None = None,  # TODO: determine default
+        adapter_type: AdapterPairs | None = None,
+        paired: bool = True,
+        min_length: int = 50,
         two_colour: bool = True,
-        min_length: int | None = None,
         polyA: bool = False,
-        poly: str | None = None,
-        # TODO: add more parameters
+        quality_trim: int | None = None,  # TODO: determine default
     ):
-        self.command = ['cutadapt', '-o', str(output_fastq_pair.r1), '-p', str(output_fastq_pair.r2)]
-        adapter_args = []
-        if adapterR13p:
-            adapter_args.extend(['-a', adapterR13p])
-        if adapterR23p:
-            adapter_args.extend(['-A', adapterR23p])
-        if adapterR15p:
-            adapter_args.extend(['-g', adapterR15p])
-        if adapterR25p:
-            adapter_args.extend(['-G', adapterR25p])
-        self.command.extend(adapter_args)
+        try:
+            adapters: AdapterPair = AdapterPairs[adapter_type].value
+        except AttributeError:
+            raise ValueError(f'Invalid adapter type: {adapter_type}')
+        self.command = [
+            'cutadapt',
+            '-o', str(output_fastq_pair.r1),
+            '-a', adapters.r1.sequence,
+        ]
+        if paired:
+            self.command.extend([
+                '-p', str(output_fastq_pair.r2),
+                '-A', adapters.r2.sequence,
+            ])
         if quality_trim:
             if two_colour:
                 self.command.append(f'--nextseq-trim={quality_trim}')
@@ -66,7 +105,53 @@ class Cutadapt:
             self.command.append(f'--minimum-length={min_length}')
         if polyA:
             self.command.append('--poly-a')
-        self.command.extend([str(input_fastq_pair.r1), str(input_fastq_pair.r2)])
+        self.command.append(str(input_fastq_pair.r1))
+        if paired:
+            self.command.append(str(input_fastq_pair.r2))
+
+    def __str__(self) -> str:
+        return ' '.join(self.command)
+    
+    def __repr__(self) -> str:
+        return str(self)
+
+
+class Fastp:
+    """
+    Construct a fastp command for trimming FASTQs.
+    """
+
+    def __init__(
+        self,
+        input_fastq_pair: FastqPair,
+        output_fastq_pair: FastqPair,
+        adapter_type: AdapterPairs | None = None,
+        paired: bool = True,
+        min_length: int = 50,
+        polyG: bool = True,
+        polyX: bool = False,
+    ):
+        try:
+            adapters: AdapterPair = AdapterPairs[adapter_type].value
+        except AttributeError:
+            raise ValueError(f'Invalid adapter type: {adapter_type}')
+        self.command = [
+            'fastp',
+            '--in1', str(input_fastq_pair.r1),
+            '--out1', str(output_fastq_pair.r1),
+            '--length_required', str(min_length),
+            '--adapter_sequence', adapters.r1.sequence,
+        ]
+        if paired:
+            self.command.extend([
+                '--in2', str(input_fastq_pair.r2),
+                '--out2', str(output_fastq_pair.r2),
+                '--adapter_sequence_r2', adapters.r2.sequence,
+            ])
+        if not polyG:
+            self.command.append('--disable_trim_poly_g')
+        if polyX:
+            self.command.append('--trim_poly_x')
 
     def __str__(self) -> str:
         return ' '.join(self.command)
@@ -109,17 +194,22 @@ def trim(
             f" for job type '{base_job_name}'; sequencing type must be 'rna'"
         )
     
-    trim_tool = 'cutadapt'
+    trim_tool = 'fastp'
 
     trim_j_name = base_job_name
     trim_j_attrs = (job_attrs or {}) | dict(label=base_job_name, tool=trim_tool)
     trim_j = b.new_job(trim_j_name, trim_j_attrs)
-    trim_cmd = Cutadapt(  # TODO: add more arguments
+    trim_cmd = Fastp(
         input_fastq_pair=input_fq_pair,
         output_fastq_pair=FastqPair(
             r1=trim_j.output_r1,
             r2=trim_j.output_r2,
         ),
+        adapter_type=get_config()['trim']['adapter_type'],
+        paired=True,
+        min_length=50,
+        polyG=True,
+        polyX=True,
     )
     trim_j.command(command(str(trim_cmd), monitor_space=True))
 

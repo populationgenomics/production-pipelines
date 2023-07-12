@@ -34,8 +34,12 @@ def get_toml(tmp_path) -> str:
     backend = "local"
 
     [images]
+    fastp = "stub"
     STAR = "stub"
     samtools = "stub"
+
+    [trim]
+    adapter_type = "ILLUMINA_TRUSEQ"
 
     [references]
     star_ref_dir = "stub"
@@ -199,7 +203,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     get_workflow().run(stages=[AlignRNA])
 
     b = get_batch()
-    trim_job = b.job_by_tool['cutadapt']
+    trim_job = b.job_by_tool['fastp']
     align_job = b.job_by_tool['STAR']
     samtools_job = b.job_by_tool['samtools']
     sample_list = get_cohort().get_sequencing_groups()
