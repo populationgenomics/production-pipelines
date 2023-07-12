@@ -34,7 +34,10 @@ def get_toml(tmp_path) -> str:
     backend = "local"
 
     [images]
-    cutadapt = "stub"
+    fastp = "stub"
+
+    [trim]
+    adapter_type = "ILLUMINA_TRUSEQ"
 
     [storage.default]
     default = '{tmp_path}'
@@ -166,7 +169,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     get_workflow().run(stages=[Trim])
 
     b = get_batch()
-    trim_job = b.job_by_tool['cutadapt']
+    trim_job = b.job_by_tool['fastp']
     sample_list = get_cohort().get_sequencing_groups()
 
     # The number of FASTQ trim jobs should equal the number of FASTQ pairs
