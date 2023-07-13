@@ -565,7 +565,7 @@ class VepMito(CohortStage):
         return {
             # convert to str to avoid checking existence
             'tmp_prefix': str(self.tmp_prefix),
-            'sites_only_vcf': self.prefix / 'mito' / 'cohort.sites_only.vcf',
+            'sites_only_vcf': self.prefix / 'mito' / 'cohort.sites_only.vcf.gz',
             'vep_json': self.prefix / 'mito' / 'cohort.sites_only.vep.json',
             'mito_vep_ht': self.prefix / 'mito' / 'cohort.sites_only.vep.ht',
         }
@@ -614,6 +614,7 @@ class VepMito(CohortStage):
             job_attrs=self.get_job_attrs(cohort),
             depends_on=jobs
         )
+        json_to_ht_j.depends_on(*jobs)
         jobs.append(json_to_ht_j)
         # tmp_prefix=to_path(self.expected_outputs(cohort)['tmp_prefix']),
 
