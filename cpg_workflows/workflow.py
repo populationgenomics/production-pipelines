@@ -877,10 +877,10 @@ def skip(
 _workflow: Optional['Workflow'] = None
 
 
-def get_workflow(dry_run: bool = False) -> 'Workflow':
+def get_workflow(dry_run: bool = False, test_mode: bool = False) -> 'Workflow':
     global _workflow
     if _workflow is None:
-        _workflow = Workflow(dry_run=dry_run)
+        _workflow = Workflow(dry_run=dry_run, test_mode=test_mode)
     return _workflow
 
 
@@ -888,8 +888,9 @@ def run_workflow(
     stages: list[StageDecorator] | None = None,
     wait: bool | None = False,
     dry_run: bool = False,
+    test_mode: bool = False,
 ) -> 'Workflow':
-    wfl = get_workflow(dry_run=dry_run)
+    wfl = get_workflow(dry_run=dry_run, test_mode=test_mode)
     wfl = wfl.run(stages=stages, wait=wait)
     return wfl
 
@@ -904,6 +905,7 @@ class Workflow:
         self,
         stages: list[StageDecorator] | None = None,
         dry_run: bool | None = None,
+        test_mode: bool = False,
     ):
         if _workflow is not None:
             raise ValueError(
@@ -911,6 +913,7 @@ class Workflow:
             )
 
         self.dry_run = dry_run or get_config()['workflow'].get('dry_run')
+        self.test_mode = test_mode
 
         analysis_dataset = get_config()['workflow']['dataset']
         name = get_config()['workflow'].get('name', analysis_dataset)
@@ -983,7 +986,7 @@ class Workflow:
             raise WorkflowError('No stages added')
         self.set_stages(_stages)
 
-        if not self.dry_run:
+        if not (self.dry_run or self.test_mode):
             get_batch().run(wait=wait)
 
     @staticmethod
@@ -1085,7 +1088,7 @@ class Workflow:
                 )
 
         # We want to run stages only appearing in only_stages, and check outputs of
-        # imediate predecessor stages, but skip everything else.
+        # immediate predecessor stages, but skip everything else.
         required_stages: set[str] = set()
         for os in only_stages:
             rs = nx.descendants_at_distance(graph, os, 1)
@@ -1103,7 +1106,7 @@ class Workflow:
 
     def set_stages(
         self,
-        requested_stages: list[StageDecorator],
+        requested_stages: list[StageDecorator]
     ):
         """
         Iterate over stages and call their queue_for_cohort(cohort) methods;
@@ -1216,7 +1219,7 @@ class Workflow:
             )
 
         # Round 6: actually adding jobs from the stages.
-        if not self.dry_run:
+        if self.test_mode or (not self.dry_run):
             cohort = get_cohort()  # Would communicate with metamist.
             for i, stg in enumerate(stages):
                 logging.info(f'*' * 60)
