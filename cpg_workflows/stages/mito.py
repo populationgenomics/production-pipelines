@@ -14,7 +14,7 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_workflows import get_batch
 from cpg_workflows.filetypes import CramPath
-from cpg_workflows.jobs import mito, picard, mito_cohort, joint_genotyping
+from cpg_workflows.jobs import mito, picard, mito_cohort, joint_genotyping, vep
 from cpg_workflows.stages.align import Align
 from cpg_workflows.stages.cram_qc import CramQC
 from cpg_workflows.targets import Cohort
@@ -566,6 +566,7 @@ class VepMito(CohortStage):
             # convert to str to avoid checking existence
             'tmp_prefix': str(self.tmp_prefix),
             'sites_only_vcf': self.prefix / 'mito' / 'cohort.sites_only.vcf',
+            'vep_json': self.prefix / 'mito' / 'cohort.sites_only.vep.json',
             'mito_vep_ht': self.prefix / 'mito' / 'cohort.sites_only.vep.ht',
         }
 
@@ -589,9 +590,32 @@ class VepMito(CohortStage):
             output_vcf_path=self.expected_outputs(cohort)['sites_only_vcf'],
             job_attrs=self.get_job_attrs(cohort),
         )
-
         if siteonly_j:
             jobs.append(siteonly_j)
+
+        # Run VEP
+        vep_j = vep.vep_one(
+            get_batch(),
+            vcf=self.expected_outputs(cohort)['sites_only_vcf'],
+            out_path=self.expected_outputs(cohort)['vep_json'],
+            out_format='json',
+            job_attrs=self.get_job_attrs(cohort),
+        )
+        if vep_j:
+            if jobs:
+                vep_j.depends_on(*jobs)
+            jobs.append(vep_j)
+
+        # Convert to ht
+        json_to_ht_j = vep.gather_vep_json_to_ht(
+            get_batch(),
+            vep_results_paths=[self.expected_outputs(cohort)['vep_json'],],
+            out_path=self.expected_outputs(cohort)['mito_vep_ht'],
+            job_attrs=self.get_job_attrs(cohort),
+            depends_on=jobs
+        )
+        jobs.append(json_to_ht_j)
+        # tmp_prefix=to_path(self.expected_outputs(cohort)['tmp_prefix']),
 
         return self.make_outputs(
             cohort,
