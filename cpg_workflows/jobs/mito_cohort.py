@@ -6,6 +6,8 @@ from hailtop.batch.job import Job
 from cpg_utils.config import get_config
 from cpg_utils import Path
 from cpg_workflows.resources import STANDARD
+from cpg_utils.hail_batch import image_path, query_command
+
 
 
 
@@ -639,6 +641,42 @@ def combine_vcfs(
     )
 
     return j
+
+
+
+
+# def annotate_cohort_jobs(
+#     b,
+#     input_path: Path,
+#     out_mt_path: Path,
+#     checkpoint_prefix: Path,
+#     vep_ht_path: Path,
+#     job_attrs: dict | None = None,
+#     depends_on: list[Job] | None = None,
+# ) -> list[Job]:
+#     """
+
+
+#     """
+#     from cpg_workflows.query_modules import seqr_loader
+
+#     j = b.new_job(f'annotate cohort', job_attrs)
+#     j.image(image_path('cpg_workflows'))
+#     j.command(
+#         query_command(
+#             seqr_loader,
+#             seqr_loader.annotate_cohort.__name__,
+#             str(input_path),
+#             str(out_mt_path),
+#             str(vep_ht_path),
+#             None,
+#             str(checkpoint_prefix),
+#             setup_gcp=True,
+#         )
+#     )
+#     if depends_on:
+#         j.depends_on(*depends_on)
+#     return [j]
 
 
 

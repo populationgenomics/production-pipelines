@@ -16,15 +16,15 @@ from cpg_workflows.utils import can_reuse
 
 
 def annotate_cohort(
-    vcf_path,
+    input_path,
     out_mt_path,
     vep_ht_path,
     site_only_vqsr_vcf_path=None,
     checkpoint_prefix=None,
 ):
     """
-    Convert VCF to matrix table, annotate for Seqr Loader, add VEP and VQSR
-    annotations.
+    Takes a matrix table or a VCF as input then annotates it for Seqr Loader, add VEP and
+    (optionally) VQSR annotations. Returns a matrix table.
     """
 
     def _read(path):
@@ -47,13 +47,17 @@ def annotate_cohort(
                 t = _read(str(path))
         return t
 
-    mt = hl.import_vcf(
-        str(vcf_path),
-        reference_genome=genome_build(),
-        skip_invalid_loci=True,
-        force_bgz=True,
-    )
-    logging.info(f'Importing VCF {vcf_path}')
+    if str(input_path).endswith('.mt'):
+        mt = hl.read_matrix_table(str(input_path))
+        logging.info(f'Importing MT {input_path}')
+    else:
+        mt = hl.import_vcf(
+            str(input_path),
+            reference_genome=genome_build(),
+            skip_invalid_loci=True,
+            force_bgz=True,
+        )
+        logging.info(f'Importing VCF {input_path}')
 
     logging.info(f'Loading VEP Table from {vep_ht_path}')
     # Annotate VEP. Do ti before splitting multi, because we run VEP on unsplit VCF,
@@ -165,7 +169,7 @@ def annotate_cohort(
         ),
     )
     mt = mt.annotate_globals(
-        sourceFilePath=vcf_path,
+        sourceFilePath=input_path,
         genomeVersion=genome_build().replace('GRCh', ''),
         hail_version=hl.version(),
     )

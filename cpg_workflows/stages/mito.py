@@ -14,7 +14,7 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_workflows import get_batch
 from cpg_workflows.filetypes import CramPath
-from cpg_workflows.jobs import mito, picard, mito_cohort, joint_genotyping, vep
+from cpg_workflows.jobs import mito, picard, mito_cohort, joint_genotyping, vep, seqr_loader
 from cpg_workflows.stages.align import Align
 from cpg_workflows.stages.cram_qc import CramQC
 from cpg_workflows.targets import Cohort
@@ -27,6 +27,7 @@ from cpg_workflows.workflow import (
     SequencingGroup,
     CohortStage,
 )
+
 
 MITO_REF = {
     'dict': 'gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.dict',
@@ -534,17 +535,6 @@ class JoinMito(CohortStage):
         combine_vcfs_j.depends_on(annotate_coverage_j)
         jobs.append(combine_vcfs_j)
 
-        # jobs = annotate_cohort_jobs(
-        #     b=get_batch(),
-        #     vcf_path=vcf_path,
-        #     siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
-        #     vep_ht_path=vep_ht_path,
-        #     out_mt_path=self.expected_outputs(cohort)['mt'],
-        #     checkpoint_prefix=checkpoint_prefix,
-        #     job_attrs=self.get_job_attrs(cohort),
-        #     depends_on=inputs.get_jobs(cohort),
-        # )
-
         return self.make_outputs(
             cohort,
             data=self.expected_outputs(cohort),
@@ -606,7 +596,7 @@ class VepMito(CohortStage):
                 vep_j.depends_on(*jobs)
             jobs.append(vep_j)
 
-        # Convert to ht
+        # Convert to VEP output to a hail table
         json_to_ht_j = vep.gather_vep_json_to_ht(
             get_batch(),
             vep_results_paths=[self.expected_outputs(cohort)['vep_json'],],
@@ -616,10 +606,50 @@ class VepMito(CohortStage):
         )
         json_to_ht_j.depends_on(*jobs)
         jobs.append(json_to_ht_j)
-        # tmp_prefix=to_path(self.expected_outputs(cohort)['tmp_prefix']),
 
         return self.make_outputs(
             cohort,
             data=self.expected_outputs(cohort),
             jobs=jobs,
         )
+
+
+@stage(required_stages=[JoinMito, VepMito])
+class AnotateMito(CohortStage):
+    """
+    Annotate final MT
+    """
+
+    def expected_outputs(self, cohort: Cohort):
+        """
+        Expected to write a matrix table.
+        """
+        return {
+            # convert to str to avoid checking existence
+            'tmp_prefix': str(self.tmp_prefix),
+            'mt': self.prefix / 'mito' / 'cohort.annotated.mt',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        """ """
+
+        checkpoint_prefix = (
+            to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
+        )
+
+        # Make a sites only vcf to run vep on
+        jobs = seqr_loader.annotate_cohort_jobs(
+            b=get_batch(),
+            vcf_path=inputs.as_path(cohort, JoinMito, 'cohort_mt'),
+            out_mt_path=self.expected_outputs(cohort)['mt'],
+            checkpoint_prefix=checkpoint_prefix,
+            vep_ht_path=inputs.as_path(cohort, VepMito, 'mito_vep_ht'),
+            job_attrs=self.get_job_attrs(cohort),
+            use_dataproc=False
+        )
+
+        return self.make_outputs(
+                    cohort,
+                    data=self.expected_outputs(cohort),
+                    jobs=jobs,
+                )
