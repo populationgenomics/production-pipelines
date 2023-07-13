@@ -463,6 +463,47 @@ class GenotypeMito(SequencingGroupStage):
         )
 
 
+@stage(
+    required_stages=[RealignMito, GenotypeMito]
+    # TODO: add suitable analysis types
+)
+class MitoReport(SequencingGroupStage):
+    """
+    Run the standalone MitoReport program on each SG
+
+    This is not part of the Broad Mito pipeline, but generates an alternative non-seqr
+    based interpretable html report of mito variants.
+
+    Requires vep annotated individual vcf.
+
+    https://github.com/bioinfomethods/mitoreport
+    """
+
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
+        main = sequencing_group.dataset.prefix()
+        web = sequencing_group.dataset.web_prefix()
+        return {
+            'vep_vcf': main / 'mito' / f'{sequencing_group.id}.mito.vep.vcf.bgz',
+            'mitoreport': web / 'mito' / f'mitoreport-{sequencing_group.id}' / 'index.html',
+        }
+
+    def queue_jobs(
+        self, sequencing_group: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
+
+        jobs = []
+
+        vep_j = vep.vep_one(
+                    get_batch(),
+                    vcf=inputs.as_path(sequencing_group, GenotypeMito, 'out_vcf'),
+                    out_path=self.expected_outputs(sequencing_group)['vep_vcf'],
+                    out_format='vcf',
+                    job_attrs=self.get_job_attrs(sequencing_group),
+                )
+        if vep_j:
+            jobs.append(vep_j)
+
+
 @stage(required_stages=[RealignMito, GenotypeMito])
 class JoinMito(CohortStage):
     """
