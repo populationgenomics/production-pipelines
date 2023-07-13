@@ -3,15 +3,10 @@ concept test of a stage using a test_mode
 """
 import inspect
 from cpg_workflows.stages.happy_validation import ValidationMtToVcf
-from cpg_workflows.jobs.validation import validation_mt_to_vcf_job
 from cpg_workflows.query_modules.validation import single_sample_vcf_from_dataset_vcf
 from unittest import mock
 
-from cpg_utils import Path, to_path
 from cpg_workflows.batch import get_batch
-
-from cpg_workflows.targets import Cohort, SequencingGroup
-from cpg_workflows.workflow import path_walk
 
 from .. import set_config
 
