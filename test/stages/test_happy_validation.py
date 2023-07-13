@@ -108,18 +108,18 @@ def test_validation_happy_on_vcf(tmp_path):
         sg = j_dict['attributes']['sequencing_group']
         participant = j_dict['attributes']['participant_id']
         whole_bit = re.compile(
-            f'mkdir \${{BATCH_TMPDIR}}/Run_Happy_on_{participant}_VCF-{token}/output && '
-            f'hap.py \${{BATCH_TMPDIR}}/inputs/\w+/vcf \$\{{BATCH_TMPDIR}}/inputs/\w+/{sg}.vcf.bgz '
-            '-r \${BATCH_TMPDIR}/inputs/\w+/ref_fasta '
-            '-R \${BATCH_TMPDIR}/inputs/\w+/bed '
-            f'-o \${{BATCH_TMPDIR}}/Run_Happy_on_{participant}_VCF-{token}/output/output '
+            fr'mkdir \${{BATCH_TMPDIR}}/Run_Happy_on_{participant}_VCF-{token}/output && '
+            fr'hap.py \${{BATCH_TMPDIR}}/inputs/\w+/vcf \$\{{BATCH_TMPDIR}}/inputs/\w+/{sg}.vcf.bgz '
+            r'-r \${BATCH_TMPDIR}/inputs/\w+/ref_fasta '
+            r'-R \${BATCH_TMPDIR}/inputs/\w+/bed '
+            fr'-o \${{BATCH_TMPDIR}}/Run_Happy_on_{participant}_VCF-{token}/output/output '
             '--leftshift '
             '--threads 4 '
             '--preprocess-truth '
             '--engine-vcfeval-path=/opt/hap.py/libexec/rtg-tools-install/rtg '
-            '--engine-vcfeval-template \${BATCH_TMPDIR}/inputs/\w+ '
+            r'--engine-vcfeval-template \${BATCH_TMPDIR}/inputs/\w+ '
             '--engine=vcfeval '
-            '--stratification \${BATCH_TMPDIR}/inputs/\w+/definition.tsv'
+            r'--stratification \${BATCH_TMPDIR}/inputs/\w+/definition.tsv'
         )
         assert job.attributes['stage'] == 'ValidationHappyOnVcf'
         assert re.match(whole_bit, job._command[0])
