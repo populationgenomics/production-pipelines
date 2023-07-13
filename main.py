@@ -30,7 +30,7 @@ from cpg_workflows.stages.happy_validation import (
     ValidationHappyOnVcf,
     ValidationParseHappy
 )
-from cpg_workflows.stages.mito import GenotypeMito, JoinMito,VepMito
+from cpg_workflows.stages.mito import GenotypeMito, JoinMito, VepMito, AnotateMito
 
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
@@ -44,7 +44,8 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         Stripy,
         GenotypeMito,
         JoinMito,
-        VepMito
+        VepMito,
+        AnotateMito,
     ],
     'validation': [ValidationMtToVcf, ValidationHappyOnVcf, ValidationParseHappy],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
