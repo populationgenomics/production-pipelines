@@ -639,3 +639,16 @@ def combine_vcfs(
     )
 
     return j
+
+
+
+
+# prepare vep
+# f = mt.filter_cols(False)
+# checkpoint
+# hl.export_vcf(f, 'cas.vcf')  bgz?
+# add_vep_jobs sites only vcf -> ht
+# annotate_cohort (should 'just work')
+# fix mito specific fields from mito schema
+# MtToEs - need to add meta field for "variant_type"
+# add something to cycle though varinat types here: https://github.com/populationgenomics/sample-metadata/blob/main/scripts/sync_seqr.py#L426-L460
