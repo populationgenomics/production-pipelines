@@ -552,7 +552,7 @@ class JoinMito(CohortStage):
         )
 
 
-@stage(required_stages=[RealignMito, GenotypeMito])
+@stage(required_stages=[RealignMito, GenotypeMito, JoinMito])
 class VepMito(CohortStage):
     """
     Run VEP on Mito VCF
@@ -576,9 +576,9 @@ class VepMito(CohortStage):
         # Input resources
         cohort_vcf = get_batch().read_input_group(
             **{
-                'vcf.gz': inputs.as_str(
-                    target=cohort, stage=GenotypeMito, key='cohort_vcf'
-                )
+                'vcf.gz': str(inputs.as_path(
+                    target=cohort, stage=JoinMito, key='cohort_vcf'
+                ))
             }
         )
 
