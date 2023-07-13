@@ -41,6 +41,7 @@ default = "{directory}"
 billing_project = 'fewgenomes'
 delete_scratch_on_exit = false
 backend = 'local'
+dry_run = true
 
 [references]
 refgenome_sdf = "refgenome_sdf"
@@ -76,7 +77,7 @@ def test_validation_mt_to_vcf(tmp_path):
 
     conf = TOML.format(directory=tmp_path, only='ValidationMtToVcf')
     set_config(conf, tmp_path / 'config.toml')
-    run_workflow(stages=[ValidationMtToVcf], test_mode=True)
+    run_workflow(stages=[ValidationMtToVcf])
     jobs = get_batch()._jobs
 
     expected_code = inspect.getsource(single_sample_vcf_from_dataset_vcf)
@@ -98,7 +99,7 @@ def test_validation_happy_on_vcf(tmp_path):
     definition_path.write_text('test')
 
     set_config(conf, tmp_path / 'config.toml')
-    run_workflow(stages=[ValidationHappyOnVcf], test_mode=True)
+    run_workflow(stages=[ValidationHappyOnVcf])
     jobs = get_batch()._jobs
 
     assert len(jobs) == 2
