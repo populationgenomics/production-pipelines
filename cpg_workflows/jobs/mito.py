@@ -10,9 +10,11 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, image_path, fasta_res_group
 from cpg_workflows.batch import Batch
 from cpg_workflows.filetypes import CramPath
+
 # from cpg_workflows.jobs import picard
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.targets import SequencingGroup
+
 # from cpg_workflows.utils import can_reuse
 
 
@@ -708,7 +710,12 @@ def mitoreport(
         'gs://cpg-common-test/references/mitoreport/mito_map_annotations_20220616.json'
     )
     vcf = b.read_input_group(**{'vcf.gz': str(vcf_path)})
-    cram = b.read_input_group(**{'cram': str(cram_path)})
+    cram = b.read_input_group(
+        **{
+            'cram': str(cram_path),
+            'cram.crai': str(cram_path.with_suffix('cram.crai)')),
+        }
+    )
 
     cmd = f"""
         java -jar mitoreport-1.0.0-beta-1-all.jar mito-report \
