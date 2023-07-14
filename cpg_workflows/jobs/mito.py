@@ -713,7 +713,7 @@ def mitoreport(
     cram = b.read_input_group(
         **{
             'cram': str(cram_path),
-            'cram.crai': str(cram_path.with_suffix('cram.crai)')),
+            'cram.crai': str(cram_path.with_suffix('cram.crai')),
         }
     )
 
