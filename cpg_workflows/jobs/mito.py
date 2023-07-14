@@ -726,7 +726,7 @@ def mitoreport(
             -sample {sequencing_group.id} \
             -mann {mito_map_annotations} \
             -gnomad resources/gnomad.genomes.v3.1.sites.chrM.vcf.bgz \
-            resources/test-sample/mitoreport-test-sample.vep.vcf.gz \
+            -vcf resources/test-sample/mitoreport-test-sample.vep.vcf.gz \
             {sequencing_group.id}.bam ./resources/controls/*.bam
         """
             # -vcf {vcf['vcf.gz']} \
