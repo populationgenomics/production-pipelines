@@ -707,7 +707,7 @@ def mitoreport(
     mito_map_annotations = b.read_input(
         'gs://cpg-common-test/references/mitoreport/mito_map_annotations_20220616.json'
     )
-    vcf = b.read_input_group(**{'vcf.bgz': str(vcf_path)})
+    vcf = b.read_input_group(**{'vcf.gz': str(vcf_path)})
     cram = b.read_input_group(**{'cram': str(cram_path)})
 
     cmd = f"""
@@ -715,7 +715,7 @@ def mitoreport(
             -sample {sequencing_group.id} \
             -mann {mito_map_annotations} \
             -gnomad resources/gnomad.genomes.v3.1.sites.chrM.vcf.bgz \
-            -vcf {vcf['vcf.bgz']} \
+            -vcf {vcf['vcf.gz']} \
             {cram['cram']} ./resources/controls/*.bam
         """
 
