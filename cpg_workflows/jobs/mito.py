@@ -722,7 +722,7 @@ def mitoreport(
         samtools view -T {mito_ref.base} -b -o {sequencing_group.id}.bam {cram['cram']}
         samtools index {sequencing_group.id}.bam
 
-        ll resources
+        ls -lh resources
 
         head -c 1000 {mito_map_annotations}
 
