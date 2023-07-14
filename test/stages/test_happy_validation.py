@@ -3,8 +3,9 @@ concept test of a stage using a test_mode
 """
 import inspect
 import re
-from cpg_workflows.stages.happy_validation import ValidationMtToVcf, ValidationHappyOnVcf
+from cpg_workflows.stages.happy_validation import ValidationMtToVcf, ValidationHappyOnVcf, ValidationParseHappy
 from cpg_workflows.query_modules.validation import single_sample_vcf_from_dataset_vcf
+from cpg_workflows.jobs.validation import parse_and_post_results
 from unittest import mock
 
 from cpg_workflows.batch import get_batch
@@ -124,3 +125,21 @@ def test_validation_happy_on_vcf(tmp_path):
         )
         assert job.attributes['stage'] == 'ValidationHappyOnVcf'
         assert re.match(whole_bit, job._command[0])
+
+
+@mock.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
+@mock.patch('cpg_workflows.workflow.list_of_all_dir_contents', set)
+def test_validation_result_parse(tmp_path):
+
+    from cpg_workflows.workflow import run_workflow
+
+    conf = TOML.format(directory=tmp_path, only='ValidationParseHappy')
+    set_config(conf, tmp_path / 'config.toml')
+    run_workflow(stages=[ValidationParseHappy])
+    jobs = get_batch()._jobs
+
+    expected_code = inspect.getsource(parse_and_post_results)
+    assert len(jobs) == 2
+    for job in jobs:
+        assert job.attributes['stage'] == 'ValidationParseHappy'
+        assert expected_code in job._user_code
