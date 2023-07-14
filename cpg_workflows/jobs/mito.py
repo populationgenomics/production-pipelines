@@ -722,6 +722,10 @@ def mitoreport(
         samtools view -T {mito_ref.base} -b -o {sequencing_group.id}.bam {cram['cram']}
         samtools index {sequencing_group.id}.bam
 
+        ll resources
+
+        head -c 1000 {mito_map_annotations}
+
         java -jar mitoreport-1.0.0-beta-1-all.jar mito-report \
             -sample {sequencing_group.id} \
             -mann {mito_map_annotations} \
