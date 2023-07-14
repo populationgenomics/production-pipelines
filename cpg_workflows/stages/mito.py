@@ -512,6 +512,7 @@ class MitoReport(SequencingGroupStage):
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         if mitoreport_j:
+            mitoreport_j.depends_on(*jobs)
             jobs.append(mitoreport_j)
 
         return self.make_outputs(
