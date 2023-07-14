@@ -5,15 +5,15 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 from hailtop.batch.resource import PythonResult
 
-from cpg_utils.config import get_config
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import image_path, fasta_res_group
-from cpg_utils.hail_batch import command
-from cpg_workflows.resources import STANDARD
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import command, image_path, fasta_res_group
+from cpg_workflows.batch import Batch
 from cpg_workflows.filetypes import CramPath
-from cpg_workflows.utils import can_reuse
-
-from cpg_workflows.jobs import picard
+# from cpg_workflows.jobs import picard
+from cpg_workflows.resources import STANDARD
+from cpg_workflows.targets import SequencingGroup
+# from cpg_workflows.utils import can_reuse
 
 
 def subset_cram_to_chrM(
@@ -532,9 +532,13 @@ def split_multi_allelics(
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 
-    j.declare_resource_group(split_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
+    j.declare_resource_group(
+        split_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
     # Downstream hail steps prefer explicit .bgz suffix
-    j.declare_resource_group(output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+    j.declare_resource_group(
+        output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
+    )
 
     cmd = f"""
         gatk LeftAlignAndTrimVariants \
@@ -678,3 +682,43 @@ def parse_contamination_results(
     )
 
     return j, contamination_level
+
+
+def mitoreport(
+    b: Batch,
+    sequencing_group: SequencingGroup,
+    vcf_path: Path,
+    cram_path: Path,
+    job_attrs: dict | None = None,
+) -> Job:
+    """
+    Run Mitoreport
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_job('mitoreport', job_attrs)
+    # j.image(image_path('mitoreport'))
+    j.image(
+        'australia-southeast1-docker.pkg.dev/cpg-common/images/mitoreport:1.0.0-beta-1'
+    )
+
+    res = STANDARD.request_resources(ncpu=2)
+    res.set_to_job(j)
+
+    mito_map_annotations = b.read_input(
+        'gs://cpg-common-test/references/mitoreport/mito_map_annotations_20220616.json'
+    )
+    vcf = b.read_input_group(**{'vcf.bgz': str(vcf_path)})
+    cram = b.read_input_group(**{'cram': str(cram_path)})
+
+    cmd = f"""
+        java -jar mitoreport-1.0.0-beta-1-all.jar mito-report \
+            -sample {sequencing_group.id} \
+            -mann {mito_map_annotations} \
+            -gnomad resources/gnomad.genomes.v3.1.sites.chrM.vcf.bgz \
+            -vcf {vcf['vcf.bgz']} \
+            {cram['cram']} ./resources/controls/*.bam
+        """
+
+    j.command(command(cmd))
+
+    return j

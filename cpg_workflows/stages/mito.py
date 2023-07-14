@@ -504,6 +504,21 @@ class MitoReport(SequencingGroupStage):
             jobs.append(vep_j)
 
 
+        mitoreport_j = mito.mitoreport(
+            get_batch(),
+            sequencing_group=sequencing_group,
+            vcf_path=self.expected_outputs(sequencing_group)['vep_vcf'],
+            cram_path=inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram'),
+            job_attrs=self.get_job_attrs(sequencing_group),
+        )
+        if mitoreport_j:
+            jobs.append(mitoreport_j)
+
+        return self.make_outputs(
+            sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs
+        )
+
+
 @stage(required_stages=[RealignMito, GenotypeMito])
 class JoinMito(CohortStage):
     """
