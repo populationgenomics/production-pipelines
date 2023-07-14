@@ -483,7 +483,7 @@ class MitoReport(SequencingGroupStage):
         main = sequencing_group.dataset.prefix()
         web = sequencing_group.dataset.web_prefix()
         return {
-            'vep_vcf': main / 'mito' / f'{sequencing_group.id}.mito.vep.vcf.bgz',
+            'vep_vcf': main / 'mito' / f'{sequencing_group.id}.mito.vep.vcf.gz',
             'mitoreport': web / 'mito' / f'mitoreport-{sequencing_group.id}' / 'index.html',
         }
 
