@@ -490,7 +490,7 @@ class MitoReport(SequencingGroupStage):
     def queue_jobs(
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
-
+        mito_ref = get_batch().read_input_group(**MITO_REF)
         jobs = []
 
         vep_j = vep.vep_one(
@@ -509,6 +509,7 @@ class MitoReport(SequencingGroupStage):
             sequencing_group=sequencing_group,
             vcf_path=self.expected_outputs(sequencing_group)['vep_vcf'],
             cram_path=inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram'),
+            mito_ref=mito_ref,
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         if mitoreport_j:

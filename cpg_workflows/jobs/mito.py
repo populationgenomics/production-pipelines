@@ -691,6 +691,7 @@ def mitoreport(
     sequencing_group: SequencingGroup,
     vcf_path: Path,
     cram_path: Path,
+    mito_ref: hb.ResourceGroup,
     job_attrs: dict | None = None,
 ) -> Job:
     """
@@ -718,12 +719,14 @@ def mitoreport(
     )
 
     cmd = f"""
+        samtools view -T {mito_ref.base} -b -o {sequencing_group.id}.bam {cram['cram']}
+
         java -jar mitoreport-1.0.0-beta-1-all.jar mito-report \
             -sample {sequencing_group.id} \
             -mann {mito_map_annotations} \
             -gnomad resources/gnomad.genomes.v3.1.sites.chrM.vcf.bgz \
             -vcf {vcf['vcf.gz']} \
-            {cram['cram']} ./resources/controls/*.bam
+            {sequencing_group.id}.bam ./resources/controls/*.bam
         """
 
     j.command(command(cmd))
