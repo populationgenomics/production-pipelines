@@ -687,7 +687,7 @@ def mitoreport(
     vcf_path: Path,
     cram_path: Path,
     mito_ref: hb.ResourceGroup,
-    output_path : Path,
+    output_path: Path,
     job_attrs: dict | None = None,
 ) -> Job:
     """
@@ -696,9 +696,7 @@ def mitoreport(
     job_attrs = job_attrs or {}
     j = b.new_job('mitoreport', job_attrs)
     # j.image(image_path('mitoreport'))
-    j.image(
-        'australia-southeast1-docker.pkg.dev/cpg-common/images/mitoreport:1.1.0'
-    )
+    j.image('australia-southeast1-docker.pkg.dev/cpg-common/images/mitoreport:1.1.0')
 
     res = STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
@@ -725,6 +723,11 @@ def mitoreport(
         gsutil -m cp -r 'mitoreport-{sequencing_group.id}/*' {output_path.parent}
         """
 
-    j.command(command(cmd))
+    j.command(
+        command(
+            cmd,
+            setup_gcp=True,
+        )
+    )
 
     return j
