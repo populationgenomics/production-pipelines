@@ -701,7 +701,7 @@ def mitoreport(
     j = b.new_job('mitoreport', job_attrs)
     # j.image(image_path('mitoreport'))
     j.image(
-        'australia-southeast1-docker.pkg.dev/cpg-common/images/mitoreport:1.0.0-beta-1'
+        'australia-southeast1-docker.pkg.dev/cpg-common/images/mitoreport:1.1.0'
     )
 
     res = STANDARD.request_resources(ncpu=2)
