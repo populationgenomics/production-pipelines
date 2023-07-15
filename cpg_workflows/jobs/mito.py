@@ -707,9 +707,9 @@ def mitoreport(
     res = STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
 
-    mito_map_annotations = b.read_input(
-        'gs://cpg-common-test/references/mitoreport/mito_map_annotations_20220616.json'
-    )
+    # mito_map_annotations = b.read_input(
+    #     'gs://cpg-common-test/references/mitoreport/mito_map_annotations_20220616.json'
+    # )
     vcf = b.read_input_group(**{'vcf.gz': str(vcf_path)})
     cram = b.read_input_group(
         **{
@@ -722,19 +722,14 @@ def mitoreport(
         samtools view -T {mito_ref.base} -b -o {sequencing_group.id}.bam {cram['cram']}
         samtools index {sequencing_group.id}.bam
 
-        ls -lh resources
 
-        head -c 1000 {mito_map_annotations}
-
-        java -jar mitoreport-1.0.0-beta-1-all.jar mito-report \
+        java -jar mitoreport.jar mito-report \
             -sample {sequencing_group.id} \
-            -mann {mito_map_annotations} \
+            -mann resources/mito_map_annotations.json \
             -gnomad resources/gnomad.genomes.v3.1.sites.chrM.vcf.bgz \
-            -vcf resources/test-sample/mitoreport-test-sample.vep.vcf.gz \
+            -vcf {vcf['vcf.gz']} \
             {sequencing_group.id}.bam ./resources/controls/*.bam
         """
             # -vcf {vcf['vcf.gz']} \
 
     j.command(command(cmd))
-
-    return j
