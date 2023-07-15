@@ -503,13 +503,13 @@ class MitoReport(SequencingGroupStage):
         if vep_j:
             jobs.append(vep_j)
 
-
         mitoreport_j = mito.mitoreport(
             get_batch(),
             sequencing_group=sequencing_group,
             vcf_path=self.expected_outputs(sequencing_group)['vep_vcf'],
             cram_path=inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram'),
             mito_ref=mito_ref,
+            output_path=self.expected_outputs(sequencing_group)['mitoreport'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         if mitoreport_j:

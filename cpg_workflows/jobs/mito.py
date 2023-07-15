@@ -614,7 +614,7 @@ def parse_contamination_results(
     job_attrs: dict | None = None,
 ) -> tuple[Job, PythonResult]:
     """
-    Post process halpocheck and (optionaly) verifybamid reports to determin single value
+    Post process halpocheck and (optionaly) verifybamid reports to determine single value
     for estimated contamination that can be used for variant filtering.
 
     Inputs:
@@ -633,12 +633,7 @@ def parse_contamination_results(
     res = STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
 
-    # Hmmmm. So, the only way I can get this function to the execution node seems
-    # to be by defining it locally within the job function. If I move it out to the same
-    # scope as the job funtion (or anywhere else) hail seems to try to find it in the
-    #  version of production_pipelines installed in the node (and it is not there unless
-    # I publish a new image).
-    # Someone please tell me there is a better way?
+    # TODO: move this function when we have updated the driver image
     def parse_contamination_worker(
         haplocheck_report: str, verifybamid_report: str | None
     ) -> float:
@@ -692,10 +687,11 @@ def mitoreport(
     vcf_path: Path,
     cram_path: Path,
     mito_ref: hb.ResourceGroup,
+    output_path : Path,
     job_attrs: dict | None = None,
 ) -> Job:
     """
-    Run Mitoreport
+    Run Mitoreport to generate html report of mito variants
     """
     job_attrs = job_attrs or {}
     j = b.new_job('mitoreport', job_attrs)
@@ -707,9 +703,6 @@ def mitoreport(
     res = STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
 
-    # mito_map_annotations = b.read_input(
-    #     'gs://cpg-common-test/references/mitoreport/mito_map_annotations_20220616.json'
-    # )
     vcf = b.read_input_group(**{'vcf.gz': str(vcf_path)})
     cram = b.read_input_group(
         **{
@@ -722,14 +715,16 @@ def mitoreport(
         samtools view -T {mito_ref.base} -b -o {sequencing_group.id}.bam {cram['cram']}
         samtools index {sequencing_group.id}.bam
 
-
         java -jar mitoreport.jar mito-report \
             -sample {sequencing_group.id} \
             -mann resources/mito_map_annotations.json \
             -gnomad resources/gnomad.genomes.v3.1.sites.chrM.vcf.bgz \
             -vcf {vcf['vcf.gz']} \
             {sequencing_group.id}.bam ./resources/controls/*.bam
+
+        gsutil -m cp -r 'mitoreport-{sequencing_group.id}/*' {output_path.parent}
         """
-            # -vcf {vcf['vcf.gz']} \
 
     j.command(command(cmd))
+
+    return j
