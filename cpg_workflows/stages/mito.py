@@ -312,7 +312,7 @@ class GenotypeMito(SequencingGroupStage):
         main = sequencing_group.dataset.prefix()
         analysis = sequencing_group.dataset.analysis_prefix()
         return {
-            'out_vcf': main / 'mito' / f'{sequencing_group.id}.mito.vcf',
+            'out_vcf': main / 'mito' / f'{sequencing_group.id}.mito.vcf.bgz',
             'haplocheck_metrics': analysis
             / 'mito'
             / f'{sequencing_group.id}.haplocheck.txt',
