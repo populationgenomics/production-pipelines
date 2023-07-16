@@ -198,7 +198,6 @@ def extract_coverage_mean(
     j = b.new_job('extract_coverage_mean', job_attrs)
     j.image(image_path('peer'))
 
-
     res = STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
 
