@@ -14,7 +14,7 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_workflows import get_batch
 from cpg_workflows.filetypes import CramPath
-from cpg_workflows.jobs import mito, picard
+from cpg_workflows.jobs import mito, picard, vep
 from cpg_workflows.stages.align import Align
 from cpg_workflows.stages.cram_qc import CramQC
 from cpg_workflows.utils import exists
@@ -470,6 +470,64 @@ class GenotypeMito(SequencingGroupStage):
             split_multiallelics_j.output_vcf,
             str(self.expected_outputs(sequencing_group)['out_vcf']),
         )
+
+        return self.make_outputs(
+            sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs
+        )
+
+
+@stage(
+    required_stages=[RealignMito, GenotypeMito]
+    # TODO: add suitable analysis types
+)
+class MitoReport(SequencingGroupStage):
+    """
+    Run the standalone MitoReport program on each SG
+
+    This is not part of the Broad Mito pipeline, but generates an alternative non-seqr
+    based interpretable html report of mito variants.
+
+    Requires vep annotated individual vcf.
+
+    https://github.com/bioinfomethods/mitoreport
+    """
+
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
+        main = sequencing_group.dataset.prefix()
+        web = sequencing_group.dataset.web_prefix()
+        return {
+            'vep_vcf': main / 'mito' / f'{sequencing_group.id}.mito.vep.vcf.gz',
+            'mitoreport': web / 'mito' / f'mitoreport-{sequencing_group.id}' / 'index.html',
+        }
+
+    def queue_jobs(
+        self, sequencing_group: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
+        mito_ref = get_batch().read_input_group(**MITO_REF)
+        jobs = []
+
+        vep_j = vep.vep_one(
+                    get_batch(),
+                    vcf=inputs.as_path(sequencing_group, GenotypeMito, 'out_vcf'),
+                    out_path=self.expected_outputs(sequencing_group)['vep_vcf'],
+                    out_format='vcf',
+                    job_attrs=self.get_job_attrs(sequencing_group),
+                )
+        if vep_j:
+            jobs.append(vep_j)
+
+        mitoreport_j = mito.mitoreport(
+            get_batch(),
+            sequencing_group=sequencing_group,
+            vcf_path=self.expected_outputs(sequencing_group)['vep_vcf'],
+            cram_path=inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram'),
+            mito_ref=mito_ref,
+            output_path=self.expected_outputs(sequencing_group)['mitoreport'],
+            job_attrs=self.get_job_attrs(sequencing_group),
+        )
+        if mitoreport_j:
+            mitoreport_j.depends_on(*jobs)
+            jobs.append(mitoreport_j)
 
         return self.make_outputs(
             sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs
