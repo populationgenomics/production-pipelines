@@ -202,9 +202,11 @@ def extract_coverage_mean(
     res.set_to_job(j)
 
     cmd = f"""
+        cat {metrics}
+
         R --vanilla <<CODE
         df = read.table(
-            "{metrics}",skip=6,header=TRUE,stringsAsFactors=FALSE,sep='\\\t',nrows=1
+            "{metrics}",skip=6,header=TRUE,stringsAsFactors=FALSE,sep='\\\\t',nrows=1
         )
         write.table(
             floor(df[,"MEAN_COVERAGE"]),
