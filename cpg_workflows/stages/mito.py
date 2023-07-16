@@ -466,11 +466,14 @@ class GenotypeMito(SequencingGroupStage):
         jobs.append(split_multiallelics_j)
 
         # Write the final vcf to the bucket
+        output_vcf_root = str(
+            self.expected_outputs(sequencing_group)['out_vcf']
+        ).replace('.g.vcf.gz', '')
+
         get_batch().write_output(
             split_multiallelics_j.output_vcf,
-            str(self.expected_outputs(sequencing_group)['out_vcf']),
+            output_vcf_root,
         )
-
         return self.make_outputs(
             sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs
         )
