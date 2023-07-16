@@ -40,7 +40,7 @@
 # Description of the workflow (to display in the Batch GUI)
 #description =
 
-# Suffix the workflow outputs location (`get_workflow().prefix`) with this string. 
+# Suffix the workflow outputs location (`get_workflow().prefix`) with this string.
 # By default, the hash of all input paths will be used.
 #output_version = "0.1"
 
@@ -60,7 +60,7 @@ skip_sgs_with_missing_input = false
 # If set to False, will overwrite all intermediates. Used by `utils.can_reuse(path)`.
 check_intermediates = true
 
-# Before running a stage, check if input (i.e. expected outputs from required stages) 
+# Before running a stage, check if input (i.e. expected outputs from required stages)
 # already exist. If it exists, do not submit stage jobs.
 check_expected_outputs = true
 
@@ -81,7 +81,7 @@ check_expected_outputs = true
 reblock_gq_bands = [20, 30, 40]
 
 # Only print the final merged config and a list of stages to be submitted.
-# Will skip any communication with Metamist, Hail Batch, and Cloud Storage, so 
+# Will skip any communication with Metamist, Hail Batch, and Cloud Storage, so
 # the code can be run without permissions.
 #dry_run = true
 
@@ -92,3 +92,14 @@ SYNDIP = 'syndip'
 
 [hail]
 delete_scratch_on_exit = false
+
+[mito_snv]
+# Example config for broad wdl found here:
+# https://raw.githubusercontent.com/broadinstitute/gatk/master/scripts/mitochondria_m2_wdl/ExampleInputsMitochondriaPipeline.json
+# f_score_beta is not configured so will use tool default of 1.0
+f_score_beta = 1.0
+# Sarah Stenton from Broad runs this pipline for seqr ingest and indicated they use a
+# threshold of 0.01 for seqr cohorts.
+vaf_filter_threshold = 0.01
+# Use verifybamid in adition to haplocheck for contamination estimate
+use_verifybamid = true
