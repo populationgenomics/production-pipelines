@@ -716,8 +716,8 @@ def parse_contamination_results(
             for line in haplocheck:
                 cleaned_lines.append([x.strip('"') for x in line.strip().split('\t')])
         # sanity check and reformat
-        assert len(cleaned_lines) == 2, "haplocheck report is unexpected format"
-        assert len(cleaned_lines[0]) == 17, "haplocheck report is unexpected format"
+        assert len(cleaned_lines) == 2, 'haplocheck report is unexpected format'
+        assert len(cleaned_lines[0]) == 17, 'haplocheck report is unexpected format'
         report = dict(zip(cleaned_lines[0], cleaned_lines[1]))
 
         # Determine final contamination level
@@ -743,6 +743,8 @@ def parse_contamination_results(
 
         return max_contamination
 
+    # Call parse_contamination_worker as pythonJob which returns contamination_level
+    # as a hail PythonResult.
     contamination_level = j.call(
         parse_contamination_worker, haplocheck_output, verifybamid_output
     )
