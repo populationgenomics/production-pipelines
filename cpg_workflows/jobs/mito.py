@@ -338,13 +338,16 @@ def mito_mutect2(
 ) -> Job:
     """
     Call SNPs and indels in mitochondrial genome using Mutect2 in"mitochondria-mode"
+
     Args:
         cram: Cam to call variants in.
         reference: Resource group of reference sequence to align to.
         region: Coordinate string restricting the region to call variants within.
         max_reads_per_alignment_start: Mutect argument. [Default: 75].
+
     Output:
-        output_vcf: resource file containing vcf, index AND statistics file.
+        job.output_vcf: resource group containing vcf, index AND statistics file.
+
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L417-L484
     """
@@ -393,13 +396,16 @@ def liftover_and_combine_vcfs(
 ) -> Job:
     """
     Lifts over shifted vcf and combines it with the rest of the chrM calls.
+
     Args:
         vcf: chrM variants mapped to wt chrM (exl control region).
         shifted_vcf: chrM control region variants mapped to shifted chrM.
         reference: resource group for wt chrM reference.
         shift_back_chain: chain file provided with shifted genome.
+
     Outputs:
-        output_vcf: Merged vcf.gz in standard hg38 coordinate space.
+        job.output_vcf: Merged vcf.gz in standard hg38 coordinate space.
+
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL360-L415C2
     """
@@ -424,6 +430,7 @@ def liftover_and_combine_vcfs(
             R={reference.base} \
             CHAIN={shift_back_chain} \
             REJECT={j.rejected_vcf}.vcf.gz
+
         picard MergeVcfs \
             I={vcf['vcf.gz']} \
             I={j.lifted_vcf['vcf.gz']} \
@@ -443,11 +450,14 @@ def merge_mutect_stats(
 ) -> Job:
     """
     Merge stats files from two mutect runs
+
     Args:
         first_stats_file: Mutect stats ResourceFile
         second_stats_file: Mutect stats ResourceFile
+
     Outputs:
         combined_stats: Combined stats file
+
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL573-L598C2
     """
@@ -486,9 +496,11 @@ def filter_variants(
 ) -> Job:
     """
     Filter mutect variant calls
+
     Uses:
       gatk FilterMutectCalls to filter on variant properties
       gatk VariantFiltration to exclude a (broad supplied) black list of problem variants.
+
     Args:
         vcf: input vcf
         merged_mutect_stats: Mutect statistics file
@@ -501,8 +513,10 @@ def filter_variants(
         f_score_beta: F score beta, the relative weight of recall to precision,
             used if OPTIMAL_F_SCORE strategy is chosen (VariantFiltration). Default: 1.0
             is default provided by VariantFiltration.
+
     Outputs:
-        output_vcf: filtered vcf file.
+        job.output_vcf: filtered vcf file.
+
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL486-L571C2
     Note:
@@ -583,8 +597,13 @@ def split_multi_allelics(
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 
-    j.declare_resource_group(split_vcf={'vcf.gz': '{root}.vcf.gz'})
-    j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz'})
+    j.declare_resource_group(
+        split_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+    # Downstream hail steps prefer explicit .bgz suffix
+    j.declare_resource_group(
+        output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
+    )
 
     cmd = f"""
         gatk LeftAlignAndTrimVariants \
@@ -599,12 +618,13 @@ def split_multi_allelics(
         cmd += f"""
             gatk SelectVariants \
                 -V {j.split_vcf['vcf.gz']} \
-                -O {j.output_vcf['vcf.gz']} \
+                -O {j.output_vcf['vcf.bgz']} \
                 --exclude-filtered
         """
     else:
         cmd += f"""
-            mv {j.split_vcf['vcf.gz']} {j.output_vcf['vcf.gz']}
+            mv {j.split_vcf['vcf.gz']} {j.output_vcf['vcf.bgz']}
+            mv {j.split_vcf['vcf.gz.tbi']} {j.output_vcf['vcf.bgz.tbi']}
         """
 
     j.command(command(cmd, define_retry_function=True))
@@ -621,11 +641,14 @@ def get_contamination(
     """
     Uses new HaplocheckerCLI to estimate levels of contamination in mitochondria based
     on known mitochondrial haplotypes.
+
     Args:
         vcf: input vcf of passing variants with multi-allelics split.
         haplocheck_output: Path to write results file.
+
     Outputs:
-        haplocheck_output: ResourceFile containing HaplocheckerCLI tsv report.
+        job.haplocheck_output: ResourceFile containing HaplocheckerCLI tsv report.
+
     Cmd from:
       https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L239
     """
@@ -637,7 +660,8 @@ def get_contamination(
     res.set_to_job(j)
 
     cmd = f"""
-        PARENT_DIR="$(dirname "{vcf['vcf.gz']}")"
+        mv {vcf['vcf.bgz']} {vcf}.vcf.gz
+        PARENT_DIR="$(dirname "{vcf['vcf.bgz']}")"
         java -jar /haplocheckCLI.jar "$PARENT_DIR"
         mv output {j.haplocheck_output}
         """
@@ -656,7 +680,7 @@ def parse_contamination_results(
     job_attrs: dict | None = None,
 ) -> tuple[Job, PythonResult]:
     """
-    Post process halpocheck and (optionaly) verifybamid reports to determin single value
+    Post process halpocheck and (optionally) verifybamid reports to determine single value
     for estimated contamination that can be used for variant filtering.
 
     Inputs:
@@ -666,7 +690,8 @@ def parse_contamination_results(
         Based on logic here:
         https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL523-L524
 
-
+    Output:
+        returns contamination level as a PythonResult
     """
     job_attrs = job_attrs or {}
     j = b.new_python_job('parse_contamination_results', job_attrs)
@@ -675,12 +700,7 @@ def parse_contamination_results(
     res = STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
 
-    # Hmmmm. So, the only way I can get this function to the execution node seems
-    # to be by defining it locally within the job function. If I move it out to the same
-    # scope as the job funtion (or anywhere else) hail seems to try to find it in the
-    #  version of production_pipelines installed in the node (and it is not there unless
-    # I publish a new image).
-    # Someone please tell me there is a better way?
+    # TODO: move this function when we have updated the driver image
     def parse_contamination_worker(
         haplocheck_report: str, verifybamid_report: str | None
     ) -> float:

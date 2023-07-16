@@ -11,6 +11,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
+from cpg_utils.config import get_config
 from cpg_workflows import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import mito, picard
@@ -259,8 +260,9 @@ class RealignMito(SequencingGroupStage):
             sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs
         )
 
+
 @stage(
-    required_stages=[RealignMito,CramQC]
+    required_stages=[RealignMito, CramQC]
     # TODO: add suitable analysis types
 )
 class GenotypeMito(SequencingGroupStage):
@@ -271,10 +273,7 @@ class GenotypeMito(SequencingGroupStage):
     https://github.com/broadinstitute/gatk/blob/330c59a5bcda6a837a545afd2d453361f373fae3/scripts/mitochondria_m2_wdl/MitochondriaPipeline.wdl
     A default config file here:
     https://raw.githubusercontent.com/broadinstitute/gatk/master/scripts/mitochondria_m2_wdl/ExampleInputsMitochondriaPipeline.json
-    Mitochondrial variant calling is a subtle art with potential for artifacts resulting
-    from mapping errors and other complexities such as NUMTs. In an attempt to avoid these
-    issues, this stage has blind faith in the gnomAD pipeline and faithfully re-implements
-    as much of the logic, tools and configuration as possible.
+
     The main phases of analysis include:
         - Calling of variants from non-shifted cram using mutect2
         - Calling of variants in control region in shifted cram using mutect2
@@ -285,20 +284,25 @@ class GenotypeMito(SequencingGroupStage):
         - Variant filtering part 2: exclude variants with VAF below contamination
             estimate.
         - Export final vcf
-    Mitochondrial reference indexes and filtering black lists were copied from Broad
+
+     Mitochondrial reference indexes and filtering black lists were copied from Broad
     (gs://gcp-public-data--broad-references/hg38/v0/chrM/).
+
     Requires:
         sequencing_group cram from Align stage.
+
     Outputs:
         out_vcf: the final filtered vcf for downstream use
         haplocheck_metrics: Metrics generated from the haplocheckCLI tool including an
             estimate of contamination and the predicted mitochondrial haplotype found.
+
     Configuration options:
-    The following are surfaced as configurable parameters in the Broad WDL. Other
-    parameters hardcoded in the WDL are also hardcoded in this pipeline.
+        The following are surfaced as configurable parameters in the Broad WDL. Other
+        parameters hardcoded in the WDL are also hardcoded in this pipeline.
         mito_snv.vaf_filter_threshold: "Hard threshold for filtering low VAF sites"
         mito_snv.f_score_beta: "F-Score beta balances the filtering strategy between
             recall and precision. The relative weight of recall to precision."
+
     Not Implemented:
         - The Broad wdl allows for use of verifyBamID as a second input for contamination
             estimation. This has not been implemented yet but is probably a good idea.
@@ -309,11 +313,14 @@ class GenotypeMito(SequencingGroupStage):
         analysis = sequencing_group.dataset.analysis_prefix()
         return {
             'out_vcf': main / 'mito' / f'{sequencing_group.id}.mito.vcf',
-            'haplocheck_metrics': analysis / 'mito' / f'{sequencing_group.id}.haplocheck.txt',
+            'haplocheck_metrics': analysis
+            / 'mito'
+            / f'{sequencing_group.id}.haplocheck.txt',
         }
 
-    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-
+    def queue_jobs(
+        self, sequencing_group: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         # Mitochondrial specific reference files.
         mito_ref = get_batch().read_input_group(**MITO_REF)
         shifted_mito_ref = get_batch().read_input_group(**SHIFTED_MITO_REF)
@@ -323,16 +330,18 @@ class GenotypeMito(SequencingGroupStage):
         # Get input resources
         non_shifted_cram = get_batch().read_input_group(
             cram=str(inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram')),
-            crai=str(inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram')) + '.crai',
-            )
+            crai=str(inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram'))
+            + '.crai',
+        )
         shifted_cram = get_batch().read_input_group(
             cram=str(inputs.as_path(sequencing_group, RealignMito, 'shifted_cram')),
-            crai=str(inputs.as_path(sequencing_group, RealignMito, 'shifted_cram')) + '.crai',
-            )
+            crai=str(inputs.as_path(sequencing_group, RealignMito, 'shifted_cram'))
+            + '.crai',
+        )
         if get_config()['mito_snv']['use_verifybamid']:
             verifybamid_output = get_batch().read_input(
                 str(inputs.as_path(sequencing_group, CramQC, 'verify_bamid')),
-                )
+            )
         else:
             verifybamid_output = None
 
@@ -412,7 +421,9 @@ class GenotypeMito(SequencingGroupStage):
         get_contamination_j = mito.get_contamination(
             b=get_batch(),
             vcf=split_multiallelics_j.output_vcf,
-            haplocheck_output=self.expected_outputs(sequencing_group)['haplocheck_metrics'],
+            haplocheck_output=self.expected_outputs(sequencing_group)[
+                'haplocheck_metrics'
+            ],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(get_contamination_j)
@@ -460,4 +471,6 @@ class GenotypeMito(SequencingGroupStage):
             str(self.expected_outputs(sequencing_group)['out_vcf']),
         )
 
-        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
+        return self.make_outputs(
+            sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs
+        )
