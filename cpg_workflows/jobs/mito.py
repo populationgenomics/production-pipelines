@@ -1,5 +1,5 @@
 """
-Create Hail Batch jobs to call mitochondrial SNVs
+Hail Batch jobs needed to call mitochondrial SNVs
 """
 import hailtop.batch as hb
 from hailtop.batch.job import Job
@@ -9,9 +9,6 @@ from cpg_utils.hail_batch import image_path, fasta_res_group
 from cpg_utils.hail_batch import command
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.filetypes import CramPath
-from cpg_workflows.utils import can_reuse
-
-from cpg_workflows.jobs import picard
 
 
 def subset_cram_to_chrM(
@@ -23,14 +20,14 @@ def subset_cram_to_chrM(
     Extract read pairs with at least one read mapping to chrM
 
     Specific config for selection of which reads to extract may influence the impact of
-    NUMTs. Because of this we stick to the exact command used by Broad until we know
-    better.
+    NUMTs. Because of this we stick to the exact command used by Broad until we have a
+    good reason not to.
 
     Args:
         cram_path: Input cram to extract chrM reads from.
 
     Outputs:
-        output_bam: a ResourceGroup containing bam of reads mapped to chrM
+        job.output_bam: a ResourceGroup containing bam of reads mapped to chrM
 
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/330c59a5bcda6a837a545afd2d453361f373fae3/scripts/mitochondria_m2_wdl/MitochondriaPipeline.wdl#LL188-L244C2
@@ -52,15 +49,13 @@ def subset_cram_to_chrM(
         }
     )
 
-    # We are only accessing a fraction fof the genome. Mounting is the best option.
+    # We are only accessing a tiny fraction of the genome. Mounting is the best option.
     bucket = cram_path.path.drive
-    print(f'bucket = {bucket}')
     bucket_mount_path = to_path('/bucket')
     j.cloudfuse(bucket, str(bucket_mount_path), read_only=True)
     mounted_cram_path = bucket_mount_path / '/'.join(cram_path.path.parts[2:])
 
     cmd = f"""
-
         gatk PrintReads \
             -R {reference.base} \
             -L chrM \
@@ -71,7 +66,7 @@ def subset_cram_to_chrM(
 
     """
 
-    j.command(command(cmd, define_retry_function=True))
+    j.command(command(cmd))
     return j
 
 
@@ -91,9 +86,10 @@ def mito_realign(
     Args:
         sequencing_group_id: CPG sequencing_group id for inclusion in RG header
         input_bam: Bam for realignment
+        mito_ref: Resource group containing the mito genome and bwa index to align to
 
     Outputs:
-        output_cram: A sorted cram
+        job.output_cram: A sorted cram
 
     Bwa command from:
     https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignmentPipeline.wdl#L59
@@ -117,7 +113,7 @@ def mito_realign(
         samtools view -bSu -T {mito_ref.base} - | \
         samtools sort -o {j.output_cram}
         """
-    j.command(command(cmd, define_retry_function=True))
+    j.command(command(cmd))
 
     return j
 
@@ -168,12 +164,6 @@ def collect_coverage_metrics(
             INCLUDE_BQ_HISTOGRAM=true \
             THEORETICAL_SENSITIVITY_OUTPUT={j.theoretical_sensitivity}
 
-            # TODO: build an picard image with R to extract values
-            # R --vanilla <<CODE
-            # df = read.table("metrics.txt",skip=6,header=TRUE,stringsAsFactors=FALSE,sep='\t',nrows=1)
-            # write.table(floor(df[,"MEAN_COVERAGE"]), "mean_coverage.txt", quote=F, col.names=F, row.names=F)
-            # write.table(df[,"MEDIAN_COVERAGE"], "median_coverage.txt", quote=F, col.names=F, row.names=F)
-            # CODE
     """
 
     j.command(command(cmd))
@@ -181,6 +171,56 @@ def collect_coverage_metrics(
         b.write_output(j.metrics, str(metrics))
     if metrics:
         b.write_output(j.theoretical_sensitivity, str(theoretical_sensitivity))
+
+    return j
+
+
+def extract_coverage_mean(
+    b,
+    metrics: hb.ResourceFile,
+    mean_path: Path | None = None,
+    median_path: Path | None = None,
+    job_attrs: dict | None = None,
+) -> Job:
+    """
+    Extract mean and median coverage values for sequencing group
+
+    Args:
+        metrics: CollectWgsMetrics metrics output to process.
+        mean_path: Output path for mean file.
+        median_path: Output path for median file.
+
+    Outputs:
+        job.mean_coverage: mean coverage of chrM
+        job.median_coverage: median coverage of chrM
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_job('extract_coverage_mean', job_attrs)
+
+    res = STANDARD.request_resources(ncpu=2)
+    res.set_to_job(j)
+
+    cmd = f"""
+        R --vanilla <<CODE
+        df = read.table(
+            "{metrics}",skip=6,header=TRUE,stringsAsFactors=FALSE,sep='\\\t',nrows=1
+        )
+        write.table(
+            floor(df[,"MEAN_COVERAGE"]),
+            "{j.mean_coverage}",
+            quote=F, col.names=F, row.names=F)
+        write.table(
+            df[,"MEDIAN_COVERAGE"],
+            "{j.median_coverage}",
+            quote=F, col.names=F, row.names=F)
+        CODE
+    """
+
+    j.command(command(cmd))
+    if mean_path:
+        b.write_output(j.mean, str(mean_path))
+    if median_path:
+        b.write_output(j.median, str(median_path))
 
     return j
 
@@ -193,8 +233,16 @@ def coverage_at_every_base(
     job_attrs: dict | None = None,
 ) -> Job:
     """
+    Run picard CollectHsMetrics to calculate read coverage at each base.
 
+    Args:
+        cram: Input cram
+        reference: Cram reference genome
+        intervals_list: intervals list of target region
 
+    Outputs:
+        job.per_base_coverage
+        job.hs_metics_out
     """
     job_attrs = job_attrs or {}
     j = b.new_job('coverage_at_every_base', job_attrs)
@@ -239,7 +287,7 @@ def merge_coverage(
         merged_coverage: Path to write merged coverage tsv.
 
     Outputs:
-        merged_coverage: Merged coverage tsv.
+        job.merged_coverage: Merged coverage tsv.
     """
     job_attrs = job_attrs or {}
     j = b.new_job('merge_coverage', job_attrs)
@@ -267,7 +315,7 @@ def merge_coverage(
 
       non_control_region = read.table("{non_cr_coverage}", header=T)
       combined_table = rbind(beginning, non_control_region, end)
-      write.table(combined_table, "{j.merged_coverage}", row.names=F, col.names=T, quote=F, sep="\t")
+      write.table(combined_table, "{j.merged_coverage}", row.names=F, col.names=T, quote=F, sep="\\\t")
 
     CODE
     """
