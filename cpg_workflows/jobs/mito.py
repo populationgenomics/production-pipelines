@@ -218,9 +218,9 @@ def extract_coverage_mean(
 
     j.command(command(cmd))
     if mean_path:
-        b.write_output(j.mean, str(mean_path))
+        b.write_output(j.mean_coverage, str(mean_path))
     if median_path:
-        b.write_output(j.median, str(median_path))
+        b.write_output(j.median_coverage, str(median_path))
 
     return j
 
