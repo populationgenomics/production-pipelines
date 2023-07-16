@@ -198,14 +198,16 @@ def extract_coverage_mean(
     """
     job_attrs = job_attrs or {}
     j = b.new_job('extract_coverage_mean', job_attrs)
+    j.image(image_path('peer'))
 
     res = STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)
 
     cmd = f"""
-        R --vanilla <<CODE
+
+    R --vanilla <<CODE
         df = read.table(
-            "{metrics}",skip=6,header=TRUE,stringsAsFactors=FALSE,sep='\\\t',nrows=1
+            "{metrics}",skip=6,header=TRUE,stringsAsFactors=FALSE,sep='\\\\t',nrows=1
         )
         write.table(
             floor(df[,"MEAN_COVERAGE"]),
