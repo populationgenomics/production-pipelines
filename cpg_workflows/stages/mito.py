@@ -468,7 +468,7 @@ class GenotypeMito(SequencingGroupStage):
         # Write the final vcf to the bucket
         output_vcf_root = str(
             self.expected_outputs(sequencing_group)['out_vcf']
-        ).replace('.g.vcf.gz', '')
+        ).replace('.vcf.bgz', '')
 
         get_batch().write_output(
             split_multiallelics_j.output_vcf,
