@@ -12,6 +12,7 @@ from .. import update_dict, set_config
 from os import makedirs
 import os.path
 
+
 def get_toml(tmp_path) -> str:
     return f"""
     [workflow]
@@ -126,12 +127,13 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     
     # Capture the trim command
     cmd_str_list = []
+
     def capture_trim_cmd(*args, **kwargs) -> list[Job]:
         trim_job = trim(*args, **kwargs)
         cmd_str_list.append(
-            "===== FASTQ TRIM JOB START =====\n\n" +
-            "\n".join(trim_job._command) +
-            "\n\n===== FASTQ TRIM JOB END =====\n\n"
+            '===== FASTQ TRIM JOB START =====\n\n' +
+            '\n'.join(trim_job._command) +
+            '\n\n===== FASTQ TRIM JOB END =====\n\n'
         )
         return trim_job
 

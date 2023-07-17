@@ -22,6 +22,7 @@ from os.path import basename
 import re
 from dataclasses import dataclass
 
+
 def get_trim_inputs(sequencing_group: SequencingGroup) -> FastqPairs | None:
     """
     Get the input FASTQ file pairs for trimming
