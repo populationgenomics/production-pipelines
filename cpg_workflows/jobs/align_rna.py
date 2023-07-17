@@ -77,7 +77,6 @@ class STAR:
             self.move_output_command = f' > {output_path}'
         else:
             self.move_output_command = ''
-        
 
     def __str__(self):
         return ' '.join(self.command) + self.move_output_command
@@ -228,9 +227,10 @@ def merge_bams(
     merge_tool = 'samtools'
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=merge_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
-    cmd = f'samtools merge -@ {nthreads - 1} -o {j.merged_bam} {" ".join(input_bams)}'
+    cmd = f'samtools merge -@ {nthreads - 1} -o {j.merged_bam} {" ".join([str(b) for b in input_bams])}'
     j.command(command(cmd, monitor_space=True))
     return j
+
 
 def sort_index_bam(
     b: hb.Batch,

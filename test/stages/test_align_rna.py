@@ -12,6 +12,7 @@ from .. import update_dict, set_config
 from os import makedirs
 import os.path
 
+
 def get_toml(tmp_path) -> str:
     return f"""
     [workflow]
@@ -146,23 +147,24 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     
     # Capture the trim command
     cmd_str_list = []
+
     def capture_trim_cmd(*args, **kwargs) -> list[Job]:
         trim_job = trim(*args, **kwargs)
         cmd_str_list.append(
-            "===== FASTQ TRIM JOB START =====\n\n" +
-            "\n".join(trim_job._command) +
-            "\n\n===== FASTQ TRIM JOB END =====\n\n"
+            '===== FASTQ TRIM JOB START =====\n\n' +
+            '\n'.join(trim_job._command) +
+            '\n\n===== FASTQ TRIM JOB END =====\n\n'
         )
         return trim_job
     
     def capture_align_cmd(*args, **kwargs) -> list[Job]:
         align_jobs = align(*args, **kwargs)
         cmd_str_list.append(
-            "===== ALIGN STAGE START =====\n\n" +
+            '===== ALIGN STAGE START =====\n\n' +
             '----- Align sub-job start -----\n\n' +
             '\n\n----- Align sub-job end\n\n-----Align sub-job start -----\n\n'.join(['\n'.join(j._command) for j in align_jobs]) +
             '\n\n----- Align sub-job end -----\n\n'
-            "\n\n===== ALIGN STAGE END =====\n\n"
+            '\n\n===== ALIGN STAGE END =====\n\n'
         )
         return align_jobs
 
@@ -209,10 +211,13 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     sample_list = get_cohort().get_sequencing_groups()
 
     # The number of FASTQ trim jobs should equal the number of FASTQ pairs
-    n_trim_jobs_list = [
-        len(s.alignment_input_by_seq_type.get('rna'))
+    alignment_input_list = [
+        s.alignment_input_by_seq_type.get('rna')
         for s in sample_list
-        if isinstance(s.alignment_input_by_seq_type.get('rna'), FastqPairs)
+    ]
+    n_trim_jobs_list = [
+        len(i) if isinstance(i, FastqPairs) else 0
+        for i in alignment_input_list
     ]
     n_trim_jobs = sum(n_trim_jobs_list)
     assert trim_job['job_n'] == n_trim_jobs
@@ -222,9 +227,8 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     # + 1 if there are multiple FASTQ pairs (for merging the BAMs)
     # + 1 for the final sort and index job
     n_align_jobs_list = [
-        len(s.alignment_input_by_seq_type.get('rna')) + int(len(s.alignment_input_by_seq_type.get('rna')) > 1) + 1
-        for s in sample_list
-        if isinstance(s.alignment_input_by_seq_type.get('rna'), FastqPairs)
+        len(i) + int(len(i) > 1) + 1 if isinstance(i, FastqPairs) else 0
+        for i in alignment_input_list
     ]
     n_align_jobs = sum(n_align_jobs_list)
     assert align_job['job_n'] + samtools_job['job_n'] == n_align_jobs

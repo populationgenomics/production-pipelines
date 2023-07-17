@@ -3,6 +3,7 @@ Align RNA-seq reads to the genome using STAR.
 """
 
 import logging
+from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_workflows import get_batch
 from cpg_workflows.targets import SequencingGroup
@@ -11,7 +12,6 @@ from cpg_workflows.workflow import (
     stage,
     StageInput,
     StageOutput,
-    SequencingGroup,
     SequencingGroupStage,
 )
 from cpg_workflows.filetypes import (
@@ -33,7 +33,7 @@ def get_alignment_inputs(sequencing_group: SequencingGroup, inputs: StageInput) 
         for k, v in inputs.as_dict(sequencing_group, Trim).items()
         if k.startswith('fastq_')
     }
-    input_fastq_pairs_dict = {}
+    input_fastq_pairs_dict: dict[str, dict[str, Path]] = {}
     for fq in input_fastqs:
         prefix = re.sub(r'_R[12]$', '', fq)
         if prefix not in input_fastq_pairs_dict:
@@ -60,7 +60,7 @@ class AlignRNA(SequencingGroupStage):
     Align RNA-seq FASTQ reads with STAR
     """
 
-    def expected_outputs(self, sequencing_group: SequencingGroup) -> ExpectedResultT:
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         """
         Expect a pair of BAM and BAI files, one per set of input FASTQ files
         """
