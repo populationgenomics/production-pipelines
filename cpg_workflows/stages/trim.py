@@ -126,7 +126,7 @@ class Trim(SequencingGroupStage):
                 if j:
                     jobs.append(j)
             except trim.MissingFastqInputException:
-                if get_config()['workflow'].get('skip_samples_with_missing_input'):
+                if get_config()['workflow'].get('skip_sgs_with_missing_input'):
                     logging.error(f'No FASTQ inputs, skipping sample {sequencing_group}')
                     sequencing_group.active = False
                     return self.make_outputs(sequencing_group, skipped=True)  # return empty output
