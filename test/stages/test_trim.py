@@ -174,7 +174,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
 
     # The number of FASTQ trim jobs should equal the number of FASTQ pairs
     n_trim_jobs_list = [
-        len(s.alignment_input_by_seq_type.get('rna'))
+        len(s.alignment_input_by_seq_type.get('rna') or [])
         for s in sample_list
         if isinstance(s.alignment_input_by_seq_type.get('rna'), FastqPairs)
     ]
