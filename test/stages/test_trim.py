@@ -177,13 +177,8 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
         s.alignment_input_by_seq_type.get('rna')
         for s in sample_list
     ]
-    alignment_input_list = [
-        i
-        for i in alignment_input_list
-        if isinstance(i, FastqPairs)
-    ]
     n_trim_jobs_list = [
-        len(i)
+        len(i) if isinstance(i, FastqPairs) else 0
         for i in alignment_input_list
     ]
     n_trim_jobs = sum(n_trim_jobs_list)
