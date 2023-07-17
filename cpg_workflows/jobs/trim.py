@@ -75,7 +75,7 @@ class Cutadapt:
         self,
         input_fastq_pair: FastqPair,
         output_fastq_pair: FastqPair,
-        adapter_type: AdapterPairs | None = None,
+        adapter_type: str,
         paired: bool = True,
         min_length: int = 50,
         two_colour: bool = True,
@@ -125,7 +125,7 @@ class Fastp:
         self,
         input_fastq_pair: FastqPair,
         output_fastq_pair: FastqPair,
-        adapter_type: AdapterPairs | None = None,
+        adapter_type: str,
         paired: bool = True,
         min_length: int = 50,
         polyG: bool = True,
@@ -163,9 +163,9 @@ class Fastp:
 def trim(
     b: hb.Batch,
     sequencing_group: SequencingGroup,
+    input_fq_pair: FastqPair,
+    output_fq_pair: FastqPair,
     job_attrs: dict | None = None,
-    input_fq_pair: FastqPair | None = None,
-    output_fq_pair: FastqPair | None = None,
     extra_label: str | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
@@ -194,6 +194,11 @@ def trim(
             f" for job type '{base_job_name}'; sequencing type must be 'rna'"
         )
     
+    try:
+        adapter_type = get_config()['trim']['adapter_type']
+    except KeyError:
+        raise ValueError('No adapter type specified in config file')
+    
     trim_tool = 'fastp'
 
     trim_j_name = base_job_name
@@ -205,7 +210,7 @@ def trim(
             r1=trim_j.output_r1,
             r2=trim_j.output_r2,
         ),
-        adapter_type=get_config()['trim']['adapter_type'],
+        adapter_type=adapter_type,
         paired=True,
         min_length=50,
         polyG=True,

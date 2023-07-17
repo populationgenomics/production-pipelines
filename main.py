@@ -30,6 +30,7 @@ from cpg_workflows.stages.happy_validation import (
     ValidationHappyOnVcf,
     ValidationParseHappy
 )
+from cpg_workflows.stages.trim import Trim
 
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
@@ -50,6 +51,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         MergeBatchSites
     ],  # stage to run between FilterBatch & GenotypeBatch
     'gatk_sv_multisample_2': [AnnotateVcf],
+    'rare_disease_rnaseq': [Trim],
 }
 
 

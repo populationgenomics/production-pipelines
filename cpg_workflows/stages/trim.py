@@ -22,7 +22,8 @@ from os.path import basename
 import re
 from dataclasses import dataclass
 
-def get_trim_inputs(sequencing_group: SequencingGroup) -> FastqPairs:
+
+def get_trim_inputs(sequencing_group: SequencingGroup) -> FastqPairs | None:
     """
     Get the input FASTQ file pairs for trimming
     """
@@ -57,7 +58,7 @@ def get_input_output_pairs(sequencing_group: SequencingGroup) -> list[InOutFastq
     """
     inputs = get_trim_inputs(sequencing_group)
     if not inputs or not isinstance(inputs, FastqPairs):
-        return None
+        return []
     prefix = sequencing_group.dataset.prefix() / 'trim'
     trim_suffix = '.trimmed.fastq.gz'
     input_output_pairs = []
@@ -126,7 +127,7 @@ class Trim(SequencingGroupStage):
                 if j:
                     jobs.append(j)
             except trim.MissingFastqInputException:
-                if get_config()['workflow'].get('skip_samples_with_missing_input'):
+                if get_config()['workflow'].get('skip_sgs_with_missing_input'):
                     logging.error(f'No FASTQ inputs, skipping sample {sequencing_group}')
                     sequencing_group.active = False
                     return self.make_outputs(sequencing_group, skipped=True)  # return empty output
