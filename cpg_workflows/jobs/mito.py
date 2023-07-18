@@ -38,8 +38,7 @@ def subset_cram_to_chrM(
     j = b.new_job('subset_cram_to_chrM', job_attrs)
     j.image(image_path('gatk'))
 
-    res = STANDARD.request_resources(ncpu=2)
-    res.set_to_job(j)
+    STANDARD.set_resources(j, ncpu=2)
 
     reference = fasta_res_group(b)
     j.declare_resource_group(
@@ -169,7 +168,7 @@ def collect_coverage_metrics(
     j.command(command(cmd))
     if metrics:
         b.write_output(j.metrics, str(metrics))
-    if metrics:
+    if theoretical_sensitivity:
         b.write_output(j.theoretical_sensitivity, str(theoretical_sensitivity))
 
     return j
@@ -244,7 +243,7 @@ def coverage_at_every_base(
 
     Outputs:
         job.per_base_coverage
-        job.hs_metics_out
+        job.hs_metrics_out
     """
     job_attrs = job_attrs or {}
     j = b.new_job('coverage_at_every_base', job_attrs)
@@ -258,7 +257,7 @@ def coverage_at_every_base(
       I={cram.cram} \
       R={reference.base} \
       PER_BASE_COVERAGE={j.per_base_coverage} \
-      O={j.hs_metics_out} \
+      O={j.hs_metrics_out} \
       TI={intervals_list} \
       BI={intervals_list} \
       COVMAX=20000 \
