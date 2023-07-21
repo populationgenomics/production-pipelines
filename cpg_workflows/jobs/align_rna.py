@@ -95,12 +95,43 @@ class STAR:
         return read_group_line.strip()
     
 
+class GCPStarReference:
+    def __init__(
+            self,
+            b: hb.Batch,
+            genome_prefix: str | Path
+        ):
+        gp = re.sub(r'/+$', '', genome_prefix)
+        self.genome_files = {'prefix': gp}
+        self.genome_files.update({
+            key: f'{gp}/{file}'
+            for key, file in {
+                'chr_len': 'chrLength.txt',
+                'chr_name_len': 'chrNameLength.txt',
+                'chr_name': 'chrName.txt',
+                'chr_start': 'chrStart.txt',
+                'exon_ge_tr_info': 'exonGeTrInfo.tab',
+                'exon_info': 'exonInfo.tab',
+                'gene_info': 'geneInfo.tab',
+                'genome': 'Genome',
+                'genome_params': 'genomeParameters.txt',
+                'sa': 'SA',
+                'sa_idx': 'SAindex',
+                'sjdb_info': 'sjdbInfo.txt',
+                'sjdb_list_gtf': 'sjdbList.fromGTF.out.tab',
+                'sjdb_list': 'sjdbList.out.tab',
+                'transcript_info': 'transcriptInfo.tab',
+            }.items()
+        })
+        self.genome_res_group = b.read_input_group(**self.genome_files)
+    
+
 def align(
     b: hb.Batch,
     fastq_pairs: FastqPairs,
     output_bam: BamPath,
     sample_name: str,
-    genome_dir: str | Path,
+    genome_prefix: str | Path,
     extra_label: str | None = None,
     job_attrs: dict | None = None,
     overwrite: bool = False,
@@ -133,7 +164,7 @@ def align(
             b=b,
             fastq_pair=fq_pair,
             sample_name=sample_name,
-            genome_dir=genome_dir,
+            genome_prefix=genome_prefix,
             extra_label=label,
             job_attrs=job_attrs,
             requested_nthreads=requested_nthreads,
@@ -174,7 +205,7 @@ def align_fq_pair(
     b: hb.Batch,
     fastq_pair: FastqPair,
     sample_name: str,
-    genome_dir: str | Path,
+    genome_prefix: str | Path,
     extra_label: str | None = None,
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
@@ -192,10 +223,11 @@ def align_fq_pair(
     align_tool = 'STAR'
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=align_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
+    star_ref = GCPStarReference(b=b, genome_prefix=genome_prefix)
     star = STAR(
         input_fastq_pair=fastq_pair,
         sample_name=sample_name,
-        genome_dir=genome_dir,
+        genome_dir=star_ref.genome_res_group.prefix,
         nthreads=(nthreads - 1),
         output_path=j.output_bam,
         bamout=True,
