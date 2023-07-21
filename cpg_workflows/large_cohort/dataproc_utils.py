@@ -3,6 +3,8 @@ Utils for submitting the workflow to a Dataproc cluster.
 """
 
 import math
+from typing import Sequence
+
 from analysis_runner import dataproc
 from hailtop.batch.job import Job
 
@@ -34,7 +36,7 @@ def dataproc_job(
     function_str_args: list[str] | None = None,
     preemptible: bool = True,
     num_workers: int | None = None,
-    depends_on: list[Job | None] = None,
+    depends_on: Sequence[Job | None] | None = None,
     autoscaling_policy: str | None = None,
     long: bool = False,
     worker_boot_disk_size: int | None = None,

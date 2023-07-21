@@ -836,7 +836,7 @@ def stage(
 def skip(
     _fun: Optional[StageDecorator] = None,
     *,
-    reason: str = None,
+    reason: str | None = None,
     assume_outputs_exist: bool = False,
 ) -> Union[StageDecorator, Callable[..., StageDecorator]]:
     """
