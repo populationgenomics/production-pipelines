@@ -89,7 +89,7 @@ class AlignRNA(SequencingGroupStage):
                 fastq_pairs=input_fastq_pairs,
                 output_bam=output_bam,
                 sample_name=sequencing_group.id,
-                genome_dir=get_config()['references'].get('star_ref_dir'),
+                genome_prefix=get_config()['references'].get('star_ref_dir'),
                 job_attrs=self.get_job_attrs(sequencing_group),
                 overwrite=sequencing_group.forced,
             )
