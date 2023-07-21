@@ -7,7 +7,7 @@ from cpg_utils import to_path
 from unittest.mock import mock_open
 from pytest_mock import MockFixture
 
-from .. import update_dict, set_config
+from . import update_dict, set_config
 
 from os import makedirs
 import os.path
@@ -69,7 +69,7 @@ def get_toml(tmp_path) -> str:
 
 
 DEFAULT_CONFIG = Path(
-    to_path(__file__).parent.parent.parent / 'cpg_workflows' / 'defaults.toml'
+    to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml'
 )
 
 
