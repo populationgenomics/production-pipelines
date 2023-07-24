@@ -9,6 +9,4 @@ SequencingGroupId = str
 
 SequencingGroupExternalId = str
 
-SequencingGroupExternalName = str
-
 DatasetId = str

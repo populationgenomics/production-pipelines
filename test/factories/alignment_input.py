@@ -1,6 +1,3 @@
-from enum import Enum
-from typing import Optional
-
 from cloudpathlib import CloudPath
 from cpg_utils import Path, to_path
 
@@ -201,7 +198,7 @@ def create_cram_input(
     location: str | Path,
     prefix: str = 'SAMPLE1',
     index: bool = True,
-    reference_assembly: Optional[str | Path] = 'GRCh38.fa',
+    reference_assembly: str | Path | None = 'GRCh38.fa',
     create: bool = False,
 ) -> CramPath:
     """
@@ -218,7 +215,7 @@ def create_cram_input(
         prefix (str, optional):
             String to prefix cram and crai file names with. Defaults to 'SAMPLE1'.
 
-        reference_assembly (str | Path, optional):
+        reference_assembly (str | Path | None, optional):
             Path to a fasta file or a string representing a file name without a path.
             If a `str` is provided, the corresponding reference assembly path will be
             set to `'{location}/{reference_assembly}'` and created if `create` is

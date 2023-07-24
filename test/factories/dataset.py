@@ -1,4 +1,4 @@
-from typing import Iterable, Optional
+from typing import Sequence, Optional
 
 from cpg_workflows.targets import Cohort, Dataset, SequencingGroup
 
@@ -10,8 +10,8 @@ DEFAULT_DATASET_NAME: DatasetId = 'local-test'
 
 def create_dataset(
     name: DatasetId = DEFAULT_DATASET_NAME,
-    cohort: Optional[Cohort] = None,
-    sequencing_groups: Optional[Iterable[SequencingGroup]] = None,
+    cohort: Cohort | None = None,
+    sequencing_groups: Sequence[SequencingGroup] | None = None,
     active: bool = True,
     forced: bool = False,
 ) -> Dataset:
@@ -27,7 +27,7 @@ def create_dataset(
         cohort (Cohort | None, optional):
             The cohort to add the dataset to. Defaults to `None`.
 
-        sequencing_groups (Iterable[SequencingGroup] | None, optional):
+        sequencing_groups (Sequence[SequencingGroup] | None, optional):
             An iterable of sequencing groups to add to the dataset. Defaults to `None`.
 
         active (bool, optional):

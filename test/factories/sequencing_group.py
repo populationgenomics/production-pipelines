@@ -7,7 +7,6 @@ from .dataset import DEFAULT_DATASET_NAME
 from .types import (
     DatasetId,
     SequencingGroupExternalId,
-    SequencingGroupExternalName,
     SequencingGroupId,
     SequencingType,
 )
@@ -16,15 +15,15 @@ from .types import (
 def create_sequencing_group(
     id: SequencingGroupId = 'CPG000001',
     external_id: SequencingGroupExternalId = 'SAMPLE1',
-    participant_id: SequencingGroupExternalName | None = None,
     dataset: DatasetId | Dataset = DEFAULT_DATASET_NAME,
+    participant_id: str | None = None,
     meta: dict | None = None,
     sex: Sex | None = None,
-    pedigree: Optional[PedigreeInfo] = None,
+    pedigree: PedigreeInfo | None = None,
     sequencing_type: SequencingType = 'genome',
-    alignment_input: Optional[FastqPair | FastqPairs | CramPath | BamPath] = None,
-    gvcf: Optional[GvcfPath | Literal['auto']] = None,
-    cram: Optional[CramPath | Literal['auto']] = None,
+    alignment_input: FastqPair | FastqPairs | CramPath | BamPath | None = None,
+    gvcf: GvcfPath | Literal['auto'] | None = None,
+    cram: CramPath | Literal['auto'] | None = None,
     forced: bool = False,
     active: bool = True,
 ) -> SequencingGroup:
@@ -38,19 +37,19 @@ def create_sequencing_group(
         external_id (SequencingGroupExternalId):
             The external ID of the sequencing group. Defaults to `SAMPLE1`.
 
-        participant_id (SequencingGroupExternalName, optional):
-            The participant ID of the sequencing group. Defaults to `None`.
-
         dataset (DatasetId | Dataset):
             The dataset associated with the sequencing group. Defaults to `local-test`.
 
-        meta (dict, optional):
+        participant_id (SequencingGroupExternalName | None, optional):
+            The participant ID of the sequencing group. Defaults to `None`.
+
+        meta (dict | None, optional):
             Metadata dictionary for the sequencing group. Defaults to `None`.
 
-        sex (Sex, optional):
+        sex (Sex | None, optional):
             PED format SEX field for the sequencing group. Defaults to `None`.
 
-        pedigree (PedigreeInfo, optional):
+        pedigree (PedigreeInfo | None, optional):
             A pedigree information instance describing how this sequencing group
             is related to other sequencing groups in a cohort or dataset. Defaults to
             `None`.
@@ -59,11 +58,11 @@ def create_sequencing_group(
             The type of sequencing performed used as the key in the property
             `alignment_input_by_seq_type` on the new instance. Defaults to 'genome'.
 
-        alignment_input (FastqPair | FastqPairs | CramPath | BamPath, optional):
+        alignment_input (FastqPair | FastqPairs | CramPath | BamPath | None, optional):
             The alignment input data. Defaults to `None`. If `None`, the property
             `alignment_input_by_seq_type` on the new instance will be `None`.
 
-        gvcf (GvcfPath | Literal['auto'], optional):
+        gvcf (GvcfPath | Literal['auto'] | None, optional):
             Path to a gVCF file path for the sequencing group that will be used to save
             genotyping stage output to. It's meant be used as an alternative to the
             method `make_gvcf_path` on this instance if you want to use a different
@@ -71,7 +70,7 @@ def create_sequencing_group(
             'default' key in storage configuration option for the parent dataset passed
             in via `dataset`. Defaults to `None`.
 
-        cram (CramPath | Literal['auto'], optional):
+        cram (CramPath | Literal['auto'] | None, optional):
             Path to a CRAM file for the sequencing group that will be used to
             save alignment stage output to. It's meant be used as an alternative to the
             method `make_cram_path` on this instance if you want to use a different

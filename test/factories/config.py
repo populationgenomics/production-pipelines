@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass, field
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from cpg_utils import Path
 
@@ -39,78 +39,78 @@ class WorkflowConfig:
     access_level: Literal['main', 'test'] = 'test'
 
     # Possibly unused, or used by cpg_utils somewhere?
-    dataset_gcp_project: Optional[str] = None
+    dataset_gcp_project: str | None = None
 
     # Description of the workflow (to display in the Batch GUI)
-    description: Optional[str] = None
+    description: str | None = None
 
     # Name of the workflow passed to Hail Batch instance
-    name: Optional[str] = None
+    name: str | None = None
 
     # List of dataset IDs that will be processed during this analysis. Leave blank
     # if the input dataset is the dataset being processed.
-    input_datasets: Optional[list[DatasetId]] = None
+    input_datasets: list[DatasetId] | None = None
 
     # Version of this analysis... Not sure versioning is implemented yet.
-    output_version: Optional[str] = None
+    output_version: str | None = None
 
     # Reference fasta file path to use instead of Broad's reference.
-    ref_fasta: Optional[str | Path] = None
+    ref_fasta: str | Path | None = None
 
     # Skip quality control stages
-    skip_qc: Optional[bool] = None
+    skip_qc: bool | None = None
 
     # We only support one status reporter right now, and that is Metamist.
-    status_reporter: Optional[Literal['metamist']] = None
+    status_reporter: Literal['metamist'] | None = None
 
-    path_scheme: Optional[str] = None  # Possibly unused
-    local_dir: Optional[str] = None  # Possibly unused
+    path_scheme: str | None = None  # Possibly unused
+    local_dir: str | None = None  # Possibly unused
 
     # ---- Stage specific resources
-    resources: Optional[dict[StageName, dict[str, Any]]] = None
+    resources: dict[StageName, dict[str, Any]] | None = None
 
     # ---- Technical
     # The driver image use when running an analysis on Hail Batch. Not used locally.
-    driver_image: Optional[str] = None
+    driver_image: str | None = None
 
     # Only computes DAG of stages to run, but doesn't call methods to queue jobs.
-    dry_run: Optional[bool] = None
+    dry_run: bool | None = None
 
     # Request high memory compute instances
-    highmem_workers: Optional[bool] = None
+    highmem_workers: bool | None = None
 
     # ---- Checks
     # Check input file existence (e.g. FASTQ files). When they are missing, the
     # `skip_sgs_with_missing_input` option controls whether such sequencing groups
     #  should be ignored, or it should cause raising an error. Defaults to `True`.
-    check_inputs: Optional[bool] = None
+    check_inputs: bool | None = None
 
     # Within jobs, check all in-job intermediate files for possible reuse. If set to
     # `False`, will overwrite all intermediates. Used by `utils.can_reuse(path)`.
     # Defaults to `True` in `utils.can_reuse(path)`, but stages may override this.
-    check_intermediates: Optional[bool] = None
+    check_intermediates: bool | None = None
 
     # Before running a stage, check if its outputs already exist. If they exist,
     # then do not run this stage. Defaults to `False`.
-    check_expected_outputs: Optional[bool] = None
+    check_expected_outputs: bool | None = None
 
     # ---- Stages
-    first_stages: Optional[list[StageName]] = None
-    last_stages: Optional[list[StageName]] = None
-    only_stages: Optional[list[StageName]] = None
-    skip_stages: Optional[list[StageName]] = None
-    force_stages: Optional[list[StageName]] = None
+    first_stages: list[StageName] | None = None
+    last_stages: list[StageName] | None = None
+    only_stages: list[StageName] | None = None
+    skip_stages: list[StageName] | None = None
+    force_stages: list[StageName] | None = None
     # pylint: disable=invalid-name
-    allow_missing_outputs_for_stages: Optional[list[StageName]] = None
+    allow_missing_outputs_for_stages: list[StageName] | None = None
 
     # ---- Dataset options
-    skip_datasets: Optional[list[DatasetId]] = None
+    skip_datasets: list[DatasetId] | None = None
 
     # ---- Sequencing group options
-    skip_sgs: Optional[list[SequencingGroupId]] = None
-    only_sgs: Optional[list[SequencingGroupId]] = None
-    force_sgs: Optional[list[SequencingGroupId]] = None
-    skip_stages_for_sgs: Optional[dict[StageName, list[SequencingGroupId]]] = None
+    skip_sgs: list[SequencingGroupId] | None = None
+    only_sgs: list[SequencingGroupId] | None = None
+    force_sgs: list[SequencingGroupId] | None = None
+    skip_stages_for_sgs: dict[StageName, list[SequencingGroupId]] | None = None
 
     # For the first (not-skipped) stage, if the input for a sequencing group does not
     # exist, skip this instance instead of failing. For example, if the first stage is
@@ -118,20 +118,20 @@ class WorkflowConfig:
     # exist, remove this sequencing group (i.e the `active` attiribute will be set to
     # `False`), instead of failing. In other words, ignore sequencing groups that are
     # missing results from skipped stages that the non-skipped stage might require.
-    skip_sgs_with_missing_input: Optional[bool] = None
+    skip_sgs_with_missing_input: bool | None = None
 
     # ---- Other
-    realign_from_cram_version: Optional[str] = None
-    cram_version_reference: Optional[dict[str, str | Path]] = None
-    intervals_path: Optional[str | Path] = None
-    reblock_gq_bands: Optional[list[int]] = None
-    create_es_index_for_datasets: Optional[list[str]] = None
-    scatter_count: Optional[int] = None
-    scatter_count_genotype: Optional[int] = None
-    vds_version: Optional[str] = None
-    use_gnarly: Optional[bool] = None
-    use_as_vqsr: Optional[bool] = None
-    write_vcf: Optional[list[str]] = None
+    realign_from_cram_version: str | None = None
+    cram_version_reference: dict[str, str | Path] | None = None
+    intervals_path: str | Path | None = None
+    reblock_gq_bands: list[int] | None = None
+    create_es_index_for_datasets: list[str] | None = None
+    scatter_count: int | None = None
+    scatter_count_genotype: int | None = None
+    vds_version: str | None = None
+    use_gnarly: bool | None = None
+    use_as_vqsr: bool | None = None
+    write_vcf: list[str] | None = None
 
 
 @dataclass(kw_only=True)
@@ -144,7 +144,7 @@ class HailConfig:
             Runs Hail Batch in dry_run mode, meaning jobs are not executed. Defaults
             to `True`.
 
-        backend (Optional[Literal['batch', 'local']], optional):
+        backend (Literal['batch', 'local' | None], optional):
             Specifies which backend Hail Batch is initialised with. Use 'local' for
             local testing, and 'batch' for running on Google Cloud. Defaults to `local`.
 
@@ -152,28 +152,28 @@ class HailConfig:
             Specifies which backend Hail is initialised with when calling
             `cpg_utils.hail_batch.start_query_context`. Defaults to `spark`.
 
-        billing_project (Optional[str], optional):
+        billing_project (str | None, optional):
             The GCP billing project that Hail Batch will use to provision resources,
             and run jobs. Required if `backend` is set to `batch`. Defaults to `None`.
 
-        pool_label (Optional[str], optional):
+        pool_label (str | None, optional):
             Sets preemptible Hail Batch jobs' `_pool_label` attribute to this value.
             Defaults to `None`.
 
-        delete_scratch_on_exit (Optional[bool], optional):
+        delete_scratch_on_exit (bool | None, optional):
             If True, delete temporary directories containing intermediate files after
             the batch has finished executing. Defaults to `None`.
 
-        cancel_after_n_failures (Optional[int], optional):
+        cancel_after_n_failures (int | None, optional):
             Automatically cancel the batch after N failures have occurred. The default
             behavior is there is no limit on the number of failures. Only applicable
             if `backend` is set to `batch`. Must be greater than 0. Defaults to `None`.
 
-        default_memory (Optional[str], optional):
+        default_memory (str | None, optional):
             Memory setting to use by default if not specified by a Hail Batch Job
             instance. Defaults to `None`.
 
-        default_timeout (Optional[str], optional):
+        default_timeout (str | None, optional):
             Maximum time in seconds for a job to run before being killed. Only
             applicable if `backend` is set to `batch`. There is no timeout if this
             value is not set. Defaults to `None`.
@@ -182,12 +182,12 @@ class HailConfig:
     dry_run: bool = True
     backend: Literal['batch', 'local'] = 'local'
     query_backend: Literal['spark', 'batch', 'local', 'spark_local'] = 'spark'
-    billing_project: Optional[str] = None
-    pool_label: Optional[str] = None
-    delete_scratch_on_exit: Optional[bool] = True
-    cancel_after_n_failures: Optional[int] = None
-    default_memory: Optional[str] = None
-    default_timeout: Optional[str] = None
+    billing_project: str | None = None
+    pool_label: str | None = None
+    delete_scratch_on_exit: bool | None = True
+    cancel_after_n_failures: int | None = None
+    default_memory: str | None = None
+    default_timeout: str | None = None
 
 
 @dataclass(kw_only=True)
@@ -204,11 +204,11 @@ class StorageConfig:
     web_url = "https://main-web.populationgenomics.org.au/fewgenomes"
     """
 
-    default: Optional[str | Path] = None
-    analysis: Optional[str | Path] = None
-    tmp: Optional[str | Path] = None
-    web: Optional[str | Path] = None
-    web_url: Optional[str | Path] = None
+    default: str | Path | None = None
+    analysis: str | Path | None = None
+    tmp: str | Path | None = None
+    web: str | Path | None = None
+    web_url: str | Path | None = None
 
 
 def default_hail_config() -> HailConfig:
