@@ -482,8 +482,11 @@ class GenotypeMito(SequencingGroupStage):
 
 
 @stage(
-    required_stages=[RealignMito, GenotypeMito]
-    # TODO: add suitable analysis types
+    required_stages=[RealignMito, GenotypeMito],
+    analysis_type='web',
+    analysis_keys=[
+        'mitoreport',
+    ],
 )
 class MitoReport(SequencingGroupStage):
     """
