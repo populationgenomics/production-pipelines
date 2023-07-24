@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Any, Mapping, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import toml
 from cpg_utils import Path as AnyPath
@@ -67,7 +67,7 @@ def set_config(
             Defaults to `None`.
     """
     with path.open('w') as f:
-        if isinstance(config, Mapping):
+        if isinstance(config, dict):
             toml.dump(config, f, encoder=TomlAnyPathEncoder())
         elif isinstance(config, IDictRepresentable):
             toml.dump(config.as_dict(), f, encoder=TomlAnyPathEncoder())
