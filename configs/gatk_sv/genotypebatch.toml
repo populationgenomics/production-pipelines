@@ -1,5 +1,5 @@
 [workflow]
 only_stages = ['GenotypeBatch']
 # this will be a single VCF, combined across multiple sub-cohort VCF outputs
-cohort_depth_vcf = 'gs://cpg-seqr-main/gatk_sv/a5407cc508c8f25f960e1b52be1f31e740d289_119/MergeBatchSites/cohort_depth.vcf.gz'
-cohort_pesr_vcf = 'gs://cpg-seqr-main/gatk_sv/a5407cc508c8f25f960e1b52be1f31e740d289_119/MergeBatchSites/cohort_pesr.vcf.gz'
+cohort_depth_vcf = 'gs://cpg-seqr-main/gatk_sv/9beee5a0a2e112a018c97605699792d8082181_238/MergeBatchSites/cohort_depth.vcf.gz'
+cohort_pesr_vcf = 'gs://cpg-seqr-main/gatk_sv/9beee5a0a2e112a018c97605699792d8082181_238/MergeBatchSites/cohort_pesr.vcf.gz'

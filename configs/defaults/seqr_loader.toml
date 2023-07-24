@@ -28,8 +28,9 @@ write_vcf = ["udn-aus"]
 # Override default resource requirements for unusually large seq data without
 # demanding higher resources for all operations as standard. Examples below
 
-# picard override (int), GB to use in MarkDuplicates
-#picard = 100
+# picard MarkDuplicates overrides for unreasnobly large sequnce groups
+#picard_mem_gb = 100
+#picard_storage_gb = 350
 
 # haplotype caller overrides, see production-pipelines PR#381
 # defaults in code are 40 for genomes, none for exomes
