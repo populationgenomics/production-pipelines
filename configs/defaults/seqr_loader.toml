@@ -92,6 +92,6 @@ f_score_beta = 1.0
 # Sarah Stenton from Broad runs this pipline for seqr ingest and indicated they use a
 # threshold of 0.01 for seqr cohorts.
 vaf_filter_threshold = 0.01
-# Use verifybamid in adition to haplocheck for contamination estimate
+# Use verifybamid in addition to haplocheck for contamination estimate
 # Broad pipeline is not clear if this option is used by default?
 use_verifybamid = true
