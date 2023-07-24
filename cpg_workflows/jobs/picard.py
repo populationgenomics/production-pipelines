@@ -77,7 +77,7 @@ def get_intervals(
 
     cmd = f"""
     mkdir $BATCH_TMPDIR/out
-    
+
     picard -Xms1000m -Xmx1500m \
     IntervalListTools \
     SCATTER_COUNT={scatter_count} \
@@ -130,13 +130,19 @@ def markdup(
 
     j.image(image_path('picard'))
     resource = HIGHMEM.request_resources(ncpu=4)
-    # enough for input BAM and output CRAM
-    resource.attach_disk_storage_gb = 250
+
+    # check for a storage override for unreasonably large sequencing groups
+    if (storage_override := get_config()['resource_overrides'].get('picard_storage_gb')) is not None:
+        assert isinstance(storage_override, int)
+        resource.attach_disk_storage_gb = storage_override
+    else:
+        # enough for input BAM and output CRAM
+        resource.attach_disk_storage_gb = 250
     resource.set_to_job(j)
 
     # check for a memory override for impossible sequencing groups
     # if RAM is overridden, update the memory resource setting
-    if (memory_override := get_config()['resource_overrides'].get('picard')) is not None:
+    if (memory_override := get_config()['resource_overrides'].get('picard_mem_gb')) is not None:
         assert isinstance(memory_override, int)
         # Hail will select the right number of CPUs based on RAM request
         j.memory(f'{memory_override}G')
@@ -156,12 +162,15 @@ def markdup(
     TMP_DIR=$(dirname {j.output_cram.cram})/picard-tmp \\
     ASSUME_SORT_ORDER=coordinate
     echo "MarkDuplicates finished successfully"
+
+    rm {sorted_bam}
+
     samtools view --write-index -@{resource.get_nthreads() - 1} \\
     -T {fasta_reference.base} \\
     -O cram \\
     -o {j.output_cram.cram} \\
     {j.temp_bam}
-    echo "samtools view finished successfully" 
+    echo "samtools view finished successfully"
     """
     j.command(command(cmd, monitor_space=True))
 
@@ -225,7 +234,7 @@ def vcf_qc(
     SEQUENCE_DICTIONARY={reference['dict']} \
     TARGET_INTERVALS={intervals_file} \
     GVCF_INPUT={"true" if is_gvcf else "false"}
-    
+
     cp $BATCH_TMPDIR/prefix.variant_calling_summary_metrics {j.summary}
     cp $BATCH_TMPDIR/prefix.variant_calling_detail_metrics {j.detail}
     """
@@ -300,7 +309,7 @@ def picard_collect_metrics(
       PROGRAM=CollectQualityYieldMetrics \\
       METRIC_ACCUMULATION_LEVEL=null \\
       METRIC_ACCUMULATION_LEVEL=SAMPLE
-      
+
     ls $BATCH_TMPDIR/
     cp $BATCH_TMPDIR/prefix.alignment_summary_metrics {j.out_alignment_summary_metrics}
     cp $BATCH_TMPDIR/prefix.base_distribution_by_cycle_metrics {j.out_base_distribution_by_cycle_metrics}
@@ -361,9 +370,9 @@ def picard_hs_metrics(
     retry_gs_cp {str(cram_path.path)} $CRAM
     retry_gs_cp {str(cram_path.index_path)} $CRAI
 
-    # Picard is strict about the interval-list file header - contigs md5s, etc. - and 
-    # if md5s do not match the ref.dict file, picard would crash. So fixing the header 
-    # by converting the interval-list to bed (i.e. effectively dropping the header) 
+    # Picard is strict about the interval-list file header - contigs md5s, etc. - and
+    # if md5s do not match the ref.dict file, picard would crash. So fixing the header
+    # by converting the interval-list to bed (i.e. effectively dropping the header)
     # and back to interval-list (effectively re-adding the header from input ref-dict).
     # VALIDATION_STRINGENCY=SILENT does not help.
     picard IntervalListToBed \\
@@ -373,7 +382,7 @@ def picard_hs_metrics(
     I=$BATCH_TMPDIR/intervals.bed \\
     O=$BATCH_TMPDIR/intervals.interval_list \\
     SD={reference.dict}
-    
+
     picard -Xmx{res.get_java_mem_mb()}m \\
       CollectHsMetrics \\
       INPUT=$CRAM \\

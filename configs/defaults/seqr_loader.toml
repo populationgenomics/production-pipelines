@@ -28,8 +28,9 @@ write_vcf = ["udn-aus"]
 # Override default resource requirements for unusually large seq data without
 # demanding higher resources for all operations as standard. Examples below
 
-# picard override (int), GB to use in MarkDuplicates
-#picard = 100
+# picard MarkDuplicates overrides for unreasnobly large sequnce groups
+#picard_mem_gb = 100
+#picard_storage_gb = 350
 
 # haplotype caller overrides, see production-pipelines PR#381
 # defaults in code are 40 for genomes, none for exomes
@@ -37,7 +38,7 @@ write_vcf = ["udn-aus"]
 
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
-# sensitivities. The tool matches them internally to a VQSLOD score cutoff 
+# sensitivities. The tool matches them internally to a VQSLOD score cutoff
 # based on the model's estimated sensitivity to a set of true variants.
 snp_filter_level = 99.7
 indel_filter_level = 99.0
@@ -72,7 +73,7 @@ password_secret_id = 'seqr-es-password'
 password_project_id = 'seqr-308602'
 
 [stripy]
-# Analysis_type can be "standard" (fast) or "extended" (marginally slower 
+# Analysis_type can be "standard" (fast) or "extended" (marginally slower
 # but also uses unmapped reads for genotying)
 analysis_type = "extended"
 # See https://gitlab.com/andreassh/stripy-pipeline#list-of-loci

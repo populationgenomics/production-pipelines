@@ -119,7 +119,7 @@ def main(
     mt_path: str,
     es_index: str,
     done_flag_path: str,
-    password: str = None,
+    password: str | None = None,
 ):
     """
     Entry point.
