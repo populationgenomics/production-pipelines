@@ -116,7 +116,7 @@ class MakeCohortVcf(CohortStage):
 
         input_dict: dict[str, Any] = {
             'cohort_name': cohort.name,
-            'batches': [batch_names],
+            'batches': batch_names,
             'ped_file': make_combined_ped(cohort, self.prefix),
             'ref_dict': str(get_fasta().with_suffix('.dict')),
             'chr_x': 'chrX',

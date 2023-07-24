@@ -6,7 +6,7 @@ import pytest
 import pandas as pd
 
 from cpg_utils import to_path
-from cpg_workflows.jobs.sample_batching import batch_samples
+from cpg_workflows.jobs.sample_batching import batch_sgs
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_fasta,
     get_images,
@@ -115,7 +115,7 @@ def test_batch_samples():
     max_size = 5
 
     # generate batches
-    batches = batch_samples(qc_df, min_size, max_size)
+    batches = batch_sgs(qc_df, min_size, max_size)
 
     # check that each incremental batch has higher mean coverage
     # and a size within range
@@ -130,3 +130,24 @@ def test_batch_samples():
         )
         assert mean_of_medians > cov
         cov = mean_of_medians
+
+
+def test_batch_samples_single_chunk():
+    """
+    use some dummy data to check that the batch_samples function works
+    check for an appropriate size for each batch
+    assert that each batch in turn has a higher mean coverage
+    """
+
+    # loading and formatting done in partition_batches function
+    qc_table = to_path(__file__).parent / 'data' / 'gatk_sv' / 'evidence_qc.tsv'
+    qc_df = pd.read_csv(qc_table, sep='\t')
+    qc_df.columns = [x.replace('#', '') for x in qc_df.columns]
+
+    # parameters to use
+    min_size = 2
+    max_size = 500
+
+    # generate batches
+    batches = batch_sgs(qc_df, min_size, max_size)
+    assert len(batches) == 1
