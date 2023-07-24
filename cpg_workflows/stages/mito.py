@@ -55,7 +55,7 @@ CONTROL_REGION_INTERVALS = {
 }
 
 # alt_allele config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
-MAX_ALT_ALLELE_COUNT=4,
+MAX_ALT_ALLELE_COUNT = 4
 
 
 @stage(
