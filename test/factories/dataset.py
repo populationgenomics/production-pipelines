@@ -1,4 +1,4 @@
-from typing import Sequence, Optional
+from typing import Sequence
 
 from cpg_workflows.targets import Cohort, Dataset, SequencingGroup
 
