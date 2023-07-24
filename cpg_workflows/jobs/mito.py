@@ -102,9 +102,7 @@ def mito_realign(
     j = b.new_job('mito_realign', job_attrs)
     j.image(image_path('bwa'))
 
-    res = STANDARD.request_resources(ncpu=4)
-    res.set_to_job(j)
-    nthreads = res.get_nthreads()
+    nthreads = STANDARD.set_resources(j, ncpu=4).get_nthreads()
 
     cmd = f"""\
         bazam -Xmx16g \
@@ -151,8 +149,7 @@ def collect_coverage_metrics(
     j = b.new_job('collect_coverage_metrics', job_attrs)
     j.image(image_path('picard'))
 
-    res = STANDARD.request_resources(ncpu=2)
-    res.set_to_job(j)
+    STANDARD.set_resources(j, ncpu=2)
 
     cmd = f"""
         picard \
@@ -201,8 +198,7 @@ def extract_coverage_mean(
     j = b.new_job('extract_coverage_mean', job_attrs)
     j.image(image_path('peer'))
 
-    res = STANDARD.request_resources(ncpu=2)
-    res.set_to_job(j)
+    STANDARD.set_resources(j, ncpu=2)
 
     cmd = f"""
 
@@ -253,8 +249,7 @@ def coverage_at_every_base(
     j = b.new_job('coverage_at_every_base', job_attrs)
     j.image(image_path('picard'))
 
-    res = STANDARD.request_resources(ncpu=2)
-    res.set_to_job(j)
+    STANDARD.set_resources(j, ncpu=2)
 
     cmd = f"""
     picard CollectHsMetrics \
@@ -298,8 +293,7 @@ def merge_coverage(
     j = b.new_job('merge_coverage', job_attrs)
     j.image(image_path('peer'))
 
-    res = STANDARD.request_resources(ncpu=2)
-    res.set_to_job(j)
+    STANDARD.set_resources(j, ncpu=2)
 
     cmd = f"""
     R --vanilla <<CODE
@@ -340,10 +334,10 @@ def mito_mutect2(
     job_attrs: dict | None = None,
 ) -> Job:
     """
-    Call SNPs and indels in mitochondrial genome using Mutect2 in"mitochondria-mode"
+    Call SNPs and indels in mitochondrial genome using Mutect2 in "mitochondria-mode"
 
     Args:
-        cram: Cam to call variants in.
+        cram: Cram to call variants in.
         reference: Resource group of reference sequence to align to.
         region: Coordinate string restricting the region to call variants within.
         max_reads_per_alignment_start: Mutect argument. [Default: 75].
@@ -358,8 +352,7 @@ def mito_mutect2(
     j = b.new_job('mito_mutect2', job_attrs)
     j.image(image_path('gatk'))
 
-    res = STANDARD.request_resources(ncpu=4)
-    res.set_to_job(j)
+    res = STANDARD.set_resources(j, ncpu=4)
     java_mem_mb = res.get_java_mem_mb()
 
     j.declare_resource_group(
@@ -416,8 +409,7 @@ def liftover_and_combine_vcfs(
     j = b.new_job('liftover_and_combine_vcfs', job_attrs)
     j.image(image_path('picard'))
 
-    res = STANDARD.request_resources(ncpu=4)
-    res.set_to_job(j)
+    STANDARD.set_resources(j, ncpu=4)
 
     j.declare_resource_group(
         lifted_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
@@ -468,12 +460,7 @@ def merge_mutect_stats(
     j = b.new_job('merge_stats', job_attrs)
     j.image(image_path('gatk'))
 
-    res = STANDARD.request_resources(ncpu=4)
-    res.set_to_job(j)
-
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
+    STANDARD.set_resources(j, ncpu=4)
 
     cmd = f"""
         gatk MergeMutectStats \
@@ -529,8 +516,7 @@ def filter_variants(
     j = b.new_job('filter_variants', job_attrs)
     j.image(image_path('gatk'))
 
-    res = STANDARD.request_resources(ncpu=4)
-    res.set_to_job(j)
+    STANDARD.set_resources(j, ncpu=4)
 
     blacklisted_sites = b.read_input_group(
         bed='gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.hg38.chrM.bed',
@@ -597,8 +583,7 @@ def split_multi_allelics(
     j = b.new_job('split_multi_allelics', job_attrs)
     j.image(image_path('gatk'))
 
-    res = STANDARD.request_resources(ncpu=4)
-    res.set_to_job(j)
+    STANDARD.set_resources(j, ncpu=4)
 
     j.declare_resource_group(
         split_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
@@ -659,8 +644,7 @@ def get_contamination(
     j = b.new_job('get_contamination', job_attrs)
     j.image(image_path('haplocheckcli'))
 
-    res = STANDARD.request_resources(ncpu=2)
-    res.set_to_job(j)
+    STANDARD.set_resources(j, ncpu=2)
 
     cmd = f"""
         mv {vcf['vcf.bgz']} {vcf}.vcf.gz
@@ -700,8 +684,7 @@ def parse_contamination_results(
     j = b.new_python_job('parse_contamination_results', job_attrs)
     j.image(get_config()['workflow']['driver_image'])
 
-    res = STANDARD.request_resources(ncpu=2)
-    res.set_to_job(j)
+    STANDARD.set_resources(j, ncpu=4)
 
     # TODO: move this function when we have updated the driver image
     def parse_contamination_worker(

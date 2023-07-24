@@ -54,6 +54,9 @@ CONTROL_REGION_INTERVALS = {
     'non_control_region': 'gs://cpg-common-main/references/hg38/v0/chrM/non_control_region.chrM.interval_list',
 }
 
+# alt_allele config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
+MAX_ALT_ALLELE_COUNT = 4
+
 
 @stage(
     required_stages=Align,
@@ -382,24 +385,24 @@ class GenotypeMito(SequencingGroupStage):
         assert isinstance(merge_j.output_vcf, hb.ResourceGroup)
 
         # Merge the mutect stats output files (needed for filtering)
-        merge_stats_J = mito.merge_mutect_stats(
+        merge_stats_j = mito.merge_mutect_stats(
             b=get_batch(),
             first_stats_file=call_j.output_vcf['vcf.gz.stats'],
             second_stats_file=shifted_call_j.output_vcf['vcf.gz.stats'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
-        jobs.append(merge_stats_J)
-        assert isinstance(merge_stats_J.combined_stats, hb.ResourceFile)
+        jobs.append(merge_stats_j)
+        assert isinstance(merge_stats_j.combined_stats, hb.ResourceFile)
 
         # Initial round of filtering to exclude blacklist and high alt alleles
         initial_filter_j = mito.filter_variants(
             b=get_batch(),
             vcf=merge_j.output_vcf,
             reference=mito_ref,
-            merged_mutect_stats=merge_stats_J.combined_stats,
+            merged_mutect_stats=merge_stats_j.combined_stats,
             # alt_allele and vaf config hardcoded in this round of filtering as per
             # https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
-            max_alt_allele_count=4,
+            max_alt_allele_count=MAX_ALT_ALLELE_COUNT,
             min_allele_fraction=0,
             f_score_beta=get_config()['mito_snv']['f_score_beta'],
             job_attrs=self.get_job_attrs(sequencing_group),
@@ -445,9 +448,9 @@ class GenotypeMito(SequencingGroupStage):
             b=get_batch(),
             vcf=initial_filter_j.output_vcf,
             reference=mito_ref,
-            merged_mutect_stats=merge_stats_J.combined_stats,
+            merged_mutect_stats=merge_stats_j.combined_stats,
             # alt_allele config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
-            max_alt_allele_count=4,
+            max_alt_allele_count=MAX_ALT_ALLELE_COUNT,
             min_allele_fraction=get_config()['mito_snv']['vaf_filter_threshold'],
             f_score_beta=get_config()['mito_snv']['f_score_beta'],
             # contamination_estimate=get_contamination_j.max_contamination,
