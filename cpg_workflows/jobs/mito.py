@@ -469,9 +469,6 @@ def merge_mutect_stats(
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
 
     cmd = f"""
         gatk MergeMutectStats \
