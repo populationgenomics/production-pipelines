@@ -33,11 +33,22 @@ class Count(SequencingGroupStage):
         Generate a text file output containing read counts.
         """
         return {
-            'txt': sequencing_group.dataset.prefix() / 'count' / f'{sequencing_group.id}.count.txt'
+            'count': sequencing_group.dataset.prefix() / 'count' / f'{sequencing_group.id}.count',
+            'summary': sequencing_group.dataset.prefix() / 'count' / f'{sequencing_group.id}.count.summary',
         }
     
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
         Queue a job to count the reads with featureCounts.
         """
-        pass
+        bam_path = inputs.as_path(sequencing_group, AlignRNA, 'bam')
+        bai_path = inputs.as_path(sequencing_group, AlignRNA, 'bai')
+        j = count.count(
+            b=get_batch(),
+            input_bam=BamPath(bam_path, bai_path),
+            output_path=self.expected_outputs(sequencing_group)['count'],
+            summary_path=self.expected_outputs(sequencing_group)['summary'],
+            sample_name=sequencing_group.id,
+            job_attrs=self.get_job_attrs(sequencing_group),
+        )
+        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=j)

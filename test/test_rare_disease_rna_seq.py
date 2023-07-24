@@ -38,12 +38,14 @@ def get_toml(tmp_path) -> str:
     fastp = "stub"
     STAR = "stub"
     samtools = "stub"
+    featureCounts = "stub"
 
     [trim]
     adapter_type = "ILLUMINA_TRUSEQ"
 
     [references]
     star_ref_dir = "stub"
+    gtf = "stub"
 
     [storage.default]
     default = '{tmp_path}'
@@ -129,6 +131,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     from hailtop.batch.job import Job
     from cpg_workflows.jobs.trim import trim
     from cpg_workflows.jobs.align_rna import align
+    from cpg_workflows.jobs.count import count
 
     conf = get_toml(tmp_path)
     set_config(
@@ -148,7 +151,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     # Capture the trim command
     cmd_str_list = []
 
-    def capture_trim_cmd(*args, **kwargs) -> list[Job]:
+    def capture_trim_cmd(*args, **kwargs) -> Job:
         trim_job = trim(*args, **kwargs)
         cmd_str_list.append(
             '===== FASTQ TRIM JOB START =====\n\n' +
@@ -167,6 +170,15 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
             '\n\n===== ALIGN STAGE END =====\n\n'
         )
         return align_jobs
+    
+    def capture_count_cmd(*args, **kwargs) -> Job:
+        count_job = count(*args, **kwargs)
+        cmd_str_list.append(
+            '===== COUNT STAGE START =====\n\n' +
+            '\n'.join(count_job._command) +
+            '\n\n===== COUNT STAGE END =====\n\n'
+        )
+        return count_job
 
     mocker.patch('pathlib.Path.open', selective_mock_open)
     # functions like get_intervals checks file existence
@@ -191,6 +203,8 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     mocker.patch('cpg_workflows.jobs.trim.trim', capture_trim_cmd)
     # Patch the align function to capture the job command
     mocker.patch('cpg_workflows.jobs.align_rna.align', capture_align_cmd)
+    # Patch the count function to capture the job command
+    mocker.patch('cpg_workflows.jobs.count.count', capture_count_cmd)
 
     from cpg_workflows.batch import get_batch
     from cpg_workflows.inputs import get_cohort
@@ -200,14 +214,16 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     from cpg_utils.hail_batch import dataset_path
     from cpg_workflows.stages.trim import Trim
     from cpg_workflows.stages.align_rna import AlignRNA
+    from cpg_workflows.stages.count import Count
     from cpg_workflows.filetypes import FastqPairs, FastqPair
 
-    get_workflow().run(stages=[AlignRNA])
+    get_workflow().run(stages=[Count])
 
     b = get_batch()
     trim_job = b.job_by_tool['fastp']
     align_job = b.job_by_tool['STAR']
     samtools_job = b.job_by_tool['samtools']
+    featureCounts_job = b.job_by_tool['featureCounts']
     sample_list = get_cohort().get_sequencing_groups()
 
     # The number of FASTQ trim jobs should equal the number of FASTQ pairs
@@ -232,6 +248,10 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     ]
     n_align_jobs = sum(n_align_jobs_list)
     assert align_job['job_n'] + samtools_job['job_n'] == n_align_jobs
+
+    # The number of count jobs should equal the number of samples
+    n_count_jobs = len(sample_list)
+    assert featureCounts_job['job_n'] == n_count_jobs
 
     output_path = dataset_path('cmd.txt')
     output_path_parent = os.path.dirname(output_path)
