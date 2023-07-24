@@ -338,10 +338,10 @@ def mito_mutect2(
     job_attrs: dict | None = None,
 ) -> Job:
     """
-    Call SNPs and indels in mitochondrial genome using Mutect2 in"mitochondria-mode"
+    Call SNPs and indels in mitochondrial genome using Mutect2 in "mitochondria-mode"
 
     Args:
-        cram: Cam to call variants in.
+        cram: Cram to call variants in.
         reference: Resource group of reference sequence to align to.
         region: Coordinate string restricting the region to call variants within.
         max_reads_per_alignment_start: Mutect argument. [Default: 75].
