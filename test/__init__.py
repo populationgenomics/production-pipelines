@@ -75,7 +75,7 @@ def set_config(
             f.write(config)
         else:
             raise TypeError(
-                f'Expected config to be a string, dict, or DictRepresentable, but'
+                f'Expected config to be a string, dict, or IDictRepresentable, but'
                 f'got {type(config)}'
             )
 
