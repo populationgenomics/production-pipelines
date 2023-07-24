@@ -22,6 +22,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_ref_panel,
     make_combined_ped,
     SV_CALLERS,
+    _sv_batch_meta
 )
 from cpg_workflows.workflow import get_workflow
 
@@ -474,7 +475,12 @@ class MergeBatchSites(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=[FilterBatch, GatherBatchEvidence])
+@stage(
+    required_stages=[FilterBatch, GatherBatchEvidence],
+    analysis_type='sv',
+    analysis_keys=[f'genotyped_{mode}_vcf' for mode in ['pesr', 'depth']],
+    update_analysis_meta=_sv_batch_meta
+)
 class GenotypeBatch(CohortStage):
     """
     Genotypes a batch of samples across filtered variants combined across all batches.
