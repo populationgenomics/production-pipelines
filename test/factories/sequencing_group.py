@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal
 
 from cpg_workflows.filetypes import BamPath, CramPath, FastqPair, FastqPairs, GvcfPath
 from cpg_workflows.targets import Dataset, PedigreeInfo, SequencingGroup, Sex
