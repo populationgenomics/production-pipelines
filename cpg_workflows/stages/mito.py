@@ -54,7 +54,10 @@ CONTROL_REGION_INTERVALS = {
 
 @stage(
     required_stages=Align,
-    # TODO: add suitable analysis types
+    analysis_type='mito_cram',
+    analysis_keys=[
+        'non_shifted_cram',
+    ],
 )
 class RealignMito(SequencingGroupStage):
     """
