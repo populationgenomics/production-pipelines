@@ -266,7 +266,6 @@ class RealignMito(SequencingGroupStage):
 
 @stage(
     required_stages=[RealignMito, CramQC]
-    # TODO: add suitable analysis types
 )
 class GenotypeMito(SequencingGroupStage):
     """
