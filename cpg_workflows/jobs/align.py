@@ -82,9 +82,6 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
     if realign_cram_ver := get_config()['workflow'].get('realign_from_cram_version'):
         if (
             path := (
-                # TODO: This will always pull from a dataset's 'default' storage key...
-                # ... Is this intentional? Seems like it should be synced with the
-                # 'access-level' workflow config.
                 sequencing_group.dataset.prefix()
                 / 'cram'
                 / realign_cram_ver
