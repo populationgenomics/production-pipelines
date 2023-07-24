@@ -39,7 +39,7 @@ def create_fastq_pair_input(
     on disk with no contents.
 
     Args:
-        location (str):
+        location (str | Path):
             File location either locally or in a cloud bucket.
 
         prefix (str, optional):
@@ -88,7 +88,7 @@ def create_fastq_pairs_input(
     on disk with no contents.
 
     Args:
-        location (str):
+        location (str | Path):
             File location either locally or in a cloud bucket. It does not need to
             exist.
 
@@ -134,7 +134,7 @@ def create_bam_input(
     `True`, the files will be created on disk with no contents.
 
     Args:
-        location (str):
+        location (str | Path):
             File location either locally or in a cloud bucket. It does not need to
             exist.
 
@@ -174,7 +174,7 @@ def create_reference_assembly(
     with no contents.
 
     Args:
-        location (str):
+        location (str | Path):
             File location either locally or in a cloud bucket. It does not need to
             exist.
 
@@ -210,7 +210,7 @@ def create_cram_input(
     is `True`, these files will be created on disk with no contents.
 
     Args:
-        location (str):
+        location (str | Path):
             File location either locally or in a cloud bucket. It does not need to
             exist. Will be also used to set the location of the reference assembly if
             `reference_assembly` is a `str`.
