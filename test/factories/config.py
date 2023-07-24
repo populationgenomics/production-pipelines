@@ -140,40 +140,40 @@ class HailConfig:
     Configuration options used to configure Hail batch jobs.
 
     Attributes:
-        dry_run (`bool`, optional):
+        dry_run (bool, optional):
             Runs Hail Batch in dry_run mode, meaning jobs are not executed. Defaults
             to `True`.
 
-        backend (`Optional[Literal['batch', 'local']]`, optional):
+        backend (Optional[Literal['batch', 'local']], optional):
             Specifies which backend Hail Batch is initialised with. Use 'local' for
             local testing, and 'batch' for running on Google Cloud. Defaults to `local`.
 
-        query_backend (`Optional[Literal['spark', 'batch', 'local', 'spark_local']]`, optional):
+        query_backend (Literal['spark', 'batch', 'local', 'spark_local'], optional):
             Specifies which backend Hail is initialised with when calling
             `cpg_utils.hail_batch.start_query_context`. Defaults to `spark`.
 
-        billing_project (`Optional[str]`, optional):
+        billing_project (Optional[str], optional):
             The GCP billing project that Hail Batch will use to provision resources,
             and run jobs. Required if `backend` is set to `batch`. Defaults to `None`.
 
-        pool_label (`Optional[str]`, optional):
+        pool_label (Optional[str], optional):
             Sets preemptible Hail Batch jobs' `_pool_label` attribute to this value.
             Defaults to `None`.
 
-        delete_scratch_on_exit (`Optional[bool]`, optional):
+        delete_scratch_on_exit (Optional[bool], optional):
             If True, delete temporary directories containing intermediate files after
             the batch has finished executing. Defaults to `None`.
 
-        cancel_after_n_failures (`Optional[int]`, optional):
+        cancel_after_n_failures (Optional[int], optional):
             Automatically cancel the batch after N failures have occurred. The default
             behavior is there is no limit on the number of failures. Only applicable
             if `backend` is set to `batch`. Must be greater than 0. Defaults to `None`.
 
-        default_memory (`Optional[str]`, optional):
+        default_memory (Optional[str], optional):
             Memory setting to use by default if not specified by a Hail Batch Job
             instance. Defaults to `None`.
 
-        default_timeout (`Optional[str]`, optional):
+        default_timeout (Optional[str], optional):
             Maximum time in seconds for a job to run before being killed. Only
             applicable if `backend` is set to `batch`. There is no timeout if this
             value is not set. Defaults to `None`.
@@ -260,24 +260,24 @@ class PipelineConfig:
     will have no effect if `as_dict` is `False`.
 
     Attributes:
-        workflow (`WorkflowConfig`, optional):
+        workflow (WorkflowConfig, optional):
             A `WorkflowConfig` dictionary instance. Defaults to the a minimal
             configuration for local testing.
 
-        hail (`HailConfig`, optional):
+        hail (HailConfig, optional):
             A `HailConfig` dictionary instance. Defaults to a config to enable local
             testing.
 
-        images: (`dict[str, str | Path]`, optional):
+        images: (dict[str, str | Path], optional):
             A dictionary of docker image names and their corresponding image paths.
             Defaults to `{}`.
 
-        storage (`dict[DatasetId, StorageConfig]`, optional):
+        storage (dict[DatasetId, StorageConfig], optional):
             Storage paths for a dataset. Each dataset's storage configuration can
             theoretically accept any key, but we typically use 'default', 'tmp', 'web',
             'analysis', 'web_url' paths. Defaults to `{}`.
 
-        other (`dict[str, dict[str, Any]]`, optional):
+        other (dict[str, dict[str, Any]], optional):
             A catch-all for any configuration section which are not present here as
             explicit keyword arguments. Defaults to `{}`.
     """
