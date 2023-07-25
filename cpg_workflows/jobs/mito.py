@@ -748,7 +748,7 @@ def mitoreport(
     """
     Run Mitoreport to generate html report of mito variants
     """
-    job_attrs = job_attrs or {}
+    job_attrs=(job_attrs or {}) | dict(tool='mitoreport'),
     j = b.new_job('mitoreport', job_attrs)
     j.image(image_path('mitoreport'))
 
