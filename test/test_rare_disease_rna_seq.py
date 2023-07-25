@@ -12,6 +12,8 @@ from . import update_dict, set_config
 from os import makedirs
 import os.path
 
+import inspect
+
 
 def get_toml(tmp_path) -> str:
     return f"""
@@ -39,6 +41,7 @@ def get_toml(tmp_path) -> str:
     STAR = "stub"
     samtools = "stub"
     featureCounts = "stub"
+    outrider = "stub"
 
     [trim]
     adapter_type = "ILLUMINA_TRUSEQ"
@@ -132,6 +135,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     from cpg_workflows.jobs.trim import trim
     from cpg_workflows.jobs.align_rna import align
     from cpg_workflows.jobs.count import count
+    from cpg_workflows.jobs.outrider import outrider
 
     conf = get_toml(tmp_path)
     set_config(
@@ -179,6 +183,27 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
             '\n\n===== COUNT STAGE END =====\n\n'
         )
         return count_job
+    
+    def capture_outrider_cmd(*args, **kwargs) -> Job:
+        outrider_job = outrider(*args, **kwargs)
+        cmd_str_list.append(
+            '===== OUTRIDER STAGE START =====\n\n' +
+            '\n'.join(outrider_job._command) +
+            '\n\n===== OUTRIDER STAGE END =====\n\n'
+        )
+        return outrider_job
+
+    python_function_list = []
+    def capture_outrider_calls(*args, **kwargs) -> Job:
+        outrider_job = outrider(*args, **kwargs)
+        for func_calls in outrider_job._function_calls:
+            func_id = func_calls[1]
+            cmd_str_list.append(
+                '===== OUTRIDER STAGE START =====\n\n' +
+                inspect.getsource(outrider_job._batch._python_function_defs[func_id]) +
+                '\n\n===== OUTRIDER STAGE END =====\n\n'
+            )
+        return outrider_job
 
     mocker.patch('pathlib.Path.open', selective_mock_open)
     # functions like get_intervals checks file existence
@@ -205,6 +230,10 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     mocker.patch('cpg_workflows.jobs.align_rna.align', capture_align_cmd)
     # Patch the count function to capture the job command
     mocker.patch('cpg_workflows.jobs.count.count', capture_count_cmd)
+    # Patch the outrider function to capture the job calls
+    mocker.patch('cpg_workflows.jobs.outrider.outrider', capture_outrider_cmd)
+    # Patch the outrider function to capture the job calls
+    mocker.patch('cpg_workflows.jobs.outrider.outrider_pyjob', capture_outrider_calls)
 
     from cpg_workflows.batch import get_batch
     from cpg_workflows.inputs import get_cohort
@@ -215,15 +244,17 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     from cpg_workflows.stages.trim import Trim
     from cpg_workflows.stages.align_rna import AlignRNA
     from cpg_workflows.stages.count import Count
+    from cpg_workflows.stages.outrider import Outrider
     from cpg_workflows.filetypes import FastqPairs, FastqPair
 
-    get_workflow().run(stages=[Count])
+    get_workflow().run(stages=[Outrider])
 
     b = get_batch()
     trim_job = b.job_by_tool['fastp']
     align_job = b.job_by_tool['STAR']
     samtools_job = b.job_by_tool['samtools']
     featureCounts_job = b.job_by_tool['featureCounts']
+    outrider_job = b.job_by_tool['outrider']
     sample_list = get_cohort().get_sequencing_groups()
 
     # The number of FASTQ trim jobs should equal the number of FASTQ pairs
@@ -252,6 +283,10 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     # The number of count jobs should equal the number of samples
     n_count_jobs = len(sample_list)
     assert featureCounts_job['job_n'] == n_count_jobs
+
+    # The number of outrider jobs should equal the number of samples
+    n_outrider_jobs = len(sample_list)
+    assert outrider_job['job_n'] == n_outrider_jobs
 
     output_path = dataset_path('cmd.txt')
     output_path_parent = os.path.dirname(output_path)

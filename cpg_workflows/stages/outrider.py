@@ -23,7 +23,7 @@ from cpg_workflows.jobs import outrider
 @stage(
     required_stages=Count,
 )
-class Count(SequencingGroupStage):
+class Outrider(SequencingGroupStage):
     """
     Perform outlier gene expression analysis with Outrider.
     """
@@ -33,7 +33,7 @@ class Count(SequencingGroupStage):
         Generate outrider outputs.
         """
         return {
-            
+            'test': sequencing_group.dataset.prefix() / 'outrider' / f'{sequencing_group.id}.test',
         }
     
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
@@ -42,5 +42,8 @@ class Count(SequencingGroupStage):
         """
         j = outrider.outrider(
             b=get_batch(),
+            output_path=self.expected_outputs(sequencing_group)['test'],
+            sample_name=sequencing_group.id,
+            job_attrs=self.get_job_attrs(sequencing_group),
         )
         return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=j)
