@@ -79,7 +79,7 @@ def run(
 
     sequencing_groups = _check_gvcfs(sequencing_groups)
 
-    params = get_config().get('combiner', {})
+    params = get_config().get('large_cohort', {}).get('combiner', {})
 
     if intervals := params.get('intervals'):
         if isinstance(intervals, list):
