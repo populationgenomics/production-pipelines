@@ -5,7 +5,7 @@ import hail as hl
 import pandas as pd
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from gnomad.sample_qc.ancestry import run_pca_with_relateds, assign_population_pcs
+from gnomad_methods.gnomad.sample_qc.ancestry import run_pca_with_relateds, assign_population_pcs
 
 from cpg_utils.hail_batch import reference_path
 from cpg_workflows.utils import can_reuse
