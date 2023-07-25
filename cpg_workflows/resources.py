@@ -167,7 +167,7 @@ class MachineType:
         the nearest power of 2, not less than the minimal number of cores allowed.
         """
         if ncpu > self.max_ncpu:
-            ValueError(
+            raise ValueError(
                 f'Requesting more cores than available on {self.name} machine: '
                 f'{ncpu}>{self.max_ncpu}'
             )

@@ -147,6 +147,10 @@ def align(
     if output_path and can_reuse(output_path.path, overwrite):
         return []
 
+    # NOTE: If re-aligning from CRAM, the function call below returns a new CramPath
+    # based on the [storage.<dataqset>] config key, ignoring the sequencing_group's
+    # alignment input. The `index_path` attribute is set to `None` on this new instance
+    # so `sharded_bazam` will be False. Not sure if this is a bug or intended behaviour?
     alignment_input = _get_alignment_input(sequencing_group)
 
     base_job_name = 'Align'
