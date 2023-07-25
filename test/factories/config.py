@@ -23,8 +23,11 @@ class WorkflowConfig:
     """
     See `<root>/cpg_workflows/defaults.toml` for a description of these options.
 
-    Note: that the `Optional` type is used to indicate that a key is optional, but
-    some stages may require it.
+    Note: that the `Union` type with `None` is used to indicate that a key is
+    optional, but some stages may require it.
+
+    If you find a config key not present here, please add it along with some
+    documnentation on what it is, and what it is used for.
     """
 
     # ---- Core
