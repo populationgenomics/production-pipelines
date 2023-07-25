@@ -150,7 +150,7 @@ class HailConfig:
 
         query_backend (Literal['spark', 'batch', 'local', 'spark_local'], optional):
             Specifies which backend Hail is initialised with when calling
-            `cpg_utils.hail_batch.start_query_context`. Defaults to `spark`.
+            `cpg_utils.hail_batch.start_query_context`. Defaults to `spark_local`.
 
         billing_project (str | None, optional):
             The GCP billing project that Hail Batch will use to provision resources,
@@ -181,7 +181,7 @@ class HailConfig:
 
     dry_run: bool = True
     backend: Literal['batch', 'local'] = 'local'
-    query_backend: Literal['spark', 'batch', 'local', 'spark_local'] = 'spark'
+    query_backend: Literal['spark', 'batch', 'local', 'spark_local'] = 'spark_local'
     billing_project: str | None = None
     pool_label: str | None = None
     delete_scratch_on_exit: bool | None = True
