@@ -239,13 +239,7 @@ class PipelineConfig:
     for any configuration section which are not present heres explicit keyword
     arguments. The config keys not represented here that should go in `other` are:
 
-        - references
-            - broad
-            - gnomad
-            - gatk_sv
         - validation.sample_map
-        - combiner
-        - large_cohort
         - sv_ref_panel
         - vqsr
         - cramqc
@@ -268,14 +262,24 @@ class PipelineConfig:
             A `HailConfig` dictionary instance. Defaults to a config to enable local
             testing.
 
-        images: (dict[str, str | Path], optional):
-            A dictionary of docker image names and their corresponding image paths.
-            Defaults to `{}`.
-
         storage (dict[DatasetId, StorageConfig], optional):
             Storage paths for a dataset. Each dataset's storage configuration can
             theoretically accept any key, but we typically use 'default', 'tmp', 'web',
             'analysis', 'web_url' paths. Defaults to `{}`.
+
+        images: (dict[str, str | Path], optional):
+            A dictionary of docker image names and their corresponding image paths.
+            Defaults to `{}`.
+
+        references (dict[str, str | dict[str, Any]], optional):
+            A dictionary containing reference options. May also contain nested
+            dictionaries for broad, gnomad, gatk_sv and other references. Defaults to
+            `{}`.
+
+        large_cohort (dict[str, Any], optional):
+            A dictionary containing large cohort pipeline configuration parameters and
+            values used by functions in the large cohort module (e.g. `n_pcs`,
+            `sample_qc_cutoffs`, `combiner`). Defaults to `{}`.
 
         other (dict[str, dict[str, Any]], optional):
             A catch-all for any configuration section which are not present here as
@@ -284,8 +288,10 @@ class PipelineConfig:
 
     workflow: WorkflowConfig = field(default_factory=default_workflow_config)
     hail: HailConfig = field(default_factory=default_hail_config)
-    images: dict[str, str | Path] = field(default_factory=dict)
     storage: dict[DatasetId, StorageConfig] = field(default_factory=dict)
+    images: dict[str, str | Path] = field(default_factory=dict)
+    references: dict[str, str | dict[str, Any]] = field(default_factory=dict)
+    large_cohort: dict[str, Any] = field(default_factory=dict)
     other: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def set_storage(
@@ -312,6 +318,8 @@ class PipelineConfig:
         # Leave these out unless they contain something.
         storage = d.pop('storage')
         images = d.pop('images')
+        references = d.pop('references')
+        large_cohort = d.pop('large_cohort')
 
         config = {**d, **other}
 
@@ -319,5 +327,9 @@ class PipelineConfig:
             config['storage'] = storage
         if images:
             config['images'] = images
+        if references:
+            config['references'] = references
+        if large_cohort:
+            config['large_cohort'] = large_cohort
 
         return config
