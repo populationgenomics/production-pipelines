@@ -10,7 +10,9 @@ from cpg_utils import Path, to_path
 from cpg_utils.hail_batch import image_path, fasta_res_group
 from cpg_utils.hail_batch import command
 from cpg_workflows.resources import STANDARD
+from cpg_workflows.batch import Batch
 from cpg_workflows.filetypes import CramPath
+from cpg_workflows.targets import SequencingGroup
 
 
 def subset_cram_to_chrM(
@@ -732,3 +734,54 @@ def parse_contamination_results(
     )
 
     return j, contamination_level
+
+
+def mitoreport(
+    b: Batch,
+    sequencing_group: SequencingGroup,
+    vcf_path: Path,
+    cram_path: Path,
+    mito_ref: hb.ResourceGroup,
+    output_path: Path,
+    job_attrs: dict | None = None,
+) -> Job:
+    """
+    Run Mitoreport to generate html report of mito variants
+    """
+    job_attrs = (job_attrs or {}) | dict(tool='mitoreport')
+    j = b.new_job('mitoreport', job_attrs)
+    j.image(image_path('mitoreport'))
+
+    res = STANDARD.request_resources(ncpu=2)
+    res.set_to_job(j)
+
+    vcf = b.read_input_group(**{'vcf.gz': str(vcf_path)})
+    cram = b.read_input_group(
+        **{
+            'cram': str(cram_path),
+            'cram.crai': str(cram_path.with_suffix('.cram.crai')),
+        }
+    )
+
+    cmd = f"""
+        samtools view -T {mito_ref.base} -b -o {sequencing_group.id}.bam {cram['cram']}
+        samtools index {sequencing_group.id}.bam
+
+        java -jar mitoreport.jar mito-report \
+            -sample {sequencing_group.id} \
+            -mann resources/mito_map_annotations.json \
+            -gnomad resources/gnomad.genomes.v3.1.sites.chrM.vcf.bgz \
+            -vcf {vcf['vcf.gz']} \
+            {sequencing_group.id}.bam ./resources/controls/*.bam
+
+        gsutil -m cp -r 'mitoreport-{sequencing_group.id}/*' {output_path.parent}
+        """
+
+    j.command(
+        command(
+            cmd,
+            setup_gcp=True,
+        )
+    )
+
+    return j
