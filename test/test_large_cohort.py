@@ -158,7 +158,7 @@ class TestCombiner:
             gnomad_prefix=gnomad_prefix,
             broad_prefix=broad_prefix,
         )
-        mocker: MockFixture, tmp_path: Path = ['chr27:start-end']
+        conf.large_cohort['combiner']['intervals'] = ['chr27:start-end']
 
         # Set config and patch cohort
         set_config(
@@ -211,6 +211,12 @@ class TestCombiner:
 
     def test_fails_if_given_two_sequencing_groups_with_the_same_gvcf_path(
         self, mocker: MockFixture, tmp_path: Path
+    ):
+        pass
+
+    @pytest.mark.parametrize('seq_type', ['exome', 'genome'])
+    def test_calls_hail_combiner_with_correct_parameters(
+        self, mocker: MockFixture, tmp_path: Path, seq_type: SequencingType
     ):
         pass
 
