@@ -121,6 +121,16 @@ def create_config(
         },
     )
 
+def test_dry_run_reference_points_to_broad():
+    # setup
+    config = create_config(
+        references = {} # no reference should point to broad
+    )
+    # thing i want to test
+    
+    # assertions
+
+    pass
 
 def _mock_cohort(dataset_id: str):
     cohort = Cohort()
