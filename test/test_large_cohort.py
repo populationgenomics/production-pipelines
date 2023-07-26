@@ -166,7 +166,7 @@ class TestCombiner:
     ):
         pass
 
-    @pytest.mark.parametrize("seq_type", ['exome', 'genome'])
+    @pytest.mark.parametrize('seq_type', ['exome', 'genome'])
     def test_calls_hail_combiner_with_correct_parameters(
         self, mocker: MockFixture, tmp_path: Path, seq_type: SequencingType
     ):
