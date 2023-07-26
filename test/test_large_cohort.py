@@ -181,6 +181,7 @@ class TestCombiner:
     def test_can_reuse_existing_vds_that_exists_at_output_path(
         self, mocker: MockFixture, tmp_path: Path
     ):
+        # Hint: create a blank file and mock hl.vds.read_vds to fake a return value
         pass
 
 
