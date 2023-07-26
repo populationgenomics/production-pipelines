@@ -5,6 +5,7 @@ Test large-cohort workflow.
 from os.path import exists
 from pathlib import Path
 
+import pytest
 from cpg_utils import Path as CPGPath
 from cpg_utils import to_path
 from cpg_utils.hail_batch import start_query_context
@@ -20,12 +21,12 @@ from cpg_workflows.large_cohort import (
     sample_qc,
     site_only_vcf,
 )
-from cpg_workflows.targets import Cohort
+from cpg_workflows.targets import Cohort, Dataset
 
 from . import set_config
 from .factories.config import HailConfig, PipelineConfig, StorageConfig, WorkflowConfig
+from .factories.sequencing_group import create_sequencing_group
 from .factories.types import SequencingType
-
 
 ref_prefix = to_path(__file__).parent / 'data/large_cohort/reference'
 gnomad_prefix = ref_prefix / 'gnomad/v0'
@@ -123,19 +124,65 @@ def create_config(
 
 
 def _mock_cohort(dataset_id: str):
-    cohort = Cohort()
-    dataset = cohort.create_dataset(dataset_id)
+    dataset = Dataset(name=dataset_id)
+
+    # Parse gVCF files from the test/data/large_cohort/gvcf directory
     gvcf_root = to_path(__file__).parent / 'data' / 'large_cohort' / 'gvcf'
     found_gvcf_paths = list(gvcf_root.glob('*.g.vcf.gz'))
     assert len(found_gvcf_paths) > 0, gvcf_root
+
     for gvcf_path in found_gvcf_paths:
         sequencing_group_id = gvcf_path.name.split('.')[0]
-        sequencing_group = dataset.add_sequencing_group(
+        create_sequencing_group(
             id=sequencing_group_id,
             external_id=sequencing_group_id.replace('CPG', 'EXT'),
+            dataset=dataset,
+            gvcf=GvcfPath(gvcf_path),
         )
-        sequencing_group.gvcf = GvcfPath(gvcf_path)
+
+    cohort = Cohort()
+    cohort.add_dataset(dataset)
     return cohort
+
+
+class TestCombiner:
+    def test_fails_if_given_malformed_intervals(
+        self, mocker: MockFixture, tmp_path: Path
+    ):
+        pass
+
+    def test_fails_if_given_invalid_chromosome_that_does_not_exist(
+        self, mocker: MockFixture, tmp_path: Path
+    ):
+        pass
+
+    def test_fails_if_given_duplicate_sequencing_groups(
+        self, mocker: MockFixture, tmp_path: Path
+    ):
+        pass
+
+    def test_fails_if_given_two_sequencing_groups_with_the_same_gvcf_path(
+        self, mocker: MockFixture, tmp_path: Path
+    ):
+        pass
+
+    @pytest.mark.parametrize('seq_type', ['exome', 'genome'])
+    def test_calls_hail_combiner_with_correct_parameters(
+        self, mocker: MockFixture, tmp_path: Path, seq_type: SequencingType
+    ):
+        # Hint: read about pytest_mock spy from the guide in the testing google document
+        pass
+
+    def test_fails_if_all_sequencing_groups_do_not_have_a_gvcf_file(
+        self, mocker: MockFixture, tmp_path: Path
+    ):
+        pass
+
+    def test_can_reuse_existing_vds_that_exists_at_output_path(
+        self, mocker: MockFixture, tmp_path: Path
+    ):
+        # Hint: create a blank file and mock hl.vds.read_vds to fake a return value
+        pass
 
 
 class TestAllLargeCohortMethods:
@@ -143,7 +190,13 @@ class TestAllLargeCohortMethods:
         """
         Run entire workflow in a local mode.
         """
-        conf = create_config(tmp_path, 'genome', gnomad_prefix, broad_prefix)
+        conf = create_config(
+            tmp_path,
+            seq_type='genome',
+            gnomad_prefix=gnomad_prefix,
+            broad_prefix=broad_prefix,
+        )
+
         set_config(
             conf,
             tmp_path / 'config.toml',
