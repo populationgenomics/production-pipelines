@@ -38,33 +38,6 @@ def default_config() -> PipelineConfig:
     )
 
 
-def custom_scatter_config() -> PipelineConfig:
-    return PipelineConfig(
-        workflow=WorkflowConfig(
-            dataset='genotype-test',
-            access_level='test',
-            sequencing_type='genome',
-            check_inputs=False,
-            reblock_gq_bands=[20, 30, 50],
-            scatter_count_genotype=10,
-        ),
-        images={
-            'picard': 'picard:2.27.4',
-            'gatk': 'gatk:4.2.6.1',
-        },
-        other={
-            'resource_overrides': {},
-            'references': {
-                'broad': {
-                    'ref_fasta': 'hg38_reference.fa',
-                    'genome_calling_interval_lists': 'wgs_calling_regions.hg38.interval_list',
-                    'noalt_bed': 'primary_contigs_plus_mito.bed.gz',
-                }
-            },
-        },
-    )
-
-
 class TestGenotyping:
     def test_genotype_jobs_with_default_scatter_count(self, tmp_path: Path):
         # ---- Test setup
@@ -138,7 +111,8 @@ class TestGenotyping:
                 print(cmd)
 
     def test_genotype_jobs_with_custom_scatter_count(self, tmp_path: Path):
-        config = custom_scatter_config()
+        config = default_config()
+        config.workflow.scatter_count_genotype = 10
         set_config(config, tmp_path / 'config.toml')
         dataset_id = config.workflow.dataset
         batch = create_local_batch(tmp_path)
