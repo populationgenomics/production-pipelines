@@ -12,6 +12,7 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
+from cpg_utils.hail_batch import reference_path
 from cpg_workflows import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import mito, picard, vep
@@ -26,32 +27,32 @@ from cpg_workflows.workflow import (
     SequencingGroup,
 )
 
+
 MITO_REF = {
-    'dict': 'gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.dict',
-    'base': 'gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta',
-    'amb': 'gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.amb',
-    'ann': 'gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.ann',
-    'bwt': 'gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.bwt',
-    'fai': 'gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.fai',
-    'pac': 'gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.pac',
-    'sa': 'gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.fasta.sa',
+    'dict': reference_path('gnomad_mito/dict'),
+    'base': reference_path('gnomad_mito/fasta'),
+    'amb': reference_path('gnomad_mito/amb'),
+    'ann': reference_path('gnomad_mito/ann'),
+    'bwt': reference_path('gnomad_mito/bwt'),
+    'fai': reference_path('gnomad_mito/fai'),
+    'pac': reference_path('gnomad_mito/pac'),
+    'sa': reference_path('gnomad_mito/sa'),
 }
 
 SHIFTED_MITO_REF = {
-    'dict': 'gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.dict',
-    'base': 'gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta',
-    'amb': 'gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.amb',
-    'ann': 'gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.ann',
-    'bwt': 'gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.bwt',
-    'fai': 'gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.fai',
-    'pac': 'gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.pac',
-    'sa': 'gs://cpg-common-main/references/hg38/v0/chrM/Homo_sapiens_assembly38.chrM.shifted_by_8000_bases.fasta.sa',
-    'shift_back_chain': 'gs://cpg-common-main/references/hg38/v0/chrM/ShiftBack.chain',
+    'dict': reference_path('gnomad_mito/shifted_dict'),
+    'base': reference_path('gnomad_mito/shifted_fasta'),
+    'amb': reference_path('gnomad_mito/shifted_amb'),
+    'ann': reference_path('gnomad_mito/shifted_ann'),
+    'bwt': reference_path('gnomad_mito/shifted_bwt'),
+    'fai': reference_path('gnomad_mito/shifted_fai'),
+    'pac': reference_path('gnomad_mito/shifted_pac'),
+    'sa': reference_path('gnomad_mito/shifted_sa'),
 }
 
 CONTROL_REGION_INTERVALS = {
-    'control_region_shifted': 'gs://cpg-common-main/references/hg38/v0/chrM/control_region_shifted.chrM.interval_list',
-    'non_control_region': 'gs://cpg-common-main/references/hg38/v0/chrM/non_control_region.chrM.interval_list',
+    'control_region_shifted': reference_path('gnomad_mito/shifted_control_region_interval'),
+    'non_control_region':  reference_path('gnomad_mito/non_control_region_interval'),
 }
 
 # alt_allele config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
@@ -134,6 +135,11 @@ class RealignMito(SequencingGroupStage):
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
         # Mitochondrial specific reference files.
+        mito_fasta_path = reference_path('gnomad_mito/fasta')
+        shifted_mito_fasta_path = reference_path('gnomad_mito/shifted_fasta')
+
+
+
         mito_ref = get_batch().read_input_group(**MITO_REF)
         shifted_mito_ref = get_batch().read_input_group(**SHIFTED_MITO_REF)
         intervals = get_batch().read_input_group(**CONTROL_REGION_INTERVALS)
