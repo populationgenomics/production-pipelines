@@ -1,4 +1,5 @@
 import re
+import git
 from pathlib import Path
 from functools import cached_property
 
@@ -53,81 +54,49 @@ class TestAncestryPCA:
         from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
 
         # ---- The job that we want to test
+        # -- args
+        dense_mt_path = tmp_path / 'DenseSubset.mt'
+        sample_qc_ht_path = tmp_path / 'SampleQC.ht'
+        relateds_to_drop_ht_path = tmp_path / 'Relatedness.mt'
+        out_scores_ht_path = tmp_path / 'outputs' / 'scores.ht'
+        out_eigenvalues_ht_path = tmp_path / 'outputs' / 'eigenvalues.ht'
+        out_loadings_ht_path = tmp_path / 'outputs' / 'loadings.ht'
+        out_inferred_pop_ht_path = tmp_path / 'outputs' / 'inferred_pop.ht'
+        out_sample_qc_ht_path = tmp_path / 'outputs' / 'sample_qc.ht'
+
+        # -- create job
         batch = create_local_batch(tmp_path)
         job = dataproc_job(
             job_name=self.__class__.__name__,
             function=ancestry_pca.run,
             function_path_args=dict(
-                dense_mt_path=tmp_path / 'DenseSubset.mt',
-                sample_qc_ht_path=tmp_path / 'SampleQC.ht',
-                relateds_to_drop_ht_path=tmp_path / 'Relatedness.mt',
+                dense_mt_path=dense_mt_path,
+                sample_qc_ht_path=sample_qc_ht_path,
+                relateds_to_drop_ht_path=relateds_to_drop_ht_path,
                 tmp_prefix=tmp_path,
-                out_scores_ht_path=tmp_path / 'outputs' / 'scores.ht',
-                out_eigenvalues_ht_path=tmp_path / 'outputs' / 'eigenvalues.ht',
-                out_loadings_ht_path=tmp_path / 'outputs' / 'loadings.ht',
-                out_inferred_pop_ht_path=tmp_path / 'outputs' / 'inferred_pop.ht',
-                out_sample_qc_ht_path=tmp_path / 'outputs' / 'sample_qc.ht',
+                out_scores_ht_path=out_scores_ht_path,
+                out_eigenvalues_ht_path=out_eigenvalues_ht_path,
+                out_loadings_ht_path=out_loadings_ht_path,
+                out_inferred_pop_ht_path=out_inferred_pop_ht_path,
+                out_sample_qc_ht_path=out_sample_qc_ht_path,
             ),
             # depends_on=inputs.get_jobs(cohort),
         )
         cmd = get_command_str(job)
+        repo = git.Repo(search_parent_directories=True)
+        git_hash = repo.head.object.hexsha
 
         # ---- Assertions
-        assert False
-
-    def test_add_background(self, tmp_path: Path):
-        # ---- Test setup
-        config = self.default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        # ---- The job that we want to test
-
-        # ---- Assertions
-
-        assert False
-
-    def test_fail_n_pcs_less_than_min_n_pcs(self, tmp_path: Path):
-        # ---- Test setup
-        config = self.default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        # ---- The job that we want to test
-
-        # ---- Assertions
-
-        assert False
-
-    def test_run_pca_ancestry_analysis(self, tmp_path: Path):
-        # ---- Test setup
-        config = self.default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        # ---- The job that we want to test
-
-        # ---- Assertions
-
-        assert False
-
-    def test_infer_pop_labels(self, tmp_path: Path):
-        # ---- Test setup
-        config = self.default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        # ---- The job that we want to test
-
-        # ---- Assertions
-
-        assert False
-
-    def test_run_assign_population_pcs(
-        self, tmp_path: Path, pop_pca_scores_ht_, min_prob_
-    ):
-        # ---- Test setup
-        config = self.default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        # ---- The job that we want to test
-
-        # ---- Assertions
-
-        assert False
+        assert re.search(git_hash, cmd)
+        assert re.search('dataproc *submit *--region=australia-southeast1', cmd)
+        assert re.search('--pyfiles *cpg_workflows,gnomad_methods/gnomad', cmd)
+        assert re.search('pg_workflows/large_cohort/dataproc_script.py', cmd)
+        assert re.search('pg_workflows.large_cohort.ancestry_pca', cmd)
+        assert re.search(f'-p.*{dense_mt_path}', cmd)
+        assert re.search(f'-p.*{sample_qc_ht_path}', cmd)
+        assert re.search(f'-p.*{relateds_to_drop_ht_path}', cmd)
+        assert re.search(f'-p.*{out_scores_ht_path}', cmd)
+        assert re.search(f'-p.*{out_eigenvalues_ht_path}', cmd)
+        assert re.search(f'-p.*{out_loadings_ht_path}', cmd)
+        assert re.search(f'-p.*{out_inferred_pop_ht_path}', cmd)
+        assert re.search(f'-p.*{out_sample_qc_ht_path}', cmd)
