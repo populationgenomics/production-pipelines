@@ -22,6 +22,8 @@ def default_config() -> PipelineConfig:
             sequencing_type='genome',
             check_inputs=False,
             scatter_count=20,
+            dataset_gcp_project='cpg-fake-gcp-project',
+            driver_image='fake-driver-image',
         ),
         images={
             'dragmap': 'dragmap_image:1.3.0',
@@ -52,7 +54,7 @@ class TestAncestryPCA:
 
         # ---- The job that we want to test
         batch = create_local_batch(tmp_path)
-        j = dataproc_job(
+        job = dataproc_job(
             job_name=self.__class__.__name__,
             function=ancestry_pca.run,
             function_path_args=dict(
@@ -68,6 +70,7 @@ class TestAncestryPCA:
             ),
             # depends_on=inputs.get_jobs(cohort),
         )
+        cmd = get_command_str(job)
 
         # ---- Assertions
         assert False
