@@ -80,7 +80,6 @@ class TestAncestryPCA:
                 out_inferred_pop_ht_path=out_inferred_pop_ht_path,
                 out_sample_qc_ht_path=out_sample_qc_ht_path,
             ),
-            # depends_on=inputs.get_jobs(cohort),
         )
         cmd = get_command_str(job)
         repo = git.Repo(search_parent_directories=True)
