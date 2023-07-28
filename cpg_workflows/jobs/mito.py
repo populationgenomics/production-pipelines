@@ -3,12 +3,15 @@ Hail Batch jobs needed to call mitochondrial SNVs
 """
 import hailtop.batch as hb
 from hailtop.batch.job import Job
+from hailtop.batch.resource import PythonResult
 
+from cpg_utils.config import get_config
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import image_path, fasta_res_group
-from cpg_utils.hail_batch import command
+from cpg_utils.hail_batch import command, image_path, fasta_res_group, reference_path
 from cpg_workflows.resources import STANDARD
+from cpg_workflows.batch import Batch
 from cpg_workflows.filetypes import CramPath
+from cpg_workflows.targets import SequencingGroup
 
 
 def subset_cram_to_chrM(
@@ -98,9 +101,7 @@ def mito_realign(
     j = b.new_job('mito_realign', job_attrs)
     j.image(image_path('bwa'))
 
-    res = STANDARD.request_resources(ncpu=4)
-    res.set_to_job(j)
-    nthreads = res.get_nthreads()
+    nthreads = STANDARD.set_resources(j, ncpu=4).get_nthreads()
 
     cmd = f"""\
         bazam -Xmx16g \
@@ -147,8 +148,7 @@ def collect_coverage_metrics(
     j = b.new_job('collect_coverage_metrics', job_attrs)
     j.image(image_path('picard'))
 
-    res = STANDARD.request_resources(ncpu=2)
-    res.set_to_job(j)
+    STANDARD.set_resources(j, ncpu=2)
 
     cmd = f"""
         picard \
@@ -197,8 +197,7 @@ def extract_coverage_mean(
     j = b.new_job('extract_coverage_mean', job_attrs)
     j.image(image_path('peer'))
 
-    res = STANDARD.request_resources(ncpu=2)
-    res.set_to_job(j)
+    STANDARD.set_resources(j, ncpu=2)
 
     cmd = f"""
 
@@ -249,8 +248,7 @@ def coverage_at_every_base(
     j = b.new_job('coverage_at_every_base', job_attrs)
     j.image(image_path('picard'))
 
-    res = STANDARD.request_resources(ncpu=2)
-    res.set_to_job(j)
+    STANDARD.set_resources(j, ncpu=2)
 
     cmd = f"""
     picard CollectHsMetrics \
@@ -294,8 +292,7 @@ def merge_coverage(
     j = b.new_job('merge_coverage', job_attrs)
     j.image(image_path('peer'))
 
-    res = STANDARD.request_resources(ncpu=2)
-    res.set_to_job(j)
+    STANDARD.set_resources(j, ncpu=2)
 
     cmd = f"""
     R --vanilla <<CODE
@@ -323,5 +320,467 @@ def merge_coverage(
 
     j.command(command(cmd))
     b.write_output(j.merged_coverage, str(merged_coverage))
+
+    return j
+
+
+def mito_mutect2(
+    b,
+    cram: hb.ResourceGroup,
+    reference: hb.ResourceGroup,
+    region: str,
+    max_reads_per_alignment_start: int = 75,
+    job_attrs: dict | None = None,
+) -> Job:
+    """
+    Call SNPs and indels in mitochondrial genome using Mutect2 in "mitochondria-mode"
+
+    Args:
+        cram: Cram to call variants in.
+        reference: Resource group of reference sequence to align to.
+        region: Coordinate string restricting the region to call variants within.
+        max_reads_per_alignment_start: Mutect argument. [Default: 75].
+
+    Output:
+        job.output_vcf: resource group containing vcf, index AND statistics file.
+
+    Cmd from:
+    https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L417-L484
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_job('mito_mutect2', job_attrs)
+    j.image(image_path('gatk'))
+
+    res = STANDARD.set_resources(j, ncpu=4)
+    java_mem_mb = res.get_java_mem_mb()
+
+    j.declare_resource_group(
+        output_vcf={
+            'vcf.gz': '{root}.vcf.gz',
+            'vcf.gz.tbi': '{root}.vcf.gz.tbi',
+            'vcf.gz.stats': '{root}.vcf.gz.stats',
+        }
+    )
+
+    cmd = f"""
+        gatk --java-options "-Xmx{java_mem_mb}m" Mutect2 \
+            -R {reference.base} \
+            -I {cram.cram} \
+            --read-filter MateOnSameContigOrNoMappedMateReadFilter \
+            --read-filter MateUnmappedAndUnmappedReadFilter \
+            -O {j.output_vcf['vcf.gz']} \
+            --annotation StrandBiasBySample \
+            --mitochondria-mode \
+            --max-reads-per-alignment-start {max_reads_per_alignment_start} \
+            --max-mnp-distance 0 \
+            -L {region}
+    """
+
+    j.command(command(cmd))
+
+    return j
+
+
+def liftover_and_combine_vcfs(
+    b,
+    vcf: hb.ResourceGroup,
+    shifted_vcf: hb.ResourceGroup,
+    reference: hb.ResourceGroup,
+    shift_back_chain: hb.ResourceFile,
+    job_attrs: dict | None = None,
+) -> Job:
+    """
+    Lifts over shifted vcf and combines it with the rest of the chrM calls.
+
+    Args:
+        vcf: chrM variants mapped to wt chrM (exl control region).
+        shifted_vcf: chrM control region variants mapped to shifted chrM.
+        reference: resource group for wt chrM reference.
+        shift_back_chain: chain file provided with shifted genome.
+
+    Outputs:
+        job.output_vcf: Merged vcf.gz in standard hg38 coordinate space.
+
+    Cmd from:
+    https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL360-L415C2
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_job('liftover_and_combine_vcfs', job_attrs)
+    j.image(image_path('picard'))
+
+    STANDARD.set_resources(j, ncpu=4)
+
+    j.declare_resource_group(
+        lifted_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+    j.declare_resource_group(
+        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+
+    cmd = f"""
+        picard LiftoverVcf \
+            I={shifted_vcf['vcf.gz']} \
+            O={j.lifted_vcf['vcf.gz']} \
+            R={reference.base} \
+            CHAIN={shift_back_chain} \
+            REJECT={j.rejected_vcf}.vcf.gz
+
+        picard MergeVcfs \
+            I={vcf['vcf.gz']} \
+            I={j.lifted_vcf['vcf.gz']} \
+            O={j.output_vcf['vcf.gz']}
+    """
+
+    j.command(command(cmd))
+
+    return j
+
+
+def merge_mutect_stats(
+    b,
+    first_stats_file: hb.ResourceFile,
+    second_stats_file: hb.ResourceFile,
+    job_attrs: dict | None = None,
+) -> Job:
+    """
+    Merge stats files from two mutect runs
+
+    Args:
+        first_stats_file: Mutect stats ResourceFile
+        second_stats_file: Mutect stats ResourceFile
+
+    Outputs:
+        combined_stats: Combined stats file
+
+    Cmd from:
+    https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL573-L598C2
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_job('merge_stats', job_attrs)
+    j.image(image_path('gatk'))
+
+    STANDARD.set_resources(j, ncpu=4)
+
+    cmd = f"""
+        gatk MergeMutectStats \
+            --stats {first_stats_file} \
+            --stats {second_stats_file} -O {j.combined_stats}
+    """
+
+    j.command(command(cmd))
+
+    return j
+
+
+def filter_variants(
+    b,
+    vcf: hb.ResourceGroup,
+    reference: hb.ResourceGroup,
+    merged_mutect_stats: hb.ResourceFile,
+    max_alt_allele_count: int,
+    min_allele_fraction: int,
+    contamination_estimate: hb.ResourceFile | None = None,
+    f_score_beta: float = 1.0,
+    job_attrs: dict | None = None,
+) -> Job:
+    """
+    Filter mutect variant calls
+
+    Uses:
+      gatk FilterMutectCalls to filter on variant properties
+      gatk VariantFiltration to exclude a (broad supplied) black list of problem variants.
+
+    Args:
+        vcf: input vcf
+        merged_mutect_stats: Mutect statistics file
+        max_alt_allele_count: Maximum alt alleles per site (VariantFiltration).
+        min_allele_fraction: Hard cutoff for minimum allele fraction. All sites with VAF
+            less than this cutoff will be filtered. (VariantFiltration).
+        contamination_estimate: Estimated sample contamination level (VariantFiltration).
+            This is passed as a single float in a file as it is calculated at an earlier
+            step in the pipeline.
+        f_score_beta: F score beta, the relative weight of recall to precision,
+            used if OPTIMAL_F_SCORE strategy is chosen (VariantFiltration). Default: 1.0
+            is default provided by VariantFiltration.
+
+    Outputs:
+        job.output_vcf: filtered vcf file.
+
+    Cmd from:
+    https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL486-L571C2
+    Note:
+        contamination_estimate pre-calculation has been moved out of this function.
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_job('filter_variants', job_attrs)
+    j.image(image_path('gatk'))
+
+    STANDARD.set_resources(j, ncpu=4)
+
+    blacklisted_sites = b.read_input_group(
+        bed=str(reference_path('gnomad_mito/blacklist_sites')),
+        idx=str(reference_path('gnomad_mito/blacklist_sites')) + '.idx',
+    )
+
+    j.declare_resource_group(
+        filtered_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+    j.declare_resource_group(
+        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+
+    if contamination_estimate:
+        contamination_estimate_string = (
+            f'--contamination-estimate  $(cat {contamination_estimate})'
+        )
+    else:
+        contamination_estimate_string = ''
+
+    cmd = f"""
+      gatk --java-options "-Xmx2500m" FilterMutectCalls -V {vcf['vcf.gz']} \\
+        -R {reference.base} \\
+        -O {j.filtered_vcf['vcf.gz']} \\
+        --stats {merged_mutect_stats} \\
+        --max-alt-allele-count {max_alt_allele_count} \\
+        --mitochondria-mode \\
+        --min-allele-fraction  {min_allele_fraction} \\
+        --f-score-beta  {f_score_beta} \\
+        {contamination_estimate_string}
+      gatk VariantFiltration -V {j.filtered_vcf['vcf.gz']} \\
+        -O {j.output_vcf['vcf.gz']} \\
+        --apply-allele-specific-filters \\
+        --mask {blacklisted_sites.bed} \\
+        --mask-name "blacklisted_site"
+    """
+
+    j.command(command(cmd, define_retry_function=True))
+
+    return j
+
+
+def split_multi_allelics(
+    b,
+    vcf: hb.ResourceGroup,
+    reference: hb.ResourceGroup,
+    remove_non_pass_sites: bool = False,
+    job_attrs: dict | None = None,
+) -> Job:
+    """
+    Splits multi allelics and removes non pass sites
+    Uses LeftAlignAndTrimVariants to split then optionally use SelectVariants to select
+    only passing variants.
+    Args:
+        vcf: Input vcf file.
+        reference: chrM reference fasta.
+        remove_non_pass_sites:
+    Output:
+        output_vcf: Final vcf file.
+    Cmd from:
+    https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L600
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_job('split_multi_allelics', job_attrs)
+    j.image(image_path('gatk'))
+
+    STANDARD.set_resources(j, ncpu=4)
+
+    j.declare_resource_group(
+        split_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+    # Downstream hail steps prefer explicit .bgz suffix
+    j.declare_resource_group(
+        output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
+    )
+
+    cmd = f"""
+        gatk LeftAlignAndTrimVariants \
+            -R {reference.base} \
+            -V {vcf['vcf.gz']} \
+            -O {j.split_vcf['vcf.gz']} \
+            --split-multi-allelics \
+            --dont-trim-alleles \
+            --keep-original-ac
+        """
+    if remove_non_pass_sites:
+        cmd += f"""
+            gatk SelectVariants \
+                -V {j.split_vcf['vcf.gz']} \
+                -O {j.output_vcf['vcf.bgz']} \
+                --exclude-filtered
+        """
+    else:
+        cmd += f"""
+            mv {j.split_vcf['vcf.gz']} {j.output_vcf['vcf.bgz']}
+            mv {j.split_vcf['vcf.gz.tbi']} {j.output_vcf['vcf.bgz.tbi']}
+        """
+
+    j.command(command(cmd, define_retry_function=True))
+
+    return j
+
+
+def get_contamination(
+    b,
+    vcf: hb.ResourceGroup,
+    haplocheck_output: Path | None,
+    job_attrs: dict | None = None,
+) -> Job:
+    """
+    Uses new HaplocheckerCLI to estimate levels of contamination in mitochondria based
+    on known mitochondrial haplotypes.
+
+    Args:
+        vcf: input vcf of passing variants with multi-allelics split.
+        haplocheck_output: Path to write results file.
+
+    Outputs:
+        job.haplocheck_output: ResourceFile containing HaplocheckerCLI tsv report.
+
+    Cmd from:
+      https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L239
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_job('get_contamination', job_attrs)
+    j.image(image_path('haplocheckcli'))
+
+    STANDARD.set_resources(j, ncpu=2)
+
+    cmd = f"""
+        mv {vcf['vcf.bgz']} {vcf}.vcf.gz
+        PARENT_DIR="$(dirname "{vcf['vcf.bgz']}")"
+        java -jar /haplocheckCLI.jar "$PARENT_DIR"
+        mv output {j.haplocheck_output}
+        """
+
+    j.command(command(cmd, define_retry_function=True))
+    if haplocheck_output:
+        b.write_output(j.haplocheck_output, str(haplocheck_output))
+
+    return j
+
+
+def parse_contamination_results(
+    b,
+    haplocheck_output: hb.ResourceFile,
+    verifybamid_output: hb.ResourceFile | None = None,
+    job_attrs: dict | None = None,
+) -> tuple[Job, PythonResult]:
+    """
+    Post process halpocheck and (optionally) verifybamid reports to determine single value
+    for estimated contamination that can be used for variant filtering.
+
+    Inputs:
+        haplocheck_report: native output from haplocheckCLI
+        verifybamid_output: [optional] native output from verifyBamID
+
+        Based on logic here:
+        https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL523-L524
+
+    Output:
+        returns contamination level as a PythonResult
+    """
+    job_attrs = job_attrs or {}
+    j = b.new_python_job('parse_contamination_results', job_attrs)
+    j.image(get_config()['workflow']['driver_image'])
+
+    STANDARD.set_resources(j, ncpu=4)
+
+    # TODO: move this function when we have updated the driver image
+    def parse_contamination_worker(
+        haplocheck_report: str, verifybamid_report: str | None
+    ) -> float:
+        """
+        Process haplocheckCLI and verifyBamID outputs to get contamination level as a
+        single float.
+        """
+        cleaned_lines = []
+        with open(haplocheck_report) as haplocheck:
+            # Split line on tabs and strip double quotes
+            for line in haplocheck:
+                cleaned_lines.append([x.strip('"') for x in line.strip().split('\t')])
+        # sanity check and reformat
+        assert len(cleaned_lines) == 2, 'haplocheck report is unexpected format'
+        assert len(cleaned_lines[0]) == 17, 'haplocheck report is unexpected format'
+        report = dict(zip(cleaned_lines[0], cleaned_lines[1]))
+
+        # Determine final contamination level
+        if report['Contamination'] == 'YES':
+            if float(report['MeanHetLevelMajor']) == 0:
+                max_contamination = float(report['MeanHetLevelMinor'])
+            else:
+                max_contamination = 1.0 - float(report['MeanHetLevelMajor'])
+        else:
+            max_contamination = 0.0
+
+        # If verifybamid_report is provided, chose the higher of the two
+        if verifybamid_report:
+            with open(verifybamid_report) as verifybamid:
+                lines = [line.split('\t') for line in verifybamid.readlines()]
+                assert len(lines) == 2
+                report = dict(zip(lines[0], lines[1]))
+
+            verifybamid_estimate = float(report['FREEMIX'])
+
+            if verifybamid_estimate > max_contamination:
+                max_contamination = verifybamid_estimate
+
+        return max_contamination
+
+    # Call parse_contamination_worker as pythonJob which returns contamination_level
+    # as a hail PythonResult.
+    contamination_level = j.call(
+        parse_contamination_worker, haplocheck_output, verifybamid_output
+    )
+
+    return j, contamination_level
+
+
+def mitoreport(
+    b: Batch,
+    sequencing_group: SequencingGroup,
+    vcf_path: Path,
+    cram_path: Path,
+    mito_ref: hb.ResourceGroup,
+    output_path: Path,
+    job_attrs: dict | None = None,
+) -> Job:
+    """
+    Run Mitoreport to generate html report of mito variants
+    """
+    job_attrs = (job_attrs or {}) | dict(tool='mitoreport')
+    j = b.new_job('mitoreport', job_attrs)
+    j.image(image_path('mitoreport'))
+
+    res = STANDARD.request_resources(ncpu=2)
+    res.set_to_job(j)
+
+    vcf = b.read_input_group(**{'vcf.gz': str(vcf_path)})
+    cram = b.read_input_group(
+        **{
+            'cram': str(cram_path),
+            'cram.crai': str(cram_path.with_suffix('.cram.crai')),
+        }
+    )
+
+    cmd = f"""
+        samtools view -T {mito_ref.base} -b -o {sequencing_group.id}.bam {cram['cram']}
+        samtools index {sequencing_group.id}.bam
+
+        java -jar mitoreport.jar mito-report \
+            -sample {sequencing_group.id} \
+            -mann resources/mito_map_annotations.json \
+            -gnomad resources/gnomad.genomes.v3.1.sites.chrM.vcf.bgz \
+            -vcf {vcf['vcf.gz']} \
+            {sequencing_group.id}.bam ./resources/controls/*.bam
+
+        gsutil -m cp -r 'mitoreport-{sequencing_group.id}/*' {output_path.parent}
+        """
+
+    j.command(
+        command(
+            cmd,
+            setup_gcp=True,
+        )
+    )
 
     return j

@@ -30,7 +30,7 @@ from cpg_workflows.stages.happy_validation import (
     ValidationHappyOnVcf,
     ValidationParseHappy
 )
-from cpg_workflows.stages.mito import RealignMito
+from cpg_workflows.stages.mito import MitoReport
 
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
@@ -42,7 +42,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         GvcfMultiQC,
         CramMultiQC,
         Stripy,
-        RealignMito
+        MitoReport
     ],
     'validation': [ValidationMtToVcf, ValidationHappyOnVcf, ValidationParseHappy],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
