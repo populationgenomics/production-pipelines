@@ -61,10 +61,11 @@ MAX_ALT_ALLELE_COUNT = 4
 
 @stage(
     required_stages=Align,
-    analysis_type='mito_cram',
-    analysis_keys=[
-        'non_shifted_cram',
-    ],
+    # TODO: enable once this type can be created
+    # analysis_type='mito-cram',
+    # analysis_keys=[
+    #     'non_shifted_cram',
+    # ],
 )
 class RealignMito(SequencingGroupStage):
     """
@@ -135,11 +136,6 @@ class RealignMito(SequencingGroupStage):
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput | None:
         # Mitochondrial specific reference files.
-        mito_fasta_path = reference_path('gnomad_mito/fasta')
-        shifted_mito_fasta_path = reference_path('gnomad_mito/shifted_fasta')
-
-
-
         mito_ref = get_batch().read_input_group(**MITO_REF)
         shifted_mito_ref = get_batch().read_input_group(**SHIFTED_MITO_REF)
         intervals = get_batch().read_input_group(**CONTROL_REGION_INTERVALS)
