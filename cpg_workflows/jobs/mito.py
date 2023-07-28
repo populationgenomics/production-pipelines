@@ -7,8 +7,7 @@ from hailtop.batch.resource import PythonResult
 
 from cpg_utils.config import get_config
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import image_path, fasta_res_group
-from cpg_utils.hail_batch import command
+from cpg_utils.hail_batch import command, image_path, fasta_res_group, reference_path
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.batch import Batch
 from cpg_workflows.filetypes import CramPath
@@ -519,8 +518,8 @@ def filter_variants(
     STANDARD.set_resources(j, ncpu=4)
 
     blacklisted_sites = b.read_input_group(
-        bed='gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.hg38.chrM.bed',
-        idx='gs://cpg-common-main/references/hg38/v0/chrM/blacklist_sites.hg38.chrM.bed.idx',
+        bed=str(reference_path('gnomad_mito/blacklist_sites')),
+        idx=str(reference_path('gnomad_mito/blacklist_sites')) + '.idx',
     )
 
     j.declare_resource_group(
