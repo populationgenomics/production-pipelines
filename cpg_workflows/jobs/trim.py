@@ -187,10 +187,10 @@ def trim(
     if extra_label:
         base_job_name += f' {extra_label}'
     
-    if not get_config()['workflow']['sequencing_type'] == 'rna':
+    if not get_config()['workflow']['sequencing_type'] == 'transcriptome':
         raise InvalidSequencingTypeException(
             f"Invalid sequencing type '{get_config()['workflow']['sequencing_type']}'" +
-            f" for job type '{base_job_name}'; sequencing type must be 'rna'"
+            f" for job type '{base_job_name}'; sequencing type must be 'transcriptome'"
         )
     
     try:
