@@ -51,8 +51,8 @@ SHIFTED_MITO_REF = {
 }
 
 CONTROL_REGION_INTERVALS = {
-    'control_region_shifted': reference_path('gnomad_mito/shifted_control_region_interval'),
-    'non_control_region':  reference_path('gnomad_mito/non_control_region_interval'),
+    'control_region_shifted': str(reference_path('gnomad_mito/shifted_control_region_interval')),
+    'non_control_region':  str(reference_path('gnomad_mito/non_control_region_interval')),
 }
 
 # alt_allele config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
