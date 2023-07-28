@@ -29,25 +29,25 @@ from cpg_workflows.workflow import (
 
 
 MITO_REF = {
-    'dict': reference_path('gnomad_mito/dict'),
-    'base': reference_path('gnomad_mito/fasta'),
-    'amb': reference_path('gnomad_mito/amb'),
-    'ann': reference_path('gnomad_mito/ann'),
-    'bwt': reference_path('gnomad_mito/bwt'),
-    'fai': reference_path('gnomad_mito/fai'),
-    'pac': reference_path('gnomad_mito/pac'),
-    'sa': reference_path('gnomad_mito/sa'),
+    'dict': str(reference_path('gnomad_mito/dict')),
+    'base': str(reference_path('gnomad_mito/fasta')),
+    'amb': str(reference_path('gnomad_mito/amb')),
+    'ann': str(reference_path('gnomad_mito/ann')),
+    'bwt': str(reference_path('gnomad_mito/bwt')),
+    'fai': str(reference_path('gnomad_mito/fai')),
+    'pac': str(reference_path('gnomad_mito/pac')),
+    'sa': str(reference_path('gnomad_mito/sa')),
 }
 
 SHIFTED_MITO_REF = {
-    'dict': reference_path('gnomad_mito/shifted_dict'),
-    'base': reference_path('gnomad_mito/shifted_fasta'),
-    'amb': reference_path('gnomad_mito/shifted_amb'),
-    'ann': reference_path('gnomad_mito/shifted_ann'),
-    'bwt': reference_path('gnomad_mito/shifted_bwt'),
-    'fai': reference_path('gnomad_mito/shifted_fai'),
-    'pac': reference_path('gnomad_mito/shifted_pac'),
-    'sa': reference_path('gnomad_mito/shifted_sa'),
+    'dict': str(reference_path('gnomad_mito/shifted_dict')),
+    'base': str(reference_path('gnomad_mito/shifted_fasta')),
+    'amb': str(reference_path('gnomad_mito/shifted_amb')),
+    'ann': str(reference_path('gnomad_mito/shifted_ann')),
+    'bwt': str(reference_path('gnomad_mito/shifted_bwt')),
+    'fai': str(reference_path('gnomad_mito/shifted_fai')),
+    'pac': str(reference_path('gnomad_mito/shifted_pac')),
+    'sa': str(reference_path('gnomad_mito/shifted_sa')),
 }
 
 CONTROL_REGION_INTERVALS = {
