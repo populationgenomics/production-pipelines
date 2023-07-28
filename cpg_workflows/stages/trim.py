@@ -62,8 +62,7 @@ def get_input_output_pairs(sequencing_group: SequencingGroup) -> list[InOutFastq
     prefix = sequencing_group.dataset.tmp_prefix() / 'trim'
     trim_suffix = '.trimmed.fastq.gz'
     input_output_pairs = []
-    i = 1
-    for pair in inputs:
+    for i, pair in enumerate(inputs, 1):
         input_r1_bn = str(pair.r1.name).replace('.fastq.gz', '')
         input_r2_bn = str(pair.r2.name).replace('.fastq.gz', '')
         output_r1 = prefix / f'{input_r1_bn}{trim_suffix}'
@@ -73,7 +72,6 @@ def get_input_output_pairs(sequencing_group: SequencingGroup) -> list[InOutFastq
             pair,  # input FASTQ pair
             FastqPair(output_r1, output_r2),  # output FASTQ pair
         ))
-        i += 1
     return input_output_pairs
 
 
