@@ -61,7 +61,7 @@ MAX_ALT_ALLELE_COUNT = 4
 
 @stage(
     required_stages=Align,
-    analysis_type='web',
+    analysis_type='mito_cram',
     analysis_keys=[
         'non_shifted_cram',
     ],

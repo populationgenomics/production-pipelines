@@ -144,6 +144,7 @@ class AnalysisType(Enum):
     JOINT_CALLING = 'joint-calling'
     GVCF = 'gvcf'
     CRAM = 'cram'
+    MITO_CRAM = 'mito_cram'
     CUSTOM = 'custom'
     ES_INDEX = 'es-index'
 
