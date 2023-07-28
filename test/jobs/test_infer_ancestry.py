@@ -11,43 +11,40 @@ from .helpers import get_command_str
 
 from ..factories.batch import create_local_batch
 from ..factories.config import PipelineConfig, WorkflowConfig
-from ..factories.alignment_input import create_fastq_pairs_input
-from ..factories.sequencing_group import create_sequencing_group
-
-
-def default_config() -> PipelineConfig:
-    return PipelineConfig(
-        workflow=WorkflowConfig(
-            dataset='ancestry-test',
-            access_level='test',
-            sequencing_type='genome',
-            check_inputs=False,
-            scatter_count=20,
-            dataset_gcp_project='cpg-fake-gcp-project',
-            driver_image='fake-driver-image',
-        ),
-        images={
-            'dragmap': 'dragmap_image:1.3.0',
-        },
-        references={
-            'broad': {
-                'ref_fasta': 'hg38_reference.fa',
-                'dragmap_prefix': 'gs://a-cpg-bucket/dragen_reference/',
-            }
-        },
-        large_cohort={
-            'min_pop_prob': 0.5,
-            'n_pcs': 16,
-            'training_pop': 'Superpopulation name',
-        },
-    )
 
 
 class TestAncestryPCA:
+    @cached_property
+    def default_config(self) -> PipelineConfig:
+        return PipelineConfig(
+            workflow=WorkflowConfig(
+                dataset='ancestry-test',
+                access_level='test',
+                sequencing_type='genome',
+                check_inputs=False,
+                scatter_count=20,
+                dataset_gcp_project='cpg-fake-gcp-project',
+                driver_image='fake-driver-image',
+            ),
+            images={
+                'dragmap': 'dragmap_image:1.3.0',
+            },
+            references={
+                'broad': {
+                    'ref_fasta': 'hg38_reference.fa',
+                    'dragmap_prefix': 'gs://a-cpg-bucket/dragen_reference/',
+                }
+            },
+            large_cohort={
+                'min_pop_prob': 0.5,
+                'n_pcs': 16,
+                'training_pop': 'Superpopulation name',
+            },
+        )
+
     def test_ancestry_pca_typical_run(self, tmp_path: Path):
         # ---- Test setup
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
+        set_config(self.default_config, tmp_path / 'config.toml')
 
         # TODO: move to correct location after analysis_runner bug fixed
         # see: https://github.com/orgs/populationgenomics/projects/17/views/1?pane=issue&itemId=34321186
