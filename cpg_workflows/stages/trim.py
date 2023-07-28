@@ -65,7 +65,7 @@ def get_input_output_pairs(sequencing_group: SequencingGroup) -> list[InOutFastq
     i = 1
     for pair in inputs:
         input_r1_bn = str(pair.r1.name).replace('.fastq.gz', '')
-        input_r2_bn = str(pair.r1.name).replace('.fastq.gz', '')
+        input_r2_bn = str(pair.r2.name).replace('.fastq.gz', '')
         output_r1 = prefix / f'{input_r1_bn}{trim_suffix}'
         output_r2 = prefix / f'{input_r2_bn}{trim_suffix}'
         input_output_pairs.append(InOutFastqPair(
