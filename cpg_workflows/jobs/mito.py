@@ -144,7 +144,7 @@ def collect_coverage_metrics(
         metrics: output file
         theoretical_sensitivity: Undocumented CollectWgsMetrics output?
     """
-    job_attrs = job_attrs or {}
+    job_attrs = (job_attrs or {}) | dict(tool='picard_CollectWgsMetrics')
     j = b.new_job('collect_coverage_metrics', job_attrs)
     j.image(image_path('picard'))
 
