@@ -15,39 +15,38 @@ from ..factories.alignment_input import create_fastq_pairs_input
 from ..factories.sequencing_group import create_sequencing_group
 
 
-def default_config() -> PipelineConfig:
-    return PipelineConfig(
-        workflow=WorkflowConfig(
-            dataset='ancestry-test',
-            access_level='test',
-            sequencing_type='genome',
-            check_inputs=False,
-            scatter_count=20,
-            dataset_gcp_project='cpg-fake-gcp-project',
-            driver_image='fake-driver-image',
-        ),
-        images={
-            'dragmap': 'dragmap_image:1.3.0',
-        },
-        references={
-            'broad': {
-                'ref_fasta': 'hg38_reference.fa',
-                'dragmap_prefix': 'gs://a-cpg-bucket/dragen_reference/',
-            }
-        },
-        large_cohort={
-            'min_pop_prob': 0.5,
-            'n_pcs': 16,
-            'training_pop': 'Superpopulation name',
-        },
-    )
-
-
 class TestAncestryPlots:
+    @cached_property
+    def default_config(self) -> PipelineConfig:
+        return PipelineConfig(
+            workflow=WorkflowConfig(
+                dataset='ancestry-test',
+                access_level='test',
+                sequencing_type='genome',
+                check_inputs=False,
+                scatter_count=20,
+                dataset_gcp_project='cpg-fake-gcp-project',
+                driver_image='fake-driver-image',
+            ),
+            images={
+                'dragmap': 'dragmap_image:1.3.0',
+            },
+            references={
+                'broad': {
+                    'ref_fasta': 'hg38_reference.fa',
+                    'dragmap_prefix': 'gs://a-cpg-bucket/dragen_reference/',
+                }
+            },
+            large_cohort={
+                'min_pop_prob': 0.5,
+                'n_pcs': 16,
+                'training_pop': 'Superpopulation name',
+            },
+        )
+
     def test_ancestry_plots_typical_run(self, tmp_path: Path):
         # ---- Test setup
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
+        set_config(self.default_config, tmp_path / 'config.toml')
 
         # TODO: move to correct location after analysis_runner bug fixed
         # see: https://github.com/orgs/populationgenomics/projects/17/views/1?pane=issue&itemId=34321186
@@ -65,7 +64,7 @@ class TestAncestryPlots:
         out_sample_qc_ht_path = tmp_path / 'outputs' / 'sample_qc.ht'
 
         # -- create job
-        batch = create_local_batch(tmp_path)
+        _ = create_local_batch(tmp_path)
         job = dataproc_job(
             job_name=self.__class__.__name__,
             function=ancestry_plots.run,
