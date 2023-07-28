@@ -4,7 +4,7 @@ Trim raw FASTQ reads using cutadapt
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
-from cpg_utils.hail_batch import command
+from cpg_utils.hail_batch import command, image_path
 from cpg_utils.config import get_config
 from cpg_workflows.utils import can_reuse
 from cpg_workflows.resources import STANDARD
@@ -128,6 +128,7 @@ class Fastp:
         adapter_type: str,
         paired: bool = True,
         min_length: int = 50,
+        nthreads: int = 3,
         polyG: bool = True,
         polyX: bool = False,
     ):
@@ -141,6 +142,7 @@ class Fastp:
             '--out1', str(output_fastq_pair.r1),
             '--length_required', str(min_length),
             '--adapter_sequence', adapters.r1.sequence,
+            '--thread', str(nthreads),
         ]
         if paired:
             self.command.extend([
@@ -185,9 +187,6 @@ def trim(
     if extra_label:
         base_job_name += f' {extra_label}'
     
-    # if number of threads is not requested, using whole instance
-    requested_nthreads = requested_nthreads or STANDARD.max_threads()
-    
     if not get_config()['workflow']['sequencing_type'] == 'rna':
         raise InvalidSequencingTypeException(
             f"Invalid sequencing type '{get_config()['workflow']['sequencing_type']}'" +
@@ -204,8 +203,21 @@ def trim(
     trim_j_name = base_job_name
     trim_j_attrs = (job_attrs or {}) | dict(label=base_job_name, tool=trim_tool)
     trim_j = b.new_job(trim_j_name, trim_j_attrs)
+    # trim_j.image(image_path('fastp'))  # PRODUCTION
+    trim_j.image('australia-southeast1-docker.pkg.dev/cpg-common/images/fastp:0.23.4')  # DEV
+    
+    # Set resource requirements
+    requested_nthreads = requested_nthreads or 8
+    res = STANDARD.set_resources(
+        trim_j,
+        ncpu=requested_nthreads,
+        storage_gb=50,  # TODO: make configurable
+    )
+
+    fastq_pair = input_fq_pair.as_resources(b)
+
     trim_cmd = Fastp(
-        input_fastq_pair=input_fq_pair,
+        input_fastq_pair=fastq_pair,
         output_fastq_pair=FastqPair(
             r1=trim_j.output_r1,
             r2=trim_j.output_r2,
@@ -213,6 +225,7 @@ def trim(
         adapter_type=adapter_type,
         paired=True,
         min_length=50,
+        nthreads=requested_nthreads,
         polyG=True,
         polyX=True,
     )
