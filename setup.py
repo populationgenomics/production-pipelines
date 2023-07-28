@@ -16,7 +16,7 @@ setup(
         'cpg-utils',
         'cyvcf2==0.30.18',
         'analysis-runner>=2.41.2',
-        'hail',
+        'hail==0.2.116',
         'networkx',
         'metamist>=6.0.4',
         'pandas',
