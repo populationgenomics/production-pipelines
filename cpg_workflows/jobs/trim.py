@@ -222,10 +222,7 @@ def trim(
     trim_j_name = base_job_name
     trim_j_attrs = (job_attrs or {}) | dict(label=base_job_name, tool=trim_tool)
     trim_j = b.new_job(trim_j_name, trim_j_attrs)
-    # trim_j.image(image_path('fastp'))  # PRODUCTION
-    trim_j.image(
-        'australia-southeast1-docker.pkg.dev/cpg-common/images/fastp:0.23.4'
-    )  # DEV
+    trim_j.image(image_path('fastp'))
 
     # Set resource requirements
     res = STANDARD.set_resources(
