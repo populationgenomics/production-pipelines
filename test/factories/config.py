@@ -307,6 +307,16 @@ class PipelineConfig:
         self.images[name] = path
         return self
 
+    def set_references(
+        self, name: str, value: str | dict[str, Any]
+    ) -> 'PipelineConfig':
+        self.references[name] = value
+        return self
+
+    def set_large_cohort(self, key: str, value: Any) -> 'PipelineConfig':
+        self.large_cohort[key] = value
+        return self
+
     def set_other(self, key: str, value: dict[str, Any]) -> 'PipelineConfig':
         self.other[key] = value
         return self
@@ -336,3 +346,17 @@ class PipelineConfig:
             config['large_cohort'] = large_cohort
 
         return config
+
+    def dig(self, *keys, default: Any = None, silent=True) -> Any:
+        d = self.as_dict()
+        path_so_far: list[Any] = []
+        for key in keys:
+            if (not silent) and (key not in d):
+                path = ' / '.join([*path_so_far, key])
+                raise KeyError(f"Nested key '{path}' not found in config.")
+            elif key not in d:
+                return default
+            else:
+                d = d[key]
+                path_so_far.append(key)
+        return d
