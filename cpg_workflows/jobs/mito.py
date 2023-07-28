@@ -37,7 +37,7 @@ def subset_cram_to_chrM(
 
     """
 
-    job_attrs = job_attrs or {}
+    job_attrs = (job_attrs or {}) | dict(tool='gatk_PrintReads')
     j = b.new_job('subset_cram_to_chrM', job_attrs)
     j.image(image_path('gatk'))
 
