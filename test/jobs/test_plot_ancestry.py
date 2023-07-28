@@ -54,14 +54,12 @@ class TestAncestryPlots:
 
         # ---- The job that we want to test
         # -- args
-        dense_mt_path = tmp_path / 'DenseSubset.mt'
+        out_path_pattern = tmp_path
         sample_qc_ht_path = tmp_path / 'SampleQC.ht'
-        relateds_to_drop_ht_path = tmp_path / 'Relatedness.mt'
-        out_scores_ht_path = tmp_path / 'outputs' / 'scores.ht'
-        out_eigenvalues_ht_path = tmp_path / 'outputs' / 'eigenvalues.ht'
-        out_loadings_ht_path = tmp_path / 'outputs' / 'loadings.ht'
-        out_inferred_pop_ht_path = tmp_path / 'outputs' / 'inferred_pop.ht'
-        out_sample_qc_ht_path = tmp_path / 'outputs' / 'sample_qc.ht'
+        scores_ht_path = tmp_path / 'Scores.ht'
+        eigenvalues_ht_path = tmp_path / 'eigenvalues.ht'
+        loadings_ht_path = tmp_path / 'loading.ht'
+        inferred_pop_ht_path = tmp_path / 'inferred_pop.ht'
 
         # -- create job
         _ = create_local_batch(tmp_path)
@@ -69,15 +67,12 @@ class TestAncestryPlots:
             job_name=self.__class__.__name__,
             function=ancestry_plots.run,
             function_path_args=dict(
-                dense_mt_path=dense_mt_path,
+                out_path_pattern=out_path_pattern,
                 sample_qc_ht_path=sample_qc_ht_path,
-                relateds_to_drop_ht_path=relateds_to_drop_ht_path,
-                tmp_prefix=tmp_path,
-                out_scores_ht_path=out_scores_ht_path,
-                out_eigenvalues_ht_path=out_eigenvalues_ht_path,
-                out_loadings_ht_path=out_loadings_ht_path,
-                out_inferred_pop_ht_path=out_inferred_pop_ht_path,
-                out_sample_qc_ht_path=out_sample_qc_ht_path,
+                scores_ht_path=scores_ht_path,
+                eigenvalues_ht_path=eigenvalues_ht_path,
+                loadings_ht_path=loadings_ht_path,
+                inferred_pop_ht_path=inferred_pop_ht_path,
             ),
         )
         cmd = get_command_str(job)
@@ -88,13 +83,11 @@ class TestAncestryPlots:
         assert re.search(git_hash, cmd)
         assert re.search('dataproc *submit *--region=australia-southeast1', cmd)
         assert re.search('--pyfiles *cpg_workflows,gnomad_methods/gnomad', cmd)
-        assert re.search('pg_workflows/large_cohort/dataproc_script.py', cmd)
-        assert re.search('pg_workflows.large_cohort.ancestry_pca', cmd)
-        assert re.search(f'-p.*{dense_mt_path}', cmd)
+        assert re.search('cpg_workflows/large_cohort/dataproc_script.py', cmd)
+        assert re.search('cpg_workflows.large_cohort.ancestry_plots', cmd)
+        assert re.search(f'-p.*{out_path_pattern}', cmd)
         assert re.search(f'-p.*{sample_qc_ht_path}', cmd)
-        assert re.search(f'-p.*{relateds_to_drop_ht_path}', cmd)
-        assert re.search(f'-p.*{out_scores_ht_path}', cmd)
-        assert re.search(f'-p.*{out_eigenvalues_ht_path}', cmd)
-        assert re.search(f'-p.*{out_loadings_ht_path}', cmd)
-        assert re.search(f'-p.*{out_inferred_pop_ht_path}', cmd)
-        assert re.search(f'-p.*{out_sample_qc_ht_path}', cmd)
+        assert re.search(f'-p.*{scores_ht_path}', cmd)
+        assert re.search(f'-p.*{eigenvalues_ht_path}', cmd)
+        assert re.search(f'-p.*{loadings_ht_path}', cmd)
+        assert re.search(f'-p.*{inferred_pop_ht_path}', cmd)
