@@ -48,6 +48,7 @@ SHIFTED_MITO_REF = {
     'fai': str(reference_path('gnomad_mito/shifted_fai')),
     'pac': str(reference_path('gnomad_mito/shifted_pac')),
     'sa': str(reference_path('gnomad_mito/shifted_sa')),
+    'shift_back_chain': str(reference_path('gnomad_mito/shift_back_chain')),
 }
 
 CONTROL_REGION_INTERVALS = {
