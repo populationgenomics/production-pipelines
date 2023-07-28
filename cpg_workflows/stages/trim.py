@@ -30,9 +30,12 @@ def get_trim_inputs(sequencing_group: SequencingGroup) -> FastqPairs | None:
     sequencing_type = get_config()['workflow']['sequencing_type']
     alignment_input = sequencing_group.alignment_input_by_seq_type.get(sequencing_type)
     if (
-        not alignment_input or
-        (get_config()['workflow'].get('check_inputs', True) and not alignment_input.exists()) or
-        not isinstance(alignment_input, (FastqPair, FastqPairs))
+        not alignment_input
+        or (
+            get_config()['workflow'].get('check_inputs', True)
+            and not alignment_input.exists()
+        )
+        or not isinstance(alignment_input, (FastqPair, FastqPairs))
     ):
         return None
     if isinstance(alignment_input, FastqPair):
@@ -63,15 +66,19 @@ def get_input_output_pairs(sequencing_group: SequencingGroup) -> list[InOutFastq
     trim_suffix = '.trimmed.fastq.gz'
     input_output_pairs = []
     for i, pair in enumerate(inputs, 1):
+        assert isinstance(pair.r1, Path)
+        assert isinstance(pair.r2, Path)
         input_r1_bn = str(pair.r1.name).replace('.fastq.gz', '')
         input_r2_bn = str(pair.r2.name).replace('.fastq.gz', '')
         output_r1 = prefix / f'{input_r1_bn}{trim_suffix}'
         output_r2 = prefix / f'{input_r2_bn}{trim_suffix}'
-        input_output_pairs.append(InOutFastqPair(
-            str(i),  # ID
-            pair,  # input FASTQ pair
-            FastqPair(output_r1, output_r2),  # output FASTQ pair
-        ))
+        input_output_pairs.append(
+            InOutFastqPair(
+                str(i),  # ID
+                pair,  # input FASTQ pair
+                FastqPair(output_r1, output_r2),  # output FASTQ pair
+            )
+        )
     return input_output_pairs
 
 
@@ -86,10 +93,12 @@ def get_output_dict(sequencing_group: SequencingGroup) -> dict[str, Path]:
     for io_pair in input_output_pairs:
         r1_id = f'{io_pair.id}_R1'
         r2_id = f'{io_pair.id}_R2'
-        out_dict.update({
-            f'fastq_{r1_id}': io_pair.output_pair.r1,
-            f'fastq_{r2_id}': io_pair.output_pair.r2,
-        })
+        out_dict.update(
+            {
+                f'fastq_{r1_id}': io_pair.output_pair.r1,
+                f'fastq_{r2_id}': io_pair.output_pair.r2,
+            }
+        )
     return out_dict
 
 
@@ -105,7 +114,9 @@ class Trim(SequencingGroupStage):
         """
         return get_output_dict(sequencing_group)
 
-    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(
+        self, sequencing_group: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         """
         Queue a cutadapt job for each FASTQ file
         """
@@ -120,15 +131,19 @@ class Trim(SequencingGroupStage):
                     output_fq_pair=io_pair.output_pair,
                     job_attrs=self.get_job_attrs(sequencing_group),
                     overwrite=sequencing_group.forced,
-                    extra_label=f'fastq_pair_{io_pair.id}'
+                    extra_label=f'fastq_pair_{io_pair.id}',
                 )
                 if j:
                     jobs.append(j)
             except trim.MissingFastqInputException:
                 if get_config()['workflow'].get('skip_sgs_with_missing_input'):
-                    logging.error(f'No FASTQ inputs, skipping sample {sequencing_group}')
+                    logging.error(
+                        f'No FASTQ inputs, skipping sample {sequencing_group}'
+                    )
                     sequencing_group.active = False
-                    return self.make_outputs(sequencing_group, skipped=True)  # return empty output
+                    return self.make_outputs(
+                        sequencing_group, skipped=True
+                    )  # return empty output
                 else:
                     return self.make_outputs(
                         target=sequencing_group, error_msg=f'No FASTQ input found'
