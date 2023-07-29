@@ -97,7 +97,7 @@ def mito_realign(
     https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignmentPipeline.wdl#L59
 
     """
-    job_attrs = job_attrs or {}
+    job_attrs = job_attrs or {} | dict(tool='bwa')
     j = b.new_job('mito_realign', job_attrs)
     j.image(image_path('bwa'))
 
@@ -193,7 +193,7 @@ def extract_coverage_mean(
         job.mean_coverage: mean coverage of chrM
         job.median_coverage: median coverage of chrM
     """
-    job_attrs = job_attrs or {}
+    job_attrs = job_attrs or {} | dict(tool='R')
     j = b.new_job('extract_coverage_mean', job_attrs)
     j.image(image_path('peer'))
 
@@ -244,7 +244,7 @@ def coverage_at_every_base(
         job.per_base_coverage
         job.hs_metrics_out
     """
-    job_attrs = job_attrs or {}
+    job_attrs = job_attrs or {} | dict(tool='picard_CollectHsMetrics')
     j = b.new_job('coverage_at_every_base', job_attrs)
     j.image(image_path('picard'))
 
@@ -288,7 +288,7 @@ def merge_coverage(
     Outputs:
         job.merged_coverage: Merged coverage tsv.
     """
-    job_attrs = job_attrs or {}
+    job_attrs = job_attrs or {} | dict(tool='R')
     j = b.new_job('merge_coverage', job_attrs)
     j.image(image_path('peer'))
 
@@ -347,7 +347,7 @@ def mito_mutect2(
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L417-L484
     """
-    job_attrs = job_attrs or {}
+    job_attrs = job_attrs or {} | dict(tool='Mutect2')
     j = b.new_job('mito_mutect2', job_attrs)
     j.image(image_path('gatk'))
 
@@ -404,7 +404,7 @@ def liftover_and_combine_vcfs(
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL360-L415C2
     """
-    job_attrs = job_attrs or {}
+    job_attrs = job_attrs or {} | dict(tool='picard_LiftoverVcf')
     j = b.new_job('liftover_and_combine_vcfs', job_attrs)
     j.image(image_path('picard'))
 
@@ -455,7 +455,7 @@ def merge_mutect_stats(
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#LL573-L598C2
     """
-    job_attrs = job_attrs or {}
+    job_attrs = job_attrs or {} | dict(tool='gatk_MergeMutectStats')
     j = b.new_job('merge_stats', job_attrs)
     j.image(image_path('gatk'))
 
@@ -511,7 +511,7 @@ def filter_variants(
     Note:
         contamination_estimate pre-calculation has been moved out of this function.
     """
-    job_attrs = job_attrs or {}
+    job_attrs = job_attrs or {} | dict(tool='gatk_FilterMutectCalls')
     j = b.new_job('filter_variants', job_attrs)
     j.image(image_path('gatk'))
 
@@ -578,7 +578,7 @@ def split_multi_allelics(
     Cmd from:
     https://github.com/broadinstitute/gatk/blob/4ba4ab5900d88da1fcf62615aa038e5806248780/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L600
     """
-    job_attrs = job_attrs or {}
+    job_attrs = job_attrs or {} | dict(tool='gatk_SelectVariants')
     j = b.new_job('split_multi_allelics', job_attrs)
     j.image(image_path('gatk'))
 
@@ -639,7 +639,7 @@ def get_contamination(
     Cmd from:
       https://github.com/broadinstitute/gatk/blob/227bbca4d6cf41dbc61f605ff4a4b49fc3dbc337/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L239
     """
-    job_attrs = job_attrs or {}
+    job_attrs = job_attrs or {} | dict(tool='haplocheckcli')
     j = b.new_job('get_contamination', job_attrs)
     j.image(image_path('haplocheckcli'))
 
@@ -685,7 +685,6 @@ def parse_contamination_results(
 
     STANDARD.set_resources(j, ncpu=4)
 
-    # TODO: move this function when we have updated the driver image
     def parse_contamination_worker(
         haplocheck_report: str, verifybamid_report: str | None
     ) -> float:
