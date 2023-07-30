@@ -202,6 +202,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
     ]
 
     for job in get_batch()._jobs:
+        assert job.attributes
         for key in job.attributes:
             assert key in expected_attrs
         assert job.attributes['stage'] in [s.__name__ for s in workflow_stages]
@@ -215,6 +216,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
             or job.attributes['sequencing_groups'] == "['CPG02']"
         )
         # test job name
+        assert job.name
         assert job.name.startswith(
             f'{get_cohort().get_datasets()[0].name}/{job.attributes["sequencing_group"]}/{job.attributes["participant_id"]}'
         )
