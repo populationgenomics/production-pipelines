@@ -118,6 +118,7 @@ def markdup(
     job_attrs: dict | None = None,
     output_path: Path | None = None,
     out_markdup_metrics_path: Path | None = None,
+    fasta_reference: hb.ResourceGroup | None = None,
     overwrite: bool = False,
 ) -> Job | None:
     """
@@ -153,7 +154,9 @@ def markdup(
             'cram.crai': '{root}.cram.crai',
         }
     )
-    fasta_reference = fasta_res_group(b)
+
+    if fasta_reference is None:
+        fasta_reference = fasta_res_group(b)
 
     assert isinstance(j.output_cram, hb.ResourceGroup)
     cmd = f"""
