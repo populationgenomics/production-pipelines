@@ -169,6 +169,7 @@ class TestAllLargeCohortMethods:
         )
 
         dense_mt_path = res_pref / 'dense.mt'
+        print(f'How about this, then? {type(dense_subset)=}')
         dense_subset.run(
             vds_path=vds_path,
             out_dense_mt_path=dense_mt_path,
