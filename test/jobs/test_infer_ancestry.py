@@ -62,7 +62,7 @@ class TestAncestryPCA:
         out_sample_qc_ht_path = tmp_path / 'outputs' / 'sample_qc.ht'
 
         # -- create job
-        batch = create_local_batch(tmp_path)
+        _ = create_local_batch(tmp_path)
         job = dataproc_job(
             job_name=self.__class__.__name__,
             function=ancestry_pca.run,
