@@ -93,8 +93,12 @@ def run(
             params['intervals'] = hl.import_locus_intervals(params['intervals'])
     elif get_config()['workflow']['sequencing_type'] == 'exome':
         params.setdefault('use_exome_default_intervals', True)
+        # Hail treats empty list as valid, so set None
+        params['intervals'] = None
     elif get_config()['workflow']['sequencing_type'] == 'genome':
         params.setdefault('use_genome_default_intervals', True)
+        # Hail treats empty list as valid, so set None
+        params['intervals'] = None
     else:
         raise ValueError(
             'Either combiner/intervals must be set, or workflow/sequencing_type '
