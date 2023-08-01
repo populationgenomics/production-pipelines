@@ -6,7 +6,7 @@ You will need the following software installed to complete this setup:
 - Python 3.10.x (there have been some issues with 3.11)
 - Java 8 or Java 11 (required for running Hail locally)
 
-Since most of our org use Apple laptos for developmnent, this rest of this guide assumes
+Since most of our org use Apple laptops for development, this rest of this guide assumes
 that you are operating in a macOS environment.
 
 ## Homebrew
