@@ -11,7 +11,7 @@ that you are operating in a macOS environment.
 
 ## Homebrew
 
-Setup homebrew according to the instructions [here](https://brew.sh/). Before closing
+Set up homebrew according to the instructions [here](https://brew.sh/). Before closing
 your terminal, please read any output from the installation script because it may print
 additional instructions on how to complete the setup. Before proceeding, ensure that it
 has installed correctly by running `brew doctor` in your terminal and checking that the
