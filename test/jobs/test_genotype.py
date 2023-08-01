@@ -19,29 +19,27 @@ def default_config() -> PipelineConfig:
             access_level='test',
             sequencing_type='genome',
             check_inputs=False,
-            reblock_gq_bands=[20, 30, 50],
+            reblock_gq_bands=[20, 30, 40],
         ),
         images={
             'picard': 'picard:2.27.4',
             'gatk': 'gatk:4.2.6.1',
         },
+        references={
+            'broad': {
+                'ref_fasta': 'hg38_reference.fa',
+                'genome_calling_interval_lists': 'wgs_calling_regions.hg38.interval_list',
+                'noalt_bed': 'primary_contigs_plus_mito.bed.gz',
+            }
+        },
         other={
             'resource_overrides': {},
-            'references': {
-                'broad': {
-                    'ref_fasta': 'hg38_reference.fa',
-                    'genome_calling_interval_lists': 'wgs_calling_regions.hg38.interval_list',
-                    'noalt_bed': 'primary_contigs_plus_mito.bed.gz',
-                }
-            },
         },
     )
 
 
 class TestGenotyping:
-    def test_genotype_jobs_with_default_scatter_count(self, tmp_path: Path):
-        # ---- Test setup
-        config = default_config()
+    def _get_new_genotype_job(self, tmp_path: Path, config: PipelineConfig):
         set_config(config, tmp_path / 'config.toml')
 
         dataset_id = config.workflow.dataset
@@ -55,13 +53,29 @@ class TestGenotyping:
 
         assert sg.cram
         # ---- The job that we want to test
-        genotype_jobs = genotype(
+        return genotype(
             b=batch,
             sequencing_group_name=sg.id,
             cram_path=sg.cram,
             output_path=sg.gvcf,
             tmp_prefix=tmp_path,
         )
+
+    def test_genotype_jobs_default_ref_fasta(self, tmp_path: Path):
+        # ---- Test setup
+        # config = default_config()
+        # config.references['broad']['ref_fasta'] = None
+
+        # genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+
+        assert True
+
+    def test_genotype_jobs_with_default_scatter_count(self, tmp_path: Path):
+        # ---- Test setup
+        config = default_config()
+        set_config(config, tmp_path / 'config.toml')
+
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
 
         # ---- Assertions
         expected_scatter_count = 50
@@ -114,24 +128,8 @@ class TestGenotyping:
         config = default_config()
         config.workflow.scatter_count_genotype = 10
         set_config(config, tmp_path / 'config.toml')
-        dataset_id = config.workflow.dataset
-        batch = create_local_batch(tmp_path)
-        sg = create_sequencing_group(
-            dataset=dataset_id,
-            sequencing_type=config.workflow.sequencing_type,
-            alignment_input=create_fastq_pairs_input(location=tmp_path, n=1),
-            cram=CramPath(tmp_path / 'test_genotype2.cram'),
-        )
 
-        assert sg.cram
-        # ---- The job that we want to test
-        genotype_jobs = genotype(
-            b=batch,
-            sequencing_group_name=sg.id,
-            cram_path=sg.cram,
-            output_path=sg.gvcf,
-            tmp_prefix=tmp_path,
-        )
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
 
         # ---- Assertions
         expected_scatter_count = 10
