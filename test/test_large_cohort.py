@@ -29,9 +29,14 @@ from . import set_config
 from .factories.config import HailConfig, PipelineConfig, StorageConfig, WorkflowConfig
 from .factories.sequencing_group import create_sequencing_group
 from .factories.types import SequencingType
+
 # test imports
 import pytest
 from hail.utils.java import FatalError
+import hail as hl
+from cpg_workflows.inputs import get_cohort
+from cpg_utils.config import get_config
+from unittest.mock import _ANY
 
 ref_prefix = to_path(__file__).parent / 'data/large_cohort/reference'
 gnomad_prefix = ref_prefix / 'gnomad/v0'
@@ -128,13 +133,16 @@ def create_config(
     )
 
 
-def _mock_cohort(dataset_id: str):
+def _mock_cohort(dataset_id: str, *create_duplicates: bool):
     dataset = Dataset(name=dataset_id)
 
     # Parse gVCF files from the test/data/large_cohort/gvcf directory
     gvcf_root = to_path(__file__).parent / 'data' / 'large_cohort' / 'gvcf'
     found_gvcf_paths = list(gvcf_root.glob('*.g.vcf.gz'))
     assert len(found_gvcf_paths) > 0, gvcf_root
+
+    if create_duplicates:
+        found_gvcf_paths += found_gvcf_paths[:2]
 
     for gvcf_path in found_gvcf_paths:
         sequencing_group_id = gvcf_path.name.split('.')[0]
@@ -144,10 +152,10 @@ def _mock_cohort(dataset_id: str):
             dataset=dataset,
             gvcf=GvcfPath(gvcf_path),
         )
-
     cohort = Cohort()
     cohort.add_dataset(dataset)
     return cohort
+
 
 class TestCombiner:
     def test_fails_if_given_invalid_chromosome_that_does_not_exist(
@@ -181,7 +189,6 @@ class TestCombiner:
         with pytest.raises(FatalError, match='invalid interval expression'):
             combiner.run(out_vds_path=vds_path, tmp_prefix=res_pref / 'tmp')
 
-    @MockFixture
     def test_uses_default_genome_intervals_if_intervals_are_not_specified(
         self, mocker: MockFixture, tmp_path: Path
     ):
@@ -195,7 +202,7 @@ class TestCombiner:
             gnomad_prefix=gnomad_prefix,
             broad_prefix=broad_prefix,
         )
-        conf.large_cohort['combiner']['intervals'] = [] # set to empty list
+        conf.large_cohort['combiner']['intervals'] = []  # set to empty list
 
         # Set config and patch cohort
         set_config(
@@ -209,16 +216,18 @@ class TestCombiner:
             lambda: _mock_cohort(conf.workflow.dataset),
         )
 
+        # Create a spy on hl.vds.new_combiner
+        spy_new_combiner = mocker.spy(hl.vds, 'new_combiner')
+
         # Run the combiner function
         start_query_context()
         res_pref = tmp_path
         vds_path = res_pref / 'v01.vds'
-        combined = combiner.run(out_vds_path=vds_path, tmp_prefix=res_pref / 'tmp')
-        print()
-        # wrtie a pytest_mock that replicates a combiner.run() call and tests whether
-        # 'params' attribute = {'intervals': [], 'use_genome_default_intervals': True}
-        # Hint: read about pytest_mock spy from the guide in the testing google document
-        
+        # FIXME: make this fast
+        combiner.run(out_vds_path=vds_path, tmp_prefix=res_pref / 'tmp')
+
+        # Check that hl.vds.new_combiner was called with the expected arguments
+        assert spy_new_combiner.call_args[1]['use_genome_default_intervals'] == True
 
     def test_uses_default_exome_intervals_if_intervals_are_not_specified(
         self, mocker: MockFixture, tmp_path: Path
@@ -229,17 +238,89 @@ class TestCombiner:
         # Hint: read about pytest_mock spy from the guide in the testing google document
         pass
 
-    def test_fails_if_given_malformed_intervals(
-        self, mocker: MockFixture, tmp_path: Path
+    def test_fails_if_given_malformed_intervals(  # TODO: Finish creating test examples
+        self,
+        mocker: MockFixture,
+        tmp_path: Path,
     ):
         # See https://hail.is/docs/0.2/functions/genetics.html#hail.expr.functions.parse_locus_interval
         # for valid formats
-        pass
+
+        # Creating a config and modyfing it in some way
+        conf = create_config(
+            tmp_path,
+            seq_type='genome',
+            gnomad_prefix=gnomad_prefix,
+            broad_prefix=broad_prefix,
+        )
+
+        invalid = [
+            'this_shouldnt_work',  # Junk string
+            'CHR1:POS1-CHR1:100M',
+            'CHR2:POS2-CHR1:POS1',  # The start locus ("CHR2:POS2") must precede the end locus ("CHR1:POS1").
+            'CHR1:POS2-CHR1:POS1',  # The start position ("POS2") must be less than the end position ("POS1") within the same contig ("CHR1")
+            'CHR1:POS1-CHR1:START',  # The position "START" stands for 1, so it should not be used as an end position in the interval
+        ]
+
+        context_started = False
+
+        with open(tmp_path / 'intervals.txt'):  # test if can read intervals from txt
+            pass
+
+        for interval in invalid:
+            # Intervals that should break parsing
+            conf.large_cohort['combiner']['intervals'] = [interval]
+
+            # Set config and patch cohort
+            set_config(
+                conf,
+                tmp_path / 'config.toml',
+                merge_with=[DEFAULT_CONFIG, LARGE_COHORT_CONFIG],
+            )
+
+            mocker.patch(
+                'cpg_workflows.inputs.create_cohort',
+                lambda: _mock_cohort(conf.workflow.dataset),
+            )
+
+            # Run the combiner function
+            if not context_started:
+                start_query_context()
+                context_started = True
+
+            res_pref = tmp_path
+            vds_path = res_pref / 'v01.vds'
+            with pytest.raises(FatalError, match='invalid interval'):
+                combiner.run(out_vds_path=vds_path, tmp_prefix=res_pref / 'tmp')
 
     def test_fails_if_given_duplicate_sequencing_groups(
         self, mocker: MockFixture, tmp_path: Path
     ):
-        pass
+        # Creating a config and modyfing it in some way
+        conf = create_config(
+            tmp_path,
+            seq_type='genome',
+            gnomad_prefix=gnomad_prefix,
+            broad_prefix=broad_prefix,
+        )
+        conf.large_cohort['combiner']['intervals'] = []  # set to empty list
+
+        # Set config and patch cohort
+        set_config(
+            conf,
+            tmp_path / 'config.toml',
+            merge_with=[DEFAULT_CONFIG, LARGE_COHORT_CONFIG],
+        )
+
+        mocker.patch(
+            'cpg_workflows.inputs.create_cohort',
+            lambda: _mock_cohort(conf.workflow.dataset, True),
+        )
+
+        res_pref = tmp_path
+        vds_path = res_pref / 'v01.vds'
+        combiner.run(out_vds_path=vds_path, tmp_prefix=res_pref / 'tmp')
+        print()
 
     def test_fails_if_given_two_sequencing_groups_with_the_same_gvcf_path(
         self, mocker: MockFixture, tmp_path: Path
@@ -250,7 +331,48 @@ class TestCombiner:
     def test_calls_hail_combiner_with_correct_parameters(
         self, mocker: MockFixture, tmp_path: Path, seq_type: SequencingType
     ):
-        pass
+        # Creating a config and modyfing it in some way
+        conf = create_config(
+            tmp_path,
+            seq_type=seq_type,
+            gnomad_prefix=gnomad_prefix,
+            broad_prefix=broad_prefix,
+        )
+        conf.large_cohort['combiner']['intervals'] = []
+
+        # Set config and patch cohort
+        set_config(
+            conf,
+            tmp_path / 'config.toml',
+            merge_with=[DEFAULT_CONFIG, LARGE_COHORT_CONFIG],
+        )
+
+        mocker.patch(
+            'cpg_workflows.inputs.create_cohort',
+            lambda: _mock_cohort(conf.workflow.dataset),
+        )
+
+        # Create a spy on hl.vds.new_combiner
+        spy_new_combiner = mocker.spy(hl.vds, 'new_combiner')
+
+        # Run the combiner function
+        start_query_context()
+        res_pref = tmp_path
+        vds_path = res_pref / 'v01.vds'
+        combiner.run(out_vds_path=vds_path, tmp_prefix=res_pref / 'tmp')
+
+        # Check that hl.vds.new_combiner was called with the expected arguments
+        is_exome_seq = seq_type == 'exome'
+        is_genome_seq = seq_type == 'genome'
+
+        if is_exome_seq:
+            assert spy_new_combiner.call_args[1][
+                'use_exome_default_intervals'
+            ], "use_exome_default_intervals should be True for exome sequencing."
+        if is_genome_seq:
+            assert spy_new_combiner.call_args[1][
+                'use_genome_default_intervals'
+            ], "use_genome_default_intervals should be True for genome sequencing."
 
     def test_fails_if_all_sequencing_groups_do_not_have_a_gvcf_file(
         self, mocker: MockFixture, tmp_path: Path
