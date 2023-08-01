@@ -112,7 +112,6 @@ pip install gnomad_methods/ .
 pip install -r seqr-loading-pipelines/luigi_pipeline/requirements.txt
 pip install .
 pip install -r requirements-dev.txt
-pip install cloudpathlib==0.13.0 luigi==3.3.0
 ```
 
 # Visual Studio Code
