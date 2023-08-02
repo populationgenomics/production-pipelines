@@ -4,6 +4,7 @@ from pathlib import Path
 from functools import cached_property
 
 from cpg_workflows.batch import Batch
+from cpg_workflows.filetypes import BamPath
 from cpg_workflows.jobs.picard import (
     get_intervals,
     markdup,
@@ -12,6 +13,7 @@ from cpg_workflows.jobs.picard import (
     picard_hs_metrics,
     picard_wgs_metrics,
 )
+from cpg_utils.hail_batch import fasta_res_group
 
 from .. import set_config
 from ..factories.alignment_input import create_fastq_pairs_input
@@ -39,6 +41,9 @@ class TestPicard:
                     'broad': {
                         'ref_fasta': 'hg38_reference.fa',
                     }
+                },
+                'resource_overrides': {
+                    'picard_storage_gb': 1,
                 },
             },
         )
@@ -93,15 +98,25 @@ class TestPicard:
             assert re.search(f'temp_{i:04d}_of_{scatter_count}', cmd)
             assert re.search(f'/{i}.interval_list', cmd)
 
+        return
+
     def test_markdup(self, tmp_path: Path):
         # ---- Test setup
         batch = self._setup(self.default_config, tmp_path)
 
         # ---- The job we want to test
-        pass
+        sorted_bam = BamPath(
+            path=tmp_path / 'sorted.bam', index_path=tmp_path / 'sorted.bam.bai'
+        )
+        job = markdup(
+            b=batch,
+            sorted_bam=sorted_bam,
+        )
+        cmd = get_command_str(job)
 
         # ---- Assertions
-        assert False
+        assert re.search('I=\S*sorted.bam', cmd)
+        assert re.search('-T\s*\S*hg38_reference.fa', cmd)
 
     def test_vcf_qc(self, tmp_path: Path):
         # ---- Test setup
