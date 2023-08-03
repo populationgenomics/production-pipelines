@@ -4,7 +4,7 @@ from pathlib import Path
 from functools import cached_property
 
 from cpg_workflows.batch import Batch
-from cpg_workflows.filetypes import BamPath
+from cpg_workflows.filetypes import BamPath, GvcfPath
 from cpg_workflows.jobs.picard import (
     get_intervals,
     markdup,
@@ -36,12 +36,15 @@ class TestPicard:
             images={
                 'picard': 'picard_image:1.3.0',
             },
+            references={
+                'broad': {
+                    'ref_fasta': 'hg38_reference.fa',
+                    'dbsnp_vcf': 'dbsnp.vcf.gz',
+                    'dbsnp_vcf_index': 'dbsnp.vcf.gz.tbi',
+                    'genome_evaluation_interval_lists': 'intervals.txt',
+                }
+            },
             other={
-                'references': {
-                    'broad': {
-                        'ref_fasta': 'hg38_reference.fa',
-                    }
-                },
                 'resource_overrides': {
                     'picard_storage_gb': 1,
                 },
@@ -118,15 +121,35 @@ class TestPicard:
         assert re.search('I=\S*sorted.bam', cmd)
         assert re.search('-T\s*\S*hg38_reference.fa', cmd)
 
-    def test_vcf_qc(self, tmp_path: Path):
+    @pytest.mark.parametrize('gvcf', ['file.gvcf.gz', 'file.gvcf'])
+    @pytest.mark.parametrize('dbsnp', ['dbsnp.vcf.gz', 'DBSNP.vcf.gz'])
+    @pytest.mark.parametrize('intervals', ['intervals.txt', 'intrvls.txt'])
+    def test_vcf_qc(self, tmp_path: Path, gvcf: GvcfPath, dbsnp: str, intervals: str):
         # ---- Test setup
-        batch = self._setup(self.default_config, tmp_path)
+        config = self.default_config
+        config.references['broad']['dbsnp_vcf'] = dbsnp
+        config.references['broad']['dbsnp_vcf_index'] = dbsnp + '.tbi'
+        config.references['broad']['genome_evaluation_interval_lists'] = intervals
+        batch = self._setup(config, tmp_path)
 
         # ---- The job we want to test
-        pass
+        gvcf_path = GvcfPath(tmp_path / gvcf)
+        job = vcf_qc(
+            b=batch,
+            vcf_or_gvcf=gvcf_path.resource_group(batch),
+            is_gvcf=True,
+            sequencing_group_count=100,
+            output_summary_path=tmp_path / 'summary.txt',
+            output_detail_path=tmp_path / 'output.txt',
+            overwrite=False,
+        )
+        cmd = get_command_str(job)
 
         # ---- Assertions
-        assert False
+        assert re.search(f'INPUT=\S*{gvcf}', cmd)
+        assert re.search(f'DBSNP=\S*{dbsnp}', cmd)
+        assert re.search(f'TARGET_INTERVALS=\S*{intervals}', cmd)
+        assert re.search(f'GVCF_INPUT=true', cmd)
 
     def test_picard_collect_metrics(self, tmp_path: Path):
         # ---- Test setup
