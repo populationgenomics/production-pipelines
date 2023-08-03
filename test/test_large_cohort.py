@@ -4,16 +4,22 @@ Test large-cohort workflow.
 
 from os.path import exists
 from pathlib import Path
+from unittest.mock import _ANY
 
+import hail as hl
+
+# test imports
 import pytest
 from cpg_utils import Path as CPGPath
 from cpg_utils import to_path
+from cpg_utils.config import get_config
 from cpg_utils.hail_batch import start_query_context
+from hail.utils import FatalError
+from hail.utils.java import FatalError
 from pytest_mock import MockFixture
 
-from hail.utils import FatalError
-
 from cpg_workflows.filetypes import GvcfPath
+from cpg_workflows.inputs import get_cohort
 from cpg_workflows.large_cohort import (
     ancestry_pca,
     ancestry_plots,
@@ -29,14 +35,6 @@ from . import set_config
 from .factories.config import HailConfig, PipelineConfig, StorageConfig, WorkflowConfig
 from .factories.sequencing_group import create_sequencing_group
 from .factories.types import SequencingType
-
-# test imports
-import pytest
-from hail.utils.java import FatalError
-import hail as hl
-from cpg_workflows.inputs import get_cohort
-from cpg_utils.config import get_config
-from unittest.mock import _ANY
 
 ref_prefix = to_path(__file__).parent / 'data/large_cohort/reference'
 gnomad_prefix = ref_prefix / 'gnomad/v0'
@@ -264,9 +262,6 @@ class TestCombiner:
 
         context_started = False
 
-        with open(tmp_path / 'intervals.txt'):  # test if can read intervals from txt
-            pass
-
         for interval in invalid:
             # Intervals that should break parsing
             conf.large_cohort['combiner']['intervals'] = [interval]
@@ -292,6 +287,11 @@ class TestCombiner:
             vds_path = res_pref / 'v01.vds'
             with pytest.raises(FatalError, match='invalid interval'):
                 combiner.run(out_vds_path=vds_path, tmp_prefix=res_pref / 'tmp')
+
+    def test_can_pull_intervals_from_file(self, mocker: MockFixture, tmp_path: Path):
+        with open(tmp_path / 'intervals.txt'):  # test if can read intervals from txt
+            pass
+        pass
 
     def test_fails_if_given_duplicate_sequencing_groups(
         self, mocker: MockFixture, tmp_path: Path
