@@ -4,7 +4,7 @@ from pathlib import Path
 from functools import cached_property
 
 from cpg_workflows.batch import Batch
-from cpg_workflows.filetypes import BamPath, GvcfPath
+from cpg_workflows.filetypes import BamPath, CramPath, GvcfPath
 from cpg_workflows.jobs.picard import (
     get_intervals,
     markdup,
@@ -48,6 +48,7 @@ class TestPicard:
                 'resource_overrides': {
                     'picard_storage_gb': 1,
                 },
+                'cramqc': {'assume_sorted': False},
             },
         )
 
@@ -151,15 +152,36 @@ class TestPicard:
         assert re.search(f'TARGET_INTERVALS=\S*{intervals}', cmd)
         assert re.search(f'GVCF_INPUT=true', cmd)
 
-    def test_picard_collect_metrics(self, tmp_path: Path):
+    @pytest.mark.parametrize('cram', ['file.cram', 'file2.cram'])
+    @pytest.mark.parametrize('assume_sorted', [True, False])
+    def test_picard_collect_metrics(
+        self, tmp_path: Path, cram: str, assume_sorted: bool
+    ):
         # ---- Test setup
-        batch = self._setup(self.default_config, tmp_path)
+        config = self.default_config
+        config.other['cramqc']['assume_sorted'] = assume_sorted
+        batch = self._setup(config, tmp_path)
 
         # ---- The job we want to test
-        pass
+        cram_path = CramPath(
+            path=tmp_path / cram, index_path=tmp_path / (cram + '.crai')
+        )
+        job = picard_collect_metrics(
+            b=batch,
+            cram_path=cram_path,
+            out_alignment_summary_metrics_path=tmp_path / 'algn_summary_metrics.txt',
+            out_base_distribution_by_cycle_metrics_path=tmp_path / 'base_dist.txt',
+            out_insert_size_metrics_path=tmp_path / 'insrt_size_metrics.txt',
+            out_quality_by_cycle_metrics_path=tmp_path / 'qual_by_cycle.txt',
+            out_quality_yield_metrics_path=tmp_path / 'qual_yield_by_cycle.txt',
+        )
+        cmd = get_command_str(job)
 
         # ---- Assertions
-        assert False
+        assert re.search(f'CRAM=\$BATCH_TMPDIR/{cram}', cmd)
+        assert re.search(f'CRAI=\$BATCH_TMPDIR/{cram}.crai', cmd)
+        assert re.search('REFERENCE_SEQUENCE=\S+hg38_reference.fa', cmd)
+        assert re.search(f'ASSUME_SORTED={assume_sorted}', cmd)
 
     def test_picard_hs_metrics(self, tmp_path: Path):
         # ---- Test setup
@@ -180,56 +202,3 @@ class TestPicard:
 
         # ---- Assertions
         assert False
-
-    # def test_creates_one_align_job(self, tmp_path: Path):
-    #     # ---- Test setup
-    #     config = default_config()
-    #     set_config(config, tmp_path / 'config.toml')
-
-    #     dataset_id = config.workflow.dataset
-    #     batch = create_local_batch(tmp_path)
-    #     sg = create_sequencing_group(
-    #         dataset=dataset_id,
-    #         sequencing_type=config.workflow.sequencing_type,
-    #         alignment_input=create_fastq_pairs_input(location=tmp_path, n=1),
-    #     )
-
-    #     # ---- The job that we want to test
-    #     _ = align(
-    #         b=batch,
-    #         sequencing_group=sg,
-    #         extra_label=dataset_id,
-    #         aligner=Aligner.DRAGMAP,
-    #         markdup_tool=MarkDupTool.NO_MARKDUP,
-    #     )
-
-    #     # ---- Assertions
-    #     align_jobs = batch.select_jobs(rf'(.*){dataset_id}(.*)')
-    #     assert len(align_jobs) == 1
-
-    # def test_sorts_output_with_bamtools(self, tmp_path: Path):
-    #     # ---- Test setup
-    #     config = default_config()
-    #     set_config(config.as_dict(), tmp_path / 'config.toml')
-
-    #     dataset_id = config.workflow.dataset
-    #     batch = create_local_batch(tmp_path)
-    #     sg = create_sequencing_group(
-    #         dataset=dataset_id,
-    #         sequencing_type=config.workflow.sequencing_type,
-    #         alignment_input=create_fastq_pairs_input(location=tmp_path, n=1),
-    #     )
-
-    #     # ---- The job that we want to test
-    #     _ = align(
-    #         b=batch,
-    #         sequencing_group=sg,
-    #         extra_label=dataset_id,
-    #         aligner=Aligner.DRAGMAP,
-    #         markdup_tool=MarkDupTool.NO_MARKDUP,
-    #     )
-
-    #     # ---- Assertions
-    #     align_jobs = batch.select_jobs(rf'(.*){dataset_id}(.*)')
-    #     cmd = get_command_str(align_jobs[0])
-    #     assert re.search(r'\| samtools sort .* -Obam', cmd)
