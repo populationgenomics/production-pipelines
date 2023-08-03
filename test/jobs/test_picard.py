@@ -97,11 +97,11 @@ class TestPicard:
             assert job is None
             return
 
-        assert re.search(f'INPUT=\S*{source_intervals_path}', cmd)
+        assert re.search(rf'INPUT=\S*{source_intervals_path}', cmd)
 
         for i in range(1, scatter_count + 1):
-            assert re.search(f'temp_{i:04d}_of_{scatter_count}', cmd)
-            assert re.search(f'/{i}.interval_list', cmd)
+            assert re.search(rf'temp_{i:04d}_of_{scatter_count}', cmd)
+            assert re.search(rf'/{i}.interval_list', cmd)
 
         return
 
@@ -120,18 +120,21 @@ class TestPicard:
         cmd = get_command_str(job)
 
         # ---- Assertions
-        assert re.search('I=\S*sorted.bam', cmd)
-        assert re.search('-T\s*\S*hg38_reference.fa', cmd)
+        assert re.search(r'I=\S*sorted.bam', cmd)
+        assert re.search(r'-T\s*\S*hg38_reference.fa', cmd)
 
     @pytest.mark.parametrize('gvcf', ['file.gvcf.gz', 'file.gvcf'])
     @pytest.mark.parametrize('dbsnp', ['dbsnp.vcf.gz', 'DBSNP.vcf.gz'])
     @pytest.mark.parametrize('intervals', ['intervals.txt', 'intrvls.txt'])
-    def test_vcf_qc(self, tmp_path: Path, gvcf: GvcfPath, dbsnp: str, intervals: str):
+    def test_vcf_qc(self, tmp_path: Path, gvcf: str, dbsnp: str, intervals: str):
         # ---- Test setup
         config = self.default_config
-        config.references['broad']['dbsnp_vcf'] = dbsnp
-        config.references['broad']['dbsnp_vcf_index'] = dbsnp + '.tbi'
-        config.references['broad']['genome_evaluation_interval_lists'] = intervals
+        config.references['broad'] = {
+            'ref_fasta': 'hg38_reference.fa',
+            'dbsnp_vcf': dbsnp,
+            'dbsnp_vcf_index': dbsnp + '.tbi',
+            'genome_evaluation_interval_lists': intervals,
+        }
         batch = self._setup(config, tmp_path)
 
         # ---- The job we want to test
@@ -148,10 +151,10 @@ class TestPicard:
         cmd = get_command_str(job)
 
         # ---- Assertions
-        assert re.search(f'INPUT=\S*{gvcf}', cmd)
-        assert re.search(f'DBSNP=\S*{dbsnp}', cmd)
-        assert re.search(f'TARGET_INTERVALS=\S*{intervals}', cmd)
-        assert re.search(f'GVCF_INPUT=true', cmd)
+        assert re.search(rf'INPUT=\S*{gvcf}', cmd)
+        assert re.search(rf'DBSNP=\S*{dbsnp}', cmd)
+        assert re.search(rf'TARGET_INTERVALS=\S*{intervals}', cmd)
+        assert re.search(rf'GVCF_INPUT=true', cmd)
 
     @pytest.mark.parametrize('cram', ['file.cram', 'file2.cram'])
     @pytest.mark.parametrize('assume_sorted', [True, False])
@@ -179,10 +182,10 @@ class TestPicard:
         cmd = get_command_str(job)
 
         # ---- Assertions
-        assert re.search(f'CRAM=\$BATCH_TMPDIR/{cram}', cmd)
-        assert re.search(f'CRAI=\$BATCH_TMPDIR/{cram}.crai', cmd)
-        assert re.search('REFERENCE_SEQUENCE=\S+hg38_reference.fa', cmd)
-        assert re.search(f'ASSUME_SORTED={assume_sorted}', cmd)
+        assert re.search(rf'CRAM=\$BATCH_TMPDIR/{cram}', cmd)
+        assert re.search(rf'CRAI=\$BATCH_TMPDIR/{cram}.crai', cmd)
+        assert re.search(r'REFERENCE_SEQUENCE=\S+hg38_reference.fa', cmd)
+        assert re.search(rf'ASSUME_SORTED={assume_sorted}', cmd)
 
     @pytest.mark.parametrize('cram', ['file.cram', 'file2.cram'])
     @pytest.mark.parametrize(
@@ -197,7 +200,10 @@ class TestPicard:
             sequencing_type='exome',
             check_inputs=False,
         )
-        config.references['broad']['exome_evaluation_interval_lists'] = exome_intervals
+        config.references['broad'] = {
+            'ref_fasta': 'hg38_reference.fa',
+            'exome_evaluation_interval_lists': exome_intervals,
+        }
         batch = self._setup(self.default_config, tmp_path)
 
         # ---- The job we want to test
@@ -212,10 +218,10 @@ class TestPicard:
         cmd = get_command_str(job)
 
         # ---- Assertions
-        assert re.search(f'CRAM=\$BATCH_TMPDIR/{cram}', cmd)
-        assert re.search(f'CRAI=\$BATCH_TMPDIR/{cram}.crai', cmd)
-        assert re.search('REFERENCE_SEQUENCE=\S+hg38_reference.fa', cmd)
-        assert re.search(f'I=\S+{exome_intervals}', cmd)
+        assert re.search(rf'CRAM=\$BATCH_TMPDIR/{cram}', cmd)
+        assert re.search(rf'CRAI=\$BATCH_TMPDIR/{cram}.crai', cmd)
+        assert re.search(r'REFERENCE_SEQUENCE=\S+hg38_reference.fa', cmd)
+        assert re.search(rf'I=\S+{exome_intervals}', cmd)
 
     @pytest.mark.parametrize('cram', ['file.cram', 'file2.cram'])
     @pytest.mark.parametrize(
@@ -230,7 +236,10 @@ class TestPicard:
             sequencing_type='exome',
             check_inputs=False,
         )
-        config.references['broad']['exome_evaluation_interval_lists'] = exome_intervals
+        config.references['broad'] = {
+            'ref_fasta': 'hg38_reference.fa',
+            'exome_evaluation_interval_lists': exome_intervals,
+        }
         batch = self._setup(self.default_config, tmp_path)
 
         # ---- The job we want to test
@@ -245,7 +254,7 @@ class TestPicard:
         cmd = get_command_str(job)
 
         # ---- Assertions
-        assert re.search(f'CRAM=\$BATCH_TMPDIR/{cram}', cmd)
-        assert re.search(f'CRAI=\$BATCH_TMPDIR/{cram}.crai', cmd)
-        assert re.search('REFERENCE_SEQUENCE=\S+hg38_reference.fa', cmd)
-        assert re.search(f'I=\S+{exome_intervals}', cmd)
+        assert re.search(rf'CRAM=\$BATCH_TMPDIR/{cram}', cmd)
+        assert re.search(rf'CRAI=\$BATCH_TMPDIR/{cram}.crai', cmd)
+        assert re.search(r'REFERENCE_SEQUENCE=\S+hg38_reference.fa', cmd)
+        assert re.search(rf'I=\S+{exome_intervals}', cmd)
