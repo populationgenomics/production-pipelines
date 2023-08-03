@@ -5,11 +5,10 @@ import hail as hl
 import pandas as pd
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from gnomad_methods.gnomad.sample_qc.ancestry import run_pca_with_relateds, assign_population_pcs
-
 from cpg_utils.hail_batch import reference_path
-from cpg_workflows.utils import can_reuse
+from gnomad.sample_qc.ancestry import assign_population_pcs, run_pca_with_relateds
 
+from cpg_workflows.utils import can_reuse
 
 MIN_N_PCS = 3  # for one PC1 vs PC2 plot
 MIN_N_SAMPLES = 10
