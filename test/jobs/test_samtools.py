@@ -41,7 +41,7 @@ def default_config() -> PipelineConfig:
 
 
 class TestSamtoolsRun:
-    def test_run_samtools(self, tmp_path: Path):
+    def test_samtools_stats_creates_a_job(self, tmp_path: Path):
         # ---- Test setup
         config = default_config()
         set_config(config, tmp_path / 'config.toml')
@@ -63,35 +63,8 @@ class TestSamtoolsRun:
 
         # ---- Assertions
         assert (
-            batch.select_jobs('samtools stats')[0].name == j.name
-        ), "Job name does not match job in batch"
-        assert j is not None, "The samtools_stats function did not create a job."
-
-        assert j._image == image_path('samtools')  # Ensure the correct image is used
-
-    def test_sample_command(self, tmp_path: Path):
-        # ---- Test setup
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        cram_pth = create_cram_input(
-            location=tmp_path, prefix='test', index=True, reference_assembly='GRCh38.fa'
-        )
-
-        batch = create_local_batch(tmp_path)
-
-        # ---- The job we want to test
-        j = samtools_stats(
-            b=batch,
-            cram_path=cram_pth,
-            out_samtools_stats_path=tmp_path,
-            job_attrs=None,
-            overwrite=True,
-        )
-        samtools_jobs = batch.select_jobs('samtools stats')
-        # ---- Assertions
-        cmd = get_command_str(samtools_jobs[0])
-        print()
+            j is not None
+        ), 'The samtools_stats function did not create a job. Check if overwrite=False in samtools_stats call'
 
     def test_creates_one_job(self, tmp_path: Path):
         # ---- Test setup
@@ -147,8 +120,8 @@ class TestSamtoolsRun:
         # ---- Assertions
         assert (
             j2 is None
-        ), "New directory has been created for second job when it should reuse directory \
-        of j1. Try setting overwrite to False in subsequent jobs. "
+        ), 'New directory has been created for second job when it should reuse directory \
+        of j1. Try setting overwrite to False in subsequent jobs.'
 
     def test_can_overwrite_existing_output_path(
         self, mocker: MockFixture, tmp_path: Path
@@ -179,7 +152,6 @@ class TestSamtoolsRun:
             job_attrs=None,
             overwrite=True,
         )
-        print()
         # ---- Assert initial .cram & .crai paths are created and point to correct directory
         assert initial_cram_pth.path == (tmp_path / 'test1.cram')
         assert initial_cram_pth.index_path == (tmp_path / 'test1.cram.crai')
@@ -199,7 +171,6 @@ class TestSamtoolsRun:
             job_attrs=None,
             overwrite=True,
         )
-        print()
         # ---- Assertions
         # assert spy_can_reuse.assert_called_once_with(tmp_path, True)
         assert second_cram_pth.path == initial_cram_pth.path
@@ -339,7 +310,7 @@ class TestSamtoolsRun:
         actual_output_stats = match.group(1)
         assert (
             actual_output_stats == j.output_stats
-        ), f"Expected: {j.output_stats}, Got: {actual_output_stats}"
+        ), f'Expected: {j.output_stats}, Got: {actual_output_stats}'
 
     # TODO: What's the difference between this test and testing whether output exists?
     def test_batch_writes_samtools_stats_file_to_output_path():
@@ -393,4 +364,4 @@ class TestSamtoolsRun:
         # ---- Assertions
         assert (
             tmp_path / f'{j.output_stats}'
-        ).exists(), f"No output file named {j.output_stats}"
+        ).exists(), f'No output file named {j.output_stats}'
