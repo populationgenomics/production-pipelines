@@ -126,7 +126,7 @@ class TestSamtoolsRun:
         # --- Assertions
         assert j is not None
 
-    def test_pass_file_that_doesnt_exist(self, mocker: MockFixture, tmp_path: Path):
+    def test_pass_file_that_doesnt_exist(self, tmp_path: Path):
         # can_reuse() executes all(exists()) which checks whether all files in the path exist
         # if any of the files in the paths do not exist can_reuse() returns False and a job is created
 
@@ -137,7 +137,7 @@ class TestSamtoolsRun:
         j = samtools_stats(
             b=batch,
             cram_path=cram_pth,
-            out_samtools_stats_path=(tmp_path / 'output_stats_file'),
+            out_samtools_stats_path=(tmp_path / 'output_stats_file'),  # doesn't exist
             job_attrs=None,
             overwrite=False,
         )
