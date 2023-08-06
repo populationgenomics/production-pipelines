@@ -40,17 +40,23 @@ def default_config() -> PipelineConfig:
     )
 
 
+def setup_test(tmp_path: Path):
+    config = default_config()
+    set_config(config, tmp_path / 'config.toml')
+
+    cram_pth = create_cram_input(
+        location=tmp_path, prefix='test', index=True, reference_assembly='GRCh38.fa'
+    )
+
+    batch = create_local_batch(tmp_path)
+
+    return config, cram_pth, batch
+
+
 class TestSamtoolsRun:
     def test_samtools_stats_creates_a_job(self, tmp_path: Path):
         # ---- Test setup
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        cram_pth = create_cram_input(
-            location=tmp_path, prefix='test', index=True, reference_assembly='GRCh38.fa'
-        )
-
-        batch = create_local_batch(tmp_path)
+        config, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The job we want to test
         j = samtools_stats(
@@ -68,14 +74,7 @@ class TestSamtoolsRun:
 
     def test_creates_one_job(self, tmp_path: Path):
         # ---- Test setup
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        cram_pth = create_cram_input(
-            location=tmp_path, prefix='test', index=True, reference_assembly='GRCh38.fa'
-        )
-
-        batch = create_local_batch(tmp_path)
+        config, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The job we want to test
         j = samtools_stats(
@@ -92,14 +91,7 @@ class TestSamtoolsRun:
 
     def test_can_reuse_existing_output_path(self, tmp_path: Path):
         # ---- Test setup
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        cram_pth = create_cram_input(
-            location=tmp_path, prefix='test', index=True, reference_assembly='GRCh38.fa'
-        )
-
-        batch = create_local_batch(tmp_path)
+        config, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The jobs we want to test
         j1 = samtools_stats(
@@ -122,6 +114,62 @@ class TestSamtoolsRun:
             j2 is None
         ), 'New directory has been created for second job when it should reuse directory \
         of j1. Try setting overwrite to False in subsequent jobs.'
+
+    def test_will_return_None_if_path_already_exists(self, tmp_path: Path):
+        # ---- Test setup
+        config, cram_pth, batch = setup_test(tmp_path)
+
+        output = tmp_path / 'output_stats_file'
+        output.touch()
+
+        # ---- The jobs we want to test
+        j = samtools_stats(
+            b=batch,
+            cram_path=cram_pth,
+            out_samtools_stats_path=output,
+            overwrite=False,
+        )
+
+        # --- Assertions
+        assert j is None
+
+    def test_will_create_job_if_path_already_exists_and_overwrite_true(
+        self, tmp_path: Path
+    ):
+        # ---- Test setup
+        config, cram_pth, batch = setup_test(tmp_path)
+        output = tmp_path / 'output_stats_file'
+        output.touch()
+
+        # ---- The jobs we want to test
+        j = samtools_stats(
+            b=batch,
+            cram_path=cram_pth,
+            out_samtools_stats_path=output,
+            overwrite=True,
+        )
+
+        # --- Assertions
+        assert j is not None
+
+    def test_pass_file_that_doesnt_exist(self, mocker: MockFixture, tmp_path: Path):
+        # can_reuse() executes all(exists()) which checks whether all files in the path exist
+        # if any of the files in the paths do not exist can_reuse() returns False and a job is created
+
+        # ---- Test setup
+        config, cram_pth, batch = setup_test(tmp_path)
+
+        # ---- The job we want to test
+        j = samtools_stats(
+            b=batch,
+            cram_path=cram_pth,
+            out_samtools_stats_path=(tmp_path / 'output_stats_file'),
+            job_attrs=None,
+            overwrite=False,
+        )
+
+        # ---- Assertions
+        assert j is not None
 
     def test_can_overwrite_existing_output_path(
         self, mocker: MockFixture, tmp_path: Path
