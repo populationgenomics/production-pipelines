@@ -76,22 +76,96 @@ class TestVerifyBAMID:
     def test_VBI_can_reuse_existing_output_path(self, tmp_path: Path):
         # ---- Test setup
         config, cram_pth, batch = setup_test(tmp_path)
+        output = tmp_path / 'output_stats_file'
+        output.touch()
 
         # ---- The job we want to test
         j = verifybamid(
             b=batch,
             cram_path=cram_pth,
-            out_verify_bamid_path=tmp_path,
+            out_verify_bamid_path=output,
             job_attrs=None,
             overwrite=False,
         )
-        print()
+
+        # ---- Assertions
+        assert (
+            j is None
+        ), 'A new job was created when it should have reused existing output, was overwrite set to True?'
 
     def test_VBI_can_overwrite_existing_output_path(self, tmp_path: Path):
-        pass
+        # ---- Test setup
+        config, cram_pth, batch = setup_test(tmp_path)
+        output = tmp_path / 'output_stats_file'
+        output.touch()
+
+        # ---- The job we want to test
+        j = verifybamid(
+            b=batch,
+            cram_path=cram_pth,
+            out_verify_bamid_path=output,
+            job_attrs=None,
+            overwrite=True,
+        )
+
+        # ---- Assertions
+        assert j is not None, 'Output not overwritten, no new job was created.'
+
+    def test_pass_file_that_doesnt_exist(self, tmp_path: Path):
+        # can_reuse() executes all(exists()) which checks whether all files in the path exist
+        # if any of the files in the paths do not exist can_reuse() returns False and a job is created
+
+        # ---- Test setup
+        config, cram_pth, batch = setup_test(tmp_path)
+
+        # ---- The job we want to test
+        j = verifybamid(
+            b=batch,
+            cram_path=cram_pth,
+            out_verify_bamid_path=(tmp_path / 'output_stats_file'),  # doesn't exist
+            job_attrs=None,
+            overwrite=False,
+        )
+
+        # ---- Assertions
+        assert j is not None, 'Check if passed file that actually exists'
 
     def test_sets_job_attrs_or_sets_default_attrs_if_not_supplied(self, tmp_path: Path):
-        pass
+        # ---- Test setup
+        config, cram_pth, batch = setup_test(tmp_path)
+
+        # ---- The jobs we want to test
+        j_default_attrs = verifybamid(
+            b=batch,
+            cram_path=cram_pth,
+            out_verify_bamid_path=tmp_path,
+            job_attrs=None,
+            overwrite=True,
+        )
+        j_supplied_attrs = verifybamid(
+            b=batch,
+            cram_path=cram_pth,
+            out_verify_bamid_path=tmp_path,
+            job_attrs={'test_tool': 'test_VerifyBamID'},
+            overwrite=True,
+        )
+
+        assert j_default_attrs.attributes == {'tool': 'VerifyBamID'}
+        assert j_supplied_attrs.attributes == {
+            'test_tool': 'test_VerifyBamID',
+            'tool': 'VerifyBamID',
+        }
 
     def test_uses_VBI_image_specified_in_config(self, tmp_path: Path):
-        pass
+        # ---- Test setup
+        config, cram_pth, batch = setup_test(tmp_path)
+
+        # ---- The jobs we want to test
+        j = verifybamid(
+            b=batch,
+            cram_path=cram_pth,
+            out_verify_bamid_path=tmp_path,
+            job_attrs=None,
+            overwrite=True,
+        )
+        assert j._image == config.images['verifybamid']
