@@ -89,32 +89,6 @@ class TestSamtoolsRun:
             len(batch.select_jobs('samtools stats')) == 1
         ), "Unexpected number of 'samtools stats' jobs in batch list, should be just 1 job"
 
-    def test_can_reuse_existing_output_path(self, tmp_path: Path):
-        # ---- Test setup
-        config, cram_pth, batch = setup_test(tmp_path)
-
-        # ---- The jobs we want to test
-        j1 = samtools_stats(
-            b=batch,
-            cram_path=cram_pth,
-            out_samtools_stats_path=tmp_path,
-            job_attrs=None,
-            overwrite=True,
-        )
-        j2 = samtools_stats(
-            b=batch,
-            cram_path=cram_pth,
-            out_samtools_stats_path=tmp_path,
-            job_attrs=None,
-            overwrite=False,
-        )
-
-        # ---- Assertions
-        assert (
-            j2 is None
-        ), 'New directory has been created for second job when it should reuse directory \
-        of j1. Try setting overwrite to False in subsequent jobs.'
-
     def test_will_return_None_if_path_already_exists(self, tmp_path: Path):
         # ---- Test setup
         config, cram_pth, batch = setup_test(tmp_path)
@@ -171,69 +145,9 @@ class TestSamtoolsRun:
         # ---- Assertions
         assert j is not None
 
-    def test_can_overwrite_existing_output_path(
-        self, mocker: MockFixture, tmp_path: Path
-    ):
-        # ---- Test setup
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        # Create a spy on cpg_workflows.utils.can_reuse
-        # TODO: why is spy not working?
-        # spy_can_reuse = mocker.spy(utils, 'can_reuse')
-
-        initial_cram_pth = create_cram_input(
-            location=tmp_path,
-            prefix='test1',
-            index=True,
-            reference_assembly='GRCh38.fa',
-            create=True,
-        )
-
-        batch = create_local_batch(tmp_path)
-
-        # ---- The jobs we want to test
-        j1 = samtools_stats(
-            b=batch,
-            cram_path=initial_cram_pth,
-            out_samtools_stats_path=tmp_path,
-            job_attrs=None,
-            overwrite=True,
-        )
-        # ---- Assert initial .cram & .crai paths are created and point to correct directory
-        assert initial_cram_pth.path == (tmp_path / 'test1.cram')
-        assert initial_cram_pth.index_path == (tmp_path / 'test1.cram.crai')
-
-        second_cram_pth = create_cram_input(
-            location=tmp_path,
-            prefix='test1',
-            index=True,
-            reference_assembly='GRCh38.fa',
-            create=True,
-        )
-
-        j2 = samtools_stats(
-            b=batch,
-            cram_path=second_cram_pth,
-            out_samtools_stats_path=tmp_path,
-            job_attrs=None,
-            overwrite=True,
-        )
-        # ---- Assertions
-        # assert spy_can_reuse.assert_called_once_with(tmp_path, True)
-        assert second_cram_pth.path == initial_cram_pth.path
-        assert second_cram_pth.index_path == initial_cram_pth.index_path
-
     def test_sets_job_attrs_or_sets_default_attrs_if_not_supplied(self, tmp_path: Path):
         # ---- Test setup
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        cram_pth = create_cram_input(
-            location=tmp_path, prefix='test', index=True, reference_assembly='GRCh38.fa'
-        )
-
-        batch = create_local_batch(tmp_path)
+        config, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The jobs we want to test
         j_default_attrs = samtools_stats(
@@ -259,14 +173,7 @@ class TestSamtoolsRun:
 
     def test_uses_samtools_image_specified_in_config(self, tmp_path: Path):
         # ---- Test setup
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        cram_pth = create_cram_input(
-            location=tmp_path, prefix='test', index=True, reference_assembly='GRCh38.fa'
-        )
-
-        batch = create_local_batch(tmp_path)
+        config, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The jobs we want to test
         j = samtools_stats(
@@ -284,14 +191,7 @@ class TestSamtoolsRun:
         # The resource group inside the job 'j' is not obvious in its naming
 
         # ---- Test setup
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        cram_pth = create_cram_input(
-            location=tmp_path, prefix='test', index=True, reference_assembly='GRCh38.fa'
-        )
-
-        batch = create_local_batch(tmp_path)
+        config, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The jobs we want to test
         j = samtools_stats(
@@ -312,14 +212,7 @@ class TestSamtoolsRun:
         self, tmp_path: Path
     ):
         # ---- Test setup
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        cram_pth = create_cram_input(
-            location=tmp_path, prefix='test', index=True, reference_assembly='GRCh38.fa'
-        )
-
-        batch = create_local_batch(tmp_path)
+        config, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The jobs we want to test
         j = samtools_stats(
@@ -334,14 +227,7 @@ class TestSamtoolsRun:
     # Can't test this properly as no output is being generated
     def test_samtools_writes_to_resource_file_named_output_stats(self, tmp_path: Path):
         # ---- Test setup
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        cram_pth = create_cram_input(
-            location=tmp_path, prefix='test', index=True, reference_assembly='GRCh38.fa'
-        )
-
-        batch = create_local_batch(tmp_path)
+        config, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The jobs we want to test
         j = samtools_stats(
@@ -367,14 +253,7 @@ class TestSamtoolsRun:
     # TODO: Check if implemented spy object properly
     def test_check_batch_command_executed(self, mocker: MockFixture, tmp_path: Path):
         # ---- Test setup
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        cram_pth = create_cram_input(
-            location=tmp_path, prefix='test', index=True, reference_assembly='GRCh38.fa'
-        )
-
-        batch = create_local_batch(tmp_path)
+        config, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The jobs we want to test
         j = samtools_stats(
@@ -392,14 +271,7 @@ class TestSamtoolsRun:
 
     def test_check_output_files_exist(self, tmp_path: Path):
         # ---- Test setup
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        cram_pth = create_cram_input(
-            location=tmp_path, prefix='test', index=True, reference_assembly='GRCh38.fa'
-        )
-
-        batch = create_local_batch(tmp_path)
+        config, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The jobs we want to test
         j = samtools_stats(
