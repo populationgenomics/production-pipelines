@@ -154,7 +154,7 @@ def _mock_cohort(dataset_id: str, *create_duplicates: bool):
     return cohort
 
 
-@pytest.mark.skip(reason="Not testing cohort stages at the moment")
+@pytest.mark.skip(reason='Not testing cohort stages at the moment')
 class TestCombiner:
     def test_fails_if_given_invalid_chromosome_that_does_not_exist(
         self, mocker: MockFixture, tmp_path: Path
