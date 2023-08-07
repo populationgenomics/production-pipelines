@@ -15,7 +15,6 @@ from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import start_query_context
 from hail.utils import FatalError
-from hail.utils.java import FatalError
 from pytest_mock import MockFixture
 
 from cpg_workflows.filetypes import GvcfPath
@@ -225,7 +224,7 @@ class TestCombiner:
         combiner.run(out_vds_path=vds_path, tmp_prefix=res_pref / 'tmp')
 
         # Check that hl.vds.new_combiner was called with the expected arguments
-        assert spy_new_combiner.call_args[1]['use_genome_default_intervals'] == True
+        assert spy_new_combiner.call_args[1]['use_genome_default_intervals'] is True
 
     def test_uses_default_exome_intervals_if_intervals_are_not_specified(
         self, mocker: MockFixture, tmp_path: Path
@@ -368,11 +367,11 @@ class TestCombiner:
         if is_exome_seq:
             assert spy_new_combiner.call_args[1][
                 'use_exome_default_intervals'
-            ], "use_exome_default_intervals should be True for exome sequencing."
+            ], 'use_exome_default_intervals should be True for exome sequencing.'
         if is_genome_seq:
             assert spy_new_combiner.call_args[1][
                 'use_genome_default_intervals'
-            ], "use_genome_default_intervals should be True for genome sequencing."
+            ], 'use_genome_default_intervals should be True for genome sequencing.'
 
     def test_fails_if_all_sequencing_groups_do_not_have_a_gvcf_file(
         self, mocker: MockFixture, tmp_path: Path

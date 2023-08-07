@@ -41,7 +41,7 @@ def default_config() -> PipelineConfig:
 def setup_test(tmp_path: Path, ref_fasta: str | None = None):
     config = default_config()
 
-    if ref_fasta != None:
+    if ref_fasta is not None:
         config.workflow.ref_fasta = ref_fasta
 
     set_config(config, tmp_path / 'config.toml')
@@ -61,7 +61,7 @@ class TestSamtoolsRun:
         _, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The job we want to test
-        j = samtools_stats(
+        _ = samtools_stats(
             b=batch,
             cram_path=cram_pth,
             out_samtools_stats_path=(tmp_path / 'output_file'),
@@ -96,7 +96,7 @@ class TestSamtoolsRun:
         self, tmp_path: Path
     ):
         # ---- Test setup
-        config, cram_pth, batch = setup_test(tmp_path)
+        _, cram_pth, batch = setup_test(tmp_path)
         output = tmp_path / 'output_stats_file'
         output.touch()
 
@@ -151,9 +151,6 @@ class TestSamtoolsRun:
         assert j._image == config.images['samtools']
 
     def test_uses_reference_in_workflow_config_section_if_set(self, tmp_path: Path):
-        # Not sure how to check what reference file is being used. \
-        # The resource group inside the job 'j' is not obvious in its naming
-
         # ---- Test setup
         config, cram_pth, batch = setup_test(tmp_path, ref_fasta='test_workflow_ref.fa')
 

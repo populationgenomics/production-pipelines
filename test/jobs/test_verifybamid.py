@@ -42,11 +42,16 @@ def default_config() -> PipelineConfig:
     )
 
 
-def setup_test(tmp_path: Path, ref_fasta: str | None = None):
+def setup_test(
+    tmp_path: Path, ref_fasta: str | None = None, sequencing_type: str | None = None
+):
     config = default_config()
 
-    if ref_fasta != None:
+    if ref_fasta is not None:
         config.workflow.ref_fasta = ref_fasta
+
+    if sequencing_type is not None:
+        config.workflow.sequencing_type = sequencing_type
 
     set_config(config, tmp_path / 'config.toml')
 
@@ -65,7 +70,7 @@ class TestVerifyBAMID:
         _, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The job we want to test
-        j = verifybamid(
+        _ = verifybamid(
             b=batch,
             cram_path=cram_pth,
             out_verify_bamid_path=(tmp_path / 'output_file'),
@@ -165,9 +170,10 @@ class TestVerifyBAMID:
             job_attrs=None,
         )
 
+        # ---- Assertions
         num_pcs = config.other['cramqc']['num_pcs']
         cmd = get_command_str(j)
-        assert re.search(fr"--NumPC {num_pcs}", cmd)
+        assert re.search(fr'--NumPC {num_pcs}', cmd)
 
     def test_uses_reference_in_workflow_config_section_if_set(self, tmp_path: Path):
         # ---- Test setup
@@ -184,7 +190,7 @@ class TestVerifyBAMID:
         # ---- Assertions
         cmd = get_command_str(j)
         ref_file = config.workflow.ref_fasta
-        assert re.search(fr'--Reference .*/{ref_file}', cmd)
+        assert re.search(fr'--Reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
 
     def test_uses_broad_reference_as_default_if_reference_not_set_in_workflow_config_section(
         self, tmp_path: Path
@@ -205,7 +211,7 @@ class TestVerifyBAMID:
         ref_file = config.references['broad']['ref_fasta']
         assert re.search(fr'--Reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
 
-    def test_uses_input_ud_bed_mu_files_set_in_contig(self, tmp_path: Path):
+    def test_uses_input_ud_bed_mu_files_set_in_config(self, tmp_path: Path):
         # ---- Test setup
         config, cram_pth, batch = setup_test(tmp_path)
 
@@ -243,8 +249,47 @@ class TestVerifyBAMID:
         )
 
         cmd = get_command_str(j)
-        assert re.search(fr"retry_gs_cp .*{cram_pth.path}", cmd)
-        assert re.search(fr"retry_gs_cp .*{cram_pth.index_path}", cmd)
+        assert re.search(fr'retry_gs_cp .*{cram_pth.path}', cmd)
+        assert re.search(fr'retry_gs_cp .*{cram_pth.index_path}', cmd)
+
+    def test_ncpu_resources_set(self, tmp_path: Path):
+        # ---- Test setup
+        config, cram_pth, batch = setup_test(tmp_path)
+
+        # ---- The job we want to test
+        j = verifybamid(
+            b=batch,
+            cram_path=cram_pth,
+            out_verify_bamid_path=(tmp_path / 'output_file'),
+            job_attrs=None,
+        )
+
+        # ---- Assertions
+        cmd = get_command_str(j)
+        num_threads = int(config.other['cramqc']['num_pcs']) * 2
+        assert re.search(fr'--NumThread {num_threads}', cmd)
+
+    @pytest.mark.parametrize('sequencing_type', ['exome', 'genome'])
+    def test_extra_opts_changes_according_to_sequencing_type(
+        self, tmp_path: Path, sequencing_type: str
+    ):
+        # ---- Test setup
+        _, cram_pth, batch = setup_test(tmp_path, sequencing_type=sequencing_type)
+
+        # ---- The job we want to test
+        j = verifybamid(
+            b=batch,
+            cram_path=cram_pth,
+            out_verify_bamid_path=(tmp_path / 'output_file'),
+            job_attrs=None,
+        )
+
+        # ---- Assertions
+        cmd = get_command_str(j)
+        if sequencing_type == 'exome':
+            assert re.search('--max-depth 1000', cmd)
+        else:
+            assert '--max-depth 1000' not in cmd
 
     def test_batch_writes_verifybamid_selfsm_file_to_output_path(
         self, mocker: MockFixture, tmp_path: Path
