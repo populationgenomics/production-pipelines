@@ -222,20 +222,14 @@ class TestPicard:
 
     @pytest.mark.parametrize('cram', ['file.cram', 'file2.cram'])
     @pytest.mark.parametrize(
-        'exome_intervals', ['exome_intervals.txt', 'ex_intrvls.txt']
+        'genome_intervals', ['genome_intervals.txt', 'gnm_intrvls.txt']
     )
-    def test_picard_wgs_metrics(self, tmp_path: Path, cram: str, exome_intervals: str):
+    def test_picard_wgs_metrics(self, tmp_path: Path, cram: str, genome_intervals: str):
         # ---- Test setup
         config = self.default_config
-        config.workflow = WorkflowConfig(
-            dataset='picard-test',
-            access_level='test',
-            sequencing_type='exome',
-            check_inputs=False,
-        )
         config.references['broad'] = {
             'ref_fasta': 'hg38_reference.fa',
-            'exome_evaluation_interval_lists': exome_intervals,
+            'genome_coverage_interval_list': genome_intervals,
         }
         batch = self._setup(self.default_config, tmp_path)
 
@@ -246,7 +240,7 @@ class TestPicard:
         job = picard_wgs_metrics(
             b=batch,
             cram_path=cram_path,
-            out_picard_hs_metrics_path=tmp_path / 'picard_hs_metrics.txt',
+            out_picard_wgs_metrics_path=tmp_path / 'picard_hs_metrics.txt',
         )
         cmd = get_command_str(job)
 
@@ -254,4 +248,4 @@ class TestPicard:
         assert re.search(rf'CRAM=\$BATCH_TMPDIR/{cram}', cmd)
         assert re.search(rf'CRAI=\$BATCH_TMPDIR/{cram}.crai', cmd)
         assert re.search(r'REFERENCE_SEQUENCE=\S+hg38_reference.fa', cmd)
-        assert re.search(rf'I=\S+{exome_intervals}', cmd)
+        assert re.search(rf'INTERVALS=\S+{genome_intervals}', cmd)
