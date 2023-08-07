@@ -1,3 +1,6 @@
+import re
+
+import pytest
 from cpg_utils import Path
 from cpg_utils.hail_batch import image_path
 from pytest_mock import MockFixture
@@ -23,26 +26,28 @@ def default_config() -> PipelineConfig:
         images={
             'verifybamid': 'test_image',
         },
-        other={
-            'references': {
-                'broad': {
-                    'ref_fasta': 'hg38_reference.fa',
-                    'dragmap_prefix': 'gs://a-cpg-bucket/dragen_reference/',
-                    'genome_contam_ud': 'test_genome_ud.ud',
-                    'genome_contam_bed': 'test_genome_bed.bed',
-                    'genome_contam_mu': 'test__genome_mu.mu',
-                    'exome_contam_ud': 'test_exome_ud.ud',
-                    'exome_contam_bed': 'test_exome_bed.bed',
-                    'exome_contam_mu': 'test_exome_mu.mu',
-                }
-            },
-            'cramqc': {'num_pcs': '4'},
+        references={
+            'broad': {
+                'ref_fasta': 'hg38_reference.fa',
+                'dragmap_prefix': 'gs://a-cpg-bucket/dragen_reference/',
+                'genome_contam_ud': 'test_genome_ud.ud',
+                'genome_contam_bed': 'test_genome_bed.bed',
+                'genome_contam_mu': 'test__genome_mu.mu',
+                'exome_contam_ud': 'test_exome_ud.ud',
+                'exome_contam_bed': 'test_exome_bed.bed',
+                'exome_contam_mu': 'test_exome_mu.mu',
+            }
         },
+        other={'cramqc': {'num_pcs': '4'}},
     )
 
 
-def setup_test(tmp_path: Path):
+def setup_test(tmp_path: Path, ref_fasta: str | None = None):
     config = default_config()
+
+    if ref_fasta != None:
+        config.workflow.ref_fasta = ref_fasta
+
     set_config(config, tmp_path / 'config.toml')
 
     cram_pth = create_cram_input(
@@ -55,27 +60,27 @@ def setup_test(tmp_path: Path):
 
 
 class TestVerifyBAMID:
-    def test_VBI_creates_a_job(self, tmp_path: Path):
+    def test_creates_one_job(self, tmp_path: Path):
         # ---- Test setup
-        config, cram_pth, batch = setup_test(tmp_path)
+        _, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The job we want to test
         j = verifybamid(
             b=batch,
             cram_path=cram_pth,
-            out_verify_bamid_path=tmp_path,
+            out_verify_bamid_path=(tmp_path / 'output_file'),
             job_attrs=None,
-            overwrite=True,
         )
 
         # ---- Assertions
         assert (
-            j is not None
-        ), 'The verifybamid function did not create a job. Check if overwrite=False in verifybamid call'
+            len(batch.select_jobs('VerifyBamID')) == 1
+        ), "Unexpected number of 'VerifyBamID' jobs in batch list, should be just 1 job"
 
-    def test_VBI_can_reuse_existing_output_path(self, tmp_path: Path):
+    def test_will_return_none_if_path_already_exists(self, tmp_path: Path):
         # ---- Test setup
-        config, cram_pth, batch = setup_test(tmp_path)
+        _, cram_pth, batch = setup_test(tmp_path)
+
         output = tmp_path / 'output_stats_file'
         output.touch()
 
@@ -85,7 +90,6 @@ class TestVerifyBAMID:
             cram_path=cram_pth,
             out_verify_bamid_path=output,
             job_attrs=None,
-            overwrite=False,
         )
 
         # ---- Assertions
@@ -93,61 +97,41 @@ class TestVerifyBAMID:
             j is None
         ), 'A new job was created when it should have reused existing output, was overwrite set to True?'
 
-    def test_VBI_can_overwrite_existing_output_path(self, tmp_path: Path):
+    def test_will_create_job_if_path_already_exists_and_overwrite_true(
+        self, tmp_path: Path
+    ):
         # ---- Test setup
-        config, cram_pth, batch = setup_test(tmp_path)
+        _, cram_pth, batch = setup_test(tmp_path)
         output = tmp_path / 'output_stats_file'
         output.touch()
 
-        # ---- The job we want to test
+        # ---- The jobs we want to test
         j = verifybamid(
             b=batch,
             cram_path=cram_pth,
             out_verify_bamid_path=output,
-            job_attrs=None,
             overwrite=True,
         )
 
-        # ---- Assertions
+        # --- Assertions
         assert j is not None, 'Output not overwritten, no new job was created.'
-
-    def test_pass_file_that_doesnt_exist(self, tmp_path: Path):
-        # can_reuse() executes all(exists()) which checks whether all files in the path exist
-        # if any of the files in the paths do not exist can_reuse() returns False and a job is created
-
-        # ---- Test setup
-        config, cram_pth, batch = setup_test(tmp_path)
-
-        # ---- The job we want to test
-        j = verifybamid(
-            b=batch,
-            cram_path=cram_pth,
-            out_verify_bamid_path=(tmp_path / 'output_stats_file'),  # doesn't exist
-            job_attrs=None,
-            overwrite=False,
-        )
-
-        # ---- Assertions
-        assert j is not None, 'Check if passed file that actually exists'
 
     def test_sets_job_attrs_or_sets_default_attrs_if_not_supplied(self, tmp_path: Path):
         # ---- Test setup
-        config, cram_pth, batch = setup_test(tmp_path)
+        _, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The jobs we want to test
         j_default_attrs = verifybamid(
             b=batch,
             cram_path=cram_pth,
-            out_verify_bamid_path=tmp_path,
+            out_verify_bamid_path=(tmp_path / 'output_file'),
             job_attrs=None,
-            overwrite=True,
         )
         j_supplied_attrs = verifybamid(
             b=batch,
             cram_path=cram_pth,
-            out_verify_bamid_path=tmp_path,
+            out_verify_bamid_path=(tmp_path / 'second_output_file'),
             job_attrs={'test_tool': 'test_VerifyBamID'},
-            overwrite=True,
         )
 
         assert j_default_attrs.attributes == {'tool': 'VerifyBamID'}
@@ -164,8 +148,119 @@ class TestVerifyBAMID:
         j = verifybamid(
             b=batch,
             cram_path=cram_pth,
-            out_verify_bamid_path=tmp_path,
+            out_verify_bamid_path=(tmp_path / 'output_file'),
             job_attrs=None,
-            overwrite=True,
         )
         assert j._image == config.images['verifybamid']
+
+    def test_uses_num_pc_in_config_file_in_bash_command(self, tmp_path: Path):
+        # ---- Test setup
+        config, cram_pth, batch = setup_test(tmp_path)
+
+        # ---- The jobs we want to test
+        j = verifybamid(
+            b=batch,
+            cram_path=cram_pth,
+            out_verify_bamid_path=(tmp_path / 'output_file'),
+            job_attrs=None,
+        )
+
+        num_pcs = config.other['cramqc']['num_pcs']
+        cmd = get_command_str(j)
+        assert re.search(fr"--NumPC {num_pcs}", cmd)
+
+    def test_uses_reference_in_workflow_config_section_if_set(self, tmp_path: Path):
+        # ---- Test setup
+        config, cram_pth, batch = setup_test(tmp_path, ref_fasta='test_workflow_ref.fa')
+
+        # ---- The jobs we want to test
+        j = verifybamid(
+            b=batch,
+            cram_path=cram_pth,
+            out_verify_bamid_path=(tmp_path / 'output_file'),
+            job_attrs=None,
+        )
+
+        # ---- Assertions
+        cmd = get_command_str(j)
+        ref_file = config.workflow.ref_fasta
+        assert re.search(fr'--Reference .*/{ref_file}', cmd)
+
+    def test_uses_broad_reference_as_default_if_reference_not_set_in_workflow_config_section(
+        self, tmp_path: Path
+    ):
+        # ---- Test setup
+        config, cram_pth, batch = setup_test(tmp_path)
+
+        # ---- The jobs we want to test
+        j = verifybamid(
+            b=batch,
+            cram_path=cram_pth,
+            out_verify_bamid_path=(tmp_path / 'output_file'),
+            job_attrs=None,
+        )
+
+        # ---- Assertions
+        cmd = get_command_str(j)
+        ref_file = config.references['broad']['ref_fasta']
+        assert re.search(fr'--Reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
+
+    def test_uses_input_ud_bed_mu_files_set_in_contig(self, tmp_path: Path):
+        # ---- Test setup
+        config, cram_pth, batch = setup_test(tmp_path)
+
+        # ---- The jobs we want to test
+        j = verifybamid(
+            b=batch,
+            cram_path=cram_pth,
+            out_verify_bamid_path=(tmp_path / 'output_file'),
+            job_attrs=None,
+        )
+
+        # ---- Assertions
+        cmd = get_command_str(j)
+        sequencing_type = config.workflow.sequencing_type
+        ud_file = config.references['broad'][f'{sequencing_type}_contam_ud']
+        bed_file = config.references['broad'][f'{sequencing_type}_contam_bed']
+        mu_file = config.references['broad'][f'{sequencing_type}_contam_mu']
+
+        assert re.search(fr'--UDPath \${{BATCH_TMPDIR}}/inputs/\w+/{ud_file}', cmd)
+        assert re.search(fr'--MeanPath \${{BATCH_TMPDIR}}/inputs/\w+/{mu_file}', cmd)
+        assert re.search(fr'--BedPath \${{BATCH_TMPDIR}}/inputs/\w+/{bed_file}', cmd)
+
+    def test_uses_fail_safe_copy_on_cram_path_and_index_in_bash_command(
+        self, tmp_path: Path
+    ):
+        # ---- Test setup
+        _, cram_pth, batch = setup_test(tmp_path)
+
+        # ---- The jobs we want to test
+        j = verifybamid(
+            b=batch,
+            cram_path=cram_pth,
+            out_verify_bamid_path=(tmp_path / 'output_file'),
+            job_attrs=None,
+        )
+
+        cmd = get_command_str(j)
+        assert re.search(fr"retry_gs_cp .*{cram_pth.path}", cmd)
+        assert re.search(fr"retry_gs_cp .*{cram_pth.index_path}", cmd)
+
+    def test_batch_writes_verifybamid_selfsm_file_to_output_path(
+        self, mocker: MockFixture, tmp_path: Path
+    ):
+        # ---- Test setup
+        _, cram_pth, batch = setup_test(tmp_path)
+
+        # ---- The jobs we want to test
+        spy = mocker.spy(batch, 'write_output')
+        out_path = tmp_path / 'output_file'
+
+        j = verifybamid(
+            b=batch,
+            cram_path=cram_pth,
+            out_verify_bamid_path=out_path,
+            job_attrs=None,
+        )
+
+        spy.assert_called_with(j.out_selfsm, str(out_path))
