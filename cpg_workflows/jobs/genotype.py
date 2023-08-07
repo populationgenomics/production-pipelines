@@ -8,7 +8,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
+from cpg_utils.config import get_config, ConfigError
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path, command
 
 from cpg_workflows.filetypes import CramPath, GvcfPath
@@ -216,7 +216,14 @@ def _haplotype_caller_one(
         }
     )
 
-    reference = fasta_res_group(b)
+    try:
+        reference = fasta_res_group(b)
+    except ConfigError as e:
+        error_message = (
+            'Failed to get reference fasta. Check that it was set in the config.'
+        )
+        logging.error(f'{error_message} Original error: {e}')
+        raise ConfigError(error_message) from e
 
     assert isinstance(j.output_gvcf, hb.ResourceGroup)
 
