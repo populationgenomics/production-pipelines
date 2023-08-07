@@ -13,13 +13,10 @@ from cpg_workflows.jobs.picard import (
     picard_hs_metrics,
     picard_wgs_metrics,
 )
-from cpg_utils.hail_batch import fasta_res_group
 
 from .. import set_config
-from ..factories.alignment_input import create_fastq_pairs_input
 from ..factories.batch import create_local_batch
 from ..factories.config import PipelineConfig, WorkflowConfig
-from ..factories.sequencing_group import create_sequencing_group
 from .helpers import get_command_str
 
 
@@ -246,7 +243,7 @@ class TestPicard:
         cram_path = CramPath(
             path=tmp_path / cram, index_path=tmp_path / (cram + '.crai')
         )
-        job = picard_hs_metrics(
+        job = picard_wgs_metrics(
             b=batch,
             cram_path=cram_path,
             out_picard_hs_metrics_path=tmp_path / 'picard_hs_metrics.txt',
