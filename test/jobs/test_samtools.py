@@ -71,7 +71,7 @@ class TestSamtoolsRun:
         # ---- Assertions
         assert (
             len(batch.select_jobs('samtools stats')) == 1
-        ), "Unexpected number of 'samtools stats' jobs in batch list, should be just 1 job"
+        ), 'Unexpected number of samtools stats jobs in batch list, should be just 1 job'
 
     def test_will_return_none_if_path_already_exists(self, tmp_path: Path):
         # Giving output file that DOES exist
@@ -147,7 +147,6 @@ class TestSamtoolsRun:
             cram_path=cram_pth,
             out_samtools_stats_path=(tmp_path / 'output_file'),
             job_attrs=None,
-            overwrite=True,
         )
         assert j._image == config.images['samtools']
 
@@ -168,7 +167,7 @@ class TestSamtoolsRun:
         )
         cmd = get_command_str(j)
         ref_file = config.workflow.ref_fasta
-        assert re.search(fr"--reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}", cmd)
+        assert re.search(fr'--reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
 
     def test_uses_broad_reference_as_default_if_reference_not_set_in_workflow_config_section(
         self, tmp_path: Path
@@ -186,13 +185,13 @@ class TestSamtoolsRun:
 
         cmd = get_command_str(j)
         ref_file = config.references['broad']['ref_fasta']
-        assert re.search(fr"--reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}", cmd)
+        assert re.search(fr'--reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
 
     def test_uses_fail_safe_copy_on_cram_path_and_index_in_bash_command(
         self, tmp_path: Path
     ):
         # ---- Test setup
-        config, cram_pth, batch = setup_test(tmp_path)
+        _, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The jobs we want to test
         j = samtools_stats(
@@ -203,8 +202,8 @@ class TestSamtoolsRun:
         )
 
         cmd = get_command_str(j)
-        assert re.search(fr"retry_gs_cp .*{cram_pth.path}", cmd)
-        assert re.search(fr"retry_gs_cp .*{cram_pth.index_path}", cmd)
+        assert re.search(fr'retry_gs_cp .*{cram_pth.path}', cmd)
+        assert re.search(fr'retry_gs_cp .*{cram_pth.index_path}', cmd)
 
     def test_samtools_writes_to_resource_file_named_output_stats(self, tmp_path: Path):
         # ---- Test setup
