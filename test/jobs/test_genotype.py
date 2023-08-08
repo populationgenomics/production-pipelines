@@ -156,6 +156,11 @@ class TestGenotyping:
                 assert re.search(r'IntervalListTools', cmd)
                 assert re.search(r'SCATTER_COUNT=50', cmd)
 
+                # Testing that outputs will be unique, sorted and internally divided
+                assert re.search(r'SUBDIVISION_MODE=INTERVAL_SUBDIVISION', cmd)
+                assert re.search(r'UNIQUE=true', cmd)
+                assert re.search(r'SORT=true', cmd)
+
             elif job.name == merge_job_name:
                 assert re.search(r'picard', cmd)
                 assert re.search(r'MergeVcfs', cmd)
@@ -173,10 +178,27 @@ class TestGenotyping:
                 # TODO: Validate input and output
                 assert re.search(r'gatk', cmd)
                 assert re.search(r'HaplotypeCaller', cmd)
+                assert re.search(r'--dragen-mode', cmd)
                 pattern = r'-O\s+([^\\]+\.gz)'
                 match = re.search(pattern, cmd)
                 assert match
                 haplotype_output_paths.append(match.group(1))
+
+                # If a genotyping event overlaps deletions that the '*' spanning event will be excluded
+                assert re.search(r'--disable-spanning-event-genotyping', cmd)
+
+                # Allele specific annotations requested
+                assert re.search(r'-G AS_StandardAnnotation', cmd)
+
+                # GQB bands set to multiples of 10
+                assert re.search(
+                    r'-GQB 10 -GQB 20 -GQB 30 -GQB 40 -GQB 50 -GQB 60 -GQB 70 -GQB 80 -GQB 90',
+                    cmd,
+                )
+
+                assert re.search(r'-ERC GVCF', cmd)
+                # Tabix index created
+                assert re.search(r'--create-output-variant-index', cmd)
                 print(cmd)
 
     def test_genotype_jobs_with_custom_scatter_count(self, tmp_path: Path):
@@ -294,3 +316,6 @@ class TestGenotyping:
                     cmd,
                 )
         """
+
+
+# TODO: Run exome tests
