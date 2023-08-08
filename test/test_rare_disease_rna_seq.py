@@ -198,11 +198,10 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
 
     # Imports specific for testing the trim stage
     from cpg_utils.hail_batch import dataset_path
-    from cpg_workflows.stages.trim import Trim
-    from cpg_workflows.stages.align_rna import AlignRNA
+    from cpg_workflows.stages.trim_align import TrimAlignRNA
     from cpg_workflows.filetypes import FastqPairs, FastqPair
 
-    get_workflow().run(stages=[AlignRNA])
+    get_workflow().run(stages=[TrimAlignRNA])
 
     b = get_batch()
     trim_job = b.job_by_tool['fastp']
