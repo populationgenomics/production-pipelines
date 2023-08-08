@@ -20,7 +20,7 @@ def get_toml(tmp_path) -> str:
     dataset_gcp_project = "test-analysis-dataset-1234"
     dataset = "test-analysis-dataset"
     access_level = "test"
-    sequencing_type = "rna"
+    sequencing_type = "transcriptome"
     driver_image = "<stub>"
     check_inputs = false
     check_intermediates = false
@@ -78,7 +78,7 @@ def _mock_cohort():
         'CPG01',
         'SAMPLE1',
         alignment_input_by_seq_type={
-            'rna': FastqPairs(
+            'transcriptome': FastqPairs(
                 [
                     FastqPair(
                         'gs://test-input-dataset-upload/sample1_L1_R1.fq.gz',
@@ -176,7 +176,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
 
     # The number of FASTQ trim jobs should equal the number of FASTQ pairs
     alignment_input_list = [
-        s.alignment_input_by_seq_type.get('rna')
+        s.alignment_input_by_seq_type.get('transcriptome')
         for s in sample_list
     ]
     n_trim_jobs_list = [

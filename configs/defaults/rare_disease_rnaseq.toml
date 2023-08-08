@@ -1,5 +1,5 @@
 [workflow]
-sequencing_type = "rna"
+sequencing_type = "transcriptome"
 
 [trim]
 adapter_type = "ILLUMINA_TRUSEQ"
