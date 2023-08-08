@@ -12,7 +12,6 @@ from cpg_workflows.workflow import (
     stage,
     StageInput,
     StageOutput,
-    SequencingGroup,
     SequencingGroupStage,
 )
 from cpg_workflows.filetypes import (
