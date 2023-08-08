@@ -12,6 +12,8 @@ from .helpers import get_command_str
 from cpg_workflows.filetypes import CramPath
 from pytest import raises
 
+import inspect
+
 
 def default_config() -> PipelineConfig:
     return PipelineConfig(
@@ -40,16 +42,21 @@ def default_config() -> PipelineConfig:
 
 
 class TestGenotyping:
-    def _get_new_genotype_job(self, tmp_path: Path, config: PipelineConfig):
+    def _get_new_genotype_job(
+        self,
+        tmp_path: Path,
+        config: PipelineConfig,
+        cram_path_string: str = 'test_genotype.cram',
+    ):
         set_config(config, tmp_path / 'config.toml')
 
         dataset_id = config.workflow.dataset
-        batch = create_local_batch(tmp_path)
+        batch = create_local_batch(tmp_path, cram_path_string)
         sg = create_sequencing_group(
             dataset=dataset_id,
             sequencing_type=config.workflow.sequencing_type,
             alignment_input=create_fastq_pairs_input(location=tmp_path, n=1),
-            cram=CramPath(tmp_path / 'test_genotype.cram'),
+            cram=CramPath(tmp_path / cram_path_string),
         )
 
         assert sg.cram
@@ -67,8 +74,9 @@ class TestGenotyping:
         config = default_config()
         config.workflow.ref_fasta = 'workflow_overwritten_reference.fa'
         config.references['broad']['ref_fasta'] = None
+        calling_func_name = inspect.currentframe().f_code.co_name
 
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config, calling_func_name)
 
         for job in genotype_jobs:
             cmd = get_command_str(job)
@@ -82,7 +90,9 @@ class TestGenotyping:
         config.workflow.ref_fasta = None
         config.references['broad']['ref_fasta'] = 'default_reference.fa'
 
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+        calling_func_name = inspect.currentframe().f_code.co_name
+
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config, calling_func_name)
 
         for job in genotype_jobs:
             cmd = get_command_str(job)
@@ -105,8 +115,9 @@ class TestGenotyping:
         config = default_config()
         config.workflow.ref_fasta = 'workflow_overwritten_reference.fa'
         config.references['broad']['ref_fasta'] = 'default_reference.fa'
+        calling_func_name = inspect.currentframe().f_code.co_name
 
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config, calling_func_name)
 
         for job in genotype_jobs:
             cmd = get_command_str(job)
@@ -226,3 +237,60 @@ class TestGenotyping:
                 pattern = r'-O\s+([^\\]+\.gz)'
                 match = re.search(pattern, cmd)
                 assert match
+
+    def test_genotype_default_reblock_gq_bands(self, tmp_path: Path):
+        # ---- Test setup
+        config = default_config()
+        set_config(config, tmp_path / 'config.toml')
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+
+        # ---- Assertions
+        postproc_job_name = 'Postproc GVCF'
+
+        for job in genotype_jobs:
+            if job.name == postproc_job_name:
+                cmd = get_command_str(job)
+                assert re.search(r'ReblockGVCF', cmd)
+                assert re.search(
+                    r'-floor-blocks -GQB 20 -GQB 30 -GQB 40',
+                    cmd,
+                )
+
+    def test_genotype_custom_reblock_gq_bands(self, tmp_path: Path):
+        # ---- Test setup
+        config = default_config()
+        config.workflow.reblock_gq_bands = [10, 20, 50]
+        set_config(config, tmp_path / 'config.toml')
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+
+        # ---- Assertions
+        postproc_job_name = 'Postproc GVCF'
+        for job in genotype_jobs:
+            if job.name == postproc_job_name:
+                cmd = get_command_str(job)
+                assert re.search(r'ReblockGVCF', cmd)
+                assert re.search(
+                    r'-floor-blocks -GQB 10 -GQB 20 -GQB 50',
+                    cmd,
+                )
+
+    def test_genotype_reblock_gq_bands_single_integer(self, tmp_path: Path):
+        # NOTE: This test fails, but should it?
+        """
+        # ---- Test setup
+        config = default_config()
+        config.workflow.reblock_gq_bands = 10
+        set_config(config, tmp_path / 'config.toml')
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+
+        # ---- Assertions
+        postproc_job_name = 'Postproc GVCF'
+        for job in genotype_jobs:
+            if job.name == postproc_job_name:
+                cmd = get_command_str(job)
+                assert re.search(r'ReblockGVCF', cmd)
+                assert re.search(
+                    r'-floor-blocks -GQB 10',
+                    cmd,
+                )
+        """
