@@ -1,5 +1,5 @@
 """
-Test the align RNA stage
+Test the rare disease RNA seq workflow
 """
 
 from pathlib import Path
@@ -7,7 +7,7 @@ from cpg_utils import to_path
 from unittest.mock import mock_open
 from pytest_mock import MockFixture
 
-from .. import update_dict, set_config
+from . import update_dict, set_config
 
 from os import makedirs
 import os.path
@@ -16,11 +16,11 @@ import os.path
 def get_toml(tmp_path) -> str:
     return f"""
     [workflow]
-    name = "rare_rna_align"
+    name = "rare_disease_rna_seq"
     dataset_gcp_project = "test-analysis-dataset-1234"
     dataset = "test-analysis-dataset"
     access_level = "test"
-    sequencing_type = "rna"
+    sequencing_type = "transcriptome"
     driver_image = "<stub>"
     check_inputs = false
     check_intermediates = false
@@ -69,7 +69,7 @@ def get_toml(tmp_path) -> str:
 
 
 DEFAULT_CONFIG = Path(
-    to_path(__file__).parent.parent.parent / 'cpg_workflows' / 'defaults.toml'
+    to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml'
 )
 
 
@@ -83,7 +83,7 @@ def _mock_cohort():
         'CPG01',
         'SAMPLE1',
         alignment_input_by_seq_type={
-            'rna': FastqPairs(
+            'transcriptome': FastqPairs(
                 [
                     FastqPair(
                         'gs://test-input-dataset-upload/sample1_L1_R1.fq.gz',
@@ -101,7 +101,7 @@ def _mock_cohort():
         'CPG02',
         'SAMPLE2',
         alignment_input_by_seq_type={
-            'rna': FastqPairs(
+            'transcriptome': FastqPairs(
                 [
                     FastqPair(
                         'gs://test-input-dataset-upload/sample2_L1_R1.fq.gz',
@@ -148,7 +148,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     # Capture the trim command
     cmd_str_list = []
 
-    def capture_trim_cmd(*args, **kwargs) -> list[Job]:
+    def capture_trim_cmd(*args, **kwargs) -> Job:
         trim_job = trim(*args, **kwargs)
         cmd_str_list.append(
             '===== FASTQ TRIM JOB START =====\n\n' +
@@ -212,7 +212,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
 
     # The number of FASTQ trim jobs should equal the number of FASTQ pairs
     alignment_input_list = [
-        s.alignment_input_by_seq_type.get('rna')
+        s.alignment_input_by_seq_type.get('transcriptome')
         for s in sample_list
     ]
     n_trim_jobs_list = [
