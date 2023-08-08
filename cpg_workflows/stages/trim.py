@@ -64,8 +64,7 @@ def get_input_output_pairs(sequencing_group: SequencingGroup) -> list[InOutFastq
     trim_suffix = '.trimmed.fastq.gz'
     input_output_pairs = []
     for i, pair in enumerate(inputs, 1):
-        assert isinstance(pair.r1, FastqPath), type(pair.r1)
-        assert isinstance(pair.r2, FastqPath), type(pair.r2)
+        assert isinstance(pair, FastqPair)
         input_r1_bn = re.sub('.f(ast)?q.gz', '', basename(pair.r1))
         input_r2_bn = re.sub('.f(ast)?q.gz', '', basename(pair.r2))
         output_r1 = prefix / f'{input_r1_bn}{trim_suffix}'
