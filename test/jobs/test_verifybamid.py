@@ -1,4 +1,5 @@
 import re
+from typing import Literal
 
 import pytest
 from cpg_utils import Path
@@ -43,7 +44,9 @@ def default_config() -> PipelineConfig:
 
 
 def setup_test(
-    tmp_path: Path, ref_fasta: str | None = None, sequencing_type: str | None = None
+    tmp_path: Path,
+    ref_fasta: str | None = None,
+    sequencing_type: Literal['genome', 'exome'] | None = None,
 ):
     config = default_config()
 
@@ -139,6 +142,8 @@ class TestVerifyBAMID:
             job_attrs={'test_tool': 'test_VerifyBamID'},
         )
 
+        # ---- Assertions
+        assert j_default_attrs is not None and j_supplied_attrs is not None
         assert j_default_attrs.attributes == {'tool': 'VerifyBamID'}
         assert j_supplied_attrs.attributes == {
             'test_tool': 'test_VerifyBamID',
@@ -156,6 +161,9 @@ class TestVerifyBAMID:
             out_verify_bamid_path=(tmp_path / 'output_file'),
             job_attrs=None,
         )
+
+        # ---- Assertions
+        assert j is not None
         assert j._image == config.images['verifybamid']
 
     def test_uses_num_pc_in_config_file_in_bash_command(self, tmp_path: Path):
@@ -271,7 +279,7 @@ class TestVerifyBAMID:
 
     @pytest.mark.parametrize('sequencing_type', ['exome', 'genome'])
     def test_extra_opts_changes_according_to_sequencing_type(
-        self, tmp_path: Path, sequencing_type: str
+        self, tmp_path: Path, sequencing_type: Literal['exome', 'genome']
     ):
         # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path, sequencing_type=sequencing_type)
@@ -308,4 +316,6 @@ class TestVerifyBAMID:
             job_attrs=None,
         )
 
+        # ---- Assertions
+        assert j is not None
         spy.assert_called_with(j.out_selfsm, str(out_path))

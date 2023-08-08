@@ -68,6 +68,7 @@ class TestSamtoolsRun:
             job_attrs=None,
             overwrite=False,
         )
+
         # ---- Assertions
         assert (
             len(batch.select_jobs('samtools stats')) == 1
@@ -131,6 +132,8 @@ class TestSamtoolsRun:
             overwrite=False,
         )
 
+        # ---- Assertions
+        assert j_default_attrs is not None and j_supplied_attrs is not None
         assert j_default_attrs.attributes == {'tool': 'samtools'}
         assert j_supplied_attrs.attributes == {
             'test_tool': 'test_samtools',
@@ -148,6 +151,9 @@ class TestSamtoolsRun:
             out_samtools_stats_path=(tmp_path / 'output_file'),
             job_attrs=None,
         )
+
+        # ---- Assertions
+        assert j is not None
         assert j._image == config.images['samtools']
 
     def test_uses_reference_in_workflow_config_section_if_set(self, tmp_path: Path):
@@ -162,6 +168,8 @@ class TestSamtoolsRun:
             job_attrs=None,
             overwrite=True,
         )
+
+        # ---- Assertions
         cmd = get_command_str(j)
         ref_file = config.workflow.ref_fasta
         assert re.search(fr'--reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
@@ -180,6 +188,7 @@ class TestSamtoolsRun:
             job_attrs=None,
         )
 
+        # ---- Assertions
         cmd = get_command_str(j)
         ref_file = config.references['broad']['ref_fasta']
         assert re.search(fr'--reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
@@ -198,6 +207,7 @@ class TestSamtoolsRun:
             job_attrs=None,
         )
 
+        # ---- Assertions
         cmd = get_command_str(j)
         assert re.search(fr'retry_gs_cp .*{cram_pth.path}', cmd)
         assert re.search(fr'retry_gs_cp .*{cram_pth.index_path}', cmd)
@@ -213,11 +223,11 @@ class TestSamtoolsRun:
             out_samtools_stats_path=(tmp_path / 'output_file'),
             job_attrs=None,
         )
+
         # ---- Assertions
         cmd = get_command_str(j)
         assert re.search(r'\$CRAM > \${BATCH_TMPDIR}/.*/output_stats', cmd)
 
-    # TODO: What's the difference between this test and testing whether output exists?
     def test_batch_writes_samtools_stats_file_to_output_path(
         self, mocker: MockFixture, tmp_path: Path
     ):
@@ -234,4 +244,6 @@ class TestSamtoolsRun:
             job_attrs=None,
         )
 
+        # ---- Assertions
+        assert j is not None
         spy.assert_called_with(j.output_stats, str(out_path))
