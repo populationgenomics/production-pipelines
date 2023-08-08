@@ -14,6 +14,7 @@ from cpg_workflows.workflow import (
     SequencingGroupStage,
 )
 from cpg_workflows.filetypes import (
+    FastqPath,
     FastqPair,
     FastqPairs,
 )
@@ -59,13 +60,14 @@ def get_input_output_pairs(sequencing_group: SequencingGroup) -> list[InOutFastq
     inputs = get_trim_inputs(sequencing_group)
     if not inputs or not isinstance(inputs, FastqPairs):
         return []
-    prefix = sequencing_group.dataset.prefix() / 'trim'
+    prefix = sequencing_group.dataset.tmp_prefix() / 'trim'
     trim_suffix = '.trimmed.fastq.gz'
     input_output_pairs = []
-    i = 1
-    for pair in inputs:
-        input_r1_bn = re.sub(re.escape('.fastq.gz'), '', basename(pair.r1))
-        input_r2_bn = re.sub(re.escape('.fastq.gz'), '', basename(pair.r2))
+    for i, pair in enumerate(inputs, 1):
+        assert isinstance(pair.r1, FastqPath), type(pair.r1)
+        assert isinstance(pair.r2, FastqPath), type(pair.r2)
+        input_r1_bn = re.sub('.f(ast)?q.gz', '', basename(pair.r1))
+        input_r2_bn = re.sub('.f(ast)?q.gz', '', basename(pair.r2))
         output_r1 = prefix / f'{input_r1_bn}{trim_suffix}'
         output_r2 = prefix / f'{input_r2_bn}{trim_suffix}'
         input_output_pairs.append(InOutFastqPair(
@@ -122,7 +124,7 @@ class Trim(SequencingGroupStage):
                     output_fq_pair=io_pair.output_pair,
                     job_attrs=self.get_job_attrs(sequencing_group),
                     overwrite=sequencing_group.forced,
-                    extra_label=f'fastq_pair_{io_pair.id}'
+                    extra_label=f'fastq_pair_{io_pair.id}',
                 )
                 if j:
                     jobs.append(j)
