@@ -145,7 +145,6 @@ class TestGenotyping:
         assert merge_job_name in job_names
         assert postproc_job_name in job_names
 
-        # TODO: Add a list of params we could check
         haplotype_output_paths: list[str] = []
         for job in genotype_jobs:
             cmd = get_command_str(job)
@@ -167,6 +166,10 @@ class TestGenotyping:
                 # Validate the outputs from the haploytype caller jobs are the inputs to the merge job
                 for haplotype_output_path in haplotype_output_paths:
                     assert re.search(re.escape(haplotype_output_path), cmd)
+
+                # Validate the output is unique
+                assert len(set(haplotype_output_paths)) == len(haplotype_output_paths)
+                assert len(haplotype_output_paths) == expected_scatter_count
 
             elif job.name == postproc_job_name:
                 # TODO Validate input and output
@@ -220,6 +223,28 @@ class TestGenotyping:
         assert make_intervals_job_name in job_names
         assert merge_job_name in job_names
         assert postproc_job_name in job_names
+
+        haplotype_output_paths: list[str] = []
+        for job in genotype_jobs:
+            cmd = get_command_str(job)
+            if job.name == merge_job_name:
+                assert re.search(r'picard', cmd)
+                assert re.search(r'MergeVcfs', cmd)
+                # Validate the outputs from the haploytype caller jobs are the inputs to the merge job
+                for haplotype_output_path in haplotype_output_paths:
+                    assert re.search(re.escape(haplotype_output_path), cmd)
+
+                # Validate the output is unique
+                assert len(set(haplotype_output_paths)) == len(haplotype_output_paths)
+                assert len(haplotype_output_paths) == expected_scatter_count
+            if job.name == 'HaplotypeCaller':
+                # HaplotypeCaller jobs
+                assert re.search(r'gatk', cmd)
+                assert re.search(r'HaplotypeCaller', cmd)
+                pattern = r'-O\s+([^\\]+\.gz)'
+                match = re.search(pattern, cmd)
+                assert match
+                haplotype_output_paths.append(match.group(1))
 
     def test_genotype_jobs_with_invalid_scatter_count(self, tmp_path: Path):
         config = default_config()
