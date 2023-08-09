@@ -64,9 +64,11 @@ class TestFastqc:
 
         # ---- Assertions
         assert re.search(rf'{bam}', cmd)
+        assert re.search(r'ln .*_fastqc.html \S+/\S+/out_html', cmd)
+        assert re.search(r'ln .*_fastqc.zip \S+/\S+/out_zip', cmd)
         assert job_attrs.items() <= job.attributes.items()
 
-    @pytest.mark.parametrize('fastq', ['input.fastq', 'file.fastq'])
+    @pytest.mark.parametrize('fastq', ['input.fastq', 'file.fastq', 'in.fq.gz'])
     @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
     def test_fastqc_fastq(self, tmp_path: Path, fastq: str, job_attrs: dict):
         # ---- Test setup
@@ -87,4 +89,6 @@ class TestFastqc:
 
         # ---- Assertions
         assert re.search(rf'{fastq}', cmd)
+        assert re.search(r'ln .*_fastqc.html \S+/\S+/out_html', cmd)
+        assert re.search(r'ln .*_fastqc.zip \S+/\S+/out_zip', cmd)
         assert job_attrs.items() <= job.attributes.items()
