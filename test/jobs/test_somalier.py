@@ -406,3 +406,27 @@ class TestSomalierRelate:
         # ---- Assertions
         assert j is not None
         assert j._image == config.images['somalier']
+
+    def test_if_verifybamid_exists_for_sg_check_freemix(self, tmp_path: Path):
+        # ---- Test setup
+        config, batch, sg, somalier_path_by_sgid = setup_relate_test(tmp_path)
+
+        # ---- The job that we want to test
+        j = _relate(
+            b=batch,
+            somalier_path_by_sgid=somalier_path_by_sgid,
+            sequencing_group_ids=[sg.id],
+            rich_id_map={sg.id: sg.pedigree.fam_id},
+            expected_ped_path=(tmp_path / 'test_ped.ped'),
+            label=None,
+            out_samples_path=(tmp_path / 'out_samples'),
+            out_pairs_path=(tmp_path / 'out_pairs'),
+            out_html_path=(tmp_path / 'out_html'),
+            verifybamid_by_sgid=somalier_path_by_sgid,
+        )
+
+        # ---- Assertions
+        cmd = get_command_str(j)
+        verifybamid_file = somalier_path_by_sgid
+        print()
+        assert re.search(fr'FREEMIX=$(cat ${{BATCH_TMPDIR}}"/inputs/\w+')
