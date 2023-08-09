@@ -1,7 +1,10 @@
 import re
 import pytest
+import random
 from pathlib import Path
 from functools import cached_property
+
+from cpg_utils.hail_batch import fasta_res_group
 
 from cpg_workflows.batch import Batch
 from cpg_workflows.filetypes import BamPath, CramPath, GvcfPath
@@ -17,7 +20,7 @@ from cpg_workflows.jobs.picard import (
 from .. import set_config
 from ..factories.batch import create_local_batch
 from ..factories.config import PipelineConfig, WorkflowConfig
-from .helpers import get_command_str
+from .helpers import get_command_str, get_path_from_resource_file
 
 
 class TestPicard:
@@ -50,18 +53,117 @@ class TestPicard:
             },
         )
 
-    def _setup(self, config: PipelineConfig, tmp_path: Path) -> Batch:
+    def _setup(self, config: PipelineConfig, tmp_path: Path, ref: str = None) -> Batch:
+        if ref is not None:
+            config.workflow.ref_fasta = ref
+
         set_config(config, tmp_path / 'config.toml')
         batch = create_local_batch(tmp_path)
 
         return batch
 
-    @pytest.mark.parametrize('scatter_count', [-1, 1, 10, 15, 20])
+    @pytest.mark.parametrize('scatter_count', [-645, -1, 0])
+    def test_get_intervals_scatter_less_than_zero(
+        self, tmp_path: Path, scatter_count: int
+    ):
+        # ---- Test setup
+        batch = self._setup(self.default_config, tmp_path)
+
+        # ---- The job we want to test
+
+        # Assert error for invalid scatter count
+        with pytest.raises(AssertionError, match=str(scatter_count)):
+            _, _ = get_intervals(
+                b=batch,
+                scatter_count=scatter_count,
+                source_intervals_path=tmp_path / 'source_intervals.txt',
+                output_prefix=tmp_path / 'intervals',
+            )
+
+    def test_get_intervals_scatter_is_one(self, tmp_path: Path):
+        # ---- Test setup
+        batch = self._setup(self.default_config, tmp_path)
+
+        # ---- The job we want to test
+        job, _ = get_intervals(
+            b=batch,
+            scatter_count=1,
+            source_intervals_path=tmp_path / 'source_intervals.txt',
+            output_prefix=tmp_path,
+        )
+
+        # ---- Assertions
+        assert job is None
+
+    @pytest.mark.parametrize('scatter_count', [10, 15, 20])
+    def test_get_intervals_all_outputs_exist(
+        self,
+        tmp_path: Path,
+        scatter_count: int,
+    ):
+        # ---- Test setup
+        batch = self._setup(self.default_config, tmp_path)
+
+        # Create all of the files
+        output_prefix = tmp_path
+        for i in range(1, scatter_count + 1):
+            file = output_prefix / f'{i}.interval_list'
+            file.touch()
+
+        # ---- The job we want to test
+        job, intervals = get_intervals(
+            b=batch,
+            scatter_count=scatter_count,
+            source_intervals_path=tmp_path / 'source_intervals.txt',
+            output_prefix=output_prefix,
+        )
+
+        # ---- Assertions
+        assert job is None
+        assert len(intervals) == scatter_count
+
+        for i, file in enumerate(intervals):
+            file_path = get_path_from_resource_file(file)
+            assert file_path == str(tmp_path / f'{i+1}.interval_list')
+
+    @pytest.mark.parametrize('scatter_count', [10, 15, 20])
+    def test_get_intervals_some_outputs_exist(
+        self,
+        tmp_path: Path,
+        scatter_count: int,
+    ):
+        # ---- Test setup
+        batch = self._setup(self.default_config, tmp_path)
+
+        # Create only some of the files
+        output_prefix = tmp_path
+        for i in range(1, random.randint(2, scatter_count)):
+            file = output_prefix / f'{i}.interval_list'
+            file.touch()
+
+        # ---- The job we want to test
+        job, intervals = get_intervals(
+            b=batch,
+            scatter_count=scatter_count,
+            source_intervals_path=tmp_path / 'source_intervals.txt',
+            output_prefix=output_prefix,
+        )
+        cmd = get_command_str(job)
+
+        # ---- Assertions
+        assert job is not None
+        assert len(intervals) == scatter_count
+
+        for i in range(1, scatter_count + 1):
+            assert re.search(rf'temp_{i:04d}_of_{scatter_count}', cmd)
+            assert re.search(rf'/{i}.interval_list', cmd)
+
+    @pytest.mark.parametrize('scatter_count', [10, 15, 20])
     @pytest.mark.parametrize(
         'source_intervals_path', ['source_intervals.txt', 'src_intrvls.txt']
     )
     @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
-    def test_get_intervals(
+    def test_get_intervals_valid_inputs(
         self,
         tmp_path: Path,
         scatter_count: int,
@@ -72,20 +174,6 @@ class TestPicard:
         batch = self._setup(self.default_config, tmp_path)
 
         # ---- The job we want to test
-
-        # Assert error for invalid scatter count
-        if scatter_count <= 0:
-            with pytest.raises(AssertionError, match=str(scatter_count)):
-                job, _ = get_intervals(
-                    b=batch,
-                    scatter_count=scatter_count,
-                    source_intervals_path=tmp_path / source_intervals_path,
-                    output_prefix=tmp_path / 'intervals',
-                    job_attrs=job_attrs,
-                )
-                assert job_attrs.items() <= job.attributes.items()
-            return
-
         job, _ = get_intervals(
             b=batch,
             scatter_count=scatter_count,
@@ -96,10 +184,6 @@ class TestPicard:
         cmd = get_command_str(job)
 
         # ---- Assertions
-        if scatter_count == 1:
-            assert job is None
-            return
-
         assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'INPUT=\S*{source_intervals_path}', cmd)
 
@@ -110,10 +194,31 @@ class TestPicard:
     # test_get_intervals_already_exists
     # put files into data folder
 
+    @pytest.mark.parametrize('ref', [None, 'ref.fa'])
+    def test_markdup_ref_fasta(self, tmp_path: Path, ref: str):
+        # ---- Test setup
+        batch = self._setup(self.default_config, tmp_path, ref=ref)
+
+        # ---- The job we want to test
+        sorted_bam = BamPath(
+            path=tmp_path / 'in.bam', index_path=tmp_path / f'in.bam.bai'
+        )
+        job = markdup(
+            b=batch,
+            sorted_bam=sorted_bam,
+            fasta_reference=fasta_res_group(batch),
+        )
+        cmd = get_command_str(job)
+
+        # ---- Assertions
+        if ref is None:
+            ref = self.default_config.references['broad']['ref_fasta']
+
+        assert re.search(rf'-T\s*\S*{ref}', cmd)
+
     @pytest.mark.parametrize('bam', ['input.bam', 'sorted.bam'])
-    @pytest.mark.parametrize('ref', [None, 'hg37_ref.fa'])
     @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
-    def test_markdup(self, tmp_path: Path, bam: str, ref: str | None, job_attrs: dict):
+    def test_markdup_valid_inputs(self, tmp_path: Path, bam: str, job_attrs: dict):
         # ---- Test setup
 
         batch = self._setup(self.default_config, tmp_path)
@@ -123,7 +228,6 @@ class TestPicard:
         job = markdup(
             b=batch,
             sorted_bam=sorted_bam,
-            fasta_reference=ref,
             job_attrs=job_attrs,
         )
         cmd = get_command_str(job)
@@ -131,7 +235,6 @@ class TestPicard:
         # ---- Assertions
         assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'I=\S*{bam}', cmd)
-        assert re.search(rf'-T\s*\S*{ref}', cmd)
 
     @pytest.mark.parametrize('gvcf', ['file.gvcf.gz', 'file.gvcf'])
     @pytest.mark.parametrize('dbsnp', ['dbsnp.vcf.gz', 'DBSNP.vcf.gz'])
