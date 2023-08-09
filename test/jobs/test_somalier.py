@@ -164,7 +164,26 @@ class TestSomalier:
         assert j is not None
         assert j._image == config.images['somalier']
 
-    def test_gets_somalier_sites_from_config_file(self, tmp_path: Path):
+    def test_sets_sites_location_with_name_of_sites_file_in_config(
+        self, tmp_path: Path
+    ):
+        # ---- Test setup
+        config, cram_pth, batch = setup_test(tmp_path)
+
+        # ---- The jobs we want to test
+        j = extract(
+            b=batch,
+            cram_path=cram_pth,
+            out_somalier_path=(tmp_path / 'output_file'),
+        )
+
+        # ---- Assertions
+        cmd = get_command_str(j)
+        sites = config.other['references']['somalier_sites']
+        assert j is not None
+        assert re.search(fr'SITES=\$BATCH_TMPDIR/sites/{sites}', cmd)
+
+    def test_runs_with_somalier_sites_from_config_file(self, tmp_path: Path):
         # ---- Test setup
         config, cram_pth, batch = setup_test(tmp_path)
 
