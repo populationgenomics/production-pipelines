@@ -107,15 +107,14 @@ class TestPicard:
             assert re.search(rf'temp_{i:04d}_of_{scatter_count}', cmd)
             assert re.search(rf'/{i}.interval_list', cmd)
 
+    @pytest.mark.parametrize('bam', ['input.bam', 'sorted.bam'])
     @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
-    def test_markdup(self, tmp_path: Path, job_attrs: dict):
+    def test_markdup(self, tmp_path: Path, bam: str, job_attrs: dict):
         # ---- Test setup
         batch = self._setup(self.default_config, tmp_path)
 
         # ---- The job we want to test
-        sorted_bam = BamPath(
-            path=tmp_path / 'sorted.bam', index_path=tmp_path / 'sorted.bam.bai'
-        )
+        sorted_bam = BamPath(path=tmp_path / bam, index_path=tmp_path / f'{bam}.bai')
         job = markdup(
             b=batch,
             sorted_bam=sorted_bam,
@@ -125,7 +124,7 @@ class TestPicard:
 
         # ---- Assertions
         assert job_attrs.items() <= job.attributes.items()
-        assert re.search(r'I=\S*sorted.bam', cmd)
+        assert re.search(rf'I=\S*{bam}', cmd)
         assert re.search(r'-T\s*\S*hg38_reference.fa', cmd)
 
     @pytest.mark.parametrize('gvcf', ['file.gvcf.gz', 'file.gvcf'])
