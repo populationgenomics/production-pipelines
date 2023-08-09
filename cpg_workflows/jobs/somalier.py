@@ -4,18 +4,18 @@ Adding jobs for fingerprinting and pedigree checks. Mostly using Somalier.
 from typing import cast
 
 import pandas as pd
-from hailtop.batch import Batch, Resource
-from hailtop.batch.job import Job
-
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import (
+    command,
+    copy_common_env,
+    fasta_res_group,
     image_path,
     reference_path,
-    fasta_res_group,
-    copy_common_env,
-    command,
 )
+from hailtop.batch import Batch, Resource
+from hailtop.batch.job import Job
+
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.python_scripts import check_pedigree
 from cpg_workflows.resources import STANDARD
