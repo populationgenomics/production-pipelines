@@ -8,7 +8,7 @@ from hailtop.batch import Batch, Resource
 from hailtop.batch.job import Job
 from pytest_mock import MockFixture
 
-from cpg_workflows.jobs.somalier import extract
+from cpg_workflows.jobs.somalier import _check_pedigree, _relate, extract
 
 from .. import set_config
 from ..factories.alignment_input import create_cram_input
@@ -21,7 +21,7 @@ from .helpers import get_command_str
 def default_config() -> PipelineConfig:
     return PipelineConfig(
         workflow=WorkflowConfig(
-            dataset='som-test',
+            dataset='somalier-test',
             access_level='test',
             sequencing_type='genome',
             check_inputs=False,
@@ -67,7 +67,11 @@ def setup_test(
     return config, cram_pth, batch
 
 
-class TestSomalier:
+def setup_dataset_test():
+    pass
+
+
+class TestSomalierExtract:
     def test_creates_one_job(self, tmp_path: Path):
         # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
@@ -252,24 +256,25 @@ class TestSomalier:
         ref_file = config.other['references']['broad']['ref_fasta']
         assert re.search(fr'-f \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
 
-    def test_writes_to_resource_file_named_output_file(self, tmp_path: Path):
+    def test_batch_writes_output_file_to_output_path(
+        self, mocker: MockFixture, tmp_path: Path
+    ):
         # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The jobs we want to test
+        spy = mocker.spy(batch, 'write_output')
+        out_path = tmp_path / 'output_file'
+
         j = extract(
             b=batch,
             cram_path=cram_pth,
-            out_somalier_path=(tmp_path / 'output_file'),
+            out_somalier_path=out_path,
         )
 
         # ---- Assertions
-        cmd = get_command_str(j)
         assert j is not None
-        assert re.search(
-            r'mv extracted/\*\.somalier \${BATCH_TMPDIR}/Somalier_extract-\w+/output_file',
-            cmd,
-        )
+        spy.assert_called_with(j.output_file, str(out_path))
 
     def test_raises_error_if_no_cram_index_path_given(self, tmp_path: Path):
         # ---- Test setup
@@ -284,3 +289,34 @@ class TestSomalier:
                 cram_path=cram_pth,
                 out_somalier_path=(tmp_path / 'output_file'),
             )
+
+
+class TestSomalierRelate:
+    def test_creates_one_relate_job(self, tmp_path: Path):
+        # ---- Test setup
+        config = default_config()
+        set_config(config, tmp_path / 'config.toml')
+
+        dataset_id = config.workflow.dataset
+        batch = create_local_batch(tmp_path)
+        sg = create_sequencing_group(
+            dataset=dataset_id,
+            sequencing_type=config.workflow.sequencing_type,
+        )
+        somalier_path_by_sgid = {sg.id: (tmp_path / 'test.somalier')}
+
+        # ---- The job that we want to test
+        j = _relate(
+            b=batch,
+            somalier_path_by_sgid=somalier_path_by_sgid,
+            sequencing_group_ids=[sg.id],
+            rich_id_map={sg.id: sg.pedigree.fam_id},
+            expected_ped_path=(tmp_path / 'test_ped.ped'),
+            label=None,
+            out_samples_path=(tmp_path / 'out_samples'),
+            out_pairs_path=(tmp_path / 'out_pairs'),
+            out_html_path=(tmp_path / 'out_html'),
+        )
+        print()
+        # ---- Assertions
+        relate_jobs = batch.select_jobs(rf'')
