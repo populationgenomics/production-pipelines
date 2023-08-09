@@ -60,8 +60,13 @@ class TestPicard:
     @pytest.mark.parametrize(
         'source_intervals_path', ['source_intervals.txt', 'src_intrvls.txt']
     )
+    @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
     def test_get_intervals(
-        self, tmp_path: Path, scatter_count: int, source_intervals_path: str
+        self,
+        tmp_path: Path,
+        scatter_count: int,
+        source_intervals_path: str,
+        job_attrs: dict,
     ):
         # ---- Test setup
         batch = self._setup(self.default_config, tmp_path)
@@ -75,17 +80,18 @@ class TestPicard:
                     b=batch,
                     scatter_count=scatter_count,
                     source_intervals_path=tmp_path / source_intervals_path,
-                    job_attrs=None,
                     output_prefix=tmp_path / 'intervals',
+                    job_attrs=job_attrs,
                 )
+                assert job_attrs.items() <= job.attributes.items()
             return
 
         job, _ = get_intervals(
             b=batch,
             scatter_count=scatter_count,
             source_intervals_path=tmp_path / source_intervals_path,
-            job_attrs=None,
             output_prefix=tmp_path / 'intervals',
+            job_attrs=job_attrs,
         )
         cmd = get_command_str(job)
 
@@ -94,15 +100,15 @@ class TestPicard:
             assert job is None
             return
 
+        assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'INPUT=\S*{source_intervals_path}', cmd)
 
         for i in range(1, scatter_count + 1):
             assert re.search(rf'temp_{i:04d}_of_{scatter_count}', cmd)
             assert re.search(rf'/{i}.interval_list', cmd)
 
-        return
-
-    def test_markdup(self, tmp_path: Path):
+    @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
+    def test_markdup(self, tmp_path: Path, job_attrs: dict):
         # ---- Test setup
         batch = self._setup(self.default_config, tmp_path)
 
@@ -113,17 +119,22 @@ class TestPicard:
         job = markdup(
             b=batch,
             sorted_bam=sorted_bam,
+            job_attrs=job_attrs,
         )
         cmd = get_command_str(job)
 
         # ---- Assertions
+        assert job_attrs.items() <= job.attributes.items()
         assert re.search(r'I=\S*sorted.bam', cmd)
         assert re.search(r'-T\s*\S*hg38_reference.fa', cmd)
 
     @pytest.mark.parametrize('gvcf', ['file.gvcf.gz', 'file.gvcf'])
     @pytest.mark.parametrize('dbsnp', ['dbsnp.vcf.gz', 'DBSNP.vcf.gz'])
     @pytest.mark.parametrize('intervals', ['intervals.txt', 'intrvls.txt'])
-    def test_vcf_qc(self, tmp_path: Path, gvcf: str, dbsnp: str, intervals: str):
+    @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
+    def test_vcf_qc(
+        self, tmp_path: Path, gvcf: str, dbsnp: str, intervals: str, job_attrs: dict
+    ):
         # ---- Test setup
         config = self.default_config
         config.references['broad'] = {
@@ -144,10 +155,12 @@ class TestPicard:
             output_summary_path=tmp_path / 'summary.txt',
             output_detail_path=tmp_path / 'output.txt',
             overwrite=False,
+            job_attrs=job_attrs,
         )
         cmd = get_command_str(job)
 
         # ---- Assertions
+        assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'INPUT=\S*{gvcf}', cmd)
         assert re.search(rf'DBSNP=\S*{dbsnp}', cmd)
         assert re.search(rf'TARGET_INTERVALS=\S*{intervals}', cmd)
@@ -155,8 +168,9 @@ class TestPicard:
 
     @pytest.mark.parametrize('cram', ['file.cram', 'file2.cram'])
     @pytest.mark.parametrize('assume_sorted', [True, False])
+    @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
     def test_picard_collect_metrics(
-        self, tmp_path: Path, cram: str, assume_sorted: bool
+        self, tmp_path: Path, cram: str, assume_sorted: bool, job_attrs: dict
     ):
         # ---- Test setup
         config = self.default_config
@@ -175,10 +189,12 @@ class TestPicard:
             out_insert_size_metrics_path=tmp_path / 'insrt_size_metrics.txt',
             out_quality_by_cycle_metrics_path=tmp_path / 'qual_by_cycle.txt',
             out_quality_yield_metrics_path=tmp_path / 'qual_yield_by_cycle.txt',
+            job_attrs=job_attrs,
         )
         cmd = get_command_str(job)
 
         # ---- Assertions
+        assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'CRAM=\$BATCH_TMPDIR/{cram}', cmd)
         assert re.search(rf'CRAI=\$BATCH_TMPDIR/{cram}.crai', cmd)
         assert re.search(r'REFERENCE_SEQUENCE=\S+hg38_reference.fa', cmd)
@@ -188,7 +204,10 @@ class TestPicard:
     @pytest.mark.parametrize(
         'exome_intervals', ['exome_intervals.txt', 'ex_intrvls.txt']
     )
-    def test_picard_hs_metrics(self, tmp_path: Path, cram: str, exome_intervals: str):
+    @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
+    def test_picard_hs_metrics(
+        self, tmp_path: Path, cram: str, exome_intervals: str, job_attrs: dict
+    ):
         # ---- Test setup
         config = self.default_config
         config.workflow = WorkflowConfig(
@@ -211,10 +230,12 @@ class TestPicard:
             b=batch,
             cram_path=cram_path,
             out_picard_hs_metrics_path=tmp_path / 'picard_hs_metrics.txt',
+            job_attrs=job_attrs,
         )
         cmd = get_command_str(job)
 
         # ---- Assertions
+        assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'CRAM=\$BATCH_TMPDIR/{cram}', cmd)
         assert re.search(rf'CRAI=\$BATCH_TMPDIR/{cram}.crai', cmd)
         assert re.search(r'REFERENCE_SEQUENCE=\S+hg38_reference.fa', cmd)
@@ -224,7 +245,10 @@ class TestPicard:
     @pytest.mark.parametrize(
         'genome_intervals', ['genome_intervals.txt', 'gnm_intrvls.txt']
     )
-    def test_picard_wgs_metrics(self, tmp_path: Path, cram: str, genome_intervals: str):
+    @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
+    def test_picard_wgs_metrics(
+        self, tmp_path: Path, cram: str, genome_intervals: str, job_attrs: dict
+    ):
         # ---- Test setup
         config = self.default_config
         config.references['broad'] = {
@@ -241,10 +265,12 @@ class TestPicard:
             b=batch,
             cram_path=cram_path,
             out_picard_wgs_metrics_path=tmp_path / 'picard_hs_metrics.txt',
+            job_attrs=job_attrs,
         )
         cmd = get_command_str(job)
 
         # ---- Assertions
+        assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'CRAM=\$BATCH_TMPDIR/{cram}', cmd)
         assert re.search(rf'CRAI=\$BATCH_TMPDIR/{cram}.crai', cmd)
         assert re.search(r'REFERENCE_SEQUENCE=\S+hg38_reference.fa', cmd)
