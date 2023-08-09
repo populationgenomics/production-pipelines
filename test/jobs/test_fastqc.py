@@ -41,7 +41,8 @@ class TestFastqc:
         return batch
 
     @pytest.mark.parametrize('bam', ['input.bam', 'file.bam'])
-    def test_fastqc_bam(self, tmp_path: Path, bam: str):
+    @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
+    def test_fastqc_bam(self, tmp_path: Path, bam: str, job_attrs: dict):
         # ---- Test setup
         batch = self._setup(self.default_config, tmp_path)
 
@@ -57,14 +58,17 @@ class TestFastqc:
             output_zip_path=tmp_path / 'output.zip',
             input_path=bam_path,
             subsample=True,
+            job_attrs=job_attrs,
         )
         cmd = get_command_str(job)
 
         # ---- Assertions
         assert re.search(rf'{bam}', cmd)
+        assert job_attrs.items() <= job.attributes.items()
 
     @pytest.mark.parametrize('fastq', ['input.fastq', 'file.fastq'])
-    def test_fastqc_fastq(self, tmp_path: Path, fastq: str):
+    @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
+    def test_fastqc_fastq(self, tmp_path: Path, fastq: str, job_attrs: dict):
         # ---- Test setup
         batch = self._setup(self.default_config, tmp_path)
 
@@ -77,8 +81,10 @@ class TestFastqc:
             output_zip_path=tmp_path / 'output.zip',
             input_path=fastq_path,
             subsample=True,
+            job_attrs=job_attrs,
         )
         cmd = get_command_str(job)
 
         # ---- Assertions
         assert re.search(rf'{fastq}', cmd)
+        assert job_attrs.items() <= job.attributes.items()
