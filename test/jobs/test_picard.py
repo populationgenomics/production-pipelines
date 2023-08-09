@@ -107,10 +107,15 @@ class TestPicard:
             assert re.search(rf'temp_{i:04d}_of_{scatter_count}', cmd)
             assert re.search(rf'/{i}.interval_list', cmd)
 
+    # test_get_intervals_already_exists
+    # put files into data folder
+
     @pytest.mark.parametrize('bam', ['input.bam', 'sorted.bam'])
+    @pytest.mark.parametrize('ref', [None, 'hg37_ref.fa'])
     @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
-    def test_markdup(self, tmp_path: Path, bam: str, job_attrs: dict):
+    def test_markdup(self, tmp_path: Path, bam: str, ref: str | None, job_attrs: dict):
         # ---- Test setup
+
         batch = self._setup(self.default_config, tmp_path)
 
         # ---- The job we want to test
@@ -118,6 +123,7 @@ class TestPicard:
         job = markdup(
             b=batch,
             sorted_bam=sorted_bam,
+            fasta_reference=ref,
             job_attrs=job_attrs,
         )
         cmd = get_command_str(job)
@@ -125,7 +131,7 @@ class TestPicard:
         # ---- Assertions
         assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'I=\S*{bam}', cmd)
-        assert re.search(r'-T\s*\S*hg38_reference.fa', cmd)
+        assert re.search(rf'-T\s*\S*{ref}', cmd)
 
     @pytest.mark.parametrize('gvcf', ['file.gvcf.gz', 'file.gvcf'])
     @pytest.mark.parametrize('dbsnp', ['dbsnp.vcf.gz', 'DBSNP.vcf.gz'])
