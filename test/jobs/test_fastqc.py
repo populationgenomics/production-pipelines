@@ -64,7 +64,7 @@ class TestFastqc:
         assert re.search(rf'{bam}', cmd)
 
     @pytest.mark.parametrize('fastq', ['input.fastq', 'file.fastq'])
-    def test_fastqc_bam(self, tmp_path: Path, fastq: str):
+    def test_fastqc_fastq(self, tmp_path: Path, fastq: str):
         # ---- Test setup
         batch = self._setup(self.default_config, tmp_path)
 
