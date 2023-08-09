@@ -67,8 +67,19 @@ def setup_test(
     return config, cram_pth, batch
 
 
-def setup_dataset_test():
-    pass
+def setup_relate_test(tmp_path: Path):
+    config = default_config()
+    set_config(config, tmp_path / 'config.toml')
+
+    dataset_id = config.workflow.dataset
+    batch = create_local_batch(tmp_path)
+    sg = create_sequencing_group(
+        dataset=dataset_id,
+        sequencing_type=config.workflow.sequencing_type,
+    )
+    somalier_path_by_sgid = {sg.id: (tmp_path / 'test.somalier')}
+
+    return config, batch, sg, somalier_path_by_sgid
 
 
 class TestSomalierExtract:
@@ -294,16 +305,7 @@ class TestSomalierExtract:
 class TestSomalierRelate:
     def test_creates_one_relate_job(self, tmp_path: Path):
         # ---- Test setup
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        dataset_id = config.workflow.dataset
-        batch = create_local_batch(tmp_path)
-        sg = create_sequencing_group(
-            dataset=dataset_id,
-            sequencing_type=config.workflow.sequencing_type,
-        )
-        somalier_path_by_sgid = {sg.id: (tmp_path / 'test.somalier')}
+        _, batch, sg, somalier_path_by_sgid = setup_relate_test(tmp_path)
 
         # ---- The job that we want to test
         j = _relate(
@@ -317,6 +319,90 @@ class TestSomalierRelate:
             out_pairs_path=(tmp_path / 'out_pairs'),
             out_html_path=(tmp_path / 'out_html'),
         )
-        print()
+
         # ---- Assertions
-        relate_jobs = batch.select_jobs(rf'')
+        relate_jobs = batch.select_jobs(rf'Somalier relate')
+        assert len(relate_jobs) == 1
+
+    def test_adds_label_to_default_job_title_if_label_provided(self, tmp_path: Path):
+        # ---- Test setup
+        _, batch, sg, somalier_path_by_sgid = setup_relate_test(tmp_path)
+
+        label = 'test-label'
+
+        # ---- The job that we want to test
+        j = _relate(
+            b=batch,
+            somalier_path_by_sgid=somalier_path_by_sgid,
+            sequencing_group_ids=[sg.id],
+            rich_id_map={sg.id: sg.pedigree.fam_id},
+            expected_ped_path=(tmp_path / 'test_ped.ped'),
+            label=label,
+            out_samples_path=(tmp_path / 'out_samples'),
+            out_pairs_path=(tmp_path / 'out_pairs'),
+            out_html_path=(tmp_path / 'out_html'),
+        )
+
+        # ---- Assertions
+        job_name = f'Somalier relate [{label}]'
+        assert j.name == job_name
+
+    def test_sets_job_attrs_or_sets_default_attrs_if_not_supplied(self, tmp_path: Path):
+        # ---- Test setup
+        _, batch, sg, somalier_path_by_sgid = setup_relate_test(tmp_path)
+
+        # ---- The job that we want to test
+        j_default_attrs = _relate(
+            b=batch,
+            somalier_path_by_sgid=somalier_path_by_sgid,
+            sequencing_group_ids=[sg.id],
+            rich_id_map={sg.id: sg.pedigree.fam_id},
+            expected_ped_path=(tmp_path / 'test_ped.ped'),
+            label=None,
+            out_samples_path=(tmp_path / 'out_samples'),
+            out_pairs_path=(tmp_path / 'out_pairs'),
+            out_html_path=(tmp_path / 'out_html'),
+            job_attrs=None,
+        )
+
+        j_supplied_attrs = _relate(
+            b=batch,
+            somalier_path_by_sgid=somalier_path_by_sgid,
+            sequencing_group_ids=[sg.id],
+            rich_id_map={sg.id: sg.pedigree.fam_id},
+            expected_ped_path=(tmp_path / 'test_ped.ped'),
+            label=None,
+            out_samples_path=(tmp_path / 'out_samples'),
+            out_pairs_path=(tmp_path / 'out_pairs'),
+            out_html_path=(tmp_path / 'out_html'),
+            job_attrs={'test_tool': 'test_relate'},
+        )
+
+        # ---- Assertions
+        assert j_default_attrs is not None and j_supplied_attrs is not None
+        assert j_default_attrs.attributes == {'tool': 'somalier'}
+        assert j_supplied_attrs.attributes == {
+            'test_tool': 'test_relate',
+            'tool': 'somalier',
+        }
+
+    def test_uses_image_specified_in_config(self, tmp_path: Path):
+        # ---- Test setup
+        config, batch, sg, somalier_path_by_sgid = setup_relate_test(tmp_path)
+
+        # ---- The job that we want to test
+        j = _relate(
+            b=batch,
+            somalier_path_by_sgid=somalier_path_by_sgid,
+            sequencing_group_ids=[sg.id],
+            rich_id_map={sg.id: sg.pedigree.fam_id},
+            expected_ped_path=(tmp_path / 'test_ped.ped'),
+            label=None,
+            out_samples_path=(tmp_path / 'out_samples'),
+            out_pairs_path=(tmp_path / 'out_pairs'),
+            out_html_path=(tmp_path / 'out_html'),
+        )
+
+        # ---- Assertions
+        assert j is not None
+        assert j._image == config.images['somalier']
