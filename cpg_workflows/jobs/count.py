@@ -133,7 +133,7 @@ def count(
     job_name = f'count_{sample_name}' if sample_name else 'count'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='featureCounts')
     j = b.new_job(job_name, _job_attrs)
-    j.image(image_path('featurecounts'))
+    j.image(image_path('subread'))
     
     # Create counting command
     fc = FeatureCounts(

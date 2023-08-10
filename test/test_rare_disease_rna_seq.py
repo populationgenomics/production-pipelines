@@ -38,7 +38,7 @@ def get_toml(tmp_path) -> str:
     fastp = "stub"
     star = "stub"
     samtools = "stub"
-    featureCounts = "stub"
+    subread = "stub"
 
     [trim]
     adapter_type = "ILLUMINA_TRUSEQ"
