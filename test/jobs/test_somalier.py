@@ -44,31 +44,20 @@ def default_config() -> PipelineConfig:
 
 def setup_test(
     tmp_path: Path,
-    ref_fasta: str | None = None,
-    sequencing_type: Literal['genome', 'exome'] | None = None,
+    config: PipelineConfig | None = None,
     index: bool = True,
 ):
-    config = default_config()
-
-    if ref_fasta is not None:
-        config.workflow.ref_fasta = ref_fasta
-
-    if sequencing_type is not None:
-        config.workflow.sequencing_type = sequencing_type
-
+    config = config or default_config()
     set_config(config, tmp_path / 'config.toml')
 
-    cram_pth = create_cram_input(
-        location=tmp_path, prefix='test', index=index, reference_assembly='GRCh38.fa'
-    )
-
+    cram_pth = create_cram_input(location=tmp_path, index=index)
     batch = create_local_batch(tmp_path)
 
     return config, cram_pth, batch
 
 
-def setup_relate_test(tmp_path: Path):
-    config = default_config()
+def setup_relate_test(tmp_path: Path, config: PipelineConfig | None = None):
+    config = config or default_config()
     set_config(config, tmp_path / 'config.toml')
 
     dataset_id = config.workflow.dataset
@@ -235,7 +224,9 @@ class TestSomalierExtract:
 
     def test_uses_reference_in_workflow_config_section_if_set(self, tmp_path: Path):
         # ---- Test setup
-        config, cram_pth, batch = setup_test(tmp_path, ref_fasta='test_workflow_ref.fa')
+        config = default_config()
+        config.workflow.ref_fasta = 'test_workflow_ref.fa'
+        _, cram_pth, batch = setup_test(tmp_path, config)
 
         # ---- The jobs we want to test
         j = extract(
@@ -321,7 +312,7 @@ class TestSomalierRelate:
         )
 
         # ---- Assertions
-        relate_jobs = batch.select_jobs(rf'Somalier relate')
+        relate_jobs = batch.select_jobs('Somalier relate')
         assert len(relate_jobs) == 1
 
     def test_adds_label_to_default_job_title_if_label_provided(self, tmp_path: Path):
@@ -409,7 +400,7 @@ class TestSomalierRelate:
 
     def test_if_verifybamid_exists_for_sg_check_freemix(self, tmp_path: Path):
         # ---- Test setup
-        config, batch, sg, somalier_path_by_sgid = setup_relate_test(tmp_path)
+        _, batch, sg, somalier_path_by_sgid = setup_relate_test(tmp_path)
 
         # ---- The job that we want to test
         j = _relate(
@@ -427,6 +418,102 @@ class TestSomalierRelate:
 
         # ---- Assertions
         cmd = get_command_str(j)
-        verifybamid_file = somalier_path_by_sgid
+        verifybamid_file = somalier_path_by_sgid[sg.id].name  # same as somalier file
         print()
-        assert re.search(fr'FREEMIX=$(cat ${{BATCH_TMPDIR}}"/inputs/\w+')
+        assert re.search(
+            fr'FREEMIX=\$\(cat \${{BATCH_TMPDIR}}/inputs/\w+/{verifybamid_file}', cmd
+        )
+
+    def test_max_freemix_is_checked_if_verifybamid_file_available(self, tmp_path: Path):
+        # ---- Test setup
+        _, batch, sg, somalier_path_by_sgid = setup_relate_test(tmp_path)
+
+        # ---- The job that we want to test
+        j = _relate(
+            b=batch,
+            somalier_path_by_sgid=somalier_path_by_sgid,
+            sequencing_group_ids=[sg.id],
+            rich_id_map={sg.id: sg.pedigree.fam_id},
+            expected_ped_path=(tmp_path / 'test_ped.ped'),
+            label=None,
+            out_samples_path=(tmp_path / 'out_samples'),
+            out_pairs_path=(tmp_path / 'out_pairs'),
+            out_html_path=(tmp_path / 'out_html'),
+            verifybamid_by_sgid=somalier_path_by_sgid,
+        )
+
+        # ---- Assertions
+        cmd = get_command_str(j)
+        max_freemix = 0.04
+        print()
+        assert re.search(fr'echo "\$FREEMIX > {max_freemix}"', cmd)
+
+    def test_somalier_file_written_to_relate_input_file_if_verifybamid_file_available(
+        self, tmp_path: Path
+    ):
+        # ---- Test setup
+        _, batch, sg, somalier_path_by_sgid = setup_relate_test(tmp_path)
+
+        # ---- The job that we want to test
+        j = _relate(
+            b=batch,
+            somalier_path_by_sgid=somalier_path_by_sgid,
+            sequencing_group_ids=[sg.id],
+            rich_id_map={sg.id: sg.pedigree.fam_id},
+            expected_ped_path=(tmp_path / 'test_ped.ped'),
+            label=None,
+            out_samples_path=(tmp_path / 'out_samples'),
+            out_pairs_path=(tmp_path / 'out_pairs'),
+            out_html_path=(tmp_path / 'out_html'),
+            verifybamid_by_sgid=somalier_path_by_sgid,
+        )
+
+        # ---- Assertions
+        cmd = get_command_str(j)
+        relate_input_file = 'input_files.list'
+        somalier_file = somalier_path_by_sgid[sg.id].name
+        sample_id_list_file = 'sample_ids.list'
+        sequencing_group_id = sg.id
+        assert re.search(
+            fr'echo "\${{BATCH_TMPDIR}}/inputs/\w+/{somalier_file}" >> \$BATCH_TMPDIR/{relate_input_file}',
+            cmd,
+        )
+        assert re.search(
+            fr'echo "{sequencing_group_id}" >> \$BATCH_TMPDIR/{sample_id_list_file}',
+            cmd,
+        )
+
+    def test_somalier_file_written_to_relate_input_file_if_verifybamid_file_not_available(
+        self, tmp_path: Path
+    ):
+        # ---- Test setup
+        _, batch, sg, somalier_path_by_sgid = setup_relate_test(tmp_path)
+
+        # ---- The job that we want to test
+        j = _relate(
+            b=batch,
+            somalier_path_by_sgid=somalier_path_by_sgid,
+            sequencing_group_ids=[sg.id],
+            rich_id_map={sg.id: sg.pedigree.fam_id},
+            expected_ped_path=(tmp_path / 'test_ped.ped'),
+            label=None,
+            out_samples_path=(tmp_path / 'out_samples'),
+            out_pairs_path=(tmp_path / 'out_pairs'),
+            out_html_path=(tmp_path / 'out_html'),
+        )
+
+        # ---- Assertions
+        cmd = get_command_str(j)
+        relate_input_file = 'input_files.list'
+        somalier_file = somalier_path_by_sgid[sg.id].name
+        sample_id_list_file = 'sample_ids.list'
+        sequencing_group_id = sg.id
+        assert 'FREEMIX' not in cmd
+        assert re.search(
+            fr'echo "\${{BATCH_TMPDIR}}/inputs/\w+/{somalier_file}" >> \$BATCH_TMPDIR/{relate_input_file}',
+            cmd,
+        )
+        assert re.search(
+            fr'echo "{sequencing_group_id}" >> \$BATCH_TMPDIR/{sample_id_list_file}',
+            cmd,
+        )
