@@ -1,13 +1,9 @@
 import os
 import re
+from pathlib import Path
 
-from cpg_utils import Path
-from cpg_utils.hail_batch import image_path
 from pytest_mock import MockFixture
 
-from cpg_workflows import utils
-from cpg_workflows.batch import Batch
-from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs.samtools import samtools_stats
 
 from .. import set_config
@@ -38,24 +34,17 @@ def default_config() -> PipelineConfig:
     )
 
 
-def setup_test(tmp_path: Path, ref_fasta: str | None = None):
-    config = default_config()
-
-    if ref_fasta is not None:
-        config.workflow.ref_fasta = ref_fasta
-
+def setup_test(tmp_path: Path, config: PipelineConfig | None = None):
+    config = config or default_config()
     set_config(config, tmp_path / 'config.toml')
 
-    cram_pth = create_cram_input(
-        location=tmp_path, prefix='test', index=True, reference_assembly='GRCh38.fa'
-    )
-
     batch = create_local_batch(tmp_path)
+    cram_pth = create_cram_input(location=tmp_path, index=True)
 
     return config, cram_pth, batch
 
 
-class TestSamtoolsRun:
+class TestSamtoolsStatsRun:
     def test_creates_one_job(self, tmp_path: Path):
         # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
@@ -75,7 +64,6 @@ class TestSamtoolsRun:
         ), 'Unexpected number of samtools stats jobs in batch list, should be just 1 job'
 
     def test_will_return_none_if_path_already_exists(self, tmp_path: Path):
-        # Giving output file that DOES exist
         # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
 
@@ -158,15 +146,16 @@ class TestSamtoolsRun:
 
     def test_uses_reference_in_workflow_config_section_if_set(self, tmp_path: Path):
         # ---- Test setup
-        config, cram_pth, batch = setup_test(tmp_path, ref_fasta='test_workflow_ref.fa')
+        config = default_config()
+        config.workflow.ref_fasta = 'test_workflow_ref.fa'
+        _, cram_pth, batch = setup_test(tmp_path, config)
 
         # ---- The jobs we want to test
         j = samtools_stats(
             b=batch,
             cram_path=cram_pth,
-            out_samtools_stats_path=tmp_path,
+            out_samtools_stats_path=(tmp_path / 'output_file'),
             job_attrs=None,
-            overwrite=True,
         )
 
         # ---- Assertions
