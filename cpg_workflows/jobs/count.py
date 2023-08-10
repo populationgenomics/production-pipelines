@@ -39,7 +39,7 @@ class FeatureCounts:
             input_bam: BamPath,
             gtf_file: str | Path,
             output_path: str | Path,
-            summary_path: str| Path,
+            summary_path: str | Path,
             paired_end: bool = True,
             feature_type: str = 'exon',
             attribute: str = 'gene_id',
@@ -124,8 +124,6 @@ def count(
         raise ValueError(
             f'Invalid alignment input: "{str(input_bam)}", expected BAM file.'
         )
-    else:
-        bam_path = str(input_bam.path)
 
     counting_reference = count_res_group(b)
 
