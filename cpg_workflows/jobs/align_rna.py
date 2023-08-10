@@ -5,7 +5,7 @@ Align RNA-seq reads to the genome using STAR.
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import command
+from cpg_utils.hail_batch import command, image_path
 from cpg_utils.config import get_config
 from cpg_workflows.utils import can_reuse
 from cpg_workflows.resources import STANDARD
@@ -223,6 +223,7 @@ def align_fq_pair(
     align_tool = 'STAR'
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=align_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
+    j.image(image_path('star'))
     star_ref = GCPStarReference(b=b, genome_prefix=genome_prefix)
     star = STAR(
         input_fastq_pair=fastq_pair,
@@ -259,6 +260,7 @@ def merge_bams(
     merge_tool = 'samtools'
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=merge_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
+    j.image(image_path('samtools'))
     cmd = f'samtools merge -@ {nthreads - 1} -o {j.merged_bam} {" ".join([str(b) for b in input_bams])}'
     j.command(command(cmd, monitor_space=True))
     return j
@@ -284,6 +286,7 @@ def sort_index_bam(
     sort_tool = 'samtools'
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=sort_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
+    j.image(image_path('samtools'))
     cmd = f'samtools sort -@ {nthreads - 1} {input_bam} | tee {j.sorted_bam} | samtools index -@ {nthreads - 1} - {j.sorted_bam_idx}'
     j.command(command(cmd, monitor_space=True))
     return j

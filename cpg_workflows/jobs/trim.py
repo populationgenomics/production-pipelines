@@ -4,7 +4,8 @@ Trim raw FASTQ reads using cutadapt
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
-from cpg_utils.hail_batch import command
+from hailtop.batch import ResourceFile, ResourceGroup
+from cpg_utils.hail_batch import command, image_path
 from cpg_utils.config import get_config
 from cpg_workflows.utils import can_reuse
 from cpg_workflows.resources import STANDARD
@@ -128,6 +129,7 @@ class Fastp:
         adapter_type: str,
         paired: bool = True,
         min_length: int = 50,
+        nthreads: int = 3,
         polyG: bool = True,
         polyX: bool = False,
     ):
@@ -141,6 +143,7 @@ class Fastp:
             '--out1', str(output_fastq_pair.r1),
             '--length_required', str(min_length),
             '--adapter_sequence', adapters.r1.sequence,
+            '--thread', str(nthreads),
         ]
         if paired:
             self.command.extend([
@@ -185,13 +188,10 @@ def trim(
     if extra_label:
         base_job_name += f' {extra_label}'
     
-    # if number of threads is not requested, using whole instance
-    requested_nthreads = requested_nthreads or STANDARD.max_threads()
-    
-    if not get_config()['workflow']['sequencing_type'] == 'rna':
+    if not get_config()['workflow']['sequencing_type'] == 'transcriptome':
         raise InvalidSequencingTypeException(
             f"Invalid sequencing type '{get_config()['workflow']['sequencing_type']}'" +
-            f" for job type '{base_job_name}'; sequencing type must be 'rna'"
+            f" for job type '{base_job_name}'; sequencing type must be 'transcriptome'"
         )
     
     try:
@@ -204,15 +204,33 @@ def trim(
     trim_j_name = base_job_name
     trim_j_attrs = (job_attrs or {}) | dict(label=base_job_name, tool=trim_tool)
     trim_j = b.new_job(trim_j_name, trim_j_attrs)
+    trim_j.image(image_path('fastp'))
+    
+    # Set resource requirements
+    nthreads = requested_nthreads or 8
+    res = STANDARD.set_resources(
+        trim_j,
+        ncpu=nthreads,
+        storage_gb=50,  # TODO: make configurable
+    )
+
+    fastq_pair = input_fq_pair.as_resources(b)
+
+    trim_j.declare_resource_group(output_r1={'fastq.gz': '{root}.fastq.gz'})
+    trim_j.declare_resource_group(output_r2={'fastq.gz': '{root}.fastq.gz'})
+    assert isinstance(trim_j.output_r1, ResourceGroup)
+    assert isinstance(trim_j.output_r2, ResourceGroup)
+
     trim_cmd = Fastp(
-        input_fastq_pair=input_fq_pair,
+        input_fastq_pair=fastq_pair,
         output_fastq_pair=FastqPair(
-            r1=trim_j.output_r1,
-            r2=trim_j.output_r2,
+            r1=trim_j.output_r1['fastq.gz'],
+            r2=trim_j.output_r2['fastq.gz'],
         ),
         adapter_type=adapter_type,
         paired=True,
         min_length=50,
+        nthreads=res.get_nthreads(),
         polyG=True,
         polyX=True,
     )
@@ -220,7 +238,7 @@ def trim(
 
     # Write output to file
     if output_fq_pair:
-        b.write_output(trim_j.output_r1, str(output_fq_pair.r1))
-        b.write_output(trim_j.output_r2, str(output_fq_pair.r2))
+        b.write_output(trim_j.output_r1['fastq.gz'], str(output_fq_pair.r1))
+        b.write_output(trim_j.output_r2['fastq.gz'], str(output_fq_pair.r2))
 
     return trim_j
