@@ -36,7 +36,7 @@ def get_toml(tmp_path) -> str:
 
     [images]
     fastp = "stub"
-    STAR = "stub"
+    star = "stub"
     samtools = "stub"
 
     [trim]

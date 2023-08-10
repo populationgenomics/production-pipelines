@@ -223,7 +223,7 @@ def align_fq_pair(
     align_tool = 'STAR'
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=align_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
-    j.image(image_path('STAR'))
+    j.image(image_path('star'))
     star_ref = GCPStarReference(b=b, genome_prefix=genome_prefix)
     star = STAR(
         input_fastq_pair=fastq_pair,
