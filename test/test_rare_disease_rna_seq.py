@@ -193,18 +193,6 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
         )
         return outrider_job
 
-    python_function_list = []
-    def capture_outrider_calls(*args, **kwargs) -> Job:
-        outrider_job = outrider(*args, **kwargs)
-        for func_calls in outrider_job._function_calls:
-            func_id = func_calls[1]
-            cmd_str_list.append(
-                '===== OUTRIDER STAGE START =====\n\n' +
-                inspect.getsource(outrider_job._batch._python_function_defs[func_id]) +
-                '\n\n===== OUTRIDER STAGE END =====\n\n'
-            )
-        return outrider_job
-
     mocker.patch('pathlib.Path.open', selective_mock_open)
     # functions like get_intervals checks file existence
     mocker.patch('cpg_workflows.workflow.list_all_parent_dirs', lambda *args: {})
@@ -232,8 +220,6 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     mocker.patch('cpg_workflows.jobs.count.count', capture_count_cmd)
     # Patch the outrider function to capture the job calls
     mocker.patch('cpg_workflows.jobs.outrider.outrider', capture_outrider_cmd)
-    # Patch the outrider function to capture the job calls
-    mocker.patch('cpg_workflows.jobs.outrider.outrider_pyjob', capture_outrider_calls)
 
     from cpg_workflows.batch import get_batch
     from cpg_workflows.inputs import get_cohort
