@@ -5,7 +5,7 @@ Count RNA seq reads mapping to genes and/or transcripts using featureCounts.
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import command
+from cpg_utils.hail_batch import command, image_path
 from cpg_utils.config import get_config
 from cpg_workflows.utils import can_reuse
 from cpg_workflows.resources import STANDARD
@@ -39,7 +39,7 @@ class FeatureCounts:
             input_bam: BamPath,
             gtf_file: str | Path,
             output_path: str | Path,
-            summary_path: str| Path,
+            summary_path: str | Path,
             paired_end: bool = True,
             feature_type: str = 'exon',
             attribute: str = 'gene_id',
@@ -124,8 +124,6 @@ def count(
         raise ValueError(
             f'Invalid alignment input: "{str(input_bam)}", expected BAM file.'
         )
-    else:
-        bam_path = str(input_bam.path)
 
     counting_reference = count_res_group(b)
 
@@ -133,6 +131,7 @@ def count(
     job_name = f'count_{sample_name}' if sample_name else 'count'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='featureCounts')
     j = b.new_job(job_name, _job_attrs)
+    j.image(image_path('subread'))
     
     # Create counting command
     fc = FeatureCounts(

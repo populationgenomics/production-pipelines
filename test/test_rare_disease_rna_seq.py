@@ -1,5 +1,5 @@
 """
-Test the align RNA stage
+Test the rare disease RNA seq workflow
 """
 
 from pathlib import Path
@@ -18,11 +18,11 @@ import inspect
 def get_toml(tmp_path) -> str:
     return f"""
     [workflow]
-    name = "rare_rna_align"
+    name = "rare_disease_rna_seq"
     dataset_gcp_project = "test-analysis-dataset-1234"
     dataset = "test-analysis-dataset"
     access_level = "test"
-    sequencing_type = "rna"
+    sequencing_type = "transcriptome"
     driver_image = "<stub>"
     check_inputs = false
     check_intermediates = false
@@ -38,9 +38,9 @@ def get_toml(tmp_path) -> str:
 
     [images]
     fastp = "stub"
-    STAR = "stub"
+    star = "stub"
     samtools = "stub"
-    featureCounts = "stub"
+    subread = "stub"
     outrider = "stub"
 
     [trim]
@@ -88,7 +88,7 @@ def _mock_cohort():
         'CPG01',
         'SAMPLE1',
         alignment_input_by_seq_type={
-            'rna': FastqPairs(
+            'transcriptome': FastqPairs(
                 [
                     FastqPair(
                         'gs://test-input-dataset-upload/sample1_L1_R1.fq.gz',
@@ -106,7 +106,7 @@ def _mock_cohort():
         'CPG02',
         'SAMPLE2',
         alignment_input_by_seq_type={
-            'rna': FastqPairs(
+            'transcriptome': FastqPairs(
                 [
                     FastqPair(
                         'gs://test-input-dataset-upload/sample2_L1_R1.fq.gz',
@@ -241,9 +241,6 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
 
     # Imports specific for testing the trim stage
     from cpg_utils.hail_batch import dataset_path
-    from cpg_workflows.stages.trim import Trim
-    from cpg_workflows.stages.align_rna import AlignRNA
-    from cpg_workflows.stages.count import Count
     from cpg_workflows.stages.outrider import Outrider
     from cpg_workflows.filetypes import FastqPairs, FastqPair
 
@@ -259,7 +256,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
 
     # The number of FASTQ trim jobs should equal the number of FASTQ pairs
     alignment_input_list = [
-        s.alignment_input_by_seq_type.get('rna')
+        s.alignment_input_by_seq_type.get('transcriptome')
         for s in sample_list
     ]
     n_trim_jobs_list = [
