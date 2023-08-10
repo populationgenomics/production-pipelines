@@ -184,6 +184,7 @@ class TestPicard:
         cmd = get_command_str(job)
 
         # ---- Assertions
+        assert job
         assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'INPUT=\S*{source_intervals_path}', cmd)
 
@@ -233,6 +234,7 @@ class TestPicard:
         cmd = get_command_str(job)
 
         # ---- Assertions
+        assert job
         assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'I=\S*{bam}', cmd)
 
@@ -268,6 +270,7 @@ class TestPicard:
         cmd = get_command_str(job)
 
         # ---- Assertions
+        assert job
         assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'INPUT=\S*{gvcf}', cmd)
         assert re.search(rf'DBSNP=\S*{dbsnp}', cmd)
@@ -302,6 +305,7 @@ class TestPicard:
         cmd = get_command_str(job)
 
         # ---- Assertions
+        assert job
         assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'CRAM=\$BATCH_TMPDIR/{cram}', cmd)
         assert re.search(rf'CRAI=\$BATCH_TMPDIR/{cram}.crai', cmd)
@@ -343,6 +347,7 @@ class TestPicard:
         cmd = get_command_str(job)
 
         # ---- Assertions
+        assert job
         assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'CRAM=\$BATCH_TMPDIR/{cram}', cmd)
         assert re.search(rf'CRAI=\$BATCH_TMPDIR/{cram}.crai', cmd)
@@ -378,6 +383,7 @@ class TestPicard:
         cmd = get_command_str(job)
 
         # ---- Assertions
+        assert job
         assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'CRAM=\$BATCH_TMPDIR/{cram}', cmd)
         assert re.search(rf'CRAI=\$BATCH_TMPDIR/{cram}.crai', cmd)
