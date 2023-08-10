@@ -8,6 +8,7 @@ from hailtop.batch import Batch, Resource
 from hailtop.batch.job import Job
 from pytest_mock import MockFixture
 
+from cpg_workflows import utils
 from cpg_workflows.jobs.somalier import _check_pedigree, _relate, extract
 
 from .. import set_config
@@ -543,3 +544,31 @@ class TestSomalierRelate:
             fr'cat \${{BATCH_TMPDIR}}/inputs/\w+/{expected_ped_filename}', cmd
         )
         assert re.search(fr'grep -f \$BATCH_TMPDIR/{sample_id_list_file}', cmd)
+
+    def test_related_html_sequencing_group_id_replacement(
+        self, mocker: MockFixture, tmp_path: Path
+    ):
+        # ---- Test setup
+        _, batch, sg, somalier_path_by_sgid = setup_relate_test(tmp_path)
+
+        # ---- The job that we want to test
+        j = _relate(
+            b=batch,
+            somalier_path_by_sgid=somalier_path_by_sgid,
+            sequencing_group_ids=[sg.id],
+            rich_id_map={sg.id: sg.pedigree.fam_id},
+            expected_ped_path=(tmp_path / 'test_ped.ped'),
+            label=None,
+            out_samples_path=(tmp_path / 'out_samples'),
+            out_pairs_path=(tmp_path / 'out_pairs'),
+            out_html_path=(tmp_path / 'out_html'),
+        )
+
+        # ---- Assertions
+        cmd = get_command_str(j)
+        sequencing_group_id = sg.id
+        sequencing_group_fam_id = sg.pedigree.fam_id
+        rich_id_map = {sg.id: sg.pedigree.fam_id}
+        assert re.search(
+            fr"sed -iBAK 's/{sequencing_group_id}/{sequencing_group_fam_id}/g'", cmd
+        )
