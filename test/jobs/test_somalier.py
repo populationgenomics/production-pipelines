@@ -572,3 +572,34 @@ class TestSomalierRelate:
         assert re.search(
             fr"sed -iBAK 's/{sequencing_group_id}/{sequencing_group_fam_id}/g'", cmd
         )
+
+    def test_writes_outputs_to_final_destinations(
+        self, mocker: MockFixture, tmp_path: Path
+    ):
+        # ---- Test setup
+        _, batch, sg, somalier_path_by_sgid = setup_relate_test(tmp_path)
+
+        # ---- The job that we want to test
+        spy = mocker.spy(batch, 'write_output')
+        out_samples = tmp_path / 'out_samples'
+        out_pairs = tmp_path / 'out_pairs'
+        out_html = tmp_path / 'out_html'
+
+        j = _relate(
+            b=batch,
+            somalier_path_by_sgid=somalier_path_by_sgid,
+            sequencing_group_ids=[sg.id],
+            rich_id_map={sg.id: sg.pedigree.fam_id},
+            expected_ped_path=(tmp_path / 'test_ped.ped'),
+            label=None,
+            out_samples_path=out_samples,
+            out_pairs_path=out_pairs,
+            out_html_path=out_html,
+        )
+
+        # ---- Assertions
+        assert j is not None
+        print()
+        spy.assert_has_calls(calls=[(j.output_samples, str(out_samples))])
+        # spy.assert_called_with(j.output_samples, str(out_pairs_path))
+        # spy.assert_called_with(j.output_samples, str(out_html_path))
