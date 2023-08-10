@@ -517,3 +517,29 @@ class TestSomalierRelate:
             fr'echo "{sequencing_group_id}" >> \$BATCH_TMPDIR/{sample_id_list_file}',
             cmd,
         )
+
+    def test_filter_expected_pedigrees_to_ped_file(self, tmp_path: Path):
+        # ---- Test setup
+        _, batch, sg, somalier_path_by_sgid = setup_relate_test(tmp_path)
+
+        # ---- The job that we want to test
+        j = _relate(
+            b=batch,
+            somalier_path_by_sgid=somalier_path_by_sgid,
+            sequencing_group_ids=[sg.id],
+            rich_id_map={sg.id: sg.pedigree.fam_id},
+            expected_ped_path=(tmp_path / 'test_ped.ped'),
+            label=None,
+            out_samples_path=(tmp_path / 'out_samples'),
+            out_pairs_path=(tmp_path / 'out_pairs'),
+            out_html_path=(tmp_path / 'out_html'),
+        )
+
+        # ---- Assertions
+        cmd = get_command_str(j)
+        expected_ped_filename = 'test_ped.ped'
+        sample_id_list_file = 'sample_ids.list'
+        assert re.search(
+            fr'cat \${{BATCH_TMPDIR}}/inputs/\w+/{expected_ped_filename}', cmd
+        )
+        assert re.search(fr'grep -f \$BATCH_TMPDIR/{sample_id_list_file}', cmd)
