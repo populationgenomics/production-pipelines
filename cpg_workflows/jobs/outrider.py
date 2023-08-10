@@ -5,7 +5,7 @@ Perform outlier gene expression analysis with Outrider.
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import command
+from cpg_utils.hail_batch import command, image_path
 from cpg_utils.config import get_config
 from cpg_workflows.utils import can_reuse
 from cpg_workflows.resources import STANDARD
@@ -57,6 +57,7 @@ def outrider(
     job_name = f'outrider_{sample_name}' if sample_name else 'count'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='outrider')
     j = b.new_job(job_name, _job_attrs)
+    j.image(image_path('outrider'))
 
     # Create counting command
     outrider = Outrider(
