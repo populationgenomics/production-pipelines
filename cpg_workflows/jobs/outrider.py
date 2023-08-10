@@ -42,18 +42,6 @@ class Outrider:
     def __repr__(self):
         return self.__str__()
 
-def test_outrider(a):
-    import rpy2
-    from rpy2 import robjects
-    from rpy2.robjects.packages import importr, data
-    base = importr('base')
-    utils = importr('utils')
-    outrider = importr('OUTRIDER')
-    datasets = importr('datasets')
-    mtcars = data(datasets).fetch('mtcars')['mtcars']
-    print(a)
-    return utils.head(mtcars).__str__()
-
 
 def outrider(
     b: hb.Batch,
@@ -82,31 +70,5 @@ def outrider(
     if output_path:
         # NOTE: j.output is just a placeholder
         b.write_output(j.output, str(output_path))
-    
-    return j
-
-
-def outrider_pyjob(
-    b: hb.Batch,
-    output_path: str | Path | None = None,
-    sample_name: str | None = None,
-    job_attrs: dict[str, str] | None = None,
-) -> Job:
-    """
-    Run Outrider.
-    """
-
-    # Create job
-    job_name = f'outrider_{sample_name}' if sample_name else 'count'
-    _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='outrider')
-
-    j = b.new_python_job(job_name, _job_attrs)
-
-    result = j.call(test_outrider, j.output)
-
-    # Write output to file
-    if output_path:
-        # NOTE: j.output is just a placeholder
-        b.write_output(result.as_str(), str(output_path))
     
     return j
