@@ -33,6 +33,7 @@ def default_config() -> PipelineConfig:
                 'ref_fasta': 'hg38_reference.fa',
                 'genome_calling_interval_lists': 'wgs_calling_regions.hg38.interval_list',
                 'noalt_bed': 'primary_contigs_plus_mito.bed.gz',
+                'exome_calling_interval_lists': 'exome_calling_regions.v1.interval_list',
             }
         },
         other={
@@ -130,7 +131,26 @@ class TestGenotyping:
         config = default_config()
         set_config(config, tmp_path / 'config.toml')
 
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+        # genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+        set_config(config, tmp_path / 'config.toml')
+
+        dataset_id = config.workflow.dataset
+        batch = create_local_batch(tmp_path)
+        sg = create_sequencing_group(
+            dataset=dataset_id,
+            sequencing_type=config.workflow.sequencing_type,
+            alignment_input=create_fastq_pairs_input(location=tmp_path, n=1),
+            cram=CramPath(tmp_path / 'test_genotype.cram'),
+        )
+
+        # ---- The job that we want to test
+        genotype_jobs = genotype(
+            b=batch,
+            sequencing_group_name=sg.id,
+            cram_path=sg.cram,
+            output_path=sg.gvcf,
+            tmp_prefix=tmp_path,
+        )
 
         # ---- Assertions
         expected_scatter_count = 50
@@ -149,8 +169,6 @@ class TestGenotyping:
         for job in genotype_jobs:
             cmd = get_command_str(job)
             if job.name == make_intervals_job_name:
-                # TODO: Validate input and output
-                print(cmd)
                 assert re.search(r'picard', cmd)
                 assert re.search(r'IntervalListTools', cmd)
                 assert re.search(r'SCATTER_COUNT=50', cmd)
@@ -172,13 +190,27 @@ class TestGenotyping:
                 assert len(haplotype_output_paths) == expected_scatter_count
 
             elif job.name == postproc_job_name:
-                # TODO Validate input and output
-                print(cmd)
                 assert re.search(r'gatk', cmd)
                 assert re.search(r'ReblockGVCF', cmd)
+                # Necessary info field annotations added to perform QUAL approximation downstream
+                assert re.search(r'-do-qual-approx', cmd)
+                # Create tabix index
+                assert re.search(r'--create-output-variant-index', cmd)
+
+                # Validate SG ID in reheader #bcftools reheader -s <(echo "$EXISTING_SN CPG000001")
+                reheader_with_sgid = (
+                    f'bcftools reheader -s <(echo "$EXISTING_SN {sg.id}")'
+                )
+                assert re.search(re.escape(reheader_with_sgid), cmd)
+
+                # No alt region set to broad/noalt_bed
+                no_alt_region = (
+                    f'-T .*{config.references.get("broad").get("noalt_bed")}'
+                )
+                assert re.search(no_alt_region, cmd)
+
             else:
                 # HaplotypeCaller jobs
-                # TODO: Validate input and output
                 assert re.search(r'gatk', cmd)
                 assert re.search(r'HaplotypeCaller', cmd)
                 assert re.search(r'--dragen-mode', cmd)
@@ -189,20 +221,16 @@ class TestGenotyping:
 
                 # If a genotyping event overlaps deletions that the '*' spanning event will be excluded
                 assert re.search(r'--disable-spanning-event-genotyping', cmd)
-
                 # Allele specific annotations requested
                 assert re.search(r'-G AS_StandardAnnotation', cmd)
-
                 # GQB bands set to multiples of 10
                 assert re.search(
                     r'-GQB 10 -GQB 20 -GQB 30 -GQB 40 -GQB 50 -GQB 60 -GQB 70 -GQB 80 -GQB 90',
                     cmd,
                 )
-
                 assert re.search(r'-ERC GVCF', cmd)
                 # Tabix index created
                 assert re.search(r'--create-output-variant-index', cmd)
-                print(cmd)
 
     def test_genotype_jobs_with_custom_scatter_count(self, tmp_path: Path):
         config = default_config()
@@ -272,13 +300,10 @@ class TestGenotyping:
         for job in genotype_jobs:
             cmd = get_command_str(job)
             if job.name == postproc_job_name:
-                # TODO Validate input and output
-                print(cmd)
                 assert re.search(r'gatk', cmd)
                 assert re.search(r'ReblockGVCF', cmd)
             else:
                 # HaplotypeCaller job
-                # TODO: Validate input and output
                 assert re.search(r'gatk', cmd)
                 assert re.search(r'HaplotypeCaller', cmd)
                 pattern = r'-O\s+([^\\]+\.gz)'
@@ -321,26 +346,57 @@ class TestGenotyping:
                     cmd,
                 )
 
-    def test_genotype_reblock_gq_bands_single_integer(self, tmp_path: Path):
-        # NOTE: This test fails, but should it?
-        """
+    def test_interval_tool_list_for_exome_with_defaults(self, tmp_path: Path):
         # ---- Test setup
+
         config = default_config()
-        config.workflow.reblock_gq_bands = 10
+        config.workflow.sequencing_type = 'exome'
         set_config(config, tmp_path / 'config.toml')
         genotype_jobs = self._get_new_genotype_job(tmp_path, config)
 
         # ---- Assertions
-        postproc_job_name = 'Postproc GVCF'
+        expected_scatter_count = 50
+        make_intervals_job_name = f'Make {expected_scatter_count} intervals for exome'
+        assert make_intervals_job_name in [job.name for job in genotype_jobs]
         for job in genotype_jobs:
-            if job.name == postproc_job_name:
-                cmd = get_command_str(job)
-                assert re.search(r'ReblockGVCF', cmd)
-                assert re.search(
-                    r'-floor-blocks -GQB 10',
-                    cmd,
-                )
-        """
+            cmd = get_command_str(job)
+            if job.name == make_intervals_job_name:
+                assert re.search(r'BREAK_BANDS_AT_MULTIPLES_OF=0 ', cmd)
 
+    def test_interval_tool_list_for_genome_with_defaults(self, tmp_path: Path):
+        # ---- Test setup
+        config = default_config()
+        config.workflow.sequencing_type = 'genome'
+        set_config(config, tmp_path / 'config.toml')
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
 
-# TODO: Run exome tests
+        # ---- Assertions
+        expected_scatter_count = 50
+        make_intervals_job_name = f'Make {expected_scatter_count} intervals for genome'
+        assert make_intervals_job_name in [job.name for job in genotype_jobs]
+        for job in genotype_jobs:
+            cmd = get_command_str(job)
+            if job.name == make_intervals_job_name:
+                assert re.search(r'BREAK_BANDS_AT_MULTIPLES_OF=100000 ', cmd)
+
+    # def test_genotype_reblock_gq_bands_single_integer(self, tmp_path: Path):
+    #     # NOTE: This test fails, but should it?
+    #     """
+    #     # ---- Test setup
+    #     config = default_config()
+    #     config.workflow.reblock_gq_bands = 10
+    #     set_config(config, tmp_path / 'config.toml')
+    #     genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+
+    #     # ---- Assertions
+    #     postproc_job_name = 'Postproc GVCF'
+    #     for job in genotype_jobs:
+    #         if job.name == postproc_job_name:
+    #             cmd = get_command_str(job)
+    #             assert re.search(r'ReblockGVCF', cmd)
+    #             assert re.search(
+    #                 r'-floor-blocks -GQB 10',
+    #                 cmd,
+    #             )
+    #     """
+    #     pass
