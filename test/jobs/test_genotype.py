@@ -12,8 +12,6 @@ from .helpers import get_command_str
 from cpg_workflows.filetypes import CramPath
 from pytest import raises
 
-import inspect
-
 
 def default_config() -> PipelineConfig:
     return PipelineConfig(
@@ -74,10 +72,9 @@ class TestGenotyping:
         # ---- Test setup
         config = default_config()
         config.workflow.ref_fasta = 'workflow_overwritten_reference.fa'
-        config.references['broad']['ref_fasta'] = None
-        calling_func_name = inspect.currentframe().f_code.co_name
-
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config, calling_func_name)
+        if isinstance(config.references['broad'], dict):
+            config.references['broad']['ref_fasta'] = None
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
 
         for job in genotype_jobs:
             cmd = get_command_str(job)
@@ -89,11 +86,10 @@ class TestGenotyping:
         # ---- Test setup
         config = default_config()
         config.workflow.ref_fasta = None
-        config.references['broad']['ref_fasta'] = 'default_reference.fa'
+        if isinstance(config.references['broad'], dict):
+            config.references['broad']['ref_fasta'] = 'default_reference.fa'
 
-        calling_func_name = inspect.currentframe().f_code.co_name
-
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config, calling_func_name)
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
 
         for job in genotype_jobs:
             cmd = get_command_str(job)
@@ -105,7 +101,8 @@ class TestGenotyping:
         # ---- Test setup
         config = default_config()
         config.workflow.ref_fasta = None
-        config.references['broad']['ref_fasta'] = None
+        if isinstance(config.references['broad'], dict):
+            config.references['broad']['ref_fasta'] = None
 
         with raises(ConfigError) as e:
             self._get_new_genotype_job(tmp_path, config)
@@ -115,10 +112,10 @@ class TestGenotyping:
         # ---- Test setup
         config = default_config()
         config.workflow.ref_fasta = 'workflow_overwritten_reference.fa'
-        config.references['broad']['ref_fasta'] = 'default_reference.fa'
-        calling_func_name = inspect.currentframe().f_code.co_name
+        if isinstance(config.references['broad'], dict):
+            config.references['broad']['ref_fasta'] = 'default_reference.fa'
 
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config, calling_func_name)
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
 
         for job in genotype_jobs:
             cmd = get_command_str(job)
@@ -142,7 +139,7 @@ class TestGenotyping:
             alignment_input=create_fastq_pairs_input(location=tmp_path, n=1),
             cram=CramPath(tmp_path / 'test_genotype.cram'),
         )
-
+        assert sg.cram
         # ---- The job that we want to test
         genotype_jobs = genotype(
             b=batch,
@@ -204,10 +201,12 @@ class TestGenotyping:
                 assert re.search(re.escape(reheader_with_sgid), cmd)
 
                 # No alt region set to broad/noalt_bed
-                no_alt_region = (
-                    f'-T .*{config.references.get("broad").get("noalt_bed")}'
-                )
-                assert re.search(no_alt_region, cmd)
+                broad_reference = config.references.get('broad')
+                if isinstance(broad_reference, dict) and (
+                    no_alt_bed := broad_reference.get('noalt_bed')
+                ):
+                    no_alt_region = f'-T .*{no_alt_bed}'
+                    assert re.search(no_alt_region, cmd)
 
             else:
                 # HaplotypeCaller jobs
