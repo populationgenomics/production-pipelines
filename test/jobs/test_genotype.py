@@ -123,7 +123,7 @@ class TestGenotyping:
                 assert re.search(r'workflow_overwritten_reference.fa', cmd)
                 assert not re.search(r'default_references.fa', cmd)
 
-    def test_postprof_gvcf_jobs_with_default_scatter_count(self, tmp_path: Path):
+    def test_postprof_gvcf_job_params_with_defaults(self, tmp_path: Path):
         # ---- Test setup
         config = default_config()
         set_config(config, tmp_path / 'config.toml')
@@ -175,13 +175,61 @@ class TestGenotyping:
                     no_alt_region = f'-T .*{no_alt_bed}'
                     assert re.search(no_alt_region, cmd)
 
+    def test_make_intervals_job_params_with_defaults(self, tmp_path: Path):
+        # ---- Test setup
+        config = default_config()
+        set_config(config, tmp_path / 'config.toml')
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+
+        # ---- Assertions
+        expected_scatter_count = 50
+        make_intervals_job_name = f'Make {expected_scatter_count} intervals for genome'
+
+        for job in genotype_jobs:
+            if job.name == make_intervals_job_name:
+                cmd = get_command_str(job)
+                assert re.search(r'picard', cmd)
+                assert re.search(r'IntervalListTools', cmd)
+                assert re.search(r'SCATTER_COUNT=50', cmd)
+
+                # Testing that outputs will be unique, sorted and internally divided
+                assert re.search(r'SUBDIVISION_MODE=INTERVAL_SUBDIVISION', cmd)
+                assert re.search(r'UNIQUE=true', cmd)
+                assert re.search(r'SORT=true', cmd)
+
+    def test_haplotype_caller_job_params_with_defaults(self, tmp_path: Path):
+        # ---- Test setup
+        config = default_config()
+        set_config(config, tmp_path / 'config.toml')
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+
+        # ---- Assertions
+        haplotype_caller_job_name = 'HaplotypeCaller'
+        for job in genotype_jobs:
+            if job.name == haplotype_caller_job_name:
+                cmd = get_command_str(job)
+                assert re.search(r'gatk', cmd)
+                assert re.search(r'HaplotypeCaller', cmd)
+                assert re.search(r'--dragen-mode', cmd)
+                # If a genotyping event overlaps deletions that the '*' spanning event will be excluded
+                assert re.search(r'--disable-spanning-event-genotyping', cmd)
+                # Allele specific annotations requested
+                assert re.search(r'-G AS_StandardAnnotation', cmd)
+                # GQB bands set to multiples of 10
+                assert re.search(
+                    r'-GQB 10 -GQB 20 -GQB 30 -GQB 40 -GQB 50 -GQB 60 -GQB 70 -GQB 80 -GQB 90',
+                    cmd,
+                )
+                assert re.search(r'-ERC GVCF', cmd)
+                # Tabix index created
+                assert re.search(r'--create-output-variant-index', cmd)
+
     def test_genotype_jobs_with_default_scatter_count(self, tmp_path: Path):
         # ---- Test setup
         config = default_config()
         set_config(config, tmp_path / 'config.toml')
 
         genotype_jobs = self._get_new_genotype_job(tmp_path, config)
-        set_config(config, tmp_path / 'config.toml')
 
         # ---- Assertions
         expected_scatter_count = 50
@@ -200,49 +248,22 @@ class TestGenotyping:
         haplotype_output_paths: list[str] = []
         for job in genotype_jobs:
             cmd = get_command_str(job)
-            if job.name == make_intervals_job_name:
-                assert re.search(r'picard', cmd)
-                assert re.search(r'IntervalListTools', cmd)
-                assert re.search(r'SCATTER_COUNT=50', cmd)
-
-                # Testing that outputs will be unique, sorted and internally divided
-                assert re.search(r'SUBDIVISION_MODE=INTERVAL_SUBDIVISION', cmd)
-                assert re.search(r'UNIQUE=true', cmd)
-                assert re.search(r'SORT=true', cmd)
-
             if job.name == merge_job_name:
                 assert re.search(r'picard', cmd)
                 assert re.search(r'MergeVcfs', cmd)
                 # Validate the outputs from the haploytype caller jobs are the inputs to the merge job
                 for haplotype_output_path in haplotype_output_paths:
                     assert re.search(re.escape(haplotype_output_path), cmd)
-
                 # Validate the output is unique
                 assert len(set(haplotype_output_paths)) == len(haplotype_output_paths)
                 assert len(haplotype_output_paths) == expected_scatter_count
 
             if job.name == haplotype_caller_job_name:
                 # HaplotypeCaller jobs
-                assert re.search(r'gatk', cmd)
-                assert re.search(r'HaplotypeCaller', cmd)
-                assert re.search(r'--dragen-mode', cmd)
                 pattern = r'-O\s+([^\\]+\.gz)'
                 match = re.search(pattern, cmd)
                 assert match
                 haplotype_output_paths.append(match.group(1))
-
-                # If a genotyping event overlaps deletions that the '*' spanning event will be excluded
-                assert re.search(r'--disable-spanning-event-genotyping', cmd)
-                # Allele specific annotations requested
-                assert re.search(r'-G AS_StandardAnnotation', cmd)
-                # GQB bands set to multiples of 10
-                assert re.search(
-                    r'-GQB 10 -GQB 20 -GQB 30 -GQB 40 -GQB 50 -GQB 60 -GQB 70 -GQB 80 -GQB 90',
-                    cmd,
-                )
-                assert re.search(r'-ERC GVCF', cmd)
-                # Tabix index created
-                assert re.search(r'--create-output-variant-index', cmd)
 
     def test_genotype_jobs_with_custom_scatter_count(self, tmp_path: Path):
         config = default_config()
