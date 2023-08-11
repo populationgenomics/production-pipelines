@@ -123,12 +123,9 @@ class TestGenotyping:
                 assert re.search(r'workflow_overwritten_reference.fa', cmd)
                 assert not re.search(r'default_references.fa', cmd)
 
-    def test_genotype_jobs_with_default_scatter_count(self, tmp_path: Path):
+    def test_postprof_gvcf_jobs_with_default_scatter_count(self, tmp_path: Path):
         # ---- Test setup
         config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        # genotype_jobs = self._get_new_genotype_job(tmp_path, config)
         set_config(config, tmp_path / 'config.toml')
 
         dataset_id = config.workflow.dataset
@@ -150,7 +147,45 @@ class TestGenotyping:
         )
 
         # ---- Assertions
+        postproc_job_name = 'Postproc GVCF'
+        job_names = [job.name for job in genotype_jobs]
+        assert postproc_job_name in job_names
+
+        for job in genotype_jobs:
+            cmd = get_command_str(job)
+            if job.name == postproc_job_name:
+                assert re.search(r'gatk', cmd)
+                assert re.search(r'ReblockGVCF', cmd)
+                # Necessary info field annotations added to perform QUAL approximation downstream
+                assert re.search(r'-do-qual-approx', cmd)
+                # Create tabix index
+                assert re.search(r'--create-output-variant-index', cmd)
+
+                # Validate SG ID in reheader #bcftools reheader -s <(echo "$EXISTING_SN CPG000001")
+                reheader_with_sgid = (
+                    f'bcftools reheader -s <(echo "$EXISTING_SN {sg.id}")'
+                )
+                assert re.search(re.escape(reheader_with_sgid), cmd)
+
+                # No alt region set to broad/noalt_bed
+                broad_reference = config.references.get('broad')
+                if isinstance(broad_reference, dict) and (
+                    no_alt_bed := broad_reference.get('noalt_bed')
+                ):
+                    no_alt_region = f'-T .*{no_alt_bed}'
+                    assert re.search(no_alt_region, cmd)
+
+    def test_genotype_jobs_with_default_scatter_count(self, tmp_path: Path):
+        # ---- Test setup
+        config = default_config()
+        set_config(config, tmp_path / 'config.toml')
+
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+        set_config(config, tmp_path / 'config.toml')
+
+        # ---- Assertions
         expected_scatter_count = 50
+        haplotype_caller_job_name = 'HaplotypeCaller'
         merge_job_name = f'Merge {expected_scatter_count} GVCFs'
         postproc_job_name = 'Postproc GVCF'
         make_intervals_job_name = f'Make {expected_scatter_count} intervals for genome'
@@ -175,7 +210,7 @@ class TestGenotyping:
                 assert re.search(r'UNIQUE=true', cmd)
                 assert re.search(r'SORT=true', cmd)
 
-            elif job.name == merge_job_name:
+            if job.name == merge_job_name:
                 assert re.search(r'picard', cmd)
                 assert re.search(r'MergeVcfs', cmd)
                 # Validate the outputs from the haploytype caller jobs are the inputs to the merge job
@@ -186,29 +221,7 @@ class TestGenotyping:
                 assert len(set(haplotype_output_paths)) == len(haplotype_output_paths)
                 assert len(haplotype_output_paths) == expected_scatter_count
 
-            elif job.name == postproc_job_name:
-                assert re.search(r'gatk', cmd)
-                assert re.search(r'ReblockGVCF', cmd)
-                # Necessary info field annotations added to perform QUAL approximation downstream
-                assert re.search(r'-do-qual-approx', cmd)
-                # Create tabix index
-                assert re.search(r'--create-output-variant-index', cmd)
-
-                # Validate SG ID in reheader #bcftools reheader -s <(echo "$EXISTING_SN CPG000001")
-                reheader_with_sgid = (
-                    f'bcftools reheader -s <(echo "$EXISTING_SN {sg.id}")'
-                )
-                assert re.search(re.escape(reheader_with_sgid), cmd)
-
-                # No alt region set to broad/noalt_bed
-                broad_reference = config.references.get('broad')
-                if isinstance(broad_reference, dict) and (
-                    no_alt_bed := broad_reference.get('noalt_bed')
-                ):
-                    no_alt_region = f'-T .*{no_alt_bed}'
-                    assert re.search(no_alt_region, cmd)
-
-            else:
+            if job.name == haplotype_caller_job_name:
                 # HaplotypeCaller jobs
                 assert re.search(r'gatk', cmd)
                 assert re.search(r'HaplotypeCaller', cmd)
