@@ -29,7 +29,7 @@ class STAR:
             self,
             input_fastq_pair: FastqPair,
             sample_name: str,
-            genome_dir: str | Path,
+            genome: hb.ResourceGroup,
             nthreads: int,
             read_group: dict[str, str] | None = None,
             output_path: str | BamPath | Path | None = None,
@@ -65,7 +65,7 @@ class STAR:
         # Create command
         self.command.extend([
             '--runThreadN', str(nthreads),
-            '--genomeDir', str(genome_dir),
+            '--genomeDir', f'$(dirname {str(genome.genome)})',
             '--outSAMtype', self.outSAMtype,
             '--outStd', self.outStd,
             '--outSAMattrRGline', self.read_group_line,
@@ -228,7 +228,7 @@ def align_fq_pair(
     star = STAR(
         input_fastq_pair=fastq_pair,
         sample_name=sample_name,
-        genome_dir=star_ref.genome_res_group.prefix,
+        genome=star_ref.genome_res_group,
         nthreads=(nthreads - 1),
         output_path=j.output_bam,
         bamout=True,
