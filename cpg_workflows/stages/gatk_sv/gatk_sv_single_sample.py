@@ -96,10 +96,6 @@ class GatherSampleEvidence(SequencingGroupStage):
             'bam_or_cram_file': str(sequencing_group.cram),
             'bam_or_cram_index': str(sequencing_group.cram) + '.crai',
             'sample_id': sequencing_group.id,
-            # This option forces CRAM localisation, otherwise it would be passed to
-            # samtools as a URL (in CramToBam.wdl) and it would fail to read it as
-            # GCS_OAUTH_TOKEN is not set.
-            'requester_pays_crams': True,
             'reference_fasta': str(get_fasta()),
             'reference_index': str(get_fasta()) + '.fai',
             'reference_dict': str(get_fasta().with_suffix('.dict')),
@@ -108,15 +104,17 @@ class GatherSampleEvidence(SequencingGroupStage):
 
         input_dict |= get_images(
             [
+                'sv_pipeline_base_docker',
                 'sv_pipeline_docker',
                 'sv_base_mini_docker',
                 'samtools_cloud_docker',
-                'gatk_docker',
-                'genomes_in_the_cloud_docker',
-                'cloud_sdk_docker',
-                'wham_docker',
                 'manta_docker',
                 'scramble_docker',
+                'wham_docker',
+                'gatk_docker',
+                'gatk_docker_pesr_override',
+                'genomes_in_the_cloud_docker',
+                'cloud_sdk_docker',
             ]
         )
         input_dict |= get_references(
@@ -194,6 +192,7 @@ class EvidenceQC(CohortStage):
                 'sv_base_mini_docker',
                 'sv_base_docker',
                 'sv_pipeline_docker',
+                'sv_pipeline_qc_docker'
             ]
         )
 
