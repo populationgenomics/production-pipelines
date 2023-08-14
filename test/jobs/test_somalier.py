@@ -304,296 +304,530 @@ class TestSomalierExtract:
 
 
 class TestSomalierPedigree:
-    def test_creates_one_relate_job(self, tmp_path: Path):
-        # ---- Test setup
-        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
-        # ---- The job that we want to test
-        _ = pedigree(
-            dataset=dataset,
-            b=batch,
-            expected_ped_path=(tmp_path / 'test_ped.ped'),
-            somalier_path_by_sgid=somalier_path_by_sgid,
-            out_samples_path=(tmp_path / 'out_samples'),
-            out_pairs_path=(tmp_path / 'out_pairs'),
-            out_html_path=(tmp_path / 'out_html'),
-            label=None,
-        )
+    class TestSomalierRelate:
+        def test_creates_one_relate_job(self, tmp_path: Path):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+            # ---- The job that we want to test
+            _ = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+                label=None,
+            )
 
-        # ---- Assertions
-        relate_jobs = batch.select_jobs('Somalier relate')
-        assert len(relate_jobs) == 1
+            # ---- Assertions
+            relate_jobs = batch.select_jobs('Somalier relate')
+            assert len(relate_jobs) == 1
 
-    def test_adds_label_to_default_job_title_if_label_provided(self, tmp_path: Path):
-        # ---- Test setup
-        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+        def test_if_label_provided_adds_label_to_default_job_title_(
+            self, tmp_path: Path
+        ):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
-        label = 'test-label'
+            label = 'test-label'
 
-        # ---- The job that we want to test
-        pedigree_jobs = pedigree(
-            dataset=dataset,
-            b=batch,
-            expected_ped_path=(tmp_path / 'test_ped.ped'),
-            somalier_path_by_sgid=somalier_path_by_sgid,
-            out_samples_path=(tmp_path / 'out_samples'),
-            out_pairs_path=(tmp_path / 'out_pairs'),
-            out_html_path=(tmp_path / 'out_html'),
-            label=label,
-        )
-        relate_j = pedigree_jobs[0]
+            # ---- The job that we want to test
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+                label=label,
+            )
+            relate_j = pedigree_jobs[0]
 
-        # ---- Assertions
-        job_name = f'Somalier relate [{label}]'
-        assert relate_j.name == job_name
+            # ---- Assertions
+            job_name = f'Somalier relate [{label}]'
+            assert relate_j.name == job_name
 
-    def test_sets_job_attrs_or_sets_default_attrs_if_not_supplied(self, tmp_path: Path):
-        # ---- Test setup
-        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+        def test_if_job_attrs_supplied_job_attrs_set_or_sets_default_attrs_if_not_supplied(
+            self, tmp_path: Path
+        ):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
-        # ---- The job that we want to test
-        pedigree_jobs_default_attrs = pedigree(
-            dataset=dataset,
-            b=batch,
-            expected_ped_path=(tmp_path / 'test_ped.ped'),
-            somalier_path_by_sgid=somalier_path_by_sgid,
-            out_samples_path=(tmp_path / 'out_samples'),
-            out_pairs_path=(tmp_path / 'out_pairs'),
-            out_html_path=(tmp_path / 'out_html'),
-            job_attrs=None,
-        )
-        pedigree_jobs_supplied_attrs = pedigree(
-            dataset=dataset,
-            b=batch,
-            expected_ped_path=(tmp_path / 'test_ped.ped'),
-            somalier_path_by_sgid=somalier_path_by_sgid,
-            out_samples_path=(tmp_path / 'out_samples'),
-            out_pairs_path=(tmp_path / 'out_pairs'),
-            out_html_path=(tmp_path / 'out_html'),
-            job_attrs={'test_tool': 'test_relate'},
-        )
-        relate_j_default_attrs = pedigree_jobs_default_attrs[0]
-        relate_j_supplied_attrs = pedigree_jobs_supplied_attrs[0]
+            # ---- The job that we want to test
+            pedigree_jobs_default_attrs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+                job_attrs=None,
+            )
+            pedigree_jobs_supplied_attrs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+                job_attrs={'test_tool': 'test_relate'},
+            )
+            relate_j_default_attrs = pedigree_jobs_default_attrs[0]
+            relate_j_supplied_attrs = pedigree_jobs_supplied_attrs[0]
 
-        # ---- Assertions
-        assert (
-            relate_j_default_attrs is not None and relate_j_supplied_attrs is not None
-        )
-        assert relate_j_default_attrs.attributes == {'tool': 'somalier'}
-        assert relate_j_supplied_attrs.attributes == {
-            'test_tool': 'test_relate',
-            'tool': 'somalier',
-        }
+            # ---- Assertions
+            assert (
+                relate_j_default_attrs is not None
+                and relate_j_supplied_attrs is not None
+            )
+            assert relate_j_default_attrs.attributes == {'tool': 'somalier'}
+            assert relate_j_supplied_attrs.attributes == {
+                'test_tool': 'test_relate',
+                'tool': 'somalier',
+            }
 
-    def test_uses_image_specified_in_config(self, tmp_path: Path):
-        # ---- Test setup
-        config, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+        def test_uses_image_specified_in_config(self, tmp_path: Path):
+            # ---- Test setup
+            config, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(
+                tmp_path
+            )
 
-        # ---- The job that we want to test
-        pedigree_jobs = pedigree(
-            dataset=dataset,
-            b=batch,
-            expected_ped_path=(tmp_path / 'test_ped.ped'),
-            somalier_path_by_sgid=somalier_path_by_sgid,
-            out_samples_path=(tmp_path / 'out_samples'),
-            out_pairs_path=(tmp_path / 'out_pairs'),
-            out_html_path=(tmp_path / 'out_html'),
-        )
-        relate_j = pedigree_jobs[0]
+            # ---- The job that we want to test
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+            )
+            relate_j = pedigree_jobs[0]
 
-        # ---- Assertions
-        assert relate_j is not None
-        assert relate_j._image == config.images['somalier']
+            # ---- Assertions
+            assert relate_j is not None
+            assert relate_j._image == config.images['somalier']
 
-    def test_if_verifybamid_exists_for_sg_check_freemix(self, tmp_path: Path):
-        # ---- Test setup
-        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+        def test_if_verifybamid_exists_for_sg_check_freemix(self, tmp_path: Path):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
-        # ---- The job that we want to test
-        pedigree_jobs = pedigree(
-            dataset=dataset,
-            b=batch,
-            expected_ped_path=(tmp_path / 'test_ped.ped'),
-            somalier_path_by_sgid=somalier_path_by_sgid,
-            out_samples_path=(tmp_path / 'out_samples'),
-            out_pairs_path=(tmp_path / 'out_pairs'),
-            out_html_path=(tmp_path / 'out_html'),
-            verifybamid_by_sgid=somalier_path_by_sgid,
-        )
-        relate_j = pedigree_jobs[0]
+            # ---- The job that we want to test
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+                verifybamid_by_sgid=somalier_path_by_sgid,
+            )
+            relate_j = pedigree_jobs[0]
 
-        # ---- Assertions
-        cmd = get_command_str(relate_j)
-        sg = dataset.get_sequencing_groups()[0]
-        verifybamid_file = somalier_path_by_sgid[sg.id].name  # same as somalier file
-        assert re.search(
-            fr'FREEMIX=\$\(cat \${{BATCH_TMPDIR}}/inputs/\w+/{verifybamid_file}', cmd
-        )
-        assert re.search(fr'\(echo "\$FREEMIX > {MAX_FREEMIX}" \| bc\) -eq 0', cmd)
+            # ---- Assertions
+            cmd = get_command_str(relate_j)
+            sg = dataset.get_sequencing_groups()[0]
+            verifybamid_file = somalier_path_by_sgid[
+                sg.id
+            ].name  # same as somalier file
+            assert re.search(
+                fr'FREEMIX=\$\(cat \${{BATCH_TMPDIR}}/inputs/\w+/{verifybamid_file}',
+                cmd,
+            )
+            assert re.search(fr'\(echo "\$FREEMIX > {MAX_FREEMIX}" \| bc\) -eq 0', cmd)
 
-        # Test somalier file and sg id's appended to correct files
-        relate_input_file = 'input_files.list'
-        somalier_file = somalier_path_by_sgid[sg.id].name
-        sample_id_list_file = 'sample_ids.list'
-        sequencing_group_id = sg.id
-        assert re.search(
-            fr'echo "\${{BATCH_TMPDIR}}/inputs/\w+/{somalier_file}" >> \$BATCH_TMPDIR/{relate_input_file}',
-            cmd,
-        )
-        assert re.search(
-            fr'echo "{sequencing_group_id}" >> \$BATCH_TMPDIR/{sample_id_list_file}',
-            cmd,
-        )
+            # Test somalier file and sg id's appended to correct files
+            relate_input_file = 'input_files.list'
+            somalier_file = somalier_path_by_sgid[sg.id].name
+            sample_id_list_file = 'sample_ids.list'
+            sequencing_group_id = sg.id
+            assert re.search(
+                fr'echo "\${{BATCH_TMPDIR}}/inputs/\w+/{somalier_file}" >> \$BATCH_TMPDIR/{relate_input_file}',
+                cmd,
+            )
+            assert re.search(
+                fr'echo "{sequencing_group_id}" >> \$BATCH_TMPDIR/{sample_id_list_file}',
+                cmd,
+            )
 
-    def test_somalier_file_written_to_relate_input_file_if_verifybamid_file_not_available(
-        self, tmp_path: Path
-    ):
-        # ---- Test setup
-        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+        def test_if_verifybamid_file_not_available_somalier_file_written_to_relate_input_file_(
+            self, tmp_path: Path
+        ):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
-        # ---- The job that we want to test
-        pedigree_jobs = pedigree(
-            dataset=dataset,
-            b=batch,
-            expected_ped_path=(tmp_path / 'test_ped.ped'),
-            somalier_path_by_sgid=somalier_path_by_sgid,
-            out_samples_path=(tmp_path / 'out_samples'),
-            out_pairs_path=(tmp_path / 'out_pairs'),
-            out_html_path=(tmp_path / 'out_html'),
-        )
-        relate_j = pedigree_jobs[0]
+            # ---- The job that we want to test
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+            )
+            relate_j = pedigree_jobs[0]
 
-        # ---- Assertions
-        cmd = get_command_str(relate_j)
-        sg = dataset.get_sequencing_groups()[0]
-        relate_input_file = 'input_files.list'
-        somalier_file = somalier_path_by_sgid[sg.id].name
-        sample_id_list_file = 'sample_ids.list'
-        sequencing_group_id = sg.id
-        assert 'FREEMIX' not in cmd
-        assert re.search(
-            fr'echo "\${{BATCH_TMPDIR}}/inputs/\w+/{somalier_file}" >> \$BATCH_TMPDIR/{relate_input_file}',
-            cmd,
-        )
-        assert re.search(
-            fr'echo "{sequencing_group_id}" >> \$BATCH_TMPDIR/{sample_id_list_file}',
-            cmd,
-        )
+            # ---- Assertions
+            cmd = get_command_str(relate_j)
+            sg = dataset.get_sequencing_groups()[0]
+            relate_input_file = 'input_files.list'
+            somalier_file = somalier_path_by_sgid[sg.id].name
+            sample_id_list_file = 'sample_ids.list'
+            sequencing_group_id = sg.id
+            assert 'FREEMIX' not in cmd
+            assert re.search(
+                fr'echo "\${{BATCH_TMPDIR}}/inputs/\w+/{somalier_file}" >> \$BATCH_TMPDIR/{relate_input_file}',
+                cmd,
+            )
+            assert re.search(
+                fr'echo "{sequencing_group_id}" >> \$BATCH_TMPDIR/{sample_id_list_file}',
+                cmd,
+            )
 
-    def test_filter_expected_pedigrees_to_ped_file(self, tmp_path: Path):
-        # ---- Test setup
-        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+        def test_filter_expected_pedigrees_to_ped_file(self, tmp_path: Path):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
-        # ---- The job that we want to test
-        pedigree_jobs = pedigree(
-            dataset=dataset,
-            b=batch,
-            expected_ped_path=(tmp_path / 'test_ped.ped'),
-            somalier_path_by_sgid=somalier_path_by_sgid,
-            out_samples_path=(tmp_path / 'out_samples'),
-            out_pairs_path=(tmp_path / 'out_pairs'),
-            out_html_path=(tmp_path / 'out_html'),
-        )
-        relate_j = pedigree_jobs[0]
+            # ---- The job that we want to test
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+            )
+            relate_j = pedigree_jobs[0]
 
-        # ---- Assertions
-        cmd = get_command_str(relate_j)
-        expected_ped_filename = 'test_ped.ped'
-        sample_id_list_file = 'sample_ids.list'
-        assert re.search(
-            fr'cat \${{BATCH_TMPDIR}}/inputs/\w+/{expected_ped_filename}', cmd
-        )
-        assert re.search(fr'grep -f \$BATCH_TMPDIR/{sample_id_list_file}', cmd)
+            # ---- Assertions
+            cmd = get_command_str(relate_j)
+            expected_ped_filename = 'test_ped.ped'
+            sample_id_list_file = 'sample_ids.list'
+            assert re.search(
+                fr'cat \${{BATCH_TMPDIR}}/inputs/\w+/{expected_ped_filename}', cmd
+            )
+            assert re.search(fr'grep -f \$BATCH_TMPDIR/{sample_id_list_file}', cmd)
 
-    def test_moves_somalier_output_to_expected_batch_resource_files(
-        self, tmp_path: Path
-    ):
-        # ---- Test setup
-        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+        def test_moves_somalier_output_to_expected_batch_resource_files(
+            self, tmp_path: Path
+        ):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
-        # ---- The job that we want to test
-        pedigree_jobs = pedigree(
-            dataset=dataset,
-            b=batch,
-            expected_ped_path=(tmp_path / 'test_ped.ped'),
-            somalier_path_by_sgid=somalier_path_by_sgid,
-            out_samples_path=(tmp_path / 'out_samples'),
-            out_pairs_path=(tmp_path / 'out_pairs'),
-            out_html_path=(tmp_path / 'out_html'),
-        )
-        relate_j = pedigree_jobs[0]
+            # ---- The job that we want to test
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+            )
+            relate_j = pedigree_jobs[0]
 
-        # ---- Assertions
-        cmd = get_command_str(relate_j)
-        assert re.search(
-            fr'mv related.pairs.tsv \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_pairs',
-            cmd,
-        )
-        assert re.search(
-            fr'mv related.samples.tsv \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_samples',
-            cmd,
-        )
-        assert re.search(
-            fr'mv related.html \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_html', cmd
-        )
+            # ---- Assertions
+            cmd = get_command_str(relate_j)
+            assert re.search(
+                fr'mv related.pairs.tsv \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_pairs',
+                cmd,
+            )
+            assert re.search(
+                fr'mv related.samples.tsv \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_samples',
+                cmd,
+            )
+            assert re.search(
+                fr'mv related.html \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_html',
+                cmd,
+            )
 
-    def test_related_html_sequencing_group_id_replacement(
-        self, mocker: MockFixture, tmp_path: Path
-    ):
-        # ---- Test setup
-        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+        def test_related_html_sequencing_group_id_replacement(
+            self, mocker: MockFixture, tmp_path: Path
+        ):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
-        # ---- The job that we want to test
-        pedigree_jobs = pedigree(
-            dataset=dataset,
-            b=batch,
-            expected_ped_path=(tmp_path / 'test_ped.ped'),
-            somalier_path_by_sgid=somalier_path_by_sgid,
-            out_samples_path=(tmp_path / 'out_samples'),
-            out_pairs_path=(tmp_path / 'out_pairs'),
-            out_html_path=(tmp_path / 'out_html'),
-        )
-        relate_j = pedigree_jobs[0]
+            # ---- The job that we want to test
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+            )
+            relate_j = pedigree_jobs[0]
 
-        # ---- Assertions
-        cmd = get_command_str(relate_j)
-        sequencing_group_id = dataset.get_sequencing_groups()[0].id
-        # sequencing_group_id = sg.id
-        rich_id = dataset.rich_id_map()[sequencing_group_id]
+            # ---- Assertions
+            cmd = get_command_str(relate_j)
+            sequencing_group_id = dataset.get_sequencing_groups()[0].id
+            rich_id = dataset.rich_id_map()[sequencing_group_id]
 
-        assert re.search(
-            fr"sed -iBAK 's/{sequencing_group_id}/{rich_id}/g' related.html",
-            cmd,
-        )
+            assert re.search(
+                fr"sed -iBAK 's/{sequencing_group_id}/{rich_id}/g' related.html",
+                cmd,
+            )
 
-    def test_writes_outputs_to_final_destinations(
-        self, mocker: MockFixture, tmp_path: Path
-    ):
-        # ---- Test setup
-        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+        def test_writes_outputs_to_final_destinations(
+            self, mocker: MockFixture, tmp_path: Path
+        ):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
-        # ---- The job that we want to test
-        spy = mocker.spy(batch, 'write_output')
-        out_samples_path = tmp_path / 'out_samples'
-        out_pairs_path = tmp_path / 'out_pairs'
-        out_html_path = tmp_path / 'out_html'
+            # ---- The job that we want to test
+            spy = mocker.spy(batch, 'write_output')
+            out_samples_path = tmp_path / 'out_samples'
+            out_pairs_path = tmp_path / 'out_pairs'
+            out_html_path = tmp_path / 'out_html'
 
-        pedigree_jobs = pedigree(
-            dataset=dataset,
-            b=batch,
-            expected_ped_path=(tmp_path / 'test_ped.ped'),
-            somalier_path_by_sgid=somalier_path_by_sgid,
-            out_samples_path=out_samples_path,
-            out_pairs_path=out_pairs_path,
-            out_html_path=out_html_path,
-        )
-        relate_j = pedigree_jobs[0]
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=out_samples_path,
+                out_pairs_path=out_pairs_path,
+                out_html_path=out_html_path,
+            )
+            relate_j = pedigree_jobs[0]
 
-        # ---- Assertions
-        assert relate_j is not None
-        spy.assert_has_calls(
-            calls=[
-                mocker.call(relate_j.output_samples, str(out_samples_path)),
-                mocker.call(relate_j.output_pairs, str(out_pairs_path)),
-                mocker.call(relate_j.output_html, str(out_html_path)),
-            ]
-        )
+            # ---- Assertions
+            assert relate_j is not None
+            spy.assert_has_calls(
+                calls=[
+                    mocker.call(relate_j.output_samples, str(out_samples_path)),
+                    mocker.call(relate_j.output_pairs, str(out_pairs_path)),
+                    mocker.call(relate_j.output_html, str(out_html_path)),
+                ]
+            )
+
+    class TestSomalierCheckPedigree:
+        # Test _check_pedigree
+        def test_creates_one_relate_job(self, tmp_path: Path):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+            # ---- The job that we want to test
+            _ = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+                label=None,
+            )
+
+            # ---- Assertions
+            relate_jobs = batch.select_jobs('Pedigree check')
+            assert len(relate_jobs) == 1
+
+        def test_if_label_provided_adds_label_to_default_job_title_(
+            self, tmp_path: Path
+        ):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+
+            label = 'test-label'
+
+            # ---- The job that we want to test
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+                label=label,
+            )
+            pedigree_check_j = pedigree_jobs[1]
+
+            # ---- Assertions
+            job_name = f'Pedigree check [{label}]'
+            assert pedigree_check_j.name == job_name
+
+        def test_if_job_attrs_supplied_job_attrs_set_or_sets_default_attrs_if_not_supplied(
+            self, tmp_path: Path
+        ):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+
+            # ---- The job that we want to test
+            pedigree_jobs_default_attrs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+                job_attrs=None,
+            )
+            pedigree_jobs_supplied_attrs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+                job_attrs={'test_tool': 'test_check_pedigree'},
+            )
+            pedigree_check_j_default_attrs = pedigree_jobs_default_attrs[1]
+            pedigree_check_j_supplied_attrs = pedigree_jobs_supplied_attrs[1]
+
+            # ---- Assertions
+            assert (
+                pedigree_check_j_default_attrs is not None
+                and pedigree_check_j_supplied_attrs is not None
+            )
+            assert pedigree_check_j_default_attrs.attributes == {'tool': 'python'}
+            assert pedigree_check_j_supplied_attrs.attributes == {
+                'test_tool': 'test_check_pedigree',
+                'tool': 'python',
+            }
+
+        def test_uses_image_specified_in_config(self, tmp_path: Path):
+            # ---- Test setup
+            config, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(
+                tmp_path
+            )
+
+            # ---- The job that we want to test
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+            )
+            check_pedigree_j = pedigree_jobs[1]
+
+            # ---- Assertions
+            assert check_pedigree_j is not None
+            assert check_pedigree_j._image == config.images['cpg_workflows']
+
+        def test_script_path_correctness(self, tmp_path: Path):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+
+            # ---- The job that we want to test
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+            )
+            check_pedigree_j = pedigree_jobs[1]
+            # ---- Assertions
+            cmd = get_command_str(check_pedigree_j)
+            script_name = 'check_pedigree.py'
+            assert re.search(fr'python3 {script_name}', cmd)
+
+        def test_sed_commands_for_samples_pairs_and_expected_ped_files(
+            self, tmp_path: Path
+        ):
+            # ---- Test setup
+            config, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(
+                tmp_path
+            )
+
+            # ---- The job that we want to test
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+            )
+            relate_j = pedigree_jobs[0]
+            check_pedigree_j = pedigree_jobs[1]
+
+            # ---- Assertions
+            cmd = get_command_str(check_pedigree_j)
+            sequencing_group_id = dataset.get_sequencing_groups()[0].id
+            rich_id = dataset.rich_id_map()[sequencing_group_id]
+            expected_ped = 'test_ped.ped'
+
+            # check_pedigree uses output_samples and output_pairs files from _relate job
+            assert re.search(
+                fr"sed -iBAK 's/{sequencing_group_id}/{rich_id}/g' \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_samples'",
+                cmd,
+            )
+            assert re.search(
+                fr"sed -iBAK 's/{sequencing_group_id}/{rich_id}/g' \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_pairs'",
+                cmd,
+            )
+            assert re.search(
+                fr"sed -iBAK 's/{sequencing_group_id}/{rich_id}/g' \${{BATCH_TMPDIR}}/inputs/\w+/{expected_ped}",
+                cmd,
+            )
+
+        def test_sed_commands_not_present_if_no_rich_id_map_provided(
+            self, tmp_path: Path
+        ):
+            # ---- Test setup
+            config, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(
+                tmp_path
+            )
+
+            # ---- The job that we want to test
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+            )
+            relate_j = pedigree_jobs[0]
+            check_pedigree_j = pedigree_jobs[1]
+
+            # ---- Assertions
+            cmd = get_command_str(check_pedigree_j)
+            sequencing_group_id = dataset.get_sequencing_groups()[0].id
+            rich_id = dataset.rich_id_map()[sequencing_group_id]
+            expected_ped = 'test_ped.ped'
+
+            # check_pedigree uses output_samples and output_pairs files from _relate job
+            assert re.search(
+                fr"sed -iBAK 's/{sequencing_group_id}/{rich_id}/g' \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_samples'",
+                cmd,
+            )
+            assert re.search(
+                fr"sed -iBAK 's/{sequencing_group_id}/{rich_id}/g' \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_pairs'",
+                cmd,
+            )
+            assert re.search(
+                fr"sed -iBAK 's/{sequencing_group_id}/{rich_id}/g' \${{BATCH_TMPDIR}}/inputs/\w+/{expected_ped}",
+                cmd,
+            )
+
+        # def test_flags_called_correctly(self, tmp_path: Path):
+        #     assert re.search(
+        #         fr'--somalier-samples \${{BATCH_TMPDIR}}/{check_pedigree_j._dirname}/output_samples',
+        #         cmd,
+        #     )
+        #     assert re.search(
+        #         fr'--somalier-pairs \${{BATCH_TMPDIR}}/{check_pedigree_j._dirname}/output_pairs',
+        #         cmd,
+        #     )
+        #
+        #     pass
