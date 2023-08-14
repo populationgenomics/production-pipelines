@@ -123,7 +123,7 @@ class TestGenotyping:
                 assert re.search(r'workflow_overwritten_reference.fa', cmd)
                 assert not re.search(r'default_references.fa', cmd)
 
-    def test_postprof_gvcf_job_params_with_defaults(self, tmp_path: Path):
+    def test_postproc_gvcf_job_params_with_defaults(self, tmp_path: Path):
         # ---- Test setup
         config = default_config()
         set_config(config, tmp_path / 'config.toml')
