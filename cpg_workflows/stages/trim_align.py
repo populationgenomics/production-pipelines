@@ -67,8 +67,8 @@ def get_input_output_pairs(sequencing_group: SequencingGroup) -> list[InOutFastq
     input_output_pairs = []
     for i, pair in enumerate(inputs, 1):
         assert isinstance(pair, FastqPair)
-        input_r1_bn = re.sub('.f(ast)?q.gz', '', basename(pair.r1))
-        input_r2_bn = re.sub('.f(ast)?q.gz', '', basename(pair.r2))
+        input_r1_bn = re.sub('.f(ast)?q.gz', '', basename(str(pair.r1)))
+        input_r2_bn = re.sub('.f(ast)?q.gz', '', basename(str(pair.r2)))
         output_r1 = prefix / f'{input_r1_bn}{trim_suffix}'
         output_r2 = prefix / f'{input_r2_bn}{trim_suffix}'
         input_output_pairs.append(InOutFastqPair(
