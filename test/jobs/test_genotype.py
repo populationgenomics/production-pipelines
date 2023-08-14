@@ -1,4 +1,5 @@
 import re
+import pytest
 from pathlib import Path
 
 from cpg_utils.config import ConfigError
@@ -50,7 +51,7 @@ class TestGenotyping:
         set_config(config, tmp_path / 'config.toml')
 
         dataset_id = config.workflow.dataset
-        batch = create_local_batch(tmp_path, cram_path_string)
+        batch = create_local_batch(tmp_path)
         sg = create_sequencing_group(
             dataset=dataset_id,
             sequencing_type=config.workflow.sequencing_type,
@@ -68,66 +69,172 @@ class TestGenotyping:
             tmp_prefix=tmp_path,
         )
 
-    def test_genotype_jobs_workflow_ref_fasta(self, tmp_path: Path):
+    @pytest.mark.parametrize('scatter_count', [50, 10, 0, None])
+    def test_genotype_jobs_with_varying_scatter_counts(
+        self, tmp_path: Path, scatter_count
+    ):
         # ---- Test setup
         config = default_config()
-        config.workflow.ref_fasta = 'workflow_overwritten_reference.fa'
+        if scatter_count is not None:
+            config.workflow.scatter_count_genotype = scatter_count
+        else:
+            scatter_count = 50
+
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+
+        # ---- Assertions
+        if scatter_count == 0:
+            expected_jobs = 2
+            expected_postproc = True
+            expected_intervals = False
+            expected_merge = False
+        else:
+            expected_jobs = scatter_count + 3
+            expected_postproc = True
+            expected_intervals = True
+            expected_merge = True
+
+        job_names = [job.name for job in genotype_jobs]
+        assert len(genotype_jobs) == expected_jobs
+
+        assert ('Postproc GVCF' in job_names) == expected_postproc
+        assert (
+            f'Make {scatter_count} intervals for genome' in job_names
+        ) == expected_intervals
+        assert (f'Merge {scatter_count} GVCFs' in job_names) == expected_merge
+
+        haplotype_output_paths: list[str] = []
+        for job in genotype_jobs:
+            cmd = get_command_str(job)
+            if job.name == f'Merge {scatter_count} GVCFs':
+                assert re.search(r'picard', cmd)
+                assert re.search(r'MergeVcfs', cmd)
+                for haplotype_output_path in haplotype_output_paths:
+                    assert re.search(re.escape(haplotype_output_path), cmd)
+                assert len(set(haplotype_output_paths)) == len(haplotype_output_paths)
+                assert len(haplotype_output_paths) == scatter_count
+
+            if job.name == 'HaplotypeCaller':
+                assert re.search(r'gatk', cmd)
+                assert re.search(r'HaplotypeCaller', cmd)
+                pattern = r'-O\s+([^\\]+\.gz)'
+                match = re.search(pattern, cmd)
+                assert match
+                haplotype_output_paths.append(match.group(1))
+
+            if job.name == 'Postproc GVCF':
+                assert re.search(r'gatk', cmd)
+                assert re.search(r'ReblockGVCF', cmd)
+
+    @pytest.mark.parametrize(
+        'reblock_gq_bands, expected_gqb_flags',
+        [
+            ([20, 30, 40], '-GQB 20 -GQB 30 -GQB 40'),
+            ([10, 20, 50], '-GQB 10 -GQB 20 -GQB 50'),
+            (None, '-GQB 20 -GQB 30 -GQB 40'),
+        ],
+    )
+    def test_genotype_reblock_gq_bands(
+        self, tmp_path: Path, reblock_gq_bands, expected_gqb_flags
+    ):
+        # ---- Test setup
+        config = default_config()
+        if reblock_gq_bands is not None:
+            config.workflow.reblock_gq_bands = reblock_gq_bands
+        set_config(config, tmp_path / 'config.toml')
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+
+        # ---- Assertions
+        postproc_job_name = 'Postproc GVCF'
+
+        for job in genotype_jobs:
+            if job.name == postproc_job_name:
+                cmd = get_command_str(job)
+                assert re.search(r'ReblockGVCF', cmd)
+                assert re.search(rf'-floor-blocks {expected_gqb_flags}', cmd)
+
+    @pytest.mark.parametrize(
+        'sequencing_type, expected_intervals_name, expected_multiples_of',
+        [
+            ('exome', 'Make 50 intervals for exome', '0'),
+            ('genome', 'Make 50 intervals for genome', '100000'),
+        ],
+    )
+    def test_interval_tool_list_with_defaults(
+        self,
+        tmp_path: Path,
+        sequencing_type,
+        expected_intervals_name,
+        expected_multiples_of,
+    ):
+        # ---- Test setup
+        config = default_config()
+        config.workflow.sequencing_type = sequencing_type
+        set_config(config, tmp_path / 'config.toml')
+        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+
+        # ---- Assertions
+        assert expected_intervals_name in [job.name for job in genotype_jobs]
+        for job in genotype_jobs:
+            cmd = get_command_str(job)
+            if job.name == expected_intervals_name:
+                assert re.search(
+                    rf'BREAK_BANDS_AT_MULTIPLES_OF={expected_multiples_of} ', cmd
+                )
+
+    @pytest.mark.parametrize(
+        'workflow_ref_fasta, broad_ref_fasta, expected_ref_fasta_match, expect_error',
+        [
+            (
+                'workflow_overwritten_reference.fa',
+                None,
+                'workflow_overwritten_reference.fa',
+                False,
+            ),
+            (None, 'default_reference.fa', 'default_reference.fa', False),
+            (None, None, None, True),
+            (
+                'workflow_overwritten_reference.fa',
+                'default_reference.fa',
+                'workflow_overwritten_reference.fa',
+                False,
+            ),
+        ],
+    )
+    def test_genotype_jobs_ref_fasta(
+        self,
+        tmp_path: Path,
+        workflow_ref_fasta,
+        broad_ref_fasta,
+        expected_ref_fasta_match,
+        expect_error,
+    ):
+        # ---- Test setup
+        config = default_config()
+        config.workflow.ref_fasta = workflow_ref_fasta
         if isinstance(config.references['broad'], dict):
-            config.references['broad']['ref_fasta'] = None
+            config.references['broad']['ref_fasta'] = broad_ref_fasta
+
+        if expect_error:
+            with pytest.raises(ConfigError, match=r'Failed to get reference fasta'):
+                self._get_new_genotype_job(tmp_path, config)
+            return
+
         genotype_jobs = self._get_new_genotype_job(tmp_path, config)
 
         for job in genotype_jobs:
             cmd = get_command_str(job)
             if job.name == 'HaplotypeCaller' or job.name == 'Postproc GVCF':
-                assert re.search(r'workflow_overwritten_reference.fa', cmd)
+                if expected_ref_fasta_match:
+                    assert re.search(expected_ref_fasta_match, cmd)
                 assert not re.search(r'hg38_reference.fa', cmd)
-
-    def test_genotype_jobs_default_ref_fasta(self, tmp_path: Path):
-        # ---- Test setup
-        config = default_config()
-        config.workflow.ref_fasta = None
-        if isinstance(config.references['broad'], dict):
-            config.references['broad']['ref_fasta'] = 'default_reference.fa'
-
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
-
-        for job in genotype_jobs:
-            cmd = get_command_str(job)
-            if job.name == 'HaplotypeCaller' or job.name == 'Postproc GVCF':
-                assert re.search(r'default_reference.fa', cmd)
-                assert not re.search(r'hg38_reference.fa', cmd)
-
-    def test_genotype_jobs_no_ref_fasta(self, tmp_path: Path):
-        # ---- Test setup
-        config = default_config()
-        config.workflow.ref_fasta = None
-        if isinstance(config.references['broad'], dict):
-            config.references['broad']['ref_fasta'] = None
-
-        with raises(ConfigError) as e:
-            self._get_new_genotype_job(tmp_path, config)
-        assert e.match(r'Failed to get reference fasta')
-
-    def test_genotype_jobs_both_references_set(self, tmp_path: Path):
-        # ---- Test setup
-        config = default_config()
-        config.workflow.ref_fasta = 'workflow_overwritten_reference.fa'
-        if isinstance(config.references['broad'], dict):
-            config.references['broad']['ref_fasta'] = 'default_reference.fa'
-
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
-
-        for job in genotype_jobs:
-            cmd = get_command_str(job)
-            if job.name == 'HaplotypeCaller' or job.name == 'Postproc GVCF':
-                assert re.search(r'workflow_overwritten_reference.fa', cmd)
-                assert not re.search(r'default_references.fa', cmd)
 
     def test_postproc_gvcf_job_params_with_defaults(self, tmp_path: Path):
         # ---- Test setup
         config = default_config()
         set_config(config, tmp_path / 'config.toml')
 
+        # We can't use the _get_new_genotype_job helper here because we need to access the sg.
         dataset_id = config.workflow.dataset
         batch = create_local_batch(tmp_path)
         sg = create_sequencing_group(
@@ -178,7 +285,6 @@ class TestGenotyping:
     def test_make_intervals_job_params_with_defaults(self, tmp_path: Path):
         # ---- Test setup
         config = default_config()
-        set_config(config, tmp_path / 'config.toml')
         genotype_jobs = self._get_new_genotype_job(tmp_path, config)
 
         # ---- Assertions
@@ -200,7 +306,6 @@ class TestGenotyping:
     def test_haplotype_caller_job_params_with_defaults(self, tmp_path: Path):
         # ---- Test setup
         config = default_config()
-        set_config(config, tmp_path / 'config.toml')
         genotype_jobs = self._get_new_genotype_job(tmp_path, config)
 
         # ---- Assertions
@@ -223,194 +328,6 @@ class TestGenotyping:
                 assert re.search(r'-ERC GVCF', cmd)
                 # Tabix index created
                 assert re.search(r'--create-output-variant-index', cmd)
-
-    def test_genotype_jobs_with_default_scatter_count(self, tmp_path: Path):
-        # ---- Test setup
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
-
-        # ---- Assertions
-        expected_scatter_count = 50
-        haplotype_caller_job_name = 'HaplotypeCaller'
-        merge_job_name = f'Merge {expected_scatter_count} GVCFs'
-        postproc_job_name = 'Postproc GVCF'
-        make_intervals_job_name = f'Make {expected_scatter_count} intervals for genome'
-        assert (
-            len(genotype_jobs) == expected_scatter_count + 3
-        )  # +3 for making intervals, merging and postprocessing
-        job_names = [job.name for job in genotype_jobs]
-        assert make_intervals_job_name in job_names
-        assert merge_job_name in job_names
-        assert postproc_job_name in job_names
-
-        haplotype_output_paths: list[str] = []
-        for job in genotype_jobs:
-            cmd = get_command_str(job)
-            if job.name == merge_job_name:
-                assert re.search(r'picard', cmd)
-                assert re.search(r'MergeVcfs', cmd)
-                # Validate the outputs from the haploytype caller jobs are the inputs to the merge job
-                for haplotype_output_path in haplotype_output_paths:
-                    assert re.search(re.escape(haplotype_output_path), cmd)
-                # Validate the output is unique
-                assert len(set(haplotype_output_paths)) == len(haplotype_output_paths)
-                assert len(haplotype_output_paths) == expected_scatter_count
-
-            if job.name == haplotype_caller_job_name:
-                # HaplotypeCaller jobs
-                pattern = r'-O\s+([^\\]+\.gz)'
-                match = re.search(pattern, cmd)
-                assert match
-                haplotype_output_paths.append(match.group(1))
-
-    def test_genotype_jobs_with_custom_scatter_count(self, tmp_path: Path):
-        config = default_config()
-        config.workflow.scatter_count_genotype = 10
-        set_config(config, tmp_path / 'config.toml')
-
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
-
-        # ---- Assertions
-        expected_scatter_count = 10
-        merge_job_name = f'Merge {expected_scatter_count} GVCFs'
-        postproc_job_name = 'Postproc GVCF'
-        make_intervals_job_name = f'Make {expected_scatter_count} intervals for genome'
-        assert (
-            len(genotype_jobs) == expected_scatter_count + 3
-        )  # +3 for making intervals, merging and postprocessing
-        job_names = [job.name for job in genotype_jobs]
-        assert make_intervals_job_name in job_names
-        assert merge_job_name in job_names
-        assert postproc_job_name in job_names
-
-        haplotype_output_paths: list[str] = []
-        for job in genotype_jobs:
-            cmd = get_command_str(job)
-            if job.name == merge_job_name:
-                assert re.search(r'picard', cmd)
-                assert re.search(r'MergeVcfs', cmd)
-                # Validate the outputs from the haploytype caller jobs are the inputs to the merge job
-                for haplotype_output_path in haplotype_output_paths:
-                    assert re.search(re.escape(haplotype_output_path), cmd)
-
-                # Validate the output is unique
-                assert len(set(haplotype_output_paths)) == len(haplotype_output_paths)
-                assert len(haplotype_output_paths) == expected_scatter_count
-            if job.name == 'HaplotypeCaller':
-                # HaplotypeCaller jobs
-                assert re.search(r'gatk', cmd)
-                assert re.search(r'HaplotypeCaller', cmd)
-                pattern = r'-O\s+([^\\]+\.gz)'
-                match = re.search(pattern, cmd)
-                assert match
-                haplotype_output_paths.append(match.group(1))
-
-    def test_genotype_jobs_with_invalid_scatter_count(self, tmp_path: Path):
-        config = default_config()
-        config.workflow.scatter_count_genotype = 0
-        set_config(config, tmp_path / 'config.toml')
-
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
-
-        print(genotype_jobs)
-
-        # ---- Assertions
-        expected_scatter_count = 0
-        merge_job_name = f'Merge {expected_scatter_count} GVCFs'
-        postproc_job_name = 'Postproc GVCF'
-        make_intervals_job_name = f'Make {expected_scatter_count} intervals for genome'
-        assert (
-            len(genotype_jobs) == 2
-        )  # We should only do the Postproc GVCF job and one haplotype caller job
-
-        job_names = [job.name for job in genotype_jobs]
-        assert make_intervals_job_name not in job_names
-        assert merge_job_name not in job_names
-        assert postproc_job_name in job_names
-
-        for job in genotype_jobs:
-            cmd = get_command_str(job)
-            if job.name == postproc_job_name:
-                assert re.search(r'gatk', cmd)
-                assert re.search(r'ReblockGVCF', cmd)
-            else:
-                # HaplotypeCaller job
-                assert re.search(r'gatk', cmd)
-                assert re.search(r'HaplotypeCaller', cmd)
-                pattern = r'-O\s+([^\\]+\.gz)'
-                match = re.search(pattern, cmd)
-                assert match
-
-    def test_genotype_default_reblock_gq_bands(self, tmp_path: Path):
-        # ---- Test setup
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
-
-        # ---- Assertions
-        postproc_job_name = 'Postproc GVCF'
-
-        for job in genotype_jobs:
-            if job.name == postproc_job_name:
-                cmd = get_command_str(job)
-                assert re.search(r'ReblockGVCF', cmd)
-                assert re.search(
-                    r'-floor-blocks -GQB 20 -GQB 30 -GQB 40',
-                    cmd,
-                )
-
-    def test_genotype_custom_reblock_gq_bands(self, tmp_path: Path):
-        # ---- Test setup
-        config = default_config()
-        config.workflow.reblock_gq_bands = [10, 20, 50]
-        set_config(config, tmp_path / 'config.toml')
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
-
-        # ---- Assertions
-        postproc_job_name = 'Postproc GVCF'
-        for job in genotype_jobs:
-            if job.name == postproc_job_name:
-                cmd = get_command_str(job)
-                assert re.search(r'ReblockGVCF', cmd)
-                assert re.search(
-                    r'-floor-blocks -GQB 10 -GQB 20 -GQB 50',
-                    cmd,
-                )
-
-    def test_interval_tool_list_for_exome_with_defaults(self, tmp_path: Path):
-        # ---- Test setup
-
-        config = default_config()
-        config.workflow.sequencing_type = 'exome'
-        set_config(config, tmp_path / 'config.toml')
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
-
-        # ---- Assertions
-        expected_scatter_count = 50
-        make_intervals_job_name = f'Make {expected_scatter_count} intervals for exome'
-        assert make_intervals_job_name in [job.name for job in genotype_jobs]
-        for job in genotype_jobs:
-            cmd = get_command_str(job)
-            if job.name == make_intervals_job_name:
-                assert re.search(r'BREAK_BANDS_AT_MULTIPLES_OF=0 ', cmd)
-
-    def test_interval_tool_list_for_genome_with_defaults(self, tmp_path: Path):
-        # ---- Test setup
-        config = default_config()
-        config.workflow.sequencing_type = 'genome'
-        set_config(config, tmp_path / 'config.toml')
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
-
-        # ---- Assertions
-        expected_scatter_count = 50
-        make_intervals_job_name = f'Make {expected_scatter_count} intervals for genome'
-        assert make_intervals_job_name in [job.name for job in genotype_jobs]
-        for job in genotype_jobs:
-            cmd = get_command_str(job)
-            if job.name == make_intervals_job_name:
-                assert re.search(r'BREAK_BANDS_AT_MULTIPLES_OF=100000 ', cmd)
 
     # def test_genotype_reblock_gq_bands_single_integer(self, tmp_path: Path):
     #     # NOTE: This test fails, but should it?
