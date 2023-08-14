@@ -17,6 +17,8 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_references,
     make_combined_ped,
     _sv_batch_meta,
+    _sv_filtered_meta,
+    SV_CALLERS
 )
 
 
@@ -179,6 +181,168 @@ class MakeCohortVcf(CohortStage):
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
+
+@stage(required_stages=MakeCohortVcf)
+class FormatVcfForGatk(CohortStage):
+    """
+    Takes the clean VCF and reformat for GATK intake
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict:
+        """
+        create dictionary of names -> output paths
+        """
+
+        return {
+            'gatk_formatted_vcf': self.prefix / 'gatk_formatted.vcf.gz',
+            'gatk_formatted_vcf_index': self.prefix / 'gatk_formatted.vcf.gz.tbi'
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        """
+
+
+        Args:
+            cohort (Cohort): cohort of all samples (across several sub-cohort batches)
+            inputs (StageInput): access to prior inputs
+        """
+
+        make_vcf_d = inputs.as_dict(cohort, MakeCohortVcf)
+        input_dict: dict[str, Any] = {
+            'prefix': cohort.name,
+            'vcf': make_vcf_d['vcf'],
+            'ped_file': make_combined_ped(cohort, self.prefix)
+        }
+        input_dict |= get_images(
+            ['sv_pipeline_docker', 'sv_base_mini_docker']
+        )
+        input_dict |= get_references(
+            [{'contig_list': 'primary_contigs_list'}]
+        )
+
+        expected_d = self.expected_outputs(cohort)
+        jobs = add_gatk_sv_jobs(
+            batch=get_batch(),
+            dataset=cohort.analysis_dataset,
+            wfl_name=self.name,
+            input_dict=input_dict,
+            expected_out_dict=expected_d,
+        )
+        return self.make_outputs(cohort, data=expected_d, jobs=jobs)
+
+
+@stage(required_stages=MakeCohortVcf)
+class JoinRawCalls(CohortStage):
+    """
+    Joins all individually clustered caller results
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict:
+        """
+        create dictionary of names -> output paths
+        """
+
+        return {
+            'joined_raw_calls_vcf': self.prefix / 'raw_clustered_calls.vcf.gz',
+            'joined_raw_calls_vcf_index': self.prefix / 'raw_clustered_calls.vcf.gz.tbi'
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        """
+
+        """
+
+        input_dict: dict[str, Any] = {
+            'prefix': cohort.name,
+            'ped_file': make_combined_ped(cohort, self.prefix),
+            'reference_fasta': get_fasta(),
+            'reference_fasta_fai': str(get_fasta()) + '.fai',
+            'reference_dict': str(get_fasta().with_suffix('.dict')),
+        }
+        input_dict |= get_images(
+            ['gatk_docker', 'sv_pipeline_docker', 'sv_base_mini_docker']
+        )
+        input_dict |= get_references(
+            [{'contig_list': 'primary_contigs_list'}]
+        )
+
+        # add all clustered _caller_ files, plus indices
+        batch_names = get_config()['workflow']['batch_names']
+        batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
+        for caller in SV_CALLERS + ['depth']:
+            input_dict[f'clustered_{caller}_vcfs'] = [
+                batch_prefix / batch_name / 'ClusterBatch' / f'clustered-{caller}.vcf.gz'
+                for batch_name in batch_names
+            ]
+            input_dict[f'clustered_{caller}_vcf_indices'] = [
+                batch_prefix / batch_name / 'ClusterBatch' / f'clustered-{caller}.vcf.gz.tbi'
+                for batch_name in batch_names
+            ]
+        expected_d = self.expected_outputs(cohort)
+        jobs = add_gatk_sv_jobs(
+            batch=get_batch(),
+            dataset=cohort.analysis_dataset,
+            wfl_name=self.name,
+            input_dict=input_dict,
+            expected_out_dict=expected_d,
+        )
+        return self.make_outputs(cohort, data=expected_d, jobs=jobs)
+
+
+@stage(required_stages=[JoinRawCalls, FormatVcfForGatk])
+class SVConcordance(CohortStage):
+    """
+    Takes the clean VCF and reformat for GATK intake
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict:
+        """
+        create dictionary of names -> output paths
+        """
+
+        return {
+            'gatk_formatted_vcf': self.prefix / 'gatk_formatted.vcf.gz',
+            'gatk_formatted_vcf_index': self.prefix / 'gatk_formatted.vcf.gz.tbi'
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        """
+
+        Args:
+            cohort ():
+            inputs ():
+
+        Returns:
+
+        """
+        raw_calls = inputs.as_dict(cohort, JoinRawCalls)
+        format_vcf = inputs.as_dict(cohort, FormatVcfForGatk)
+
+        input_dict: dict[str, Any] = {
+            'output_prefix': cohort.name,
+            'reference_dict': str(get_fasta().with_suffix('.dict')),
+            'eval_vcf': format_vcf['gatk_formatted_vcf'],
+            'truth_vcf': raw_calls['joined_raw_calls_vcf'],
+        }
+        input_dict |= get_images(
+            ['gatk_docker', 'sv_base_mini_docker']
+        )
+        input_dict |= get_references(
+            [{'contig_list': 'primary_contigs_list'}]
+        )
+
+        expected_d = self.expected_outputs(cohort)
+        jobs = add_gatk_sv_jobs(
+            batch=get_batch(),
+            dataset=cohort.analysis_dataset,
+            wfl_name=self.name,
+            input_dict=input_dict,
+            expected_out_dict=expected_d,
+        )
+        return self.make_outputs(cohort, data=expected_d, jobs=jobs)
+
+
+# TODO - add FilterGenotypes
 
 @stage(
     required_stages=MakeCohortVcf,
