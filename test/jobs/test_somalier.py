@@ -446,7 +446,6 @@ class TestSomalierRelate:
         # ---- Assertions
         cmd = get_command_str(j)
         max_freemix = 0.04
-        print()
         assert re.search(fr'echo "\$FREEMIX > {max_freemix}"', cmd)
 
     def test_somalier_file_written_to_relate_input_file_if_verifybamid_file_available(
@@ -552,6 +551,8 @@ class TestSomalierRelate:
         _, batch, sg, somalier_path_by_sgid = setup_relate_test(tmp_path)
 
         # ---- The job that we want to test
+        spy = mocker.spy(utils, 'rich_sequencing_group_id_seds')
+
         j = _relate(
             b=batch,
             somalier_path_by_sgid=somalier_path_by_sgid,
@@ -569,6 +570,8 @@ class TestSomalierRelate:
         sequencing_group_id = sg.id
         sequencing_group_fam_id = sg.pedigree.fam_id
         rich_id_map = {sg.id: sg.pedigree.fam_id}
+
+        spy.assert_called_once_with(rich_id_map, ['related.html'])
         assert re.search(
             fr"sed -iBAK 's/{sequencing_group_id}/{sequencing_group_fam_id}/g'", cmd
         )
@@ -581,9 +584,9 @@ class TestSomalierRelate:
 
         # ---- The job that we want to test
         spy = mocker.spy(batch, 'write_output')
-        out_samples = tmp_path / 'out_samples'
-        out_pairs = tmp_path / 'out_pairs'
-        out_html = tmp_path / 'out_html'
+        out_samples_path = tmp_path / 'out_samples'
+        out_pairs_path = tmp_path / 'out_pairs'
+        out_html_path = tmp_path / 'out_html'
 
         j = _relate(
             b=batch,
@@ -592,14 +595,20 @@ class TestSomalierRelate:
             rich_id_map={sg.id: sg.pedigree.fam_id},
             expected_ped_path=(tmp_path / 'test_ped.ped'),
             label=None,
-            out_samples_path=out_samples,
-            out_pairs_path=out_pairs,
-            out_html_path=out_html,
+            out_samples_path=out_samples_path,
+            out_pairs_path=out_pairs_path,
+            out_html_path=out_html_path,
         )
 
         # ---- Assertions
         assert j is not None
-        print()
-        spy.assert_has_calls(calls=[(j.output_samples, str(out_samples))])
-        # spy.assert_called_with(j.output_samples, str(out_pairs_path))
-        # spy.assert_called_with(j.output_samples, str(out_html_path))
+        spy.assert_has_calls(
+            calls=[
+                mocker.call(j.output_samples, str(out_samples_path)),
+                mocker.call(j.output_pairs, str(out_pairs_path)),
+                mocker.call(j.output_html, str(out_html_path)),
+            ]
+        )
+        # spy.assert_called_with(j.output_samples, str(out_samples_path))
+        # spy.assert_called_with(j.output_pairs, str(out_pairs_path))
+        # spy.assert_called_with(j.out_html_path, str(out_html_path))
