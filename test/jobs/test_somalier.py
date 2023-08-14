@@ -71,22 +71,14 @@ def setup_pedigree_test(tmp_path: Path, config: PipelineConfig | None = None):
 
     dataset_id = config.workflow.dataset
 
-    # sg = create_sequencing_group(
-    #     dataset=dataset_id,
-    #     sequencing_type=config.workflow.sequencing_type,
-    # )
-    dataset = create_dataset(
-        name=dataset_id,
-        # sequencing_groups=[sg],
-    )
+    dataset = create_dataset(name=dataset_id)
     dataset.add_sequencing_group(id='CPG000001', external_id='SAMPLE1')
     batch = create_local_batch(tmp_path)
 
-    sg = dataset.get_sequencing_groups()[0]
     sg_id = dataset.get_sequencing_group_ids()[0]
     somalier_path_by_sgid = {sg_id: (tmp_path / 'test.somalier')}
 
-    return config, batch, sg, somalier_path_by_sgid, dataset
+    return config, batch, somalier_path_by_sgid, dataset
 
 
 class TestSomalierExtract:
@@ -314,11 +306,9 @@ class TestSomalierExtract:
 class TestSomalierPedigree:
     def test_creates_one_relate_job(self, tmp_path: Path):
         # ---- Test setup
-        config, batch, sg, somalier_path_by_sgid, dataset = setup_pedigree_test(
-            tmp_path
-        )
+        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
         # ---- The job that we want to test
-        relate_j = pedigree(
+        _ = pedigree(
             dataset=dataset,
             b=batch,
             expected_ped_path=(tmp_path / 'test_ped.ped'),
@@ -335,9 +325,7 @@ class TestSomalierPedigree:
 
     def test_adds_label_to_default_job_title_if_label_provided(self, tmp_path: Path):
         # ---- Test setup
-        config, batch, sg, somalier_path_by_sgid, dataset = setup_pedigree_test(
-            tmp_path
-        )
+        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
         label = 'test-label'
 
@@ -360,9 +348,7 @@ class TestSomalierPedigree:
 
     def test_sets_job_attrs_or_sets_default_attrs_if_not_supplied(self, tmp_path: Path):
         # ---- Test setup
-        config, batch, sg, somalier_path_by_sgid, dataset = setup_pedigree_test(
-            tmp_path
-        )
+        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
         # ---- The job that we want to test
         pedigree_jobs_default_attrs = pedigree(
@@ -400,9 +386,7 @@ class TestSomalierPedigree:
 
     def test_uses_image_specified_in_config(self, tmp_path: Path):
         # ---- Test setup
-        config, batch, sg, somalier_path_by_sgid, dataset = setup_pedigree_test(
-            tmp_path
-        )
+        config, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
         # ---- The job that we want to test
         pedigree_jobs = pedigree(
@@ -422,9 +406,7 @@ class TestSomalierPedigree:
 
     def test_if_verifybamid_exists_for_sg_check_freemix(self, tmp_path: Path):
         # ---- Test setup
-        config, batch, sg, somalier_path_by_sgid, dataset = setup_pedigree_test(
-            tmp_path
-        )
+        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
         # ---- The job that we want to test
         pedigree_jobs = pedigree(
@@ -441,6 +423,7 @@ class TestSomalierPedigree:
 
         # ---- Assertions
         cmd = get_command_str(relate_j)
+        sg = dataset.get_sequencing_groups()[0]
         verifybamid_file = somalier_path_by_sgid[sg.id].name  # same as somalier file
         assert re.search(
             fr'FREEMIX=\$\(cat \${{BATCH_TMPDIR}}/inputs/\w+/{verifybamid_file}', cmd
@@ -465,9 +448,7 @@ class TestSomalierPedigree:
         self, tmp_path: Path
     ):
         # ---- Test setup
-        config, batch, sg, somalier_path_by_sgid, dataset = setup_pedigree_test(
-            tmp_path
-        )
+        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
         # ---- The job that we want to test
         pedigree_jobs = pedigree(
@@ -483,6 +464,7 @@ class TestSomalierPedigree:
 
         # ---- Assertions
         cmd = get_command_str(relate_j)
+        sg = dataset.get_sequencing_groups()[0]
         relate_input_file = 'input_files.list'
         somalier_file = somalier_path_by_sgid[sg.id].name
         sample_id_list_file = 'sample_ids.list'
@@ -499,9 +481,7 @@ class TestSomalierPedigree:
 
     def test_filter_expected_pedigrees_to_ped_file(self, tmp_path: Path):
         # ---- Test setup
-        config, batch, sg, somalier_path_by_sgid, dataset = setup_pedigree_test(
-            tmp_path
-        )
+        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
         # ---- The job that we want to test
         pedigree_jobs = pedigree(
@@ -528,9 +508,7 @@ class TestSomalierPedigree:
         self, tmp_path: Path
     ):
         # ---- Test setup
-        config, batch, sg, somalier_path_by_sgid, dataset = setup_pedigree_test(
-            tmp_path
-        )
+        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
         # ---- The job that we want to test
         pedigree_jobs = pedigree(
@@ -547,24 +525,22 @@ class TestSomalierPedigree:
         # ---- Assertions
         cmd = get_command_str(relate_j)
         assert re.search(
-            fr"mv related.pairs.tsv \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_pairs",
+            fr'mv related.pairs.tsv \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_pairs',
             cmd,
         )
         assert re.search(
-            fr"mv related.samples.tsv \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_samples",
+            fr'mv related.samples.tsv \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_samples',
             cmd,
         )
         assert re.search(
-            fr"mv related.html \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_html", cmd
+            fr'mv related.html \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_html', cmd
         )
 
     def test_related_html_sequencing_group_id_replacement(
         self, mocker: MockFixture, tmp_path: Path
     ):
         # ---- Test setup
-        config, batch, sg, somalier_path_by_sgid, dataset = setup_pedigree_test(
-            tmp_path
-        )
+        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
         # ---- The job that we want to test
         pedigree_jobs = pedigree(
@@ -580,7 +556,8 @@ class TestSomalierPedigree:
 
         # ---- Assertions
         cmd = get_command_str(relate_j)
-        sequencing_group_id = sg.id
+        sequencing_group_id = dataset.get_sequencing_groups()[0].id
+        # sequencing_group_id = sg.id
         rich_id = dataset.rich_id_map()[sequencing_group_id]
 
         assert re.search(
@@ -592,9 +569,7 @@ class TestSomalierPedigree:
         self, mocker: MockFixture, tmp_path: Path
     ):
         # ---- Test setup
-        config, batch, sg, somalier_path_by_sgid, dataset = setup_pedigree_test(
-            tmp_path
-        )
+        _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
         # ---- The job that we want to test
         spy = mocker.spy(batch, 'write_output')
