@@ -102,8 +102,7 @@ class GCPStarReference:
             genome_prefix: str | Path
         ):
         gp = re.sub(r'/+$', '', genome_prefix)
-        self.genome_files = {'prefix': gp}
-        self.genome_files.update({
+        self.genome_files = {
             key: f'{gp}/{file}'
             for key, file in {
                 'chr_len': 'chrLength.txt',
@@ -122,7 +121,7 @@ class GCPStarReference:
                 'sjdb_list': 'sjdbList.out.tab',
                 'transcript_info': 'transcriptInfo.tab',
             }.items()
-        })
+        }
         self.genome_res_group = b.read_input_group(**self.genome_files)
     
 
