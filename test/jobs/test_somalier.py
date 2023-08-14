@@ -9,6 +9,7 @@ from hailtop.batch.job import Job
 from pytest_mock import MockFixture
 
 from cpg_workflows import utils
+from cpg_workflows.jobs import somalier
 from cpg_workflows.jobs.somalier import _check_pedigree, _relate, extract
 
 from .. import set_config
@@ -551,7 +552,7 @@ class TestSomalierRelate:
         _, batch, sg, somalier_path_by_sgid = setup_relate_test(tmp_path)
 
         # ---- The job that we want to test
-        spy = mocker.spy(utils, 'rich_sequencing_group_id_seds')
+        spy = mocker.spy(somalier, 'rich_sequencing_group_id_seds')
 
         j = _relate(
             b=batch,
