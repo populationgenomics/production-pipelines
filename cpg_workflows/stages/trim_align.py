@@ -3,6 +3,7 @@ Align RNA-seq reads to the genome using STAR.
 """
 
 import logging
+from hailtop.batch.job import Job
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_workflows import get_batch
@@ -118,7 +119,9 @@ class TrimAlignRNA(SequencingGroupStage):
                     overwrite=sequencing_group.forced,
                     extra_label=f'fastq_pair_{io_pair.id}',
                 )
-                if j:
+                if j and out_fqs:
+                    assert isinstance(j, Job)
+                    assert isinstance(out_fqs, FastqPair)
                     jobs.append(j)
                     trimmed_fastq_pairs.append(out_fqs)
             except trim.MissingFastqInputException:
