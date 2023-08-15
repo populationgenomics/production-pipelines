@@ -76,7 +76,7 @@ class TestGenotyping:
 
     @pytest.mark.parametrize('scatter_count', [50, 10, 0, None])
     def test_genotype_jobs_with_varying_scatter_counts(
-        self, tmp_path: Path, scatter_count
+        self, mocker: MockFixture, tmp_path: Path, scatter_count
     ):
         # ---- Test setup
         config = default_config()
@@ -85,7 +85,11 @@ class TestGenotyping:
         else:
             scatter_count = 50
 
-        genotype_jobs, _sg = self._get_new_genotype_job(tmp_path, config)
+        set_config(config, tmp_path / 'config.toml')
+        batch = create_local_batch(tmp_path)
+        spy = mocker.spy(batch, 'write_output')
+
+        genotype_jobs, sg = self._get_new_genotype_job(tmp_path, config, batch=batch)
 
         # ---- Assertions
         if scatter_count == 0:
@@ -109,6 +113,7 @@ class TestGenotyping:
         assert (f'Merge {scatter_count} GVCFs' in job_names) == expected_merge
 
         haplotype_output_paths: list[str] = []
+        expected_calls = []
         for job in genotype_jobs:
             cmd = get_command_str(job)
             if job.name == f'Merge {scatter_count} GVCFs':
@@ -127,9 +132,24 @@ class TestGenotyping:
                 assert match
                 haplotype_output_paths.append(match.group(1))
 
+                if scatter_count == 0:
+                    file_name = sg.id
+                else:
+                    scatter_frac = job.attributes['part']
+                    scatter_parts = scatter_frac.split('/')
+                    file_name = (
+                        f'{int(scatter_parts[0]) - 1}_of_{scatter_parts[1]}_{sg.id}'
+                    )
+
+                file_path = tmp_path / 'haplotypecaller' / file_name
+
+                expected_calls.append(mocker.call(job.output_gvcf, str(file_path)))
+
             if job.name == 'Postproc GVCF':
                 assert re.search(r'gatk', cmd)
                 assert re.search(r'ReblockGVCF', cmd)
+
+        spy.assert_has_calls(expected_calls, any_order=True)
 
     @pytest.mark.parametrize(
         'reblock_gq_bands, expected_gqb_flags',
