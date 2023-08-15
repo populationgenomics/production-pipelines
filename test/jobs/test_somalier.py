@@ -783,9 +783,32 @@ class TestSomalierPedigree:
             self, tmp_path: Path
         ):
             # ---- Test setup
-            config, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(
-                tmp_path
+            config, batch, somalier_path_by_sgid, _ = setup_pedigree_test(tmp_path)
+
+            dataset_id = config.workflow.dataset
+            dataset = create_dataset(name=dataset_id)
+            dataset.add_sequencing_group(id='CPG000001')
+            # ---- The job that we want to test
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
             )
+            check_pedigree_j = pedigree_jobs[1]
+
+            # ---- Assertions
+            cmd = get_command_str(check_pedigree_j)
+
+            assert 'sed -iBAK' not in cmd
+            assert bool(dataset.rich_id_map()) == False  # empty dictionary
+
+        def test_flags_called_correctly(self, tmp_path: Path):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
             # ---- The job that we want to test
             pedigree_jobs = pedigree(
@@ -802,32 +825,65 @@ class TestSomalierPedigree:
 
             # ---- Assertions
             cmd = get_command_str(check_pedigree_j)
-            sequencing_group_id = dataset.get_sequencing_groups()[0].id
-            rich_id = dataset.rich_id_map()[sequencing_group_id]
             expected_ped = 'test_ped.ped'
+            somalier_html_url = 'test_html_url'
+            assert re.search(
+                fr'--somalier-samples \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_samples',
+                cmd,
+            )
+            assert re.search(
+                fr'--somalier-pairs \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_pairs',
+                cmd,
+            )
+            assert re.search(
+                fr'--expected-ped \${{BATCH_TMPDIR}}/inputs/\w+/{expected_ped}',
+                cmd,
+            )
+            assert not re.search(fr'--html-url {somalier_html_url}', cmd)
+            assert re.search(fr'--dataset {dataset.name}', cmd)
+            assert re.search(fr'--title "{check_pedigree_j.name}"', cmd)
+            assert re.search('--send-to-slack', cmd)
 
-            # check_pedigree uses output_samples and output_pairs files from _relate job
-            assert re.search(
-                fr"sed -iBAK 's/{sequencing_group_id}/{rich_id}/g' \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_samples'",
-                cmd,
-            )
-            assert re.search(
-                fr"sed -iBAK 's/{sequencing_group_id}/{rich_id}/g' \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_pairs'",
-                cmd,
-            )
-            assert re.search(
-                fr"sed -iBAK 's/{sequencing_group_id}/{rich_id}/g' \${{BATCH_TMPDIR}}/inputs/\w+/{expected_ped}",
-                cmd,
-            )
+        def test_if_send_to_slack_false_flag(self, tmp_path: Path):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
-        # def test_flags_called_correctly(self, tmp_path: Path):
-        #     assert re.search(
-        #         fr'--somalier-samples \${{BATCH_TMPDIR}}/{check_pedigree_j._dirname}/output_samples',
-        #         cmd,
-        #     )
-        #     assert re.search(
-        #         fr'--somalier-pairs \${{BATCH_TMPDIR}}/{check_pedigree_j._dirname}/output_pairs',
-        #         cmd,
-        #     )
-        #
-        #     pass
+            # ---- The job that we want to test
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+                send_to_slack=False,
+            )
+            check_pedigree_j = pedigree_jobs[1]
+
+            # ---- Assertions
+            cmd = get_command_str(check_pedigree_j)
+            assert re.search('--no-send-to-slack', cmd)
+
+        def test_if_out_html_url_flag_is_set(self, tmp_path: Path):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+
+            # ---- The job that we want to test
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+                out_html_url='test_html_url',
+                send_to_slack=False,
+            )
+            check_pedigree_j = pedigree_jobs[1]
+
+            # ---- Assertions
+            cmd = get_command_str(check_pedigree_j)
+            somalier_html_url = 'test_html_url'
+            assert re.search(fr'--html-url {somalier_html_url}', cmd)

@@ -138,7 +138,7 @@ def _check_pedigree(
     --somalier-samples {samples_file} \\
     --somalier-pairs {pairs_file} \\
     --expected-ped {expected_ped} \\
-    {"--html-url {somalier_html_url}" if somalier_html_url else ""} \\
+    {f"--html-url {somalier_html_url}" if somalier_html_url else ""} \\
     --dataset {dataset_name} \\
     --title "{title}" \\
     --{"no-" if not send_to_slack else ""}send-to-slack
