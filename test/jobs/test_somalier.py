@@ -887,3 +887,85 @@ class TestSomalierPedigree:
             cmd = get_command_str(check_pedigree_j)
             somalier_html_url = 'test_html_url'
             assert re.search(fr'--html-url {somalier_html_url}', cmd)
+
+        def test_job_output_created(self, tmp_path: Path):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+
+            # ---- The job that we want to test
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+            )
+            check_pedigree_j = pedigree_jobs[1]
+
+            # ---- Assertions
+            cmd = get_command_str(check_pedigree_j)
+            job_output = 'output'
+            assert re.search(
+                fr'touch \${{BATCH_TMPDIR}}/{check_pedigree_j._dirname}/{job_output}',
+                cmd,
+            )
+
+        def test_if_output_path_provided_writes_outputs_to_final_destination(
+            self, mocker: MockFixture, tmp_path: Path
+        ):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+
+            # ---- The job that we want to test
+            spy = mocker.spy(batch, 'write_output')
+
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+                out_checks_path=(tmp_path / 'out_path'),
+            )
+            check_pedigree_j = pedigree_jobs[1]
+
+            # ---- Assertions
+            out_checks_path = tmp_path / 'out_path'
+            assert check_pedigree_j is not None
+            spy.assert_has_calls(
+                calls=[mocker.call(check_pedigree_j.output, str(out_checks_path))]
+            )
+
+        def test_if_output_path_not_provided_writes_outputs_to_final_destination(
+            self, mocker: MockFixture, tmp_path: Path
+        ):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+
+            # ---- The job that we want to test
+            spy = mocker.spy(batch, 'write_output')
+
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+                # No output path provided
+            )
+            check_pedigree_j = pedigree_jobs[1]
+
+            # ---- Assertions
+            out_checks_path = tmp_path / 'out_path'
+            assert check_pedigree_j is not None
+            with pytest.raises(AssertionError):
+                spy.assert_has_calls(
+                    calls=[mocker.call(check_pedigree_j.output, str(out_checks_path))],
+                    any_order=True,
+                )
