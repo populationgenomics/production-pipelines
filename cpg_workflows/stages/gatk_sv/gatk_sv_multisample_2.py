@@ -20,6 +20,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     _sv_filtered_meta,
     SV_CALLERS
 )
+from cpg_workflows.jobs import ploidy_table_from_ped
 
 
 @stage
@@ -342,10 +343,90 @@ class SVConcordance(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-# TODO - add FilterGenotypes
+@stage(required_stages=SVConcordance)
+class GeneratePloidyTable(CohortStage):
+    """
+    Quick PythonJob to generate a ploidy table
+    Calls a homebrewed version of this table generator:
+    github.com/broadinstitute/gatk-sv/blob/main/src/sv-pipeline/scripts/ploidy_table_from_ped.py
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict:
+        """
+        only one output, the ploidy table
+        """
+
+        return {'ploidy_table': self.prefix / 'ploidy_table.txt'}
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        py_job = get_batch().new_python_job('create_ploidy_table')
+        py_job.image(get_config()['workflow']['driver_image'])
+
+        ped_path = make_combined_ped(cohort, self.prefix)
+        contig_path = get_config()['references']['primary_contigs_list']
+
+        expected_d = self.expected_outputs(cohort)
+        py_job.call(
+            ploidy_table_from_ped.generate_ploidy_table,
+            ped_path,
+            contig_path,
+            expected_d['ploidy_table']
+        )
+
+        return self.make_outputs(cohort, data=expected_d, jobs=py_job)
+
+
+@stage(required_stages=GeneratePloidyTable)
+class FilterGenotypes(CohortStage):
+    """
+    Steps required to post-filter called genotypes
+    """
+    def expected_outputs(self, cohort: Cohort) -> dict:
+        """
+        create dictionary of names -> output paths
+        """
+
+        return {
+            'filtered_vcf': self.prefix / 'filtered.vcf.gz',
+            'filtered_vcf_index': self.prefix / 'filtered.vcf.gz.tbi',
+            'main_vcf_qc_tarball': self.prefix / 'filtered_SV_VCF_QC_output.tar.gz',
+            'unfiltered_recalibrated_vcf': self.prefix / 'unfiltered_recalibrated.vcf.gz',
+            'unfiltered_recalibrated_vcf_index': self.prefix / 'unfiltered_recalibrated.vcf.gz.tbi',
+            'vcf_optimization_table': self.prefix / 'vcf_optimization_table.tsv.gz',
+            'sl_cutoff_qc_tarball': self.prefix / 'sl_cutoff_SV_VCF_QC_output.tar.gz',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+
+        ploidy_table_output = inputs.as_dict(cohort, GeneratePloidyTable)['ploidy_table']
+        sv_concordance_output = inputs.as_dict(cohort, SVConcordance)['gatk_formatted_vcf']
+
+        input_dict = {
+            'vcf': sv_concordance_output,
+            'ploidy_table': ploidy_table_output,
+            'output_prefix': cohort.name,
+            'gq_recalibrator_model_file': 'TBC'
+        }
+
+        input_dict |= get_images(
+            ['gatk_docker', 'linux_docker', 'sv_base_mini_docker', 'sv_pipeline_docker']
+        )
+
+        # TODO - copy the AoU model into references, and pull in here
+
+        expected_d = self.expected_outputs(cohort)
+        jobs = add_gatk_sv_jobs(
+            batch=get_batch(),
+            dataset=cohort.analysis_dataset,
+            wfl_name=self.name,
+            input_dict=input_dict,
+            expected_out_dict=expected_d,
+        )
+        return self.make_outputs(cohort, data=expected_d, jobs=jobs)
+
 
 @stage(
-    required_stages=MakeCohortVcf,
+    required_stages=FilterGenotypes,
     analysis_type='sv',
     analysis_keys=['output_vcf'],
     update_analysis_meta=_sv_batch_meta,
@@ -373,12 +454,12 @@ class AnnotateVcf(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        make_vcf_d = inputs.as_dict(cohort, MakeCohortVcf)
+        make_vcf_d = inputs.as_dict(cohort, FilterGenotypes)
 
         input_dict: dict[str, Any] = {
             'prefix': cohort.name,
-            'vcf': make_vcf_d['vcf'],
-            'vcf_idx': make_vcf_d['vcf_index'],
+            'vcf': make_vcf_d['filtered_vcf'],
+            'vcf_idx': make_vcf_d['filtered_vcf_index'],
             'ped_file': make_combined_ped(cohort, self.prefix),
             'sv_per_shard': 5000,
             'max_shards_per_chrom_step1': 200,
