@@ -804,7 +804,7 @@ class TestSomalierPedigree:
             cmd = get_command_str(check_pedigree_j)
 
             assert 'sed -iBAK' not in cmd
-            assert bool(dataset.rich_id_map()) == False  # empty dictionary
+            assert bool(dataset.rich_id_map()) is False  # empty dictionary
 
         def test_flags_called_correctly(self, tmp_path: Path):
             # ---- Test setup
