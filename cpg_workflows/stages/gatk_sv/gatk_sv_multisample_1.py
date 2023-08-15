@@ -307,7 +307,8 @@ class GenerateBatchMetrics(CohortStage):
                 'sv_pipeline_rdtest_docker',
                 'sv_base_mini_docker',
                 'sv_base_docker',
-                'sv_pipeline_base_docker' 'linux_docker',
+                'sv_pipeline_base_docker'
+                'linux_docker',
             ]
         )
 
