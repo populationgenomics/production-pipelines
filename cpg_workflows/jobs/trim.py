@@ -172,7 +172,7 @@ def trim(
     extra_label: str | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
-) -> Job:
+) -> tuple[Job, FastqPair]:
     """
     Takes an input FastqPair object, and creates a job to trim the FASTQs using cutadapt.
     """
@@ -220,13 +220,14 @@ def trim(
     trim_j.declare_resource_group(output_r2={'fastq.gz': '{root}.fastq.gz'})
     assert isinstance(trim_j.output_r1, ResourceGroup)
     assert isinstance(trim_j.output_r2, ResourceGroup)
+    out_fqs = FastqPair(
+        r1=trim_j.output_r1['fastq.gz'],
+        r2=trim_j.output_r2['fastq.gz'],
+    )
 
     trim_cmd = Fastp(
         input_fastq_pair=fastq_pair,
-        output_fastq_pair=FastqPair(
-            r1=trim_j.output_r1['fastq.gz'],
-            r2=trim_j.output_r2['fastq.gz'],
-        ),
+        output_fastq_pair=out_fqs,
         adapter_type=adapter_type,
         paired=True,
         min_length=50,
@@ -238,7 +239,7 @@ def trim(
 
     # Write output to file
     if output_fq_pair:
-        b.write_output(trim_j.output_r1['fastq.gz'], str(output_fq_pair.r1))
-        b.write_output(trim_j.output_r2['fastq.gz'], str(output_fq_pair.r2))
+        b.write_output(out_fqs.r1, str(output_fq_pair.r1))
+        b.write_output(out_fqs.r2, str(output_fq_pair.r2))
 
-    return trim_j
+    return trim_j, out_fqs

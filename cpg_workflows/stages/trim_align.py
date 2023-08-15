@@ -106,9 +106,10 @@ class TrimAlignRNA(SequencingGroupStage):
 
         # Run trim
         input_output_pairs = get_input_output_pairs(sequencing_group)
+        trimmed_fastq_pairs = []
         for io_pair in input_output_pairs:
             try:
-                j = trim.trim(
+                j, out_fqs = trim.trim(
                     b=get_batch(),
                     sequencing_group=sequencing_group,
                     input_fq_pair=io_pair.input_pair,
@@ -119,6 +120,7 @@ class TrimAlignRNA(SequencingGroupStage):
                 )
                 if j:
                     jobs.append(j)
+                    trimmed_fastq_pairs.append(out_fqs)
             except trim.MissingFastqInputException:
                 if get_config()['workflow'].get('skip_sgs_with_missing_input'):
                     logging.error(f'No FASTQ inputs, skipping sample {sequencing_group}')
@@ -130,10 +132,7 @@ class TrimAlignRNA(SequencingGroupStage):
                     )
 
         # Run alignment
-        trimmed_fastq_pairs = FastqPairs([
-            io_pair.output_pair
-            for io_pair in input_output_pairs
-        ])
+        trimmed_fastq_pairs = FastqPairs(trimmed_fastq_pairs)
         _exp_out = self.expected_outputs(sequencing_group)
         output_bam = BamPath(
             path=_exp_out['bam'],

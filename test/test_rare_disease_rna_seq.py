@@ -149,13 +149,13 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     cmd_str_list = []
 
     def capture_trim_cmd(*args, **kwargs) -> Job:
-        trim_job = trim(*args, **kwargs)
+        trim_job_output = trim(*args, **kwargs)
         cmd_str_list.append(
             '===== FASTQ TRIM JOB START =====\n\n' +
-            '\n'.join(trim_job._command) +
+            '\n'.join(trim_job_output[0]._command) +
             '\n\n===== FASTQ TRIM JOB END =====\n\n'
         )
-        return trim_job
+        return trim_job_output
     
     def capture_align_cmd(*args, **kwargs) -> list[Job]:
         align_jobs = align(*args, **kwargs)
