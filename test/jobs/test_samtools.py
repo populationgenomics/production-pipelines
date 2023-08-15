@@ -2,6 +2,7 @@ import os
 import re
 from pathlib import Path
 
+import pytest
 from pytest_mock import MockFixture
 
 from cpg_workflows.jobs.samtools import samtools_stats
@@ -10,7 +11,6 @@ from .. import set_config
 from ..factories.alignment_input import create_cram_input
 from ..factories.batch import create_local_batch
 from ..factories.config import PipelineConfig, WorkflowConfig
-from ..factories.sequencing_group import create_sequencing_group
 from .helpers import get_command_str
 
 
@@ -100,33 +100,34 @@ class TestSamtoolsStatsRun:
         # --- Assertions
         assert j is not None
 
-    def test_sets_job_attrs_or_sets_default_attrs_if_not_supplied(self, tmp_path: Path):
+    @pytest.mark.parametrize(
+        'job_attrs, expected_attrs',
+        [
+            (None, {'tool': 'samtools'}),
+            (
+                {'test_tool': 'test_samtools'},
+                {'test_tool': 'test_samtools', 'tool': 'samtools'},
+            ),
+        ],
+    )
+    def test_sets_job_attrs_or_sets_default_attrs_if_not_supplied(
+        self, tmp_path: Path, job_attrs, expected_attrs
+    ):
         # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The jobs we want to test
-        j_default_attrs = samtools_stats(
+        j = samtools_stats(
             b=batch,
             cram_path=cram_pth,
             out_samtools_stats_path=(tmp_path / 'output_file'),
-            job_attrs=None,
-            overwrite=False,
-        )
-        j_supplied_attrs = samtools_stats(
-            b=batch,
-            cram_path=cram_pth,
-            out_samtools_stats_path=(tmp_path / 'second_output_file'),
-            job_attrs={'test_tool': 'test_samtools'},
+            job_attrs=job_attrs,
             overwrite=False,
         )
 
         # ---- Assertions
-        assert j_default_attrs is not None and j_supplied_attrs is not None
-        assert j_default_attrs.attributes == {'tool': 'samtools'}
-        assert j_supplied_attrs.attributes == {
-            'test_tool': 'test_samtools',
-            'tool': 'samtools',
-        }
+        assert j is not None
+        assert j.attributes == expected_attrs
 
     def test_uses_samtools_image_specified_in_config(self, tmp_path: Path):
         # ---- Test setup
