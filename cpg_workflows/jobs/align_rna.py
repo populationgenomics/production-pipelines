@@ -216,19 +216,25 @@ def align_fq_pair(
     if extra_label:
         job_name += f' {extra_label}'
 
-    # If number of threads is not specified, use a whole instance
-    nthreads = requested_nthreads or STANDARD.max_threads()
-
     align_tool = 'STAR'
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=align_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
     j.image('australia-southeast1-docker.pkg.dev/cpg-common/images/star:2.7.10b')  # j.image(image_path('star'))
+    
+    # Set resource requirements
+    nthreads = requested_nthreads or 8
+    res = STANDARD.set_resources(
+        j,
+        ncpu=nthreads,
+        storage_gb=50,  # TODO: make configurable
+    )
+
     star_ref = GCPStarReference(b=b, genome_prefix=genome_prefix)
     star = STAR(
         input_fastq_pair=fastq_pair,
         sample_name=sample_name,
         genome=star_ref.genome_res_group,
-        nthreads=(nthreads - 1),
+        nthreads=(res.get_nthreads() - 1),
         output_path=j.output_bam,
         bamout=True,
         sort=True,
@@ -252,15 +258,21 @@ def merge_bams(
     job_name = 'merge_bams'
     if extra_label:
         job_name += f' {extra_label}'
-    
-    # If number of threads is not specified, use a whole instance
-    nthreads = requested_nthreads or STANDARD.max_threads()
 
     merge_tool = 'samtools'
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=merge_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
     j.image(image_path('samtools'))
-    cmd = f'samtools merge -@ {nthreads - 1} -o {j.merged_bam} {" ".join([str(b) for b in input_bams])}'
+    
+    # Set resource requirements
+    nthreads = requested_nthreads or 8
+    res = STANDARD.set_resources(
+        j,
+        ncpu=nthreads,
+        storage_gb=50,  # TODO: make configurable
+    )
+
+    cmd = f'samtools merge -@ {res.get_nthreads() - 1} -o {j.merged_bam} {" ".join([str(b) for b in input_bams])}'
     j.command(command(cmd, monitor_space=True))
     return j
 
@@ -278,14 +290,20 @@ def sort_index_bam(
     job_name = 'sort_index_bam'
     if extra_label:
         job_name += f' {extra_label}'
-    
-    # If number of threads is not specified, use a whole instance
-    nthreads = requested_nthreads or STANDARD.max_threads()
 
     sort_tool = 'samtools'
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=sort_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
     j.image(image_path('samtools'))
-    cmd = f'samtools sort -@ {nthreads - 1} {input_bam} | tee {j.sorted_bam} | samtools index -@ {nthreads - 1} - {j.sorted_bam_idx}'
+    
+    # Set resource requirements
+    nthreads = requested_nthreads or 8
+    res = STANDARD.set_resources(
+        j,
+        ncpu=nthreads,
+        storage_gb=50,  # TODO: make configurable
+    )
+
+    cmd = f'samtools sort -@ {res.get_nthreads() - 1} {input_bam} | tee {j.sorted_bam} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_bam_idx}'
     j.command(command(cmd, monitor_space=True))
     return j
