@@ -1,28 +1,16 @@
 import re
-from typing import Literal
 
-import pandas as pd
 import pytest
 from cpg_utils import Path
-from hailtop.batch import Batch, Resource
-from hailtop.batch.job import Job
 from pytest_mock import MockFixture
 
-from cpg_workflows import utils
-from cpg_workflows.jobs.somalier import (
-    MAX_FREEMIX,
-    _check_pedigree,
-    _relate,
-    extract,
-    pedigree,
-)
+from cpg_workflows.jobs.somalier import MAX_FREEMIX, extract, pedigree
 
 from .. import set_config
 from ..factories.alignment_input import create_cram_input
 from ..factories.batch import create_local_batch
 from ..factories.config import PipelineConfig, WorkflowConfig
 from ..factories.dataset import create_dataset
-from ..factories.sequencing_group import create_sequencing_group
 from .helpers import get_command_str
 
 
@@ -135,33 +123,33 @@ class TestSomalierExtract:
         assert len(batch.select_jobs('Somalier extract')) == 1
         assert j is not None
 
+    @pytest.mark.parametrize(
+        'job_attrs, expected_attrs',
+        [
+            (None, {'tool': 'somalier'}),
+            (
+                {'test_tool': 'test_somalier'},
+                {'test_tool': 'test_somalier', 'tool': 'somalier'},
+            ),
+        ],
+    )
     def test_sets_supplied_job_attrs_or_sets_default_attrs_if_attrs_not_supplied(
-        self, tmp_path: Path
+        self, tmp_path: Path, job_attrs, expected_attrs
     ):
         # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The jobs we want to test
-        j_default_attrs = extract(
+        j = extract(
             b=batch,
             cram_path=cram_pth,
             out_somalier_path=(tmp_path / 'output_file'),
-            job_attrs=None,
-        )
-        j_supplied_attrs = extract(
-            b=batch,
-            cram_path=cram_pth,
-            out_somalier_path=(tmp_path / 'second_output_file'),
-            job_attrs={'test_tool': 'test_somalier'},
+            job_attrs=job_attrs,
         )
 
         # ---- Assertions
-        assert j_default_attrs is not None and j_supplied_attrs is not None
-        assert j_default_attrs.attributes == {'tool': 'somalier'}
-        assert j_supplied_attrs.attributes == {
-            'test_tool': 'test_somalier',
-            'tool': 'somalier',
-        }
+        assert j is not None
+        assert j.attributes == expected_attrs
 
     def test_uses_image_specified_in_config(self, tmp_path: Path):
         # ---- Test setup
