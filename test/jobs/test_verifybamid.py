@@ -3,7 +3,6 @@ from typing import Literal
 
 import pytest
 from cpg_utils import Path
-from cpg_utils.hail_batch import image_path
 from pytest_mock import MockFixture
 
 from cpg_workflows.jobs.verifybamid import verifybamid
@@ -12,7 +11,6 @@ from .. import set_config
 from ..factories.alignment_input import create_cram_input
 from ..factories.batch import create_local_batch
 from ..factories.config import PipelineConfig, WorkflowConfig
-from ..factories.sequencing_group import create_sequencing_group
 from .helpers import get_command_str
 
 
