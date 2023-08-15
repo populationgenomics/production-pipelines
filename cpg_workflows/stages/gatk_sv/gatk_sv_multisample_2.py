@@ -18,7 +18,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     make_combined_ped,
     _sv_batch_meta,
     _sv_filtered_meta,
-    SV_CALLERS
+    SV_CALLERS,
 )
 from cpg_workflows.jobs import ploidy_table_from_ped
 
@@ -102,11 +102,17 @@ class MakeCohortVcf(CohortStage):
             for batch_name in batch_names
         ]
         bincov_files = [
-            batch_prefix / batch_name / 'GatherBatchEvidence' / 'GatherBatchEvidence.RD.txt.gz'
+            batch_prefix
+            / batch_name
+            / 'GatherBatchEvidence'
+            / 'GatherBatchEvidence.RD.txt.gz'
             for batch_name in batch_names
         ]
         disc_files = [
-            batch_prefix / batch_name / 'GatherBatchEvidence' / 'GatherBatchEvidence.pe.txt.gz'
+            batch_prefix
+            / batch_name
+            / 'GatherBatchEvidence'
+            / 'GatherBatchEvidence.pe.txt.gz'
             for batch_name in batch_names
         ]
         median_cov_files = [
@@ -196,7 +202,7 @@ class FormatVcfForGatk(CohortStage):
 
         return {
             'gatk_formatted_vcf': self.prefix / 'gatk_formatted.vcf.gz',
-            'gatk_formatted_vcf_index': self.prefix / 'gatk_formatted.vcf.gz.tbi'
+            'gatk_formatted_vcf_index': self.prefix / 'gatk_formatted.vcf.gz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -212,14 +218,10 @@ class FormatVcfForGatk(CohortStage):
         input_dict: dict[str, Any] = {
             'prefix': cohort.name,
             'vcf': make_vcf_d['vcf'],
-            'ped_file': make_combined_ped(cohort, self.prefix)
+            'ped_file': make_combined_ped(cohort, self.prefix),
         }
-        input_dict |= get_images(
-            ['sv_pipeline_docker', 'sv_base_mini_docker']
-        )
-        input_dict |= get_references(
-            [{'contig_list': 'primary_contigs_list'}]
-        )
+        input_dict |= get_images(['sv_pipeline_docker', 'sv_base_mini_docker'])
+        input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
 
         expected_d = self.expected_outputs(cohort)
         jobs = add_gatk_sv_jobs(
@@ -245,13 +247,12 @@ class JoinRawCalls(CohortStage):
 
         return {
             'joined_raw_calls_vcf': self.prefix / 'raw_clustered_calls.vcf.gz',
-            'joined_raw_calls_vcf_index': self.prefix / 'raw_clustered_calls.vcf.gz.tbi'
+            'joined_raw_calls_vcf_index': self.prefix
+            / 'raw_clustered_calls.vcf.gz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        """
-
-        """
+        """ """
 
         input_dict: dict[str, Any] = {
             'prefix': cohort.name,
@@ -263,20 +264,24 @@ class JoinRawCalls(CohortStage):
         input_dict |= get_images(
             ['gatk_docker', 'sv_pipeline_docker', 'sv_base_mini_docker']
         )
-        input_dict |= get_references(
-            [{'contig_list': 'primary_contigs_list'}]
-        )
+        input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
 
         # add all clustered _caller_ files, plus indices
         batch_names = get_config()['workflow']['batch_names']
         batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
         for caller in SV_CALLERS + ['depth']:
             input_dict[f'clustered_{caller}_vcfs'] = [
-                batch_prefix / batch_name / 'ClusterBatch' / f'clustered-{caller}.vcf.gz'
+                batch_prefix
+                / batch_name
+                / 'ClusterBatch'
+                / f'clustered-{caller}.vcf.gz'
                 for batch_name in batch_names
             ]
             input_dict[f'clustered_{caller}_vcf_indices'] = [
-                batch_prefix / batch_name / 'ClusterBatch' / f'clustered-{caller}.vcf.gz.tbi'
+                batch_prefix
+                / batch_name
+                / 'ClusterBatch'
+                / f'clustered-{caller}.vcf.gz.tbi'
                 for batch_name in batch_names
             ]
         expected_d = self.expected_outputs(cohort)
@@ -303,7 +308,7 @@ class SVConcordance(CohortStage):
 
         return {
             'gatk_formatted_vcf': self.prefix / 'gatk_formatted.vcf.gz',
-            'gatk_formatted_vcf_index': self.prefix / 'gatk_formatted.vcf.gz.tbi'
+            'gatk_formatted_vcf_index': self.prefix / 'gatk_formatted.vcf.gz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -325,12 +330,8 @@ class SVConcordance(CohortStage):
             'eval_vcf': format_vcf['gatk_formatted_vcf'],
             'truth_vcf': raw_calls['joined_raw_calls_vcf'],
         }
-        input_dict |= get_images(
-            ['gatk_docker', 'sv_base_mini_docker']
-        )
-        input_dict |= get_references(
-            [{'contig_list': 'primary_contigs_list'}]
-        )
+        input_dict |= get_images(['gatk_docker', 'sv_base_mini_docker'])
+        input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
 
         expected_d = self.expected_outputs(cohort)
         jobs = add_gatk_sv_jobs(
@@ -370,7 +371,7 @@ class GeneratePloidyTable(CohortStage):
             ploidy_table_from_ped.generate_ploidy_table,
             ped_path,
             contig_path,
-            expected_d['ploidy_table']
+            expected_d['ploidy_table'],
         )
 
         return self.make_outputs(cohort, data=expected_d, jobs=py_job)
@@ -381,6 +382,7 @@ class FilterGenotypes(CohortStage):
     """
     Steps required to post-filter called genotypes
     """
+
     def expected_outputs(self, cohort: Cohort) -> dict:
         """
         create dictionary of names -> output paths
@@ -390,22 +392,27 @@ class FilterGenotypes(CohortStage):
             'filtered_vcf': self.prefix / 'filtered.vcf.gz',
             'filtered_vcf_index': self.prefix / 'filtered.vcf.gz.tbi',
             'main_vcf_qc_tarball': self.prefix / 'filtered_SV_VCF_QC_output.tar.gz',
-            'unfiltered_recalibrated_vcf': self.prefix / 'unfiltered_recalibrated.vcf.gz',
-            'unfiltered_recalibrated_vcf_index': self.prefix / 'unfiltered_recalibrated.vcf.gz.tbi',
+            'unfiltered_recalibrated_vcf': self.prefix
+            / 'unfiltered_recalibrated.vcf.gz',
+            'unfiltered_recalibrated_vcf_index': self.prefix
+            / 'unfiltered_recalibrated.vcf.gz.tbi',
             'vcf_optimization_table': self.prefix / 'vcf_optimization_table.tsv.gz',
             'sl_cutoff_qc_tarball': self.prefix / 'sl_cutoff_SV_VCF_QC_output.tar.gz',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-
-        ploidy_table_output = inputs.as_dict(cohort, GeneratePloidyTable)['ploidy_table']
-        sv_concordance_output = inputs.as_dict(cohort, SVConcordance)['gatk_formatted_vcf']
+        ploidy_table_output = inputs.as_dict(cohort, GeneratePloidyTable)[
+            'ploidy_table'
+        ]
+        sv_concordance_output = inputs.as_dict(cohort, SVConcordance)[
+            'gatk_formatted_vcf'
+        ]
 
         input_dict = {
             'vcf': sv_concordance_output,
             'ploidy_table': ploidy_table_output,
             'output_prefix': cohort.name,
-            'gq_recalibrator_model_file': 'TBC'
+            'gq_recalibrator_model_file': 'TBC',
         }
 
         input_dict |= get_images(
