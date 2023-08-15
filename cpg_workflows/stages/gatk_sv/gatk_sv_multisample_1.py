@@ -160,7 +160,9 @@ class GatherBatchEvidence(CohortStage):
             [
                 'sv_base_mini_docker',
                 'sv_base_docker',
+                'sv_pipeline_base_docker',
                 'sv_pipeline_docker',
+                'sv_pipeline_qc_docker',
                 'linux_docker',
                 'condense_counts_docker',
                 'gatk_docker',
@@ -232,7 +234,13 @@ class ClusterBatch(CohortStage):
             )
 
         input_dict |= get_images(
-            ['sv_base_mini_docker', 'sv_pipeline_docker', 'gatk_docker', 'linux_docker']
+            [
+                'linux_docker',
+                'sv_pipeline_base_docker',
+                'gatk_docker',
+                'sv_base_mini_docker',
+                'sv_pipeline_docker',
+            ]
         )
 
         input_dict |= get_references(
@@ -296,8 +304,10 @@ class GenerateBatchMetrics(CohortStage):
         input_dict |= get_images(
             [
                 'sv_pipeline_docker',
+                'sv_pipeline_rdtest_docker',
                 'sv_base_mini_docker',
                 'sv_base_docker',
+                'sv_pipeline_base_docker'
                 'linux_docker',
             ]
         )
@@ -387,6 +397,7 @@ class FilterBatch(CohortStage):
 
         input_dict |= get_images(
             [
+                'sv_pipeline_base_docker',
                 'sv_pipeline_docker',
                 'sv_base_mini_docker',
                 'linux_docker',
@@ -531,7 +542,6 @@ class GenotypeBatch(CohortStage):
 
         input_dict: dict[str, Any] = {
             'batch': get_workflow().output_version,
-            'ped_file': make_combined_ped(cohort, self.prefix),
             'n_per_split': 5000,
             'n_RD_genotype_bins': 100000,
             'coveragefile': batchevidence_d['merged_bincov'],  # unsure
@@ -554,11 +564,20 @@ class GenotypeBatch(CohortStage):
             ]
 
         input_dict |= get_images(
-            ['sv_pipeline_docker', 'sv_base_mini_docker', 'linux_docker']
+            [
+                'sv_pipeline_base_docker',
+                'sv_base_mini_docker',
+                'sv_pipeline_docker',
+                'sv_pipeline_rdtest_docker',
+                'linux_docker',
+            ]
         )
         input_dict |= get_references(
             ['primary_contigs_list', 'bin_exclude', 'seed_cutoffs', 'pesr_exclude_list']
         )
+        # 2 additional (optional) references CPG doesn't have:
+        # - sr_hom_cutoff_multiplier
+        # - sr_median_hom_ins
 
         expected_d = self.expected_outputs(cohort)
         jobs = add_gatk_sv_jobs(

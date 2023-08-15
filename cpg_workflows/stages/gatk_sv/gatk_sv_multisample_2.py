@@ -160,6 +160,11 @@ class MakeCohortVcf(CohortStage):
         input_dict |= get_images(
             [
                 'sv_pipeline_docker',
+                'sv_pipeline_base_docker',
+                'sv_pipeline_hail_docker',
+                'sv_pipeline_updates_docker',
+                'sv_pipeline_rdtest_docker',
+                'sv_pipeline_qc_docker',
                 'sv_base_mini_docker',
                 'linux_docker',
             ]
