@@ -337,14 +337,24 @@ class TestSomalierPedigree:
             job_name = f'Somalier relate [{label}]'
             assert relate_j.name == job_name
 
+        @pytest.mark.parametrize(
+            'job_attrs, expected_attrs',
+            [
+                (None, {'tool': 'somalier'}),
+                (
+                    {'test_tool': 'test_relate'},
+                    {'test_tool': 'test_relate', 'tool': 'somalier'},
+                ),
+            ],
+        )
         def test_if_job_attrs_supplied_job_attrs_set_or_sets_default_attrs_if_not_supplied(
-            self, tmp_path: Path
+            self, tmp_path: Path, job_attrs, expected_attrs
         ):
             # ---- Test setup
             _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
             # ---- The job that we want to test
-            pedigree_jobs_default_attrs = pedigree(
+            pedigree_jobs = pedigree(
                 dataset=dataset,
                 b=batch,
                 expected_ped_path=(tmp_path / 'test_ped.ped'),
@@ -352,31 +362,13 @@ class TestSomalierPedigree:
                 out_samples_path=(tmp_path / 'out_samples'),
                 out_pairs_path=(tmp_path / 'out_pairs'),
                 out_html_path=(tmp_path / 'out_html'),
-                job_attrs=None,
+                job_attrs=job_attrs,
             )
-            pedigree_jobs_supplied_attrs = pedigree(
-                dataset=dataset,
-                b=batch,
-                expected_ped_path=(tmp_path / 'test_ped.ped'),
-                somalier_path_by_sgid=somalier_path_by_sgid,
-                out_samples_path=(tmp_path / 'out_samples'),
-                out_pairs_path=(tmp_path / 'out_pairs'),
-                out_html_path=(tmp_path / 'out_html'),
-                job_attrs={'test_tool': 'test_relate'},
-            )
-            relate_j_default_attrs = pedigree_jobs_default_attrs[0]
-            relate_j_supplied_attrs = pedigree_jobs_supplied_attrs[0]
+            relate_j = pedigree_jobs[0]
 
             # ---- Assertions
-            assert (
-                relate_j_default_attrs is not None
-                and relate_j_supplied_attrs is not None
-            )
-            assert relate_j_default_attrs.attributes == {'tool': 'somalier'}
-            assert relate_j_supplied_attrs.attributes == {
-                'test_tool': 'test_relate',
-                'tool': 'somalier',
-            }
+            assert relate_j is not None
+            assert relate_j.attributes == expected_attrs
 
         def test_uses_image_specified_in_config(self, tmp_path: Path):
             # ---- Test setup
@@ -643,14 +635,24 @@ class TestSomalierPedigree:
             job_name = f'Pedigree check [{label}]'
             assert pedigree_check_j.name == job_name
 
+        @pytest.mark.parametrize(
+            'job_attrs, expected_attrs',
+            [
+                (None, {'tool': 'python'}),
+                (
+                    {'test_tool': 'test_check_pedigree'},
+                    {'test_tool': 'test_check_pedigree', 'tool': 'python'},
+                ),
+            ],
+        )
         def test_if_job_attrs_supplied_job_attrs_set_or_sets_default_attrs_if_not_supplied(
-            self, tmp_path: Path
+            self, tmp_path: Path, job_attrs, expected_attrs
         ):
             # ---- Test setup
             _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
             # ---- The job that we want to test
-            pedigree_jobs_default_attrs = pedigree(
+            pedigree_jobs = pedigree(
                 dataset=dataset,
                 b=batch,
                 expected_ped_path=(tmp_path / 'test_ped.ped'),
@@ -658,31 +660,13 @@ class TestSomalierPedigree:
                 out_samples_path=(tmp_path / 'out_samples'),
                 out_pairs_path=(tmp_path / 'out_pairs'),
                 out_html_path=(tmp_path / 'out_html'),
-                job_attrs=None,
+                job_attrs=job_attrs,
             )
-            pedigree_jobs_supplied_attrs = pedigree(
-                dataset=dataset,
-                b=batch,
-                expected_ped_path=(tmp_path / 'test_ped.ped'),
-                somalier_path_by_sgid=somalier_path_by_sgid,
-                out_samples_path=(tmp_path / 'out_samples'),
-                out_pairs_path=(tmp_path / 'out_pairs'),
-                out_html_path=(tmp_path / 'out_html'),
-                job_attrs={'test_tool': 'test_check_pedigree'},
-            )
-            pedigree_check_j_default_attrs = pedigree_jobs_default_attrs[1]
-            pedigree_check_j_supplied_attrs = pedigree_jobs_supplied_attrs[1]
+            pedigree_check_j = pedigree_jobs[1]
 
             # ---- Assertions
-            assert (
-                pedigree_check_j_default_attrs is not None
-                and pedigree_check_j_supplied_attrs is not None
-            )
-            assert pedigree_check_j_default_attrs.attributes == {'tool': 'python'}
-            assert pedigree_check_j_supplied_attrs.attributes == {
-                'test_tool': 'test_check_pedigree',
-                'tool': 'python',
-            }
+            assert pedigree_check_j is not None
+            assert pedigree_check_j.attributes == expected_attrs
 
         def test_uses_image_specified_in_config(self, tmp_path: Path):
             # ---- Test setup
