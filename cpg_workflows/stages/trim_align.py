@@ -119,10 +119,11 @@ class TrimAlignRNA(SequencingGroupStage):
                     overwrite=sequencing_group.forced,
                     extra_label=f'fastq_pair_{io_pair.id}',
                 )
-                if j and out_fqs:
+                if j:
                     assert isinstance(j, Job)
-                    assert isinstance(out_fqs, FastqPair)
                     jobs.append(j)
+                if out_fqs:
+                    assert isinstance(out_fqs, FastqPair)
                     trimmed_fastq_pairs.append(out_fqs)
             except trim.MissingFastqInputException:
                 if get_config()['workflow'].get('skip_sgs_with_missing_input'):

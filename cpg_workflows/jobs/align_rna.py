@@ -72,7 +72,7 @@ class STAR:
             '--readFilesIn', str(input_fastq_pair.r1), str(input_fastq_pair.r2),
         ])
         if output_path and not stdout:
-            self.move_output_command = f' && mv {self.output} {output_path}'
+            self.move_output_command = f'\n\nmv {self.output} {output_path}'
         elif output_path and stdout:
             self.move_output_command = f' > {output_path}'
         else:
