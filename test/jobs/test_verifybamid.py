@@ -124,31 +124,33 @@ class TestVerifyBAMID:
         # --- Assertions
         assert j is not None, 'Output not overwritten, no new job was created.'
 
-    def test_sets_job_attrs_or_sets_default_attrs_if_not_supplied(self, tmp_path: Path):
+    @pytest.mark.parametrize(
+        'job_attrs, expected_attrs',
+        [
+            (None, {'tool': 'VerifyBamID'}),
+            (
+                {'test_tool': 'test_VerifyBamID'},
+                {'test_tool': 'test_VerifyBamID', 'tool': 'VerifyBamID'},
+            ),
+        ],
+    )
+    def test_sets_job_attrs_or_sets_default_attrs_if_not_supplied(
+        self, tmp_path: Path, job_attrs, expected_attrs
+    ):
         # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
 
         # ---- The jobs we want to test
-        j_default_attrs = verifybamid(
+        j = verifybamid(
             b=batch,
             cram_path=cram_pth,
             out_verify_bamid_path=(tmp_path / 'output_file'),
-            job_attrs=None,
-        )
-        j_supplied_attrs = verifybamid(
-            b=batch,
-            cram_path=cram_pth,
-            out_verify_bamid_path=(tmp_path / 'second_output_file'),
-            job_attrs={'test_tool': 'test_VerifyBamID'},
+            job_attrs=job_attrs,
         )
 
         # ---- Assertions
-        assert j_default_attrs is not None and j_supplied_attrs is not None
-        assert j_default_attrs.attributes == {'tool': 'VerifyBamID'}
-        assert j_supplied_attrs.attributes == {
-            'test_tool': 'test_VerifyBamID',
-            'tool': 'VerifyBamID',
-        }
+        assert j is not None
+        assert j.attributes == expected_attrs
 
     def test_uses_VBI_image_specified_in_config(self, tmp_path: Path):
         # ---- Test setup
