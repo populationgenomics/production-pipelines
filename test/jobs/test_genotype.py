@@ -1,5 +1,6 @@
 import re
 import pytest
+from pytest_mock import MockFixture
 from pathlib import Path
 
 from cpg_utils.config import ConfigError
@@ -47,11 +48,13 @@ class TestGenotyping:
         tmp_path: Path,
         config: PipelineConfig,
         cram_path_string: str = 'test_genotype.cram',
+        batch=None,
     ):
         set_config(config, tmp_path / 'config.toml')
 
         dataset_id = config.workflow.dataset
-        batch = create_local_batch(tmp_path)
+        if batch is None:
+            batch = create_local_batch(tmp_path)
         sg = create_sequencing_group(
             dataset=dataset_id,
             sequencing_type=config.workflow.sequencing_type,
@@ -61,13 +64,15 @@ class TestGenotyping:
 
         assert sg.cram
         # ---- The job that we want to test
-        return genotype(
+        jobs = genotype(
             b=batch,
             sequencing_group_name=sg.id,
             cram_path=sg.cram,
             output_path=sg.gvcf,
             tmp_prefix=tmp_path,
         )
+
+        return jobs, sg
 
     @pytest.mark.parametrize('scatter_count', [50, 10, 0, None])
     def test_genotype_jobs_with_varying_scatter_counts(
@@ -80,7 +85,7 @@ class TestGenotyping:
         else:
             scatter_count = 50
 
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+        genotype_jobs, _sg = self._get_new_genotype_job(tmp_path, config)
 
         # ---- Assertions
         if scatter_count == 0:
@@ -142,7 +147,7 @@ class TestGenotyping:
         if reblock_gq_bands is not None:
             config.workflow.reblock_gq_bands = reblock_gq_bands
         set_config(config, tmp_path / 'config.toml')
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+        genotype_jobs, _sg = self._get_new_genotype_job(tmp_path, config)
 
         # ---- Assertions
         postproc_job_name = 'Postproc GVCF'
@@ -171,7 +176,7 @@ class TestGenotyping:
         config = default_config()
         config.workflow.sequencing_type = sequencing_type
         set_config(config, tmp_path / 'config.toml')
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+        genotype_jobs, _sg = self._get_new_genotype_job(tmp_path, config)
 
         # ---- Assertions
         assert expected_intervals_name in [job.name for job in genotype_jobs]
@@ -220,7 +225,7 @@ class TestGenotyping:
                 self._get_new_genotype_job(tmp_path, config)
             return
 
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+        genotype_jobs, _sg = self._get_new_genotype_job(tmp_path, config)
 
         for job in genotype_jobs:
             cmd = get_command_str(job)
@@ -232,26 +237,8 @@ class TestGenotyping:
     def test_postproc_gvcf_job_params_with_defaults(self, tmp_path: Path):
         # ---- Test setup
         config = default_config()
-        set_config(config, tmp_path / 'config.toml')
 
-        # We can't use the _get_new_genotype_job helper here because we need to access the sg.
-        dataset_id = config.workflow.dataset
-        batch = create_local_batch(tmp_path)
-        sg = create_sequencing_group(
-            dataset=dataset_id,
-            sequencing_type=config.workflow.sequencing_type,
-            alignment_input=create_fastq_pairs_input(location=tmp_path, n=1),
-            cram=CramPath(tmp_path / 'test_genotype.cram'),
-        )
-        assert sg.cram
-        # ---- The job that we want to test
-        genotype_jobs = genotype(
-            b=batch,
-            sequencing_group_name=sg.id,
-            cram_path=sg.cram,
-            output_path=sg.gvcf,
-            tmp_prefix=tmp_path,
-        )
+        genotype_jobs, sg = self._get_new_genotype_job(tmp_path, config)
 
         # ---- Assertions
         postproc_job_name = 'Postproc GVCF'
@@ -285,7 +272,7 @@ class TestGenotyping:
     def test_make_intervals_job_params_with_defaults(self, tmp_path: Path):
         # ---- Test setup
         config = default_config()
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+        genotype_jobs, _sg = self._get_new_genotype_job(tmp_path, config)
 
         # ---- Assertions
         expected_scatter_count = 50
@@ -303,13 +290,21 @@ class TestGenotyping:
                 assert re.search(r'UNIQUE=true', cmd)
                 assert re.search(r'SORT=true', cmd)
 
-    def test_haplotype_caller_job_params_with_defaults(self, tmp_path: Path):
+    def test_haplotype_caller_job_params_with_defaults(
+        self, mocker: MockFixture, tmp_path: Path
+    ):
         # ---- Test setup
         config = default_config()
-        genotype_jobs = self._get_new_genotype_job(tmp_path, config)
+        set_config(config, tmp_path / 'config.toml')
+        batch = create_local_batch(tmp_path)
+        spy = mocker.spy(batch, 'write_output')
+        genotype_jobs, sg = self._get_new_genotype_job(
+            tmp_path=tmp_path, config=config, batch=batch
+        )
 
         # ---- Assertions
         haplotype_caller_job_name = 'HaplotypeCaller'
+        expected_calls = []
         for job in genotype_jobs:
             if job.name == haplotype_caller_job_name:
                 cmd = get_command_str(job)
@@ -328,6 +323,15 @@ class TestGenotyping:
                 assert re.search(r'-ERC GVCF', cmd)
                 # Tabix index created
                 assert re.search(r'--create-output-variant-index', cmd)
+
+                scatter_frac = job.attributes['part']
+                scatter_parts = scatter_frac.split('/')
+                file_name = f'{int(scatter_parts[0]) - 1}_of_{scatter_parts[1]}_{sg.id}'
+                file_path = tmp_path / 'haplotypecaller' / file_name
+
+                expected_calls.append(mocker.call(job.output_gvcf, str(file_path)))
+
+        spy.assert_has_calls(expected_calls, any_order=True)
 
     # def test_genotype_reblock_gq_bands_single_integer(self, tmp_path: Path):
     #     # NOTE: This test fails, but should it?
