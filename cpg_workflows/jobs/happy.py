@@ -109,3 +109,5 @@ def happy(
     j.command(command(cmd))
     if output_path:
         b.write_output(j.summary_csv, str(output_path))
+
+    return j
