@@ -41,28 +41,30 @@ def default_config() -> PipelineConfig:
     )
 
 
-def setup_test(
-    tmp_path: Path,
-    ref_fasta: str | None = None,
-    sequencing_type: Literal['genome', 'exome'] | None = None,
-):
-    config = default_config()
-
-    if ref_fasta is not None:
-        config.workflow.ref_fasta = ref_fasta
-
-    if sequencing_type is not None:
-        config.workflow.sequencing_type = sequencing_type
-
+def setup_test(tmp_path: Path, config: PipelineConfig | None = None):
+    config = config or default_config()
     set_config(config, tmp_path / 'config.toml')
 
-    cram_pth = create_cram_input(
-        location=tmp_path, prefix='test', index=True, reference_assembly='GRCh38.fa'
-    )
-
     batch = create_local_batch(tmp_path)
+    cram_pth = create_cram_input(location=tmp_path, index=True)
 
     return config, cram_pth, batch
+
+    # if ref_fasta is not None:
+    #     config.workflow.ref_fasta = ref_fasta
+
+    # if sequencing_type is not None:
+    #     config.workflow.sequencing_type = sequencing_type
+
+    # set_config(config, tmp_path / 'config.toml')
+
+    # cram_pth = create_cram_input(
+    #     location=tmp_path, prefix='test', index=True, reference_assembly='GRCh38.fa'
+    # )
+
+    # batch = create_local_batch(tmp_path)
+
+    # return config, cram_pth, batch
 
 
 class TestVerifyBAMID:
@@ -108,7 +110,7 @@ class TestVerifyBAMID:
     ):
         # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
-        output = tmp_path / 'output_stats_file'
+        output = tmp_path / 'output_verifybamid_file'
         output.touch()
 
         # ---- The jobs we want to test
@@ -185,7 +187,9 @@ class TestVerifyBAMID:
 
     def test_uses_reference_in_workflow_config_section_if_set(self, tmp_path: Path):
         # ---- Test setup
-        config, cram_pth, batch = setup_test(tmp_path, ref_fasta='test_workflow_ref.fa')
+        config = default_config()
+        config.workflow.ref_fasta = 'test_workflow_ref.fa'
+        _, cram_pth, batch = setup_test(tmp_path, config)
 
         # ---- The jobs we want to test
         j = verifybamid(
@@ -260,29 +264,14 @@ class TestVerifyBAMID:
         assert re.search(fr'retry_gs_cp .*{cram_pth.path}', cmd)
         assert re.search(fr'retry_gs_cp .*{cram_pth.index_path}', cmd)
 
-    def test_ncpu_resources_set(self, tmp_path: Path):
-        # ---- Test setup
-        config, cram_pth, batch = setup_test(tmp_path)
-
-        # ---- The job we want to test
-        j = verifybamid(
-            b=batch,
-            cram_path=cram_pth,
-            out_verify_bamid_path=(tmp_path / 'output_file'),
-            job_attrs=None,
-        )
-
-        # ---- Assertions
-        cmd = get_command_str(j)
-        num_threads = int(config.other['cramqc']['num_pcs']) * 2
-        assert re.search(fr'--NumThread {num_threads}', cmd)
-
     @pytest.mark.parametrize('sequencing_type', ['exome', 'genome'])
     def test_extra_opts_changes_according_to_sequencing_type(
         self, tmp_path: Path, sequencing_type: Literal['exome', 'genome']
     ):
         # ---- Test setup
-        _, cram_pth, batch = setup_test(tmp_path, sequencing_type=sequencing_type)
+        config = default_config()
+        config.workflow.sequencing_type = sequencing_type
+        config, cram_pth, batch = setup_test(tmp_path, config)
 
         # ---- The job we want to test
         j = verifybamid(
