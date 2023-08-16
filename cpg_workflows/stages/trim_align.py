@@ -130,8 +130,8 @@ class TrimAlignRNA(SequencingGroupStage):
                     # we need to localise them
                     assert isinstance(out_fqs, FastqPair)
                     ex_fq = get_batch().read_input_group(
-                        r1=out_fqs.r1,
-                        r2=out_fqs.r2,
+                        r1=str(out_fqs.r1),
+                        r2=str(out_fqs.r2),
                     )
                     trimmed_fastq_pairs.append(FastqPair(
                         r1=ex_fq['r1'],
