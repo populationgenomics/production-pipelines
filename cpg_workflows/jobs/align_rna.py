@@ -69,6 +69,7 @@ class STAR:
             '--outSAMtype', self.outSAMtype,
             '--outStd', self.outStd,
             '--outSAMattrRGline', self.read_group_line,
+            '--readFilesCommand', 'zcat',
             '--readFilesIn', str(input_fastq_pair.r1), str(input_fastq_pair.r2),
         ])
         if output_path and not stdout:
