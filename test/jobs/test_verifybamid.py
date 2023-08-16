@@ -50,22 +50,6 @@ def setup_test(tmp_path: Path, config: PipelineConfig | None = None):
 
     return config, cram_pth, batch
 
-    # if ref_fasta is not None:
-    #     config.workflow.ref_fasta = ref_fasta
-
-    # if sequencing_type is not None:
-    #     config.workflow.sequencing_type = sequencing_type
-
-    # set_config(config, tmp_path / 'config.toml')
-
-    # cram_pth = create_cram_input(
-    #     location=tmp_path, prefix='test', index=True, reference_assembly='GRCh38.fa'
-    # )
-
-    # batch = create_local_batch(tmp_path)
-
-    # return config, cram_pth, batch
-
 
 class TestVerifyBAMID:
     def test_creates_one_job(self, tmp_path: Path):
