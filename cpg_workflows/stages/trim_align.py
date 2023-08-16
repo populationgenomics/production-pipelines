@@ -122,9 +122,21 @@ class TrimAlignRNA(SequencingGroupStage):
                 if j:
                     assert isinstance(j, Job)
                     jobs.append(j)
-                if out_fqs:
+                    if out_fqs:
+                        assert isinstance(out_fqs, FastqPair)
+                        trimmed_fastq_pairs.append(out_fqs)
+                elif out_fqs:
+                    # If the job was skipped due to existing trimmed FASTQs,
+                    # we need to localise them
                     assert isinstance(out_fqs, FastqPair)
-                    trimmed_fastq_pairs.append(out_fqs)
+                    ex_fq = get_batch().read_input_group(
+                        r1=out_fqs.r1,
+                        r2=out_fqs.r2,
+                    )
+                    trimmed_fastq_pairs.append(FastqPair(
+                        r1=ex_fq['r1'],
+                        r2=ex_fq['r2'],
+                    ))
             except trim.MissingFastqInputException:
                 if get_config()['workflow'].get('skip_sgs_with_missing_input'):
                     logging.error(f'No FASTQ inputs, skipping sample {sequencing_group}')
