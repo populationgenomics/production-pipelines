@@ -412,14 +412,15 @@ class FilterGenotypes(CohortStage):
             'vcf': sv_concordance_output,
             'ploidy_table': ploidy_table_output,
             'output_prefix': cohort.name,
-            'gq_recalibrator_model_file': 'TBC',
         }
 
         input_dict |= get_images(
             ['gatk_docker', 'linux_docker', 'sv_base_mini_docker', 'sv_pipeline_docker']
         )
 
-        # TODO - copy the AoU model into references, and pull in here
+        input_dict |= get_references(
+            [{'gq_recalibrator_model_file': 'aou_filtering_model'}]
+        )
 
         expected_d = self.expected_outputs(cohort)
         jobs = add_gatk_sv_jobs(
