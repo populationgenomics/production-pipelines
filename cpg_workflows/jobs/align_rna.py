@@ -8,7 +8,7 @@ from cpg_utils import Path, to_path
 from cpg_utils.hail_batch import command, image_path
 from cpg_utils.config import get_config
 from cpg_workflows.utils import can_reuse
-from cpg_workflows.resources import STANDARD
+from cpg_workflows.resources import STANDARD, HIGHMEM
 from cpg_workflows.filetypes import (
     FastqPair,
     FastqPairs,
@@ -224,7 +224,7 @@ def align_fq_pair(
     
     # Set resource requirements
     nthreads = requested_nthreads or 8
-    res = STANDARD.set_resources(
+    res = HIGHMEM.set_resources(
         j,
         ncpu=nthreads,
         storage_gb=50,  # TODO: make configurable
