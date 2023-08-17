@@ -4,6 +4,7 @@ import pytest
 from cpg_utils import Path
 from pytest_mock import MockFixture
 
+from cpg_workflows.jobs import somalier
 from cpg_workflows.jobs.somalier import MAX_FREEMIX, extract, pedigree
 
 from .. import set_config
@@ -184,22 +185,6 @@ class TestSomalierExtract:
         sites = config.other['references']['somalier_sites']
         assert j is not None
         assert re.search(fr'SITES=\$BATCH_TMPDIR/sites/{sites}', cmd)
-
-    def test_runs_with_somalier_sites_from_config_file(self, tmp_path: Path):
-        # ---- Test setup
-        config, cram_pth, batch = setup_test(tmp_path)
-
-        # ---- The jobs we want to test
-        j = extract(
-            b=batch,
-            cram_path=cram_pth,
-            out_somalier_path=(tmp_path / 'output_file'),
-        )
-
-        # ---- Assertions
-        cmd = get_command_str(j)
-        sites = config.other['references']['somalier_sites']
-        assert j is not None
         assert re.search(fr'--sites \${{BATCH_TMPDIR}}/inputs/\w+/{sites}', cmd)
 
     def test_uses_fail_safe_copy_on_cram_path_and_index_in_bash_command(
@@ -278,7 +263,7 @@ class TestSomalierExtract:
 
     def test_raises_error_if_no_cram_index_path_given(self, tmp_path: Path):
         # ---- Test setup
-        _, cram_pth, batch = setup_test(tmp_path, index=False)
+        _, cram_pth_no_index, batch = setup_test(tmp_path, index=False)
 
         # ---- The jobs we want to test and Assertions
         with pytest.raises(
@@ -286,7 +271,7 @@ class TestSomalierExtract:
         ):
             _ = extract(
                 b=batch,
-                cram_path=cram_pth,
+                cram_path=cram_pth_no_index,
                 out_somalier_path=(tmp_path / 'output_file'),
             )
 
@@ -435,7 +420,7 @@ class TestSomalierPedigree:
                 cmd,
             )
 
-        def test_if_verifybamid_file_not_available_somalier_file_written_to_relate_input_file_(
+        def test_if_verifybamid_file_not_available_inputs_files_still_generated(
             self, tmp_path: Path
         ):
             # ---- Test setup
@@ -516,21 +501,19 @@ class TestSomalierPedigree:
             # ---- Assertions
             cmd = get_command_str(relate_j)
             assert re.search(
-                fr'mv related.pairs.tsv \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_pairs',
+                fr'mv related.pairs.tsv \${{BATCH_TMPDIR}}/.+\/output_pairs',
                 cmd,
             )
             assert re.search(
-                fr'mv related.samples.tsv \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_samples',
+                fr'mv related.samples.tsv \${{BATCH_TMPDIR}}/.+\/output_samples',
                 cmd,
             )
             assert re.search(
-                fr'mv related.html \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_html',
+                fr'mv related.html \${{BATCH_TMPDIR}}/.+\/output_html',
                 cmd,
             )
 
-        def test_related_html_sequencing_group_id_replacement(
-            self, mocker: MockFixture, tmp_path: Path
-        ):
+        def test_related_html_sequencing_group_id_replacement(self, tmp_path: Path):
             # ---- Test setup
             _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
@@ -609,6 +592,48 @@ class TestSomalierPedigree:
             # ---- Assertions
             relate_jobs = batch.select_jobs('Pedigree check')
             assert len(relate_jobs) == 1
+
+            # TODO: check_pedigree uses output_samples and output_pairs files from _relate job
+
+        def test_check_pedigree_uses_output_files_from_relate(
+            self, mocker: MockFixture, tmp_path: Path
+        ):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+
+            # ---- The job that we want to test
+            spy = mocker.spy(somalier, '_check_pedigree')
+            samples_file = tmp_path / 'out_samples'
+            pairs_file = tmp_path / 'out_pairs'
+            expected_ped_path = tmp_path / 'test_ped.ped'
+            out_html_url = tmp_path / 'out_html'
+
+            label = None
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+            )
+            pedigree_relate_j = pedigree_jobs[0]
+            pedigree_check_j = pedigree_jobs[1]
+            cmd = get_command_str(pedigree_relate_j)
+            spy.assert_called_with(
+                b=batch,
+                samples_file=pedigree_relate_j.output_samples,
+                pairs_file=pedigree_relate_j.output_pairs,
+                expected_ped=batch.read_input(str(expected_ped_path)),
+                somalier_html_url=out_html_url,
+                rich_id_map=dataset.rich_id_map(),
+                dataset_name=dataset.name,
+                label=label,
+                out_checks_path=None,
+                job_attrs=None,
+                send_to_slack=True,
+            )
 
         def test_if_label_provided_adds_label_to_default_job_title_(
             self, tmp_path: Path
@@ -714,9 +739,7 @@ class TestSomalierPedigree:
             self, tmp_path: Path
         ):
             # ---- Test setup
-            config, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(
-                tmp_path
-            )
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
             # ---- The job that we want to test
             pedigree_jobs = pedigree(
@@ -737,13 +760,12 @@ class TestSomalierPedigree:
             rich_id = dataset.rich_id_map()[sequencing_group_id]
             expected_ped = 'test_ped.ped'
 
-            # check_pedigree uses output_samples and output_pairs files from _relate job
             assert re.search(
-                fr"sed -iBAK 's/{sequencing_group_id}/{rich_id}/g' \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_samples'",
+                fr"sed -iBAK 's/{sequencing_group_id}/{rich_id}/g' \${{BATCH_TMPDIR}}/.+\/output_samples'",
                 cmd,
             )
             assert re.search(
-                fr"sed -iBAK 's/{sequencing_group_id}/{rich_id}/g' \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_pairs'",
+                fr"sed -iBAK 's/{sequencing_group_id}/{rich_id}/g' \${{BATCH_TMPDIR}}/.+\/output_pairs'",
                 cmd,
             )
             assert re.search(
@@ -761,6 +783,7 @@ class TestSomalierPedigree:
             dataset = create_dataset(name=dataset_id)
             dataset.add_sequencing_group(id='CPG000001')
             # ---- The job that we want to test
+            # TODO: check if this can be put in setup_pedigree_test()
             pedigree_jobs = pedigree(
                 dataset=dataset,
                 b=batch,
@@ -800,11 +823,11 @@ class TestSomalierPedigree:
             expected_ped = 'test_ped.ped'
             somalier_html_url = 'test_html_url'
             assert re.search(
-                fr'--somalier-samples \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_samples',
+                fr'--somalier-samples \${{BATCH_TMPDIR}}\/.+\/output_samples',
                 cmd,
             )
             assert re.search(
-                fr'--somalier-pairs \${{BATCH_TMPDIR}}/{relate_j._dirname}/output_pairs',
+                fr'--somalier-pairs \${{BATCH_TMPDIR}}\/.+\/output_pairs',
                 cmd,
             )
             assert re.search(
@@ -837,7 +860,8 @@ class TestSomalierPedigree:
             cmd = get_command_str(check_pedigree_j)
             assert re.search('--no-send-to-slack', cmd)
 
-        def test_if_out_html_url_flag_is_set(self, tmp_path: Path):
+        @pytest.mark.parametrize('out_html_url', ['test_html_url', None])
+        def test_if_out_html_url_flag_is_set(self, tmp_path: Path, out_html_url: str):
             # ---- Test setup
             _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
@@ -850,15 +874,20 @@ class TestSomalierPedigree:
                 out_samples_path=(tmp_path / 'out_samples'),
                 out_pairs_path=(tmp_path / 'out_pairs'),
                 out_html_path=(tmp_path / 'out_html'),
-                out_html_url='test_html_url',
+                out_html_url=out_html_url,
                 send_to_slack=False,
             )
             check_pedigree_j = pedigree_jobs[1]
 
             # ---- Assertions
             cmd = get_command_str(check_pedigree_j)
-            somalier_html_url = 'test_html_url'
-            assert re.search(fr'--html-url {somalier_html_url}', cmd)
+            pattern = r'python3 check_pedigree\.py.*?--html-url ([^\n]+)'
+            regex = re.compile(pattern, re.DOTALL)
+            match = regex.search(cmd)
+            if out_html_url is None:
+                assert bool(match) is False
+            else:
+                assert re.search(fr'--html-url {out_html_url}', cmd)
 
         def test_job_output_created(self, tmp_path: Path):
             # ---- Test setup
@@ -912,7 +941,7 @@ class TestSomalierPedigree:
                 calls=[mocker.call(check_pedigree_j.output, str(out_checks_path))]
             )
 
-        def test_if_output_path_not_provided_writes_outputs_to_final_destination(
+        def test_if_output_path_not_provided_does_not_write_outputs_to_final_destination(
             self, mocker: MockFixture, tmp_path: Path
         ):
             # ---- Test setup
