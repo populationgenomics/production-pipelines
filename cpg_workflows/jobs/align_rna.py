@@ -227,7 +227,7 @@ def align_fq_pair(
     res = HIGHMEM.set_resources(
         j,
         ncpu=nthreads,
-        storage_gb=50,  # TODO: make configurable
+        storage_gb=100,  # TODO: make configurable
     )
 
     star_ref = GCPStarReference(b=b, genome_prefix=genome_prefix)
