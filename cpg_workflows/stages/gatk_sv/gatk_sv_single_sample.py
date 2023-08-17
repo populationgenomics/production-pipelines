@@ -31,7 +31,7 @@ from cpg_utils.config import get_config
 @stage(
     analysis_keys=[f'{caller}_vcf' for caller in SV_CALLERS],
     analysis_type='sv',
-    update_analysis_meta=_sv_individual_meta
+    update_analysis_meta=_sv_individual_meta,
 )
 class GatherSampleEvidence(SequencingGroupStage):
     """
@@ -192,7 +192,7 @@ class EvidenceQC(CohortStage):
                 'sv_base_mini_docker',
                 'sv_base_docker',
                 'sv_pipeline_docker',
-                'sv_pipeline_qc_docker'
+                'sv_pipeline_qc_docker',
             ]
         )
 

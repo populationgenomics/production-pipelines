@@ -46,5 +46,5 @@ model_tar_cnt = 285
 [workflow]
 status_reporter = 'metamist'
 # un-comment these to force stages to repeat
-#check_intermediates = false
-#check_expected_outputs = false
+check_intermediates = false
+check_expected_outputs = false

@@ -22,7 +22,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_ref_panel,
     make_combined_ped,
     SV_CALLERS,
-    _sv_batch_meta
+    _sv_batch_meta,
 )
 from cpg_workflows.workflow import get_workflow
 
@@ -43,7 +43,7 @@ class GatherBatchEvidence(CohortStage):
 
     https://github.com/broadinstitute/gatk-sv#gather-batch-evidence
     https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherBatchEvidence.wdl
-    
+
     it's critical to separate the ending with a dot, e.g.: `*.sr.txt.gz`,
     These files are passed to `gatk PrintSVEvidence`, that determines file
     format based on the file name.
@@ -490,7 +490,7 @@ class MergeBatchSites(CohortStage):
     required_stages=[FilterBatch, GatherBatchEvidence],
     analysis_type='sv',
     analysis_keys=[f'genotyped_{mode}_vcf' for mode in ['pesr', 'depth']],
-    update_analysis_meta=_sv_batch_meta
+    update_analysis_meta=_sv_batch_meta,
 )
 class GenotypeBatch(CohortStage):
     """
