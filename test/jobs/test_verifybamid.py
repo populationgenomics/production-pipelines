@@ -136,7 +136,7 @@ class TestVerifyBAMID:
         assert j is not None
         assert j.attributes == expected_attrs
 
-    def test_uses_VBI_image_specified_in_config(self, tmp_path: Path):
+    def test_uses_verifybamid_image_specified_in_config(self, tmp_path: Path):
         # ---- Test setup
         config, cram_pth, batch = setup_test(tmp_path)
 
@@ -152,7 +152,9 @@ class TestVerifyBAMID:
         assert j is not None
         assert j._image == config.images['verifybamid']
 
-    def test_uses_num_pc_in_config_file_in_bash_command(self, tmp_path: Path):
+    def test_uses_num_principal_components_in_config_file_in_bash_command(
+        self, tmp_path: Path
+    ):
         # ---- Test setup
         config, cram_pth, batch = setup_test(tmp_path)
 
@@ -291,4 +293,4 @@ class TestVerifyBAMID:
 
         # ---- Assertions
         assert j is not None
-        spy.assert_called_with(j.out_selfsm, str(out_path))
+        spy.assert_called_once_with(j.out_selfsm, str(out_path))
