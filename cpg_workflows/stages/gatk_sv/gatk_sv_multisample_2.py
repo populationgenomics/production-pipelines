@@ -364,7 +364,7 @@ class GeneratePloidyTable(CohortStage):
         py_job.image(get_config()['workflow']['driver_image'])
 
         ped_path = make_combined_ped(cohort, self.prefix)
-        contig_path = get_config()['references']['primary_contigs_list']
+        contig_path = get_references(['primary_contigs_list'])['primary_contigs_list']
 
         expected_d = self.expected_outputs(cohort)
         py_job.call(
