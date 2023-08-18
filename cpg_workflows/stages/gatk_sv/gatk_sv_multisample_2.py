@@ -364,7 +364,7 @@ class GeneratePloidyTable(CohortStage):
         py_job.image(get_config()['workflow']['driver_image'])
 
         ped_path = make_combined_ped(cohort, self.prefix)
-        contig_path = get_config()['references']['primary_contigs_list']
+        contig_path = get_references(['primary_contigs_list'])['primary_contigs_list']
 
         expected_d = self.expected_outputs(cohort)
         py_job.call(
@@ -377,7 +377,12 @@ class GeneratePloidyTable(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=py_job)
 
 
-@stage(required_stages=GeneratePloidyTable)
+@stage(
+    required_stages=[GeneratePloidyTable, SVConcordance],
+    analysis_type='sv',
+    analysis_keys=['filtered_vcf'],
+    update_analysis_meta=_sv_filtered_meta,
+)
 class FilterGenotypes(CohortStage):
     """
     Steps required to post-filter called genotypes
