@@ -277,7 +277,7 @@ class JoinRawCalls(CohortStage):
                 / f'clustered-{caller}.vcf.gz'
                 for batch_name in batch_names
             ]
-            input_dict[f'clustered_{caller}_vcf_indices'] = [
+            input_dict[f'clustered_{caller}_vcf_indexes'] = [
                 batch_prefix
                 / batch_name
                 / 'ClusterBatch'
