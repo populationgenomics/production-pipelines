@@ -377,7 +377,12 @@ class GeneratePloidyTable(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=py_job)
 
 
-@stage(required_stages=[GeneratePloidyTable,SVConcordance])
+@stage(
+    required_stages=[GeneratePloidyTable, SVConcordance],
+    analysis_type='sv',
+    analysis_keys=['filtered_vcf'],
+    update_analysis_meta=_sv_filtered_meta,
+)
 class FilterGenotypes(CohortStage):
     """
     Steps required to post-filter called genotypes
