@@ -593,48 +593,6 @@ class TestSomalierPedigree:
             relate_jobs = batch.select_jobs('Pedigree check')
             assert len(relate_jobs) == 1
 
-            # TODO: check_pedigree uses output_samples and output_pairs files from _relate job
-
-        def test_check_pedigree_uses_output_files_from_relate(
-            self, mocker: MockFixture, tmp_path: Path
-        ):
-            # ---- Test setup
-            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
-
-            # ---- The job that we want to test
-            spy = mocker.spy(somalier, '_check_pedigree')
-            samples_file = tmp_path / 'out_samples'
-            pairs_file = tmp_path / 'out_pairs'
-            expected_ped_path = tmp_path / 'test_ped.ped'
-            out_html_url = tmp_path / 'out_html'
-
-            label = None
-            pedigree_jobs = pedigree(
-                dataset=dataset,
-                b=batch,
-                expected_ped_path=(tmp_path / 'test_ped.ped'),
-                somalier_path_by_sgid=somalier_path_by_sgid,
-                out_samples_path=(tmp_path / 'out_samples'),
-                out_pairs_path=(tmp_path / 'out_pairs'),
-                out_html_path=(tmp_path / 'out_html'),
-            )
-            pedigree_relate_j = pedigree_jobs[0]
-            pedigree_check_j = pedigree_jobs[1]
-            cmd = get_command_str(pedigree_relate_j)
-            spy.assert_called_with(
-                b=batch,
-                samples_file=pedigree_relate_j.output_samples,
-                pairs_file=pedigree_relate_j.output_pairs,
-                expected_ped=batch.read_input(str(expected_ped_path)),
-                somalier_html_url=out_html_url,
-                rich_id_map=dataset.rich_id_map(),
-                dataset_name=dataset.name,
-                label=label,
-                out_checks_path=None,
-                job_attrs=None,
-                send_to_slack=True,
-            )
-
         def test_if_label_provided_adds_label_to_default_job_title_(
             self, tmp_path: Path
         ):
@@ -800,6 +758,39 @@ class TestSomalierPedigree:
 
             assert 'sed -iBAK' not in cmd
             assert bool(dataset.rich_id_map()) is False  # empty dictionary
+
+        # TODO: check_pedigree uses output_samples and output_pairs files from _relate job
+        # when _relate() is running create a list of output paths for the samples and pairs files
+        # then check that these output paths are input to _check_pedigree in the list. check vivian's code snippet
+        def test_check_pedigree_uses_output_files_from_relate(
+            self, mocker: MockFixture, tmp_path: Path
+        ):
+            # ---- Test setup
+            _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
+
+            # ---- The job that we want to test
+            pedigree_jobs = pedigree(
+                dataset=dataset,
+                b=batch,
+                expected_ped_path=(tmp_path / 'test_ped.ped'),
+                somalier_path_by_sgid=somalier_path_by_sgid,
+                out_samples_path=(tmp_path / 'out_samples'),
+                out_pairs_path=(tmp_path / 'out_pairs'),
+                out_html_path=(tmp_path / 'out_html'),
+            )
+            relate_j, check_pedigree_j = pedigree_jobs
+            relate_cmd = get_command_str(relate_j)
+            check_pedigree_j_cmd = get_command_str(check_pedigree_j)
+            out_sample_path = re.search(
+                fr'\${{BATCH_TMPDIR}}\/.+\/output_samples', relate_cmd
+            ).group(0)
+            out_pairs_path = re.search(
+                fr'\${{BATCH_TMPDIR}}\/.+\/output_pairs', relate_cmd
+            ).group(0)
+
+            # ---- Assertions
+            assert f'--somalier-samples {out_sample_path}' in check_pedigree_j_cmd
+            assert f'--somalier-pairs {out_pairs_path}' in check_pedigree_j_cmd
 
         def test_flags_called_correctly(self, tmp_path: Path):
             # ---- Test setup
