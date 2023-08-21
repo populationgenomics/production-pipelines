@@ -189,7 +189,6 @@ class TestSomalierCheckPedigree:
             out_pairs_path=(tmp_path / 'out_pairs'),
             out_html_path=(tmp_path / 'out_html'),
         )
-        relate_j = pedigree_jobs[0]
         check_pedigree_j = pedigree_jobs[1]
 
         # ---- Assertions
@@ -256,16 +255,19 @@ class TestSomalierCheckPedigree:
         relate_j, check_pedigree_j = pedigree_jobs
         relate_cmd = get_command_str(relate_j)
         check_pedigree_j_cmd = get_command_str(check_pedigree_j)
-        out_sample_path = re.search(
+        out_sample_path_match = re.search(
             fr'\${{BATCH_TMPDIR}}\/.+\/output_samples', relate_cmd
-        ).group(0)
-        out_pairs_path = re.search(
+        )
+        out_pairs_path_match = re.search(
             fr'\${{BATCH_TMPDIR}}\/.+\/output_pairs', relate_cmd
-        ).group(0)
+        )
+        if out_sample_path_match is not None and out_pairs_path_match is not None:
+            matched_sample = out_sample_path_match.group(0)
+            matched_pairs = out_pairs_path_match.group(0)
 
         # ---- Assertions
-        assert f'--somalier-samples {out_sample_path}' in check_pedigree_j_cmd
-        assert f'--somalier-pairs {out_pairs_path}' in check_pedigree_j_cmd
+        assert f'--somalier-samples {matched_sample}' in check_pedigree_j_cmd
+        assert f'--somalier-pairs {matched_pairs}' in check_pedigree_j_cmd
 
     def test_flags_called_correctly(self, tmp_path: Path):
         # ---- Test setup
@@ -281,7 +283,6 @@ class TestSomalierCheckPedigree:
             out_pairs_path=(tmp_path / 'out_pairs'),
             out_html_path=(tmp_path / 'out_html'),
         )
-        relate_j = pedigree_jobs[0]
         check_pedigree_j = pedigree_jobs[1]
 
         # ---- Assertions
