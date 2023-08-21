@@ -148,7 +148,6 @@ class TrimAlignRNA(SequencingGroupStage):
                     r2=ex_fq['r2'],
                 ))
 
-
         # Run alignment
         trimmed_fastq_pairs = FastqPairs(trimmed_fastq_pairs)
         aligned_bam = None

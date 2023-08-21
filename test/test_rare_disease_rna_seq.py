@@ -130,10 +130,12 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     """
     Test the trim stage in a dry run mode.
     """
+    from hailtop.batch import ResourceGroup
     from hailtop.batch.job import Job
     from cpg_workflows.jobs.trim import trim
     from cpg_workflows.jobs.align_rna import align
     from cpg_workflows.jobs.picard import markdup
+    from cpg_workflows.filetypes import FastqPairs, FastqPair, BamPath
 
     conf = get_toml(tmp_path)
     set_config(
@@ -153,7 +155,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     # Capture the trim command
     cmd_str_list = []
 
-    def capture_trim_cmd(*args, **kwargs) -> Job:
+    def capture_trim_cmd(*args, **kwargs) -> tuple[Job | None, FastqPair]:
         trim_job_output = trim(*args, **kwargs)
         j = trim_job_output[0]
         if j and isinstance(j, Job):
@@ -164,7 +166,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
             )
         return trim_job_output
     
-    def capture_align_cmd(*args, **kwargs) -> list[Job]:
+    def capture_align_cmd(*args, **kwargs) -> tuple[list[Job], ResourceGroup] | tuple[None, BamPath]:
         align_job_output = align(*args, **kwargs)
         align_jobs = align_job_output[0]
         if align_jobs and isinstance(align_jobs, list) and all([isinstance(j, Job) for j in align_jobs]):
@@ -179,11 +181,12 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     
     def capture_markdup_cmd(*args, **kwargs) -> Job:
         markdup_job = markdup(*args, **kwargs)
-        cmd_str_list.append(
-            '===== MARKDUP JOB START =====\n\n' +
-            '\n'.join(markdup_job._command) +
-            '\n\n===== MARKDUP JOB END =====\n\n'
-        )
+        if markdup_job:
+            cmd_str_list.append(
+                '===== MARKDUP JOB START =====\n\n' +
+                '\n'.join(markdup_job._command) +
+                '\n\n===== MARKDUP JOB END =====\n\n'
+            )
         return markdup_job
 
     mocker.patch('pathlib.Path.open', selective_mock_open)
@@ -219,7 +222,6 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     # Imports specific for testing the trim stage
     from cpg_utils.hail_batch import dataset_path
     from cpg_workflows.stages.trim_align import TrimAlignRNA
-    from cpg_workflows.filetypes import FastqPairs, FastqPair
 
     get_workflow().run(stages=[TrimAlignRNA])
 
