@@ -233,7 +233,7 @@ def align_fq_pair(
 
     j.declare_resource_group(
         output_bam={
-            'bam': "{root}.bam",
+            'bam': '{root}.bam',
         }
     )
 
@@ -282,7 +282,7 @@ def merge_bams(
 
     j.declare_resource_group(
         merged_bam={
-            'bam': "{root}.bam",
+            'bam': '{root}.bam',
         }
     )
 
@@ -320,8 +320,8 @@ def sort_index_bam(
 
     j.declare_resource_group(
         sorted_bam={
-            'bam': "{root}.bam",
-            'bam.bai': "{root}.bam.bai",
+            'bam': '{root}.bam',
+            'bam.bai': '{root}.bam.bai',
         }
     )
 
