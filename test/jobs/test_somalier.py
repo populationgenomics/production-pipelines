@@ -759,9 +759,6 @@ class TestSomalierPedigree:
             assert 'sed -iBAK' not in cmd
             assert bool(dataset.rich_id_map()) is False  # empty dictionary
 
-        # TODO: check_pedigree uses output_samples and output_pairs files from _relate job
-        # when _relate() is running create a list of output paths for the samples and pairs files
-        # then check that these output paths are input to _check_pedigree in the list. check vivian's code snippet
         def test_check_pedigree_uses_output_files_from_relate(
             self, mocker: MockFixture, tmp_path: Path
         ):
