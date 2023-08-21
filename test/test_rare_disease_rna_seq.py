@@ -27,6 +27,7 @@ def get_toml(tmp_path) -> str:
     check_expected_outputs = false
     path_scheme = "local"
     local_dir = "{tmp_path}"
+    ref_fasta = "stub"
 
     [hail]
     billing_project = "test-analysis-dataset"
@@ -38,12 +39,15 @@ def get_toml(tmp_path) -> str:
     fastp = "stub"
     star = "stub"
     samtools = "stub"
+    picard = "stub"
 
     [trim]
     adapter_type = "ILLUMINA_TRUSEQ"
 
     [references]
     star_ref_dir = "stub"
+
+    [resource_overrides]
 
     [storage.default]
     default = '{tmp_path}'
@@ -129,6 +133,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     from hailtop.batch.job import Job
     from cpg_workflows.jobs.trim import trim
     from cpg_workflows.jobs.align_rna import align
+    from cpg_workflows.jobs.picard import markdup
 
     conf = get_toml(tmp_path)
     set_config(
@@ -160,15 +165,26 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
         return trim_job_output
     
     def capture_align_cmd(*args, **kwargs) -> list[Job]:
-        align_jobs = align(*args, **kwargs)
+        align_job_output = align(*args, **kwargs)
+        align_jobs = align_job_output[0]
+        if align_jobs and isinstance(align_jobs, list) and all([isinstance(j, Job) for j in align_jobs]):
+            cmd_str_list.append(
+                '===== ALIGN STAGE START =====\n\n' +
+                '----- Align sub-job start -----\n\n' +
+                '\n\n----- Align sub-job end\n\n-----Align sub-job start -----\n\n'.join(['\n'.join(j._command) for j in align_jobs]) +
+                '\n\n----- Align sub-job end -----\n\n'
+                '\n\n===== ALIGN STAGE END =====\n\n'
+            )
+        return align_job_output
+    
+    def capture_markdup_cmd(*args, **kwargs) -> Job:
+        markdup_job = markdup(*args, **kwargs)
         cmd_str_list.append(
-            '===== ALIGN STAGE START =====\n\n' +
-            '----- Align sub-job start -----\n\n' +
-            '\n\n----- Align sub-job end\n\n-----Align sub-job start -----\n\n'.join(['\n'.join(j._command) for j in align_jobs]) +
-            '\n\n----- Align sub-job end -----\n\n'
-            '\n\n===== ALIGN STAGE END =====\n\n'
+            '===== MARKDUP JOB START =====\n\n' +
+            '\n'.join(markdup_job._command) +
+            '\n\n===== MARKDUP JOB END =====\n\n'
         )
-        return align_jobs
+        return markdup_job
 
     mocker.patch('pathlib.Path.open', selective_mock_open)
     # functions like get_intervals checks file existence
@@ -193,6 +209,8 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     mocker.patch('cpg_workflows.jobs.trim.trim', capture_trim_cmd)
     # Patch the align function to capture the job command
     mocker.patch('cpg_workflows.jobs.align_rna.align', capture_align_cmd)
+    # Patch the markdup function to capture the job command
+    mocker.patch('cpg_workflows.jobs.picard.markdup', capture_markdup_cmd)
 
     from cpg_workflows.batch import get_batch
     from cpg_workflows.inputs import get_cohort
@@ -209,6 +227,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     trim_job = b.job_by_tool['fastp']
     align_job = b.job_by_tool['STAR']
     samtools_job = b.job_by_tool['samtools']
+    markdup_job = b.job_by_tool['picard_MarkDuplicates']
     sample_list = get_cohort().get_sequencing_groups()
 
     # The number of FASTQ trim jobs should equal the number of FASTQ pairs
@@ -233,6 +252,10 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     ]
     n_align_jobs = sum(n_align_jobs_list)
     assert align_job['job_n'] + samtools_job['job_n'] == n_align_jobs
+
+    # The number of markdup jobs should equal the number of samples
+    n_markdup_jobs = len(sample_list)
+    assert markdup_job['job_n'] == n_markdup_jobs
 
     output_path = dataset_path('cmd.txt')
     output_path_parent = os.path.dirname(output_path)

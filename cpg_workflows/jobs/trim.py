@@ -167,7 +167,7 @@ def trim(
     b: hb.Batch,
     sequencing_group: SequencingGroup,
     input_fq_pair: FastqPair,
-    output_fq_pair: FastqPair,
+    output_fq_pair: FastqPair | None = None,
     job_attrs: dict | None = None,
     extra_label: str | None = None,
     overwrite: bool = False,

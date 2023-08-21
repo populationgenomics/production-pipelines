@@ -129,14 +129,14 @@ class GCPStarReference:
 def align(
     b: hb.Batch,
     fastq_pairs: FastqPairs,
-    output_bam: BamPath,
     sample_name: str,
     genome_prefix: str | Path,
+    output_bam: BamPath | None = None,
     extra_label: str | None = None,
     job_attrs: dict | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
-):
+) -> tuple[list[Job], hb.ResourceGroup] | tuple[None, BamPath]:
     """
     Align (potentially multiple) FASTQ pairs using STAR,
     merge the resulting BAMs (if necessary),
@@ -144,7 +144,7 @@ def align(
     """
     # Don't run if the output exists and can be reused
     if output_bam and can_reuse(output_bam, overwrite):
-        return None
+        return None, output_bam
     
     if not isinstance(fastq_pairs, FastqPairs):
         raise TypeError(f'fastq_pairs must be a FastqPairs object, not {type(fastq_pairs)}')
@@ -160,7 +160,7 @@ def align(
         if not isinstance(fq_pair, FastqPair):
             raise TypeError(f'fastq_pairs must contain FastqPair objects, not {type(fq_pair)}')
         label = f'{extra_label} {job_idx}' if extra_label else f'{job_idx}'
-        j = align_fq_pair(
+        j, bam = align_fq_pair(
             b=b,
             fastq_pair=fq_pair,
             sample_name=sample_name,
@@ -170,11 +170,11 @@ def align(
             requested_nthreads=requested_nthreads,
         )
         jobs.append(j)
-        aligned_bams.append(j.output_bam)
+        aligned_bams.append(bam.bam)
         job_idx += 1
     
     if merge:
-        j = merge_bams(
+        j, merged_bam = merge_bams(
             b=b,
             input_bams=aligned_bams,
             extra_label=extra_label,
@@ -182,11 +182,11 @@ def align(
             requested_nthreads=requested_nthreads,
         )
         jobs.append(j)
-        aligned_bam = j.merged_bam
+        aligned_bam = merged_bam.bam
     else:
         aligned_bam = aligned_bams[0]
 
-    j = sort_index_bam(
+    j, sorted_bam = sort_index_bam(
         b=b,
         input_bam=aligned_bam,
         extra_label=extra_label,
@@ -196,9 +196,10 @@ def align(
     jobs.append(j)
 
     if output_bam:
-        b.write_output(j.sorted_bam, str(output_bam.path))
+        sorted_bam_path = to_path(sorted_bam.bam)
+        b.write_output(sorted_bam, str(sorted_bam_path.with_suffix('')))
 
-    return jobs
+    return jobs, sorted_bam
 
 
 def align_fq_pair(
@@ -209,7 +210,7 @@ def align_fq_pair(
     extra_label: str | None = None,
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
-) -> Job:
+) -> tuple[Job, hb.ResourceGroup]:
     """
     Takes an input FastqPair object, and creates a job to align it using STAR.
     """
@@ -230,20 +231,26 @@ def align_fq_pair(
         storage_gb=200,  # TODO: make configurable
     )
 
+    j.declare_resource_group(
+        output_bam={
+            'bam': "{root}.bam",
+        }
+    )
+
     star_ref = GCPStarReference(b=b, genome_prefix=genome_prefix)
     star = STAR(
         input_fastq_pair=fastq_pair,
         sample_name=sample_name,
         genome=star_ref.genome_res_group,
         nthreads=(res.get_nthreads() - 1),
-        output_path=j.output_bam,
+        output_path=j.output_bam.bam,
         bamout=True,
         sort=True,
         stdout=False,
     )
     cmd = str(star)
     j.command(command(cmd, monitor_space=True))
-    return j
+    return j, j.output_bam
     
 
 def merge_bams(
@@ -252,7 +259,7 @@ def merge_bams(
     extra_label: str | None = None,
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
-) -> Job:
+) -> tuple[Job, hb.ResourceGroup]:
     """
     Merge a list of BAM files into a single BAM file.
     """
@@ -273,9 +280,15 @@ def merge_bams(
         storage_gb=50,  # TODO: make configurable
     )
 
-    cmd = f'samtools merge -@ {res.get_nthreads() - 1} -o {j.merged_bam} {" ".join([str(b) for b in input_bams])}'
+    j.declare_resource_group(
+        merged_bam={
+            'bam': "{root}.bam",
+        }
+    )
+
+    cmd = f'samtools merge -@ {res.get_nthreads() - 1} -o {j.merged_bam.bam} {" ".join([str(b) for b in input_bams])}'
     j.command(command(cmd, monitor_space=True))
-    return j
+    return j, j.merged_bam
 
 
 def sort_index_bam(
@@ -284,7 +297,7 @@ def sort_index_bam(
     extra_label: str | None = None,
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
-):
+) -> tuple[Job, hb.ResourceGroup]:
     """
     Sort and index a BAM file.
     """
@@ -305,6 +318,13 @@ def sort_index_bam(
         storage_gb=50,  # TODO: make configurable
     )
 
-    cmd = f'samtools sort -@ {res.get_nthreads() - 1} {input_bam} | tee {j.sorted_bam} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_bam_idx}'
+    j.declare_resource_group(
+        sorted_bam={
+            'bam': "{root}.bam",
+            'bam.bai': "{root}.bam.bai",
+        }
+    )
+
+    cmd = f'samtools sort -@ {res.get_nthreads() - 1} {input_bam} | tee {j.sorted_bam["bam"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_bam["bam.bai"]}'
     j.command(command(cmd, monitor_space=True))
-    return j
+    return j, j.sorted_bam

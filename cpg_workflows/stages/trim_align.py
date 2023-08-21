@@ -3,8 +3,9 @@ Align RNA-seq reads to the genome using STAR.
 """
 
 import logging
+from hailtop.batch import ResourceGroup
 from hailtop.batch.job import Job
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_workflows import get_batch
 from cpg_workflows.targets import SequencingGroup
@@ -19,9 +20,11 @@ from cpg_workflows.filetypes import (
     FastqPair,
     FastqPairs,
     BamPath,
+    CramPath
 )
 from cpg_workflows.jobs import trim
 from cpg_workflows.jobs import align_rna
+from cpg_workflows.jobs import picard
 import re
 from os.path import basename
 from dataclasses import dataclass
@@ -89,13 +92,13 @@ class TrimAlignRNA(SequencingGroupStage):
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         """
-        Expect a pair of BAM and BAI files, one per set of input FASTQ files
+        Expect a pair of CRAM and CRAI files, one per set of input FASTQ files
         """
         return {
-            suffix: sequencing_group.dataset.prefix() / 'bam' / f'{sequencing_group.id}.{extension}'
+            suffix: sequencing_group.dataset.prefix() / 'cram' / f'{sequencing_group.id}.{extension}'
             for suffix, extension in [
-                ('bam', 'bam'),
-                ('bai', 'bam.bai'),
+                ('cram', 'cram'),
+                ('crai', 'cram.crai'),
             ]
         }
     
@@ -106,18 +109,16 @@ class TrimAlignRNA(SequencingGroupStage):
         jobs = []
 
         # Run trim
-        input_output_pairs = get_input_output_pairs(sequencing_group)
+        input_fq_pairs = get_trim_inputs(sequencing_group)
         trimmed_fastq_pairs = []
-        for io_pair in input_output_pairs:
+        for fq_pair in input_fq_pairs:
             try:
                 j, out_fqs = trim.trim(
                     b=get_batch(),
                     sequencing_group=sequencing_group,
-                    input_fq_pair=io_pair.input_pair,
-                    output_fq_pair=io_pair.output_pair,
+                    input_fq_pair=fq_pair,
                     job_attrs=self.get_job_attrs(sequencing_group),
                     overwrite=sequencing_group.forced,
-                    extra_label=f'fastq_pair_{io_pair.id}',
                 )
                 if j:
                     assert isinstance(j, Job)
@@ -149,23 +150,53 @@ class TrimAlignRNA(SequencingGroupStage):
 
         # Run alignment
         trimmed_fastq_pairs = FastqPairs(trimmed_fastq_pairs)
-        _exp_out = self.expected_outputs(sequencing_group)
-        output_bam = BamPath(
-            path=_exp_out['bam'],
-            index_path=_exp_out['bai'],
-        )
+        aligned_bam = None
         try:
-            jobs = align_rna.align(
+            align_jobs, bam_out = align_rna.align(
                 b=get_batch(),
                 fastq_pairs=trimmed_fastq_pairs,
-                output_bam=output_bam,
                 sample_name=sequencing_group.id,
                 genome_prefix=get_config()['references'].get('star_ref_dir'),
                 job_attrs=self.get_job_attrs(sequencing_group),
                 overwrite=sequencing_group.forced,
             )
+            if align_jobs:
+                assert isinstance(align_jobs, list)
+                assert all([isinstance(j, Job) for j in align_jobs])
+                assert isinstance(bam_out, ResourceGroup)
+                jobs.extend(align_jobs)
+                aligned_bam = bam_out
+            else:
+                # If the job was skipped due to existing BAMs,
+                # we need to localise them
+                assert isinstance(bam_out, BamPath)
+                aligned_bam = get_batch().read_input_group(
+                    bam=str(bam_out.path),
+                    bai=str(bam_out.index_path),
+                )
         except Exception as e:
             logging.error(f'Error aligning RNA-seq reads for {sequencing_group}: {e}')
+            raise Exception(f'Error aligning RNA-seq reads for {sequencing_group}: {e}')
+
+        # Run mark duplicates
+        _exp_out = self.expected_outputs(sequencing_group)
+        output_cram = CramPath(
+            path=_exp_out['cram'],
+            index_path=_exp_out['crai'],
+        )
+        output_cram_path = to_path(output_cram.path)
+        j = picard.markdup(
+            b=get_batch(),
+            sorted_bam=aligned_bam.bam,
+            output_path=output_cram_path,
+            job_attrs=self.get_job_attrs(sequencing_group),
+            overwrite=sequencing_group.forced,
+        )
+        if j:
+            assert isinstance(j, Job)
+            jobs.append(j)
+
+        # Create outputs and return jobs
         return self.make_outputs(
             sequencing_group,
             data=_exp_out,
