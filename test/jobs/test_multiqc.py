@@ -38,8 +38,11 @@ def default_config() -> PipelineConfig:
                     'dragmap_prefix': 'gs://a-cpg-bucket/dragen_reference/',
                 },
             },
+            'qc_thresholds': {
+                'genome': {'min': {'genome_metric1': 20, 'genome_metric2': 20}},
+                'exome': {'max': {'exome_metric1': 20, 'exome_metric2': 20}},
+            },
         },
-        'qc_thresholds': 
     )
 
 
