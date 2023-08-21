@@ -39,6 +39,7 @@ def default_config() -> PipelineConfig:
                 },
             },
         },
+        'qc_thresholds': 
     )
 
 
@@ -72,5 +73,26 @@ class TestMultiQC:
         )
 
         # ---- Assertions
-        multiqc_job = batch.select_jobs('MultiQC')
-        assert len(multiqc_job) == 1
+        mqc_j = batch.select_jobs('MultiQC')
+        assert len(mqc_j) == 1
+
+    def test_if_label_provided_name_of_job_changes(self, tmp_path: Path):
+        # ---- Test setup
+        config, batch, dataset, paths = setup_multiqc_test(tmp_path)
+
+        # ---- The job that we want to test
+        label = 'test-label'
+        jobs = multiqc(
+            b=batch,
+            dataset=dataset,
+            tmp_prefix=tmp_path,
+            paths=paths,
+            out_json_path=(tmp_path / 'out_json_path'),
+            out_html_path=(tmp_path / 'out_html_path'),
+            label=label,
+        )
+
+        # ---- Assertions
+        job_name = f'MultiQC [{label}]'
+        mqc_j = batch.select_jobs(re.escape(job_name))
+        assert len(mqc_j) == 1
