@@ -140,6 +140,14 @@ def count(
     j = b.new_job(job_name, _job_attrs)
     # j.image(image_path('subread'))
     j.image('australia-southeast1-docker.pkg.dev/cpg-common/images/subread:2.0.6')
+    
+    # Set resource requirements
+    nthreads = requested_nthreads or 8
+    res = STANDARD.set_resources(
+        j,
+        ncpu=nthreads,
+        storage_gb=50,  # TODO: make configurable
+    )
 
     # Declare output resource group
     j.declare_resource_group(
@@ -166,7 +174,7 @@ def count(
         count_pairs=True,  # TODO: determine default value
         both_ends_mapped=True,  # TODO: determine default value
         both_ends_same_chr=True,  # TODO: determine default value
-        threads=requested_nthreads or STANDARD.max_threads(),
+        threads=res.get_nthreads(),
     )
     cmd = str(fc)
 
