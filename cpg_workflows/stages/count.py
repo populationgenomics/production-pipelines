@@ -14,7 +14,7 @@ from cpg_workflows.workflow import (
     SequencingGroupStage,
 )
 from cpg_workflows.filetypes import (
-    BamPath,
+    CramPath,
 )
 from cpg_workflows.stages.trim_align import TrimAlignRNA
 from cpg_workflows.jobs import count
@@ -41,11 +41,11 @@ class Count(SequencingGroupStage):
         """
         Queue a job to count the reads with featureCounts.
         """
-        bam_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'bam')
-        bai_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'bai')
+        cram_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'cram')
+        crai_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'crai')
         j = count.count(
             b=get_batch(),
-            input_bam=BamPath(bam_path, bai_path),
+            input_bam_or_cram=CramPath(cram_path, crai_path),
             output_path=self.expected_outputs(sequencing_group)['count'],
             summary_path=self.expected_outputs(sequencing_group)['summary'],
             sample_name=sequencing_group.id,

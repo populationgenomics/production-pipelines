@@ -11,6 +11,7 @@ from cpg_workflows.utils import can_reuse
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.filetypes import (
     BamPath,
+    CramPath,
 )
 from cpg_workflows.workflow import (
     SequencingGroup,
@@ -36,7 +37,7 @@ class FeatureCounts:
 
     def __init__(
             self,
-            input_bam: BamPath,
+            input_bam_or_cram: BamPath | CramPath,
             gtf_file: str | Path,
             output_path: str | Path,
             summary_path: str | Path,
@@ -89,7 +90,7 @@ class FeatureCounts:
         self.tmp_output = f'$BATCH_TMPDIR/count_out/count'
         self.tmp_output_summary = f'{self.tmp_output}.summary'
         
-        self.command.extend(['-o', self.tmp_output, str(input_bam)])
+        self.command.extend(['-o', self.tmp_output, str(input_bam_or_cram)])
 
         self.make_tmpdir_command = f'mkdir -p $BATCH_TMPDIR/count_out'
 
@@ -108,7 +109,7 @@ class FeatureCounts:
 
 def count(
     b: hb.Batch,
-    input_bam: BamPath,
+    input_bam_or_cram: BamPath | CramPath,
     output_path: str | Path,
     summary_path: str | Path,
     sample_name: str | None = None,
@@ -119,10 +120,10 @@ def count(
     Count RNA seq reads mapping to genes and/or transcripts using featureCounts.
     """
     # Determine whether input is a CRAM or BAM file
-    is_bam = isinstance(input_bam, BamPath)
-    if not is_bam:
+    is_bam_or_cram = isinstance(input_bam_or_cram, (BamPath, CramPath))
+    if not is_bam_or_cram:
         raise ValueError(
-            f'Invalid alignment input: "{str(input_bam)}", expected BAM file.'
+            f'Invalid alignment input: "{str(input_bam_or_cram)}", expected BAM or CRAM file.'
         )
 
     counting_reference = count_res_group(b)
@@ -132,13 +133,21 @@ def count(
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='featureCounts')
     j = b.new_job(job_name, _job_attrs)
     j.image(image_path('subread'))
+
+    # Declare output resource group
+    j.declare_resource_group(
+        count_output={
+            'count': '{root}.count',
+            'count.summary': '{root}.count.summary',
+        }
+    )
     
     # Create counting command
     fc = FeatureCounts(
-        input_bam=input_bam,
+        input_bam_or_cram=input_bam_or_cram,
         gtf_file=counting_reference.gtf,
-        output_path=j.output_txt,
-        summary_path=j.output_summary,
+        output_path=j.count_output['count'],
+        summary_path=j.count_output['count.summary'],
         paired_end=True,
         feature_type='exon',
         attribute='gene_id',
@@ -157,18 +166,9 @@ def count(
     # Add command to job
     j.command(command(cmd, monitor_space=True))
 
-    # # Declare output resource group
-    # j.declare_resource_group(
-    #     count_output={
-    #         'txt': j.output_txt,
-    #         'summary': j.output_summary,
-    #     }
-    # )
-
     # Write output to file
     if output_path:
-        # NOTE: j.output is just a placeholder
-        b.write_output(j.output_txt, str(output_path))
-        b.write_output(j.output_summary, str(summary_path))
+        b.write_output(j.count_output['count'], str(output_path))
+        b.write_output(j.count_output['count.summary'], str(summary_path))
     
     return j
