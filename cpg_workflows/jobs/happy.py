@@ -70,9 +70,11 @@ def happy(
     if seq_type == 'genome':
         # sparse regions, bcftools would loop through them
         regions_opt = '--restrict-regions'
-    else:
+    elif seq_type == 'exome':
         # dense regions, bcftools would use tabix to access each region in vcf
         regions_opt = '--target-regions'
+    else:
+        raise ValueError(f'Unsupported sequencing type: {seq_type}')
 
     job_name = f'hap.py ({"GVCF" if is_gvcf else "VCF"})'
     job_attrs = (job_attrs or {}) | dict(tool='hap.py')
