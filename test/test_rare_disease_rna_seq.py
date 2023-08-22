@@ -39,7 +39,7 @@ def get_toml(tmp_path) -> str:
     fastp = "stub"
     star = "stub"
     samtools = "stub"
-    picard = "stub"
+    sambamba = "stub"
 
     [trim]
     adapter_type = "ILLUMINA_TRUSEQ"
@@ -134,7 +134,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     from hailtop.batch.job import Job
     from cpg_workflows.jobs.trim import trim
     from cpg_workflows.jobs.align_rna import align
-    from cpg_workflows.jobs.picard import markdup
+    from cpg_workflows.jobs.markdups import markdup
     from cpg_workflows.filetypes import FastqPairs, FastqPair, BamPath
 
     conf = get_toml(tmp_path)
@@ -213,7 +213,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     # Patch the align function to capture the job command
     mocker.patch('cpg_workflows.jobs.align_rna.align', capture_align_cmd)
     # Patch the markdup function to capture the job command
-    mocker.patch('cpg_workflows.jobs.picard.markdup', capture_markdup_cmd)
+    mocker.patch('cpg_workflows.jobs.markdups.markdup', capture_markdup_cmd)
 
     from cpg_workflows.batch import get_batch
     from cpg_workflows.inputs import get_cohort
@@ -229,7 +229,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     trim_job = b.job_by_tool['fastp']
     align_job = b.job_by_tool['STAR']
     samtools_job = b.job_by_tool['samtools']
-    markdup_job = b.job_by_tool['picard_MarkDuplicates']
+    markdup_job = b.job_by_tool['sambamba']
     sample_list = get_cohort().get_sequencing_groups()
 
     # The number of FASTQ trim jobs should equal the number of FASTQ pairs

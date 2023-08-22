@@ -24,7 +24,7 @@ from cpg_workflows.filetypes import (
 )
 from cpg_workflows.jobs import trim
 from cpg_workflows.jobs import align_rna
-from cpg_workflows.jobs import picard
+from cpg_workflows.jobs import markdups
 import re
 from os.path import basename
 from dataclasses import dataclass
@@ -92,13 +92,13 @@ class TrimAlignRNA(SequencingGroupStage):
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         """
-        Expect a pair of CRAM and CRAI files, one per set of input FASTQ files
+        Expect a pair of BAM and BAI files, one per set of input FASTQ files
         """
         return {
-            suffix: sequencing_group.dataset.prefix() / 'cram' / f'{sequencing_group.id}.{extension}'
+            suffix: sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.{extension}'
             for suffix, extension in [
-                ('cram', 'cram'),
-                ('crai', 'cram.crai'),
+                ('bam', 'bam'),
+                ('bai', 'bam.bai'),
             ]
         }
     
@@ -180,15 +180,15 @@ class TrimAlignRNA(SequencingGroupStage):
 
         # Run mark duplicates
         _exp_out = self.expected_outputs(sequencing_group)
-        output_cram = CramPath(
-            path=_exp_out['cram'],
-            index_path=_exp_out['crai'],
+        output_bam = BamPath(
+            path=_exp_out['bam'],
+            index_path=_exp_out['bai'],
         )
-        output_cram_path = to_path(output_cram.path)
-        j = picard.markdup(
+        output_bam_path = to_path(output_bam.path)
+        j = markdups.markdup(
             b=get_batch(),
-            sorted_bam=aligned_bam.bam,
-            output_path=output_cram_path,
+            input_bam=aligned_bam,
+            output_bam=output_bam_path,
             job_attrs=self.get_job_attrs(sequencing_group),
             overwrite=sequencing_group.forced,
         )
