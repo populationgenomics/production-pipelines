@@ -27,7 +27,6 @@ def get_toml(tmp_path) -> str:
     check_expected_outputs = false
     path_scheme = "local"
     local_dir = "{tmp_path}"
-    ref_fasta = "stub"
 
     [hail]
     billing_project = "test-analysis-dataset"
@@ -46,8 +45,6 @@ def get_toml(tmp_path) -> str:
 
     [references]
     star_ref_dir = "stub"
-
-    [resource_overrides]
 
     [storage.default]
     default = '{tmp_path}'
