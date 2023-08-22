@@ -37,7 +37,7 @@ class FeatureCounts:
 
     def __init__(
             self,
-            input_bam_or_cram: BamPath | CramPath,
+            input_bam_or_cram: BamPath | CramPath | str | Path,
             gtf_file: str | Path,
             output_path: str | Path,
             summary_path: str | Path,
@@ -126,6 +126,12 @@ def count(
             f'Invalid alignment input: "{str(input_bam_or_cram)}", expected BAM or CRAM file.'
         )
 
+    # Localise input
+    input_reads = b.read_input_group(
+        reads=str(input_bam_or_cram.path),
+        index=str(input_bam_or_cram.index_path),
+    )
+
     counting_reference = count_res_group(b)
 
     # Create job
@@ -145,7 +151,7 @@ def count(
     
     # Create counting command
     fc = FeatureCounts(
-        input_bam_or_cram=input_bam_or_cram,
+        input_bam_or_cram=input_reads.reads,
         gtf_file=counting_reference.gtf,
         output_path=j.count_output['count'],
         summary_path=j.count_output['count.summary'],
