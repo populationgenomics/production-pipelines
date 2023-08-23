@@ -104,7 +104,7 @@ class TestMultiQC:
         )
 
         # ---- Assertions
-        mqc_j = batch.select_jobs('MultiQC')
+        mqc_j = batch.select_jobs('MultiQC$')
         assert len(mqc_j) == 1
 
     def test_if_qc_thresholds_provided_check_report_job_created(self, tmp_path: Path):
@@ -207,14 +207,18 @@ class TestMultiQC:
             paths=paths,
             out_json_path=(tmp_path / 'out_json_path'),
             out_html_path=(tmp_path / 'out_html_path'),
-            ending_to_trim=['CPG000000', 'CPG000001', 'CPG000002', 'CPG000003'],
+            ending_to_trim={'CPG000000', 'CPG000001', 'CPG000002', 'CPG000003'},
         )
         mqc_j = jobs[0]
+
         # ---- Assertions
         cmd = get_command_str(mqc_j)
-        string_endings_cut = '[CPG000000, CPG000001, CPG000002, CPG000003]'
+        pattern = r'--cl-config "extra_fn_clean_exts: \[(.*?)\]"'
+        match = re.search(pattern, cmd)
+        string_endings_cut = match.group(1)
         assert re.search(
-            re.escape(fr'--cl-config "extra_fn_clean_exts: {string_endings_cut}"'), cmd
+            re.escape(fr'--cl-config "extra_fn_clean_exts: [{string_endings_cut}]"'),
+            cmd,
         )
 
     def test_if_modules_to_trim_endings_provided_modules_from_string_removed(
@@ -231,15 +235,19 @@ class TestMultiQC:
             paths=paths,
             out_json_path=(tmp_path / 'out_json_path'),
             out_html_path=(tmp_path / 'out_html_path'),
-            modules_to_trim_endings=['module_0', 'module_1', 'module_2', 'module_3'],
+            modules_to_trim_endings={'module_0', 'module_1', 'module_2', 'module_3'},
         )
         mqc_j = jobs[0]
 
         # ---- Assertions
         cmd = get_command_str(mqc_j)
-        modules_to_trim = '[module_0, module_1, module_2, module_3]'
+        pattern = r'--cl-config "use_filename_as_sample_name: \[(.*?)\]"'
+        match = re.search(pattern, cmd)
+        modules_to_trim = match.group(1)
         assert re.search(
-            re.escape(fr'--cl-config "use_filename_as_sample_name: {modules_to_trim}"'),
+            re.escape(
+                fr'--cl-config "use_filename_as_sample_name: [{modules_to_trim}]"'
+            ),
             cmd,
         )
 
@@ -274,10 +282,10 @@ class TestMultiQC:
         assert sample_map_path.exists()
         spy.assert_called_once_with(sequencing_group_id_map, sample_map_path)
         expected_content = (
-            "CPG000000\tSAMPLE0\n"
-            "CPG000001\tSAMPLE1\n"
-            "CPG000002\tSAMPLE2\n"
-            "CPG000003\tSAMPLE3\n"
+            'CPG000000\tSAMPLE0\n'
+            'CPG000001\tSAMPLE1\n'
+            'CPG000002\tSAMPLE2\n'
+            'CPG000003\tSAMPLE3\n'
         )
         if sample_map_path.exists():
             with open(sample_map_path, 'r') as f:
@@ -551,6 +559,7 @@ class TestCheckReport:
     # Send_to_slack is not parametrised by multiqc() and has default value of True
     # so no point in paramertrising it?
     # @pytest.mark.parametrize('send_to_slack', [True, False])
+
     def test_flags_are_set_properly_when_calling_script(self, tmp_path: Path):
         # ---- Test setup
         _, batch, dataset, paths = setup_multiqc_test(tmp_path)
