@@ -273,6 +273,16 @@ class TestMultiQC:
         # ---- Assertions
         assert sample_map_path.exists()
         spy.assert_called_once_with(sequencing_group_id_map, sample_map_path)
+        expected_content = (
+            "CPG000000\tSAMPLE0\n"
+            "CPG000001\tSAMPLE1\n"
+            "CPG000002\tSAMPLE2\n"
+            "CPG000003\tSAMPLE3\n"
+        )
+        if sample_map_path.exists():
+            with open(sample_map_path, 'r') as f:
+                f_content = f.read()
+                assert f_content == expected_content
 
     def test_if_no_sequencing_group_id_map_provided_sample_map_file_not_created(
         self, tmp_path: Path
@@ -516,7 +526,7 @@ class TestCheckReport:
 
     def test_sed_commands_in_cmd(self, tmp_path: Path):
         # ---- Test setup
-        config, batch, dataset, paths = setup_multiqc_test(tmp_path)
+        _, batch, dataset, paths = setup_multiqc_test(tmp_path)
 
         # ---- The job that we want to test
         jobs = multiqc(
@@ -533,5 +543,62 @@ class TestCheckReport:
         cmd = get_command_str(check_j)
         rich_id_map = dataset.rich_id_map()
         for sg_id, participant_id in rich_id_map.items():
-            assert re.search(fr'sed -iBAK 's/{sg_id}/CPG000000|SAMPLE0/g')
-        print()
+            assert re.search(
+                fr"sed -iBAK 's/{sg_id}/{participant_id}/g' \${{BATCH_TMPDIR}}/\w+-\w+/json",
+                cmd,
+            )
+
+    # Send_to_slack is not parametrised by multiqc() and has default value of True
+    # so no point in paramertrising it?
+    # @pytest.mark.parametrize('send_to_slack', [True, False])
+    def test_flags_are_set_properly_when_calling_script(self, tmp_path: Path):
+        # ---- Test setup
+        _, batch, dataset, paths = setup_multiqc_test(tmp_path)
+
+        # ---- The job that we want to test
+        jobs = multiqc(
+            b=batch,
+            dataset=dataset,
+            tmp_prefix=tmp_path,
+            paths=paths,
+            out_json_path=(tmp_path / 'out_json_path'),
+            out_html_path=(tmp_path / 'out_html_path'),
+            # send_to_slack=send_to_slack,
+        )
+        _, check_j = jobs
+
+        # ---- Assertions
+        cmd = get_command_str(check_j)
+        script_name = 'check_multiqc.py'
+        title = 'MultiQC'
+        assert re.search(fr'python3 {script_name}', cmd)
+        assert re.search(fr'--multiqc-json \${{BATCH_TMPDIR}}/\w+-\w+/json', cmd)
+        assert re.search(fr'--dataset {dataset.name}', cmd)
+        assert re.search(fr'--title "{title}"', cmd)
+        # if send_to_slack is False:
+        #     assert re.search(fr'--no-send_to_slack')
+        # else:
+        #     assert re.search(fr'--send_to_slack')
+
+    def test_if_out_checks_path_provided_check_report_job_writes_output(
+        self, mocker: MockFixture, tmp_path: Path
+    ):
+        # ---- Test setup
+        _, batch, dataset, paths = setup_multiqc_test(tmp_path)
+        out_checks_path = tmp_path / 'out_checks_path'
+        spy = mocker.spy(batch, 'write_output')
+
+        # ---- The job that we want to test
+        jobs = multiqc(
+            b=batch,
+            dataset=dataset,
+            tmp_prefix=tmp_path,
+            paths=paths,
+            out_json_path=(tmp_path / 'out_json_path'),
+            out_html_path=(tmp_path / 'out_html_path'),
+            out_checks_path=out_checks_path,
+        )
+        _, check_j = jobs
+
+        # ---- Assertions
+        spy.assert_called_with(check_j.output, str(out_checks_path))
