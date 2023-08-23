@@ -24,6 +24,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_1 import (
 )
 from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_2 import AnnotateVcf
 from cpg_workflows.stages.gatk_sv.gatk_sv_single_sample import CreateSampleBatches
+from cpg_workflows.stages.gcnv import GermlineCNVCalls
 from cpg_workflows.stages.stripy import Stripy
 from cpg_workflows.stages.happy_validation import (
     ValidationMtToVcf,
@@ -52,6 +53,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         MergeBatchSites
     ],  # stage to run between FilterBatch & GenotypeBatch
     'gatk_sv_multisample_2': [AnnotateVcf],
+    'gcnv': [GermlineCNVCalls],
 }
 
 
