@@ -531,4 +531,7 @@ class TestCheckReport:
 
         # ---- Assertions
         cmd = get_command_str(check_j)
+        rich_id_map = dataset.rich_id_map()
+        for sg_id, participant_id in rich_id_map.items():
+            assert re.search(fr'sed -iBAK 's/{sg_id}/CPG000000|SAMPLE0/g')
         print()
