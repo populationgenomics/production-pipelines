@@ -175,7 +175,6 @@ class RealignMito(SequencingGroupStage):
             overwrite=True,
         )
         jobs.append(realign_mkdup_j)
-        assert isinstance(realign_mkdup_j, Job)
         assert isinstance(realign_mkdup_j.output_cram, hb.ResourceGroup)
 
         # Align extracted reads to "shifted" chrM using bwa
@@ -199,7 +198,6 @@ class RealignMito(SequencingGroupStage):
             overwrite=True,
         )
         jobs.append(shifted_mkdup_j)
-        assert isinstance(shifted_mkdup_j, Job)
         assert isinstance(shifted_mkdup_j.output_cram, hb.ResourceGroup)
 
         # Collect coverage metrics (only on non-shifted)
