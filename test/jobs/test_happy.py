@@ -19,16 +19,12 @@ from pytest_mock import MockFixture
 def default_config() -> PipelineConfig:
     return PipelineConfig(
         workflow=WorkflowConfig(
-            dataset='genotype-test',
+            dataset='happy-test',
             access_level='test',
             sequencing_type='genome',
             check_inputs=False,
-            reblock_gq_bands=[20, 30, 40],
-            driver_image='australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:latest',
         ),
         images={
-            'picard': 'picard:2.27.4',
-            'gatk': 'gatk:4.2.6.1',
             'hap-py': 'hap-py:0.3.15',
         },
         references={
@@ -73,10 +69,9 @@ class TestHappy:
             sequencing_type=config.workflow.sequencing_type,
             alignment_input=create_fastq_pairs_input(location=tmp_path, n=1),
             cram=CramPath(tmp_path / 'sample_one.cram'),
+            # Can't use tmp_path for gvcf, because it expects a gs:// path
             gvcf=GvcfPath('gs://test-project/gvcf/sample_one_genotype.g.vcf.gz'),
         )
-
-        vcf_path = tmp_path / 'test_vcf.vcf.gz'
 
         assert sg.gvcf
 
@@ -89,6 +84,7 @@ class TestHappy:
                 job_attrs={},
             )
         else:
+            vcf_path = tmp_path / 'test_vcf.vcf.gz'
             happy_job = happy(
                 sequencing_group=sg,
                 b=batch,
