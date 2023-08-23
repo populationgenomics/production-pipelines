@@ -6,15 +6,9 @@ from cpg_utils.config import ConfigError
 from pytest_mock import MockFixture
 
 from cpg_workflows.jobs import multiqc as mqc_module
-from cpg_workflows.jobs.multiqc import (
-    _write_sg_id_map,
-    check_multiqc,
-    check_report_job,
-    multiqc,
-)
+from cpg_workflows.jobs.multiqc import multiqc
 
 from .. import set_config
-from ..factories.alignment_input import create_cram_input
 from ..factories.batch import create_local_batch
 from ..factories.config import PipelineConfig, WorkflowConfig
 from ..factories.dataset import create_dataset
@@ -65,27 +59,6 @@ def setup_multiqc_test(tmp_path: Path, config: PipelineConfig | None = None):
     # Don't think I actually need the following, the endings aren't getting cut as the script isn't running
     paths = [(tmp_path / f'mqc_input_file_CPG00000{i}') for i in range(4)]
     return config, batch, dataset, paths
-
-
-# def setup_check_report_job_test(tmp_path: Path, config: PipelineConfig | None = None):
-#     config = config or default_config()
-
-#     # TODO: put qc_thresholds and cpg_workflows inside default config.
-#     if config.images['cpg_workflows'] is not None:
-#         config.images['cpg_workflows'] = 'test_check_report_job_image'
-#     set_config(config, tmp_path / 'config.toml')
-
-#     dataset_id = config.workflow.dataset
-#     dataset = create_dataset(name=dataset_id)
-#     dataset.add_sequencing_group(id='CPG000000', external_id='SAMPLE0')
-#     dataset.add_sequencing_group(id='CPG000001', external_id='SAMPLE1')
-#     dataset.add_sequencing_group(id='CPG000002', external_id='SAMPLE2')
-#     dataset.add_sequencing_group(id='CPG000003', external_id='SAMPLE3')
-
-#     batch = create_local_batch(tmp_path)
-#     # Don't think I actually need the following, the endings aren't getting cut as the script isn't running
-#     paths = [(tmp_path / f'mqc_input_file_CPG00000{i}') for i in range(4)]
-#     return config, batch, dataset, paths
 
 
 class TestMultiQC:
@@ -215,6 +188,7 @@ class TestMultiQC:
         cmd = get_command_str(mqc_j)
         pattern = r'--cl-config "extra_fn_clean_exts: \[(.*?)\]"'
         match = re.search(pattern, cmd)
+        assert match is not None
         string_endings_cut = match.group(1)
         assert re.search(
             re.escape(fr'--cl-config "extra_fn_clean_exts: [{string_endings_cut}]"'),
@@ -243,6 +217,7 @@ class TestMultiQC:
         cmd = get_command_str(mqc_j)
         pattern = r'--cl-config "use_filename_as_sample_name: \[(.*?)\]"'
         match = re.search(pattern, cmd)
+        assert match is not None
         modules_to_trim = match.group(1)
         assert re.search(
             re.escape(
@@ -550,16 +525,15 @@ class TestCheckReport:
         # ---- Assertions
         cmd = get_command_str(check_j)
         rich_id_map = dataset.rich_id_map()
-        for sg_id, participant_id in rich_id_map.items():
+        for sg_id, external_id in rich_id_map.items():
             assert re.search(
-                fr"sed -iBAK 's/{sg_id}/{participant_id}/g' \${{BATCH_TMPDIR}}/\w+-\w+/json",
+                fr"sed -iBAK 's/{sg_id}/{external_id}/g' \${{BATCH_TMPDIR}}/\w+-\w+/json",
                 cmd,
             )
 
     # Send_to_slack is not parametrised by multiqc() and has default value of True
     # so no point in paramertrising it?
     # @pytest.mark.parametrize('send_to_slack', [True, False])
-
     def test_flags_are_set_properly_when_calling_script(self, tmp_path: Path):
         # ---- Test setup
         _, batch, dataset, paths = setup_multiqc_test(tmp_path)
