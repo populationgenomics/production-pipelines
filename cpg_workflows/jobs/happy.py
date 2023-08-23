@@ -66,7 +66,6 @@ def happy(
 
     # Calling regions
     seq_type = get_config()['workflow']['sequencing_type']
-    eval_intervals_path = reference_path(f'broad/{seq_type}_evaluation_interval_lists')
     if seq_type == 'genome':
         # sparse regions, bcftools would loop through them
         regions_opt = '--restrict-regions'
@@ -75,6 +74,8 @@ def happy(
         regions_opt = '--target-regions'
     else:
         raise ValueError(f'Unsupported sequencing type: {seq_type}')
+
+    eval_intervals_path = reference_path(f'broad/{seq_type}_evaluation_interval_lists')
 
     job_name = f'hap.py ({"GVCF" if is_gvcf else "VCF"})'
     job_attrs = (job_attrs or {}) | dict(tool='hap.py')
