@@ -3,3 +3,6 @@ sequencing_type = "transcriptome"
 
 [trim]
 adapter_type = "ILLUMINA_TRUSEQ"
+
+[references]
+gtf = 'gs://kccg-references/hg38.gtf'

@@ -36,7 +36,7 @@ class FeatureCounts:
 
     def __init__(
             self,
-            input_bam: BamPath,
+            input_bam: BamPath | str | Path,
             gtf_file: str | Path,
             output_path: str | Path,
             summary_path: str | Path,
@@ -118,12 +118,18 @@ def count(
     """
     Count RNA seq reads mapping to genes and/or transcripts using featureCounts.
     """
-    # Determine whether input is a CRAM or BAM file
+    # Determine whether input is a BAM file
     is_bam = isinstance(input_bam, BamPath)
     if not is_bam:
         raise ValueError(
             f'Invalid alignment input: "{str(input_bam)}", expected BAM file.'
         )
+
+    # Localise input
+    input_reads = b.read_input_group(
+        reads=str(input_bam.path),
+        index=str(input_bam.index_path),
+    )
 
     counting_reference = count_res_group(b)
 
@@ -131,14 +137,31 @@ def count(
     job_name = f'count_{sample_name}' if sample_name else 'count'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='featureCounts')
     j = b.new_job(job_name, _job_attrs)
-    j.image(image_path('subread'))
+    # j.image(image_path('subread'))
+    j.image('australia-southeast1-docker.pkg.dev/cpg-common/images/subread:2.0.6')
+    
+    # Set resource requirements
+    nthreads = requested_nthreads or 8
+    res = STANDARD.set_resources(
+        j,
+        ncpu=nthreads,
+        storage_gb=50,  # TODO: make configurable
+    )
+
+    # Declare output resource group
+    j.declare_resource_group(
+        count_output={
+            'count': '{root}.count',
+            'count.summary': '{root}.count.summary',
+        }
+    )
     
     # Create counting command
     fc = FeatureCounts(
-        input_bam=input_bam,
+        input_bam=input_reads.reads,
         gtf_file=counting_reference.gtf,
-        output_path=j.output_txt,
-        summary_path=j.output_summary,
+        output_path=j.count_output['count'],
+        summary_path=j.count_output['count.summary'],
         paired_end=True,
         feature_type='exon',
         attribute='gene_id',
@@ -150,25 +173,16 @@ def count(
         count_pairs=True,  # TODO: determine default value
         both_ends_mapped=True,  # TODO: determine default value
         both_ends_same_chr=True,  # TODO: determine default value
-        threads=requested_nthreads or STANDARD.max_threads(),
+        threads=res.get_nthreads(),
     )
     cmd = str(fc)
 
     # Add command to job
     j.command(command(cmd, monitor_space=True))
 
-    # # Declare output resource group
-    # j.declare_resource_group(
-    #     count_output={
-    #         'txt': j.output_txt,
-    #         'summary': j.output_summary,
-    #     }
-    # )
-
     # Write output to file
     if output_path:
-        # NOTE: j.output is just a placeholder
-        b.write_output(j.output_txt, str(output_path))
-        b.write_output(j.output_summary, str(summary_path))
+        b.write_output(j.count_output['count'], str(output_path))
+        b.write_output(j.count_output['count.summary'], str(summary_path))
     
     return j
