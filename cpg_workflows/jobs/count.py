@@ -11,7 +11,6 @@ from cpg_workflows.utils import can_reuse
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.filetypes import (
     BamPath,
-    CramPath,
 )
 from cpg_workflows.workflow import (
     SequencingGroup,
@@ -37,7 +36,7 @@ class FeatureCounts:
 
     def __init__(
             self,
-            input_bam_or_cram: BamPath | CramPath | str | Path,
+            input_bam: BamPath | str | Path,
             gtf_file: str | Path,
             output_path: str | Path,
             summary_path: str | Path,
@@ -90,7 +89,7 @@ class FeatureCounts:
         self.tmp_output = f'$BATCH_TMPDIR/count_out/count'
         self.tmp_output_summary = f'{self.tmp_output}.summary'
         
-        self.command.extend(['-o', self.tmp_output, str(input_bam_or_cram)])
+        self.command.extend(['-o', self.tmp_output, str(input_bam)])
 
         self.make_tmpdir_command = f'mkdir -p $BATCH_TMPDIR/count_out'
 
@@ -109,7 +108,7 @@ class FeatureCounts:
 
 def count(
     b: hb.Batch,
-    input_bam_or_cram: BamPath | CramPath,
+    input_bam: BamPath,
     output_path: str | Path,
     summary_path: str | Path,
     sample_name: str | None = None,
@@ -119,17 +118,17 @@ def count(
     """
     Count RNA seq reads mapping to genes and/or transcripts using featureCounts.
     """
-    # Determine whether input is a CRAM or BAM file
-    is_bam_or_cram = isinstance(input_bam_or_cram, (BamPath, CramPath))
-    if not is_bam_or_cram:
+    # Determine whether input is a BAM file
+    is_bam = isinstance(input_bam, BamPath)
+    if not is_bam:
         raise ValueError(
-            f'Invalid alignment input: "{str(input_bam_or_cram)}", expected BAM or CRAM file.'
+            f'Invalid alignment input: "{str(input_bam)}", expected BAM file.'
         )
 
     # Localise input
     input_reads = b.read_input_group(
-        reads=str(input_bam_or_cram.path),
-        index=str(input_bam_or_cram.index_path),
+        reads=str(input_bam.path),
+        index=str(input_bam.index_path),
     )
 
     counting_reference = count_res_group(b)
@@ -159,7 +158,7 @@ def count(
     
     # Create counting command
     fc = FeatureCounts(
-        input_bam_or_cram=input_reads.reads,
+        input_bam=input_reads.reads,
         gtf_file=counting_reference.gtf,
         output_path=j.count_output['count'],
         summary_path=j.count_output['count.summary'],
