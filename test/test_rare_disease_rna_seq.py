@@ -291,8 +291,8 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     n_count_jobs = len(sample_list)
     assert featureCounts_job['job_n'] == n_count_jobs
 
-    # The number of outrider jobs should equal the number of samples
-    n_outrider_jobs = len(sample_list)
+    # The number of outrider jobs should be 1 (for the cohort)
+    n_outrider_jobs = 1
     assert outrider_job['job_n'] == n_outrider_jobs
 
     output_path = dataset_path('cmd.txt')
