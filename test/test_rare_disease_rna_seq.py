@@ -27,7 +27,6 @@ def get_toml(tmp_path) -> str:
     check_expected_outputs = false
     path_scheme = "local"
     local_dir = "{tmp_path}"
-    ref_fasta = "stub"
 
     [hail]
     billing_project = "test-analysis-dataset"
@@ -39,7 +38,7 @@ def get_toml(tmp_path) -> str:
     fastp = "stub"
     star = "stub"
     samtools = "stub"
-    picard = "stub"
+    sambamba = "stub"
     subread = "stub"
 
     [trim]
@@ -48,8 +47,6 @@ def get_toml(tmp_path) -> str:
     [references]
     star_ref_dir = "stub"
     gtf = "stub"
-
-    [resource_overrides]
 
     [storage.default]
     default = '{tmp_path}'
@@ -136,7 +133,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     from hailtop.batch.job import Job
     from cpg_workflows.jobs.trim import trim
     from cpg_workflows.jobs.align_rna import align
-    from cpg_workflows.jobs.picard import markdup
+    from cpg_workflows.jobs.markdups import markdup
     from cpg_workflows.jobs.count import count
     from cpg_workflows.filetypes import FastqPairs, FastqPair, BamPath
 
@@ -225,7 +222,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     # Patch the align function to capture the job command
     mocker.patch('cpg_workflows.jobs.align_rna.align', capture_align_cmd)
     # Patch the markdup function to capture the job command
-    mocker.patch('cpg_workflows.jobs.picard.markdup', capture_markdup_cmd)
+    mocker.patch('cpg_workflows.jobs.markdups.markdup', capture_markdup_cmd)
     # Patch the count function to capture the job command
     mocker.patch('cpg_workflows.jobs.count.count', capture_count_cmd)
 
@@ -243,7 +240,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     trim_job = b.job_by_tool['fastp']
     align_job = b.job_by_tool['STAR']
     samtools_job = b.job_by_tool['samtools']
-    markdup_job = b.job_by_tool['picard_MarkDuplicates']
+    markdup_job = b.job_by_tool['sambamba']
     featureCounts_job = b.job_by_tool['featureCounts']
     sample_list = get_cohort().get_sequencing_groups()
 

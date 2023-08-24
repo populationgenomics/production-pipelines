@@ -196,7 +196,7 @@ def align(
     jobs.append(j)
 
     if output_bam:
-        sorted_bam_path = to_path(sorted_bam.bam)
+        sorted_bam_path = to_path(output_bam.path)
         b.write_output(sorted_bam, str(sorted_bam_path.with_suffix('')))
 
     return jobs, sorted_bam
