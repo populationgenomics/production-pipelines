@@ -4,14 +4,12 @@ import pytest
 from cpg_utils import Path
 from pytest_mock import MockFixture
 
-from cpg_workflows.jobs import somalier
-from cpg_workflows.jobs.somalier import MAX_FREEMIX, extract, pedigree
+from cpg_workflows.jobs.somalier import extract
 
 from ... import set_config
 from ...factories.alignment_input import create_cram_input
 from ...factories.batch import create_local_batch
 from ...factories.config import PipelineConfig, WorkflowConfig
-from ...factories.dataset import create_dataset
 from ..helpers import get_command_str
 
 
