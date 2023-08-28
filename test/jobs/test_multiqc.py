@@ -251,7 +251,6 @@ class TestMultiQC:
             out_html_path=(tmp_path / 'out_html_path'),
             sequencing_group_id_map=sequencing_group_id_map,
         )
-        _ = jobs[0]
 
         # ---- Assertions
         assert sample_map_path.exists()
@@ -470,7 +469,7 @@ class TestCheckReport:
             out_html_path=(tmp_path / 'out_html_path'),
             label=label,
         )
-        _, check_j = jobs
+        check_j = jobs[1]
 
         # ---- Assertions
         check_j_name = 'MultiQC [test_check_j] check'
