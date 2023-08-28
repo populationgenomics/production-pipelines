@@ -8,7 +8,8 @@ from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import gcnv
 from cpg_workflows.stages.align import Align
 from cpg_workflows.targets import SequencingGroup, Cohort
-from cpg_workflows.workflow import stage, StageInput, StageOutput, CohortStage, SequencingGroupStage
+from cpg_workflows.workflow import stage, StageInput, StageOutput
+from cpg_workflows.workflow import SequencingGroupStage, CohortStage
 from .. import get_batch
 
 
@@ -18,6 +19,7 @@ class PrepareIntervals(CohortStage):
     Interval preparation steps that don't require the sample read counts:
     PreprocessIntervals and AnnotateIntervals.
     """
+
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'preprocessed': self.prefix / f'{cohort.name}.preprocessed.interval_list',
@@ -40,6 +42,7 @@ class CollectReadCounts(SequencingGroupStage):
     """
     Per-sample stage that runs CollectReadCounts to produce .counts.tsv.gz files.
     """
+
     def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
         return {
             'counts': seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.counts.tsv.gz',
@@ -66,11 +69,12 @@ class DeterminePloidy(CohortStage):
     The non-sharded cohort-wide gCNV steps after read counts have been collected:
     FilterIntervals and DetermineGermlineContigPloidy.
     """
+
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'filtered': self.tmp_prefix / f'{cohort.name}.filtered.interval_list',
-            'calls': self.tmp_prefix / f'{cohort.name}-ploidy-calls.tar.gz',
-            'model': self.tmp_prefix / f'{cohort.name}-ploidy-model.tar.gz',
+            'calls':    self.tmp_prefix / f'{cohort.name}-ploidy-calls.tar.gz',
+            'model':    self.tmp_prefix / f'{cohort.name}-ploidy-model.tar.gz',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -95,6 +99,7 @@ class GermlineCNV(CohortStage):
     This is separate from the DeterminePloidy stage so that the GermlineCNVCalls
     stage can pick out this stage's sharded inputs easily.
     """
+
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             name: self.tmp_prefix / f'{name}.tar.gz' for name in gcnv.shard_basenames()
@@ -120,6 +125,7 @@ class GermlineCNVCalls(SequencingGroupStage):
     """
     Produces final individual VCF results by running PostprocessGermlineCNVCalls.
     """
+
     def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
         return {
             'intervals': seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.intervals.vcf.gz',

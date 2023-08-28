@@ -15,8 +15,11 @@ from cpg_workflows.filetypes import CramPath
 from cpg_workflows.utils import can_reuse
 
 
-def prepare_intervals(b: hb.Batch, job_attrs: dict[str, str],
-                      output_paths: dict[str, Path]) -> list[Job]:
+def prepare_intervals(
+    b: hb.Batch,
+    job_attrs: dict[str, str],
+    output_paths: dict[str, Path],
+) -> list[Job]:
     j = b.new_job('Prepare intervals', job_attrs | {
         'tool': 'gatk PreprocessIntervals/AnnotateIntervals',
     })
@@ -67,8 +70,13 @@ def prepare_intervals(b: hb.Batch, job_attrs: dict[str, str],
     return [j]
 
 
-def collect_read_counts(b: hb.Batch, intervals_path: Path, cram_path: CramPath,
-                        job_attrs: dict[str, str], output_base_path: Path) -> list[Job]:
+def collect_read_counts(
+    b: hb.Batch,
+    intervals_path: Path,
+    cram_path: CramPath,
+    job_attrs: dict[str, str],
+    output_base_path: Path,
+) -> list[Job]:
     j = b.new_job('Collect gCNV read counts', job_attrs | {'tool': 'gatk CollectReadCounts'})
     j.image(image_path('gatk_gcnv'))
 
@@ -108,11 +116,15 @@ def _counts_input_args(b: hb.Batch, counts_paths: Iterable[Path]) -> str:
     return args
 
 
-def filter_and_determine_ploidy(b: hb.Batch, ploidy_priors_path: Path,
-                                preprocessed_intervals_path: Path,
-                                annotated_intervals_path: Path, counts_paths: Iterable[Path],
-                                job_attrs: dict[str, str],
-                                output_paths: dict[str, Path]) -> list[Job]:
+def filter_and_determine_ploidy(
+    b: hb.Batch,
+    ploidy_priors_path: Path,
+    preprocessed_intervals_path: Path,
+    annotated_intervals_path: Path,
+    counts_paths: Iterable[Path],
+    job_attrs: dict[str, str],
+    output_paths: dict[str, Path],
+) -> list[Job]:
     j = b.new_job('Filter intervals and determine ploidy', job_attrs | {
         'tool': 'gatk FilterIntervals/DetermineGermlineContigPloidy',
     })
@@ -183,9 +195,15 @@ def shard_basenames():
     return _shard_items(name_only=True)
 
 
-def shard_gcnv(b: hb.Batch, annotated_intervals_path: Path, filtered_intervals_path: Path,
-               ploidy_calls_path: Path, counts_paths: Iterable[Path],
-               job_attrs: dict[str, str], output_paths: dict[str, Path]) -> list[Job]:
+def shard_gcnv(
+    b: hb.Batch,
+    annotated_intervals_path: Path,
+    filtered_intervals_path: Path,
+    ploidy_calls_path: Path,
+    counts_paths: Iterable[Path],
+    job_attrs: dict[str, str],
+    output_paths: dict[str, Path],
+) -> list[Job]:
     annotated_intervals = b.read_input(str(annotated_intervals_path))
     filtered_intervals = b.read_input(str(filtered_intervals_path))
     ploidy_calls_tarball = b.read_input(str(ploidy_calls_path))
@@ -231,9 +249,14 @@ def shard_gcnv(b: hb.Batch, annotated_intervals_path: Path, filtered_intervals_p
     return jobs
 
 
-def postprocess_calls(b: hb.Batch, ploidy_calls_path: Path, shard_paths: dict[str, Path],
-                      sample_index: int, job_attrs: dict[str, str],
-                      output_path: dict[str, Path]) -> list[Job]:
+def postprocess_calls(
+    b: hb.Batch,
+    ploidy_calls_path: Path,
+    shard_paths: dict[str, Path],
+    sample_index: int,
+    job_attrs: dict[str, str],
+    output_path: dict[str, Path],
+) -> list[Job]:
     j = b.new_job('Postprocess gCNV calls', job_attrs | {
         'tool': 'gatk PostprocessGermlineCNVCalls',
     })
