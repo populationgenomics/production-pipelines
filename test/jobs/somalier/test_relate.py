@@ -56,9 +56,8 @@ def setup_pedigree_test(tmp_path: Path, config: PipelineConfig | None = None):
 
 class TestSomalierRelate:
     def test_creates_one_relate_job(self, tmp_path: Path):
-        # ---- Test setup
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
-        # ---- The job that we want to test
+
         _ = pedigree(
             dataset=dataset,
             b=batch,
@@ -70,17 +69,14 @@ class TestSomalierRelate:
             label=None,
         )
 
-        # ---- Assertions
         relate_jobs = batch.select_jobs('Somalier relate')
         assert len(relate_jobs) == 1
 
     def test_if_label_provided_adds_label_to_default_job_title_(self, tmp_path: Path):
-        # ---- Test setup
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
         label = 'test-label'
 
-        # ---- The job that we want to test
         pedigree_jobs = pedigree(
             dataset=dataset,
             b=batch,
@@ -93,7 +89,6 @@ class TestSomalierRelate:
         )
         relate_j = pedigree_jobs[0]
 
-        # ---- Assertions
         job_name = f'Somalier relate [{label}]'
         assert relate_j.name == job_name
 
@@ -110,10 +105,8 @@ class TestSomalierRelate:
     def test_if_job_attrs_supplied_job_attrs_set_or_sets_default_attrs_if_not_supplied(
         self, tmp_path: Path, job_attrs, expected_attrs
     ):
-        # ---- Test setup
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
-        # ---- The job that we want to test
         pedigree_jobs = pedigree(
             dataset=dataset,
             b=batch,
@@ -126,15 +119,12 @@ class TestSomalierRelate:
         )
         relate_j = pedigree_jobs[0]
 
-        # ---- Assertions
         assert relate_j is not None
         assert relate_j.attributes == expected_attrs
 
     def test_uses_image_specified_in_config(self, tmp_path: Path):
-        # ---- Test setup
         config, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
-        # ---- The job that we want to test
         pedigree_jobs = pedigree(
             dataset=dataset,
             b=batch,
@@ -146,15 +136,12 @@ class TestSomalierRelate:
         )
         relate_j = pedigree_jobs[0]
 
-        # ---- Assertions
         assert relate_j is not None
         assert relate_j._image == config.images['somalier']
 
     def test_if_verifybamid_exists_for_sg_check_freemix(self, tmp_path: Path):
-        # ---- Test setup
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
-        # ---- The job that we want to test
         pedigree_jobs = pedigree(
             dataset=dataset,
             b=batch,
@@ -167,7 +154,6 @@ class TestSomalierRelate:
         )
         relate_j = pedigree_jobs[0]
 
-        # ---- Assertions
         cmd = get_command_str(relate_j)
         sg = dataset.get_sequencing_groups()[0]
         verifybamid_file = somalier_path_by_sgid[sg.id].name  # same as somalier file
@@ -194,10 +180,8 @@ class TestSomalierRelate:
     def test_if_verifybamid_file_not_available_inputs_files_still_generated(
         self, tmp_path: Path
     ):
-        # ---- Test setup
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
-        # ---- The job that we want to test
         pedigree_jobs = pedigree(
             dataset=dataset,
             b=batch,
@@ -209,7 +193,6 @@ class TestSomalierRelate:
         )
         relate_j = pedigree_jobs[0]
 
-        # ---- Assertions
         cmd = get_command_str(relate_j)
         sg = dataset.get_sequencing_groups()[0]
         relate_input_file = 'input_files.list'
@@ -227,10 +210,8 @@ class TestSomalierRelate:
         )
 
     def test_filter_expected_pedigrees_to_ped_file(self, tmp_path: Path):
-        # ---- Test setup
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
-        # ---- The job that we want to test
         pedigree_jobs = pedigree(
             dataset=dataset,
             b=batch,
@@ -242,7 +223,6 @@ class TestSomalierRelate:
         )
         relate_j = pedigree_jobs[0]
 
-        # ---- Assertions
         cmd = get_command_str(relate_j)
         expected_ped_filename = 'test_ped.ped'
         sample_id_list_file = 'sample_ids.list'
@@ -254,10 +234,8 @@ class TestSomalierRelate:
     def test_moves_somalier_output_to_expected_batch_resource_files(
         self, tmp_path: Path
     ):
-        # ---- Test setup
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
-        # ---- The job that we want to test
         pedigree_jobs = pedigree(
             dataset=dataset,
             b=batch,
@@ -269,7 +247,6 @@ class TestSomalierRelate:
         )
         relate_j = pedigree_jobs[0]
 
-        # ---- Assertions
         cmd = get_command_str(relate_j)
         assert re.search(
             fr'mv related.pairs.tsv \${{BATCH_TMPDIR}}/.+\/output_pairs',
@@ -285,10 +262,8 @@ class TestSomalierRelate:
         )
 
     def test_related_html_sequencing_group_id_replacement(self, tmp_path: Path):
-        # ---- Test setup
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
-        # ---- The job that we want to test
         pedigree_jobs = pedigree(
             dataset=dataset,
             b=batch,
@@ -300,7 +275,6 @@ class TestSomalierRelate:
         )
         relate_j = pedigree_jobs[0]
 
-        # ---- Assertions
         cmd = get_command_str(relate_j)
         sequencing_group_id = dataset.get_sequencing_groups()[0].id
         rich_id = dataset.rich_id_map()[sequencing_group_id]
@@ -313,10 +287,8 @@ class TestSomalierRelate:
     def test_writes_outputs_to_final_destinations(
         self, mocker: MockFixture, tmp_path: Path
     ):
-        # ---- Test setup
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
-        # ---- The job that we want to test
         spy = mocker.spy(batch, 'write_output')
         out_samples_path = tmp_path / 'out_samples'
         out_pairs_path = tmp_path / 'out_pairs'
@@ -333,7 +305,6 @@ class TestSomalierRelate:
         )
         relate_j = pedigree_jobs[0]
 
-        # ---- Assertions
         assert relate_j is not None
         spy.assert_has_calls(
             calls=[
