@@ -63,7 +63,7 @@ def subset_vcf(
 
 def gather_vcfs(
     b: hb.Batch,
-    input_vcfs: list[hb.ResourceGroup],
+    input_vcfs: list[Path],
     out_vcf_path: Path | None = None,
     site_only: bool = False,
     sequencing_group_count: int | None = None,
@@ -91,6 +91,11 @@ def gather_vcfs(
     jobs: list[Job | None] = []
     gathered_vcf: hb.ResourceFile
 
+    read_vcfs_into_batch = [
+        b.read_input_group(**{'vcf.gz': str(vcf), 'vcf.gz.tbi': str(vcf) + '.tbi'})
+        for vcf in input_vcfs
+    ]
+
     if not can_reuse(out_vcf_path):
         job_name = f'Merge {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
         j = b.new_job(job_name, (job_attrs or {}) | {'tool': 'bcftools concat'})
@@ -99,7 +104,7 @@ def gather_vcfs(
             j, storage_gb=storage_for_joint_vcf(sequencing_group_count, site_only)
         )
         cmd = f"""
-        bcftools concat --threads {res.get_nthreads() -1 } -a {" ".join(vcf["vcf.gz"] for vcf in input_vcfs)} \
+        bcftools concat --threads {res.get_nthreads() -1 } -a {" ".join(vcf["vcf.gz"] for vcf in read_vcfs_into_batch)} \
         -Oz -o {j.output_vcf}
         """
         j.command(command(cmd, monitor_space=True))
