@@ -3,7 +3,7 @@
 """
 Creates a Hail Batch job to run the command line VEP tool.
 """
-
+import logging
 from typing import Literal
 
 import hailtop.batch as hb
@@ -120,13 +120,16 @@ def add_vep_jobs(
             depends_on=jobs,
         )
         gather_jobs = [j]
-    else:
+    elif scatter_count != 1:
         assert len(result_part_paths) == scatter_count
         gather_jobs = gather_vcfs(
             b=b,
             input_vcfs=result_part_paths,
             out_vcf_path=out_path,
         )
+    else:
+        print('no need to merge VCF results')
+        gather_jobs = []
     for j in gather_jobs:
         j.depends_on(*jobs)
         jobs.append(j)
