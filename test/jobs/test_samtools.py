@@ -45,10 +45,8 @@ def setup_test(tmp_path: Path, config: PipelineConfig | None = None):
 
 class TestSamtoolsStatsRun:
     def test_creates_one_job(self, tmp_path: Path):
-        # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
 
-        # ---- The job we want to test
         _ = samtools_stats(
             b=batch,
             cram_path=cram_pth,
@@ -57,19 +55,16 @@ class TestSamtoolsStatsRun:
             overwrite=False,
         )
 
-        # ---- Assertions
         assert (
             len(batch.select_jobs('samtools stats')) == 1
         ), 'Unexpected number of samtools stats jobs in batch list, should be just 1 job'
 
     def test_will_return_none_if_path_already_exists(self, tmp_path: Path):
-        # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
 
         output = tmp_path / 'output_stats_file'
         output.touch()
 
-        # ---- The jobs we want to test
         j = samtools_stats(
             b=batch,
             cram_path=cram_pth,
@@ -77,18 +72,15 @@ class TestSamtoolsStatsRun:
             overwrite=False,
         )
 
-        # --- Assertions
         assert j is None
 
     def test_will_create_job_if_path_already_exists_and_overwrite_true(
         self, tmp_path: Path
     ):
-        # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
         output = tmp_path / 'output_stats_file'
         output.touch()
 
-        # ---- The jobs we want to test
         j = samtools_stats(
             b=batch,
             cram_path=cram_pth,
@@ -96,7 +88,6 @@ class TestSamtoolsStatsRun:
             overwrite=True,
         )
 
-        # --- Assertions
         assert j is not None
 
     @pytest.mark.parametrize(
@@ -112,10 +103,8 @@ class TestSamtoolsStatsRun:
     def test_sets_job_attrs_or_sets_default_attrs_if_not_supplied(
         self, tmp_path: Path, job_attrs, expected_attrs
     ):
-        # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
 
-        # ---- The jobs we want to test
         j = samtools_stats(
             b=batch,
             cram_path=cram_pth,
@@ -124,15 +113,12 @@ class TestSamtoolsStatsRun:
             overwrite=False,
         )
 
-        # ---- Assertions
         assert j is not None
         assert j.attributes == expected_attrs
 
     def test_uses_samtools_image_specified_in_config(self, tmp_path: Path):
-        # ---- Test setup
         config, cram_pth, batch = setup_test(tmp_path)
 
-        # ---- The jobs we want to test
         j = samtools_stats(
             b=batch,
             cram_path=cram_pth,
@@ -140,17 +126,14 @@ class TestSamtoolsStatsRun:
             job_attrs=None,
         )
 
-        # ---- Assertions
         assert j is not None
         assert j._image == config.images['samtools']
 
     def test_uses_reference_in_workflow_config_section_if_set(self, tmp_path: Path):
-        # ---- Test setup
         config = default_config()
         config.workflow.ref_fasta = 'test_workflow_ref.fa'
         _, cram_pth, batch = setup_test(tmp_path, config)
 
-        # ---- The jobs we want to test
         j = samtools_stats(
             b=batch,
             cram_path=cram_pth,
@@ -158,7 +141,6 @@ class TestSamtoolsStatsRun:
             job_attrs=None,
         )
 
-        # ---- Assertions
         cmd = get_command_str(j)
         ref_file = config.workflow.ref_fasta
         assert re.search(fr'--reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
@@ -166,10 +148,8 @@ class TestSamtoolsStatsRun:
     def test_uses_broad_reference_as_default_if_reference_not_set_in_workflow_config_section(
         self, tmp_path: Path
     ):
-        # ---- Test setup
         config, cram_pth, batch = setup_test(tmp_path)
 
-        # ---- The jobs we want to test
         j = samtools_stats(
             b=batch,
             cram_path=cram_pth,
@@ -177,7 +157,6 @@ class TestSamtoolsStatsRun:
             job_attrs=None,
         )
 
-        # ---- Assertions
         cmd = get_command_str(j)
         ref_file = config.references['broad']['ref_fasta']
         assert re.search(fr'--reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
@@ -185,10 +164,8 @@ class TestSamtoolsStatsRun:
     def test_uses_fail_safe_copy_on_cram_path_and_index_in_bash_command(
         self, tmp_path: Path
     ):
-        # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
 
-        # ---- The jobs we want to test
         j = samtools_stats(
             b=batch,
             cram_path=cram_pth,
@@ -196,16 +173,13 @@ class TestSamtoolsStatsRun:
             job_attrs=None,
         )
 
-        # ---- Assertions
         cmd = get_command_str(j)
         assert re.search(fr'retry_gs_cp .*{cram_pth.path}', cmd)
         assert re.search(fr'retry_gs_cp .*{cram_pth.index_path}', cmd)
 
     def test_samtools_writes_to_resource_file_named_output_stats(self, tmp_path: Path):
-        # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
 
-        # ---- The jobs we want to test
         j = samtools_stats(
             b=batch,
             cram_path=cram_pth,
@@ -213,17 +187,14 @@ class TestSamtoolsStatsRun:
             job_attrs=None,
         )
 
-        # ---- Assertions
         cmd = get_command_str(j)
         assert re.search(r'\$CRAM > \${BATCH_TMPDIR}/.*/output_stats', cmd)
 
     def test_batch_writes_samtools_stats_file_to_output_path(
         self, mocker: MockFixture, tmp_path: Path
     ):
-        # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
 
-        # ---- The jobs we want to test
         spy = mocker.spy(batch, 'write_output')
         out_path = tmp_path / 'output_file'
         j = samtools_stats(
@@ -233,6 +204,5 @@ class TestSamtoolsStatsRun:
             job_attrs=None,
         )
 
-        # ---- Assertions
         assert j is not None
         spy.assert_called_with(j.output_stats, str(out_path))
