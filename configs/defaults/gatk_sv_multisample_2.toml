@@ -3,3 +3,10 @@ name = 'gatk_sv'
 dataset_gcp_project = 'seqr-308602'
 dataset = 'seqr'
 ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
+
+[references.gatk_sv]
+# This model is trained on the All Of Us dataset. If this is used in any published work,
+# credit must be given in accordance with the AoU publication policy.
+# Access to this file was provided on a one-off basis, and is not publicly available.
+# If an updated model is required, contact Mark Walker at the Broad Institute
+aou_filtering_model = 'gs://cpg-common-test/references/gatk-sv/gatk-sv-recalibrator.aou_phase_1.v1.model'
