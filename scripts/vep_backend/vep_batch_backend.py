@@ -27,13 +27,14 @@ def main(vcf_path: str, output_ht: str):
     located in the same directory.
     """
     vep_image = get_config()['images']['vep']
-    b = get_batch(f'Run VEP with Batch Backend, image {vep_image}')
+    scatter_count=get_config()['vep']['scatter_count']
+    b = get_batch(f'Run VEP with Batch Backend, image {vep_image}, scatter count {scatter_count}')
     add_vep_jobs(
         b=b,
         input_siteonly_vcf_path=to_path(vcf_path),
         tmp_prefix=to_path(output_path('vcf_fragments/', 'tmp')),
         out_path=to_path(dataset_path(output_ht)),
-        scatter_count=get_config()['vep']['scatter_count'],
+        scatter_count=scatter_count,
     )
     b.run(wait=False)
 
