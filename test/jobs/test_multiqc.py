@@ -81,7 +81,7 @@ class TestMultiQC:
         self, tmp_path: Path
     ):
         config = default_config()
-        config.other['qc_thresholds'] = None
+        config.other['qc_thresholds'] = {}
         config, batch, dataset, paths = setup_multiqc_test(tmp_path, config)
 
         jobs = multiqc(
