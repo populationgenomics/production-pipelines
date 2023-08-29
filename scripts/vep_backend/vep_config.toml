@@ -1,0 +1,5 @@
+[workflow]
+sequencing_type = 'genome'
+
+[vep]
+scatter_count = 1
