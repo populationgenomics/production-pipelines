@@ -54,13 +54,10 @@ def setup_test(
 
 class TestSomalierExtract:
     def test_creates_one_job(self, tmp_path: Path):
-        # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
 
-        # ---- The job we want to test
         _ = extract(b=batch, cram_path=cram_pth, out_somalier_path=tmp_path)
 
-        # ---- Assertions
         assert (
             len(batch.select_jobs('Somalier extract')) == 1
         ), "Unexpected number of 'Somalier' jobs in batch list, should be just 1 job"
@@ -68,13 +65,11 @@ class TestSomalierExtract:
     def test_will_return_none_if_output_file_exists_and_overwrite_is_false(
         self, tmp_path: Path
     ):
-        # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
 
         output = tmp_path / 'output_somalier_file'
         output.touch()
 
-        # ---- The jobs we want to test
         j = extract(
             b=batch,
             cram_path=cram_pth,
@@ -82,19 +77,16 @@ class TestSomalierExtract:
             overwrite=False,
         )
 
-        # --- Assertions
         assert j is None, 'Job was created when output file should have been reused'
 
     def test_will_create_one_job_if_output_file_exists_and_overwrite_is_true(
         self, tmp_path: Path
     ):
-        # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
 
         output = tmp_path / 'output_somalier_file'
         output.touch()
 
-        # ---- The jobs we want to test
         j = extract(
             b=batch,
             cram_path=cram_pth,
@@ -102,7 +94,6 @@ class TestSomalierExtract:
             overwrite=True,
         )
 
-        # ---- Assertions
         assert len(batch.select_jobs('Somalier extract')) == 1
         assert j is not None
 
@@ -119,10 +110,8 @@ class TestSomalierExtract:
     def test_sets_supplied_job_attrs_or_sets_default_attrs_if_attrs_not_supplied(
         self, tmp_path: Path, job_attrs, expected_attrs
     ):
-        # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
 
-        # ---- The jobs we want to test
         j = extract(
             b=batch,
             cram_path=cram_pth,
@@ -130,39 +119,32 @@ class TestSomalierExtract:
             job_attrs=job_attrs,
         )
 
-        # ---- Assertions
         assert j is not None
         assert j.attributes == expected_attrs
 
     def test_uses_image_specified_in_config(self, tmp_path: Path):
-        # ---- Test setup
         config, cram_pth, batch = setup_test(tmp_path)
 
-        # ---- The jobs we want to test
         j = extract(
             b=batch,
             cram_path=cram_pth,
             out_somalier_path=(tmp_path / 'output_file'),
         )
 
-        # ---- Assertions
         assert j is not None
         assert j._image == config.images['somalier']
 
     def test_sets_sites_location_with_name_of_sites_file_in_config(
         self, tmp_path: Path
     ):
-        # ---- Test setup
         config, cram_pth, batch = setup_test(tmp_path)
 
-        # ---- The jobs we want to test
         j = extract(
             b=batch,
             cram_path=cram_pth,
             out_somalier_path=(tmp_path / 'output_file'),
         )
 
-        # ---- Assertions
         cmd = get_command_str(j)
         sites = config.other['references']['somalier_sites']
         assert j is not None
@@ -172,35 +154,29 @@ class TestSomalierExtract:
     def test_uses_fail_safe_copy_on_cram_path_and_index_in_bash_command(
         self, tmp_path: Path
     ):
-        # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
 
-        # ---- The jobs we want to test
         j = extract(
             b=batch,
             cram_path=cram_pth,
             out_somalier_path=(tmp_path / 'output_file'),
         )
 
-        # ---- Assertions
         cmd = get_command_str(j)
         assert re.search(fr'retry_gs_cp .*{cram_pth.path}', cmd)
         assert re.search(fr'retry_gs_cp .*{cram_pth.index_path}', cmd)
 
     def test_uses_reference_in_workflow_config_section_if_set(self, tmp_path: Path):
-        # ---- Test setup
         config = default_config()
         config.workflow.ref_fasta = 'test_workflow_ref.fa'
         _, cram_pth, batch = setup_test(tmp_path, config)
 
-        # ---- The jobs we want to test
         j = extract(
             b=batch,
             cram_path=cram_pth,
             out_somalier_path=(tmp_path / 'output_file'),
         )
 
-        # ---- Assertions
         cmd = get_command_str(j)
         ref_file = config.workflow.ref_fasta
         assert re.search(fr'-f \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
@@ -208,17 +184,14 @@ class TestSomalierExtract:
     def test_uses_broad_reference_as_default_if_reference_not_set_in_workflow_config_section(
         self, tmp_path: Path
     ):
-        # ---- Test setup
         config, cram_pth, batch = setup_test(tmp_path)
 
-        # ---- The jobs we want to test
         j = extract(
             b=batch,
             cram_path=cram_pth,
             out_somalier_path=(tmp_path / 'output_file'),
         )
 
-        # ---- Assertions
         cmd = get_command_str(j)
         ref_file = config.other['references']['broad']['ref_fasta']
         assert re.search(fr'-f \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
@@ -226,10 +199,8 @@ class TestSomalierExtract:
     def test_batch_writes_output_file_to_output_path(
         self, mocker: MockFixture, tmp_path: Path
     ):
-        # ---- Test setup
         _, cram_pth, batch = setup_test(tmp_path)
 
-        # ---- The jobs we want to test
         spy = mocker.spy(batch, 'write_output')
         out_path = tmp_path / 'output_file'
 
@@ -239,15 +210,12 @@ class TestSomalierExtract:
             out_somalier_path=out_path,
         )
 
-        # ---- Assertions
         assert j is not None
         spy.assert_called_with(j.output_file, str(out_path))
 
     def test_raises_error_if_no_cram_index_path_given(self, tmp_path: Path):
-        # ---- Test setup
         _, cram_pth_no_index, batch = setup_test(tmp_path, index=False)
 
-        # ---- The jobs we want to test and Assertions
         with pytest.raises(
             ValueError, match='CRAM for somalier is required to have CRAI index'
         ):
