@@ -62,6 +62,11 @@ def add_vep_jobs(
                     **{'vcf.gz': str(path), 'vcf.gz.tbi': str(path) + '.tbi'}
                 )
             )
+
+    # If there is only one partition, we don't need to split the VCF
+    elif scatter_count == 1:
+        input_vcf_parts.append(siteonly_vcf)
+
     else:
         intervals_j, intervals = get_intervals(
             b=b,
@@ -86,7 +91,7 @@ def add_vep_jobs(
 
     result_parts_bucket = tmp_prefix / 'vep' / 'parts'
     result_part_paths = []
-    for idx in range(scatter_count):
+    for idx, resource in enumerate(input_vcf_parts):
         if to_hail_table:
             result_part_path = result_parts_bucket / f'part{idx + 1}.jsonl'
         else:
@@ -98,7 +103,7 @@ def add_vep_jobs(
         # noinspection PyTypeChecker
         vep_one_job = vep_one(
             b,
-            vcf=input_vcf_parts[idx]['vcf.gz'],
+            vcf=resource['vcf.gz'],
             out_format='json' if to_hail_table else 'vcf',
             out_path=result_part_paths[idx],
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
