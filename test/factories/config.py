@@ -297,6 +297,12 @@ class PipelineConfig:
     large_cohort: dict[str, Any] = field(default_factory=dict)
     other: dict[str, dict[str, Any]] = field(default_factory=dict)
 
+    def __getitem__(self, key: str) -> Any:
+        return self.as_dict()[key]
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.as_dict().get(key, default)
+
     def set_storage(
         self, dataset: DatasetId, storage: StorageConfig
     ) -> 'PipelineConfig':
@@ -346,17 +352,3 @@ class PipelineConfig:
             config['large_cohort'] = large_cohort
 
         return config
-
-    def dig(self, *keys, default: Any = None, silent=True) -> Any:
-        d = self.as_dict()
-        path_so_far: list[Any] = []
-        for key in keys:
-            if (not silent) and (key not in d):
-                path = ' / '.join([*path_so_far, key])
-                raise KeyError(f"Nested key '{path}' not found in config.")
-            elif key not in d:
-                return default
-            else:
-                d = d[key]
-                path_so_far.append(key)
-        return d
