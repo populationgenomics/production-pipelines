@@ -400,17 +400,11 @@ class FilterGenotypes(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        ploidy_table_output = inputs.as_dict(cohort, GeneratePloidyTable)[
-            'ploidy_table'
-        ]
-        sv_concordance_output = inputs.as_dict(cohort, SVConcordance)[
-            'gatk_formatted_vcf'
-        ]
 
         input_dict = {
-            'vcf': sv_concordance_output,
-            'ploidy_table': ploidy_table_output,
             'output_prefix': cohort.name,
+            'vcf': inputs.as_dict(cohort, SVConcordance)['concordance_vcf'],
+            'ploidy_table': inputs.as_dict(cohort, GeneratePloidyTable)['ploidy_table'],
         }
 
         input_dict |= get_images(
