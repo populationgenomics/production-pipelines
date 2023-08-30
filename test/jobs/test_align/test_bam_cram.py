@@ -29,12 +29,12 @@ from ..helpers import get_command_str
 from .shared import select_jobs, default_config
 
 
-ALIGNERS = [Aligner.BWA, Aligner.BWAMEM2, Aligner.DRAGMAP]
+pytestmark = pytest.mark.parametrize(
+    'aligner', [Aligner.BWA, Aligner.BWAMEM2, Aligner.DRAGMAP]
+)
 
-pytestmark = pytest.mark.parametrize('aligner', ALIGNERS)
 
-
-def _setup(
+def setup_test(
     config: PipelineConfig,
     tmp_path: Path,
     alignment_input: Optional[CramPath | BamPath] = None,
@@ -60,7 +60,7 @@ def test_does_not_shard_and_merge_realignment_if_sequencing_exome(
     config = default_config()
     config.workflow.sequencing_type = 'exome'
 
-    config, batch, sg = _setup(config, tmp_path)
+    config, batch, sg = setup_test(config, tmp_path)
 
     jobs = align(
         b=batch,
@@ -83,7 +83,7 @@ def test_shards_and_merges_realignment_if_sequencing_genome(
     config = default_config()
     config.workflow.sequencing_type = 'genome'
 
-    config, batch, sg = _setup(config, tmp_path)
+    config, batch, sg = setup_test(config, tmp_path)
 
     jobs = align(
         b=batch,
@@ -93,8 +93,9 @@ def test_shards_and_merges_realignment_if_sequencing_genome(
     )
 
     align_jobs = select_jobs(jobs, 'align')
+    merge_job = select_jobs(jobs, 'merge')
     assert len(align_jobs) == 10
-    assert len(select_jobs(jobs, 'merge')) == 1
+    assert len(merge_job) == 1
 
     for i, job in enumerate(align_jobs):
         cmd = get_command_str(job)
@@ -102,6 +103,8 @@ def test_shards_and_merges_realignment_if_sequencing_genome(
             fr'bazam .* -bam \${{BATCH_TMPDIR}}/inputs/\w+/SAMPLE1.bam -s {i+1},10',
             cmd,
         )
+
+    cmd = get_command_str(merge_job[0])
 
 
 def test_does_not_shard_bam_and_indexes_bam_if_index_does_not_exist(
@@ -114,7 +117,7 @@ def test_does_not_shard_bam_and_indexes_bam_if_index_does_not_exist(
     config = default_config()
     config.workflow.sequencing_type = 'genome'
 
-    config, batch, sg = _setup(
+    config, batch, sg = setup_test(
         config,
         tmp_path,
         alignment_input=create_bam_input(
@@ -158,7 +161,7 @@ def test_does_not_shard_cram_and_indexes_cram_if_index_does_not_exist(
     config = default_config()
     config.workflow.sequencing_type = 'genome'
 
-    config, batch, sg = _setup(
+    config, batch, sg = setup_test(
         config,
         tmp_path,
         alignment_input=create_cram_input(
@@ -216,7 +219,7 @@ def test_use_reference_assembly_from_config_when_realigning_cram_version_if_exis
     config.workflow.realign_from_cram_version = 'v1'
     config.workflow.cram_version_reference = {'v1': 'realign.fa'}
 
-    config, batch, sg = _setup(
+    config, batch, sg = setup_test(
         config,
         tmp_path,
         alignment_input=create_cram_input(
@@ -262,7 +265,7 @@ def test_error_if_no_reference_assembly_on_cram_input(tmp_path: Path, aligner: A
     """
     config = default_config()
 
-    config, batch, sg = _setup(
+    config, batch, sg = setup_test(
         config,
         tmp_path,
         alignment_input=create_cram_input(
@@ -290,7 +293,7 @@ def test_error_if_alignment_input_does_not_exist(tmp_path: Path, aligner: Aligne
     config = default_config()
     config.workflow.check_inputs = True
 
-    config, batch, sg = _setup(config, tmp_path)
+    config, batch, sg = setup_test(config, tmp_path)
 
     with pytest.raises(
         MissingAlignmentInputException,
