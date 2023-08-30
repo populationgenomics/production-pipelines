@@ -66,17 +66,17 @@ def create_sequencing_group(
             Path to a gVCF file path for the sequencing group that will be used to save
             genotyping stage output to. It's meant be used as an alternative to the
             method `make_gvcf_path` on this instance if you want to use a different
-            path. If 'auto' is selected, then the path is constructed from using the
-            'default' key in storage configuration option for the parent dataset passed
-            in via `dataset`. Defaults to `None`.
+            path. If 'auto' is selected, the path is contructed from the parent
+            dataset's path and the 'default' storage configuration key. Defaults to
+            `None`.
 
         cram (CramPath | Literal['auto'] | None, optional):
             Path to a CRAM file for the sequencing group that will be used to
             save alignment stage output to. It's meant be used as an alternative to the
             method `make_cram_path` on this instance if you want to use a different
-            path. If 'auto' is selected, then the path is constructed from using the
-            'default' key in storage configuration option for the parent dataset passed
-            in via `dataset`. Defaults to `None`.
+            path. If 'auto' is selected, the path is contructed from the parent
+            dataset's path and the 'default' storage configuration key. Defaults to
+            `None`.
 
         active (bool, optional):
             Sets to active, so this sequencing group will be included in the workflow
