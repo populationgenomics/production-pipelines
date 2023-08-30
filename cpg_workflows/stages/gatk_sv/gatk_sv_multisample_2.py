@@ -307,19 +307,13 @@ class SVConcordance(CohortStage):
         """
 
         return {
-            'gatk_formatted_vcf': self.prefix / 'gatk_formatted.vcf.gz',
-            'gatk_formatted_vcf_index': self.prefix / 'gatk_formatted.vcf.gz.tbi',
+            'concordance_vcf': self.prefix / 'sv_concordance.vcf.gz',
+            'concordance_vcf_index': self.prefix / 'sv_concordance.vcf.gz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
-
-        Args:
-            cohort ():
-            inputs ():
-
-        Returns:
-
+        configure and queue jobs for SV concordance
         """
         raw_calls = inputs.as_dict(cohort, JoinRawCalls)
         format_vcf = inputs.as_dict(cohort, FormatVcfForGatk)
