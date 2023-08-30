@@ -27,7 +27,7 @@ def main(vcf_path: str, output_ht: str):
     located in the same directory.
     """
     vep_image = get_config()['images']['vep']
-    scatter_count=get_config()['vep']['scatter_count']
+    scatter_count = get_config()['vep']['scatter_count']
     b = get_batch(f'Run VEP with Batch Backend, image {vep_image}, scatter count {scatter_count}')
     add_vep_jobs(
         b=b,
