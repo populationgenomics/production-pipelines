@@ -19,7 +19,7 @@ from cpg_workflows.batch import make_job_name, Batch
 from cpg_workflows.workflow import Dataset, Cohort
 
 
-GATK_SV_COMMIT = 'ecab760a23868ad667dfed39429759a214295d51'
+GATK_SV_COMMIT = 'e2e76a8018c61e1733c993680ea21a105273a1d9'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 _FASTA = None
 
@@ -28,16 +28,25 @@ def _sv_batch_meta(
     output_path: str,  # pylint: disable=W0613:unused-argument
 ) -> dict[str, Any]:
     """
-    Callable, add meta.type to custom analysis object
+    Callable, add meta[type] to custom analysis object
     """
     return {'type': 'gatk-sv-batch-calls'}
+
+
+def _sv_filtered_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, Any]:
+    """
+    Callable, add meta[type] to custom analysis object
+    """
+    return {'type': 'gatk-sv-filtered-calls'}
 
 
 def _sv_individual_meta(
     output_path: str,  # pylint: disable=W0613:unused-argument
 ) -> dict[str, Any]:
     """
-    Callable, add meta.type to custom analysis object
+    Callable, add meta[type] to custom analysis object
     """
     return {'type': 'gatk-sv-sequence-group-calls'}
 
@@ -164,7 +173,7 @@ def add_gatk_sv_jobs(
         input_dict=paths_as_strings,
         outputs_to_collect=outputs_to_collect,
         driver_image=driver_image,
-        copy_outputs_to_gcp=copy_outputs
+        copy_outputs_to_gcp=copy_outputs,
     )
 
     copy_j = batch.new_job(f'{job_prefix}: copy outputs')
