@@ -6,7 +6,6 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import gcnv
-from cpg_workflows.stages.align import Align
 from cpg_workflows.targets import SequencingGroup, Cohort
 from cpg_workflows.workflow import stage, StageInput, StageOutput
 from cpg_workflows.workflow import SequencingGroupStage, CohortStage
@@ -37,7 +36,7 @@ class PrepareIntervals(CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
-@stage(required_stages=[Align, PrepareIntervals])
+@stage(required_stages=PrepareIntervals)
 class CollectReadCounts(SequencingGroupStage):
     """
     Per-sample stage that runs CollectReadCounts to produce .counts.tsv.gz files.
@@ -50,13 +49,15 @@ class CollectReadCounts(SequencingGroupStage):
         }
 
     def queue_jobs(self, seqgroup: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        seqgroup_d = inputs.as_dict(seqgroup, Align)
         outputs = self.expected_outputs(seqgroup)
+
+        if seqgroup.cram is None:
+            raise ValueError(f'No CRAM file found for {seqgroup}')
 
         jobs = gcnv.collect_read_counts(
             get_batch(),
             inputs.as_path(seqgroup.dataset, PrepareIntervals, 'preprocessed'),
-            CramPath(seqgroup_d['cram'], seqgroup_d['crai']),
+            seqgroup.cram,
             self.get_job_attrs(seqgroup),
             seqgroup.dataset.prefix() / 'gcnv' / seqgroup.id,
         )
@@ -67,7 +68,8 @@ class CollectReadCounts(SequencingGroupStage):
 class DeterminePloidy(CohortStage):
     """
     The non-sharded cohort-wide gCNV steps after read counts have been collected:
-    FilterIntervals and DetermineGermlineContigPloidy.
+    FilterIntervals and DetermineGermlineContigPloidy. These outputs represent
+    intermediate results for the cohort as a whole, so are written to tmp_prefix.
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:

@@ -267,23 +267,19 @@ def postprocess_calls(
 
     ploidy_calls_tarball = b.read_input(str(ploidy_calls_path))
 
-    cmd = f"""
-    tar -xzf {ploidy_calls_tarball} -C $BATCH_TMPDIR
-    """
+    unpack_cmds = [f'tar -xzf {ploidy_calls_tarball} -C $BATCH_TMPDIR']
 
     model_shard_args = ''
     calls_shard_args = ''
     for name, path in shard_paths.items():
-        cmd += f"""
-        gsutil cat {path} | tar -xz -C $BATCH_TMPDIR
-        """
+        unpack_cmds.append(f'gsutil cat {path} | tar -xz -C $BATCH_TMPDIR')
         model_shard_args += f' --model-shard-path $BATCH_TMPDIR/{name}-model'
         calls_shard_args += f' --calls-shard-path $BATCH_TMPDIR/{name}-calls'
 
     allosomal_contigs = get_config()['workflow'].get('allosomal_contigs', [])
     allosomal_contigs_args = ' '.join([f'--allosomal-contig {c}' for c in allosomal_contigs])
 
-    cmd += f"""
+    postprocess_cmd = f"""
     gatk PostprocessGermlineCNVCalls \\
       --sequence-dictionary {reference.dict} {allosomal_contigs_args} \\
       --contig-ploidy-calls $BATCH_TMPDIR/ploidy-calls \\
@@ -301,7 +297,7 @@ def postprocess_calls(
     j.segments.add_extension('.vcf.gz')
     j.ratios.add_extension('.tsv')
 
-    j.command(command(cmd, setup_gcp=True))
+    j.command(command([*unpack_cmds, postprocess_cmd], setup_gcp=True))
     for key, path in output_path.items():
         b.write_output(j[key], str(path))
     return [j]
