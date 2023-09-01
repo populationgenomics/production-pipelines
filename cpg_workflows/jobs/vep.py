@@ -256,6 +256,7 @@ def vep_one(
     --dir_cache {vep_dir}/vep/ \\
     --dir_plugins $LOFTEE_PLUGIN_PATH \\
     --fasta $FASTA \\
+    --fork 4 \\
     --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())}
     """
     if out_format == 'vcf':
