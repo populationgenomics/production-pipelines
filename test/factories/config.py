@@ -293,7 +293,7 @@ class PipelineConfig:
     hail: HailConfig = field(default_factory=default_hail_config)
     storage: dict[DatasetId, StorageConfig] = field(default_factory=dict)
     images: dict[str, str | Path] = field(default_factory=dict)
-    references: dict[str, str | dict[str, Any]] = field(default_factory=dict)
+    references: dict[str, Any | dict[str, Any]] = field(default_factory=dict)
     large_cohort: dict[str, Any] = field(default_factory=dict)
     other: dict[str, dict[str, Any]] = field(default_factory=dict)
 
