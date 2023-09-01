@@ -18,6 +18,7 @@ def default_config() -> PipelineConfig:
             'bwa': 'bwa:latest',
             'bwamem2': 'bwamem2:latest',
             'samtools': 'samtools:latest',
+            'picard': 'picard:latest',
         },
         references={
             'broad': {
@@ -25,6 +26,7 @@ def default_config() -> PipelineConfig:
                 'dragmap_prefix': 'gs://a-cpg-bucket/dragen_reference/',
             }
         },
+        other={'resource_overrides': {}},
     )
 
 
