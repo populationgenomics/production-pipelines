@@ -307,19 +307,13 @@ class SVConcordance(CohortStage):
         """
 
         return {
-            'gatk_formatted_vcf': self.prefix / 'gatk_formatted.vcf.gz',
-            'gatk_formatted_vcf_index': self.prefix / 'gatk_formatted.vcf.gz.tbi',
+            'concordance_vcf': self.prefix / 'sv_concordance.vcf.gz',
+            'concordance_vcf_index': self.prefix / 'sv_concordance.vcf.gz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
-
-        Args:
-            cohort ():
-            inputs ():
-
-        Returns:
-
+        configure and queue jobs for SV concordance
         """
         raw_calls = inputs.as_dict(cohort, JoinRawCalls)
         format_vcf = inputs.as_dict(cohort, FormatVcfForGatk)
@@ -406,17 +400,11 @@ class FilterGenotypes(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        ploidy_table_output = inputs.as_dict(cohort, GeneratePloidyTable)[
-            'ploidy_table'
-        ]
-        sv_concordance_output = inputs.as_dict(cohort, SVConcordance)[
-            'gatk_formatted_vcf'
-        ]
 
         input_dict = {
-            'vcf': sv_concordance_output,
-            'ploidy_table': ploidy_table_output,
             'output_prefix': cohort.name,
+            'vcf': inputs.as_dict(cohort, SVConcordance)['concordance_vcf'],
+            'ploidy_table': inputs.as_dict(cohort, GeneratePloidyTable)['ploidy_table'],
         }
 
         input_dict |= get_images(
