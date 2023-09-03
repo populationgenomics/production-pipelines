@@ -174,6 +174,8 @@ class TestSamtoolsStatsRun:
         )
 
         cmd = get_command_str(j)
+        # This test ensures the script uses a fail-safe copy operation when working with CRAM files and their indices.
+        # Such retries are common for network calls like copying files from GCS to handle unexpected issues.
         assert re.search(fr'retry_gs_cp .*{cram_pth.path}', cmd)
         assert re.search(fr'retry_gs_cp .*{cram_pth.index_path}', cmd)
 
