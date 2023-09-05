@@ -3,7 +3,6 @@ Hail Query functions for seqr loader.
 """
 
 import logging
-import os
 
 import hail as hl
 
@@ -12,7 +11,7 @@ from cpg_utils.hail_batch import reference_path, genome_build
 from hail_scripts.computed_fields import vep, variant_id
 
 from cpg_workflows.large_cohort.load_vqsr import load_vqsr
-from cpg_workflows.utils import can_reuse, checkpoint_hail
+from cpg_workflows.utils import checkpoint_hail
 
 
 def annotate_cohort(
@@ -99,7 +98,7 @@ def annotate_cohort(
         clinvar_data=clinvar_ht[mt.row_key],
         ref_data=ref_ht[mt.row_key],
     )
-    mt = _checkpoint(mt, 'mt-vep-split-vqsr-round1.mt')
+    mt = checkpoint_hail(mt, 'mt-vep-split-vqsr-round1.mt', checkpoint_prefix)
 
     logging.info(
         'Annotating with seqr-loader fields: round 2 '
