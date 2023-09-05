@@ -3,6 +3,7 @@ Utility functions and constants.
 """
 
 import logging
+import hail as hl
 import re
 import string
 import sys
@@ -10,6 +11,7 @@ import time
 import traceback
 import unicodedata
 from functools import lru_cache
+from os.path import join
 from random import choices
 from typing import cast, Union
 
@@ -17,6 +19,36 @@ from hailtop.batch import ResourceFile
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
+
+
+def read_hail(path):
+    """
+    read a hail object using the appropriate method
+    Args:
+        path (str): path to the input object
+    Returns:
+        hail object (hl.MatrixTable or hl.Table)
+    """
+    if path.strip('/').endswith('.ht'):
+        t = hl.read_table(str(path))
+    else:
+        assert path.strip('/').endswith('.mt')
+        t = hl.read_matrix_table(str(path))
+    logging.info(f'Read data from {path}')
+    return t
+
+
+def checkpoint_hail(t, file_name: str, checkpoint_prefix: str | None = None):
+    if checkpoint_prefix:
+        path = join(checkpoint_prefix, file_name)
+        if can_reuse(path):
+            t = read_hail(str(path))
+        else:
+            t.write(str(path), overwrite=True)
+            logging.info(f'Wrote checkpoint {path}')
+            t = read_hail(str(path))
+    return t
+
 
 
 def missing_from_pre_collected(test: set[Path], known: set[Path]) -> Path | None:

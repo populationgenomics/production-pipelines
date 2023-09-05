@@ -12,7 +12,7 @@ from cpg_utils.hail_batch import reference_path, genome_build
 from hail_scripts.computed_fields import vep, variant_id
 
 from cpg_workflows.large_cohort.load_vqsr import load_vqsr
-from cpg_workflows.utils import can_reuse
+from cpg_workflows.utils import can_reuse, checkpoint_hail
 
 
 def annotate_cohort(
@@ -27,26 +27,6 @@ def annotate_cohort(
     annotations.
     """
 
-    def _read(path):
-        if path.strip('/').endswith('.ht'):
-            t = hl.read_table(str(path))
-        else:
-            assert path.strip('/').endswith('.mt')
-            t = hl.read_matrix_table(str(path))
-        logging.info(f'Read checkpoint {path}')
-        return t
-
-    def _checkpoint(t, file_name):
-        if checkpoint_prefix:
-            path = os.path.join(checkpoint_prefix, file_name)
-            if can_reuse(path):
-                t = _read(str(path))
-            else:
-                t.write(str(path), overwrite=True)
-                logging.info(f'Wrote checkpoint {path}')
-                t = _read(str(path))
-        return t
-
     mt = hl.import_vcf(
         str(vcf_path),
         reference_genome=genome_build(),
@@ -56,7 +36,7 @@ def annotate_cohort(
     logging.info(f'Importing VCF {vcf_path}')
 
     logging.info(f'Loading VEP Table from {vep_ht_path}')
-    # Annotate VEP. Do ti before splitting multi, because we run VEP on unsplit VCF,
+    # Annotate VEP. Do it before splitting multi, because we run VEP on unsplit VCF,
     # and hl.split_multi_hts can handle multiallelic VEP field.
     vep_ht = hl.read_table(str(vep_ht_path))
     logging.info(f'Adding VEP annotations into the Matrix Table from {vep_ht_path}')
@@ -67,11 +47,11 @@ def annotate_cohort(
     mt = hl.split_multi_hts(
         mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
     )
-    mt = _checkpoint(mt, 'mt-vep-split.mt')
+    mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
 
     if site_only_vqsr_vcf_path:
         vqsr_ht = load_vqsr(site_only_vqsr_vcf_path)
-        vqsr_ht = _checkpoint(vqsr_ht, 'vqsr.ht')
+        vqsr_ht = checkpoint_hail(vqsr_ht, 'vqsr.ht', checkpoint_prefix)
 
         logging.info('Adding VQSR annotations into the Matrix Table')
         mt = mt.annotate_globals(**vqsr_ht.index_globals())
@@ -82,7 +62,7 @@ def annotate_cohort(
                 lambda val: val != 'PASS'
             ),
         )
-        mt = _checkpoint(mt, 'mt-vep-split-vqsr.mt')
+        mt = checkpoint_hail(mt, 'mt-vep-split-vqsr.mt', checkpoint_prefix)
 
     ref_ht = hl.read_table(str(reference_path('seqr_combined_reference_data')))
     clinvar_ht = hl.read_table(str(reference_path('seqr_clinvar')))
