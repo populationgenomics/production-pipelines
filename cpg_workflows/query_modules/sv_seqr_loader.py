@@ -410,3 +410,7 @@ def annotate_sv_dataset(mt_path: str, out_mt_path: str, checkpoint_prefix: str |
             gte_4=_genotype_filter_samples(lambda g: g.cn >= 4)  # not sure if I can mix syntax
         ),
     )
+
+    logging.info('Genotype fields annotated')
+    mt.describe()
+    mt.write(out_mt_path, overwrite=True)
