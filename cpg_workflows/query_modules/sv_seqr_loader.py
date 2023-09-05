@@ -74,27 +74,27 @@ def unsafe_cast_int32(f: hl.tfloat32) -> hl.int32:
 
 
 def get_cpx_interval(x):
-    # an example format of CPX_INTERVALS is "DUP_chr1:1499897-1499974"
+    """
+    an example format of CPX_INTERVALS is "DUP_chr1:1499897-1499974"
+    Args:
+        x (hl.StringExpression instance):
+
+    Returns:
+        Struct of CPX components
+    """
     type_chr = x.split('_chr')
     chr_pos = type_chr[1].split(':')
     pos = chr_pos[1].split('-')
     return hl.struct(type=type_chr[0], chrom=chr_pos[0], start=hl.int32(pos[0]), end=hl.int32(pos[1]))
 
 
-def end_locus(mt):
-    return hl.if_else(
-        hl.is_defined(mt.info.END2),
-        hl.struct(contig=mt.info.CHR2, position=mt.info.END2),
-        hl.struct(contig=mt.locus.contig, position=mt.info.END)
-    )
-
-
-def sv_types(mt):
-    return mt.alleles[1].replace('[<>]', '').split(':', 2)
-
-
 def download_gencode_gene_id_mapping(gencode_release: str) -> str:
     """
+    This is an inefficient stand-in for now. Swap this out with a more permanent
+    location for this file in the resources bucket
+
+    Not suuuuuuper keen on storing a pickled representation, but a minimised JSON
+    would be a good middle ground. Parsed ~= 62000 {str: str}
 
     Args:
         gencode_release (str | int): Which gencode release do you want?
@@ -231,7 +231,7 @@ def annotate_sv_cohort(
             hl.is_defined(mt.info.CPX_INTERVALS),
             mt.info.CPX_INTERVALS.map(lambda x: get_cpx_interval(x)),
         ),
-        sy_types=mt.alleles[1].replace('[<>]', '').split(':', 2)
+        sv_types=mt.alleles[1].replace('[<>]', '').split(':', 2)
     )
 
     # save those changes
