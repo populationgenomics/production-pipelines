@@ -1,5 +1,5 @@
 """
-Hail Query functions for seqr loader; gCNV edition.
+Hail Query functions for seqr loader; SV edition.
 """
 
 import gzip
@@ -414,3 +414,4 @@ def annotate_sv_dataset(mt_path: str, out_mt_path: str, checkpoint_prefix: str |
     logging.info('Genotype fields annotated')
     mt.describe()
     mt.write(out_mt_path, overwrite=True)
+    logging.info(f'Written  SV MT to {out_mt_path}')
