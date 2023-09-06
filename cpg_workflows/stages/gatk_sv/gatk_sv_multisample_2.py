@@ -9,7 +9,10 @@ from typing import Any
 from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_workflows.batch import get_batch
-from cpg_workflows.jobs.seqr_loader_sv import annotate_cohort_jobs_sv, annotate_dataset_jobs_sv
+from cpg_workflows.jobs.seqr_loader_sv import (
+    annotate_cohort_jobs_sv,
+    annotate_dataset_jobs_sv,
+)
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     add_gatk_sv_jobs,
     get_fasta,
@@ -619,7 +622,9 @@ class AnnotateDatasetSv(DatasetStage):
                 Uses analysis-runner's dataproc helper to run a hail query script
                 """
         assert dataset.cohort
-        mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateCohortSv, key='mt')
+        mt_path = inputs.as_path(
+            target=dataset.cohort, stage=AnnotateCohortSv, key='mt'
+        )
 
         checkpoint_prefix = (
             to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'

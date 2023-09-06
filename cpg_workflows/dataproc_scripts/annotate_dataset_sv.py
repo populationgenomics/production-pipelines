@@ -24,6 +24,16 @@ def main(
     out_mt_path: str,
     checkpoint_prefix: str,
 ):
+    """
+    Schedule two job stages - subset_mt_to_samples and annotate_dataset_sv
+
+    Args:
+        mt_path (str): path to the reformatted-annotations MT
+        sample_ids_path (str): path to a file containing subset of sample IDs
+        out_mt_path (str): where to write the final MT
+        checkpoint_prefix ():
+    """
+
     hl.init(default_reference='GRCh38')
 
     with to_path(sample_ids_path).open() as f:

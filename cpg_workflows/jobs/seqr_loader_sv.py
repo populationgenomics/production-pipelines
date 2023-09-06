@@ -200,4 +200,3 @@ def annotate_dataset_jobs_sv(
         jobs = [subset_j, annotate_j]
 
     return jobs
-
