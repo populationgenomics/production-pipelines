@@ -17,38 +17,38 @@ from cpg_workflows.utils import read_hail, checkpoint_hail
 
 
 # I'm just going to go ahead and steal these constants from their seqr loader
-BOTHSIDES_SUPPORT = "BOTHSIDES_SUPPORT"
-GENE_SYMBOL = "gene_symbol"
-GENE_ID = "gene_id"
-MAJOR_CONSEQUENCE = "major_consequence"
-PASS = "PASS"
+BOTHSIDES_SUPPORT = 'BOTHSIDES_SUPPORT'
+GENE_SYMBOL = 'gene_symbol'
+GENE_ID = 'gene_id'
+MAJOR_CONSEQUENCE = 'major_consequence'
+PASS = 'PASS'
 
 # Used to filter mt.info fields.
 CONSEQ_PREDICTED_PREFIX = 'PREDICTED_'
 NON_GENE_PREDICTIONS = {'PREDICTED_INTERGENIC', 'PREDICTED_NONCODING_BREAKPOINT', 'PREDICTED_NONCODING_SPAN'}
 
 # path for downloading this file
-GENCODE_GTF_URL = "http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_{gencode_release}/gencode.v{gencode_release}.annotation.gtf.gz"
+GENCODE_GTF_URL = 'http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_{gencode_release}/gencode.v{gencode_release}.annotation.gtf.gz'
 
 PREVIOUS_GENOTYPE_N_ALT_ALLELES = hl.dict({
     # Map of concordance string -> previous n_alt_alleles()
 
     # Concordant
-    frozenset(["TN"]): 0,        # 0/0 -> 0/0
-    frozenset(["TP"]): 2,        # 1/1 -> 1/1
-    frozenset(["TN", "TP"]): 1,  # 0/1 -> 0/1
+    frozenset(['TN']): 0,        # 0/0 -> 0/0
+    frozenset(['TP']): 2,        # 1/1 -> 1/1
+    frozenset(['TN', 'TP']): 1,  # 0/1 -> 0/1
 
     # Novel
-    frozenset(["FP"]): 0,        # 0/0 -> 1/1
-    frozenset(["TN", "FP"]): 0,  # 0/0 -> 0/1
+    frozenset(['FP']): 0,        # 0/0 -> 1/1
+    frozenset(['TN', 'FP']): 0,  # 0/0 -> 0/1
 
     # Absent
-    frozenset(["FN"]): 2,        # 1/1 -> 0/0
-    frozenset(["TN", "FN"]): 1,  # 0/1 -> 0/0
+    frozenset(['FN']): 2,        # 1/1 -> 0/0
+    frozenset(['TN', 'FN']): 1,  # 0/1 -> 0/0
 
     # Discordant
-    frozenset(["FP", "TP"]): 1,  # 0/1 -> 1/1
-    frozenset(["FN", "TP"]): 2,  # 1/1 -> 0/1
+    frozenset(['FP', 'TP']): 1,  # 0/1 -> 1/1
+    frozenset(['FN', 'TP']): 2,  # 1/1 -> 0/1
 })
 GENCODE_FILE_HEADER = [
     'chrom', 'source', 'feature_type', 'start', 'end', 'score', 'strand', 'phase', 'info'
@@ -69,7 +69,7 @@ def unsafe_cast_int32(f: hl.tfloat32) -> hl.int32:
     return (
         hl.case()
         .when(hl.approx_equal(f, i), i)
-        .or_error(f"Found non-integer value {f}")
+        .or_error(f'Found non-integer value {f}')
     )
 
 
@@ -118,7 +118,7 @@ def download_gencode_gene_id_mapping(gencode_release: str) -> str:
         gtf_path = GENCODE_GTF_URL.format(gencode_release=gencode_release)
 
     # if it wasn't a local file, download it
-    if gtf_path.startswith(("http://", "https://")):
+    if gtf_path.startswith(('http://', 'https://')):
         gz_stream = requests.get(gtf_path, stream=True)
         with open(local_gtf, 'wb') as f:
             f.writelines(gz_stream)
@@ -140,7 +140,7 @@ def parse_gtf_from_local(gtf_path: str) -> hl.dict:
     """
 
     gene_id_mapping = {}
-    logging.info("Loading {}".format(gtf_path))
+    logging.info(f'Loading {gtf_path}')
 
     with gzip.open(gtf_path, 'rt') as gencode_file:
 
@@ -152,7 +152,7 @@ def parse_gtf_from_local(gtf_path: str) -> hl.dict:
             fields = line.split('\t')
 
             if len(fields) != len(GENCODE_FILE_HEADER):
-                raise ValueError("Unexpected number of fields on line #%s: %s" % (i, fields))
+                raise ValueError(f'Unexpected number of fields on line #{i}: {fields}')
 
             record = dict(zip(GENCODE_FILE_HEADER, fields))
 
@@ -160,8 +160,8 @@ def parse_gtf_from_local(gtf_path: str) -> hl.dict:
                 continue
 
             # parse info field
-            info_fields = [x.strip().split() for x in record['info'].split(';') if x != '']
-            info_fields = {k: v.strip('"') for k, v in info_fields}
+            info_fields_list = [x.strip().split() for x in record['info'].split(';') if x != '']
+            info_fields = {k: v.strip('"') for k, v in info_fields_list}
 
             gene_id_mapping[info_fields['gene_name']] = info_fields['gene_id'].split('.')[0]
 
@@ -206,7 +206,7 @@ def annotate_sv_cohort(
         sf=mt.info.AF[0],
         sn=mt.info.AN,
         end=mt.info.END,
-        sv_callset_Het=mt.info.N_Het,
+        sv_callset_Het=mt.info.N_HET,
         sv_callset_Hom=mt.info.N_HOMALT,
         gnomad_svs_ID=mt.info.gnomAD_V2_SVID,
         gnomad_svs_AF=mt.info.gnomAD_V2_AF,
@@ -325,7 +325,7 @@ def annotate_sv_dataset(mt_path: str, out_mt_path: str, checkpoint_prefix: str |
     mt = read_hail(str(mt_path))
 
     is_called = hl.is_defined(mt.GT)
-    was_previously_called = hl.is_defined(mt.CONC_ST) & ~mt.CONC_ST.contains("EMPTY")
+    was_previously_called = hl.is_defined(mt.CONC_ST) & ~mt.CONC_ST.contains('EMPTY')
     num_alt = hl.if_else(is_called, mt.GT.n_alt_alleles(), -1)
     prev_num_alt = hl.if_else(was_previously_called, PREVIOUS_GENOTYPE_N_ALT_ALLELES[hl.set(mt.CONC_ST)], -1)
     concordant_genotype = num_alt == prev_num_alt
@@ -334,7 +334,7 @@ def annotate_sv_dataset(mt_path: str, out_mt_path: str, checkpoint_prefix: str |
     mt = mt.annotate_rows(
         genotypes=hl.agg.collect(
             hl.struct(
-                sample_id= mt.s,
+                sample_id=mt.s,
                 gq=mt.GQ,
                 cn=mt.RD_CN,
                 num_alt=num_alt,
@@ -397,14 +397,14 @@ def annotate_sv_dataset(mt_path: str, out_mt_path: str, checkpoint_prefix: str |
     mt = mt.annotate_rows(
         samples_qs=hl.struct(
             **{
-                '%i_to_%i' % (i, i + 10): _genotype_filter_samples(lambda g: ((g.qs >= i) & (g.qs < i + 10)))
+                f'{i}_to_{i + 10}': _genotype_filter_samples(lambda g: ((g.qs >= i) & (g.qs < i + 10)))
                 for i in range(0, 1000, 10)
             },
             gt_1000=_genotype_filter_samples(lambda g: g.qs >= 1000)
         ),
         samples_cn=hl.struct(
             **{
-                '%i' % i: _genotype_filter_samples(lambda g: g.cn == i)
+                f'{i}': _genotype_filter_samples(lambda g: g.cn == i)
                 for i in range(0, 4, 1)
             },
             gte_4=_genotype_filter_samples(lambda g: g.cn >= 4)  # not sure if I can mix syntax

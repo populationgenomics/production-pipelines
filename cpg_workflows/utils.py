@@ -50,7 +50,6 @@ def checkpoint_hail(t, file_name: str, checkpoint_prefix: str | None = None):
     return t
 
 
-
 def missing_from_pre_collected(test: set[Path], known: set[Path]) -> Path | None:
     """
     Check if a path exists in a set of known paths.

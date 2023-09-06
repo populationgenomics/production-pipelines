@@ -465,9 +465,13 @@ class AnnotateVcf(CohortStage):
             'max_shards_per_chrom_step1': 200,
             'min_records_per_shard_step1': 5000,
         }
+
         input_dict |= get_references(
             [
                 'protein_coding_gtf',
+                {'ref_bed': 'external_af_ref_bed'},
+                {'ref_prefix': 'external_af_ref_bed_prefix'},
+                {'population': 'external_af_population'},
                 {'contig_list': 'primary_contigs_list'},
             ]
         )

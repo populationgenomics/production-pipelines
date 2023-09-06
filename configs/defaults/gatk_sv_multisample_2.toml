@@ -10,3 +10,8 @@ ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapie
 # Access to this file was provided on a one-off basis, and is not publicly available.
 # If an updated model is required, contact Mark Walker at the Broad Institute
 aou_filtering_model = 'gs://cpg-common-test/references/gatk-sv/gatk-sv-recalibrator.aou_phase_1.v1.model'
+
+# a couple of annotation arguments are not files
+# github.com/broadinstitute/gatk-sv/blob/main/inputs/templates/test/AnnotateVcf/AnnotateVcf.json.tmpl#L4-L8
+external_af_population = ['ALL', 'AFR', 'AMR', 'EAS', 'EUR']
+external_af_ref_bed_prefix = 'gnomad_v2.1_sv'
