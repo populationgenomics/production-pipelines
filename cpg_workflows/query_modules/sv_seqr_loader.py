@@ -25,33 +25,43 @@ PASS = 'PASS'
 
 # Used to filter mt.info fields.
 CONSEQ_PREDICTED_PREFIX = 'PREDICTED_'
-NON_GENE_PREDICTIONS = {'PREDICTED_INTERGENIC', 'PREDICTED_NONCODING_BREAKPOINT', 'PREDICTED_NONCODING_SPAN'}
+NON_GENE_PREDICTIONS = {
+    'PREDICTED_INTERGENIC',
+    'PREDICTED_NONCODING_BREAKPOINT',
+    'PREDICTED_NONCODING_SPAN',
+}
 
 # path for downloading this file
 GENCODE_GTF_URL = 'http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_{gencode_release}/gencode.v{gencode_release}.annotation.gtf.gz'
 
-PREVIOUS_GENOTYPE_N_ALT_ALLELES = hl.dict({
-    # Map of concordance string -> previous n_alt_alleles()
-
-    # Concordant
-    frozenset(['TN']): 0,        # 0/0 -> 0/0
-    frozenset(['TP']): 2,        # 1/1 -> 1/1
-    frozenset(['TN', 'TP']): 1,  # 0/1 -> 0/1
-
-    # Novel
-    frozenset(['FP']): 0,        # 0/0 -> 1/1
-    frozenset(['TN', 'FP']): 0,  # 0/0 -> 0/1
-
-    # Absent
-    frozenset(['FN']): 2,        # 1/1 -> 0/0
-    frozenset(['TN', 'FN']): 1,  # 0/1 -> 0/0
-
-    # Discordant
-    frozenset(['FP', 'TP']): 1,  # 0/1 -> 1/1
-    frozenset(['FN', 'TP']): 2,  # 1/1 -> 0/1
-})
+PREVIOUS_GENOTYPE_N_ALT_ALLELES = hl.dict(
+    {
+        # Map of concordance string -> previous n_alt_alleles()
+        # Concordant
+        frozenset(['TN']): 0,  # 0/0 -> 0/0
+        frozenset(['TP']): 2,  # 1/1 -> 1/1
+        frozenset(['TN', 'TP']): 1,  # 0/1 -> 0/1
+        # Novel
+        frozenset(['FP']): 0,  # 0/0 -> 1/1
+        frozenset(['TN', 'FP']): 0,  # 0/0 -> 0/1
+        # Absent
+        frozenset(['FN']): 2,  # 1/1 -> 0/0
+        frozenset(['TN', 'FN']): 1,  # 0/1 -> 0/0
+        # Discordant
+        frozenset(['FP', 'TP']): 1,  # 0/1 -> 1/1
+        frozenset(['FN', 'TP']): 2,  # 1/1 -> 0/1
+    }
+)
 GENCODE_FILE_HEADER = [
-    'chrom', 'source', 'feature_type', 'start', 'end', 'score', 'strand', 'phase', 'info'
+    'chrom',
+    'source',
+    'feature_type',
+    'start',
+    'end',
+    'score',
+    'strand',
+    'phase',
+    'info',
 ]
 
 
@@ -85,7 +95,9 @@ def get_cpx_interval(x):
     type_chr = x.split('_chr')
     chr_pos = type_chr[1].split(':')
     pos = chr_pos[1].split('-')
-    return hl.struct(type=type_chr[0], chrom=chr_pos[0], start=hl.int32(pos[0]), end=hl.int32(pos[1]))
+    return hl.struct(
+        type=type_chr[0], chrom=chr_pos[0], start=hl.int32(pos[0]), end=hl.int32(pos[1])
+    )
 
 
 def download_gencode_gene_id_mapping(gencode_release: str) -> str:
@@ -160,19 +172,21 @@ def parse_gtf_from_local(gtf_path: str) -> hl.dict:
                 continue
 
             # parse info field
-            info_fields_list = [x.strip().split() for x in record['info'].split(';') if x != '']
+            info_fields_list = [
+                x.strip().split() for x in record['info'].split(';') if x != ''
+            ]
             info_fields = {k: v.strip('"') for k, v in info_fields_list}
 
-            gene_id_mapping[info_fields['gene_name']] = info_fields['gene_id'].split('.')[0]
+            gene_id_mapping[info_fields['gene_name']] = info_fields['gene_id'].split(
+                '.'
+            )[0]
 
     logging.info('Completed ingestion of gene-ID mapping')
     return hl.literal(gene_id_mapping)
 
 
 def annotate_sv_cohort(
-        vcf_path: str,
-        out_mt_path: str,
-        checkpoint_prefix: str | None = None
+    vcf_path: str, out_mt_path: str, checkpoint_prefix: str | None = None
 ):
     """
     Translate an annotated SV VCF into a Seqr-ready format
@@ -214,37 +228,39 @@ def annotate_sv_cohort(
         gnomad_svs_AN=unsafe_cast_int32(mt.info.gnomAD_V2_AN),
         StrVCTVRE_score=hl.or_missing(
             hl.is_defined(mt.info.StrVCTVRE_score),
-            hl.parse_float(mt.info.StrVCTVRE_score)
+            hl.parse_float(mt.info.StrVCTVRE_score),
         ),
         filters=hl.or_missing(  # hopefully this plays nicely
-            (
-                mt.filters.filter(
-                    lambda x: (x != PASS) & (x != BOTHSIDES_SUPPORT)
-                )
-            ).size() > 0, mt.filters
+            (mt.filters.filter(lambda x: (x != PASS) & (x != BOTHSIDES_SUPPORT))).size()
+            > 0,
+            mt.filters,
         ),
-        bothsides_support=mt.filters.any(
-            lambda x: x == BOTHSIDES_SUPPORT
-        ),
+        bothsides_support=mt.filters.any(lambda x: x == BOTHSIDES_SUPPORT),
         algorithms=mt.info.ALGORITHMS,
         cpx_intervals=hl.or_missing(
             hl.is_defined(mt.info.CPX_INTERVALS),
             mt.info.CPX_INTERVALS.map(lambda x: get_cpx_interval(x)),
         ),
-        sv_types=mt.alleles[1].replace('[<>]', '').split(':', 2)
+        sv_types=mt.alleles[1].replace('[<>]', '').split(':', 2),
     )
 
     # save those changes
     mt = checkpoint_hail(mt, 'initial_annotation_round.mt', checkpoint_prefix)
 
     # get the Gene-Symbol mapping dict
-    gene_id_mapping_file = download_gencode_gene_id_mapping(get_config().get('gencode_release', '42'))
+    gene_id_mapping_file = download_gencode_gene_id_mapping(
+        get_config().get('gencode_release', '42')
+    )
     gene_id_mapping = parse_gtf_from_local(gene_id_mapping_file)
 
     # OK, NOW IT'S BUSINESS TIME
     conseq_predicted_gene_cols = [
-        gene_col for gene_col in mt.info
-        if (gene_col.startswith(CONSEQ_PREDICTED_PREFIX) and gene_col not in NON_GENE_PREDICTIONS)
+        gene_col
+        for gene_col in mt.info
+        if (
+            gene_col.startswith(CONSEQ_PREDICTED_PREFIX)
+            and gene_col not in NON_GENE_PREDICTIONS
+        )
     ]
 
     # annotate with mapped genes
@@ -253,23 +269,27 @@ def annotate_sv_cohort(
             hl.is_defined,
             [
                 mt.info[gene_col].map(
-                    lambda gene: hl.struct(**{
-                        GENE_SYMBOL: gene,
-                        GENE_ID: gene_id_mapping.get(gene, hl.missing(hl.tstr)),
-                        MAJOR_CONSEQUENCE: gene_col.replace(CONSEQ_PREDICTED_PREFIX, '', 1)
-                    })
+                    lambda gene: hl.struct(
+                        **{
+                            GENE_SYMBOL: gene,
+                            GENE_ID: gene_id_mapping.get(gene, hl.missing(hl.tstr)),
+                            MAJOR_CONSEQUENCE: gene_col.replace(  # noqa: B023
+                                CONSEQ_PREDICTED_PREFIX, '', 1
+                            ),
+                        }
+                    )
                 )
                 for gene_col in conseq_predicted_gene_cols
-            ]
+            ],
         ).flatmap(lambda x: x),
         xstop=variant_id.get_expr_for_xpos(
             hl.if_else(
                 hl.is_defined(mt.info.END2),
                 hl.struct(contig=mt.info.CHR2, position=mt.info.END2),
-                hl.struct(contig=mt.locus.contig, position=mt.info.END)
+                hl.struct(contig=mt.locus.contig, position=mt.info.END),
             )
         ),
-        rg37_locus=mt.rg37_locus
+        rg37_locus=mt.rg37_locus,
     )
 
     # chuck in another checkpoint
@@ -278,28 +298,34 @@ def annotate_sv_cohort(
     # and some more annotation stuff
     mt = mt.annotate_rows(
         rg37_locus_end=hl.or_missing(
-            mt.xstop.position <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.xstop.contig],
-            hl.liftover(hl.locus(mt.xstop.contig, mt.xstop.position, reference_genome='GRCh38'), 'GRCh37'),
+            mt.xstop.position
+            <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.xstop.contig],
+            hl.liftover(
+                hl.locus(mt.xstop.contig, mt.xstop.position, reference_genome='GRCh38'),
+                'GRCh37',
+            ),
         ),
         syType=mt.sv_types[0],
-        transcriptConsequenceTerms=hl.set(mt.sortedTranscriptConsequences.map(lambda x: x[MAJOR_CONSEQUENCE]).extend([mt.sv_types[0]])),
+        transcriptConsequenceTerms=hl.set(
+            mt.sortedTranscriptConsequences.map(lambda x: x[MAJOR_CONSEQUENCE]).extend(
+                [mt.sv_types[0]]
+            )
+        ),
         sv_type_detail=hl.if_else(
             mt.sv_types[0] == 'CPX',
             mt.info.CPX_TYPE,
             hl.or_missing(
                 (mt.sv_types[0] == 'INS') & (hl.len(mt.sv_types) > 1),
                 mt.sv_types[1],
-            )
+            ),
         ),
         geneIds=hl.set(
             mt.sortedTranscriptConsequences.filter(
                 lambda x: x[MAJOR_CONSEQUENCE] != 'NEAREST_TSS'
-            ).map(
-                lambda x: x[GENE_ID]
-            )
+            ).map(lambda x: x[GENE_ID])
         ),
         variantId=mt.rsid,
-        docId=mt.rsid[0: 512]
+        docId=mt.rsid[0:512],
     )
 
     # write this output
@@ -327,7 +353,9 @@ def annotate_sv_dataset(mt_path: str, out_mt_path: str, checkpoint_prefix: str |
     is_called = hl.is_defined(mt.GT)
     was_previously_called = hl.is_defined(mt.CONC_ST) & ~mt.CONC_ST.contains('EMPTY')
     num_alt = hl.if_else(is_called, mt.GT.n_alt_alleles(), -1)
-    prev_num_alt = hl.if_else(was_previously_called, PREVIOUS_GENOTYPE_N_ALT_ALLELES[hl.set(mt.CONC_ST)], -1)
+    prev_num_alt = hl.if_else(
+        was_previously_called, PREVIOUS_GENOTYPE_N_ALT_ALLELES[hl.set(mt.CONC_ST)], -1
+    )
     concordant_genotype = num_alt == prev_num_alt
     discordant_genotype = (num_alt != prev_num_alt) & (prev_num_alt > 0)
     novel_genotype = (num_alt != prev_num_alt) & (prev_num_alt == 0)
@@ -339,8 +367,12 @@ def annotate_sv_dataset(mt_path: str, out_mt_path: str, checkpoint_prefix: str |
                 cn=mt.RD_CN,
                 num_alt=num_alt,
                 prev_num_alt=hl.or_missing(discordant_genotype, prev_num_alt),
-                prev_call=hl.or_missing(is_called, was_previously_called & concordant_genotype),
-                new_call=hl.or_missing(is_called, ~was_previously_called | novel_genotype)
+                prev_call=hl.or_missing(
+                    is_called, was_previously_called & concordant_genotype
+                ),
+                new_call=hl.or_missing(
+                    is_called, ~was_previously_called | novel_genotype
+                ),
             )
         )
     )
@@ -369,6 +401,14 @@ def annotate_sv_dataset(mt_path: str, out_mt_path: str, checkpoint_prefix: str |
     def _filter_samples_gq(i, g):
         return (g.gq >= i) & (g.gq < i + 10)
 
+    @_capture_i_decorator
+    def _filter_samples_qs(i, g):
+        return (g.qs >= i) & (g.qs < i + 10)
+
+    @_capture_i_decorator
+    def _filter_sample_cn(i, g):
+        return g.cn == i
+
     # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/sv_mt_schema.py#L221
     # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/seqr_mt_schema.py#L251
     mt = mt.annotate_rows(
@@ -387,7 +427,7 @@ def annotate_sv_dataset(mt_path: str, out_mt_path: str, checkpoint_prefix: str |
                 )
                 for i in range(0, 90, 10)
             }
-        )
+        ),
     )
 
     # not sure if this checkpoint is worthwhile
@@ -397,17 +437,17 @@ def annotate_sv_dataset(mt_path: str, out_mt_path: str, checkpoint_prefix: str |
     mt = mt.annotate_rows(
         samples_qs=hl.struct(
             **{
-                f'{i}_to_{i + 10}': _genotype_filter_samples(lambda g: ((g.qs >= i) & (g.qs < i + 10)))
+                f'{i}_to_{i + 10}': _genotype_filter_samples(_filter_samples_qs(i))
                 for i in range(0, 1000, 10)
             },
-            gt_1000=_genotype_filter_samples(lambda g: g.qs >= 1000)
+            gt_1000=_genotype_filter_samples(lambda g: g.qs >= 1000),
         ),
         samples_cn=hl.struct(
             **{
-                f'{i}': _genotype_filter_samples(lambda g: g.cn == i)
+                f'{i}': _genotype_filter_samples(_filter_sample_cn(i))
                 for i in range(0, 4, 1)
             },
-            gte_4=_genotype_filter_samples(lambda g: g.cn >= 4)  # not sure if I can mix syntax
+            gte_4=_genotype_filter_samples(lambda g: g.cn >= 4),
         ),
     )
 
