@@ -406,32 +406,27 @@ class FilterGenotypes(CohortStage):
             'vcf': inputs.as_dict(cohort, SVConcordance)['concordance_vcf'],
             'ploidy_table': inputs.as_dict(cohort, GeneratePloidyTable)['ploidy_table'],
             'ped_file': make_combined_ped(cohort, self.prefix),
+            'fmax_beta': get_config()['references']['gatk_sv'].get('fmax_beta', 0.3),
+            'recalibrate_gq_args': get_config()['references']['gatk_sv'].get('recalibrate_gq_args'),
+            'sl_filter_args': get_config()['references']['gatk_sv'].get('sl_filter_args'),
         }
+        assert input_dict['recalibrate_gq_args']
+        assert input_dict['sl_filter_args']
 
         input_dict |= get_images(
             ['gatk_docker', 'linux_docker', 'sv_base_mini_docker', 'sv_pipeline_docker']
         )
 
-        input_dict |= get_references(
-            [
-                'fmax_beta',  # hoping for more stringent filtering
-                'recalibrate_gq_args',  # list of param Strings
-                'sl_filter_args',
-                {'gq_recalibrator_model_file': 'aou_filtering_model'},
-            ]
-        )
+        # only path arguments can be retrieved using get_references, so there is some
+        # hard coding here.
+
+        input_dict |= get_references([{'gq_recalibrator_model_file': 'aou_filtering_model'}])
 
         # something a little trickier - we need to get various genome tracks
         # we don't copy in the indexes, so that might be a problem later
         input_dict['genome_tracks'] = list(
             get_references(
-                [
-                    'recalibrate_gq_repeatmasker',
-                    'recalibrate_gq_segmental_dups',
-                    'recalibrate_gq_simple_reps',
-                    'recalibrate_gq_umap_s100',
-                    'recalibrate_gq_umap_s24',
-                ]
+                get_config()['references']['gatk_sv'].get('genome_tracks', [])
             ).values()
         )
 
@@ -484,13 +479,14 @@ class AnnotateVcf(CohortStage):
             'sv_per_shard': 5000,
             'max_shards_per_chrom_step1': 200,
             'min_records_per_shard_step1': 5000,
+            'population': get_config()['references']['gatk_sv'].get('external_af_population'),
+            'ref_prefix': get_config()['references']['gatk_sv'].get('external_af_ref_bed_prefix'),
         }
+
         input_dict |= get_references(
             [
                 'protein_coding_gtf',
                 {'ref_bed': 'external_af_ref_bed'},
-                {'ref_prefix': 'external_af_ref_bed_prefix'},
-                {'population': 'external_af_population'},
                 {'contig_list': 'primary_contigs_list'},
             ]
         )
