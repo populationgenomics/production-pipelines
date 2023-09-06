@@ -6,13 +6,14 @@ MakeCohortVCF and AnnotateVCF
 
 from typing import Any
 
-from cpg_utils import to_path
+from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
 from cpg_workflows.batch import get_batch
 from cpg_workflows.jobs.seqr_loader_sv import (
     annotate_cohort_jobs_sv,
     annotate_dataset_jobs_sv,
 )
+from cpg_workflows.stages.seqr_loader import es_password, MtToEs
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     add_gatk_sv_jobs,
     get_fasta,
@@ -643,3 +644,95 @@ class AnnotateDatasetSv(DatasetStage):
         return self.make_outputs(
             dataset, data=self.expected_outputs(dataset), jobs=jobs
         )
+
+
+@stage(
+    required_stages=[AnnotateDatasetSv],
+    analysis_type='es-index',  # specific type of es index
+    analysis_keys=['index_name'],
+)
+class MtToEsSv(DatasetStage):
+    """
+    Create a Seqr index.
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict[str, str | Path]:
+        """
+        Expected to generate a Seqr index, which is not a file
+        """
+        sequencing_type = get_config()['workflow']['sequencing_type']
+        index_name = f'{dataset.name}-{sequencing_type}-SV-{get_workflow().run_timestamp}'.lower()
+        return {
+            'index_name': index_name,
+            'done_flag': dataset.prefix() / 'es' / f'{index_name}.done',
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """
+        Uses analysis-runner's dataproc helper to run a hail query script
+        """
+        if (
+            es_datasets := get_config()['workflow'].get('create_es_index_for_datasets')
+        ) and dataset.name not in es_datasets:
+            # Skipping dataset that wasn't explicitly requested to upload to ES
+            return self.make_outputs(dataset)
+
+        dataset_mt_path = inputs.as_path(
+            target=dataset, stage=AnnotateDatasetSv, key='mt'
+        )
+        index_name = self.expected_outputs(dataset)['index_name']
+        done_flag_path = self.expected_outputs(dataset)['done_flag']
+
+        if 'elasticsearch' not in get_config():
+            raise ValueError(
+                f'"elasticsearch" section is not defined in config, cannot create '
+                f'Elasticsearch index for dataset {dataset}'
+            )
+
+        from analysis_runner import dataproc
+
+        # transformation is the same, just use the same methods file?
+        script = (
+            f'cpg_workflows/dataproc_scripts/mt_to_es.py '
+            f'--mt-path {dataset_mt_path} '
+            f'--es-index {index_name} '
+            f'--done-flag-path {done_flag_path} '
+            f'--es-password {es_password()}'
+        )
+        pyfiles = ['seqr-loading-pipelines/hail_scripts']
+        job_name = f'{dataset.name}: create ES index'
+
+        if cluster_id := get_config()['hail'].get('dataproc', {}).get('cluster_id'):
+            # noinspection PyProtectedMember
+            j = dataproc._add_submit_job(
+                batch=get_batch(),
+                cluster_id=cluster_id,
+                script=script,
+                pyfiles=pyfiles,
+                job_name=job_name,
+                region='australia-southeast1',
+            )
+        else:
+            j = dataproc.hail_dataproc_job(
+                get_batch(),
+                script,
+                max_age='48h',
+                packages=[
+                    'cpg_workflows',
+                    'elasticsearch==8.*',
+                    'google',
+                    'fsspec',
+                    'gcloud',
+                ],
+                num_workers=2,
+                num_secondary_workers=0,
+                job_name=job_name,
+                depends_on=inputs.get_jobs(dataset),
+                scopes=['cloud-platform'],
+                pyfiles=pyfiles,
+                init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
+            )
+        j._preemptible = False
+        j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}
+        jobs = [j]
+        return self.make_outputs(dataset, data=index_name, jobs=jobs)
