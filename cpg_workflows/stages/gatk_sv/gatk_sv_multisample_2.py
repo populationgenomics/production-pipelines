@@ -405,6 +405,7 @@ class FilterGenotypes(CohortStage):
             'output_prefix': cohort.name,
             'vcf': inputs.as_dict(cohort, SVConcordance)['concordance_vcf'],
             'ploidy_table': inputs.as_dict(cohort, GeneratePloidyTable)['ploidy_table'],
+            'ped_file': make_combined_ped(cohort, self.prefix),
         }
 
         input_dict |= get_images(
@@ -412,7 +413,26 @@ class FilterGenotypes(CohortStage):
         )
 
         input_dict |= get_references(
-            [{'gq_recalibrator_model_file': 'aou_filtering_model'}]
+            [
+                'fmax_beta',  # hoping for more stringent filtering
+                'recalibrate_gq_args',  # list of param Strings
+                'sl_filter_args',
+                {'gq_recalibrator_model_file': 'aou_filtering_model'},
+            ]
+        )
+
+        # something a little trickier - we need to get various genome tracks
+        # we don't copy in the indexes, so that might be a problem later
+        input_dict['genome_tracks'] = list(
+            get_references(
+                [
+                    'recalibrate_gq_repeatmasker',
+                    'recalibrate_gq_segmental_dups',
+                    'recalibrate_gq_simple_reps',
+                    'recalibrate_gq_umap_s100',
+                    'recalibrate_gq_umap_s24',
+                ]
+            ).values()
         )
 
         expected_d = self.expected_outputs(cohort)
@@ -468,6 +488,9 @@ class AnnotateVcf(CohortStage):
         input_dict |= get_references(
             [
                 'protein_coding_gtf',
+                {'ref_bed': 'external_af_ref_bed'},
+                {'ref_prefix': 'external_af_ref_bed_prefix'},
+                {'population': 'external_af_population'},
                 {'contig_list': 'primary_contigs_list'},
             ]
         )
