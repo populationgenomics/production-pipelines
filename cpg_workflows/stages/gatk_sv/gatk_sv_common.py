@@ -19,7 +19,7 @@ from cpg_workflows.batch import make_job_name, Batch
 from cpg_workflows.workflow import Dataset, Cohort
 
 
-GATK_SV_COMMIT = 'e2e76a8018c61e1733c993680ea21a105273a1d9'
+GATK_SV_COMMIT = '8759710f2a3cc396b966dae5bab5b36896fae060'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 _FASTA = None
 
