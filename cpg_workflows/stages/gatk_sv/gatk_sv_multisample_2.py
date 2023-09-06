@@ -6,10 +6,10 @@ MakeCohortVCF and AnnotateVCF
 
 from typing import Any
 
+from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_workflows.batch import get_batch
-from cpg_workflows.workflow import stage, StageOutput, StageInput, Cohort, CohortStage
-
+from cpg_workflows.jobs.seqr_loader_sv import annotate_cohort_jobs_sv, annotate_dataset_jobs_sv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     add_gatk_sv_jobs,
     get_fasta,
@@ -17,9 +17,18 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_references,
     make_combined_ped,
     _sv_annotated_meta,
-    _sv_batch_meta,
     _sv_filtered_meta,
     SV_CALLERS,
+)
+from cpg_workflows.workflow import (
+    get_workflow,
+    stage,
+    Cohort,
+    CohortStage,
+    Dataset,
+    DatasetStage,
+    StageOutput,
+    StageInput,
 )
 from cpg_workflows.jobs import ploidy_table_from_ped
 
@@ -449,7 +458,7 @@ class FilterGenotypes(CohortStage):
     required_stages=FilterGenotypes,
     analysis_type='sv',
     analysis_keys=['output_vcf'],
-    update_analysis_meta=_sv_batch_meta,
+    update_analysis_meta=_sv_annotated_meta,
 )
 class AnnotateVcf(CohortStage):
     """
@@ -517,13 +526,115 @@ class AnnotateVcf(CohortStage):
 @stage(
     required_stages=AnnotateVcf,
     analysis_type='sv',
-    analysis_keys=['output_vcf'],
+    analysis_keys=['mt'],
     update_analysis_meta=_sv_annotated_meta,
 )
-class AnnotateSVCohort(CohortStage):
+class AnnotateCohortSv(CohortStage):
     """
     What do we want?! SV Data in Seqr!
     When do we want it?! Now!
 
-    This is the first step in transforming the annotated SV callset data into a seqr ready format
+    First step to transform annotated SV callset data into a seqr ready format
     """
+
+    def expected_outputs(self, cohort: Cohort) -> dict:
+        """
+        Expected to write a matrix table.
+        """
+        return {
+            'tmp_prefix': str(self.tmp_prefix),
+            'mt': self.prefix / 'cohort_sv.mt',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        """
+        queue job(s) to rearrange the annotations prior to Seqr transformation
+
+        Args:
+            cohort ():
+            inputs ():
+        """
+
+        vcf_path = inputs.as_path(target=cohort, stage=AnnotateVcf, key='output_vcf')
+        checkpoint_prefix = (
+            to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
+        )
+
+        jobs = annotate_cohort_jobs_sv(
+            b=get_batch(),
+            vcf_path=vcf_path,
+            out_mt_path=self.expected_outputs(cohort)['mt'],
+            checkpoint_prefix=checkpoint_prefix,
+            job_attrs=self.get_job_attrs(cohort),
+            depends_on=inputs.get_jobs(cohort),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
+
+
+def _update_sv_dataset_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, Any]:
+    """
+    Add meta.type to custom analysis object
+    """
+    return {'type': 'annotated-sv-dataset-callset'}
+
+
+@stage(
+    required_stages=AnnotateCohortSv,
+    analysis_type='sv',
+    analysis_keys=['mt'],
+    update_analysis_meta=_update_sv_dataset_meta,
+)
+class AnnotateDatasetSv(DatasetStage):
+    """
+    blip blop
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict:
+        """
+        Expected to generate a matrix table
+        """
+        return {
+            'tmp_prefix': str(self.tmp_prefix / dataset.name),
+            'mt': (
+                dataset.prefix()
+                / 'mt'
+                / f'{get_workflow().output_version}-{dataset.name}.mt'
+            ),
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """
+        pass
+        Args:
+            dataset ():
+            inputs ():
+
+        Returns:
+
+        """
+        """
+                Uses analysis-runner's dataproc helper to run a hail query script
+                """
+        assert dataset.cohort
+        mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateCohortSv, key='mt')
+
+        checkpoint_prefix = (
+            to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
+        )
+
+        jobs = annotate_dataset_jobs_sv(
+            b=get_batch(),
+            mt_path=mt_path,
+            sequencing_group_ids=dataset.get_sequencing_group_ids(),
+            out_mt_path=self.expected_outputs(dataset)['mt'],
+            tmp_prefix=checkpoint_prefix,
+            job_attrs=self.get_job_attrs(dataset),
+            depends_on=inputs.get_jobs(dataset),
+        )
+
+        return self.make_outputs(
+            dataset, data=self.expected_outputs(dataset), jobs=jobs
+        )

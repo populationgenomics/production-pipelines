@@ -188,7 +188,7 @@ def parse_gtf_from_local(gtf_path: str) -> hl.dict:
     return hl.literal(gene_id_mapping)
 
 
-def annotate_sv_cohort(
+def annotate_cohort_sv(
     vcf_path: str, out_mt_path: str, checkpoint_prefix: str | None = None
 ):
     """
@@ -340,7 +340,7 @@ def annotate_sv_cohort(
     mt.write(out_mt_path, overwrite=True)
 
 
-def annotate_sv_dataset(mt_path: str, out_mt_path: str, checkpoint_prefix: str | None):
+def annotate_dataset_sv(mt_path: str, out_mt_path: str, checkpoint_prefix: str | None):
     """
     load the stuff specific to samples in this dataset
     do this after subsetting to specific samples

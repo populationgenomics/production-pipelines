@@ -9,10 +9,8 @@ import hail as hl
 
 from cpg_utils import to_path
 
-from cpg_workflows.query_modules.seqr_loader import (
-    subset_mt_to_samples,
-    annotate_dataset_mt,
-)
+from cpg_workflows.query_modules.seqr_loader import subset_mt_to_samples
+from cpg_workflows.query_modules.seqr_loader_sv import annotate_dataset_sv
 
 
 @click.command()
@@ -34,12 +32,10 @@ def main(
     subset_mt_path = to_path(checkpoint_prefix) / 'cohort-subset.mt'
 
     subset_mt_to_samples(
-        mt_path=mt_path,
-        sample_ids=sample_ids,
-        out_mt_path=str(subset_mt_path),
+        mt_path=mt_path, sample_ids=sample_ids, out_mt_path=str(subset_mt_path)
     )
 
-    annotate_dataset_mt(
+    annotate_dataset_sv(
         mt_path=str(subset_mt_path),
         out_mt_path=out_mt_path,
         checkpoint_prefix=checkpoint_prefix,
