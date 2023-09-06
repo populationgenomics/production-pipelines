@@ -32,7 +32,10 @@ NON_GENE_PREDICTIONS = {
 }
 
 # path for downloading this file
-GENCODE_GTF_URL = 'http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_{gencode_release}/gencode.v{gencode_release}.annotation.gtf.gz'
+GENCODE_GTF_URL = (
+    'http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/'
+    'release_{gencode_release}/gencode.v{gencode_release}.annotation.gtf.gz'
+)
 
 PREVIOUS_GENOTYPE_N_ALT_ALLELES = hl.dict(
     {
