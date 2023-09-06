@@ -267,6 +267,11 @@ def annotate_sv_cohort(
     ]
 
     # annotate with mapped genes
+    # Note I'm adding a Flake8 noqa for B023 (loop variable gene_col unbound)
+    # I've experimented in a notebook and this seems to perform as expected
+    # The homologous small variant seqr_loader method performs a similar function
+    # but in a slightly more complicated way (mediated by a method in the S-L-P
+    # codebase, so as not to trigger Flake8 evaluation)
     mt = mt.annotate_rows(
         sortedTranscriptConsequences=hl.filter(
             hl.is_defined,

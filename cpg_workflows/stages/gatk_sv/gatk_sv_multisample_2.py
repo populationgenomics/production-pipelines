@@ -16,6 +16,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_images,
     get_references,
     make_combined_ped,
+    _sv_annotated_meta,
     _sv_batch_meta,
     _sv_filtered_meta,
     SV_CALLERS,
@@ -511,3 +512,18 @@ class AnnotateVcf(CohortStage):
             expected_out_dict=expected_d,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
+
+
+@stage(
+    required_stages=AnnotateVcf,
+    analysis_type='sv',
+    analysis_keys=['output_vcf'],
+    update_analysis_meta=_sv_annotated_meta,
+)
+class AnnotateSVCohort(CohortStage):
+    """
+    What do we want?! SV Data in Seqr!
+    When do we want it?! Now!
+
+    This is the first step in transforming the annotated SV callset data into a seqr ready format
+    """
