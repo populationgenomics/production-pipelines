@@ -407,8 +407,12 @@ class FilterGenotypes(CohortStage):
             'ploidy_table': inputs.as_dict(cohort, GeneratePloidyTable)['ploidy_table'],
             'ped_file': make_combined_ped(cohort, self.prefix),
             'fmax_beta': get_config()['references']['gatk_sv'].get('fmax_beta', 0.3),
-            'recalibrate_gq_args': get_config()['references']['gatk_sv'].get('recalibrate_gq_args'),
-            'sl_filter_args': get_config()['references']['gatk_sv'].get('sl_filter_args'),
+            'recalibrate_gq_args': get_config()['references']['gatk_sv'].get(
+                'recalibrate_gq_args'
+            ),
+            'sl_filter_args': get_config()['references']['gatk_sv'].get(
+                'sl_filter_args'
+            ),
         }
         assert input_dict['recalibrate_gq_args']
         assert input_dict['sl_filter_args']
@@ -420,7 +424,12 @@ class FilterGenotypes(CohortStage):
         # only path arguments can be retrieved using get_references, so there is some
         # hard coding here.
 
-        input_dict |= get_references([{'gq_recalibrator_model_file': 'aou_filtering_model'}])
+        input_dict |= get_references(
+            [
+                {'gq_recalibrator_model_file': 'aou_filtering_model'},
+                'primary_contigs_fai',
+            ]
+        )
 
         # something a little trickier - we need to get various genome tracks
         # we don't copy in the indexes, so that might be a problem later
@@ -479,8 +488,12 @@ class AnnotateVcf(CohortStage):
             'sv_per_shard': 5000,
             'max_shards_per_chrom_step1': 200,
             'min_records_per_shard_step1': 5000,
-            'population': get_config()['references']['gatk_sv'].get('external_af_population'),
-            'ref_prefix': get_config()['references']['gatk_sv'].get('external_af_ref_bed_prefix'),
+            'population': get_config()['references']['gatk_sv'].get(
+                'external_af_population'
+            ),
+            'ref_prefix': get_config()['references']['gatk_sv'].get(
+                'external_af_ref_bed_prefix'
+            ),
         }
 
         input_dict |= get_references(
