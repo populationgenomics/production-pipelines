@@ -22,21 +22,21 @@ genome_tracks = [
     'recalibrate_gq_segmental_dups',
     'recalibrate_gq_simple_reps',
     'recalibrate_gq_umap_s100',
-    'recalibrate_gq_umap_s24'
+    'recalibrate_gq_umap_s24',
 ]
 genome_tracks_index = [
     'recalibrate_gq_repeatmasker_index',
     'recalibrate_gq_segmental_dups_index',
     'recalibrate_gq_simple_reps_index',
     'recalibrate_gq_umap_s100_index',
-    'recalibrate_gq_umap_s24_index'
+    'recalibrate_gq_umap_s24_index',
 ]
 recalibrate_gq_args = [
     '--keep-homvar false',
     '--keep-homref true',
     '--keep-multiallelic true',
     '--skip-genotype-filtering true',
-    '--min-samples-to-estimate-allele-frequency -1'
+    '--min-samples-to-estimate-allele-frequency -1',
 ]
 
 # FilterGenotypes - stringent end of [0.3, 0.5] range
