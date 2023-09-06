@@ -405,6 +405,7 @@ class FilterGenotypes(CohortStage):
             'output_prefix': cohort.name,
             'vcf': inputs.as_dict(cohort, SVConcordance)['concordance_vcf'],
             'ploidy_table': inputs.as_dict(cohort, GeneratePloidyTable)['ploidy_table'],
+            'ped_file': make_combined_ped(cohort, self.prefix),
         }
 
         input_dict |= get_images(
@@ -415,6 +416,7 @@ class FilterGenotypes(CohortStage):
             [
                 'fmax_beta',  # hoping for more stringent filtering
                 'recalibrate_gq_args',  # list of param Strings
+                'sl_filter_args',
                 {'gq_recalibrator_model_file': 'aou_filtering_model'},
             ]
         )

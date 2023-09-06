@@ -41,3 +41,5 @@ recalibrate_gq_args = [
 
 # FilterGenotypes - stringent end of [0.3, 0.5] range
 fmax_beta = 0.3
+
+sl_filter_args = '--small-del-threshold 93 --medium-del-threshold 150 --small-dup-threshold -51 --medium-dup-threshold -4 --ins-threshold -13 --inv-threshold -19'
