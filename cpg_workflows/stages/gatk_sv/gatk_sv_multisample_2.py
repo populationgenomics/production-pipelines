@@ -497,6 +497,7 @@ class AnnotateVcf(CohortStage):
             'ref_prefix': get_config()['references']['gatk_sv'].get(
                 'external_af_ref_bed_prefix'
             ),
+            'use_hail': False
         }
 
         input_dict |= get_references(
