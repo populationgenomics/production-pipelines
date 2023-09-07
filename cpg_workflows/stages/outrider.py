@@ -35,7 +35,7 @@ class Outrider(CohortStage):
         Generate outrider outputs.
         """
         return {
-            sequencing_group.id: sequencing_group.dataset.prefix() / 'outrider' / f'{sequencing_group.id}.output'
+            sequencing_group.id: sequencing_group.dataset.prefix() / 'outrider' / f'{sequencing_group.id}.output.tar.gz'
             for sequencing_group in cohort.get_sequencing_groups()
         }
     
