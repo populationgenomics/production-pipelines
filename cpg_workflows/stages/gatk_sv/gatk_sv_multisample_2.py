@@ -503,7 +503,6 @@ class AnnotateVcf(CohortStage):
             [
                 'noncoding_bed',
                 'protein_coding_gtf',
-                {'allosomes_list': 'allosomal_contigs'},
                 {'ref_bed': 'external_af_ref_bed'},
                 {'contig_list': 'primary_contigs_list'},
             ]
