@@ -476,8 +476,8 @@ class AnnotateVcf(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict:
         return {
-            'output_vcf': self.prefix / 'unfiltered_annotated.vcf.gz',
-            'output_vcf_idx': self.prefix / 'unfiltered_annotated.vcf.gz.tbi',
+            'output_vcf': self.prefix / 'unfiltered_annotated.vcf.bgz',
+            'output_vcf_idx': self.prefix / 'unfiltered_annotated.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
