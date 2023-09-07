@@ -19,7 +19,7 @@ from cpg_workflows.batch import make_job_name, Batch
 from cpg_workflows.workflow import Dataset, Cohort
 
 
-GATK_SV_COMMIT = '1423339ff587b29c92bef725ad9882ae4a03cabd'
+GATK_SV_COMMIT = '8759710f2a3cc396b966dae5bab5b36896fae060'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 _FASTA = None
 
@@ -28,7 +28,7 @@ def _sv_batch_meta(
     output_path: str,  # pylint: disable=W0613:unused-argument
 ) -> dict[str, Any]:
     """
-    Callable, add meta.type to custom analysis object
+    Callable, add meta[type] to custom analysis object
     """
     return {'type': 'gatk-sv-batch-calls'}
 
@@ -37,7 +37,7 @@ def _sv_filtered_meta(
     output_path: str,  # pylint: disable=W0613:unused-argument
 ) -> dict[str, Any]:
     """
-    Callable, add meta.type to custom analysis object
+    Callable, add meta[type] to custom analysis object
     """
     return {'type': 'gatk-sv-filtered-calls'}
 
@@ -46,7 +46,7 @@ def _sv_individual_meta(
     output_path: str,  # pylint: disable=W0613:unused-argument
 ) -> dict[str, Any]:
     """
-    Callable, add meta.type to custom analysis object
+    Callable, add meta[type] to custom analysis object
     """
     return {'type': 'gatk-sv-sequence-group-calls'}
 
@@ -228,10 +228,11 @@ def make_combined_ped(cohort: Cohort, prefix: Path) -> Path:
     Concatenating all samples across all datasets with ref panel
     """
     combined_ped_path = prefix / 'ped_with_ref_panel.ped'
+    conf_ped_path = get_references(['ped_file'])['ped_file']
     with combined_ped_path.open('w') as out:
         with cohort.write_ped_file().open() as f:
             out.write(f.read())
         # The ref panel PED doesn't have any header, so can safely concatenate:
-        with reference_path('gatk_sv/ped_file').open() as f:
+        with to_path(conf_ped_path).open() as f:
             out.write(f.read())
     return combined_ped_path

@@ -189,10 +189,12 @@ class MakeCohortVcf(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=MakeCohortVcf)
+# @stage(required_stages=MakeCohortVcf)
 class FormatVcfForGatk(CohortStage):
     """
     Takes the clean VCF and reformat for GATK intake
+
+    temporarily disabled
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict:
@@ -214,10 +216,9 @@ class FormatVcfForGatk(CohortStage):
             inputs (StageInput): access to prior inputs
         """
 
-        make_vcf_d = inputs.as_dict(cohort, MakeCohortVcf)
         input_dict: dict[str, Any] = {
             'prefix': cohort.name,
-            'vcf': make_vcf_d['vcf'],
+            'vcf': inputs.as_dict(cohort, MakeCohortVcf)['vcf'],
             'ped_file': make_combined_ped(cohort, self.prefix),
         }
         input_dict |= get_images(['sv_pipeline_docker', 'sv_base_mini_docker'])
@@ -307,19 +308,13 @@ class SVConcordance(CohortStage):
         """
 
         return {
-            'gatk_formatted_vcf': self.prefix / 'gatk_formatted.vcf.gz',
-            'gatk_formatted_vcf_index': self.prefix / 'gatk_formatted.vcf.gz.tbi',
+            'concordance_vcf': self.prefix / 'sv_concordance.vcf.gz',
+            'concordance_vcf_index': self.prefix / 'sv_concordance.vcf.gz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
-
-        Args:
-            cohort ():
-            inputs ():
-
-        Returns:
-
+        configure and queue jobs for SV concordance
         """
         raw_calls = inputs.as_dict(cohort, JoinRawCalls)
         format_vcf = inputs.as_dict(cohort, FormatVcfForGatk)
@@ -406,25 +401,43 @@ class FilterGenotypes(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        ploidy_table_output = inputs.as_dict(cohort, GeneratePloidyTable)[
-            'ploidy_table'
-        ]
-        sv_concordance_output = inputs.as_dict(cohort, SVConcordance)[
-            'gatk_formatted_vcf'
-        ]
 
         input_dict = {
-            'vcf': sv_concordance_output,
-            'ploidy_table': ploidy_table_output,
             'output_prefix': cohort.name,
+            'vcf': inputs.as_dict(cohort, SVConcordance)['concordance_vcf'],
+            'ploidy_table': inputs.as_dict(cohort, GeneratePloidyTable)['ploidy_table'],
+            'ped_file': make_combined_ped(cohort, self.prefix),
+            'fmax_beta': get_config()['references']['gatk_sv'].get('fmax_beta', 0.3),
+            'recalibrate_gq_args': get_config()['references']['gatk_sv'].get(
+                'recalibrate_gq_args'
+            ),
+            'sl_filter_args': get_config()['references']['gatk_sv'].get(
+                'sl_filter_args'
+            ),
         }
+        assert input_dict['recalibrate_gq_args']
+        assert input_dict['sl_filter_args']
 
         input_dict |= get_images(
             ['gatk_docker', 'linux_docker', 'sv_base_mini_docker', 'sv_pipeline_docker']
         )
 
+        # only path arguments can be retrieved using get_references, so there is some
+        # hard coding here.
+
         input_dict |= get_references(
-            [{'gq_recalibrator_model_file': 'aou_filtering_model'}]
+            [
+                {'gq_recalibrator_model_file': 'aou_filtering_model'},
+                'primary_contigs_fai',
+            ]
+        )
+
+        # something a little trickier - we need to get various genome tracks
+        # we don't copy in the indexes, so that might be a problem later
+        input_dict['genome_tracks'] = list(
+            get_references(
+                get_config()['references']['gatk_sv'].get('genome_tracks', [])
+            ).values()
         )
 
         expected_d = self.expected_outputs(cohort)
@@ -439,7 +452,7 @@ class FilterGenotypes(CohortStage):
 
 
 @stage(
-    required_stages=FilterGenotypes,
+    required_stages=MakeCohortVcf,
     analysis_type='sv',
     analysis_keys=['output_vcf'],
     update_analysis_meta=_sv_batch_meta,
@@ -448,6 +461,8 @@ class AnnotateVcf(CohortStage):
     """
     Add annotations, such as the inferred function and allele frequencies of variants,
     to final VCF.
+
+    In future this will take filtered VCFs, but for now that workflow is disabled
 
     Annotations methods include:
     * Functional annotation - annotate SVs with inferred functional consequence on
@@ -461,25 +476,35 @@ class AnnotateVcf(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict:
         return {
-            'output_vcf': self.prefix / 'filtered_annotated.vcf.gz',
-            'output_vcf_idx': self.prefix / 'filtered_annotated.vcf.gz.tbi',
+            'output_vcf': self.prefix / 'unfiltered_annotated.vcf.bgz',
+            'output_vcf_idx': self.prefix / 'unfiltered_annotated.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        make_vcf_d = inputs.as_dict(cohort, FilterGenotypes)
-
+        """
+        configure and queue jobs for SV annotation
+        passing the VCF Index has become implicit, which may be a problem for us
+        """
         input_dict: dict[str, Any] = {
+            'vcf': inputs.as_dict(cohort, MakeCohortVcf)['vcf'],
             'prefix': cohort.name,
-            'vcf': make_vcf_d['filtered_vcf'],
-            'vcf_idx': make_vcf_d['filtered_vcf_index'],
             'ped_file': make_combined_ped(cohort, self.prefix),
             'sv_per_shard': 5000,
-            'max_shards_per_chrom_step1': 200,
-            'min_records_per_shard_step1': 5000,
+            'population': get_config()['references']['gatk_sv'].get(
+                'external_af_population'
+            ),
+            'ref_prefix': get_config()['references']['gatk_sv'].get(
+                'external_af_ref_bed_prefix'
+            ),
+            'use_hail': False
         }
+
         input_dict |= get_references(
             [
+                'noncoding_bed',
                 'protein_coding_gtf',
+                {'allosomes_list': 'allosomal_contigs'},
+                {'ref_bed': 'external_af_ref_bed'},
                 {'contig_list': 'primary_contigs_list'},
             ]
         )
