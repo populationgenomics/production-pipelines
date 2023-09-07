@@ -43,3 +43,4 @@ recalibrate_gq_args = [
 fmax_beta = 0.3
 
 sl_filter_args = '--small-del-threshold 93 --medium-del-threshold 150 --small-dup-threshold -51 --medium-dup-threshold -4 --ins-threshold -13 --inv-threshold -19'
+noncoding_bed = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/noncoding.sort.hg38.bed'
