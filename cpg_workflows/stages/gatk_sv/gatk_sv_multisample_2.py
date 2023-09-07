@@ -189,10 +189,12 @@ class MakeCohortVcf(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=MakeCohortVcf)
+# @stage(required_stages=MakeCohortVcf)
 class FormatVcfForGatk(CohortStage):
     """
     Takes the clean VCF and reformat for GATK intake
+
+    temporarily disabled
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict:
@@ -214,10 +216,9 @@ class FormatVcfForGatk(CohortStage):
             inputs (StageInput): access to prior inputs
         """
 
-        make_vcf_d = inputs.as_dict(cohort, MakeCohortVcf)
         input_dict: dict[str, Any] = {
             'prefix': cohort.name,
-            'vcf': make_vcf_d['vcf'],
+            'vcf': inputs.as_dict(cohort, MakeCohortVcf)['vcf'],
             'ped_file': make_combined_ped(cohort, self.prefix),
         }
         input_dict |= get_images(['sv_pipeline_docker', 'sv_base_mini_docker'])
@@ -451,7 +452,7 @@ class FilterGenotypes(CohortStage):
 
 
 @stage(
-    required_stages=FilterGenotypes,
+    required_stages=MakeCohortVcf,
     analysis_type='sv',
     analysis_keys=['output_vcf'],
     update_analysis_meta=_sv_batch_meta,
@@ -460,6 +461,8 @@ class AnnotateVcf(CohortStage):
     """
     Add annotations, such as the inferred function and allele frequencies of variants,
     to final VCF.
+
+    In future this will take filtered VCFs, but for now that workflow is disabled
 
     Annotations methods include:
     * Functional annotation - annotate SVs with inferred functional consequence on
@@ -473,17 +476,17 @@ class AnnotateVcf(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict:
         return {
-            'output_vcf': self.prefix / 'filtered_annotated.vcf.gz',
-            'output_vcf_idx': self.prefix / 'filtered_annotated.vcf.gz.tbi',
+            'output_vcf': self.prefix / 'unfiltered_annotated.vcf.gz',
+            'output_vcf_idx': self.prefix / 'unfiltered_annotated.vcf.gz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        make_vcf_d = inputs.as_dict(cohort, FilterGenotypes)
+        make_vcf_d = inputs.as_dict(cohort, MakeCohortVcf)
 
         input_dict: dict[str, Any] = {
             'prefix': cohort.name,
-            'vcf': make_vcf_d['filtered_vcf'],
-            'vcf_idx': make_vcf_d['filtered_vcf_index'],
+            'vcf': make_vcf_d['vcf'],
+            'vcf_idx': make_vcf_d['vcf_index'],
             'ped_file': make_combined_ped(cohort, self.prefix),
             'sv_per_shard': 5000,
             'max_shards_per_chrom_step1': 200,
