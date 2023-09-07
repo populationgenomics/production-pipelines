@@ -295,9 +295,10 @@ def outrider(
     # Localise input files
     assert all([isinstance(f, (str, Path)) for f in input_counts])
     infiles = {
-        basename(str(f)).replace('.count', ''): b.read_input(str(f))
+        basename(str(f)).replace('.count', ''): str(f)
         for f in input_counts
     }
+    b.read_input_group(**infiles)
     gtf_file = get_config()['references'].get('gtf')
     gtf_file = to_path(gtf_file)
     b.read_input_group(gtf=str(gtf_file))
