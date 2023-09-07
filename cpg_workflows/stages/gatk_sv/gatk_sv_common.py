@@ -19,7 +19,7 @@ from cpg_workflows.batch import make_job_name, Batch
 from cpg_workflows.workflow import Dataset, Cohort
 
 
-GATK_SV_COMMIT = 'e2e76a8018c61e1733c993680ea21a105273a1d9'
+GATK_SV_COMMIT = '8759710f2a3cc396b966dae5bab5b36896fae060'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 _FASTA = None
 
@@ -228,10 +228,11 @@ def make_combined_ped(cohort: Cohort, prefix: Path) -> Path:
     Concatenating all samples across all datasets with ref panel
     """
     combined_ped_path = prefix / 'ped_with_ref_panel.ped'
+    conf_ped_path = get_references(['ped_file'])['ped_file']
     with combined_ped_path.open('w') as out:
         with cohort.write_ped_file().open() as f:
             out.write(f.read())
         # The ref panel PED doesn't have any header, so can safely concatenate:
-        with reference_path('gatk_sv/ped_file').open() as f:
+        with to_path(conf_ped_path).open() as f:
             out.write(f.read())
     return combined_ped_path
