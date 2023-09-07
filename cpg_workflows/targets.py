@@ -28,7 +28,7 @@ class Target:
     Defines a target that a stage can act upon.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Whether to process even if outputs exist:
         self.forced: bool = False
         # If not set, exclude from the workflow:
@@ -121,7 +121,7 @@ class Cohort(Target):
     cohort.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.name = get_config()['workflow']['dataset']
         self.analysis_dataset = Dataset(name=self.name, cohort=self)
