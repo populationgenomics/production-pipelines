@@ -48,7 +48,7 @@ input_datasets = ['validation']
 sequencing_type = 'genome'
 create_es_index_for_datasets = ['validation']
 skip_sgs = [
-    'CPGXXXX',  # NA12878_KCCG low coverage (8x)
+    'CPGXXXX',  # eg: low coverage (8x)
 ]
 ```
 
