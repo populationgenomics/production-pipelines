@@ -2,8 +2,6 @@
 Create Hail Batch jobs to run Picard tools (marking duplicates, QC).
 """
 
-from typing import overload, Literal
-
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
@@ -112,30 +110,6 @@ def get_intervals(
         assert isinstance(interval, hb.ResourceFile)
         intervals.append(interval)
     return j, intervals
-
-
-@overload
-def markdup(
-    b: hb.Batch,
-    sorted_bam: hb.ResourceFile,
-    job_attrs: dict | None = ...,
-    output_path: Path | None = ...,
-    out_markdup_metrics_path: Path | None = ...,
-    fasta_reference: hb.ResourceGroup | None = ...,
-    overwrite: Literal[True] = ...,
-) -> Job: ...  # When overwrite=True this will not return None
-
-
-@overload
-def markdup(
-    b: hb.Batch,
-    sorted_bam: hb.ResourceFile,
-    job_attrs: dict | None = ...,
-    output_path: Path | None = ...,
-    out_markdup_metrics_path: Path | None = ...,
-    fasta_reference: hb.ResourceGroup | None = ...,
-    overwrite: bool = ...,
-) -> Job | None: ...
 
 
 def markdup(

@@ -174,6 +174,7 @@ class RealignMito(SequencingGroupStage):
             job_attrs=self.get_job_attrs(sequencing_group),
             overwrite=True,
         )
+        assert isinstance(realign_mkdup_j, Job)
         jobs.append(realign_mkdup_j)
         assert isinstance(realign_mkdup_j.output_cram, hb.ResourceGroup)
 
@@ -197,6 +198,7 @@ class RealignMito(SequencingGroupStage):
             job_attrs=self.get_job_attrs(sequencing_group),
             overwrite=True,
         )
+        assert isinstance(shifted_mkdup_j, Job)
         jobs.append(shifted_mkdup_j)
         assert isinstance(shifted_mkdup_j.output_cram, hb.ResourceGroup)
 
