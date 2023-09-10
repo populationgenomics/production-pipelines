@@ -454,7 +454,7 @@ class FilterGenotypes(CohortStage):
 @stage(
     required_stages=MakeCohortVcf,
     analysis_type='sv',
-    analysis_keys=['output_vcf'],
+    analysis_keys=['annotated_vcf'],
     update_analysis_meta=_sv_batch_meta,
 )
 class AnnotateVcf(CohortStage):
