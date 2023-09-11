@@ -89,7 +89,10 @@ class GatherSampleEvidence(SequencingGroupStage):
     def queue_jobs(
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput:
-        """Add jobs to batch"""
+        """
+        Add jobs to batch
+        Adds billing-related labels to the Cromwell job(s)
+        """
         assert sequencing_group.cram, sequencing_group
 
         input_dict: dict[str, Any] = {
@@ -134,6 +137,12 @@ class GatherSampleEvidence(SequencingGroupStage):
 
         expected_d = self.expected_outputs(sequencing_group)
 
+        # billing labels!
+        billing_labels = {
+            'dataset': sequencing_group.dataset.name,
+            'sequencing_group': sequencing_group.id,
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=sequencing_group.dataset,
@@ -141,6 +150,7 @@ class GatherSampleEvidence(SequencingGroupStage):
             input_dict=input_dict,
             expected_out_dict=expected_d,
             sequencing_group_id=sequencing_group.id,
+            labels=billing_labels
         )
         return self.make_outputs(sequencing_group, data=expected_d, jobs=jobs)
 

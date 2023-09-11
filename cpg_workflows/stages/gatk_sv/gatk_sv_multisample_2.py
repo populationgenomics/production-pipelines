@@ -454,7 +454,7 @@ class FilterGenotypes(CohortStage):
 @stage(
     required_stages=MakeCohortVcf,
     analysis_type='sv',
-    analysis_keys=['output_vcf'],
+    analysis_keys=['annotated_vcf'],
     update_analysis_meta=_sv_batch_meta,
 )
 class AnnotateVcf(CohortStage):
@@ -476,8 +476,8 @@ class AnnotateVcf(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict:
         return {
-            'output_vcf': self.prefix / 'unfiltered_annotated.vcf.bgz',
-            'output_vcf_idx': self.prefix / 'unfiltered_annotated.vcf.bgz.tbi',
+            'annotated_vcf': self.prefix / 'unfiltered_annotated.vcf.bgz',
+            'annotated_vcf_index': self.prefix / 'unfiltered_annotated.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -503,7 +503,6 @@ class AnnotateVcf(CohortStage):
             [
                 'noncoding_bed',
                 'protein_coding_gtf',
-                {'allosomes_list': 'allosomal_contigs'},
                 {'ref_bed': 'external_af_ref_bed'},
                 {'contig_list': 'primary_contigs_list'},
             ]
