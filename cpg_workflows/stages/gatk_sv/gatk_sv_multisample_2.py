@@ -549,6 +549,7 @@ class AnnotateCohortSv(CohortStage):
     When do we want it?! Now!
 
     First step to transform annotated SV callset data into a seqr ready format
+    Rearrange all the annotations
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict:
@@ -603,7 +604,8 @@ def _update_sv_dataset_meta(
 )
 class AnnotateDatasetSv(DatasetStage):
     """
-    blip blop
+    Subset the MT to be this Dataset only
+    Then work up all the genotype values
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict:
@@ -621,17 +623,14 @@ class AnnotateDatasetSv(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
-        pass
+        Whether Dataproc or not, this Stage subsets the whole MT to this cohort only
+        Then brings a whole bunch of genotype data into row annotations
+
         Args:
-            dataset ():
+            dataset (Dataset): SGIDs specific to this dataset/project
             inputs ():
-
-        Returns:
-
         """
-        """
-                Uses analysis-runner's dataproc helper to run a hail query script
-                """
+
         assert dataset.cohort
         mt_path = inputs.as_path(
             target=dataset.cohort, stage=AnnotateCohortSv, key='mt'
@@ -664,6 +663,7 @@ class AnnotateDatasetSv(DatasetStage):
 class MtToEsSv(DatasetStage):
     """
     Create a Seqr index.
+    AFAIK this is identical to the small vairant version
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, str | Path]:
