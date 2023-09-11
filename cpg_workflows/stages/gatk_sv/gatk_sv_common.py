@@ -128,6 +128,7 @@ def add_gatk_sv_jobs(
     expected_out_dict: dict[str, Path | list[Path]],
     sequencing_group_id: str | None = None,
     driver_image: str | None = None,
+    labels: dict[str, str] | None = None,
 ) -> list[Job]:
     """
     Generic function to add a job that would run one GATK-SV workflow.
@@ -183,6 +184,7 @@ def add_gatk_sv_jobs(
         outputs_to_collect=outputs_to_collect,
         driver_image=driver_image,
         copy_outputs_to_gcp=copy_outputs,
+        labels=labels
     )
 
     copy_j = batch.new_job(f'{job_prefix}: copy outputs')
@@ -237,10 +239,11 @@ def make_combined_ped(cohort: Cohort, prefix: Path) -> Path:
     Concatenating all samples across all datasets with ref panel
     """
     combined_ped_path = prefix / 'ped_with_ref_panel.ped'
+    conf_ped_path = get_references(['ped_file'])['ped_file']
     with combined_ped_path.open('w') as out:
         with cohort.write_ped_file().open() as f:
             out.write(f.read())
         # The ref panel PED doesn't have any header, so can safely concatenate:
-        with reference_path('gatk_sv/ped_file').open() as f:
+        with to_path(conf_ped_path).open() as f:
             out.write(f.read())
     return combined_ped_path

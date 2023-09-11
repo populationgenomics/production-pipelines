@@ -20,6 +20,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_images,
     get_references,
     make_combined_ped,
+    _sv_batch_meta,
     _sv_annotated_meta,
     _sv_filtered_meta,
     SV_CALLERS,
@@ -203,10 +204,12 @@ class MakeCohortVcf(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=MakeCohortVcf)
+# @stage(required_stages=MakeCohortVcf)
 class FormatVcfForGatk(CohortStage):
     """
     Takes the clean VCF and reformat for GATK intake
+
+    temporarily disabled
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict:
@@ -228,10 +231,9 @@ class FormatVcfForGatk(CohortStage):
             inputs (StageInput): access to prior inputs
         """
 
-        make_vcf_d = inputs.as_dict(cohort, MakeCohortVcf)
         input_dict: dict[str, Any] = {
             'prefix': cohort.name,
-            'vcf': make_vcf_d['vcf'],
+            'vcf': inputs.as_dict(cohort, MakeCohortVcf)['vcf'],
             'ped_file': make_combined_ped(cohort, self.prefix),
         }
         input_dict |= get_images(['sv_pipeline_docker', 'sv_base_mini_docker'])
@@ -420,18 +422,28 @@ class FilterGenotypes(CohortStage):
             'vcf': inputs.as_dict(cohort, SVConcordance)['concordance_vcf'],
             'ploidy_table': inputs.as_dict(cohort, GeneratePloidyTable)['ploidy_table'],
             'ped_file': make_combined_ped(cohort, self.prefix),
+            'fmax_beta': get_config()['references']['gatk_sv'].get('fmax_beta', 0.3),
+            'recalibrate_gq_args': get_config()['references']['gatk_sv'].get(
+                'recalibrate_gq_args'
+            ),
+            'sl_filter_args': get_config()['references']['gatk_sv'].get(
+                'sl_filter_args'
+            ),
         }
+        assert input_dict['recalibrate_gq_args']
+        assert input_dict['sl_filter_args']
 
         input_dict |= get_images(
             ['gatk_docker', 'linux_docker', 'sv_base_mini_docker', 'sv_pipeline_docker']
         )
 
+        # only path arguments can be retrieved using get_references, so there is some
+        # hard coding here.
+
         input_dict |= get_references(
             [
-                'fmax_beta',  # hoping for more stringent filtering
-                'recalibrate_gq_args',  # list of param Strings
-                'sl_filter_args',
                 {'gq_recalibrator_model_file': 'aou_filtering_model'},
+                'primary_contigs_fai',
             ]
         )
 
@@ -439,13 +451,7 @@ class FilterGenotypes(CohortStage):
         # we don't copy in the indexes, so that might be a problem later
         input_dict['genome_tracks'] = list(
             get_references(
-                [
-                    'recalibrate_gq_repeatmasker',
-                    'recalibrate_gq_segmental_dups',
-                    'recalibrate_gq_simple_reps',
-                    'recalibrate_gq_umap_s100',
-                    'recalibrate_gq_umap_s24',
-                ]
+                get_config()['references']['gatk_sv'].get('genome_tracks', [])
             ).values()
         )
 
@@ -461,15 +467,17 @@ class FilterGenotypes(CohortStage):
 
 
 @stage(
-    required_stages=FilterGenotypes,
+    required_stages=MakeCohortVcf,
     analysis_type='sv',
-    analysis_keys=['output_vcf'],
+    analysis_keys=['annotated_vcf'],
     update_analysis_meta=_sv_annotated_meta,
 )
 class AnnotateVcf(CohortStage):
     """
     Add annotations, such as the inferred function and allele frequencies of variants,
     to final VCF.
+
+    In future this will take filtered VCFs, but for now that workflow is disabled
 
     Annotations methods include:
     * Functional annotation - annotate SVs with inferred functional consequence on
@@ -483,29 +491,34 @@ class AnnotateVcf(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict:
         return {
-            'output_vcf': self.prefix / 'filtered_annotated.vcf.gz',
-            'output_vcf_idx': self.prefix / 'filtered_annotated.vcf.gz.tbi',
+            'annotated_vcf': self.prefix / 'unfiltered_annotated.vcf.bgz',
+            'annotated_vcf_index': self.prefix / 'unfiltered_annotated.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        make_vcf_d = inputs.as_dict(cohort, FilterGenotypes)
-
+        """
+        configure and queue jobs for SV annotation
+        passing the VCF Index has become implicit, which may be a problem for us
+        """
         input_dict: dict[str, Any] = {
+            'vcf': inputs.as_dict(cohort, MakeCohortVcf)['vcf'],
             'prefix': cohort.name,
-            'vcf': make_vcf_d['filtered_vcf'],
-            'vcf_idx': make_vcf_d['filtered_vcf_index'],
             'ped_file': make_combined_ped(cohort, self.prefix),
             'sv_per_shard': 5000,
-            'max_shards_per_chrom_step1': 200,
-            'min_records_per_shard_step1': 5000,
+            'population': get_config()['references']['gatk_sv'].get(
+                'external_af_population'
+            ),
+            'ref_prefix': get_config()['references']['gatk_sv'].get(
+                'external_af_ref_bed_prefix'
+            ),
+            'use_hail': False
         }
 
         input_dict |= get_references(
             [
+                'noncoding_bed',
                 'protein_coding_gtf',
                 {'ref_bed': 'external_af_ref_bed'},
-                {'ref_prefix': 'external_af_ref_bed_prefix'},
-                {'population': 'external_af_population'},
                 {'contig_list': 'primary_contigs_list'},
             ]
         )
