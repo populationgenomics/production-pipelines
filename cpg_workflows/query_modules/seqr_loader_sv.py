@@ -225,14 +225,18 @@ def annotate_cohort_sv(
         end=mt.info.END,
         sv_callset_Het=mt.info.N_HET,
         sv_callset_Hom=mt.info.N_HOMALT,
-        gnomad_svs_ID=mt.info.gnomAD_V2_SVID,
-        gnomad_svs_AF=mt.info.gnomAD_V2_AF,
-        gnomad_svs_AC=unsafe_cast_int32(mt.info.gnomAD_V2_AC),
-        gnomad_svs_AN=unsafe_cast_int32(mt.info.gnomAD_V2_AN),
-        StrVCTVRE_score=hl.or_missing(
-            hl.is_defined(mt.info.StrVCTVRE_score),
-            hl.parse_float(mt.info.StrVCTVRE_score),
-        ),
+        gnomad_svs_ID=mt.info['gnomad_v2.1_sv_SVID'],
+        gnomad_svs_AF=mt.info['gnomad_v2.1_sv_AF'],
+        gnomad_svs_AC=hl.missing('float64'),
+        gnomad_svs_AN=hl.missing('float64'),
+        StrVCTVRE_score=hl.missing('float64'),
+        # I DON'T HAVE THESE ANNOTATIONS
+        # gnomad_svs_AC=unsafe_cast_int32(mt.info.gnomAD_V2_AC),
+        # gnomad_svs_AN=unsafe_cast_int32(mt.info.gnomAD_V2_AN),
+        # StrVCTVRE_score=hl.or_missing(
+        #     hl.is_defined(mt.info.StrVCTVRE_score),
+        #     hl.parse_float(mt.info.StrVCTVRE_score),
+        # ),
         filters=hl.or_missing(  # hopefully this plays nicely
             (mt.filters.filter(lambda x: (x != PASS) & (x != BOTHSIDES_SUPPORT))).size()
             > 0,
@@ -297,28 +301,10 @@ def annotate_cohort_sv(
                 hl.struct(contig=mt.locus.contig, position=mt.info.END),
             )
         ),
-        rg37_locus=mt.rg37_locus,
-    )
-
-    # chuck in another checkpoint
-    mt = checkpoint_hail(mt, 'second_annotation_round.mt', checkpoint_prefix)
-
-    # and some more annotation stuff
-    mt = mt.annotate_rows(
-        rg37_locus_end=hl.or_missing(
-            mt.xstop.position
-            <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.xstop.contig],
-            hl.liftover(
-                hl.locus(mt.xstop.contig, mt.xstop.position, reference_genome='GRCh38'),
-                'GRCh37',
-            ),
-        ),
+        # scrapping out GRCh37 loci
+        rg37_locus=mt.locus,
+        rg37_locus_end=mt.xstop.position,
         syType=mt.sv_types[0],
-        transcriptConsequenceTerms=hl.set(
-            mt.sortedTranscriptConsequences.map(lambda x: x[MAJOR_CONSEQUENCE]).extend(
-                [mt.sv_types[0]]
-            )
-        ),
         sv_type_detail=hl.if_else(
             mt.sv_types[0] == 'CPX',
             mt.info.CPX_TYPE,
@@ -327,13 +313,38 @@ def annotate_cohort_sv(
                 mt.sv_types[1],
             ),
         ),
+        variantId=mt.rsid,
+        docId=mt.rsid[0:512],
+    )
+
+    # chuck in another checkpoint
+    mt = checkpoint_hail(mt, 'second_annotation_round.mt', checkpoint_prefix)
+
+    # # add a chain? - throws a contig mismatch error
+    # rg37 = hl.get_reference('GRCh37')
+    # rg38 = hl.get_reference('GRCh38')
+    # rg37.add_liftover('gs://cpg-common-main/references/liftover/grch38_to_grch37.over.chain.gz', rg38)
+
+    # and some more annotation stuff
+    mt = mt.annotate_rows(
+        # rg37_locus_end=hl.or_missing(
+        #     mt.xstop.position
+        #     <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.xstop.contig],
+        #     hl.liftover(
+        #         hl.locus(mt.xstop.contig, mt.xstop.position, reference_genome='GRCh38'),
+        #         'GRCh37',
+        #     ),
+        # ),
+        transcriptConsequenceTerms=hl.set(
+            mt.sortedTranscriptConsequences.map(lambda x: x[MAJOR_CONSEQUENCE]).extend(
+                [mt.sv_types[0]]
+            )
+        ),
         geneIds=hl.set(
             mt.sortedTranscriptConsequences.filter(
                 lambda x: x[MAJOR_CONSEQUENCE] != 'NEAREST_TSS'
             ).map(lambda x: x[GENE_ID])
-        ),
-        variantId=mt.rsid,
-        docId=mt.rsid[0:512],
+        )
     )
 
     # write this output
@@ -346,7 +357,9 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str, checkpoint_prefix: str |
     do this after subsetting to specific samples
     unsure how relevant that is in this case, but who knows
 
-    maybe we should assume that these are always new... hmm
+    This whole section relies heavily on CONC_ST, an annotation we don't have
+    Hopefully this field will appear once we have SV concordance implemented
+    CONC_ST: seqr-loading-pipelines...luigi_pipeline/lib/model/sv_mt_schema.py#L223
 
     Args:
         mt_path (str): path to the annotated MatrixTable
@@ -359,14 +372,9 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str, checkpoint_prefix: str |
     mt = read_hail(str(mt_path))
 
     is_called = hl.is_defined(mt.GT)
-    was_previously_called = hl.is_defined(mt.CONC_ST) & ~mt.CONC_ST.contains('EMPTY')
     num_alt = hl.if_else(is_called, mt.GT.n_alt_alleles(), -1)
-    prev_num_alt = hl.if_else(
-        was_previously_called, PREVIOUS_GENOTYPE_N_ALT_ALLELES[hl.set(mt.CONC_ST)], -1
-    )
-    concordant_genotype = num_alt == prev_num_alt
+    prev_num_alt = -1
     discordant_genotype = (num_alt != prev_num_alt) & (prev_num_alt > 0)
-    novel_genotype = (num_alt != prev_num_alt) & (prev_num_alt == 0)
     mt = mt.annotate_rows(
         genotypes=hl.agg.collect(
             hl.struct(
@@ -375,12 +383,8 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str, checkpoint_prefix: str |
                 cn=mt.RD_CN,
                 num_alt=num_alt,
                 prev_num_alt=hl.or_missing(discordant_genotype, prev_num_alt),
-                prev_call=hl.or_missing(
-                    is_called, was_previously_called & concordant_genotype
-                ),
-                new_call=hl.or_missing(
-                    is_called, ~was_previously_called | novel_genotype
-                ),
+                prev_call=hl.missing(hl.tstr),
+                new_call=True,
             )
         )
     )
@@ -410,10 +414,6 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str, checkpoint_prefix: str |
         return (g.gq >= i) & (g.gq < i + 10)
 
     @_capture_i_decorator
-    def _filter_samples_qs(i, g):
-        return (g.qs >= i) & (g.qs < i + 10)
-
-    @_capture_i_decorator
     def _filter_sample_cn(i, g):
         return g.cn == i
 
@@ -435,20 +435,6 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str, checkpoint_prefix: str |
                 )
                 for i in range(0, 90, 10)
             }
-        ),
-    )
-
-    # not sure if this checkpoint is worthwhile
-    mt = mt.checkpoint(f'{checkpoint_prefix}/dataset-genotypes.mt')
-    logging.info(f'Written {checkpoint_prefix}/dataset-genotypes.mt')
-
-    mt = mt.annotate_rows(
-        samples_qs=hl.struct(
-            **{
-                f'{i}_to_{i + 10}': _genotype_filter_samples(_filter_samples_qs(i))
-                for i in range(0, 1000, 10)
-            },
-            gt_1000=_genotype_filter_samples(lambda g: g.qs >= 1000),
         ),
         samples_cn=hl.struct(
             **{

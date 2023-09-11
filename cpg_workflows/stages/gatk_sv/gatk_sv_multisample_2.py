@@ -542,12 +542,7 @@ class AnnotateVcf(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(
-    required_stages=AnnotateVcf,
-    analysis_type='sv',
-    analysis_keys=['mt'],
-    update_analysis_meta=_sv_annotated_meta,
-)
+@stage(required_stages=AnnotateVcf)
 class AnnotateCohortSv(CohortStage):
     """
     What do we want?! SV Data in Seqr!
