@@ -118,7 +118,7 @@ class MetamistStatusReporter(StatusReporter):
     Job status reporter. Works through creating and updating metamist Analysis entries.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
     def add_updaters_jobs(

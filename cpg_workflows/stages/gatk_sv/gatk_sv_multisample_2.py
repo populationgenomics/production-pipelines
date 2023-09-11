@@ -454,7 +454,7 @@ class FilterGenotypes(CohortStage):
 @stage(
     required_stages=MakeCohortVcf,
     analysis_type='sv',
-    analysis_keys=['output_vcf'],
+    analysis_keys=['annotated_vcf'],
     update_analysis_meta=_sv_batch_meta,
 )
 class AnnotateVcf(CohortStage):
@@ -476,21 +476,20 @@ class AnnotateVcf(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict:
         return {
-            'output_vcf': self.prefix / 'unfiltered_annotated.vcf.bgz',
-            'output_vcf_idx': self.prefix / 'unfiltered_annotated.vcf.bgz.tbi',
+            'annotated_vcf': self.prefix / 'unfiltered_annotated.vcf.bgz',
+            'annotated_vcf_index': self.prefix / 'unfiltered_annotated.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        make_vcf_d = inputs.as_dict(cohort, MakeCohortVcf)
-
+        """
+        configure and queue jobs for SV annotation
+        passing the VCF Index has become implicit, which may be a problem for us
+        """
         input_dict: dict[str, Any] = {
+            'vcf': inputs.as_dict(cohort, MakeCohortVcf)['vcf'],
             'prefix': cohort.name,
-            'vcf': make_vcf_d['vcf'],
-            'vcf_idx': make_vcf_d['vcf_index'],
             'ped_file': make_combined_ped(cohort, self.prefix),
             'sv_per_shard': 5000,
-            'max_shards_per_chrom_step1': 200,
-            'min_records_per_shard_step1': 5000,
             'population': get_config()['references']['gatk_sv'].get(
                 'external_af_population'
             ),
@@ -502,6 +501,7 @@ class AnnotateVcf(CohortStage):
 
         input_dict |= get_references(
             [
+                'noncoding_bed',
                 'protein_coding_gtf',
                 {'ref_bed': 'external_af_ref_bed'},
                 {'contig_list': 'primary_contigs_list'},
