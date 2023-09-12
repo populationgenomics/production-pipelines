@@ -148,3 +148,33 @@ class GermlineCNVCalls(SequencingGroupStage):
             outputs,
         )
         return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
+
+
+@stage(required_stages=[GermlineCNVCalls])
+class FastCombineGCNVs(CohortStage):
+    """
+    Produces final multi-sample VCF results by running a merge
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {
+            'combined_calls': self.prefix / 'gcnv_joint_call.vcf.bgz',
+            'combined_calls_index': self.prefix / 'gcnv_joint_call.vcf.bgz.tbi',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        outputs = self.expected_outputs(cohort)
+
+        # do a slapdash bcftools merge on all input files...
+        gcnv_vcfs = inputs.as_dict_by_target(GermlineCNVCalls)
+        sgids = cohort.get_sequencing_group_ids()
+        all_vcfs = [str(gcnv_vcfs[sgid]['intervals']) for sgid in sgids]
+
+        jobs = gcnv.merge_calls(
+            get_batch(),
+            sgids=sgids,
+            sg_vcfs=all_vcfs,
+            job_attrs=self.get_job_attrs(cohort),
+            output_path=outputs['combined_calls'],
+        )
+        return self.make_outputs(cohort, data=outputs, jobs=jobs)

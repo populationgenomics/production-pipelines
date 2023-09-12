@@ -301,3 +301,34 @@ def postprocess_calls(
     for key, path in output_path.items():
         b.write_output(j[key], str(path))
     return [j]
+
+
+def merge_calls(
+    b: hb.Batch,
+    sgids: list[str],
+    sg_vcfs: list[str],
+    job_attrs: dict[str, str],
+    output_path:  Path
+):
+    """
+    This job will run a fast simple merge on per-SGID call files
+    No expectation that we need a fancy merge here since per-SGID
+    VCFs were derived from a joint-called dataset (see above)
+
+    Args:
+        b (batch):
+        sgids (list[str]): all SG IDs
+        sg_vcfs (list[str]): paths to all individual VCFs
+        job_attrs (dict): any params to atach to the job
+        output_path (Path): path to the final merged VCF
+    """
+
+    assert sg_vcfs, 'No VCFs to merge'
+
+    j = b.new_job(
+        'Merge gCNV calls',
+        job_attrs | {'tool': 'bcftools'}
+    )
+    j.image(image_path('bcftools'))
+
+    # make a fuse connection to the data source
