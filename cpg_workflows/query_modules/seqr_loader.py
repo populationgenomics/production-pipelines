@@ -190,8 +190,7 @@ def subset_mt_to_sgids(mt_path: str, sgid_list: list[str], out_mt_path: str):
         )
 
     logging.info(
-        f'Found {len(mt_sgids)} samples in mt, '
-        f'subsetting to {len(sgid_list)} samples.'
+        f'Found {len(mt_sgids)} SG IDs in mt, subsetting to {len(sgid_list)} SG IDs.'
     )
 
     n_rows_before = mt.count_rows()
