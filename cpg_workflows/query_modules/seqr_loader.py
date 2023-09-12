@@ -152,11 +152,9 @@ def annotate_cohort(
         # Map to Seqr-style string
         # https://github.com/broadinstitute/seqr/blob/e0c179c36c0f68c892017de5eab2e4c1b9ffdc92/seqr/models.py#L592-L594
         mt = mt.annotate_globals(
-            sampleType={
-                'genome': 'WGS',
-                'exome': 'WES',
-                'single_cell': 'RNA',
-            }.get(sequencing_type, ''),
+            sampleType={'genome': 'WGS', 'exome': 'WES', 'single_cell': 'RNA'}.get(
+                sequencing_type, ''
+            ),
         )
 
     logging.info('Done:')
