@@ -511,7 +511,7 @@ class AnnotateVcf(CohortStage):
             'ref_prefix': get_config()['references']['gatk_sv'].get(
                 'external_af_ref_bed_prefix'
             ),
-            'use_hail': False
+            'use_hail': False,
         }
 
         input_dict |= get_references(
@@ -643,7 +643,7 @@ class AnnotateDatasetSv(DatasetStage):
         jobs = annotate_dataset_jobs_sv(
             b=get_batch(),
             mt_path=mt_path,
-            sequencing_group_ids=dataset.get_sequencing_group_ids(),
+            sgids=dataset.get_sequencing_group_ids(),
             out_mt_path=self.expected_outputs(dataset)['mt'],
             tmp_prefix=checkpoint_prefix,
             job_attrs=self.get_job_attrs(dataset),

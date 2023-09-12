@@ -92,7 +92,7 @@ def annotate_cohort_jobs_sv(
 def annotate_dataset_jobs_sv(
     b: Batch,
     mt_path: Path,
-    sequencing_group_ids: list[str],
+    sgids: list[str],
     out_mt_path: Path,
     tmp_prefix: Path,
     job_attrs: dict | None = None,
@@ -103,10 +103,10 @@ def annotate_dataset_jobs_sv(
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
     that will be loaded into Seqr).
     """
-    sample_ids_list_path = tmp_prefix / 'sample-list.txt'
+    sgids_list_path = tmp_prefix / 'sgid-list.txt'
     if not get_config()['workflow'].get('dry_run', False):
-        with sample_ids_list_path.open('w') as f:
-            f.write(','.join(sequencing_group_ids))
+        with sgids_list_path.open('w') as f:
+            f.write(','.join(sgids))
 
     subset_mt_path = tmp_prefix / 'cohort-subset.mt'
 
@@ -117,9 +117,9 @@ def annotate_dataset_jobs_sv(
 
         # Script path and pyfiles should be relative to the repository root
         script = (
-            f'cpg_workflows/dataproc_scripts/annotate_dataset.py '
-            f'--mt-path {mt_path} '
-            f'--sample-ids {sample_ids_list_path} '
+            f'cpg_workflows/dataproc_scripts/annotate_dataset_sv.py '
+            f'--mt-path {str(mt_path)} '
+            f'--sgids {sgids_list_path} '
             f'--out-mt-path {out_mt_path} '
             f'--checkpoint-prefix {tmp_prefix}'
         )
@@ -168,13 +168,13 @@ def annotate_dataset_jobs_sv(
             f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
         )
         subset_j.image(image_path('cpg_workflows'))
-        assert sequencing_group_ids
+        assert sgids
         subset_j.command(
             query_command(
                 seqr_loader,
-                seqr_loader.subset_mt_to_samples.__name__,
+                seqr_loader.subset_mt_to_sgids.__name__,
                 str(mt_path),
-                sequencing_group_ids,
+                sgids,
                 str(subset_mt_path),
                 setup_gcp=True,
             )

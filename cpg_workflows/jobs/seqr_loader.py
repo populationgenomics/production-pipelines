@@ -114,9 +114,9 @@ def annotate_dataset_jobs(
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
     that will be loaded into Seqr).
     """
-    sample_ids_list_path = tmp_prefix / 'sample-list.txt'
+    sgid_list_path = tmp_prefix / 'sgid-list.txt'
     if not get_config()['workflow'].get('dry_run', False):
-        with sample_ids_list_path.open('w') as f:
+        with sgid_list_path.open('w') as f:
             f.write(','.join(sequencing_group_ids))
 
     subset_mt_path = tmp_prefix / 'cohort-subset.mt'
@@ -130,7 +130,7 @@ def annotate_dataset_jobs(
         script = (
             f'cpg_workflows/dataproc_scripts/annotate_dataset.py '
             f'--mt-path {mt_path} '
-            f'--sample-ids {sample_ids_list_path} '
+            f'--sgids {sgid_list_path} '
             f'--out-mt-path {out_mt_path} '
             f'--checkpoint-prefix {tmp_prefix}'
         )
@@ -183,7 +183,7 @@ def annotate_dataset_jobs(
         subset_j.command(
             query_command(
                 seqr_loader,
-                seqr_loader.subset_mt_to_samples.__name__,
+                seqr_loader.subset_mt_to_sgids.__name__,
                 str(mt_path),
                 sequencing_group_ids,
                 str(subset_mt_path),

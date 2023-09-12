@@ -165,41 +165,43 @@ def annotate_cohort(
     logging.info(f'Written final matrix table into {out_mt_path}')
 
 
-def subset_mt_to_samples(mt_path, sample_ids, out_mt_path):
+def subset_mt_to_sgids(mt_path: str, sgid_list: list[str], out_mt_path: str):
     """
     Subset the MatrixTable to the provided list of samples and to variants present
     in those samples
-    @param mt_path: cohort-level matrix table from VCF.
-    @param sample_ids: samples to take from the matrix table.
-    @param out_mt_path: path to write the result.
+
+    Args:
+        mt_path (str): cohort-level matrix table from VCF
+        sgid_list (list[str]): SG IDs to take from the matrix table
+        out_mt_path (str): path to write the result
     """
+
     mt = hl.read_matrix_table(str(mt_path))
 
-    sample_ids = set(sample_ids)
-    mt_sample_ids = set(mt.s.collect())
+    sgid_list = set(sgid_list)
+    mt_sgids = set(mt.s.collect())
 
-    sample_ids_not_in_mt = sample_ids - mt_sample_ids
-    if sample_ids_not_in_mt:
+    if sgids_not_in_mt := sgid_list - mt_sgids:
         raise Exception(
-            f'Found {len(sample_ids_not_in_mt)}/{len(sample_ids)} samples '
+            f'Found {len(sgids_not_in_mt)}/{len(sgid_list)} samples '
             f'in the subset set that do not matching IDs in the variant callset.\n'
-            f'IDs that aren\'t in the callset: {sample_ids_not_in_mt}\n'
-            f'All callset sample IDs: {mt_sample_ids}',
+            f'IDs that aren\'t in the callset: {sgids_not_in_mt}\n'
+            f'All callset sample IDs: {mt_sgids}',
         )
 
     logging.info(
-        f'Found {len(mt_sample_ids)} samples in mt, '
-        f'subsetting to {len(sample_ids)} samples.'
+        f'Found {len(mt_sgids)} samples in mt, '
+        f'subsetting to {len(sgid_list)} samples.'
     )
 
     n_rows_before = mt.count_rows()
 
-    mt = mt.filter_cols(hl.literal(sample_ids).contains(mt.s))
+    mt = mt.filter_cols(hl.literal(sgid_list).contains(mt.s))
     mt = mt.filter_rows(hl.agg.any(mt.GT.is_non_ref()))
 
     logging.info(
-        f'Finished subsetting to {len(sample_ids)} samples. '
-        f'Kept {mt.count_cols()}/{len(mt_sample_ids)} samples, '
+        f'Finished subsetting to {len(sgid_list)} samples. '
+        f'Kept {mt.count_cols()}/{len(mt_sgids)} samples, '
         f'{mt.count_rows()}/{n_rows_before} rows'
     )
     mt.write(str(out_mt_path), overwrite=True)
@@ -217,17 +219,17 @@ def vcf_from_mt_subset(mt_path: str, out_vcf_path: str):
         out_vcf_path (str): path of the vcf.bgz to generate
     """
 
-    mt = hl.read_matrix_table(str(mt_path))
+    mt = hl.read_matrix_table(mt_path)
     logging.info(f'Dataset MT dimensions: {mt.count()}')
     hl.export_vcf(mt, out_vcf_path, tabix=True)
     logging.info(f'Written {out_vcf_path}')
 
 
-def annotate_dataset_mt(mt_path, out_mt_path, checkpoint_prefix):
+def annotate_dataset_mt(mt_path: str, out_mt_path, checkpoint_prefix):
     """
     Add dataset-level annotations.
     """
-    mt = hl.read_matrix_table(str(mt_path))
+    mt = hl.read_matrix_table(mt_path)
 
     # Convert the mt genotype entries into num_alt, gq, ab, dp, and sample_id.
     is_called = hl.is_defined(mt.GT)

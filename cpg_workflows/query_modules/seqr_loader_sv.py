@@ -320,10 +320,10 @@ def annotate_cohort_sv(
     # chuck in another checkpoint
     mt = checkpoint_hail(mt, 'second_annotation_round.mt', checkpoint_prefix)
 
-    # # add a chain? - throws a contig mismatch error
+    # # add a chain? - nb this is done during the index generation anyway
     # rg37 = hl.get_reference('GRCh37')
     # rg38 = hl.get_reference('GRCh38')
-    # rg37.add_liftover('gs://cpg-common-main/references/liftover/grch38_to_grch37.over.chain.gz', rg38)
+    # rg38.add_liftover('gs://cpg-common-main/references/liftover/grch38_to_grch37.over.chain.gz', rg37)
 
     # and some more annotation stuff
     mt = mt.annotate_rows(
@@ -344,14 +344,14 @@ def annotate_cohort_sv(
             mt.sortedTranscriptConsequences.filter(
                 lambda x: x[MAJOR_CONSEQUENCE] != 'NEAREST_TSS'
             ).map(lambda x: x[GENE_ID])
-        )
+        ),
     )
 
     # write this output
     mt.write(out_mt_path, overwrite=True)
 
 
-def annotate_dataset_sv(mt_path: str, out_mt_path: str, checkpoint_prefix: str | None):
+def annotate_dataset_sv(mt_path: str, out_mt_path: str):
     """
     load the stuff specific to samples in this dataset
     do this after subsetting to specific samples
@@ -364,7 +364,6 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str, checkpoint_prefix: str |
     Args:
         mt_path (str): path to the annotated MatrixTable
         out_mt_path (str): and where do you want it to end up?
-        checkpoint_prefix (str | None): do you want checkpoints??
     """
 
     logging.info('Annotating genotypes')

@@ -94,32 +94,19 @@ class HailElasticsearchClientV8(HailElasticsearchClient):
 
 
 @click.command()
-@click.option(
-    '--mt-path',
-    'mt_path',
-    required=True,
-)
+@click.option('--mt-path', required=True)
 @click.option(
     '--es-index',
-    'es_index',
-    type=click.STRING,
     help='Elasticsearch index. Usually the dataset name. Will be lowercased',
     required=True,
 )
-@click.option(
-    '--done-flag-path',
-    'done_flag_path',
-    help='File to touch in the end',
-)
-@click.option(
-    '--es-password',
-    'password',
-)
+@click.option('--done-flag-path', help='File to touch in the end')
+@click.option('--es-password')
 def main(
     mt_path: str,
     es_index: str,
     done_flag_path: str,
-    password: str | None = None,
+    es_password: str | None = None,
 ):
     """
     Entry point.
@@ -132,7 +119,7 @@ def main(
     username = get_config()['elasticsearch']['username']
     project_id = get_config()['elasticsearch']['password_project_id']
     secret_name = get_config()['elasticsearch']['password_secret_id']
-    password = password or read_secret(
+    password = es_password or read_secret(
         project_id=project_id,
         secret_name=secret_name,
         fail_gracefully=False,
@@ -144,10 +131,7 @@ def main(
     )
     print(f'Reading passport from secret "{secret_name}" in project "{project_id}"')
     es = HailElasticsearchClientV8(
-        host=host,
-        port=port,
-        es_username=username,
-        es_password=password,
+        host=host, port=port, es_username=username, es_password=password
     )
 
     mt = hl.read_matrix_table(mt_path)

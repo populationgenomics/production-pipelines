@@ -150,7 +150,7 @@ class GatherSampleEvidence(SequencingGroupStage):
             input_dict=input_dict,
             expected_out_dict=expected_d,
             sequencing_group_id=sequencing_group.id,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(sequencing_group, data=expected_d, jobs=jobs)
 
