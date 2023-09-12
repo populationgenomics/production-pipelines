@@ -60,9 +60,7 @@ def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
 
     # shortcut return if the total sequencing groups is a valid batch
     if min_batch_size <= n_sg <= max_batch_size:
-        logging.info(
-            f'Number of sequencing_groups ({n_sg}) is within range of batch sizes'
-        )
+        logging.info(f'Number of SGs ({n_sg}) is within range of batch sizes')
         return [
             {
                 'sequencing_groups': md.ID.tolist(),
