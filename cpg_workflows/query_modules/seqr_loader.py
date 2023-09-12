@@ -3,7 +3,6 @@ Hail Query functions for seqr loader.
 """
 
 import logging
-import os
 
 import hail as hl
 
@@ -12,7 +11,7 @@ from cpg_utils.hail_batch import reference_path, genome_build
 from hail_scripts.computed_fields import vep, variant_id
 
 from cpg_workflows.large_cohort.load_vqsr import load_vqsr
-from cpg_workflows.utils import can_reuse
+from cpg_workflows.utils import checkpoint_hail
 
 
 def annotate_cohort(
@@ -26,26 +25,6 @@ def annotate_cohort(
     Convert VCF to matrix table, annotate for Seqr Loader, add VEP and VQSR
     annotations.
     """
-
-    def _read(path):
-        if path.strip('/').endswith('.ht'):
-            t = hl.read_table(str(path))
-        else:
-            assert path.strip('/').endswith('.mt')
-            t = hl.read_matrix_table(str(path))
-        logging.info(f'Read checkpoint {path}')
-        return t
-
-    def _checkpoint(t, file_name):
-        if checkpoint_prefix:
-            path = os.path.join(checkpoint_prefix, file_name)
-            if can_reuse(path):
-                t = _read(str(path))
-            else:
-                t.write(str(path), overwrite=True)
-                logging.info(f'Wrote checkpoint {path}')
-                t = _read(str(path))
-        return t
 
     mt = hl.import_vcf(
         str(vcf_path),
@@ -67,11 +46,11 @@ def annotate_cohort(
     mt = hl.split_multi_hts(
         mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
     )
-    mt = _checkpoint(mt, 'mt-vep-split.mt')
+    mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
 
     if site_only_vqsr_vcf_path:
         vqsr_ht = load_vqsr(site_only_vqsr_vcf_path)
-        vqsr_ht = _checkpoint(vqsr_ht, 'vqsr.ht')
+        vqsr_ht = checkpoint_hail(vqsr_ht, 'vqsr.ht', checkpoint_prefix)
 
         logging.info('Adding VQSR annotations into the Matrix Table')
         mt = mt.annotate_globals(**vqsr_ht.index_globals())
@@ -82,7 +61,7 @@ def annotate_cohort(
                 lambda val: val != 'PASS'
             ),
         )
-        mt = _checkpoint(mt, 'mt-vep-split-vqsr.mt')
+        mt = checkpoint_hail(mt, 'mt-vep-split-vqsr.mt', checkpoint_prefix)
 
     ref_ht = hl.read_table(str(reference_path('seqr_combined_reference_data')))
     clinvar_ht = hl.read_table(str(reference_path('seqr_clinvar')))
@@ -119,7 +98,7 @@ def annotate_cohort(
         clinvar_data=clinvar_ht[mt.row_key],
         ref_data=ref_ht[mt.row_key],
     )
-    mt = _checkpoint(mt, 'mt-vep-split-vqsr-round1.mt')
+    mt = checkpoint_hail(mt, 'mt-vep-split-vqsr-round1.mt', checkpoint_prefix)
 
     logging.info(
         'Annotating with seqr-loader fields: round 2 '
@@ -273,8 +252,7 @@ def annotate_dataset_mt(mt_path, out_mt_path, checkpoint_prefix):
         genotypes=hl.agg.collect(hl.struct(**genotype_fields)),
     )
 
-    mt = mt.checkpoint(f'{checkpoint_prefix}/dataset-genotypes.mt')
-    logging.info(f'Written {checkpoint_prefix}/dataset-genotypes.mt')
+    mt = checkpoint_hail(mt, 'dataset-genotypes.mt', checkpoint_prefix)
 
     def _genotype_filter_samples(fn):
         # Filter on the genotypes.

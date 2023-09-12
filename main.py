@@ -22,7 +22,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_1 import (
     GenotypeBatch,
     MergeBatchSites,
 )
-from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_2 import AnnotateVcf
+from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_2 import AnnotateVcf, AnnotateDatasetSv, MtToEsSv
 from cpg_workflows.stages.gatk_sv.gatk_sv_single_sample import CreateSampleBatches
 from cpg_workflows.stages.gcnv import GermlineCNVCalls
 from cpg_workflows.stages.stripy import Stripy
@@ -52,7 +52,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'gatk_sv_sandwich': [
         MergeBatchSites
     ],  # stage to run between FilterBatch & GenotypeBatch
-    'gatk_sv_multisample_2': [AnnotateVcf],
+    'gatk_sv_multisample_2': [AnnotateVcf, AnnotateDatasetSv, MtToEsSv],
     'gcnv': [GermlineCNVCalls],
 }
 
