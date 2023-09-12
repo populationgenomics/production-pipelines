@@ -47,11 +47,11 @@ jobs:
         run: |
           docker build . -f Dockerfile --tag $IMAGE_NAME:${{ github.sha }}
 
-#      - name: push PR
-#        if: ${{ github.event_name == 'pull_request' }}
-#        run: |
-#          docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:pr-${{ github.event.number }}
-#          docker push $IMAGE_NAME:pr-${{ github.event.number }}
+      - name: push PR
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:pr-${{ github.event.number }}
+          docker push $IMAGE_NAME:pr-${{ github.event.number }}
         
       - name: manually triggered build
         if: ${{ github.event_name == 'workflow_dispatch' }}
