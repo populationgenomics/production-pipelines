@@ -14,10 +14,10 @@ from cpg_workflows.query_modules.seqr_loader_sv import annotate_dataset_sv
 
 
 @click.command()
-@click.option('--mt-path', 'mt_path', required=True)
-@click.option('--sgids', 'sample_ids_path', required=True)
-@click.option('--out-mt-path', 'out_mt_path', required=True)
-@click.option('--checkpoint-prefix', 'checkpoint_prefix', required=True)
+@click.option('--mt-path', required=True)
+@click.option('--sgids', required=True)
+@click.option('--out-mt-path', required=True)
+@click.option('--checkpoint-prefix', required=True)
 def main(mt_path: str, sgids: str, out_mt_path: str, checkpoint_prefix: str):
     """
     Schedule two job stages - subset_mt_to_samples and annotate_dataset_sv
