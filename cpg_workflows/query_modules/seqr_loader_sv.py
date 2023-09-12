@@ -10,7 +10,7 @@ import hail as hl
 
 from cpg_utils import to_path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build
+from cpg_utils.hail_batch import genome_build, reference_path
 from hail_scripts.computed_fields import variant_id
 
 from cpg_workflows.utils import read_hail, checkpoint_hail
@@ -301,9 +301,6 @@ def annotate_cohort_sv(
                 hl.struct(contig=mt.locus.contig, position=mt.info.END),
             )
         ),
-        # scrapping out GRCh37 loci
-        rg37_locus=mt.locus,
-        rg37_locus_end=mt.xstop.position,
         syType=mt.sv_types[0],
         sv_type_detail=hl.if_else(
             mt.sv_types[0] == 'CPX',
@@ -320,21 +317,23 @@ def annotate_cohort_sv(
     # chuck in another checkpoint
     mt = checkpoint_hail(mt, 'second_annotation_round.mt', checkpoint_prefix)
 
-    # # add a chain? - nb this is done during the index generation anyway
-    # rg37 = hl.get_reference('GRCh37')
-    # rg38 = hl.get_reference('GRCh38')
-    # rg38.add_liftover('gs://cpg-common-main/references/liftover/grch38_to_grch37.over.chain.gz', rg37)
+    # register a chain file
+    liftover_path = reference_path('liftover_38_to_37')
+    rg37 = hl.get_reference('GRCh37')
+    rg38 = hl.get_reference('GRCh38')
+    rg38.add_liftover(str(liftover_path), rg37)
 
     # and some more annotation stuff
     mt = mt.annotate_rows(
-        # rg37_locus_end=hl.or_missing(
-        #     mt.xstop.position
-        #     <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.xstop.contig],
-        #     hl.liftover(
-        #         hl.locus(mt.xstop.contig, mt.xstop.position, reference_genome='GRCh38'),
-        #         'GRCh37',
-        #     ),
-        # ),
+        rg37_locus=hl.liftover(mt.locus, 'GRCh37'),
+        rg37_locus_end=hl.or_missing(
+            mt.xstop.position
+            <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.xstop.contig],
+            hl.liftover(
+                hl.locus(mt.xstop.contig, mt.xstop.position, reference_genome='GRCh38'),
+                'GRCh37',
+            ),
+        ),
         transcriptConsequenceTerms=hl.set(
             mt.sortedTranscriptConsequences.map(lambda x: x[MAJOR_CONSEQUENCE]).extend(
                 [mt.sv_types[0]]

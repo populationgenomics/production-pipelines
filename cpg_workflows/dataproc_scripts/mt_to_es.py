@@ -7,7 +7,6 @@ Loads the matrix table into an ElasticSearch index.
 """
 
 import logging
-import time
 
 import math
 from pprint import pformat
@@ -20,7 +19,7 @@ import elasticsearch
 from cpg_utils import to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import start_query_context, reference_path
+from cpg_utils.hail_batch import reference_path
 
 from hail_scripts.elasticsearch.hail_elasticsearch_client import HailElasticsearchClient
 
