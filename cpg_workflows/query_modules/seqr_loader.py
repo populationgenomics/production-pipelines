@@ -178,10 +178,10 @@ def subset_mt_to_sgids(mt_path: str, sgid_list: list[str], out_mt_path: str):
 
     mt = hl.read_matrix_table(str(mt_path))
 
-    sgid_list = set(sgid_list)
-    mt_sgids = set(mt.s.collect())
+    sgid_set: set[str] = set(sgid_list)
+    mt_sgids: set[str] = set(mt.s.collect())
 
-    if sgids_not_in_mt := sgid_list - mt_sgids:
+    if sgids_not_in_mt := sgid_set - mt_sgids:
         raise Exception(
             f'Found {len(sgids_not_in_mt)}/{len(sgid_list)} samples '
             f'in the subset set that do not matching IDs in the variant callset.\n'
