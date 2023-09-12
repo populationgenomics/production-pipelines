@@ -12,29 +12,11 @@ from cpg_workflows.query_modules.seqr_loader import annotate_cohort
 
 
 @click.command()
-@click.option(
-    '--vcf-path',
-    'vcf_path',
-    required=True,
-)
-@click.option(
-    '--out-mt-path',
-    'out_mt_path',
-    required=True,
-)
-@click.option(
-    '--vep-ht-path',
-    'vep_ht_path',
-    required=True,
-)
-@click.option(
-    '--siteonly-vqsr-vcf-path',
-    'siteonly_vqsr_vcf_path',
-)
-@click.option(
-    '--checkpoint-prefix',
-    'checkpoint_prefix',
-)
+@click.option('--vcf-path', required=True)
+@click.option('--out-mt-path', required=True)
+@click.option('--vep-ht-path', required=True)
+@click.option('--siteonly-vqsr-vcf-path')
+@click.option('--checkpoint-prefix')
 def main(
     vcf_path: str,
     out_mt_path: str,
