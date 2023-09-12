@@ -675,7 +675,7 @@ def _gatk_sv_index_meta(
     required_stages=[AnnotateDatasetSv],
     analysis_type='es-index',  # specific type of es index
     analysis_keys=['index_name'],
-    update_analysis_meta=_gatk_sv_index_meta
+    update_analysis_meta=_gatk_sv_index_meta,
 )
 class MtToEsSv(DatasetStage):
     """
