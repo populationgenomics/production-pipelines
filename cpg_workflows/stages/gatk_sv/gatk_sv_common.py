@@ -33,6 +33,15 @@ def _sv_batch_meta(
     return {'type': 'gatk-sv-batch-calls'}
 
 
+def _gcnv_annotated_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, Any]:
+    """
+    Callable, add meta[type] to custom analysis object
+    """
+    return {'type': 'gCNV-annotated'}
+
+
 def _sv_filtered_meta(
     output_path: str,  # pylint: disable=W0613:unused-argument
 ) -> dict[str, Any]:

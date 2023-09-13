@@ -11,7 +11,7 @@ from cpg_workflows.workflow import SequencingGroupStage, CohortStage
 
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     queue_annotate_sv_jobs,
-    _sv_batch_meta,
+    _gcnv_annotated_meta,
 )
 
 from cpg_workflows.batch import get_batch
@@ -198,7 +198,7 @@ class FastCombineGCNVs(CohortStage):
     required_stages=FastCombineGCNVs,
     analysis_type='sv',
     analysis_keys=['annotated_vcf'],
-    update_analysis_meta=_sv_batch_meta,
+    update_analysis_meta=_gcnv_annotated_meta,
 )
 class AnnotateVcf(CohortStage):
     """
