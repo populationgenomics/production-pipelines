@@ -359,4 +359,3 @@ def merge_calls(
     output_no_suffix = str(output_path).removesuffix('.vcf.bgz')
     b.write_output(j.output, output_no_suffix)
     return j
-
