@@ -21,7 +21,7 @@ def stripy(
     out_path: Path,
     log_path: Path,
     json_path: Path,
-    custom_loci_path: str = "",
+    custom_loci_path: str = '',
     analysis_type: str = 'standard',
     job_attrs: dict | None = None,
     overwrite: bool = False,
