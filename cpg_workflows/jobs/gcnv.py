@@ -313,6 +313,8 @@ def merge_calls(
     This job will run a fast simple merge on per-SGID call files
     No expectation that we need a fancy merge here since per-SGID
     VCFs were derived from a joint-called dataset (see above)
+    based on the WDL here:
+    portal.firecloud.org/?return=terra#methods/asmirnov-broad/Germline-CNV-joint-callng-featured-workspace/1/wdl
 
     Args:
         b (batch):
