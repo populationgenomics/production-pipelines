@@ -130,9 +130,9 @@ class GermlineCNVCalls(SequencingGroupStage):
 
     def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
         return {
-            'intervals': seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.intervals.vcf.gz',
-            'segments':  seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.segments.vcf.gz',
-            'ratios':    seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.ratios.tsv',
+            'intervals': self.prefix / f'{seqgroup.id}.intervals.vcf.gz',
+            'segments':  self.prefix / f'{seqgroup.id}.segments.vcf.gz',
+            'ratios':    self.prefix / f'{seqgroup.id}.ratios.tsv',
         }
 
     def queue_jobs(self, seqgroup: SequencingGroup, inputs: StageInput) -> StageOutput | None:
@@ -167,14 +167,12 @@ class FastCombineGCNVs(CohortStage):
 
         # do a slapdash bcftools merge on all input files...
         gcnv_vcfs = inputs.as_dict_by_target(GermlineCNVCalls)
-        sgids = cohort.get_sequencing_group_ids()
-        all_vcfs = [str(gcnv_vcfs[sgid]['intervals']) for sgid in sgids]
+        all_vcfs = [str(gcnv_vcfs[sgid]['intervals']) for sgid in cohort.get_sequencing_group_ids()]
 
-        jobs = gcnv.merge_calls(
+        job_or_none = gcnv.merge_calls(
             get_batch(),
-            sgids=sgids,
             sg_vcfs=all_vcfs,
             job_attrs=self.get_job_attrs(cohort),
             output_path=outputs['combined_calls'],
         )
-        return self.make_outputs(cohort, data=outputs, jobs=jobs)
+        return self.make_outputs(cohort, data=outputs, jobs=job_or_none)

@@ -8,7 +8,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 from hailtop.batch.resource import JobResourceFile, ResourceFile, ResourceGroup
 
-from cpg_utils import Path
+from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, fasta_res_group, image_path
 from cpg_workflows.filetypes import CramPath
@@ -305,7 +305,6 @@ def postprocess_calls(
 
 def merge_calls(
     b: hb.Batch,
-    sgids: list[str],
     sg_vcfs: list[str],
     job_attrs: dict[str, str],
     output_path:  Path
@@ -317,11 +316,13 @@ def merge_calls(
 
     Args:
         b (batch):
-        sgids (list[str]): all SG IDs
         sg_vcfs (list[str]): paths to all individual VCFs
         job_attrs (dict): any params to atach to the job
         output_path (Path): path to the final merged VCF
     """
+
+    if can_reuse(output_path):
+        return None
 
     assert sg_vcfs, 'No VCFs to merge'
 
@@ -331,4 +332,31 @@ def merge_calls(
     )
     j.image(image_path('bcftools'))
 
+    j.declare_resource_group(
+        output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
+    )
+
     # make a fuse connection to the data source
+    # to require only one fused connection we need files in one bucket
+    # pop a file off and use it to find the bucket
+    example_vcf = to_path(sg_vcfs[0])
+
+    # mount on equivalent path, minus 'gs://'
+    j.cloudfuse(example_vcf.drive, f'/{example_vcf.drive}', read_only=True)
+
+    # should be a simple transformation of VCF.removeprefix('gs://') on each path
+    all_vcfs = [f'/{v.removeprefix("gs://")}' for v in sg_vcfs]
+    # option breakdown:
+    # -Oz: bgzip output
+    # -o: output file
+    # --threads: number of threads to use
+    # -m: merge strategy
+    # -0: compression level
+    j.command(f'bcftools merge {" ".join(all_vcfs)} -Oz -o {j.output["vcf.bgz"]} --threads 4 -m all -0')
+    j.command(f'tabix index {j.output["vcf.bgz"]}')
+
+    # get the output root to write to
+    output_no_suffix = str(output_path).removesuffix('.vcf.bgz')
+    b.write_output(j.output, output_no_suffix)
+    return j
+
