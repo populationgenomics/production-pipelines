@@ -71,37 +71,3 @@ username = 'seqr'
 # Load ElasticSearch password from a secret, unless SEQR_ES_PASSWORD is set
 password_secret_id = 'seqr-es-password'
 password_project_id = 'seqr-308602'
-
-[stripy]
-# Analysis_type can be "standard" (fast) or "extended" (marginally slower
-# but also uses unmapped reads for genotying)
-analysis_type = "extended"
-# See https://gitlab.com/andreassh/stripy-pipeline#list-of-loci
-# Excluded by default: C9orf72, HTT
-target_loci = """AFF2,AR,ARX_1,ARX_2,ATN1,ATXN1,ATXN10,ATXN2,ATXN3,ATXN7,ATXN8OS,\
-BEAN1,CACNA1A,CBL,CNBP,COMP,DAB1,DIP2B,DMD,DMPK,FGF14,FMR1,FOXL2,FXN,GIPC1,GLS,\
-HOXA13_1,HOXA13_2,HOXA13_3,HOXD13,JPH3,LRP12,MARCHF6,NIPA1,NOP56,NOTCH2NLC,\
-NUTM2B-AS1,PABPN1,PHOX2B,PPP2R2B,PRDM12,RAPGEF2,RFC1,RUNX2,SAMD12,SOX3,STARD7,TBP,\
-TBX1,TCF4,TNRC6A,XYLT1,YEATS2,ZIC2,ZIC3"""
-# Path to bed+ file containins extra loci to include in the analysis. Tab-delimited BED
-# file containing at least the following four values: chromosome, start and end position
-# of the STR locus and motif on the plus strand. Optionally, the locus name/ID can be
-# specified as fifth value. Additionally, you can also specify disease name, inheritance,
-# normal range and pathogenic cut-off values which are then being used to colourise
-# results e.g.:
-# https://gitlab.com/andreassh/stripy-pipeline/-/blob/main/examples/vntr.bed
-# custom_loci_path = "gs://cpg-reference/hg38/loci/seqr/seqr_stripy_custom_loci.bed"
-# Set to empty string if no custom loci are to be used.
-custom_loci_path = ""
-
-[mito_snv]
-# Example config for broad wdl found here:
-# https://raw.githubusercontent.com/broadinstitute/gatk/master/scripts/mitochondria_m2_wdl/ExampleInputsMitochondriaPipeline.json
-# f_score_beta is not configured so will use tool default of 1.0
-f_score_beta = 1.0
-# Sarah Stenton from Broad runs this pipline for seqr ingest and indicated they use a
-# threshold of 0.01 for seqr cohorts.
-vaf_filter_threshold = 0.01
-# Use verifybamid in addition to haplocheck for contamination estimate
-# Broad pipeline is not clear if this option is used by default?
-use_verifybamid = true
