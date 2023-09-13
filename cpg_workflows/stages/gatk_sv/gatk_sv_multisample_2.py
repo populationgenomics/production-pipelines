@@ -16,6 +16,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_images,
     get_references,
     make_combined_ped,
+    queue_annotate_sv_jobs,
     _sv_batch_meta,
     _sv_filtered_meta,
     SV_CALLERS,
@@ -485,43 +486,12 @@ class AnnotateVcf(CohortStage):
         configure and queue jobs for SV annotation
         passing the VCF Index has become implicit, which may be a problem for us
         """
-        input_dict: dict[str, Any] = {
-            'vcf': inputs.as_dict(cohort, MakeCohortVcf)['vcf'],
-            'prefix': cohort.name,
-            'ped_file': make_combined_ped(cohort, self.prefix),
-            'sv_per_shard': 5000,
-            'population': get_config()['references']['gatk_sv'].get(
-                'external_af_population'
-            ),
-            'ref_prefix': get_config()['references']['gatk_sv'].get(
-                'external_af_ref_bed_prefix'
-            ),
-            'use_hail': False
-        }
-
-        input_dict |= get_references(
-            [
-                'noncoding_bed',
-                'protein_coding_gtf',
-                {'ref_bed': 'external_af_ref_bed'},
-                {'contig_list': 'primary_contigs_list'},
-            ]
-        )
-
-        # images!
-        input_dict |= get_images(
-            [
-                'sv_pipeline_docker',
-                'sv_base_mini_docker',
-                'gatk_docker',
-            ]
-        )
-        expected_d = self.expected_outputs(cohort)
-        jobs = add_gatk_sv_jobs(
+        expected_out = self.expected_outputs(cohort)
+        job_or_none = queue_annotate_sv_jobs(
             batch=get_batch(),
-            dataset=cohort.analysis_dataset,
-            wfl_name=self.name,
-            input_dict=input_dict,
-            expected_out_dict=expected_d,
+            cohort=Cohort,
+            cohort_prefix=self.prefix,
+            input_vcf=inputs.as_dict(cohort, MakeCohortVcf)['vcf'],
+            outputs=expected_out,
         )
-        return self.make_outputs(cohort, data=expected_d, jobs=jobs)
+        return self.make_outputs(cohort, data=expected_out, jobs=job_or_none)

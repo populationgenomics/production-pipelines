@@ -4,12 +4,17 @@ Stages that implement GATK-gCNV.
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import gcnv
 from cpg_workflows.targets import SequencingGroup, Cohort
 from cpg_workflows.workflow import stage, StageInput, StageOutput
 from cpg_workflows.workflow import SequencingGroupStage, CohortStage
-from .. import get_batch
+
+from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
+    queue_annotate_sv_jobs,
+    _sv_batch_meta,
+)
+
+from cpg_workflows.batch import get_batch
 
 
 @stage
@@ -22,7 +27,7 @@ class PrepareIntervals(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'preprocessed': self.prefix / f'{cohort.name}.preprocessed.interval_list',
-            'annotated':    self.prefix / f'{cohort.name}.annotated.tsv',
+            'annotated': self.prefix / f'{cohort.name}.annotated.tsv',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -44,11 +49,17 @@ class CollectReadCounts(SequencingGroupStage):
 
     def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
         return {
-            'counts': seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.counts.tsv.gz',
-            'index':  seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.counts.tsv.gz.tbi',
+            'counts': seqgroup.dataset.prefix()
+            / 'gcnv'
+            / f'{seqgroup.id}.counts.tsv.gz',
+            'index': seqgroup.dataset.prefix()
+            / 'gcnv'
+            / f'{seqgroup.id}.counts.tsv.gz.tbi',
         }
 
-    def queue_jobs(self, seqgroup: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(
+        self, seqgroup: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         outputs = self.expected_outputs(seqgroup)
 
         if seqgroup.cram is None:
@@ -75,8 +86,8 @@ class DeterminePloidy(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'filtered': self.tmp_prefix / f'{cohort.name}.filtered.interval_list',
-            'calls':    self.tmp_prefix / f'{cohort.name}-ploidy-calls.tar.gz',
-            'model':    self.tmp_prefix / f'{cohort.name}-ploidy-model.tar.gz',
+            'calls': self.tmp_prefix / f'{cohort.name}-ploidy-calls.tar.gz',
+            'model': self.tmp_prefix / f'{cohort.name}-ploidy-model.tar.gz',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -131,11 +142,13 @@ class GermlineCNVCalls(SequencingGroupStage):
     def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
         return {
             'intervals': self.prefix / f'{seqgroup.id}.intervals.vcf.gz',
-            'segments':  self.prefix / f'{seqgroup.id}.segments.vcf.gz',
-            'ratios':    self.prefix / f'{seqgroup.id}.ratios.tsv',
+            'segments': self.prefix / f'{seqgroup.id}.segments.vcf.gz',
+            'ratios': self.prefix / f'{seqgroup.id}.ratios.tsv',
         }
 
-    def queue_jobs(self, seqgroup: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(
+        self, seqgroup: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         outputs = self.expected_outputs(seqgroup)
 
         jobs = gcnv.postprocess_calls(
@@ -167,7 +180,10 @@ class FastCombineGCNVs(CohortStage):
 
         # do a slapdash bcftools merge on all input files...
         gcnv_vcfs = inputs.as_dict_by_target(GermlineCNVCalls)
-        all_vcfs = [str(gcnv_vcfs[sgid]['intervals']) for sgid in cohort.get_sequencing_group_ids()]
+        all_vcfs = [
+            str(gcnv_vcfs[sgid]['intervals'])
+            for sgid in cohort.get_sequencing_group_ids()
+        ]
 
         job_or_none = gcnv.merge_calls(
             get_batch(),
@@ -176,3 +192,49 @@ class FastCombineGCNVs(CohortStage):
             output_path=outputs['combined_calls'],
         )
         return self.make_outputs(cohort, data=outputs, jobs=job_or_none)
+
+
+@stage(
+    required_stages=FastCombineGCNVs,
+    analysis_type='sv',
+    analysis_keys=['annotated_vcf'],
+    update_analysis_meta=_sv_batch_meta,
+)
+class AnnotateVcf(CohortStage):
+    """
+    Add annotations, such as the inferred function and allele frequencies of variants,
+    to final VCF.
+
+    This is a full clone of the GATK-SV pipeline Cromwell stage, but use on a slightly
+    different output. Trying to work out the best way to handle this through inheritance
+
+    Annotations methods include:
+    * Functional annotation - annotate SVs with inferred functional consequence on
+      protein-coding regions, regulatory regions such as UTR and promoters, and other
+      non-coding elements.
+    * Allele frequency annotation - annotate SVs with their allele frequencies across
+      all samples, and samples of specific sex, as well as specific subpopulations.
+    * Allele Frequency annotation with external callset - annotate SVs with the allele
+      frequencies of their overlapping SVs in another callset, e.g. gnomad SV callset.
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict:
+        return {
+            'annotated_vcf': self.prefix / 'unfiltered_annotated.vcf.bgz',
+            'annotated_vcf_index': self.prefix / 'unfiltered_annotated.vcf.bgz.tbi',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        """
+        configure and queue jobs for SV annotation
+        passing the VCF Index has become implicit, which may be a problem for us
+        """
+        expected_out = self.expected_outputs(cohort)
+        job_or_none = queue_annotate_sv_jobs(
+            batch=get_batch(),
+            cohort=Cohort,
+            cohort_prefix=self.prefix,
+            input_vcf=inputs.as_dict(cohort, FastCombineGCNVs)['combined_calls'],
+            outputs=expected_out,
+        )
+        return self.make_outputs(cohort, data=expected_out, jobs=job_or_none)

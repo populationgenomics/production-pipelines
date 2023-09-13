@@ -175,7 +175,7 @@ def add_gatk_sv_jobs(
         outputs_to_collect=outputs_to_collect,
         driver_image=driver_image,
         copy_outputs_to_gcp=copy_outputs,
-        labels=labels
+        labels=labels,
     )
 
     copy_j = batch.new_job(f'{job_prefix}: copy outputs')
@@ -238,3 +238,54 @@ def make_combined_ped(cohort: Cohort, prefix: Path) -> Path:
         with to_path(conf_ped_path).open() as f:
             out.write(f.read())
     return combined_ped_path
+
+
+def queue_annotate_sv_jobs(
+    batch,
+    cohort,
+    cohort_prefix: Path,
+    input_vcf: Path,
+    outputs: dict,
+) -> list[Job] | Job | None:
+    """
+    Helper function to queue jobs for SV annotation
+    """
+    input_dict: dict[str, Any] = {
+        'vcf': input_vcf,
+        'prefix': cohort.name,
+        'ped_file': make_combined_ped(cohort, cohort_prefix),
+        'sv_per_shard': 5000,
+        'population': get_config()['references']['gatk_sv'].get(
+            'external_af_population'
+        ),
+        'ref_prefix': get_config()['references']['gatk_sv'].get(
+            'external_af_ref_bed_prefix'
+        ),
+        'use_hail': False,
+    }
+
+    input_dict |= get_references(
+        [
+            'noncoding_bed',
+            'protein_coding_gtf',
+            {'ref_bed': 'external_af_ref_bed'},
+            {'contig_list': 'primary_contigs_list'},
+        ]
+    )
+
+    # images!
+    input_dict |= get_images(
+        [
+            'sv_pipeline_docker',
+            'sv_base_mini_docker',
+            'gatk_docker',
+        ]
+    )
+    jobs = add_gatk_sv_jobs(
+        batch=batch,
+        dataset=cohort.analysis_dataset,
+        wfl_name='AnnotateVcf',
+        input_dict=input_dict,
+        expected_out_dict=outputs,
+    )
+    return jobs
