@@ -202,12 +202,10 @@ class MakeCohortVcf(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-# @stage(required_stages=MakeCohortVcf)
+@stage(required_stages=MakeCohortVcf)
 class FormatVcfForGatk(CohortStage):
     """
     Takes the clean VCF and reformat for GATK intake
-
-    temporarily disabled
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict:
@@ -222,8 +220,6 @@ class FormatVcfForGatk(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
-
-
         Args:
             cohort (Cohort): cohort of all samples (across several sub-cohort batches)
             inputs (StageInput): access to prior inputs
@@ -432,12 +428,12 @@ class FilterGenotypes(CohortStage):
         assert input_dict['sl_filter_args']
 
         input_dict |= get_images(
-            ['gatk_docker', 'linux_docker', 'sv_base_mini_docker', 'sv_pipeline_docker']
+            ['linux_docker', 'sv_base_mini_docker', 'sv_pipeline_docker']
         )
-
-        # only path arguments can be retrieved using get_references, so there is some
-        # hard coding here.
-
+        # use a non-standard GATK image containing required filtering tool
+        input_dict['gatk_docker'] = get_images(['gq_recalibrator_docker'])[
+            'gq_recalibrator_docker'
+        ]
         input_dict |= get_references(
             [
                 {'gq_recalibrator_model_file': 'aou_filtering_model'},
@@ -446,7 +442,6 @@ class FilterGenotypes(CohortStage):
         )
 
         # something a little trickier - we need to get various genome tracks
-        # we don't copy in the indexes, so that might be a problem later
         input_dict['genome_tracks'] = list(
             get_references(
                 get_config()['references']['gatk_sv'].get('genome_tracks', [])
@@ -474,7 +469,7 @@ def _sv_annotated_meta(
 
 
 @stage(
-    required_stages=MakeCohortVcf,
+    required_stages=FilterGenotypes,
     analysis_type='sv',
     analysis_keys=['annotated_vcf'],
     update_analysis_meta=_sv_annotated_meta,
@@ -483,8 +478,6 @@ class AnnotateVcf(CohortStage):
     """
     Add annotations, such as the inferred function and allele frequencies of variants,
     to final VCF.
-
-    In future this will take filtered VCFs, but for now that workflow is disabled
 
     Annotations methods include:
     * Functional annotation - annotate SVs with inferred functional consequence on
@@ -508,7 +501,7 @@ class AnnotateVcf(CohortStage):
         passing the VCF Index has become implicit, which may be a problem for us
         """
         input_dict: dict[str, Any] = {
-            'vcf': inputs.as_dict(cohort, MakeCohortVcf)['vcf'],
+            'vcf': inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf'],
             'prefix': cohort.name,
             'ped_file': make_combined_ped(cohort, self.prefix),
             'sv_per_shard': 5000,
@@ -532,11 +525,7 @@ class AnnotateVcf(CohortStage):
 
         # images!
         input_dict |= get_images(
-            [
-                'sv_pipeline_docker',
-                'sv_base_mini_docker',
-                'gatk_docker',
-            ]
+            ['sv_pipeline_docker', 'sv_base_mini_docker', 'gatk_docker']
         )
         expected_d = self.expected_outputs(cohort)
         jobs = add_gatk_sv_jobs(
@@ -571,10 +560,6 @@ class AnnotateCohortSv(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
         queue job(s) to rearrange the annotations prior to Seqr transformation
-
-        Args:
-            cohort ():
-            inputs ():
         """
 
         vcf_path = inputs.as_path(target=cohort, stage=AnnotateVcf, key='output_vcf')
@@ -631,7 +616,7 @@ class AnnotateDatasetSv(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
         Whether Dataproc or not, this Stage subsets the whole MT to this cohort only
-        Then brings a whole bunch of genotype data into row annotations
+        Then brings a range of genotype data into row annotations
 
         Args:
             dataset (Dataset): SGIDs specific to this dataset/project
