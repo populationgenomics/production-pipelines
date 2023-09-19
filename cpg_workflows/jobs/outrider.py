@@ -298,10 +298,14 @@ def outrider(
         basename(str(f)).replace('.count', ''): str(f)
         for f in input_counts
     }
-    b.read_input_group(**infiles)
+    infiles_rg = b.read_input_group(**infiles)
+    infiles_localised = [
+        str(infiles_rg[key])
+        for key in infiles.keys()
+    ]
     gtf_file = get_config()['references'].get('gtf')
     gtf_file = to_path(gtf_file)
-    b.read_input_group(gtf=str(gtf_file))
+    gtf_file_rg = b.read_input_group(gtf=str(gtf_file))
 
     # Create job
     job_name = f'outrider_{cohort_name}' if cohort_name else 'count'
@@ -318,8 +322,8 @@ def outrider(
 
     # Create counting command
     outrider = Outrider(
-        input_counts=input_counts,
-        gtf_file=gtf_file,
+        input_counts=infiles_localised,
+        gtf_file=str(gtf_file_rg.gtf),
         output_tar_gz_path=j.output.tar_gz,
     )
 
