@@ -45,6 +45,7 @@ def get_toml(tmp_path) -> str:
 
     [references]
     star_ref_dir = "stub"
+    fasta = "stub"
 
     [storage.default]
     default = '{tmp_path}'
@@ -132,7 +133,8 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     from cpg_workflows.jobs.trim import trim
     from cpg_workflows.jobs.align_rna import align
     from cpg_workflows.jobs.markdups import markdup
-    from cpg_workflows.filetypes import FastqPairs, FastqPair, BamPath
+    from cpg_workflows.jobs.bam_to_cram import bam_to_cram
+    from cpg_workflows.filetypes import FastqPairs, FastqPair, BamPath, CramPath
 
     conf = get_toml(tmp_path)
     set_config(
@@ -176,15 +178,27 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
             )
         return align_job_output
     
-    def capture_markdup_cmd(*args, **kwargs) -> Job:
-        markdup_job = markdup(*args, **kwargs)
+    def capture_markdup_cmd(*args, **kwargs) -> tuple[Job, ResourceGroup] | tuple[None, BamPath]:
+        markdup_job_output = markdup(*args, **kwargs)
+        markdup_job = markdup_job_output[0]
         if markdup_job:
             cmd_str_list.append(
                 '===== MARKDUP JOB START =====\n\n' +
                 '\n'.join(markdup_job._command) +
                 '\n\n===== MARKDUP JOB END =====\n\n'
             )
-        return markdup_job
+        return markdup_job_output
+    
+    def capture_bam_to_cram_cmd(*args, **kwargs) -> tuple[Job, ResourceGroup] | tuple[None, CramPath]:
+        bam_to_cram_job_output = bam_to_cram(*args, **kwargs)
+        bam_to_cram_job = bam_to_cram_job_output[0]
+        if bam_to_cram_job:
+            cmd_str_list.append(
+                '===== BAM TO CRAM JOB START =====\n\n' +
+                '\n'.join(bam_to_cram_job._command) +
+                '\n\n===== BAM TO CRAM JOB END =====\n\n'
+            )
+        return bam_to_cram_job_output
 
     mocker.patch('pathlib.Path.open', selective_mock_open)
     # functions like get_intervals checks file existence
@@ -211,6 +225,8 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     mocker.patch('cpg_workflows.jobs.align_rna.align', capture_align_cmd)
     # Patch the markdup function to capture the job command
     mocker.patch('cpg_workflows.jobs.markdups.markdup', capture_markdup_cmd)
+    # Patch the bam_to_cram function to capture the job command
+    mocker.patch('cpg_workflows.jobs.bam_to_cram.bam_to_cram', capture_bam_to_cram_cmd)
 
     from cpg_workflows.batch import get_batch
     from cpg_workflows.inputs import get_cohort
@@ -227,6 +243,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     align_job = b.job_by_tool['STAR']
     samtools_job = b.job_by_tool['samtools']
     markdup_job = b.job_by_tool['sambamba']
+    bam_to_cram_job = b.job_by_tool['samtools_view']
     sample_list = get_cohort().get_sequencing_groups()
 
     # The number of FASTQ trim jobs should equal the number of FASTQ pairs
@@ -255,6 +272,10 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     # The number of markdup jobs should equal the number of samples
     n_markdup_jobs = len(sample_list)
     assert markdup_job['job_n'] == n_markdup_jobs
+
+    # The number of bam_to_cram jobs should equal the number of samples
+    n_bam_to_cram_jobs = len(sample_list)
+    assert bam_to_cram_job['job_n'] == n_bam_to_cram_jobs
 
     output_path = dataset_path('cmd.txt')
     output_path_parent = os.path.dirname(output_path)
