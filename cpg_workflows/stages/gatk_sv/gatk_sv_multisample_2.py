@@ -667,8 +667,9 @@ def _gatk_sv_index_meta(
 ) -> dict[str, Any]:
     """
     Add meta.type to custom analysis object
+    https://github.com/populationgenomics/metamist/issues/539
     """
-    return {'type': 'gatk-sv-index'}
+    return {'type': 'gatk-sv-index', 'seqr-data-type': 'gatk-sv'}
 
 
 @stage(
