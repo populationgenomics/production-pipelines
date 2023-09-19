@@ -20,7 +20,9 @@ from cpg_workflows.workflow import (
 )
 import re
 
-def bam_to_cram(b: hb.Batch,
+
+def bam_to_cram(
+    b: hb.Batch,
     input_bam: ResourceGroup,
     output_cram: CramPath | None = None,
     extra_label: str | None = None,

@@ -114,7 +114,6 @@ class TrimAlignRNA(SequencingGroupStage):
                 ('bai', 'bam.bai'),
             ]
         }
-
     
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
