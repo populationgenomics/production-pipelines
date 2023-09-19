@@ -25,6 +25,7 @@ from cpg_workflows.filetypes import (
 from cpg_workflows.jobs import trim
 from cpg_workflows.jobs import align_rna
 from cpg_workflows.jobs import markdups
+from cpg_workflows.jobs import bam_to_cram
 import re
 from os.path import basename
 from dataclasses import dataclass
@@ -91,6 +92,18 @@ class TrimAlignRNA(SequencingGroupStage):
     """
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
+        """
+        Expect a pair of CRAM and CRAI files, one per set of input FASTQ files
+        """
+        return {
+            suffix: sequencing_group.dataset.prefix() / 'cram' / f'{sequencing_group.id}.{extension}'
+            for suffix, extension in [
+                ('cram', 'cram'),
+                ('crai', 'cram.crai'),
+            ]
+        }
+    
+    def expected_tmp_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         """
         Expect a pair of BAM and BAI files, one per set of input FASTQ files
         """
@@ -179,22 +192,52 @@ class TrimAlignRNA(SequencingGroupStage):
             raise Exception(f'Error aligning RNA-seq reads for {sequencing_group}: {e}')
 
         # Run mark duplicates
-        _exp_out = self.expected_outputs(sequencing_group)
+        _exp_tmp_out = self.expected_tmp_outputs(sequencing_group)
         output_bam = BamPath(
-            path=_exp_out['bam'],
-            index_path=_exp_out['bai'],
+            path=_exp_tmp_out['bam'],
+            index_path=_exp_tmp_out['bai'],
         )
-        output_bam_path = to_path(output_bam.path)
-        j = markdups.markdup(
+        j, mkdup_bam_out = markdups.markdup(
             b=get_batch(),
             input_bam=aligned_bam,
-            output_bam=output_bam_path,
+            output_bam=output_bam,
             job_attrs=self.get_job_attrs(sequencing_group),
             overwrite=sequencing_group.forced,
         )
         if j:
             assert isinstance(j, Job)
+            assert isinstance(mkdup_bam_out, ResourceGroup)
             jobs.append(j)
+            mkdup_bam = mkdup_bam_out
+        else:
+            # If the job was skipped due to an existing BAM,
+            # we need to localise it
+            assert isinstance(mkdup_bam_out, BamPath)
+            mkdup_bam = get_batch().read_input_group(
+                bam=str(mkdup_bam_out.path),
+                bai=str(mkdup_bam_out.index_path),
+            )
+
+        # Convert BAM to CRAM
+        _exp_out = self.expected_outputs(sequencing_group)
+        output_cram = CramPath(
+            path=_exp_out['cram'],
+            index_path=_exp_out['crai'],
+        )
+        j, mkdup_cram = bam_to_cram.bam_to_cram(
+            b=get_batch(),
+            input_bam=mkdup_bam,
+            output_cram=output_cram,
+            extra_label='mkdup',
+            job_attrs=self.get_job_attrs(sequencing_group),
+            overwrite=sequencing_group.forced,
+        )
+        if j:
+            assert isinstance(j, Job)
+            assert isinstance(mkdup_cram, ResourceGroup)
+            jobs.append(j)
+        else:
+            assert isinstance(mkdup_cram, CramPath)
 
         # Create outputs and return jobs
         return self.make_outputs(

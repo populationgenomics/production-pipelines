@@ -6,3 +6,4 @@ adapter_type = "ILLUMINA_TRUSEQ"
 
 [references]
 gtf = 'gs://kccg-references/hg38.gtf'
+fasta = "gs://cpg-common-main/references/hg38/v0/Homo_sapiens_assembly38.fasta"
