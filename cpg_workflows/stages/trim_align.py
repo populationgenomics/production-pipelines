@@ -228,7 +228,6 @@ class TrimAlignRNA(SequencingGroupStage):
             b=get_batch(),
             input_bam=mkdup_bam,
             output_cram=output_cram,
-            extra_label='mkdup',
             job_attrs=self.get_job_attrs(sequencing_group),
             overwrite=sequencing_group.forced,
         )
