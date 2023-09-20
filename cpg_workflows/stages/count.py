@@ -81,4 +81,4 @@ class Count(SequencingGroupStage):
                 job_attrs=self.get_job_attrs(sequencing_group),
             )
         )
-        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=j)
+        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
