@@ -11,7 +11,7 @@ logging.getLogger().setLevel(logging.WARN)
 
 # silence other loggers
 logging.getLogger('pyspark').setLevel(logging.ERROR)
-logging.getLogger("py4j").setLevel(logging.ERROR)
+logging.getLogger('py4j').setLevel(logging.ERROR)
 
 
 @runtime_checkable
