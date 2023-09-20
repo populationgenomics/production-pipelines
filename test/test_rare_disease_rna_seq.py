@@ -135,7 +135,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     from cpg_workflows.jobs.trim import trim
     from cpg_workflows.jobs.align_rna import align
     from cpg_workflows.jobs.markdups import markdup
-    from cpg_workflows.jobs.bam_to_cram import bam_to_cram
+    from cpg_workflows.jobs.bam_to_cram import bam_to_cram, cram_to_bam
     from cpg_workflows.jobs.count import count
     from cpg_workflows.filetypes import FastqPairs, FastqPair, BamPath, CramPath
 
@@ -203,6 +203,16 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
             )
         return bam_to_cram_job_output
     
+    def capture_cram_to_bam_cmd(*args, **kwargs) -> Job:
+        cram_to_bam_job = cram_to_bam(*args, **kwargs)
+        if cram_to_bam_job:
+            cmd_str_list.append(
+                '===== CRAM TO BAM JOB START =====\n\n' +
+                '\n'.join(cram_to_bam_job._command) +
+                '\n\n===== CRAM TO BAM JOB END =====\n\n'
+            )
+        return cram_to_bam_job
+    
     def capture_count_cmd(*args, **kwargs) -> Job:
         count_job = count(*args, **kwargs)
         cmd_str_list.append(
@@ -239,6 +249,8 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     mocker.patch('cpg_workflows.jobs.markdups.markdup', capture_markdup_cmd)
     # Patch the bam_to_cram function to capture the job command
     mocker.patch('cpg_workflows.jobs.bam_to_cram.bam_to_cram', capture_bam_to_cram_cmd)
+    # Patch the cram_to_bam function to capture the job command
+    mocker.patch('cpg_workflows.jobs.bam_to_cram.cram_to_bam', capture_cram_to_bam_cmd)
     # Patch the count function to capture the job command
     mocker.patch('cpg_workflows.jobs.count.count', capture_count_cmd)
 
@@ -258,6 +270,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     samtools_job = b.job_by_tool['samtools']
     markdup_job = b.job_by_tool['sambamba']
     bam_to_cram_job = b.job_by_tool['samtools_view']
+    cram_to_bam_job = b.job_by_tool['samtools_view_cram_to_bam']
     featureCounts_job = b.job_by_tool['featureCounts']
     sample_list = get_cohort().get_sequencing_groups()
 
@@ -295,6 +308,10 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     # The number of bam_to_cram jobs should equal the number of samples
     n_bam_to_cram_jobs = len(sample_list)
     assert bam_to_cram_job['job_n'] == n_bam_to_cram_jobs
+
+    # The number of cram_to_bam jobs should equal the number of samples
+    n_cram_to_bam_jobs = len(sample_list)
+    assert cram_to_bam_job['job_n'] == n_cram_to_bam_jobs
 
     output_path = dataset_path('cmd.txt')
     output_path_parent = os.path.dirname(output_path)

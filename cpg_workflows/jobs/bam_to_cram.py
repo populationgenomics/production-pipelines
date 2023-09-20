@@ -13,6 +13,7 @@ from cpg_workflows.resources import STANDARD, HIGHMEM
 from cpg_workflows.filetypes import (
     FastqPair,
     FastqPairs,
+    BamPath,
     CramPath,
 )
 from cpg_workflows.workflow import (
@@ -79,3 +80,65 @@ def bam_to_cram(
         b.write_output(j.sorted_cram, str(output_bam_path.with_suffix('')))
 
     return j, j.sorted_cram
+
+
+def cram_to_bam(
+    b: hb.Batch,
+    input_cram: CramPath,
+    output_bam: BamPath | None = None,
+    extra_label: str | None = None,
+    overwrite: bool = False,
+    job_attrs: dict | None = None,
+    requested_nthreads: int | None = None,
+) -> Job:
+    """
+    Convert a CRAM file to a BAM file.
+    """
+    
+    assert isinstance(input_cram, CramPath)
+
+    cram_rg = b.read_input_group(
+        cram=str(input_cram.path),
+        crai=str(input_cram.index_path),
+    )
+
+    job_name = 'cram_to_bam'
+    if extra_label:
+        job_name += f' {extra_label}'
+
+    convert_tool = 'samtools_view_cram_to_bam'
+    j_attrs = (job_attrs or {}) | dict(label=job_name, tool=convert_tool)
+    j = b.new_job(name=job_name, attributes=j_attrs)
+    j.image(image_path('samtools'))
+
+    # Get fasta file
+    # fasta_path = str(get_config()['references']['fasta'])
+    # fasta = b.read_input_group(
+    #     fasta=fasta_path,
+    #     fasta_fai=f'{fasta_path}.fai',
+    # )
+    
+    # Set resource requirements
+    nthreads = requested_nthreads or 8
+    res = STANDARD.set_resources(
+        j,
+        ncpu=nthreads,
+        storage_gb=50,  # TODO: make configurable
+    )
+
+    j.declare_resource_group(
+        sorted_bam={
+            'bam': '{root}.bam',
+            'bam.bai': '{root}.bam.bai',
+        }
+    )
+
+    cmd = f'samtools view -@ {res.get_nthreads() - 1} -b {cram_rg.cram} | tee {j.sorted_bam["bam"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_bam["bam.bai"]}'
+    j.command(command(cmd, monitor_space=True))
+
+    # Write output to file
+    if output_bam:
+        output_bam_path = to_path(output_bam.path)
+        b.write_output(j.sorted_bam, str(output_bam_path.with_suffix('')))
+
+    return j
