@@ -4,6 +4,7 @@ Count RNA seq reads mapping to genes and/or transcripts using featureCounts.
 
 import logging
 from hailtop.batch import ResourceGroup
+from hailtop.batch.job import Job
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_workflows import get_batch
@@ -52,7 +53,7 @@ class Count(SequencingGroupStage):
         input_bam = BamPath(potential_bam_path, potential_bai_path)
         output_path = self.expected_outputs(sequencing_group)['count']
         summary_path = self.expected_outputs(sequencing_group)['summary']
-        jobs = []
+        jobs: list[Job] = []
         if (
             can_reuse(output_path, overwrite=sequencing_group.forced) and
             can_reuse(summary_path, overwrite=sequencing_group.forced)
