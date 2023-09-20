@@ -123,10 +123,10 @@ def count(
         input_reads = input_bam
     elif isinstance(input_bam, BamPath):
         # Localise input
-        input_reads = b.read_input_group(
-            reads=str(input_bam.path),
-            index=str(input_bam.index_path),
-        )
+        input_reads = b.read_input_group(**{
+            'bam': str(input_bam.path),
+            'bam.bai': str(input_bam.index_path),
+        })
     else:
         raise ValueError(
             f'Invalid alignment input: "{str(input_bam)}", expected BAM file.'
@@ -159,7 +159,7 @@ def count(
     
     # Create counting command
     fc = FeatureCounts(
-        input_bam=input_reads.reads,
+        input_bam=input_reads['bam'],
         gtf_file=counting_reference.gtf,
         output_path=j.count_output['count'],
         summary_path=j.count_output['count.summary'],

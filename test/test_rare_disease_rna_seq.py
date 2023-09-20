@@ -204,14 +204,15 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
         return bam_to_cram_job_output
     
     def capture_cram_to_bam_cmd(*args, **kwargs) -> Job:
-        cram_to_bam_job = cram_to_bam(*args, **kwargs)
+        cram_to_bam_job_output = cram_to_bam(*args, **kwargs)
+        cram_to_bam_job = cram_to_bam_job_output[0]
         if cram_to_bam_job:
             cmd_str_list.append(
                 '===== CRAM TO BAM JOB START =====\n\n' +
                 '\n'.join(cram_to_bam_job._command) +
                 '\n\n===== CRAM TO BAM JOB END =====\n\n'
             )
-        return cram_to_bam_job
+        return cram_to_bam_job_output
     
     def capture_count_cmd(*args, **kwargs) -> Job:
         count_job = count(*args, **kwargs)

@@ -63,7 +63,7 @@ class Count(SequencingGroupStage):
         elif potential_bam_path.exists() and potential_bai_path.exists():
             logging.info(f'Using existing BAM {potential_bam_path}')
         else:
-            j = bam_to_cram.cram_to_bam(
+            j, output_bam = bam_to_cram.cram_to_bam(
                 b=get_batch(),
                 input_cram=CramPath(cram_path, crai_path),
                 output_bam=input_bam,
@@ -71,6 +71,8 @@ class Count(SequencingGroupStage):
                 overwrite=sequencing_group.forced,
             )
             jobs.append(j)
+            assert isinstance(output_bam, ResourceGroup)
+            input_bam = output_bam
         jobs.append(
             count.count(
                 b=get_batch(),

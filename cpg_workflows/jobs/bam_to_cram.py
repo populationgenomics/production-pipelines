@@ -90,7 +90,7 @@ def cram_to_bam(
     overwrite: bool = False,
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
-) -> Job:
+) -> tuple[Job, ResourceGroup]:
     """
     Convert a CRAM file to a BAM file.
     """
@@ -141,4 +141,4 @@ def cram_to_bam(
         output_bam_path = to_path(output_bam.path)
         b.write_output(j.sorted_bam, str(output_bam_path.with_suffix('')))
 
-    return j
+    return j, j.sorted_bam
