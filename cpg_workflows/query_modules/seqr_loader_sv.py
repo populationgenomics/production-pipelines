@@ -357,7 +357,7 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
 
     mt = read_hail(str(mt_path))
     is_called = hl.is_defined(mt.GT)
-    was_previously_called = hl.is_defined(mt.CONC_ST) & ~mt.CONC_ST.contains("EMPTY")
+    was_previously_called = hl.is_defined(mt.CONC_ST) & ~mt.CONC_ST.contains('EMPTY')
     num_alt = hl.if_else(is_called, mt.GT.n_alt_alleles(), -1)
     prev_num_alt = hl.if_else(was_previously_called, PREVIOUS_GENOTYPE_N_ALT_ALLELES[hl.set(mt.CONC_ST)], -1)
     concordant_genotype = num_alt == prev_num_alt
