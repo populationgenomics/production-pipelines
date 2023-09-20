@@ -37,25 +37,24 @@ GENCODE_GTF_URL = (
     'release_{gencode_release}/gencode.v{gencode_release}.annotation.gtf.gz'
 )
 
-# not currently in use - we don't have 'previous call' annotations
-# PREVIOUS_GENOTYPE_N_ALT_ALLELES = hl.dict(
-#     {
-#         # Map of concordance string -> previous n_alt_alleles()
-#         # Concordant
-#         frozenset(['TN']): 0,  # 0/0 -> 0/0
-#         frozenset(['TP']): 2,  # 1/1 -> 1/1
-#         frozenset(['TN', 'TP']): 1,  # 0/1 -> 0/1
-#         # Novel
-#         frozenset(['FP']): 0,  # 0/0 -> 1/1
-#         frozenset(['TN', 'FP']): 0,  # 0/0 -> 0/1
-#         # Absent
-#         frozenset(['FN']): 2,  # 1/1 -> 0/0
-#         frozenset(['TN', 'FN']): 1,  # 0/1 -> 0/0
-#         # Discordant
-#         frozenset(['FP', 'TP']): 1,  # 0/1 -> 1/1
-#         frozenset(['FN', 'TP']): 2,  # 1/1 -> 0/1
-#     }
-# )
+PREVIOUS_GENOTYPE_N_ALT_ALLELES = hl.dict(
+    {
+        # Map of concordance string -> previous n_alt_alleles()
+        # Concordant
+        frozenset(['TN']): 0,  # 0/0 -> 0/0
+        frozenset(['TP']): 2,  # 1/1 -> 1/1
+        frozenset(['TN', 'TP']): 1,  # 0/1 -> 0/1
+        # Novel
+        frozenset(['FP']): 0,  # 0/0 -> 1/1
+        frozenset(['TN', 'FP']): 0,  # 0/0 -> 0/1
+        # Absent
+        frozenset(['FN']): 2,  # 1/1 -> 0/0
+        frozenset(['TN', 'FN']): 1,  # 0/1 -> 0/0
+        # Discordant
+        frozenset(['FP', 'TP']): 1,  # 0/1 -> 1/1
+        frozenset(['FN', 'TP']): 2,  # 1/1 -> 0/1
+    }
+)
 
 GENCODE_FILE_HEADER = [
     'chrom',
@@ -357,11 +356,13 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
     logging.info('Annotating genotypes')
 
     mt = read_hail(str(mt_path))
-
     is_called = hl.is_defined(mt.GT)
+    was_previously_called = hl.is_defined(mt.CONC_ST) & ~mt.CONC_ST.contains('EMPTY')
     num_alt = hl.if_else(is_called, mt.GT.n_alt_alleles(), -1)
-    prev_num_alt = -1
+    prev_num_alt = hl.if_else(was_previously_called, PREVIOUS_GENOTYPE_N_ALT_ALLELES[hl.set(mt.CONC_ST)], -1)
+    concordant_genotype = num_alt == prev_num_alt
     discordant_genotype = (num_alt != prev_num_alt) & (prev_num_alt > 0)
+    novel_genotype = (num_alt != prev_num_alt) & (prev_num_alt == 0)
     mt = mt.annotate_rows(
         genotypes=hl.agg.collect(
             hl.struct(
@@ -370,8 +371,8 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
                 cn=mt.RD_CN,
                 num_alt=num_alt,
                 prev_num_alt=hl.or_missing(discordant_genotype, prev_num_alt),
-                prev_call=hl.missing(hl.tstr),
-                new_call=True,
+                prev_call=hl.or_missing(is_called, was_previously_called & concordant_genotype),
+                new_call=hl.or_missing(is_called, ~was_previously_called | novel_genotype),
             )
         )
     )

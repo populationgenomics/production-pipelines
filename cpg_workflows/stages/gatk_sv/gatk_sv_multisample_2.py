@@ -406,7 +406,7 @@ class FilterGenotypes(CohortStage):
             'unfiltered_recalibrated_vcf_index': self.prefix
             / 'unfiltered_recalibrated.vcf.gz.tbi',
             # 'vcf_optimization_table': self.prefix / 'vcf_optimization_table.tsv.gz',
-            'sl_cutoff_qc_tarball': self.prefix / 'sl_cutoff_SV_VCF_QC_output.tar.gz',
+            # 'sl_cutoff_qc_tarball': self.prefix / 'sl_cutoff_SV_VCF_QC_output.tar.gz',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
