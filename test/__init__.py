@@ -7,7 +7,11 @@ from cpg_utils import Path as AnyPath
 from cpg_utils.config import set_config_paths
 
 logging.basicConfig()
-logging.getLogger().setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.WARN)
+
+# silence other loggers
+logging.getLogger('pyspark').setLevel(logging.ERROR)
+logging.getLogger("py4j").setLevel(logging.ERROR)
 
 
 @runtime_checkable
