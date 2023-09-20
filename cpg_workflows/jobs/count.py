@@ -108,7 +108,7 @@ class FeatureCounts:
 
 def count(
     b: hb.Batch,
-    input_bam: BamPath,
+    input_bam: BamPath | hb.ResourceGroup,
     output_path: str | Path,
     summary_path: str | Path,
     sample_name: str | None = None,
@@ -118,18 +118,19 @@ def count(
     """
     Count RNA seq reads mapping to genes and/or transcripts using featureCounts.
     """
-    # Determine whether input is a BAM file
-    is_bam = isinstance(input_bam, BamPath)
-    if not is_bam:
+    # Determine whether input is a BAM file or a resource group
+    if isinstance(input_bam, hb.ResourceGroup):
+        input_reads = input_bam
+    elif isinstance(input_bam, BamPath):
+        # Localise input
+        input_reads = b.read_input_group(**{
+            'bam': str(input_bam.path),
+            'bam.bai': str(input_bam.index_path),
+        })
+    else:
         raise ValueError(
             f'Invalid alignment input: "{str(input_bam)}", expected BAM file.'
         )
-
-    # Localise input
-    input_reads = b.read_input_group(
-        reads=str(input_bam.path),
-        index=str(input_bam.index_path),
-    )
 
     counting_reference = count_res_group(b)
 
@@ -158,7 +159,7 @@ def count(
     
     # Create counting command
     fc = FeatureCounts(
-        input_bam=input_reads.reads,
+        input_bam=input_reads['bam'],
         gtf_file=counting_reference.gtf,
         output_path=j.count_output['count'],
         summary_path=j.count_output['count.summary'],
