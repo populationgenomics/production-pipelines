@@ -98,6 +98,19 @@ def annotate_cohort(
         clinvar_data=clinvar_ht[mt.row_key],
         ref_data=ref_ht[mt.row_key],
     )
+
+    # this was previously executed in the MtToEs job, as it was not
+    # previously possible on QoB
+    logging.info('Adding GRCh37 coords')
+    liftover_path = reference_path('liftover_38_to_37')
+    rg37 = hl.get_reference('GRCh37')
+    rg38 = hl.get_reference('GRCh38')
+    rg38.add_liftover(str(liftover_path), rg37)
+    mt = mt.annotate_rows(
+        rg37_locus=hl.liftover(mt.locus, 'GRCh37'),
+        info=mt.info.drop('InbreedingCoeff')
+    )
+
     mt = checkpoint_hail(mt, 'mt-vep-split-vqsr-round1.mt', checkpoint_prefix)
 
     logging.info(

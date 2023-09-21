@@ -138,10 +138,6 @@ def main(
 
     mt = hl.read_matrix_table(mt_path)
 
-    # Annotate GRCh37 coordinates here, until liftover is supported by Batch Backend
-    # and can be moved to annotate_cohort.
-    mt = _annotate_grch37(mt)
-
     logging.info('Getting rows and exporting to the ES')
     row_ht = elasticsearch_row(mt)
     es_shards = _mt_num_shards(mt)
@@ -155,16 +151,6 @@ def main(
     _cleanup(es, es_index, es_shards)
     with to_path(done_flag_path).open('w') as f:
         f.write('done')
-
-
-def _annotate_grch37(mt):
-    logging.info('Adding GRCh37 coords')
-    liftover_path = reference_path('liftover_38_to_37')
-    rg37 = hl.get_reference('GRCh37')
-    rg38 = hl.get_reference('GRCh38')
-    rg38.add_liftover(str(liftover_path), rg37)
-    mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
-    return mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
 
 
 def elasticsearch_row(mt: hl.MatrixTable):
