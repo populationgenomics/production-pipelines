@@ -74,12 +74,12 @@ def get_expr_for_contig_number(locus: hl.LocusExpression) -> hl.Int32Expression:
     return hl.bind(
         lambda contig: (
             hl.case()
-            .when(contig == "X", 23)
-            .when(contig == "Y", 24)
-            .when(contig[0] == "M", 25)
+            .when(contig == 'X', 23)
+            .when(contig == 'Y', 24)
+            .when(contig[0] == 'M', 25)
             .default(hl.int(contig))
         ),
-        locus.contig.replace("^chr", "")
+        locus.contig.replace('^chr', '')
     )
 
 
