@@ -321,9 +321,6 @@ def annotate_cohort_sv(
         docId=mt.rsid[0:512],
     )
 
-    # chuck in another checkpoint
-    mt = checkpoint_hail(mt, 'second_annotation_round.mt', checkpoint_prefix)
-
     # and some more annotation stuff
     mt = mt.annotate_rows(
         transcriptConsequenceTerms=hl.set(
