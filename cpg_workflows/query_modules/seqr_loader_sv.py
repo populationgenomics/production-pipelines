@@ -354,7 +354,7 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
 
     logging.info('Annotating genotypes')
 
-    mt = read_hail(str(mt_path))
+    mt = read_hail(mt_path)
     is_called = hl.is_defined(mt.GT)
     was_previously_called = hl.is_defined(mt.CONC_ST) & ~mt.CONC_ST.contains('EMPTY')
     num_alt = hl.if_else(is_called, mt.GT.n_alt_alleles(), -1)
@@ -414,6 +414,9 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
     # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/seqr_mt_schema.py#L251
     mt = mt.annotate_rows(
         samples=_genotype_filter_samples(lambda g: True),
+        samples_new_alt=_genotype_filter_samples(
+            lambda g: g.new_call | hl.is_defined(g.prev_num_alt)
+        ),
         samples_no_call=_genotype_filter_samples(lambda g: g.num_alt == -1),
         samples_num_alt=hl.struct(
             **{
