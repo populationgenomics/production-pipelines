@@ -38,7 +38,7 @@ class Outrider:
 
         # Build OUTRIDER command
         self.command = """
-        Rscript --vanilla <<EOF
+        R --vanilla <<EOF
         library(OUTRIDER)
         library(tidyverse)
 
@@ -60,7 +60,7 @@ class Outrider:
         self.command += """
         input_counts_tbl_list <- lapply(input_counts_files, function(x) {
             read_tsv(x, col_names = TRUE, comment = "#") %>%
-                rename_with(~ gsub("\\\\.bam$", "", basename(.x)), .cols = last_col()) %>%
+                rename_with(~ gsub("\\\\\\\\.bam$", "", basename(.x)), .cols = last_col()) %>%
                 select(c(Geneid, last_col()))
         })
         input_counts_tbl <- reduce(input_counts_tbl_list, left_join, by = "Geneid")
@@ -99,7 +99,7 @@ class Outrider:
         ods_filt <- ods
 
         # Subset based on filter
-        ods <- ods[mcols(ods)$passedFilter, ]
+        ods <- ods[mcols(ods)\\$passedFilter, ]
 
         # Plotting - heatmaps
         # also annotates the clusters resulting from the dendrogram
@@ -141,7 +141,7 @@ class Outrider:
         p <- plotEncDimSearch(ods)
         print(p)
         dev.off()
-        optimal_q <- ods@metadata$optimalEncDim
+        optimal_q <- ods@metadata\\$optimalEncDim
 
         # Save dataset with optimal encoding dimension
         ods_opt_q <- ods
@@ -197,7 +197,7 @@ class Outrider:
         # Get number of aberrant genes per sample and per gene
         ab_genes_per_samples <- as.data.frame(aberrant(ods, by = "sample", padjCutoff = 0.05, zScoreCutoff = 0))
         colnames(ab_genes_per_samples) <- "num_aberrant_genes"
-        ab_genes_per_samples$sampleID <- rownames(ab_genes_per_samples)
+        ab_genes_per_samples\\$sampleID <- rownames(ab_genes_per_samples)
         ab_genes_per_samples <- ab_genes_per_samples[, c(2, 1)]
         write_csv(
             ab_genes_per_samples,
@@ -208,7 +208,7 @@ class Outrider:
 
         ab_samples_per_gene <- as.data.frame(aberrant(ods, by = "gene", padjCutoff = 0.05, zScoreCutoff = 0))
         colnames(ab_samples_per_gene) <- "num_aberrant_samples"
-        ab_samples_per_gene$geneID <- rownames(ab_samples_per_gene)
+        ab_samples_per_gene\\$geneID <- rownames(ab_samples_per_gene)
         ab_samples_per_gene <- ab_samples_per_gene[, c(2, 1)]
         write_csv(
             ab_samples_per_gene,
@@ -222,7 +222,7 @@ class Outrider:
         dev.off()
 
         # Volcano plots
-        sig_samples <- unique(res$sampleID)
+        sig_samples <- unique(res\\$sampleID)
         for (sig_sample in sig_samples) {
             png(file = paste0("plots/by_sample/volcano.", sig_sample, ".p_", pval_cutoff, ".z_", z_cutoff, ".png"), width = 4000, height = 4000, res = 600)
             p <- plotVolcano(ods, sig_sample, basePlot = TRUE)
@@ -231,7 +231,7 @@ class Outrider:
         }
 
         # Gene-level plots
-        sig_genes <- unique(res$geneID)
+        sig_genes <- unique(res\\$geneID)
         for (sig_gene in sig_genes) {
             png(file = paste0("plots/by_gene/expression_rank.", sig_gene, ".p_", pval_cutoff, ".z_", z_cutoff, ".png"), width = 4000, height = 4000, res = 600)
             p <- plotExpressionRank(ods, sig_gene, basePlot = TRUE)
