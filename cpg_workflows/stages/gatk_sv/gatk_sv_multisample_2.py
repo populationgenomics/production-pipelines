@@ -491,8 +491,8 @@ class AnnotateVcf(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict:
         return {
-            'annotated_vcf': self.prefix / 'unfiltered_annotated.vcf.bgz',
-            'annotated_vcf_index': self.prefix / 'unfiltered_annotated.vcf.bgz.tbi',
+            'annotated_vcf': self.prefix / 'filtered_annotated.vcf.bgz',
+            'annotated_vcf_index': self.prefix / 'filtered_annotated.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -562,7 +562,7 @@ class AnnotateCohortSv(CohortStage):
         queue job(s) to rearrange the annotations prior to Seqr transformation
         """
 
-        vcf_path = inputs.as_path(target=cohort, stage=AnnotateVcf, key='output_vcf')
+        vcf_path = inputs.as_path(target=cohort, stage=AnnotateVcf, key='annotated_vcf')
         checkpoint_prefix = (
             to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
         )
