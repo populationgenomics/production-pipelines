@@ -574,6 +574,7 @@ class AnnotateCohortSv(CohortStage):
             checkpoint_prefix=checkpoint_prefix,
             job_attrs=self.get_job_attrs(cohort),
             depends_on=inputs.get_jobs(cohort),
+            use_dataproc=get_config()['workflow'].get('use_dataproc', False)
         )
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
@@ -640,6 +641,7 @@ class AnnotateDatasetSv(DatasetStage):
             tmp_prefix=checkpoint_prefix,
             job_attrs=self.get_job_attrs(dataset),
             depends_on=inputs.get_jobs(dataset),
+            use_dataproc=get_config()['workflow'].get('use_dataproc', False)
         )
 
         return self.make_outputs(

@@ -11,8 +11,6 @@ import hail as hl
 from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build, reference_path
-from hail_scripts.computed_fields import variant_id
-
 from cpg_workflows.utils import read_hail, checkpoint_hail
 
 
@@ -67,6 +65,30 @@ GENCODE_FILE_HEADER = [
     'phase',
     'info',
 ]
+
+
+# yoinking some methods out of hail_scripts.computed_fields
+# removes dependency on submodule completely
+def get_expr_for_contig_number(locus: hl.LocusExpression) -> hl.Int32Expression:
+    """Convert contig name to contig number"""
+    return hl.bind(
+        lambda contig: (
+            hl.case()
+            .when(contig == "X", 23)
+            .when(contig == "Y", 24)
+            .when(contig[0] == "M", 25)
+            .default(hl.int(contig))
+        ),
+        locus.contig.replace("^chr", "")
+    )
+
+
+def get_expr_for_xpos(locus: hl.LocusExpression) -> hl.Int64Expression:
+    """Genomic position represented as a single number = contig_number * 10**9 + position.
+    This represents chrom:pos more compactly and allows for easier sorting.
+    """
+    contig_number = get_expr_for_contig_number(locus)
+    return hl.int64(contig_number) * 1_000_000_000 + locus.position
 
 
 def unsafe_cast_int32(f: hl.tfloat32) -> hl.int32:
@@ -284,7 +306,7 @@ def annotate_cohort_sv(
                 for gene_col in conseq_predicted_gene_cols
             ],
         ).flatmap(lambda x: x),
-        xstop=variant_id.get_expr_for_xpos(
+        xstop=get_expr_for_xpos(
             hl.if_else(
                 hl.is_defined(mt.info.END2),
                 hl.struct(contig=mt.info.CHR2, position=mt.info.END2),
