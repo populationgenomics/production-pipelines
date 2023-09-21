@@ -79,7 +79,7 @@ def get_expr_for_contig_number(locus: hl.LocusExpression) -> hl.Int32Expression:
             .when(contig[0] == 'M', 25)
             .default(hl.int(contig))
         ),
-        locus.contig.replace('^chr', '')
+        locus.contig.replace('^chr', ''),
     )
 
 
@@ -89,22 +89,6 @@ def get_expr_for_xpos(locus: hl.LocusExpression) -> hl.Int64Expression:
     """
     contig_number = get_expr_for_contig_number(locus)
     return hl.int64(contig_number) * 1_000_000_000 + locus.position
-
-
-def unsafe_cast_int32(f: hl.tfloat32) -> hl.int32:
-    """
-    This method is taken directly from the original seqr loader
-    Args:
-        f (floatExpression):
-    Returns:
-        int32Expression: int representation of a float
-    """
-    i = hl.int32(f)
-    return (
-        hl.case()
-        .when(hl.approx_equal(f, i), i)
-        .or_error(f'Found non-integer value {f}')
-    )
 
 
 def get_cpx_interval(x):
@@ -218,11 +202,12 @@ def annotate_cohort_sv(
         checkpoint_prefix (str): CHECKPOINT!@!!
     """
 
-    logging.info(f'Importing SV VCF {vcf_path}')
+    logger = logging.getLogger('annotate_cohort_sv')
+    logger.setLevel(logging.INFO)
 
-    # load the VCF
+    logger.info(f'Importing SV VCF {vcf_path}')
     mt = hl.import_vcf(
-        str(vcf_path),
+        vcf_path,
         reference_genome=genome_build(),
         skip_invalid_loci=True,
         force_bgz=True,
@@ -235,6 +220,11 @@ def annotate_cohort_sv(
         sf=mt.info.AF[0],
         sn=mt.info.AN,
         end=mt.info.END,
+        end_locus=hl.if_else(
+            hl.is_defined(mt.info.END2),
+            hl.struct(contig=mt.info.CHR2, position=mt.info.END2),
+            hl.struct(contig=mt.locus.contig, position=mt.info.END)
+        ),
         sv_callset_Het=mt.info.N_HET,
         sv_callset_Hom=mt.info.N_HOMALT,
         gnomad_svs_ID=mt.info['gnomad_v2.1_sv_SVID'],
@@ -282,6 +272,12 @@ def annotate_cohort_sv(
         )
     ]
 
+    # register a chain file
+    liftover_path = reference_path('liftover_38_to_37')
+    rg37 = hl.get_reference('GRCh37')
+    rg38 = hl.get_reference('GRCh38')
+    rg38.add_liftover(str(liftover_path), rg37)
+
     # annotate with mapped genes
     # Note I'm adding a Flake8 noqa for B023 (loop variable gene_col unbound)
     # I've experimented in a notebook and this seems to perform as expected
@@ -306,12 +302,11 @@ def annotate_cohort_sv(
                 for gene_col in conseq_predicted_gene_cols
             ],
         ).flatmap(lambda x: x),
-        xstop=get_expr_for_xpos(
-            hl.if_else(
-                hl.is_defined(mt.info.END2),
-                hl.struct(contig=mt.info.CHR2, position=mt.info.END2),
-                hl.struct(contig=mt.locus.contig, position=mt.info.END),
-            )
+        xstop=get_expr_for_xpos(mt.end_locus),
+        rg37_locus=hl.liftover(mt.locus, 'GRCh37'),
+        rg37_locus_end=hl.or_missing(
+            mt.end_locus.position <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.end_locus.contig],
+            hl.liftover(hl.locus(mt.end_locus.contig, mt.end_locus.position, reference_genome='GRCh38'), 'GRCh37'),
         ),
         syType=mt.sv_types[0],
         sv_type_detail=hl.if_else(
@@ -329,23 +324,8 @@ def annotate_cohort_sv(
     # chuck in another checkpoint
     mt = checkpoint_hail(mt, 'second_annotation_round.mt', checkpoint_prefix)
 
-    # register a chain file
-    liftover_path = reference_path('liftover_38_to_37')
-    rg37 = hl.get_reference('GRCh37')
-    rg38 = hl.get_reference('GRCh38')
-    rg38.add_liftover(str(liftover_path), rg37)
-
     # and some more annotation stuff
     mt = mt.annotate_rows(
-        rg37_locus=hl.liftover(mt.locus, 'GRCh37'),
-        rg37_locus_end=hl.or_missing(
-            mt.xstop.position
-            <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.xstop.contig],
-            hl.liftover(
-                hl.locus(mt.xstop.contig, mt.xstop.position, reference_genome='GRCh38'),
-                'GRCh37',
-            ),
-        ),
         transcriptConsequenceTerms=hl.set(
             mt.sortedTranscriptConsequences.map(lambda x: x[MAJOR_CONSEQUENCE]).extend(
                 [mt.sv_types[0]]
@@ -381,7 +361,9 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
     is_called = hl.is_defined(mt.GT)
     was_previously_called = hl.is_defined(mt.CONC_ST) & ~mt.CONC_ST.contains('EMPTY')
     num_alt = hl.if_else(is_called, mt.GT.n_alt_alleles(), -1)
-    prev_num_alt = hl.if_else(was_previously_called, PREVIOUS_GENOTYPE_N_ALT_ALLELES[hl.set(mt.CONC_ST)], -1)
+    prev_num_alt = hl.if_else(
+        was_previously_called, PREVIOUS_GENOTYPE_N_ALT_ALLELES[hl.set(mt.CONC_ST)], -1
+    )
     concordant_genotype = num_alt == prev_num_alt
     discordant_genotype = (num_alt != prev_num_alt) & (prev_num_alt > 0)
     novel_genotype = (num_alt != prev_num_alt) & (prev_num_alt == 0)
@@ -393,8 +375,12 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
                 cn=mt.RD_CN,
                 num_alt=num_alt,
                 prev_num_alt=hl.or_missing(discordant_genotype, prev_num_alt),
-                prev_call=hl.or_missing(is_called, was_previously_called & concordant_genotype),
-                new_call=hl.or_missing(is_called, ~was_previously_called | novel_genotype),
+                prev_call=hl.or_missing(
+                    is_called, was_previously_called & concordant_genotype
+                ),
+                new_call=hl.or_missing(
+                    is_called, ~was_previously_called | novel_genotype
+                ),
             )
         )
     )
