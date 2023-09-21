@@ -16,7 +16,7 @@ def annotate_cohort_jobs_sv(
     out_mt_path: Path,
     checkpoint_prefix: Path,
     job_attrs: dict | None = None,
-    use_dataproc: bool = True,
+    use_dataproc: bool = False,
     depends_on: list[Job] | None = None,
 ) -> list[Job]:
     """
@@ -33,10 +33,7 @@ def annotate_cohort_jobs_sv(
             f'--out-mt-path {out_mt_path} '
             f'--checkpoint-prefix {checkpoint_prefix} '
         )
-        pyfiles = [
-            'seqr-loading-pipelines/hail_scripts',
-            'cpg_workflows/query_modules',
-        ]
+        pyfiles = ['cpg_workflows/query_modules']
         job_name = 'Annotate cohort'
 
         if cluster_id := get_config()['hail'].get('dataproc', {}).get('cluster_id'):
@@ -96,13 +93,14 @@ def annotate_dataset_jobs_sv(
     out_mt_path: Path,
     tmp_prefix: Path,
     job_attrs: dict | None = None,
-    use_dataproc: bool = True,
+    use_dataproc: bool = False,
     depends_on: list[Job] | None = None,
 ) -> list[Job]:
     """
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
     that will be loaded into Seqr).
     """
+    assert sgids
     sgids_list_path = tmp_prefix / 'sgid-list.txt'
     if not get_config()['workflow'].get('dry_run', False):
         with sgids_list_path.open('w') as f:
@@ -168,7 +166,6 @@ def annotate_dataset_jobs_sv(
             f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
         )
         subset_j.image(image_path('cpg_workflows'))
-        assert sgids
         subset_j.command(
             query_command(
                 seqr_loader,
