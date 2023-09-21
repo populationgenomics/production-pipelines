@@ -160,7 +160,7 @@ def annotate_dataset_jobs_sv(
         jobs = [j]
 
     else:
-        from cpg_workflows.query_modules import seqr_loader
+        from cpg_workflows.query_modules import seqr_loader, seqr_loader_sv
 
         subset_j = b.new_job(
             f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
@@ -185,8 +185,8 @@ def annotate_dataset_jobs_sv(
         annotate_j.image(image_path('cpg_workflows'))
         annotate_j.command(
             query_command(
-                seqr_loader,
-                seqr_loader.annotate_dataset_mt.__name__,
+                seqr_loader_sv,
+                seqr_loader_sv.annotate_dataset_sv().__name__,
                 str(subset_mt_path),
                 str(out_mt_path),
                 str(tmp_prefix),
