@@ -567,17 +567,16 @@ class AnnotateCohortSv(CohortStage):
             to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
         )
 
-        jobs = annotate_cohort_jobs_sv(
+        job = annotate_cohort_jobs_sv(
             b=get_batch(),
             vcf_path=vcf_path,
             out_mt_path=self.expected_outputs(cohort)['mt'],
             checkpoint_prefix=checkpoint_prefix,
             job_attrs=self.get_job_attrs(cohort),
             depends_on=inputs.get_jobs(cohort),
-            use_dataproc=get_config()['workflow'].get('use_dataproc', False)
         )
 
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=job)
 
 
 def _update_sv_dataset_meta(
@@ -640,8 +639,7 @@ class AnnotateDatasetSv(DatasetStage):
             out_mt_path=self.expected_outputs(dataset)['mt'],
             tmp_prefix=checkpoint_prefix,
             job_attrs=self.get_job_attrs(dataset),
-            depends_on=inputs.get_jobs(dataset),
-            use_dataproc=get_config()['workflow'].get('use_dataproc', False)
+            depends_on=inputs.get_jobs(dataset)
         )
 
         return self.make_outputs(
