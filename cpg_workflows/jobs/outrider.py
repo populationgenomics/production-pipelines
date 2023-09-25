@@ -29,23 +29,20 @@ class Outrider:
             input_counts: list[str | Path],
             gtf_file: str | Path | None = None,
             output_tar_gz_path: str | Path | None = None,
+            nthreads: int = 8,
         ) -> None:
         self.input_counts = input_counts
         assert isinstance(self.input_counts, list), f'input_counts must be a list, instead got {self.input_counts}'
         self.input_counts_r_str = ', '.join([f'"{str(f)}"' for f in self.input_counts])
         self.gtf_file_path = str(gtf_file)
         self.output_tar_gz_path = str(output_tar_gz_path)
+        self.nthreads = nthreads
 
         # Build OUTRIDER command
         self.command = """
         R --vanilla <<EOF
         library(OUTRIDER)
         library(tidyverse)
-
-        # Set significance values
-        pval_cutoff <- 0.05
-        z_cutoff <- 0
-        n_parallel_workers <- 4  # 8
 
         # Create directories
         dir.create("plots", showWarnings = FALSE)
@@ -55,6 +52,11 @@ class Outrider:
         dir.create("results", showWarnings = FALSE)
         """
         self.command += f"""
+        # Set significance values
+        pval_cutoff <- 0.05
+        z_cutoff <- 0
+        n_parallel_workers <- {str(self.nthreads - 1)}
+
         input_counts_files <- c({self.input_counts_r_str})
         """
         self.command += """
@@ -287,6 +289,7 @@ def outrider(
     output_path: str | Path | None = None,
     cohort_name: str | None = None,
     job_attrs: dict[str, str] | None = None,
+    requested_nthreads: int | None = None,
 ) -> Job:
     """
     Run Outrider.
@@ -314,6 +317,14 @@ def outrider(
     # j.image(image_path('outrider'))
     j.image('australia-southeast1-docker.pkg.dev/cpg-common/images/outrider:1.18.1')
 
+    # Set resource requirements
+    nthreads = requested_nthreads or 8
+    res = STANDARD.set_resources(
+        j,
+        ncpu=nthreads,
+        storage_gb=50,
+    )
+
     j.declare_resource_group(
         output={
             'tar_gz': '{root}.tar.gz'
@@ -325,6 +336,7 @@ def outrider(
         input_counts=infiles_localised,
         gtf_file=str(gtf_file_rg.gtf),
         output_tar_gz_path=j.output.tar_gz,
+        nthreads=res.get_nthreads(),
     )
 
     cmd = str(outrider)
