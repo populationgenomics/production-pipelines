@@ -55,7 +55,7 @@ def stripy(
         cram_path.index_path.parts[2:]
     )
 
-    res = STANDARD.request_resources(ncpu=2)
+    res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 
     if (
