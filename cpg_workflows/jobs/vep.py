@@ -238,11 +238,21 @@ def vep_one(
     j.cloudfuse(vep_mount_path.drive, str(data_mount), read_only=True)
     vep_dir = data_mount / '/'.join(vep_mount_path.parts[2:])
     loftee_conf = {
-        'loftee_path': '$LOFTEE_PLUGIN_PATH',
         'gerp_bigwig': f'{vep_dir}/gerp_conservation_scores.homo_sapiens.GRCh38.bw',
         'human_ancestor_fa': f'{vep_dir}/human_ancestor.fa.gz',
         'conservation_file': f'{vep_dir}/loftee.sql',
     }
+
+    # non-default location only required for v105
+    if not use_110:
+        loftee_conf['loftee_path'] = '$LOFTEE_PLUGIN_PATH'
+
+    # sexy new plugin
+    alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz,transcript_match=1'
+
+    # this plugin doesn't support JSON output at this time
+    # only activate for VCF outputs
+    utr_annotator_plugin = f'--plugin UTRAnnotator,file=$UTR38'
 
     authenticate_cloud_credentials_in_job(j)
     cmd = f"""\
@@ -262,11 +272,14 @@ def vep_one(
     --minimal \\
     --cache --offline --assembly GRCh38 \\
     --dir_cache {vep_dir}/vep/ \\
-    --dir_plugins $LOFTEE_PLUGIN_PATH \\
+    {'' if use_110 else '--dir_plugins $LOFTEE_PLUGIN_PATH'} \\
     --fasta $FASTA \\
-    --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())}
+    --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \\
+    {alpha_missense_plugin if use_110 else ''} \\
+    {utr_annotator_plugin if out_format == 'vcf' else ''}
     """
     if out_format == 'vcf':
+
         cmd += f'tabix -p vcf {output}'
 
     j.command(
