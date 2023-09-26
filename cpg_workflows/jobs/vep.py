@@ -15,8 +15,6 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import (
     image_path,
     reference_path,
-    command,
-    authenticate_cloud_credentials_in_job,
     query_command,
 )
 from cpg_workflows.resources import STANDARD
@@ -254,7 +252,6 @@ def vep_one(
     # only activate for VCF outputs
     utr_annotator_plugin = f'--plugin UTRAnnotator,file=$UTR38'
 
-    authenticate_cloud_credentials_in_job(j)
     cmd = f"""\
     ls {vep_dir}
     ls {vep_dir}/vep
@@ -282,13 +279,9 @@ def vep_one(
 
         cmd += f'tabix -p vcf {output}'
 
-    j.command(
-        command(
-            cmd,
-            setup_gcp=True,
-            monitor_space=True,
-        )
-    )
+    j.command(cmd)
+
     if out_path:
         b.write_output(j.output, str(out_path).replace('.vcf.gz', ''))
+
     return j
