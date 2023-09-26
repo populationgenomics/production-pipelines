@@ -243,11 +243,13 @@ def vep_one(
     }
 
     # sexy new plugin
-    alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz,transcript_match=1'
+    alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz,transcript_match=1 \\'
 
     # this plugin doesn't support JSON output at this time
     # only activate for VCF outputs
-    utr_annotator_plugin = f'--plugin UTRAnnotator,file=$UTR38'
+    utr_annotator_plugin = f'--plugin UTRAnnotator,file=$UTR38 \\'
+
+    loftee_plugin_path = '--dir_plugins $LOFTEE_PLUGIN_PATH \\'
 
     cmd = f"""\
     ls {vep_dir}
@@ -266,11 +268,11 @@ def vep_one(
     --minimal \\
     --cache --offline --assembly GRCh38 \\
     --dir_cache {vep_dir}/vep/ \\
-    {'' if use_110 else '--dir_plugins $LOFTEE_PLUGIN_PATH'} \\
     --fasta $FASTA \\
-    --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \\
-    {alpha_missense_plugin if use_110 else ''} \\
+    {'' if use_110 else loftee_plugin_path}
+    {alpha_missense_plugin if use_110 else ''}
     {utr_annotator_plugin if (use_110 and out_format == 'vcf') else ''}
+    --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())}
     """
     if out_format == 'vcf':
 
