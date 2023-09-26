@@ -11,6 +11,7 @@ from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
 from cpg_utils import Path, to_path
+from cpg_utils.config import get_config
 from cpg_utils.hail_batch import (
     image_path,
     reference_path,
@@ -208,7 +209,15 @@ def vep_one(
         return None
 
     j = b.new_job('VEP', (job_attrs or {}) | dict(tool='vep'))
-    j.image(image_path('vep'))
+    use_110 = get_config()['workflow'].get('use_vep_110', False)
+    if use_110:
+        logging.info('Using VEP 110')
+        j.image(image_path('ensembl-vep'))
+        vep_mount_path = reference_path('vep_110_mount')
+    else:
+        j.image(image_path('vep'))
+        vep_mount_path = reference_path('vep_mount')
+
     STANDARD.set_resources(j, storage_gb=50, mem_gb=50, ncpu=16)
 
     if not isinstance(vcf, hb.ResourceFile):
@@ -225,7 +234,6 @@ def vep_one(
         output = j.output
 
     # gcsfuse works only with the root bucket, without prefix:
-    vep_mount_path = reference_path('vep_mount')
     data_mount = to_path(f'/{vep_mount_path.drive}')
     j.cloudfuse(vep_mount_path.drive, str(data_mount), read_only=True)
     vep_dir = data_mount / '/'.join(vep_mount_path.parts[2:])
