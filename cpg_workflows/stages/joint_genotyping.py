@@ -77,7 +77,6 @@ class JointGenotyping(CohortStage):
             )
 
         jobs = []
-        vcf_path = self.expected_outputs(cohort)['vcf']
         siteonly_vcf_path = self.expected_outputs(cohort)['siteonly']
         scatter_count = joint_calling_scatter_count(len(cohort.get_sequencing_groups()))
 
@@ -103,6 +102,7 @@ class JointGenotyping(CohortStage):
 
         else:
             # Run joint genotyping using GenotypeGVCFs or GnarlyGenotyper.
+            vcf_path = self.expected_outputs(cohort)['vcf']
             out_siteonly_vcf_part_paths = [
                 to_path(
                     self.expected_outputs(cohort)['siteonly_part_pattern'].format(
