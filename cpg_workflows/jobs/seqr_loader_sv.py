@@ -89,7 +89,6 @@ def annotate_dataset_jobs_sv(
             seqr_loader_sv.annotate_dataset_sv.__name__,
             str(subset_mt_path),
             str(out_mt_path),
-            str(tmp_prefix),
             setup_gcp=True,
         )
     )
