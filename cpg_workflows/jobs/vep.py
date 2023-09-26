@@ -243,13 +243,13 @@ def vep_one(
     }
 
     # sexy new plugin
-    alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz,transcript_match=1 \\'
+    alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz,transcript_match=1 '
 
     # this plugin doesn't support JSON output at this time
     # only activate for VCF outputs
-    utr_annotator_plugin = f'--plugin UTRAnnotator,file=$UTR38 \\'
+    utr_annotator_plugin = f'--plugin UTRAnnotator,file=$UTR38 '
 
-    loftee_plugin_path = '--dir_plugins $LOFTEE_PLUGIN_PATH \\'
+    loftee_plugin_path = '--dir_plugins $LOFTEE_PLUGIN_PATH '
 
     cmd = f"""\
     LOFTEE_PLUGIN_PATH=$MAMBA_ROOT_PREFIX/share/ensembl-vep
