@@ -34,9 +34,9 @@ class Outrider(CohortStage):
         """
         Generate outrider outputs.
         """
+        dataset_prefix = cohort.get_sequencing_groups()[0].dataset.prefix()
         return {
-            sequencing_group.id: sequencing_group.dataset.prefix() / 'outrider' / f'{sequencing_group.id}.output.tar.gz'
-            for sequencing_group in cohort.get_sequencing_groups()
+            cohort.name: dataset_prefix / 'outrider' / f'{cohort.name}.output.tar.gz'
         }
     
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
