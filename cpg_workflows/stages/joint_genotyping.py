@@ -37,8 +37,8 @@ class JointGenotyping(CohortStage):
             # convert to str to avoid checking existence
             'tmp_prefix': str(self.prefix / 'tmp'),
             # 'vcf': to_path(self.prefix / 'full.vcf.gz'),
-            'mt': to_path(self.prefix / 'full.mt'),
-            'siteonly': to_path(self.prefix / 'siteonly.vcf.gz'),
+            'mt': str(self.prefix / 'full.mt'),
+            'siteonly': str(self.prefix / 'siteonly.vcf.gz'),
             # 'siteonly_part_pattern': str(
             #     self.prefix / 'siteonly_parts' / 'part{idx}.vcf.gz'
             # ),
