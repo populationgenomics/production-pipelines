@@ -252,9 +252,6 @@ def vep_one(
     loftee_plugin_path = '--dir_plugins $LOFTEE_PLUGIN_PATH \\'
 
     cmd = f"""\
-    ls {vep_dir}
-    ls {vep_dir}/vep
-
     LOFTEE_PLUGIN_PATH=$MAMBA_ROOT_PREFIX/share/ensembl-vep
     FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
 
@@ -269,9 +266,8 @@ def vep_one(
     --cache --offline --assembly GRCh38 \\
     --dir_cache {vep_dir}/vep/ \\
     --fasta $FASTA \\
-    {'' if use_110 else loftee_plugin_path}
-    {alpha_missense_plugin if use_110 else ''}
-    {utr_annotator_plugin if (use_110 and out_format == 'vcf') else ''}
+    {alpha_missense_plugin if use_110 else loftee_plugin_path} \
+    {utr_annotator_plugin if (use_110 and out_format == 'vcf') else ''} \
     --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())}
     """
     if out_format == 'vcf':
