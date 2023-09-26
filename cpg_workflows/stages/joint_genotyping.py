@@ -32,17 +32,27 @@ class JointGenotyping(CohortStage):
         """
         Generate a site-only VCF and a hail mt.
         """
-        return {
+        outputs = {
             # writing into perm location for late debugging
             # convert to str to avoid checking existence
             'tmp_prefix': str(self.prefix / 'tmp'),
             # 'vcf': to_path(self.prefix / 'full.vcf.gz'),
             'mt': to_path(self.prefix / 'full.mt'),
             'siteonly': to_path(self.prefix / 'siteonly.vcf.gz'),
-            'siteonly_part_pattern': str(
-                self.prefix / 'siteonly_parts' / 'part{idx}.vcf.gz'
-            ),
+            # 'siteonly_part_pattern': str(
+            #     self.prefix / 'siteonly_parts' / 'part{idx}.vcf.gz'
+            # ),
         }
+
+        # Only generate a full VCF if not using vcf combiner
+        if not get_config()['workflow'].get('use_vcf_combiner', False):
+            outputs['vcf'] = to_path(self.prefix / 'full.vcf.gz')
+            outputs['siteonly_part_pattern'] = str(
+                self.prefix / 'siteonly_parts' / 'part{idx}.vcf.gz'
+            )
+
+        return outputs
+
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
