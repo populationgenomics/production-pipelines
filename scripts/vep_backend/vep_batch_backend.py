@@ -7,7 +7,7 @@ Run VEP in parallel using batch backend
 import click
 
 from cpg_utils import to_path
-from cpg_utils.hail_batch import dataset_path, output_path
+from cpg_utils.hail_batch import output_path
 from cpg_utils.config import get_config
 from cpg_workflows.batch import get_batch
 from cpg_workflows.jobs.vep import add_vep_jobs
@@ -33,7 +33,7 @@ def main(vcf_path: str, output_ht: str):
         b=b,
         input_siteonly_vcf_path=to_path(vcf_path),
         tmp_prefix=to_path(output_path('vcf_fragments/', 'tmp')),
-        out_path=to_path(dataset_path(output_ht)),
+        out_path=to_path(output_path(output_ht)),
         scatter_count=scatter_count,
     )
     b.run(wait=False)
