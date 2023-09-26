@@ -239,11 +239,8 @@ def vep_one(
         'gerp_bigwig': f'{vep_dir}/gerp_conservation_scores.homo_sapiens.GRCh38.bw',
         'human_ancestor_fa': f'{vep_dir}/human_ancestor.fa.gz',
         'conservation_file': f'{vep_dir}/loftee.sql',
+        'loftee_path': '$VEP_DIR_PLUGINS' if use_110 else '$LOFTEE_PLUGIN_PATH'
     }
-
-    # non-default location only required for v105
-    if not use_110:
-        loftee_conf['loftee_path'] = '$LOFTEE_PLUGIN_PATH'
 
     # sexy new plugin
     alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz,transcript_match=1'
