@@ -158,7 +158,7 @@ def gather_vep_json_to_ht(
 
         j = dataproc.hail_dataproc_job(
             b,
-            f'{script_path} --out-path {out_path} '
+            f'{script_path} --out_path {out_path} '
             + ' '.join(str(p) for p in vep_results_paths),
             max_age='24h',
             packages=[
@@ -187,6 +187,7 @@ def gather_vep_json_to_ht(
                 vep.vep_json_to_ht.__name__,
                 [str(p) for p in vep_results_paths],
                 str(out_path),
+                get_config()['workflow'].get('use_vep_110', False),
                 setup_gcp=True,
             )
         )
