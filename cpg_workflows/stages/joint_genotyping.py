@@ -96,6 +96,7 @@ class JointGenotyping(CohortStage):
                         .get('dataproc', {})
                         .get('combiner_autoscaling_policy')
                     ),
+                    num_workers=scatter_count,
                     depends_on=inputs.get_jobs(cohort),
                 )
             jobs.append(combine_job)
