@@ -107,8 +107,7 @@ def annotate_cohort(
     rg38 = hl.get_reference('GRCh38')
     rg38.add_liftover(str(liftover_path), rg37)
     mt = mt.annotate_rows(
-        rg37_locus=hl.liftover(mt.locus, 'GRCh37'),
-        info=mt.info.drop('InbreedingCoeff')
+        rg37_locus=hl.liftover(mt.locus, 'GRCh37'), info=mt.info.drop('InbreedingCoeff')
     )
 
     mt = checkpoint_hail(mt, 'mt-vep-split-vqsr-round1.mt', checkpoint_prefix)
@@ -327,3 +326,31 @@ def annotate_dataset_mt(mt_path, out_mt_path, checkpoint_prefix):
     mt.describe()
     mt.write(out_mt_path, overwrite=True)
     logging.info(f'Written {out_mt_path}')
+
+
+def vds_to_mt_and_sites_only_vcf(
+    vds_path: str, out_mt_path: str, out_sites_only_path: str | None = None
+):
+    """
+    Read the VDS in, densify and write out to a MT optionally also write out
+    a sites only VCF.
+
+    Args:
+        vds_path (str): path of the VDS to read in
+        out_mt_path (str): output path for the MT
+        out_sites_only_path (str): output path for the sites only VCF
+    """
+
+    vds = hl.vds.read_vds(str(vds_path))
+
+    logging.info('Densifying data...')
+    mt = hl.vds.to_dense_mt(vds)
+
+    mt = mt.naive_coalesce(1000)  # How many partitions to coalesce to?
+    mt = mt.checkpoint(str(out_mt_path), overwrite=True)
+
+    if out_sites_only_path:
+        logging.info('Writing sites only VCF...')
+        sites_only_ht = mt.rows()
+        hl.export_vcf(sites_only_ht, out_sites_only_path, tabix=True)
+        logging.info(f'Written {out_sites_only_path}')

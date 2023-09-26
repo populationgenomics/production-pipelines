@@ -6,7 +6,7 @@ import logging
 from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_workflows.filetypes import GvcfPath
-from cpg_workflows.jobs import joint_genotyping
+from cpg_workflows.jobs import joint_genotyping, seqr_loader
 from cpg_workflows.workflow import (
     Cohort,
     stage,
@@ -39,19 +39,17 @@ class JointGenotyping(CohortStage):
             # 'vcf': to_path(self.prefix / 'full.vcf.gz'),
             'mt': self.prefix / 'full.mt',
             'siteonly': str(self.prefix / 'siteonly.vcf.gz'),
-            'siteonly_part_pattern': str(
-                self.prefix / 'siteonly_parts' / 'part{idx}.vcf.gz'
-            ),
         }
 
-        # Only generate a full VCF if not using vcf combiner
         if get_config()['workflow'].get('use_vcf_combiner', False):
             outputs['vds'] = str(self.prefix / 'full.vds')
         else:
             outputs['vcf'] = to_path(self.prefix / 'full.vcf.gz')
+            outputs['siteonly_part_pattern'] = str(
+                self.prefix / 'siteonly_parts' / 'part{idx}.vcf.gz'
+            ),
 
         return outputs
-
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
@@ -83,6 +81,7 @@ class JointGenotyping(CohortStage):
             from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
             from cpg_workflows.large_cohort.combiner import run
 
+            # Combine GVCFs using vcf combiner
             combine_job = dataproc_job(
                     job_name=self.__class__.__name__,
                     function=run,
@@ -99,6 +98,16 @@ class JointGenotyping(CohortStage):
                     depends_on=inputs.get_jobs(cohort),
                 )
             jobs.append(combine_job)
+
+            # Convert VDS to MT and sites-only VCF
+            to_mt_job = seqr_loader.vds_to_mt_job(
+                b=get_batch(),
+                vds_path=self.expected_outputs(cohort)['vds'],
+                out_mt_path=self.expected_outputs(cohort)['mt'],
+                out_siteonly_vcf_path=siteonly_vcf_path,
+                depends_on=[combine_job],
+            )
+            jobs.append(to_mt_job)
 
         else:
             # Run joint genotyping using GenotypeGVCFs or GnarlyGenotyper.

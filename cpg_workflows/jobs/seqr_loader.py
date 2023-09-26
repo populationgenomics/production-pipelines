@@ -9,6 +9,8 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, query_command
 
+from cpg_workflows.query_modules import seqr_loader
+
 
 def annotate_cohort_jobs(
     b: Batch,
@@ -252,3 +254,32 @@ def cohort_to_vcf_job(
         vcf_j.depends_on(*depends_on)
 
     return vcf_j
+
+
+def vds_to_mt_job(
+    b: Batch,
+    vds_path: Path,
+    out_mt_path: Path,
+    out_siteonly_vcf_path: Path| None = None,
+    job_attrs: dict | None = None,
+    depends_on: list[Job] | None = None
+) -> Job:
+    """
+    Convert VDS to MT and (optionally) a sites-only VCF
+    """
+
+    j = b.new_job('Annotate cohort', job_attrs)
+    j.image(get_config()['workflow']['driver_image'])
+    j.command(
+        query_command(
+            seqr_loader,
+            seqr_loader.vds_to_mt_and_sites_only_vcf.__name__,
+            str(vds_path),
+            str(out_mt_path),
+            str(out_siteonly_vcf_path),
+            setup_gcp=True,
+        )
+    )
+    if depends_on:
+        j.depends_on(*depends_on)
+    return j
