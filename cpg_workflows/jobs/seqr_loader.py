@@ -10,7 +10,7 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, query_command
 
 from cpg_workflows.query_modules import seqr_loader
-
+from cpg_workflows.large_cohort import combiner
 
 def annotate_cohort_jobs(
     b: Batch,
@@ -256,6 +256,33 @@ def cohort_to_vcf_job(
     return vcf_j
 
 
+def gvcf_combiner_job(
+    b: Batch,
+    out_vds_path: Path,
+    tmp_prefix: str,
+    job_attrs: dict | None = None,
+    depends_on: list[Job] | None = None
+) -> Job:
+    """
+    Combine gVCFs using vcf combiner
+    """
+
+    j = b.new_job('gVCF Combiner', job_attrs)
+    j.image(get_config()['workflow']['driver_image'])
+    j.command(
+        query_command(
+            combiner,
+            combiner.run.__name__,
+            str(out_vds_path),
+            str(tmp_prefix),
+            setup_gcp=True,
+        )
+    )
+    if depends_on:
+        j.depends_on(*depends_on)
+    return j
+
+
 def vds_to_mt_job(
     b: Batch,
     vds_path: Path,
@@ -268,7 +295,7 @@ def vds_to_mt_job(
     Convert VDS to MT and (optionally) a sites-only VCF
     """
 
-    j = b.new_job('Annotate cohort', job_attrs)
+    j = b.new_job('VDS to MT', job_attrs)
     j.image(get_config()['workflow']['driver_image'])
     j.command(
         query_command(
