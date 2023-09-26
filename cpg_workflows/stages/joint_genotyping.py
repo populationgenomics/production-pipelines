@@ -37,19 +37,18 @@ class JointGenotyping(CohortStage):
             # convert to str to avoid checking existence
             'tmp_prefix': str(self.prefix / 'tmp'),
             # 'vcf': to_path(self.prefix / 'full.vcf.gz'),
-            'mt': str(self.prefix / 'full.mt'),
+            'mt': self.prefix / 'full.mt',
             'siteonly': str(self.prefix / 'siteonly.vcf.gz'),
-            # 'siteonly_part_pattern': str(
-            #     self.prefix / 'siteonly_parts' / 'part{idx}.vcf.gz'
-            # ),
+            'siteonly_part_pattern': str(
+                self.prefix / 'siteonly_parts' / 'part{idx}.vcf.gz'
+            ),
         }
 
         # Only generate a full VCF if not using vcf combiner
-        if not get_config()['workflow'].get('use_vcf_combiner', False):
+        if get_config()['workflow'].get('use_vcf_combiner', False):
+            outputs['vds'] = str(self.prefix / 'full.vds')
+        else:
             outputs['vcf'] = to_path(self.prefix / 'full.vcf.gz')
-            outputs['siteonly_part_pattern'] = str(
-                self.prefix / 'siteonly_parts' / 'part{idx}.vcf.gz'
-            )
 
         return outputs
 
@@ -88,7 +87,7 @@ class JointGenotyping(CohortStage):
                     job_name=self.__class__.__name__,
                     function=run,
                     function_path_args=dict(
-                        out_vds_path=self.expected_outputs(cohort),
+                        out_vds_path=self.expected_outputs(cohort)['vds'],
                         tmp_prefix=self.tmp_prefix,
                     ),
                     autoscaling_policy=(
