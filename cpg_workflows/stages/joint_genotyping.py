@@ -109,6 +109,25 @@ class JointGenotyping(CohortStage):
             )
             jobs.append(to_mt_job)
 
+            from cpg_workflows.large_cohort.site_only_vcf import run
+
+            sites_only_job = dataproc_job(
+                job_name=self.__class__.__name__,
+                function=run,
+                function_path_args=dict(
+                    vds_path=self.expected_outputs(cohort)['vds'],
+                    out_vcf_path=siteonly_vcf_path,
+                    tmp_prefix=self.tmp_prefix,
+                ),
+                depends_on=[combine_job],
+                # hl.export_vcf() uses non-preemptible workers' disk to merge VCF files.
+                # 10 samples take 2.3G, 400 samples take 60G, which roughly matches
+                # `huge_disk` (also used in the AS-VQSR VCF-gather job)
+                worker_boot_disk_size=200,
+                secondary_worker_boot_disk_size=200,
+            )
+            jobs.append(sites_only_job)
+
         else:
             # Run joint genotyping using GenotypeGVCFs or GnarlyGenotyper.
             vcf_path = self.expected_outputs(cohort)['vcf']
