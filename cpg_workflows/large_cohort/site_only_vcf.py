@@ -14,14 +14,24 @@ from gnomad.utils.sparse_mt import default_compute_info
 
 def run(
     vds_path: Path,
-    sample_qc_ht_path: Path,
-    relateds_to_drop_ht_path: Path,
     out_vcf_path: Path,
     tmp_prefix: Path,
+    sample_qc_ht_path: Path | None = None,
+    relateds_to_drop_ht_path: Path | None = None,
+
 ):
     vds = hl.vds.read_vds(str(vds_path))
-    sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
-    relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
+
+    # TODO: if this works, clean this mess up
+    if sample_qc_ht_path:
+        sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
+    else:
+        sample_qc_ht = None
+
+    if relateds_to_drop_ht_path:
+        relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
+    else:
+        relateds_to_drop_ht = None
 
     site_only_ht_path = tmp_prefix / 'site_only.ht'
     site_only_ht = vds_to_site_only_ht(
@@ -37,8 +47,8 @@ def run(
 
 def vds_to_site_only_ht(
     vds: hl.vds.VariantDataset,
-    sample_qc_ht: hl.Table,
-    relateds_to_drop_ht: hl.Table,
+    sample_qc_ht: hl.Table | None,
+    relateds_to_drop_ht: hl.Table | None,
     out_ht_path: Path,
 ) -> hl.Table:
     """
@@ -48,8 +58,10 @@ def vds_to_site_only_ht(
         return hl.read_table(str(out_ht_path))
 
     mt = hl.vds.to_dense_mt(vds)
-    mt = mt.filter_cols(hl.len(sample_qc_ht[mt.col_key].filters) > 0, keep=False)
-    mt = mt.filter_cols(hl.is_defined(relateds_to_drop_ht[mt.col_key]), keep=False)
+    if sample_qc_ht:
+        mt = mt.filter_cols(hl.len(sample_qc_ht[mt.col_key].filters) > 0, keep=False)
+    if relateds_to_drop_ht:
+        mt = mt.filter_cols(hl.is_defined(relateds_to_drop_ht[mt.col_key]), keep=False)
     mt = _filter_rows_and_add_tags(mt)
     var_ht = _create_info_ht(mt, n_partitions=mt.n_partitions())
     var_ht = adjust_vcf_incompatible_types(
