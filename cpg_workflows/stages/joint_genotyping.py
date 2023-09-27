@@ -109,11 +109,11 @@ class JointGenotyping(CohortStage):
             )
             jobs.append(to_mt_job)
 
-            from cpg_workflows.large_cohort.site_only_vcf import run
+            from cpg_workflows.large_cohort.site_only_vcf import run as site_only_run
 
             sites_only_job = dataproc_job(
                 job_name=self.__class__.__name__,
-                function=run,
+                function=site_only_run,
                 function_path_args=dict(
                     vds_path=self.expected_outputs(cohort)['vds'],
                     out_vcf_path=siteonly_vcf_path,
