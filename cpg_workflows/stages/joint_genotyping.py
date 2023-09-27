@@ -37,7 +37,7 @@ class JointGenotyping(CohortStage):
             # convert to str to avoid checking existence
             'tmp_prefix': str(self.prefix / 'tmp'),
             'mt': self.prefix / 'full.mt',
-            'siteonly': str(self.prefix / 'siteonly.vcf.bgz'),
+            'siteonly': self.prefix / 'siteonly.vcf.bgz',
         }
 
         if get_config()['workflow'].get('use_vcf_combiner', False):
