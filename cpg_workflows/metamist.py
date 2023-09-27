@@ -209,7 +209,7 @@ class Metamist:
     Communication with metamist.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.default_dataset: str = get_config()['workflow']['dataset']
         self.aapi = AnalysisApi()
 
