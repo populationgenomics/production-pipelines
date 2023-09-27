@@ -256,31 +256,34 @@ def cohort_to_vcf_job(
     return vcf_j
 
 
-def gvcf_combiner_job(
-    b: Batch,
-    out_vds_path: Path,
-    tmp_prefix: str,
-    job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None
-) -> Job:
-    """
-    Combine gVCFs using vcf combiner
-    """
+# def gvcf_combiner_job(
+#     b: Batch,
+#     out_vds_path: Path,
+#     tmp_prefix: str,
+#     job_attrs: dict | None = None,
+#     depends_on: list[Job] | None = None
+# ) -> Job:
+#     """
+#     Combine gVCFs using vcf combiner
 
-    j = b.new_job('gVCF Combiner', job_attrs)
-    j.image(get_config()['workflow']['driver_image'])
-    j.command(
-        query_command(
-            combiner,
-            combiner.run.__name__,
-            str(out_vds_path),
-            str(tmp_prefix),
-            setup_gcp=True,
-        )
-    )
-    if depends_on:
-        j.depends_on(*depends_on)
-    return j
+#     Currently not supported on batch :-(
+#     NotImplementedError: 'import_gvcfs' is not yet supported on the service backend.
+#     """
+
+#     j = b.new_job('gVCF Combiner', job_attrs)
+#     j.image(get_config()['workflow']['driver_image'])
+#     j.command(
+#         query_command(
+#             combiner,
+#             combiner.run.__name__,
+#             str(out_vds_path),
+#             str(tmp_prefix),
+#             setup_gcp=True,
+#         )
+#     )
+#     if depends_on:
+#         j.depends_on(*depends_on)
+#     return j
 
 
 def vds_to_mt_job(

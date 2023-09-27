@@ -36,7 +36,6 @@ class JointGenotyping(CohortStage):
             # writing into perm location for late debugging
             # convert to str to avoid checking existence
             'tmp_prefix': str(self.prefix / 'tmp'),
-            # 'vcf': to_path(self.prefix / 'full.vcf.gz'),
             'mt': self.prefix / 'full.mt',
             'siteonly': str(self.prefix / 'siteonly.vcf.bgz'),
         }
@@ -82,27 +81,20 @@ class JointGenotyping(CohortStage):
             from cpg_workflows.large_cohort.combiner import run
 
             # Combine GVCFs using vcf combiner
-            if get_config()['workflow'].get('use_dataproc', False):
-                combine_job = dataproc_job(
-                        job_name=self.__class__.__name__,
-                        function=run,
-                        function_path_args=dict(
-                            out_vds_path=self.expected_outputs(cohort)['vds'],
-                            tmp_prefix=self.tmp_prefix,
-                        ),
-                        autoscaling_policy=(
-                            get_config()['hail']
-                            .get('dataproc', {})
-                            .get('combiner_autoscaling_policy')
-                        ),
-                        num_workers=scatter_count,
-                        depends_on=inputs.get_jobs(cohort),
-                    )
-            else:
-                combine_job = seqr_loader.gvcf_combiner_job(
-                    b=get_batch(),
-                    out_vds_path=self.expected_outputs(cohort)['vds'],
-                    tmp_prefix=self.tmp_prefix,
+            combine_job = dataproc_job(
+                    job_name=self.__class__.__name__,
+                    function=run,
+                    function_path_args=dict(
+                        out_vds_path=self.expected_outputs(cohort)['vds'],
+                        tmp_prefix=self.tmp_prefix,
+                    ),
+                    autoscaling_policy=(
+                        get_config()['hail']
+                        .get('dataproc', {})
+                        .get('combiner_autoscaling_policy')
+                    ),
+                    num_workers=scatter_count,
+                    depends_on=inputs.get_jobs(cohort),
                 )
 
             jobs.append(combine_job)
