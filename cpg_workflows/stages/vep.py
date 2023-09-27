@@ -18,7 +18,7 @@ from .. import get_batch
 from ..resources import joint_calling_scatter_count
 
 
-@stage(required_stages=[Vqsr, JointGenotyping])
+@stage(required_stages=[JointGenotyping])
 class Vep(CohortStage):
     """
     Run VEP on a VCF.
@@ -57,7 +57,7 @@ class Vep(CohortStage):
 
         jobs = vep.add_vep_jobs(
             get_batch(),
-            input_siteonly_vcf_path=inputs.as_path(cohort, stage=Vqsr, key='siteonly'),
+            input_siteonly_vcf_path=inputs.as_path(cohort, stage=JointGenotyping, key='siteonly'),
             input_siteonly_vcf_part_paths=input_siteonly_vcf_part_paths,
             out_path=self.expected_outputs(cohort)['ht'],
             tmp_prefix=to_path(self.expected_outputs(cohort)['tmp_prefix']),
