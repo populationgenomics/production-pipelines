@@ -29,15 +29,15 @@ def default_config() -> PipelineConfig:
             'cpg_workflows': 'test_check_report_job_image',
         },
         other={
-            'references': {
-                'broad': {
-                    'ref_fasta': 'hg38_reference.fa',
-                    'dragmap_prefix': 'gs://a-cpg-bucket/dragen_reference/',
-                },
-            },
             'qc_thresholds': {
                 'genome': {'min': {'genome_metric1': 20, 'genome_metric2': 20}},
                 'exome': {'max': {'exome_metric1': 20, 'exome_metric2': 20}},
+            },
+        },
+        references={
+            'broad': {
+                'ref_fasta': 'hg38_reference.fa',
+                'dragmap_prefix': 'gs://a-cpg-bucket/dragen_reference/',
             },
         },
     )
