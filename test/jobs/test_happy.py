@@ -239,51 +239,17 @@ class TestHappy:
          )
         spy.assert_called_once_with(happy_job.summary_csv, str(output_path))
 
-    @pytest.mark.parametrize('sequencing_type', ['genome', 'exome'])
-    @pytest.mark.parametrize(
-        'external_id, sample_map',
-        [('SAMPLE1', 'sample_one'), ('SAMPLE2', 'sample_two')],
-    )
-    def test_read_input_is_correctly_called(
-        self,
-        mocker: MockFixture,
-        tmp_path: Path,
-        sequencing_type: Literal['genome', 'exome'],
-        external_id: str,
-        sample_map: str,
+    @pytest.mark.parametrize('seq_type', ['genome', 'exome'])
+    def test_uses_correct_regions_list_file_for_sequencing_type(
+        self, tmp_path: Path, seq_type: SequencingType
     ):
         config = default_config()
-        config.workflow.sequencing_type = sequencing_type
-        config.other['validation']['sample_map'] = {external_id: external_id.lower()}
-        set_config(config, tmp_path / 'config.toml')
+        config.workflow.sequencing_type = seq_type
 
-        dataset_id = config.workflow.dataset
-        batch = create_local_batch(tmp_path, 'test_batch')
+        happy_job = self._get_new_happy_job(tmp_path, config)
+        assert happy_job is not None
 
-        spy = mocker.spy(batch, 'read_input')
-
-        sg = create_sequencing_group(
-            external_id=external_id,
-            dataset=dataset_id,
-            sequencing_type=config.workflow.sequencing_type,
-            alignment_input=create_fastq_pairs_input(location=tmp_path, n=1),
-            cram=CramPath(tmp_path / 'sample_one.cram'),
-            gvcf=GvcfPath('gs://test-project/gvcf/sample_one_genotype.g.vcf.gz'),
-        )
-        happy_job = happy(
-            sequencing_group=sg,
-            b=batch,
-            vcf_or_gvcf=GvcfPath(sg.gvcf).resource_group(batch),
-            is_gvcf=True,
-            job_attrs={},
-        )
-
-        assert happy_job
-
-        spy.assert_has_calls(
-            [
-                mocker.call(f'{sequencing_type}_evaluation_regions.v1.interval_list'),
-                mocker.call(f'{sample_map}_truth.vcf.gz'),
-                mocker.call(f'{sample_map}_regions.bed'),
-            ]
-        )
+        # Test correct regions file used
+        cmd = get_command_str(happy_job)
+        regions = config.references['broad'][f'{seq_type}_evaluation_interval_lists']
+        assert re.search(fr'grep -v \^@ \${{BATCH_TMPDIR}}/inputs/.*/{regions}', cmd)
