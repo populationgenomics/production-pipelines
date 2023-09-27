@@ -12,6 +12,7 @@ from cpg_utils.hail_batch import image_path, query_command
 from cpg_workflows.query_modules import seqr_loader
 from cpg_workflows.large_cohort import combiner
 
+
 def annotate_cohort_jobs(
     b: Batch,
     vcf_path: Path,
@@ -290,9 +291,9 @@ def vds_to_mt_job(
     b: Batch,
     vds_path: Path,
     out_mt_path: Path,
-    out_siteonly_vcf_path: Path| None = None,
+    out_siteonly_vcf_path: Path | None = None,
     job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None
+    depends_on: list[Job] | None = None,
 ) -> Job:
     """
     Convert VDS to MT and (optionally) a sites-only VCF
