@@ -15,6 +15,7 @@ from ..factories.alignment_input import create_fastq_pairs_input
 from ..factories.batch import create_local_batch
 from ..factories.config import PipelineConfig, WorkflowConfig
 from ..factories.sequencing_group import create_sequencing_group
+from ..factories.types import SequencingType
 
 from .helpers import get_command_str
 
@@ -116,25 +117,29 @@ class TestHappy:
         assert happy_job is None
 
     @pytest.mark.parametrize('is_gvcf', [True, False])
-    def test_if_genome_then_restrict_regions_option_is_set(self, tmp_path: Path, is_gvcf: bool):
+    def test_if_genome_then_restrict_regions_option_is_set(
+        self, tmp_path: Path, is_gvcf: bool
+    ):
         config = default_config()
         config.workflow.sequencing_type = 'genome'
-        
+
         happy_job = self._get_new_happy_job(tmp_path, config, is_gvcf=is_gvcf)
-        
+
         assert happy_job
-                
+
         cmd = get_command_str(happy_job)
         assert re.search(r'--restrict-regions', cmd)
         assert not re.search(r'--target-regions', cmd)
 
     @pytest.mark.parametrize('is_gvcf', [True, False])
-    def test_if_exome_then_target_regions_option_is_set(self, tmp_path: Path, is_gvcf: bool):
+    def test_if_exome_then_target_regions_option_is_set(
+        self, tmp_path: Path, is_gvcf: bool
+    ):
         config = default_config()
         config.workflow.sequencing_type = 'exome'
-        
+
         happy_job = self._get_new_happy_job(tmp_path, config, is_gvcf=is_gvcf)
-        
+
         assert happy_job
 
         cmd = get_command_str(happy_job)
@@ -233,10 +238,12 @@ class TestHappy:
             output_path=output_path,
         )
 
+        cmd = get_command_str(happy_job)
+
         assert re.search(
             r'cp \$BATCH_TMPDIR/prefix.summary.csv \${BATCH_TMPDIR}/.*/summary_csv',
             cmd,
-         )
+        )
         spy.assert_called_once_with(happy_job.summary_csv, str(output_path))
 
     @pytest.mark.parametrize('seq_type', ['genome', 'exome'])
@@ -251,5 +258,6 @@ class TestHappy:
 
         # Test correct regions file used
         cmd = get_command_str(happy_job)
-        regions = config.references['broad'][f'{seq_type}_evaluation_interval_lists']
+        regions_key = f'{seq_type}_evaluation_interval_lists'
+        regions = config.references['broad'][regions_key]
         assert re.search(fr'grep -v \^@ \${{BATCH_TMPDIR}}/inputs/.*/{regions}', cmd)
