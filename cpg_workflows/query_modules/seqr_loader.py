@@ -26,13 +26,17 @@ def annotate_cohort(
     annotations.
     """
 
-    mt = hl.import_vcf(
-        str(vcf_path),
-        reference_genome=genome_build(),
-        skip_invalid_loci=True,
-        force_bgz=True,
-    )
-    logging.info(f'Importing VCF {vcf_path}')
+    # Todo: Clean this up if this works
+    if str(vcf_path).endswith('.mt'):
+        mt = hl.read_table(str(vcf_path))
+    else:
+        mt = hl.import_vcf(
+            str(vcf_path),
+            reference_genome=genome_build(),
+            skip_invalid_loci=True,
+            force_bgz=True,
+        )
+        logging.info(f'Importing VCF {vcf_path}')
 
     logging.info(f'Loading VEP Table from {vep_ht_path}')
     # Annotate VEP. Do ti before splitting multi, because we run VEP on unsplit VCF,
