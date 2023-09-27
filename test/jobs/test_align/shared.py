@@ -23,7 +23,7 @@ def default_config() -> PipelineConfig:
         references={
             'broad': {
                 'ref_fasta': 'broad_reference.fa',
-                'dragmap_prefix': 'gs://a-cpg-bucket/dragen_reference/',
+                'dragmap_prefix': 'a-cpg-bucket/dragen_reference/',
             }
         },
         other={'resource_overrides': {}},
