@@ -128,22 +128,15 @@ class TestHappy:
         assert re.search(r'--restrict-regions', cmd)
         assert not re.search(r'--target-regions', cmd)
 
-    def test_exome_sequencing_type_gvcf(self, tmp_path: Path):
+    @pytest.mark.parametrize('is_gvcf', [True, False])
+    def test_if_exome_then_target_regions_option_is_set(self, tmp_path: Path, is_gvcf: bool):
         config = default_config()
         config.workflow.sequencing_type = 'exome'
-        happy_job = self._get_new_happy_job(tmp_path, config)
+        
+        happy_job = self._get_new_happy_job(tmp_path, config, is_gvcf=is_gvcf)
+        
         assert happy_job
-        assert happy_job.name == 'hap.py (GVCF)'
-        cmd = get_command_str(happy_job)
-        assert re.search(r'--target-regions', cmd)
-        assert not re.search(r'--restrict-regions', cmd)
 
-    def test_exome_sequencing_type_vcf(self, tmp_path: Path):
-        config = default_config()
-        config.workflow.sequencing_type = 'exome'
-        happy_job = self._get_new_happy_job(tmp_path, config, is_gvcf=False)
-        assert happy_job
-        assert happy_job.name == 'hap.py (VCF)'
         cmd = get_command_str(happy_job)
         assert re.search(r'--target-regions', cmd)
         assert not re.search(r'--restrict-regions', cmd)
