@@ -244,6 +244,10 @@ class TestHappy:
             output_path=output_path,
         )
 
+        assert re.search(
+            r'cp \$BATCH_TMPDIR/prefix.summary.csv \${BATCH_TMPDIR}/.*/summary_csv',
+            cmd,
+         )
         spy.assert_called_once_with(happy_job.summary_csv, str(output_path))
 
     @pytest.mark.parametrize('sequencing_type', ['genome', 'exome'])
