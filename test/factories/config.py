@@ -293,9 +293,15 @@ class PipelineConfig:
     hail: HailConfig = field(default_factory=default_hail_config)
     storage: dict[DatasetId, StorageConfig] = field(default_factory=dict)
     images: dict[str, str | Path] = field(default_factory=dict)
-    references: dict[str, str | dict[str, Any]] = field(default_factory=dict)
+    references: dict[str, Any | dict[str, Any]] = field(default_factory=dict)
     large_cohort: dict[str, Any] = field(default_factory=dict)
     other: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    def __getitem__(self, key: str) -> Any:
+        return self.as_dict()[key]
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.as_dict().get(key, default)
 
     def set_storage(
         self, dataset: DatasetId, storage: StorageConfig
@@ -305,6 +311,16 @@ class PipelineConfig:
 
     def set_image(self, name: str, path: str | Path) -> 'PipelineConfig':
         self.images[name] = path
+        return self
+
+    def set_references(
+        self, name: str, value: str | dict[str, Any]
+    ) -> 'PipelineConfig':
+        self.references[name] = value
+        return self
+
+    def set_large_cohort(self, key: str, value: Any) -> 'PipelineConfig':
+        self.large_cohort[key] = value
         return self
 
     def set_other(self, key: str, value: dict[str, Any]) -> 'PipelineConfig':
