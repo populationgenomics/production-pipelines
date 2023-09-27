@@ -1,19 +1,22 @@
 import re
 from pathlib import Path
-
 from typing import Literal
+
+import pytest
 from cpg_utils.config import ConfigError
+from pytest import raises
+from pytest_mock import MockFixture
+
+from cpg_workflows.filetypes import CramPath, GvcfPath
 from cpg_workflows.jobs.happy import happy
+
 from .. import set_config
 from ..factories.alignment_input import create_fastq_pairs_input
 from ..factories.batch import create_local_batch
 from ..factories.config import PipelineConfig, WorkflowConfig
 from ..factories.sequencing_group import create_sequencing_group
+
 from .helpers import get_command_str
-from cpg_workflows.filetypes import CramPath, GvcfPath
-from pytest import raises
-import pytest
-from pytest_mock import MockFixture
 
 
 def default_config() -> PipelineConfig:
