@@ -217,7 +217,7 @@ def vep_one(
         j.image(image_path('vep'))
         vep_mount_path = reference_path('vep_mount')
 
-    STANDARD.set_resources(j, storage_gb=50, mem_gb=50, ncpu=16)
+    STANDARD.set_resources(j, storage_gb=50, mem_gb=16, ncpu=2)
 
     if not isinstance(vcf, hb.ResourceFile):
         vcf = b.read_input(str(vcf))
@@ -240,7 +240,7 @@ def vep_one(
         'gerp_bigwig': f'{vep_dir}/gerp_conservation_scores.homo_sapiens.GRCh38.bw',
         'human_ancestor_fa': f'{vep_dir}/human_ancestor.fa.gz',
         'conservation_file': f'{vep_dir}/loftee.sql',
-        'loftee_path': '$VEP_DIR_PLUGINS' if use_110 else '$LOFTEE_PLUGIN_PATH'
+        'loftee_path': '$VEP_DIR_PLUGINS' if use_110 else '$MAMBA_ROOT_PREFIX/share/ensembl-vep'
     }
 
     # sexy new plugin
@@ -253,17 +253,29 @@ def vep_one(
     loftee_plugin_path = '--dir_plugins $LOFTEE_PLUGIN_PATH '
 
     cmd = f"""\
-    LOFTEE_PLUGIN_PATH=$MAMBA_ROOT_PREFIX/share/ensembl-vep
     FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
 
     vep \\
     --format vcf \\
+    --fork 4 \\
     --{out_format} {'--compress_output bgzip' if out_format == 'vcf' else ''} \\
     -o {output} \\
     -i {vcf} \\
-    --everything \\
+    --af \\
+    --af_gnomade \\
+    --af_gnomadg \\
+    --max_af \\
+    --hgvs \\
+    --protein \\
+    --biotype \\
+    --symbol \\
+    --numbers \\
+    --mane \\
+    --mane_select \\
+    --no_stats \\
     --allele_number \\
     --minimal \\
+    --species homo_sapiens \\
     --cache --offline --assembly GRCh38 \\
     --dir_cache {vep_dir}/vep/ \\
     --fasta $FASTA \\
