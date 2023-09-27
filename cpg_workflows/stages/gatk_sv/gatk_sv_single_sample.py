@@ -31,7 +31,7 @@ from cpg_utils.config import get_config
 @stage(
     analysis_keys=[f'{caller}_vcf' for caller in SV_CALLERS],
     analysis_type='sv',
-    update_analysis_meta=_sv_individual_meta
+    update_analysis_meta=_sv_individual_meta,
 )
 class GatherSampleEvidence(SequencingGroupStage):
     """
@@ -89,17 +89,16 @@ class GatherSampleEvidence(SequencingGroupStage):
     def queue_jobs(
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput:
-        """Add jobs to batch"""
+        """
+        Add jobs to batch
+        Adds billing-related labels to the Cromwell job(s)
+        """
         assert sequencing_group.cram, sequencing_group
 
         input_dict: dict[str, Any] = {
             'bam_or_cram_file': str(sequencing_group.cram),
             'bam_or_cram_index': str(sequencing_group.cram) + '.crai',
             'sample_id': sequencing_group.id,
-            # This option forces CRAM localisation, otherwise it would be passed to
-            # samtools as a URL (in CramToBam.wdl) and it would fail to read it as
-            # GCS_OAUTH_TOKEN is not set.
-            'requester_pays_crams': True,
             'reference_fasta': str(get_fasta()),
             'reference_index': str(get_fasta()) + '.fai',
             'reference_dict': str(get_fasta().with_suffix('.dict')),
@@ -108,15 +107,17 @@ class GatherSampleEvidence(SequencingGroupStage):
 
         input_dict |= get_images(
             [
+                'sv_pipeline_base_docker',
                 'sv_pipeline_docker',
                 'sv_base_mini_docker',
                 'samtools_cloud_docker',
-                'gatk_docker',
-                'genomes_in_the_cloud_docker',
-                'cloud_sdk_docker',
-                'wham_docker',
                 'manta_docker',
                 'scramble_docker',
+                'wham_docker',
+                'gatk_docker',
+                'gatk_docker_pesr_override',
+                'genomes_in_the_cloud_docker',
+                'cloud_sdk_docker',
             ]
         )
         input_dict |= get_references(
@@ -136,6 +137,12 @@ class GatherSampleEvidence(SequencingGroupStage):
 
         expected_d = self.expected_outputs(sequencing_group)
 
+        # billing labels!
+        billing_labels = {
+            'dataset': sequencing_group.dataset.name,
+            'sequencing_group': sequencing_group.id,
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=sequencing_group.dataset,
@@ -143,6 +150,7 @@ class GatherSampleEvidence(SequencingGroupStage):
             input_dict=input_dict,
             expected_out_dict=expected_d,
             sequencing_group_id=sequencing_group.id,
+            labels=billing_labels,
         )
         return self.make_outputs(sequencing_group, data=expected_d, jobs=jobs)
 
@@ -194,6 +202,7 @@ class EvidenceQC(CohortStage):
                 'sv_base_mini_docker',
                 'sv_base_docker',
                 'sv_pipeline_docker',
+                'sv_pipeline_qc_docker',
             ]
         )
 
