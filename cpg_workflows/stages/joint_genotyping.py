@@ -42,6 +42,7 @@ class JointGenotyping(CohortStage):
 
         if get_config()['workflow'].get('use_vcf_combiner', False):
             outputs['vds'] = str(self.prefix / 'full.vds')
+            outputs['siteonly_part_pattern'] = None
         else:
             outputs['vcf'] = to_path(self.prefix / 'full.vcf.gz')
             outputs['siteonly_part_pattern'] = str(
