@@ -51,7 +51,8 @@ class AnnotateCohort(CohortStage):
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        vcf_path = inputs.as_path(target=cohort, stage=JointGenotyping, key='vcf')
+        # Todo: clean up if this works.
+        mt_path = inputs.as_path(target=cohort, stage=JointGenotyping, key='mt')
         siteonly_vqsr_vcf_path = inputs.as_path(
             target=cohort, stage=Vqsr, key='siteonly'
         )
@@ -63,7 +64,7 @@ class AnnotateCohort(CohortStage):
 
         jobs = annotate_cohort_jobs(
             b=get_batch(),
-            vcf_path=vcf_path,
+            vcf_path=mt_path,
             siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
             vep_ht_path=vep_ht_path,
             out_mt_path=self.expected_outputs(cohort)['mt'],
