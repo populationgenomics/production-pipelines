@@ -6,19 +6,32 @@ MakeCohortVCF and AnnotateVCF
 
 from typing import Any
 
+from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
 from cpg_workflows.batch import get_batch
-from cpg_workflows.workflow import stage, StageOutput, StageInput, Cohort, CohortStage
-
+from cpg_workflows.jobs.seqr_loader_sv import (
+    annotate_cohort_jobs_sv,
+    annotate_dataset_jobs_sv,
+)
+from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     add_gatk_sv_jobs,
     get_fasta,
     get_images,
     get_references,
     make_combined_ped,
-    _sv_batch_meta,
     _sv_filtered_meta,
     SV_CALLERS,
+)
+from cpg_workflows.workflow import (
+    get_workflow,
+    stage,
+    Cohort,
+    CohortStage,
+    Dataset,
+    DatasetStage,
+    StageOutput,
+    StageInput,
 )
 from cpg_workflows.jobs import ploidy_table_from_ped
 
@@ -207,17 +220,14 @@ class FormatVcfForGatk(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
-
-
         Args:
             cohort (Cohort): cohort of all samples (across several sub-cohort batches)
             inputs (StageInput): access to prior inputs
         """
 
-        make_vcf_d = inputs.as_dict(cohort, MakeCohortVcf)
         input_dict: dict[str, Any] = {
             'prefix': cohort.name,
-            'vcf': make_vcf_d['vcf'],
+            'vcf': inputs.as_dict(cohort, MakeCohortVcf)['vcf'],
             'ped_file': make_combined_ped(cohort, self.prefix),
         }
         input_dict |= get_images(['sv_pipeline_docker', 'sv_base_mini_docker'])
@@ -307,19 +317,13 @@ class SVConcordance(CohortStage):
         """
 
         return {
-            'gatk_formatted_vcf': self.prefix / 'gatk_formatted.vcf.gz',
-            'gatk_formatted_vcf_index': self.prefix / 'gatk_formatted.vcf.gz.tbi',
+            'concordance_vcf': self.prefix / 'sv_concordance.vcf.gz',
+            'concordance_vcf_index': self.prefix / 'sv_concordance.vcf.gz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
-
-        Args:
-            cohort ():
-            inputs ():
-
-        Returns:
-
+        configure and queue jobs for SV concordance
         """
         raw_calls = inputs.as_dict(cohort, JoinRawCalls)
         format_vcf = inputs.as_dict(cohort, FormatVcfForGatk)
@@ -401,30 +405,47 @@ class FilterGenotypes(CohortStage):
             / 'unfiltered_recalibrated.vcf.gz',
             'unfiltered_recalibrated_vcf_index': self.prefix
             / 'unfiltered_recalibrated.vcf.gz.tbi',
-            'vcf_optimization_table': self.prefix / 'vcf_optimization_table.tsv.gz',
-            'sl_cutoff_qc_tarball': self.prefix / 'sl_cutoff_SV_VCF_QC_output.tar.gz',
+            # 'vcf_optimization_table': self.prefix / 'vcf_optimization_table.tsv.gz',
+            # 'sl_cutoff_qc_tarball': self.prefix / 'sl_cutoff_SV_VCF_QC_output.tar.gz',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        ploidy_table_output = inputs.as_dict(cohort, GeneratePloidyTable)[
-            'ploidy_table'
-        ]
-        sv_concordance_output = inputs.as_dict(cohort, SVConcordance)[
-            'gatk_formatted_vcf'
-        ]
 
         input_dict = {
-            'vcf': sv_concordance_output,
-            'ploidy_table': ploidy_table_output,
             'output_prefix': cohort.name,
+            'vcf': inputs.as_dict(cohort, SVConcordance)['concordance_vcf'],
+            'ploidy_table': inputs.as_dict(cohort, GeneratePloidyTable)['ploidy_table'],
+            'ped_file': make_combined_ped(cohort, self.prefix),
+            'fmax_beta': get_config()['references']['gatk_sv'].get('fmax_beta', 0.3),
+            'recalibrate_gq_args': get_config()['references']['gatk_sv'].get(
+                'recalibrate_gq_args'
+            ),
+            'sl_filter_args': get_config()['references']['gatk_sv'].get(
+                'sl_filter_args'
+            ),
         }
+        assert input_dict['recalibrate_gq_args']
+        assert input_dict['sl_filter_args']
 
         input_dict |= get_images(
-            ['gatk_docker', 'linux_docker', 'sv_base_mini_docker', 'sv_pipeline_docker']
+            ['linux_docker', 'sv_base_mini_docker', 'sv_pipeline_docker']
+        )
+        # use a non-standard GATK image containing required filtering tool
+        input_dict['gatk_docker'] = get_images(['gq_recalibrator_docker'])[
+            'gq_recalibrator_docker'
+        ]
+        input_dict |= get_references(
+            [
+                {'gq_recalibrator_model_file': 'aou_filtering_model'},
+                'primary_contigs_fai',
+            ]
         )
 
-        input_dict |= get_references(
-            [{'gq_recalibrator_model_file': 'aou_filtering_model'}]
+        # something a little trickier - we need to get various genome tracks
+        input_dict['genome_tracks'] = list(
+            get_references(
+                get_config()['references']['gatk_sv'].get('genome_tracks', [])
+            ).values()
         )
 
         expected_d = self.expected_outputs(cohort)
@@ -438,11 +459,20 @@ class FilterGenotypes(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
+def _sv_annotated_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, Any]:
+    """
+    Callable, add meta[type] to custom analysis object
+    """
+    return {'type': 'gatk-sv-annotated'}
+
+
 @stage(
     required_stages=FilterGenotypes,
     analysis_type='sv',
-    analysis_keys=['output_vcf'],
-    update_analysis_meta=_sv_batch_meta,
+    analysis_keys=['annotated_vcf'],
+    update_analysis_meta=_sv_annotated_meta,
 )
 class AnnotateVcf(CohortStage):
     """
@@ -461,36 +491,41 @@ class AnnotateVcf(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict:
         return {
-            'output_vcf': self.prefix / 'filtered_annotated.vcf.gz',
-            'output_vcf_idx': self.prefix / 'filtered_annotated.vcf.gz.tbi',
+            'annotated_vcf': self.prefix / 'filtered_annotated.vcf.bgz',
+            'annotated_vcf_index': self.prefix / 'filtered_annotated.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        make_vcf_d = inputs.as_dict(cohort, FilterGenotypes)
-
+        """
+        configure and queue jobs for SV annotation
+        passing the VCF Index has become implicit, which may be a problem for us
+        """
         input_dict: dict[str, Any] = {
+            'vcf': inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf'],
             'prefix': cohort.name,
-            'vcf': make_vcf_d['filtered_vcf'],
-            'vcf_idx': make_vcf_d['filtered_vcf_index'],
             'ped_file': make_combined_ped(cohort, self.prefix),
             'sv_per_shard': 5000,
-            'max_shards_per_chrom_step1': 200,
-            'min_records_per_shard_step1': 5000,
+            'population': get_config()['references']['gatk_sv'].get(
+                'external_af_population'
+            ),
+            'ref_prefix': get_config()['references']['gatk_sv'].get(
+                'external_af_ref_bed_prefix'
+            ),
+            'use_hail': False,
         }
+
         input_dict |= get_references(
             [
+                'noncoding_bed',
                 'protein_coding_gtf',
+                {'ref_bed': 'external_af_ref_bed'},
                 {'contig_list': 'primary_contigs_list'},
             ]
         )
 
         # images!
         input_dict |= get_images(
-            [
-                'sv_pipeline_docker',
-                'sv_base_mini_docker',
-                'gatk_docker',
-            ]
+            ['sv_pipeline_docker', 'sv_base_mini_docker', 'gatk_docker']
         )
         expected_d = self.expected_outputs(cohort)
         jobs = add_gatk_sv_jobs(
@@ -501,3 +536,216 @@ class AnnotateVcf(CohortStage):
             expected_out_dict=expected_d,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
+
+
+@stage(required_stages=AnnotateVcf)
+class AnnotateCohortSv(CohortStage):
+    """
+    What do we want?! SV Data in Seqr!
+    When do we want it?! Now!
+
+    First step to transform annotated SV callset data into a seqr ready format
+    Rearrange all the annotations
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict:
+        """
+        Expected to write a matrix table.
+        """
+        return {
+            'tmp_prefix': str(self.tmp_prefix),
+            'mt': self.prefix / 'cohort_sv.mt',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        """
+        queue job(s) to rearrange the annotations prior to Seqr transformation
+        """
+
+        vcf_path = inputs.as_path(target=cohort, stage=AnnotateVcf, key='annotated_vcf')
+        checkpoint_prefix = (
+            to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
+        )
+
+        job = annotate_cohort_jobs_sv(
+            b=get_batch(),
+            vcf_path=vcf_path,
+            out_mt_path=self.expected_outputs(cohort)['mt'],
+            checkpoint_prefix=checkpoint_prefix,
+            job_attrs=self.get_job_attrs(cohort),
+            depends_on=inputs.get_jobs(cohort),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=job)
+
+
+def _update_sv_dataset_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, Any]:
+    """
+    Add meta.type to custom analysis object
+    """
+    return {'type': 'annotated-sv-dataset-callset'}
+
+
+@stage(
+    required_stages=AnnotateCohortSv,
+    analysis_type='sv',
+    analysis_keys=['mt'],
+    update_analysis_meta=_update_sv_dataset_meta,
+)
+class AnnotateDatasetSv(DatasetStage):
+    """
+    Subset the MT to be this Dataset only
+    Then work up all the genotype values
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict:
+        """
+        Expected to generate a matrix table
+        """
+        return {
+            'tmp_prefix': str(self.tmp_prefix / dataset.name),
+            'mt': (
+                dataset.prefix()
+                / 'mt'
+                / f'{get_workflow().output_version}-{dataset.name}.mt'
+            ),
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """
+        Whether Dataproc or not, this Stage subsets the whole MT to this cohort only
+        Then brings a range of genotype data into row annotations
+
+        Args:
+            dataset (Dataset): SGIDs specific to this dataset/project
+            inputs ():
+        """
+
+        assert dataset.cohort
+        mt_path = inputs.as_path(
+            target=dataset.cohort, stage=AnnotateCohortSv, key='mt'
+        )
+
+        checkpoint_prefix = (
+            to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
+        )
+
+        jobs = annotate_dataset_jobs_sv(
+            b=get_batch(),
+            mt_path=mt_path,
+            sgids=dataset.get_sequencing_group_ids(),
+            out_mt_path=self.expected_outputs(dataset)['mt'],
+            tmp_prefix=checkpoint_prefix,
+            job_attrs=self.get_job_attrs(dataset),
+            depends_on=inputs.get_jobs(dataset)
+        )
+
+        return self.make_outputs(
+            dataset, data=self.expected_outputs(dataset), jobs=jobs
+        )
+
+
+def _gatk_sv_index_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, Any]:
+    """
+    Add meta.type to custom analysis object
+    https://github.com/populationgenomics/metamist/issues/539
+    """
+    return {'type': 'gatk-sv-index', 'seqr-data-type': 'gatk-sv'}
+
+
+@stage(
+    required_stages=[AnnotateDatasetSv],
+    analysis_type='es-index',  # specific type of es index
+    analysis_keys=['index_name'],
+    update_analysis_meta=_gatk_sv_index_meta,
+)
+class MtToEsSv(DatasetStage):
+    """
+    Create a Seqr index.
+    AFAIK this is identical to the small vairant version
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict[str, str | Path]:
+        """
+        Expected to generate a Seqr index, which is not a file
+        """
+        sequencing_type = get_config()['workflow']['sequencing_type']
+        index_name = f'{dataset.name}-{sequencing_type}-SV-{get_workflow().run_timestamp}'.lower()
+        return {
+            'index_name': index_name,
+            'done_flag': dataset.prefix() / 'es' / f'{index_name}.done',
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """
+        Uses analysis-runner's dataproc helper to run a hail query script
+        """
+        if (
+            es_datasets := get_config()['workflow'].get('create_es_index_for_datasets')
+        ) and dataset.name not in es_datasets:
+            # Skipping dataset that wasn't explicitly requested to upload to ES
+            return self.make_outputs(dataset)
+
+        dataset_mt_path = inputs.as_path(
+            target=dataset, stage=AnnotateDatasetSv, key='mt'
+        )
+        index_name = self.expected_outputs(dataset)['index_name']
+        done_flag_path = self.expected_outputs(dataset)['done_flag']
+
+        if 'elasticsearch' not in get_config():
+            raise ValueError(
+                f'"elasticsearch" section is not defined in config, cannot create '
+                f'Elasticsearch index for dataset {dataset}'
+            )
+
+        from analysis_runner import dataproc
+
+        # transformation is the same, just use the same methods file?
+        script = (
+            f'cpg_workflows/dataproc_scripts/mt_to_es.py '
+            f'--mt-path {dataset_mt_path} '
+            f'--es-index {index_name} '
+            f'--done-flag-path {done_flag_path} '
+            f'--es-password {es_password()}'
+        )
+        pyfiles = ['seqr-loading-pipelines/hail_scripts']
+        job_name = f'{dataset.name}: create ES index'
+
+        if cluster_id := get_config()['hail'].get('dataproc', {}).get('cluster_id'):
+            # noinspection PyProtectedMember
+            j = dataproc._add_submit_job(
+                batch=get_batch(),
+                cluster_id=cluster_id,
+                script=script,
+                pyfiles=pyfiles,
+                job_name=job_name,
+                region='australia-southeast1',
+            )
+        else:
+            j = dataproc.hail_dataproc_job(
+                get_batch(),
+                script,
+                max_age='48h',
+                packages=[
+                    'cpg_workflows',
+                    'elasticsearch==8.*',
+                    'google',
+                    'fsspec',
+                    'gcloud',
+                ],
+                num_workers=2,
+                num_secondary_workers=0,
+                job_name=job_name,
+                depends_on=inputs.get_jobs(dataset),
+                scopes=['cloud-platform'],
+                pyfiles=pyfiles,
+                init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
+            )
+        j._preemptible = False
+        j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}
+        jobs = [j]
+        return self.make_outputs(dataset, data=index_name, jobs=jobs)

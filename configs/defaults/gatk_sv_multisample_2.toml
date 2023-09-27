@@ -10,3 +10,46 @@ ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapie
 # Access to this file was provided on a one-off basis, and is not publicly available.
 # If an updated model is required, contact Mark Walker at the Broad Institute
 aou_filtering_model = 'gs://cpg-common-test/references/gatk-sv/gatk-sv-recalibrator.aou_phase_1.v1.model'
+
+# a couple of annotation arguments are not files
+# github.com/broadinstitute/gatk-sv/blob/main/inputs/templates/test/AnnotateVcf/AnnotateVcf.json.tmpl#L4-L8
+external_af_population = ['ALL', 'AFR', 'AMR', 'EAS', 'EUR']
+external_af_ref_bed_prefix = 'gnomad_v2.1_sv'
+
+# genome tracks are a list of CPG config keys
+genome_tracks = [
+    'recalibrate_gq_repeatmasker',
+    'recalibrate_gq_segmental_dups',
+    'recalibrate_gq_simple_reps',
+    'recalibrate_gq_umap_s100',
+    'recalibrate_gq_umap_s24',
+]
+genome_tracks_index = [
+    'recalibrate_gq_repeatmasker_index',
+    'recalibrate_gq_segmental_dups_index',
+    'recalibrate_gq_simple_reps_index',
+    'recalibrate_gq_umap_s100_index',
+    'recalibrate_gq_umap_s24_index',
+]
+recalibrate_gq_args = [
+    '--keep-homvar false',
+    '--keep-homref true',
+    '--keep-multiallelic true',
+    '--skip-genotype-filtering true',
+    '--min-samples-to-estimate-allele-frequency -1',
+]
+
+# FilterGenotypes - stringent end of [0.3, 0.5] range
+fmax_beta = 0.3
+
+sl_filter_args = '--small-del-threshold 93 --medium-del-threshold 150 --small-dup-threshold -51 --medium-dup-threshold -4 --ins-threshold -13 --inv-threshold -19'
+noncoding_bed = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/noncoding.sort.hg38.bed'
+
+[elasticsearch]
+# Configure access to ElasticSearch server
+port = '9243'
+host = 'elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com'
+username = 'seqr'
+# Load ElasticSearch password from a secret, unless SEQR_ES_PASSWORD is set
+password_secret_id = 'seqr-es-password'
+password_project_id = 'seqr-308602'
