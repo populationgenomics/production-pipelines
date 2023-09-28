@@ -12,16 +12,12 @@ from hailtop.batch import Batch
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import (
-    image_path,
-    reference_path,
-    query_command,
-)
+from cpg_utils.hail_batch import image_path, reference_path, query_command
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import can_reuse
 
-from .picard import get_intervals
-from .vcf import gather_vcfs, subset_vcf
+from cpg_workflows.jobs.picard import get_intervals
+from cpg_workflows.jobs.vcf import gather_vcfs, subset_vcf
 
 
 def add_vep_jobs(
@@ -254,24 +250,19 @@ def vep_one(
 
     cmd = f"""\
     FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
-
     vep \\
     --format vcf \\
     --fork 4 \\
     --{out_format} {'--compress_output bgzip' if out_format == 'vcf' else ''} \\
     -o {output} \\
     -i {vcf} \\
-    --af \\
-    --af_gnomade \\
-    --af_gnomadg \\
-    --max_af \\
+    --af --af_gnomade --af_gnomadg --max_af \\
     --hgvs \\
     --protein \\
     --biotype \\
     --symbol \\
     --numbers \\
-    --mane \\
-    --mane_select \\
+    --mane --mane_select \\
     --no_stats \\
     --allele_number \\
     --minimal \\
