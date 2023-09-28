@@ -248,24 +248,15 @@ def vep_one(
 
     loftee_plugin_path = '--dir_plugins $LOFTEE_PLUGIN_PATH '
 
-    # different AF flags are valid between versions of VEP
-    af_fields = '--af --af_gnomade --af_gnomadg --max_af' if use_110 else '--af --max_af'
-
     cmd = f"""\
     FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
     vep \\
     --format vcf \\
-    --fork 4 \\
     --{out_format} {'--compress_output bgzip' if out_format == 'vcf' else ''} \\
     -o {output} \\
     -i {vcf} \\
-    {af_fields} \\
-    --hgvs \\
-    --protein \\
-    --biotype \\
-    --symbol \\
-    --numbers \\
-    --mane --mane_select \\
+    --everything \\
+    --mane_select \\
     --no_stats \\
     --allele_number \\
     --minimal \\
@@ -277,8 +268,8 @@ def vep_one(
     {utr_annotator_plugin if (use_110 and out_format == 'vcf') else ''} \
     --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())}
     """
-    if out_format == 'vcf':
 
+    if out_format == 'vcf':
         cmd += f'tabix -p vcf {output}'
 
     j.command(cmd)
