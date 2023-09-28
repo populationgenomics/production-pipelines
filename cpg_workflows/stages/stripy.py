@@ -86,6 +86,7 @@ class Stripy(SequencingGroupStage):
             analysis_type=get_config()['stripy']['analysis_type'],
             out_path=self.expected_outputs(sequencing_group)['stripy_html'],
             json_path=self.expected_outputs(sequencing_group)['stripy_json'],
+            custom_loci_path=get_config()['stripy']['custom_loci_path'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(j)
