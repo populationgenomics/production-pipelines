@@ -21,6 +21,7 @@ def stripy(
     out_path: Path,
     log_path: Path,
     json_path: Path,
+    custom_loci_path: str = '',
     analysis_type: str = 'standard',
     job_attrs: dict | None = None,
     overwrite: bool = False,
@@ -65,6 +66,12 @@ def stripy(
     else:
         sex_argument = ''
 
+    if custom_loci_path:
+        custom_loci_input = b.read_input(str(custom_loci_path))
+        custom_loci_argument = f'--custom {custom_loci_input}'
+    else:
+        custom_loci_argument = ''
+
     cmd = f"""\
     # Increase logging to max verbosity and output json results. Needs to be passed as a config file so doing a
     # quick an dirty edit of the default config on the fly and cat to the job log.
@@ -85,7 +92,9 @@ def stripy(
         --logflags {j.log_path} \\
         --config $BATCH_TMPDIR/config.json \\
         --analysis {analysis_type} \\
-        --locus {target_loci}
+        --locus {target_loci} \\
+        {custom_loci_argument}
+
 
     ls $BATCH_TMPDIR/
 

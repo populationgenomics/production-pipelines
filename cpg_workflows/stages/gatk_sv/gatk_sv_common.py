@@ -175,7 +175,7 @@ def add_gatk_sv_jobs(
         outputs_to_collect=outputs_to_collect,
         driver_image=driver_image,
         copy_outputs_to_gcp=copy_outputs,
-        labels=labels
+        labels=labels,
     )
 
     copy_j = batch.new_job(f'{job_prefix}: copy outputs')
@@ -198,7 +198,7 @@ def get_ref_panel(keys: list[str] | None = None) -> dict:
         for k, v in {
             'ref_panel_samples': get_config()['sv_ref_panel']['ref_panel_samples'],
             'ref_panel_bincov_matrix': str(
-                reference_path('gatk_sv/ref_panel_bincov_matrix')
+                reference_path('broad/ref_panel_bincov_matrix')
             ),
             'contig_ploidy_model_tar': str(
                 reference_path('gatk_sv/contig_ploidy_model_tar')

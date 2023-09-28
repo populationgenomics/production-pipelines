@@ -1,13 +1,17 @@
 name: Docker
 on:
-  pull_request:
+#  pull_request:
   push:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to use (defaults to "test")'
+        default: "test"
 
 env:
-  VERSION: 1.15.2
+  VERSION: 1.15.3
 
 jobs:
   docker:
@@ -48,9 +52,15 @@ jobs:
         run: |
           docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:pr-${{ github.event.number }}
           docker push $IMAGE_NAME:pr-${{ github.event.number }}
-        
+
+      - name: manually triggered build
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:${{github.event.inputs.tag}}
+          docker push $IMAGE_NAME:${{github.event.inputs.tag}}
+
       - name: push latest
-        if: ${{ github.event_name != 'pull_request' }}
+        if: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
         run: |
           docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:$VERSION
           docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:latest
