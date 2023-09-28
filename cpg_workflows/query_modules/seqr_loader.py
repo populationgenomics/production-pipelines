@@ -28,7 +28,7 @@ def annotate_cohort(
 
     # Todo: Clean this up if this works
     if str(vcf_path).endswith('.mt'):
-        mt = hl.read_table(str(vcf_path))
+        mt = hl.read_matrix_table(str(vcf_path))
     else:
         mt = hl.import_vcf(
             str(vcf_path),
