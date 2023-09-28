@@ -70,6 +70,7 @@ class AnnotateCohort(CohortStage):
             out_mt_path=self.expected_outputs(cohort)['mt'],
             checkpoint_prefix=checkpoint_prefix,
             job_attrs=self.get_job_attrs(cohort),
+            use_dataproc=False,
             depends_on=inputs.get_jobs(cohort),
         )
 
