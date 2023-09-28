@@ -1,0 +1,9 @@
+[workflow]
+sequencing_type = 'genome'
+use_vep_110 = true
+
+[vep]
+scatter_count = 1
+
+[references]
+vep_110_mount = 'gs://cpg-common-test/references/vep/110/mount'
