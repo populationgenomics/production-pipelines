@@ -246,7 +246,7 @@ def vep_one(
     # only activate for VCF outputs
     utr_annotator_plugin = f'--plugin UTRAnnotator,file=$UTR38 '
 
-    loftee_plugin_path = '--dir_plugins $LOFTEE_PLUGIN_PATH '
+    loftee_plugin_path = '--dir_plugins $MAMBA_ROOT_PREFIX/share/ensembl-vep '
 
     cmd = f"""\
     FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
