@@ -74,7 +74,7 @@ class TestHappy:
             alignment_input=create_fastq_pairs_input(location=tmp_path, n=1),
             cram=CramPath(tmp_path / 'sample_one.cram'),
             # Can't use tmp_path for gvcf, because it expects a gs:// path
-            gvcf=GvcfPath('gs://test-project/gvcf/sample_one_genotype.g.vcf.gz'),
+            gvcf=GvcfPath('test-project/gvcf/sample_one_genotype.g.vcf.gz'),
         )
 
         assert sg.gvcf
@@ -226,7 +226,7 @@ class TestHappy:
             sequencing_type=config.workflow.sequencing_type,
             alignment_input=create_fastq_pairs_input(location=tmp_path, n=1),
             cram=CramPath(tmp_path / 'sample_one.cram'),
-            gvcf=GvcfPath('gs://test-project/gvcf/sample_one_genotype.g.vcf.gz'),
+            gvcf=GvcfPath('test-project/gvcf/sample_one_genotype.g.vcf.gz'),
         )
         output_path = tmp_path / 'test_output.csv'
         happy_job = happy(
