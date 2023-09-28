@@ -248,6 +248,9 @@ def vep_one(
 
     loftee_plugin_path = '--dir_plugins $LOFTEE_PLUGIN_PATH '
 
+    # different AF flags are valid between versions of VEP
+    af_fields = '--af --af_gnomade --af_gnomadg --max_af' if use_110 else '--af --max_af'
+
     cmd = f"""\
     FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
     vep \\
@@ -256,7 +259,7 @@ def vep_one(
     --{out_format} {'--compress_output bgzip' if out_format == 'vcf' else ''} \\
     -o {output} \\
     -i {vcf} \\
-    --af --af_gnomade --af_gnomadg --max_af \\
+    {af_fields} \\
     --hgvs \\
     --protein \\
     --biotype \\
