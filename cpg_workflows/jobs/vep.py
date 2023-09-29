@@ -248,8 +248,7 @@ def vep_one(
 
     loftee_plugin_path = '--dir_plugins $MAMBA_ROOT_PREFIX/share/ensembl-vep '
 
-    vep_fields = """--fork 4 \\
-    --sift b \\
+    vep_fields = """--sift b \\
     --polyphen b \\
     --hgvs \\
     --symbol \\
