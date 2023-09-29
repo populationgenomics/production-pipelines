@@ -240,13 +240,30 @@ def vep_one(
     }
 
     # sexy new plugin
-    alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz,transcript_match=1 '
+    alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
 
     # this plugin doesn't support JSON output at this time
     # only activate for VCF outputs
     utr_annotator_plugin = f'--plugin UTRAnnotator,file=$UTR38 '
 
     loftee_plugin_path = '--dir_plugins $MAMBA_ROOT_PREFIX/share/ensembl-vep '
+
+    vep_fields = """--fork 4 \\
+    --sift b \\
+    --polyphen b \\
+    --hgvs \\
+    --symbol \\
+    --protein \\
+    --biotype \\
+    --af \\
+    --af_1kg \\
+    --af_esp \\
+    --af_gnomade \\
+    --af_gnomadg \\
+    --max_af \\
+    --mane \\
+    --exclude_predicted \\
+    """ if use_110 else '--everything \\'
 
     cmd = f"""\
     FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
@@ -255,7 +272,7 @@ def vep_one(
     --{out_format} {'--compress_output bgzip' if out_format == 'vcf' else ''} \\
     -o {output} \\
     -i {vcf} \\
-    --everything \\
+    {vep_fields}
     --mane_select \\
     --no_stats \\
     --allele_number \\
@@ -265,7 +282,6 @@ def vep_one(
     --dir_cache {vep_dir}/vep/ \\
     --fasta $FASTA \\
     {alpha_missense_plugin if use_110 else loftee_plugin_path} \
-    {'--buffer_size 15000 --use_given_ref' if use_110 else ''} \
     {utr_annotator_plugin if (use_110 and out_format == 'vcf') else ''} \
     --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())}
     """
