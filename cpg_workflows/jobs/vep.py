@@ -256,8 +256,6 @@ def vep_one(
     --protein \\
     --biotype \\
     --af \\
-    --af_1kg \\
-    --af_esp \\
     --af_gnomade \\
     --af_gnomadg \\
     --max_af \\
