@@ -61,9 +61,11 @@ def annotate_cohort(
         mt = mt.annotate_rows(
             # vqsr_ht has info annotation split by allele, plus the new AS-VQSR annotations
             info=vqsr_ht[mt.row_key].info,
-            filters=mt.filters.union(vqsr_ht[mt.row_key].filters).filter(
-                lambda val: val != 'PASS'
-            ),
+            # TODO: handle existing filters in vcf path
+            # filters=mt.filters.union(vqsr_ht[mt.row_key].filters).filter(
+            #     lambda val: val != 'PASS'
+            # ),
+            filters=vqsr_ht[mt.row_key].filters
         )
         mt = checkpoint_hail(mt, 'mt-vep-split-vqsr.mt', checkpoint_prefix)
 
