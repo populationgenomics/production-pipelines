@@ -260,8 +260,7 @@ def vep_one(
     --af_gnomadg \\
     --max_af \\
     --mane \\
-    --exclude_predicted \\
-    """ if use_110 else '--everything \\'
+    --exclude_predicted \\""" if use_110 else '--everything \\'
 
     cmd = f"""\
     FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
