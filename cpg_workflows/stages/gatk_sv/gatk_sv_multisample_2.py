@@ -665,8 +665,7 @@ def _gatk_sv_index_meta(
 )
 class MtToEsSv(DatasetStage):
     """
-    Create a Seqr index.
-    AFAIK this is identical to the small vairant version
+    Create a Seqr index
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, str | Path]:
