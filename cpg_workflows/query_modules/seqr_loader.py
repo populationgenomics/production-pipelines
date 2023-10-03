@@ -361,7 +361,7 @@ def vds_to_mt_and_sites_only_vcf(
 
     mt = mt.naive_coalesce(1000)  # How many partitions to coalesce to?
 
-    mt = mt.checkpoint(str(out_mt_path), overwrite=True)
+    # mt = mt.checkpoint(str(out_mt_path), overwrite=True)
     # Calculate freq stats
     mt.describe()
     mt = hl.variant_qc(mt)
