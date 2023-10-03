@@ -349,6 +349,12 @@ def vds_to_mt_and_sites_only_vcf(
 
     vds = hl.vds.read_vds(str(vds_path))
 
+    # from https://discuss.hail.is/t/export-vds-to-vcf/2951/13
+    vds.variant_data = vds.variant_data.transmute_entries(
+        GT = hl.vds.lgt_to_gt(vds.variant_data.LGT, vds.variant_data.LA),
+        # FT=hl.if_else(vds.variant_data.FT, "PASS", "FAIL")
+    )
+
     logging.info('Densifying data...')
     mt = hl.vds.to_dense_mt(vds)
 
