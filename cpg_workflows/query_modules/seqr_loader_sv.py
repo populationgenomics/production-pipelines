@@ -213,6 +213,23 @@ def annotate_cohort_sv(
         force_bgz=True,
     )
 
+    # add attributes required for Seqr
+    mt = mt.annotate_globals(
+        sourceFilePath=vcf_path,
+        genomeVersion=genome_build().replace('GRCh', ''),
+        hail_version=hl.version(),
+    )
+    if sequencing_type := get_config()['workflow'].get('sequencing_type'):
+        # Map to Seqr-style string
+        # https://github.com/broadinstitute/seqr/blob/e0c179c36c0f68c892017de5eab2e4c1b9ffdc92/seqr/models.py#L592-L594
+        mt = mt.annotate_globals(
+            sampleType={
+                'genome': 'WGS',
+                'exome': 'WES',
+                'single_cell': 'RNA',
+            }.get(sequencing_type, ''),
+        )
+
     # reimplementation of
     # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/sv_mt_schema.py
     mt = mt.annotate_rows(
