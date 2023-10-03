@@ -6,4 +6,4 @@ use_vep_110 = true
 scatter_count = 1
 
 [references]
-vep_110_mount = 'gs://cpg-common-test/references/vep/110/mount'
+vep_110_mount = 'gs://cpg-common-test/references/vep/110/mount_unmerged'
