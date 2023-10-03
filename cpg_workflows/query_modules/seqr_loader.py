@@ -353,6 +353,10 @@ def vds_to_mt_and_sites_only_vcf(
     mt = hl.vds.to_dense_mt(vds)
 
     mt = mt.naive_coalesce(1000)  # How many partitions to coalesce to?
+
+    # Calculate freq stats
+    mt = hl.variant_qc(mt)
+
     mt = mt.checkpoint(str(out_mt_path), overwrite=True)
 
     if out_sites_only_path:
