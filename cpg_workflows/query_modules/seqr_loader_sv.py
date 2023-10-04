@@ -302,6 +302,8 @@ def annotate_cohort_sv(
     # The homologous small variant seqr_loader method performs a similar function
     # but in a slightly more complicated way (mediated by a method in the S-L-P
     # codebase, so as not to trigger Flake8 evaluation)
+    # pos/contig/xpos sourced from
+    # seqr-loading-pipelines...luigi_pipeline/lib/model/seqr_mt_schema.py#L12
     mt = mt.annotate_rows(
         sortedTranscriptConsequences=hl.filter(
             hl.is_defined,
@@ -320,6 +322,11 @@ def annotate_cohort_sv(
                 for gene_col in conseq_predicted_gene_cols
             ],
         ).flatmap(lambda x: x),
+        contig=mt.locus.contig.replace('^chr', ''),
+        start=mt.locus.position,
+        pos=mt.locus.position,
+        xpos=get_expr_for_xpos(mt.locus),
+        xstart=get_expr_for_xpos(mt.locus),
         xstop=get_expr_for_xpos(mt.end_locus),
         rg37_locus=hl.liftover(mt.locus, 'GRCh37'),
         rg37_locus_end=hl.or_missing(
