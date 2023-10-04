@@ -365,6 +365,11 @@ def vds_to_mt_and_sites_only_vcf(
     # Calculate freq stats
     mt.describe()
     mt = hl.variant_qc(mt)
+    mt = mt.annotate_rows(info = mt.info.annotate(AC=mt.variant_qc.AC))
+    mt = mt.annotate_rows(info = mt.info.annotate(AN=mt.variant_qc.AN))
+    mt = mt.annotate_rows(info = mt.info.annotate(AF=mt.variant_qc.AF))
+
+    mt.describe()
     mt = mt.checkpoint(str(out_mt_path), overwrite=True)
 
     if out_sites_only_path:
