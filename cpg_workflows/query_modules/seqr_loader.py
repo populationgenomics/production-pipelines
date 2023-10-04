@@ -26,6 +26,7 @@ def annotate_cohort(
     annotations.
     """
 
+    print('checkpoint_prefix:', checkpoint_prefix)
     # Todo: Clean this up if this works
     if str(vcf_path).endswith('.mt'):
         mt = hl.read_matrix_table(str(vcf_path))
