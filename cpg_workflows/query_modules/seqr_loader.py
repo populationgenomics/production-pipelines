@@ -61,6 +61,8 @@ def annotate_cohort(
 
         logging.info('Adding VQSR annotations into the Matrix Table')
         mt = mt.annotate_globals(**vqsr_ht.index_globals())
+        # TODO: add existence check for info field
+        mt.transmute_rows(old_info=mt[mt.row_key].info)
         mt = mt.annotate_rows(
             # vqsr_ht has info annotation split by allele, plus the new AS-VQSR annotations
             info=vqsr_ht[mt.row_key].info,
@@ -72,15 +74,20 @@ def annotate_cohort(
         )
         mt = checkpoint_hail(mt, 'mt-vep-split-vqsr.mt', checkpoint_prefix)
 
+        # Re add AN, AC, AF fields
+        mt = mt.annotate_rows(info=mt.info.annotate(AC=mt.old_info.AC))
+        mt = mt.annotate_rows(info=mt.info.annotate(AN=mt.old_info.AN))
+        mt = mt.annotate_rows(info=mt.info.annotate(AF=mt.old_info.AF))
+
     ref_ht = hl.read_table(str(reference_path('seqr_combined_reference_data')))
     clinvar_ht = hl.read_table(str(reference_path('seqr_clinvar')))
 
     logging.info('Annotating with seqr-loader fields: round 1')
 
-    # don't fail if the AC/AF attributes are an inappropriate type
-    # for attr in ['AC', 'AF']:
-    #     if not isinstance(mt.info[attr], hl.ArrayExpression):
-    #         mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [mt.info[attr]]}))
+    don't fail if the AC/AF attributes are an inappropriate type
+    for attr in ['AC', 'AF']:
+        if not isinstance(mt.info[attr], hl.ArrayExpression):
+            mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [mt.info[attr]]}))
 
     mt = mt.annotate_rows(
         AC=mt.info.AC[mt.a_index - 1],
