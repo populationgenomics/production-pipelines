@@ -29,6 +29,8 @@ def annotate_cohort(
     # Todo: Clean this up if this works
     if str(vcf_path).endswith('.mt'):
         mt = hl.read_matrix_table(str(vcf_path))
+        mt.describe()
+        mt.show()
     else:
         mt = hl.import_vcf(
             str(vcf_path),
@@ -75,9 +77,9 @@ def annotate_cohort(
     logging.info('Annotating with seqr-loader fields: round 1')
 
     # don't fail if the AC/AF attributes are an inappropriate type
-    for attr in ['AC', 'AF']:
-        if not isinstance(mt.info[attr], hl.ArrayExpression):
-            mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [mt.info[attr]]}))
+    # for attr in ['AC', 'AF']:
+    #     if not isinstance(mt.info[attr], hl.ArrayExpression):
+    #         mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [mt.info[attr]]}))
 
     mt = mt.annotate_rows(
         AC=mt.info.AC[mt.a_index - 1],
