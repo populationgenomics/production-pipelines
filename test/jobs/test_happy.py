@@ -83,8 +83,6 @@ class TestHappy:
             happy_job = happy(
                 sequencing_group=sg,
                 b=batch,
-                # vcf_or_gvcf=GvcfPath(sg.gvcf).resource_group(batch),
-                # vcf_or_gvcf=GvcfPath(tmp_path / 'sample_one_genotype.g.vcf.gz'),
                 vcf_or_gvcf=batch.read_input_group(
                     **{
                         'g.vcf.gz': str(sg.gvcf),
@@ -238,8 +236,6 @@ class TestHappy:
         happy_job = happy(
             sequencing_group=sg,
             b=batch,
-            # vcf_or_gvcf=GvcfPath(sg.gvcf).resource_group(batch),
-            # vcf_or_gvcf=GvcfPath(tmp_path / 'sample_one_genotype.g.vcf.gz'),
             vcf_or_gvcf=batch.read_input_group(
                 **{
                     'g.vcf.gz': str(sg.gvcf),
