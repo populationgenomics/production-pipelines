@@ -84,7 +84,7 @@ def annotate_cohort(
 
     logging.info('Annotating with seqr-loader fields: round 1')
 
-    don't fail if the AC/AF attributes are an inappropriate type
+    # don't fail if the AC/AF attributes are an inappropriate type
     for attr in ['AC', 'AF']:
         if not isinstance(mt.info[attr], hl.ArrayExpression):
             mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [mt.info[attr]]}))
