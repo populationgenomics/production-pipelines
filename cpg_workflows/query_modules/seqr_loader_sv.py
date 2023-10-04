@@ -322,7 +322,7 @@ def annotate_cohort_sv(
                 for gene_col in conseq_predicted_gene_cols
             ],
         ).flatmap(lambda x: x),
-        contig=mt.locus.contig.replace("^chr", ""),
+        contig=mt.locus.contig.replace('^chr', ''),
         start=mt.locus.position,
         pos=mt.locus.position,
         xpos=get_expr_for_xpos(mt.locus),
