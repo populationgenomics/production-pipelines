@@ -62,7 +62,8 @@ def annotate_cohort(
         logging.info('Adding VQSR annotations into the Matrix Table')
         mt = mt.annotate_globals(**vqsr_ht.index_globals())
         # TODO: add existence check for info field
-        mt.transmute_rows(old_info=mt[mt.row_key].info)
+        mt = mt.rename({'info': 'old_info'})
+
         mt = mt.annotate_rows(
             # vqsr_ht has info annotation split by allele, plus the new AS-VQSR annotations
             info=vqsr_ht[mt.row_key].info,
