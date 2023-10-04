@@ -218,6 +218,7 @@ def annotate_cohort_sv(
         sourceFilePath=vcf_path,
         genomeVersion=genome_build().replace('GRCh', ''),
         hail_version=hl.version(),
+        datasetType='SV',
     )
     if sequencing_type := get_config()['workflow'].get('sequencing_type'):
         # Map to Seqr-style string
