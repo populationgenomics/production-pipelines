@@ -47,6 +47,7 @@ def annotate_cohort(
     vep_ht = hl.read_table(str(vep_ht_path))
     logging.info(f'Adding VEP annotations into the Matrix Table from {vep_ht_path}')
     mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
+    mt.describe()
 
     # Splitting multi-allelics. We do not handle AS info fields here - we handle
     # them when loading VQSR instead, and populate entire "info" from VQSR.
@@ -54,6 +55,7 @@ def annotate_cohort(
         mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
     )
     mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
+    mt.describe()
 
     if site_only_vqsr_vcf_path:
         vqsr_ht = load_vqsr(site_only_vqsr_vcf_path)
@@ -62,6 +64,7 @@ def annotate_cohort(
         logging.info('Adding VQSR annotations into the Matrix Table')
         mt = mt.annotate_globals(**vqsr_ht.index_globals())
         # TODO: add existence check for info field
+        mt.describe()
         mt = mt.rename({'info': 'old_info'})
 
         mt = mt.annotate_rows(

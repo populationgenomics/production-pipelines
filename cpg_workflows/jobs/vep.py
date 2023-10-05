@@ -18,7 +18,7 @@ from cpg_utils.hail_batch import (
     authenticate_cloud_credentials_in_job,
     query_command,
 )
-from cpg_workflows.resources import STANDARD
+from cpg_workflows.resources import HIGHMEM
 from cpg_workflows.utils import can_reuse
 
 from .picard import get_intervals
@@ -202,7 +202,7 @@ def vep_one(
     j = b.new_job('VEP', (job_attrs or {}) | dict(tool='vep'))
     j.image(image_path('vep'))
     # STANDARD.set_resources(j, storage_gb=50, mem_gb=50, ncpu=16)
-    STANDARD.set_resources(j, storage_gb=10, mem_gb=10, ncpu=2)
+    HIGHMEM.set_resources(j, mem_gb=10, ncpu=2)
 
     if not isinstance(vcf, hb.ResourceFile):
         vcf = b.read_input(str(vcf))
