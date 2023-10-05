@@ -265,8 +265,8 @@ def vep_one(
     --dir_cache {vep_dir}/vep/ \\
     --fasta $FASTA \\
     {alpha_missense_plugin if use_110 else loftee_plugin_path} \
-    {utr_annotator_plugin if (use_110 and out_format == 'vcf') else ''} \
-    --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())}
+    --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \
+    {utr_annotator_plugin if (use_110 and out_format == 'vcf') else ''}
     """
 
     if out_format == 'vcf':
