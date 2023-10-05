@@ -239,28 +239,14 @@ def vep_one(
         'loftee_path': '$VEP_DIR_PLUGINS' if use_110 else '$MAMBA_ROOT_PREFIX/share/ensembl-vep'
     }
 
-    # sexy new plugin
+    # sexy new plugin - only present in 110 build
     alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
 
-    # this plugin doesn't support JSON output at this time
-    # only activate for VCF outputs
+    # plugin doesn't support JSON output at this time; only activate for VCF outputs
     utr_annotator_plugin = f'--plugin UTRAnnotator,file=$UTR38 '
 
+    # VEP 105 installs plugins in non-standard locations
     loftee_plugin_path = '--dir_plugins $MAMBA_ROOT_PREFIX/share/ensembl-vep '
-
-    vep_fields = """--sift b \\
-    --polyphen b \\
-    --hgvs \\
-    --symbol \\
-    --protein \\
-    --biotype \\
-    --af \\
-    --af_gnomade \\
-    --af_gnomadg \\
-    --max_af \\
-    --mane \\
-    --exclude_predicted \\
-    --use_given_ref \\""" if use_110 else '--everything \\'
 
     cmd = f"""\
     FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
@@ -269,7 +255,7 @@ def vep_one(
     --{out_format} {'--compress_output bgzip' if out_format == 'vcf' else ''} \\
     -o {output} \\
     -i {vcf} \\
-    {vep_fields}
+    --everything \\
     --mane_select \\
     --no_stats \\
     --allele_number \\
