@@ -13,7 +13,7 @@ from hailtop.batch import Batch
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, reference_path, query_command
-from cpg_workflows.resources import STANDARD
+from cpg_workflows.resources import HIGHMEM
 from cpg_workflows.utils import can_reuse
 
 from cpg_workflows.jobs.picard import get_intervals
@@ -213,7 +213,10 @@ def vep_one(
         j.image(image_path('vep'))
         vep_mount_path = reference_path('vep_mount')
 
-    STANDARD.set_resources(j, storage_gb=50, mem_gb=16, ncpu=2)
+    # vep is single threaded, with a middling memory requirement
+    # during test it caps out around 4GB, though this could be
+    # larger for some long running jobs
+    HIGHMEM.set_resources(j, storage_gb=25, mem_gb=6.5, ncpu=1)
 
     if not isinstance(vcf, hb.ResourceFile):
         vcf = b.read_input(str(vcf))
