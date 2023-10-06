@@ -21,7 +21,7 @@ from cpg_workflows.jobs.vep import add_vep_jobs
     required=True,
     help='Path to where finished VEP-annotated VCF will be output',
 )
-@click.option('--to-mt', is_flag=True, help='Complete transition to MT')
+@click.option('--to-mt', is_flag=True, help='Complete transition to MT, only available on HT output')
 def main(vcf_path: str, output_ht: str, to_mt: bool = False):
     """
     Run VEP in parallel using Picard tools intervals as partitions.
