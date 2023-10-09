@@ -47,6 +47,7 @@ def annotate_cohort(
     vep_ht = hl.read_table(str(vep_ht_path))
     logging.info(f'Adding VEP annotations into the Matrix Table from {vep_ht_path}')
     mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
+    mt = mt.annotate_rows(my_info=mt.info)
     mt.describe()
 
     # Splitting multi-allelics. We do not handle AS info fields here - we handle
