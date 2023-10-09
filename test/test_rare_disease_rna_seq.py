@@ -141,6 +141,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     from cpg_workflows.jobs.bam_to_cram import bam_to_cram, cram_to_bam
     from cpg_workflows.jobs.count import count
     from cpg_workflows.jobs.outrider import outrider
+    from cpg_workflows.jobs.fraser import fraser
     from cpg_workflows.filetypes import FastqPairs, FastqPair, BamPath, CramPath
 
     conf = get_toml(tmp_path)
@@ -235,6 +236,15 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
             '\n\n===== OUTRIDER STAGE END =====\n\n'
         )
         return outrider_job
+    
+    def capture_fraser_cmd(*args, **kwargs) -> Job:
+        fraser_job = fraser(*args, **kwargs)
+        cmd_str_list.append(
+            '===== FRASER STAGE START =====\n\n' +
+            '\n'.join(fraser_job._command) +
+            '\n\n===== FRASER STAGE END =====\n\n'
+        )
+        return fraser_job
 
     mocker.patch('pathlib.Path.open', selective_mock_open)
     # functions like get_intervals checks file existence
@@ -269,6 +279,8 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     mocker.patch('cpg_workflows.jobs.count.count', capture_count_cmd)
     # Patch the outrider function to capture the job calls
     mocker.patch('cpg_workflows.jobs.outrider.outrider', capture_outrider_cmd)
+    # Patch the fraser function to capture the job calls
+    mocker.patch('cpg_workflows.jobs.fraser.fraser', capture_fraser_cmd)
 
     from cpg_workflows.batch import get_batch
     from cpg_workflows.inputs import get_cohort
@@ -277,8 +289,9 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     # Imports specific for testing the trim stage
     from cpg_utils.hail_batch import dataset_path
     from cpg_workflows.stages.outrider import Outrider
+    from cpg_workflows.stages.fraser import Fraser
 
-    get_workflow().run(stages=[Outrider])
+    get_workflow().run(stages=[Outrider, Fraser])
 
     b = get_batch()
     trim_job = b.job_by_tool['fastp']
@@ -289,6 +302,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     cram_to_bam_job = b.job_by_tool['samtools_view_cram_to_bam']
     featureCounts_job = b.job_by_tool['featureCounts']
     outrider_job = b.job_by_tool['outrider']
+    fraser_job = b.job_by_tool['fraser']
     sample_list = get_cohort().get_sequencing_groups()
 
     # The number of FASTQ trim jobs should equal the number of FASTQ pairs
@@ -325,13 +339,18 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     n_bam_to_cram_jobs = len(sample_list)
     assert bam_to_cram_job['job_n'] == n_bam_to_cram_jobs
 
-    # The number of cram_to_bam jobs should equal the number of samples
-    n_cram_to_bam_jobs = len(sample_list)
+    # The number of cram_to_bam jobs should equal the number of samples x2
+    # for OUTRIDER and FRASER
+    n_cram_to_bam_jobs = len(sample_list) * 2
     assert cram_to_bam_job['job_n'] == n_cram_to_bam_jobs
 
     # The number of outrider jobs should be 1 (for the cohort)
     n_outrider_jobs = 1
     assert outrider_job['job_n'] == n_outrider_jobs
+
+    # The number of fraser jobs should be 1 (for the cohort)
+    n_fraser_jobs = 1
+    assert fraser_job['job_n'] == n_fraser_jobs
 
     output_path = dataset_path('cmd.txt')
     output_path_parent = os.path.dirname(output_path)

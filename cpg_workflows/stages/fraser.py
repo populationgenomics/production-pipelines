@@ -71,14 +71,14 @@ class Fraser(CohortStage):
         }
         bam_inputs: list[BamPath | ResourceGroup] = [
             inpt['bam']
-            for inpt in cram_bam_inputs.values()
+            for id, inpt in cram_bam_inputs.items()
             if (
                 (alignment_inputs[id]['bam'].exists() and alignment_inputs[id]['bai'].exists()) and
                 isinstance(inpt['bam'], BamPath)
             )
         ]
         jobs: list[Job] = []
-        for id, inpt in cram_to_bam_inputs.items():
+        for inpt in cram_to_bam_inputs.values():
             cram = inpt['cram']
             bam = inpt['bam']
             assert isinstance(cram, CramPath)
