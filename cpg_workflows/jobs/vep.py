@@ -249,7 +249,7 @@ def vep_one(
     # VCF annotation doesn't utilise the aggregated Seqr reference data, including spliceAI
     vcf_plugins = (
         f'--plugin UTRAnnotator,file=$UTR38 '
-        f'--plugin SpliceAI,file={vep_dir}/spliceai_scores.raw.snv.hg38.vcf.gz'
+        f'--plugin SpliceAI,snv={vep_dir}/spliceai_scores.raw.snv.hg38.vcf.gz'
     )
 
     # VEP 105 installs plugins in non-standard locations
