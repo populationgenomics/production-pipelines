@@ -247,9 +247,10 @@ def vep_one(
 
     # UTRannotator plugin doesn't support JSON output at this time; only activate for VCF outputs
     # VCF annotation doesn't utilise the aggregated Seqr reference data, including spliceAI
+    # SpliceAI requires both indel and SNV files to be present (~100GB), untested
     vcf_plugins = (
         f'--plugin UTRAnnotator,file=$UTR38 '
-        f'--plugin SpliceAI,snv={vep_dir}/spliceai_scores.raw.snv.hg38.vcf.gz'
+        # f'--plugin SpliceAI,snv={vep_dir}/spliceai_scores.raw.snv.hg38.vcf.gz'
     )
 
     # VEP 105 installs plugins in non-standard locations
