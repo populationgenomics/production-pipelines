@@ -52,9 +52,8 @@ def annotate_cohort(
 
     # Splitting multi-allelics. We do not handle AS info fields here - we handle
     # them when loading VQSR instead, and populate entire "info" from VQSR.
-    mt = hl.split_multi_hts(
-        mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
-    )
+    mt = mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
+    mt = hl.split_multi_hts(mt)
     mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
     mt.describe()
 
