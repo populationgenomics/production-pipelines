@@ -41,7 +41,7 @@ def main(vcf_path: str, output_ht: str, to_mt: bool = False):
     )
     if to_mt:
         assert vep_ht.endswith('.ht')
-        vep_mt = vep_ht[:-len('.ht')] +'.mt'
+        vep_mt = vep_ht[:-len('.ht')] + '.mt'
         j = b.new_job(f'annotate cohort', {'tool': 'hail query'})
         j.image(image_path('cpg_workflows'))
         j.command(

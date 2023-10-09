@@ -13,7 +13,7 @@ from hailtop.batch import Batch
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, reference_path, query_command
-from cpg_workflows.resources import HIGHMEM
+from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import can_reuse
 
 from cpg_workflows.jobs.picard import get_intervals
@@ -216,7 +216,7 @@ def vep_one(
     # vep is single threaded, with a middling memory requirement
     # during test it caps out around 4GB, though this could be
     # larger for some long running jobs
-    HIGHMEM.set_resources(j, storage_gb=25, mem_gb=6.5, ncpu=1)
+    STANDARD.set_resources(j, storage_gb=25, ncpu=2)
 
     if not isinstance(vcf, hb.ResourceFile):
         vcf = b.read_input(str(vcf))
@@ -245,8 +245,12 @@ def vep_one(
     # sexy new plugin - only present in 110 build
     alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
 
-    # plugin doesn't support JSON output at this time; only activate for VCF outputs
-    utr_annotator_plugin = f'--plugin UTRAnnotator,file=$UTR38 '
+    # UTRannotator plugin doesn't support JSON output at this time; only activate for VCF outputs
+    # VCF annotation doesn't utilise the aggregated Seqr reference data, including spliceAI
+    vcf_plugins = (
+        f'--plugin UTRAnnotator,file=$UTR38 '
+        f'--plugin SpliceAI,file={vep_dir}/spliceai_scores.raw.snv.hg38.vcf.gz'
+    )
 
     # VEP 105 installs plugins in non-standard locations
     loftee_plugin_path = '--dir_plugins $MAMBA_ROOT_PREFIX/share/ensembl-vep '
@@ -269,7 +273,7 @@ def vep_one(
     --fasta $FASTA \\
     {alpha_missense_plugin if use_110 else loftee_plugin_path} \
     --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \
-    {utr_annotator_plugin if (use_110 and out_format == 'vcf') else ''}
+    {vcf_plugins if (use_110 and out_format == 'vcf') else ''}
     """
 
     if out_format == 'vcf':

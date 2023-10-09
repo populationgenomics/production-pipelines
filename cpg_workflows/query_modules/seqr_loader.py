@@ -118,7 +118,7 @@ def annotate_cohort(
 
     # only remove if present
     if 'InbreedingCoeff' in mt.info:
-        mt.annotate_rows(info = mt.info.drop('InbreedingCoeff'))
+        mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
 
     mt = checkpoint_hail(mt, 'mt-vep-split-vqsr-round1.mt', checkpoint_prefix)
 
