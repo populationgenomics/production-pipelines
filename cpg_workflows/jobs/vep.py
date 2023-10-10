@@ -250,7 +250,8 @@ def vep_one(
     # SpliceAI requires both indel and SNV files to be present (~100GB), untested
     vcf_plugins = (
         f'--plugin UTRAnnotator,file=$UTR38 '
-        # f'--plugin SpliceAI,snv={vep_dir}/spliceai_scores.raw.snv.hg38.vcf.gz'
+        f'--plugin SpliceAI,snv={vep_dir}/spliceai_scores.raw.snv.hg38.vcf.gz,'
+        f'indel={vep_dir}/spliceai_scores.raw.indel.hg38.vcf.gz'
     )
 
     # VEP 105 installs plugins in non-standard locations
