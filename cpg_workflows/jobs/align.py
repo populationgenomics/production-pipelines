@@ -386,7 +386,6 @@ def _align_one(
         group = alignment_input.resource_group(b)
 
         if not alignment_input.index_path:
-
             sort_index_input_cmd = dedent(
                 f"""
             mkdir -p $BATCH_TMPDIR/sorted

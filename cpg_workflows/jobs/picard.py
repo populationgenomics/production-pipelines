@@ -57,11 +57,16 @@ def get_intervals(
         # Special case when we don't need to split
         return None, [b.read_input(str(source_intervals_path))]
 
-    if output_prefix and exists(output_prefix / '1.interval_list'):
-        return None, [
-            b.read_input(str(output_prefix / f'{idx + 1}.interval_list'))
-            for idx in range(scatter_count)
-        ]
+    if output_prefix:
+        interval_lists_exist = all(
+            exists(output_prefix / f'{idx}.interval_list')
+            for idx in range(1, scatter_count + 1)
+        )
+        if interval_lists_exist:
+            return None, [
+                b.read_input(str(output_prefix / f'{idx + 1}.interval_list'))
+                for idx in range(scatter_count)
+            ]
 
     j = b.new_job(
         f'Make {scatter_count} intervals for {sequencing_type}',
@@ -133,7 +138,9 @@ def markdup(
     resource = HIGHMEM.request_resources(ncpu=4)
 
     # check for a storage override for unreasonably large sequencing groups
-    if (storage_override := get_config()['resource_overrides'].get('picard_storage_gb')) is not None:
+    if (
+        storage_override := get_config()['resource_overrides'].get('picard_storage_gb')
+    ) is not None:
         assert isinstance(storage_override, int)
         resource.attach_disk_storage_gb = storage_override
     else:
@@ -143,7 +150,9 @@ def markdup(
 
     # check for a memory override for impossible sequencing groups
     # if RAM is overridden, update the memory resource setting
-    if (memory_override := get_config()['resource_overrides'].get('picard_mem_gb')) is not None:
+    if (
+        memory_override := get_config()['resource_overrides'].get('picard_mem_gb')
+    ) is not None:
         assert isinstance(memory_override, int)
         # Hail will select the right number of CPUs based on RAM request
         j.memory(f'{memory_override}G')

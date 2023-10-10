@@ -2,12 +2,12 @@
 Test reading inputs into a Cohort object.
 """
 
-from pytest_mock import MockFixture
 import logging
 import re
 
+from pytest_mock import MockFixture
+
 from . import set_config
-from cloudpathlib import CloudPath
 
 LOGGER = logging.getLogger(__name__)
 
@@ -195,9 +195,7 @@ def test_cohort(mocker: MockFixture, tmp_path, caplog):
 
     # from cpg_workflows.filetypes import BamPath
     from cpg_workflows.inputs import get_cohort
-
-    from cpg_workflows.targets import Sex
-    from cpg_workflows.targets import SequencingGroup
+    from cpg_workflows.targets import SequencingGroup, Sex
 
     cohort = get_cohort()
 
@@ -365,7 +363,6 @@ def test_missing_reads(mocker: MockFixture, tmp_path):
 
     # from cpg_workflows.filetypes import BamPath
     from cpg_workflows.inputs import get_cohort
-
     from cpg_workflows.targets import Sex
 
     cohort = get_cohort()
@@ -419,7 +416,7 @@ def mock_get_sgs_with_mixed_reads(
 ) -> list[dict]:  # pylint: disable=unused-argument
     return [
         {
-            'id': 'CPG700',
+            'id': 'CPGccc',
             'meta': {'sg_meta': 'is_fun'},
             'platform': 'illumina',
             'type': 'genome',
@@ -470,7 +467,7 @@ def mock_get_sgs_with_mixed_reads(
             ],
         },
         {
-            'id': 'CPG200',
+            'id': 'CPGbbb',
             'meta': {'sample_meta': 'is_fun'},
             'platform': 'illumina',
             'type': 'genome',
@@ -503,7 +500,7 @@ def mock_get_sgs_with_mixed_reads(
             ],
         },
         {
-            'id': 'CPG100',
+            'id': 'CPGaaa',
             'meta': {'sg_meta': 'is_fun'},
             'platform': 'illumina',
             'type': 'exome',
@@ -579,7 +576,7 @@ def test_mixed_reads(mocker: MockFixture, tmp_path, caplog):
 
     # Testing Cohort Information
     assert len(cohort.get_sequencing_groups()) == 3
-    assert cohort.get_sequencing_group_ids() == ['CPG700', 'CPG200', 'CPG100']
+    assert cohort.get_sequencing_group_ids() == ['CPGccc', 'CPGbbb', 'CPGaaa']
 
     # test_genome = cohort.get_sequencing_groups()[0]
     test_none = cohort.get_sequencing_groups()[1]
@@ -596,7 +593,7 @@ def test_mixed_reads(mocker: MockFixture, tmp_path, caplog):
 
     assert test_none.alignment_input_by_seq_type == {}
     assert re.search(
-        r'WARNING\s+root:inputs\.py:\d+\s+No reads found for sequencing group CPG200 of type genome',
+        r'WARNING\s+root:inputs\.py:\d+\s+No reads found for sequencing group CPGbbb of type genome',
         caplog.text,
     )
 
@@ -613,7 +610,7 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
     ) -> list[dict]:  # pylint: disable=unused-argument
         return [
             {
-                'id': 'CPG700',
+                'id': 'CPGccc',
                 'meta': {'sg_meta': 'is_fun'},
                 'platform': 'illumina',
                 'type': 'genome',
@@ -647,7 +644,7 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
                 ],
             },
             {
-                'id': 'CPG100',
+                'id': 'CPGaaa',
                 'meta': {'sg_meta': 'is_fun'},
                 'platform': 'illumina',
                 'type': 'exome',

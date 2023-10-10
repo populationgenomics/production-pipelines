@@ -15,51 +15,50 @@ from cpg_workflows.utils import checkpoint_hail
 
 
 def annotate_cohort(
-    mt_or_vcf_path,
-    out_mt_path,
-    vep_ht_path,
-    site_only_vqsr_vcf_path=None,
-    checkpoint_prefix=None,
+    mt_or_vcf_path: str,
+    out_mt_path: str,
+    vep_ht_path: str,
+    site_only_vqsr_vcf_path: str | None = None,
+    checkpoint_prefix: str | None = None,
 ):
     """
     Takes either a VCF or a MatrixTable as input. Annotates for Seqr Loader and adds
     add VEP and VQSR annotations. Returns a MatrixTable.
     """
 
+    # set logging for the duration of annotate cohort
+    logging.getLogger().setLevel(logging.INFO)
+
     print('checkpoint_prefix:', checkpoint_prefix)
-    if str(mt_or_vcf_path).endswith('.mt'):
-        mt = hl.read_matrix_table(str(mt_or_vcf_path))
+    if mt_or_vcf_path.endswith('.mt'):
+        mt = hl.read_matrix_table(mt_or_vcf_path)
         mt.describe()
         mt.show()
     else:
         mt = hl.import_vcf(
-            str(mt_or_vcf_path),
+            mt_or_vcf_path,
             reference_genome=genome_build(),
             skip_invalid_loci=True,
             force_bgz=True,
         )
         logging.info(f'Importing VCF {mt_or_vcf_path}')
 
-    logging.info(f'Loading VEP Table from {vep_ht_path}')
     # Annotate VEP. Do this before splitting multi because VEP  is run on the un-split VCF
     # and hl.split_multi_hts can handle multiallelic VEP field.
-    vep_ht = hl.read_table(str(vep_ht_path))
     logging.info(f'Adding VEP annotations into the Matrix Table from {vep_ht_path}')
+    vep_ht = hl.read_table(vep_ht_path)
     mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
-    mt.describe()  # THis describe shows the mt.info struct exists as expected.
+    mt.describe()  # describe() shows the mt.info struct exists as expected.
 
     # Split multi-allelics. We do not handle AS info fields here - we handle
     # them when loading VQSR instead, and populate entire "info" from VQSR.
     mt = mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
-    split_mt = hl.split_multi_hts(mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles))
-    split_mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
-    split_mt.describe() # The info field is not present in the split_mt - not sure why?
-
-    # Try re-adding the info field to split_mt from mt.
-    # this results in: TypeError: MatrixTable.__getitem__: invalid index argument(s)
-    # ? what is different between this and the annotate_rows at line 48 above?
-    full_mt = split_mt.annotate_rows(info=mt[split_mt.locus].info)
-    full_mt.describe()
+    mt = hl.split_multi_hts(
+        mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
+    )
+    logging.info('Description post-split')
+    mt.describe()
+    mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
 
     if site_only_vqsr_vcf_path:
         vqsr_ht = load_vqsr(site_only_vqsr_vcf_path)
@@ -70,15 +69,24 @@ def annotate_cohort(
         # TODO: add existence check for info field
         mt.describe()
 
+        # annotate with VQSR fields, not full overwrite
         mt = mt.annotate_rows(
             # vqsr_ht has info annotation split by allele, plus the new AS-VQSR annotations
-            info=vqsr_ht[mt.row_key].info,
+            info=mt.info.annotate(**vqsr_ht[mt.row_key].info),
             # TODO: handle existing filters in vcf path
             # filters=mt.filters.union(vqsr_ht[mt.row_key].filters).filter(
             #     lambda val: val != 'PASS'
             # ),
-            filters=vqsr_ht[mt.row_key].filters
+            filters=vqsr_ht[mt.row_key].filters,
         )
+        # new_mt = new_mt.annotate_rows(
+        #     info=new_mt.info.annotate(
+        #         AC=mt[new_mt.row_key].AC,
+        #         AF=mt[new_mt.row_key].AF,
+        #         AN=mt[new_mt.row_key].AN,
+        #     )
+        # )
+        mt.describe()
         mt = checkpoint_hail(mt, 'mt-vep-split-vqsr.mt', checkpoint_prefix)
 
         # Re add AN, AC, AF fields
@@ -90,11 +98,17 @@ def annotate_cohort(
     clinvar_ht = hl.read_table(str(reference_path('seqr_clinvar')))
 
     logging.info('Annotating with seqr-loader fields: round 1')
-
-    # don't fail if the AC/AF attributes are an inappropriate type
-    for attr in ['AC', 'AF']:
-        if not isinstance(mt.info[attr], hl.ArrayExpression):
-            mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [mt.info[attr]]}))
+    # this allow-to-fail was specifically for AIP, and should be reconsidered
+    # # don't fail if the AC/AF attributes are an inappropriate type
+    # # don't fail if completely absent either
+    # for attr in ['AC', 'AF']:
+    #     if attr not in mt.info:
+    #         mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [1]}))
+    #     elif not isinstance(mt.info[attr], hl.ArrayExpression):
+    #         mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [mt.info[attr]]}))
+    #
+    # if 'AN' not in mt.info:
+    #     mt = mt.annotate_rows(info=mt.info.annotate(AN=1))
 
     mt = mt.annotate_rows(
         AC=mt.info.AC[mt.a_index - 1],
@@ -129,9 +143,11 @@ def annotate_cohort(
     rg37 = hl.get_reference('GRCh37')
     rg38 = hl.get_reference('GRCh38')
     rg38.add_liftover(str(liftover_path), rg37)
-    mt = mt.annotate_rows(
-        rg37_locus=hl.liftover(mt.locus, 'GRCh37'), info=mt.info.drop('InbreedingCoeff')
-    )
+    mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
+
+    # only remove if present
+    if 'InbreedingCoeff' in mt.info:
+        mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
 
     mt = checkpoint_hail(mt, 'mt-vep-split-vqsr-round1.mt', checkpoint_prefix)
 
@@ -179,7 +195,7 @@ def annotate_cohort(
         ),
     )
     mt = mt.annotate_globals(
-        sourceFilePath=vcf_path,
+        sourceFilePath=mt_or_vcf_path,
         genomeVersion=genome_build().replace('GRCh', ''),
         hail_version=hl.version(),
     )
@@ -196,7 +212,7 @@ def annotate_cohort(
 
     logging.info('Done:')
     mt.describe()
-    mt.write(str(out_mt_path), overwrite=True)
+    mt.write(out_mt_path, overwrite=True)
     logging.info(f'Written final matrix table into {out_mt_path}')
 
 
@@ -388,11 +404,7 @@ def vds_to_mt_and_sites_only_vcf(
     # mt = mt.annotate_rows(info=mt.info.annotate(AN=mt.variant_qc.AN))
     # mt = mt.annotate_rows(info=mt.info.annotate(AF=mt.variant_qc.AF))
     mt = mt.annotate_rows(
-        info=hl.Struct(
-            AC=mt.variant_qc.AC,
-            AN=mt.variant_qc.AN,
-            AF=mt.variant_qc.AF
-        )
+        info=hl.Struct(AC=mt.variant_qc.AC, AN=mt.variant_qc.AN, AF=mt.variant_qc.AF)
     )
 
     mt.describe()

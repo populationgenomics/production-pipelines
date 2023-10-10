@@ -32,7 +32,7 @@
 
 # Map of stages to lists of sequencing groups, to skip for specific stages
 #[workflow.skip_stages_for_sgs]
-#CramQC = ['CPG13409']
+#CramQC = ['CPGaaa']
 
 # Name of the workflow (to prefix output paths)
 #name =
@@ -69,7 +69,7 @@ check_expected_outputs = true
 
 # Realign CRAM when available, instead of using FASTQ.
 # The parameter value should correspond to CRAM version
-# (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPG01234.cram
+# (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPGaaa.cram
 #realign_from_cram_version = 'v0'
 
 # Calling intervals (defauls to whole genome intervals)
