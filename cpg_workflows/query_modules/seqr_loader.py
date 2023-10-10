@@ -57,7 +57,7 @@ def annotate_cohort(
     split_mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
     split_mt.describe()
 
-    mt = split_mt.annotate_rows(info=mt[mt.locus].info)
+    mt = split_mt.annotate_rows(info=mt[split_mt.locus].info)
     mt.describe()
 
     if site_only_vqsr_vcf_path:
