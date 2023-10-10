@@ -154,7 +154,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     # Capture the trim command
     cmd_str_list = []
 
-    def capture_trim_cmd(*args, **kwargs) -> tuple[Job | None, FastqPair]:
+    def capture_trim_cmd(*args, **kwargs) -> Job | None:
         j = trim(*args, **kwargs)
         if j and isinstance(j, Job):
             cmd_str_list.append(
@@ -164,7 +164,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
             )
         return j
     
-    def capture_align_cmd(*args, **kwargs) -> tuple[list[Job], ResourceGroup] | tuple[None, BamPath]:
+    def capture_align_cmd(*args, **kwargs) -> list[Job] | None:
         align_jobs = align(*args, **kwargs)
         if align_jobs and isinstance(align_jobs, list) and all([isinstance(j, Job) for j in align_jobs]):
             cmd_str_list.append(
@@ -176,7 +176,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
             )
         return align_jobs
     
-    def capture_markdup_cmd(*args, **kwargs) -> tuple[Job, ResourceGroup] | tuple[None, BamPath]:
+    def capture_markdup_cmd(*args, **kwargs) -> Job | None:
         markdup_job = markdup(*args, **kwargs)
         if markdup_job:
             cmd_str_list.append(
@@ -186,7 +186,7 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
             )
         return markdup_job
     
-    def capture_bam_to_cram_cmd(*args, **kwargs) -> tuple[Job, ResourceGroup] | tuple[None, CramPath]:
+    def capture_bam_to_cram_cmd(*args, **kwargs) -> Job | None:
         bam_to_cram_job = bam_to_cram(*args, **kwargs)
         if bam_to_cram_job:
             cmd_str_list.append(
