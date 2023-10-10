@@ -231,7 +231,6 @@ def align_fq_pair(
         storage_gb=200,  # TODO: make configurable
     )
 
-
     fq_pair = fastq_pair.as_resources(b)
 
     j.declare_resource_group(

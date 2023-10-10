@@ -154,10 +154,10 @@ class TrimAlignRNA(SequencingGroupStage):
         trimmed_fastq_pairs = FastqPairs([
             io_fq_pair.output_pair for io_fq_pair in input_output_fq_pairs
         ])
-        aligned_bam = self.expected_tmp_alignment(sequencing_group)
+        aligned_bam_dict = self.expected_tmp_alignment(sequencing_group)
         aligned_bam = BamPath(
-            path=aligned_bam['bam'],
-            index_path=aligned_bam['bai'],
+            path=aligned_bam_dict['bam'],
+            index_path=aligned_bam_dict['bai'],
         )
         try:
             align_jobs = align_rna.align(
@@ -178,10 +178,10 @@ class TrimAlignRNA(SequencingGroupStage):
             raise Exception(f'Error aligning RNA-seq reads for {sequencing_group}: {e}')
 
         # Run mark duplicates
-        mkdup_bam = self.expected_tmp_bam(sequencing_group)
+        mkdup_bam_dict = self.expected_tmp_bam(sequencing_group)
         mkdup_bam = BamPath(
-            path=mkdup_bam['bam'],
-            index_path=mkdup_bam['bai'],
+            path=mkdup_bam_dict['bam'],
+            index_path=mkdup_bam_dict['bai'],
         )
         j = markdups.markdup(
             b=get_batch(),
@@ -195,10 +195,10 @@ class TrimAlignRNA(SequencingGroupStage):
             jobs.append(j)
 
         # Convert BAM to CRAM
-        output_cram = self.expected_outputs(sequencing_group)
+        output_cram_dict = self.expected_outputs(sequencing_group)
         output_cram = CramPath(
-            path=output_cram['cram'],
-            index_path=output_cram['crai'],
+            path=output_cram_dict['cram'],
+            index_path=output_cram_dict['crai'],
         )
         j = bam_to_cram.bam_to_cram(
             b=get_batch(),
@@ -214,6 +214,6 @@ class TrimAlignRNA(SequencingGroupStage):
         # Create outputs and return jobs
         return self.make_outputs(
             sequencing_group,
-            data=output_cram,
+            data=output_cram_dict,
             jobs=jobs
         )
