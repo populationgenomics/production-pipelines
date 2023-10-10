@@ -24,18 +24,14 @@ import re
 def bam_to_cram(
     b: hb.Batch,
     input_bam: ResourceGroup,
-    output_cram: CramPath | None = None,
     extra_label: str | None = None,
     overwrite: bool = False,
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
-) -> tuple[Job, hb.ResourceGroup] | tuple[None, CramPath]:
+) -> tuple[Job, hb.ResourceGroup]:
     """
     Convert a BAM file to a CRAM file.
     """
-    # Don't run if output files exist and can be reused
-    if output_cram and can_reuse(output_cram, overwrite):
-        return None, output_cram
     
     assert isinstance(input_bam, ResourceGroup)
 
@@ -72,10 +68,5 @@ def bam_to_cram(
 
     cmd = f'samtools view -@ {res.get_nthreads() - 1} -T {fasta.fasta} -C {input_bam.bam} | tee {j.sorted_cram["cram"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_cram["cram.crai"]}'
     j.command(command(cmd, monitor_space=True))
-
-    # Write output to file
-    if output_cram:
-        output_bam_path = to_path(output_cram.path)
-        b.write_output(j.sorted_cram, str(output_bam_path.with_suffix('')))
 
     return j, j.sorted_cram

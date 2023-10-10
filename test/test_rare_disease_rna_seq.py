@@ -165,40 +165,17 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
             )
         return trim_job_output
     
-    def capture_align_cmd(*args, **kwargs) -> tuple[list[Job], ResourceGroup] | tuple[None, BamPath]:
-        align_job_output = align(*args, **kwargs)
-        align_jobs = align_job_output[0]
-        if align_jobs and isinstance(align_jobs, list) and all([isinstance(j, Job) for j in align_jobs]):
+    def capture_align_cmd(*args, **kwargs) -> list[Job] | None:
+        align_jobs = align(*args, **kwargs)
+        if align_jobs and isinstance(align_jobs, list):
             cmd_str_list.append(
                 '===== ALIGN STAGE START =====\n\n' +
                 '----- Align sub-job start -----\n\n' +
-                '\n\n----- Align sub-job end\n\n-----Align sub-job start -----\n\n'.join(['\n'.join(j._command) for j in align_jobs]) +
+                '\n\n----- Align sub-job end\n\n-----Align sub-job start -----\n\n'.join(['\n'.join(j._command) for j in align_jobs if isinstance(j, Job)]) +
                 '\n\n----- Align sub-job end -----\n\n'
                 '\n\n===== ALIGN STAGE END =====\n\n'
             )
-        return align_job_output
-    
-    def capture_markdup_cmd(*args, **kwargs) -> tuple[Job, ResourceGroup] | tuple[None, BamPath]:
-        markdup_job_output = markdup(*args, **kwargs)
-        markdup_job = markdup_job_output[0]
-        if markdup_job:
-            cmd_str_list.append(
-                '===== MARKDUP JOB START =====\n\n' +
-                '\n'.join(markdup_job._command) +
-                '\n\n===== MARKDUP JOB END =====\n\n'
-            )
-        return markdup_job_output
-    
-    def capture_bam_to_cram_cmd(*args, **kwargs) -> tuple[Job, ResourceGroup] | tuple[None, CramPath]:
-        bam_to_cram_job_output = bam_to_cram(*args, **kwargs)
-        bam_to_cram_job = bam_to_cram_job_output[0]
-        if bam_to_cram_job:
-            cmd_str_list.append(
-                '===== BAM TO CRAM JOB START =====\n\n' +
-                '\n'.join(bam_to_cram_job._command) +
-                '\n\n===== BAM TO CRAM JOB END =====\n\n'
-            )
-        return bam_to_cram_job_output
+        return align_jobs
 
     mocker.patch('pathlib.Path.open', selective_mock_open)
     # functions like get_intervals checks file existence
@@ -223,10 +200,6 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     mocker.patch('cpg_workflows.jobs.trim.trim', capture_trim_cmd)
     # Patch the align function to capture the job command
     mocker.patch('cpg_workflows.jobs.align_rna.align', capture_align_cmd)
-    # Patch the markdup function to capture the job command
-    mocker.patch('cpg_workflows.jobs.markdups.markdup', capture_markdup_cmd)
-    # Patch the bam_to_cram function to capture the job command
-    mocker.patch('cpg_workflows.jobs.bam_to_cram.bam_to_cram', capture_bam_to_cram_cmd)
 
     from cpg_workflows.batch import get_batch
     from cpg_workflows.inputs import get_cohort

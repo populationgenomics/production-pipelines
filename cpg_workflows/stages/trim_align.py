@@ -124,14 +124,9 @@ class TrimAlignRNA(SequencingGroupStage):
         # Run trim
         input_fq_pairs = get_trim_inputs(sequencing_group)
         if not input_fq_pairs:
-            if get_config()['workflow'].get('skip_sgs_with_missing_input'):
-                logging.error(f'No FASTQ inputs, skipping sample {sequencing_group}')
-                sequencing_group.active = False
-                return self.make_outputs(sequencing_group, skipped=True)  # return empty output
-            else:
-                return self.make_outputs(
-                    target=sequencing_group, error_msg=f'No FASTQ input found'
-                )
+            return self.make_outputs(
+                target=sequencing_group, error_msg=f'No FASTQ input found'
+            )
         assert isinstance(input_fq_pairs, FastqPairs)
         trimmed_fastq_pairs = []
         for fq_pair in input_fq_pairs:
@@ -145,102 +140,45 @@ class TrimAlignRNA(SequencingGroupStage):
             if j:
                 assert isinstance(j, Job)
                 jobs.append(j)
-                if out_fqs:
-                    assert isinstance(out_fqs, FastqPair)
-                    trimmed_fastq_pairs.append(out_fqs)
-            elif out_fqs:
-                # If the job was skipped due to existing trimmed FASTQs,
-                # we need to localise them
-                assert isinstance(out_fqs, FastqPair)
-                ex_fq = get_batch().read_input_group(
-                    r1=str(out_fqs.r1),
-                    r2=str(out_fqs.r2),
-                )
-                trimmed_fastq_pairs.append(FastqPair(
-                    r1=ex_fq['r1'],
-                    r2=ex_fq['r2'],
-                ))
+            if not out_fqs or not isinstance(out_fqs, FastqPair):
+                raise Exception(f'Error trimming FASTQs for {sequencing_group}')
+            trimmed_fastq_pairs.append(out_fqs)
 
         # Run alignment
         trimmed_fastq_pairs = FastqPairs(trimmed_fastq_pairs)
-        aligned_bam = None
+        aligned_bam_dict = self.expected_tmp_outputs(sequencing_group)
+        alinged_bam = BamPath(
+            path=aligned_bam_dict['bam'],
+            index_path=aligned_bam_dict['bai'],
+        )
+        aligned_cram_dict = self.expected_outputs(sequencing_group)
+        aligned_cram = CramPath(
+            path=aligned_cram_dict['cram'],
+            index_path=aligned_cram_dict['crai'],
+        )
         try:
-            align_jobs, bam_out = align_rna.align(
+            align_jobs = align_rna.align(
                 b=get_batch(),
                 fastq_pairs=trimmed_fastq_pairs,
                 sample_name=sequencing_group.id,
                 genome_prefix=get_config()['references'].get('star_ref_dir'),
+                mark_duplicates=True,
+                output_bam=alinged_bam,
+                output_cram=aligned_cram,
                 job_attrs=self.get_job_attrs(sequencing_group),
                 overwrite=sequencing_group.forced,
             )
             if align_jobs:
                 assert isinstance(align_jobs, list)
                 assert all([isinstance(j, Job) for j in align_jobs])
-                assert isinstance(bam_out, ResourceGroup)
                 jobs.extend(align_jobs)
-                aligned_bam = bam_out
-            else:
-                # If the job was skipped due to existing BAMs,
-                # we need to localise them
-                assert isinstance(bam_out, BamPath)
-                aligned_bam = get_batch().read_input_group(
-                    bam=str(bam_out.path),
-                    bai=str(bam_out.index_path),
-                )
         except Exception as e:
             logging.error(f'Error aligning RNA-seq reads for {sequencing_group}: {e}')
             raise Exception(f'Error aligning RNA-seq reads for {sequencing_group}: {e}')
 
-        # Run mark duplicates
-        _exp_tmp_out = self.expected_tmp_outputs(sequencing_group)
-        output_bam = BamPath(
-            path=_exp_tmp_out['bam'],
-            index_path=_exp_tmp_out['bai'],
-        )
-        j, mkdup_bam_out = markdups.markdup(
-            b=get_batch(),
-            input_bam=aligned_bam,
-            output_bam=output_bam,
-            job_attrs=self.get_job_attrs(sequencing_group),
-            overwrite=sequencing_group.forced,
-        )
-        if j:
-            assert isinstance(j, Job)
-            assert isinstance(mkdup_bam_out, ResourceGroup)
-            jobs.append(j)
-            mkdup_bam = mkdup_bam_out
-        else:
-            # If the job was skipped due to an existing BAM,
-            # we need to localise it
-            assert isinstance(mkdup_bam_out, BamPath)
-            mkdup_bam = get_batch().read_input_group(
-                bam=str(mkdup_bam_out.path),
-                bai=str(mkdup_bam_out.index_path),
-            )
-
-        # Convert BAM to CRAM
-        _exp_out = self.expected_outputs(sequencing_group)
-        output_cram = CramPath(
-            path=_exp_out['cram'],
-            index_path=_exp_out['crai'],
-        )
-        j, mkdup_cram = bam_to_cram.bam_to_cram(
-            b=get_batch(),
-            input_bam=mkdup_bam,
-            output_cram=output_cram,
-            job_attrs=self.get_job_attrs(sequencing_group),
-            overwrite=sequencing_group.forced,
-        )
-        if j:
-            assert isinstance(j, Job)
-            assert isinstance(mkdup_cram, ResourceGroup)
-            jobs.append(j)
-        else:
-            assert isinstance(mkdup_cram, CramPath)
-
         # Create outputs and return jobs
         return self.make_outputs(
             sequencing_group,
-            data=_exp_out,
+            data=aligned_cram_dict,
             jobs=jobs
         )
