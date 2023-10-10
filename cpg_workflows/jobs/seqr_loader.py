@@ -35,7 +35,7 @@ def annotate_cohort_jobs(
         # Script path and pyfiles should be relative to the repository root
         script = (
             'cpg_workflows/dataproc_scripts/annotate_cohort.py '
-            f'--vcf-path {vcf_path} '
+            f'--mt-or-vcf-path {vcf_path} '
             f'--vep-ht-path {vep_ht_path} '
             f'--out-mt-path {out_mt_path} '
             f'--checkpoint-prefix {checkpoint_prefix} '
