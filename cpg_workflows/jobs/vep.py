@@ -205,6 +205,7 @@ def vep_one(
 
     j = b.new_job('VEP', (job_attrs or {}) | dict(tool='vep'))
     use_110 = get_config()['workflow'].get('use_vep_110', False)
+    use_plugins = get_config()['workflow'].get('all_vcf_plugins', False)
     if use_110:
         logging.info('Using VEP 110')
         j.image(image_path('ensembl-vep'))
@@ -275,7 +276,7 @@ def vep_one(
     --fasta $FASTA \\
     {alpha_missense_plugin if use_110 else loftee_plugin_path} \
     --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \
-    {vcf_plugins if (use_110 and out_format == 'vcf') else ''}
+    {vcf_plugins if (use_110 and use_plugins and out_format == 'vcf') else ''}
     """
 
     if out_format == 'vcf':
