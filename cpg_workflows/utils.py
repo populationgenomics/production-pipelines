@@ -42,6 +42,7 @@ def checkpoint_hail(t, file_name: str, checkpoint_prefix: str | None = None):
     if checkpoint_prefix:
         path = join(checkpoint_prefix, file_name)
         if can_reuse(path):
+            logging.warning(f'The checkpoint {path} is being reused from an earlier state')
             t = read_hail(str(path))
         else:
             t.write(str(path), overwrite=True)
