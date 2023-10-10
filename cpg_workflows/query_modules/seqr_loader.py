@@ -18,8 +18,8 @@ def annotate_cohort(
     mt_or_vcf_path: str,
     out_mt_path: str,
     vep_ht_path: str,
-    site_only_vqsr_vcf_path: str | None=None,
-    checkpoint_prefix: str | None=None,
+    site_only_vqsr_vcf_path: str | None = None,
+    checkpoint_prefix: str | None = None,
 ):
     """
     Takes either a VCF or a MatrixTable as input. Annotates for Seqr Loader and adds
@@ -53,7 +53,9 @@ def annotate_cohort(
     # Split multi-allelics. We do not handle AS info fields here - we handle
     # them when loading VQSR instead, and populate entire "info" from VQSR.
     mt = mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
-    mt = hl.split_multi_hts(mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles))
+    mt = hl.split_multi_hts(
+        mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
+    )
     logging.info('Description post-split')
     mt.describe()
     mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
@@ -74,7 +76,7 @@ def annotate_cohort(
             # filters=mt.filters.union(vqsr_ht[mt.row_key].filters).filter(
             #     lambda val: val != 'PASS'
             # ),
-            filters=vqsr_ht[mt.row_key].filters
+            filters=vqsr_ht[mt.row_key].filters,
         )
         mt.describe()
         mt = checkpoint_hail(mt, 'mt-vep-split-vqsr.mt', checkpoint_prefix)
@@ -133,9 +135,7 @@ def annotate_cohort(
     rg37 = hl.get_reference('GRCh37')
     rg38 = hl.get_reference('GRCh38')
     rg38.add_liftover(str(liftover_path), rg37)
-    mt = mt.annotate_rows(
-        rg37_locus=hl.liftover(mt.locus, 'GRCh37')
-    )
+    mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
 
     # only remove if present
     if 'InbreedingCoeff' in mt.info:
@@ -396,11 +396,7 @@ def vds_to_mt_and_sites_only_vcf(
     # mt = mt.annotate_rows(info=mt.info.annotate(AN=mt.variant_qc.AN))
     # mt = mt.annotate_rows(info=mt.info.annotate(AF=mt.variant_qc.AF))
     mt = mt.annotate_rows(
-        info=hl.Struct(
-            AC=mt.variant_qc.AC,
-            AN=mt.variant_qc.AN,
-            AF=mt.variant_qc.AF
-        )
+        info=hl.Struct(AC=mt.variant_qc.AC, AN=mt.variant_qc.AN, AF=mt.variant_qc.AF)
     )
 
     mt.describe()
