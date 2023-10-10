@@ -48,39 +48,29 @@ class Count(SequencingGroupStage):
         """
         cram_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'cram')
         crai_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'crai')
-        potential_bam_path = sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.bam'
-        potential_bai_path = sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.bam.bai'
-        input_bam = BamPath(potential_bam_path, potential_bai_path)
+        try:
+            bam_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'bam')
+            bai_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'bai')
+            input_cram_or_bam = BamPath(bam_path, bai_path)
+        except KeyError:
+            potential_bam_path = sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.bam'
+            potential_bai_path = sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.bam.bai'
+            if potential_bam_path.exists() and potential_bai_path.exists():
+                input_cram_or_bam = BamPath(potential_bam_path, potential_bai_path)
+            else:
+                input_cram_or_bam = CramPath(cram_path, crai_path)
+
         output_path = self.expected_outputs(sequencing_group)['count']
         summary_path = self.expected_outputs(sequencing_group)['summary']
-        jobs: list[Job] = []
-        if (
-            can_reuse(output_path, overwrite=sequencing_group.forced) and
-            can_reuse(summary_path, overwrite=sequencing_group.forced)
-        ):
-            logging.info(f'Reusing existing count output {output_path}')
-            return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
-        elif potential_bam_path.exists() and potential_bai_path.exists():
-            logging.info(f'Using existing BAM {potential_bam_path}')
-        else:
-            j, output_bam = bam_to_cram.cram_to_bam(
-                b=get_batch(),
-                input_cram=CramPath(cram_path, crai_path),
-                output_bam=input_bam,
-                job_attrs=self.get_job_attrs(sequencing_group),
-                overwrite=sequencing_group.forced,
-            )
-            jobs.append(j)
-            assert isinstance(output_bam, ResourceGroup)
-            input_bam = output_bam
-        jobs.append(
-            count.count(
-                b=get_batch(),
-                input_bam=input_bam,
-                output_path=output_path,
-                summary_path=summary_path,
-                sample_name=sequencing_group.id,
-                job_attrs=self.get_job_attrs(sequencing_group),
-            )
+
+        jobs = count.count(
+            b=get_batch(),
+            input_cram_or_bam=input_cram_or_bam,
+            output_path=output_path,
+            summary_path=summary_path,
+            sample_name=sequencing_group.id,
+            job_attrs=self.get_job_attrs(sequencing_group),
+            overwrite=sequencing_group.forced,
         )
+
         return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
