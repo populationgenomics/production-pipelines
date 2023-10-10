@@ -69,38 +69,41 @@ def annotate_cohort(
         # TODO: add existence check for info field
         mt.describe()
 
+        # annotate with VQSR fields, not full overwrite
         mt = mt.annotate_rows(
             # vqsr_ht has info annotation split by allele, plus the new AS-VQSR annotations
-            info=vqsr_ht[mt.row_key].info,
+            info=mt.info.annotate(**vqsr_ht[mt.row_key].info),
             # TODO: handle existing filters in vcf path
             # filters=mt.filters.union(vqsr_ht[mt.row_key].filters).filter(
             #     lambda val: val != 'PASS'
             # ),
             filters=vqsr_ht[mt.row_key].filters,
         )
+        # new_mt = new_mt.annotate_rows(
+        #     info=new_mt.info.annotate(
+        #         AC=mt[new_mt.row_key].AC,
+        #         AF=mt[new_mt.row_key].AF,
+        #         AN=mt[new_mt.row_key].AN,
+        #     )
+        # )
         mt.describe()
         mt = checkpoint_hail(mt, 'mt-vep-split-vqsr.mt', checkpoint_prefix)
-
-        # # Re add AN, AC, AF fields
-        # # this looks like bootstrapping...
-        # mt = mt.annotate_rows(info=mt.info.annotate(AC=mt.info.AC))
-        # mt = mt.annotate_rows(info=mt.info.annotate(AN=mt.info.AN))
-        # mt = mt.annotate_rows(info=mt.info.annotate(AF=mt.info.AF))
 
     ref_ht = hl.read_table(str(reference_path('seqr_combined_reference_data')))
     clinvar_ht = hl.read_table(str(reference_path('seqr_clinvar')))
 
     logging.info('Annotating with seqr-loader fields: round 1')
-    # don't fail if the AC/AF attributes are an inappropriate type
-    # don't fail if completely absent either
-    for attr in ['AC', 'AF']:
-        if attr not in mt.info:
-            mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [1]}))
-        elif not isinstance(mt.info[attr], hl.ArrayExpression):
-            mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [mt.info[attr]]}))
-
-    if 'AN' not in mt.info:
-        mt = mt.annotate_rows(info=mt.info.annotate(AN=1))
+    # this allow-to-fail was specifically for AIP, and should be reconsidered
+    # # don't fail if the AC/AF attributes are an inappropriate type
+    # # don't fail if completely absent either
+    # for attr in ['AC', 'AF']:
+    #     if attr not in mt.info:
+    #         mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [1]}))
+    #     elif not isinstance(mt.info[attr], hl.ArrayExpression):
+    #         mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [mt.info[attr]]}))
+    #
+    # if 'AN' not in mt.info:
+    #     mt = mt.annotate_rows(info=mt.info.annotate(AN=1))
 
     mt = mt.annotate_rows(
         AC=mt.info.AC[mt.a_index - 1],
