@@ -90,18 +90,6 @@ class TrimAlignRNA(SequencingGroupStage):
     """
     Trim and align RNA-seq FASTQ reads with fastp and STAR
     """
-
-    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
-        """
-        Expect a pair of CRAM and CRAI files, one per set of input FASTQ files
-        """
-        return {
-            suffix: sequencing_group.dataset.prefix() / 'cram' / f'{sequencing_group.id}.{extension}'
-            for suffix, extension in [
-                ('cram', 'cram'),
-                ('crai', 'cram.crai'),
-            ]
-        }
     
     def expected_tmp_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         """
@@ -114,6 +102,25 @@ class TrimAlignRNA(SequencingGroupStage):
                 ('bai', 'bam.bai'),
             ]
         }
+
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
+        """
+        Expect a pair of CRAM and CRAI files, one per set of input FASTQ files
+        """
+        expected_outs = {
+            suffix: sequencing_group.dataset.prefix() / 'cram' / f'{sequencing_group.id}.{extension}'
+            for suffix, extension in [
+                ('cram', 'cram'),
+                ('crai', 'cram.crai'),
+            ]
+        }
+        # Also include the temporary BAM and BAI files, but only if the CRAM and CRAI files don't exist
+        if not (
+            expected_outs['cram'].exists() and
+            expected_outs['crai'].exists()
+        ):
+            expected_outs.update(self.expected_tmp_outputs(sequencing_group))
+        return expected_outs
     
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
