@@ -48,6 +48,7 @@ class Count(SequencingGroupStage):
         """
         cram_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'cram')
         crai_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'crai')
+        input_cram_or_bam: BamPath | CramPath | None = None
         try:
             bam_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'bam')
             bai_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'bai')
