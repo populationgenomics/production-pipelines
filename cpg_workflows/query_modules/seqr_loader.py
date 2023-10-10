@@ -15,48 +15,49 @@ from cpg_workflows.utils import checkpoint_hail
 
 
 def annotate_cohort(
-    vcf_path,
+    mt_or_vcf_path,
     out_mt_path,
     vep_ht_path,
     site_only_vqsr_vcf_path=None,
     checkpoint_prefix=None,
 ):
     """
-    Convert VCF to matrix table, annotate for Seqr Loader, add VEP and VQSR
-    annotations.
+    Takes either a VCF or a MatrixTable as input. Annotates for Seqr Loader and adds
+    add VEP and VQSR annotations. Returns a MatrixTable.
     """
 
     print('checkpoint_prefix:', checkpoint_prefix)
-    # Todo: Clean this up if this works
-    if str(vcf_path).endswith('.mt'):
-        mt = hl.read_matrix_table(str(vcf_path))
+    if str(mt_or_vcf_path).endswith('.mt'):
+        mt = hl.read_matrix_table(str(mt_or_vcf_path))
         mt.describe()
         mt.show()
     else:
         mt = hl.import_vcf(
-            str(vcf_path),
+            str(mt_or_vcf_path),
             reference_genome=genome_build(),
             skip_invalid_loci=True,
             force_bgz=True,
         )
-        logging.info(f'Importing VCF {vcf_path}')
+        logging.info(f'Importing VCF {mt_or_vcf_path}')
 
     logging.info(f'Loading VEP Table from {vep_ht_path}')
-    # Annotate VEP. Do ti before splitting multi, because we run VEP on unsplit VCF,
+    # Annotate VEP. Do this before splitting multi because VEP  is run on the un-split VCF
     # and hl.split_multi_hts can handle multiallelic VEP field.
     vep_ht = hl.read_table(str(vep_ht_path))
     logging.info(f'Adding VEP annotations into the Matrix Table from {vep_ht_path}')
     mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
-    mt = mt.annotate_rows(my_info=mt.info)
-    mt.describe()
+    mt.describe()  # THis describe shows the mt.info struct exists as expected.
 
-    # Splitting multi-allelics. We do not handle AS info fields here - we handle
+    # Split multi-allelics. We do not handle AS info fields here - we handle
     # them when loading VQSR instead, and populate entire "info" from VQSR.
     mt = mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
-    split_mt = hl.split_multi_hts(mt)
+    split_mt = hl.split_multi_hts(mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles))
     split_mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
-    split_mt.describe()
+    split_mt.describe() # The info field is not present in the split_mt - not sure why?
 
+    # Try re-adding the info field to split_mt from mt.
+    # this results in: TypeError: MatrixTable.__getitem__: invalid index argument(s)
+    # ? what is different between this and the annotate_rows at line 48 above?
     full_mt = split_mt.annotate_rows(info=mt[split_mt.locus].info)
     full_mt.describe()
 
@@ -68,7 +69,6 @@ def annotate_cohort(
         mt = mt.annotate_globals(**vqsr_ht.index_globals())
         # TODO: add existence check for info field
         mt.describe()
-        mt = mt.rename({'info': 'old_info'})
 
         mt = mt.annotate_rows(
             # vqsr_ht has info annotation split by allele, plus the new AS-VQSR annotations
@@ -82,9 +82,9 @@ def annotate_cohort(
         mt = checkpoint_hail(mt, 'mt-vep-split-vqsr.mt', checkpoint_prefix)
 
         # Re add AN, AC, AF fields
-        mt = mt.annotate_rows(info=mt.info.annotate(AC=mt.old_info.AC))
-        mt = mt.annotate_rows(info=mt.info.annotate(AN=mt.old_info.AN))
-        mt = mt.annotate_rows(info=mt.info.annotate(AF=mt.old_info.AF))
+        mt = mt.annotate_rows(info=mt.info.annotate(AC=mt.info.AC))
+        mt = mt.annotate_rows(info=mt.info.annotate(AN=mt.info.AN))
+        mt = mt.annotate_rows(info=mt.info.annotate(AF=mt.info.AF))
 
     ref_ht = hl.read_table(str(reference_path('seqr_combined_reference_data')))
     clinvar_ht = hl.read_table(str(reference_path('seqr_clinvar')))
