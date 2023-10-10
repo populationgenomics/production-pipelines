@@ -136,7 +136,7 @@ def align(
     job_attrs: dict | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
-) -> tuple[list[Job], hb.ResourceGroup] | tuple[None, BamPath]:
+) -> list[Job] | None:
     """
     Align (potentially multiple) FASTQ pairs using STAR,
     merge the resulting BAMs (if necessary),
@@ -144,7 +144,7 @@ def align(
     """
     # Don't run if the output exists and can be reused
     if output_bam and can_reuse(output_bam, overwrite):
-        return None, output_bam
+        return None
     
     if not isinstance(fastq_pairs, FastqPairs):
         raise TypeError(f'fastq_pairs must be a FastqPairs object, not {type(fastq_pairs)}')
@@ -199,7 +199,7 @@ def align(
         sorted_bam_path = to_path(output_bam.path)
         b.write_output(sorted_bam, str(sorted_bam_path.with_suffix('')))
 
-    return jobs, sorted_bam
+    return jobs
 
 
 def align_fq_pair(
@@ -231,6 +231,9 @@ def align_fq_pair(
         storage_gb=200,  # TODO: make configurable
     )
 
+
+    fq_pair = fastq_pair.as_resources(b)
+
     j.declare_resource_group(
         output_bam={
             'bam': '{root}.bam',
@@ -239,7 +242,7 @@ def align_fq_pair(
 
     star_ref = GCPStarReference(b=b, genome_prefix=genome_prefix)
     star = STAR(
-        input_fastq_pair=fastq_pair,
+        input_fastq_pair=fq_pair,
         sample_name=sample_name,
         genome=star_ref.genome_res_group,
         nthreads=(res.get_nthreads() - 1),

@@ -172,7 +172,7 @@ def trim(
     extra_label: str | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
-) -> tuple[Job | None, FastqPair]:
+) -> Job | None:
     """
     Takes an input FastqPair object, and creates a job to trim the FASTQs using cutadapt.
     """
@@ -182,7 +182,7 @@ def trim(
         can_reuse(output_fq_pair.r1, overwrite) and
         can_reuse(output_fq_pair.r2, overwrite)
     ):
-        return None, output_fq_pair
+        return None
     
     base_job_name = 'TrimFastqs'
     if extra_label:
@@ -242,4 +242,4 @@ def trim(
         b.write_output(out_fqs.r1, str(output_fq_pair.r1))
         b.write_output(out_fqs.r2, str(output_fq_pair.r2))
 
-    return trim_j, out_fqs
+    return trim_j

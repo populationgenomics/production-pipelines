@@ -47,13 +47,13 @@ class Markdup:
 
 def markdup(
     b: hb.Batch,
-    input_bam: ResourceGroup,
+    input_bam: BamPath,
     output_bam: BamPath | None = None,
     job_attrs: dict | None = None,
     extra_label: str | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
-) -> tuple[Job, hb.ResourceGroup] | tuple[None, BamPath]:
+) -> Job | None:
     """
     Takes an input BAM file and creates a job to mark duplicates with sambamba markdup.
     """
@@ -61,7 +61,9 @@ def markdup(
     if output_bam and can_reuse(output_bam, overwrite):
         return None, output_bam
     
-    assert isinstance(input_bam, ResourceGroup)
+    assert isinstance(input_bam, BamPath)
+
+    input_bam_r = input_bam.resource_group(b)
     
     base_job_name = 'sambamba_markdup'
     if extra_label:
@@ -90,7 +92,7 @@ def markdup(
     assert isinstance(j.output_bam, ResourceGroup)
 
     cmd = Markdup(
-        input_bam=input_bam.bam,
+        input_bam=input_bam_r.bam,
         output_bam=j.output_bam.bam,
         nthreads=res.get_nthreads(),
     )
@@ -101,4 +103,4 @@ def markdup(
         output_bam_path = to_path(output_bam.path)
         b.write_output(j.output_bam, str(output_bam_path.with_suffix('')))
 
-    return j, j.output_bam
+    return j

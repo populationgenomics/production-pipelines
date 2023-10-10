@@ -13,6 +13,7 @@ from cpg_workflows.resources import STANDARD, HIGHMEM
 from cpg_workflows.filetypes import (
     FastqPair,
     FastqPairs,
+    BamPath,
     CramPath,
 )
 from cpg_workflows.workflow import (
@@ -23,21 +24,23 @@ import re
 
 def bam_to_cram(
     b: hb.Batch,
-    input_bam: ResourceGroup,
+    input_bam: BamPath,
     output_cram: CramPath | None = None,
     extra_label: str | None = None,
     overwrite: bool = False,
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
-) -> tuple[Job, hb.ResourceGroup] | tuple[None, CramPath]:
+) -> Job | None:
     """
     Convert a BAM file to a CRAM file.
     """
     # Don't run if output files exist and can be reused
     if output_cram and can_reuse(output_cram, overwrite):
-        return None, output_cram
+        return None
     
-    assert isinstance(input_bam, ResourceGroup)
+    assert isinstance(input_bam, BamPath)
+
+    input_bam_r = input_bam.resource_group(b)
 
     job_name = 'bam_to_cram'
     if extra_label:
@@ -70,7 +73,7 @@ def bam_to_cram(
         }
     )
 
-    cmd = f'samtools view -@ {res.get_nthreads() - 1} -T {fasta.fasta} -C {input_bam.bam} | tee {j.sorted_cram["cram"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_cram["cram.crai"]}'
+    cmd = f'samtools view -@ {res.get_nthreads() - 1} -T {fasta.fasta} -C {input_bam_r.bam} | tee {j.sorted_cram["cram"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_cram["cram.crai"]}'
     j.command(command(cmd, monitor_space=True))
 
     # Write output to file
@@ -78,4 +81,4 @@ def bam_to_cram(
         output_bam_path = to_path(output_cram.path)
         b.write_output(j.sorted_cram, str(output_bam_path.with_suffix('')))
 
-    return j, j.sorted_cram
+    return j

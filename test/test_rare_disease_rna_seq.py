@@ -155,19 +155,17 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     cmd_str_list = []
 
     def capture_trim_cmd(*args, **kwargs) -> tuple[Job | None, FastqPair]:
-        trim_job_output = trim(*args, **kwargs)
-        j = trim_job_output[0]
+        j = trim(*args, **kwargs)
         if j and isinstance(j, Job):
             cmd_str_list.append(
                 '===== FASTQ TRIM JOB START =====\n\n' +
                 '\n'.join(j._command) +
                 '\n\n===== FASTQ TRIM JOB END =====\n\n'
             )
-        return trim_job_output
+        return j
     
     def capture_align_cmd(*args, **kwargs) -> tuple[list[Job], ResourceGroup] | tuple[None, BamPath]:
-        align_job_output = align(*args, **kwargs)
-        align_jobs = align_job_output[0]
+        align_jobs = align(*args, **kwargs)
         if align_jobs and isinstance(align_jobs, list) and all([isinstance(j, Job) for j in align_jobs]):
             cmd_str_list.append(
                 '===== ALIGN STAGE START =====\n\n' +
@@ -176,29 +174,27 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
                 '\n\n----- Align sub-job end -----\n\n'
                 '\n\n===== ALIGN STAGE END =====\n\n'
             )
-        return align_job_output
+        return align_jobs
     
     def capture_markdup_cmd(*args, **kwargs) -> tuple[Job, ResourceGroup] | tuple[None, BamPath]:
-        markdup_job_output = markdup(*args, **kwargs)
-        markdup_job = markdup_job_output[0]
+        markdup_job = markdup(*args, **kwargs)
         if markdup_job:
             cmd_str_list.append(
                 '===== MARKDUP JOB START =====\n\n' +
                 '\n'.join(markdup_job._command) +
                 '\n\n===== MARKDUP JOB END =====\n\n'
             )
-        return markdup_job_output
+        return markdup_job
     
     def capture_bam_to_cram_cmd(*args, **kwargs) -> tuple[Job, ResourceGroup] | tuple[None, CramPath]:
-        bam_to_cram_job_output = bam_to_cram(*args, **kwargs)
-        bam_to_cram_job = bam_to_cram_job_output[0]
+        bam_to_cram_job = bam_to_cram(*args, **kwargs)
         if bam_to_cram_job:
             cmd_str_list.append(
                 '===== BAM TO CRAM JOB START =====\n\n' +
                 '\n'.join(bam_to_cram_job._command) +
                 '\n\n===== BAM TO CRAM JOB END =====\n\n'
             )
-        return bam_to_cram_job_output
+        return bam_to_cram_job
 
     mocker.patch('pathlib.Path.open', selective_mock_open)
     # functions like get_intervals checks file existence
