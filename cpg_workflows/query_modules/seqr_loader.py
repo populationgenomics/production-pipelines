@@ -134,8 +134,12 @@ def annotate_cohort(
     rg38 = hl.get_reference('GRCh38')
     rg38.add_liftover(str(liftover_path), rg37)
     mt = mt.annotate_rows(
-        rg37_locus=hl.liftover(mt.locus, 'GRCh37'), info=mt.info.drop('InbreedingCoeff')
+        rg37_locus=hl.liftover(mt.locus, 'GRCh37')
     )
+
+    # only remove if present
+    if 'InbreedingCoeff' in mt.info:
+        mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
 
     mt = checkpoint_hail(mt, 'mt-vep-split-vqsr-round1.mt', checkpoint_prefix)
 
