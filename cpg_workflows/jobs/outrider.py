@@ -299,8 +299,6 @@ def outrider(
     if output_path and can_reuse(output_path, overwrite):
         return []
 
-    jobs: list[Job] = []
-
     # Localise input files
     assert all([isinstance(f, (str, Path)) for f in input_counts])
     infiles = {
