@@ -1,6 +1,5 @@
 [workflow]
 name = 'AIP'
-status_reporter = 'metamist'
 
 # optionally allow for running a different HTML script
 presentation = 'cpg'
