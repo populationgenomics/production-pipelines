@@ -1,17 +1,19 @@
 import re
-import pytest
-from pytest_mock import MockFixture
 from pathlib import Path
 
+import pytest
 from cpg_utils.config import ConfigError
+from pytest_mock import MockFixture
+
+from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs.genotype import genotype
+
 from .. import set_config
 from ..factories.alignment_input import create_fastq_pairs_input
 from ..factories.batch import create_local_batch
 from ..factories.config import PipelineConfig, WorkflowConfig
 from ..factories.sequencing_group import create_sequencing_group
 from .helpers import get_command_str
-from cpg_workflows.filetypes import CramPath
 
 
 def default_config() -> PipelineConfig:
@@ -62,7 +64,6 @@ class TestGenotyping:
         )
 
         assert sg.cram
-        # ---- The job that we want to test
         jobs = genotype(
             b=batch,
             sequencing_group_name=sg.id,
@@ -76,7 +77,6 @@ class TestGenotyping:
     def test_genotype_jobs_with_zero_scatter_count(
         self, mocker: MockFixture, tmp_path: Path
     ):
-        # ---- Test setup
         config = default_config()
         config.workflow.scatter_count_genotype = 0
         set_config(config, tmp_path / 'config.toml')
@@ -85,7 +85,6 @@ class TestGenotyping:
 
         genotype_jobs, sg = self._get_new_genotype_job(tmp_path, config, batch=batch)
 
-        # ---- Assertions
         job_names = [job.name for job in genotype_jobs]
         assert (
             len(genotype_jobs) == 2
@@ -116,7 +115,6 @@ class TestGenotyping:
         spy.assert_has_calls(expected_calls, any_order=True)
 
     def test_genotype_jobs_with_default(self, mocker: MockFixture, tmp_path: Path):
-        # ---- Test setup
         config = default_config()
         expected_scatter_count = 50
 
@@ -126,7 +124,6 @@ class TestGenotyping:
 
         genotype_jobs, sg = self._get_new_genotype_job(tmp_path, config, batch=batch)
 
-        # ---- Assertions
         expected_jobs = expected_scatter_count + 3
         job_names = [job.name for job in genotype_jobs]
         assert len(genotype_jobs) == expected_jobs
@@ -173,7 +170,6 @@ class TestGenotyping:
     def test_genotype_jobs_with_varying_scatter_counts(
         self, mocker: MockFixture, tmp_path: Path, scatter_count
     ):
-        # ---- Test setup
         config = default_config()
         if scatter_count is not None:
             config.workflow.scatter_count_genotype = scatter_count
@@ -186,7 +182,6 @@ class TestGenotyping:
 
         genotype_jobs, sg = self._get_new_genotype_job(tmp_path, config, batch=batch)
 
-        # ---- Assertions
         expected_jobs = scatter_count + 3
         job_names = [job.name for job in genotype_jobs]
         assert len(genotype_jobs) == expected_jobs
@@ -241,7 +236,6 @@ class TestGenotyping:
     def test_genotype_reblock_gq_bands(
         self, tmp_path: Path, reblock_gq_bands, expected_gqb_flags
     ):
-        # ---- Test setup
         config = default_config()
 
         if reblock_gq_bands is not None:
@@ -251,7 +245,6 @@ class TestGenotyping:
         batch = create_local_batch(tmp_path)
         self._get_new_genotype_job(tmp_path, config, batch=batch)
 
-        # ---- Assertions
         postproc_job_name = 'Postproc GVCF'
         postproc_jobs = batch.select_jobs(postproc_job_name)
         assert len(postproc_jobs) == 1
@@ -273,7 +266,6 @@ class TestGenotyping:
         expected_intervals_name,
         expected_multiples_of,
     ):
-        # ---- Test setup
         config = default_config()
         config.workflow.sequencing_type = sequencing_type
 
@@ -281,7 +273,6 @@ class TestGenotyping:
         batch = create_local_batch(tmp_path)
         genotype_jobs, _sg = self._get_new_genotype_job(tmp_path, config, batch=batch)
 
-        # ---- Assertions
         expected_intervals_jobs = batch.select_jobs(expected_intervals_name)
         assert len(expected_intervals_jobs) == 1
 
@@ -289,7 +280,6 @@ class TestGenotyping:
         assert re.search(rf'BREAK_BANDS_AT_MULTIPLES_OF={expected_multiples_of} ', cmd)
 
     def test_uses_workflow_reference(self, tmp_path: Path):
-        # ---- Test setup
         config = default_config()
         config.workflow.ref_fasta = 'workflow_overwritten_reference.fa'
         if isinstance(config.references['broad'], dict):
@@ -303,7 +293,6 @@ class TestGenotyping:
                 assert re.search(r'workflow_overwritten_reference.fa', cmd)
 
     def test_throws_error_if_no_reference_set(self, tmp_path: Path):
-        # ---- Test setup
         config = default_config()
         config.workflow.ref_fasta = None
 
@@ -318,7 +307,6 @@ class TestGenotyping:
     def test_uses_workflow_reference_when_both_workflow_and_references_set(
         self, tmp_path: Path
     ):
-        # ---- Test setup
         config = default_config()
         config.workflow.ref_fasta = 'workflow_overwritten_reference.fa'
         if isinstance(config.references['broad'], dict):
@@ -335,7 +323,6 @@ class TestGenotyping:
     def test_uses_default_references_when_workflow_reference_not_set(
         self, tmp_path: Path
     ):
-        # ---- Test setup
         config = default_config()
         config.workflow.ref_fasta = None
         if isinstance(config.references['broad'], dict):
@@ -349,14 +336,12 @@ class TestGenotyping:
                 assert re.search(r'default_reference.fa', cmd)
 
     def test_postproc_gvcf_job_params_with_defaults(self, tmp_path: Path):
-        # ---- Test setup
         config = default_config()
         set_config(config, tmp_path / 'config.toml')
         batch = create_local_batch(tmp_path)
 
         _genotype_jobs, sg = self._get_new_genotype_job(tmp_path, config, batch=batch)
 
-        # ---- Assertions
         postproc_job_name = 'Postproc GVCF'
         postproc_job = batch.select_jobs(postproc_job_name)
 
@@ -392,14 +377,12 @@ class TestGenotyping:
     def test_make_intervals_job_params_with_defaults(
         self, tmp_path: Path, sequencing_type, interval_list_input
     ):
-        # ---- Test setup
         config = default_config()
         config.workflow.sequencing_type = sequencing_type
         set_config(config, tmp_path / 'config.toml')
         batch = create_local_batch(tmp_path)
         self._get_new_genotype_job(tmp_path, config, batch=batch)
 
-        # ---- Assertions
         expected_scatter_count = 50
         make_intervals_job_name = (
             f'Make {expected_scatter_count} intervals for {sequencing_type}'
@@ -425,7 +408,6 @@ class TestGenotyping:
     def test_haplotype_caller_job_params_with_defaults(
         self, mocker: MockFixture, tmp_path: Path
     ):
-        # ---- Test setup
         config = default_config()
         set_config(config, tmp_path / 'config.toml')
         batch = create_local_batch(tmp_path)
@@ -434,7 +416,6 @@ class TestGenotyping:
             tmp_path=tmp_path, config=config, batch=batch
         )
 
-        # ---- Assertions
         haplotype_caller_job_name = 'HaplotypeCaller'
         expected_calls = []
         job_names = [job.name for job in genotype_jobs]
@@ -492,7 +473,6 @@ class TestGenotyping:
             dragen_mode=False,
         )
 
-        # ---- Assertions
         haplotype_caller_job_name = 'HaplotypeCaller'
         job_names = [job.name for job in genotype_jobs]
         assert haplotype_caller_job_name in job_names
