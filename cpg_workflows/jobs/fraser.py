@@ -174,16 +174,6 @@ class Fraser:
         return self.__str__()
 
 
-
-#     j, output_bam = bam_to_cram.cram_to_bam(
-#         b=get_batch(),
-#         input_cram=cram,
-#         output_bam=bam,
-#         job_attrs=self.get_job_attrs(),
-#         overwrite=cohort.forced,
-#     )
-
-
 def fraser(
     b: hb.Batch,
     input_bams_or_crams: list[BamPath | CramPath],
