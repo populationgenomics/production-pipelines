@@ -53,5 +53,6 @@ class Outrider(CohortStage):
             output_path=list(self.expected_outputs(cohort).values())[0],
             cohort_name=cohort.name,
             job_attrs=self.get_job_attrs(),
+            overwrite=cohort.forced,
         )
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=j)
