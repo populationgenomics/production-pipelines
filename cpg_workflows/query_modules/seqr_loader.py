@@ -385,6 +385,20 @@ def vds_to_mt_and_sites_only_vcf(
     # from https://discuss.hail.is/t/export-vds-to-vcf/2951/13
     vd_gt = vds.variant_data.transmute_entries(
         GT=hl.vds.lgt_to_gt(vds.variant_data.LGT, vds.variant_data.LA),
+        AD=hl.vds.local_to_global(
+            vds.variant_data.LAD,
+            vds.variant_data.LA,
+            len(vds.variant_data.alleles),
+            fill_value=0,
+            number='R',
+        ),
+        PL=hl.vds.local_to_global(
+            vds.variant_data.LPL,
+            vds.variant_data.LA,
+            len(vds.variant_data.alleles),
+            fill_value=999,
+            number='G',
+        )
         # FT=hl.if_else(vds.variant_data.FT, "PASS", "FAIL")
     )
 

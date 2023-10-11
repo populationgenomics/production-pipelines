@@ -157,6 +157,7 @@ class AnnotateDataset(DatasetStage):
             out_mt_path=self.expected_outputs(dataset)['mt'],
             tmp_prefix=checkpoint_prefix,
             job_attrs=self.get_job_attrs(dataset),
+            use_dataproc=False,
             depends_on=inputs.get_jobs(dataset),
         )
 
