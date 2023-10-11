@@ -11,10 +11,12 @@ from cpg_workflows.utils import can_reuse
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.filetypes import (
     BamPath,
+    CramPath,
 )
 from cpg_workflows.workflow import (
     SequencingGroup,
 )
+from cpg_workflows.jobs.bam_to_cram import cram_to_bam
 from textwrap import dedent
 from os.path import basename
 
@@ -172,30 +174,53 @@ class Fraser:
         return self.__str__()
 
 
+
+#     j, output_bam = bam_to_cram.cram_to_bam(
+#         b=get_batch(),
+#         input_cram=cram,
+#         output_bam=bam,
+#         job_attrs=self.get_job_attrs(),
+#         overwrite=cohort.forced,
+#     )
+
+
 def fraser(
     b: hb.Batch,
-    input_bams: list[BamPath | hb.ResourceGroup],
+    input_bams_or_crams: list[BamPath | CramPath],
     output_path: str | Path | None = None,
     cohort_name: str | None = None,
     job_attrs: dict[str, str] | None = None,
+    overwrite: bool = False,
     requested_nthreads: int | None = None,
-) -> Job:
+) -> list[Job]:
     """
     Run FRASER.
     """
+    # Reuse existing output if possible
+    if output_path and can_reuse(output_path, overwrite):
+        return []
 
-    # Localise input files
-    assert all([isinstance(f, (BamPath, hb.ResourceGroup)) for f in input_bams])
-    input_bams_localised = [
-        f if isinstance(f, hb.ResourceGroup) else b.read_input_group(**{
-            'bam': str(f.path),
-            'bam.bai': str(f.index_path),
-        })
-        for f in input_bams
-    ]
+    jobs: list[Job] = []
+
+    # Convert CRAMs to BAMs if necessary
+    input_bams_localised: list[hb.ResourceGroup] = []
+    for input_bam_or_cram in input_bams_or_crams:
+        if isinstance(input_bam_or_cram, CramPath):
+            j, output_bam = cram_to_bam(
+                b=b,
+                input_cram=input_bam_or_cram,
+                job_attrs=job_attrs,
+                requested_nthreads=requested_nthreads,
+            )
+            if j and isinstance(j, Job):
+                jobs.append(j)
+            input_bam_or_cram = output_bam
+        elif isinstance(input_bam_or_cram, BamPath):
+            # Localise BAM
+            input_bams_localised.append(input_bam_or_cram.resource_group(b))
     assert all([isinstance(f, hb.ResourceGroup) for f in input_bams_localised])
 
-    # Create job
+    # Create FRASER job
     job_name = f'fraser_{cohort_name}' if cohort_name else 'count'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
     j = b.new_job(job_name, _job_attrs)
@@ -226,9 +251,11 @@ def fraser(
     cmd = str(fraser)
     j.command(command(cmd, monitor_space=True))
 
+    jobs.append(j)
+
     # Write output to file
     if output_path:
         # NOTE: j.output is just a placeholder
         b.write_output(j.output.tar_gz, str(output_path))
     
-    return j
+    return jobs

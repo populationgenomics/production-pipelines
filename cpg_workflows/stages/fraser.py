@@ -48,55 +48,29 @@ class Fraser(CohortStage):
         Queue a job to run FRASER.
         """
         sequencing_groups = cohort.get_sequencing_groups()
-        alignment_inputs: dict[str, dict[str, Path]] = {
-            sequencing_group.id: {
-                'cram': inputs.as_path(sequencing_group, TrimAlignRNA, 'cram'),
-                'crai': inputs.as_path(sequencing_group, TrimAlignRNA, 'crai'),
-                'bam': sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.bam',
-                'bai': sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.bam.bai',
-            }
-            for sequencing_group in sequencing_groups
-        }
-        cram_bam_inputs: dict[str, dict[str, (BamPath | CramPath)]] = {
-            id: {
-                'bam': BamPath(aln['bam'], aln['bai']),
-                'cram': CramPath(aln['cram'], aln['crai']),
-            }
-            for id, aln in alignment_inputs.items()
-        }
-        cram_to_bam_inputs: dict[str, dict[str, (BamPath | CramPath)]] = {
-            id: inpt
-            for id, inpt in cram_bam_inputs.items()
-            if not (alignment_inputs[id]['bam'].exists() and alignment_inputs[id]['bai'].exists())
-        }
-        bam_inputs: list[BamPath | ResourceGroup] = [
-            inpt['bam']
-            for id, inpt in cram_bam_inputs.items()
-            if (
-                (alignment_inputs[id]['bam'].exists() and alignment_inputs[id]['bai'].exists()) and
-                isinstance(inpt['bam'], BamPath)
-            )
-        ]
-        jobs: list[Job] = []
-        for inpt in cram_to_bam_inputs.values():
-            cram = inpt['cram']
-            bam = inpt['bam']
-            assert isinstance(cram, CramPath)
-            assert isinstance(bam, BamPath)
-            logging.info(f'Converting {cram} to BAM')
-            j, output_bam = bam_to_cram.cram_to_bam(
-                b=get_batch(),
-                input_cram=cram,
-                output_bam=bam,
-                job_attrs=self.get_job_attrs(),
-                overwrite=cohort.forced,
-            )
-            jobs.append(j)
-            assert isinstance(output_bam, ResourceGroup)
-            bam_inputs.append(output_bam)
+        
+        bam_or_cram_inputs: list[BamPath | CramPath] = []
+        for sequencing_group in sequencing_groups:
+            cram_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'cram')
+            crai_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'crai')
+            input_bam_or_cram: BamPath | CramPath | None = None
+            try:
+                bam_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'bam')
+                bai_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'bai')
+                input_bam_or_cram = BamPath(bam_path, bai_path)
+            except KeyError:
+                potential_bam_path = sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.bam'
+                potential_bai_path = sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.bam.bai'
+                if potential_bam_path.exists() and potential_bai_path.exists():
+                    input_bam_or_cram = BamPath(potential_bam_path, potential_bai_path)
+                else:
+                    input_bam_or_cram = CramPath(cram_path, crai_path)
+            if isinstance(input_bam_or_cram, (BamPath, CramPath)):
+                bam_or_cram_inputs.append(input_bam_or_cram)
+
         j = fraser.fraser(
             b=get_batch(),
-            input_bams=bam_inputs,
+            input_bams_or_crams=bam_or_cram_inputs,
             output_path=list(self.expected_outputs(cohort).values())[0],
             cohort_name=cohort.name,
             job_attrs=self.get_job_attrs(),
