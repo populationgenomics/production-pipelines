@@ -11,10 +11,12 @@ from cpg_workflows.utils import can_reuse
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.filetypes import (
     BamPath,
+    CramPath,
 )
 from cpg_workflows.workflow import (
     SequencingGroup,
 )
+from cpg_workflows.jobs.bam_to_cram import cram_to_bam
 
 
 def count_res_group(b: hb.Batch) -> hb.ResourceGroup:
@@ -108,29 +110,56 @@ class FeatureCounts:
 
 def count(
     b: hb.Batch,
-    input_bam: BamPath | hb.ResourceGroup,
+    input_cram_or_bam: BamPath | CramPath,
     output_path: str | Path,
     summary_path: str | Path,
     sample_name: str | None = None,
     job_attrs: dict[str, str] | None = None,
+    overwrite: bool = False,
     requested_nthreads: int | None = None,
-) -> Job:
+) -> list[Job]:
     """
     Count RNA seq reads mapping to genes and/or transcripts using featureCounts.
     """
-    # Determine whether input is a BAM file or a resource group
-    if isinstance(input_bam, hb.ResourceGroup):
-        input_reads = input_bam
-    elif isinstance(input_bam, BamPath):
+    # Reuse existing output if possible
+    if (
+        output_path and
+        summary_path and
+        can_reuse(output_path, overwrite) and
+        can_reuse(summary_path, overwrite)
+    ):
+        return []
+    
+    jobs: list[Job] = []
+
+    # Determine whether input is a BAM file or a CRAM file
+    if isinstance(input_cram_or_bam, BamPath):
         # Localise input
-        input_reads = b.read_input_group(**{
-            'bam': str(input_bam.path),
-            'bam.bai': str(input_bam.index_path),
+        input_bam_reads = b.read_input_group(**{
+            'bam': str(input_cram_or_bam.path),
+            'bam.bai': str(input_cram_or_bam.index_path),
         })
+    elif isinstance(input_cram_or_bam, CramPath):
+        # Localise input
+        input_cram_reads = b.read_input_group(**{
+            'cram': str(input_cram_or_bam.path),
+            'cram.crai': str(input_cram_or_bam.index_path),
+        })
+        # Convert CRAM to BAM
+        j, input_bam_reads = cram_to_bam(
+            b=b,
+            input_cram=input_cram_reads,
+            job_attrs=job_attrs,
+            requested_nthreads=requested_nthreads,
+        )
+        if j and isinstance(j, Job):
+            jobs.append(j)
     else:
         raise ValueError(
-            f'Invalid alignment input: "{str(input_bam)}", expected BAM file.'
+            f'Invalid alignment input: "{str(input_cram_or_bam)}", expected BAM or CRAM file.'
         )
+    
+    assert isinstance(input_bam_reads, hb.ResourceGroup)
 
     counting_reference = count_res_group(b)
 
@@ -159,7 +188,7 @@ def count(
     
     # Create counting command
     fc = FeatureCounts(
-        input_bam=input_reads['bam'],
+        input_bam=input_bam_reads.bam,
         gtf_file=counting_reference.gtf,
         output_path=j.count_output['count'],
         summary_path=j.count_output['count.summary'],
@@ -181,9 +210,12 @@ def count(
     # Add command to job
     j.command(command(cmd, monitor_space=True))
 
+    jobs.append(j)
+
     # Write output to file
     if output_path:
         b.write_output(j.count_output['count'], str(output_path))
+    if summary_path:
         b.write_output(j.count_output['count.summary'], str(summary_path))
     
-    return j
+    return jobs

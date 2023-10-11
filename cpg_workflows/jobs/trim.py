@@ -182,7 +182,7 @@ def trim(
         can_reuse(output_fq_pair.r1, overwrite) and
         can_reuse(output_fq_pair.r2, overwrite)
     ):
-        return None, output_fq_pair
+        return None, output_fq_pair.as_resources(b)
     
     base_job_name = 'TrimFastqs'
     if extra_label:

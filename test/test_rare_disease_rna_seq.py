@@ -82,7 +82,7 @@ DEFAULT_CONFIG = Path(
 
 def _mock_cohort():
     from cpg_workflows.targets import Cohort
-    from cpg_workflows.filetypes import FastqPair, FastqPairs  # , BamPath
+    from cpg_workflows.filetypes import FastqPair, FastqPairs, CramPath
 
     cohort = Cohort()
     ds = cohort.create_dataset('test-input-dataset')
@@ -172,61 +172,30 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
             )
         return trim_job_output
     
-    def capture_align_cmd(*args, **kwargs) -> tuple[list[Job], ResourceGroup] | tuple[None, BamPath]:
-        align_job_output = align(*args, **kwargs)
-        align_jobs = align_job_output[0]
-        if align_jobs and isinstance(align_jobs, list) and all([isinstance(j, Job) for j in align_jobs]):
+    def capture_align_cmd(*args, **kwargs) -> list[Job] | None:
+        align_jobs = align(*args, **kwargs)
+        if align_jobs and isinstance(align_jobs, list):
             cmd_str_list.append(
                 '===== ALIGN STAGE START =====\n\n' +
                 '----- Align sub-job start -----\n\n' +
-                '\n\n----- Align sub-job end\n\n-----Align sub-job start -----\n\n'.join(['\n'.join(j._command) for j in align_jobs]) +
-                '\n\n----- Align sub-job end -----\n\n'
+                '\n\n----- Align sub-job end\n\n-----Align sub-job start -----\n\n'.join(['\n'.join(j._command) for j in align_jobs if isinstance(j, Job)]) +
+                '\n\n----- Align sub-job end -----\n\n' +
                 '\n\n===== ALIGN STAGE END =====\n\n'
             )
-        return align_job_output
+        return align_jobs
     
-    def capture_markdup_cmd(*args, **kwargs) -> tuple[Job, ResourceGroup] | tuple[None, BamPath]:
-        markdup_job_output = markdup(*args, **kwargs)
-        markdup_job = markdup_job_output[0]
-        if markdup_job:
+    def capture_count_cmd(*args, **kwargs) -> list[Job]:
+        count_jobs = count(*args, **kwargs)
+        if count_jobs and isinstance(count_jobs, list):
             cmd_str_list.append(
-                '===== MARKDUP JOB START =====\n\n' +
-                '\n'.join(markdup_job._command) +
-                '\n\n===== MARKDUP JOB END =====\n\n'
+                '===== COUNT STAGE START =====\n\n' +
+                '----- Count sub-job start -----\n\n' +
+                '\n\n----- Count sub-job end\n\n-----Count sub-job start -----\n\n'.join(['\n'.join(j._command) for j in count_jobs if isinstance(j, Job)]) +
+                '\n\n----- Count sub-job end -----\n\n' +
+                '\n\n===== COUNT STAGE END =====\n\n'
             )
-        return markdup_job_output
-    
-    def capture_bam_to_cram_cmd(*args, **kwargs) -> tuple[Job, ResourceGroup] | tuple[None, CramPath]:
-        bam_to_cram_job_output = bam_to_cram(*args, **kwargs)
-        bam_to_cram_job = bam_to_cram_job_output[0]
-        if bam_to_cram_job:
-            cmd_str_list.append(
-                '===== BAM TO CRAM JOB START =====\n\n' +
-                '\n'.join(bam_to_cram_job._command) +
-                '\n\n===== BAM TO CRAM JOB END =====\n\n'
-            )
-        return bam_to_cram_job_output
-    
-    def capture_cram_to_bam_cmd(*args, **kwargs) -> Job:
-        cram_to_bam_job_output = cram_to_bam(*args, **kwargs)
-        cram_to_bam_job = cram_to_bam_job_output[0]
-        if cram_to_bam_job:
-            cmd_str_list.append(
-                '===== CRAM TO BAM JOB START =====\n\n' +
-                '\n'.join(cram_to_bam_job._command) +
-                '\n\n===== CRAM TO BAM JOB END =====\n\n'
-            )
-        return cram_to_bam_job_output
-    
-    def capture_count_cmd(*args, **kwargs) -> Job:
-        count_job = count(*args, **kwargs)
-        cmd_str_list.append(
-            '===== COUNT STAGE START =====\n\n' +
-            '\n'.join(count_job._command) +
-            '\n\n===== COUNT STAGE END =====\n\n'
-        )
-        return count_job
-    
+        return count_jobs
+
     def capture_outrider_cmd(*args, **kwargs) -> Job:
         outrider_job = outrider(*args, **kwargs)
         cmd_str_list.append(
@@ -259,12 +228,6 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     mocker.patch('cpg_workflows.jobs.trim.trim', capture_trim_cmd)
     # Patch the align function to capture the job command
     mocker.patch('cpg_workflows.jobs.align_rna.align', capture_align_cmd)
-    # Patch the markdup function to capture the job command
-    mocker.patch('cpg_workflows.jobs.markdups.markdup', capture_markdup_cmd)
-    # Patch the bam_to_cram function to capture the job command
-    mocker.patch('cpg_workflows.jobs.bam_to_cram.bam_to_cram', capture_bam_to_cram_cmd)
-    # Patch the cram_to_bam function to capture the job command
-    mocker.patch('cpg_workflows.jobs.bam_to_cram.cram_to_bam', capture_cram_to_bam_cmd)
     # Patch the count function to capture the job command
     mocker.patch('cpg_workflows.jobs.count.count', capture_count_cmd)
     # Patch the outrider function to capture the job calls
@@ -286,7 +249,6 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     samtools_job = b.job_by_tool['samtools']
     markdup_job = b.job_by_tool['sambamba']
     bam_to_cram_job = b.job_by_tool['samtools_view']
-    cram_to_bam_job = b.job_by_tool['samtools_view_cram_to_bam']
     featureCounts_job = b.job_by_tool['featureCounts']
     outrider_job = b.job_by_tool['outrider']
     sample_list = get_cohort().get_sequencing_groups()
@@ -317,17 +279,14 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     # The number of markdup jobs should equal the number of samples
     n_markdup_jobs = len(sample_list)
     assert markdup_job['job_n'] == n_markdup_jobs
+
+    # The number of bam_to_cram jobs should equal the number of samples
+    n_bam_to_cram_jobs = len(sample_list)
+    assert bam_to_cram_job['job_n'] == n_bam_to_cram_jobs
     
     # The number of count jobs should equal the number of samples
     n_count_jobs = len(sample_list)
     assert featureCounts_job['job_n'] == n_count_jobs
-    # The number of bam_to_cram jobs should equal the number of samples
-    n_bam_to_cram_jobs = len(sample_list)
-    assert bam_to_cram_job['job_n'] == n_bam_to_cram_jobs
-
-    # The number of cram_to_bam jobs should equal the number of samples
-    n_cram_to_bam_jobs = len(sample_list)
-    assert cram_to_bam_job['job_n'] == n_cram_to_bam_jobs
 
     # The number of outrider jobs should be 1 (for the cohort)
     n_outrider_jobs = 1

@@ -13,10 +13,13 @@ from cpg_workflows.filetypes import (
     FastqPair,
     FastqPairs,
     BamPath,
+    CramPath,
 )
 from cpg_workflows.workflow import (
     SequencingGroup,
 )
+from cpg_workflows.jobs.markdups import markdup
+from cpg_workflows.jobs.bam_to_cram import bam_to_cram
 import re
 
 
@@ -131,20 +134,24 @@ def align(
     fastq_pairs: FastqPairs,
     sample_name: str,
     genome_prefix: str | Path,
+    mark_duplicates: bool = True,
     output_bam: BamPath | None = None,
+    output_cram: CramPath | None = None,
     extra_label: str | None = None,
     job_attrs: dict | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
-) -> tuple[list[Job], hb.ResourceGroup] | tuple[None, BamPath]:
+) -> list[Job] | None:
     """
     Align (potentially multiple) FASTQ pairs using STAR,
     merge the resulting BAMs (if necessary),
     then sort and index the resulting BAM.
     """
     # Don't run if the output exists and can be reused
-    if output_bam and can_reuse(output_bam, overwrite):
-        return None, output_bam
+    if output_cram and can_reuse(output_cram, overwrite):
+        return None
+    if not output_cram and output_bam and can_reuse(output_bam, overwrite):
+        return None
     
     if not isinstance(fastq_pairs, FastqPairs):
         raise TypeError(f'fastq_pairs must be a FastqPairs object, not {type(fastq_pairs)}')
@@ -195,11 +202,38 @@ def align(
     )
     jobs.append(j)
 
-    if output_bam:
-        sorted_bam_path = to_path(output_bam.path)
-        b.write_output(sorted_bam, str(sorted_bam_path.with_suffix('')))
+    # Mark duplicates
+    if mark_duplicates:
+        j, mkdup_bam = markdup(
+            b=b,
+            input_bam=sorted_bam,
+            extra_label=extra_label,
+            job_attrs=job_attrs,
+            requested_nthreads=requested_nthreads,
+        )
+        jobs.append(j)
+        out_bam = mkdup_bam
+    else:
+        out_bam = sorted_bam
 
-    return jobs, sorted_bam
+    if output_bam:
+        out_bam_path = to_path(output_bam.path)
+        b.write_output(out_bam, str(out_bam_path.with_suffix('')))
+
+    # Convert to CRAM
+    if output_cram:
+        j, out_cram = bam_to_cram(
+            b=b,
+            input_bam=out_bam,
+            extra_label=extra_label,
+            job_attrs=job_attrs,
+            requested_nthreads=requested_nthreads,
+        )
+        jobs.append(j)
+        out_cram_path = to_path(output_cram.path)
+        b.write_output(out_cram, str(out_cram_path.with_suffix('')))
+
+    return jobs
 
 
 def align_fq_pair(
