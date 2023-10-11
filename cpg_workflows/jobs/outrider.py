@@ -289,11 +289,15 @@ def outrider(
     output_path: str | Path | None = None,
     cohort_name: str | None = None,
     job_attrs: dict[str, str] | None = None,
+    overwrite: bool = False,
     requested_nthreads: int | None = None,
 ) -> Job:
     """
     Run Outrider.
     """
+    # Reuse existing output if possible
+    if output_path and can_reuse(output_path, overwrite):
+        return []
 
     # Localise input files
     assert all([isinstance(f, (str, Path)) for f in input_counts])
