@@ -388,14 +388,14 @@ def vds_to_mt_and_sites_only_vcf(
         AD=hl.vds.local_to_global(
             vds.variant_data.LAD,
             vds.variant_data.LA,
-            len(vds.variant_data.alleles),
+            hl.len(vds.variant_data.alleles),
             fill_value=0,
             number='R',
         ),
         PL=hl.vds.local_to_global(
             vds.variant_data.LPL,
             vds.variant_data.LA,
-            len(vds.variant_data.alleles),
+            hl.len(vds.variant_data.alleles),
             fill_value=999,
             number='G',
         )
