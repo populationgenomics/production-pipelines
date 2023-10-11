@@ -22,7 +22,6 @@ as we will need to reference data in test
 
 HPO file currently gs://cpg-common-test/references/aip/hpo_terms.obo
 """
-import logging
 from os.path import join
 from datetime import datetime
 from cpg_utils import to_path, Path
@@ -30,7 +29,6 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, copy_common_env
 from metamist.graphql import gql, query
 from cpg_workflows.batch import get_batch
-from cpg_workflows.utils import ExpectedResultT
 
 from cpg_workflows.workflow import (
     stage,
