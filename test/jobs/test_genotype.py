@@ -44,6 +44,21 @@ def default_config() -> PipelineConfig:
 
 
 class TestGenotyping:
+    def _setup_test(self, tmp_path: Path, config: PipelineConfig, cram_path_str: str):
+        set_config(config, tmp_path / 'config.toml')
+
+        dataset_id = config.workflow.dataset
+        batch = create_local_batch(tmp_path)
+        sg = create_sequencing_group(
+            dataset=dataset_id,
+            sequencing_type=config.workflow.sequencing_type,
+            alignment_input=create_fastq_pairs_input(location=tmp_path, n=1),
+            cram=CramPath(tmp_path / cram_path_str),
+        )
+
+        assert sg.cram
+        return config, batch, sg
+
     def _get_new_genotype_job(
         self,
         tmp_path: Path,
