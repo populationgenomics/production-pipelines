@@ -11,6 +11,8 @@ status_reporter = 'metamist'
 #clinvar_decisions = "HailTable path to private ClinVar"
 #clinvar_pm5 = "HailTable path to ClinVar PM5"
 
+obo_file = 'gs://cpg-common-test/references/aip/hpo_terms.obo'
+
 [images]
 aip = "australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_aip:latest"
 

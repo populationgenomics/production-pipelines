@@ -19,8 +19,6 @@ Plan -
 
 Initial expectation - this will have to be run using Full permissions
 as we will need to reference data in test
-
-HPO file currently gs://cpg-common-test/references/aip/hpo_terms.obo
 """
 from os.path import join
 from datetime import datetime
@@ -63,7 +61,7 @@ class GeneratePanelData(DatasetStage):
         py_job.image(image_path('aip'))
 
         expected_d = self.expected_outputs(dataset)
-        hpo_file = get_batch().read_input('OBO FILE')  # todo
+        hpo_file = get_batch().read_input(get_config()['workflow']['obo_file'])
         py_job.call(
             panel_match_main,
             dataset.name,
