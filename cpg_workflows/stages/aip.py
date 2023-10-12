@@ -88,6 +88,7 @@ class QueryPanelapp(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
         job = get_batch().new_job('query panel data')
+        STANDARD.set_resources(job, ncpu=1, mem_gb=1.0)
         job.image(image_path('aip'))
 
         # auth and copy env
@@ -101,7 +102,7 @@ class QueryPanelapp(DatasetStage):
         job.command(
             f'python3 reanalysis/query_panelapp.py '
             f'--panels {str(hpo_panel_json)} '
-            f'--out_json {str(expected_out["panel_data"])}'
+            f'--out_path {str(expected_out["panel_data"])}'
         )
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
