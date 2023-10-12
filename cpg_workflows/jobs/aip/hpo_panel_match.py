@@ -20,6 +20,7 @@ from collections import defaultdict
 import networkx
 from obonet import read_obo
 
+from cpg_utils import to_path
 from metamist.graphql import gql, query
 
 
@@ -256,7 +257,7 @@ def main(dataset: str, hpo_file: str, panel_out: str):
         hpo_to_panel_map=panels_by_hpo, hpo_file=hpo_file, all_hpos=all_hpo
     )
     match_participants_to_panels(hpo_dict, hpo_to_panels)
-    with open(panel_out, 'w', encoding='utf-8') as handle:
+    with to_path(panel_out).open('w', encoding='utf-8') as handle:
         json.dump(hpo_dict, handle, indent=4)
 
 

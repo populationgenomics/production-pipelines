@@ -35,6 +35,10 @@ from cpg_workflows.workflow import (
     StageOutput,
     StageInput,
 )
+from cpg_workflows.resources import (
+    HIGHMEM,
+    STANDARD
+)
 from cpg_workflows.jobs.aip.hpo_panel_match import main as panel_match_main
 
 
@@ -66,7 +70,7 @@ class GeneratePanelData(DatasetStage):
             panel_match_main,
             dataset.name,
             hpo_file,
-            expected_d['hpo_panels']
+            str(expected_d['hpo_panels'])
         )
 
         return self.make_outputs(dataset, data=expected_d, jobs=py_job)
