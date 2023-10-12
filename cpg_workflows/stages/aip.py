@@ -94,13 +94,13 @@ class QueryPanelapp(DatasetStage):
         authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
 
-        hpo_panel_json = inputs.as_str(
+        hpo_panel_json = inputs.as_path(
             target=dataset, stage=GeneratePanelData, key='hpo_panels'
         )
         expected_out = self.expected_outputs(dataset)
         job.command(
             f'python3 reanalysis/query_panelapp.py '
-            f'--panels {hpo_panel_json} '
+            f'--panels {str(hpo_panel_json)} '
             f'--out_json {str(expected_out["panel_data"])}'
         )
 
@@ -195,11 +195,12 @@ def _aip_summary_meta(
     """
     return {'type': 'aip_output_json'}
 
+
 @stage(
     required_stages=RunHailFiltering,
     analysis_type='custom',
     analysis_keys=['summary_json'],
-    update_analysis_meta=_aip_summary_meta
+    update_analysis_meta=_aip_summary_meta,
 )
 class ValidateMOI(DatasetStage):
     """
@@ -213,18 +214,20 @@ class ValidateMOI(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {'summary_json': dataset.prefix() / DATED_FOLDER / 'summary_output.json'}
+
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'AIP summary for {dataset.name}')
-
 
         expected_out = self.expected_outputs(dataset)
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
+
 @stage(required_stages=[ValidateMOI])
 class CreateAIPHTML(DatasetStage):
-
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {'panel_data': dataset.prefix() / DATED_FOLDER / 'panelapp_data.json'}
-    def queue_jobs(self, dataset: Dataset):
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        job = get_batch().new_job(f'AIP HTML for {dataset.name}')
         expected_out = self.expected_outputs(dataset)
         return self.make_outputs(dataset, data=expected_out, jobs=job)
