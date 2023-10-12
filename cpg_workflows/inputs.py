@@ -6,9 +6,8 @@ import logging
 
 from cpg_utils.config import get_config, update_dict
 
-from .metamist import get_metamist, Assay, AnalysisType, MetamistError, parse_reads
-from .targets import Cohort, Sex, PedigreeInfo, SequencingGroup
-
+from .metamist import AnalysisType, Assay, MetamistError, get_metamist, parse_reads
+from .targets import Cohort, PedigreeInfo, SequencingGroup, Sex
 
 _cohort: Cohort | None = None
 
@@ -35,7 +34,6 @@ def create_cohort() -> Cohort:
     cohort = Cohort()
     for dataset_name in dataset_names:
         dataset = cohort.create_dataset(dataset_name)
-        logging.info(f'Getting sequencing groups for dataset {dataset_name}')
         sequencing_group_entries = get_metamist().get_sg_entries(dataset_name)
         for entry in sequencing_group_entries:
             metadata = entry.get('meta', {})
