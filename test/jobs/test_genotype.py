@@ -59,46 +59,21 @@ class TestGenotyping:
         assert sg.cram
         return config, batch, sg
 
-    def _get_new_genotype_job(
-        self,
-        tmp_path: Path,
-        config: PipelineConfig,
-        cram_path_string: str = 'test_genotype.cram',
-        batch=None,
+    def test_genotype_jobs_with_zero_scatter_count(
+        self, mocker: MockFixture, tmp_path: Path
     ):
-        set_config(config, tmp_path / 'config.toml')
+        config = default_config()
+        config.workflow.scatter_count_genotype = 0
+        config, batch, sg = self._setup_test(tmp_path, config, 'test_genotype.cram')
+        spy = mocker.spy(batch, 'write_output')
 
-        dataset_id = config.workflow.dataset
-        if batch is None:
-            batch = create_local_batch(tmp_path)
-        sg = create_sequencing_group(
-            dataset=dataset_id,
-            sequencing_type=config.workflow.sequencing_type,
-            alignment_input=create_fastq_pairs_input(location=tmp_path, n=1),
-            cram=CramPath(tmp_path / cram_path_string),
-        )
-
-        assert sg.cram
-        jobs = genotype(
+        genotype_jobs = genotype(
             b=batch,
             sequencing_group_name=sg.id,
             cram_path=sg.cram,
             output_path=sg.gvcf,
             tmp_prefix=tmp_path,
         )
-
-        return jobs, sg
-
-    def test_genotype_jobs_with_zero_scatter_count(
-        self, mocker: MockFixture, tmp_path: Path
-    ):
-        config = default_config()
-        config.workflow.scatter_count_genotype = 0
-        set_config(config, tmp_path / 'config.toml')
-        batch = create_local_batch(tmp_path)
-        spy = mocker.spy(batch, 'write_output')
-
-        genotype_jobs, sg = self._get_new_genotype_job(tmp_path, config, batch=batch)
 
         job_names = [job.name for job in genotype_jobs]
         assert (
@@ -132,12 +107,16 @@ class TestGenotyping:
     def test_genotype_jobs_with_default(self, mocker: MockFixture, tmp_path: Path):
         config = default_config()
         expected_scatter_count = 50
-
-        set_config(config, tmp_path / 'config.toml')
-        batch = create_local_batch(tmp_path)
+        config, batch, sg = self._setup_test(tmp_path, config, 'test_genotype.cram')
         spy = mocker.spy(batch, 'write_output')
 
-        genotype_jobs, sg = self._get_new_genotype_job(tmp_path, config, batch=batch)
+        genotype_jobs = genotype(
+            b=batch,
+            sequencing_group_name=sg.id,
+            cram_path=sg.cram,
+            output_path=sg.gvcf,
+            tmp_prefix=tmp_path,
+        )
 
         expected_jobs = expected_scatter_count + 3
         job_names = [job.name for job in genotype_jobs]
@@ -191,11 +170,16 @@ class TestGenotyping:
         else:
             scatter_count = 50
 
-        set_config(config, tmp_path / 'config.toml')
-        batch = create_local_batch(tmp_path)
+        config, batch, sg = self._setup_test(tmp_path, config, 'test_genotype.cram')
         spy = mocker.spy(batch, 'write_output')
 
-        genotype_jobs, sg = self._get_new_genotype_job(tmp_path, config, batch=batch)
+        genotype_jobs = genotype(
+            b=batch,
+            sequencing_group_name=sg.id,
+            cram_path=sg.cram,
+            output_path=sg.gvcf,
+            tmp_prefix=tmp_path,
+        )
 
         expected_jobs = scatter_count + 3
         job_names = [job.name for job in genotype_jobs]
@@ -255,10 +239,15 @@ class TestGenotyping:
 
         if reblock_gq_bands is not None:
             config.workflow.reblock_gq_bands = reblock_gq_bands
-        set_config(config, tmp_path / 'config.toml')
 
-        batch = create_local_batch(tmp_path)
-        self._get_new_genotype_job(tmp_path, config, batch=batch)
+        config, batch, sg = self._setup_test(tmp_path, config, 'test_genotype.cram')
+        genotype(
+            b=batch,
+            sequencing_group_name=sg.id,
+            cram_path=sg.cram,
+            output_path=sg.gvcf,
+            tmp_prefix=tmp_path,
+        )
 
         postproc_job_name = 'Postproc GVCF'
         postproc_jobs = batch.select_jobs(postproc_job_name)
@@ -283,10 +272,14 @@ class TestGenotyping:
     ):
         config = default_config()
         config.workflow.sequencing_type = sequencing_type
-
-        set_config(config, tmp_path / 'config.toml')
-        batch = create_local_batch(tmp_path)
-        genotype_jobs, _sg = self._get_new_genotype_job(tmp_path, config, batch=batch)
+        config, batch, sg = self._setup_test(tmp_path, config, 'test_genotype.cram')
+        genotype(
+            b=batch,
+            sequencing_group_name=sg.id,
+            cram_path=sg.cram,
+            output_path=sg.gvcf,
+            tmp_prefix=tmp_path,
+        )
 
         expected_intervals_jobs = batch.select_jobs(expected_intervals_name)
         assert len(expected_intervals_jobs) == 1
@@ -300,8 +293,14 @@ class TestGenotyping:
         if isinstance(config.references['broad'], dict):
             config.references['broad']['ref_fasta'] = None
 
-        genotype_jobs, _sg = self._get_new_genotype_job(tmp_path, config)
-
+        config, batch, sg = self._setup_test(tmp_path, config, 'test_genotype.cram')
+        genotype_jobs = genotype(
+            b=batch,
+            sequencing_group_name=sg.id,
+            cram_path=sg.cram,
+            output_path=sg.gvcf,
+            tmp_prefix=tmp_path,
+        )
         for job in genotype_jobs:
             cmd = get_command_str(job)
             if job.name == 'HaplotypeCaller' or job.name == 'Postproc GVCF':
@@ -314,10 +313,18 @@ class TestGenotyping:
         if isinstance(config.references['broad'], dict):
             config.references['broad']['ref_fasta'] = None
 
-        set_config(config, tmp_path / 'config.toml')
+        # set_config(config, tmp_path / 'config.toml')
+        config, batch, sg = self._setup_test(tmp_path, config, 'test_genotype.cram')
 
         with pytest.raises(ConfigError, match=r'Failed to get reference fasta'):
-            self._get_new_genotype_job(tmp_path, config)
+            # self._get_new_genotype_job(tmp_path, config)
+            genotype(
+                b=batch,
+                sequencing_group_name=sg.id,
+                cram_path=sg.cram,
+                output_path=sg.gvcf,
+                tmp_prefix=tmp_path,
+            )
 
     def test_uses_workflow_reference_when_both_workflow_and_references_set(
         self, tmp_path: Path
@@ -327,7 +334,16 @@ class TestGenotyping:
         if isinstance(config.references['broad'], dict):
             config.references['broad']['ref_fasta'] = 'default_reference.fa'
 
-        genotype_jobs, _sg = self._get_new_genotype_job(tmp_path, config)
+        config, batch, sg = self._setup_test(tmp_path, config, 'test_genotype.cram')
+        genotype_jobs = genotype(
+            b=batch,
+            sequencing_group_name=sg.id,
+            cram_path=sg.cram,
+            output_path=sg.gvcf,
+            tmp_prefix=tmp_path,
+        )
+
+        # genotype_jobs, _sg = self._get_new_genotype_job(tmp_path, config)
 
         for job in genotype_jobs:
             cmd = get_command_str(job)
@@ -343,7 +359,16 @@ class TestGenotyping:
         if isinstance(config.references['broad'], dict):
             config.references['broad']['ref_fasta'] = 'default_reference.fa'
 
-        genotype_jobs, _sg = self._get_new_genotype_job(tmp_path, config)
+        config, batch, sg = self._setup_test(tmp_path, config, 'test_genotype.cram')
+        genotype_jobs = genotype(
+            b=batch,
+            sequencing_group_name=sg.id,
+            cram_path=sg.cram,
+            output_path=sg.gvcf,
+            tmp_prefix=tmp_path,
+        )
+
+        # genotype_jobs, _sg = self._get_new_genotype_job(tmp_path, config)
 
         for job in genotype_jobs:
             cmd = get_command_str(job)
@@ -351,12 +376,16 @@ class TestGenotyping:
                 assert re.search(r'default_reference.fa', cmd)
 
     def test_postproc_gvcf_job_params_with_defaults(self, tmp_path: Path):
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-        batch = create_local_batch(tmp_path)
-
-        _genotype_jobs, sg = self._get_new_genotype_job(tmp_path, config, batch=batch)
-
+        config, batch, sg = self._setup_test(
+            tmp_path, default_config(), 'test_genotype.cram'
+        )
+        genotype(
+            b=batch,
+            sequencing_group_name=sg.id,
+            cram_path=sg.cram,
+            output_path=sg.gvcf,
+            tmp_prefix=tmp_path,
+        )
         postproc_job_name = 'Postproc GVCF'
         postproc_job = batch.select_jobs(postproc_job_name)
 
@@ -394,10 +423,14 @@ class TestGenotyping:
     ):
         config = default_config()
         config.workflow.sequencing_type = sequencing_type
-        set_config(config, tmp_path / 'config.toml')
-        batch = create_local_batch(tmp_path)
-        self._get_new_genotype_job(tmp_path, config, batch=batch)
-
+        config, batch, sg = self._setup_test(tmp_path, config, 'test_genotype.cram')
+        genotype(
+            b=batch,
+            sequencing_group_name=sg.id,
+            cram_path=sg.cram,
+            output_path=sg.gvcf,
+            tmp_prefix=tmp_path,
+        )
         expected_scatter_count = 50
         make_intervals_job_name = (
             f'Make {expected_scatter_count} intervals for {sequencing_type}'
@@ -423,12 +456,17 @@ class TestGenotyping:
     def test_haplotype_caller_job_params_with_defaults(
         self, mocker: MockFixture, tmp_path: Path
     ):
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-        batch = create_local_batch(tmp_path)
+        _config, batch, sg = self._setup_test(
+            tmp_path, default_config(), 'test_genotype.cram'
+        )
         spy = mocker.spy(batch, 'write_output')
-        genotype_jobs, sg = self._get_new_genotype_job(
-            tmp_path=tmp_path, config=config, batch=batch
+
+        genotype_jobs = genotype(
+            b=batch,
+            sequencing_group_name=sg.id,
+            cram_path=sg.cram,
+            output_path=sg.gvcf,
+            tmp_prefix=tmp_path,
         )
 
         haplotype_caller_job_name = 'HaplotypeCaller'
@@ -464,18 +502,9 @@ class TestGenotyping:
         spy.assert_has_calls(expected_calls, any_order=True)
 
     def test_dragen_mode_is_not_called_when_set_to_false(self, tmp_path: Path):
-        config = default_config()
-        set_config(config, tmp_path / 'config.toml')
-        batch = create_local_batch(tmp_path)
-        dataset_id = config.workflow.dataset
-        sg = create_sequencing_group(
-            dataset=dataset_id,
-            sequencing_type=config.workflow.sequencing_type,
-            alignment_input=create_fastq_pairs_input(location=tmp_path, n=1),
-            cram=CramPath(tmp_path / 'test_cram.cram'),
+        _config, batch, sg = self._setup_test(
+            tmp_path, default_config(), 'test_genotype.cram'
         )
-
-        assert sg.cram
 
         # NOTE: The dragen_mode param is currently not exposed in the config. So the only way to test it
         # is to directly modify it when calling the job.
