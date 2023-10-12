@@ -215,7 +215,7 @@ def fraser(
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
     j = b.new_job(job_name, _job_attrs)
     # j.image(image_path('fraser'))
-    j.image('australia-southeast1-docker.pkg.dev/cpg-common/images/fraser:1.12.1')
+    j.image('australia-southeast1-docker.pkg.dev/cpg-common/images-dev/fraser:1.12.1')
 
     # Set resource requirements
     nthreads = requested_nthreads or 8
