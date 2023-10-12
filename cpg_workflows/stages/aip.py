@@ -58,7 +58,7 @@ class GeneratePanelData(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         py_job = get_batch().new_python_job('create_panel_data')
-        py_job.image(image_path('aip'))
+        py_job.image(get_config()['workflow']['driver_image'])
 
         expected_d = self.expected_outputs(dataset)
         hpo_file = get_batch().read_input(get_config()['workflow']['obo_file'])
