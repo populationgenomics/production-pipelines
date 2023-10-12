@@ -24,12 +24,12 @@ HPO file currently gs://cpg-common-test/references/aip/hpo_terms.obo
 """
 from os.path import join
 from datetime import datetime
-from cpg_utils import to_path, Path
+from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, copy_common_env
+from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, copy_common_env, image_path
 from metamist.graphql import gql, query
-from cpg_workflows.batch import get_batch
 
+from cpg_workflows.batch import get_batch
 from cpg_workflows.workflow import (
     stage,
     Dataset,
@@ -44,9 +44,6 @@ DATED_FOLDER = join('reanalysis', get_config()['workflow'].get(
     'fake_date',
     datetime.now().strftime('%Y-%m-%d')
 ))
-
-# TODO move to default config
-AIP_IMAGE = 'australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_aip:latest'
 
 
 @stage
@@ -63,7 +60,7 @@ class GeneratePanelData(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         py_job = get_batch().new_python_job('create_panel_data')
-        py_job.image(AIP_IMAGE)
+        py_job.image(image_path('aip'))
 
         expected_d = self.expected_outputs(dataset)
         hpo_file = get_batch().read_input('OBO FILE')  # todo
@@ -89,7 +86,7 @@ class QueryPanelapp(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
         job = get_batch().new_job('query panel data')
-        job.image(AIP_IMAGE)
+        job.image(image_path('aip'))
 
         # auth and copy env
         authenticate_cloud_credentials_in_job(job)
@@ -159,7 +156,7 @@ class RunHailFiltering(DatasetStage):
         # this could potentially follow on from the AnnotateDataset stage
         input_mt = get_config()['workflow'].get('matrix_table', query_for_latest_mt(dataset.name))
         job = get_batch().new_job('run hail labelling')
-        job.image(AIP_IMAGE)
+        job.image(image_path('aip'))
         job.memory('32Gi')
 
         # auth and copy env
