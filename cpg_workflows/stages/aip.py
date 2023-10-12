@@ -218,7 +218,31 @@ class ValidateMOI(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'AIP summary for {dataset.name}')
+        STANDARD.set_resources(job, ncpu=1, mem_gb=4.0)
 
+        # auth and copy env
+        job.image(image_path('aip'))
+        authenticate_cloud_credentials_in_job(job)
+        copy_common_env(job)
+        hpo_panels = str(inputs.as_dict(dataset, GeneratePanelData)["hpo_panels"])
+        hail_inputs = inputs.as_dict(dataset, RunHailFiltering)
+        panel_input = str(inputs.as_dict(dataset, QueryPanelapp)['panel_data'])
+        # peddy can't read cloud paths
+        local_ped = get_batch().read_input(str(hail_inputs['pedigree']))
+        labelled_vcf = str(hail_inputs["labelled_vcf"])
+        out_json_path = str(self.expected_outputs(dataset)['summary_json'])
+        input_mt = get_config()['workflow'].get(
+            'matrix_table', query_for_latest_mt(dataset.name)
+        )
+        job.command(
+            f'python3 reanalysis/validate_categories.py '
+            f'--labelled_vcf {labelled_vcf} '
+            f'--out_json {out_json_path} '
+            f'--panelapp {panel_input} '
+            f'--pedigree {local_ped} '
+            f'--input_path {input_mt} '
+            f'--participant_panels {hpo_panels} '
+        )
         expected_out = self.expected_outputs(dataset)
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
