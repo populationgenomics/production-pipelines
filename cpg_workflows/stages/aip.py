@@ -42,11 +42,8 @@ from cpg_workflows.workflow import (
 from cpg_workflows.resources import HIGHMEM, STANDARD
 from cpg_workflows.jobs.aip.hpo_panel_match import main as panel_match_main
 
-
-DATED_FOLDER = join(
-    'reanalysis',
-    get_config()['workflow'].get('fake_date', datetime.now().strftime('%Y-%m-%d')),
-)
+CHUNKY_DATE = get_config()['workflow'].get('fake_date', datetime.now().strftime('%Y-%m-%d'))
+DATED_FOLDER = join('reanalysis', CHUNKY_DATE)
 
 
 @stage
@@ -158,6 +155,7 @@ class RunHailFiltering(DatasetStage):
 
         # either do as you're told, or find the latest
         # this could potentially follow on from the AnnotateDataset stage
+        # if this becomes integrated in the main pipeline
         input_mt = get_config()['workflow'].get(
             'matrix_table', query_for_latest_mt(dataset.name)
         )
@@ -174,9 +172,8 @@ class RunHailFiltering(DatasetStage):
         )
         expected_out = self.expected_outputs(dataset)
         pedigree = dataset.write_ped_file(out_path=expected_out['pedigree'])
-        local_ped = get_batch().read_input(
-            str(pedigree)
-        )  # peddy can't read cloud paths
+        # peddy can't read cloud paths
+        local_ped = get_batch().read_input(str(pedigree))
         job.command(
             f'python3 reanalysis/hail_filter_and_label.py '
             f'--mt {input_mt} '
@@ -205,12 +202,7 @@ def _aip_summary_meta(
 )
 class ValidateMOI(DatasetStage):
     """
-    labelled_vcf: str,
-    out_json: str,
-    panelapp: str,
-    pedigree: str,
-    input_path: str,
-    participant_panels: str | None = None,
+    run the labelled VCF -> results JSON stage
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
@@ -247,12 +239,56 @@ class ValidateMOI(DatasetStage):
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
 
-@stage(required_stages=[ValidateMOI])
+def _aip_html_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, str]:
+    """
+    Add meta.type to custom analysis object
+    This isn't quite conformant with what AIP alone produces
+    e.g. doesn't have the full URL to the results in GCP
+    """
+    return {
+        'type': 'aip_output_json',
+        'is_singleton': False,  # not doing this at the moment
+        'is_exome': get_config()['workflow'].get('sequencing_type') == 'exome'
+    }
+
+
+@stage(
+    required_stages=[ValidateMOI],
+    analysis_type='custom',
+    analysis_keys=['results_html', 'latest_html'],
+    update_analysis_meta=_aip_summary_meta,
+)
 class CreateAIPHTML(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'panel_data': dataset.prefix() / DATED_FOLDER / 'panelapp_data.json'}
+        return {
+            'results_html': dataset.prefix(category='web') / DATED_FOLDER / 'summary_output.html',
+            'latest_html': dataset.prefix(category='web') / DATED_FOLDER / f'summary_latest_{CHUNKY_DATE}.html',
+        }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'AIP HTML for {dataset.name}')
+        STANDARD.set_resources(job, ncpu=1, mem_gb=1.0)
+
+        # auth and copy env
+        authenticate_cloud_credentials_in_job(job)
+        copy_common_env(job)
+
+        moi_inputs = inputs.as_dict(dataset, ValidateMOI)['summary_json']
+        panel_input = inputs.as_dict(dataset, QueryPanelapp)['panel_data']
+        pedigree = inputs.as_dict(dataset, RunHailFiltering)['pedigree']
+        local_ped = get_batch().read_input(str(pedigree))
+
+        expected_out = self.expected_outputs(dataset)
+        job.command(
+            f'python3 reanalysis/html_builder.py '
+            f'--results {moi_inputs} '
+            f'--panelapp {panel_input} '
+            f'--pedigree {local_ped} '
+            f'--output {expected_out["results_html"]} '
+            f'--latest {expected_out["latest_html"]} '
+        )
+
         expected_out = self.expected_outputs(dataset)
         return self.make_outputs(dataset, data=expected_out, jobs=job)
