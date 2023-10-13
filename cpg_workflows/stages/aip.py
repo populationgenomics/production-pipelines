@@ -216,12 +216,12 @@ class ValidateMOI(DatasetStage):
         job.image(image_path('aip'))
         authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
-        hpo_panels = str(inputs.as_dict(dataset, GeneratePanelData)["hpo_panels"])
+        hpo_panels = str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels'])
         hail_inputs = inputs.as_dict(dataset, RunHailFiltering)
         panel_input = str(inputs.as_dict(dataset, QueryPanelapp)['panel_data'])
         # peddy can't read cloud paths
         local_ped = get_batch().read_input(str(hail_inputs['pedigree']))
-        labelled_vcf = str(hail_inputs["labelled_vcf"])
+        labelled_vcf = str(hail_inputs['labelled_vcf'])
         out_json_path = str(self.expected_outputs(dataset)['summary_json'])
         input_mt = get_config()['workflow'].get(
             'matrix_table', query_for_latest_mt(dataset.name)
@@ -249,7 +249,7 @@ def _aip_html_meta(
     """
     return {
         'type': 'aip_output_json',
-        'is_singleton': False,  # not doing this at the moment
+        'is_singleton': '',  # not doing this at the moment
         'is_exome': get_config()['workflow'].get('sequencing_type') == 'exome'
     }
 
