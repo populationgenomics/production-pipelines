@@ -193,7 +193,7 @@ def fraser(
     jobs: list[Job] = []
 
     # Convert CRAMs to BAMs if necessary
-    input_bams_localised: list[hb.ResourceGroup] = []
+    input_bams_localised: list[hb.ResourceFile] = []
     for input_bam_or_cram in input_bams_or_crams:
         if isinstance(input_bam_or_cram, CramPath):
             j, output_bam = cram_to_bam(
@@ -204,11 +204,11 @@ def fraser(
             )
             if j and isinstance(j, Job):
                 jobs.append(j)
-            input_bam_or_cram = output_bam
+            input_bam_or_cram = output_bam.bam
         elif isinstance(input_bam_or_cram, BamPath):
             # Localise BAM
-            input_bams_localised.append(input_bam_or_cram.resource_group(b))
-    assert all([isinstance(f, hb.ResourceGroup) for f in input_bams_localised])
+            input_bams_localised.append(input_bam_or_cram.resource_group(b).bam)
+    assert all([isinstance(f, hb.ResourceFile) for f in input_bams_localised])
 
     # Create FRASER job
     job_name = f'fraser_{cohort_name}' if cohort_name else 'count'
