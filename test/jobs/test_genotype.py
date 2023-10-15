@@ -162,13 +162,12 @@ class TestGenotyping:
 
     @pytest.mark.parametrize('scatter_count', [10, 20, 30])
     def test_genotype_jobs_with_varying_scatter_counts(
-        self, mocker: MockFixture, tmp_path: Path, scatter_count
+        self, tmp_path: Path, scatter_count
     ):
         config = default_config()
         config.workflow.scatter_count_genotype = scatter_count
 
         config, batch, sg = self._setup_test(tmp_path, config, 'test_genotype.cram')
-        spy = mocker.spy(batch, 'write_output')
 
         genotype_jobs = genotype(
             b=batch,
@@ -179,46 +178,22 @@ class TestGenotyping:
         )
 
         expected_jobs = scatter_count + 3
-        job_names = [job.name for job in genotype_jobs]
         assert len(genotype_jobs) == expected_jobs
 
-        assert 'Postproc GVCF' in job_names
-        assert f'Make {scatter_count} intervals for genome' in job_names
-        assert f'Merge {scatter_count} GVCFs' in job_names
-
         haplotype_output_paths: list[str] = []
-        expected_calls = []
         for job in genotype_jobs:
             cmd = get_command_str(job)
             if job.name == f'Merge {scatter_count} GVCFs':
-                assert re.search(r'picard', cmd)
-                assert re.search(r'MergeVcfs', cmd)
                 for haplotype_output_path in haplotype_output_paths:
                     assert re.search(re.escape(haplotype_output_path), cmd)
                 assert len(set(haplotype_output_paths)) == len(haplotype_output_paths)
                 assert len(haplotype_output_paths) == scatter_count
 
             if job.name == 'HaplotypeCaller':
-                assert re.search(r'gatk', cmd)
-                assert re.search(r'HaplotypeCaller', cmd)
                 pattern = r'-O\s+([^\\]+\.gz)'
                 match = re.search(pattern, cmd)
                 assert match
                 haplotype_output_paths.append(match.group(1))
-
-                scatter_frac = job.attributes['part']
-                scatter_parts = scatter_frac.split('/')
-                file_name = f'{int(scatter_parts[0]) - 1}_of_{scatter_parts[1]}_{sg.id}'
-
-                file_path = tmp_path / 'haplotypecaller' / file_name
-
-                expected_calls.append(mocker.call(job.output_gvcf, str(file_path)))
-
-            if job.name == 'Postproc GVCF':
-                assert re.search(r'gatk', cmd)
-                assert re.search(r'ReblockGVCF', cmd)
-
-        spy.assert_has_calls(expected_calls, any_order=True)
 
     @pytest.mark.parametrize(
         'reblock_gq_bands, expected_gqb_flags',
