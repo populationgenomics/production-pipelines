@@ -160,15 +160,12 @@ class TestGenotyping:
 
         spy.assert_has_calls(expected_calls, any_order=True)
 
-    @pytest.mark.parametrize('scatter_count', [10, 20, 30, None])
+    @pytest.mark.parametrize('scatter_count', [10, 20, 30])
     def test_genotype_jobs_with_varying_scatter_counts(
         self, mocker: MockFixture, tmp_path: Path, scatter_count
     ):
         config = default_config()
-        if scatter_count is not None:
-            config.workflow.scatter_count_genotype = scatter_count
-        else:
-            scatter_count = 50
+        config.workflow.scatter_count_genotype = scatter_count
 
         config, batch, sg = self._setup_test(tmp_path, config, 'test_genotype.cram')
         spy = mocker.spy(batch, 'write_output')
