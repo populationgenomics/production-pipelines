@@ -70,13 +70,9 @@ def get_panels(endpoint: str = PANELS_ENDPOINT) -> dict[str, set[int]]:
                 hpo_dict[match].add(int(panel['id']))
 
         # cycle through additional pages
-        # why don't GEL make the panelapp API public...
-        if endpoint_data['next']:
-            endpoint = endpoint_data['next']
-        else:
-            break
-
-    return dict(hpo_dict)
+        if endpoint := endpoint_data['next']:
+            continue
+        return dict(hpo_dict)
 
 
 def get_participant_hpos(dataset: str) -> tuple[dict, set[str]]:
