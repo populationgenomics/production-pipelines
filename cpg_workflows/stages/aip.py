@@ -172,7 +172,7 @@ class RunHailFiltering(DatasetStage):
         authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
 
-        panelapp_json = inputs.as_str(
+        panelapp_json = inputs.as_path(
             target=dataset, stage=QueryPanelapp, key='panel_data'
         )
         expected_out = self.expected_outputs(dataset)
