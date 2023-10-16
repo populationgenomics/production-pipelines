@@ -39,10 +39,11 @@ from cpg_workflows.workflow import (
     StageOutput,
     StageInput,
 )
-from cpg_workflows.resources import HIGHMEM, STANDARD
+from cpg_workflows.resources import HIGHMEM
 from cpg_workflows.jobs.aip.hpo_panel_match import main as panel_match_main
 
-CHUNKY_DATE = get_config()['workflow'].get('fake_date', datetime.now().strftime('%Y-%m-%d'))
+RUN_CONFIG = get_config()
+CHUNKY_DATE = datetime.now().strftime('%Y-%m-%d')
 DATED_FOLDER = join('reanalysis', CHUNKY_DATE)
 
 
