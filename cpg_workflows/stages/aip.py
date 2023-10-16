@@ -63,7 +63,7 @@ class GeneratePanelData(DatasetStage):
         py_job.image(get_config()['workflow']['driver_image'])
 
         # only needs a really tiny image
-        STANDARD.set_resources(py_job, ncpu=1, mem_gb=1.0)
+        py_job.cpu(0.25).memory('lowemem')
         expected_d = self.expected_outputs(dataset)
         hpo_file = get_batch().read_input(get_config()['workflow']['obo_file'])
         py_job.call(
@@ -85,7 +85,7 @@ class QueryPanelapp(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
         job = get_batch().new_job('query panel data')
-        STANDARD.set_resources(job, ncpu=1, mem_gb=1.0)
+        job.cpu(0.25).memory('lowemem')
         job.image(image_path('aip'))
 
         # auth and copy env
