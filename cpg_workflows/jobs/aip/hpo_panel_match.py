@@ -164,6 +164,9 @@ def match_hpo_terms(
     if hpo_str in panel_map:
         selections.update(panel_map[hpo_str])
 
+    # at time of writing the constant MAX_DEPTH is 3
+    # i.e. once the HPO tree traversal has reached 3 layers up, stop
+    # layers in this context represents a reduction in term specificity
     if layers_scanned >= MAX_DEPTH:
         return selections
 
