@@ -45,6 +45,18 @@ from cpg_workflows.jobs.aip.hpo_panel_match import main as panel_match_main
 RUN_CONFIG = get_config()
 CHUNKY_DATE = datetime.now().strftime('%Y-%m-%d')
 DATED_FOLDER = join('reanalysis', CHUNKY_DATE)
+MTA_QUERY = gql(
+    """
+    query MyQuery($dataset: String!) {
+        project(name: $dataset) {
+            analyses(type: {eq: "custom"}, status: {eq: COMPLETED}) {
+                output
+                timestampCompleted
+            }
+        }
+    }
+""")
+# validate(MTA_QUERY)
 
 
 @stage
@@ -99,8 +111,8 @@ class QueryPanelapp(DatasetStage):
         expected_out = self.expected_outputs(dataset)
         job.command(
             f'python3 reanalysis/query_panelapp.py '
-            f'--panels {str(hpo_panel_json)} '
-            f'--out_path {str(expected_out["panel_data"])}'
+            f'--panels "{str(hpo_panel_json)}" '
+            f'--out_path "{str(expected_out["panel_data"])}" '
         )
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -114,30 +126,22 @@ def query_for_latest_mt(dataset: str) -> str:
     Returns:
         str, the path to the latest MT
     """
-    my_query = gql(
-        """
-        query MyQuery($dataset: String!) {
-            project(name: $dataset) {
-                analyses(type: {eq: "custom"}, status: {eq: COMPLETED}) {
-                    output
-                }
-            }
-        }
-    """
-    )
-    result = query(my_query, variables={'dataset': dataset})
+    result = query(MTA_QUERY, variables={'dataset': dataset})
+    mt_by_date = {}
     seq_type_exome = get_config()['workflow'].get('sequencing_type') == 'exome'
-    mt_path = ''
     for analysis in result['project']['analyses']:
-        if analysis['output'].endswith('.mt') and (
+        if analysis['output'] and analysis['output'].endswith('.mt') and (
             (seq_type_exome and '/exome/' in analysis['output'])
             or (not seq_type_exome and '/exome/' not in analysis['output'])
         ):
-            mt_path = analysis['output']
+            mt_by_date[analysis['timestampCompleted']] = analysis['output']
 
-    if not mt_path:
+    if not mt_by_date:
         raise ValueError(f'No MT found for dataset {dataset}')
-    return mt_path
+
+    # return the latest, determined by a sort on timestamp
+    # 2023-10-10... > 2023-10-09..., so sort on strings
+    return mt_by_date[sorted(mt_by_date)[-1]]
 
 
 @stage(required_stages=[QueryPanelapp])
@@ -177,10 +181,10 @@ class RunHailFiltering(DatasetStage):
         local_ped = get_batch().read_input(str(pedigree))
         job.command(
             f'python3 reanalysis/hail_filter_and_label.py '
-            f'--mt {input_mt} '
-            f'--panelapp {panelapp_json} '
-            f'--pedigree {local_ped} '
-            f'--vcf_out {str(expected_out["labelled_vcf"])}'
+            f'--mt "{input_mt}" '
+            f'--panelapp "{panelapp_json}" '
+            f'--pedigree "{local_ped}" '
+            f'--vcf_out "{str(expected_out["labelled_vcf"])}" '
         )
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -229,12 +233,12 @@ class ValidateMOI(DatasetStage):
         )
         job.command(
             f'python3 reanalysis/validate_categories.py '
-            f'--labelled_vcf {labelled_vcf} '
-            f'--out_json {out_json_path} '
-            f'--panelapp {panel_input} '
-            f'--pedigree {local_ped} '
-            f'--input_path {input_mt} '
-            f'--participant_panels {hpo_panels} '
+            f'--labelled_vcf "{labelled_vcf}" '
+            f'--out_json "{out_json_path}" '
+            f'--panelapp "{panel_input}" '
+            f'--pedigree "{local_ped}" '
+            f'--input_path "{input_mt}" '
+            f'--participant_panels "{hpo_panels}" '
         )
         expected_out = self.expected_outputs(dataset)
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -284,11 +288,11 @@ class CreateAIPHTML(DatasetStage):
         expected_out = self.expected_outputs(dataset)
         job.command(
             f'python3 reanalysis/html_builder.py '
-            f'--results {moi_inputs} '
-            f'--panelapp {panel_input} '
-            f'--pedigree {local_ped} '
-            f'--output {expected_out["results_html"]} '
-            f'--latest {expected_out["latest_html"]} '
+            f'--results "{moi_inputs}" '
+            f'--panelapp "{panel_input}" '
+            f'--pedigree "{local_ped}" '
+            f'--output "{expected_out["results_html"]}" '
+            f'--latest "{expected_out["latest_html"]}" '
         )
 
         expected_out = self.expected_outputs(dataset)
