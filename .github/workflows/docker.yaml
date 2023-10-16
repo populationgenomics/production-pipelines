@@ -24,8 +24,8 @@ jobs:
       BUILDKIT_PROGRESS: plain
       CLOUDSDK_CORE_DISABLE_PROMPTS: 1
       IMAGE_NAME: cpg_workflows
-      DOCKER_DEV: australia-southeast1-docker.pkg.dev/cpg-common/images-dev/
-      DOCKER_MAIN: australia-southeast1-docker.pkg.dev/cpg-common/images/
+      DOCKER_DEV: australia-southeast1-docker.pkg.dev/cpg-common/images-dev
+      DOCKER_MAIN: australia-southeast1-docker.pkg.dev/cpg-common/images
     steps:
       - uses: actions/checkout@v3
         with:
@@ -52,14 +52,14 @@ jobs:
       - name: push PR
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_DEV$IMAGE_NAME:pr-${{ github.event.number }}
-          docker push $DOCKER_DEV$IMAGE_NAME:pr-${{ github.event.number }}
+          docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_DEV/$IMAGE_NAME:pr-${{ github.event.number }}
+          docker push $DOCKER_DEV/$IMAGE_NAME:pr-${{ github.event.number }}
 
       - name: manually triggered build
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
-          docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_DEV$IMAGE_NAME:${{github.event.inputs.tag}}
-          docker push $DOCKER_DEV$IMAGE_NAME:${{github.event.inputs.tag}}
+          docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_DEV/$IMAGE_NAME:${{github.event.inputs.tag}}
+          docker push $DOCKER_DEV/$IMAGE_NAME:${{github.event.inputs.tag}}
 
       - name: push latest
         if: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
