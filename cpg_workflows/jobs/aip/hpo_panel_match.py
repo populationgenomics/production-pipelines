@@ -132,7 +132,7 @@ def match_hpo_terms(
     hpo_tree: networkx.MultiDiGraph,
     hpo_str: str,
     layers_scanned: int = 0,
-    selections: set | None = None,
+    selections: set[int] | None = None,
 ) -> set[int]:
     """
     get panels relevant for this HPO
@@ -151,7 +151,7 @@ def match_hpo_terms(
         hpo_tree (): a graph object representing the HPO tree
         hpo_str (str): the query HPO term
         layers_scanned (int): number of layers traversed so far
-        selections (set[str]): collected panel IDs so far
+        selections (set[int]): collected panel IDs so far
 
     Returns:
         set: panel IDs relating to this HPO term, up to 3 HPO layers away
