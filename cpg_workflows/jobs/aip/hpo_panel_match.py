@@ -60,7 +60,7 @@ def get_panels(endpoint: str = PANELS_ENDPOINT) -> dict[str, set[int]]:
 
     hpo_dict = defaultdict(set)
 
-    while endpoint:
+    while True:
         endpoint_data = get_json_response(endpoint)
         for panel in endpoint_data['results']:
 
@@ -72,6 +72,7 @@ def get_panels(endpoint: str = PANELS_ENDPOINT) -> dict[str, set[int]]:
         # cycle through additional pages
         if endpoint := endpoint_data['next']:
             continue
+
         return dict(hpo_dict)
 
 
