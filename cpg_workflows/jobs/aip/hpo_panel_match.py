@@ -26,7 +26,7 @@ from metamist.graphql import gql, query
 
 HPO_KEY = 'HPO Terms (present)'
 HPO_RE = re.compile(r'HP:[0-9]+')
-MAX_DEPTH: int = 3
+MAX_DEPTH = 3
 PANELS_ENDPOINT = 'https://panelapp.agha.umccr.org/api/v1/panels/'
 
 
@@ -118,12 +118,12 @@ def get_participant_hpos(dataset: str) -> tuple[dict, set[str]]:
             HPO_RE.findall(sg['sample']['participant']['phenotypes'].get(HPO_KEY, ''))
         )
         all_hpo.update(hpos)
-        hpo_dict[sg['id']] = dict(
-            hpo_terms=hpos,
-            family_id=sg['sample']['participant']['families'][0]['externalId'],
-            external_id=sg['sample']['participant']['externalId'],
-            panels={137},  # baseline panel is always mendeliome
-        )
+        hpo_dict[sg['id']] = {
+            'external_id': sg['sample']['participant']['externalId'],
+            'family_id': sg['sample']['participant']['families'][0]['externalId'],
+            'hpo_terms': hpos,
+            'panels': {137},
+        }
     return hpo_dict, all_hpo
 
 
@@ -131,22 +131,30 @@ def match_hpo_terms(
     panel_map: dict[str, set[int]],
     hpo_tree: networkx.MultiDiGraph,
     hpo_str: str,
-    max_layer_delta: int = 3,
     layers_scanned: int = 0,
     selections: set | None = None,
 ) -> set[int]:
     """
-    get a list of panels which are relevant for this HPO
-    this includes a manual recursive implementation of the edge traversal
-    main reason is to take superseded terms into account
+    get panels relevant for this HPO
+    uses a recursive  edge traversal
 
-    instead of just checking parent(s), we also check if a term is obsolete
-    if so, we instead check each replacement term
+    we check if a term is obsolete; if so, we instead
+    check each replacement term
 
     for live terms we recurse on all parents
 
     relevant usage guide:
     https://github.com/dhimmel/obonet/blob/main/examples/go-obonet.ipynb
+
+    Args:
+        panel_map (dict):
+        hpo_tree (): a graph object representing the HPO tree
+        hpo_str (str): the query HPO term
+        layers_scanned (int): number of layers traversed so far
+        selections (set[str]): collected panel IDs so far
+
+    Returns:
+        set: panel IDs relating to this HPO term, up to 3 HPO layers away
     """
 
     if selections is None:
@@ -156,7 +164,7 @@ def match_hpo_terms(
     if hpo_str in panel_map:
         selections.update(panel_map[hpo_str])
 
-    if layers_scanned >= max_layer_delta:
+    if layers_scanned >= MAX_DEPTH:
         return selections
 
     # if a node is invalid, recursively call this method for each replacement D:
@@ -173,7 +181,6 @@ def match_hpo_terms(
                     panel_map,
                     hpo_tree,
                     hpo_term,
-                    max_layer_delta,
                     layers_scanned + 1,
                     selections,
                 )
@@ -185,7 +192,6 @@ def match_hpo_terms(
                 panel_map,
                 hpo_tree,
                 hpo_term,
-                max_layer_delta,
                 layers_scanned + 1,
                 selections,
             )
@@ -213,8 +219,7 @@ def match_hpos_to_panels(
         panel_ids = match_hpo_terms(
             panel_map=hpo_to_panel_map,
             hpo_tree=hpo_graph,
-            hpo_str=hpo,
-            max_layer_delta=MAX_DEPTH,
+            hpo_str=hpo
         )
         hpo_to_panels[hpo] = panel_ids
 
