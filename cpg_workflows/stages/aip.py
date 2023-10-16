@@ -63,7 +63,7 @@ class GeneratePanelData(DatasetStage):
         py_job.image(get_config()['workflow']['driver_image'])
 
         # only needs a really tiny image
-        py_job.cpu(0.25).memory('lowemem')
+        py_job.cpu(0.25).memory('lowmem')
         expected_d = self.expected_outputs(dataset)
         hpo_file = get_batch().read_input(get_config()['workflow']['obo_file'])
         py_job.call(
@@ -85,7 +85,7 @@ class QueryPanelapp(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
         job = get_batch().new_job('query panel data')
-        job.cpu(0.25).memory('lowemem')
+        job.cpu(0.25).memory('lowmem')
         job.image(image_path('aip'))
 
         # auth and copy env
@@ -210,7 +210,7 @@ class ValidateMOI(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'AIP summary for {dataset.name}')
-        STANDARD.set_resources(job, ncpu=1, mem_gb=4.0)
+        job.cpu(1.0).memory('standard')
 
         # auth and copy env
         job.image(image_path('aip'))
@@ -269,7 +269,7 @@ class CreateAIPHTML(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'AIP HTML for {dataset.name}')
-        STANDARD.set_resources(job, ncpu=1, mem_gb=1.0)
+        job.cpu(1.0).memory('lowmem')
 
         # auth and copy env
         authenticate_cloud_credentials_in_job(job)
