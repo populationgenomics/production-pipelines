@@ -287,6 +287,7 @@ class CreateAIPHTML(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'AIP HTML for {dataset.name}')
         job.cpu(1.0).memory('lowmem')
+        job.image(image_path('aip'))
 
         # auth and copy env
         authenticate_cloud_credentials_in_job(job)
