@@ -272,7 +272,7 @@ def _aip_html_meta(
 
 
 @stage(
-    required_stages=[ValidateMOI],
+    required_stages=[ValidateMOI, QueryPanelapp, RunHailFiltering],
     analysis_type='custom',
     analysis_keys=['results_html', 'latest_html'],
     update_analysis_meta=_aip_summary_meta,
