@@ -200,7 +200,7 @@ def _aip_summary_meta(
 
 
 @stage(
-    required_stages=RunHailFiltering,
+    required_stages=[GeneratePanelData, QueryPanelapp, RunHailFiltering],
     analysis_type='custom',
     analysis_keys=['summary_json'],
     update_analysis_meta=_aip_summary_meta,
