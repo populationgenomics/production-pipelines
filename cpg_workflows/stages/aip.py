@@ -79,8 +79,12 @@ class GeneratePanelData(DatasetStage):
         py_job.cpu(0.25).memory('lowmem')
         expected_d = self.expected_outputs(dataset)
         hpo_file = get_batch().read_input(get_config()['workflow']['obo_file'])
+        query_dataset = dataset.name
+        if get_config()['workflow'].get('access_level') == 'test' and not 'test' in query_dataset:
+            query_dataset += '-test'
+
         py_job.call(
-            panel_match_main, dataset.name, hpo_file, str(expected_d['hpo_panels'])
+            panel_match_main, query_dataset, hpo_file, str(expected_d['hpo_panels'])
         )
 
         return self.make_outputs(dataset, data=expected_d, jobs=py_job)
@@ -122,11 +126,14 @@ def query_for_latest_mt(dataset: str) -> str:
     """
     query for the latest MT for a dataset
     Args:
-        dataset (str):
+        dataset (str): project to query for
     Returns:
         str, the path to the latest MT
     """
-    result = query(MTA_QUERY, variables={'dataset': dataset})
+    query_dataset = dataset
+    if get_config()['workflow'].get('access_level') == 'test' and not 'test' in query_dataset:
+        query_dataset += '-test'
+    result = query(MTA_QUERY, variables={'dataset': query_dataset})
     mt_by_date = {}
     seq_type_exome = get_config()['workflow'].get('sequencing_type') == 'exome'
     for analysis in result['project']['analyses']:
@@ -137,7 +144,7 @@ def query_for_latest_mt(dataset: str) -> str:
             mt_by_date[analysis['timestampCompleted']] = analysis['output']
 
     if not mt_by_date:
-        raise ValueError(f'No MT found for dataset {dataset}')
+        raise ValueError(f'No MT found for dataset {query_dataset}')
 
     # return the latest, determined by a sort on timestamp
     # 2023-10-10... > 2023-10-09..., so sort on strings
