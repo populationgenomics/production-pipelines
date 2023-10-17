@@ -226,7 +226,12 @@ class ValidateMOI(DatasetStage):
         panel_input = str(inputs.as_dict(dataset, QueryPanelapp)['panel_data'])
         # peddy can't read cloud paths
         local_ped = get_batch().read_input(str(hail_inputs['pedigree']))
-        labelled_vcf = str(hail_inputs['labelled_vcf'])
+        labelled_vcf = get_batch().read_input_group(
+            **{
+                'vcf.bgz': str(hail_inputs['labelled_vcf']),
+                'vcf.bgz.tbi': str(hail_inputs['labelled_vcf']) + '.tbi',
+            }
+        )['vcf.bgz']
         out_json_path = str(self.expected_outputs(dataset)['summary_json'])
         input_mt = get_config()['workflow'].get(
             'matrix_table', query_for_latest_mt(dataset.name)
