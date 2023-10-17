@@ -80,7 +80,7 @@ class GeneratePanelData(DatasetStage):
         expected_d = self.expected_outputs(dataset)
         hpo_file = get_batch().read_input(get_config()['workflow']['obo_file'])
         query_dataset = dataset.name
-        if get_config()['workflow'].get('access_level') == 'test' and not 'test' in query_dataset:
+        if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
             query_dataset += '-test'
 
         py_job.call(
@@ -131,7 +131,7 @@ def query_for_latest_mt(dataset: str) -> str:
         str, the path to the latest MT
     """
     query_dataset = dataset
-    if get_config()['workflow'].get('access_level') == 'test' and not 'test' in query_dataset:
+    if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
         query_dataset += '-test'
     result = query(MTA_QUERY, variables={'dataset': query_dataset})
     mt_by_date = {}
