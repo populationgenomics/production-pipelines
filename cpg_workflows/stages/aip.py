@@ -10,7 +10,6 @@ Takes as input:
     - HPO.obo file
 Generates:
     - PED file
-    - Mapping between internal and external IDs
     - Latest participant panels
     - PanelApp results
 
@@ -273,7 +272,7 @@ def _aip_html_meta(
     e.g. doesn't have the full URL to the results in GCP
     """
     return {
-        'type': 'aip_output_json',
+        'type': 'aip_output_html',
         'is_singleton': '',  # not doing this at the moment
         'is_exome': get_config()['workflow'].get('sequencing_type') == 'exome'
     }
@@ -283,7 +282,7 @@ def _aip_html_meta(
     required_stages=[ValidateMOI, QueryPanelapp, RunHailFiltering],
     analysis_type='custom',
     analysis_keys=['results_html', 'latest_html'],
-    update_analysis_meta=_aip_summary_meta,
+    update_analysis_meta=_aip_html_meta,
 )
 class CreateAIPHTML(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
