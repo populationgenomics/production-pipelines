@@ -1,5 +1,24 @@
 """
 Query function to parse JSON VEP results.
+
+Decoding a JSON string is a very expensive operation, so we need to
+provide a fixed schema
+
+This schema is completely rigid (each element needs a name and type),
+which causes some issues with parsing, e.g. frequencies:
+
+- the frequencies field is a Dict[str, Dict[str, Float]]
+- the top level key is the alt allele, which can be A/C/G/T, or
+  "-" for a deletion, and any alt allele for a complex var / indel
+- it is not possible to define a fixed schema for this, because any
+  alt allele is possible - we have to skip this whole section in the schema
+- this isn't an issue for us, as we apply frequencies from an alternative
+  resource bundle
+- if we were relying on the VEP-supplied frequencies we would have to use
+  an alternative way of parsing the VEP JSON, or export to a different format
+
+The key here is that we are aware of the fields that can/will fail, and
+avoid relying on them downstream
 """
 
 import hail as hl
@@ -68,6 +87,7 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, use_110: bool = False)
               'motif_pos:int32,'
               'motif_score_change:float64,'
               'strand:int32,'
+              'transcription_factors:array<str>,'
               'variant_allele:str'
             '}>,'
             'regulatory_feature_consequences:array<struct{'
@@ -118,6 +138,7 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, use_110: bool = False)
               'lof_filter:str,'
               'lof_info:str,'
               'minimised:int32,'
+              'mirna:array<str>,'
               'polyphen_prediction:str,'
               'polyphen_score:float64,'
               'protein_end:int32,'
@@ -131,6 +152,7 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, use_110: bool = False)
               'trembl:array<str>,'
               'tsl:int32,'
               'uniparc:array<str>,'
+              'uniprot_isoform:array<str>,'
               'variant_allele:str,'
               'am_class:str,'
               'am_pathogenicity:float64,'
