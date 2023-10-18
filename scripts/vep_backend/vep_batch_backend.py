@@ -5,7 +5,6 @@ Run VEP in parallel using batch backend
 """
 
 import click
-
 from cpg_utils import to_path
 from cpg_utils.hail_batch import output_path, image_path, query_command
 from cpg_utils.config import get_config

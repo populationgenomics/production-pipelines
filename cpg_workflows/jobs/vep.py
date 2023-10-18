@@ -143,6 +143,9 @@ def gather_vep_json_to_ht(
     Parse results from VEP with annotations formatted in JSON,
     and write into a Hail Table using a Batch job.
     """
+
+    vep_version = get_config()['workflow']['vep_version']
+
     if use_dataproc:
         # Importing this requires CPG_CONFIG_PATH to be already set, that's why
         # we are not importing it on the top level.
@@ -154,7 +157,7 @@ def gather_vep_json_to_ht(
 
         j = dataproc.hail_dataproc_job(
             b,
-            f'{script_path} --out_path {out_path} '
+            f'{script_path} --out_path {out_path} --vep_version {vep_version}'
             + ' '.join(str(p) for p in vep_results_paths),
             max_age='24h',
             packages=[
@@ -183,7 +186,7 @@ def gather_vep_json_to_ht(
                 vep.vep_json_to_ht.__name__,
                 [str(p) for p in vep_results_paths],
                 str(out_path),
-                get_config()['workflow'].get('use_vep_110', False),
+                vep_version,
                 setup_gcp=True,
             )
         )
@@ -203,16 +206,19 @@ def vep_one(
     if out_path and can_reuse(out_path):
         return None
 
-    j = b.new_job('VEP', (job_attrs or {}) | dict(tool='vep'))
-    use_110 = get_config()['workflow'].get('use_vep_110', False)
+    vep_version = get_config()['workflow'].get('vep_version')
+    if not vep_version:
+        raise IndexError('No VEP version specified in config.workflow.vep_version')
+
+    # check that the cache and image for this version exist
+    vep_image = image_path(f'vep_{vep_version}')
+    vep_mount_path = reference_path(f'vep_{vep_version}_mount')
+    assert all([vep_image, vep_mount_path])
+    logging.info(f'Using VEP {vep_version}')
+
+    j = b.new_job('VEP', (job_attrs or {}) | dict(tool=f'VEP {vep_version}'))
+    j.image(vep_image)
     splice_ai = get_config()['workflow'].get('spliceai_plugin', False)
-    if use_110:
-        logging.info('Using VEP 110')
-        j.image(image_path('ensembl-vep'))
-        vep_mount_path = reference_path('vep_110_mount')
-    else:
-        j.image(image_path('vep'))
-        vep_mount_path = reference_path('vep_mount')
 
     # vep is single threaded, with a middling memory requirement
     # during test it caps out around 4GB, though this could be
@@ -236,11 +242,13 @@ def vep_one(
     data_mount = to_path(f'/{vep_mount_path.drive}')
     j.cloudfuse(vep_mount_path.drive, str(data_mount), read_only=True)
     vep_dir = data_mount / '/'.join(vep_mount_path.parts[2:])
+
+    # assume for now that only VEP 105 has a non-standard install location
     loftee_conf = {
         'gerp_bigwig': f'{vep_dir}/gerp_conservation_scores.homo_sapiens.GRCh38.bw',
         'human_ancestor_fa': f'{vep_dir}/human_ancestor.fa.gz',
         'conservation_file': f'{vep_dir}/loftee.sql',
-        'loftee_path': '$VEP_DIR_PLUGINS' if use_110 else '$MAMBA_ROOT_PREFIX/share/ensembl-vep'
+        'loftee_path': '$MAMBA_ROOT_PREFIX/share/ensembl-vep' if vep_version == '105' else '$VEP_DIR_PLUGINS'
     }
 
     # sexy new plugin - only present in 110 build
@@ -249,12 +257,12 @@ def vep_one(
     # UTRannotator plugin doesn't support JSON output at this time; only activate for VCF outputs
     # VCF annotation doesn't utilise the aggregated Seqr reference data, including spliceAI
     # SpliceAI requires both indel and SNV files to be present (~100GB), untested
-    vcf_plugins = (
-        f'--plugin UTRAnnotator,file=$UTR38 '
-        f'--plugin SpliceAI,snv={vep_dir}/spliceai_scores.raw.snv.hg38.vcf.gz,'
-        f'indel={vep_dir}/spliceai_scores.raw.indel.hg38.vcf.gz' if splice_ai else
-        f'--plugin UTRAnnotator,file=$UTR38 '
-    )
+    vcf_plugins = '--plugin UTRAnnotator,file=$UTR38 '
+    if splice_ai:
+        vcf_plugins += (
+            f'--plugin SpliceAI,snv={vep_dir}/spliceai_scores.raw.snv.hg38.vcf.gz,'
+            f'indel={vep_dir}/spliceai_scores.raw.indel.hg38.vcf.gz '
+        )
 
     # VEP 105 installs plugins in non-standard locations
     loftee_plugin_path = '--dir_plugins $MAMBA_ROOT_PREFIX/share/ensembl-vep '
@@ -275,9 +283,9 @@ def vep_one(
     --cache --offline --assembly GRCh38 \\
     --dir_cache {vep_dir}/vep/ \\
     --fasta $FASTA \\
-    {alpha_missense_plugin if use_110 else loftee_plugin_path} \
+    {loftee_plugin_path if vep_version == '105' else alpha_missense_plugin} \
     --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \
-    {vcf_plugins if (use_110 and out_format == 'vcf') else ''}
+    {vcf_plugins if (vep_version == '110' and out_format == 'vcf') else ''}
     """
 
     if out_format == 'vcf':

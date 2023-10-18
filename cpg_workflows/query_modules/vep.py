@@ -24,15 +24,19 @@ avoid relying on them downstream
 import hail as hl
 
 
-def vep_json_to_ht(vep_result_paths: list[str], out_path, use_110: bool = False):
+def vep_json_to_ht(vep_result_paths: list[str], out_path, vep_version: str):
     """
     Parse results from VEP with annotations formatted in JSON,
     and write into a Hail Table.
+    receives a vep_version String to determine how data is decoded
     """
+
+    # check against supported versions
+    assert vep_version in ['105', '110']
 
     # Defining schema inside the function, so we can submit
     # the function to the Batch Job:
-    if use_110:
+    if vep_version == '110':
         # Differences relative to the 105 schema:
         # - minimised, int32, new field at top level
         # - seq_region_name, str, new field at top level
@@ -162,7 +166,7 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, use_110: bool = False)
                 variant_class:str
             }
         """)
-    else:
+    elif vep_version == '105':
         json_schema = hl.dtype("""
             struct{
                 assembly_name:str,
@@ -314,6 +318,9 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, use_110: bool = False)
                 }>,
                 variant_class:str
             }""")
+
+    else:
+        raise AssertionError(f'VEP version {vep_version} not supported')
 
     ht = hl.import_table(
         paths=vep_result_paths, no_header=True, types={'f0': json_schema}

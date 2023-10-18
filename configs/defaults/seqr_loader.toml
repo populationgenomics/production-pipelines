@@ -10,8 +10,8 @@ use_gnarly = false
 # Use allele-specific annotations for VQSR
 use_as_vqsr = true
 
-# Use the VEP 110 annotation version (default is 105
-#use_vep_110 = true
+# Version of VEP to use, currently operational: 105, 110
+vep_version = '110'
 
 # Realign CRAM when available, instead of using FASTQ.
 # The parameter value should correspond to CRAM version
@@ -74,3 +74,12 @@ username = 'seqr'
 # Load ElasticSearch password from a secret, unless SEQR_ES_PASSWORD is set
 password_secret_id = 'seqr-es-password'
 password_project_id = 'seqr-308602'
+
+# temporary overrides until we rename images/config
+[images]
+vep_105 = "australia-southeast1-docker.pkg.dev/cpg-common/images/vep:105.0"
+vep_110 = "australia-southeast1-docker.pkg.dev/cpg-common/images/ensembl-vep:release_110.1"
+
+[references]
+vep_105_mount = "gs://cpg-common-main/references/vep/105.0/mount"
+vep_110_mount = "gs://cpg-common-main/references/vep/110/mount"
