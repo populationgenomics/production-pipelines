@@ -217,7 +217,7 @@ def vep_one(
     # vep is single threaded, with a middling memory requirement
     # during test it caps out around 4GB, though this could be
     # larger for some long-running jobs
-    j.memory('standard').storage('25Gi')
+    j.memory('standard').storage('25Gi').cpu(1)
 
     if not isinstance(vcf, hb.ResourceFile):
         vcf = b.read_input(str(vcf))
