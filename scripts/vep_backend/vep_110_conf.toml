@@ -4,9 +4,3 @@ use_vep_110 = true
 
 [vep]
 scatter_count = 1
-
-[references]
-vep_110_mount = 'gs://cpg-common-test/references/vep/110/mount'
-
-[images]
-cpg_workflows = 'australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:1.16.1'

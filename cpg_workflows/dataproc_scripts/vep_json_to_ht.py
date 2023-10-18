@@ -19,7 +19,7 @@ def main(vep_results_paths: list[str], out_path: str, use_110: bool):
     hl.init(default_reference=genome_build())
 
     vep.vep_json_to_ht(
-        vep_results_paths=vep_results_paths,
+        vep_result_paths=vep_results_paths,
         out_path=out_path,
         use_110=use_110
     )
