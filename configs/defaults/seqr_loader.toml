@@ -10,6 +10,9 @@ use_gnarly = false
 # Use allele-specific annotations for VQSR
 use_as_vqsr = true
 
+# Use the VEP 110 annotation version (default is 105
+#use_vep_110 = true
+
 # Realign CRAM when available, instead of using FASTQ.
 # The parameter value should correspond to CRAM version
 # (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPGaaa.cram
