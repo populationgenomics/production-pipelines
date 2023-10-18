@@ -40,7 +40,7 @@ from cpg_workflows.workflow import (
     StageInput,
 )
 from cpg_workflows.resources import HIGHMEM
-from cpg_workflows.jobs.aip.hpo_panel_match import main as panel_match_main
+
 
 RUN_CONFIG = get_config()
 CHUNKY_DATE = datetime.now().strftime('%Y-%m-%d')
@@ -71,23 +71,31 @@ class GeneratePanelData(DatasetStage):
         """
         return {'hpo_panels': dataset.prefix() / DATED_FOLDER / 'hpo_panel_data.json'}
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
-        py_job = get_batch().new_python_job('create_panel_data')
-        py_job.image(get_config()['workflow']['driver_image'])
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
-        # only needs a really tiny image
-        py_job.cpu(0.25).memory('lowmem')
-        expected_d = self.expected_outputs(dataset)
-        hpo_file = get_batch().read_input(get_config()['workflow']['obo_file'])
+        job = get_batch().new_job('query panel data')
+        job.cpu(0.25).memory('lowmem')
+        job.image(image_path('aip'))
+
+        # auth and copy env
+        authenticate_cloud_credentials_in_job(job)
+        copy_common_env(job)
+
+        expected_out = self.expected_outputs(dataset)
+
         query_dataset = dataset.name
         if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
             query_dataset += '-test'
+        hpo_file = get_batch().read_input(get_config()['workflow']['obo_file'])
 
-        py_job.call(
-            panel_match_main, query_dataset, hpo_file, str(expected_d['hpo_panels'])
+        job.command(
+            f'python3 reanalysis/hpo_panel_match.py '
+            f'--dataset "{query_dataset}" '
+            f'--hpo "{hpo_file}" '
+            f'--out "{str(expected_out["hpo_panels"])}" '
         )
 
-        return self.make_outputs(dataset, data=expected_d, jobs=py_job)
+        return self.make_outputs(dataset, data=expected_out, jobs=job)
 
 
 @stage(required_stages=[GeneratePanelData])
