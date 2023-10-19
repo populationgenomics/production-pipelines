@@ -83,9 +83,9 @@ class GeneratePanelData(DatasetStage):
         expected_out = self.expected_outputs(dataset)
 
         query_dataset = dataset.name
-        if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
+        if RUN_CONFIG['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
             query_dataset += '-test'
-        hpo_file = get_batch().read_input(get_config()['workflow']['obo_file'])
+        hpo_file = get_batch().read_input(RUN_CONFIG['workflow']['obo_file'])
 
         job.command(
             f'python3 reanalysis/hpo_panel_match.py '
@@ -138,11 +138,11 @@ def query_for_latest_mt(dataset: str) -> str:
         str, the path to the latest MT
     """
     query_dataset = dataset
-    if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
+    if RUN_CONFIG['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
         query_dataset += '-test'
     result = query(MTA_QUERY, variables={'dataset': query_dataset})
     mt_by_date = {}
-    seq_type_exome = get_config()['workflow'].get('sequencing_type') == 'exome'
+    seq_type_exome = RUN_CONFIG['workflow'].get('sequencing_type') == 'exome'
     for analysis in result['project']['analyses']:
         if analysis['output'] and analysis['output'].endswith('.mt') and (
             (seq_type_exome and '/exome/' in analysis['output'])
@@ -175,7 +175,7 @@ class RunHailFiltering(DatasetStage):
         # either do as you're told, or find the latest
         # this could potentially follow on from the AnnotateDataset stage
         # if this becomes integrated in the main pipeline
-        input_mt = get_config()['workflow'].get(
+        input_mt = RUN_CONFIG['workflow'].get(
             'matrix_table', query_for_latest_mt(dataset.name)
         )
         job = get_batch().new_job('run hail labelling')
@@ -247,7 +247,7 @@ class ValidateMOI(DatasetStage):
             }
         )['vcf.bgz']
         out_json_path = str(self.expected_outputs(dataset)['summary_json'])
-        input_mt = get_config()['workflow'].get(
+        input_mt = RUN_CONFIG['workflow'].get(
             'matrix_table', query_for_latest_mt(dataset.name)
         )
         job.command(
@@ -274,7 +274,7 @@ def _aip_html_meta(
     return {
         'type': 'aip_output_html',
         'is_singleton': '',  # not doing this at the moment
-        'is_exome': get_config()['workflow'].get('sequencing_type') == 'exome'
+        'is_exome': RUN_CONFIG['workflow'].get('sequencing_type') == 'exome'
     }
 
 
