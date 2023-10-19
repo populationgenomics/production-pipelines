@@ -73,7 +73,6 @@ genome_build = 'GRCh38'
 # per-cohort section
 #clinvar_filter = when running a clinvar re-summary, remove submissions by these sites. Default = no removal
 #cohort_panels = any panel IDs to be applied to this cohort, even if not otherwise phenotype-matched
-#cohort_percentage = when generating an analysis pedigree, reduce the cohort to this percentage of the total. Default = 100
 #gene_prior = if a specific gene list is to be used to determine Cat 2 (new gene-disease associations), provide the filepath here
 
 # this content is not stored in this repository due to data protection concerns.
