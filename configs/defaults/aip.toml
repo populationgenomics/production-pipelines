@@ -16,9 +16,6 @@ obo_file = 'gs://cpg-common-test/references/aip/hpo_terms.obo'
 [images]
 aip = "australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_aip:latest"
 
-[dataset_specific]
-# placeholder for dataset-specific attributes
-
 [panels]
 default_panel = 137
 panelapp = 'https://panelapp.agha.umccr.org/api/v1/panels'
