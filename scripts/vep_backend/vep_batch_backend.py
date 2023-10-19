@@ -27,7 +27,8 @@ def main(vcf_path: str, output_ht: str, to_mt: bool = False):
     Input: the full path to a VCF file, along with a tabix (.tbi) file,
     located in the same directory.
     """
-    vep_image = get_config()['images']['vep']
+    vep_version = get_config()['workflow']['vep_version']
+    vep_image = image_path(f'vep_{vep_version}')
     scatter_count = get_config()['vep']['scatter_count']
     b = get_batch(f'Run VEP with Batch Backend, image {vep_image}, scatter count {scatter_count}')
     vep_ht = output_path(output_ht)
