@@ -72,7 +72,7 @@ class GeneratePanelData(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
-        job = get_batch().new_job('query panel data')
+        job = get_batch().new_job('Find HPO-matched Panels')
         job.cpu(0.25).memory('lowmem')
         job.image(image_path('aip'))
 
@@ -108,7 +108,7 @@ class QueryPanelapp(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
-        job = get_batch().new_job('query panel data')
+        job = get_batch().new_job('Query PanelApp')
         job.cpu(0.25).memory('lowmem')
         job.image(image_path('aip'))
 
