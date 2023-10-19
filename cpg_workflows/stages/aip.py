@@ -304,9 +304,7 @@ def _aip_html_meta(
     e.g. doesn't have the full URL to the results in GCP
     """
     return {
-        'type': 'aip_output_html',
-        'is_singleton': '',  # not doing this at the moment
-        'is_exome': RUN_CONFIG['workflow'].get('sequencing_type') == 'exome'
+        'type': 'aip_output_html'
     }
 
 
