@@ -7,7 +7,3 @@ scatter_count = 1
 
 [images]
 vep_105 = "australia-southeast1-docker.pkg.dev/cpg-common/images/vep:105.0"
-
-[references]
-vep_105_mount = "gs://cpg-common-main/references/vep/105.0/mount"
-vep_110_mount = "gs://cpg-common-main/references/vep/110/mount"
