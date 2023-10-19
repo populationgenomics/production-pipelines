@@ -180,7 +180,7 @@ class RunHailFiltering(DatasetStage):
         )
         job = get_batch().new_job('run hail labelling')
         job.image(image_path('aip'))
-        STANDARD.set_resources(job, ncpu=1)
+        STANDARD.set_resources(job, ncpu=1, storage_gb=5)
 
         # auth and copy env
         authenticate_cloud_credentials_in_job(job)
