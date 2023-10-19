@@ -38,7 +38,7 @@ from cpg_workflows.workflow import (
     StageOutput,
     StageInput,
 )
-from cpg_workflows.resources import HIGHMEM
+from cpg_workflows.resources import STANDARD
 
 
 RUN_CONFIG = get_config()
@@ -180,7 +180,7 @@ class RunHailFiltering(DatasetStage):
         )
         job = get_batch().new_job('run hail labelling')
         job.image(image_path('aip'))
-        HIGHMEM.set_resources(job, mem_gb=16.0)
+        STANDARD.set_resources(job, ncpu=1)
 
         # auth and copy env
         authenticate_cloud_credentials_in_job(job)
