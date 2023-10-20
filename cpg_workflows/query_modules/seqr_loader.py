@@ -69,9 +69,15 @@ def annotate_cohort(
     logging.info('Annotating with seqr-loader fields: round 1')
 
     # don't fail if the AC/AF attributes are an inappropriate type
+    # don't fail if completely absent either
     for attr in ['AC', 'AF']:
-        if not isinstance(mt.info[attr], hl.ArrayExpression):
+        if attr not in mt.info:
+            mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [1]}))
+        elif not isinstance(mt.info[attr], hl.ArrayExpression):
             mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [mt.info[attr]]}))
+
+    if 'AN' not in mt.info:
+        mt = mt.annotate_rows(info=mt.info.annotate(AN=1))
 
     mt = mt.annotate_rows(
         AC=mt.info.AC[mt.a_index - 1],
@@ -107,9 +113,12 @@ def annotate_cohort(
     rg38 = hl.get_reference('GRCh38')
     rg38.add_liftover(str(liftover_path), rg37)
     mt = mt.annotate_rows(
-        rg37_locus=hl.liftover(mt.locus, 'GRCh37'),
-        info=mt.info.drop('InbreedingCoeff')
+        rg37_locus=hl.liftover(mt.locus, 'GRCh37')
     )
+
+    # only remove if present
+    if 'InbreedingCoeff' in mt.info:
+        mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
 
     mt = checkpoint_hail(mt, 'mt-vep-split-vqsr-round1.mt', checkpoint_prefix)
 

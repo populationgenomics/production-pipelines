@@ -42,7 +42,8 @@ peer = "stub"
 picard = "stub"
 samtools = "stub"
 somalier = "stub"
-vep = "stub"
+vep_110 = "stub"
+vep_105 = "stub"
 verifybamid = "stub"
 
 [references]
