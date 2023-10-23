@@ -167,8 +167,7 @@ def count(
     job_name = f'count_{sample_name}' if sample_name else 'count'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='featureCounts')
     j = b.new_job(job_name, _job_attrs)
-    # j.image(image_path('subread'))
-    j.image('australia-southeast1-docker.pkg.dev/cpg-common/images/subread:2.0.6')
+    j.image(image_path('subread'))
     
     # Set resource requirements
     nthreads = requested_nthreads or 8
