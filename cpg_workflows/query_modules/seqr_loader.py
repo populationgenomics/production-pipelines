@@ -112,7 +112,9 @@ def annotate_cohort(
     rg37 = hl.get_reference('GRCh37')
     rg38 = hl.get_reference('GRCh38')
     rg38.add_liftover(str(liftover_path), rg37)
-    mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
+    mt = mt.annotate_rows(
+        rg37_locus=hl.liftover(mt.locus, 'GRCh37')
+    )
 
     # only remove if present
     if 'InbreedingCoeff' in mt.info:
