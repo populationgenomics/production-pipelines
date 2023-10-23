@@ -30,6 +30,8 @@ class Outrider:
             gtf_file: str | Path | None = None,
             output_tar_gz_path: str | Path | None = None,
             nthreads: int = 8,
+            pval_cutoff: float = 0.05,
+            z_cutoff: float = 0.0,
         ) -> None:
         self.input_counts = input_counts
         assert isinstance(self.input_counts, list), f'input_counts must be a list, instead got {self.input_counts}'
@@ -37,6 +39,8 @@ class Outrider:
         self.gtf_file_path = str(gtf_file)
         self.output_tar_gz_path = str(output_tar_gz_path)
         self.nthreads = nthreads
+        self.pval_cutoff = pval_cutoff
+        self.z_cutoff = z_cutoff
 
         # Build OUTRIDER command
         self.command = """
@@ -53,8 +57,8 @@ class Outrider:
         """
         self.command += f"""
         # Set significance values
-        pval_cutoff <- 0.05
-        z_cutoff <- 0
+        pval_cutoff <- {str(self.pval_cutoff)}
+        z_cutoff <- {str(self.z_cutoff)}
         n_parallel_workers <- {str(self.nthreads - 1)}
 
         input_counts_files <- c({self.input_counts_r_str})
@@ -314,6 +318,10 @@ def outrider(
     gtf_file = to_path(gtf_file)
     gtf_file_rg = b.read_input_group(gtf=str(gtf_file))
 
+    # Get Outrider parameters
+    pval_cutoff = get_config().get('outrider', {}).get('pval_cutoff', 0.05)
+    z_cutoff = get_config().get('outrider', {}).get('z_cutoff', 0.0)
+
     # Create job
     job_name = f'outrider_{cohort_name}' if cohort_name else 'count'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='outrider')
@@ -340,6 +348,8 @@ def outrider(
         gtf_file=str(gtf_file_rg.gtf),
         output_tar_gz_path=j.output.tar_gz,
         nthreads=res.get_nthreads(),
+        pval_cutoff=pval_cutoff,
+        z_cutoff=z_cutoff,
     )
 
     cmd = str(outrider)
