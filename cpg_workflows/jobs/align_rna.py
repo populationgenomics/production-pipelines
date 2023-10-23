@@ -255,7 +255,7 @@ def align_fq_pair(
     align_tool = 'STAR'
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=align_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
-    j.image('australia-southeast1-docker.pkg.dev/cpg-common/images/star:2.7.10b')  # j.image(image_path('star'))
+    j.image(image_path('star'))
     
     # Set resource requirements
     nthreads = requested_nthreads or 8
