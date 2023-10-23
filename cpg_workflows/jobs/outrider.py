@@ -318,8 +318,7 @@ def outrider(
     job_name = f'outrider_{cohort_name}' if cohort_name else 'count'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='outrider')
     j = b.new_job(job_name, _job_attrs)
-    # j.image(image_path('outrider'))
-    j.image('australia-southeast1-docker.pkg.dev/cpg-common/images/outrider:1.18.1')
+    j.image(image_path('outrider'))
 
     # Set resource requirements
     nthreads = requested_nthreads or 8
