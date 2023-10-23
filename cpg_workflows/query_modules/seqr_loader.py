@@ -112,9 +112,7 @@ def annotate_cohort(
     rg37 = hl.get_reference('GRCh37')
     rg38 = hl.get_reference('GRCh38')
     rg38.add_liftover(str(liftover_path), rg37)
-    mt = mt.annotate_rows(
-        rg37_locus=hl.liftover(mt.locus, 'GRCh37')
-    )
+    mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
 
     # only remove if present
     if 'InbreedingCoeff' in mt.info:
@@ -169,6 +167,9 @@ def annotate_cohort(
         sourceFilePath=vcf_path,
         genomeVersion=genome_build().replace('GRCh', ''),
         hail_version=hl.version(),
+        # Broad seqr uses a new datasetType string for SNV index https://github.com/broadinstitute/seqr/blob/master/seqr/models.py#L642
+        # populationgenomics seqr fork still uses the original datasetType string 'VARIANTS' ~ EddieLF 2023-10-23
+        datasetType='VARIANTS',
     )
     if sequencing_type := get_config()['workflow'].get('sequencing_type'):
         # Map to Seqr-style string
