@@ -169,9 +169,6 @@ def annotate_cohort(
         sourceFilePath=vcf_path,
         genomeVersion=genome_build().replace('GRCh', ''),
         hail_version=hl.version(),
-        # Broad seqr uses a new datasetType string for SNV index https://github.com/broadinstitute/seqr/blob/master/seqr/models.py#L642
-        # populationgenomics seqr fork still uses the original datasetType string 'VARIANTS' ~ EddieLF 2023-10-23
-        datasetType='VARIANTS',
     )
     if sequencing_type := get_config()['workflow'].get('sequencing_type'):
         # Map to Seqr-style string
