@@ -344,6 +344,7 @@ class CreateAIPHTML(DatasetStage):
             f'--pedigree "{local_ped}" '
             f'--output "{expected_out["results_html"]}" '
             f'--latest "{expected_out["latest_html"]}" '
+            f'--dataset "{dataset.name}" '
         )
 
         expected_out = self.expected_outputs(dataset)
