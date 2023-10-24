@@ -221,7 +221,7 @@ class MetamistStatusReporter(StatusReporter):
 
         j = b.new_job(job_name, job_attrs)
         j.image(image_path('cpg_workflows'))
-        j.memory('lowmem')
+        j.memory('500Mi').cpu(0.25)
 
         meta_updaters_definitions = ''
         meta_updaters_funcs: list[Callable[[str], dict]] = []
