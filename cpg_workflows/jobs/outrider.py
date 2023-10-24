@@ -27,8 +27,8 @@ class Outrider:
     def __init__(
             self,
             input_counts: list[str | Path],
+            output: hb.ResourceGroup,
             gtf_file: str | Path | None = None,
-            output: hb.ResourceGroup | None = None,
             nthreads: int = 8,
             pval_cutoff: float = 0.05,
             z_cutoff: float = 0.0,
