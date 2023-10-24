@@ -366,6 +366,6 @@ def outrider(
     # Write output to file
     if output_rdata_path:
         # NOTE: j.output is just a placeholder
-        b.write_output(j.output, str(output_rdata_path.with_suffix('')))
+        b.write_output(j.output, str(to_path(output_rdata_path).with_suffix('')))
     
     return j
