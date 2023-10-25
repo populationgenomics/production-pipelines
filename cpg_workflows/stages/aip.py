@@ -231,6 +231,7 @@ class RunHailFiltering(DatasetStage):
             f'--panelapp "{panelapp_json}" '
             f'--pedigree "{local_ped}" '
             f'--vcf_out "{str(expected_out["labelled_vcf"])}" '
+            f'--dataset {dataset.name} '
         )
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
