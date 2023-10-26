@@ -80,6 +80,7 @@ def _update_analysis_status(
     new_status: AnalysisStatus,
     updater_funcs: list[Callable[[str], dict[str, Any]]] | None = None,
     output_path: str | None = None,
+    tolerate_missing_output: bool = False,
 ) -> None:
     """
     Self-contained function to update Metamist analysis entry.
@@ -88,12 +89,18 @@ def _update_analysis_status(
     @param updater_funcs: list of functions to update the entry's metadata,
     assuming output_path as input parameter
     @param output_path: remote path of the output file, to be passed to the updaters
+    @param tolerate_missing_output: if True, fail gracefully if file doesn't exist
     """
     from metamist.apis import AnalysisApi
     from metamist.models import AnalysisUpdateModel
     from metamist import exceptions
     from metamist.models import AnalysisStatus as MmAnalysisStatus
     import traceback
+    from cpg_utils import to_path
+
+    if tolerate_missing_output and not to_path(output_path).exists():
+        print(f"Output {output_path} doesn't exist, allowing silent return")
+        return
 
     meta: dict[str, Any] = dict()
     if output_path and updater_funcs:
@@ -132,6 +139,7 @@ class MetamistStatusReporter(StatusReporter):
         meta: dict | None = None,
         job_attrs: dict[str, str] | None = None,
         update_analysis_meta: Callable[[str], dict] | None = None,
+        tolerate_missing_output: bool = False,
         project_name: str | None = None,
     ) -> list[Job]:
         """
@@ -170,6 +178,7 @@ class MetamistStatusReporter(StatusReporter):
             job_attrs=(job_attrs or {}) | dict(tool='metamist'),
             output=output,
             update_analysis_meta=update_analysis_meta,
+            tolerate_missing_output=tolerate_missing_output,
         )
 
         if prev_jobs:
@@ -205,10 +214,12 @@ class MetamistStatusReporter(StatusReporter):
         job_attrs: dict | None = None,
         output: Path | str | None = None,
         update_analysis_meta: Callable[[str], dict] | None = None,
+        tolerate_missing_output: bool = False,
     ) -> Job:
         """
         Create a Hail Batch job that updates status of analysis. For status=COMPLETED,
         adds the size of `output` into `meta.size` if provided.
+        if tolerate_missing_output is True, the job will not fail if the output is missing.
         """
         try:
             analysis_id_int = int(analysis_id)
@@ -254,6 +265,7 @@ from cpg_workflows.metamist import AnalysisStatus
     new_status=AnalysisStatus("{status.value}"),
     updater_funcs=[{', '.join(f.__name__ for f in meta_updaters_funcs)}],
     output_path={'"' + str(output) + '"' if output else 'None'},
+    tolerate_missing_output={tolerate_missing_output}
 )
 
 EOT

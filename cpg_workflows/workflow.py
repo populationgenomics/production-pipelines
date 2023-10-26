@@ -401,6 +401,7 @@ class Stage(Generic[TargetT], ABC):
         analysis_type: str | None = None,
         analysis_keys: list[str] | None = None,
         update_analysis_meta: Callable[[str], dict] | None = None,
+        tolerate_missing_output: bool = False,
         skipped: bool = False,
         assume_outputs_exist: bool = False,
         forced: bool = False,
@@ -426,6 +427,8 @@ class Stage(Generic[TargetT], ABC):
         # if `update_analysis_meta` is defined, it is called on the `Analysis.output`
         # field, and result is merged into the `Analysis.meta` dictionary.
         self.update_analysis_meta = update_analysis_meta
+
+        self.tolerate_missing_output = tolerate_missing_output
 
         # Populated with the return value of `add_to_the_workflow()`
         self.output_by_target: dict[str, StageOutput | None] = dict()
@@ -621,6 +624,7 @@ class Stage(Generic[TargetT], ABC):
                     meta=outputs.meta,
                     job_attrs=self.get_job_attrs(target),
                     update_analysis_meta=self.update_analysis_meta,
+                    tolerate_missing_output=self.tolerate_missing_output,
                     project_name=project_name,
                 )
 
@@ -775,6 +779,7 @@ def stage(
     analysis_type: str | None = None,
     analysis_keys: list[str | Path] | None = None,
     update_analysis_meta: Callable[[str], dict] | None = None,
+    tolerate_missing_output: bool = False,
     required_stages: list[StageDecorator] | StageDecorator | None = None,
     skipped: bool = False,
     assume_outputs_exist: bool = False,
@@ -798,6 +803,8 @@ def stage(
         if the Stage.expected_outputs() returns a dict.
     @update_analysis_meta: if defined, this function is called on the `Analysis.output`
         field, and returns a dictionary to be merged into the `Analysis.meta`
+    @tolerate_missing_output: if True, when registering the output of this stage,
+        allow for the output file to be missing (only relevant for metamist entry)
     @required_stages: list of other stage classes that are required prerequisites
         for this stage. Outputs of those stages will be passed to
         `Stage.queue_jobs(... , inputs)` as `inputs`, and all required
