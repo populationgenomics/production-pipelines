@@ -153,9 +153,9 @@ def test_status_reporter(mocker: MockFixture, tmp_path):
 
 
 def _update_meta(output_path: str) -> dict[str, Any]:
-    from cloudpathlib import CloudPath
+    from cpg_utils import to_path
 
-    with CloudPath(output_path).open() as f:
+    with to_path(output_path).open() as f:
         return dict(result=f.read().strip())
 
 

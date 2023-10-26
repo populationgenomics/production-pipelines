@@ -33,12 +33,12 @@ def complete_analysis_job(
 
     """
     import traceback
-    from cloudpathlib import CloudPath
+    from cpg_utils import to_path
     from metamist.apis import AnalysisApi
     from metamist.exceptions import ApiException
     from metamist.models import AnalysisStatus, Analysis
     assert isinstance(output, str)
-    output_cloudpath = CloudPath(output)
+    output_cloudpath = to_path(output)
 
     if not output_cloudpath.exists():
         if tolerate_missing:
