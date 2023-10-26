@@ -13,6 +13,7 @@ setup(
     license='MIT',
     packages=find_packages(),
     install_requires=[
+        'cloudpathlib==0.16.0',
         'cpg-utils',
         'cyvcf2==0.30.18',
         'analysis-runner>=2.41.2',

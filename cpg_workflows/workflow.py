@@ -614,7 +614,7 @@ class Stage(Generic[TargetT], ABC):
                 assert isinstance(
                     analysis_output, (str, Path)
                 ), f'{analysis_output} should be a str or Path object'
-                self.status_reporter.add_updaters_jobs(
+                self.status_reporter.create_analysis(
                     b=get_batch(),
                     output=analysis_output,
                     analysis_type=self.analysis_type,
