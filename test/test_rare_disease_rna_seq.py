@@ -47,6 +47,10 @@ def get_toml(tmp_path) -> str:
     [trim]
     adapter_type = "ILLUMINA_TRUSEQ"
 
+    [outrider]
+    pval_cutoff = 0.01
+    z_cutoff = 1
+
     [references]
     star_ref_dir = "stub"
     gtf = "stub"

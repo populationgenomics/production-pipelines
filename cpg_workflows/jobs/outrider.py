@@ -27,16 +27,20 @@ class Outrider:
     def __init__(
             self,
             input_counts: list[str | Path],
+            output: hb.ResourceGroup,
             gtf_file: str | Path | None = None,
-            output_tar_gz_path: str | Path | None = None,
             nthreads: int = 8,
+            pval_cutoff: float = 0.05,
+            z_cutoff: float = 0.0,
         ) -> None:
         self.input_counts = input_counts
         assert isinstance(self.input_counts, list), f'input_counts must be a list, instead got {self.input_counts}'
         self.input_counts_r_str = ', '.join([f'"{str(f)}"' for f in self.input_counts])
         self.gtf_file_path = str(gtf_file)
-        self.output_tar_gz_path = str(output_tar_gz_path)
+        self.output = output
         self.nthreads = nthreads
+        self.pval_cutoff = pval_cutoff
+        self.z_cutoff = z_cutoff
 
         # Build OUTRIDER command
         self.command = """
@@ -47,14 +51,15 @@ class Outrider:
         # Create directories
         dir.create("plots", showWarnings = FALSE)
         dir.create("plots/heatmaps", showWarnings = FALSE)
-        dir.create("plots/by_gene", showWarnings = FALSE)
-        dir.create("plots/by_sample", showWarnings = FALSE)
+        dir.create("plots/sig_genes", showWarnings = FALSE)
+        dir.create("plots/volcano", showWarnings = FALSE)
+        dir.create("plots/stats", showWarnings = FALSE)
         dir.create("results", showWarnings = FALSE)
         """
         self.command += f"""
         # Set significance values
-        pval_cutoff <- 0.05
-        z_cutoff <- 0
+        pval_cutoff <- {str(self.pval_cutoff)}
+        z_cutoff <- {str(self.z_cutoff)}
         n_parallel_workers <- {str(self.nthreads - 1)}
 
         input_counts_files <- c({self.input_counts_r_str})
@@ -89,11 +94,11 @@ class Outrider:
         )
 
         # Plotting
-        png(file = "plots/fpkm.png", width = 4000, height = 4000, res = 600)
+        png(file = "plots/stats/fpkm.png", width = 4000, height = 4000, res = 600)
         plotFPKM(ods)
         dev.off()
 
-        png(file = "plots/by_sample/expressed_genes_per_sample.png", width = 4000, height = 4000, res = 600)
+        png(file = "plots/stats/expressed_genes_per_sample.png", width = 4000, height = 4000, res = 600)
         plotExpressedGenes(ods)
         dev.off()
 
@@ -139,7 +144,7 @@ class Outrider:
 
         # Find optimal encoding dimension
         ods <- findEncodingDim(ods, BPPARAM=MulticoreParam(workers = n_parallel_workers))
-        png(file = "plots/enc_dim_search.png", width = 4000, height = 4000, res = 600)
+        png(file = "plots/stats/enc_dim_search.png", width = 4000, height = 4000, res = 600)
         p <- plotEncDimSearch(ods)
         print(p)
         dev.off()
@@ -188,12 +193,7 @@ class Outrider:
         # Get results
         res <- results(ods, padjCutoff = pval_cutoff, zScoreCutoff = z_cutoff)
         res_all <- results(ods, all = TRUE)
-        write_csv(
-            res,
-            file = paste0(
-                "results/results.significant.p_", pval_cutoff, ".z_", z_cutoff, ".csv"
-            )
-        )
+        write_csv(res, file = "results/results.significant.csv")
         write_csv(res_all, file = "results/results.all.csv")
 
         # Get number of aberrant genes per sample and per gene
@@ -203,9 +203,7 @@ class Outrider:
         ab_genes_per_samples <- ab_genes_per_samples[, c(2, 1)]
         write_csv(
             ab_genes_per_samples,
-            file = paste0(
-                "results/aberrant_genes_per_sample.p_", pval_cutoff, ".z_", z_cutoff, ".csv"
-            )
+            file = "results/aberrant_genes_per_sample.csv"
         )
 
         ab_samples_per_gene <- as.data.frame(aberrant(ods, by = "gene", padjCutoff = 0.05, zScoreCutoff = 0))
@@ -214,19 +212,17 @@ class Outrider:
         ab_samples_per_gene <- ab_samples_per_gene[, c(2, 1)]
         write_csv(
             ab_samples_per_gene,
-            file = paste0(
-                "results/aberrant_samples_per_gene.p_", pval_cutoff, ".z_", z_cutoff, ".csv"
-            )
+            file = "results/aberrant_samples_per_gene.csv"
         )
 
-        png(file = paste0("plots/by_sample/aberrant_genes_per_sample.p_", pval_cutoff, ".z_", z_cutoff, ".png"), width = 4000, height = 4000, res = 600)
+        png(file = "plots/stats/aberrant_genes_per_sample.png", width = 4000, height = 4000, res = 600)
         plotAberrantPerSample(ods, padjCutoff = 0.05)
         dev.off()
 
         # Volcano plots
         sig_samples <- unique(res\\$sampleID)
         for (sig_sample in sig_samples) {
-            png(file = paste0("plots/by_sample/volcano.", sig_sample, ".p_", pval_cutoff, ".z_", z_cutoff, ".png"), width = 4000, height = 4000, res = 600)
+            png(file = paste0("plots/volcano/volcano.", sig_sample, ".png"), width = 4000, height = 4000, res = 600)
             p <- plotVolcano(ods, sig_sample, basePlot = TRUE)
             print(p)
             dev.off()
@@ -235,22 +231,22 @@ class Outrider:
         # Gene-level plots
         sig_genes <- unique(res\\$geneID)
         for (sig_gene in sig_genes) {
-            png(file = paste0("plots/by_gene/expression_rank.", sig_gene, ".p_", pval_cutoff, ".z_", z_cutoff, ".png"), width = 4000, height = 4000, res = 600)
+            png(file = paste0("plots/sig_genes/expression_rank.", sig_gene, ".png"), width = 4000, height = 4000, res = 600)
             p <- plotExpressionRank(ods, sig_gene, basePlot = TRUE)
             print(p)
             dev.off()
-            png(file = paste0("plots/by_gene/qq.", sig_gene, ".p_", pval_cutoff, ".z_", z_cutoff, ".png"), width = 4000, height = 4000, res = 600)
+            png(file = paste0("plots/sig_genes/qq.", sig_gene, ".png"), width = 4000, height = 4000, res = 600)
             p <- plotQQ(ods, sig_gene)
             print(p)
             dev.off()
-            png(file = paste0("plots/by_gene/expected_vs_observed_counts.", sig_gene, ".png"), width = 4000, height = 4000, res = 600)
+            png(file = paste0("plots/sig_genes/expected_vs_observed_counts.", sig_gene, ".png"), width = 4000, height = 4000, res = 600)
             p <- plotExpectedVsObservedCounts(ods, sig_gene, basePlot = TRUE)
             print(p)
             dev.off()
         }
 
         # Power analysis plot
-        png(file = "plots/power_analysis.png", width = 4000, height = 4000, res = 600)
+        png(file = "plots/stats/power_analysis.png", width = 4000, height = 4000, res = 600)
         plotPowerAnalysis(ods)
         dev.off()
 
@@ -270,9 +266,17 @@ class Outrider:
         )
         EOF
         """
-        # Tar up outputs
+        # Copy outputs
         self.command += f"""
-        tar -czvf {self.output_tar_gz_path} plots results outrider.results.RData
+        tar -czvf {self.output['heatmaps.tar.gz']} -C plots/heatmaps .
+        tar -czvf {self.output['volcano_plots.tar.gz']} -C plots/volcano .
+        tar -czvf {self.output['gene_plots.tar.gz']} -C plots/sig_genes .
+        tar -czvf {self.output['stats_plots.tar.gz']} -C plots/stats .
+        cp results/results.significant.csv {self.output['results.txt']}
+        cp results/results.all.csv {self.output['results.all.txt']}
+        cp results/aberrant_genes_per_sample.csv {self.output['aberrant_genes_per_sample.txt']}
+        cp results/aberrant_samples_per_gene.csv {self.output['aberrant_samples_per_gene.txt']}
+        cp outrider.results.RData {self.output['RData']}
         """
         self.command = dedent(self.command).strip()
 
@@ -286,7 +290,7 @@ class Outrider:
 def outrider(
     b: hb.Batch,
     input_counts: list[str | Path],
-    output_path: str | Path | None = None,
+    output_rdata_path: str | Path | None = None,
     cohort_name: str | None = None,
     job_attrs: dict[str, str] | None = None,
     overwrite: bool = False,
@@ -296,7 +300,7 @@ def outrider(
     Run Outrider.
     """
     # Reuse existing output if possible
-    if output_path and can_reuse(output_path, overwrite):
+    if output_rdata_path and can_reuse(output_rdata_path, overwrite):
         return []
 
     # Localise input files
@@ -314,12 +318,15 @@ def outrider(
     gtf_file = to_path(gtf_file)
     gtf_file_rg = b.read_input_group(gtf=str(gtf_file))
 
+    # Get Outrider parameters
+    pval_cutoff = get_config().get('outrider', {}).get('pval_cutoff', 0.05)
+    z_cutoff = get_config().get('outrider', {}).get('z_cutoff', 0.0)
+
     # Create job
     job_name = f'outrider_{cohort_name}' if cohort_name else 'count'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='outrider')
     j = b.new_job(job_name, _job_attrs)
-    # j.image(image_path('outrider'))
-    j.image('australia-southeast1-docker.pkg.dev/cpg-common/images/outrider:1.18.1')
+    j.image(image_path('outrider'))
 
     # Set resource requirements
     nthreads = requested_nthreads or 8
@@ -331,7 +338,15 @@ def outrider(
 
     j.declare_resource_group(
         output={
-            'tar_gz': '{root}.tar.gz'
+            'results.txt': '{root}.results.txt',
+            'results.all.txt': '{root}.results.all.txt',
+            'aberrant_genes_per_sample.txt': '{root}.aberrant_genes_per_sample.txt',
+            'aberrant_samples_per_gene.txt': '{root}.aberrant_samples_per_gene.txt',
+            'RData': '{root}.RData',
+            'heatmaps.tar.gz': '{root}.heatmaps.tar.gz',
+            'volcano_plots.tar.gz': '{root}.volcano_plots.tar.gz',
+            'gene_plots.tar.gz': '{root}.gene_plots.tar.gz',
+            'stats_plots.tar.gz': '{root}.stats_plots.tar.gz',
         }
     )
 
@@ -339,16 +354,18 @@ def outrider(
     outrider = Outrider(
         input_counts=infiles_localised,
         gtf_file=str(gtf_file_rg.gtf),
-        output_tar_gz_path=j.output.tar_gz,
+        output=j.output,
         nthreads=res.get_nthreads(),
+        pval_cutoff=pval_cutoff,
+        z_cutoff=z_cutoff,
     )
 
     cmd = str(outrider)
     j.command(command(cmd, monitor_space=True))
 
     # Write output to file
-    if output_path:
+    if output_rdata_path:
         # NOTE: j.output is just a placeholder
-        b.write_output(j.output.tar_gz, str(output_path))
+        b.write_output(j.output, str(to_path(output_rdata_path).with_suffix('')))
     
     return j

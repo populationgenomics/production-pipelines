@@ -36,7 +36,7 @@ class Outrider(CohortStage):
         """
         dataset_prefix = cohort.get_sequencing_groups()[0].dataset.prefix()
         return {
-            cohort.name: dataset_prefix / 'outrider' / f'{cohort.name}.output.tar.gz'
+            cohort.name: dataset_prefix / 'outrider' / f'{cohort.name}.outrider.RData'
         }
     
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -50,7 +50,7 @@ class Outrider(CohortStage):
         j = outrider.outrider(
             b=get_batch(),
             input_counts=count_inputs,
-            output_path=list(self.expected_outputs(cohort).values())[0],
+            output_rdata_path=list(self.expected_outputs(cohort).values())[0],
             cohort_name=cohort.name,
             job_attrs=self.get_job_attrs(),
             overwrite=cohort.forced,
