@@ -14,7 +14,7 @@ def complete_analysis_job(
         analysis_type: str,
         sg_ids: list[str],
         project_name: str,
-        meta: dict | None = None,
+        meta: dict,
         tolerate_missing: bool = False
 ):
     """
