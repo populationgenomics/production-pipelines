@@ -611,19 +611,25 @@ class Stage(Generic[TargetT], ABC):
                 project_name = target.analysis_dataset.name
 
             for analysis_output in analysis_outputs:
+                if not outputs.jobs:
+                    continue
+
                 assert isinstance(
                     analysis_output, (str, Path)
                 ), f'{analysis_output} should be a str or Path object'
+                if outputs.meta is None:
+                    outputs.meta = {}
+
+                if self.update_analysis_meta:
+                    outputs.meta |= self.update_analysis_meta(analysis_output)
+
                 self.status_reporter.create_analysis(
                     b=get_batch(),
-                    output=analysis_output,
+                    output=str(analysis_output),
                     analysis_type=self.analysis_type,
                     target=target,
                     jobs=outputs.jobs,
-                    prev_jobs=inputs.get_jobs(target),
                     meta=outputs.meta,
-                    job_attrs=self.get_job_attrs(target),
-                    update_analysis_meta=self.update_analysis_meta,
                     tolerate_missing_output=self.tolerate_missing_output,
                     project_name=project_name,
                 )

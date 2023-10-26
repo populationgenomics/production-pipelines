@@ -2,9 +2,6 @@
 Metamist wrapper to report analysis progress.
 """
 from abc import ABC, abstractmethod
-from typing import Callable
-
-from cpg_utils import Path
 from cpg_utils.config import get_config
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
@@ -88,13 +85,15 @@ class StatusReporter(ABC):
     @abstractmethod
     def create_analysis(
         self,
+        b: Batch,
         output: str,
         analysis_type: str,
-        analysis_status: str,
         target: Target,
+        jobs: list[Job] | None = None,
         meta: dict | None = None,
+        tolerate_missing_output: bool = False,
         project_name: str | None = None,
-    ) -> int | None:
+    ):
         """
         Record analysis entry.
         """
@@ -111,14 +110,11 @@ class MetamistStatusReporter(StatusReporter):
     def create_analysis(
         self,
         b: Batch,
-        output: str | Path,
+        output: str,
         analysis_type: str,
         target: Target,
         jobs: list[Job] | None = None,
-        prev_jobs: list[Job] | None = None,
         meta: dict | None = None,
-        job_attrs: dict[str, str] | None = None,
-        update_analysis_meta: Callable[[str], dict] | None = None,
         tolerate_missing_output: bool = False,
         project_name: str | None = None,
     ):
@@ -133,14 +129,20 @@ class MetamistStatusReporter(StatusReporter):
         if meta is None:
             meta = {}
 
-        if update_analysis_meta:
-            meta |= update_analysis_meta(output)
-
         # find all relevant SG IDs
         sg_ids = target.get_sequencing_group_ids()
         py_job = b.new_python_job(
-            f'Register analysis output {output}', job_attrs
+            f'Register analysis output {output}', {'tool': 'metamist'}
         )
         py_job.image(get_config()['workflow']['driver_image'])
-        py_job.call(complete_analysis_job, output, analysis_type, sg_ids, project_name, meta, tolerate_missing_output)
+        py_job.call(
+            complete_analysis_job,
+            str(output),
+            analysis_type,
+            sg_ids,
+            project_name,
+            meta,
+            tolerate_missing_output
+        )
+
         py_job.depends_on(*jobs)
