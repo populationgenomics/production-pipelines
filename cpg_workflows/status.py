@@ -99,6 +99,7 @@ class StatusReporter(ABC):
         jobs: list[Job] | None = None,
         job_attr: dict | None = None,
         meta: dict | None = None,
+        update_analysis_meta: Callable | None = None,
         tolerate_missing_output: bool = False,
         project_name: str | None = None,
     ):
