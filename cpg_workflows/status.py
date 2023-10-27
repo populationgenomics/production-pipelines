@@ -2,6 +2,8 @@
 Metamist wrapper to report analysis progress.
 """
 from abc import ABC, abstractmethod
+from typing import Callable
+
 from cpg_utils.config import get_config
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
@@ -15,6 +17,7 @@ def complete_analysis_job(
         sg_ids: list[str],
         project_name: str,
         meta: dict,
+        update_analysis_meta: Callable | None = None,
         tolerate_missing: bool = False
 ):
     """
@@ -27,6 +30,7 @@ def complete_analysis_job(
         sg_ids (list[str]): all CPG IDs
         project_name (str): project/dataset name
         meta (dict): any metadata to add
+        update_analysis_meta (Callable | None): function to update analysis meta
         tolerate_missing (bool): if True, allow missing output
 
     Returns:
@@ -46,9 +50,12 @@ def complete_analysis_job(
             return
         raise ValueError(f"Output {output} doesn't exist")
 
+    if update_analysis_meta is not None:
+        meta | update_analysis_meta(output)
+
     # pad meta with real file size
     if not output_cloudpath.is_dir():
-        meta = meta | {'size': output_cloudpath.stat().st_size}
+        meta |= {'size': output_cloudpath.stat().st_size}
 
     this_analysis = Analysis(
         type=analysis_type,
@@ -90,6 +97,7 @@ class StatusReporter(ABC):
         analysis_type: str,
         target: Target,
         jobs: list[Job] | None = None,
+        job_attr: dict | None = None,
         meta: dict | None = None,
         tolerate_missing_output: bool = False,
         project_name: str | None = None,
@@ -114,7 +122,9 @@ class MetamistStatusReporter(StatusReporter):
         analysis_type: str,
         target: Target,
         jobs: list[Job] | None = None,
+        job_attr: dict | None = None,
         meta: dict | None = None,
+        update_analysis_meta: Callable | None = None,
         tolerate_missing_output: bool = False,
         project_name: str | None = None,
     ):
@@ -132,7 +142,7 @@ class MetamistStatusReporter(StatusReporter):
         # find all relevant SG IDs
         sg_ids = target.get_sequencing_group_ids()
         py_job = b.new_python_job(
-            f'Register analysis output {output}', {'tool': 'metamist'}
+            f'Register analysis output {output}', job_attr or {} | {'tool': 'metamist'}
         )
         py_job.image(get_config()['workflow']['driver_image'])
         py_job.call(
@@ -142,6 +152,7 @@ class MetamistStatusReporter(StatusReporter):
             sg_ids,
             project_name,
             meta,
+            update_analysis_meta,
             tolerate_missing_output
         )
 

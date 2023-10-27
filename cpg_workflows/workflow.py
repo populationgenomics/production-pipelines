@@ -620,16 +620,15 @@ class Stage(Generic[TargetT], ABC):
                 if outputs.meta is None:
                     outputs.meta = {}
 
-                if self.update_analysis_meta:
-                    outputs.meta |= self.update_analysis_meta(analysis_output)
-
                 self.status_reporter.create_analysis(
                     b=get_batch(),
                     output=str(analysis_output),
                     analysis_type=self.analysis_type,
                     target=target,
                     jobs=outputs.jobs,
+                    job_attr=self.get_job_attrs(target) | {'stage': self.name, 'tool': 'metamist'},
                     meta=outputs.meta,
+                    update_analysis_meta=self.update_analysis_meta,
                     tolerate_missing_output=self.tolerate_missing_output,
                     project_name=project_name,
                 )
