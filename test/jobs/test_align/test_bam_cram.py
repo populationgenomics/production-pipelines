@@ -397,7 +397,7 @@ class TestDragmap:
         )
 
         cmd = get_command_str(align_jobs[0])
-        assert re.search(pattern, cmd)
+        assert re.search(pattern, cmd, flags=re.DOTALL)
 
     def test_dragmap_aligner_reads_dragmap_reference_resource(
         self, mocker: MockFixture, tmp_path: Path
