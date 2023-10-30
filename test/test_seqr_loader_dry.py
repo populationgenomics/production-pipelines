@@ -199,7 +199,8 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
     )
     mocker.patch('metamist.apis.AnalysisApi.update_analysis', do_nothing)
 
-    from cpg_workflows.batch import get_batch
+    from cpg_utils.hail_batch import get_batch, reset_batch
+
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.stages.cram_qc import CramMultiQC
     from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
@@ -207,6 +208,7 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
     from cpg_workflows.stages.seqr_loader import MtToEs
     from cpg_workflows.workflow import get_workflow
 
+    reset_batch()
     get_workflow().run(stages=[MtToEs, GvcfMultiQC, CramMultiQC, JointVcfQC])
 
     assert (

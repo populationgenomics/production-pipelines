@@ -7,9 +7,9 @@ MakeCohortVCF and AnnotateVCF
 from typing import Any
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
+from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
+from cpg_utils.hail_batch import get_batch
 
-from cpg_workflows.batch import get_batch
 from cpg_workflows.jobs import ploidy_table_from_ped
 from cpg_workflows.jobs.seqr_loader_sv import (
     annotate_cohort_jobs_sv,

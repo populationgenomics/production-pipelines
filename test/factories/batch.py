@@ -1,8 +1,7 @@
 from pathlib import Path
 
+from cpg_utils.hail_batch import Batch
 from hailtop.batch import LocalBackend
-
-from cpg_workflows.batch import Batch
 
 
 def create_local_batch(tmp_dir: Path | str, name: str = 'local-test') -> Batch:

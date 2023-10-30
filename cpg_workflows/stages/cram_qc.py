@@ -7,8 +7,8 @@ from typing import Any, Callable, Optional
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
+from cpg_utils.hail_batch import get_batch
 
-from cpg_workflows import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import somalier
 from cpg_workflows.jobs.multiqc import multiqc

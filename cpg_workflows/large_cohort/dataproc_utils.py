@@ -5,12 +5,13 @@ Utils for submitting the workflow to a Dataproc cluster.
 import math
 from typing import Sequence
 
+from hailtop.batch.job import Job
+
 from analysis_runner import dataproc
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from hailtop.batch.job import Job
+from cpg_utils.hail_batch import get_batch
 
-from cpg_workflows.batch import get_batch
 
 DATAPROC_PACKAGES = [
     'cpg-utils',

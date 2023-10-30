@@ -51,28 +51,29 @@ This will have to be run using Full permissions as we will need to reference
 data in test and main buckets.
 """
 import logging
-from os.path import join
 from datetime import datetime
 from functools import lru_cache
+from os.path import join
+
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import (
     authenticate_cloud_credentials_in_job,
     copy_common_env,
+    get_batch,
     image_path,
 )
 from metamist.graphql import gql
 
-from cpg_workflows.batch import get_batch
+from cpg_workflows.metamist import gql_query_optional_logging
+from cpg_workflows.resources import STANDARD
 from cpg_workflows.workflow import (
-    stage,
     Dataset,
     DatasetStage,
-    StageOutput,
     StageInput,
+    StageOutput,
+    stage,
 )
-from cpg_workflows.resources import STANDARD
-from cpg_workflows.metamist import gql_query_optional_logging
 
 
 CHUNKY_DATE = datetime.now().strftime('%Y-%m-%d')

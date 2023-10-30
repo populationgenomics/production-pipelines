@@ -3,9 +3,10 @@ Test building stages DAG.
 """
 
 import pytest
+from cpg_utils.hail_batch import get_batch
 from pytest_mock import MockFixture
 
-from cpg_workflows.workflow import WorkflowError, get_batch, stage
+from cpg_workflows.workflow import WorkflowError, stage
 
 from .. import set_config
 from . import TestStage, run_workflow
