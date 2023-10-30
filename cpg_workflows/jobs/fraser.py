@@ -28,34 +28,35 @@ class Fraser:
 
     def __init__(
             self,
-            input_bams: list[str | Path],
+            fds_tar: hb.ResourceFile,
+            cohort_name: str,
             output_tar_gz_path: str | Path | None = None,
             nthreads: int = 8,
         ) -> None:
-        self.input_bams = input_bams
-        assert isinstance(self.input_bams, list), f'input_bams must be a list, instead got {self.input_bams}'
-        self.input_bams_r_str = ', '.join([f'"{str(f)}"' for f in self.input_bams])
+        self.fds_tar = fds_tar
+        assert isinstance(self.fds_tar, hb.ResourceFile), f'fds_tar must be a resource file, instead got {self.fds_tar}'
+        self.cohort_name = cohort_name
         self.output_tar_gz_path = str(output_tar_gz_path)
         self.nthreads = nthreads
 
         # Build OUTRIDER command
-        self.command = """
+        self.command = f"""\
+        # Create output directories
+        rm -rf plots results output
+        mkdir -p plots/heatmaps plots/by_gene plots/by_sample results
+
+        # Extract FDS data
+        tar -xvf {self.fds_tar}
+        """
+        self.command += """\
         R --vanilla <<EOF
         library(FRASER)
         library(tidyverse)
         library(TxDb.Hsapiens.UCSC.hg38.knownGene)
         library(org.Hs.eg.db)
-
-        # Create directories
-        dir.create("plots", showWarnings = FALSE)
-        dir.create("plots/heatmaps", showWarnings = FALSE)
-        dir.create("plots/by_gene", showWarnings = FALSE)
-        dir.create("plots/by_sample", showWarnings = FALSE)
-        dir.create("results", showWarnings = FALSE)
-        dir.create("output", showWarnings = FALSE)
         """
-        self.command += f"""
-        # Set significance values
+        self.command += f"""\
+        # Set significance values and other parameters
         pval_cutoff <- 0.05
         z_cutoff <- NA
         minDeltaPsi <- 0.0
@@ -63,29 +64,34 @@ class Fraser:
         min_count <- 5
         n_parallel_workers <- {str(self.nthreads - 1)}
 
-        input_bam_files <- c({self.input_bams_r_str})
+        # Load FDS (pre-counted)
+        fds <- loadFraserDataSet(dir = "output", name = "{self.cohort_name}")
+
+        # Extract count data and build new FDS using the FraserDataSet command
+        sample_table <- fds@colData
+        raw_counts_splice_sites <- cbind(
+          as.data.table(granges(rowRanges(fds, type="ss"))),
+          as.data.table(rowData(fds, type="ss")),
+          as.data.table(counts(fds, type="ss"))
+        )
+        raw_counts_junctions <- cbind(
+          as.data.table(granges(rowRanges(fds, type="j"))),
+          as.data.table(counts(fds, type="j")),
+          as.data.table(rowData(fds, type="j"))
+        )
+        rm(fds)
+
+        fds <- FraserDataSet(
+          colData = sample_table,
+          junctions = raw_counts_junctions,
+          spliceSites = raw_counts_splice_sites,
+          workingDir = "output.cohort.new"
+        )
         """
-        self.command += """
-        # Create sample table
-        sampleTable <- DataFrame(
-        sampleID = gsub("\\\\\\\\.bam$", "", basename(input_bam_files), perl = TRUE),
-        bamFile = input_bam_files,
-        group = seq_len(length(input_bam_files)),
-        pairedEnd = TRUE
-        )
-
-        # Create FRASER settings object
-        settings <- FraserDataSet(
-        colData = sampleTable,
-        workingDir = "output"
-        )
-
+        self.command += """\
         # Setup parallelisation
         register(MulticoreParam(workers = n_parallel_workers))
         bp <- MulticoreParam(workers = n_parallel_workers)
-
-        # Count reads
-        fds <- countRNAData(settings)
 
         # Calculate PSI values
         fds <- calculatePSIValues(fds)
@@ -107,16 +113,18 @@ class Fraser:
         }
 
         # Calculate optimal encoding dimensions (q)
-        optimal_qs <- c(
-            psi5 = optimHyperParams(fds_filtered, type = "psi5", plot = FALSE),
-            psi3 = optimHyperParams(fds_filtered, type = "psi3", plot = FALSE),
-            theta = optimHyperParams(fds_filtered, type = "theta", plot = FALSE)
-        )
         for (psi_type in c("psi5", "psi3", "theta")) {
+            fds_filtered <- optimHyperParams(fds_filtered, type = psi_type, plot = FALSE)
             png(file = paste0("plots/optimal_q.", psi_type, ".png"), width = 4000, height = 4000, res = 600)
             print(plotEncDimSearch(fds_filtered, type = psi_type))
             dev.off()
         }
+
+        optimal_qs <- c(
+          psi5 = fds_filtered@metadata$hyperParams_psi5$q,
+          psi3 = fds_filtered@metadata$hyperParams_psi3$q,
+          theta = fds_filtered@metadata$hyperParams_theta$q
+        )
 
         # Fit model
         fds_filtered_fit <- FRASER(fds_filtered, q = optimal_qs, BPPARAM = bp)
@@ -145,7 +153,7 @@ class Fraser:
         write_csv(res_all, file = "results/results.all.csv")
 
         # Plot results
-        for (sample_id in sampleTable\\$sampleID) {
+        for (sample_id in fds\\$sampleID) {
             png(file = paste0("plots/per_sample/", sample_id, ".psi5.png"), width = 4000, height = 4000, res = 600)
             plotVolcano(fds_filtered_fit, sample_id, type = "psi5")
             dev.off()
@@ -162,7 +170,7 @@ class Fraser:
         EOF
         """
         # Tar up outputs
-        self.command += f"""
+        self.command += f"""\
         tar -czvf {self.output_tar_gz_path} plots results output savedObjects
         """
         self.command = dedent(self.command).strip()
@@ -193,9 +201,10 @@ def fraser(
     jobs: list[Job] = []
 
     # Convert CRAMs to BAMs if necessary
-    input_bams_localised: list[hb.ResourceFile] = []
+    input_bams_localised: dict[str, hb.ResourceFile] = {}
     for input_bam_or_cram in input_bams_or_crams:
         if isinstance(input_bam_or_cram, CramPath):
+            sample_id = basename(input_bam_or_cram.path).replace('.cram', '')
             j, output_bam = cram_to_bam(
                 b=b,
                 input_cram=input_bam_or_cram,
@@ -204,18 +213,18 @@ def fraser(
             )
             if j and isinstance(j, Job):
                 jobs.append(j)
-            input_bam_or_cram = output_bam.bam
+            input_bams_localised[sample_id] = output_bam.bam
         elif isinstance(input_bam_or_cram, BamPath):
+            sample_id = basename(input_bam_or_cram.path).replace('.bam', '')
             # Localise BAM
-            input_bams_localised.append(input_bam_or_cram.resource_group(b).bam)
-    assert all([isinstance(f, hb.ResourceFile) for f in input_bams_localised])
+            input_bams_localised[sample_id] = input_bam_or_cram.resource_group(b).bam
+    assert all([isinstance(f, hb.ResourceFile) for f in list(input_bams_localised.values())])
 
     # Create FRASER job
     job_name = f'fraser_{cohort_name}' if cohort_name else 'count'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
     j = b.new_job(job_name, _job_attrs)
-    # j.image(image_path('fraser'))
-    j.image('australia-southeast1-docker.pkg.dev/cpg-common/images-dev/fraser:1.12.1')
+    j.image(image_path('fraser'))
 
     # Set resource requirements
     nthreads = requested_nthreads or 8
@@ -231,9 +240,20 @@ def fraser(
         }
     )
 
+    # Perform counting in parallel jobs
+    count_jobs, fds_tar = fraser_count(
+        b=b,
+        input_bams_localised=input_bams_localised,
+        cohort_name=cohort_name,
+        job_attrs=job_attrs,
+        requested_nthreads=requested_nthreads,
+    )
+    jobs.extend(count_jobs)
+
     # Create counting command
     fraser = Fraser(
-        input_bams=input_bams_localised,
+        fds_tar=fds_tar,
+        cohort_name=cohort_name,
         output_tar_gz_path=j.output.tar_gz,
         nthreads=res.get_nthreads(),
     )
@@ -249,3 +269,482 @@ def fraser(
         b.write_output(j.output.tar_gz, str(output_path))
     
     return jobs
+
+
+def fraser_count(
+    b: hb.Batch,
+    input_bams_localised: dict[str, hb.ResourceFile],
+    cohort_name: str,
+    job_attrs: dict[str, str] | None = None,
+    requested_nthreads: int | None = None,
+) -> tuple[list[Job], hb.ResourceFile]:
+    """
+    Run FRASER counting.
+    """
+    jobs = []
+    j, fds, sample_ids = fraser_init(
+        b=b,
+        input_bams_localised=input_bams_localised,
+        cohort_name=cohort_name,
+        job_attrs=job_attrs,
+        requested_nthreads=requested_nthreads,
+    )
+    jobs.append(j)
+
+    split_counts_dict = {}
+    for sample_id in sample_ids:
+        sample_j, split_counts = fraser_count_split_reads_one_sample(
+            b=b,
+            fds=fds,
+            sample_id=sample_id,
+            cohort_name=cohort_name,
+            job_attrs=job_attrs,
+            requested_nthreads=requested_nthreads,
+        )
+        jobs.append(sample_j)
+        split_counts_dict[sample_id] = split_counts
+
+    j, split_counts_rg = fraser_merge_split_reads(
+        b=b,
+        fds=fds,
+        cohort_name=cohort_name,
+        split_counts_dict=split_counts_dict,
+        job_attrs=job_attrs,
+        requested_nthreads=requested_nthreads,
+    )
+    jobs.append(j)
+
+    non_spliced_counts_dict = {}
+    for sample_id in sample_ids:
+        sample_j, non_spliced_counts = fraser_count_non_split_reads_one_sample(
+            b=b,
+            fds=fds,
+            cohort_name=cohort_name,
+            split_counts=split_counts_rg,
+            sample_id=sample_id,
+            job_attrs=job_attrs,
+            requested_nthreads=requested_nthreads,
+        )
+        jobs.append(sample_j)
+        non_spliced_counts_dict[sample_id] = non_spliced_counts
+
+    j, fds_tar = fraser_merge_non_split_reads(
+        b=b,
+        fds=fds,
+        cohort_name=cohort_name,
+        non_spliced_counts_dict=non_spliced_counts_dict,
+        split_counts=split_counts_rg,
+        job_attrs=job_attrs,
+        requested_nthreads=requested_nthreads,
+    )
+    jobs.append(j)
+
+    return jobs, fds_tar
+
+
+def fraser_init(
+    b: hb.Batch,
+    input_bams_localised: dict[str, hb.ResourceFile],
+    cohort_name: str,
+    job_attrs: dict[str, str] | None = None,
+    requested_nthreads: int | None = None,
+) -> tuple[Job, hb.ResrouceFile, list[str]]:
+    """
+    Run FRASER initialisation.
+    """
+    # Create FRASER job
+    job_name = f'fraser_init'
+    _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
+    j = b.new_job(job_name, _job_attrs)
+    j.image(image_path('fraser'))
+
+    # Set resource requirements
+    nthreads = requested_nthreads or 8
+    res = STANDARD.set_resources(
+        j,
+        ncpu=nthreads,
+        storage_gb=50,
+    )
+
+    bam_files_r_str = ''
+    sample_ids_r_str = ''
+    sample_ids = []
+    for sample_id, bam_file in input_bams_localised.items():
+        bam_files_r_str += f'"{bam_file}", '
+        sample_ids_r_str += f'"{sample_id}", '
+        sample_ids.append(sample_id)
+
+    cmd = dedent(
+        f"""\
+        R --vanilla <<EOF
+        library(FRASER)
+
+        bam_files <- c({bam_files_r_str})
+        sample_ids <- c({sample_ids_r_str})
+        sample_table <- DataFrame(
+            sampleID = sample_ids,
+            bamFile = bam_files,
+            group = seq_len(length(bam_files)),
+            pairedEnd = TRUE
+        )
+
+        fds <- FraserDataset(
+            colData = sample_table,
+            workingDir = "output",
+            name = "{cohort_name}"
+        )
+
+        n_parallel_workers <- {str(res.get_nthreads() - 1)}
+        register(MulticoreParam(workers = n_parallel_workers))
+        bp <- MulticoreParam(workers = n_parallel_workers)
+
+        fds <- saveFraserDataSet(fds)
+        EOF
+
+        # Move output to resource file
+        mv output/savedObjects/{cohort_name}/fds-object.RDS {j.fds}
+        """
+    )
+
+    j.command(command(cmd, monitor_space=True))
+
+    return j, j.fds, sample_ids
+
+
+def fraser_count_split_reads_one_sample(
+    b: hb.Batch,
+    fds: hb.ResourceGroup,
+    sample_id: str,
+    cohort_name: str,
+    job_attrs: dict[str, str] | None = None,
+    requested_nthreads: int | None = None,
+) -> tuple[Job, hb.ResourceFile]:
+    """
+    Run FRASER split-read counting for a single sample.
+    """
+    # Create FRASER job
+    job_name = f'fraser_count_split'
+    _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
+    j = b.new_job(job_name, _job_attrs)
+    j.image(image_path('fraser'))
+
+    # Set resource requirements
+    nthreads = requested_nthreads or 8
+    res = STANDARD.set_resources(
+        j,
+        ncpu=nthreads,
+        storage_gb=50,
+    )
+
+    cmd = dedent(
+        f"""\
+        # Symlink FDS resource file to proper location
+        mkdir -p output/savedObjects/{cohort_name}
+        ln -s {fds} output/savedObjects/{cohort_name}/fds-object.RDS
+        
+        R --vanilla <<EOF
+        library(FRASER)
+
+        fds <- loadFraserDataSet(dir = "output", name = "{cohort_name}")
+
+        n_parallel_workers <- {str(res.get_nthreads() - 1)}
+        register(MulticoreParam(workers = n_parallel_workers))
+        bp <- MulticoreParam(workers = n_parallel_workers)
+
+        options("FRASER.maxSamplesNoHDF5"=0)
+        options("FRASER.maxJunctionsNoHDF5"=-1)
+
+        sample_id <- "{sample_id}"
+        sample_count <- countSplitReads(
+          sampleID = sample_id,
+          fds = fds,
+          NcpuPerSample = n_parallel_workers,
+        )
+        EOF
+
+        # Move output to resource file
+        mv output/cache/splitCounts/splitCounts-{sample_id}.RDS {j.split_counts}
+        """
+    )
+
+    j.command(command(cmd, monitor_space=True))
+
+    return j, j.split_counts
+
+
+def fraser_merge_split_reads(
+    b: hb.Batch,
+    fds: hb.ResourceGroup,
+    cohort_name: str,
+    split_counts_dict: dict[str, hb.ResourceFile],
+    job_attrs: dict[str, str] | None = None,
+    requested_nthreads: int | None = None,
+) -> tuple[Job, hb.ResourceGroup]:
+    """
+    Merge split-read counts.
+    """
+    # Create FRASER job
+    job_name = f'fraser_merge_split'
+    _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
+    j = b.new_job(job_name, _job_attrs)
+    j.image(image_path('fraser'))
+
+    # Set resource requirements
+    nthreads = requested_nthreads or 8
+    res = STANDARD.set_resources(
+        j,
+        ncpu=nthreads,
+        storage_gb=50,
+    )
+
+    # Create command to symlink split counts
+    link_counts_cmd = 'mkdir -p output/cache/splitCounts\n'
+    link_counts_cmd += '\n'.join([
+        f'ln -s {split_counts} output/cache/splitCounts/splitCounts-{sample_id}.RDS'
+        for sample_id, split_counts in split_counts_dict.items()
+    ])
+
+    # Create resource group for outputs
+    split_counts_rg={
+        'raw_counts_j_h5': 'output/savedObjects/{cohort_name}/rawCountsJ.h5',
+        'split_counts_assays': 'output/savedObjects/{cohort_name}/splitCounts/assays.h5',
+        'split_counts_se': 'output/savedObjects/{cohort_name}/splitCounts/se.rds',
+        'g_ranges_split_counts': 'rds/g_ranges_split_counts.RDS',
+        'g_ranges_non_split_counts': 'rds/g_ranges_non_split_counts.RDS',
+        'splice_site_coords': 'rds/splice_site_coords.RDS',
+    }
+    j.declare_resource_group(
+        split_counts=split_counts_rg,
+    )
+
+    # Create move command for outputs
+    move_cmd = '\n'.join([
+        f'mv {file} {j.split_counts[key]}'
+        for key, file in split_counts_rg.items()
+    ])
+
+    cmd = dedent(
+        f"""\
+        # Symlink FDS resource file to proper location
+        mkdir -p output/savedObjects/{cohort_name}
+        ln -s {fds} output/savedObjects/{cohort_name}/fds-object.RDS
+        # Symlink split counts
+        {link_counts_cmd}
+        
+        R --vanilla <<EOF
+        library(FRASER)
+        fds <- loadFraserDataSet(dir = "output", name = "{cohort_name}")
+
+        n_parallel_workers <- {str(res.get_nthreads() - 1)}
+        register(MulticoreParam(workers = n_parallel_workers))
+        bp <- MulticoreParam(workers = n_parallel_workers)
+
+        options("FRASER.maxSamplesNoHDF5"=0)
+        options("FRASER.maxJunctionsNoHDF5"=-1)
+
+        minExpressionInOneSample <- 20
+
+        # Read counts from cache
+        split_counts <- getSplitReadCountsForAllSamples(fds = fds, recount = FALSE)
+
+        split_count_ranges <- rowRanges(split_counts)
+        split_count_ranges <- FRASER:::annotateSpliceSite(split_count_ranges)
+        saveRDS(split_count_ranges, "rds/g_ranges_split_counts.RDS")
+
+        max_count <- rowMaxs(assay(split_counts, "rawCountsJ"))
+        passed <- max_count >= minExpressionInOneSample
+        split_count_ranges <- split_count_ranges[passed, ]
+        saveRDS(split_count_ranges, "rds/g_ranges_non_split_counts.RDS")
+
+        splice_site_coords <- FRASER:::extractSpliceSiteCoordinates(split_count_ranges, fds)
+        saveRDS(splice_site_coords, "rds/splice_site_coords.RDS")
+        EOF
+
+        # Move outputs to resource group
+        {move_cmd}
+        """
+    )
+
+    j.command(command(cmd, monitor_space=True))
+
+    return j, j.split_counts
+
+
+def fraser_count_non_split_reads_one_sample(
+    b: hb.Batch,
+    fds: hb.ResourceGroup,
+    cohort_name: str,
+    split_counts: hb.ResourceGroup,
+    sample_id: str,
+    job_attrs: dict[str, str] | None = None,
+    requested_nthreads: int | None = None,
+) -> tuple[Job, hb.ResourceFile]:
+    """
+    Run FRASER non-split-read counting for a single sample.
+    """
+    # Create FRASER job
+    job_name = f'fraser_count_non_split'
+    _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
+    j = b.new_job(job_name, _job_attrs)
+    j.image(image_path('fraser'))
+
+    # Set resource requirements
+    nthreads = requested_nthreads or 8
+    res = STANDARD.set_resources(
+        j,
+        ncpu=nthreads,
+        storage_gb=50,
+    )
+
+    cmd = dedent(
+        f"""\
+        # Symlink FDS resource file to proper location
+        mkdir -p output/savedObjects/{cohort_name}
+        ln -s {fds} output/savedObjects/{cohort_name}/fds-object.RDS
+        # Symlink splice site coords RDS file
+        mkdir -p rds
+        ln -s {split_counts.splice_site_coords} rds/splice_site_coords.RDS
+        
+        R --vanilla <<EOF
+        library(FRASER)
+        fds <- loadFraserDataSet(dir = "output", name = "{cohort_name}")
+
+        n_parallel_workers <- {str(res.get_nthreads() - 1)}
+        register(MulticoreParam(workers = n_parallel_workers))
+        bp <- MulticoreParam(workers = n_parallel_workers)
+
+        options("FRASER.maxSamplesNoHDF5"=0)
+        options("FRASER.maxJunctionsNoHDF5"=-1)
+
+        splice_site_coords <- readRDS("rds/splice_site_coords.RDS")
+
+        sample_id <- "{sample_id}"
+        sample_count <- countNonSplicedReads(
+          sampleID = sample_id,
+          splitCountRanges = NULL,
+          fds = fds,
+          minAnchor = 5,
+          NcpuPerSample = n_parallel_workers,
+          spliceSiteCoords = splice_site_coords
+        )
+        EOF
+
+        # Move output to resource file
+        mv output/cache/nonSplicedCounts/{cohort_name}/nonSplicedCounts-{sample_id}.h5 {j.non_spliced_counts}
+        """
+    )
+
+    j.command(command(cmd, monitor_space=True))
+
+    return j, j.non_spliced_counts
+
+
+def fraser_merge_non_split_reads(
+    b: hb.Batch,
+    fds: hb.ResourceGroup,
+    cohort_name: str,
+    non_spliced_counts_dict: dict[str, hb.ResourceFile],
+    split_counts: hb.ResourceGroup,
+    job_attrs: dict[str, str] | None = None,
+    requested_nthreads: int | None = None,
+) -> tuple[Job, hb.ResourceFile]:
+    """
+    Merge non-split-read counts.
+    """
+    # Create FRASER job
+    job_name = f'fraser_count_split'
+    _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
+    j = b.new_job(job_name, _job_attrs)
+    j.image(image_path('fraser'))
+
+    # Set resource requirements
+    nthreads = requested_nthreads or 8
+    res = STANDARD.set_resources(
+        j,
+        ncpu=nthreads,
+        storage_gb=50,
+    )
+
+    # Create command to symlink non-spliced counts
+    link_counts_cmd = f'mkdir -p output/cache/nonSplicedCounts/{cohort_name}\n'
+    link_counts_cmd += '\n'.join([
+        f'ln -s {non_spliced_counts} output/cache/nonSplicedCounts/{cohort_name}/nonSplicedCounts-{sample_id}.h5'
+        for sample_id, non_spliced_counts in non_spliced_counts_dict.items()
+    ])
+    link_counts_cmd += f'\n'
+    # Add command to symlink RDS files
+    link_counts_cmd += 'mkdir -p rds\n'
+    link_counts_cmd += f'ln -s {split_counts.g_ranges_split_counts} rds/g_ranges_split_counts.RDS\n'
+    link_counts_cmd += f'ln -s {split_counts.g_ranges_non_split_counts} rds/g_ranges_non_split_counts.RDS\n'
+    link_counts_cmd += f'ln -s {split_counts.splice_site_coords} rds/splice_site_coords.RDS\n'
+    # Add command to symlink split counts assays
+    link_counts_cmd += 'mkdir -p output/savedObjects/{cohort_name}/splitCounts\n'
+    link_counts_cmd += f'ln -s {split_counts.raw_counts_j_h5} output/savedObjects/{cohort_name}/rawCountsJ.h5\n'
+    link_counts_cmd += f'ln -s {split_counts.split_counts_assays} output/savedObjects/{cohort_name}/splitCounts/assays.h5\n'
+    link_counts_cmd += f'ln -s {split_counts.split_counts_se} output/savedObjects/{cohort_name}/splitCounts/se.rds\n'
+
+    cmd = dedent(
+        f"""\
+        # Symlink FDS resource file to proper location
+        mkdir -p output/savedObjects/{cohort_name}
+        ln -s {fds} output/savedObjects/{cohort_name}/fds-object.RDS
+        # Symlink non-spliced counts, RDS files, and split counts
+        {link_counts_cmd}
+        
+        R --vanilla <<EOF
+        library(FRASER)
+
+        fds <- loadFraserDataSet(dir = "output", name = "{cohort_name}")
+
+        n_parallel_workers <- {str(res.get_nthreads() - 1)}
+        register(MulticoreParam(workers = n_parallel_workers))
+        bp <- MulticoreParam(workers = n_parallel_workers)
+
+        options("FRASER.maxSamplesNoHDF5"=0)
+        options("FRASER.maxJunctionsNoHDF5"=-1)
+
+        minAnchor <- 5
+
+        split_count_ranges <- readRDS("rds/g_ranges_non_split_counts.RDS")
+        non_split_counts <- getNonSplitReadCountsForAllSamples(
+          fds = fds,
+          splitCountRanges = split_count_ranges,
+          minAnchor = minAnchor,
+          recount = FALSE,
+          longRead = FALSE
+        )
+
+        split_count_ranges <- readRDS("rds/g_ranges_split_counts.RDS")
+        splice_site_coords <- readRDS("rds/splice_site_coords.RDS")
+
+        split_counts_h5 <- HDF5Array::HDF5Array("output/savedObjects/{cohort_name}/rawCountsJ.h5", "rawCountsJ")
+        split_counts_se <- SummarizedExperiment(
+          colData = colData(fds),
+          rowRanges = split_count_ranges,
+          assays = list(rawCountsJ = split_counts_h5)
+        )
+
+        non_split_counts_h5 <- HDF5Array::HDF5Array("output.cohort/savedObjects/{cohort_name}/rawCountsSS.h5", "rawCountsSS")
+        non_split_counts_se <- SummarizedExperiment(
+          colData = colData(fds),
+          rowRanges = splice_site_coords,
+          assays = list(rawCountsSS = non_split_counts_h5)
+        )
+
+        fds <- addCountsToFraserDataSet(
+          fds = fds,
+          splitCounts = split_counts_se,
+          nonSplitCounts = non_split_counts_se
+        )
+
+        fds <- saveFraserDataSet(fds)
+        EOF
+
+        # tar saved objects directory
+        tar -cf {j.fds_tar} output/savedObjects/{cohort_name}/
+        """
+    )
+
+    j.command(command(cmd, monitor_space=True))
+
+    return j, j.fds_tar
