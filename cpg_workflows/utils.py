@@ -1,9 +1,7 @@
 """
 Utility functions and constants.
 """
-
 import logging
-import hail as hl
 import re
 import string
 import sys
@@ -11,14 +9,21 @@ import time
 import traceback
 import unicodedata
 from functools import lru_cache
-from os.path import join
+from os.path import basename, dirname, join
 from random import choices
-from typing import cast, Union
+from typing import Union, cast
 
-from hailtop.batch import ResourceFile
-
+import hail as hl
+from cloudpathlib import GSPath
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
+from google.cloud import storage
+from hailtop.batch import ResourceFile
+
+
+@lru_cache(maxsize=1)
+def get_gs_client():
+    return storage.Client()
 
 
 def read_hail(path):
@@ -104,14 +109,52 @@ def exists_not_cached(path: Path | str, verbose: bool = True) -> bool:
     if verbose:
         # noinspection PyBroadException
         try:
-            res = path.exists()
+            res = _exists_not_cached(path)
         except BaseException:
             traceback.print_exc()
             logging.error(f'Failed checking {path}')
             sys.exit(1)
         logging.debug(f'Checked {path} [' + ('exists' if res else 'missing') + ']')
         return res
+
+    return _exists_not_cached(path)
+
+
+def _exists_not_cached(path: Path):
+    """
+    Bare basic implementation of exists not cached with no extra path modification
+    """
+    if isinstance(path, GSPath):
+        return check_gs_exists_path(path)
     return path.exists()
+
+
+def check_gs_exists_path(gs_path: str) -> bool:
+    """
+    Check whether a gs_path exists by calling the client library directly
+    """
+    return basename(gs_path) in get_contents_of_gs_path(dirname(gs_path))
+
+
+@lru_cache
+def get_contents_of_gs_path(gs_path: str) -> set[str]:
+    """
+    Get the contents of a GCS path, returning non-complete paths, eg:
+
+        get_contents_of_gs_path('gs://my-bucket/my-dir/')
+        'my-file.txt'
+
+    """
+    assert gs_path.startswith('gs://')
+    bucket_name, prefix = (
+        gs_path.removeprefix('gs://').strip('/').split('/', maxsplit=1)
+    )
+
+    # create gsclient and list contents of blob at path
+    # need to supply a user project here if requester-pays bucket
+    blobs = get_gs_client().list_blobs(bucket_name, prefix=prefix, delimiter='/')
+
+    return {blob.name for blob in blobs}
 
 
 def can_reuse(
