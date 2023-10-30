@@ -51,27 +51,27 @@ This will have to be run using Full permissions as we will need to reference
 data in test and main buckets.
 """
 
-from os.path import join
 from datetime import datetime
+from os.path import join
+
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import (
     authenticate_cloud_credentials_in_job,
     copy_common_env,
+    get_batch,
     image_path,
 )
 from metamist.graphql import gql, query
 
-from cpg_workflows.batch import get_batch
+from cpg_workflows.resources import STANDARD
 from cpg_workflows.workflow import (
-    stage,
     Dataset,
     DatasetStage,
-    StageOutput,
     StageInput,
+    StageOutput,
+    stage,
 )
-from cpg_workflows.resources import STANDARD
-
 
 CHUNKY_DATE = datetime.now().strftime('%Y-%m-%d')
 DATED_FOLDER = join('reanalysis', CHUNKY_DATE)

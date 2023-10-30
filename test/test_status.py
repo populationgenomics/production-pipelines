@@ -79,9 +79,8 @@ def _common(mocker, tmp_path):
 def test_status_reporter(mocker: MockFixture, tmp_path):
     _common(mocker, tmp_path)
 
-    from cpg_utils.hail_batch import dataset_path
+    from cpg_utils.hail_batch import dataset_path, get_batch
 
-    from cpg_workflows.batch import get_batch
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
@@ -162,9 +161,8 @@ def _update_meta(output_path: str) -> dict[str, Any]:
 def test_status_reporter_with_custom_updater(mocker: MockFixture, tmp_path):
     _common(mocker, tmp_path)
 
-    from cpg_utils.hail_batch import dataset_path
+    from cpg_utils.hail_batch import dataset_path, get_batch
 
-    from cpg_workflows.batch import get_batch
     from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
         SequencingGroupStage,
@@ -201,9 +199,8 @@ def test_status_reporter_with_custom_updater(mocker: MockFixture, tmp_path):
 def test_status_reporter_fails(mocker: MockFixture, tmp_path):
     _common(mocker, tmp_path)
 
-    from cpg_utils.hail_batch import dataset_path
+    from cpg_utils.hail_batch import dataset_path, get_batch
 
-    from cpg_workflows.batch import get_batch
     from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
         SequencingGroupStage,

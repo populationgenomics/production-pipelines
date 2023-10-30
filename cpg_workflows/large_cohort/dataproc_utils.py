@@ -6,13 +6,10 @@ import math
 from typing import Sequence
 
 from analysis_runner import dataproc
-from hailtop.batch.job import Job
-
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-
-from cpg_workflows.batch import get_batch
-
+from cpg_utils.hail_batch import get_batch
+from hailtop.batch.job import Job
 
 DATAPROC_PACKAGES = [
     'cpg-utils',

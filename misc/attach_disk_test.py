@@ -11,8 +11,8 @@ point it performs that attachment, as often we want to avoid extra costs incurre
 external disk, and use the default space only.
 """
 
-from cpg_utils.config import update_dict, get_config
-from cpg_workflows import get_batch
+from cpg_utils.config import get_config, update_dict
+from cpg_utils.hail_batch import get_batch
 
 
 def main():  # pylint: disable=missing-function-docstring

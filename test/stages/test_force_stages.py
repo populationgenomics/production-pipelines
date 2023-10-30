@@ -47,11 +47,13 @@ def test_force_stages(mocker: MockFixture, tmp_path):
     # dummy mocking to avoid file system scanning
     mocker.patch('cpg_workflows.workflow.list_all_parent_dirs', lambda *args: {})
     mocker.patch('cpg_workflows.workflow.list_of_all_dir_contents', lambda *args: {})
-    mocker.patch('cpg_workflows.workflow.missing_from_pre_collected', lambda *args: None)
+    mocker.patch(
+        'cpg_workflows.workflow.missing_from_pre_collected', lambda *args: None
+    )
     set_config(conf, tmp_path / 'config.toml')
     run_workflow(mocker)
 
-    from cpg_workflows.workflow import get_batch
+    from cpg_utils.hail_batch import get_batch
 
     print('Job by stage:', get_batch().job_by_stage)
     assert 'A' not in get_batch().job_by_stage

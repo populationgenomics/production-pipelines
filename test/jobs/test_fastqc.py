@@ -1,16 +1,17 @@
 import re
-import pytest
-from pathlib import Path
 from functools import cached_property
+from pathlib import Path
 
-from cpg_workflows.jobs.fastqc import fastqc
-from cpg_workflows.batch import Batch
+import pytest
+from cpg_utils.hail_batch import Batch
+
 from cpg_workflows.filetypes import BamPath, FastqPath
+from cpg_workflows.jobs.fastqc import fastqc
 
 from .. import set_config
-from .helpers import get_command_str
 from ..factories.batch import create_local_batch
 from ..factories.config import PipelineConfig, WorkflowConfig
+from .helpers import get_command_str
 
 
 class TestFastqc:

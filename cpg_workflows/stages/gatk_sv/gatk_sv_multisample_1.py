@@ -11,20 +11,26 @@ from typing import Any
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_workflows.batch import get_batch
-from cpg_workflows.workflow import stage, StageOutput, StageInput, Cohort, CohortStage
+from cpg_utils.hail_batch import get_batch
 
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
+    SV_CALLERS,
+    _sv_batch_meta,
     add_gatk_sv_jobs,
     get_fasta,
     get_images,
-    get_references,
     get_ref_panel,
+    get_references,
     make_combined_ped,
-    SV_CALLERS,
-    _sv_batch_meta,
 )
-from cpg_workflows.workflow import get_workflow
+from cpg_workflows.workflow import (
+    Cohort,
+    CohortStage,
+    StageInput,
+    StageOutput,
+    get_workflow,
+    stage,
+)
 
 
 @stage

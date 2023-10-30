@@ -5,23 +5,25 @@ from typing import Any
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from cpg_workflows.workflow import (
-    stage,
-    StageInput,
-    StageOutput,
-    CohortStage,
-    StageInputNotFoundError,
-    Cohort,
-    SequencingGroupStage,
-    get_workflow,
-)
+from cpg_utils.hail_batch import get_batch
 
 from cpg_workflows.jobs.multiqc import multiqc
 from cpg_workflows.jobs.picard import vcf_qc
-from .joint_genotyping import JointGenotyping
-from .. import get_cohort, get_batch
+from cpg_workflows.workflow import (
+    Cohort,
+    CohortStage,
+    SequencingGroupStage,
+    StageInput,
+    StageInputNotFoundError,
+    StageOutput,
+    get_workflow,
+    stage,
+)
+
+from .. import get_cohort
 from ..jobs.happy import happy
 from ..targets import SequencingGroup
+from .joint_genotyping import JointGenotyping
 
 
 @stage(required_stages=JointGenotyping)
@@ -123,8 +125,9 @@ class JointVcfHappy(SequencingGroupStage):
 
 
 def _update_meta(output_path: str) -> dict[str, Any]:
-    from cloudpathlib import CloudPath
     import json
+
+    from cloudpathlib import CloudPath
 
     with CloudPath(output_path).open() as f:
         d = json.load(f)
