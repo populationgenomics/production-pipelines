@@ -475,7 +475,7 @@ def _align_one(
         {prepare_fastq_cmd}
         dragen-os -r {dragmap_index} {input_params} \\
             --RGID {sequencing_group_name} --RGSM {sequencing_group_name} \\
-            --num-threads {nthreads - 3}
+            --num-threads {nthreads - 1}
         """
 
     else:
