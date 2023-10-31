@@ -18,7 +18,6 @@ from cpg_workflows.workflow import (
 )
 from cpg_workflows.jobs.bam_to_cram import cram_to_bam
 from textwrap import dedent
-from os.path import basename
 
 
 class Fraser:
@@ -145,12 +144,12 @@ class Fraser:
         res <- results(fds_filtered_fit, padjCutoff = pval_cutoff, deltaPsiCutoff = deltaPsi_cutoff, zScoreCutoff = z_cutoff, minCount = min_count)
         res_all <- results(fds_filtered_fit, padjCutoff = 1, deltaPsiCutoff = 0, minCount = 0)
         write_csv(
-            res,
+            data.frame(res),
             file = paste0(
                 "results/results.significant.p_", pval_cutoff, ".z_", z_cutoff, ".dPsi_", deltaPsi_cutoff, ".min_count_", min_count, ".csv"
             )
         )
-        write_csv(res_all, file = "results/results.all.csv")
+        write_csv(data.frame(res_all), file = "results/results.all.csv")
 
         # Plot results
         for (sample_id in fds\\$sampleID) {
@@ -204,7 +203,7 @@ def fraser(
     input_bams_localised: dict[str, hb.ResourceFile] = {}
     for input_bam_or_cram in input_bams_or_crams:
         if isinstance(input_bam_or_cram, CramPath):
-            sample_id = basename(input_bam_or_cram.path).replace('.cram', '')
+            sample_id = input_bam_or_cram.path.name.replace('.cram', '')
             j, output_bam = cram_to_bam(
                 b=b,
                 input_cram=input_bam_or_cram,
@@ -215,7 +214,7 @@ def fraser(
                 jobs.append(j)
             input_bams_localised[sample_id] = output_bam.bam
         elif isinstance(input_bam_or_cram, BamPath):
-            sample_id = basename(input_bam_or_cram.path).replace('.bam', '')
+            sample_id = input_bam_or_cram.path.name.replace('.bam', '')
             # Localise BAM
             input_bams_localised[sample_id] = input_bam_or_cram.resource_group(b).bam
     assert all([isinstance(f, hb.ResourceFile) for f in list(input_bams_localised.values())])
