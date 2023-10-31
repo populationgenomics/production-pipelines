@@ -474,7 +474,7 @@ def _align_one(
         cmd = f"""\
         {prepare_fastq_cmd}
         dragen-os -r {dragmap_index} {input_params} \\
-            --RGID {sequencing_group_name} --RGSM {sequencing_group_name} \\
+            --RGID {sequencing_group_name} --RGSM {sequencing_group_name} 
         """
 
     else:
