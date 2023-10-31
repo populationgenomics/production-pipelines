@@ -206,7 +206,7 @@ def fraser(
             sample_id = input_bam_or_cram.path.name.replace('.cram', '')
             j, output_bam = cram_to_bam(
                 b=b,
-                input_cram=input_bam_or_cram,
+                input_cram=input_bam_or_cram.resource_group(b),
                 job_attrs=job_attrs,
                 requested_nthreads=requested_nthreads,
             )
