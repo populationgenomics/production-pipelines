@@ -10,25 +10,21 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
+from cpg_utils import Path, to_path
+from cpg_utils.config import get_config
 from metamist import models
-from metamist.apis import (
-    AnalysisApi,
-)
+from metamist.apis import AnalysisApi
 from metamist.exceptions import ApiException
-
 from metamist.graphql import gql, query, validate
 
-from cpg_utils.config import get_config
-from cpg_utils import Path, to_path
-
-from cpg_workflows.utils import exists
 from cpg_workflows.filetypes import (
-    FastqPair,
-    CramPath,
-    BamPath,
     AlignmentInput,
+    BamPath,
+    CramPath,
+    FastqPair,
     FastqPairs,
 )
+from cpg_workflows.utils import exists
 
 GET_SEQUENCING_GROUPS_QUERY = gql(
     """
@@ -221,6 +217,7 @@ class Metamist:
         metamist_proj = dataset_name
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
+        logging.info(f'Getting sequencing groups for dataset {metamist_proj}')
 
         skip_sgs = get_config()['workflow'].get('skip_sgs', [])
         only_sgs = get_config()['workflow'].get('only_sgs', [])

@@ -10,9 +10,12 @@ use_gnarly = false
 # Use allele-specific annotations for VQSR
 use_as_vqsr = true
 
+# Version of VEP to use, currently operational: 105, 110
+vep_version = '110'
+
 # Realign CRAM when available, instead of using FASTQ.
 # The parameter value should correspond to CRAM version
-# (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPG01234.cram
+# (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPGaaa.cram
 #realign_from_cram_version = 'v0'
 
 # Calling intervals (defauls to whole genome intervals)
@@ -72,26 +75,10 @@ username = 'seqr'
 password_secret_id = 'seqr-es-password'
 password_project_id = 'seqr-308602'
 
-[stripy]
-# Analysis_type can be "standard" (fast) or "extended" (marginally slower
-# but also uses unmapped reads for genotying)
-analysis_type = "extended"
-# See https://gitlab.com/andreassh/stripy-pipeline#list-of-loci
-# Excluded by default: C9orf72, HTT
-target_loci = """AFF2,AR,ARX_1,ARX_2,ATN1,ATXN1,ATXN10,ATXN2,ATXN3,ATXN7,ATXN8OS,\
-BEAN1,CACNA1A,CBL,CNBP,COMP,DAB1,DIP2B,DMD,DMPK,FMR1,FOXL2,FXN,GIPC1,GLS,\
-HOXA13_1,HOXA13_2,HOXA13_3,HOXD13,JPH3,LRP12,MARCHF6,NIPA1,NOP56,NOTCH2NLC,\
-NUTM2B-AS1,PABPN1,PHOX2B,PPP2R2B,PRDM12,RAPGEF2,RFC1,RUNX2,SAMD12,SOX3,STARD7,TBP,\
-TBX1,TCF4,TNRC6A,XYLT1,YEATS2,ZIC2,ZIC3"""
+# temporary overrides until we rename images/config
+[images]
+vep_105 = "australia-southeast1-docker.pkg.dev/cpg-common/images/vep:105.0"
 
-[mito_snv]
-# Example config for broad wdl found here:
-# https://raw.githubusercontent.com/broadinstitute/gatk/master/scripts/mitochondria_m2_wdl/ExampleInputsMitochondriaPipeline.json
-# f_score_beta is not configured so will use tool default of 1.0
-f_score_beta = 1.0
-# Sarah Stenton from Broad runs this pipline for seqr ingest and indicated they use a
-# threshold of 0.01 for seqr cohorts.
-vaf_filter_threshold = 0.01
-# Use verifybamid in addition to haplocheck for contamination estimate
-# Broad pipeline is not clear if this option is used by default?
-use_verifybamid = true
+[references]
+vep_105_mount = "gs://cpg-common-main/references/vep/105.0/mount"
+vep_110_mount = "gs://cpg-common-main/references/vep/110/mount"
