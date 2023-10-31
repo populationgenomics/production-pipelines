@@ -213,6 +213,9 @@ def annotate_cohort_sv(
         force_bgz=True,
     )
 
+    # key the rows by rsid
+    mt = mt.key_rows_by('rsid')
+
     # add attributes required for Seqr
     mt = mt.annotate_globals(
         sourceFilePath=vcf_path,
@@ -231,9 +234,21 @@ def annotate_cohort_sv(
             }.get(sequencing_type, ''),
         )
 
+    # github.com/broadinstitute/seqr-loading-pipelines..luigi_pipeline/lib/hail_tasks.py#L212
+    mt = mt.annotate_rows(
+        gt_stats=hl.agg.call_stats(mt.GT, mt.alleles),
+        aIndex=mt.a_index,
+        wasSplit=mt.was_split,
+    )
+
     # reimplementation of
     # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/sv_mt_schema.py
     mt = mt.annotate_rows(
+        contig=mt.locus.contig.replace('^chr', ''),
+        start=mt.locus.position,
+        pos=mt.locus.position,
+        xpos=get_expr_for_xpos(mt.locus),
+        xstart=get_expr_for_xpos(mt.locus),
         sc=mt.info.AC[0],
         sf=mt.info.AF[0],
         sn=mt.info.AN,
@@ -322,11 +337,6 @@ def annotate_cohort_sv(
                 for gene_col in conseq_predicted_gene_cols
             ],
         ).flatmap(lambda x: x),
-        contig=mt.locus.contig.replace('^chr', ''),
-        start=mt.locus.position,
-        pos=mt.locus.position,
-        xpos=get_expr_for_xpos(mt.locus),
-        xstart=get_expr_for_xpos(mt.locus),
         xstop=get_expr_for_xpos(mt.end_locus),
         rg37_locus=hl.liftover(mt.locus, 'GRCh37'),
         rg37_locus_end=hl.or_missing(
