@@ -221,7 +221,7 @@ def fraser(
     assert all([isinstance(f, hb.ResourceFile) for f in list(input_bams_localised.values())])
 
     # Create FRASER job
-    job_name = f'fraser_{cohort_name}' if cohort_name else 'count'
+    job_name = f'fraser_{cohort_name}' if cohort_name else 'fraser'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
     j = b.new_job(job_name, _job_attrs)
     j.image(image_path('fraser'))
@@ -348,7 +348,7 @@ def fraser_init(
     cohort_name: str,
     job_attrs: dict[str, str] | None = None,
     requested_nthreads: int | None = None,
-) -> tuple[Job, hb.ResrouceFile, list[str]]:
+) -> tuple[Job, hb.ResourceFile, list[str]]:
     """
     Run FRASER initialisation.
     """
@@ -506,9 +506,9 @@ def fraser_merge_split_reads(
 
     # Create resource group for outputs
     split_counts_rg={
-        'raw_counts_j_h5': 'output/savedObjects/{cohort_name}/rawCountsJ.h5',
-        'split_counts_assays': 'output/savedObjects/{cohort_name}/splitCounts/assays.h5',
-        'split_counts_se': 'output/savedObjects/{cohort_name}/splitCounts/se.rds',
+        'raw_counts_j_h5': f'output/savedObjects/{cohort_name}/rawCountsJ.h5',
+        'split_counts_assays': f'output/savedObjects/{cohort_name}/splitCounts/assays.h5',
+        'split_counts_se': f'output/savedObjects/{cohort_name}/splitCounts/se.rds',
         'g_ranges_split_counts': 'rds/g_ranges_split_counts.RDS',
         'g_ranges_non_split_counts': 'rds/g_ranges_non_split_counts.RDS',
         'splice_site_coords': 'rds/splice_site_coords.RDS',

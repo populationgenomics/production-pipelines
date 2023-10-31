@@ -43,6 +43,7 @@ def get_toml(tmp_path) -> str:
     sambamba = "stub"
     subread = "stub"
     outrider = "stub"
+    fraser = "stub"
 
     [trim]
     adapter_type = "ILLUMINA_TRUSEQ"
@@ -313,8 +314,12 @@ def test_rare_rna(mocker: MockFixture, tmp_path):
     n_outrider_jobs = 1
     assert outrider_job['job_n'] == n_outrider_jobs
 
-    # The number of fraser jobs should be 1 (for the cohort)
-    n_fraser_jobs = 1
+    # The number of fraser jobs should be equal to
+    # 1 (fraser init for the cohort) +
+    # 2 * number of samples (count split and non-split reads per sample) +
+    # 2 (merge split and non-split reads separately for the cohort) +
+    # 1 (run fraser on the merged split and non-split reads)
+    n_fraser_jobs = 1 + 2 * len(sample_list) + 2 + 1
     assert fraser_job['job_n'] == n_fraser_jobs
 
     output_path = dataset_path('cmd.txt')
