@@ -185,8 +185,8 @@ class Fraser:
 def fraser(
     b: hb.Batch,
     input_bams_or_crams: list[BamPath | CramPath],
+    cohort_name: str,
     output_path: str | Path | None = None,
-    cohort_name: str | None = None,
     job_attrs: dict[str, str] | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
