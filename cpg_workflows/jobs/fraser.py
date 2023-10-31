@@ -505,7 +505,7 @@ def fraser_merge_split_reads(
     ])
 
     # Create resource group for outputs
-    split_counts_rg={
+    split_counts_rg = {
         'raw_counts_j_h5': f'output/savedObjects/{cohort_name}/rawCountsJ.h5',
         'split_counts_assays': f'output/savedObjects/{cohort_name}/splitCounts/assays.h5',
         'split_counts_se': f'output/savedObjects/{cohort_name}/splitCounts/se.rds',
