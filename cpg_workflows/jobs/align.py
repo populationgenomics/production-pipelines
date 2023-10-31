@@ -22,7 +22,7 @@ from cpg_workflows.filetypes import (
     BamPath,
     FastqPair,
 )
-from cpg_workflows.resources import STANDARD
+from cpg_workflows.resources import STANDARD, HIGHMEM
 from cpg_workflows.utils import can_reuse
 
 from . import picard
@@ -245,7 +245,7 @@ def align(
         )
         merge_j.image(image_path('samtools'))
 
-        nthreads = STANDARD.set_resources(
+        nthreads = HIGHMEM.set_resources(
             merge_j,
             nthreads=requested_nthreads,
             # for FASTQ or BAM inputs, requesting more disk (400G). Example when
@@ -475,7 +475,6 @@ def _align_one(
         {prepare_fastq_cmd}
         dragen-os -r {dragmap_index} {input_params} \\
             --RGID {sequencing_group_name} --RGSM {sequencing_group_name} \\
-            --ht-num-threads 14
         """
 
     else:
