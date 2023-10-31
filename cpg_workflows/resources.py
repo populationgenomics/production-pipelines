@@ -29,7 +29,7 @@ class MachineType:
     """
 
     min_cpu: int = 2
-    threads_on_cpu = 2  # hyper-threading
+    threads_on_cpu = 1  # GCP does not have hyper-threading
 
     def __init__(
         self,
