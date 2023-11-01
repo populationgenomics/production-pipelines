@@ -245,7 +245,7 @@ def align(
         )
         merge_j.image(image_path('samtools'))
 
-        nthreads = HIGHMEM.set_resources(
+        nthreads = STANDARD.set_resources(
             merge_j,
             nthreads=requested_nthreads,
             # for FASTQ or BAM inputs, requesting more disk (400G). Example when
@@ -346,7 +346,7 @@ def _align_one(
     job_name = f'{job_name} {alignment_input}'
     j = b.new_job(job_name, job_attrs)
 
-    nthreads = STANDARD.set_resources(
+    nthreads = HIGHMEM.set_resources(
         j,
         nthreads=requested_nthreads,
         storage_gb=storage_for_align_job(alignment_input=alignment_input),
