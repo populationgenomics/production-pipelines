@@ -169,7 +169,7 @@ def markdup(
 
     assert isinstance(j.output_cram, hb.ResourceGroup)
     cmd = f"""
-    picard MarkDuplicates -Xms{resource.get_java_mem_mb()}M \\
+    picard MarkDuplicates -Xms{resource.get_java_mem_mb()}M -Xlog:gc+heap=trace \\
     I={sorted_bam} O={j.temp_bam} M={j.markdup_metrics} \\
     TMP_DIR=$(dirname {j.output_cram.cram})/picard-tmp \\
     ASSUME_SORT_ORDER=coordinate
