@@ -244,20 +244,24 @@ def annotate_cohort_sv(
     # reimplementation of
     # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/sv_mt_schema.py
     mt = mt.annotate_rows(
+        # BaseVariantSchema
         contig=mt.locus.contig.replace('^chr', ''),
         start=mt.locus.position,
         pos=mt.locus.position,
         xpos=get_expr_for_xpos(mt.locus),
         xstart=get_expr_for_xpos(mt.locus),
-        sc=mt.info.AC[0],
-        sf=mt.info.AF[0],
-        sn=mt.info.AN,
-        end=mt.info.END,
+        # SeqrSVVariantSchema
+        # broadinstitute/seqr-loading-pipelines..luigi_pipeline/lib/model/sv_mt_schema.py#L64
         end_locus=hl.if_else(
             hl.is_defined(mt.info.END2),
             hl.struct(contig=mt.info.CHR2, position=mt.info.END2),
             hl.struct(contig=mt.locus.contig, position=mt.info.END)
         ),
+        sv_types=mt.alleles[1].replace('[<>]', '').split(':', 2),
+        sc=mt.info.AC[0],
+        sf=mt.info.AF[0],
+        sn=mt.info.AN,
+        end=mt.info.END,
         sv_callset_Het=mt.info.N_HET,
         sv_callset_Hom=mt.info.N_HOMALT,
         gnomad_svs_ID=mt.info['gnomad_v2.1_sv_SVID'],
@@ -272,7 +276,7 @@ def annotate_cohort_sv(
         #     hl.is_defined(mt.info.StrVCTVRE_score),
         #     hl.parse_float(mt.info.StrVCTVRE_score),
         # ),
-        filters=hl.or_missing(  # hopefully this plays nicely
+        filters=hl.or_missing(
             (mt.filters.filter(lambda x: (x != PASS) & (x != BOTHSIDES_SUPPORT))).size()
             > 0,
             mt.filters,
@@ -283,7 +287,6 @@ def annotate_cohort_sv(
             hl.is_defined(mt.info.CPX_INTERVALS),
             mt.info.CPX_INTERVALS.map(lambda x: get_cpx_interval(x)),
         ),
-        sv_types=mt.alleles[1].replace('[<>]', '').split(':', 2),
     )
 
     # save those changes
@@ -343,7 +346,7 @@ def annotate_cohort_sv(
             mt.end_locus.position <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.end_locus.contig],
             hl.liftover(hl.locus(mt.end_locus.contig, mt.end_locus.position, reference_genome='GRCh38'), 'GRCh37'),
         ),
-        syType=mt.sv_types[0],
+        svType=mt.sv_types[0],
         sv_type_detail=hl.if_else(
             mt.sv_types[0] == 'CPX',
             mt.info.CPX_TYPE,
