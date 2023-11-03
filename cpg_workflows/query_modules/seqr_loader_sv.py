@@ -234,13 +234,6 @@ def annotate_cohort_sv(
             }.get(sequencing_type, ''),
         )
 
-    # github.com/broadinstitute/seqr-loading-pipelines..luigi_pipeline/lib/hail_tasks.py#L212
-    mt = mt.annotate_rows(
-        gt_stats=hl.agg.call_stats(mt.GT, mt.alleles),
-        aIndex=mt.a_index,
-        wasSplit=mt.was_split,
-    )
-
     # reimplementation of
     # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/sv_mt_schema.py
     mt = mt.annotate_rows(
