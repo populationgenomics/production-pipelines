@@ -213,6 +213,9 @@ def annotate_cohort_sv(
         force_bgz=True,
     )
 
+    # re-key on new field
+    mt = mt.key_rows_by('rsid')
+
     # add attributes required for Seqr
     mt = mt.annotate_globals(
         sourceFilePath=vcf_path,
@@ -333,7 +336,7 @@ def annotate_cohort_sv(
             mt.end_locus.position <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.end_locus.contig],
             hl.liftover(hl.locus(mt.end_locus.contig, mt.end_locus.position, reference_genome='GRCh38'), 'GRCh37'),
         ),
-        syType=mt.sv_types[0],
+        svType=mt.sv_types[0],
         sv_type_detail=hl.if_else(
             mt.sv_types[0] == 'CPX',
             mt.info.CPX_TYPE,
