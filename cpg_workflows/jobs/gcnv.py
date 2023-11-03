@@ -12,7 +12,58 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, fasta_res_group, image_path
 from cpg_workflows.filetypes import CramPath
+from cpg_workflows.resources import HIGHMEM
 from cpg_workflows.utils import can_reuse
+
+
+def hack_markdup(
+    b: hb.Batch,
+    job_attrs: dict | None = None,
+) -> Job | None:
+    """
+    Make job that runs Picard MarkDuplicates and converts the result to CRAM.
+    """
+    job_attrs = (job_attrs or {}) | dict(tool='picard_MarkDuplicates')
+    j = b.new_job('MarkDuplicates', job_attrs)
+
+    j.image(image_path('picard'))
+    resource = HIGHMEM.request_resources(ncpu=4)
+
+    # check for a storage override for unreasonably large sequencing groups
+    if (
+        storage_override := get_config()['resource_overrides'].get('picard_storage_gb')
+    ) is not None:
+        assert isinstance(storage_override, int)
+        resource.attach_disk_storage_gb = storage_override
+    else:
+        # enough for input BAM and output CRAM
+        resource.attach_disk_storage_gb = 250
+    resource.set_to_job(j)
+
+    # check for a memory override for impossible sequencing groups
+    # if RAM is overridden, update the memory resource setting
+    if (
+        memory_override := get_config()['resource_overrides'].get('picard_mem_gb')
+    ) is not None:
+        assert isinstance(memory_override, int)
+        # Hail will select the right number of CPUs based on RAM request
+        j.memory(f'{memory_override}G')
+
+    j.declare_resource_group(
+        output_cram={
+            'cram': '{root}.cram',
+            'cram.crai': '{root}.cram.crai',
+        }
+    )
+
+    cmd = f"""
+    export _JAVA_OPTIONS='-Xlog:gc+heap=trace'
+    picard MarkDuplicates -Xms{resource.get_java_mem_mb()}M
+    """
+
+    j.command(command(cmd, monitor_space=True))
+
+    return j
 
 
 def prepare_intervals(

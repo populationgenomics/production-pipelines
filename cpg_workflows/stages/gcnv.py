@@ -21,17 +21,16 @@ class PrepareIntervals(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'preprocessed': self.prefix / f'{cohort.name}.preprocessed.interval_list',
-            'annotated':    self.prefix / f'{cohort.name}.annotated.tsv',
+            'preprocessed': self.prefix / f'{cohort.name}.banana.preprocessed.interval_list',
+            'annotated':    self.prefix / f'{cohort.name}.banana.annotated.tsv',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         outputs = self.expected_outputs(cohort)
 
-        jobs = gcnv.prepare_intervals(
+        jobs = gcnv.hack_markdup(
             get_batch(),
             self.get_job_attrs(cohort),
-            outputs,
         )
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
