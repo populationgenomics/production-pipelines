@@ -119,7 +119,7 @@ def _snv_es_index_meta(
     Add meta.type to es-index analysis object
     https://github.com/populationgenomics/metamist/issues/539
     """
-    return {'seqr-data-type': 'snv'}
+    return {'seqr-dataset-type': 'VARIANTS'}
 
 
 @stage(

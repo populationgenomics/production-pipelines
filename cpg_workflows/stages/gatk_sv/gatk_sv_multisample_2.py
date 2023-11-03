@@ -654,7 +654,7 @@ def _gatk_sv_index_meta(
     Add meta.type to custom analysis object
     https://github.com/populationgenomics/metamist/issues/539
     """
-    return {'seqr-data-type': 'gatk-sv'}
+    return {'seqr-dataset-type': 'SV'}
 
 
 @stage(
