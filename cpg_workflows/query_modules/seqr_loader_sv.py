@@ -438,7 +438,11 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
     # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/sv_mt_schema.py#L221
     # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/seqr_mt_schema.py#L251
     mt = mt.annotate_rows(
-        samples=_genotype_filter_samples(lambda g: True),
+
+        # omit samples field for GATKSV callsets. Leaving this here as likely needed
+        # for gCNV specific callsets (maybe)
+        # samples=_genotype_filter_samples(lambda g: True),
+
         samples_new_alt=_genotype_filter_samples(
             lambda g: g.new_call | hl.is_defined(g.prev_num_alt)
         ),
