@@ -461,13 +461,17 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
                 for i in range(0, 90, 10)
             }
         ),
-        samples_cn=hl.struct(
-            **{
-                f'{i}': _genotype_filter_samples(_filter_sample_cn(i))
-                for i in range(0, 4, 1)
-            },
-            gte_4=_genotype_filter_samples(lambda g: g.cn >= 4),
-        ),
+
+        # As per `samples` field, I beleive CN stats should only be generated for gCNV only
+        # callsets. In particular samples_cn_2 is used to select ALT_ALT variants,
+        # presumably because this genotype is only asigned when this CN is alt (ie on chrX)
+        # samples_cn=hl.struct(
+        #     **{
+        #         f'{i}': _genotype_filter_samples(_filter_sample_cn(i))
+        #         for i in range(0, 4, 1)
+        #     },
+        #     gte_4=_genotype_filter_samples(lambda g: g.cn >= 4),
+        # ),
     )
 
     logging.info('Genotype fields annotated')
