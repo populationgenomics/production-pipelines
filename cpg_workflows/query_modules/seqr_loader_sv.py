@@ -358,6 +358,7 @@ def annotate_cohort_sv(
                 lambda x: x[MAJOR_CONSEQUENCE] != 'NEAREST_TSS'
             ).map(lambda x: x[GENE_ID])
         ),
+        rsid=hl.missing('tstr')
     )
 
     # write this output
