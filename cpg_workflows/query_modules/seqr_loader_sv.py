@@ -333,7 +333,7 @@ def annotate_cohort_sv(
             mt.end_locus.position <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.end_locus.contig],
             hl.liftover(hl.locus(mt.end_locus.contig, mt.end_locus.position, reference_genome='GRCh38'), 'GRCh37'),
         ),
-        syType=mt.sv_types[0],
+        svType=mt.sv_types[0],
         sv_type_detail=hl.if_else(
             mt.sv_types[0] == 'CPX',
             mt.info.CPX_TYPE,
@@ -438,7 +438,11 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
     # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/sv_mt_schema.py#L221
     # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/seqr_mt_schema.py#L251
     mt = mt.annotate_rows(
-        samples=_genotype_filter_samples(lambda g: True),
+
+        # omit samples field for GATKSV callsets. Leaving this here as likely needed
+        # for gCNV specific callsets (maybe)
+        # samples=_genotype_filter_samples(lambda g: True),
+
         samples_new_alt=_genotype_filter_samples(
             lambda g: g.new_call | hl.is_defined(g.prev_num_alt)
         ),
@@ -457,13 +461,17 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
                 for i in range(0, 90, 10)
             }
         ),
-        samples_cn=hl.struct(
-            **{
-                f'{i}': _genotype_filter_samples(_filter_sample_cn(i))
-                for i in range(0, 4, 1)
-            },
-            gte_4=_genotype_filter_samples(lambda g: g.cn >= 4),
-        ),
+
+        # As per `samples` field, I beleive CN stats should only be generated for gCNV only
+        # callsets. In particular samples_cn_2 is used to select ALT_ALT variants,
+        # presumably because this genotype is only asigned when this CN is alt (ie on chrX)
+        # samples_cn=hl.struct(
+        #     **{
+        #         f'{i}': _genotype_filter_samples(_filter_sample_cn(i))
+        #         for i in range(0, 4, 1)
+        #     },
+        #     gte_4=_genotype_filter_samples(lambda g: g.cn >= 4),
+        # ),
     )
 
     logging.info('Genotype fields annotated')

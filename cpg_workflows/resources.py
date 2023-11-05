@@ -29,7 +29,9 @@ class MachineType:
     """
 
     min_cpu: int = 2
-    threads_on_cpu = 2  # hyper-threading
+    # GCP supports one active thread per vCPU.
+    # See https://cloud.google.com/compute/docs/instances/set-threads-per-core
+    threads_on_cpu = 1
 
     def __init__(
         self,

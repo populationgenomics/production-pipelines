@@ -73,7 +73,6 @@ from cpg_workflows.workflow import (
 from cpg_workflows.resources import STANDARD
 
 
-RUN_CONFIG = get_config()
 CHUNKY_DATE = datetime.now().strftime('%Y-%m-%d')
 DATED_FOLDER = join('reanalysis', CHUNKY_DATE)
 MTA_QUERY = gql(
@@ -115,9 +114,9 @@ class GeneratePanelData(DatasetStage):
         expected_out = self.expected_outputs(dataset)
 
         query_dataset = dataset.name
-        if RUN_CONFIG['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
+        if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
             query_dataset += '-test'
-        hpo_file = get_batch().read_input(RUN_CONFIG['workflow']['obo_file'])
+        hpo_file = get_batch().read_input(get_config()['workflow']['obo_file'])
 
         job.command(
             f'python3 reanalysis/hpo_panel_match.py '
@@ -156,6 +155,7 @@ class QueryPanelapp(DatasetStage):
             f'python3 reanalysis/query_panelapp.py '
             f'--panels "{str(hpo_panel_json)}" '
             f'--out_path "{str(expected_out["panel_data"])}" '
+            f'--dataset {dataset.name} '
         )
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -170,11 +170,11 @@ def query_for_latest_mt(dataset: str) -> str:
         str, the path to the latest MT
     """
     query_dataset = dataset
-    if RUN_CONFIG['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
+    if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
         query_dataset += '-test'
     result = query(MTA_QUERY, variables={'dataset': query_dataset})
     mt_by_date = {}
-    seq_type_exome = RUN_CONFIG['workflow'].get('sequencing_type') == 'exome'
+    seq_type_exome = get_config()['workflow'].get('sequencing_type') == 'exome'
     for analysis in result['project']['analyses']:
         if analysis['output'] and analysis['output'].endswith('.mt') and (
             (seq_type_exome and '/exome/' in analysis['output'])
@@ -207,7 +207,7 @@ class RunHailFiltering(DatasetStage):
         # either do as you're told, or find the latest
         # this could potentially follow on from the AnnotateDataset stage
         # if this becomes integrated in the main pipeline
-        input_mt = RUN_CONFIG['workflow'].get(
+        input_mt = get_config()['workflow'].get(
             'matrix_table', query_for_latest_mt(dataset.name)
         )
         job = get_batch().new_job('run hail labelling')
@@ -231,6 +231,7 @@ class RunHailFiltering(DatasetStage):
             f'--panelapp "{panelapp_json}" '
             f'--pedigree "{local_ped}" '
             f'--vcf_out "{str(expected_out["labelled_vcf"])}" '
+            f'--dataset {dataset.name} '
         )
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -279,7 +280,7 @@ class ValidateMOI(DatasetStage):
             }
         )['vcf.bgz']
         out_json_path = str(self.expected_outputs(dataset)['summary_json'])
-        input_mt = RUN_CONFIG['workflow'].get(
+        input_mt = get_config()['workflow'].get(
             'matrix_table', query_for_latest_mt(dataset.name)
         )
         job.command(
@@ -290,6 +291,7 @@ class ValidateMOI(DatasetStage):
             f'--pedigree "{local_ped}" '
             f'--input_path "{input_mt}" '
             f'--participant_panels "{hpo_panels}" '
+            f'--dataset {dataset.name} '
         )
         expected_out = self.expected_outputs(dataset)
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -343,6 +345,7 @@ class CreateAIPHTML(DatasetStage):
             f'--pedigree "{local_ped}" '
             f'--output "{expected_out["results_html"]}" '
             f'--latest "{expected_out["latest_html"]}" '
+            f'--dataset "{dataset.name}" '
         )
 
         expected_out = self.expected_outputs(dataset)
