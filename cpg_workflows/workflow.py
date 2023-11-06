@@ -834,6 +834,7 @@ def stage(
                 skipped=skipped,
                 assume_outputs_exist=assume_outputs_exist,
                 forced=forced,
+                tolerate_missing_output=tolerate_missing_output
             )
 
         return wrapper_stage
