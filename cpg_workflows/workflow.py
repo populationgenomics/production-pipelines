@@ -610,6 +610,8 @@ class Stage(Generic[TargetT], ABC):
             elif isinstance(target, Cohort):
                 project_name = target.analysis_dataset.name
 
+            assert isinstance(project_name, str)
+
             # bump name to include `-test`
             if get_config()['workflow']['access_level'] == 'test' and 'test' not in project_name:
                 project_name = f'{project_name}-test'
