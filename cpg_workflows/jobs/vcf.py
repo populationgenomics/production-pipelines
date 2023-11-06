@@ -63,7 +63,7 @@ def subset_vcf(
 
 def gather_vcfs(
     b: hb.Batch,
-    input_vcfs: list[Path],
+    input_vcfs: list[Path | hb.ResourceGroup],
     out_vcf_path: Path | None = None,
     site_only: bool = False,
     sequencing_group_count: int | None = None,
@@ -75,7 +75,7 @@ def gather_vcfs(
 
     Requires all VCFs to be strictly distinct, so doesn't work well
     for indels SelectVariants based on intervals from IntervalListTools,
-    as ond indel might span 2 intervals and would end up in both.
+    as one indel might span 2 intervals and would end up in both.
 
     @param b: Batch object
     @param input_vcfs: list of Hail Batch ResourceFiles pointing to
