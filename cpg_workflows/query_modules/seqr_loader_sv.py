@@ -358,6 +358,7 @@ def annotate_cohort_sv(
                 lambda x: x[MAJOR_CONSEQUENCE] != 'NEAREST_TSS'
             ).map(lambda x: x[GENE_ID])
         ),
+        rsid=hl.missing('tstr')
     )
 
     # write this output
@@ -368,10 +369,10 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
     """
     load the stuff specific to samples in this dataset
     do this after subsetting to specific samples
-    unsure how relevant that is in this case, but who knows
-    This whole section relies heavily on CONC_ST, an annotation we don't have
-    Hopefully this field will appear once we have SV concordance implemented
-    CONC_ST: seqr-loading-pipelines...luigi_pipeline/lib/model/sv_mt_schema.py#L223
+
+    Removing the current logic around comparing genotypes to a previous
+    callset - doesn't fit with the current implementation
+
     Args:
         mt_path (str): path to the annotated MatrixTable
         out_mt_path (str): and where do you want it to end up?
@@ -381,14 +382,14 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
 
     mt = read_hail(mt_path)
     is_called = hl.is_defined(mt.GT)
-    was_previously_called = hl.is_defined(mt.CONC_ST) & ~mt.CONC_ST.contains('EMPTY')
     num_alt = hl.if_else(is_called, mt.GT.n_alt_alleles(), -1)
-    prev_num_alt = hl.if_else(
-        was_previously_called, PREVIOUS_GENOTYPE_N_ALT_ALLELES[hl.set(mt.CONC_ST)], -1
-    )
-    concordant_genotype = num_alt == prev_num_alt
-    discordant_genotype = (num_alt != prev_num_alt) & (prev_num_alt > 0)
-    novel_genotype = (num_alt != prev_num_alt) & (prev_num_alt == 0)
+    # was_previously_called = hl.is_defined(mt.CONC_ST) & ~mt.CONC_ST.contains('EMPTY')
+    # prev_num_alt = hl.if_else(
+    #     was_previously_called, PREVIOUS_GENOTYPE_N_ALT_ALLELES[hl.set(mt.CONC_ST)], -1
+    # )
+    # concordant_genotype = num_alt == prev_num_alt
+    # discordant_genotype = (num_alt != prev_num_alt) & (prev_num_alt > 0)
+    # novel_genotype = (num_alt != prev_num_alt) & (prev_num_alt == 0)
     mt = mt.annotate_rows(
         genotypes=hl.agg.collect(
             hl.struct(
@@ -396,13 +397,13 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
                 gq=mt.GQ,
                 cn=mt.RD_CN,
                 num_alt=num_alt,
-                prev_num_alt=hl.or_missing(discordant_genotype, prev_num_alt),
-                prev_call=hl.or_missing(
-                    is_called, was_previously_called & concordant_genotype
-                ),
-                new_call=hl.or_missing(
-                    is_called, ~was_previously_called | novel_genotype
-                ),
+                # prev_num_alt=hl.or_missing(discordant_genotype, prev_num_alt),
+                # prev_call=hl.or_missing(
+                #     is_called, was_previously_called & concordant_genotype
+                # ),
+                # new_call=hl.or_missing(
+                #     is_called, ~was_previously_called | novel_genotype
+                # ),
             )
         )
     )
@@ -443,9 +444,9 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
         # for gCNV specific callsets (maybe)
         # samples=_genotype_filter_samples(lambda g: True),
 
-        samples_new_alt=_genotype_filter_samples(
-            lambda g: g.new_call | hl.is_defined(g.prev_num_alt)
-        ),
+        # samples_new_alt=_genotype_filter_samples(
+        #     lambda g: g.new_call | hl.is_defined(g.prev_num_alt)
+        # ),
         samples_no_call=_genotype_filter_samples(lambda g: g.num_alt == -1),
         samples_num_alt=hl.struct(
             **{
