@@ -609,11 +609,6 @@ class AnnotateCohortSv(CohortStage):
             to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
         )
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
-        }
-
         job = annotate_cohort_jobs_sv(
             b=get_batch(),
             vcf_path=vcf_path,
@@ -678,11 +673,6 @@ class AnnotateDatasetSv(DatasetStage):
         checkpoint_prefix = (
             to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
         )
-
-        billing_labels = {
-            'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
-        }
 
         jobs = annotate_dataset_jobs_sv(
             b=get_batch(),

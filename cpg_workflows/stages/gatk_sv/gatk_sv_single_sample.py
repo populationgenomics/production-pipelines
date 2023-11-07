@@ -141,8 +141,8 @@ class GatherSampleEvidence(SequencingGroupStage):
         # https://cromwell.readthedocs.io/en/stable/wf_options/Google/
         # these must conform to the regex [a-z]([-a-z0-9]*[a-z0-9])?
         billing_labels = {
-            'dataset': sequencing_group.dataset.name, # already lowercase
-            'sequencing-group': sequencing_group.id.lower(), # cpg123123
+            'dataset': sequencing_group.dataset.name,  # already lowercase
+            'sequencing-group': sequencing_group.id.lower(),  # cpg123123
             'stage': self.name.lower(),
             'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
         }
