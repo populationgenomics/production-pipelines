@@ -6,13 +6,17 @@ a script to find samples that need to be run through the structural variant pipe
 
 usage:
     python3 find_samples_needing_sv.py
-    -n <min_#_samples>
+    -n <max_#_samples>
     -o <output_path>
     <projects in order of preference>
 
-optional argument:
-    -e <path to json file containing sequencing groups to exclude from search>
-    -a <path to json file containing sequencing groups to include specifically>
+The integer argument -n will be the maximum number of samples to return
+If all eligible SG IDs in all listed projects are not enough to reach this number,
+the samples that were successfully collected will be returned
+
+optional arguments:
+    -e <path to json list containing sequencing groups to exclude from search>
+    -a <path to json list containing sequencing groups to include specifically>
 """
 from argparse import ArgumentParser
 from random import sample
@@ -119,7 +123,7 @@ def get_project_crams(project: str) -> set[str]:
 
 
 def main(
-    min_samples: int,
+    max_samples: int,
     output_path: str,
     projects: list[str],
     exclude: str = None,
@@ -128,7 +132,7 @@ def main(
     """
 
     Args:
-        min_samples ():
+        max_samples ():
         output_path ():
         projects ():
         exclude (str | None): a json file containing sequencing groups to exclude from search
@@ -148,7 +152,7 @@ def main(
     for project in projects:
 
         # decide if its time to stop
-        if len(collected_sgs) >= min_samples:
+        if len(collected_sgs) >= max_samples:
             break
 
         # find all SGs with a registered ready CRAM
@@ -164,8 +168,8 @@ def main(
         project_samples_to_call = project_crams.intersection(all_eligible_sgs) - called_sgs
         print(f'{project}: {len(project_samples_to_call)} samples to call')
 
-        if len(project_samples_to_call) + len(collected_sgs) > min_samples:
-            more_samples = min_samples - len(collected_sgs)
+        if len(project_samples_to_call) + len(collected_sgs) > max_samples:
+            more_samples = max_samples - len(collected_sgs)
             collected_sgs.update(sample(list(project_samples_to_call), more_samples))
             print(f'Only added {more_samples} samples from {project}')
 
