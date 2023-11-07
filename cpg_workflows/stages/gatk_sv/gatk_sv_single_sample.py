@@ -142,7 +142,7 @@ class GatherSampleEvidence(SequencingGroupStage):
         # these must conform to the regex [a-z]([-a-z0-9]*[a-z0-9])?
         billing_labels = {
             'dataset': sequencing_group.dataset.name, # already lowercase
-            'sequencing_group': sequencing_group.id.lower(), # cpg123123
+            'sequencing-group': sequencing_group.id.lower(), # cpg123123
             'stage': self.name.lower(),
             'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
         }
@@ -213,12 +213,19 @@ class EvidenceQC(CohortStage):
         input_dict |= get_references(['genome_file', 'wgd_scoring_mask'])
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
