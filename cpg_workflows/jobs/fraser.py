@@ -372,6 +372,8 @@ def fraser_init(
         bam_files_r_str += f'"{bam_file}", '
         sample_ids_r_str += f'"{sample_id}", '
         sample_ids.append(sample_id)
+    bam_files_r_str = bam_files_r_str[:-2]  # Remove trailing comma and space
+    sample_ids_r_str = sample_ids_r_str[:-2]  # Remove trailing comma and space
 
     cmd = dedent(
         f"""\
