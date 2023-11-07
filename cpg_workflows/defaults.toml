@@ -105,6 +105,9 @@ delete_scratch_on_exit = false
 # defaults in code are 40 for genomes, none for exomes
 #haplotypecaller_storage = 80
 
+# Use highmem machine type for alignment step
+# align_use_highmem = true
+
 [mito_snv]
 # Example config for broad wdl found here:
 # https://raw.githubusercontent.com/broadinstitute/gatk/master/scripts/mitochondria_m2_wdl/ExampleInputsMitochondriaPipeline.json
