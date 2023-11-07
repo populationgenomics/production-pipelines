@@ -275,7 +275,6 @@ def vep_one(
     -i {vcf} \\
     --everything \\
     --mane_select \\
-    --no_stats \\
     --allele_number \\
     --minimal \\
     --species homo_sapiens \\

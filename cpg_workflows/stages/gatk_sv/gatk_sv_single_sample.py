@@ -141,12 +141,11 @@ class GatherSampleEvidence(SequencingGroupStage):
         # billing labels!
         # https://cromwell.readthedocs.io/en/stable/wf_options/Google/
         # these must conform to the regex [a-z]([-a-z0-9]*[a-z0-9])?
-
         billing_labels = {
             'dataset': sequencing_group.dataset.name,  # already lowercase
             'sequencing-group': sequencing_group.id.lower(),  # cpg123123
             'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
+            AR_GUID_NAME: try_get_ar_guid()
         }
 
         jobs = add_gatk_sv_jobs(
@@ -218,7 +217,7 @@ class EvidenceQC(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
+            AR_GUID_NAME: try_get_ar_guid()
         }
 
         jobs = add_gatk_sv_jobs(
