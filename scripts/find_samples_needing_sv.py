@@ -12,6 +12,7 @@ usage:
 
 optional argument:
     -e <path to json file containing sequencing groups to exclude from search>
+    -a <path to json file containing sequencing groups to include specifically>
 """
 from argparse import ArgumentParser
 from random import sample
@@ -21,7 +22,8 @@ import json
 from metamist.graphql import query, gql
 
 
-FIND_ANALYSES = gql("""
+FIND_ANALYSES = gql(
+    """
 query MyQuery ($project: String!) {
   project(name: $project) {
     analyses(
@@ -33,9 +35,11 @@ query MyQuery ($project: String!) {
     }
   }
 }
-""")
+"""
+)
 
-GENOME_SGS = gql("""
+GENOME_SGS = gql(
+    """
 query SG_Query($project: String!) {
   project(name: $project) {
     sequencingGroups(activeOnly: {eq: true}, type: {eq: "genome"}) {
@@ -43,7 +47,8 @@ query SG_Query($project: String!) {
       type
     }
   }
-}""")
+}"""
+)
 
 
 def get_all_sgs(project: str, exclude_sgs: set[str] | None = None) -> set[str]:
@@ -91,7 +96,13 @@ def get_called_sgs(project: str) -> set[str]:
     return sgs
 
 
-def main(min_samples: int, output_path: str, projects: list[str], exclude: str = None, additional: str| None = None):
+def main(
+    min_samples: int,
+    output_path: str,
+    projects: list[str],
+    exclude: str = None,
+    additional: str | None = None,
+):
     """
 
     Args:
@@ -152,4 +163,10 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--additional', required=False, default=None)
     parser.add_argument('projects', nargs='+')
     args = parser.parse_args()
-    main(args.min_samples, args.output_path, args.projects, exclude=args.exclude, additional=args.additional)
+    main(
+        args.min_samples,
+        args.output_path,
+        args.projects,
+        exclude=args.exclude,
+        additional=args.additional,
+    )
