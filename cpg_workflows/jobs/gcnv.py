@@ -56,9 +56,17 @@ def hack_markdup(
         }
     )
 
+    sorted_bam: ResourceFile = b.read_input('gs://cpg-validation-test/cram/CPG276378.cram')
+    reference = fasta_res_group(b)
+
     cmd = f"""
-    export _JAVA_OPTIONS='-Xlog:gc+heap=trace'
-    picard MarkDuplicates -Xms{resource.get_java_mem_mb()}M
+    #export _JAVA_OPTIONS='-Xlog:gc+heap=trace'
+    picard MarkDuplicates -Xms{resource.get_java_mem_mb()}M \\
+    I={sorted_bam} O={j.temp_bam} M={j.markdup_metrics} \\
+    REFERENCE_SEQUENCE={reference.base} \\
+    TMP_DIR=$(dirname {j.output_cram.cram})/picard-tmp \\
+    ASSUME_SORT_ORDER=coordinate
+    echo "MarkDuplicates finished successfully"
     """
 
     j.command(command(cmd, monitor_space=True))
