@@ -192,12 +192,19 @@ class MakeCohortVcf(CohortStage):
             ]
         )
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -234,12 +241,19 @@ class FormatVcfForGatk(CohortStage):
         input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -295,12 +309,19 @@ class JoinRawCalls(CohortStage):
                 for batch_name in batch_names
             ]
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -338,12 +359,19 @@ class SVConcordance(CohortStage):
         input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -449,12 +477,19 @@ class FilterGenotypes(CohortStage):
         )
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -528,12 +563,19 @@ class AnnotateVcf(CohortStage):
             ['sv_pipeline_docker', 'sv_base_mini_docker', 'gatk_docker']
         )
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -566,6 +608,11 @@ class AnnotateCohortSv(CohortStage):
         checkpoint_prefix = (
             to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
         )
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+        }
 
         job = annotate_cohort_jobs_sv(
             b=get_batch(),
@@ -631,6 +678,11 @@ class AnnotateDatasetSv(DatasetStage):
         checkpoint_prefix = (
             to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
         )
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+        }
 
         jobs = annotate_dataset_jobs_sv(
             b=get_batch(),
