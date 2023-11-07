@@ -10,7 +10,7 @@ across batches between FilterBatch and GenotypeBatch
 from typing import Any
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
+from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
 from cpg_workflows.batch import get_batch
 from cpg_workflows.workflow import stage, StageOutput, StageInput, Cohort, CohortStage
 
@@ -174,7 +174,7 @@ class GatherBatchEvidence(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            AR_GUID_NAME: try_get_ar_guid(),
         }
 
         jobs = add_gatk_sv_jobs(
@@ -262,7 +262,7 @@ class ClusterBatch(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            AR_GUID_NAME: try_get_ar_guid(),
         }
 
         jobs = add_gatk_sv_jobs(
@@ -340,7 +340,7 @@ class GenerateBatchMetrics(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            AR_GUID_NAME: try_get_ar_guid(),
         }
 
         jobs = add_gatk_sv_jobs(
@@ -435,7 +435,7 @@ class FilterBatch(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            AR_GUID_NAME: try_get_ar_guid(),
         }
 
         jobs = add_gatk_sv_jobs(
@@ -507,7 +507,7 @@ class MergeBatchSites(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            AR_GUID_NAME: try_get_ar_guid(),
         }
 
         jobs = add_gatk_sv_jobs(
@@ -618,7 +618,7 @@ class GenotypeBatch(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            AR_GUID_NAME: try_get_ar_guid(),
         }
 
         jobs = add_gatk_sv_jobs(

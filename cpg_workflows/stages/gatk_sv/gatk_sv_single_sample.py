@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from cpg_utils import Path
+from cpg_utils.config import try_get_ar_guid, AR_GUID_NAME
 from cpg_workflows.batch import get_batch
 from cpg_workflows.workflow import (
     stage,
@@ -140,11 +141,12 @@ class GatherSampleEvidence(SequencingGroupStage):
         # billing labels!
         # https://cromwell.readthedocs.io/en/stable/wf_options/Google/
         # these must conform to the regex [a-z]([-a-z0-9]*[a-z0-9])?
+
         billing_labels = {
             'dataset': sequencing_group.dataset.name,  # already lowercase
             'sequencing-group': sequencing_group.id.lower(),  # cpg123123
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            AR_GUID_NAME: try_get_ar_guid(),
         }
 
         jobs = add_gatk_sv_jobs(
@@ -216,7 +218,7 @@ class EvidenceQC(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            AR_GUID_NAME: try_get_ar_guid(),
         }
 
         jobs = add_gatk_sv_jobs(
