@@ -127,8 +127,8 @@ def main(min_samples: int, output_path: str, projects: list[str], exclude: str =
         project_samples_to_call = all_eligible_sgs - called_sgs
         print(f'{project}: {len(project_samples_to_call)} samples to call')
 
-        if len(project_samples_to_call) + len(called_sgs) > min_samples:
-            more_samples = min_samples - len(called_sgs)
+        if len(project_samples_to_call) + len(collected_sgs) > min_samples:
+            more_samples = min_samples - len(collected_sgs)
             collected_sgs.update(sample(list(project_samples_to_call), more_samples))
             print(f'Only added {more_samples} samples from {project}')
 
