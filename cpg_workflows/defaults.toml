@@ -106,7 +106,7 @@ delete_scratch_on_exit = false
 #haplotypecaller_storage = 80
 
 # Use highmem machine type for alignment step
-align_use_highmem = false
+# align_use_highmem = true
 
 [mito_snv]
 # Example config for broad wdl found here:
