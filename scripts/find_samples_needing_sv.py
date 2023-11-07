@@ -24,14 +24,17 @@ from metamist.graphql import query, gql
 
 FIND_ANALYSES = gql(
     """
-query MyQuery ($project: String!) {
+query MyQuery ($project: String!, $type: String!) {
   project(name: $project) {
     analyses(
       status: {eq: COMPLETED}
-      type: {eq: "sv"}
+      type: {eq: $type}
       active: {eq: true}
     ) {
       meta
+      sequencingGroups {
+        id
+      }
     }
   }
 }
@@ -87,13 +90,32 @@ def get_called_sgs(project: str) -> set[str]:
 
     sgs = set()
 
-    for analysis in query(FIND_ANALYSES, {'project': project})['project']['analyses']:
+    for analysis in query(FIND_ANALYSES, {'project': project, 'type': 'sv'})['project']['analyses']:
         if analysis['meta'].get('type') != 'annotated-sv-dataset-callset':
             continue
         assert analysis['meta'].get('stage') == 'AnnotateDatasetSv'
 
         sgs.update(analysis['meta']['sequencing_groups'])
     return sgs
+
+
+def get_project_crams(project: str) -> set[str]:
+    """
+    find all SGs with crams in the project
+
+    Args:
+        project (str): the project ID to use
+
+    Returns:
+        a set of all crams in the project
+    """
+
+    crams = set()
+
+    for analysis in query(FIND_ANALYSES, {'project': project, 'type': 'cram'})['project']['analyses']:
+        if analysis['sequencingGroups']:
+            crams.add(analysis['sequencingGroups'][0]['id'])
+    return crams
 
 
 def main(
@@ -125,17 +147,21 @@ def main(
     # iterate over projects in order
     for project in projects:
 
+        # decide if its time to stop
         if len(collected_sgs) >= min_samples:
             break
 
-        # find all SGs
+        # find all SGs with a registered ready CRAM
+        project_crams = get_project_crams(project)
+
+        # find all SGs, with optional manual exclusions
         all_eligible_sgs = get_all_sgs(project=project, exclude_sgs=exclude_sgs)
 
         # find all SGs with SV calls
         called_sgs = get_called_sgs(project=project)
 
-        # find all SGs without SV calls
-        project_samples_to_call = all_eligible_sgs - called_sgs
+        # find all SGs with CRAMs & without SV calls
+        project_samples_to_call = project_crams.intersection(all_eligible_sgs) - called_sgs
         print(f'{project}: {len(project_samples_to_call)} samples to call')
 
         if len(project_samples_to_call) + len(collected_sgs) > min_samples:
