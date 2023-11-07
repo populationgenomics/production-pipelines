@@ -146,7 +146,7 @@ class GatherSampleEvidence(SequencingGroupStage):
             'dataset': sequencing_group.dataset.name,  # already lowercase
             'sequencing-group': sequencing_group.id.lower(),  # cpg123123
             'stage': self.name.lower(),
-            AR_GUID_NAME: f'ar-{try_get_ar_guid()}',
+            AR_GUID_NAME: try_get_ar_guid(),
         }
 
         jobs = add_gatk_sv_jobs(
