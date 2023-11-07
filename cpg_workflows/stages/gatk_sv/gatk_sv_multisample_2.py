@@ -7,7 +7,7 @@ MakeCohortVCF and AnnotateVCF
 from typing import Any
 
 from cpg_utils import to_path, Path
-from cpg_utils.config import get_config
+from cpg_utils.config import get_config, try_get_ar_guid
 from cpg_workflows.batch import get_batch
 from cpg_workflows.jobs.seqr_loader_sv import (
     annotate_cohort_jobs_sv,
@@ -195,7 +195,7 @@ class MakeCohortVcf(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
+            'ar-guid': f'ar-{try_get_ar_guid()}',
         }
 
         jobs = add_gatk_sv_jobs(
@@ -244,7 +244,7 @@ class FormatVcfForGatk(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
+            'ar-guid': f'ar-{try_get_ar_guid()}',
         }
 
         jobs = add_gatk_sv_jobs(
@@ -312,7 +312,7 @@ class JoinRawCalls(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
+            'ar-guid': f'ar-{try_get_ar_guid()}',
         }
 
         jobs = add_gatk_sv_jobs(
@@ -362,7 +362,7 @@ class SVConcordance(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
+            'ar-guid': f'ar-{try_get_ar_guid()}',
         }
 
         jobs = add_gatk_sv_jobs(
@@ -480,7 +480,7 @@ class FilterGenotypes(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
+            'ar-guid': f'ar-{try_get_ar_guid()}',
         }
 
         jobs = add_gatk_sv_jobs(
@@ -566,7 +566,7 @@ class AnnotateVcf(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
+            'ar-guid': f'ar-{try_get_ar_guid()}',
         }
 
         jobs = add_gatk_sv_jobs(
