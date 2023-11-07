@@ -346,7 +346,7 @@ def _align_one(
     job_name = f'{job_name} {alignment_input}'
     j = b.new_job(job_name, job_attrs)
 
-    if get_config()['resource_overrides']['align_use_highmem']:
+    if get_config()['resource_overrides'].get('align_use_highmem'):
         align_machine_type = HIGHMEM
     else:
         align_machine_type = STANDARD
