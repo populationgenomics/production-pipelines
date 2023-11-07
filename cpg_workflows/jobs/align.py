@@ -469,10 +469,13 @@ def _align_one(
             input_params = f'--interleaved=1 -b {r1_param}'
         else:
             input_params = f'-1 {r1_param} -2 {r2_param}'
+        # TODO: consider reverting to use of all threads if node capacity
+        # issue is resolved: https://hail.zulipchat.com/#narrow/stream/223457-Hail-Batch-support/topic/Job.20becomes.20unresponsive
         cmd = f"""\
         {prepare_fastq_cmd}
         dragen-os -r {dragmap_index} {input_params} \\
-            --RGID {sequencing_group_name} --RGSM {sequencing_group_name}
+            --RGID {sequencing_group_name} --RGSM {sequencing_group_name} \\
+            --num-threads {nthreads - 1}
         """
 
     else:

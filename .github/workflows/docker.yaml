@@ -11,7 +11,7 @@ on:
         default: "test"
 
 env:
-  VERSION: 1.17.0
+  VERSION: 1.17.1
 
 jobs:
   docker:
@@ -23,7 +23,9 @@ jobs:
       DOCKER_BUILDKIT: 1
       BUILDKIT_PROGRESS: plain
       CLOUDSDK_CORE_DISABLE_PROMPTS: 1
-      IMAGE_NAME: australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows
+      IMAGE_NAME: cpg_workflows
+      DOCKER_DEV: australia-southeast1-docker.pkg.dev/cpg-common/images-dev
+      DOCKER_MAIN: australia-southeast1-docker.pkg.dev/cpg-common/images
     steps:
       - uses: actions/checkout@v3
         with:
@@ -50,19 +52,19 @@ jobs:
       - name: push PR
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:pr-${{ github.event.number }}
-          docker push $IMAGE_NAME:pr-${{ github.event.number }}
+          docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_DEV/$IMAGE_NAME:pr-${{ github.event.number }}
+          docker push $DOCKER_DEV/$IMAGE_NAME:pr-${{ github.event.number }}
 
       - name: manually triggered build
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
-          docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:${{github.event.inputs.tag}}
-          docker push $IMAGE_NAME:${{github.event.inputs.tag}}
+          docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_DEV/$IMAGE_NAME:${{github.event.inputs.tag}}
+          docker push $DOCKER_DEV/$IMAGE_NAME:${{github.event.inputs.tag}}
 
       - name: push latest
         if: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
         run: |
-          docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:$VERSION
-          docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:latest
-          docker push $IMAGE_NAME:$VERSION
-          docker push $IMAGE_NAME:latest
+          docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_MAIN/$IMAGE_NAME:$VERSION
+          docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_MAIN/$IMAGE_NAME:latest
+          docker push $DOCKER_MAIN/$IMAGE_NAME:$VERSION
+          docker push $DOCKER_MAIN/$IMAGE_NAME:latest
