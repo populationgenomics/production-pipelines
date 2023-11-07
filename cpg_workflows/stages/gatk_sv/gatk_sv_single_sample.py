@@ -218,7 +218,7 @@ class EvidenceQC(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            AR_GUID_NAME: f'ar-{get_config()["workflow"]["ar-guid"]}',
+            AR_GUID_NAME: try_get_ar_guid(),
         }
 
         jobs = add_gatk_sv_jobs(
