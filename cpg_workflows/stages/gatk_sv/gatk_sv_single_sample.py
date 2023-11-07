@@ -5,7 +5,7 @@ import logging
 from typing import Any
 
 from cpg_utils import Path
-from cpg_utils.config import try_get_ar_guid
+from cpg_utils.config import try_get_ar_guid, AR_GUID_NAME
 from cpg_workflows.batch import get_batch
 from cpg_workflows.workflow import (
     stage,
@@ -146,7 +146,7 @@ class GatherSampleEvidence(SequencingGroupStage):
             'dataset': sequencing_group.dataset.name,  # already lowercase
             'sequencing-group': sequencing_group.id.lower(),  # cpg123123
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{try_get_ar_guid()}',
+            AR_GUID_NAME: f'ar-{try_get_ar_guid()}',
         }
 
         jobs = add_gatk_sv_jobs(
@@ -218,7 +218,7 @@ class EvidenceQC(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
+            AR_GUID_NAME: f'ar-{get_config()["workflow"]["ar-guid"]}',
         }
 
         jobs = add_gatk_sv_jobs(
