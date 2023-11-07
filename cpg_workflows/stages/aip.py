@@ -315,6 +315,7 @@ def _aip_html_meta(
     analysis_type='aip-report',
     analysis_keys=['results_html', 'latest_html'],
     update_analysis_meta=_aip_html_meta,
+    tolerate_missing_output=True
 )
 class CreateAIPHTML(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
