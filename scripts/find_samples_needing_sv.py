@@ -113,7 +113,7 @@ def main(
         additional (str | None): a json file containing sequencing groups to include specifically
     """
 
-    collected_sgs = set()
+    collected_sgs: set[str] = set()
 
     # get excluded SGs if that's valid
     if exclude is not None:
