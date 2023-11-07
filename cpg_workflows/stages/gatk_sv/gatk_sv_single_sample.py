@@ -138,9 +138,13 @@ class GatherSampleEvidence(SequencingGroupStage):
         expected_d = self.expected_outputs(sequencing_group)
 
         # billing labels!
+        # https://cromwell.readthedocs.io/en/stable/wf_options/Google/
+        # these must conform to the regex [a-z]([-a-z0-9]*[a-z0-9])?
         billing_labels = {
-            'dataset': sequencing_group.dataset.name,
-            'sequencing_group': sequencing_group.id,
+            'dataset': sequencing_group.dataset.name, # already lowercase
+            'sequencing_group': sequencing_group.id.lower(), # cpg123123
+            'stage': self.name.lower(),
+            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
         }
 
         jobs = add_gatk_sv_jobs(
