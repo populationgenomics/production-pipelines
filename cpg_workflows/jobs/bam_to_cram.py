@@ -78,6 +78,7 @@ def cram_to_bam(
     input_cram: ResourceGroup,
     extra_label: str | None = None,
     overwrite: bool = False,
+    output_bam: Path | None = None,
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
 ) -> tuple[Job, ResourceGroup]:
@@ -113,5 +114,9 @@ def cram_to_bam(
 
     cmd = f'samtools view -@ {res.get_nthreads() - 1} -b {input_cram.cram} | tee {j.sorted_bam["bam"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_bam["bam.bai"]}'
     j.command(command(cmd, monitor_space=True))
+
+    # Write BAM if requested
+    if output_bam:
+        b.write_output(j.sorted_bam, str(output_bam.with_suffix('')))
 
     return j, j.sorted_bam

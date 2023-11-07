@@ -48,14 +48,14 @@ class Count(SequencingGroupStage):
         """
         cram_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'cram')
         crai_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'crai')
+        potential_bam_path = sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.bam'
+        potential_bai_path = sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.bam.bai'
         input_cram_or_bam: BamPath | CramPath | None = None
         try:
             bam_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'bam')
             bai_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'bai')
             input_cram_or_bam = BamPath(bam_path, bai_path)
         except KeyError:
-            potential_bam_path = sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.bam'
-            potential_bai_path = sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.bam.bai'
             if potential_bam_path.exists() and potential_bai_path.exists():
                 input_cram_or_bam = BamPath(potential_bam_path, potential_bai_path)
             else:
@@ -67,6 +67,7 @@ class Count(SequencingGroupStage):
         jobs = count.count(
             b=get_batch(),
             input_cram_or_bam=input_cram_or_bam,
+            cram_to_bam_path=potential_bam_path,
             output_path=output_path,
             summary_path=summary_path,
             sample_name=sequencing_group.id,

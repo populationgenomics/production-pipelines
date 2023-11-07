@@ -183,7 +183,7 @@ class Fraser:
 
 def fraser(
     b: hb.Batch,
-    input_bams_or_crams: list[BamPath | CramPath],
+    input_bams_or_crams: list[tuple[BamPath, None] | tuple[CramPath, Path]],
     cohort_name: str,
     output_path: str | Path | None = None,
     job_attrs: dict[str, str] | None = None,
@@ -201,12 +201,18 @@ def fraser(
 
     # Convert CRAMs to BAMs if necessary
     input_bams_localised: dict[str, hb.ResourceFile] = {}
-    for input_bam_or_cram in input_bams_or_crams:
+    for input_bam_or_cram_tuple in input_bams_or_crams:
+        input_bam_or_cram = input_bam_or_cram_tuple[0]
+        potential_bam_path = input_bam_or_cram_tuple[1]
         if isinstance(input_bam_or_cram, CramPath):
             sample_id = input_bam_or_cram.path.name.replace('.cram', '')
+            output_bam_path: Path | None = None
+            if potential_bam_path:
+                output_bam_path = potential_bam_path
             j, output_bam = cram_to_bam(
                 b=b,
                 input_cram=input_bam_or_cram.resource_group(b),
+                output_bam=output_bam_path,
                 job_attrs=job_attrs,
                 requested_nthreads=requested_nthreads,
             )
@@ -389,7 +395,7 @@ def fraser_init(
             pairedEnd = TRUE
         )
 
-        fds <- FraserDataset(
+        fds <- FraserDataSet(
             colData = sample_table,
             workingDir = "output",
             name = "{cohort_name}"

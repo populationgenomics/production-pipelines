@@ -113,6 +113,7 @@ def count(
     input_cram_or_bam: BamPath | CramPath,
     output_path: str | Path,
     summary_path: str | Path,
+    cram_to_bam_path: Path | None = None,
     sample_name: str | None = None,
     job_attrs: dict[str, str] | None = None,
     overwrite: bool = False,
@@ -149,6 +150,7 @@ def count(
         j, input_bam_reads = cram_to_bam(
             b=b,
             input_cram=input_cram_reads,
+            output_bam=cram_to_bam_path,
             job_attrs=job_attrs,
             requested_nthreads=requested_nthreads,
         )

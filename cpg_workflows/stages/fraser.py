@@ -49,7 +49,7 @@ class Fraser(CohortStage):
         """
         sequencing_groups = cohort.get_sequencing_groups()
         
-        bam_or_cram_inputs: list[BamPath | CramPath] = []
+        bam_or_cram_inputs: list[tuple[BamPath, None] | tuple[CramPath, Path]] = []
         for sequencing_group in sequencing_groups:
             cram_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'cram')
             crai_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'crai')
@@ -65,8 +65,10 @@ class Fraser(CohortStage):
                     input_bam_or_cram = BamPath(potential_bam_path, potential_bai_path)
                 else:
                     input_bam_or_cram = CramPath(cram_path, crai_path)
-            if isinstance(input_bam_or_cram, (BamPath, CramPath)):
-                bam_or_cram_inputs.append(input_bam_or_cram)
+            if isinstance(input_bam_or_cram, (BamPath)):
+                bam_or_cram_inputs.append((input_bam_or_cram, None))
+            elif isinstance(input_bam_or_cram, (CramPath)):
+                bam_or_cram_inputs.append((input_bam_or_cram, potential_bam_path))
 
         j = fraser.fraser(
             b=get_batch(),
