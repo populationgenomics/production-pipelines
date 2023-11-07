@@ -195,7 +195,7 @@ class MakeCohortVcf(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
         }
 
         jobs = add_gatk_sv_jobs(
@@ -244,7 +244,7 @@ class FormatVcfForGatk(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
         }
 
         jobs = add_gatk_sv_jobs(
@@ -312,7 +312,7 @@ class JoinRawCalls(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
         }
 
         jobs = add_gatk_sv_jobs(
@@ -362,7 +362,7 @@ class SVConcordance(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
         }
 
         jobs = add_gatk_sv_jobs(
@@ -480,7 +480,7 @@ class FilterGenotypes(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
         }
 
         jobs = add_gatk_sv_jobs(
@@ -566,7 +566,7 @@ class AnnotateVcf(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
         }
 
         jobs = add_gatk_sv_jobs(

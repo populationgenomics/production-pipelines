@@ -144,7 +144,7 @@ class GatherSampleEvidence(SequencingGroupStage):
             'dataset': sequencing_group.dataset.name,  # already lowercase
             'sequencing-group': sequencing_group.id.lower(),  # cpg123123
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
         }
 
         jobs = add_gatk_sv_jobs(
@@ -216,7 +216,7 @@ class EvidenceQC(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
         }
 
         jobs = add_gatk_sv_jobs(

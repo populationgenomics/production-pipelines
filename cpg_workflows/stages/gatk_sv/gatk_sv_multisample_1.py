@@ -174,7 +174,7 @@ class GatherBatchEvidence(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
         }
 
         jobs = add_gatk_sv_jobs(
@@ -262,7 +262,7 @@ class ClusterBatch(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
         }
 
         jobs = add_gatk_sv_jobs(
@@ -340,7 +340,7 @@ class GenerateBatchMetrics(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
         }
 
         jobs = add_gatk_sv_jobs(
@@ -435,7 +435,7 @@ class FilterBatch(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
         }
 
         jobs = add_gatk_sv_jobs(
@@ -507,7 +507,7 @@ class MergeBatchSites(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
         }
 
         jobs = add_gatk_sv_jobs(
@@ -618,7 +618,7 @@ class GenotypeBatch(CohortStage):
 
         billing_labels = {
             'stage': self.name.lower(),
-            'ar-guid': f'ar-{get_config()["workflow"]["ar_guid"]}',
+            'ar-guid': f'ar-{get_config()["workflow"]["ar-guid"]}',
         }
 
         jobs = add_gatk_sv_jobs(
