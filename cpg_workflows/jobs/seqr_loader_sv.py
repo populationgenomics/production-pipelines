@@ -48,7 +48,7 @@ def annotate_dataset_jobs_sv(
     out_mt_path: Path,
     tmp_prefix: Path,
     job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None,
+    depends_on: list[Job] | None = None
 ) -> list[Job]:
     """
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
