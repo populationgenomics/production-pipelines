@@ -50,7 +50,7 @@ class AnnotateCohort(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
-        Uses analysis-runner's dataproc helper to run a hail query script
+        Apply VEP and VQSR annotations to all-sample callset
         """
         vcf_path = inputs.as_path(target=cohort, stage=JointGenotyping, key='vcf')
         siteonly_vqsr_vcf_path = inputs.as_path(
@@ -150,7 +150,7 @@ class AnnotateDataset(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
-        Uses analysis-runner's dataproc helper to run a hail query script
+        Annotate MT with genotype and consequence data for Seqr
         """
         assert dataset.cohort
         mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateCohort, key='mt')
@@ -205,7 +205,7 @@ class DatasetVCF(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
-        Uses analysis-runner's dataproc helper to run a hail query script
+        Run a MT -> VCF extraction on selected cohorts
         only run this on manually defined list of cohorts
         """
 
@@ -265,7 +265,7 @@ class MtToEs(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
-        Uses analysis-runner's dataproc helper to run a hail query script
+        Transforms the MT into a Seqr index, requires Dataproc
         """
         if (
             es_datasets := get_config()['workflow'].get('create_es_index_for_datasets')
