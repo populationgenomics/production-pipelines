@@ -315,6 +315,7 @@ def fraser_count(
         fds=fds,
         cohort_name=cohort_name,
         split_counts_dict=split_counts_dict,
+        bams=list(input_bams_localised.values()),
         job_attrs=job_attrs,
         requested_nthreads=requested_nthreads,
     )
@@ -341,6 +342,7 @@ def fraser_count(
         cohort_name=cohort_name,
         non_spliced_counts_dict=non_spliced_counts_dict,
         split_counts=split_counts_rg,
+        bams=list(input_bams_localised.values()),
         job_attrs=job_attrs,
         requested_nthreads=requested_nthreads,
     )
@@ -489,6 +491,7 @@ def fraser_merge_split_reads(
     fds: hb.ResourceGroup,
     cohort_name: str,
     split_counts_dict: dict[str, hb.ResourceFile],
+    bams: list[hb.ResourceFile],
     job_attrs: dict[str, str] | None = None,
     requested_nthreads: int | None = None,
 ) -> tuple[Job, hb.ResourceGroup]:
@@ -542,6 +545,8 @@ def fraser_merge_split_reads(
         ln -s {fds} output/savedObjects/{cohort_name}/fds-object.RDS
         # Symlink split counts
         {link_counts_cmd}
+        # ls BAM files to ensure they are localised
+        ls {' '.join(bams)}
         
         R --vanilla <<EOF
         library(FRASER)
@@ -660,6 +665,7 @@ def fraser_merge_non_split_reads(
     cohort_name: str,
     non_spliced_counts_dict: dict[str, hb.ResourceFile],
     split_counts: hb.ResourceGroup,
+    bams: list[hb.ResourceFile],
     job_attrs: dict[str, str] | None = None,
     requested_nthreads: int | None = None,
 ) -> tuple[Job, hb.ResourceFile]:
@@ -705,6 +711,8 @@ def fraser_merge_non_split_reads(
         ln -s {fds} output/savedObjects/{cohort_name}/fds-object.RDS
         # Symlink non-spliced counts, RDS files, and split counts
         {link_counts_cmd}
+        # ls BAM files to ensure they are localised
+        ls {' '.join(bams)}
         
         R --vanilla <<EOF
         library(FRASER)
