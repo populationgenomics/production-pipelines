@@ -547,6 +547,8 @@ def fraser_merge_split_reads(
         {link_counts_cmd}
         # ls BAM files to ensure they are localised
         ls {' '.join(bams)}
+        # Make RDS directory
+        mkdir -p rds
         
         R --vanilla <<EOF
         library(FRASER)
