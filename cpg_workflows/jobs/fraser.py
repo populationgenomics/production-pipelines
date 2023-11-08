@@ -302,6 +302,7 @@ def fraser_count(
             b=b,
             fds=fds,
             sample_id=sample_id,
+            bam=input_bams_localised[sample_id],
             cohort_name=cohort_name,
             job_attrs=job_attrs,
             requested_nthreads=requested_nthreads,
@@ -327,6 +328,7 @@ def fraser_count(
             cohort_name=cohort_name,
             split_counts=split_counts_rg,
             sample_id=sample_id,
+            bam=input_bams_localised[sample_id],
             job_attrs=job_attrs,
             requested_nthreads=requested_nthreads,
         )
@@ -422,6 +424,7 @@ def fraser_count_split_reads_one_sample(
     b: hb.Batch,
     fds: hb.ResourceGroup,
     sample_id: str,
+    bam: hb.ResourceFile,
     cohort_name: str,
     job_attrs: dict[str, str] | None = None,
     requested_nthreads: int | None = None,
@@ -448,6 +451,8 @@ def fraser_count_split_reads_one_sample(
         # Symlink FDS resource file to proper location
         mkdir -p output/savedObjects/{cohort_name}
         ln -s {fds} output/savedObjects/{cohort_name}/fds-object.RDS
+        # ls BAM file to ensure it is localised
+        ls {bam}
         
         R --vanilla <<EOF
         library(FRASER)
@@ -583,6 +588,7 @@ def fraser_count_non_split_reads_one_sample(
     cohort_name: str,
     split_counts: hb.ResourceGroup,
     sample_id: str,
+    bam: hb.ResourceFile,
     job_attrs: dict[str, str] | None = None,
     requested_nthreads: int | None = None,
 ) -> tuple[Job, hb.ResourceFile]:
@@ -611,6 +617,8 @@ def fraser_count_non_split_reads_one_sample(
         # Symlink splice site coords RDS file
         mkdir -p rds
         ln -s {split_counts.splice_site_coords} rds/splice_site_coords.RDS
+        # ls BAM file to ensure it is localised
+        ls {bam}
         
         R --vanilla <<EOF
         library(FRASER)
