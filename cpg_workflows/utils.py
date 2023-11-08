@@ -17,13 +17,7 @@ import hail as hl
 from cloudpathlib import GSPath
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from google.cloud import storage
 from hailtop.batch import ResourceFile
-
-
-@lru_cache(maxsize=1)
-def get_gs_client():
-    return storage.Client()
 
 
 def read_hail(path):
@@ -129,11 +123,14 @@ def _exists_not_cached(path: Path):
     return path.exists()
 
 
-def check_gs_exists_path(gs_path: str) -> bool:
+def check_gs_exists_path(gs_path: Path) -> bool:
     """
-    Check whether a gs_path exists by calling the client library directly
+    Check whether a gs_path exists using a cached per-directory listing.
+    NB. reversion to Strings prevents a get call, which is typically
+    forbidden to local users - this prevents this method being used in the
+    metamist audit processes
     """
-    return basename(gs_path) in get_contents_of_gs_path(dirname(gs_path))
+    return basename(str(gs_path)) in get_contents_of_gs_path(dirname(str(gs_path)))
 
 
 @lru_cache
@@ -146,15 +143,7 @@ def get_contents_of_gs_path(gs_path: str) -> set[str]:
 
     """
     assert gs_path.startswith('gs://')
-    bucket_name, prefix = (
-        gs_path.removeprefix('gs://').strip('/').split('/', maxsplit=1)
-    )
-
-    # create gsclient and list contents of blob at path
-    # need to supply a user project here if requester-pays bucket
-    blobs = get_gs_client().list_blobs(bucket_name, prefix=prefix, delimiter='/')
-
-    return {blob.name for blob in blobs}
+    return {f.name for f in to_path(gs_path.rstrip('/')).iterdir()}
 
 
 def can_reuse(
