@@ -98,7 +98,7 @@ delete_scratch_on_exit = false
 # demanding higher resources for all operations as standard. Examples below
 
 # picard MarkDuplicates overrides for unreasnobly large sequnce groups
-picard_mem_gb = 50
+#picard_mem_gb = 100
 #picard_storage_gb = 350
 
 # haplotype caller overrides, see production-pipelines PR#381
