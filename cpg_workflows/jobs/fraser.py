@@ -120,9 +120,9 @@ class Fraser:
         }
 
         optimal_qs <- c(
-          psi5 = fds_filtered@metadata$hyperParams_psi5$q,
-          psi3 = fds_filtered@metadata$hyperParams_psi3$q,
-          theta = fds_filtered@metadata$hyperParams_theta$q
+          psi5 = fds_filtered@metadata\\$hyperParams_psi5\\$q,
+          psi3 = fds_filtered@metadata\\$hyperParams_psi3\\$q,
+          theta = fds_filtered@metadata\\$hyperParams_theta\\$q
         )
 
         # Fit model
