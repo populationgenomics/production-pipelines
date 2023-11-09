@@ -679,7 +679,7 @@ def fraser_merge_non_split_reads(
     Merge non-split-read counts.
     """
     # Create FRASER job
-    job_name = f'fraser_count_split'
+    job_name = f'fraser_merge_non_split'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
     j = b.new_job(job_name, _job_attrs)
     j.image(image_path('fraser'))
@@ -705,7 +705,7 @@ def fraser_merge_non_split_reads(
     link_counts_cmd += f'ln -s {split_counts.g_ranges_non_split_counts} rds/g_ranges_non_split_counts.RDS\n'
     link_counts_cmd += f'ln -s {split_counts.splice_site_coords} rds/splice_site_coords.RDS\n'
     # Add command to symlink split counts assays
-    link_counts_cmd += 'mkdir -p output/savedObjects/{cohort_name}/splitCounts\n'
+    link_counts_cmd += f'mkdir -p output/savedObjects/{cohort_name}/splitCounts\n'
     link_counts_cmd += f'ln -s {split_counts.raw_counts_j_h5} output/savedObjects/{cohort_name}/rawCountsJ.h5\n'
     link_counts_cmd += f'ln -s {split_counts.split_counts_assays} output/savedObjects/{cohort_name}/splitCounts/assays.h5\n'
     link_counts_cmd += f'ln -s {split_counts.split_counts_se} output/savedObjects/{cohort_name}/splitCounts/se.rds\n'
