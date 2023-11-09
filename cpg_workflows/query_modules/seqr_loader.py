@@ -15,9 +15,9 @@ from cpg_workflows.utils import checkpoint_hail
 
 
 def annotate_cohort(
-    vcf_path,
-    out_mt_path,
-    vep_ht_path,
+    vcf_path: str,
+    out_mt_path: str,
+    vep_ht_path: str,
     site_only_vqsr_vcf_path=None,
     checkpoint_prefix=None,
 ):
@@ -26,8 +26,11 @@ def annotate_cohort(
     annotations.
     """
 
+    # tune the logger correctly
+    logging.getLogger().setLevel(logging.INFO)
+
     mt = hl.import_vcf(
-        str(vcf_path),
+        vcf_path,
         reference_genome=genome_build(),
         skip_invalid_loci=True,
         force_bgz=True,
@@ -46,6 +49,10 @@ def annotate_cohort(
     mt = hl.split_multi_hts(
         mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
     )
+    # only remove InbreedingCoeff if present
+    if 'InbreedingCoeff' in mt.info:
+        mt = mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
+
     mt = checkpoint_hail(mt, 'mt-vep.mt', checkpoint_prefix)
 
     if site_only_vqsr_vcf_path:
@@ -64,13 +71,10 @@ def annotate_cohort(
         )
         mt = checkpoint_hail(mt, 'mt-with-vqsr.mt', checkpoint_prefix)
 
-    ref_ht = hl.read_table(str(reference_path('seqr_combined_reference_data')))
-    clinvar_ht = hl.read_table(str(reference_path('seqr_clinvar')))
-
     logging.info('Annotating with seqr-loader fields: round 1')
-
     # don't fail if the AC/AF attributes are an inappropriate type
     # don't fail if completely absent either
+    # this is probably limited to AIP re-runs, mey be outdated
     for attr in ['AC', 'AF']:
         if attr not in mt.info:
             mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [1]}))
@@ -80,6 +84,14 @@ def annotate_cohort(
     if 'AN' not in mt.info:
         mt = mt.annotate_rows(info=mt.info.annotate(AN=1))
 
+    # join the ref HT as a separate option
+    ref_ht = hl.read_table(str(reference_path('seqr_combined_reference_data')))
+    mt = mt.annotate_rows(ref_data=ref_ht[mt.row_key])
+    mt = checkpoint_hail(mt, 'mt-with-ref-data.mt', checkpoint_prefix)
+
+    # then load ClinVar with everything else
+    logging.info('Annotating with clinvar and munging annotation fields')
+    clinvar_ht = hl.read_table(str(reference_path('seqr_clinvar')))
     mt = mt.annotate_rows(
         AC=mt.info.AC[mt.a_index - 1],
         AF=mt.info.AF[mt.a_index - 1],
@@ -103,12 +115,10 @@ def annotate_cohort(
         xstart=variant_id.get_expr_for_xpos(mt.locus),
         xstop=variant_id.get_expr_for_xpos(mt.locus) + hl.len(mt.alleles[0]) - 1,
         clinvar_data=clinvar_ht[mt.row_key],
-        ref_data=ref_ht[mt.row_key],
     )
-    mt = checkpoint_hail(mt, 'mt-pre-rg37-locus.mt', checkpoint_prefix)
+    mt = checkpoint_hail(mt, 'mt-with-clinvar.mt', checkpoint_prefix)
 
-    # this was previously executed in the MtToEs job, as it was not
-    # previously possible on QoB
+    # this was previously executed in the MtToEs job, as it wasn't possible on QoB
     logging.info('Adding GRCh37 coords')
     liftover_path = reference_path('liftover_38_to_37')
     rg37 = hl.get_reference('GRCh37')
@@ -125,8 +135,7 @@ def annotate_cohort(
     mt = checkpoint_hail(mt, 'mt-post-rg37-locus.mt', checkpoint_prefix)
 
     logging.info(
-        'Annotating with seqr-loader fields: round 2 '
-        '(expanding sortedTranscriptConsequences, ref_data, clinvar_data)'
+        'Expanding sortedTranscriptConsequences, ref_data, clinvar_data'
     )
     mt = mt.annotate_rows(
         domains=vep.get_expr_for_vep_protein_domains_set_from_sorted(

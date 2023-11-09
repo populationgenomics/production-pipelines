@@ -11,39 +11,6 @@ from cpg_utils.hail_batch import image_path, query_command
 from cpg_workflows.query_modules import seqr_loader
 
 
-def annotate_cohort_jobs(
-    b: Batch,
-    vcf_path: Path,
-    out_mt_path: Path,
-    checkpoint_prefix: Path,
-    vep_ht_path: Path,
-    siteonly_vqsr_vcf_path: Path | None = None,
-    job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None,
-) -> list[Job]:
-    """
-    Annotate cohort for seqr loader.
-    """
-
-    j = b.new_job('annotate cohort', job_attrs)
-    j.image(image_path('cpg_workflows'))
-    j.command(
-        query_command(
-            seqr_loader,
-            seqr_loader.annotate_cohort.__name__,
-            str(vcf_path),
-            str(out_mt_path),
-            str(vep_ht_path),
-            str(siteonly_vqsr_vcf_path) if siteonly_vqsr_vcf_path else None,
-            str(checkpoint_prefix),
-            setup_gcp=True,
-        )
-    )
-    if depends_on:
-        j.depends_on(*depends_on)
-    return [j]
-
-
 def annotate_dataset_jobs(
     b: Batch,
     mt_path: Path,
@@ -65,7 +32,7 @@ def annotate_dataset_jobs(
     subset_mt_path = tmp_prefix / 'cohort-subset.mt'
 
     subset_j = b.new_job(
-        'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
+        'Subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
     )
     subset_j.image(image_path('cpg_workflows'))
     assert sequencing_group_ids
@@ -83,7 +50,7 @@ def annotate_dataset_jobs(
         subset_j.depends_on(*depends_on)
 
     annotate_j = b.new_job(
-        'annotate dataset', (job_attrs or {}) | {'tool': 'hail query'}
+        'Annotate dataset', (job_attrs or {}) | {'tool': 'hail query'}
     )
     annotate_j.image(image_path('cpg_workflows'))
     annotate_j.command(
