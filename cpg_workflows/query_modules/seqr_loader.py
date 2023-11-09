@@ -49,6 +49,7 @@ def annotate_cohort(
     mt = checkpoint_hail(mt, 'mt-vep.mt', checkpoint_prefix)
 
     if site_only_vqsr_vcf_path:
+        # load the VCF and checkpoint down to a Table
         vqsr_ht = load_vqsr(site_only_vqsr_vcf_path)
         vqsr_ht = checkpoint_hail(vqsr_ht, 'vqsr.ht', checkpoint_prefix)
 
@@ -104,6 +105,7 @@ def annotate_cohort(
         clinvar_data=clinvar_ht[mt.row_key],
         ref_data=ref_ht[mt.row_key],
     )
+    mt = checkpoint_hail(mt, 'mt-pre-rg37-locus.mt', checkpoint_prefix)
 
     # this was previously executed in the MtToEs job, as it was not
     # previously possible on QoB
@@ -119,6 +121,8 @@ def annotate_cohort(
     # only remove if present
     if 'InbreedingCoeff' in mt.info:
         mt = mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
+
+    mt = checkpoint_hail(mt, 'mt-post-rg37-locus.mt', checkpoint_prefix)
 
     logging.info(
         'Annotating with seqr-loader fields: round 2 '
