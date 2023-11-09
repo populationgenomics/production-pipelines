@@ -254,6 +254,27 @@ class JobResource:
         # get_mem_gb() is usually decimal GB, but our value is used as binary MiB
         return int(math.floor((self.get_mem_gb() - 1) * 953.6))
 
+    def java_mem_options(self, overhead_gb: float = 1) -> str:
+        """
+        Returns -Xms -Xmx options to set Java JVM memory usage to use all the memory
+        resources represented.
+        @param overhead_gb: Amount of memory (in decimal GB) to leave available for
+        other purposes.
+        """
+        mem_bytes = (self.get_mem_gb() - overhead_gb) * 1_000_000_000
+        # Approximate as binary MiB (but not GiB as these options don't support
+        # fractional values) so that logs are easier to read
+        mem_mib = math.floor(mem_bytes / 1_048_576)
+        return f'-Xms{mem_mib}M -Xmx{mem_mib}M'
+
+    def java_gc_thread_options(self, surplus: int = 2) -> str:
+        """
+        Returns -XX options to set Java JVM garbage collection threading.
+        @param surplus: Number of threads to leave available for other purposes.
+        """
+        gc_threads = self.get_nthreads() - surplus
+        return f'-XX:+UseParallelGC -XX:ParallelGCThreads={gc_threads}'
+
     def get_ncpu(self) -> int:
         """
         Number of cores/CPU
