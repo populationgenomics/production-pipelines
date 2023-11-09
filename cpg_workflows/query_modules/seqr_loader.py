@@ -46,7 +46,7 @@ def annotate_cohort(
     mt = hl.split_multi_hts(
         mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
     )
-    mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
+    mt = checkpoint_hail(mt, 'mt-vep.mt', checkpoint_prefix)
 
     if site_only_vqsr_vcf_path:
         vqsr_ht = load_vqsr(site_only_vqsr_vcf_path)
@@ -61,7 +61,7 @@ def annotate_cohort(
                 lambda val: val != 'PASS'
             ),
         )
-        mt = checkpoint_hail(mt, 'mt-vep-split-vqsr.mt', checkpoint_prefix)
+        mt = checkpoint_hail(mt, 'mt-with-vqsr.mt', checkpoint_prefix)
 
     ref_ht = hl.read_table(str(reference_path('seqr_combined_reference_data')))
     clinvar_ht = hl.read_table(str(reference_path('seqr_clinvar')))
@@ -119,8 +119,6 @@ def annotate_cohort(
     # only remove if present
     if 'InbreedingCoeff' in mt.info:
         mt = mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
-
-    mt = checkpoint_hail(mt, 'mt-vep-split-vqsr-round1.mt', checkpoint_prefix)
 
     logging.info(
         'Annotating with seqr-loader fields: round 2 '
@@ -245,7 +243,7 @@ def vcf_from_mt_subset(mt_path: str, out_vcf_path: str):
     logging.info(f'Written {out_vcf_path}')
 
 
-def annotate_dataset_mt(mt_path, out_mt_path, checkpoint_prefix):
+def annotate_dataset_mt(mt_path, out_mt_path):
     """
     Add dataset-level annotations.
     """
@@ -273,8 +271,6 @@ def annotate_dataset_mt(mt_path, out_mt_path, checkpoint_prefix):
     mt = mt.annotate_rows(
         genotypes=hl.agg.collect(hl.struct(**genotype_fields)),
     )
-
-    mt = checkpoint_hail(mt, 'dataset-genotypes.mt', checkpoint_prefix)
 
     def _genotype_filter_samples(fn):
         # Filter on the genotypes.
