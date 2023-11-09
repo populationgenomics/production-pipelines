@@ -753,7 +753,7 @@ def fraser_merge_non_split_reads(
           assays = list(rawCountsJ = split_counts_h5)
         )
 
-        non_split_counts_h5 <- HDF5Array::HDF5Array("output.cohort/savedObjects/{cohort_name}/rawCountsSS.h5", "rawCountsSS")
+        non_split_counts_h5 <- HDF5Array::HDF5Array("output/cohort/savedObjects/{cohort_name}/rawCountsSS.h5", "rawCountsSS")
         non_split_counts_se <- SummarizedExperiment(
           colData = colData(fds),
           rowRanges = splice_site_coords,
