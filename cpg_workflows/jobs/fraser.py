@@ -770,7 +770,7 @@ def fraser_merge_non_split_reads(
         EOF
 
         # tar saved objects directory
-        tar -cf {j.fds_tar} output/savedObjects/{cohort_name}/
+        tar -chf {j.fds_tar} output/savedObjects/{cohort_name}/
         """
     )
 
