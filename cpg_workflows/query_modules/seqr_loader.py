@@ -35,7 +35,7 @@ def annotate_cohort(
         reference_genome=genome_build(),
         skip_invalid_loci=True,
         force_bgz=True,
-        array_required_elements=False
+        array_elements_required=False
     )
     logging.info(f'Importing VCF {vcf_path}')
 
