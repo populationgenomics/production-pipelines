@@ -29,11 +29,13 @@ def annotate_cohort(
     # tune the logger correctly
     logging.getLogger().setLevel(logging.INFO)
 
+    # hail.zulipchat.com/#narrow/stream/223457-Hail-Batch-support/topic/permissions.20issues/near/398711114
     mt = hl.import_vcf(
         vcf_path,
         reference_genome=genome_build(),
         skip_invalid_loci=True,
         force_bgz=True,
+        array_required_elements=False
     )
     logging.info(f'Importing VCF {vcf_path}')
 
