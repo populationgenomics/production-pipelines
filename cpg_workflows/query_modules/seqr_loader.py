@@ -51,9 +51,6 @@ def annotate_cohort(
     mt = hl.split_multi_hts(
         mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
     )
-    # only remove InbreedingCoeff if present
-    if 'InbreedingCoeff' in mt.info:
-        mt = mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
 
     mt = checkpoint_hail(mt, 'mt-vep.mt', checkpoint_prefix)
 
@@ -72,6 +69,10 @@ def annotate_cohort(
             ),
         )
         mt = checkpoint_hail(mt, 'mt-with-vqsr.mt', checkpoint_prefix)
+
+    # only remove InbreedingCoeff if present (post-VQSR)
+    if 'InbreedingCoeff' in mt.info:
+        mt = mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
 
     logging.info('Annotating with seqr-loader fields: round 1')
     # don't fail if the AC/AF attributes are an inappropriate type
