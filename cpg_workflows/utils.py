@@ -70,27 +70,7 @@ def checkpoint_hail(
         return read_hail(path)
 
     logging.info(f'Checkpointing {path}')
-    t = t.checkpoint(path, overwrite=True)
-
-    # throw in a repartition
-    if file_name.endswith('.mt'):
-        # estimate partitions; fall back to 1 if low row count
-        current_rows = t.count_rows()
-    else:
-        current_rows = t.count()
-
-    partitions = current_rows // 200000 or 1
-
-    # no need to alter partitions, do not shuffle
-    if t.n_partitions() == partitions:
-        return t
-
-    logging.info(
-        f'Re-partitioning {current_rows} into {partitions} partitions'
-    )
-
-    # don't name partition arg, 'partitions' for Table, 'n_partitions' for MT
-    return t.repartition(partitions, shuffle=True)
+    return t.checkpoint(path, overwrite=True)
 
 
 def missing_from_pre_collected(test: set[Path], known: set[Path]) -> Path | None:
