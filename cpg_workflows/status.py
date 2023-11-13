@@ -44,18 +44,22 @@ def complete_analysis_job(
     assert isinstance(output, str)
     output_cloudpath = to_path(output)
 
-    if not output_cloudpath.exists():
-        if tolerate_missing:
-            print(f"Output {output} doesn't exist, allowing silent return")
-            return
-        raise ValueError(f"Output {output} doesn't exist")
-
     if update_analysis_meta is not None:
         meta | update_analysis_meta(output)
 
-    # pad meta with real file size
-    if not output_cloudpath.is_dir():
-        meta |= {'size': output_cloudpath.stat().st_size}
+    # we know that es indexes are registered names, not files/dirs
+    # skip all relevant checks for this output type
+    if analysis_type != 'es-index':
+
+        if not output_cloudpath.exists():
+            if tolerate_missing:
+                print(f"Output {output} doesn't exist, allowing silent return")
+                return
+            raise ValueError(f"Output {output} doesn't exist")
+
+        # add file size to meta
+        if not output_cloudpath.is_dir():
+            meta |= {'size': output_cloudpath.stat().st_size}
 
     this_analysis = Analysis(
         type=analysis_type,
