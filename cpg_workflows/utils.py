@@ -14,7 +14,6 @@ from random import choices
 from typing import Union, cast
 
 import hail as hl
-from cloudpathlib import GSPath
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from hailtop.batch import ResourceFile
@@ -84,7 +83,7 @@ def exists_not_cached(path: Path | str, verbose: bool = True) -> bool:
     if verbose:
         # noinspection PyBroadException
         try:
-            res = _exists_not_cached(path)
+            res = check_exists_path(path)
         except BaseException:
             traceback.print_exc()
             logging.error(f'Failed checking {path}')
@@ -92,39 +91,29 @@ def exists_not_cached(path: Path | str, verbose: bool = True) -> bool:
         logging.debug(f'Checked {path} [' + ('exists' if res else 'missing') + ']')
         return res
 
-    return _exists_not_cached(path)
+    return check_exists_path(path)
 
 
-def _exists_not_cached(path: Path):
+def check_exists_path(test_path: Path) -> bool:
     """
-    Bare basic implementation of exists not cached with no extra path modification
-    """
-    if isinstance(path, GSPath):
-        return check_gs_exists_path(path)
-    return path.exists()
-
-
-def check_gs_exists_path(gs_path: Path) -> bool:
-    """
-    Check whether a gs_path exists using a cached per-directory listing.
+    Check whether a path exists using a cached per-directory listing.
     NB. reversion to Strings prevents a get call, which is typically
     forbidden to local users - this prevents this method being used in the
     metamist audit processes
     """
-    return basename(str(gs_path)) in get_contents_of_gs_path(dirname(str(gs_path)))
+    return basename(str(test_path)) in get_contents_of_path(dirname(str(test_path)))
 
 
 @lru_cache
-def get_contents_of_gs_path(gs_path: str) -> set[str]:
+def get_contents_of_path(test_path: str) -> set[str]:
     """
     Get the contents of a GCS path, returning non-complete paths, eg:
 
-        get_contents_of_gs_path('gs://my-bucket/my-dir/')
+        get_contents_of_path('gs://my-bucket/my-dir/')
         'my-file.txt'
 
     """
-    assert gs_path.startswith('gs://')
-    return {f.name for f in to_path(gs_path.rstrip('/')).iterdir()}
+    return {f.name for f in to_path(test_path.rstrip('/')).iterdir()}
 
 
 def can_reuse(
