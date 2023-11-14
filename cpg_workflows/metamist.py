@@ -5,7 +5,6 @@ Helpers to communicate with the metamist database.
 import logging
 import pprint
 import traceback
-from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
@@ -87,6 +86,19 @@ GET_PEDIGREE_QUERY = gql(
 
 
 _metamist: Optional['Metamist'] = None
+
+
+def silent_query(query_to_run, query_params: dict | None = None):
+    """
+    Run a query, but don't log the results to the console
+    Ref: https://github.com/populationgenomics/metamist/issues/540
+    """
+
+    curr_level = logging.root.level
+    logging.getLogger().setLevel(logging.WARN)
+    result = query(query_to_run, variables=query_params)
+    logging.getLogger().setLevel(curr_level)
+    return result
 
 
 def get_metamist() -> 'Metamist':
@@ -226,7 +238,7 @@ class Metamist:
         if only_sgs and skip_sgs:
             raise MetamistError('Cannot specify both only_sgs and skip_sgs in config')
 
-        sequencing_group_entries = query(
+        sequencing_group_entries = silent_query(
             GET_SEQUENCING_GROUPS_QUERY,
             {
                 'metamist_proj': metamist_proj,
@@ -298,7 +310,7 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        analyses = query(
+        analyses = silent_query(
             GET_ANALYSES_QUERY,
             {
                 'metamist_proj': metamist_proj,
@@ -473,7 +485,7 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        entries = query(GET_PEDIGREE_QUERY, {'metamist_proj': metamist_proj})
+        entries = silent_query(GET_PEDIGREE_QUERY, {'metamist_proj': metamist_proj})
 
         pedigree_entries = entries['project']['pedigree']
 
