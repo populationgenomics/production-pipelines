@@ -164,7 +164,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
             self, sequencing_group: SequencingGroup, inputs: StageInput
         ) -> StageOutput | None:
             j = get_batch().new_job(
-                'Echo', self.get_job_attrs(sequencing_group) | dict(tool='echo')
+                'Echo', self.get_job_attrs(sequencing_group) | {'tool': 'echo'}
             )
             j.command(f'echo {sequencing_group.id}_done >> {j.output}')
             get_batch().write_output(
@@ -186,9 +186,10 @@ def test_attributes(mocker: MockFixture, tmp_path):
     # Check that the correct number of jobs were created
     assert (
         len(get_batch()._jobs)
-        == len(get_cohort().get_sequencing_groups()) * len(workflow_stages) * 3
+        == len(get_cohort().get_sequencing_groups()) * len(workflow_stages) * 2
     )
-    # 3 jobs per stage, assumes no nested workflow stages
+    # 2 jobs per stage, assumes no nested workflow stages
+    # ((1 per SG * 2 SG) * 2 workflow stages) * 2 (1 job per stage, 1 result registration)
 
     # Check that all expected attributes are present
     expected_attrs = [

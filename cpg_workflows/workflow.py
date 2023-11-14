@@ -401,6 +401,7 @@ class Stage(Generic[TargetT], ABC):
         analysis_type: str | None = None,
         analysis_keys: list[str] | None = None,
         update_analysis_meta: Callable[[str], dict] | None = None,
+        tolerate_missing_output: bool = False,
         skipped: bool = False,
         assume_outputs_exist: bool = False,
         forced: bool = False,
@@ -426,6 +427,8 @@ class Stage(Generic[TargetT], ABC):
         # if `update_analysis_meta` is defined, it is called on the `Analysis.output`
         # field, and result is merged into the `Analysis.meta` dictionary.
         self.update_analysis_meta = update_analysis_meta
+
+        self.tolerate_missing_output = tolerate_missing_output
 
         # Populated with the return value of `add_to_the_workflow()`
         self.output_by_target: dict[str, StageOutput | None] = dict()
@@ -607,20 +610,32 @@ class Stage(Generic[TargetT], ABC):
             elif isinstance(target, Cohort):
                 project_name = target.analysis_dataset.name
 
+            assert isinstance(project_name, str)
+
+            # bump name to include `-test`
+            if get_config()['workflow']['access_level'] == 'test' and 'test' not in project_name:
+                project_name = f'{project_name}-test'
+
             for analysis_output in analysis_outputs:
+                if not outputs.jobs:
+                    continue
+
                 assert isinstance(
                     analysis_output, (str, Path)
                 ), f'{analysis_output} should be a str or Path object'
-                self.status_reporter.add_updaters_jobs(
+                if outputs.meta is None:
+                    outputs.meta = {}
+
+                self.status_reporter.create_analysis(
                     b=get_batch(),
-                    output=analysis_output,
+                    output=str(analysis_output),
                     analysis_type=self.analysis_type,
                     target=target,
                     jobs=outputs.jobs,
-                    prev_jobs=inputs.get_jobs(target),
+                    job_attr=self.get_job_attrs(target) | {'stage': self.name, 'tool': 'metamist'},
                     meta=outputs.meta,
-                    job_attrs=self.get_job_attrs(target),
                     update_analysis_meta=self.update_analysis_meta,
+                    tolerate_missing_output=self.tolerate_missing_output,
                     project_name=project_name,
                 )
 
@@ -775,6 +790,7 @@ def stage(
     analysis_type: str | None = None,
     analysis_keys: list[str | Path] | None = None,
     update_analysis_meta: Callable[[str], dict] | None = None,
+    tolerate_missing_output: bool = False,
     required_stages: list[StageDecorator] | StageDecorator | None = None,
     skipped: bool = False,
     assume_outputs_exist: bool = False,
@@ -798,6 +814,8 @@ def stage(
         if the Stage.expected_outputs() returns a dict.
     @update_analysis_meta: if defined, this function is called on the `Analysis.output`
         field, and returns a dictionary to be merged into the `Analysis.meta`
+    @tolerate_missing_output: if True, when registering the output of this stage,
+        allow for the output file to be missing (only relevant for metamist entry)
     @required_stages: list of other stage classes that are required prerequisites
         for this stage. Outputs of those stages will be passed to
         `Stage.queue_jobs(... , inputs)` as `inputs`, and all required
@@ -822,6 +840,7 @@ def stage(
                 skipped=skipped,
                 assume_outputs_exist=assume_outputs_exist,
                 forced=forced,
+                tolerate_missing_output=tolerate_missing_output
             )
 
         return wrapper_stage

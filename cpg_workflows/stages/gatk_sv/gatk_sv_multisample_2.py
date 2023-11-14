@@ -7,7 +7,7 @@ MakeCohortVCF and AnnotateVCF
 from typing import Any
 
 from cpg_utils import to_path, Path
-from cpg_utils.config import get_config
+from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
 from cpg_workflows.batch import get_batch
 from cpg_workflows.jobs.seqr_loader_sv import (
     annotate_cohort_jobs_sv,
@@ -194,12 +194,19 @@ class MakeCohortVcf(CohortStage):
             ]
         )
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -236,12 +243,19 @@ class FormatVcfForGatk(CohortStage):
         input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -297,12 +311,19 @@ class JoinRawCalls(CohortStage):
                 for batch_name in batch_names
             ]
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -340,12 +361,19 @@ class SVConcordance(CohortStage):
         input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -451,12 +479,19 @@ class FilterGenotypes(CohortStage):
         )
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -503,12 +538,18 @@ class AnnotateVcf(CohortStage):
         passing the VCF Index has become implicit, which may be a problem for us
         """
         expected_out = self.expected_outputs(cohort)
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
         job_or_none = queue_annotate_sv_jobs(
             batch=get_batch(),
             cohort=Cohort,
             cohort_prefix=self.prefix,
             input_vcf=inputs.as_dict(cohort, MakeCohortVcf)['vcf'],
             outputs=expected_out,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_out, jobs=job_or_none)
 
@@ -629,7 +670,7 @@ def _gatk_sv_index_meta(
     Add meta.type to custom analysis object
     https://github.com/populationgenomics/metamist/issues/539
     """
-    return {'type': 'gatk-sv-index', 'seqr-data-type': 'gatk-sv'}
+    return {'seqr-dataset-type': 'SV'}
 
 
 @stage(
