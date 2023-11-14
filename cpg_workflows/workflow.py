@@ -924,14 +924,16 @@ class Workflow:
         stages: list[StageDecorator] | None = None,
         dry_run: bool | None = None,
     ):
+        # always print the first config call, even if dry_run
+        _config = get_config(True)
         if _workflow is not None:
             raise ValueError(
                 'Workflow already initialised. Use get_workflow() to get the instance'
             )
 
-        self.dry_run = dry_run or get_config(True)['workflow'].get('dry_run')
+        self.dry_run = dry_run or get_config()['workflow'].get('dry_run')
 
-        analysis_dataset = get_config(True)['workflow']['dataset']
+        analysis_dataset = get_config()['workflow']['dataset']
         name = get_config()['workflow'].get('name', analysis_dataset)
         description = get_config()['workflow'].get('description', name)
         self.name = slugify(name)

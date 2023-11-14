@@ -89,6 +89,7 @@ reblock_gq_bands = [20, 30, 40]
 # startup will be printed into the Hail Batch logs. These logs are substantial
 # blocks of text, and contain all query results in JSON format. By default the
 # behaviour is to hide this information from logging files.
+# This is relevant in cpg_workflows.metamist.gql_query_optional_logging
 #log_metamist = true
 
 # Map internally used validation sample external_id to truth sample names
