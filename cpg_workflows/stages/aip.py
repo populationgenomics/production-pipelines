@@ -60,7 +60,7 @@ from cpg_utils.hail_batch import (
     copy_common_env,
     image_path,
 )
-from metamist.graphql import gql, query
+from metamist.graphql import gql
 
 from cpg_workflows.batch import get_batch
 from cpg_workflows.workflow import (
@@ -71,6 +71,7 @@ from cpg_workflows.workflow import (
     StageInput,
 )
 from cpg_workflows.resources import STANDARD
+from cpg_workflows.metamist import gql_query_optional_logging
 
 
 CHUNKY_DATE = datetime.now().strftime('%Y-%m-%d')
@@ -172,7 +173,7 @@ def query_for_latest_mt(dataset: str) -> str:
     query_dataset = dataset
     if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
         query_dataset += '-test'
-    result = query(MTA_QUERY, variables={'dataset': query_dataset})
+    result = gql_query_optional_logging(MTA_QUERY, query_params={'dataset': query_dataset})
     mt_by_date = {}
     seq_type_exome = get_config()['workflow'].get('sequencing_type') == 'exome'
     for analysis in result['project']['analyses']:

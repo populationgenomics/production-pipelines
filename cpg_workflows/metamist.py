@@ -5,7 +5,6 @@ Helpers to communicate with the metamist database.
 import logging
 import pprint
 import traceback
-from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
@@ -15,7 +14,7 @@ from cpg_utils.config import get_config
 from metamist import models
 from metamist.apis import AnalysisApi
 from metamist.exceptions import ApiException
-from metamist.graphql import gql, query, validate
+from metamist.graphql import gql, query
 
 from cpg_workflows.filetypes import (
     AlignmentInput,
@@ -25,6 +24,7 @@ from cpg_workflows.filetypes import (
     FastqPairs,
 )
 from cpg_workflows.utils import exists
+
 
 GET_SEQUENCING_GROUPS_QUERY = gql(
     """
@@ -87,6 +87,32 @@ GET_PEDIGREE_QUERY = gql(
 
 
 _metamist: Optional['Metamist'] = None
+
+
+def gql_query_optional_logging(query_to_run, query_params: dict | None = None):
+    """
+    Run a query, but don't log the results to the console
+    This is done by setting the global logger level to WARN
+    for the duration of the query exectution, then returning to
+    whichever state it was previously in
+    Ref: https://github.com/populationgenomics/metamist/issues/540
+    Allow for a config override to log the results to the console
+
+    Args:
+        query_to_run (gql DocumentNode): Query String
+        query_params (dict): Query Parameters or None
+
+    Returns:
+        query result, with or without logging
+    """
+    if get_config()['workflow'].get('log_metamist', False):
+        return query(query_to_run, variables=query_params)
+
+    curr_level = logging.root.level
+    logging.getLogger().setLevel(logging.WARN)
+    result = query(query_to_run, variables=query_params)
+    logging.getLogger().setLevel(curr_level)
+    return result
 
 
 def get_metamist() -> 'Metamist':
@@ -226,7 +252,7 @@ class Metamist:
         if only_sgs and skip_sgs:
             raise MetamistError('Cannot specify both only_sgs and skip_sgs in config')
 
-        sequencing_group_entries = query(
+        sequencing_group_entries = gql_query_optional_logging(
             GET_SEQUENCING_GROUPS_QUERY,
             {
                 'metamist_proj': metamist_proj,
@@ -298,7 +324,7 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        analyses = query(
+        analyses = gql_query_optional_logging(
             GET_ANALYSES_QUERY,
             {
                 'metamist_proj': metamist_proj,
@@ -473,7 +499,7 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        entries = query(GET_PEDIGREE_QUERY, {'metamist_proj': metamist_proj})
+        entries = gql_query_optional_logging(GET_PEDIGREE_QUERY, {'metamist_proj': metamist_proj})
 
         pedigree_entries = entries['project']['pedigree']
 
