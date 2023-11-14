@@ -89,9 +89,12 @@ GET_PEDIGREE_QUERY = gql(
 _metamist: Optional['Metamist'] = None
 
 
-def silent_query(query_to_run, query_params: dict | None = None):
+def gql_query_optional_logging(query_to_run, query_params: dict | None = None):
     """
     Run a query, but don't log the results to the console
+    This is done by setting the global logger level to WARN
+    for the duration of the query exectution, then returning to
+    whichever state it was previously in
     Ref: https://github.com/populationgenomics/metamist/issues/540
     Allow for a config override to log the results to the console
 
@@ -249,7 +252,7 @@ class Metamist:
         if only_sgs and skip_sgs:
             raise MetamistError('Cannot specify both only_sgs and skip_sgs in config')
 
-        sequencing_group_entries = silent_query(
+        sequencing_group_entries = gql_query_optional_logging(
             GET_SEQUENCING_GROUPS_QUERY,
             {
                 'metamist_proj': metamist_proj,
@@ -321,7 +324,7 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        analyses = silent_query(
+        analyses = gql_query_optional_logging(
             GET_ANALYSES_QUERY,
             {
                 'metamist_proj': metamist_proj,
@@ -496,7 +499,7 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        entries = silent_query(GET_PEDIGREE_QUERY, {'metamist_proj': metamist_proj})
+        entries = gql_query_optional_logging(GET_PEDIGREE_QUERY, {'metamist_proj': metamist_proj})
 
         pedigree_entries = entries['project']['pedigree']
 
