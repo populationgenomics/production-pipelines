@@ -93,7 +93,17 @@ def silent_query(query_to_run, query_params: dict | None = None):
     """
     Run a query, but don't log the results to the console
     Ref: https://github.com/populationgenomics/metamist/issues/540
+    Allow for a config override to log the results to the console
+
+    Args:
+        query_to_run (gql DocumentNode): Query String
+        query_params (dict): Query Parameters or None
+
+    Returns:
+        query result, with or without logging
     """
+    if get_config()['workflow'].get('log_metamist', False):
+        return query(query_to_run, variables=query_params)
 
     curr_level = logging.root.level
     logging.getLogger().setLevel(logging.WARN)
