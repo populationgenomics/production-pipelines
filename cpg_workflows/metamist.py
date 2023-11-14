@@ -14,7 +14,7 @@ from cpg_utils.config import get_config
 from metamist import models
 from metamist.apis import AnalysisApi
 from metamist.exceptions import ApiException
-from metamist.graphql import gql, query, validate
+from metamist.graphql import gql, query
 
 from cpg_workflows.filetypes import (
     AlignmentInput,
@@ -24,6 +24,7 @@ from cpg_workflows.filetypes import (
     FastqPairs,
 )
 from cpg_workflows.utils import exists
+
 
 GET_SEQUENCING_GROUPS_QUERY = gql(
     """
