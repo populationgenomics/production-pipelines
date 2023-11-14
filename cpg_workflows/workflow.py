@@ -929,7 +929,7 @@ class Workflow:
                 'Workflow already initialised. Use get_workflow() to get the instance'
             )
 
-        self.dry_run = dry_run or get_config()['workflow'].get('dry_run')
+        self.dry_run = dry_run or get_config(True)['workflow'].get('dry_run')
 
         analysis_dataset = get_config()['workflow']['dataset']
         name = get_config()['workflow'].get('name', analysis_dataset)
