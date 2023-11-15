@@ -30,7 +30,6 @@ from .status import MetamistStatusReporter
 from .targets import Target, Dataset, SequencingGroup, Cohort
 from .utils import (
     exists,
-    missing_from_pre_collected,
     timestamp,
     slugify,
     ExpectedResultT,
@@ -45,33 +44,6 @@ StageDecorator = Callable[..., 'Stage']
 # it would violate the Liskov substitution principle (i.e. any Stage subclass would
 # have to be able to work on any Target subclass).
 TargetT = TypeVar('TargetT', bound=Target)
-
-
-def list_all_parent_dirs(all_outputs: set[Path]) -> set[Path]:
-    """
-    take all possible outputs, find unique parent directories
-
-    Args:
-        all_outputs (set[Path]): all possible outputs across multiple stages
-
-    Returns:
-        a set of all unique parent directories
-    """
-    return {output.parent for output in all_outputs}
-
-
-def list_of_all_dir_contents(locations: set[Path]) -> set[Path]:
-    """
-    take a collection of parent directories and identify their contents
-
-    Args:
-        locations (set[Path]): all places to look
-
-    Returns:
-        set of all files across all locations
-    """
-
-    return {file for location in locations for file in location.iterdir()}
 
 
 def path_walk(expected, collected: set | None = None) -> set[Path]:
@@ -641,12 +613,10 @@ class Stage(Generic[TargetT], ABC):
 
         return outputs
 
-    def _get_action(
-        self, target: TargetT, existing_files: set[Path] | None = None
-    ) -> Action:
+    def _get_action(self, target: TargetT) -> Action:
         """
         Based on stage parameters and expected outputs existence, determines what
-        to do with the target: queue, skip or reuse, etc..
+        to do with the target: queue, skip or reuse, etc...
         """
         if target.forced and not self.skipped:
             logging.info(f'{self.name}: {target} [QUEUE] (target is forced)')
@@ -663,9 +633,7 @@ class Stage(Generic[TargetT], ABC):
                 return Action.SKIP
 
         expected_out = self.expected_outputs(target)
-        reusable, first_missing_path = self._is_reusable(
-            expected_out, existing_outputs=existing_files
-        )
+        reusable, first_missing_path = self._is_reusable(expected_out)
 
         if self.skipped:
             if reusable and not first_missing_path:
@@ -726,14 +694,11 @@ class Stage(Generic[TargetT], ABC):
         logging.info(f'{self.name}: {target} [QUEUE]')
         return Action.QUEUE
 
-    def _is_reusable(
-        self, expected_out: ExpectedResultT, existing_outputs: set[Path] | None = None
-    ) -> tuple[bool, Path | None]:
+    def _is_reusable(self, expected_out: ExpectedResultT) -> tuple[bool, Path | None]:
         """
         Checks if the outputs of prior stages already exist, and can be reused
         Args:
             expected_out (ExpectedResultT): expected outputs of a stage
-            existing_outputs (optional[set[Path]]): pre-scanned directory contents
 
         Returns:
             tuple[bool, Path | None]:
@@ -753,16 +718,9 @@ class Stage(Generic[TargetT], ABC):
             if not paths:
                 return False, None
 
-            # check against the pre-scanned files if possible
-            if existing_outputs:
-                first_missing_path = missing_from_pre_collected(paths, existing_outputs)
-
-            # fall back to individual .exists() tests
-            else:
-                first_missing_path = next((p for p in paths if not exists(p)), None)
-
-            if first_missing_path:
+            if first_missing_path := next((p for p in paths if not exists(p)), None):
                 return False, first_missing_path
+
             return True, None
         else:
             if self.skipped:
@@ -1334,14 +1292,10 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
                 all_outputs = path_walk(
                     self.expected_outputs(sequencing_group), all_outputs
                 )
-            all_parents = list_all_parent_dirs(all_outputs)
-            existing_files = list_of_all_dir_contents(all_parents)
 
             # evaluate_stuff en masse
             for sequencing_group in dataset.get_sequencing_groups():
-                action = self._get_action(
-                    sequencing_group, existing_files=existing_files
-                )
+                action = self._get_action(sequencing_group)
                 output_by_target[
                     sequencing_group.target_id
                 ] = self._queue_jobs_with_checks(sequencing_group, action)
