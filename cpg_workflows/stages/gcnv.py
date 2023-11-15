@@ -3,7 +3,7 @@ Stages that implement GATK-gCNV.
 """
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
+from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
 from cpg_workflows.jobs import gcnv
 from cpg_workflows.targets import SequencingGroup, Cohort
 from cpg_workflows.workflow import stage, StageInput, StageOutput
@@ -230,11 +230,18 @@ class AnnotateVcf(CohortStage):
         passing the VCF Index has become implicit, which may be a problem for us
         """
         expected_out = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
         job_or_none = queue_annotate_sv_jobs(
             batch=get_batch(),
             cohort=Cohort,
             cohort_prefix=self.prefix,
             input_vcf=inputs.as_dict(cohort, FastCombineGCNVs)['combined_calls'],
             outputs=expected_out,
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_out, jobs=job_or_none)
