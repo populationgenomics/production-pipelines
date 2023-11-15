@@ -84,6 +84,14 @@ def exists_not_cached(path: Path | str, verbose: bool = True) -> bool:
         # noinspection PyBroadException
         try:
             res = check_exists_path(path)
+
+        # a failure to detect the parent folder causes a crash
+        # instead stick to a core responsibility -
+        # existence = False
+        except FileNotFoundError as fnfe:
+            logging.error(f'Failed checking {path}')
+            logging.error(f'{fnfe}')
+            return False
         except BaseException:
             traceback.print_exc()
             logging.error(f'Failed checking {path}')
