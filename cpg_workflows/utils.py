@@ -36,16 +36,39 @@ def read_hail(path):
     return t
 
 
-def checkpoint_hail(t, file_name: str, checkpoint_prefix: str | None = None):
-    if checkpoint_prefix:
-        path = join(checkpoint_prefix, file_name)
-        if can_reuse(path):
-            t = read_hail(str(path))
-        else:
-            t.write(str(path), overwrite=True)
-            logging.info(f'Wrote checkpoint {path}')
-            t = read_hail(str(path))
-    return t
+def checkpoint_hail(
+        t: hl.Table | hl.MatrixTable,
+        file_name: str,
+        checkpoint_prefix: str | None = None,
+        allow_reuse=False
+):
+    """
+    checkpoint method
+    provide with a path and a prefix (GCP directory, can be None)
+    allow_reuse sets whether the checkpoint can be reused - we
+    typically want to avoid reuse, as it means we're continuing a previous
+    failure from an unknown state
+
+    Args:
+        t (hl.Table | hl.MatrixTable):
+        file_name (str): name for this checkpoint
+        checkpoint_prefix (str): path to the checkpoint directory
+        allow_reuse (bool): whether to permit reuse of an existing checkpoint
+    """
+
+    # drop the schema here
+    t.describe()
+
+    if checkpoint_prefix is None:
+        return t
+
+    path = join(checkpoint_prefix, file_name)
+    if can_reuse(path) and allow_reuse:
+        logging.info(f'Re-using {path}')
+        return read_hail(path)
+
+    logging.info(f'Checkpointing {path}')
+    return t.checkpoint(path, overwrite=True)
 
 
 @lru_cache
