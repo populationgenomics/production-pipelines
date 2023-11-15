@@ -11,7 +11,7 @@ on:
         default: "test"
 
 env:
-  VERSION: 1.18.7
+  VERSION: 1.18.8
 
 jobs:
   docker:
