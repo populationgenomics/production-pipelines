@@ -257,7 +257,8 @@ class JobResource:
         Subtracts 1G to start a java VM, and converts to MB as the option doesn't
         support fractions of GB.
         """
-        return int(math.floor((self.get_mem_gb() - 1) * 1000))
+        # get_mem_gb() is usually decimal GB, but our value is used as binary MiB
+        return int(math.floor((self.get_mem_gb() - 1) * 953.6))
 
     def get_ncpu(self) -> int:
         """
