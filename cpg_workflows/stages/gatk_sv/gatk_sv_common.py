@@ -255,6 +255,7 @@ def queue_annotate_sv_jobs(
     cohort_prefix: Path,
     input_vcf: Path,
     outputs: dict,
+    labels: dict[str, str] | None = None,
 ) -> list[Job] | Job | None:
     """
     Helper function to queue jobs for SV annotation
@@ -296,5 +297,6 @@ def queue_annotate_sv_jobs(
         wfl_name='AnnotateVcf',
         input_dict=input_dict,
         expected_out_dict=outputs,
+        labels=labels
     )
     return jobs
