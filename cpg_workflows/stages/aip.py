@@ -62,8 +62,9 @@ from cpg_utils.hail_batch import (
     get_batch,
     image_path,
 )
-from metamist.graphql import gql, query
+from metamist.graphql import gql
 
+from cpg_workflows.metamist import gql_query_optional_logging
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.workflow import (
     Dataset,
@@ -72,6 +73,7 @@ from cpg_workflows.workflow import (
     StageOutput,
     stage,
 )
+
 
 CHUNKY_DATE = datetime.now().strftime('%Y-%m-%d')
 DATED_FOLDER = join('reanalysis', CHUNKY_DATE)
@@ -172,7 +174,7 @@ def query_for_latest_mt(dataset: str) -> str:
     query_dataset = dataset
     if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
         query_dataset += '-test'
-    result = query(MTA_QUERY, variables={'dataset': query_dataset})
+    result = gql_query_optional_logging(MTA_QUERY, query_params={'dataset': query_dataset})
     mt_by_date = {}
     seq_type_exome = get_config()['workflow'].get('sequencing_type') == 'exome'
     for analysis in result['project']['analyses']:
@@ -315,6 +317,7 @@ def _aip_html_meta(
     analysis_type='aip-report',
     analysis_keys=['results_html', 'latest_html'],
     update_analysis_meta=_aip_html_meta,
+    tolerate_missing_output=True
 )
 class CreateAIPHTML(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:

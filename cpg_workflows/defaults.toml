@@ -85,6 +85,13 @@ reblock_gq_bands = [20, 30, 40]
 # the code can be run without permissions.
 #dry_run = true
 
+# if this argument is set to True, the GQL queries executed during pipeline
+# startup will be printed into the Hail Batch logs. These logs are substantial
+# blocks of text, and contain all query results in JSON format. By default the
+# behaviour is to hide this information from logging files.
+# This is relevant in cpg_workflows.metamist.gql_query_optional_logging
+#log_metamist = true
+
 # Map internally used validation sample external_id to truth sample names
 [validation.sample_map]
 HG001_NA12878 = 'na12878'
@@ -104,6 +111,9 @@ delete_scratch_on_exit = false
 # haplotype caller overrides, see production-pipelines PR#381
 # defaults in code are 40 for genomes, none for exomes
 #haplotypecaller_storage = 80
+
+# Use highmem machine type for alignment step
+# align_use_highmem = true
 
 [mito_snv]
 # Example config for broad wdl found here:

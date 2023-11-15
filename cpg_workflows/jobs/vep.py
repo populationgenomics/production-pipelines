@@ -221,9 +221,8 @@ def vep_one(
     splice_ai = get_config()['workflow'].get('spliceai_plugin', False)
 
     # vep is single threaded, with a middling memory requirement
-    # during test it caps out around 4GB, though this could be
-    # larger for some long-running jobs
-    j.memory('highmem').storage('25Gi').cpu(1)
+    # during test it can exceed 8GB, so we'll give it 16GB
+    j.memory('16Gi').storage('15Gi').cpu(1)
 
     if not isinstance(vcf, hb.ResourceFile):
         vcf = b.read_input(str(vcf))
@@ -276,7 +275,6 @@ def vep_one(
     -i {vcf} \\
     --everything \\
     --mane_select \\
-    --no_stats \\
     --allele_number \\
     --minimal \\
     --species homo_sapiens \\

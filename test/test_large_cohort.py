@@ -154,6 +154,19 @@ class TestAllLargeCohortMethods:
             'cpg_workflows.inputs.create_cohort',
             lambda: _mock_cohort(conf.workflow.dataset),
         )
+        # skip can_reuse, implicit skip of existence checks
+        mocker.patch(
+            'cpg_workflows.large_cohort.combiner.can_reuse',
+            lambda x: False
+        )
+        mocker.patch(
+            'cpg_workflows.large_cohort.relatedness.can_reuse',
+            lambda x: False
+        )
+        mocker.patch(
+            'cpg_workflows.large_cohort.site_only_vcf.can_reuse',
+            lambda x: False
+        )
 
         start_query_context()
 

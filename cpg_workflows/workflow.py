@@ -32,7 +32,6 @@ from .targets import Cohort, Dataset, SequencingGroup, Target
 from .utils import (
     ExpectedResultT,
     exists,
-    missing_from_pre_collected,
     slugify,
     timestamp,
 )
@@ -44,33 +43,6 @@ StageDecorator = Callable[..., 'Stage']
 # it would violate the Liskov substitution principle (i.e. any Stage subclass would
 # have to be able to work on any Target subclass).
 TargetT = TypeVar('TargetT', bound=Target)
-
-
-def list_all_parent_dirs(all_outputs: set[Path]) -> set[Path]:
-    """
-    take all possible outputs, find unique parent directories
-
-    Args:
-        all_outputs (set[Path]): all possible outputs across multiple stages
-
-    Returns:
-        a set of all unique parent directories
-    """
-    return {output.parent for output in all_outputs}
-
-
-def list_of_all_dir_contents(locations: set[Path]) -> set[Path]:
-    """
-    take a collection of parent directories and identify their contents
-
-    Args:
-        locations (set[Path]): all places to look
-
-    Returns:
-        set of all files across all locations
-    """
-
-    return {file for location in locations for file in location.iterdir()}
 
 
 def path_walk(expected, collected: set | None = None) -> set[Path]:
@@ -400,6 +372,7 @@ class Stage(Generic[TargetT], ABC):
         analysis_type: str | None = None,
         analysis_keys: list[str] | None = None,
         update_analysis_meta: Callable[[str], dict] | None = None,
+        tolerate_missing_output: bool = False,
         skipped: bool = False,
         assume_outputs_exist: bool = False,
         forced: bool = False,
@@ -425,6 +398,8 @@ class Stage(Generic[TargetT], ABC):
         # if `update_analysis_meta` is defined, it is called on the `Analysis.output`
         # field, and result is merged into the `Analysis.meta` dictionary.
         self.update_analysis_meta = update_analysis_meta
+
+        self.tolerate_missing_output = tolerate_missing_output
 
         # Populated with the return value of `add_to_the_workflow()`
         self.output_by_target: dict[str, StageOutput | None] = dict()
@@ -606,31 +581,41 @@ class Stage(Generic[TargetT], ABC):
             elif isinstance(target, Cohort):
                 project_name = target.analysis_dataset.name
 
+            assert isinstance(project_name, str)
+
+            # bump name to include `-test`
+            if get_config()['workflow']['access_level'] == 'test' and 'test' not in project_name:
+                project_name = f'{project_name}-test'
+
             for analysis_output in analysis_outputs:
+                if not outputs.jobs:
+                    continue
+
                 assert isinstance(
                     analysis_output, (str, Path)
                 ), f'{analysis_output} should be a str or Path object'
-                self.status_reporter.add_updaters_jobs(
+                if outputs.meta is None:
+                    outputs.meta = {}
+
+                self.status_reporter.create_analysis(
                     b=get_batch(),
-                    output=analysis_output,
+                    output=str(analysis_output),
                     analysis_type=self.analysis_type,
                     target=target,
                     jobs=outputs.jobs,
-                    prev_jobs=inputs.get_jobs(target),
+                    job_attr=self.get_job_attrs(target) | {'stage': self.name, 'tool': 'metamist'},
                     meta=outputs.meta,
-                    job_attrs=self.get_job_attrs(target),
                     update_analysis_meta=self.update_analysis_meta,
+                    tolerate_missing_output=self.tolerate_missing_output,
                     project_name=project_name,
                 )
 
         return outputs
 
-    def _get_action(
-        self, target: TargetT, existing_files: set[Path] | None = None
-    ) -> Action:
+    def _get_action(self, target: TargetT) -> Action:
         """
         Based on stage parameters and expected outputs existence, determines what
-        to do with the target: queue, skip or reuse, etc..
+        to do with the target: queue, skip or reuse, etc...
         """
         if target.forced and not self.skipped:
             logging.info(f'{self.name}: {target} [QUEUE] (target is forced)')
@@ -647,9 +632,7 @@ class Stage(Generic[TargetT], ABC):
                 return Action.SKIP
 
         expected_out = self.expected_outputs(target)
-        reusable, first_missing_path = self._is_reusable(
-            expected_out, existing_outputs=existing_files
-        )
+        reusable, first_missing_path = self._is_reusable(expected_out)
 
         if self.skipped:
             if reusable and not first_missing_path:
@@ -710,14 +693,11 @@ class Stage(Generic[TargetT], ABC):
         logging.info(f'{self.name}: {target} [QUEUE]')
         return Action.QUEUE
 
-    def _is_reusable(
-        self, expected_out: ExpectedResultT, existing_outputs: set[Path] | None = None
-    ) -> tuple[bool, Path | None]:
+    def _is_reusable(self, expected_out: ExpectedResultT) -> tuple[bool, Path | None]:
         """
         Checks if the outputs of prior stages already exist, and can be reused
         Args:
             expected_out (ExpectedResultT): expected outputs of a stage
-            existing_outputs (optional[set[Path]]): pre-scanned directory contents
 
         Returns:
             tuple[bool, Path | None]:
@@ -737,16 +717,9 @@ class Stage(Generic[TargetT], ABC):
             if not paths:
                 return False, None
 
-            # check against the pre-scanned files if possible
-            if existing_outputs:
-                first_missing_path = missing_from_pre_collected(paths, existing_outputs)
-
-            # fall back to individual .exists() tests
-            else:
-                first_missing_path = next((p for p in paths if not exists(p)), None)
-
-            if first_missing_path:
+            if first_missing_path := next((p for p in paths if not exists(p)), None):
                 return False, first_missing_path
+
             return True, None
         else:
             if self.skipped:
@@ -774,6 +747,7 @@ def stage(
     analysis_type: str | None = None,
     analysis_keys: list[str | Path] | None = None,
     update_analysis_meta: Callable[[str], dict] | None = None,
+    tolerate_missing_output: bool = False,
     required_stages: list[StageDecorator] | StageDecorator | None = None,
     skipped: bool = False,
     assume_outputs_exist: bool = False,
@@ -797,6 +771,8 @@ def stage(
         if the Stage.expected_outputs() returns a dict.
     @update_analysis_meta: if defined, this function is called on the `Analysis.output`
         field, and returns a dictionary to be merged into the `Analysis.meta`
+    @tolerate_missing_output: if True, when registering the output of this stage,
+        allow for the output file to be missing (only relevant for metamist entry)
     @required_stages: list of other stage classes that are required prerequisites
         for this stage. Outputs of those stages will be passed to
         `Stage.queue_jobs(... , inputs)` as `inputs`, and all required
@@ -821,6 +797,7 @@ def stage(
                 skipped=skipped,
                 assume_outputs_exist=assume_outputs_exist,
                 forced=forced,
+                tolerate_missing_output=tolerate_missing_output
             )
 
         return wrapper_stage
@@ -909,9 +886,9 @@ class Workflow:
                 'Workflow already initialised. Use get_workflow() to get the instance'
             )
 
-        self.dry_run = dry_run or get_config()['workflow'].get('dry_run')
+        self.dry_run = dry_run or get_config(True)['workflow'].get('dry_run')
 
-        analysis_dataset = get_config()['workflow']['dataset']
+        analysis_dataset = get_config(True)['workflow']['dataset']
         name = get_config()['workflow'].get('name', analysis_dataset)
         description = get_config()['workflow'].get('description', name)
         self.name = slugify(name)
@@ -1314,14 +1291,10 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
                 all_outputs = path_walk(
                     self.expected_outputs(sequencing_group), all_outputs
                 )
-            all_parents = list_all_parent_dirs(all_outputs)
-            existing_files = list_of_all_dir_contents(all_parents)
 
             # evaluate_stuff en masse
             for sequencing_group in dataset.get_sequencing_groups():
-                action = self._get_action(
-                    sequencing_group, existing_files=existing_files
-                )
+                action = self._get_action(sequencing_group)
                 output_by_target[
                     sequencing_group.target_id
                 ] = self._queue_jobs_with_checks(sequencing_group, action)

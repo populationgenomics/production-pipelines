@@ -145,17 +145,19 @@ def test_status_reporter(mocker: MockFixture, tmp_path):
     run_workflow(stages=[MyQcStage1, MyQcStage2])
 
     assert 'metamist' in get_batch().job_by_tool, get_batch().job_by_tool
+    # 2 jobs per sequencing group (2 analysis outputs)
     assert (
         get_batch().job_by_tool['metamist']['job_n']
-        == len(get_cohort().get_sequencing_groups()) * 4
+        == len(get_cohort().get_sequencing_groups()) * 2
     )
 
 
 def _update_meta(output_path: str) -> dict[str, Any]:
-    from cloudpathlib import CloudPath
 
-    with CloudPath(output_path).open() as f:
-        return dict(result=f.read().strip())
+    from cpg_utils import to_path
+
+    with to_path(output_path).open() as f:
+        return {'result': f.read().strip()}
 
 
 def test_status_reporter_with_custom_updater(mocker: MockFixture, tmp_path):
@@ -181,7 +183,7 @@ def test_status_reporter_with_custom_updater(mocker: MockFixture, tmp_path):
             self, sequencing_group: SequencingGroup, inputs: StageInput
         ) -> StageOutput | None:
             j = get_batch().new_job(
-                'Echo', self.get_job_attrs(sequencing_group) | dict(tool='echo')
+                'Echo', self.get_job_attrs(sequencing_group) | {'tool': 'echo'}
             )
             j.command(f'echo 42 >> {j.output}')
             get_batch().write_output(

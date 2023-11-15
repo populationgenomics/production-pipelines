@@ -10,8 +10,9 @@ across batches between FilterBatch and GenotypeBatch
 from typing import Any
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
+from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
 from cpg_utils.hail_batch import get_batch
+from cpg_workflows.workflow import stage, StageOutput, StageInput, Cohort, CohortStage
 
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     SV_CALLERS,
@@ -177,12 +178,19 @@ class GatherBatchEvidence(CohortStage):
         )
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -258,12 +266,19 @@ class ClusterBatch(CohortStage):
         )
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -329,12 +344,19 @@ class GenerateBatchMetrics(CohortStage):
         )
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -417,12 +439,19 @@ class FilterBatch(CohortStage):
         )
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -482,12 +511,19 @@ class MergeBatchSites(CohortStage):
         }
         input_dict |= get_images(['sv_pipeline_docker'])
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -586,11 +622,18 @@ class GenotypeBatch(CohortStage):
         # - sr_median_hom_ins
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
