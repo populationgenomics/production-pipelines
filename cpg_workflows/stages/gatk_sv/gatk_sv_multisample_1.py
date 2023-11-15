@@ -12,7 +12,6 @@ from typing import Any
 from cpg_utils import Path
 from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.workflow import stage, StageOutput, StageInput, Cohort, CohortStage
 
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     SV_CALLERS,
