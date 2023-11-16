@@ -8,7 +8,7 @@ from .. import set_config
 from . import run_workflow
 
 
-def test_force_stages(mocker: MockFixture, tmp_path):
+def test_force_stages_round5(mocker: MockFixture, tmp_path):
     """
     A -> B -> C, all results exist
     force_stages = [B2]

@@ -76,7 +76,7 @@ def _common(mocker, tmp_path):
     mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
 
 
-def test_status_reporter(mocker: MockFixture, tmp_path):
+def test_status_reporter_round3(mocker: MockFixture, tmp_path):
     _common(mocker, tmp_path)
 
     from cpg_utils.hail_batch import dataset_path, get_batch
@@ -144,6 +144,7 @@ def test_status_reporter(mocker: MockFixture, tmp_path):
 
     run_workflow(stages=[MyQcStage1, MyQcStage2])
 
+    print(get_batch().job_by_tool['metamist'])
     assert 'metamist' in get_batch().job_by_tool, get_batch().job_by_tool
     # 2 jobs per sequencing group (2 analysis outputs)
     assert (

@@ -12,7 +12,7 @@ from cpg_workflows.targets import Cohort
 from . import set_config
 
 
-def test_batch_job(tmp_path):
+def test_batch_job_round2(tmp_path):
     """
     Test creating a job and running a batch.
     """
@@ -78,7 +78,7 @@ def mock_create_cohort() -> Cohort:
     return c
 
 
-def test_attributes(mocker: MockFixture, tmp_path):
+def test_attributes_round1(mocker: MockFixture, tmp_path):
     config = f"""
     [workflow]
     dataset_gcp_project = 'fewgenomes'
@@ -181,6 +181,9 @@ def test_attributes(mocker: MockFixture, tmp_path):
     workflow_stages: list[StageDecorator] = [MyQcStage1, MyQcStage2]
     run_workflow(stages=workflow_stages)
 
+    for b in get_batch()._jobs:
+        print(b.attributes)
+        print(b.name)
     # Check that the correct number of jobs were created
     assert (
         len(get_batch()._jobs)
