@@ -24,7 +24,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_1 import (
 )
 from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_2 import AnnotateVcf, AnnotateDatasetSv, MtToEsSv
 from cpg_workflows.stages.gatk_sv.gatk_sv_single_sample import CreateSampleBatches
-from cpg_workflows.stages.gcnv import GermlineCNVCalls
+from cpg_workflows.stages.gcnv import GermlineCNVCalls, FastCombineGCNVs, AnnotateVcfSV
 from cpg_workflows.stages.aip import GeneratePanelData, QueryPanelapp, RunHailFiltering, ValidateMOI, CreateAIPHTML
 from cpg_workflows.stages.stripy import Stripy
 from cpg_workflows.stages.happy_validation import (
@@ -51,11 +51,9 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
     'gatk_sv_singlesample': [CreateSampleBatches],
     'gatk_sv_multisample_1': [FilterBatch, GenotypeBatch],
-    'gatk_sv_sandwich': [
-        MergeBatchSites
-    ],  # stage to run between FilterBatch & GenotypeBatch
+    'gatk_sv_sandwich': [MergeBatchSites],  # runs between FilterBatch & GenotypeBatch
     'gatk_sv_multisample_2': [AnnotateVcf, AnnotateDatasetSv, MtToEsSv],
-    'gcnv': [GermlineCNVCalls],
+    'gcnv': [GermlineCNVCalls, FastCombineGCNVs, AnnotateVcfSV],
 }
 
 
