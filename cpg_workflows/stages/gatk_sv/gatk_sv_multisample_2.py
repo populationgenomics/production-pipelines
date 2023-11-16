@@ -545,7 +545,7 @@ class AnnotateVcf(CohortStage):
 
         job_or_none = queue_annotate_sv_jobs(
             batch=get_batch(),
-            cohort=Cohort,
+            cohort=cohort,
             cohort_prefix=self.prefix,
             input_vcf=inputs.as_dict(cohort, MakeCohortVcf)['vcf'],
             outputs=expected_out,
