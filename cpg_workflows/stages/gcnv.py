@@ -200,7 +200,7 @@ class FastCombineGCNVs(CohortStage):
     analysis_keys=['annotated_vcf'],
     update_analysis_meta=_gcnv_annotated_meta,
 )
-class AnnotateVcf(CohortStage):
+class AnnotateVcfSV(CohortStage):
     """
     Add annotations, such as the inferred function and allele frequencies of variants,
     to final VCF.
