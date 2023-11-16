@@ -8,7 +8,7 @@ from .. import set_config
 from . import run_workflow
 
 
-def test_first_stages(mocker: MockFixture, tmp_path):
+def test_first_stages_round4(mocker: MockFixture, tmp_path):
     """
     A -> B -> C
     A2 -> B2 -> C2

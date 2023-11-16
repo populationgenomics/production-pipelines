@@ -29,4 +29,13 @@ jobs:
         timeout-minutes: 20
         run: |
           PYTHONPATH=$PWD/gnomad_methods:$PWD/seqr-loading-pipelines \
-          pytest test
+          pytest -k 'round1' && \
+          pytest -k 'round2' && \
+          pytest -k 'round3' && \
+          pytest -k 'round4' && \
+          pytest -k 'round5' && \
+          pytest -k 'round6' && \
+          pytest -k 'round7' && \
+          pytest -k 'round8' && \
+          pytest -k 'round9' && \
+          pytest -k 'not round'

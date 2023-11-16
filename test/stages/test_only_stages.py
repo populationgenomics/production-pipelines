@@ -66,7 +66,7 @@ def create_config(tmp_path, allow_missing_outputs_for_stages=None):
     """
 
 
-def test_works_when_using_allow_missing_outputs_for_stages_on_required_parent_stage(
+def test_works_when_using_allow_missing_outputs_for_stages_on_required_parent_stage_round7(
     mocker: MockFixture, tmp_path
 ):
     """
