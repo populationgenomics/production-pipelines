@@ -84,7 +84,11 @@ def classify_SQ(path: str):
     return KNOWN_REFS.get(hashed, hashed)
 
 
-def do_reheader(newref, incram, outcram, outcrai):
+def do_reheader(refset, newref, incram, outcram, outcrai):
+    ref = classify_SQ(incram)
+    if ref != refset:
+        raise ValueError(f'{incram}: unexpected original reference headers: {ref}')
+
     translate = {}
     with open(newref) as refp:
         for line in refp:
@@ -147,7 +151,6 @@ if __name__ == '__main__':
         expected_refset = config['references']['expected']
         new_reference_path = config['references']['new']
 
-        set_htslib_token()
         reheader_list = []
         for fname in cram_list:
             path = to_path(fname)
@@ -157,8 +160,6 @@ if __name__ == '__main__':
                 print(f'{fname}: file does not exist')
             elif path_exists(reheadered_path):
                 print(f'{reheadered_path}: reheadered file already exists')
-            elif (ref := classify_SQ(fname)) != expected_refset:
-                print(f'{fname}: unexpected original reference headers: {ref}')
             else:
                 reheader_list.append((path, reheadered_path, path.stat().st_size))
 
@@ -175,7 +176,8 @@ if __name__ == '__main__':
             j.image(image_path('samtools'))
             j.storage(filesize * 1.2)
 
-            j.call(do_reheader, new_reference, b.read_input(str(path)), j.out_cram, j.out_crai)
+            j.call(do_reheader, expected_refset, new_reference,
+                   b.read_input(str(path)), j.out_cram, j.out_crai)
 
             assert isinstance(j.out_cram, JobResourceFile)
             assert isinstance(j.out_crai, JobResourceFile)
