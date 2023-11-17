@@ -1,5 +1,6 @@
 [workflow]
 name = 'large_cohort'
+scatter_count = 50
 scatter_count_genotype = 50
 status_reporter = 'metamist'
 # define reference fasta. If not specified here, the reference file is pulled from [references.broad][ref_fasta]
