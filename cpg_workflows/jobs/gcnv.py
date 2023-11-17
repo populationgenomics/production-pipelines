@@ -349,6 +349,8 @@ def merge_calls(
         output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
     )
 
+    print(f'in Stage vcfs: {sg_vcfs}')
+
     # make a fuse connection to the data source
     # to require only one fused connection we need files in one bucket
     # pop a file off and use it to find the bucket
@@ -359,6 +361,9 @@ def merge_calls(
 
     # should be a simple transformation of VCF.removeprefix('gs://') on each path
     all_vcfs = [f'/{v.removeprefix("gs://")}' for v in sg_vcfs]
+
+    print(f'after Stage vcfs: {all_vcfs}')
+
     # option breakdown:
     # -Oz: bgzip output
     # -o: output file

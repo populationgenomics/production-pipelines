@@ -182,10 +182,12 @@ class FastCombineGCNVs(CohortStage):
 
         # do a slapdash bcftools merge on all input files...
         gcnv_vcfs = inputs.as_dict_by_target(GermlineCNVCalls)
+        print(f'SGIDS: {cohort.get_sequencing_group_ids(False)}')
         all_vcfs = [
             str(gcnv_vcfs[sgid]['intervals'])
-            for sgid in cohort.get_sequencing_group_ids(False)  # temporary for testing
+            for sgid in cohort.get_sequencing_group_ids(False)  # temporary False for testing
         ]
+        print(all_vcfs)
 
         job_or_none = gcnv.merge_calls(
             get_batch(),
