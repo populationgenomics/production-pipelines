@@ -184,7 +184,7 @@ class FastCombineGCNVs(CohortStage):
         gcnv_vcfs = inputs.as_dict_by_target(GermlineCNVCalls)
         all_vcfs = [
             str(gcnv_vcfs[sgid]['intervals'])
-            for sgid in cohort.get_sequencing_group_ids()
+            for sgid in cohort.get_sequencing_group_ids(False)  # temporary for testing
         ]
 
         job_or_none = gcnv.merge_calls(

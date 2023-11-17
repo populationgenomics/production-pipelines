@@ -290,7 +290,6 @@ def postprocess_calls(
         }
     )
 
-
     postprocess_cmd = f"""
     gatk PostprocessGermlineCNVCalls \\
       --sequence-dictionary {reference.dict} {allosomal_contigs_args} \\
@@ -366,7 +365,6 @@ def merge_calls(
     # --threads: number of threads to use
     # -m: merge strategy
     # -0: compression level
-    j.command(f'')
     j.command(f'bcftools merge {" ".join(all_vcfs)} -Oz -o {j.output["vcf.bgz"]} --threads 4 -m all -0')
     j.command(f'tabix index {j.output["vcf.bgz"]}')
 
