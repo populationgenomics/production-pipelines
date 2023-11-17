@@ -142,7 +142,9 @@ class GermlineCNVCalls(SequencingGroupStage):
     def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
         return {
             'intervals': self.prefix / f'{seqgroup.id}.intervals.vcf.gz',
+            'intervals_index': self.prefix / f'{seqgroup.id}.intervals.vcf.gz.tbi',
             'segments': self.prefix / f'{seqgroup.id}.segments.vcf.gz',
+            'segments_index': self.prefix / f'{seqgroup.id}.segments.vcf.gz.tbi',
             'ratios': self.prefix / f'{seqgroup.id}.ratios.tsv',
         }
 
@@ -158,7 +160,7 @@ class GermlineCNVCalls(SequencingGroupStage):
             # FIXME get the sample index via sample_name.txt files instead
             seqgroup.dataset.get_sequencing_group_ids().index(seqgroup.id),
             self.get_job_attrs(seqgroup),
-            outputs,
+            output_prefix=str(self.prefix / seqgroup.id)
         )
         return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
 
