@@ -22,7 +22,7 @@ from cpg_workflows.filetypes import (
     BamPath,
     FastqPair,
 )
-from cpg_workflows.resources import STANDARD
+from cpg_workflows.resources import STANDARD, HIGHMEM
 from cpg_workflows.utils import can_reuse
 
 from . import picard
@@ -346,7 +346,12 @@ def _align_one(
     job_name = f'{job_name} {alignment_input}'
     j = b.new_job(job_name, job_attrs)
 
-    nthreads = STANDARD.set_resources(
+    if get_config()['resource_overrides'].get('align_use_highmem'):
+        align_machine_type = HIGHMEM
+    else:
+        align_machine_type = STANDARD
+
+    nthreads = align_machine_type.set_resources(
         j,
         nthreads=requested_nthreads,
         storage_gb=storage_for_align_job(alignment_input=alignment_input),
@@ -469,10 +474,13 @@ def _align_one(
             input_params = f'--interleaved=1 -b {r1_param}'
         else:
             input_params = f'-1 {r1_param} -2 {r2_param}'
+        # TODO: consider reverting to use of all threads if node capacity
+        # issue is resolved: https://hail.zulipchat.com/#narrow/stream/223457-Hail-Batch-support/topic/Job.20becomes.20unresponsive
         cmd = f"""\
         {prepare_fastq_cmd}
         dragen-os -r {dragmap_index} {input_params} \\
-            --RGID {sequencing_group_name} --RGSM {sequencing_group_name}
+            --RGID {sequencing_group_name} --RGSM {sequencing_group_name} \\
+            --num-threads {nthreads - 1}
         """
 
     else:

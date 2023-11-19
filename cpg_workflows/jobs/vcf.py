@@ -63,7 +63,7 @@ def subset_vcf(
 
 def gather_vcfs(
     b: hb.Batch,
-    input_vcfs: list[hb.ResourceGroup],
+    input_vcfs: list[Path | hb.ResourceGroup],
     out_vcf_path: Path | None = None,
     site_only: bool = False,
     sequencing_group_count: int | None = None,
@@ -75,7 +75,7 @@ def gather_vcfs(
 
     Requires all VCFs to be strictly distinct, so doesn't work well
     for indels SelectVariants based on intervals from IntervalListTools,
-    as ond indel might span 2 intervals and would end up in both.
+    as one indel might span 2 intervals and would end up in both.
 
     @param b: Batch object
     @param input_vcfs: list of Hail Batch ResourceFiles pointing to
@@ -91,6 +91,14 @@ def gather_vcfs(
     jobs: list[Job | None] = []
     gathered_vcf: hb.ResourceFile
 
+    # permit resource groups and paths, maintain ordering
+    vcfs_in_batch = []
+    for vcf in input_vcfs:
+        if isinstance(vcf, Path):
+            vcfs_in_batch.append(b.read_input_group(**{'vcf.gz': str(vcf), 'vcf.gz.tbi': str(vcf) + '.tbi'}))
+        else:
+            vcfs_in_batch.append(vcf)
+
     if not can_reuse(out_vcf_path):
         job_name = f'Merge {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
         j = b.new_job(job_name, (job_attrs or {}) | {'tool': 'bcftools concat'})
@@ -99,7 +107,7 @@ def gather_vcfs(
             j, storage_gb=storage_for_joint_vcf(sequencing_group_count, site_only)
         )
         cmd = f"""
-        bcftools concat --threads {res.get_nthreads() -1 } -a {" ".join(vcf["vcf.gz"] for vcf in input_vcfs)} \
+        bcftools concat --threads {res.get_nthreads() -1 } -a {" ".join(vcf["vcf.gz"] for vcf in vcfs_in_batch)} \
         -Oz -o {j.output_vcf}
         """
         j.command(command(cmd, monitor_space=True))

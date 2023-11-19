@@ -98,17 +98,18 @@ def annotate_cohort(
     clinvar_ht = hl.read_table(str(reference_path('seqr_clinvar')))
 
     logging.info('Annotating with seqr-loader fields: round 1')
-    # this allow-to-fail was specifically for AIP, and should be reconsidered
-    # # don't fail if the AC/AF attributes are an inappropriate type
-    # # don't fail if completely absent either
-    # for attr in ['AC', 'AF']:
-    #     if attr not in mt.info:
-    #         mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [1]}))
-    #     elif not isinstance(mt.info[attr], hl.ArrayExpression):
-    #         mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [mt.info[attr]]}))
-    #
-    # if 'AN' not in mt.info:
-    #     mt = mt.annotate_rows(info=mt.info.annotate(AN=1))
+
+    ## To do: remove/move this for combiner?
+    # don't fail if the AC/AF attributes are an inappropriate type
+    # don't fail if completely absent either
+    for attr in ['AC', 'AF']:
+        if attr not in mt.info:
+            mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [1]}))
+        elif not isinstance(mt.info[attr], hl.ArrayExpression):
+            mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [mt.info[attr]]}))
+
+    if 'AN' not in mt.info:
+        mt = mt.annotate_rows(info=mt.info.annotate(AN=1))
 
     mt = mt.annotate_rows(
         AC=mt.info.AC[mt.a_index - 1],
@@ -143,11 +144,13 @@ def annotate_cohort(
     rg37 = hl.get_reference('GRCh37')
     rg38 = hl.get_reference('GRCh38')
     rg38.add_liftover(str(liftover_path), rg37)
-    mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
+    mt = mt.annotate_rows(
+        rg37_locus=hl.liftover(mt.locus, 'GRCh37')
+    )
 
     # only remove if present
     if 'InbreedingCoeff' in mt.info:
-        mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
+        mt = mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
 
     mt = checkpoint_hail(mt, 'mt-vep-split-vqsr-round1.mt', checkpoint_prefix)
 

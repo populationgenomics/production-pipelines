@@ -518,6 +518,7 @@ class SequencingGroup(Target):
     ):
         super().__init__()
         self.id = id
+        self.name = id
         self._external_id = external_id
         self.dataset = dataset
         self._participant_id = participant_id

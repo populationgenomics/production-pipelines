@@ -114,6 +114,16 @@ def _sg_vcf_meta(
     return {'type': 'dataset-vcf'}
 
 
+def _snv_es_index_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, Any]:
+    """
+    Add meta.type to es-index analysis object
+    https://github.com/populationgenomics/metamist/issues/539
+    """
+    return {'seqr-dataset-type': 'VARIANTS'}
+
+
 @stage(
     required_stages=[AnnotateCohort],
     analysis_type='custom',
@@ -235,6 +245,7 @@ def es_password() -> str:
     required_stages=[AnnotateDataset],
     analysis_type='es-index',
     analysis_keys=['index_name'],
+    update_analysis_meta=_snv_es_index_meta,
 )
 class MtToEs(DatasetStage):
     """
