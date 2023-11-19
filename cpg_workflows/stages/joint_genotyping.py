@@ -7,6 +7,8 @@ from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.jobs import joint_genotyping, seqr_loader
+from cpg_utils.hail_batch import query_command
+
 from cpg_workflows.workflow import (
     Cohort,
     stage,
@@ -100,7 +102,7 @@ class JointGenotyping(CohortStage):
 
             jobs.append(combine_job)
 
-            # Convert VDS to MT and sites-only VCF
+            # Convert VDS to MT and sites-only VCF #this sitesonly does not work
             to_mt_job = seqr_loader.vds_to_mt_job(
                 b=get_batch(),
                 vds_path=self.expected_outputs(cohort)['vds'],
@@ -110,24 +112,43 @@ class JointGenotyping(CohortStage):
             )
             jobs.append(to_mt_job)
 
-            from cpg_workflows.large_cohort.site_only_vcf import run as site_only_run
 
-            sites_only_job = dataproc_job(
-                job_name=self.__class__.__name__,
-                function=site_only_run,
-                function_path_args=dict(
-                    vds_path=self.expected_outputs(cohort)['vds'],
-                    out_vcf_path=siteonly_vcf_path,
-                    tmp_prefix=self.tmp_prefix,
-                ),
-                depends_on=[combine_job],
-                # hl.export_vcf() uses non-preemptible workers' disk to merge VCF files.
-                # 10 samples take 2.3G, 400 samples take 60G, which roughly matches
-                # `huge_disk` (also used in the AS-VQSR VCF-gather job)
-                worker_boot_disk_size=200,
-                secondary_worker_boot_disk_size=200,
+            ## Convert to sites only
+            # from cpg_workflows.large_cohort.site_only_vcf import run as site_only_run
+            from cpg_workflows.large_cohort import site_only_vcf
+
+            ## Move this to a job if it works
+            j = get_batch().new_job('site_only')
+            j.image(get_config()['workflow']['driver_image'])
+            j.command(
+                query_command(
+                    site_only_vcf,
+                    site_only_vcf.run.__name__,
+                    self.expected_outputs(cohort)['vds'],
+                    siteonly_vcf_path,
+                    self.tmp_prefix,
+                    setup_gcp=True,
+                )
             )
-            jobs.append(sites_only_job)
+            j.depends_on(to_mt_job)
+            jobs.append(j)
+
+            # sites_only_job = dataproc_job(
+            #     job_name=self.__class__.__name__,
+            #     function=site_only_run,
+            #     function_path_args=dict(
+            #         vds_path=self.expected_outputs(cohort)['vds'],
+            #         out_vcf_path=siteonly_vcf_path,
+            #         tmp_prefix=self.tmp_prefix,
+            #     ),
+            #     depends_on=[combine_job],
+            #     # hl.export_vcf() uses non-preemptible workers' disk to merge VCF files.
+            #     # 10 samples take 2.3G, 400 samples take 60G, which roughly matches
+            #     # `huge_disk` (also used in the AS-VQSR VCF-gather job)
+            #     worker_boot_disk_size=200,
+            #     secondary_worker_boot_disk_size=200,
+            # )
+            # jobs.append(sites_only_job)
 
         else:
             # Run joint genotyping using GenotypeGVCFs or GnarlyGenotyper.
