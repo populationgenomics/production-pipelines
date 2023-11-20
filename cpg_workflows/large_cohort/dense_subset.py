@@ -2,7 +2,7 @@ import logging
 
 import hail as hl
 from pathlib import Path
-from cpg_utils.hail_batch import reference_path
+from cpg_utils.hail_batch import reference_path, dataset_path
 from cpg_workflows.utils import can_reuse
 
 
@@ -25,7 +25,7 @@ def run(
 
     logging.info('Filtering variants to predetermined QC variants...')
     qc_variants_ht = hl.read_table(
-        str(reference_path('gnomad/predetermined_qc_variants'))
+        dataset_path(str(reference_path('gnomad/predetermined_qc_variants')))
     )
     vds = hl.vds.filter_variants(vds, qc_variants_ht)
     logging.info('Densifying data...')
