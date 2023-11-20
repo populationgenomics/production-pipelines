@@ -50,7 +50,7 @@ Generates:
 This will have to be run using Full permissions as we will need to reference
 data in test and main buckets.
 """
-
+import logging
 from os.path import join
 from datetime import datetime
 from functools import lru_cache
@@ -307,6 +307,7 @@ class RunHailSVFiltering(DatasetStage):
 
         # this might work? May require some config entries
         if sv_mt is None:
+            logging.warning(f'No SV MT found for {dataset.name}, skipping stage')
             return self.make_outputs(dataset, data=expected_out, jobs=[], skipped=True)
 
         job = get_batch().new_job('run hail labelling')
