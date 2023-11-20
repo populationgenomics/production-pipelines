@@ -327,6 +327,9 @@ def merge_calls(
     based on the WDL here:
     portal.firecloud.org/?return=terra#methods/asmirnov-broad/Germline-CNV-joint-callng-featured-workspace/1/wdl
 
+    initial trial run of this using a cloudfuse failed to ever complete
+    copying in for a localised merge feels vastly better
+
     Args:
         b (batch):
         sg_vcfs (list[str]): paths to all individual VCFs
@@ -345,20 +348,19 @@ def merge_calls(
     )
     j.image(image_path('bcftools'))
 
+    # this should be made reactive, in case we scale past 10GB
+    j.storage('10Gi')
+
+    batch_vcfs = []
+    for each_vcf in sg_vcfs:
+        batch_vcfs.append(b.read_input_group(**{
+            'vcf.gz': each_vcf,
+            'vcf.gz.tbi': f'{each_vcf}.tbi',
+        })['vcf.gz'])
+
     j.declare_resource_group(
         output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
     )
-
-    # make a fuse connection to the data source
-    # to require only one fused connection we need files in one bucket
-    # pop a file off and use it to find the bucket
-    example_vcf = to_path(sg_vcfs[0])
-
-    # mount on equivalent path, minus 'gs://'
-    j.cloudfuse(example_vcf.drive, f'/{example_vcf.drive}', read_only=True)
-
-    # should be a simple transformation of VCF.removeprefix('gs://') on each path
-    all_vcfs = [f'/{v.removeprefix("gs://")}' for v in sg_vcfs]
 
     # option breakdown:
     # -Oz: bgzip output
@@ -366,7 +368,7 @@ def merge_calls(
     # --threads: number of threads to use
     # -m: merge strategy
     # -0: compression level
-    j.command(f'bcftools merge {" ".join(all_vcfs)} -Oz -o {j.output["vcf.bgz"]} --threads 4 -m all -0')
+    j.command(f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {j.output["vcf.bgz"]} --threads 4 -m all -0')
     j.command(f'tabix index {j.output["vcf.bgz"]}')
 
     # get the output root to write to
