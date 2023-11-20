@@ -371,11 +371,17 @@ class ValidateMOI(DatasetStage):
         hpo_panels = str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels'])
         hail_inputs = inputs.as_dict(dataset, RunHailFiltering)
 
-        # the SV vcf would be accepted, but is not always generated
+        input_path = get_config()['workflow'].get(
+            'matrix_table', query_for_latest_mt(dataset.name)
+        )
+
+        # the SV vcf is accepted, but is not always generated
         sv_vcf_arg = ''
-        if get_config()['workflow'].get(
+        if sv_path := get_config()['workflow'].get(
             'sv_matrix_table', query_for_sv_mt(dataset.name)
         ):
+            # bump input_path to contain both source files if appropriate
+            input_path = f'{input_path}, {sv_path}'
             hail_sv_inputs = inputs.as_dict(dataset, RunHailSVFiltering)
             labelled_sv_vcf = get_batch().read_input_group(
             **{
@@ -383,7 +389,6 @@ class ValidateMOI(DatasetStage):
                 'vcf.bgz.tbi': str(hail_sv_inputs['labelled_vcf']) + '.tbi',
             })['vcf.bgz']
             sv_vcf_arg = f'--labelled_sv {labelled_sv_vcf} '
-
 
         panel_input = str(inputs.as_dict(dataset, QueryPanelapp)['panel_data'])
         # peddy can't read cloud paths
@@ -395,18 +400,15 @@ class ValidateMOI(DatasetStage):
             }
         )['vcf.bgz']
         out_json_path = str(self.expected_outputs(dataset)['summary_json'])
-        input_mt = get_config()['workflow'].get(
-            'matrix_table', query_for_latest_mt(dataset.name)
-        )
         job.command(
             f'python3 reanalysis/validate_categories.py '
             f'--labelled_vcf "{labelled_vcf}" '
             f'--out_json "{out_json_path}" '
             f'--panelapp "{panel_input}" '
             f'--pedigree "{local_ped}" '
-            f'--input_path "{input_mt}" '
+            f'--input_path "{input_path}" '
             f'--participant_panels "{hpo_panels}" '
-            f'--dataset {dataset.name} {sv_vcf_arg}'
+            f'--dataset "{dataset.name}" "{sv_vcf_arg}"'
         )
         expected_out = self.expected_outputs(dataset)
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -426,7 +428,7 @@ def _aip_html_meta(
 
 
 @stage(
-    required_stages=[ValidateMOI, QueryPanelapp, RunHailFiltering],
+    required_stages=[ValidateMOI],
     analysis_type='aip-report',
     analysis_keys=['results_html', 'latest_html'],
     update_analysis_meta=_aip_html_meta,
