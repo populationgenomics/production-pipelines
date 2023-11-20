@@ -50,9 +50,10 @@ Generates:
 This will have to be run using Full permissions as we will need to reference
 data in test and main buckets.
 """
-
+import logging
 from datetime import datetime
 from os.path import join
+from functools import lru_cache
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
@@ -79,16 +80,106 @@ CHUNKY_DATE = datetime.now().strftime('%Y-%m-%d')
 DATED_FOLDER = join('reanalysis', CHUNKY_DATE)
 MTA_QUERY = gql(
     """
-    query MyQuery($dataset: String!) {
+    query MyQuery($dataset: String!, $type: String!) {
         project(name: $dataset) {
-            analyses(type: {eq: "custom"}, status: {eq: COMPLETED}) {
+            analyses(type: {eq: $type}, status: {eq: COMPLETED}) {
                 output
                 timestampCompleted
+                meta
             }
         }
     }
-""")
-# validate(MTA_QUERY)
+"""
+)
+
+
+@lru_cache(maxsize=None)
+def query_for_sv_mt(dataset: str, type: str = 'sv') -> str | None:
+    """
+    query for the latest SV MT for a dataset
+
+    Args:
+        dataset (str): project to query for
+        type (str): type of analysis entry to query for
+
+    Returns:
+        str, the path to the latest MT for the given type
+    """
+
+    # hot swapping to a string we can freely modify
+    query_dataset = dataset
+
+    if (
+        get_config()['workflow'].get('access_level') == 'test'
+        and 'test' not in query_dataset
+    ):
+        query_dataset += '-test'
+
+    result = gql_query_optional_logging(
+        MTA_QUERY, query_params={'dataset': query_dataset, 'type': type}
+    )
+    mt_by_date = {}
+    for analysis in result['project']['analyses']:
+        if (
+            analysis['output']
+            and analysis['output'].endswith('.mt')
+            and (
+                analysis['meta']['sequencing_type']
+                == get_config()['workflow'].get('sequencing_type')
+            )
+        ):
+            mt_by_date[analysis['timestampCompleted']] = analysis['output']
+
+    # perfectly acceptable to not have an input SV MT
+    if not mt_by_date:
+        return None
+
+    # return the latest, determined by a sort on timestamp
+    # 2023-10-10... > 2023-10-09..., so sort on strings
+    return mt_by_date[sorted(mt_by_date)[-1]]
+
+
+@lru_cache(maxsize=None)
+def query_for_latest_mt(dataset: str, type: str = 'custom') -> str:
+    """
+    query for the latest MT for a dataset
+    Args:
+        dataset (str): project to query for
+        type (str): type of analysis entry to query for
+    Returns:
+        str, the path to the latest MT for the given type
+    """
+
+    # hot swapping to a string we can freely modify
+    query_dataset = dataset
+
+    if (
+        get_config()['workflow'].get('access_level') == 'test'
+        and 'test' not in query_dataset
+    ):
+        query_dataset += '-test'
+    result = gql_query_optional_logging(
+        MTA_QUERY, query_params={'dataset': query_dataset, 'type': type}
+    )
+    mt_by_date = {}
+
+    for analysis in result['project']['analyses']:
+        if (
+            analysis['output']
+            and analysis['output'].endswith('.mt')
+            and (
+                analysis['meta']['sequencing_type']
+                == get_config()['workflow'].get('sequencing_type')
+            )
+        ):
+            mt_by_date[analysis['timestampCompleted']] = analysis['output']
+
+    if not mt_by_date:
+        raise ValueError(f'No MT found for dataset {query_dataset}')
+
+    # return the latest, determined by a sort on timestamp
+    # 2023-10-10... > 2023-10-09..., so sort on strings
+    return mt_by_date[sorted(mt_by_date)[-1]]
 
 
 @stage
@@ -116,7 +207,10 @@ class GeneratePanelData(DatasetStage):
         expected_out = self.expected_outputs(dataset)
 
         query_dataset = dataset.name
-        if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
+        if (
+            get_config()['workflow'].get('access_level') == 'test'
+            and 'test' not in query_dataset
+        ):
             query_dataset += '-test'
         hpo_file = get_batch().read_input(get_config()['workflow']['obo_file'])
 
@@ -163,35 +257,6 @@ class QueryPanelapp(DatasetStage):
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
 
-def query_for_latest_mt(dataset: str) -> str:
-    """
-    query for the latest MT for a dataset
-    Args:
-        dataset (str): project to query for
-    Returns:
-        str, the path to the latest MT
-    """
-    query_dataset = dataset
-    if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
-        query_dataset += '-test'
-    result = gql_query_optional_logging(MTA_QUERY, query_params={'dataset': query_dataset})
-    mt_by_date = {}
-    seq_type_exome = get_config()['workflow'].get('sequencing_type') == 'exome'
-    for analysis in result['project']['analyses']:
-        if analysis['output'] and analysis['output'].endswith('.mt') and (
-            (seq_type_exome and '/exome/' in analysis['output'])
-            or (not seq_type_exome and '/exome/' not in analysis['output'])
-        ):
-            mt_by_date[analysis['timestampCompleted']] = analysis['output']
-
-    if not mt_by_date:
-        raise ValueError(f'No MT found for dataset {query_dataset}')
-
-    # return the latest, determined by a sort on timestamp
-    # 2023-10-10... > 2023-10-09..., so sort on strings
-    return mt_by_date[sorted(mt_by_date)[-1]]
-
-
 @stage(required_stages=[QueryPanelapp])
 class RunHailFiltering(DatasetStage):
     """
@@ -212,9 +277,12 @@ class RunHailFiltering(DatasetStage):
         input_mt = get_config()['workflow'].get(
             'matrix_table', query_for_latest_mt(dataset.name)
         )
+        sv_mt = get_config()['workflow'].get(
+            'sv_matrix_table', query_for_sv_mt(dataset.name)
+        )
         job = get_batch().new_job('run hail labelling')
         job.image(image_path('aip'))
-        STANDARD.set_resources(job, ncpu=1, storage_gb=5)
+        STANDARD.set_resources(job, ncpu=1, storage_gb=4)
 
         # auth and copy env
         authenticate_cloud_credentials_in_job(job)
@@ -227,13 +295,70 @@ class RunHailFiltering(DatasetStage):
         pedigree = dataset.write_ped_file(out_path=expected_out['pedigree'])
         # peddy can't read cloud paths
         local_ped = get_batch().read_input(str(pedigree))
+
+        # optional additional SV MT if present for the callset
+        sv_argument = f'--sv_mt {sv_mt}' if sv_mt else ''
         job.command(
             f'python3 reanalysis/hail_filter_and_label.py '
             f'--mt "{input_mt}" '
             f'--panelapp "{panelapp_json}" '
             f'--pedigree "{local_ped}" '
             f'--vcf_out "{str(expected_out["labelled_vcf"])}" '
-            f'--dataset {dataset.name} '
+            f'--dataset {dataset.name} {sv_argument}'
+        )
+
+        return self.make_outputs(dataset, data=expected_out, jobs=job)
+
+
+@stage(required_stages=[QueryPanelapp])
+class RunHailSVFiltering(DatasetStage):
+    """
+    hail job to filter & label the SV MT
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+        return {
+            'labelled_vcf': dataset.prefix()
+            / DATED_FOLDER
+            / 'SV_hail_labelled.vcf.bgz',
+            'pedigree': dataset.prefix() / DATED_FOLDER / 'pedigree.ped',
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+
+        expected_out = self.expected_outputs(dataset)
+        sv_mt = get_config()['workflow'].get(
+            'sv_matrix_table', query_for_sv_mt(dataset.name)
+        )
+
+        # this might work? May require some config entries
+        if sv_mt is None:
+            logging.warning(f'No SV MT found for {dataset.name}, skipping stage')
+            return self.make_outputs(dataset, data=expected_out, jobs=[], skipped=True)
+
+        job = get_batch().new_job('run hail SV labelling')
+        job.image(image_path('aip'))
+        STANDARD.set_resources(job, ncpu=1, storage_gb=4)
+
+        # auth and copy env
+        authenticate_cloud_credentials_in_job(job)
+        copy_common_env(job)
+
+        panelapp_json = inputs.as_path(
+            target=dataset, stage=QueryPanelapp, key='panel_data'
+        )
+        pedigree = dataset.write_ped_file(out_path=expected_out['pedigree'])
+        # peddy can't read cloud paths
+        local_ped = get_batch().read_input(str(pedigree))
+
+        # optional additional SV MT if present for the callset
+        job.command(
+            f'python3 reanalysis/hail_filter_and_label.py '
+            f'--mt "{sv_mt}" '
+            f'--panelapp "{panelapp_json}" '
+            f'--pedigree "{local_ped}" '
+            f'--vcf_out "{str(expected_out["labelled_vcf"])}" '
+            f'--dataset {dataset.name}'
         )
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -249,7 +374,12 @@ def _aip_summary_meta(
 
 
 @stage(
-    required_stages=[GeneratePanelData, QueryPanelapp, RunHailFiltering],
+    required_stages=[
+        GeneratePanelData,
+        QueryPanelapp,
+        RunHailFiltering,
+        RunHailSVFiltering,
+    ],
     analysis_type='aip-results',
     analysis_keys=['summary_json'],
     update_analysis_meta=_aip_summary_meta,
@@ -272,6 +402,27 @@ class ValidateMOI(DatasetStage):
         copy_common_env(job)
         hpo_panels = str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels'])
         hail_inputs = inputs.as_dict(dataset, RunHailFiltering)
+
+        input_path = get_config()['workflow'].get(
+            'matrix_table', query_for_latest_mt(dataset.name)
+        )
+
+        # the SV vcf is accepted, but is not always generated
+        sv_vcf_arg = ''
+        if sv_path := get_config()['workflow'].get(
+            'sv_matrix_table', query_for_sv_mt(dataset.name)
+        ):
+            # bump input_path to contain both source files if appropriate
+            input_path = f'{input_path}, {sv_path}'
+            hail_sv_inputs = inputs.as_dict(dataset, RunHailSVFiltering)
+            labelled_sv_vcf = get_batch().read_input_group(
+                **{
+                    'vcf.bgz': str(hail_sv_inputs['labelled_vcf']),
+                    'vcf.bgz.tbi': f'{hail_sv_inputs["labelled_vcf"]}.tbi',
+                }
+            )['vcf.bgz']
+            sv_vcf_arg = f'--labelled_sv "{labelled_sv_vcf}" '
+
         panel_input = str(inputs.as_dict(dataset, QueryPanelapp)['panel_data'])
         # peddy can't read cloud paths
         local_ped = get_batch().read_input(str(hail_inputs['pedigree']))
@@ -282,18 +433,15 @@ class ValidateMOI(DatasetStage):
             }
         )['vcf.bgz']
         out_json_path = str(self.expected_outputs(dataset)['summary_json'])
-        input_mt = get_config()['workflow'].get(
-            'matrix_table', query_for_latest_mt(dataset.name)
-        )
         job.command(
             f'python3 reanalysis/validate_categories.py '
             f'--labelled_vcf "{labelled_vcf}" '
             f'--out_json "{out_json_path}" '
             f'--panelapp "{panel_input}" '
             f'--pedigree "{local_ped}" '
-            f'--input_path "{input_mt}" '
+            f'--input_path "{input_path}" '
             f'--participant_panels "{hpo_panels}" '
-            f'--dataset {dataset.name} '
+            f'--dataset "{dataset.name}" {sv_vcf_arg}'
         )
         expected_out = self.expected_outputs(dataset)
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -307,9 +455,7 @@ def _aip_html_meta(
     This isn't quite conformant with what AIP alone produces
     e.g. doesn't have the full URL to the results in GCP
     """
-    return {
-        'type': 'aip_output_html'
-    }
+    return {'type': 'aip_output_html'}
 
 
 @stage(
@@ -317,13 +463,17 @@ def _aip_html_meta(
     analysis_type='aip-report',
     analysis_keys=['results_html', 'latest_html'],
     update_analysis_meta=_aip_html_meta,
-    tolerate_missing_output=True
+    tolerate_missing_output=True,
 )
 class CreateAIPHTML(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {
-            'results_html': dataset.prefix(category='web') / DATED_FOLDER / 'summary_output.html',
-            'latest_html': dataset.prefix(category='web') / DATED_FOLDER / f'summary_latest_{CHUNKY_DATE}.html',
+            'results_html': dataset.prefix(category='web')
+            / DATED_FOLDER
+            / 'summary_output.html',
+            'latest_html': dataset.prefix(category='web')
+            / DATED_FOLDER
+            / f'summary_latest_{CHUNKY_DATE}.html',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
