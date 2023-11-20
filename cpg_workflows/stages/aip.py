@@ -310,7 +310,7 @@ class RunHailSVFiltering(DatasetStage):
             logging.warning(f'No SV MT found for {dataset.name}, skipping stage')
             return self.make_outputs(dataset, data=expected_out, jobs=[], skipped=True)
 
-        job = get_batch().new_job('run hail labelling')
+        job = get_batch().new_job('run hail SV labelling')
         job.image(image_path('aip'))
         STANDARD.set_resources(job, ncpu=1, storage_gb=4)
 
