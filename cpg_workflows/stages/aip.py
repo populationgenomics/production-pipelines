@@ -195,7 +195,7 @@ class GeneratePanelData(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
-        job = get_batch().new_job('Find HPO-matched Panels')
+        job = get_batch().new_job(f'Find HPO-matched Panels: {dataset.name}')
         job.cpu(0.25).memory('lowmem')
         job.image(image_path('aip'))
 
@@ -234,7 +234,7 @@ class QueryPanelapp(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
-        job = get_batch().new_job('Query PanelApp')
+        job = get_batch().new_job(f'Query PanelApp: {dataset.name}')
         job.cpu(0.25).memory('lowmem')
         job.image(image_path('aip'))
 
@@ -279,7 +279,7 @@ class RunHailFiltering(DatasetStage):
         sv_mt = get_config()['workflow'].get(
             'sv_matrix_table', query_for_sv_mt(dataset.name)
         )
-        job = get_batch().new_job('run hail labelling')
+        job = get_batch().new_job(f'Run hail labelling: {dataset.name}')
         job.image(image_path('aip'))
         STANDARD.set_resources(job, ncpu=1, storage_gb=4)
 
@@ -335,7 +335,7 @@ class RunHailSVFiltering(DatasetStage):
             logging.warning(f'No SV MT found for {dataset.name}, skipping stage')
             return self.make_outputs(dataset, data=expected_out, jobs=[], skipped=True)
 
-        job = get_batch().new_job('run hail SV labelling')
+        job = get_batch().new_job(f'Run hail SV labelling: {dataset.name}')
         job.image(image_path('aip'))
         STANDARD.set_resources(job, ncpu=1, storage_gb=4)
 
@@ -392,7 +392,7 @@ class ValidateMOI(DatasetStage):
         return {'summary_json': dataset.prefix() / DATED_FOLDER / 'summary_output.json'}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        job = get_batch().new_job(f'AIP summary for {dataset.name}')
+        job = get_batch().new_job(f'AIP summary: {dataset.name}')
         job.cpu(1.0).memory('standard')
 
         # auth and copy env
@@ -476,7 +476,7 @@ class CreateAIPHTML(DatasetStage):
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        job = get_batch().new_job(f'AIP HTML for {dataset.name}')
+        job = get_batch().new_job(f'AIP HTML: {dataset.name}')
         job.cpu(1.0).memory('lowmem')
         job.image(image_path('aip'))
 
