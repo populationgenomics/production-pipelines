@@ -389,7 +389,7 @@ class ValidateMOI(DatasetStage):
                 'vcf.bgz': str(hail_sv_inputs['labelled_vcf']),
                 'vcf.bgz.tbi': str(hail_sv_inputs['labelled_vcf']) + '.tbi',
             })['vcf.bgz']
-            sv_vcf_arg = f'--labelled_sv {labelled_sv_vcf} '
+            sv_vcf_arg = f'--labelled_sv "{labelled_sv_vcf}" '
 
         panel_input = str(inputs.as_dict(dataset, QueryPanelapp)['panel_data'])
         # peddy can't read cloud paths
@@ -409,7 +409,7 @@ class ValidateMOI(DatasetStage):
             f'--pedigree "{local_ped}" '
             f'--input_path "{input_path}" '
             f'--participant_panels "{hpo_panels}" '
-            f'--dataset "{dataset.name}" "{sv_vcf_arg}"'
+            f'--dataset "{dataset.name}" {sv_vcf_arg}'
         )
         expected_out = self.expected_outputs(dataset)
         return self.make_outputs(dataset, data=expected_out, jobs=job)
