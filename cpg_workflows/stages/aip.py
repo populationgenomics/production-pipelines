@@ -295,15 +295,13 @@ class RunHailFiltering(DatasetStage):
         # peddy can't read cloud paths
         local_ped = get_batch().read_input(str(pedigree))
 
-        # optional additional SV MT if present for the callset
-        sv_argument = f'--sv_mt {sv_mt}' if sv_mt else ''
         job.command(
             f'python3 reanalysis/hail_filter_and_label.py '
             f'--mt "{input_mt}" '
             f'--panelapp "{panelapp_json}" '
             f'--pedigree "{local_ped}" '
             f'--vcf_out "{str(expected_out["labelled_vcf"])}" '
-            f'--dataset {dataset.name} {sv_argument}'
+            f'--dataset {dataset.name} '
         )
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -350,14 +348,12 @@ class RunHailSVFiltering(DatasetStage):
         # peddy can't read cloud paths
         local_ped = get_batch().read_input(str(pedigree))
 
-        # optional additional SV MT if present for the callset
         job.command(
-            f'python3 reanalysis/hail_filter_and_label.py '
+            f'python3 reanalysis/hail_filter_sv.py '
             f'--mt "{sv_mt}" '
             f'--panelapp "{panelapp_json}" '
             f'--pedigree "{local_ped}" '
             f'--vcf_out "{str(expected_out["labelled_vcf"])}" '
-            f'--dataset {dataset.name}'
         )
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
