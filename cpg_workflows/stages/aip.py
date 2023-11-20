@@ -276,9 +276,6 @@ class RunHailFiltering(DatasetStage):
         input_mt = get_config()['workflow'].get(
             'matrix_table', query_for_latest_mt(dataset.name)
         )
-        sv_mt = get_config()['workflow'].get(
-            'sv_matrix_table', query_for_sv_mt(dataset.name)
-        )
         job = get_batch().new_job(f'Run hail labelling: {dataset.name}')
         job.image(image_path('aip'))
         STANDARD.set_resources(job, ncpu=1, storage_gb=4)
