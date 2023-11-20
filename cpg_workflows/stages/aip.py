@@ -88,7 +88,8 @@ MTA_QUERY = gql(
             }
         }
     }
-""")
+"""
+)
 
 
 @lru_cache(maxsize=None)
@@ -107,14 +108,24 @@ def query_for_sv_mt(dataset: str, type: str = 'sv') -> str | None:
     # hot swapping to a string we can freely modify
     query_dataset = dataset
 
-    if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
+    if (
+        get_config()['workflow'].get('access_level') == 'test'
+        and 'test' not in query_dataset
+    ):
         query_dataset += '-test'
 
-    result = gql_query_optional_logging(MTA_QUERY, query_params={'dataset': query_dataset, 'type': type})
+    result = gql_query_optional_logging(
+        MTA_QUERY, query_params={'dataset': query_dataset, 'type': type}
+    )
     mt_by_date = {}
     for analysis in result['project']['analyses']:
-        if analysis['output'] and analysis['output'].endswith('.mt') and (
-            analysis['meta']['sequencing_type'] == get_config()['workflow'].get('sequencing_type')
+        if (
+            analysis['output']
+            and analysis['output'].endswith('.mt')
+            and (
+                analysis['meta']['sequencing_type']
+                == get_config()['workflow'].get('sequencing_type')
+            )
         ):
             mt_by_date[analysis['timestampCompleted']] = analysis['output']
 
@@ -141,14 +152,24 @@ def query_for_latest_mt(dataset: str, type: str = 'custom') -> str:
     # hot swapping to a string we can freely modify
     query_dataset = dataset
 
-    if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
+    if (
+        get_config()['workflow'].get('access_level') == 'test'
+        and 'test' not in query_dataset
+    ):
         query_dataset += '-test'
-    result = gql_query_optional_logging(MTA_QUERY, query_params={'dataset': query_dataset, 'type': type})
+    result = gql_query_optional_logging(
+        MTA_QUERY, query_params={'dataset': query_dataset, 'type': type}
+    )
     mt_by_date = {}
 
     for analysis in result['project']['analyses']:
-        if analysis['output'] and analysis['output'].endswith('.mt') and (
-            analysis['meta']['sequencing_type'] == get_config()['workflow'].get('sequencing_type')
+        if (
+            analysis['output']
+            and analysis['output'].endswith('.mt')
+            and (
+                analysis['meta']['sequencing_type']
+                == get_config()['workflow'].get('sequencing_type')
+            )
         ):
             mt_by_date[analysis['timestampCompleted']] = analysis['output']
 
@@ -158,7 +179,6 @@ def query_for_latest_mt(dataset: str, type: str = 'custom') -> str:
     # return the latest, determined by a sort on timestamp
     # 2023-10-10... > 2023-10-09..., so sort on strings
     return mt_by_date[sorted(mt_by_date)[-1]]
-
 
 
 @stage
@@ -186,7 +206,10 @@ class GeneratePanelData(DatasetStage):
         expected_out = self.expected_outputs(dataset)
 
         query_dataset = dataset.name
-        if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
+        if (
+            get_config()['workflow'].get('access_level') == 'test'
+            and 'test' not in query_dataset
+        ):
             query_dataset += '-test'
         hpo_file = get_batch().read_input(get_config()['workflow']['obo_file'])
 
@@ -294,7 +317,9 @@ class RunHailSVFiltering(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {
-            'labelled_vcf': dataset.prefix() / DATED_FOLDER / 'SV_hail_labelled.vcf.bgz',
+            'labelled_vcf': dataset.prefix()
+            / DATED_FOLDER
+            / 'SV_hail_labelled.vcf.bgz',
             'pedigree': dataset.prefix() / DATED_FOLDER / 'pedigree.ped',
         }
 
@@ -348,7 +373,12 @@ def _aip_summary_meta(
 
 
 @stage(
-    required_stages=[GeneratePanelData, QueryPanelapp, RunHailFiltering, RunHailSVFiltering],
+    required_stages=[
+        GeneratePanelData,
+        QueryPanelapp,
+        RunHailFiltering,
+        RunHailSVFiltering,
+    ],
     analysis_type='aip-results',
     analysis_keys=['summary_json'],
     update_analysis_meta=_aip_summary_meta,
@@ -385,10 +415,11 @@ class ValidateMOI(DatasetStage):
             input_path = f'{input_path}, {sv_path}'
             hail_sv_inputs = inputs.as_dict(dataset, RunHailSVFiltering)
             labelled_sv_vcf = get_batch().read_input_group(
-            **{
-                'vcf.bgz': str(hail_sv_inputs['labelled_vcf']),
-                'vcf.bgz.tbi': str(hail_sv_inputs['labelled_vcf']) + '.tbi',
-            })['vcf.bgz']
+                **{
+                    'vcf.bgz': str(hail_sv_inputs['labelled_vcf']),
+                    'vcf.bgz.tbi': f'{hail_sv_inputs["labelled_vcf"]}.tbi',
+                }
+            )['vcf.bgz']
             sv_vcf_arg = f'--labelled_sv "{labelled_sv_vcf}" '
 
         panel_input = str(inputs.as_dict(dataset, QueryPanelapp)['panel_data'])
@@ -423,9 +454,7 @@ def _aip_html_meta(
     This isn't quite conformant with what AIP alone produces
     e.g. doesn't have the full URL to the results in GCP
     """
-    return {
-        'type': 'aip_output_html'
-    }
+    return {'type': 'aip_output_html'}
 
 
 @stage(
@@ -433,13 +462,17 @@ def _aip_html_meta(
     analysis_type='aip-report',
     analysis_keys=['results_html', 'latest_html'],
     update_analysis_meta=_aip_html_meta,
-    tolerate_missing_output=True
+    tolerate_missing_output=True,
 )
 class CreateAIPHTML(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {
-            'results_html': dataset.prefix(category='web') / DATED_FOLDER / 'summary_output.html',
-            'latest_html': dataset.prefix(category='web') / DATED_FOLDER / f'summary_latest_{CHUNKY_DATE}.html',
+            'results_html': dataset.prefix(category='web')
+            / DATED_FOLDER
+            / 'summary_output.html',
+            'latest_html': dataset.prefix(category='web')
+            / DATED_FOLDER
+            / f'summary_latest_{CHUNKY_DATE}.html',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
