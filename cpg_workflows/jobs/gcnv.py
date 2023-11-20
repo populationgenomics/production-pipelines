@@ -369,7 +369,7 @@ def merge_calls(
     # -m: merge strategy
     # -0: compression level
     j.command(f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {j.output["vcf.bgz"]} --threads 4 -m all -0')
-    j.command(f'tabix index {j.output["vcf.bgz"]}')
+    j.command(f'tabix {j.output["vcf.bgz"]}')
 
     # get the output root to write to
     output_no_suffix = str(output_path).removesuffix('.vcf.bgz')
