@@ -231,7 +231,7 @@ class EvidenceQC(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=EvidenceQC, analysis_type='sv', analysis_keys=['batch_json'])
+@stage(required_stages=EvidenceQC, analysis_type='sv', analysis_keys=['batch_json'], tolerate_missing_output=True)
 class CreateSampleBatches(CohortStage):
     """
     uses the values generated in EvidenceQC
@@ -250,7 +250,10 @@ class CreateSampleBatches(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {'batch_json': self.prefix / 'pcr_{pcr_status}_batches.json'}
+        return {
+            'batch_json_positive': self.prefix / 'pcr_positive_batches.json',
+            'batch_json_negative': self.prefix / 'pcr_negative_batches.json',
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         expected = self.expected_outputs(cohort)
@@ -289,7 +292,7 @@ class CreateSampleBatches(CohortStage):
                 sample_batching.partition_batches,
                 inputs.as_dict(cohort, EvidenceQC)['qc_table'],
                 sequencing_groups,
-                expected['batch_json'],
+                expected[f'batch_json_{status}'],
                 min_batch_size,
                 max_batch_size,
             )
