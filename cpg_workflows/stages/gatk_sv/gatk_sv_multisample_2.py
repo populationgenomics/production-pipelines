@@ -18,6 +18,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     add_gatk_sv_jobs,
     get_fasta,
     get_images,
+    get_partial_hash,
     get_references,
     make_combined_ped,
     _sv_filtered_meta,
@@ -82,32 +83,34 @@ class MakeCohortVcf(CohortStage):
         Replacing this nasty mess with nested/fancy cohorts would be ace
         """
 
+        cohort_hash = get_partial_hash()
+
         batch_names = get_config()['workflow']['batch_names']
         batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
         pesr_vcfs = [
-            batch_prefix / batch_name / 'GenotypeBatch' / 'pesr.vcf.gz'
+            batch_prefix / batch_name / 'GenotypeBatch' / f'{cohort_hash}_pesr.vcf.gz'
             for batch_name in batch_names
         ]
         depth_vcfs = [
-            batch_prefix / batch_name / 'GenotypeBatch' / 'depth.vcf.gz'
+            batch_prefix / batch_name / 'GenotypeBatch' / f'{cohort_hash}_depth.vcf.gz'
             for batch_name in batch_names
         ]
         sr_pass = [
             batch_prefix
             / batch_name
             / 'GenotypeBatch'
-            / 'genotype_SR_part2_bothside_pass.txt'
+            / f'{cohort_hash}_genotype_SR_part2_bothside_pass.txt'
             for batch_name in batch_names
         ]
         sr_fail = [
             batch_prefix
             / batch_name
             / 'GenotypeBatch'
-            / 'genotype_SR_part2_background_fail.txt'
+            / f'{cohort_hash}_genotype_SR_part2_background_fail.txt'
             for batch_name in batch_names
         ]
         depth_depth_cutoff = [
-            batch_prefix / batch_name / 'GenotypeBatch' / 'depth.depth_sepcutoff.txt'
+            batch_prefix / batch_name / 'GenotypeBatch' / f'{cohort_hash}_depth.depth_sepcutoff.txt'
             for batch_name in batch_names
         ]
         filter_batch_cutoffs = [
