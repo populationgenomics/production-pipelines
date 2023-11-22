@@ -2,7 +2,6 @@
 Common methods for all GATK-SV workflows
 """
 
-from functools import lru_cache
 from os.path import join
 from typing import Any
 
@@ -22,26 +21,6 @@ from cpg_workflows.workflow import Dataset, Cohort
 GATK_SV_COMMIT = '8759710f2a3cc396b966dae5bab5b36896fae060'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 _FASTA = None
-
-
-@lru_cache(maxsize=1)
-def get_partial_hash() -> str:
-    """
-    finds the config entry for the MergeBatchSites output
-    pulls out the cohort output_prefix from the file path
-    returns a partial chunk of it, including the num. samples
-
-    this won't be required in a custom-cohort world, as we would
-    be able to access this has as the cohort output_prefix
-    """
-
-    mbs_file = get_config()['workflow']['cohort_depth_vcf']
-
-    # extract a short chunk of the cohort hash
-    # e.g. 29677a_595 from the larger "hash_number"
-    cohort_prefix = mbs_file.split('/')[4]
-    assert len(cohort_prefix) > 10
-    return cohort_prefix[-10:]
 
 
 def _sv_batch_meta(
