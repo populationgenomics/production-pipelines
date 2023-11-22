@@ -7,17 +7,15 @@ import logging
 from typing import Literal
 
 import hailtop.batch as hb
-from hailtop.batch.job import Job
-from hailtop.batch import Batch
-
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import image_path, reference_path, query_command
-from cpg_workflows.resources import STANDARD
-from cpg_workflows.utils import can_reuse
+from cpg_utils.hail_batch import image_path, query_command, reference_path
+from hailtop.batch import Batch
+from hailtop.batch.job import Job
 
 from cpg_workflows.jobs.picard import get_intervals
 from cpg_workflows.jobs.vcf import gather_vcfs, subset_vcf
+from cpg_workflows.utils import can_reuse
 
 
 def add_vep_jobs(
@@ -168,17 +166,19 @@ def gather_vep_json_to_ht(
             ],
             num_workers=2,
             num_secondary_workers=20,
-            job_name=f'VEP JSON to Hail table',
+            job_name='VEP JSON to Hail table',
             depends_on=depends_on,
             scopes=['cloud-platform'],
             pyfiles=pyfiles,
-            init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
+            init=[
+                'gs://cpg-common-main/hail_dataproc/2023-11-22-mfranklin-dev/install_common.sh'
+            ],
         )
         j.attributes = (job_attrs or {}) | {'tool': 'hailctl dataproc'}
     else:
         from cpg_workflows.query_modules import vep
 
-        j = b.new_job(f'VEP', job_attrs)
+        j = b.new_job('VEP', job_attrs)
         j.image(image_path('cpg_workflows'))
         j.command(
             query_command(
@@ -247,11 +247,15 @@ def vep_one(
         'gerp_bigwig': f'{vep_dir}/gerp_conservation_scores.homo_sapiens.GRCh38.bw',
         'human_ancestor_fa': f'{vep_dir}/human_ancestor.fa.gz',
         'conservation_file': f'{vep_dir}/loftee.sql',
-        'loftee_path': '$MAMBA_ROOT_PREFIX/share/ensembl-vep' if vep_version == '105' else '$VEP_DIR_PLUGINS'
+        'loftee_path': '$MAMBA_ROOT_PREFIX/share/ensembl-vep'
+        if vep_version == '105'
+        else '$VEP_DIR_PLUGINS',
     }
 
     # sexy new plugin - only present in 110 build
-    alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
+    alpha_missense_plugin = (
+        f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
+    )
 
     # UTRannotator plugin doesn't support JSON output at this time; only activate for VCF outputs
     # VCF annotation doesn't utilise the aggregated Seqr reference data, including spliceAI

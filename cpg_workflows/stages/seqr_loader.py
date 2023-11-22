@@ -5,29 +5,30 @@ Hail Query stages for the Seqr loader workflow.
 """
 from typing import Any
 
-from cpg_utils import to_path, Path
+from cpg_utils import Path, to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
-from cpg_workflows.workflow import (
-    stage,
-    StageInput,
-    StageOutput,
-    CohortStage,
-    DatasetStage,
-    Cohort,
-    Dataset,
-    get_workflow,
-)
+
 from cpg_workflows.jobs.seqr_loader import (
     annotate_cohort_jobs,
     annotate_dataset_jobs,
     cohort_to_vcf_job,
 )
+from cpg_workflows.workflow import (
+    Cohort,
+    CohortStage,
+    Dataset,
+    DatasetStage,
+    StageInput,
+    StageOutput,
+    get_workflow,
+    stage,
+)
 
+from .. import get_batch
 from .joint_genotyping import JointGenotyping
 from .vep import Vep
 from .vqsr import Vqsr
-from .. import get_batch
 
 
 @stage(required_stages=[JointGenotyping, Vqsr, Vep])
@@ -326,7 +327,9 @@ class MtToEs(DatasetStage):
                 depends_on=inputs.get_jobs(dataset),
                 scopes=['cloud-platform'],
                 pyfiles=pyfiles,
-                init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
+                init=[
+                    'gs://cpg-common-main/hail_dataproc/2023-11-22-mfranklin-dev/install_common.sh'
+                ],
             )
         j._preemptible = False
         j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}
