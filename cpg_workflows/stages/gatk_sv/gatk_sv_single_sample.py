@@ -231,7 +231,7 @@ class EvidenceQC(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=EvidenceQC, analysis_type='sv', analysis_keys=['batch_json'], tolerate_missing_output=True)
+@stage(required_stages=EvidenceQC, analysis_type='sv', analysis_keys=['batch_json_negative', 'batch_json_positive'], tolerate_missing_output=True)
 class CreateSampleBatches(CohortStage):
     """
     uses the values generated in EvidenceQC
