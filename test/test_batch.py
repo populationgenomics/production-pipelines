@@ -12,7 +12,7 @@ from cpg_workflows.targets import Cohort
 from . import set_config
 
 
-def test_batch_job_round2(tmp_path):
+def test_batch_job(tmp_path):
     """
     Test creating a job and running a batch.
     """
@@ -41,8 +41,9 @@ def test_batch_job_round2(tmp_path):
     """
     set_config(config, tmp_path / 'config.toml')
 
-    from cpg_utils.hail_batch import command, dataset_path, get_batch
+    from cpg_utils.hail_batch import command, dataset_path, get_batch, reset_batch
 
+    reset_batch()
     b = get_batch('Test batch job')
     j1 = b.new_job('Job 1')
     text = 'success'
@@ -78,7 +79,7 @@ def mock_create_cohort() -> Cohort:
     return c
 
 
-def test_attributes_round1(mocker: MockFixture, tmp_path):
+def test_attributes(mocker: MockFixture, tmp_path):
     config = f"""
     [workflow]
     dataset_gcp_project = 'fewgenomes'
@@ -109,7 +110,7 @@ def test_attributes_round1(mocker: MockFixture, tmp_path):
     cpg_workflows = "stub"
     """
 
-    from cpg_utils.hail_batch import dataset_path, get_batch
+    from cpg_utils.hail_batch import dataset_path, get_batch, reset_batch
 
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.targets import SequencingGroup
@@ -178,6 +179,7 @@ def test_attributes_round1(mocker: MockFixture, tmp_path):
 
     set_config(config, tmp_path / 'config.toml')
 
+    reset_batch()
     workflow_stages: list[StageDecorator] = [MyQcStage1, MyQcStage2]
     run_workflow(stages=workflow_stages)
 
