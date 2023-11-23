@@ -2,7 +2,6 @@
 Common methods for all GATK-SV workflows
 """
 
-
 from os.path import join
 from typing import Any
 
