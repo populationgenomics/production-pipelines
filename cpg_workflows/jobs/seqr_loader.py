@@ -74,9 +74,6 @@ def annotate_cohort_jobs(
                 depends_on=depends_on,
                 scopes=['cloud-platform'],
                 pyfiles=pyfiles,
-                init=[
-                    'gs://cpg-common-main/hail_dataproc/2023-11-22-mfranklin-dev/install_common.sh'
-                ],
             )
         j.attributes = (job_attrs or {}) | {'tool': 'hailctl dataproc'}
     else:
@@ -168,9 +165,6 @@ def annotate_dataset_jobs(
                 depends_on=depends_on,
                 scopes=['cloud-platform'],
                 pyfiles=pyfiles,
-                init=[
-                    'gs://cpg-common-main/hail_dataproc/2023-11-22-mfranklin-dev/install_common.sh'
-                ],
             )
         j.attributes = (job_attrs or {}) | {'tool': 'hailctl dataproc'}
         jobs = [j]

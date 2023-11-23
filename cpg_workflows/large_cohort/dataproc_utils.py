@@ -122,7 +122,4 @@ def dataproc_job(
         worker_boot_disk_size=worker_boot_disk_size,
         secondary_worker_boot_disk_size=secondary_worker_boot_disk_size,
         pyfiles=pyfiles,
-        init=[
-            'gs://cpg-common-main/hail_dataproc/2023-11-22-mfranklin-dev/install_common.sh'
-        ],
     )
