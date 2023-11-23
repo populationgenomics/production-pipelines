@@ -23,7 +23,7 @@ import networkx as nx
 from cloudpathlib import CloudPath
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import get_batch
+from cpg_utils.hail_batch import get_batch, reset_batch
 from hailtop.batch.job import Job
 
 from .inputs import get_cohort
@@ -910,6 +910,7 @@ class Workflow:
         if not self.dry_run:
             if ds_set := set(d.name for d in get_cohort().get_datasets()):
                 description += ' ' + ', '.join(sorted(ds_set))
+            reset_batch()
             get_batch().name = description
 
         self.status_reporter = None

@@ -8,7 +8,7 @@ from .. import set_config
 from . import run_workflow
 
 
-def test_force_stages_round5(mocker: MockFixture, tmp_path):
+def test_force_stages(mocker: MockFixture, tmp_path):
     """
     A -> B -> C, all results exist
     force_stages = [B2]
@@ -46,10 +46,10 @@ def test_force_stages_round5(mocker: MockFixture, tmp_path):
     # dummy mocking to avoid file system scanning
     mocker.patch('cpg_workflows.utils.exists_not_cached', lambda *args: True)
     set_config(conf, tmp_path / 'config.toml')
-    run_workflow(mocker)
 
     from cpg_utils.hail_batch import get_batch
 
+    run_workflow(mocker)
     print('Job by stage:', get_batch().job_by_stage)
     assert 'A' not in get_batch().job_by_stage
     assert get_batch().job_by_stage['B']['job_n'] == 1

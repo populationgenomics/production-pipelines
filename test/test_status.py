@@ -76,10 +76,10 @@ def _common(mocker, tmp_path):
     mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
 
 
-def test_status_reporter_round3(mocker: MockFixture, tmp_path):
+def test_status_reporter(mocker: MockFixture, tmp_path):
     _common(mocker, tmp_path)
 
-    from cpg_utils.hail_batch import dataset_path, get_batch
+    from cpg_utils.hail_batch import dataset_path, get_batch, reset_batch
 
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.targets import SequencingGroup
@@ -142,6 +142,7 @@ def test_status_reporter_round3(mocker: MockFixture, tmp_path):
                 sequencing_group, self.expected_outputs(sequencing_group), [j]
             )
 
+    reset_batch()
     run_workflow(stages=[MyQcStage1, MyQcStage2])
 
     print(get_batch().job_by_tool['metamist'])

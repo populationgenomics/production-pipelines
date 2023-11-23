@@ -7,7 +7,7 @@ from .. import set_config
 from . import run_workflow
 
 
-def test_skip_stages_round8(mocker: MockFixture, tmp_path):
+def test_skip_stages(mocker: MockFixture, tmp_path):
     """
     A -> B -> C
     A2 -> B2 -> C2
@@ -42,10 +42,10 @@ def test_skip_stages_round8(mocker: MockFixture, tmp_path):
     dry_run = true
     """
     set_config(conf, tmp_path / 'config.toml')
-    run_workflow(mocker)
 
     from cpg_utils.hail_batch import get_batch
 
+    run_workflow(mocker)
     print('Job by stage:', get_batch().job_by_stage)
     assert get_batch().job_by_stage['A']['job_n'] == 1
     assert get_batch().job_by_stage['B']['job_n'] == 1
