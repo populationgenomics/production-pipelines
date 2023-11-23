@@ -14,7 +14,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'cloudpathlib>=0.16.0',
-        'cpg-utils>=4.18.0',
+        'cpg-utils>=4.18.2',
         'cyvcf2==0.30.18',
         'analysis-runner>=2.41.2',
         'hail!=0.2.120',  # Temporarily work around hail-is/hail#13337
