@@ -144,7 +144,7 @@ class GvcfMultiQC(DatasetStage):
 
         h = dataset.alignment_inputs_hash()
         return {
-            'html': dataset.web_prefix() / 'qc' / 'gvcf' / 'multiqc.html',
+            'html': dataset.web_prefix() / 'qc' / 'gvcf' / h / 'multiqc.html',
             'json': dataset.prefix() / 'qc' / 'gvcf' / h / 'multiqc_data.json',
             'checks': dataset.prefix() / 'qc' / 'gvcf' / h / '.checks',
         }

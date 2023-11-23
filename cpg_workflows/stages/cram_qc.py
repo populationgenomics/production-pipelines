@@ -277,7 +277,7 @@ class CramMultiQC(DatasetStage):
             return {}
         h = dataset.alignment_inputs_hash()
         return {
-            'html': dataset.web_prefix() / 'qc' / 'cram' / 'multiqc.html',
+            'html': dataset.web_prefix() / 'qc' / 'cram' / h / 'multiqc.html',
             'json': dataset.prefix() / 'qc' / 'cram' / h / 'multiqc_data.json',
             'checks': dataset.prefix() / 'qc' / 'cram' / h / '.checks',
         }
