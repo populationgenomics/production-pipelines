@@ -180,8 +180,7 @@ class SomalierPedigree(DatasetStage):
         """
         if get_config()['workflow'].get('skip_qc', False) is True:
             return {}
-        h = dataset.alignment_inputs_hash()
-        prefix = dataset.prefix() / 'somalier' / 'cram' / h
+        prefix = dataset.prefix() / 'somalier' / 'cram' / dataset.alignment_inputs_hash()
         return {
             'samples': prefix / f'{dataset.name}.samples.tsv',
             'expected_ped': prefix / f'{dataset.name}.expected.ped',
