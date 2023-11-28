@@ -130,7 +130,7 @@ class FastQCMultiQC(DatasetStage):
             return {}
         h = dataset.alignment_inputs_hash()
         return {
-            'html': dataset.web_prefix() / 'qc' / 'fastqc' / 'multiqc.html',
+            'html': dataset.web_prefix() / 'qc' / 'fastqc' / h / 'multiqc.html',
             'json': dataset.prefix() / 'qc' / 'fastqc' / h / 'multiqc_data.json',
         }
 
