@@ -63,14 +63,6 @@ KNOWN_REFS = {
     }
 
 
-def path_exists(path: Path):
-    try:
-        return path.exists()
-    except Exception:
-        # GSPath.exists() raises google.api_core.exceptions.NotFound if the bucket is missing
-        return False
-
-
 def parse_one_SQ(line: str):
     table = {}
     for field in line.strip().split('\t')[1:]:
@@ -168,9 +160,9 @@ if __name__ == '__main__':
         path = to_path(fname)
         reheadered_path = path.parent / 'reheadered' / path.name
 
-        if not path_exists(path):
+        if not path.exists():
             print(f'{fname}: file does not exist')
-        elif path_exists(reheadered_path):
+        elif reheadered_path.exists():
             print(f'{reheadered_path}: reheadered file already exists')
         else:
             reheader_list.append((path, reheadered_path, path.stat().st_size))
