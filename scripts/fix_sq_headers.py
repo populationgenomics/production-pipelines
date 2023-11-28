@@ -2,7 +2,7 @@
 """
 Usage: fix_sq_headers
 
-Uses the usual config entries (workflow.dataset/.access_level/.dry_run) and:
+Uses the usual config entries (workflow.dataset/.access_level/.dry_run/.sequencing_type) and:
 
   images.samtools      Path of an image containing samtools
   references.expected  Name (from KNOWN_REFS) of the (bad) refset expected
@@ -20,6 +20,8 @@ from hailtop.batch.resource import JobResourceFile
 
 from cpg_utils import Path, to_path
 from cpg_utils.hail_batch import get_batch, get_config, image_path
+from metamist import models
+from metamist.apis import AnalysisApi
 from metamist.graphql import query, gql
 
 FIND_CRAMS = gql("""
@@ -133,6 +135,27 @@ def do_reheader(dry_run, refset, newref, newrefset, incram, outcram, outcrai):
     if newrefset is not None and newref != newrefset:
         raise ValueError(f'{outcram}: unexpected reference headers written: {newref}')
 
+    return {
+        'cram_size': os.stat(outcram).st_size,
+    }
+
+
+def do_metamist_update(dataset, sequencing_type, seqgroup, oldpath, newpath, result):
+    analysis = models.Analysis(
+        type='cram',
+        status=models.AnalysisStatus('completed'),
+        output=str(newpath),
+        sequencing_group_ids=[seqgroup],
+        meta={
+            'sequencing_type': sequencing_type,
+            'size': result['cram_size'],
+            'source': f'Reheadered from {oldpath}',
+        },
+    )
+
+    aid = AnalysisApi().create_analysis(dataset, analysis)
+    print(f'Created Analysis(id={aid}, output={newpath}) in {dataset}')
+
 
 if __name__ == '__main__':
     config = get_config(True)
@@ -150,6 +173,7 @@ if __name__ == '__main__':
 
     print(f'Total CRAM file entries found: {len(cram_list)}')
 
+    sequencing_type = config['workflow']['sequencing_type']
     expected_refset = config['references']['expected']
     new_reference_path = config['references']['new']
     new_refset = config['references'].get('newset', None)
@@ -180,8 +204,9 @@ if __name__ == '__main__':
         j.image(image_path('samtools'))
         j.storage(filesize * 1.2)  # Allow some extra space for index file, references, etc
 
-        j.call(do_reheader, dry_run, expected_refset, new_reference, new_refset,
-               b.read_input(str(path)), j.out_cram, j.out_crai)
+        j_result = j.call(do_reheader,
+                          dry_run, expected_refset, new_reference, new_refset,
+                          b.read_input(str(path)), j.out_cram, j.out_crai)
 
         assert isinstance(j.out_cram, JobResourceFile)
         assert isinstance(j.out_crai, JobResourceFile)
@@ -193,5 +218,12 @@ if __name__ == '__main__':
             b.write_output(j.out_crai, str(newpath.with_suffix('.cram.crai')))
 
         print(f'Added reheader job for {path}')
+
+        if not dry_run:
+            db_j = b.new_python_job(f'Update metamist for {newpath}')
+            db_j.image(config['workflow']['driver_image'])
+
+            db_j.call(do_metamist_update,
+                      dataset, sequencing_type, path.stem, str(path), str(newpath), j_result)
 
     b.run(wait=False)
