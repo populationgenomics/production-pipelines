@@ -8,6 +8,7 @@ Uses the usual config entries (workflow.dataset/.access_level/.dry_run) and:
   references.expected  Name (from KNOWN_REFS) of the (bad) refset expected
   references.new       Dict file containing the replacement @SQ headers
   references.newset    Name (from KNOWN_REFS) of the replacement headers [optional]
+  workflow.source      Directory path containing *.cram [consults metamist instead by default]
 """
 
 import hashlib
@@ -37,6 +38,22 @@ query CramQuery($project: String!) {
   }
 }
 """)
+
+
+def query_metamist(dataset: str):
+    cram_list = []
+
+    for seqgroup in query(FIND_CRAMS, {'project': dataset})['project']['sequencingGroups']:
+        for analysis in seqgroup['analyses']:
+            fname = analysis['output']
+            if fname is not None and fname.endswith('.cram'):
+                cram_list.append(fname)
+            else:
+                sgid = seqgroup['id']
+                anid = analysis['id']
+                print(f'Sequencing group {sgid} analysis {anid} is not CRAM: {fname}')
+
+    return cram_list
 
 
 # Precomputed hashes (as per classify_SQ()) for common reference sets
@@ -132,21 +149,14 @@ if __name__ == '__main__':
     if config['workflow']['access_level'] == 'test' and not dataset.endswith('-test'):
         dataset = f'{dataset}-test'
 
-    print(f'Finding CRAMs for {dataset}')
+    if source_dir := config['workflow'].get('source', None):
+        print(f'Scanning {source_dir} for *.cram files')
+        cram_list = [fn for fn in to_path(source_dir).iterdir() if fn.suffix == '.cram']
+    else:
+        print(f'Finding CRAMs for {dataset} in database')
+        cram_list = query_metamist(dataset)
 
-    cram_list = []
-
-    for seqgroup in query(FIND_CRAMS, {'project': dataset})['project']['sequencingGroups']:
-        for analysis in seqgroup['analyses']:
-            fname = analysis['output']
-            if fname is not None and fname.endswith('.cram'):
-                cram_list.append(fname)
-            else:
-                sgid = seqgroup['id']
-                anid = analysis['id']
-                print(f'Sequencing group {sgid} analysis {anid} is not CRAM: {fname}')
-
-    print(f'Total CRAM file database entries found: {len(cram_list)}')
+    print(f'Total CRAM file entries found: {len(cram_list)}')
 
     expected_refset = config['references']['expected']
     new_reference_path = config['references']['new']
