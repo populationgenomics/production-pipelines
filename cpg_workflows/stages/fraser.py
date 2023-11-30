@@ -40,7 +40,7 @@ class Fraser(CohortStage):
         """
         dataset_prefix = cohort.get_sequencing_groups()[0].dataset.prefix()
         return {
-            cohort.name: dataset_prefix / 'fraser' / f'{cohort.name}.output.tar.gz'
+            cohort.name: dataset_prefix / 'fraser' / f'{cohort.name}.fds.tar.gz'
         }
     
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -73,7 +73,7 @@ class Fraser(CohortStage):
         j = fraser.fraser(
             b=get_batch(),
             input_bams_or_crams=bam_or_cram_inputs,
-            output_path=list(self.expected_outputs(cohort).values())[0],
+            output_fds_path=list(self.expected_outputs(cohort).values())[0],
             cohort_name=cohort.name,
             job_attrs=self.get_job_attrs(),
             overwrite=cohort.forced,

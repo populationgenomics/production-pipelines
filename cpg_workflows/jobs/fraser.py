@@ -29,7 +29,7 @@ class Fraser:
             self,
             fds_tar: hb.ResourceFile,
             cohort_name: str,
-            output_tar_gz_path: str | Path | None = None,
+            output: hb.ResourceGroup,
             nthreads: int = 8,
             pval_cutoff: float = 0.05,
             z_cutoff: float | None = None,
@@ -40,7 +40,7 @@ class Fraser:
         self.fds_tar = fds_tar
         assert isinstance(self.fds_tar, hb.ResourceFile), f'fds_tar must be a resource file, instead got {self.fds_tar}'
         self.cohort_name = cohort_name
-        self.output_tar_gz_path = str(output_tar_gz_path)
+        self.output = output
         self.nthreads = nthreads
         self.pval_cutoff = str(pval_cutoff)
         self.z_cutoff = str(z_cutoff) if z_cutoff else 'NA'
@@ -52,7 +52,7 @@ class Fraser:
         self.command = f"""\
         # Create output directories
         rm -rf plots results output
-        mkdir -p plots/heatmaps plots/by_gene plots/by_sample results
+        mkdir -p plots/heatmaps plots/volcano plots/misc results
 
         # Extract FDS data
         tar -xvf {self.fds_tar}
@@ -108,7 +108,7 @@ class Fraser:
         # Filter
         fds <- filterExpressionAndVariability(fds, minDeltaPsi = minDeltaPsi, filter = FALSE)
 
-        png(file = "plots/filter_expression.png", width = 4000, height = 4000, res = 600)
+        png(file = "plots/misc/filter_expression.png", width = 4000, height = 4000, res = 600)
         plotFilterExpression(fds, bins = 100)
         dev.off()
 
@@ -116,7 +116,7 @@ class Fraser:
 
         # Plot sample correlation
         for (psi_type in c("psi5", "psi3", "theta")) {
-            png(file = paste0("plots/count_correlation_heatmap.", psi_type, ".png"), width = 4000, height = 4000, res = 600)
+            png(file = paste0("plots/heatmaps/count_correlation_heatmap.", psi_type, ".png"), width = 4000, height = 4000, res = 600)
             print(plotCountCorHeatmap(fds_filtered, type = psi_type, logit = TRUE, normalized = FALSE))
             dev.off()
         }
@@ -124,7 +124,7 @@ class Fraser:
         # Calculate optimal encoding dimensions (q)
         for (psi_type in c("psi5", "psi3", "theta")) {
             fds_filtered <- optimHyperParams(fds_filtered, type = psi_type, plot = FALSE)
-            png(file = paste0("plots/optimal_q.", psi_type, ".png"), width = 4000, height = 4000, res = 600)
+            png(file = paste0("plots/misc/optimal_q.", psi_type, ".png"), width = 4000, height = 4000, res = 600)
             print(plotEncDimSearch(fds_filtered, type = psi_type))
             dev.off()
         }
@@ -140,7 +140,7 @@ class Fraser:
 
         # Plot sample correlation post-correction
         for (psi_type in c("psi5", "psi3", "theta")) {
-            png(file = paste0("plots/count_correlation_heatmap.corrected.", psi_type, ".png"), width = 4000, height = 4000, res = 600)
+            png(file = paste0("plots/heatmaps/count_correlation_heatmap.corrected.", psi_type, ".png"), width = 4000, height = 4000, res = 600)
             print(plotCountCorHeatmap(fds_filtered_fit, type = psi_type, logit = TRUE, normalized = TRUE))
             dev.off()
         }
@@ -163,13 +163,13 @@ class Fraser:
 
         # Plot results
         for (sample_id in fds\\$sampleID) {
-            png(file = paste0("plots/per_sample/", sample_id, ".psi5.png"), width = 4000, height = 4000, res = 600)
+            png(file = paste0("plots/volcano/", sample_id, ".psi5.png"), width = 4000, height = 4000, res = 600)
             plotVolcano(fds_filtered_fit, sample_id, type = "psi5")
             dev.off()
-            png(file = paste0("plots/per_sample/", sample_id, ".psi3.png"), width = 4000, height = 4000, res = 600)
+            png(file = paste0("plots/volcano/", sample_id, ".psi3.png"), width = 4000, height = 4000, res = 600)
             plotVolcano(fds_filtered_fit, sample_id, type = "psi3")
             dev.off()
-            png(file = paste0("plots/per_sample/", sample_id, ".theta.png"), width = 4000, height = 4000, res = 600)
+            png(file = paste0("plots/volcano/", sample_id, ".theta.png"), width = 4000, height = 4000, res = 600)
             plotVolcano(fds_filtered_fit, sample_id, type = "theta")
             dev.off()
         }
@@ -180,7 +180,12 @@ class Fraser:
         """
         # Tar up outputs
         self.command += f"""\
-        tar -czvf {self.output_tar_gz_path} plots results output savedObjects
+        tar -czvf {self.output['heatmaps.tar.gz']} -C plots/heatmaps .
+        tar -czvf {self.output['volcano_plots.tar.gz']} -C plots/volcano .
+        tar -czvf {self.output['misc_plots.tar.gz']} -C plots/misc .
+        cp results/results.significant.p_{self.pval_cutoff}.z_{self.z_cutoff}.dPsi_{self.delta_psi_cutoff}.min_count_{self.min_count}.csv {self.output['results.csv']}
+        cp results/results.all.csv {self.output['results.all.csv']}
+        tar -czvf {self.output['fds.tar.gz']} savedObjects/
         """
         self.command = dedent(self.command).strip()
 
@@ -195,7 +200,7 @@ def fraser(
     b: hb.Batch,
     input_bams_or_crams: list[tuple[BamPath, None] | tuple[CramPath, Path]],
     cohort_name: str,
-    output_path: str | Path | None = None,
+    output_fds_path: str | Path | None = None,
     job_attrs: dict[str, str] | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
@@ -204,7 +209,7 @@ def fraser(
     Run FRASER.
     """
     # Reuse existing output if possible
-    if output_path and can_reuse(output_path, overwrite):
+    if output_fds_path and can_reuse(output_fds_path, overwrite):
         return []
 
     jobs: list[Job] = []
@@ -251,7 +256,12 @@ def fraser(
 
     j.declare_resource_group(
         output={
-            'tar_gz': '{root}.tar.gz'
+            'results.csv': '{root}.results.csv',
+            'results.all.csv': '{root}.results.all.csv',
+            'heatmaps.tar.gz': '{root}.heatmaps.tar.gz',
+            'volcano_plots.tar.gz': '{root}.volcano_plots.tar.gz',
+            'misc_plots.tar.gz': '{root}.misc_plots.tar.gz',
+            'fds.tar.gz': '{root}.fds.tar.gz',
         }
     )
 
@@ -276,7 +286,7 @@ def fraser(
     fraser = Fraser(
         fds_tar=fds_tar,
         cohort_name=cohort_name,
-        output_tar_gz_path=j.output.tar_gz,
+        output=j.output,
         nthreads=res.get_nthreads(),
         pval_cutoff=pval_cutoff,
         z_cutoff=z_cutoff,
@@ -291,9 +301,9 @@ def fraser(
     jobs.append(j)
 
     # Write output to file
-    if output_path:
+    if output_fds_path:
         # NOTE: j.output is just a placeholder
-        b.write_output(j.output.tar_gz, str(output_path))
+        b.write_output(j.output, str(to_path(output_fds_path).with_suffix('').with_suffix('').with_suffix('')))  # Remove .fds.tar.gz suffix
     
     return jobs
 
