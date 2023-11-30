@@ -31,12 +31,22 @@ class Fraser:
             cohort_name: str,
             output_tar_gz_path: str | Path | None = None,
             nthreads: int = 8,
+            pval_cutoff: float = 0.05,
+            z_cutoff: float | None = None,
+            min_delta_psi: float = 0.0,
+            delta_psi_cutoff: float = 0.3,
+            min_count: int = 5,
         ) -> None:
         self.fds_tar = fds_tar
         assert isinstance(self.fds_tar, hb.ResourceFile), f'fds_tar must be a resource file, instead got {self.fds_tar}'
         self.cohort_name = cohort_name
         self.output_tar_gz_path = str(output_tar_gz_path)
         self.nthreads = nthreads
+        self.pval_cutoff = str(pval_cutoff)
+        self.z_cutoff = str(z_cutoff) if z_cutoff else 'NA'
+        self.min_delta_psi = str(min_delta_psi)
+        self.delta_psi_cutoff = str(delta_psi_cutoff)
+        self.min_count = str(min_count)
 
         # Build OUTRIDER command
         self.command = f"""\
@@ -56,11 +66,11 @@ class Fraser:
         """
         self.command += f"""\
         # Set significance values and other parameters
-        pval_cutoff <- 0.05
-        z_cutoff <- NA
-        minDeltaPsi <- 0.0
-        deltaPsi_cutoff <- 0.3
-        min_count <- 5
+        pval_cutoff <- {self.pval_cutoff}
+        z_cutoff <- {self.z_cutoff}
+        minDeltaPsi <- {self.min_delta_psi}
+        deltaPsi_cutoff <- {self.delta_psi_cutoff}
+        min_count <- {self.min_count}
         n_parallel_workers <- {str(self.nthreads - 1)}
 
         # Load FDS (pre-counted)
@@ -255,12 +265,24 @@ def fraser(
     )
     jobs.extend(count_jobs)
 
+    # Get Fraser parameters
+    pval_cutoff = get_config().get('fraser', {}).get('pval_cutoff', 0.05)
+    z_cutoff = get_config().get('fraser', {}).get('z_cutoff', None)
+    min_delta_psi = get_config().get('fraser', {}).get('min_delta_psi', 0.0)
+    delta_psi_cutoff = get_config().get('fraser', {}).get('delta_psi_cutoff', 0.3)
+    min_count = get_config().get('fraser', {}).get('min_count', 5)
+
     # Create counting command
     fraser = Fraser(
         fds_tar=fds_tar,
         cohort_name=cohort_name,
         output_tar_gz_path=j.output.tar_gz,
         nthreads=res.get_nthreads(),
+        pval_cutoff=pval_cutoff,
+        z_cutoff=z_cutoff,
+        min_delta_psi=min_delta_psi,
+        delta_psi_cutoff=delta_psi_cutoff,
+        min_count=min_count,
     )
 
     cmd = str(fraser)

@@ -52,6 +52,13 @@ def get_toml(tmp_path) -> str:
     pval_cutoff = 0.01
     z_cutoff = 1
 
+    [fraser]
+    pval_cutoff = 0.01
+    z_cutoff = 1
+    min_delta_psi = 0.1
+    delta_psi_cutoff = 0.4
+    min_count = 10
+
     [references]
     star_ref_dir = "stub"
     gtf = "stub"
