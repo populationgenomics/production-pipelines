@@ -266,10 +266,12 @@ def fraser(
     )
 
     # Perform counting in parallel jobs
+    output_counts_prefix = to_path(output_fds_path).parent / 'counts'
     count_jobs, fds_tar = fraser_count(
         b=b,
         input_bams_localised=input_bams_localised,
         cohort_name=cohort_name,
+        output_counts_prefix=output_counts_prefix,
         job_attrs=job_attrs,
         requested_nthreads=requested_nthreads,
     )
@@ -312,6 +314,7 @@ def fraser_count(
     b: hb.Batch,
     input_bams_localised: dict[str, hb.ResourceFile],
     cohort_name: str,
+    output_counts_prefix: Path,
     job_attrs: dict[str, str] | None = None,
     requested_nthreads: int | None = None,
 ) -> tuple[list[Job], hb.ResourceFile]:
@@ -330,16 +333,19 @@ def fraser_count(
 
     split_counts_dict = {}
     for sample_id in sample_ids:
+        output_counts_path = output_counts_prefix / 'output/cache/splitCounts' / f'splitCounts-{sample_id}.RDS'
         sample_j, split_counts = fraser_count_split_reads_one_sample(
             b=b,
             fds=fds,
             sample_id=sample_id,
             bam=input_bams_localised[sample_id],
             cohort_name=cohort_name,
+            output_counts_path=output_counts_path,
             job_attrs=job_attrs,
             requested_nthreads=requested_nthreads,
         )
-        jobs.append(sample_j)
+        if sample_j:
+            jobs.append(sample_j)
         split_counts_dict[sample_id] = split_counts
 
     j, split_counts_rg = fraser_merge_split_reads(
@@ -355,6 +361,7 @@ def fraser_count(
 
     non_spliced_counts_dict = {}
     for sample_id in sample_ids:
+        output_counts_path = output_counts_prefix / 'output/cache/nonSplicedCounts' / cohort_name / f'nonSplicedCounts-{sample_id}.h5'
         sample_j, non_spliced_counts = fraser_count_non_split_reads_one_sample(
             b=b,
             fds=fds,
@@ -362,10 +369,12 @@ def fraser_count(
             split_counts=split_counts_rg,
             sample_id=sample_id,
             bam=input_bams_localised[sample_id],
+            output_counts_path=output_counts_path,
             job_attrs=job_attrs,
             requested_nthreads=requested_nthreads,
         )
-        jobs.append(sample_j)
+        if sample_j:
+            jobs.append(sample_j)
         non_spliced_counts_dict[sample_id] = non_spliced_counts
 
     j, fds_tar = fraser_merge_non_split_reads(
@@ -460,12 +469,17 @@ def fraser_count_split_reads_one_sample(
     sample_id: str,
     bam: hb.ResourceFile,
     cohort_name: str,
+    output_counts_path: Path,
     job_attrs: dict[str, str] | None = None,
     requested_nthreads: int | None = None,
-) -> tuple[Job, hb.ResourceFile]:
+) -> tuple[Job | None, hb.ResourceFile]:
     """
     Run FRASER split-read counting for a single sample.
     """
+    # Reuse existing output if possible
+    if can_reuse(output_counts_path):
+        return None, b.read_input(output_counts_path)
+
     # Create FRASER job
     job_name = f'fraser_count_split'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
@@ -632,12 +646,17 @@ def fraser_count_non_split_reads_one_sample(
     split_counts: hb.ResourceGroup,
     sample_id: str,
     bam: hb.ResourceFile,
+    output_counts_path: Path,
     job_attrs: dict[str, str] | None = None,
     requested_nthreads: int | None = None,
-) -> tuple[Job, hb.ResourceFile]:
+) -> tuple[Job | None, hb.ResourceFile]:
     """
     Run FRASER non-split-read counting for a single sample.
     """
+    # Reuse existing output if possible
+    if can_reuse(output_counts_path):
+        return None, b.read_input(output_counts_path)
+
     # Create FRASER job
     job_name = f'fraser_count_non_split'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
