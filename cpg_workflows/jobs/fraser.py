@@ -529,6 +529,9 @@ def fraser_count_split_reads_one_sample(
 
     j.command(command(cmd, monitor_space=True))
 
+    # Write output to file
+    b.write_output(j.split_counts, str(output_counts_path))
+
     return j, j.split_counts
 
 
@@ -712,6 +715,9 @@ def fraser_count_non_split_reads_one_sample(
     )
 
     j.command(command(cmd, monitor_space=True))
+
+    # Write output to file
+    b.write_output(j.non_spliced_counts, str(output_counts_path))
 
     return j, j.non_spliced_counts
 
