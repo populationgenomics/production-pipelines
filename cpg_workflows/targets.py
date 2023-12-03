@@ -7,19 +7,13 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
+
 import pandas as pd
-
-from cpg_utils.hail_batch import dataset_path, web_url, reference_path
-from cpg_utils.config import get_config
 from cpg_utils import Path, to_path
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import dataset_path, reference_path, web_url
 
-from .filetypes import (
-    AlignmentInput,
-    CramPath,
-    BamPath,
-    GvcfPath,
-    FastqPairs,
-)
+from .filetypes import AlignmentInput, BamPath, CramPath, FastqPairs, GvcfPath
 from .metamist import Assay
 
 
@@ -611,6 +605,7 @@ class SequencingGroup(Target):
         """
         return self.pedigree.get_ped_dict(use_participant_id)
 
+    # TODO: Review here
     def make_cram_path(self) -> CramPath:
         """
         Path to a CRAM file. Not checking its existence here.
@@ -622,6 +617,7 @@ class SequencingGroup(Target):
             reference_assembly=reference_path('broad/ref_fasta'),
         )
 
+    # TODO: Review here
     def make_gvcf_path(self) -> GvcfPath:
         """
         Path to a GVCF file. Not checking its existence here.
