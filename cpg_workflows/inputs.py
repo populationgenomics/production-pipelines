@@ -140,21 +140,30 @@ def _populate_analysis(cohort: Cohort) -> None:
         # TODO: Review here
         for sequencing_group in dataset.get_sequencing_groups():
             if (analysis := gvcf_by_sgid.get(sequencing_group.id)) and analysis.output:
-                assert analysis.output == sequencing_group.make_gvcf_path().path, (
+                # assert file exists
+                assert analysis.output.exists(), (
+                    'gvcf file does not exist',
                     analysis.output,
-                    sequencing_group.make_gvcf_path().path,
                 )
-                sequencing_group.gvcf = sequencing_group.make_gvcf_path()
+                sequencing_group.gvcf = analysis.output
             elif sequencing_group.make_gvcf_path().exists():
-                sequencing_group.gvcf = sequencing_group.make_gvcf_path()
-            if (analysis := cram_by_sgid.get(sequencing_group.id)) and analysis.output:
-                assert analysis.output == sequencing_group.make_cram_path().path, (
-                    analysis.output,
-                    sequencing_group.make_cram_path().path,
+                logging.warning(
+                    f'We found a gvcf file in the expected location {sequencing_group.make_gvcf_path()},'
+                    'but it is not logged in metamist. Skipping. You may want to update the metadata and try again. '
                 )
-                sequencing_group.cram = sequencing_group.make_cram_path()
+            if (analysis := cram_by_sgid.get(sequencing_group.id)) and analysis.output:
+                # assert file exists
+                assert analysis.output.exists(), (
+                    'cram file does not exist',
+                    analysis.output,
+                )
+                sequencing_group.cram = analysis.output
+
             elif sequencing_group.make_cram_path().exists():
-                sequencing_group.cram = sequencing_group.make_cram_path()
+                logging.warning(
+                    f'We found a cram file in the expected location {sequencing_group.make_cram_path()},'
+                    'but it is not logged in metamist. Skipping. You may want to update the metadata and try again. '
+                )
 
 
 def _populate_pedigree(cohort: Cohort) -> None:
