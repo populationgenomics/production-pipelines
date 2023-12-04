@@ -605,7 +605,6 @@ class SequencingGroup(Target):
         """
         return self.pedigree.get_ped_dict(use_participant_id)
 
-    # TODO: Review here
     def make_cram_path(self) -> CramPath:
         """
         Path to a CRAM file. Not checking its existence here.
@@ -617,7 +616,6 @@ class SequencingGroup(Target):
             reference_assembly=reference_path('broad/ref_fasta'),
         )
 
-    # TODO: Review here
     def make_gvcf_path(self) -> GvcfPath:
         """
         Path to a GVCF file. Not checking its existence here.
