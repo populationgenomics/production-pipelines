@@ -32,7 +32,6 @@ class Genotype(SequencingGroupStage):
         """
         Generate a GVCF and corresponding TBI index.
         """
-        # TODO: Review this
         return {
             'gvcf': sequencing_group.make_gvcf_path().path,
             'tbi': sequencing_group.make_gvcf_path().tbi_path,
