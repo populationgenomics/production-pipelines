@@ -21,12 +21,11 @@ N_SEQUENCING_GROUPS = [100, 200, 300, 400, 500]
 
 
 def main():
-    # TODO: Review this
     df = pd.DataFrame(
         [
-            {'s': s.id, 'gvcf': s.make_gvcf_path()}
+            {'s': s.id, 'gvcf': s.gvcf}
             for s in get_cohort().get_sequencing_groups()
-            if s.make_gvcf_path().exists()
+            if s.gvcf.exists()
         ]
     )
     logging.info(
