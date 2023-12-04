@@ -29,7 +29,6 @@ class Align(SequencingGroupStage):
         """
         Stage is expected to generate a CRAM file and a corresponding index.
         """
-        # TODO: Review here too
         return {
             'cram': sequencing_group.make_cram_path().path,
             'crai': sequencing_group.make_cram_path().index_path,
@@ -56,7 +55,6 @@ class Align(SequencingGroupStage):
         )
 
         try:
-            # TODO: Review this.
             jobs = align.align(
                 b=get_batch(),
                 sequencing_group=sequencing_group,
