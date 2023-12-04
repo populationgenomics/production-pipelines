@@ -238,9 +238,9 @@ def run(
                 and inferred_rel != 'unknown'
                 or expected_rel == 'unrelated'
                 and inferred_rel != 'unrelated'
-                and row['relatedness'] > 0.1
             ):
-                mismatching_unrelated_to_related.append(line)
+                if row['relatedness'] > 0.1:
+                    mismatching_unrelated_to_related.append(line)
             else:
                 mismatching_related_to_unrelated.append(line)
 
