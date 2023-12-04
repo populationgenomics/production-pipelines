@@ -135,9 +135,6 @@ def _populate_analysis(cohort: Cohort) -> None:
             dataset=dataset.name,
         )
 
-        # NOTE: This logic will be simplified to remove existence checks overwriting metamist
-        # in a later PR.
-        # TODO: Review here
         for sequencing_group in dataset.get_sequencing_groups():
             if (analysis := gvcf_by_sgid.get(sequencing_group.id)) and analysis.output:
                 # assert file exists

@@ -124,7 +124,7 @@ class CramQC(SequencingGroupStage):
         for qc in qc_functions():
             for key, out in qc.outs.items():
                 if key == 'somalier':
-                    # TODO: Review here
+                    # Somalier outputs will be written to self.dataset.prefix() / 'cram' / f'{self.id}.cram.somalier' regardless of input cram path.
                     outs[key] = sequencing_group.make_cram_path().somalier_path
                 elif out:
                     outs[key] = (
