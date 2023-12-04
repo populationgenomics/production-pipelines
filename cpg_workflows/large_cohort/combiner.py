@@ -16,9 +16,6 @@ def _check_gvcfs(sequencing_groups: list[SequencingGroup]) -> list[SequencingGro
     Making sure each sequencing group has a GVCF
     """
     for sequencing_group in sequencing_groups:
-        # TODO: Review this
-        if not sequencing_group.gvcf and exists(sequencing_group.make_gvcf_path().path):
-            sequencing_group.gvcf = sequencing_group.make_gvcf_path()
         if not sequencing_group.gvcf:
             if get_config()['workflow'].get('skip_sgs_with_missing_input', False):
                 logging.warning(f'Skipping {sequencing_group} which is missing GVCF')
