@@ -213,7 +213,7 @@ def run(
             else:
                 inferred_rel = 'unknown'
 
-        if inferred_rel != expected_rel and row['relatedness'] > 0.1:
+        if inferred_rel != expected_rel:
             # Constructing a line for a report:
             line = ''
             if (fam1 := expected_ped_s1.family_id if expected_ped_s1 else None) == (
@@ -238,6 +238,7 @@ def run(
                 and inferred_rel != 'unknown'
                 or expected_rel == 'unrelated'
                 and inferred_rel != 'unrelated'
+                and row['relatedness'] > 0.1
             ):
                 mismatching_unrelated_to_related.append(line)
             else:
