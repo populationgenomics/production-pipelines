@@ -30,21 +30,22 @@ def annotate_cohort(
     logging.getLogger().setLevel(logging.INFO)
 
     # hail.zulipchat.com/#narrow/stream/223457-Hail-Batch-support/topic/permissions.20issues/near/398711114
-    # Should we set a partition count/block size? Monitor for num partitions
     mt = hl.import_vcf(
         vcf_path,
         reference_genome=genome_build(),
         skip_invalid_loci=True,
         force_bgz=True,
-        array_elements_required=False
+        array_elements_required=False,
+        block_size=128,
     )
-    logging.info(f'Importing VCF {vcf_path}')
+    logging.info(f'Imported VCF {vcf_path} as {mt.n_partitions()} partitions')
 
-    logging.info(f'Loading VEP Table from {vep_ht_path}')
     # Annotate VEP. Do it before splitting multi, because we run VEP on unsplit VCF,
     # and hl.split_multi_hts can handle multiallelic VEP field.
     vep_ht = hl.read_table(str(vep_ht_path))
-    logging.info(f'Adding VEP annotations into the Matrix Table from {vep_ht_path}')
+    logging.info(
+        f'Adding VEP annotations into the Matrix Table from {vep_ht_path}. VEP loaded as {vep_ht.n_partitions()} partitions'
+    )
     mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
 
     # Splitting multi-allelics. We do not handle AS info fields here - we handle
@@ -118,9 +119,7 @@ def annotate_cohort(
     rg37 = hl.get_reference('GRCh37')
     rg38 = hl.get_reference('GRCh38')
     rg38.add_liftover(str(liftover_path), rg37)
-    mt = mt.annotate_rows(
-        rg37_locus=hl.liftover(mt.locus, 'GRCh37')
-    )
+    mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
 
     # only remove InbreedingCoeff if present (post-VQSR)
     if 'InbreedingCoeff' in mt.info:
