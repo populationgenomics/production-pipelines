@@ -4,16 +4,18 @@ Stage that generates a GVCF file.
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
+
 from cpg_workflows.jobs import genotype
 from cpg_workflows.workflow import (
     SequencingGroup,
-    stage,
+    SequencingGroupStage,
     StageInput,
     StageOutput,
-    SequencingGroupStage,
+    stage,
 )
-from .align import Align
+
 from .. import get_batch
+from .align import Align
 
 
 @stage(
@@ -30,9 +32,13 @@ class Genotype(SequencingGroupStage):
         """
         Generate a GVCF and corresponding TBI index.
         """
+        if sequencing_group.gvcf:
+            tbi_path = sequencing_group.gvcf.tbi_path
+        else:
+            tbi_path = sequencing_group.make_gvcf_path().tbi_path
         return {
-            'gvcf': sequencing_group.make_gvcf_path().path,
-            'tbi': sequencing_group.make_gvcf_path().tbi_path,
+            'gvcf': sequencing_group.gvcf or sequencing_group.make_gvcf_path().path,
+            'tbi': tbi_path,
         }
 
     def queue_jobs(
