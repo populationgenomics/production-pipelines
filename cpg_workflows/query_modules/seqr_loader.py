@@ -30,6 +30,7 @@ def annotate_cohort(
     logging.getLogger().setLevel(logging.INFO)
 
     # hail.zulipchat.com/#narrow/stream/223457-Hail-Batch-support/topic/permissions.20issues/near/398711114
+    # Should we set a partition count/block size? Monitor for num partitions
     mt = hl.import_vcf(
         vcf_path,
         reference_genome=genome_build(),
@@ -40,7 +41,7 @@ def annotate_cohort(
     logging.info(f'Importing VCF {vcf_path}')
 
     logging.info(f'Loading VEP Table from {vep_ht_path}')
-    # Annotate VEP. Do ti before splitting multi, because we run VEP on unsplit VCF,
+    # Annotate VEP. Do it before splitting multi, because we run VEP on unsplit VCF,
     # and hl.split_multi_hts can handle multiallelic VEP field.
     vep_ht = hl.read_table(str(vep_ht_path))
     logging.info(f'Adding VEP annotations into the Matrix Table from {vep_ht_path}')
@@ -51,11 +52,9 @@ def annotate_cohort(
     mt = hl.split_multi_hts(
         mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
     )
-
-    mt = checkpoint_hail(mt, 'mt-vep.mt', checkpoint_prefix)
+    mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
 
     if site_only_vqsr_vcf_path:
-        # load the VCF and checkpoint down to a Table
         vqsr_ht = load_vqsr(site_only_vqsr_vcf_path)
         vqsr_ht = checkpoint_hail(vqsr_ht, 'vqsr.ht', checkpoint_prefix)
 
@@ -68,16 +67,15 @@ def annotate_cohort(
                 lambda val: val != 'PASS'
             ),
         )
-        mt = checkpoint_hail(mt, 'mt-with-vqsr.mt', checkpoint_prefix)
+        mt = checkpoint_hail(mt, 'mt-vep-split-vqsr.mt', checkpoint_prefix)
 
-    # only remove InbreedingCoeff if present (post-VQSR)
-    if 'InbreedingCoeff' in mt.info:
-        mt = mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
+    ref_ht = hl.read_table(str(reference_path('seqr_combined_reference_data')))
+    clinvar_ht = hl.read_table(str(reference_path('seqr_clinvar')))
 
     logging.info('Annotating with seqr-loader fields: round 1')
+
     # don't fail if the AC/AF attributes are an inappropriate type
     # don't fail if completely absent either
-    # this is probably limited to AIP re-runs, mey be outdated
     for attr in ['AC', 'AF']:
         if attr not in mt.info:
             mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [1]}))
@@ -87,14 +85,7 @@ def annotate_cohort(
     if 'AN' not in mt.info:
         mt = mt.annotate_rows(info=mt.info.annotate(AN=1))
 
-    # join the ref HT as a separate option
-    ref_ht = hl.read_table(str(reference_path('seqr_combined_reference_data')))
-    mt = mt.annotate_rows(ref_data=ref_ht[mt.row_key])
-    mt = checkpoint_hail(mt, 'mt-with-ref-data.mt', checkpoint_prefix)
-
-    # then load ClinVar with everything else
     logging.info('Annotating with clinvar and munging annotation fields')
-    clinvar_ht = hl.read_table(str(reference_path('seqr_clinvar')))
     mt = mt.annotate_rows(
         AC=mt.info.AC[mt.a_index - 1],
         AF=mt.info.AF[mt.a_index - 1],
@@ -118,8 +109,8 @@ def annotate_cohort(
         xstart=variant_id.get_expr_for_xpos(mt.locus),
         xstop=variant_id.get_expr_for_xpos(mt.locus) + hl.len(mt.alleles[0]) - 1,
         clinvar_data=clinvar_ht[mt.row_key],
+        ref_data=ref_ht[mt.row_key],
     )
-    mt = checkpoint_hail(mt, 'mt-with-clinvar.mt', checkpoint_prefix)
 
     # this was previously executed in the MtToEs job, as it wasn't possible on QoB
     logging.info('Adding GRCh37 coords')
@@ -131,14 +122,15 @@ def annotate_cohort(
         rg37_locus=hl.liftover(mt.locus, 'GRCh37')
     )
 
-    # only remove if present
+    # only remove InbreedingCoeff if present (post-VQSR)
     if 'InbreedingCoeff' in mt.info:
         mt = mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
 
-    mt = checkpoint_hail(mt, 'mt-post-rg37-locus.mt', checkpoint_prefix)
+    mt = checkpoint_hail(mt, 'mt-vep-split-vqsr-round1.mt', checkpoint_prefix)
 
     logging.info(
-        'Expanding sortedTranscriptConsequences, ref_data, clinvar_data'
+        'Annotating with seqr-loader fields: round 2 '
+        '(expanding sortedTranscriptConsequences, ref_data, clinvar_data)'
     )
     mt = mt.annotate_rows(
         domains=vep.get_expr_for_vep_protein_domains_set_from_sorted(
