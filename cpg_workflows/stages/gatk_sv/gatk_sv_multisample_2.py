@@ -659,7 +659,7 @@ class AnnotateDatasetSv(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
-        Whether Dataproc or not, this Stage subsets the whole MT to this cohort only
+        Subsets the whole MT to this cohort only
         Then brings a range of genotype data into row annotations
 
         Args:
