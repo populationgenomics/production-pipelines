@@ -125,8 +125,6 @@ def annotate_cohort(
     if 'InbreedingCoeff' in mt.info:
         mt = mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
 
-    mt = checkpoint_hail(mt, 'mt-vep-split-vqsr-round1.mt', checkpoint_prefix)
-
     logging.info(
         'Annotating with seqr-loader fields: round 2 '
         '(expanding sortedTranscriptConsequences, ref_data, clinvar_data)'
