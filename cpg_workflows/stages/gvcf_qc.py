@@ -143,11 +143,12 @@ class GvcfMultiQC(DatasetStage):
         if get_config()['workflow'].get('skip_qc', False) is True:
             return {}
 
-        h = dataset.alignment_inputs_hash()
+        # get the unique hash for these Sequencing Groups
+        sg_hash = dataset.alignment_inputs_hash()
         return {
-            'html': dataset.web_prefix() / 'qc' / 'gvcf' / 'multiqc.html',
-            'json': dataset.prefix() / 'qc' / 'gvcf' / h / 'multiqc_data.json',
-            'checks': dataset.prefix() / 'qc' / 'gvcf' / h / '.checks',
+            'html': dataset.web_prefix() / 'qc' / 'gvcf' / sg_hash / 'multiqc.html',
+            'json': dataset.prefix() / 'qc' / 'gvcf' / sg_hash / 'multiqc_data.json',
+            'checks': dataset.prefix() / 'qc' / 'gvcf' / sg_hash / '.checks',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:

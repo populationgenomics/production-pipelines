@@ -124,6 +124,7 @@ class CramQC(SequencingGroupStage):
         for qc in qc_functions():
             for key, out in qc.outs.items():
                 if key == 'somalier':
+                    # Somalier outputs will be written to self.dataset.prefix() / 'cram' / f'{self.id}.cram.somalier' regardless of input cram path.
                     outs[key] = sequencing_group.make_cram_path().somalier_path
                 elif out:
                     outs[key] = (
@@ -181,8 +182,9 @@ class SomalierPedigree(DatasetStage):
         """
         if get_config()['workflow'].get('skip_qc', False) is True:
             return {}
-        h = dataset.alignment_inputs_hash()
-        prefix = dataset.prefix() / 'somalier' / 'cram' / h
+        prefix = (
+            dataset.prefix() / 'somalier' / 'cram' / dataset.alignment_inputs_hash()
+        )
         return {
             'samples': prefix / f'{dataset.name}.samples.tsv',
             'expected_ped': prefix / f'{dataset.name}.expected.ped',
@@ -277,11 +279,13 @@ class CramMultiQC(DatasetStage):
         """
         if get_config()['workflow'].get('skip_qc', False) is True:
             return {}
-        h = dataset.alignment_inputs_hash()
+
+        # get the unique hash for these Sequencing Groups
+        sg_hash = dataset.alignment_inputs_hash()
         return {
-            'html': dataset.web_prefix() / 'qc' / 'cram' / 'multiqc.html',
-            'json': dataset.prefix() / 'qc' / 'cram' / h / 'multiqc_data.json',
-            'checks': dataset.prefix() / 'qc' / 'cram' / h / '.checks',
+            'html': dataset.web_prefix() / 'qc' / 'cram' / sg_hash / 'multiqc.html',
+            'json': dataset.prefix() / 'qc' / 'cram' / sg_hash / 'multiqc_data.json',
+            'checks': dataset.prefix() / 'qc' / 'cram' / sg_hash / '.checks',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:

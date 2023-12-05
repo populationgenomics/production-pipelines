@@ -7,8 +7,8 @@ MakeCohortVCF and AnnotateVCF
 from typing import Any
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
 from cpg_utils.hail_batch import get_batch
+from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
 
 from cpg_workflows.jobs import ploidy_table_from_ped
 from cpg_workflows.jobs.seqr_loader_sv import (
@@ -206,7 +206,7 @@ class MakeCohortVcf(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -255,7 +255,7 @@ class FormatVcfForGatk(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -323,7 +323,7 @@ class JoinRawCalls(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -373,7 +373,7 @@ class SVConcordance(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -490,7 +490,7 @@ class FilterGenotypes(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -576,7 +576,7 @@ class AnnotateVcf(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -785,7 +785,6 @@ class MtToEsSv(DatasetStage):
                 depends_on=inputs.get_jobs(dataset),
                 scopes=['cloud-platform'],
                 pyfiles=pyfiles,
-                init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
             )
         j._preemptible = False
         j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}

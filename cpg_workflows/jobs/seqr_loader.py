@@ -2,12 +2,11 @@
 Hail Query Batch-Backend jobs for seqr-loader.
 """
 
-from hailtop.batch.job import Job
-from hailtop.batch import Batch
-
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, query_command
+from hailtop.batch import Batch
+from hailtop.batch.job import Job
 
 
 def annotate_cohort_jobs(
@@ -75,13 +74,12 @@ def annotate_cohort_jobs(
                 depends_on=depends_on,
                 scopes=['cloud-platform'],
                 pyfiles=pyfiles,
-                init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
             )
         j.attributes = (job_attrs or {}) | {'tool': 'hailctl dataproc'}
     else:
         from cpg_workflows.query_modules import seqr_loader
 
-        j = b.new_job(f'annotate cohort', job_attrs)
+        j = b.new_job('annotate cohort', job_attrs)
         j.image(image_path('cpg_workflows'))
         j.command(
             query_command(
@@ -167,7 +165,6 @@ def annotate_dataset_jobs(
                 depends_on=depends_on,
                 scopes=['cloud-platform'],
                 pyfiles=pyfiles,
-                init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
             )
         j.attributes = (job_attrs or {}) | {'tool': 'hailctl dataproc'}
         jobs = [j]
@@ -176,7 +173,7 @@ def annotate_dataset_jobs(
         from cpg_workflows.query_modules import seqr_loader
 
         subset_j = b.new_job(
-            f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
+            'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
         )
         subset_j.image(image_path('cpg_workflows'))
         assert sequencing_group_ids
@@ -194,7 +191,7 @@ def annotate_dataset_jobs(
             subset_j.depends_on(*depends_on)
 
         annotate_j = b.new_job(
-            f'annotate dataset', (job_attrs or {}) | {'tool': 'hail query'}
+            'annotate dataset', (job_attrs or {}) | {'tool': 'hail query'}
         )
         annotate_j.image(image_path('cpg_workflows'))
         annotate_j.command(
@@ -235,9 +232,7 @@ def cohort_to_vcf_job(
     """
     from cpg_workflows.query_modules import seqr_loader
 
-    vcf_j = b.new_job(
-        f'VCF from dataset MT', (job_attrs or {}) | {'tool': 'hail query'}
-    )
+    vcf_j = b.new_job('VCF from dataset MT', (job_attrs or {}) | {'tool': 'hail query'})
     vcf_j.image(image_path('cpg_workflows'))
     vcf_j.command(
         query_command(
