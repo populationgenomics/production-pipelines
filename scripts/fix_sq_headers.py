@@ -1,20 +1,11 @@
 #!/usr/bin/env python3
-"""
-Usage: fix_sq_headers
-
-Uses the usual config entries (workflow.dataset/.access_level/.dry_run/.sequencing_type) and:
-
-  images.samtools      Path of an image containing samtools
-  references.expected  Name (from KNOWN_REFS) of the (bad) refset expected
-  references.new       Dict file containing the replacement @SQ headers
-  references.newset    Name (from KNOWN_REFS) of the replacement headers [optional]
-  workflow.source      Directory path containing *.cram [consults metamist instead by default]
-"""
 
 import hashlib
 import os
 import subprocess as sb
 import sys
+
+import click
 
 from hailtop.batch.resource import JobResourceFile
 
@@ -157,16 +148,34 @@ def do_metamist_update(dataset, sequencing_type, seqgroup, oldpath, newpath, res
     print(f'Created Analysis(id={aid}, output={newpath}) in {dataset}')
 
 
-if __name__ == '__main__':
+@click.command()
+@click.argument('source', nargs=-1)
+@click.option('--ref', 'new_reference_path', required=True, metavar='GCS_PATH', help='Dict file containing the new @SQ headers')
+@click.option('--expected', 'expected_refset', required=True, metavar='NAME', help='KNOWN_REFS name of the (bad) refset expected')
+@click.option('--intended', 'new_refset', metavar='NAME', help='KNOWN_REFS name of the replacement headers')
+@click.option('--dry-run', is_flag=True, help='Display information only without making changes')
+def main(
+    source: tuple[str],
+    new_reference_path: str,
+    expected_refset: str,
+    new_refset: str,
+    dry_run: bool,
+):
+    """
+    This script uses the usual config entries (workflow.dataset, .access_level, .sequencing_type
+    and images.samtools) and the following options to select CRAM files to have their @SQ
+    headers rewritten.
+    """
     config = get_config(True)
 
     dataset = config['workflow']['dataset']
     if config['workflow']['access_level'] == 'test' and not dataset.endswith('-test'):
         dataset = f'{dataset}-test'
 
-    if source_dir := config['workflow'].get('source', None):
-        print(f'Scanning {source_dir} for *.cram files')
-        cram_list = [fn for fn in to_path(source_dir).iterdir() if fn.suffix == '.cram']
+    if len(source) > 0:
+        print(f'Scanning {" ".join(source)} for *.cram files')
+        cram_list = [fn for srcdir in source
+                     for fn in to_path(srcdir).iterdir() if fn.suffix == '.cram']
     else:
         print(f'Finding CRAMs for {dataset} in database')
         cram_list = query_metamist(dataset)
@@ -174,10 +183,6 @@ if __name__ == '__main__':
     print(f'Total CRAM file entries found: {len(cram_list)}')
 
     sequencing_type = config['workflow']['sequencing_type']
-    expected_refset = config['references']['expected']
-    new_reference_path = config['references']['new']
-    new_refset = config['references'].get('newset', None)
-    dry_run = config['workflow'].get('dry_run', False)
 
     reheader_list = []
     for fname in cram_list:
@@ -227,3 +232,7 @@ if __name__ == '__main__':
                       dataset, sequencing_type, path.stem, str(path), str(newpath), j_result)
 
     b.run(wait=False)
+
+
+if __name__ == '__main__':
+    main()  # pylint: disable=no-value-for-parameter  # click will add the arguments
