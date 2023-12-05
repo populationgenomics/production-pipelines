@@ -30,7 +30,10 @@ class Align(SequencingGroupStage):
         Stage is expected to generate a CRAM file and a corresponding index.
         """
         if sequencing_group.cram:
-            crai_path = sequencing_group.cram.index_path
+            if sequencing_group.cram.index_path:
+                crai_path = sequencing_group.cram.index_path
+            else:
+                crai_path = None
         else:
             crai_path = sequencing_group.make_cram_path().index_path
 
