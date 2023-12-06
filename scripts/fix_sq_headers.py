@@ -18,7 +18,7 @@ import sys
 
 from hailtop.batch.resource import JobResourceFile
 
-from cpg_utils import Path, to_path
+from cpg_utils import to_path
 from cpg_utils.hail_batch import get_batch, get_config, image_path
 from metamist import models
 from metamist.apis import AnalysisApi
@@ -76,7 +76,7 @@ def parse_one_SQ(line: str):
 def classify_SQ(path: str):
     """Reads the file's headers and recognises well-known reference collections"""
     run = sb.run(['samtools', 'head', path], capture_output=True, text=True)
-    if (run.returncode != 0):
+    if run.returncode != 0:
         return None  # Probably file not found
 
     m5 = {}
@@ -124,7 +124,7 @@ def do_reheader(dry_run, refset, newref, newrefset, incram, outcram, outcrai):
         print(f'Would rewrite it to {outcram} with headers:')
         with open(newhdr_file) as fp:
             print(fp.read())
-        return
+        return {}
 
     sb.run(['samtools', 'reheader', '--no-PG', '--in-place', newhdr_file, incram], check=True)
     os.rename(incram, outcram)
