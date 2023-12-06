@@ -163,7 +163,6 @@ def add_gatk_sv_jobs(
         b=batch,
         job_prefix=job_prefix,
         dataset=get_config()['workflow']['dataset'],
-        access_level=get_config()['workflow']['access_level'],
         repo='gatk-sv',
         commit=GATK_SV_COMMIT,
         cwd='wdl',
