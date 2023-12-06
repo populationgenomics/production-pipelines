@@ -15,9 +15,9 @@ from cpg_workflows.utils import checkpoint_hail
 
 
 def annotate_cohort(
-    vcf_path,
-    out_mt_path,
-    vep_ht_path,
+    vcf_path: str,
+    out_mt_path: str,
+    vep_ht_path: str,
     site_only_vqsr_vcf_path=None,
     checkpoint_prefix=None,
 ):
@@ -26,19 +26,26 @@ def annotate_cohort(
     annotations.
     """
 
+    # tune the logger correctly
+    logging.getLogger().setLevel(logging.INFO)
+
+    # hail.zulipchat.com/#narrow/stream/223457-Hail-Batch-support/topic/permissions.20issues/near/398711114
     mt = hl.import_vcf(
-        str(vcf_path),
+        vcf_path,
         reference_genome=genome_build(),
         skip_invalid_loci=True,
         force_bgz=True,
+        array_elements_required=False,
+        block_size=10,
     )
-    logging.info(f'Importing VCF {vcf_path}')
+    logging.info(f'Imported VCF {vcf_path} as {mt.n_partitions()} partitions')
 
-    logging.info(f'Loading VEP Table from {vep_ht_path}')
-    # Annotate VEP. Do ti before splitting multi, because we run VEP on unsplit VCF,
+    # Annotate VEP. Do it before splitting multi, because we run VEP on unsplit VCF,
     # and hl.split_multi_hts can handle multiallelic VEP field.
     vep_ht = hl.read_table(str(vep_ht_path))
-    logging.info(f'Adding VEP annotations into the Matrix Table from {vep_ht_path}')
+    logging.info(
+        f'Adding VEP annotations into the Matrix Table from {vep_ht_path}. VEP loaded as {vep_ht.n_partitions()} partitions'
+    )
     mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
 
     # Splitting multi-allelics. We do not handle AS info fields here - we handle
@@ -79,6 +86,7 @@ def annotate_cohort(
     if 'AN' not in mt.info:
         mt = mt.annotate_rows(info=mt.info.annotate(AN=1))
 
+    logging.info('Annotating with clinvar and munging annotation fields')
     mt = mt.annotate_rows(
         AC=mt.info.AC[mt.a_index - 1],
         AF=mt.info.AF[mt.a_index - 1],
@@ -105,22 +113,17 @@ def annotate_cohort(
         ref_data=ref_ht[mt.row_key],
     )
 
-    # this was previously executed in the MtToEs job, as it was not
-    # previously possible on QoB
+    # this was previously executed in the MtToEs job, as it wasn't possible on QoB
     logging.info('Adding GRCh37 coords')
     liftover_path = reference_path('liftover_38_to_37')
     rg37 = hl.get_reference('GRCh37')
     rg38 = hl.get_reference('GRCh38')
     rg38.add_liftover(str(liftover_path), rg37)
-    mt = mt.annotate_rows(
-        rg37_locus=hl.liftover(mt.locus, 'GRCh37')
-    )
+    mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
 
-    # only remove if present
+    # only remove InbreedingCoeff if present (post-VQSR)
     if 'InbreedingCoeff' in mt.info:
         mt = mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
-
-    mt = checkpoint_hail(mt, 'mt-vep-split-vqsr-round1.mt', checkpoint_prefix)
 
     logging.info(
         'Annotating with seqr-loader fields: round 2 '
@@ -245,7 +248,7 @@ def vcf_from_mt_subset(mt_path: str, out_vcf_path: str):
     logging.info(f'Written {out_vcf_path}')
 
 
-def annotate_dataset_mt(mt_path, out_mt_path, checkpoint_prefix):
+def annotate_dataset_mt(mt_path, out_mt_path):
     """
     Add dataset-level annotations.
     """
@@ -273,8 +276,6 @@ def annotate_dataset_mt(mt_path, out_mt_path, checkpoint_prefix):
     mt = mt.annotate_rows(
         genotypes=hl.agg.collect(hl.struct(**genotype_fields)),
     )
-
-    mt = checkpoint_hail(mt, 'dataset-genotypes.mt', checkpoint_prefix)
 
     def _genotype_filter_samples(fn):
         # Filter on the genotypes.

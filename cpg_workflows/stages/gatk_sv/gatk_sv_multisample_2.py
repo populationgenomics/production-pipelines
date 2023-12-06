@@ -6,34 +6,35 @@ MakeCohortVCF and AnnotateVCF
 
 from typing import Any
 
-from cpg_utils import to_path, Path
-from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
+from cpg_utils import Path, to_path
+from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
+
 from cpg_workflows.batch import get_batch
+from cpg_workflows.jobs import ploidy_table_from_ped
 from cpg_workflows.jobs.seqr_loader_sv import (
     annotate_cohort_jobs_sv,
     annotate_dataset_jobs_sv,
 )
-from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
+    SV_CALLERS,
+    _sv_filtered_meta,
     add_gatk_sv_jobs,
     get_fasta,
     get_images,
     get_references,
     make_combined_ped,
-    _sv_filtered_meta,
-    SV_CALLERS,
 )
+from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.workflow import (
-    get_workflow,
-    stage,
     Cohort,
     CohortStage,
     Dataset,
     DatasetStage,
-    StageOutput,
     StageInput,
+    StageOutput,
+    get_workflow,
+    stage,
 )
-from cpg_workflows.jobs import ploidy_table_from_ped
 
 
 @stage
@@ -81,33 +82,34 @@ class MakeCohortVcf(CohortStage):
 
         Replacing this nasty mess with nested/fancy cohorts would be ace
         """
+        cohort_partial_hash = cohort.alignment_inputs_hash()[-10:]
 
         batch_names = get_config()['workflow']['batch_names']
         batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
         pesr_vcfs = [
-            batch_prefix / batch_name / 'GenotypeBatch' / 'pesr.vcf.gz'
+            batch_prefix / batch_name / 'GenotypeBatch' / f'{cohort_partial_hash}_pesr.vcf.gz'
             for batch_name in batch_names
         ]
         depth_vcfs = [
-            batch_prefix / batch_name / 'GenotypeBatch' / 'depth.vcf.gz'
+            batch_prefix / batch_name / 'GenotypeBatch' / f'{cohort_partial_hash}_depth.vcf.gz'
             for batch_name in batch_names
         ]
         sr_pass = [
             batch_prefix
             / batch_name
             / 'GenotypeBatch'
-            / 'genotype_SR_part2_bothside_pass.txt'
+            / f'{cohort_partial_hash}_genotype_SR_part2_bothside_pass.txt'
             for batch_name in batch_names
         ]
         sr_fail = [
             batch_prefix
             / batch_name
             / 'GenotypeBatch'
-            / 'genotype_SR_part2_background_fail.txt'
+            / f'{cohort_partial_hash}_genotype_SR_part2_background_fail.txt'
             for batch_name in batch_names
         ]
         depth_depth_cutoff = [
-            batch_prefix / batch_name / 'GenotypeBatch' / 'depth.depth_sepcutoff.txt'
+            batch_prefix / batch_name / 'GenotypeBatch' / f'{cohort_partial_hash}_depth.depth_sepcutoff.txt'
             for batch_name in batch_names
         ]
         filter_batch_cutoffs = [
@@ -204,7 +206,7 @@ class MakeCohortVcf(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -253,7 +255,7 @@ class FormatVcfForGatk(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -279,6 +281,7 @@ class JoinRawCalls(CohortStage):
         """ """
 
         input_dict: dict[str, Any] = {
+            'formatter_args': '--fix-end',
             'prefix': cohort.name,
             'ped_file': make_combined_ped(cohort, self.prefix),
             'reference_fasta': get_fasta(),
@@ -321,7 +324,7 @@ class JoinRawCalls(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -371,7 +374,7 @@ class SVConcordance(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -438,7 +441,6 @@ class FilterGenotypes(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-
         input_dict = {
             'output_prefix': cohort.name,
             'vcf': inputs.as_dict(cohort, SVConcordance)['concordance_vcf'],
@@ -489,7 +491,7 @@ class FilterGenotypes(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -575,7 +577,7 @@ class AnnotateVcf(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -657,7 +659,7 @@ class AnnotateDatasetSv(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
-        Whether Dataproc or not, this Stage subsets the whole MT to this cohort only
+        Subsets the whole MT to this cohort only
         Then brings a range of genotype data into row annotations
 
         Args:
@@ -681,7 +683,7 @@ class AnnotateDatasetSv(DatasetStage):
             out_mt_path=self.expected_outputs(dataset)['mt'],
             tmp_prefix=checkpoint_prefix,
             job_attrs=self.get_job_attrs(dataset),
-            depends_on=inputs.get_jobs(dataset)
+            depends_on=inputs.get_jobs(dataset),
         )
 
         return self.make_outputs(
@@ -784,7 +786,6 @@ class MtToEsSv(DatasetStage):
                 depends_on=inputs.get_jobs(dataset),
                 scopes=['cloud-platform'],
                 pyfiles=pyfiles,
-                init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
             )
         j._preemptible = False
         j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}
