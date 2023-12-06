@@ -47,7 +47,8 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, vep_version: str):
         # - frequencies, Dict[str, Dict[str, Float]], new struct in colocated_variants
         #   - this is being ignored, cannot be processed using fixed schema
         # - removal of all exac_* fields
-        json_schema = hl.dtype("""
+        json_schema = hl.dtype(
+            """
             struct{
                 minimised:int32,
                 assembly_name:str,
@@ -165,9 +166,11 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, vep_version: str):
                 }>,
                 variant_class:str
             }
-        """)
+        """
+        )
     elif vep_version == '105':
-        json_schema = hl.dtype("""
+        json_schema = hl.dtype(
+            """
             struct{
                 assembly_name:str,
                 allele_string:str,
@@ -317,7 +320,8 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, vep_version: str):
                     variant_allele:str
                 }>,
                 variant_class:str
-            }""")
+            }"""
+        )
 
     else:
         raise AssertionError(f'VEP version {vep_version} not supported')

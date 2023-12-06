@@ -281,6 +281,7 @@ class JoinRawCalls(CohortStage):
         """ """
 
         input_dict: dict[str, Any] = {
+            'formatter_args': '--fix-end',
             'prefix': cohort.name,
             'ped_file': make_combined_ped(cohort, self.prefix),
             'reference_fasta': get_fasta(),
@@ -658,7 +659,7 @@ class AnnotateDatasetSv(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
-        Whether Dataproc or not, this Stage subsets the whole MT to this cohort only
+        Subsets the whole MT to this cohort only
         Then brings a range of genotype data into row annotations
 
         Args:
