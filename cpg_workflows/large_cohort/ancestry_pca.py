@@ -7,7 +7,7 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from gnomad.sample_qc.ancestry import run_pca_with_relateds, assign_population_pcs
 
-from cpg_utils.hail_batch import reference_path, dataset_path
+from cpg_utils.hail_batch import reference_path
 from cpg_workflows.utils import can_reuse
 
 
@@ -22,9 +22,9 @@ def add_background(
     """
     Add background dataset samples to the dense MT and sample QC HT.
     """
-    qc_variants_ht = hl.read_table(
-        dataset_path(str(reference_path('gnomad/predetermined_qc_variants')))
-    )
+    access_level = get_config()['workflow'].get('access_level')
+    sites_table = f'gs://cpg-hgdp-1kg-{access_level}/' + str(reference_path('gnomad/predetermined_qc_variants'))
+    qc_variants_ht = hl.read_table(sites_table)
     dense_mt = (
         dense_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
     )

@@ -2,7 +2,8 @@ import logging
 
 import hail as hl
 from pathlib import Path
-from cpg_utils.hail_batch import reference_path, dataset_path
+from cpg_utils.hail_batch import reference_path
+from cpg_utils.config import get_config
 from cpg_workflows.utils import can_reuse
 
 
@@ -24,9 +25,9 @@ def run(
     vds = hl.vds.split_multi(vds, filter_changed_loci=True)
 
     logging.info('Filtering variants to predetermined QC variants...')
-    qc_variants_ht = hl.read_table(
-        dataset_path(str(reference_path('gnomad/predetermined_qc_variants')))
-    )
+    access_level = get_config()['workflow'].get('access_level')
+    sites_table = f'gs://cpg-hgdp-1kg-{access_level}/' + str(reference_path('gnomad/predetermined_qc_variants'))
+    qc_variants_ht = hl.read_table(sites_table)
     vds = hl.vds.filter_variants(vds, qc_variants_ht)
     logging.info('Densifying data...')
     mt = hl.vds.to_dense_mt(vds)
