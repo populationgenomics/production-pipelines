@@ -151,19 +151,19 @@ class JointVcfMultiQC(CohortStage):
         """
         if get_config()['workflow'].get('skip_qc', False) is True:
             return {}
-
+        h = get_workflow().output_version
         return {
-            'html': cohort.analysis_dataset.web_prefix() / 'qc' / 'jc' / 'multiqc.html',
+            'html': cohort.analysis_dataset.web_prefix()
+            / 'qc'
+            / 'jc'
+            / h
+            / 'multiqc.html',
             'json': cohort.analysis_dataset.prefix()
             / 'qc'
             / 'jc'
-            / get_workflow().output_version
+            / h
             / 'multiqc_data.json',
-            'checks': cohort.analysis_dataset.prefix()
-            / 'qc'
-            / 'jc'
-            / get_workflow().output_version
-            / '.checks',
+            'checks': cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / '.checks',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:

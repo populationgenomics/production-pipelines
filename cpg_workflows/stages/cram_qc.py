@@ -1,33 +1,34 @@
 """
 Stages that generates and summarises CRAM QC.
 """
-import logging
 import dataclasses
-from typing import Callable, Optional, Any
+import logging
+from typing import Any, Callable, Optional
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
+
 from cpg_workflows import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import somalier
 from cpg_workflows.jobs.multiqc import multiqc
 from cpg_workflows.jobs.picard import (
-    picard_wgs_metrics,
     picard_collect_metrics,
     picard_hs_metrics,
+    picard_wgs_metrics,
 )
 from cpg_workflows.jobs.samtools import samtools_stats
 from cpg_workflows.jobs.verifybamid import verifybamid
 from cpg_workflows.stages.align import Align
-from cpg_workflows.targets import SequencingGroup, Dataset
+from cpg_workflows.targets import Dataset, SequencingGroup
 from cpg_workflows.utils import exists
 from cpg_workflows.workflow import (
-    stage,
-    StageInput,
-    StageOutput,
-    SequencingGroupStage,
     DatasetStage,
+    SequencingGroupStage,
+    StageInput,
     StageInputNotFoundError,
+    StageOutput,
+    stage,
 )
 
 
@@ -123,6 +124,7 @@ class CramQC(SequencingGroupStage):
         for qc in qc_functions():
             for key, out in qc.outs.items():
                 if key == 'somalier':
+                    # Somalier outputs will be written to self.dataset.prefix() / 'cram' / f'{self.id}.cram.somalier' regardless of input cram path.
                     outs[key] = sequencing_group.make_cram_path().somalier_path
                 elif out:
                     outs[key] = (
@@ -180,8 +182,9 @@ class SomalierPedigree(DatasetStage):
         """
         if get_config()['workflow'].get('skip_qc', False) is True:
             return {}
-        h = dataset.alignment_inputs_hash()
-        prefix = dataset.prefix() / 'somalier' / 'cram' / h
+        prefix = (
+            dataset.prefix() / 'somalier' / 'cram' / dataset.alignment_inputs_hash()
+        )
         return {
             'samples': prefix / f'{dataset.name}.samples.tsv',
             'expected_ped': prefix / f'{dataset.name}.expected.ped',
@@ -247,8 +250,9 @@ class SomalierPedigree(DatasetStage):
 
 
 def _update_meta(output_path: str) -> dict[str, Any]:
-    from cloudpathlib import CloudPath
     import json
+
+    from cloudpathlib import CloudPath
 
     with CloudPath(output_path).open() as f:
         d = json.load(f)
@@ -275,11 +279,13 @@ class CramMultiQC(DatasetStage):
         """
         if get_config()['workflow'].get('skip_qc', False) is True:
             return {}
-        h = dataset.alignment_inputs_hash()
+
+        # get the unique hash for these Sequencing Groups
+        sg_hash = dataset.alignment_inputs_hash()
         return {
-            'html': dataset.web_prefix() / 'qc' / 'cram' / 'multiqc.html',
-            'json': dataset.prefix() / 'qc' / 'cram' / h / 'multiqc_data.json',
-            'checks': dataset.prefix() / 'qc' / 'cram' / h / '.checks',
+            'html': dataset.web_prefix() / 'qc' / 'cram' / sg_hash / 'multiqc.html',
+            'json': dataset.prefix() / 'qc' / 'cram' / sg_hash / 'multiqc_data.json',
+            'checks': dataset.prefix() / 'qc' / 'cram' / sg_hash / '.checks',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:

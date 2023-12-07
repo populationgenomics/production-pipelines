@@ -1,5 +1,6 @@
 [workflow]
 name = 'large_cohort'
+scatter_count = 50
 scatter_count_genotype = 50
 status_reporter = 'metamist'
 # define reference fasta. If not specified here, the reference file is pulled from [references.broad][ref_fasta]
@@ -75,4 +76,5 @@ delete_scratch_on_exit = false
 
 [references.gnomad]
 tel_and_cent_ht = "gs://cpg-common-main/references/gnomad/v0/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht"
-predetermined_qc_variants = "gs://cpg-hgdp-1kg-main/sites_table/v1-0/pruned_variants.ht/"
+predetermined_qc_variants_prefix = 'gs://cpg-hgdp-1kg-' 
+predetermined_qc_variants_path = '/sites_table/v1-0/pruned_variants.ht'

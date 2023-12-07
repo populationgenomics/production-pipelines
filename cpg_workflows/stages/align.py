@@ -2,19 +2,20 @@
 Stage that generates a CRAM file.
 """
 import logging
-from cloudpathlib import CloudPath
 
+from cloudpathlib import CloudPath
 from cpg_utils import Path
 from cpg_utils.config import get_config
+
 from cpg_workflows import get_batch
 from cpg_workflows.jobs import align
 from cpg_workflows.jobs.align import MissingAlignmentInputException
 from cpg_workflows.workflow import (
     SequencingGroup,
-    stage,
+    SequencingGroupStage,
     StageInput,
     StageOutput,
-    SequencingGroupStage,
+    stage,
 )
 
 

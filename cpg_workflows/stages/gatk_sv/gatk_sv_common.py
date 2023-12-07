@@ -2,7 +2,6 @@
 Common methods for all GATK-SV workflows
 """
 
-
 from os.path import join
 from typing import Any
 
@@ -19,7 +18,7 @@ from cpg_workflows.batch import make_job_name, Batch
 from cpg_workflows.workflow import Dataset, Cohort
 
 
-GATK_SV_COMMIT = '8759710f2a3cc396b966dae5bab5b36896fae060'
+GATK_SV_COMMIT = '6d6100082297898222dfb69fcf941d373d78eede'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 _FASTA = None
 
@@ -164,7 +163,6 @@ def add_gatk_sv_jobs(
         b=batch,
         job_prefix=job_prefix,
         dataset=get_config()['workflow']['dataset'],
-        access_level=get_config()['workflow']['access_level'],
         repo='gatk-sv',
         commit=GATK_SV_COMMIT,
         cwd='wdl',

@@ -7,19 +7,13 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
+
 import pandas as pd
-
-from cpg_utils.hail_batch import dataset_path, web_url, reference_path
-from cpg_utils.config import get_config
 from cpg_utils import Path, to_path
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import dataset_path, reference_path, web_url
 
-from .filetypes import (
-    AlignmentInput,
-    CramPath,
-    BamPath,
-    GvcfPath,
-    FastqPairs,
-)
+from .filetypes import AlignmentInput, BamPath, CramPath, FastqPairs, GvcfPath
 from .metamist import Assay
 
 

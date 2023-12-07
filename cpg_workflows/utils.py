@@ -59,6 +59,9 @@ def checkpoint_hail(
     # drop the schema here
     t.describe()
 
+    # log the current number of partitions
+    logging.info(f'Checkpointing object as {t.n_partitions()} partitions')
+
     if checkpoint_prefix is None:
         return t
 
