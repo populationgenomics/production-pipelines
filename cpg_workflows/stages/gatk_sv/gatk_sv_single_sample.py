@@ -103,6 +103,7 @@ class GatherSampleEvidence(SequencingGroupStage):
             'reference_index': str(get_fasta()) + '.fai',
             'reference_dict': str(get_fasta().with_suffix('.dict')),
             'reference_version': '38',
+            # 'scramble_part2_threads': 4,  # default = 7
         }
 
         input_dict |= get_images(

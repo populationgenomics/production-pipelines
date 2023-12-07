@@ -241,7 +241,7 @@ def annotate_cohort_sv(
         end_locus=hl.if_else(
             hl.is_defined(mt.info.END2),
             hl.struct(contig=mt.info.CHR2, position=mt.info.END2),
-            hl.struct(contig=mt.locus.contig, position=mt.info.END)
+            hl.struct(contig=mt.locus.contig, position=mt.info.END),
         ),
         sv_callset_Het=mt.info.N_HET,
         sv_callset_Hom=mt.info.N_HOMALT,
@@ -330,8 +330,16 @@ def annotate_cohort_sv(
         xstop=get_expr_for_xpos(mt.end_locus),
         rg37_locus=hl.liftover(mt.locus, 'GRCh37'),
         rg37_locus_end=hl.or_missing(
-            mt.end_locus.position <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.end_locus.contig],
-            hl.liftover(hl.locus(mt.end_locus.contig, mt.end_locus.position, reference_genome='GRCh38'), 'GRCh37'),
+            mt.end_locus.position
+            <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.end_locus.contig],
+            hl.liftover(
+                hl.locus(
+                    mt.end_locus.contig,
+                    mt.end_locus.position,
+                    reference_genome='GRCh38',
+                ),
+                'GRCh37',
+            ),
         ),
         svType=mt.sv_types[0],
         sv_type_detail=hl.if_else(
@@ -358,7 +366,7 @@ def annotate_cohort_sv(
                 lambda x: x[MAJOR_CONSEQUENCE] != 'NEAREST_TSS'
             ).map(lambda x: x[GENE_ID])
         ),
-        rsid=hl.missing('tstr')
+        rsid=hl.missing('tstr'),
     )
 
     # write this output
@@ -439,11 +447,9 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
     # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/sv_mt_schema.py#L221
     # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/seqr_mt_schema.py#L251
     mt = mt.annotate_rows(
-
         # omit samples field for GATKSV callsets. Leaving this here as likely needed
         # for gCNV specific callsets (maybe)
         # samples=_genotype_filter_samples(lambda g: True),
-
         # samples_new_alt=_genotype_filter_samples(
         #     lambda g: g.new_call | hl.is_defined(g.prev_num_alt)
         # ),
@@ -462,7 +468,6 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
                 for i in range(0, 90, 10)
             }
         ),
-
         # As per `samples` field, I beleive CN stats should only be generated for gCNV only
         # callsets. In particular samples_cn_2 is used to select ALT_ALT variants,
         # presumably because this genotype is only asigned when this CN is alt (ie on chrX)
