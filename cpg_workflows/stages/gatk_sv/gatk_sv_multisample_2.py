@@ -566,10 +566,7 @@ class AnnotateVcf(CohortStage):
         )
         expected_d = self.expected_outputs(cohort)
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
-        }
+        billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
 
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
@@ -583,6 +580,34 @@ class AnnotateVcf(CohortStage):
 
 
 @stage(required_stages=AnnotateVcf)
+class AnnotateVcfWithStrvctvre(CohortStage):
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {
+            'strvctvre_vcf': self.prefix / 'strvctvre_annotated.vcf.bgz',
+            'strvctvre_vcf_index': self.prefix / 'strvctvre_annotated.vcf.bgz.tbi',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+
+        # strvctvre image
+        strvctvre_image = get_images('strvctvre')
+        strvctvre_phylop = get_references('ref')  # todo
+
+        input_dict = inputs.as_dict(cohort, AnnotateVcf)
+        expected_d = self.expected_outputs(cohort)
+        billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
+
+        # read vcf and index into the batch
+        input_vcf = get_batch().read_input_group(
+            vcf=str(input_dict['annotated_vcf']),
+            vcf_index=str(input_dict['annotated_vcf_index'])
+        )['vcf']
+
+        ...
+
+
+@stage(required_stages=AnnotateVcfWithStrvctvre)
 class AnnotateCohortSv(CohortStage):
     """
     What do we want?! SV Data in Seqr!
