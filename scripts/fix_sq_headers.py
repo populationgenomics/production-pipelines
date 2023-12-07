@@ -132,6 +132,8 @@ def do_reheader(dry_run, refset, newref, newrefset, incram, outcram, outcrai):
 
 
 def do_metamist_update(dataset, sequencing_type, seqgroup, oldpath, newpath, result):
+    aapi = AnalysisApi()
+
     analysis = models.Analysis(
         type='cram',
         status=models.AnalysisStatus('completed'),
@@ -143,8 +145,7 @@ def do_metamist_update(dataset, sequencing_type, seqgroup, oldpath, newpath, res
             'source': f'Reheadered from {oldpath}',
         },
     )
-
-    aid = AnalysisApi().create_analysis(dataset, analysis)
+    aid = aapi.create_analysis(dataset, analysis)
     print(f'Created Analysis(id={aid}, output={newpath}) in {dataset}')
 
 
