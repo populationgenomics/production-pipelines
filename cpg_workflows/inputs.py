@@ -6,6 +6,8 @@ import logging
 
 from cpg_utils.config import get_config, update_dict
 
+from cpg_workflows.filetypes import CramPath, GvcfPath
+
 from .metamist import AnalysisType, Assay, MetamistError, get_metamist, parse_reads
 from .targets import Cohort, PedigreeInfo, SequencingGroup, Sex
 
@@ -142,7 +144,7 @@ def _populate_analysis(cohort: Cohort) -> None:
                     'gvcf file does not exist',
                     analysis.output,
                 )
-                sequencing_group.gvcf = analysis.output
+                sequencing_group.gvcf = GvcfPath(path=analysis.output)
             elif sequencing_group.make_gvcf_path().exists():
                 logging.warning(
                     f'We found a gvcf file in the expected location {sequencing_group.make_gvcf_path()},'
@@ -154,7 +156,7 @@ def _populate_analysis(cohort: Cohort) -> None:
                     'cram file does not exist',
                     analysis.output,
                 )
-                sequencing_group.cram = analysis.output
+                sequencing_group.cram = CramPath(path=analysis.output)
 
             elif sequencing_group.make_cram_path().exists():
                 logging.warning(
