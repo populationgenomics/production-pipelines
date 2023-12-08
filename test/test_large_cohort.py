@@ -93,9 +93,12 @@ def create_config(
                     / 'mills'
                     / 'Mills_and_1000G_gold_standard.indels.hg38.ht'
                 ),
-                'predetermined_qc_variants': (
-                    gnomad_prefix / 'sample_qc' / 'pre_ld_pruning_qc_variants.ht'
+                'predetermined_qc_variants_prefix': (
+                    gnomad_prefix / 'sample_qc-'
                 ),
+                'predetermined_qc_variants_path': (
+                    '/pre_ld_pruning_qc_variants.ht'
+                )
             },
             'broad': {
                 'genome_calling_interval_lists': (
