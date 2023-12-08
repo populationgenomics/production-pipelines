@@ -156,7 +156,10 @@ def _populate_analysis(cohort: Cohort) -> None:
                     'cram file does not exist',
                     analysis.output,
                 )
-                sequencing_group.cram = CramPath(path=analysis.output)
+                crai_path = analysis.output.with_suffix('.cram.crai')
+                if not crai_path.exists():
+                    crai_path = None
+                sequencing_group.cram = CramPath(analysis.output, crai_path)
 
             elif sequencing_group.make_cram_path().exists():
                 logging.warning(
