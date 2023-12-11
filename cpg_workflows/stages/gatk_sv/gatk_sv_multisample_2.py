@@ -621,7 +621,8 @@ class AnnotateVcfWithStrvctvre(CohortStage):
 
         # run strvctvre
         strv_job.command(
-            f'python StrVCTVRE/StrVCTVRE.py '
+            f'cd StrVCTVRE && '
+            f'python StrVCTVRE.py '
             f'-i {input_vcf} '
             f'-o {strv_job.output_vcf["vcf.gz"]} '
             f'-f vcf '
