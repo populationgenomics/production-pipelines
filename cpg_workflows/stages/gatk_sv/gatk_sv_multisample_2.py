@@ -604,7 +604,7 @@ class AnnotateVcfWithStrvctvre(CohortStage):
 
         strv_job.image(image_path('strvctvre'))
 
-        strvctvre_phylop = get_references('strvctvre_phylop')['strvctvre_phylop']
+        strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
 
         input_dict = inputs.as_dict(cohort, AnnotateVcf)
         expected_d = self.expected_outputs(cohort)
