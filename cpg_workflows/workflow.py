@@ -12,30 +12,29 @@ Examples of workflows can be found in the `production-workflows` repository.
 """
 
 import functools
-import networkx as nx
 import logging
 import pathlib
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from enum import Enum
-from typing import cast, Callable, Union, TypeVar, Generic, Optional, Type, Sequence
+from typing import Callable, Generic, Optional, Sequence, Type, TypeVar, Union, cast
 
+import networkx as nx
 from cloudpathlib import CloudPath
-from hailtop.batch.job import Job
-from cpg_utils.config import get_config
 from cpg_utils import Path
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import get_batch, reset_batch
+from hailtop.batch.job import Job
 
-from .batch import get_batch
-from .status import MetamistStatusReporter
-from .targets import Target, Dataset, SequencingGroup, Cohort
-from .utils import (
-    exists,
-    timestamp,
-    slugify,
-    ExpectedResultT,
-)
 from .inputs import get_cohort
-
+from .status import MetamistStatusReporter
+from .targets import Cohort, Dataset, SequencingGroup, Target
+from .utils import (
+    ExpectedResultT,
+    exists,
+    slugify,
+    timestamp,
+)
 
 StageDecorator = Callable[..., 'Stage']
 
@@ -136,11 +135,11 @@ class StageOutput:
             f'StageOutput({self.data}'
             f' target={self.target}'
             f' stage={self.stage}'
-            + (f' [reusable]' if self.reusable else '')
-            + (f' [skipped]' if self.skipped else '')
+            + (' [reusable]' if self.reusable else '')
+            + (' [skipped]' if self.skipped else '')
             + (f' [error: {self.error_msg}]' if self.error_msg else '')
             + f' meta={self.meta}'
-            + f')'
+            + ')'
         )
         return res
 
@@ -911,6 +910,7 @@ class Workflow:
         if not self.dry_run:
             if ds_set := set(d.name for d in get_cohort().get_datasets()):
                 description += ' ' + ', '.join(sorted(ds_set))
+            reset_batch()
             get_batch().name = description
 
         self.status_reporter = None
@@ -1196,7 +1196,7 @@ class Workflow:
         if not self.dry_run:
             cohort = get_cohort()  # Would communicate with metamist.
             for i, stg in enumerate(stages):
-                logging.info(f'*' * 60)
+                logging.info('*' * 60)
                 logging.info(f'Stage #{i + 1}: {stg}')
                 stg.output_by_target = stg.queue_for_cohort(cohort)
                 if errors := self._process_stage_errors(stg.output_by_target):
@@ -1205,7 +1205,7 @@ class Workflow:
                         + '\n'.join(errors)
                     )
 
-                logging.info(f'')
+                logging.info('')
         else:
             self.queued_stages = [stg for stg in _stages_d.values() if not stg.skipped]
             logging.info(f'Queued stages: {self.queued_stages}')

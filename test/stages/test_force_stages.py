@@ -46,10 +46,10 @@ def test_force_stages(mocker: MockFixture, tmp_path):
     # dummy mocking to avoid file system scanning
     mocker.patch('cpg_workflows.utils.exists_not_cached', lambda *args: True)
     set_config(conf, tmp_path / 'config.toml')
+
+    from cpg_utils.hail_batch import get_batch
+
     run_workflow(mocker)
-
-    from cpg_workflows.workflow import get_batch
-
     print('Job by stage:', get_batch().job_by_stage)
     assert 'A' not in get_batch().job_by_stage
     assert get_batch().job_by_stage['B']['job_n'] == 1
