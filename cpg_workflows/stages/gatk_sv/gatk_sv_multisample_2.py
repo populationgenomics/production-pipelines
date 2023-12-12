@@ -605,6 +605,7 @@ class AnnotateVcfWithStrvctvre(CohortStage):
         strv_job.image(image_path('strvctvre'))
 
         strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
+        phylop_in_batch = get_batch().read_input(strvctvre_phylop)
 
         input_dict = inputs.as_dict(cohort, AnnotateVcf)
         expected_d = self.expected_outputs(cohort)
@@ -626,7 +627,7 @@ class AnnotateVcfWithStrvctvre(CohortStage):
             f'-i {input_vcf} '
             f'-o {strv_job.output_vcf["vcf.gz"]} '
             f'-f vcf '
-            f'-p {strvctvre_phylop}'
+            f'-p {phylop_in_batch}'
         )
 
         # and a follow-up job to index the results
