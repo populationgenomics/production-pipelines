@@ -205,59 +205,59 @@ class FastCombineGCNVs(CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=job_or_none)
 
 
-@stage(required_stages=FastCombineGCNVs)
-class TranslategCNVToGATKVCF(CohortStage):
-    """
-    attempt at fixing the gCNV workflow - pass the VCF through
-    the to-GATK format VCF parser. This operates the Cromwell
-    workflow from GATK-SV, and may not work at all...
-    """
-
-    def expected_outputs(self, cohort: Cohort) -> dict:
-        """
-        create dictionary of names -> output paths
-        """
-
-        return {
-            'gatk_formatted_vcf': self.prefix / 'gatk_formatted.vcf.gz',
-            'gatk_formatted_vcf_index': self.prefix / 'gatk_formatted.vcf.gz.tbi',
-        }
-
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        """
-        Args:
-            cohort (Cohort): cohort of all samples (across several sub-cohort batches)
-            inputs (StageInput): access to prior inputs
-        """
-
-        input_dict: dict[str, Any] = {
-            'prefix': cohort.name,
-            'vcf': inputs.as_dict(cohort, FastCombineGCNVs)['combined_calls'],
-            'ped_file': make_combined_ped(cohort, self.prefix),
-        }
-        input_dict |= get_images(['sv_pipeline_docker', 'sv_base_mini_docker'])
-        input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
-
-        expected_d = self.expected_outputs(cohort)
-
-        billing_labels = {
-            'stage': 'formatvcfforgatk',
-            AR_GUID_NAME: try_get_ar_guid(),
-        }
-
-        jobs = add_gatk_sv_jobs(
-            batch=get_batch(),
-            dataset=cohort.analysis_dataset,
-            wfl_name='FormatVcfForGatk',
-            input_dict=input_dict,
-            expected_out_dict=expected_d,
-            labels=billing_labels,
-        )
-        return self.make_outputs(cohort, data=expected_d, jobs=jobs)
+# @stage(required_stages=FastCombineGCNVs)
+# class TranslategCNVToGATKVCF(CohortStage):
+#     """
+#     attempt at fixing the gCNV workflow - pass the VCF through
+#     the to-GATK format VCF parser. This operates the Cromwell
+#     workflow from GATK-SV, and may not work at all...
+#     """
+#
+#     def expected_outputs(self, cohort: Cohort) -> dict:
+#         """
+#         create dictionary of names -> output paths
+#         """
+#
+#         return {
+#             'gatk_formatted_vcf': self.prefix / 'gatk_formatted.vcf.gz',
+#             'gatk_formatted_vcf_index': self.prefix / 'gatk_formatted.vcf.gz.tbi',
+#         }
+#
+#     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+#         """
+#         Args:
+#             cohort (Cohort): cohort of all samples (across several sub-cohort batches)
+#             inputs (StageInput): access to prior inputs
+#         """
+#
+#         input_dict: dict[str, Any] = {
+#             'prefix': cohort.name,
+#             'vcf': inputs.as_dict(cohort, FastCombineGCNVs)['combined_calls'],
+#             'ped_file': make_combined_ped(cohort, self.prefix),
+#         }
+#         input_dict |= get_images(['sv_pipeline_docker', 'sv_base_mini_docker'])
+#         input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
+#
+#         expected_d = self.expected_outputs(cohort)
+#
+#         billing_labels = {
+#             'stage': 'formatvcfforgatk',
+#             AR_GUID_NAME: try_get_ar_guid(),
+#         }
+#
+#         jobs = add_gatk_sv_jobs(
+#             batch=get_batch(),
+#             dataset=cohort.analysis_dataset,
+#             wfl_name='FormatVcfForGatk',
+#             input_dict=input_dict,
+#             expected_out_dict=expected_d,
+#             labels=billing_labels,
+#         )
+#         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
 @stage(
-    required_stages=TranslategCNVToGATKVCF,
+    required_stages=FastCombineGCNVs,
     analysis_type='sv',
     analysis_keys=['annotated_vcf'],
     update_analysis_meta=_gcnv_annotated_meta,
@@ -302,8 +302,8 @@ class AnnotateVcfSV(CohortStage):
             batch=get_batch(),
             cohort=cohort,
             cohort_prefix=self.prefix,
-            input_vcf=inputs.as_dict(cohort, TranslategCNVToGATKVCF)[
-                'gatk_formatted_vcf'
+            input_vcf=inputs.as_dict(cohort, FastCombineGCNVs)[
+                'combined_calls'
             ],
             outputs=expected_out,
             labels=billing_labels,
