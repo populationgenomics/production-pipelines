@@ -253,8 +253,8 @@ def annotate_cohort_sv(
         # gnomad_svs_AC=unsafe_cast_int32(mt.info.gnomAD_V2_AC),
         # gnomad_svs_AN=unsafe_cast_int32(mt.info.gnomAD_V2_AN),
         StrVCTVRE_score=hl.or_missing(
-            hl.is_defined(mt.info.StrVCTVRE_score),
-            hl.parse_float(mt.info.StrVCTVRE_score),
+            hl.is_defined(mt.info.StrVCTVRE),
+            hl.parse_float(mt.info.StrVCTVRE),
         ),
         filters=hl.or_missing(  # hopefully this plays nicely
             (mt.filters.filter(lambda x: (x != PASS) & (x != BOTHSIDES_SUPPORT))).size()
