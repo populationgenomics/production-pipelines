@@ -93,9 +93,12 @@ def create_config(
                     / 'mills'
                     / 'Mills_and_1000G_gold_standard.indels.hg38.ht'
                 ),
-                'predetermined_qc_variants': (
-                    gnomad_prefix / 'sample_qc' / 'pre_ld_pruning_qc_variants.ht'
+                'predetermined_qc_variants_prefix': (
+                    gnomad_prefix / 'sample_qc-'
                 ),
+                'predetermined_qc_variants_path': (
+                    '/pre_ld_pruning_qc_variants.ht'
+                )
             },
             'broad': {
                 'genome_calling_interval_lists': (
@@ -153,6 +156,19 @@ class TestAllLargeCohortMethods:
         mocker.patch(
             'cpg_workflows.inputs.create_cohort',
             lambda: _mock_cohort(conf.workflow.dataset),
+        )
+        # skip can_reuse, implicit skip of existence checks
+        mocker.patch(
+            'cpg_workflows.large_cohort.combiner.can_reuse',
+            lambda x: False
+        )
+        mocker.patch(
+            'cpg_workflows.large_cohort.relatedness.can_reuse',
+            lambda x: False
+        )
+        mocker.patch(
+            'cpg_workflows.large_cohort.site_only_vcf.can_reuse',
+            lambda x: False
         )
 
         start_query_context()

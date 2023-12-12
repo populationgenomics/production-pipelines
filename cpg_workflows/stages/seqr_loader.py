@@ -8,26 +8,28 @@ from typing import Any
 from cpg_utils import to_path, Path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
-from cpg_workflows.workflow import (
-    stage,
-    StageInput,
-    StageOutput,
-    CohortStage,
-    DatasetStage,
-    Cohort,
-    Dataset,
-    get_workflow,
-)
+from cpg_utils.hail_batch import image_path, query_command
+
 from cpg_workflows.jobs.seqr_loader import (
-    annotate_cohort_jobs,
     annotate_dataset_jobs,
     cohort_to_vcf_job,
 )
+from cpg_workflows.query_modules import seqr_loader
+from cpg_workflows.workflow import (
+    get_workflow,
+    stage,
+    Cohort,
+    CohortStage,
+    Dataset,
+    DatasetStage,
+    StageInput,
+    StageOutput,
+)
 
+from .. import get_batch
 from .joint_genotyping import JointGenotyping
 from .vep import Vep
 from .vqsr import Vqsr
-from .. import get_batch
 
 
 @stage(required_stages=[JointGenotyping, Vqsr, Vep])
@@ -49,7 +51,7 @@ class AnnotateCohort(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
-        Uses analysis-runner's dataproc helper to run a hail query script
+        Apply VEP and VQSR annotations to all-sample callset
         """
         vcf_path = inputs.as_path(target=cohort, stage=JointGenotyping, key='vcf')
         siteonly_vqsr_vcf_path = inputs.as_path(
@@ -60,22 +62,27 @@ class AnnotateCohort(CohortStage):
         checkpoint_prefix = (
             to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
         )
-
-        jobs = annotate_cohort_jobs(
-            b=get_batch(),
-            vcf_path=vcf_path,
-            siteonly_vqsr_vcf_path=siteonly_vqsr_vcf_path,
-            vep_ht_path=vep_ht_path,
-            out_mt_path=self.expected_outputs(cohort)['mt'],
-            checkpoint_prefix=checkpoint_prefix,
-            job_attrs=self.get_job_attrs(cohort),
-            depends_on=inputs.get_jobs(cohort),
+        j = get_batch().new_job(f'annotate cohort', self.get_job_attrs(cohort))
+        j.image(image_path('cpg_workflows'))
+        j.command(
+            query_command(
+                seqr_loader,
+                seqr_loader.annotate_cohort.__name__,
+                str(vcf_path),
+                str(self.expected_outputs(cohort)['mt']),
+                str(vep_ht_path),
+                str(siteonly_vqsr_vcf_path) if siteonly_vqsr_vcf_path else None,
+                str(checkpoint_prefix),
+                setup_gcp=True,
+            )
         )
+        if depends_on := inputs.get_jobs(cohort):
+            j.depends_on(*depends_on)
 
         return self.make_outputs(
             cohort,
             data=self.expected_outputs(cohort),
-            jobs=jobs,
+            jobs=j,
         )
 
 
@@ -149,7 +156,7 @@ class AnnotateDataset(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
-        Uses analysis-runner's dataproc helper to run a hail query script
+        Annotate MT with genotype and consequence data for Seqr
         """
         assert dataset.cohort
         mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateCohort, key='mt')
@@ -204,7 +211,7 @@ class DatasetVCF(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
-        Uses analysis-runner's dataproc helper to run a hail query script
+        Run a MT -> VCF extraction on selected cohorts
         only run this on manually defined list of cohorts
         """
 
@@ -264,7 +271,7 @@ class MtToEs(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
-        Uses analysis-runner's dataproc helper to run a hail query script
+        Transforms the MT into a Seqr index, requires Dataproc
         """
         if (
             es_datasets := get_config()['workflow'].get('create_es_index_for_datasets')
@@ -326,7 +333,6 @@ class MtToEs(DatasetStage):
                 depends_on=inputs.get_jobs(dataset),
                 scopes=['cloud-platform'],
                 pyfiles=pyfiles,
-                init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
             )
         j._preemptible = False
         j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}

@@ -95,11 +95,11 @@ def get_called_sgs(project: str) -> set[str]:
     sgs = set()
 
     for analysis in query(FIND_ANALYSES, {'project': project, 'type': 'sv'})['project']['analyses']:
-        if analysis['meta'].get('type') != 'annotated-sv-dataset-callset':
+        if analysis['meta'].get('stage') != 'AnnotateDatasetSv':
             continue
-        assert analysis['meta'].get('stage') == 'AnnotateDatasetSv'
 
         sgs.update(analysis['meta']['sequencing_groups'])
+
     return sgs
 
 

@@ -185,10 +185,6 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
         return 1
 
     mocker.patch('pathlib.Path.open', selective_mock_open)
-    # functions like get_intervals checks file existence
-    mocker.patch('cpg_workflows.workflow.list_all_parent_dirs', lambda *args: {})
-    mocker.patch('cpg_workflows.workflow.list_of_all_dir_contents', lambda *args: {})
-    mocker.patch('cpg_workflows.workflow.missing_from_pre_collected', lambda *args: None)
     # cloudfuse (used in Vep) doesn't work with LocalBackend
     mocker.patch('hailtop.batch.job.Job.cloudfuse', do_nothing)
     # always_run (used in MtToEs -> hail_dataproc_job) doesn't work with LocalBackend
@@ -203,7 +199,7 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
     )
     mocker.patch('metamist.apis.AnalysisApi.update_analysis', do_nothing)
 
-    from cpg_workflows.batch import get_batch
+    from cpg_utils.hail_batch import get_batch
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.stages.cram_qc import CramMultiQC
     from cpg_workflows.stages.gvcf_qc import GvcfMultiQC

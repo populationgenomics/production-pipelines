@@ -6,8 +6,11 @@ import logging
 
 from cpg_utils.config import get_config, update_dict
 
+from cpg_workflows.filetypes import CramPath, GvcfPath
+
 from .metamist import AnalysisType, Assay, MetamistError, get_metamist, parse_reads
 from .targets import Cohort, PedigreeInfo, SequencingGroup, Sex
+from .utils import exists
 
 _cohort: Cohort | None = None
 
@@ -135,25 +138,35 @@ def _populate_analysis(cohort: Cohort) -> None:
             dataset=dataset.name,
         )
 
-        # NOTE: This logic will be simplified to remove existence checks overwriting metamist
-        # in a later PR.
         for sequencing_group in dataset.get_sequencing_groups():
             if (analysis := gvcf_by_sgid.get(sequencing_group.id)) and analysis.output:
-                assert analysis.output == sequencing_group.make_gvcf_path().path, (
+                # assert file exists
+                assert exists(analysis.output), (
+                    'gvcf file does not exist',
                     analysis.output,
-                    sequencing_group.make_gvcf_path().path,
                 )
-                sequencing_group.gvcf = sequencing_group.make_gvcf_path()
-            elif sequencing_group.make_gvcf_path().exists():
-                sequencing_group.gvcf = sequencing_group.make_gvcf_path()
+                sequencing_group.gvcf = GvcfPath(path=analysis.output)
+            elif exists(sequencing_group.make_gvcf_path()):
+                logging.warning(
+                    f'We found a gvcf file in the expected location {sequencing_group.make_gvcf_path()},'
+                    'but it is not logged in metamist. Skipping. You may want to update the metadata and try again. '
+                )
             if (analysis := cram_by_sgid.get(sequencing_group.id)) and analysis.output:
-                assert analysis.output == sequencing_group.make_cram_path().path, (
+                # assert file exists
+                assert exists(analysis.output), (
+                    'cram file does not exist',
                     analysis.output,
-                    sequencing_group.make_cram_path().path,
                 )
-                sequencing_group.cram = sequencing_group.make_cram_path()
-            elif sequencing_group.make_cram_path().exists():
-                sequencing_group.cram = sequencing_group.make_cram_path()
+                crai_path = analysis.output.with_suffix('.cram.crai')
+                if not exists(crai_path):
+                    crai_path = None
+                sequencing_group.cram = CramPath(analysis.output, crai_path)
+
+            elif exists(sequencing_group.make_cram_path()):
+                logging.warning(
+                    f'We found a cram file in the expected location {sequencing_group.make_cram_path()},'
+                    'but it is not logged in metamist. Skipping. You may want to update the metadata and try again. '
+                )
 
 
 def _populate_pedigree(cohort: Cohort) -> None:

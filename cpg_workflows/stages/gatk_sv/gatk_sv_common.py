@@ -2,24 +2,22 @@
 Common methods for all GATK-SV workflows
 """
 
-
 from os.path import join
 from typing import Any
 
 from analysis_runner.cromwell import (
-    run_cromwell_workflow_from_repo_and_get_outputs,
     CromwellOutputType,
+    run_cromwell_workflow_from_repo_and_get_outputs,
 )
+from cpg_utils import Path, to_path
+from cpg_utils.config import ConfigError, get_config
+from cpg_utils.hail_batch import Batch, command, image_path, reference_path
 from hailtop.batch.job import Job
 
-from cpg_utils import Path, to_path
-from cpg_utils.config import get_config, ConfigError
-from cpg_utils.hail_batch import command, reference_path, image_path
-from cpg_workflows.batch import make_job_name, Batch
-from cpg_workflows.workflow import Dataset, Cohort
+from cpg_workflows.batch import make_job_name
+from cpg_workflows.workflow import Cohort, Dataset
 
-
-GATK_SV_COMMIT = '8759710f2a3cc396b966dae5bab5b36896fae060'
+GATK_SV_COMMIT = '6d6100082297898222dfb69fcf941d373d78eede'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 _FASTA = None
 
@@ -173,7 +171,6 @@ def add_gatk_sv_jobs(
         b=batch,
         job_prefix=job_prefix,
         dataset=get_config()['workflow']['dataset'],
-        access_level=get_config()['workflow']['access_level'],
         repo='gatk-sv',
         commit=GATK_SV_COMMIT,
         cwd='wdl',

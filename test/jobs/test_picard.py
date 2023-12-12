@@ -1,20 +1,19 @@
-import re
-import pytest
 import random
-from pathlib import Path
+import re
 from functools import cached_property
+from pathlib import Path
 
-from cpg_utils.hail_batch import fasta_res_group
+import pytest
+from cpg_utils.hail_batch import Batch, fasta_res_group
 
-from cpg_workflows.batch import Batch
 from cpg_workflows.filetypes import BamPath, CramPath, GvcfPath
 from cpg_workflows.jobs.picard import (
     get_intervals,
     markdup,
-    vcf_qc,
     picard_collect_metrics,
     picard_hs_metrics,
     picard_wgs_metrics,
+    vcf_qc,
 )
 
 from .. import set_config
@@ -202,7 +201,7 @@ class TestPicard:
 
         # ---- The job we want to test
         sorted_bam = BamPath(
-            path=tmp_path / 'in.bam', index_path=tmp_path / f'in.bam.bai'
+            path=tmp_path / 'in.bam', index_path=tmp_path / 'in.bam.bai'
         )
         job = markdup(
             b=batch,
@@ -275,7 +274,7 @@ class TestPicard:
         assert re.search(rf'INPUT=\S*{gvcf}', cmd)
         assert re.search(rf'DBSNP=\S*{dbsnp}', cmd)
         assert re.search(rf'TARGET_INTERVALS=\S*{intervals}', cmd)
-        assert re.search(rf'GVCF_INPUT=true', cmd)
+        assert re.search(r'GVCF_INPUT=true', cmd)
 
     @pytest.mark.parametrize('cram', ['file.cram', 'file2.cram'])
     @pytest.mark.parametrize('assume_sorted', [True, False])

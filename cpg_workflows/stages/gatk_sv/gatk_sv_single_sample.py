@@ -5,28 +5,27 @@ import logging
 from typing import Any
 
 from cpg_utils import Path
-from cpg_utils.config import try_get_ar_guid, AR_GUID_NAME
-from cpg_workflows.batch import get_batch
-from cpg_workflows.workflow import (
-    stage,
-    SequencingGroupStage,
-    StageOutput,
-    StageInput,
-    SequencingGroup,
-    Cohort,
-    CohortStage,
-)
-from cpg_workflows.jobs import sample_batching
+from cpg_utils.hail_batch import get_batch
+from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
 
+from cpg_workflows.jobs import sample_batching
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
+    SV_CALLERS,
+    _sv_individual_meta,
     add_gatk_sv_jobs,
     get_fasta,
     get_images,
     get_references,
-    _sv_individual_meta,
-    SV_CALLERS,
 )
-from cpg_utils.config import get_config
+from cpg_workflows.workflow import (
+    Cohort,
+    CohortStage,
+    SequencingGroup,
+    SequencingGroupStage,
+    StageInput,
+    StageOutput,
+    stage,
+)
 
 
 @stage(
@@ -104,6 +103,7 @@ class GatherSampleEvidence(SequencingGroupStage):
             'reference_index': str(get_fasta()) + '.fai',
             'reference_dict': str(get_fasta().with_suffix('.dict')),
             'reference_version': '38',
+            # 'scramble_part2_threads': 4,  # default = 7
         }
 
         input_dict |= get_images(
@@ -228,7 +228,7 @@ class EvidenceQC(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=EvidenceQC, analysis_type='sv', analysis_keys=['batch_json'])
+@stage(required_stages=EvidenceQC, analysis_type='sv', analysis_keys=['batch_json_negative', 'batch_json_positive'], tolerate_missing_output=True)
 class CreateSampleBatches(CohortStage):
     """
     uses the values generated in EvidenceQC
@@ -247,7 +247,10 @@ class CreateSampleBatches(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {'batch_json': self.prefix / 'pcr_{pcr_status}_batches.json'}
+        return {
+            'batch_json_positive': self.prefix / 'pcr_positive_batches.json',
+            'batch_json_negative': self.prefix / 'pcr_negative_batches.json',
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         expected = self.expected_outputs(cohort)
@@ -286,7 +289,7 @@ class CreateSampleBatches(CohortStage):
                 sample_batching.partition_batches,
                 inputs.as_dict(cohort, EvidenceQC)['qc_table'],
                 sequencing_groups,
-                expected['batch_json'],
+                expected[f'batch_json_{status}'],
                 min_batch_size,
                 max_batch_size,
             )

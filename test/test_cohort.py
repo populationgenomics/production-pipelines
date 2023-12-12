@@ -184,6 +184,8 @@ def test_cohort(mocker: MockFixture, tmp_path, caplog):
     """
     set_config(_cohort_config(tmp_path), tmp_path / 'config.toml')
 
+    mocker.patch('cpg_workflows.utils.exists_not_cached', lambda *args: False)
+
     mocker.patch('cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree)
 
     mocker.patch('cpg_workflows.metamist.Metamist.get_sg_entries', mock_get_sgs)
@@ -193,7 +195,6 @@ def test_cohort(mocker: MockFixture, tmp_path, caplog):
 
     caplog.set_level(logging.WARNING)
 
-    # from cpg_workflows.filetypes import BamPath
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.targets import SequencingGroup, Sex
 
@@ -350,6 +351,9 @@ def test_missing_reads(mocker: MockFixture, tmp_path):
     Testing creating a Cohort object from metamist mocks.
     """
     set_config(_cohort_config(tmp_path), tmp_path / 'config.toml')
+
+    # mock file not existing
+    mocker.patch('cpg_workflows.utils.exists_not_cached', lambda *args: False)
 
     mocker.patch('cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree)
 
@@ -561,6 +565,8 @@ def test_mixed_reads(mocker: MockFixture, tmp_path, caplog):
     caplog.set_level(logging.WARNING)
     set_config(_cohort_config(tmp_path), tmp_path / 'config.toml')
 
+    mocker.patch('cpg_workflows.utils.exists_not_cached', lambda *args: True)
+
     mocker.patch('cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree)
 
     mocker.patch(
@@ -599,6 +605,9 @@ def test_mixed_reads(mocker: MockFixture, tmp_path, caplog):
 
 
 def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
+
+    mocker.patch('cpg_workflows.utils.exists_not_cached', lambda *args: True)
+
     def mock_get_pedigree_empty(*args, **kwargs):
         return []
 

@@ -12,31 +12,29 @@ Examples of workflows can be found in the `production-workflows` repository.
 """
 
 import functools
-import networkx as nx
 import logging
 import pathlib
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from enum import Enum
-from typing import cast, Callable, Union, TypeVar, Generic, Optional, Type, Sequence
+from typing import Callable, Generic, Optional, Sequence, Type, TypeVar, Union, cast
 
+import networkx as nx
 from cloudpathlib import CloudPath
-from hailtop.batch.job import Job
-from cpg_utils.config import get_config
 from cpg_utils import Path
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import get_batch, reset_batch
+from hailtop.batch.job import Job
 
-from .batch import get_batch
-from .status import MetamistStatusReporter
-from .targets import Target, Dataset, SequencingGroup, Cohort
-from .utils import (
-    exists,
-    missing_from_pre_collected,
-    timestamp,
-    slugify,
-    ExpectedResultT,
-)
 from .inputs import get_cohort
-
+from .status import MetamistStatusReporter
+from .targets import Cohort, Dataset, SequencingGroup, Target
+from .utils import (
+    ExpectedResultT,
+    exists,
+    slugify,
+    timestamp,
+)
 
 StageDecorator = Callable[..., 'Stage']
 
@@ -45,33 +43,6 @@ StageDecorator = Callable[..., 'Stage']
 # it would violate the Liskov substitution principle (i.e. any Stage subclass would
 # have to be able to work on any Target subclass).
 TargetT = TypeVar('TargetT', bound=Target)
-
-
-def list_all_parent_dirs(all_outputs: set[Path]) -> set[Path]:
-    """
-    take all possible outputs, find unique parent directories
-
-    Args:
-        all_outputs (set[Path]): all possible outputs across multiple stages
-
-    Returns:
-        a set of all unique parent directories
-    """
-    return {output.parent for output in all_outputs}
-
-
-def list_of_all_dir_contents(locations: set[Path]) -> set[Path]:
-    """
-    take a collection of parent directories and identify their contents
-
-    Args:
-        locations (set[Path]): all places to look
-
-    Returns:
-        set of all files across all locations
-    """
-
-    return {file for location in locations for file in location.iterdir()}
 
 
 def path_walk(expected, collected: set | None = None) -> set[Path]:
@@ -164,11 +135,11 @@ class StageOutput:
             f'StageOutput({self.data}'
             f' target={self.target}'
             f' stage={self.stage}'
-            + (f' [reusable]' if self.reusable else '')
-            + (f' [skipped]' if self.skipped else '')
+            + (' [reusable]' if self.reusable else '')
+            + (' [skipped]' if self.skipped else '')
             + (f' [error: {self.error_msg}]' if self.error_msg else '')
             + f' meta={self.meta}'
-            + f')'
+            + ')'
         )
         return res
 
@@ -641,12 +612,10 @@ class Stage(Generic[TargetT], ABC):
 
         return outputs
 
-    def _get_action(
-        self, target: TargetT, existing_files: set[Path] | None = None
-    ) -> Action:
+    def _get_action(self, target: TargetT) -> Action:
         """
         Based on stage parameters and expected outputs existence, determines what
-        to do with the target: queue, skip or reuse, etc..
+        to do with the target: queue, skip or reuse, etc...
         """
         if target.forced and not self.skipped:
             logging.info(f'{self.name}: {target} [QUEUE] (target is forced)')
@@ -663,9 +632,7 @@ class Stage(Generic[TargetT], ABC):
                 return Action.SKIP
 
         expected_out = self.expected_outputs(target)
-        reusable, first_missing_path = self._is_reusable(
-            expected_out, existing_outputs=existing_files
-        )
+        reusable, first_missing_path = self._is_reusable(expected_out)
 
         if self.skipped:
             if reusable and not first_missing_path:
@@ -726,14 +693,11 @@ class Stage(Generic[TargetT], ABC):
         logging.info(f'{self.name}: {target} [QUEUE]')
         return Action.QUEUE
 
-    def _is_reusable(
-        self, expected_out: ExpectedResultT, existing_outputs: set[Path] | None = None
-    ) -> tuple[bool, Path | None]:
+    def _is_reusable(self, expected_out: ExpectedResultT) -> tuple[bool, Path | None]:
         """
         Checks if the outputs of prior stages already exist, and can be reused
         Args:
             expected_out (ExpectedResultT): expected outputs of a stage
-            existing_outputs (optional[set[Path]]): pre-scanned directory contents
 
         Returns:
             tuple[bool, Path | None]:
@@ -753,16 +717,9 @@ class Stage(Generic[TargetT], ABC):
             if not paths:
                 return False, None
 
-            # check against the pre-scanned files if possible
-            if existing_outputs:
-                first_missing_path = missing_from_pre_collected(paths, existing_outputs)
-
-            # fall back to individual .exists() tests
-            else:
-                first_missing_path = next((p for p in paths if not exists(p)), None)
-
-            if first_missing_path:
+            if first_missing_path := next((p for p in paths if not exists(p)), None):
                 return False, first_missing_path
+
             return True, None
         else:
             if self.skipped:
@@ -953,6 +910,7 @@ class Workflow:
         if not self.dry_run:
             if ds_set := set(d.name for d in get_cohort().get_datasets()):
                 description += ' ' + ', '.join(sorted(ds_set))
+            reset_batch()
             get_batch().name = description
 
         self.status_reporter = None
@@ -1238,7 +1196,7 @@ class Workflow:
         if not self.dry_run:
             cohort = get_cohort()  # Would communicate with metamist.
             for i, stg in enumerate(stages):
-                logging.info(f'*' * 60)
+                logging.info('*' * 60)
                 logging.info(f'Stage #{i + 1}: {stg}')
                 stg.output_by_target = stg.queue_for_cohort(cohort)
                 if errors := self._process_stage_errors(stg.output_by_target):
@@ -1247,7 +1205,7 @@ class Workflow:
                         + '\n'.join(errors)
                     )
 
-                logging.info(f'')
+                logging.info('')
         else:
             self.queued_stages = [stg for stg in _stages_d.values() if not stg.skipped]
             logging.info(f'Queued stages: {self.queued_stages}')
@@ -1334,14 +1292,10 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
                 all_outputs = path_walk(
                     self.expected_outputs(sequencing_group), all_outputs
                 )
-            all_parents = list_all_parent_dirs(all_outputs)
-            existing_files = list_of_all_dir_contents(all_parents)
 
             # evaluate_stuff en masse
             for sequencing_group in dataset.get_sequencing_groups():
-                action = self._get_action(
-                    sequencing_group, existing_files=existing_files
-                )
+                action = self._get_action(sequencing_group)
                 output_by_target[
                     sequencing_group.target_id
                 ] = self._queue_jobs_with_checks(sequencing_group, action)

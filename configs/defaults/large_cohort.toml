@@ -1,5 +1,6 @@
 [workflow]
 name = 'large_cohort'
+scatter_count = 50
 scatter_count_genotype = 50
 status_reporter = 'metamist'
 # define reference fasta. If not specified here, the reference file is pulled from [references.broad][ref_fasta]
@@ -29,9 +30,10 @@ num_pcs = 4
 # demanding higher resources for all operations as standard. Examples below
 
 [large_cohort]
-# Parameters for reladness inference
-max_kin = 0.2  # maximum kin threshold to be considered unrelated in relatedness check (second degree)
-# As in hail docs https://hail.is/docs/0.2/methods/relatedness.html, 0.25
+# Kinship threshold to consider two samples as related.
+# the default threshold for second degree relatives in gnomAD is 0.1:
+# https://github.com/broadinstitute/gnomad_methods/blob/382fc2c7976d58cc8983cc4c9f0df5d8d5f9fae3/gnomad/sample_qc/relatedness.py#L195
+max_kin = 0.1  
 # Parameters for population inference
 n_pcs = 16  # number of principal components for PCA analysis
 min_pop_prob = 0.5  # minimum random forest probability for population assignment
@@ -74,4 +76,5 @@ delete_scratch_on_exit = false
 
 [references.gnomad]
 tel_and_cent_ht = "gs://cpg-common-main/references/gnomad/v0/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht"
-predetermined_qc_variants = "gs://cpg-hgdp-1kg-test/vds/pruned_variants.ht/"
+predetermined_qc_variants_prefix = 'gs://cpg-hgdp-1kg-' 
+predetermined_qc_variants_path = '/sites_table/v1-0/pruned_variants.ht'

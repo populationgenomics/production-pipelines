@@ -512,7 +512,7 @@ For example, out "Align" stage that runs BWA might look like as following:
 ```python
 from cpg_utils import Path
 from cpg_workflows.workflow import stage, SequencingGroupStage, SequencingGroup, StageInput, StageOutput
-from cpg_workflows.batch import get_batch
+from cpg_utils.hail_batch import get_batch
 
 @stage
 class Align(SequencingGroupStage):
@@ -654,10 +654,10 @@ If you are not using the analysis runner, you'd have to set those generated valu
 
 ### Batch helpers
 
-The `cpg_workflows.batch` module provides a helper function `get_batch` to set up Hail Batch in the CPG context, assuming `hail/billing_project` and `hail/backend` are set in config.
+The `cpg_utils.hail_batch` module provides a helper function `get_batch` to set up Hail Batch in the CPG context, assuming `hail/billing_project` and `hail/backend` are set in config.
 
 ```python
-from cpg_workflows.batch import get_batch
+from cpg_utils.hail_batch import get_batch
 b = get_batch(name='My batch')
 j = b.new_job('My job', ...)
 ...

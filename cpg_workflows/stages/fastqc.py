@@ -5,19 +5,20 @@ import dataclasses
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_workflows import get_batch
+from cpg_utils.hail_batch import get_batch
+
 from cpg_workflows.filetypes import BamPath, FastqPairs
-from cpg_workflows.workflow import (
-    SequencingGroup,
-    Dataset,
-    stage,
-    StageInput,
-    StageOutput,
-    SequencingGroupStage,
-    DatasetStage,
-)
 from cpg_workflows.jobs import fastqc
 from cpg_workflows.jobs.multiqc import multiqc
+from cpg_workflows.workflow import (
+    Dataset,
+    DatasetStage,
+    SequencingGroup,
+    SequencingGroupStage,
+    StageInput,
+    StageOutput,
+    stage,
+)
 
 
 @dataclasses.dataclass
@@ -130,7 +131,7 @@ class FastQCMultiQC(DatasetStage):
             return {}
         h = dataset.alignment_inputs_hash()
         return {
-            'html': dataset.web_prefix() / 'qc' / 'fastqc' / 'multiqc.html',
+            'html': dataset.web_prefix() / 'qc' / 'fastqc' / h / 'multiqc.html',
             'json': dataset.prefix() / 'qc' / 'fastqc' / h / 'multiqc_data.json',
         }
 

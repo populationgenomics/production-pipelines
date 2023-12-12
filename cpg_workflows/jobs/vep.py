@@ -7,17 +7,16 @@ import logging
 from typing import Literal
 
 import hailtop.batch as hb
-from hailtop.batch.job import Job
 from hailtop.batch import Batch
+from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, reference_path, query_command
-from cpg_workflows.resources import STANDARD
-from cpg_workflows.utils import can_reuse
-
 from cpg_workflows.jobs.picard import get_intervals
 from cpg_workflows.jobs.vcf import gather_vcfs, subset_vcf
+from cpg_workflows.utils import can_reuse
+from cpg_workflows.query_modules import vep
 
 
 def add_vep_jobs(
@@ -136,7 +135,6 @@ def gather_vep_json_to_ht(
     vep_results_paths: list[Path],
     out_path: Path,
     job_attrs: dict | None = None,
-    use_dataproc: bool = False,
     depends_on: list[hb.job.Job] | None = None,
 ) -> Job:
     """
@@ -146,50 +144,18 @@ def gather_vep_json_to_ht(
 
     vep_version = get_config()['workflow']['vep_version']
 
-    if use_dataproc:
-        # Importing this requires CPG_CONFIG_PATH to be already set, that's why
-        # we are not importing it on the top level.
-        from analysis_runner import dataproc
-
-        # Script path and pyfiles should be relative to the repository root
-        script_path = 'cpg_workflows/dataproc_scripts/vep_json_to_ht.py'
-        pyfiles = ['cpg_workflows/query_modules']
-
-        j = dataproc.hail_dataproc_job(
-            b,
-            f'{script_path} --out_path {out_path} --vep_version {vep_version}'
-            + ' '.join(str(p) for p in vep_results_paths),
-            max_age='24h',
-            packages=[
-                'cpg_workflows',
-                'google',
-                'fsspec',
-                'gcloud',
-            ],
-            num_workers=2,
-            num_secondary_workers=20,
-            job_name=f'VEP JSON to Hail table',
-            depends_on=depends_on,
-            scopes=['cloud-platform'],
-            pyfiles=pyfiles,
-            init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
+    j = b.new_job('VEP', job_attrs)
+    j.image(image_path('cpg_workflows'))
+    j.command(
+        query_command(
+            vep,
+            vep.vep_json_to_ht.__name__,
+            [str(p) for p in vep_results_paths],
+            str(out_path),
+            vep_version,
+            setup_gcp=True,
         )
-        j.attributes = (job_attrs or {}) | {'tool': 'hailctl dataproc'}
-    else:
-        from cpg_workflows.query_modules import vep
-
-        j = b.new_job(f'VEP', job_attrs)
-        j.image(image_path('cpg_workflows'))
-        j.command(
-            query_command(
-                vep,
-                vep.vep_json_to_ht.__name__,
-                [str(p) for p in vep_results_paths],
-                str(out_path),
-                vep_version,
-                setup_gcp=True,
-            )
-        )
+    )
     return j
 
 
@@ -247,11 +213,15 @@ def vep_one(
         'gerp_bigwig': f'{vep_dir}/gerp_conservation_scores.homo_sapiens.GRCh38.bw',
         'human_ancestor_fa': f'{vep_dir}/human_ancestor.fa.gz',
         'conservation_file': f'{vep_dir}/loftee.sql',
-        'loftee_path': '$MAMBA_ROOT_PREFIX/share/ensembl-vep' if vep_version == '105' else '$VEP_DIR_PLUGINS'
+        'loftee_path': '$MAMBA_ROOT_PREFIX/share/ensembl-vep'
+        if vep_version == '105'
+        else '$VEP_DIR_PLUGINS',
     }
 
     # sexy new plugin - only present in 110 build
-    alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
+    alpha_missense_plugin = (
+        f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
+    )
 
     # UTRannotator plugin doesn't support JSON output at this time; only activate for VCF outputs
     # VCF annotation doesn't utilise the aggregated Seqr reference data, including spliceAI

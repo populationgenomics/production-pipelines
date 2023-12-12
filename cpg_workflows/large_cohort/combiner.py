@@ -1,10 +1,10 @@
 import collections
 import logging
 
+import hail as hl
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build
-import hail as hl
 
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.targets import SequencingGroup
@@ -16,8 +16,6 @@ def _check_gvcfs(sequencing_groups: list[SequencingGroup]) -> list[SequencingGro
     Making sure each sequencing group has a GVCF
     """
     for sequencing_group in sequencing_groups:
-        if not sequencing_group.gvcf and exists(sequencing_group.make_gvcf_path().path):
-            sequencing_group.gvcf = sequencing_group.make_gvcf_path()
         if not sequencing_group.gvcf:
             if get_config()['workflow'].get('skip_sgs_with_missing_input', False):
                 logging.warning(f'Skipping {sequencing_group} which is missing GVCF')
