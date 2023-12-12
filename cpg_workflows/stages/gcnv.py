@@ -5,6 +5,7 @@ from typing import Any
 
 from cpg_utils import Path
 from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
+from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs import gcnv
 from cpg_workflows.targets import SequencingGroup, Cohort
 from cpg_workflows.workflow import (
@@ -23,8 +24,6 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     queue_annotate_sv_jobs,
     _gcnv_annotated_meta,
 )
-
-from cpg_workflows.batch import get_batch
 
 
 @stage
