@@ -603,6 +603,7 @@ class AnnotateVcfWithStrvctvre(CohortStage):
         )
 
         strv_job.image(image_path('strvctvre'))
+        strv_job.storage('20Gi')
 
         strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
         phylop_in_batch = get_batch().read_input(strvctvre_phylop)
