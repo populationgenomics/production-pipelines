@@ -623,27 +623,18 @@ class AnnotateVcfWithStrvctvre(CohortStage):
 
         # run strvctvre
         strv_job.command(
-            f'cd StrVCTVRE && '
             f'python StrVCTVRE.py '
             f'-i {input_vcf} '
             f'-o {strv_job.output_vcf["vcf.gz"]} '
             f'-f vcf '
             f'-p {phylop_in_batch}'
         )
-
-        # and a follow-up job to index the results
-        tabix_job = get_batch().new_job(
-            'Tabix on StrVCTVRE VCF', self.get_job_attrs() | {'tool': 'tabix'}
-        )
-        tabix_job.image(image_path('bcftools'))
-        tabix_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')
-        tabix_job.depends_on(strv_job)
+        strv_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')
 
         get_batch().write_output(
             strv_job.output_vcf, str(expected_d['strvctvre_vcf']).replace('.vcf.gz', '')
         )
-        return self.make_outputs(cohort, data=expected_d, jobs=[strv_job, tabix_job])
-
+        return self.make_outputs(cohort, data=expected_d, jobs=strv_job)
 
 @stage(required_stages=AnnotateVcfWithStrvctvre)
 class AnnotateCohortSv(CohortStage):
