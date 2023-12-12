@@ -636,6 +636,7 @@ class AnnotateVcfWithStrvctvre(CohortStage):
         )
         return self.make_outputs(cohort, data=expected_d, jobs=strv_job)
 
+
 @stage(required_stages=AnnotateVcfWithStrvctvre)
 class AnnotateCohortSv(CohortStage):
     """
@@ -660,7 +661,9 @@ class AnnotateCohortSv(CohortStage):
         queue job(s) to rearrange the annotations prior to Seqr transformation
         """
 
-        vcf_path = inputs.as_path(target=cohort, stage=AnnotateVcfWithStrvctvre, key='strvctvre_vcf')
+        vcf_path = inputs.as_path(
+            target=cohort, stage=AnnotateVcfWithStrvctvre, key='strvctvre_vcf'
+        )
         checkpoint_prefix = (
             to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
         )
