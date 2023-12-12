@@ -86,8 +86,8 @@ MTA_QUERY = gql(
             }
         }
     }
-""")
-# validate(MTA_QUERY)
+"""
+)
 
 
 @stage
@@ -115,7 +115,10 @@ class GeneratePanelData(DatasetStage):
         expected_out = self.expected_outputs(dataset)
 
         query_dataset = dataset.name
-        if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
+        if (
+            get_config()['workflow'].get('access_level') == 'test'
+            and 'test' not in query_dataset
+        ):
             query_dataset += '-test'
         hpo_file = get_batch().read_input(get_config()['workflow']['obo_file'])
 
@@ -171,15 +174,24 @@ def query_for_latest_mt(dataset: str) -> str:
         str, the path to the latest MT
     """
     query_dataset = dataset
-    if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
+    if (
+        get_config()['workflow'].get('access_level') == 'test'
+        and 'test' not in query_dataset
+    ):
         query_dataset += '-test'
-    result = gql_query_optional_logging(MTA_QUERY, query_params={'dataset': query_dataset})
+    result = gql_query_optional_logging(
+        MTA_QUERY, query_params={'dataset': query_dataset}
+    )
     mt_by_date = {}
     seq_type_exome = get_config()['workflow'].get('sequencing_type') == 'exome'
     for analysis in result['project']['analyses']:
-        if analysis['output'] and analysis['output'].endswith('.mt') and (
-            (seq_type_exome and '/exome/' in analysis['output'])
-            or (not seq_type_exome and '/exome/' not in analysis['output'])
+        if (
+            analysis['output']
+            and analysis['output'].endswith('.mt')
+            and (
+                (seq_type_exome and '/exome/' in analysis['output'])
+                or (not seq_type_exome and '/exome/' not in analysis['output'])
+            )
         ):
             mt_by_date[analysis['timestampCompleted']] = analysis['output']
 
@@ -306,9 +318,7 @@ def _aip_html_meta(
     This isn't quite conformant with what AIP alone produces
     e.g. doesn't have the full URL to the results in GCP
     """
-    return {
-        'type': 'aip_output_html'
-    }
+    return {'type': 'aip_output_html'}
 
 
 @stage(
@@ -316,13 +326,17 @@ def _aip_html_meta(
     analysis_type='aip-report',
     analysis_keys=['results_html', 'latest_html'],
     update_analysis_meta=_aip_html_meta,
-    tolerate_missing_output=True
+    tolerate_missing_output=True,
 )
 class CreateAIPHTML(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {
-            'results_html': dataset.prefix(category='web') / DATED_FOLDER / 'summary_output.html',
-            'latest_html': dataset.prefix(category='web') / DATED_FOLDER / f'summary_latest_{CHUNKY_DATE}.html',
+            'results_html': dataset.prefix(category='web')
+            / DATED_FOLDER
+            / 'summary_output.html',
+            'latest_html': dataset.prefix(category='web')
+            / DATED_FOLDER
+            / f'summary_latest_{CHUNKY_DATE}.html',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:

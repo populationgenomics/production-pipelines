@@ -145,7 +145,7 @@ class GatherSampleEvidence(SequencingGroupStage):
             'dataset': sequencing_group.dataset.name,  # already lowercase
             'sequencing-group': sequencing_group.id.lower(),  # cpg123123
             'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid()
+            AR_GUID_NAME: try_get_ar_guid(),
         }
 
         jobs = add_gatk_sv_jobs(
@@ -215,10 +215,7 @@ class EvidenceQC(CohortStage):
 
         expected_d = self.expected_outputs(cohort)
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid()
-        }
+        billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
 
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
@@ -226,7 +223,7 @@ class EvidenceQC(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 

@@ -206,7 +206,7 @@ class MakeCohortVcf(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -255,7 +255,7 @@ class FormatVcfForGatk(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -323,7 +323,7 @@ class JoinRawCalls(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -373,7 +373,7 @@ class SVConcordance(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -491,7 +491,7 @@ class FilterGenotypes(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -549,7 +549,7 @@ class AnnotateVcf(CohortStage):
             cohort_prefix=self.prefix,
             input_vcf=inputs.as_dict(cohort, MakeCohortVcf)['vcf'],
             outputs=expected_out,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_out, jobs=job_or_none)
 
@@ -655,7 +655,7 @@ class AnnotateDatasetSv(DatasetStage):
             out_mt_path=self.expected_outputs(dataset)['mt'],
             tmp_prefix=checkpoint_prefix,
             job_attrs=self.get_job_attrs(dataset),
-            depends_on=inputs.get_jobs(dataset)
+            depends_on=inputs.get_jobs(dataset),
         )
 
         return self.make_outputs(

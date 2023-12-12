@@ -297,6 +297,6 @@ def queue_annotate_sv_jobs(
         wfl_name='AnnotateVcf',
         input_dict=input_dict,
         expected_out_dict=outputs,
-        labels=labels
+        labels=labels,
     )
     return jobs
