@@ -161,7 +161,8 @@ def main(
         dataset = f'{dataset}-test'
 
     print(f'Finding CRAMs for {len(sequencing_groups)} sequencing groups from {dataset} in database')
-    cram_list = query_metamist(dataset, sequencing_groups)
+    # cram_list = query_metamist(dataset, sequencing_groups)
+    cram_list = {'CPG296947': 'gs://cpg-flinders-ophthal-test/exome/cram/CPG270371.cram'}
 
     print(f'Total CRAM file entries found: {len(cram_list)}')
 
@@ -195,7 +196,7 @@ def main(
         j.storage(filesize * 1.2)  # Allow some extra space for index file, references, etc
 
         j_result = j.call(do_reheader,
-                          dry_run, reheadered_path.stem,
+                          dry_run, newpath.stem,
                           b.read_input(str(path)), j.out_cram, j.out_crai)
 
         assert isinstance(j.out_cram, JobResourceFile)
@@ -209,12 +210,12 @@ def main(
 
         print(f'Added reheader job for {path}')
 
-        if not dry_run:
-            db_j = b.new_python_job(f'Update metamist for {newpath}')
-            db_j.image(config['workflow']['driver_image'])
+        # if not dry_run:
+        #     db_j = b.new_python_job(f'Update metamist for {newpath}')
+        #     db_j.image(config['workflow']['driver_image'])
 
-            db_j.call(do_metamist_update,
-                      dataset, sequencing_type, reheadered_path.stem, str(path), str(newpath), j_result)
+        #     db_j.call(do_metamist_update,
+        #               dataset, sequencing_type, reheadered_path.stem, str(path), str(newpath), j_result)
 
     b.run(wait=False)
 
