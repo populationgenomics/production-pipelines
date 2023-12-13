@@ -158,7 +158,7 @@ class GatherSampleEvidence(SequencingGroupStage):
             expected_out_dict=expected_d,
             sequencing_group_id=sequencing_group.id,
             labels=billing_labels,
-            cromwell_status_poll_interval=randint(300, 500),
+            cromwell_status_poll_interval=randint(300, 900),
         )
         return self.make_outputs(sequencing_group, data=expected_d, jobs=jobs)
 
