@@ -366,7 +366,7 @@ def fix_intervals_vcf(
         r"sed -i  's/<ID=GT,Number=1,Type=Integer/<ID=GT,Number=1,Type=String/' header"
     )
     reheader_job.command(
-        f'bcftools reheader -h header {input_vcf} -o {reheader_job.output["vcf.bgz"]}'
+        f'bcftools reheader -h header {input_vcf} | bgzip -c > {reheader_job.output["vcf.bgz"]}'
     )
     reheader_job.command(f'tabix {reheader_job.output["vcf.bgz"]}')
 

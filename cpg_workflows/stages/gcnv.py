@@ -194,7 +194,7 @@ class FixDodgyVCFs(SequencingGroupStage):
 
         jobs = gcnv.fix_intervals_vcf(
             get_batch(),
-            inputs.as_path(seqgroup.dataset, GermlineCNVCalls, 'intervals'),
+            inputs.as_path(seqgroup, GermlineCNVCalls, 'intervals'),
             self.get_job_attrs(seqgroup),
             output_path=outputs['fixed_intervals']
         )
