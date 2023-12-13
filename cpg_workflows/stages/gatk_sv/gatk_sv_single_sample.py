@@ -150,6 +150,10 @@ class GatherSampleEvidence(SequencingGroupStage):
         }
 
         # add some max-polling interval jitter for each sample
+        # cromwell_status_poll_interval is a number (int, seconds)
+        # this is used to determine how often to poll Cromwell for completion status
+        # we alter the per-sample maximum to be between 5 and 15 minutes for this
+        # long running job, so samples poll on different intervals, spreading load
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=sequencing_group.dataset,
