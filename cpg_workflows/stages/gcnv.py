@@ -4,8 +4,9 @@ Stages that implement GATK-gCNV.
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
-from cpg_utils.hail_batch import get_batch
+from cpg_utils.hail_batch import get_batch, image_path
 from cpg_workflows.jobs import gcnv
+from cpg_workflows.jobs.seqr_loader_cnv import annotate_cohort_jobs_cnv
 from cpg_workflows.targets import SequencingGroup, Cohort
 from cpg_workflows.workflow import (
     stage,
@@ -16,6 +17,7 @@ from cpg_workflows.workflow import (
 )
 
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
+    get_references,
     queue_annotate_sv_jobs,
     _gcnv_annotated_meta
 )
@@ -283,7 +285,55 @@ class AnnotateVcfCNV(CohortStage):
 
 
 @stage(required_stages=AnnotateVcfCNV)
-class AnnotateCohortSv(CohortStage):
+class AnnotateCNVVcfWithStrvctvre(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {
+            'strvctvre_vcf': self.prefix / 'cnv_strvctvre_annotated.vcf.gz',
+            'strvctvre_vcf_index': self.prefix / 'cnv_strvctvre_annotated.vcf.gz.tbi',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        strv_job = get_batch().new_job(
+            'StrVCTVRE', self.get_job_attrs() | {'tool': 'strvctvre'}
+        )
+
+        strv_job.image(image_path('strvctvre'))
+        strv_job.storage('20Gi')
+
+        strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
+        phylop_in_batch = get_batch().read_input(strvctvre_phylop)
+
+        input_dict = inputs.as_dict(cohort, AnnotateVcfCNV)
+        expected_d = self.expected_outputs(cohort)
+
+        # read vcf and index into the batch
+        input_vcf = get_batch().read_input_group(
+            vcf=str(input_dict['annotated_vcf']),
+            vcf_index=str(input_dict['annotated_vcf_index']),
+        )['vcf']
+
+        strv_job.declare_resource_group(
+            output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+        )
+
+        # run strvctvre
+        strv_job.command(
+            f'python StrVCTVRE.py '
+            f'-i {input_vcf} '
+            f'-o {strv_job.output_vcf["vcf.gz"]} '
+            f'-f vcf '
+            f'-p {phylop_in_batch}'
+        )
+        strv_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')
+
+        get_batch().write_output(
+            strv_job.output_vcf, str(expected_d['strvctvre_vcf']).replace('.vcf.gz', '')
+        )
+        return self.make_outputs(cohort, data=expected_d, jobs=strv_job)
+
+
+@stage(required_stages=AnnotateCNVVcfWithStrvctvre)
+class AnnotateCohortCNV(CohortStage):
     """
     What do we want?! CNV Data in Seqr!
     When do we want it?! Now!
@@ -305,12 +355,12 @@ class AnnotateCohortSv(CohortStage):
         queue job(s) to rearrange the annotations prior to Seqr transformation
         """
 
-        vcf_path = inputs.as_path(target=cohort, stage=AnnotateVcfCNV, key='annotated_vcf')
+        vcf_path = inputs.as_path(target=cohort, stage=AnnotateCNVVcfWithStrvctvre, key='strvctvre_vcf')
         checkpoint_prefix = (
             to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
         )
 
-        job = annotate_cohort_jobs_sv(
+        job = annotate_cohort_jobs_cnv(
             b=get_batch(),
             vcf_path=vcf_path,
             out_mt_path=self.expected_outputs(cohort)['mt'],

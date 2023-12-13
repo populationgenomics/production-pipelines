@@ -29,7 +29,7 @@ def annotate_cohort_jobs_cnv(
     j.command(
         query_command(
             seqr_loader_cnv,
-            seqr_loader_cnv.annotate_cohort_sv.__name__,
+            seqr_loader_cnv.annotate_cohort_cnv.__name__,
             str(vcf_path),
             str(out_mt_path),
             str(checkpoint_prefix),
@@ -41,7 +41,7 @@ def annotate_cohort_jobs_cnv(
     return j
 
 
-def annotate_dataset_jobs_sv(
+def annotate_dataset_jobs_cnv(
     b: Batch,
     mt_path: Path,
     sgids: list[str],

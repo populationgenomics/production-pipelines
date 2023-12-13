@@ -11,6 +11,7 @@ import hail as hl
 from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build, reference_path
+from cpg_workflows.query_modules.seqr_loader_sv import get_expr_for_xpos, get_expr_for_contig_number, get_cpx_interval
 from cpg_workflows.utils import read_hail, checkpoint_hail
 
 
@@ -60,46 +61,6 @@ FIELD_TYPES = {
     "no_ovl": hl.tbool,
     "is_latest": hl.tbool
 }
-
-
-# yoinking some methods out of hail_scripts.computed_fields
-# removes dependency on submodule completely
-def get_expr_for_contig_number(locus: hl.LocusExpression) -> hl.Int32Expression:
-    """Convert contig name to contig number"""
-    return hl.bind(
-        lambda contig: (
-            hl.case()
-            .when(contig == 'X', 23)
-            .when(contig == 'Y', 24)
-            .when(contig[0] == 'M', 25)
-            .default(hl.int(contig))
-        ),
-        locus.contig.replace('^chr', ''),
-    )
-
-
-def get_expr_for_xpos(locus: hl.LocusExpression) -> hl.Int64Expression:
-    """Genomic position represented as a single number = contig_number * 10**9 + position.
-    This represents chrom:pos more compactly and allows for easier sorting.
-    """
-    contig_number = get_expr_for_contig_number(locus)
-    return hl.int64(contig_number) * 1_000_000_000 + locus.position
-
-
-def get_cpx_interval(x):
-    """
-    an example format of CPX_INTERVALS is "DUP_chr1:1499897-1499974"
-    Args:
-        x (hl.StringExpression instance):
-    Returns:
-        Struct of CPX components
-    """
-    type_chr = x.split('_chr')
-    chr_pos = type_chr[1].split(':')
-    pos = chr_pos[1].split('-')
-    return hl.struct(
-        type=type_chr[0], chrom=chr_pos[0], start=hl.int32(pos[0]), end=hl.int32(pos[1])
-    )
 
 
 def download_gencode_gene_id_mapping(gencode_release: str) -> str:
@@ -182,13 +143,27 @@ def parse_gtf_from_local(gtf_path: str) -> hl.dict:
     return hl.literal(gene_id_mapping)
 
 
-def annotate_cohort_sv(
+def parse_genes(gene_col: hl.expr.StringExpression) -> hl.expr.SetExpression:
+    """
+    Convert a string-ified gene list to a set()
+    """
+    return hl.set(gene_col.split(',').filter(
+        lambda gene: ~hl.set({'None', 'null', 'NA', ''}).contains(gene)
+    ).map(
+        lambda gene: gene.split(r'\.')[0]
+    ))
+
+def hl_agg_collect_set_union(gene_col: hl.expr.SetExpression) -> hl.expr.SetExpression:
+    return hl.flatten(hl.agg.collect_as_set(gene_col))
+
+
+def annotate_cohort_cnv(
     vcf_path: str, out_mt_path: str, checkpoint_prefix: str | None = None
 ):
     """
-    Translate an annotated SV VCF into a Seqr-ready format
+    Translate an annotated CNV VCF into a Seqr-ready format
     Relevant gCNV specific schema
-    https://github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/sv_mt_schema.py
+    https://github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/gcnv_mt_schema.py
     Relevant gCNV loader script
     https://github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/seqr_sv_loading.py
     Args:
@@ -197,10 +172,10 @@ def annotate_cohort_sv(
         checkpoint_prefix (str): CHECKPOINT!@!!
     """
 
-    logger = logging.getLogger('annotate_cohort_sv')
+    logger = logging.getLogger(__file__)
     logger.setLevel(logging.INFO)
 
-    logger.info(f'Importing SV VCF {vcf_path}')
+    logger.info(f'Importing CNV VCF {vcf_path}')
     mt = hl.import_vcf(
         vcf_path,
         reference_genome=genome_build(),
@@ -213,22 +188,19 @@ def annotate_cohort_sv(
         sourceFilePath=vcf_path,
         genomeVersion=genome_build().replace('GRCh', ''),
         hail_version=hl.version(),
-        datasetType='SV',
+        datasetType='CNV',  # I think...
+        sampleType='WES'  # currently the only option
     )
-    if sequencing_type := get_config()['workflow'].get('sequencing_type'):
-        # Map to Seqr-style string
-        # https://github.com/broadinstitute/seqr/blob/e0c179c36c0f68c892017de5eab2e4c1b9ffdc92/seqr/models.py#L592-L594
-        mt = mt.annotate_globals(
-            sampleType={
-                'genome': 'WGS',
-                'exome': 'WES',
-                'single_cell': 'RNA',
-            }.get(sequencing_type, ''),
-        )
 
     # reimplementation of
-    # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/sv_mt_schema.py
+    # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/gcnv_mt_schema.py
     mt = mt.annotate_rows(
+        contig=mt.locus.contig.replace('^chr', ''),
+        start=mt.locus.position,
+        pos=mt.locus.position,
+        xpos=get_expr_for_xpos(mt.locus),
+        xstart=get_expr_for_xpos(mt.locus),
+        xstop=get_expr_for_xpos(mt.end_locus),
         sc=mt.info.AC[0],
         sf=mt.info.AF[0],
         sn=mt.info.AN,
