@@ -357,7 +357,7 @@ def fix_intervals_vcf(
         output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
     )
     reheader_job.image(image_path('bcftools'))
-    reheader_job.storage('10Gi')
+    reheader_job.storage('1Gi')
     input_vcf = b.read_input(str(interval_vcf))
     reheader_job.command(f'bcftools view -h {input_vcf} > header')
     reheader_job.command('echo "Before" && head header')
