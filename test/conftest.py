@@ -10,6 +10,7 @@ import cpg_workflows.inputs
 import cpg_workflows.metamist
 import cpg_workflows.stages.gatk_sv
 import cpg_workflows.workflow
+import cpg_workflows.jobs.genotype
 
 
 @pytest.fixture(autouse=True, scope='function')
@@ -33,3 +34,4 @@ def pre_and_post_test():
     setattr(cpg_workflows.inputs, '_cohort', None)  # noqa: B010
     setattr(cpg_workflows.stages.gatk_sv, '_FASTA', None)  # noqa: B010
     setattr(cpg_workflows.metamist, '_metamist', None)  # noqa: B010
+    setattr(cpg_workflows.jobs.genotype, 'intervals', None)  # noqa: B010
