@@ -93,15 +93,15 @@ def do_reheader(dry_run, sgid, incram, outcram, outcrai):
 
     newhdr_file = os.path.join(os.environ['BATCH_TMPDIR'], 'tmp.hdr')
     with open(newhdr_file, 'w') as newhdr:
+        pg_line_count = 0
         for line in headers.splitlines():
-            pg_line_count = 0
             if line.startswith('@RG'):
                 new_line = line.replace(header['ID'], sgid)
                 print(new_line, file=newhdr)
             elif line.startswith('@PG') and pg_line_count < 1:
                 new_line = line.replace(header['ID'], sgid)
                 print(line, file=newhdr)
-                pg_line_count += 1      
+                pg_line_count += 1
             else:
                 print(line, file=newhdr)
 
