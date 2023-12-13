@@ -1,9 +1,8 @@
 """
 Stages that implement GATK-gCNV.
 """
-from typing import Any
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs import gcnv
@@ -17,12 +16,8 @@ from cpg_workflows.workflow import (
 )
 
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
-    add_gatk_sv_jobs,
-    make_combined_ped,
-    get_images,
-    get_references,
     queue_annotate_sv_jobs,
-    _gcnv_annotated_meta,
+    _gcnv_annotated_meta
 )
 
 
@@ -238,7 +233,7 @@ class FastCombineGCNVs(CohortStage):
     analysis_keys=['annotated_vcf'],
     update_analysis_meta=_gcnv_annotated_meta,
 )
-class AnnotateVcfSV(CohortStage):
+class AnnotateVcfCNV(CohortStage):
     """
     Add annotations, such as the inferred function and allele frequencies of variants,
     to final VCF.
@@ -285,3 +280,44 @@ class AnnotateVcfSV(CohortStage):
             labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_out, jobs=job_or_none)
+
+
+@stage(required_stages=AnnotateVcfCNV)
+class AnnotateCohortSv(CohortStage):
+    """
+    What do we want?! CNV Data in Seqr!
+    When do we want it?! Now!
+
+    First step to transform annotated CNV callset data into a seqr ready format
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict:
+        """
+        Expected to write a matrix table.
+        """
+        return {
+            'tmp_prefix': str(self.tmp_prefix),
+            'mt': self.prefix / 'cohort_cnv.mt',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        """
+        queue job(s) to rearrange the annotations prior to Seqr transformation
+        """
+
+        vcf_path = inputs.as_path(target=cohort, stage=AnnotateVcfCNV, key='annotated_vcf')
+        checkpoint_prefix = (
+            to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
+        )
+
+        job = annotate_cohort_jobs_sv(
+            b=get_batch(),
+            vcf_path=vcf_path,
+            out_mt_path=self.expected_outputs(cohort)['mt'],
+            checkpoint_prefix=checkpoint_prefix,
+            job_attrs=self.get_job_attrs(cohort),
+            depends_on=inputs.get_jobs(cohort),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=job)
+
