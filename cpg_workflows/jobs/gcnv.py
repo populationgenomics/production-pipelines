@@ -441,9 +441,22 @@ def merge_calls(
     # -m: merge strategy
     # -0: compression level
     j.command(
-        f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {j.output["vcf.bgz"]} --threads 4 -m all -0'
+        f'bcftools merge {" ".join(batch_vcfs)} -Oz -o temp.vcf.bgz --threads 4 -m all -0'
     )
-    j.command(f'tabix {j.output["vcf.bgz"]}')
+    j.command(f'tabix temp.vcf.bgz')
+
+    # now do a thing to fix the header/SVTYPE in the VCF
+    # generate a new header line
+    # annotate the new line into the header (new file)
+    # run a sed insertion of SVTYPE=CNV into every variant, append to header
+    # compress and index the output file
+    j.command(f"""
+    echo -e '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="SV Type">' > hdr.txt
+    bcftools annotate -h hdr.txt temp.vcf.bgz | bcftools view -h > reheadered.vcf
+    bcftools view -H temp.vcf.bgz | sed 's/END/SVTYPE=CNV;END/' >> reheadered.vcf
+    bgzip -c reheadered.vcf > {j.output["vcf.bgz"]}
+    tabix {j.output["vcf.bgz"]}
+    """)
 
     # get the output root to write to
     output_no_suffix = str(output_path).removesuffix('.vcf.bgz')

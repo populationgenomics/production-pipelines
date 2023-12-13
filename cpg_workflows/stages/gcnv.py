@@ -176,6 +176,7 @@ class FixDodgyVCFs(SequencingGroupStage):
     """
     Fixes the GT header in the VCFs produced by gCNV
     During experimentation these were found to be Integer instead of String
+    This will be fixed in a future release of GATK
     """
 
     def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
@@ -235,7 +236,7 @@ class FastCombineGCNVs(CohortStage):
     analysis_keys=['annotated_vcf'],
     update_analysis_meta=_gcnv_annotated_meta,
 )
-class AnnotateVcfCNV(CohortStage):
+class AnnotateCNV(CohortStage):
     """
     Add annotations, such as the inferred function and allele frequencies of variants,
     to final VCF.
@@ -284,7 +285,7 @@ class AnnotateVcfCNV(CohortStage):
         return self.make_outputs(cohort, data=expected_out, jobs=job_or_none)
 
 
-@stage(required_stages=AnnotateVcfCNV)
+@stage(required_stages=AnnotateCNV)
 class AnnotateCNVVcfWithStrvctvre(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
@@ -303,7 +304,7 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
         strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
         phylop_in_batch = get_batch().read_input(strvctvre_phylop)
 
-        input_dict = inputs.as_dict(cohort, AnnotateVcfCNV)
+        input_dict = inputs.as_dict(cohort, AnnotateCNV)
         expected_d = self.expected_outputs(cohort)
 
         # read vcf and index into the batch
