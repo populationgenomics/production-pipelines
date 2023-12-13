@@ -344,6 +344,8 @@ def fix_intervals_vcf(
     b: hb.Batch, interval_vcf: Path, job_attrs: dict[str, str], output_path: Path
 ):
     """
+    Note: the reheader loop is only required until the closure and
+    adoption of https://github.com/broadinstitute/gatk/pull/8621
 
     Args:
         b (the batch instance):
@@ -356,29 +358,33 @@ def fix_intervals_vcf(
     reheader_job.declare_resource_group(
         output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
     )
-    reheader_job.image(image_path('bcftools'))
-    reheader_job.storage('1Gi')
+    reheader_job.image(image_path('bcftools')).storage('1Gi')
+
+    # read the Intervals VCF for this SG ID
     input_vcf = b.read_input(str(interval_vcf))
+
+    # pull the header into a temp file
     reheader_job.command(f'bcftools view -h {input_vcf} > header')
-    reheader_job.command('echo "Before" && head header')
-    # sed command to swap Integer GT to String
-    # 's/<ID=GT,Number=1,Type=Integer,Description="Genotype"/<ID=GT,Number=1,Type=String,Description="Genotype"/'
+
+    # sed command to swap Integer GT to String in-place
     reheader_job.command(
-        r"sed -i  's/<ID=GT,Number=1,Type=Integer/<ID=GT,Number=1,Type=String/' header"
+        r"sed -i 's/<ID=GT,Number=1,Type=Integer/<ID=GT,Number=1,Type=String/' header"
     )
-    reheader_job.command('echo "After" && head header')
 
     # apply the new header
     reheader_job.command(
         f'bcftools reheader -h header {input_vcf} -o temp.vcf.bgz'
     )
 
-    # split multiallelics
+    # split multiallelics (CNV calls are DEL/DUP at all loci)
     reheader_job.command(f'bcftools norm -m - temp.vcf.bgz | bgzip -c > {reheader_job.output["vcf.bgz"]}')
+
+    # and tabix that badboi
     reheader_job.command(f'tabix {reheader_job.output["vcf.bgz"]}')
 
-    # get the output root to write to
+    # get the output root to write to, and write both VCF and index
     b.write_output(reheader_job.output, str(output_path).removesuffix('.vcf.bgz'))
+
     return reheader_job
 
 
