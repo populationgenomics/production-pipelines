@@ -27,4 +27,4 @@ def test_check_multiqc(caplog, tmp_path):
 
     data_dir = to_path(__file__).parent / 'data' / 'check_multiqc'
     check_multiqc.run(str(data_dir / 'validation_multiqc.json'), send_to_slack=False)
-    assert '❗ CPG243717|NA12878_KCCG: MEDIAN_COVERAGE=8.00<10.00' in caplog.messages
+    assert '❗ CPGeee|NA12878_KCCG: MEDIAN_COVERAGE=8.00<10.00' in caplog.messages

@@ -3,14 +3,14 @@ Utils for submitting the workflow to a Dataproc cluster.
 """
 
 import math
-from analysis_runner import dataproc
+from typing import Sequence
+
 from hailtop.batch.job import Job
 
+from analysis_runner import dataproc
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-
-from cpg_workflows.batch import get_batch
-
+from cpg_utils.hail_batch import get_batch
 
 DATAPROC_PACKAGES = [
     'cpg-utils',
@@ -34,7 +34,7 @@ def dataproc_job(
     function_str_args: list[str] | None = None,
     preemptible: bool = True,
     num_workers: int | None = None,
-    depends_on: list[Job | None] = None,
+    depends_on: Sequence[Job | None] | None = None,
     autoscaling_policy: str | None = None,
     long: bool = False,
     worker_boot_disk_size: int | None = None,
@@ -122,5 +122,4 @@ def dataproc_job(
         worker_boot_disk_size=worker_boot_disk_size,
         secondary_worker_boot_disk_size=secondary_worker_boot_disk_size,
         pyfiles=pyfiles,
-        init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
     )
