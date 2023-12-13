@@ -2,13 +2,14 @@
 Test initialising Batch object.
 """
 
+from pathlib import Path
+
 from cpg_utils import to_path
+from pytest_mock import MockFixture
+
+from cpg_workflows.targets import Cohort
 
 from . import set_config
-
-from pathlib import Path
-from pytest_mock import MockFixture
-from cpg_workflows.targets import Cohort
 
 
 def test_batch_job(tmp_path):
@@ -40,10 +41,9 @@ def test_batch_job(tmp_path):
     """
     set_config(config, tmp_path / 'config.toml')
 
-    from cpg_utils.hail_batch import command, dataset_path
+    from cpg_utils.hail_batch import command, dataset_path, get_batch, reset_batch
 
-    from cpg_workflows.batch import get_batch
-
+    reset_batch()
     b = get_batch('Test batch job')
     j1 = b.new_job('Job 1')
     text = 'success'
@@ -110,16 +110,15 @@ def test_attributes(mocker: MockFixture, tmp_path):
     cpg_workflows = "stub"
     """
 
-    from cpg_utils.hail_batch import dataset_path
+    from cpg_utils.hail_batch import dataset_path, get_batch, reset_batch
 
-    from cpg_workflows.batch import get_batch
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
         SequencingGroupStage,
+        StageDecorator,
         StageInput,
         StageOutput,
-        StageDecorator,
         run_workflow,
         stage,
     )
@@ -164,7 +163,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
             self, sequencing_group: SequencingGroup, inputs: StageInput
         ) -> StageOutput | None:
             j = get_batch().new_job(
-                'Echo', self.get_job_attrs(sequencing_group) | dict(tool='echo')
+                'Echo', self.get_job_attrs(sequencing_group) | {'tool': 'echo'}
             )
             j.command(f'echo {sequencing_group.id}_done >> {j.output}')
             get_batch().write_output(
@@ -180,15 +179,20 @@ def test_attributes(mocker: MockFixture, tmp_path):
 
     set_config(config, tmp_path / 'config.toml')
 
+    reset_batch()
     workflow_stages: list[StageDecorator] = [MyQcStage1, MyQcStage2]
     run_workflow(stages=workflow_stages)
 
+    for b in get_batch()._jobs:
+        print(b.attributes)
+        print(b.name)
     # Check that the correct number of jobs were created
     assert (
         len(get_batch()._jobs)
-        == len(get_cohort().get_sequencing_groups()) * len(workflow_stages) * 3
+        == len(get_cohort().get_sequencing_groups()) * len(workflow_stages) * 2
     )
-    # 3 jobs per stage, assumes no nested workflow stages
+    # 2 jobs per stage, assumes no nested workflow stages
+    # ((1 per SG * 2 SG) * 2 workflow stages) * 2 (1 job per stage, 1 result registration)
 
     # Check that all expected attributes are present
     expected_attrs = [
@@ -202,6 +206,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
     ]
 
     for job in get_batch()._jobs:
+        assert job.attributes
         for key in job.attributes:
             assert key in expected_attrs
         assert job.attributes['stage'] in [s.__name__ for s in workflow_stages]
@@ -215,6 +220,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
             or job.attributes['sequencing_groups'] == "['CPG02']"
         )
         # test job name
+        assert job.name
         assert job.name.startswith(
             f'{get_cohort().get_datasets()[0].name}/{job.attributes["sequencing_group"]}/{job.attributes["participant_id"]}'
         )

@@ -142,7 +142,7 @@ def _plot_pca(
     out_path_pattern=None,
 ):
 
-    cntr: Counter = Counter(labels)
+    cntr = Counter(labels)
     # count the number of samples for each group and add it to the labels
     labels = [f'{x} ({cntr[x]})' for x in labels]
     unique_labels = list(Counter(labels).keys())

@@ -4,25 +4,25 @@ Stages that generates and summarises GVCF QC.
 import logging
 from typing import Any
 
-from cpg_utils import to_path, Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from cpg_workflows import get_batch
-from cpg_workflows.filetypes import GvcfPath
-from cpg_workflows.jobs.multiqc import multiqc
+from cpg_utils.hail_batch import get_batch
 
+from cpg_workflows.filetypes import GvcfPath
+from cpg_workflows.jobs.happy import happy
+from cpg_workflows.jobs.multiqc import multiqc
+from cpg_workflows.jobs.picard import vcf_qc
 from cpg_workflows.stages.genotype import Genotype
 from cpg_workflows.targets import Dataset
 from cpg_workflows.workflow import (
-    SequencingGroup,
-    stage,
-    StageInput,
-    StageOutput,
-    SequencingGroupStage,
     DatasetStage,
+    SequencingGroup,
+    SequencingGroupStage,
+    StageInput,
     StageInputNotFoundError,
+    StageOutput,
+    stage,
 )
-from cpg_workflows.jobs.happy import happy
-from cpg_workflows.jobs.picard import vcf_qc
 
 
 @stage(required_stages=Genotype)
@@ -113,8 +113,9 @@ class GvcfHappy(SequencingGroupStage):
 
 
 def _update_meta(output_path: str) -> dict[str, Any]:
-    from cloudpathlib import CloudPath
     import json
+
+    from cloudpathlib import CloudPath
 
     with CloudPath(output_path).open() as f:
         d = json.load(f)
@@ -142,11 +143,12 @@ class GvcfMultiQC(DatasetStage):
         if get_config()['workflow'].get('skip_qc', False) is True:
             return {}
 
-        h = dataset.alignment_inputs_hash()
+        # get the unique hash for these Sequencing Groups
+        sg_hash = dataset.alignment_inputs_hash()
         return {
-            'html': dataset.web_prefix() / 'qc' / 'gvcf' / 'multiqc.html',
-            'json': dataset.prefix() / 'qc' / 'gvcf' / h / 'multiqc_data.json',
-            'checks': dataset.prefix() / 'qc' / 'gvcf' / h / '.checks',
+            'html': dataset.web_prefix() / 'qc' / 'gvcf' / sg_hash / 'multiqc.html',
+            'json': dataset.prefix() / 'qc' / 'gvcf' / sg_hash / 'multiqc_data.json',
+            'checks': dataset.prefix() / 'qc' / 'gvcf' / sg_hash / '.checks',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
