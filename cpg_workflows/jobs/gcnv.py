@@ -20,16 +20,22 @@ def prepare_intervals(
     job_attrs: dict[str, str],
     output_paths: dict[str, Path],
 ) -> list[Job]:
-    j = b.new_job('Prepare intervals', job_attrs | {
-        'tool': 'gatk PreprocessIntervals/AnnotateIntervals',
-    })
+    j = b.new_job(
+        'Prepare intervals',
+        job_attrs
+        | {
+            'tool': 'gatk PreprocessIntervals/AnnotateIntervals',
+        },
+    )
     j.image(image_path('gatk_gcnv'))
 
     sequencing_type = get_config()['workflow']['sequencing_type']
     reference = fasta_res_group(b)
 
     exclude_intervals = get_config()['workflow'].get('exclude_intervals', [])
-    exclude_intervals_args = ' '.join([f'--exclude-intervals {i}' for i in exclude_intervals])
+    exclude_intervals_args = ' '.join(
+        [f'--exclude-intervals {i}' for i in exclude_intervals]
+    )
 
     if sequencing_type == 'exome':
         intervals = b.read_input(get_config()['workflow'].get('intervals_path'))
@@ -77,15 +83,19 @@ def collect_read_counts(
     job_attrs: dict[str, str],
     output_base_path: Path,
 ) -> list[Job]:
-    j = b.new_job('Collect gCNV read counts', job_attrs | {'tool': 'gatk CollectReadCounts'})
+    j = b.new_job(
+        'Collect gCNV read counts', job_attrs | {'tool': 'gatk CollectReadCounts'}
+    )
     j.image(image_path('gatk_gcnv'))
 
     reference = fasta_res_group(b)
 
-    j.declare_resource_group(counts={
-        'counts.tsv.gz': '{root}.counts.tsv.gz',
-        'counts.tsv.gz.tbi': '{root}.counts.tsv.gz.tbi',
-    })
+    j.declare_resource_group(
+        counts={
+            'counts.tsv.gz': '{root}.counts.tsv.gz',
+            'counts.tsv.gz.tbi': '{root}.counts.tsv.gz.tbi',
+        }
+    )
     assert isinstance(j.counts, ResourceGroup)
 
     cmd = f"""
@@ -107,10 +117,12 @@ def collect_read_counts(
 def _counts_input_args(b: hb.Batch, counts_paths: Iterable[Path]) -> str:
     args = ''
     for f in counts_paths:
-        counts = b.read_input_group(**{
-            'counts.tsv.gz': str(f),
-            'counts.tsv.gz.tbi': str(f) + '.tbi',
-        })
+        counts = b.read_input_group(
+            **{
+                'counts.tsv.gz': str(f),
+                'counts.tsv.gz.tbi': str(f) + '.tbi',
+            }
+        )
         args += f' --input {counts["counts.tsv.gz"]}'
 
     return args
@@ -125,9 +137,13 @@ def filter_and_determine_ploidy(
     job_attrs: dict[str, str],
     output_paths: dict[str, Path],
 ) -> list[Job]:
-    j = b.new_job('Filter intervals and determine ploidy', job_attrs | {
-        'tool': 'gatk FilterIntervals/DetermineGermlineContigPloidy',
-    })
+    j = b.new_job(
+        'Filter intervals and determine ploidy',
+        job_attrs
+        | {
+            'tool': 'gatk FilterIntervals/DetermineGermlineContigPloidy',
+        },
+    )
     j.image(image_path('gatk_gcnv'))
 
     counts_input_args = _counts_input_args(b, counts_paths)
@@ -215,10 +231,14 @@ def shard_gcnv(
         if can_reuse(output_paths[name]):
             continue
 
-        j = b.new_job('Call germline CNVs', job_attrs | {
-            'tool': 'gatk GermlineCNVCaller',
-            'part': f'shard {i} of {n}',
-        })
+        j = b.new_job(
+            'Call germline CNVs',
+            job_attrs
+            | {
+                'tool': 'gatk GermlineCNVCaller',
+                'part': f'shard {i} of {n}',
+            },
+        )
         j.image(image_path('gatk_gcnv'))
         j.memory('16Gi')  # TODO revisit limits
 
@@ -257,9 +277,13 @@ def postprocess_calls(
     job_attrs: dict[str, str],
     output_prefix: str,
 ) -> list[Job]:
-    j = b.new_job('Postprocess gCNV calls', job_attrs | {
-        'tool': 'gatk PostprocessGermlineCNVCalls',
-    })
+    j = b.new_job(
+        'Postprocess gCNV calls',
+        job_attrs
+        | {
+            'tool': 'gatk PostprocessGermlineCNVCalls',
+        },
+    )
     j.image(image_path('gatk_gcnv'))
     j.storage('12Gi')  # TODO revisit limits
 
@@ -277,12 +301,14 @@ def postprocess_calls(
         calls_shard_args += f' --calls-shard-path $BATCH_TMPDIR/{name}-calls'
 
     allosomal_contigs = get_config()['workflow'].get('allosomal_contigs', [])
-    allosomal_contigs_args = ' '.join([f'--allosomal-contig {c}' for c in allosomal_contigs])
+    allosomal_contigs_args = ' '.join(
+        [f'--allosomal-contig {c}' for c in allosomal_contigs]
+    )
 
     # declare all output files in advance
     j.declare_resource_group(
         output={
-            'intervals.vcf.gz':  '{root}/intervals.vcf.gz',
+            'intervals.vcf.gz': '{root}/intervals.vcf.gz',
             'intervals.vcf.gz.tbi': '{root}/intervals.vcf.gz.tbi',
             'segments.vcf.gz': '{root}/segments.vcf.gz',
             'segments.vcf.gz.tbi': '{root}/segments.vcf.gz.tbi',
@@ -314,11 +340,43 @@ def postprocess_calls(
     return [j]
 
 
+def fix_intervals_vcf(
+    b: hb.Batch, interval_vcf: Path, job_attrs: dict[str, str], output_path: Path
+):
+    """
+
+    Args:
+        b (the batch instance):
+        interval_vcf (Path): the individual intervals VCF
+
+    Returns:
+        the Job doing the work
+    """
+    reheader_job = b.new_job('Reheader intervals VCF', job_attrs | {'tool': 'bcftools'})
+    reheader_job.declare_resource_group(
+        output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
+    )
+    reheader_job.image(image_path('bcftools'))
+    reheader_job.storage('10Gi')
+    input_vcf = b.read_input(str(interval_vcf))
+    reheader_job.command(f'bcftools view -h {input_vcf} > header')
+    # sed command to swap Integer GT to String
+    # 's/<ID=GT,Number=1,Type=Integer,Description="Genotype"/<ID=GT,Number=1,Type=String,Description="Genotype"/'
+    reheader_job.command(
+        r"sed -i  's/<ID=GT,Number=1,Type=Integer/<ID=GT,Number=1,Type=String/' header"
+    )
+    reheader_job.command(
+        f'bcftools reheader -h header {input_vcf} -o {reheader_job.output["vcf.bgz"]}'
+    )
+    reheader_job.command(f'tabix {reheader_job.output["vcf.bgz"]}')
+
+    # get the output root to write to
+    b.write_output(reheader_job.output, str(output_path).removesuffix('.vcf.bgz'))
+    return reheader_job
+
+
 def merge_calls(
-    b: hb.Batch,
-    sg_vcfs: list[str],
-    job_attrs: dict[str, str],
-    output_path:  Path
+    b: hb.Batch, sg_vcfs: list[str], job_attrs: dict[str, str], output_path: Path
 ):
     """
     This job will run a fast simple merge on per-SGID call files
@@ -342,10 +400,7 @@ def merge_calls(
 
     assert sg_vcfs, 'No VCFs to merge'
 
-    j = b.new_job(
-        'Merge gCNV calls',
-        job_attrs | {'tool': 'bcftools'}
-    )
+    j = b.new_job('Merge gCNV calls', job_attrs | {'tool': 'bcftools'})
     j.image(image_path('bcftools'))
 
     # this should be made reactive, in case we scale past 10GB
@@ -353,10 +408,14 @@ def merge_calls(
 
     batch_vcfs = []
     for each_vcf in sg_vcfs:
-        batch_vcfs.append(b.read_input_group(**{
-            'vcf.gz': each_vcf,
-            'vcf.gz.tbi': f'{each_vcf}.tbi',
-        })['vcf.gz'])
+        batch_vcfs.append(
+            b.read_input_group(
+                **{
+                    'vcf.gz': each_vcf,
+                    'vcf.gz.tbi': f'{each_vcf}.tbi',
+                }
+            )['vcf.gz']
+        )
 
     j.declare_resource_group(
         output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
@@ -368,7 +427,9 @@ def merge_calls(
     # --threads: number of threads to use
     # -m: merge strategy
     # -0: compression level
-    j.command(f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {j.output["vcf.bgz"]} --threads 4 -m all -0')
+    j.command(
+        f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {j.output["vcf.bgz"]} --threads 4 -m all -0'
+    )
     j.command(f'tabix {j.output["vcf.bgz"]}')
 
     # get the output root to write to

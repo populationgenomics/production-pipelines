@@ -174,7 +174,34 @@ class GermlineCNVCalls(SequencingGroupStage):
         return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
 
 
-@stage(required_stages=[GermlineCNVCalls])
+@stage(required_stages=GermlineCNVCalls)
+class FixDodgyVCFs(SequencingGroupStage):
+    """
+    Fixes the GT header in the VCFs produced by gCNV
+    During experimentation these were found to be Integer instead of String
+    """
+
+    def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
+        return {
+            'fixed_intervals': self.prefix / f'{seqgroup.id}.fixed_intervals.vcf.bgz',
+            'fixed_intervals_index': self.prefix / f'{seqgroup.id}.fixed_intervals.vcf.bgz.tbi'
+        }
+
+    def queue_jobs(
+        self, seqgroup: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
+        outputs = self.expected_outputs(seqgroup)
+
+        jobs = gcnv.fix_intervals_vcf(
+            get_batch(),
+            inputs.as_path(seqgroup.dataset, GermlineCNVCalls, 'intervals'),
+            self.get_job_attrs(seqgroup),
+            output_path=outputs['fixed_intervals']
+        )
+        return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
+
+
+@stage(required_stages=FixDodgyVCFs)
 class FastCombineGCNVs(CohortStage):
     """
     Produces final multi-sample VCF results by running a merge
@@ -190,9 +217,9 @@ class FastCombineGCNVs(CohortStage):
         outputs = self.expected_outputs(cohort)
 
         # do a slapdash bcftools merge on all input files...
-        gcnv_vcfs = inputs.as_dict_by_target(GermlineCNVCalls)
+        gcnv_vcfs = inputs.as_dict_by_target(FixDodgyVCFs)
         all_vcfs = [
-            str(gcnv_vcfs[sgid]['intervals'])
+            str(gcnv_vcfs[sgid]['fixed_intervals'])
             for sgid in cohort.get_sequencing_group_ids()
         ]
 
@@ -203,57 +230,6 @@ class FastCombineGCNVs(CohortStage):
             output_path=outputs['combined_calls'],
         )
         return self.make_outputs(cohort, data=outputs, jobs=job_or_none)
-
-
-# @stage(required_stages=FastCombineGCNVs)
-# class TranslategCNVToGATKVCF(CohortStage):
-#     """
-#     attempt at fixing the gCNV workflow - pass the VCF through
-#     the to-GATK format VCF parser. This operates the Cromwell
-#     workflow from GATK-SV, and may not work at all...
-#     """
-#
-#     def expected_outputs(self, cohort: Cohort) -> dict:
-#         """
-#         create dictionary of names -> output paths
-#         """
-#
-#         return {
-#             'gatk_formatted_vcf': self.prefix / 'gatk_formatted.vcf.gz',
-#             'gatk_formatted_vcf_index': self.prefix / 'gatk_formatted.vcf.gz.tbi',
-#         }
-#
-#     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-#         """
-#         Args:
-#             cohort (Cohort): cohort of all samples (across several sub-cohort batches)
-#             inputs (StageInput): access to prior inputs
-#         """
-#
-#         input_dict: dict[str, Any] = {
-#             'prefix': cohort.name,
-#             'vcf': inputs.as_dict(cohort, FastCombineGCNVs)['combined_calls'],
-#             'ped_file': make_combined_ped(cohort, self.prefix),
-#         }
-#         input_dict |= get_images(['sv_pipeline_docker', 'sv_base_mini_docker'])
-#         input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
-#
-#         expected_d = self.expected_outputs(cohort)
-#
-#         billing_labels = {
-#             'stage': 'formatvcfforgatk',
-#             AR_GUID_NAME: try_get_ar_guid(),
-#         }
-#
-#         jobs = add_gatk_sv_jobs(
-#             batch=get_batch(),
-#             dataset=cohort.analysis_dataset,
-#             wfl_name='FormatVcfForGatk',
-#             input_dict=input_dict,
-#             expected_out_dict=expected_d,
-#             labels=billing_labels,
-#         )
-#         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
 @stage(
