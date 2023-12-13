@@ -118,6 +118,7 @@ def add_gatk_sv_jobs(
     sequencing_group_id: str | None = None,
     driver_image: str | None = None,
     labels: dict[str, str] | None = None,
+    cromwell_status_poll_interval: int = 60,
 ) -> list[Job]:
     """
     Generic function to add a job that would run one GATK-SV workflow.
@@ -173,6 +174,7 @@ def add_gatk_sv_jobs(
         driver_image=driver_image,
         copy_outputs_to_gcp=copy_outputs,
         labels=labels,
+        max_watch_poll_interval=cromwell_status_poll_interval,
     )
 
     copy_j = batch.new_job(f'{job_prefix}: copy outputs')
