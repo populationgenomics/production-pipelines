@@ -1,10 +1,8 @@
-import os
-
 from cpg_utils import to_path
 from cpg_utils.config import prepend_config_paths
+from cpg_utils.hail_batch import get_batch
 from .workflow import (
     get_workflow,
-    get_batch,
     get_cohort,
 )
 

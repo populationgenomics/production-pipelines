@@ -4,7 +4,7 @@ To prepare data:
 # Prepare GVCFs
 export GCS_OAUTH_TOKEN=$(gcloud auth application-default print-access-token)
 mkdir -p gvcf
-for s in CPG99994 CPG99986 CPG99978 CPG99960 CPG99952 CPG99945 CPG99937 CPG99929 CPG99911 CPG99903
+for s in SAMPLE1 SAMPLE2
 do 
   bcftools view -R intervals.bed gs://cpg-thousand-genomes-main/gvcf/$s.g.vcf.gz -Oz -o gvcf/$s.g.vcf.gz 
   tabix gvcf/$s.g.vcf.gz

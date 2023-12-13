@@ -2,80 +2,80 @@
     "report_data_sources": {
         "Somalier": {
             "all_sections": {
-                "CPG255190|HG001_NA12878": "/inputs/validation.samples.tsv",
-                "CPG255208|HG002_NA24385": "/inputs/validation.samples.tsv",
-                "CPG255216|HG003_NA24149": "/inputs/validation.samples.tsv",
-                "CPG255224|HG004_NA24143": "/inputs/validation.samples.tsv",
-                "CPG243717|NA12878_KCCG": "/inputs/validation.samples.tsv",
-                "CPG243725|SYNDIP": "/inputs/validation.samples.tsv",
-                "CPG255190|HG001_NA12878*CPG255208|HG002_NA24385": "/inputs/validation.pairs.tsv",
-                "CPG255190|HG001_NA12878*CPG255216|HG003_NA24149": "/inputs/validation.pairs.tsv",
-                "CPG255190|HG001_NA12878*CPG255224|HG004_NA24143": "/inputs/validation.pairs.tsv",
-                "CPG255190|HG001_NA12878*CPG243717|NA12878_KCCG": "/inputs/validation.pairs.tsv",
-                "CPG255190|HG001_NA12878*CPG243725|SYNDIP": "/inputs/validation.pairs.tsv",
-                "CPG255208|HG002_NA24385*CPG255216|HG003_NA24149": "/inputs/validation.pairs.tsv",
-                "CPG255208|HG002_NA24385*CPG255224|HG004_NA24143": "/inputs/validation.pairs.tsv",
-                "CPG255208|HG002_NA24385*CPG243717|NA12878_KCCG": "/inputs/validation.pairs.tsv",
-                "CPG255208|HG002_NA24385*CPG243725|SYNDIP": "/inputs/validation.pairs.tsv",
-                "CPG255216|HG003_NA24149*CPG255224|HG004_NA24143": "/inputs/validation.pairs.tsv",
-                "CPG255216|HG003_NA24149*CPG243717|NA12878_KCCG": "/inputs/validation.pairs.tsv",
-                "CPG255216|HG003_NA24149*CPG243725|SYNDIP": "/inputs/validation.pairs.tsv",
-                "CPG255224|HG004_NA24143*CPG243717|NA12878_KCCG": "/inputs/validation.pairs.tsv",
-                "CPG255224|HG004_NA24143*CPG243725|SYNDIP": "/inputs/validation.pairs.tsv",
-                "CPG243717|NA12878_KCCG*CPG243725|SYNDIP": "/inputs/validation.pairs.tsv"
+                "CPGaaa|HG001_NA12878": "/inputs/validation.samples.tsv",
+                "CPGbbb|HG002_NA24385": "/inputs/validation.samples.tsv",
+                "CPGccc|HG003_NA24149": "/inputs/validation.samples.tsv",
+                "CPGddd|HG004_NA24143": "/inputs/validation.samples.tsv",
+                "CPGeee|NA12878_KCCG": "/inputs/validation.samples.tsv",
+                "CPGfff|SYNDIP": "/inputs/validation.samples.tsv",
+                "CPGaaa|HG001_NA12878*CPGbbb|HG002_NA24385": "/inputs/validation.pairs.tsv",
+                "CPGaaa|HG001_NA12878*CPGccc|HG003_NA24149": "/inputs/validation.pairs.tsv",
+                "CPGaaa|HG001_NA12878*CPGddd|HG004_NA24143": "/inputs/validation.pairs.tsv",
+                "CPGaaa|HG001_NA12878*CPGeee|NA12878_KCCG": "/inputs/validation.pairs.tsv",
+                "CPGaaa|HG001_NA12878*CPGfff|SYNDIP": "/inputs/validation.pairs.tsv",
+                "CPGbbb|HG002_NA24385*CPGccc|HG003_NA24149": "/inputs/validation.pairs.tsv",
+                "CPGbbb|HG002_NA24385*CPGddd|HG004_NA24143": "/inputs/validation.pairs.tsv",
+                "CPGbbb|HG002_NA24385*CPGeee|NA12878_KCCG": "/inputs/validation.pairs.tsv",
+                "CPGbbb|HG002_NA24385*CPGfff|SYNDIP": "/inputs/validation.pairs.tsv",
+                "CPGccc|HG003_NA24149*CPGddd|HG004_NA24143": "/inputs/validation.pairs.tsv",
+                "CPGccc|HG003_NA24149*CPGeee|NA12878_KCCG": "/inputs/validation.pairs.tsv",
+                "CPGccc|HG003_NA24149*CPGfff|SYNDIP": "/inputs/validation.pairs.tsv",
+                "CPGddd|HG004_NA24143*CPGeee|NA12878_KCCG": "/inputs/validation.pairs.tsv",
+                "CPGddd|HG004_NA24143*CPGfff|SYNDIP": "/inputs/validation.pairs.tsv",
+                "CPGeee|NA12878_KCCG*CPGfff|SYNDIP": "/inputs/validation.pairs.tsv"
             }
         },
         "VerifyBAMID": {
             "all_sections": {
-                "CPG255208|HG002_NA24385": "/inputs/CPG255208_verify_bamid.selfSM",
-                "CPG255190|HG001_NA12878": "/inputs/CPG255190_verify_bamid.selfSM",
-                "CPG255224|HG004_NA24143": "/inputs/CPG255224_verify_bamid.selfSM",
-                "CPG243717|NA12878_KCCG": "/inputs/CPG243717_verify_bamid.selfSM",
-                "CPG243725|SYNDIP": "/inputs/CPG243725_verify_bamid.selfSM",
-                "CPG255216|HG003_NA24149": "/inputs/CPG255216_verify_bamid.selfSM"
+                "CPGbbb|HG002_NA24385": "/inputs/CPGbbb_verify_bamid.selfSM",
+                "CPGaaa|HG001_NA12878": "/inputs/CPGaaa_verify_bamid.selfSM",
+                "CPGddd|HG004_NA24143": "/inputs/CPGddd_verify_bamid.selfSM",
+                "CPGeee|NA12878_KCCG": "/inputs/CPGeee_verify_bamid.selfSM",
+                "CPGfff|SYNDIP": "/inputs/CPGfff_verify_bamid.selfSM",
+                "CPGccc|HG003_NA24149": "/inputs/CPGccc_verify_bamid.selfSM"
             }
         },
         "Picard": {
             "DuplicationMetrics": {
-                "CPG255224|HG004_NA24143": "/inputs/CPG255224.markduplicates-metrics",
-                "CPG255208|HG002_NA24385": "/inputs/CPG255208.markduplicates-metrics",
-                "CPG255216|HG003_NA24149": "/inputs/CPG255216.markduplicates-metrics",
-                "CPG255190|HG001_NA12878": "/inputs/CPG255190.markduplicates-metrics",
-                "CPG243717|NA12878_KCCG": "/inputs/CPG243717.markduplicates-metrics",
-                "CPG243725|SYNDIP": "/inputs/CPG243725.markduplicates-metrics"
+                "CPGddd|HG004_NA24143": "/inputs/CPGddd.markduplicates-metrics",
+                "CPGbbb|HG002_NA24385": "/inputs/CPGbbb.markduplicates-metrics",
+                "CPGccc|HG003_NA24149": "/inputs/CPGccc.markduplicates-metrics",
+                "CPGaaa|HG001_NA12878": "/inputs/CPGaaa.markduplicates-metrics",
+                "CPGeee|NA12878_KCCG": "/inputs/CPGeee.markduplicates-metrics",
+                "CPGfff|SYNDIP": "/inputs/CPGfff.markduplicates-metrics"
             },
             "WgsMetrics": {
-                "CPG255208|HG002_NA24385": "/inputs/CPG255208_picard_wgs_metrics.csv",
-                "CPG255224|HG004_NA24143": "/inputs/CPG255224_picard_wgs_metrics.csv",
-                "CPG255190|HG001_NA12878": "/inputs/CPG255190_picard_wgs_metrics.csv",
-                "CPG255216|HG003_NA24149": "/inputs/CPG255216_picard_wgs_metrics.csv",
-                "CPG243717|NA12878_KCCG": "/inputs/CPG243717_picard_wgs_metrics.csv",
-                "CPG243725|SYNDIP": "/inputs/CPG243725_picard_wgs_metrics.csv"
+                "CPGbbb|HG002_NA24385": "/inputs/CPGbbb_picard_wgs_metrics.csv",
+                "CPGddd|HG004_NA24143": "/inputs/CPGddd_picard_wgs_metrics.csv",
+                "CPGaaa|HG001_NA12878": "/inputs/CPGaaa_picard_wgs_metrics.csv",
+                "CPGccc|HG003_NA24149": "/inputs/CPGccc_picard_wgs_metrics.csv",
+                "CPGeee|NA12878_KCCG": "/inputs/CPGeee_picard_wgs_metrics.csv",
+                "CPGfff|SYNDIP": "/inputs/CPGfff_picard_wgs_metrics.csv"
             }
         },
         "Samtools": {
             "stats": {
-                "CPG255216|HG003_NA24149": "/inputs/CPG255216_samtools_stats.txt",
-                "CPG255224|HG004_NA24143": "/inputs/CPG255224_samtools_stats.txt",
-                "CPG255190|HG001_NA12878": "/inputs/CPG255190_samtools_stats.txt",
-                "CPG255208|HG002_NA24385": "/inputs/CPG255208_samtools_stats.txt",
-                "CPG243717|NA12878_KCCG": "/inputs/CPG243717_samtools_stats.txt",
-                "CPG243725|SYNDIP": "/inputs/CPG243725_samtools_stats.txt"
+                "CPGccc|HG003_NA24149": "/inputs/CPGccc_samtools_stats.txt",
+                "CPGddd|HG004_NA24143": "/inputs/CPGddd_samtools_stats.txt",
+                "CPGaaa|HG001_NA12878": "/inputs/CPGaaa_samtools_stats.txt",
+                "CPGbbb|HG002_NA24385": "/inputs/CPGbbb_samtools_stats.txt",
+                "CPGeee|NA12878_KCCG": "/inputs/CPGeee_samtools_stats.txt",
+                "CPGfff|SYNDIP": "/inputs/CPGfff_samtools_stats.txt"
             }
         },
         "FastQC": {
             "all_sections": {
-                "CPG255224|HG004_NA24143": "/inputs/CPG255224_fastqc.zip",
-                "CPG255216|HG003_NA24149": "/inputs/CPG255216_fastqc.zip",
-                "CPG255208|HG002_NA24385": "/inputs/CPG255208_fastqc.zip",
-                "CPG243717|NA12878_KCCG": "/inputs/CPG243717_fastqc.zip",
-                "CPG243725|SYNDIP": "/inputs/CPG243725_fastqc.zip"
+                "CPGddd|HG004_NA24143": "/inputs/CPGddd_fastqc.zip",
+                "CPGccc|HG003_NA24149": "/inputs/CPGccc_fastqc.zip",
+                "CPGbbb|HG002_NA24385": "/inputs/CPGbbb_fastqc.zip",
+                "CPGeee|NA12878_KCCG": "/inputs/CPGeee_fastqc.zip",
+                "CPGfff|SYNDIP": "/inputs/CPGfff_fastqc.zip"
             }
         }
     },
     "report_general_stats_data": [
         {
-            "CPG255208|HG002_NA24385": {
+            "CPGbbb|HG002_NA24385": {
                 "RG": "NA",
                 "CHIP_ID": "NA",
                 "#SNPS": 100000.0,
@@ -95,7 +95,7 @@
                 "RDPHET": "NA",
                 "RDPALT": "NA"
             },
-            "CPG255190|HG001_NA12878": {
+            "CPGaaa|HG001_NA12878": {
                 "RG": "NA",
                 "CHIP_ID": "NA",
                 "#SNPS": 100000.0,
@@ -115,7 +115,7 @@
                 "RDPHET": "NA",
                 "RDPALT": "NA"
             },
-            "CPG255224|HG004_NA24143": {
+            "CPGddd|HG004_NA24143": {
                 "RG": "NA",
                 "CHIP_ID": "NA",
                 "#SNPS": 100000.0,
@@ -135,7 +135,7 @@
                 "RDPHET": "NA",
                 "RDPALT": "NA"
             },
-            "CPG243717|NA12878_KCCG": {
+            "CPGeee|NA12878_KCCG": {
                 "RG": "NA",
                 "CHIP_ID": "NA",
                 "#SNPS": 100000.0,
@@ -155,7 +155,7 @@
                 "RDPHET": "NA",
                 "RDPALT": "NA"
             },
-            "CPG243725|SYNDIP": {
+            "CPGfff|SYNDIP": {
                 "RG": "NA",
                 "CHIP_ID": "NA",
                 "#SNPS": 100000.0,
@@ -175,7 +175,7 @@
                 "RDPHET": "NA",
                 "RDPALT": "NA"
             },
-            "CPG255216|HG003_NA24149": {
+            "CPGccc|HG003_NA24149": {
                 "RG": "NA",
                 "CHIP_ID": "NA",
                 "#SNPS": 100000.0,
@@ -197,7 +197,7 @@
             }
         },
         {
-            "CPG255224|HG004_NA24143": {
+            "CPGddd|HG004_NA24143": {
                 "LIBRARY": "LB0",
                 "UNPAIRED_READS_EXAMINED": 2669870.0,
                 "READ_PAIRS_EXAMINED": 315658904.0,
@@ -241,7 +241,7 @@
                 "HET_SNP_SENSITIVITY": 0.971727,
                 "HET_SNP_Q": 15.0
             },
-            "CPG255208|HG002_NA24385": {
+            "CPGbbb|HG002_NA24385": {
                 "LIBRARY": "LB0",
                 "UNPAIRED_READS_EXAMINED": 1195945.0,
                 "READ_PAIRS_EXAMINED": 267012127.0,
@@ -285,7 +285,7 @@
                 "HET_SNP_SENSITIVITY": 0.970918,
                 "HET_SNP_Q": 15.0
             },
-            "CPG255216|HG003_NA24149": {
+            "CPGccc|HG003_NA24149": {
                 "LIBRARY": "LB0",
                 "UNPAIRED_READS_EXAMINED": 1096401.0,
                 "READ_PAIRS_EXAMINED": 242498671.0,
@@ -329,7 +329,7 @@
                 "HET_SNP_SENSITIVITY": 0.970441,
                 "HET_SNP_Q": 15.0
             },
-            "CPG255190|HG001_NA12878": {
+            "CPGaaa|HG001_NA12878": {
                 "LIBRARY": "LB0",
                 "UNPAIRED_READS_EXAMINED": 2895943.0,
                 "READ_PAIRS_EXAMINED": 781006750.0,
@@ -373,7 +373,7 @@
                 "HET_SNP_SENSITIVITY": 0.968567,
                 "HET_SNP_Q": 15.0
             },
-            "CPG243717|NA12878_KCCG": {
+            "CPGeee|NA12878_KCCG": {
                 "LIBRARY": "LB0",
                 "UNPAIRED_READS_EXAMINED": 2013636.0,
                 "READ_PAIRS_EXAMINED": 92465320.0,
@@ -417,7 +417,7 @@
                 "HET_SNP_SENSITIVITY": 0.880159,
                 "HET_SNP_Q": 9.0
             },
-            "CPG243725|SYNDIP": {
+            "CPGfff|SYNDIP": {
                 "LIBRARY": "LB0",
                 "UNPAIRED_READS_EXAMINED": 5867968.0,
                 "READ_PAIRS_EXAMINED": 507491072.0,
@@ -463,7 +463,7 @@
             }
         },
         {
-            "CPG255216|HG003_NA24149": {
+            "CPGccc|HG003_NA24149": {
                 "raw_total_sequences": 488229108.0,
                 "filtered_sequences": 0.0,
                 "sequences": 488229108.0,
@@ -512,7 +512,7 @@
                 "reads_MQ0_percent": 6.182531828888826,
                 "reads_QC_failed_percent": 0.0
             },
-            "CPG255224|HG004_NA24143": {
+            "CPGddd|HG004_NA24143": {
                 "raw_total_sequences": 636664294.0,
                 "filtered_sequences": 0.0,
                 "sequences": 636664294.0,
@@ -561,7 +561,7 @@
                 "reads_MQ0_percent": 5.850843270315392,
                 "reads_QC_failed_percent": 0.0
             },
-            "CPG255190|HG001_NA12878": {
+            "CPGaaa|HG001_NA12878": {
                 "raw_total_sequences": 1567828638.0,
                 "filtered_sequences": 0.0,
                 "sequences": 1567828638.0,
@@ -610,7 +610,7 @@
                 "reads_MQ0_percent": 5.616062104358627,
                 "reads_QC_failed_percent": 0.0
             },
-            "CPG255208|HG002_NA24385": {
+            "CPGbbb|HG002_NA24385": {
                 "raw_total_sequences": 537552946.0,
                 "filtered_sequences": 0.0,
                 "sequences": 537552946.0,
@@ -659,7 +659,7 @@
                 "reads_MQ0_percent": 6.405937546475654,
                 "reads_QC_failed_percent": 0.0
             },
-            "CPG243717|NA12878_KCCG": {
+            "CPGeee|NA12878_KCCG": {
                 "raw_total_sequences": 189005322.0,
                 "filtered_sequences": 0.0,
                 "sequences": 189005322.0,
@@ -708,7 +708,7 @@
                 "reads_MQ0_percent": 5.453512573577161,
                 "reads_QC_failed_percent": 0.0
             },
-            "CPG243725|SYNDIP": {
+            "CPGfff|SYNDIP": {
                 "raw_total_sequences": 1027593132.0,
                 "filtered_sequences": 0.0,
                 "sequences": 1027593132.0,
@@ -759,35 +759,35 @@
             }
         },
         {
-            "CPG255224|HG004_NA24143": {
+            "CPGddd|HG004_NA24143": {
                 "percent_gc": 39.0,
                 "avg_sequence_length": 148.0,
                 "total_sequences": 4000000.0,
                 "percent_duplicates": 1.9940468863279222,
                 "percent_fails": 0.0
             },
-            "CPG255216|HG003_NA24149": {
+            "CPGccc|HG003_NA24149": {
                 "percent_gc": 40.0,
                 "avg_sequence_length": 148.0,
                 "total_sequences": 4000000.0,
                 "percent_duplicates": 2.018008798165255,
                 "percent_fails": 0.0
             },
-            "CPG255208|HG002_NA24385": {
+            "CPGbbb|HG002_NA24385": {
                 "percent_gc": 39.0,
                 "avg_sequence_length": 148.0,
                 "total_sequences": 4000000.0,
                 "percent_duplicates": 2.276194025261816,
                 "percent_fails": 0.0
             },
-            "CPG243717|NA12878_KCCG": {
+            "CPGeee|NA12878_KCCG": {
                 "percent_gc": 40.0,
                 "avg_sequence_length": 147.925011254445,
                 "total_sequences": 94502661.0,
                 "percent_duplicates": 13.87529091269009,
                 "percent_fails": 18.181818181818183
             },
-            "CPG243725|SYNDIP": {
+            "CPGfff|SYNDIP": {
                 "percent_gc": 41.0,
                 "avg_sequence_length": 151.0,
                 "total_sequences": 1035017682.0,

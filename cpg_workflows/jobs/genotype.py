@@ -91,7 +91,7 @@ def haplotype_caller(
         logging.info(f'Reusing HaplotypeCaller {output_path}, job attrs: {job_attrs}')
         return [None]
 
-    jobs: list[Job] = []
+    jobs: list[Job | None] = []
 
     if scatter_count > 1:
         global intervals
@@ -257,7 +257,7 @@ def _haplotype_caller_one(
 def merge_gvcfs_job(
     b: hb.Batch,
     sequencing_group_name: str,
-    gvcf_groups: list[str | hb.Resource],
+    gvcf_groups: list[str | hb.ResourceGroup],
     job_attrs: dict | None = None,
     out_gvcf_path: Path | None = None,
     overwrite: bool = False,

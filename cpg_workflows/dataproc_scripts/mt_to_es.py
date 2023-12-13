@@ -7,7 +7,6 @@ Loads the matrix table into an ElasticSearch index.
 """
 
 import logging
-import time
 
 import math
 from pprint import pformat
@@ -20,7 +19,7 @@ import elasticsearch
 from cpg_utils import to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import start_query_context, reference_path
+from cpg_utils.hail_batch import reference_path
 
 from hail_scripts.elasticsearch.hail_elasticsearch_client import HailElasticsearchClient
 
@@ -94,32 +93,19 @@ class HailElasticsearchClientV8(HailElasticsearchClient):
 
 
 @click.command()
-@click.option(
-    '--mt-path',
-    'mt_path',
-    required=True,
-)
+@click.option('--mt-path', required=True)
 @click.option(
     '--es-index',
-    'es_index',
-    type=click.STRING,
     help='Elasticsearch index. Usually the dataset name. Will be lowercased',
     required=True,
 )
-@click.option(
-    '--done-flag-path',
-    'done_flag_path',
-    help='File to touch in the end',
-)
-@click.option(
-    '--es-password',
-    'password',
-)
+@click.option('--done-flag-path', help='File to touch in the end')
+@click.option('--es-password')
 def main(
     mt_path: str,
     es_index: str,
     done_flag_path: str,
-    password: str = None,
+    es_password: str | None = None,
 ):
     """
     Entry point.
@@ -132,7 +118,7 @@ def main(
     username = get_config()['elasticsearch']['username']
     project_id = get_config()['elasticsearch']['password_project_id']
     secret_name = get_config()['elasticsearch']['password_secret_id']
-    password = password or read_secret(
+    password = es_password or read_secret(
         project_id=project_id,
         secret_name=secret_name,
         fail_gracefully=False,
@@ -152,10 +138,6 @@ def main(
 
     mt = hl.read_matrix_table(mt_path)
 
-    # Annotate GRCh37 coordinates here, until liftover is supported by Batch Backend
-    # and can be moved to annotate_cohort.
-    mt = _annotate_grch37(mt)
-
     logging.info('Getting rows and exporting to the ES')
     row_ht = elasticsearch_row(mt)
     es_shards = _mt_num_shards(mt)
@@ -171,34 +153,28 @@ def main(
         f.write('done')
 
 
-def _annotate_grch37(mt):
-    logging.info('Adding GRCh37 coords')
-    liftover_path = reference_path('liftover_38_to_37')
-    rg37 = hl.get_reference('GRCh37')
-    rg38 = hl.get_reference('GRCh38')
-    rg38.add_liftover(str(liftover_path), rg37)
-    mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
-    return mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
-
-
 def elasticsearch_row(mt: hl.MatrixTable):
     """
     Prepares the mt for export.
     - Flattens nested structs
     - drops locus and alleles key
     Borrowed from:
-    https://github.com/broadinstitute/hail-elasticsearch-pipelines/blob/495f0d1b4d49542557ca5cccf98a23fc627260bf/luigi_pipeline/lib/model/seqr_mt_schema.py
+    https://github.com/broadinstitute/hail-elasticsearch-pipelines/blob/main/luigi_pipeline/lib/model/seqr_mt_schema.py
     """
     # Converts a mt to the row equivalent.
-    ht = mt.rows()
+    if isinstance(mt, hl.MatrixTable):
+        mt = mt.rows()
+    if 'vep' in mt.row:
+        mt = mt.drop('vep')
+    key = mt.key
     # Converts nested structs into one field, e.g. {a: {b: 1}} => a.b: 1
-    ht = ht.drop('vep').flatten()
-    # When flattening, the table is unkeyed, which causes problems because our locus
-    # and alleles should not be normal fields. We can also re-key, but I believe this
-    # is computational?
-    ht = ht.drop(ht.locus, ht.alleles)
-    ht.describe()
-    return ht
+    table = mt.flatten()
+    # When flattening, the table is unkeyed, which causes problems because our row keys should not
+    # be normal fields. We can also re-key, but I believe this is computational?
+    # PS: row key is often locus and allele, but does not have to be
+    table = table.drop(*key)
+    table.describe()
+    return table
 
 
 def _mt_num_shards(mt):

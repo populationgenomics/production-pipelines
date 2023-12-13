@@ -10,9 +10,12 @@ use_gnarly = false
 # Use allele-specific annotations for VQSR
 use_as_vqsr = true
 
+# Version of VEP to use, currently operational: 105, 110
+vep_version = '110'
+
 # Realign CRAM when available, instead of using FASTQ.
 # The parameter value should correspond to CRAM version
-# (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPG01234.cram
+# (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPGaaa.cram
 #realign_from_cram_version = 'v0'
 
 # Calling intervals (defauls to whole genome intervals)
@@ -28,8 +31,9 @@ write_vcf = ["udn-aus"]
 # Override default resource requirements for unusually large seq data without
 # demanding higher resources for all operations as standard. Examples below
 
-# picard override (int), GB to use in MarkDuplicates
-#picard = 100
+# picard MarkDuplicates overrides for unreasnobly large sequnce groups
+#picard_mem_gb = 100
+#picard_storage_gb = 350
 
 # haplotype caller overrides, see production-pipelines PR#381
 # defaults in code are 40 for genomes, none for exomes
@@ -37,7 +41,7 @@ write_vcf = ["udn-aus"]
 
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
-# sensitivities. The tool matches them internally to a VQSLOD score cutoff 
+# sensitivities. The tool matches them internally to a VQSLOD score cutoff
 # based on the model's estimated sensitivity to a set of true variants.
 snp_filter_level = 99.7
 indel_filter_level = 99.0
@@ -71,14 +75,10 @@ username = 'seqr'
 password_secret_id = 'seqr-es-password'
 password_project_id = 'seqr-308602'
 
-[stripy]
-# Analysis_type can be "standard" (fast) or "extended" (marginally slower 
-# but also uses unmapped reads for genotying)
-analysis_type = "extended"
-# See https://gitlab.com/andreassh/stripy-pipeline#list-of-loci
-# Excluded by default: C9orf72, HTT
-target_loci = """AFF2,AR,ARX_1,ARX_2,ATN1,ATXN1,ATXN10,ATXN2,ATXN3,ATXN7,ATXN8OS,\
-BEAN1,CACNA1A,CBL,CNBP,COMP,DAB1,DIP2B,DMD,DMPK,FMR1,FOXL2,FXN,GIPC1,GLS,\
-HOXA13_1,HOXA13_2,HOXA13_3,HOXD13,JPH3,LRP12,MARCHF6,NIPA1,NOP56,NOTCH2NLC,\
-NUTM2B-AS1,PABPN1,PHOX2B,PPP2R2B,PRDM12,RAPGEF2,RFC1,RUNX2,SAMD12,SOX3,STARD7,TBP,\
-TBX1,TCF4,TNRC6A,XYLT1,YEATS2,ZIC2,ZIC3"""
+# temporary overrides until we rename images/config
+[images]
+vep_105 = "australia-southeast1-docker.pkg.dev/cpg-common/images/vep:105.0"
+
+[references]
+vep_105_mount = "gs://cpg-common-main/references/vep/105.0/mount"
+vep_110_mount = "gs://cpg-common-main/references/vep/110/mount"
