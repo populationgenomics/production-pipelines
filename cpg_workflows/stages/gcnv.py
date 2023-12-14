@@ -8,7 +8,6 @@ from cpg_utils.hail_batch import get_batch, image_path
 from cpg_workflows.jobs import gcnv
 from cpg_workflows.jobs.seqr_loader_cnv import annotate_cohort_jobs_cnv
 from cpg_workflows.targets import SequencingGroup, Cohort
-from cpg_workflows.utils import ExpectedResultT
 from cpg_workflows.workflow import (
     stage,
     CohortStage,
@@ -223,9 +222,12 @@ class FastCombineGCNVs(CohortStage):
             for sgid in cohort.get_sequencing_group_ids()
         ]
 
+        pipeline_image = get_images(['sv_pipeline_docker'])['sv_pipeline_docker']
+
         job_or_none = gcnv.merge_calls(
             get_batch(),
             sg_vcfs=all_vcfs,
+            docker_image=pipeline_image,
             job_attrs=self.get_job_attrs(cohort),
             output_path=outputs['combined_calls'],
         )

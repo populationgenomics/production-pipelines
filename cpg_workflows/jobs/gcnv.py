@@ -389,7 +389,7 @@ def fix_intervals_vcf(
 
 
 def merge_calls(
-    b: hb.Batch, sg_vcfs: list[str], job_attrs: dict[str, str], output_path: Path
+    b: hb.Batch, sg_vcfs: list[str], docker_image:str, job_attrs: dict[str, str], output_path: Path
 ):
     """
     This job will run a fast simple merge on per-SGID call files
@@ -399,6 +399,7 @@ def merge_calls(
     Args:
         b (batch):
         sg_vcfs (list[str]): paths to all individual VCFs
+        docker_image (str): docker image to use
         job_attrs (dict): any params to atach to the job
         output_path (Path): path to the final merged VCF
     """
@@ -409,7 +410,7 @@ def merge_calls(
     assert sg_vcfs, 'No VCFs to merge'
 
     j = b.new_job('Merge gCNV calls', job_attrs | {'tool': 'bcftools'})
-    j.image(image_path('bcftools'))
+    j.image(docker_image)
 
     # this should be made reactive, in case we scale past 10GB
     j.storage('10Gi')
