@@ -3,7 +3,6 @@ Jobs that implement GATK-gCNV.
 """
 
 from collections.abc import Iterable
-from textwrap import dedent
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
@@ -439,9 +438,7 @@ def merge_calls(
     j.command(
         f'bcftools merge {" ".join(batch_vcfs)} -Oz -o temp.vcf.bgz --threads 4 -m all -0'
     )
-    j.command(
-        dedent(
-            f"""
+    j.command(f"""
     python <<CODE
     import gzip
     headers = []
@@ -460,7 +457,7 @@ def merge_calls(
                 original_end = l_split[7]
                 end_int = int(l_split[7].removeprefix('END='))
                 l_split[7] = 'SVTYPE=CNV;SVLEN={{length}};{{end}}'.format(
-                    length=str(int(l_split[1]) - end_int),
+                    length=str(end_int - int(l_split[1])),
                     end=original_end
                 )
                 line = '\t'.join(l_split)
@@ -469,7 +466,7 @@ def merge_calls(
         f.writelines(headers)
         f.writelines(others)
     CODE
-    """))
+    """)
     j.command(f'bgzip -c temp.vcf.gz > {j.output["vcf.bgz"]}')
     j.command(f'tabix {j.output["vcf.bgz"]}')
 
