@@ -463,12 +463,12 @@ with gzip.open('temp.vcf.bgz', 'rt') as f:
             )
             line = '\t'.join(l_split)
             others.append(line)
-with gzip.open('temp.vcf.gz', 'wt') as f:
+with open('temp.vcf', 'w') as f:
     f.writelines(headers)
     f.writelines(others)
 CODE
     """)
-    j.command(f'bgzip -c temp.vcf.gz > {j.output["vcf.bgz"]}')
+    j.command(f'bgzip -c temp.vcf > {j.output["vcf.bgz"]}')
     j.command(f'tabix {j.output["vcf.bgz"]}')
 
     # get the output root to write to
