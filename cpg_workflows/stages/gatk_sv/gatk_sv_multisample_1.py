@@ -583,7 +583,10 @@ class GenotypeBatch(CohortStage):
                 f'genotyped_{mode}_vcf_index': f'{mode}.vcf.gz.tbi',
             }
 
-        return {key: self.prefix / f'{cohort_hash}_{fname}' for key, fname in ending_by_key.items()}
+        return {
+            key: self.prefix / f'{cohort_hash}_{fname}'
+            for key, fname in ending_by_key.items()
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         filterbatch_d = inputs.as_dict(cohort, FilterBatch)

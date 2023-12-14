@@ -2,6 +2,7 @@
 single-sample components of the GATK SV workflow
 """
 import logging
+from random import randint
 from typing import Any
 
 from cpg_utils import Path
@@ -148,6 +149,11 @@ class GatherSampleEvidence(SequencingGroupStage):
             AR_GUID_NAME: try_get_ar_guid(),
         }
 
+        # add some max-polling interval jitter for each sample
+        # cromwell_status_poll_interval is a number (int, seconds)
+        # this is used to determine how often to poll Cromwell for completion status
+        # we alter the per-sample maximum to be between 5 and 15 minutes for this
+        # long running job, so samples poll on different intervals, spreading load
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=sequencing_group.dataset,
@@ -156,6 +162,7 @@ class GatherSampleEvidence(SequencingGroupStage):
             expected_out_dict=expected_d,
             sequencing_group_id=sequencing_group.id,
             labels=billing_labels,
+            cromwell_status_poll_interval=randint(300, 900),
         )
         return self.make_outputs(sequencing_group, data=expected_d, jobs=jobs)
 
@@ -228,7 +235,12 @@ class EvidenceQC(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=EvidenceQC, analysis_type='sv', analysis_keys=['batch_json_negative', 'batch_json_positive'], tolerate_missing_output=True)
+@stage(
+    required_stages=EvidenceQC,
+    analysis_type='sv',
+    analysis_keys=['batch_json_negative', 'batch_json_positive'],
+    tolerate_missing_output=True,
+)
 class CreateSampleBatches(CohortStage):
     """
     uses the values generated in EvidenceQC
