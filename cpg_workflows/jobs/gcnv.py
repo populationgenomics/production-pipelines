@@ -439,7 +439,7 @@ def merge_calls(
     j.command(
         f'bcftools merge {" ".join(batch_vcfs)} -Oz -o temp.vcf.bgz --threads 4 -m all -0'
     )
-    j.command(f"""
+    j.command(fr"""
     python <<CODE
 import gzip
 headers = []
