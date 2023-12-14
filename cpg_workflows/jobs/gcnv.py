@@ -441,31 +441,31 @@ def merge_calls(
     )
     j.command(f"""
     python <<CODE
-    import gzip
-    headers = []
-    others = []
-    with gzip.open('temp.vcf.bgz', 'rt') as f:
-        for line in f:
-            if line.startswith('#'):
-                headers.append(line)
-                if line.startswith('##INFO=<ID=EN'):
-                    headers.extend([
-                        '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="SV Type">\n',
-                        '##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="SV Length">\n']
-                    )
-            else:
-                l_split = line.split('\t')
-                original_end = l_split[7]
-                end_int = int(l_split[7].removeprefix('END='))
-                l_split[7] = 'SVTYPE=CNV;SVLEN={{length}};{{end}}'.format(
-                    length=str(end_int - int(l_split[1])),
-                    end=original_end
+import gzip
+headers = []
+others = []
+with gzip.open('temp.vcf.bgz', 'rt') as f:
+    for line in f:
+        if line.startswith('#'):
+            headers.append(line)
+            if line.startswith('##INFO=<ID=EN'):
+                headers.extend([
+                    '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="SV Type">\n',
+                    '##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="SV Length">\n']
                 )
-                line = '\t'.join(l_split)
-                others.append(line)
-    with gzip.open('temp.vcf.gz', 'wt') as f:
-        f.writelines(headers)
-        f.writelines(others)
+        else:
+            l_split = line.split('\t')
+            original_end = l_split[7]
+            end_int = int(l_split[7].removeprefix('END='))
+            l_split[7] = 'SVTYPE=CNV;SVLEN={{length}};{{end}}'.format(
+                length=str(end_int - int(l_split[1])),
+                end=original_end
+            )
+            line = '\t'.join(l_split)
+            others.append(line)
+with gzip.open('temp.vcf.gz', 'wt') as f:
+    f.writelines(headers)
+    f.writelines(others)
 CODE
     """)
     j.command(f'bgzip -c temp.vcf.gz > {j.output["vcf.bgz"]}')
