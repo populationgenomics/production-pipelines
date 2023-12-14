@@ -465,7 +465,7 @@ def merge_calls(
     with gzip.open('temp.vcf.bgz', 'wt') as f:
         f.writelines(headers)
         f.writelines(others)
-    CODE
+CODE
     """)
     j.command(f'bgzip -c temp.vcf.gz > {j.output["vcf.bgz"]}')
     j.command(f'tabix {j.output["vcf.bgz"]}')
