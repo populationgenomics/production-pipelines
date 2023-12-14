@@ -463,7 +463,7 @@ def merge_calls(
                 )
                 line = '\t'.join(l_split)
                 others.append(line)
-    with gzip.open('temp.vcf.bgz', 'wt') as f:
+    with gzip.open('temp.vcf.gz', 'wt') as f:
         f.writelines(headers)
         f.writelines(others)
 CODE
