@@ -3,12 +3,13 @@ Jobs that implement GATK-gCNV.
 """
 
 from collections.abc import Iterable
+from textwrap import dedent
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 from hailtop.batch.resource import JobResourceFile, ResourceFile, ResourceGroup
 
-from cpg_utils import to_path, Path
+from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, fasta_res_group, image_path
 from cpg_workflows.filetypes import CramPath
@@ -372,12 +373,12 @@ def fix_intervals_vcf(
     )
 
     # apply the new header
-    reheader_job.command(
-        f'bcftools reheader -h header {input_vcf} -o temp.vcf.bgz'
-    )
+    reheader_job.command(f'bcftools reheader -h header {input_vcf} -o temp.vcf.bgz')
 
     # split multiallelics (CNV calls are DEL/DUP at all loci)
-    reheader_job.command(f'bcftools norm -m - temp.vcf.bgz | bgzip -c > {reheader_job.output["vcf.bgz"]}')
+    reheader_job.command(
+        f'bcftools norm -m - temp.vcf.bgz | bgzip -c > {reheader_job.output["vcf.bgz"]}'
+    )
 
     # and tabix that badboi
     reheader_job.command(f'tabix {reheader_job.output["vcf.bgz"]}')
@@ -393,13 +394,8 @@ def merge_calls(
 ):
     """
     This job will run a fast simple merge on per-SGID call files
-    No expectation that we need a fancy merge here since per-SGID
-    VCFs were derived from a joint-called dataset (see above)
-    based on the WDL here:
-    portal.firecloud.org/?return=terra#methods/asmirnov-broad/Germline-CNV-joint-callng-featured-workspace/1/wdl
-
-    initial trial run of this using a cloudfuse failed to ever complete
-    copying in for a localised merge feels vastly better
+    It then throws in a python script to add in two additional header lines
+    and edit the SVLEN and SVTYPE attributes into each row
 
     Args:
         b (batch):
@@ -443,20 +439,42 @@ def merge_calls(
     j.command(
         f'bcftools merge {" ".join(batch_vcfs)} -Oz -o temp.vcf.bgz --threads 4 -m all -0'
     )
-    j.command(f'tabix temp.vcf.bgz')
-
-    # now do a thing to fix the header/SVTYPE in the VCF
-    # generate a new header line
-    # annotate the new line into the header (new file)
-    # run a sed insertion of SVTYPE=CNV into every variant, append to header
-    # compress and index the output file
-    j.command(f"""
-    echo -e '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="SV Type">' > hdr.txt
-    bcftools annotate -h hdr.txt temp.vcf.bgz | bcftools view -h > reheadered.vcf
-    bcftools view -H temp.vcf.bgz | sed 's/END/SVTYPE=CNV;END/' >> reheadered.vcf
-    bgzip -c reheadered.vcf > {j.output["vcf.bgz"]}
+    j.command(
+        dedent(
+            f"""
+    python <<CODE
+    import gzip
+    headers = []
+    others = []
+    with gzip.open('temp.vcf.bgz', 'rt') as f:
+        for line in f:
+            if line.startswith('#'):
+                headers.append(line)
+                if line.startswith('##INFO=<ID=END'):
+                    headers.extend([
+                        '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="SV Type">\n',
+                        '##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="SV Length">\n']
+                    )
+            else:
+                l_split = line.split('\t')
+                original_end = l_split[7]
+                end_int = int(l_split[7].removesuffix('END='))
+                l_split[7] = 'SVTYPE=CNV;SVLEN={{length}};{{end}}'.format(
+                    length=str(int(l_split[2]) - end_int),
+                    end=original_end
+                )
+                line = '\t'.join(l_split)
+                others.append(line)
+    with gzip.open('temp.vcf.bgz', 'wt') as f:
+        f.writelines(headers)
+        f.writelines(others)
+    CODE
+    
+    bgzip -c temp.vcf.bgz > {j.output["vcf.bgz"]}
     tabix {j.output["vcf.bgz"]}
-    """)
+    """
+        )
+    )
 
     # get the output root to write to
     output_no_suffix = str(output_path).removesuffix('.vcf.bgz')

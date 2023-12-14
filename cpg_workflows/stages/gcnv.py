@@ -8,6 +8,7 @@ from cpg_utils.hail_batch import get_batch, image_path
 from cpg_workflows.jobs import gcnv
 from cpg_workflows.jobs.seqr_loader_cnv import annotate_cohort_jobs_cnv
 from cpg_workflows.targets import SequencingGroup, Cohort
+from cpg_workflows.utils import ExpectedResultT
 from cpg_workflows.workflow import (
     stage,
     CohortStage,
@@ -17,6 +18,7 @@ from cpg_workflows.workflow import (
 )
 
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
+    get_images,
     get_references,
     queue_annotate_sv_jobs,
     _gcnv_annotated_meta
@@ -238,6 +240,7 @@ class FastCombineGCNVs(CohortStage):
 )
 class AnnotateCNV(CohortStage):
     """
+    Smaller, direct annotation using SvAnnotate
     Add annotations, such as the inferred function and allele frequencies of variants,
     to final VCF.
 
