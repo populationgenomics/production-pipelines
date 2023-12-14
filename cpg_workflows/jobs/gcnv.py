@@ -450,7 +450,7 @@ def merge_calls(
         for line in f:
             if line.startswith('#'):
                 headers.append(line)
-                if line.startswith('##INFO=<ID=END'):
+                if line.startswith('##INFO=<ID=EN'):
                     headers.extend([
                         '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="SV Type">\n',
                         '##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="SV Length">\n']
