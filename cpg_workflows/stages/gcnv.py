@@ -2,11 +2,10 @@
 Stages that implement GATK-gCNV.
 """
 
-from cpg_utils import Path, to_path
+from cpg_utils import Path
 from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
 from cpg_utils.hail_batch import get_batch, image_path
 from cpg_workflows.jobs import gcnv
-from cpg_workflows.jobs.seqr_loader_cnv import annotate_cohort_jobs_cnv
 from cpg_workflows.targets import SequencingGroup, Cohort
 from cpg_workflows.workflow import (
     stage,
@@ -294,8 +293,8 @@ class AnnotateCNV(CohortStage):
 class AnnotateCNVVcfWithStrvctvre(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'strvctvre_vcf': self.prefix / 'cnv_strvctvre_annotated.vcf.gz',
-            'strvctvre_vcf_index': self.prefix / 'cnv_strvctvre_annotated.vcf.gz.tbi',
+            'strvctvre_vcf': self.prefix / 'cnv_strvctvre_annotated.vcf.bgz',
+            'strvctvre_vcf_index': self.prefix / 'cnv_strvctvre_annotated.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -336,44 +335,3 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
             strv_job.output_vcf, str(expected_d['strvctvre_vcf']).replace('.vcf.gz', '')
         )
         return self.make_outputs(cohort, data=expected_d, jobs=strv_job)
-
-
-@stage(required_stages=AnnotateCNVVcfWithStrvctvre)
-class AnnotateCohortCNV(CohortStage):
-    """
-    What do we want?! CNV Data in Seqr!
-    When do we want it?! Now!
-
-    First step to transform annotated CNV callset data into a seqr ready format
-    """
-
-    def expected_outputs(self, cohort: Cohort) -> dict:
-        """
-        Expected to write a matrix table.
-        """
-        return {
-            'tmp_prefix': str(self.tmp_prefix),
-            'mt': self.prefix / 'cohort_cnv.mt',
-        }
-
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        """
-        queue job(s) to rearrange the annotations prior to Seqr transformation
-        """
-
-        vcf_path = inputs.as_path(target=cohort, stage=AnnotateCNVVcfWithStrvctvre, key='strvctvre_vcf')
-        checkpoint_prefix = (
-            to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
-        )
-
-        job = annotate_cohort_jobs_cnv(
-            b=get_batch(),
-            vcf_path=vcf_path,
-            out_mt_path=self.expected_outputs(cohort)['mt'],
-            checkpoint_prefix=checkpoint_prefix,
-            job_attrs=self.get_job_attrs(cohort),
-            depends_on=inputs.get_jobs(cohort),
-        )
-
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=job)
-
