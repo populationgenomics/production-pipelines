@@ -389,7 +389,7 @@ def fix_intervals_vcf(
 
 
 def merge_calls(
-    b: hb.Batch, sg_vcfs: list[str], docker_image:str, job_attrs: dict[str, str], output_path: Path
+    b: hb.Batch, sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str], output_path: Path
 ):
     """
     This job will run a fast simple merge on per-SGID call files
