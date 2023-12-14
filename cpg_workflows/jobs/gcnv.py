@@ -469,12 +469,9 @@ def merge_calls(
         f.writelines(headers)
         f.writelines(others)
     CODE
-    
-    bgzip -c temp.vcf.gz > {j.output["vcf.bgz"]}
-    tabix {j.output["vcf.bgz"]}
-    """
-        )
-    )
+    """))
+    j.command(f'bgzip -c temp.vcf.gz > {j.output["vcf.bgz"]}')
+    j.command(f'tabix {j.output["vcf.bgz"]}')
 
     # get the output root to write to
     output_no_suffix = str(output_path).removesuffix('.vcf.bgz')
