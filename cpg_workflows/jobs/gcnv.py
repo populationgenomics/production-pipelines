@@ -458,9 +458,9 @@ def merge_calls(
             else:
                 l_split = line.split('\t')
                 original_end = l_split[7]
-                end_int = int(l_split[7].removesuffix('END='))
+                end_int = int(l_split[7].removeprefix('END='))
                 l_split[7] = 'SVTYPE=CNV;SVLEN={{length}};{{end}}'.format(
-                    length=str(int(l_split[2]) - end_int),
+                    length=str(int(l_split[1]) - end_int),
                     end=original_end
                 )
                 line = '\t'.join(l_split)
@@ -470,7 +470,7 @@ def merge_calls(
         f.writelines(others)
     CODE
     
-    bgzip -c temp.vcf.bgz > {j.output["vcf.bgz"]}
+    bgzip -c temp.vcf.gz > {j.output["vcf.bgz"]}
     tabix {j.output["vcf.bgz"]}
     """
         )
