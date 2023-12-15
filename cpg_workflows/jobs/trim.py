@@ -2,22 +2,19 @@
 Trim raw FASTQ reads using cutadapt
 """
 
-import hailtop.batch as hb
-from hailtop.batch.job import Job
-from hailtop.batch import ResourceFile, ResourceGroup
-from cpg_utils.hail_batch import command, image_path
-from cpg_utils.config import get_config
-from cpg_workflows.utils import can_reuse
-from cpg_workflows.resources import STANDARD
-from cpg_workflows.filetypes import (
-    FastqPair,
-    FastqPairs,
-)
-from cpg_workflows.workflow import (
-    SequencingGroup,
-)
 from dataclasses import dataclass
 from enum import Enum
+
+import hailtop.batch as hb
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import command, image_path
+from hailtop.batch import ResourceGroup
+from hailtop.batch.job import Job
+
+from cpg_workflows.filetypes import FastqPair
+from cpg_workflows.resources import STANDARD
+from cpg_workflows.utils import can_reuse
+from cpg_workflows.workflow import SequencingGroup
 
 
 class MissingFastqInputException(Exception):

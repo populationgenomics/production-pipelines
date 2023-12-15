@@ -3,29 +3,18 @@ Convert BAM to CRAM.
 """
 
 import hailtop.batch as hb
-from hailtop.batch.job import Job
-from hailtop.batch import ResourceGroup
-from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import command, image_path
 from cpg_utils.config import get_config
-from cpg_workflows.utils import can_reuse
-from cpg_workflows.resources import STANDARD, HIGHMEM
-from cpg_workflows.filetypes import (
-    FastqPair,
-    FastqPairs,
-    CramPath,
-)
-from cpg_workflows.workflow import (
-    SequencingGroup,
-)
-import re
+from cpg_utils.hail_batch import command, image_path
+from hailtop.batch import ResourceGroup
+from hailtop.batch.job import Job
+
+from cpg_workflows.resources import STANDARD
 
 
 def bam_to_cram(
     b: hb.Batch,
     input_bam: ResourceGroup,
     extra_label: str | None = None,
-    overwrite: bool = False,
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
 ) -> tuple[Job, hb.ResourceGroup]:

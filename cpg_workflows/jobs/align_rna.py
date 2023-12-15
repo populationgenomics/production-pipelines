@@ -2,25 +2,23 @@
 Align RNA-seq reads to the genome using STAR.
 """
 
+import re
+
 import hailtop.batch as hb
-from hailtop.batch.job import Job
 from cpg_utils import Path, to_path
 from cpg_utils.hail_batch import command, image_path
-from cpg_utils.config import get_config
-from cpg_workflows.utils import can_reuse
-from cpg_workflows.resources import STANDARD, HIGHMEM
+from hailtop.batch.job import Job
+
 from cpg_workflows.filetypes import (
     FastqPair,
     FastqPairs,
     BamPath,
     CramPath,
 )
-from cpg_workflows.workflow import (
-    SequencingGroup,
-)
-from cpg_workflows.jobs.markdups import markdup
 from cpg_workflows.jobs.bam_to_cram import bam_to_cram
-import re
+from cpg_workflows.jobs.markdups import markdup
+from cpg_workflows.resources import STANDARD, HIGHMEM
+from cpg_workflows.utils import can_reuse
 
 
 class STAR:
@@ -162,8 +160,9 @@ def align(
 
     jobs = []
     aligned_bams = []
-    job_idx = 1
-    for fq_pair in fastq_pairs:
+
+    # baseline align jobs, no prior dependencies
+    for job_idx, fq_pair in enumerate(fastq_pairs, 1):
         if not isinstance(fq_pair, FastqPair):
             raise TypeError(f'fastq_pairs must contain FastqPair objects, not {type(fq_pair)}')
         label = f'{extra_label} {job_idx}' if extra_label else f'{job_idx}'
@@ -178,7 +177,6 @@ def align(
         )
         jobs.append(j)
         aligned_bams.append(bam.bam)
-        job_idx += 1
     
     if merge:
         j, merged_bam = merge_bams(
@@ -188,6 +186,8 @@ def align(
             job_attrs=job_attrs,
             requested_nthreads=requested_nthreads,
         )
+        # depend on all prior jobs, then add to collection
+        j.depends_on(*jobs)
         jobs.append(j)
         aligned_bam = merged_bam.bam
     else:
@@ -200,6 +200,10 @@ def align(
         job_attrs=job_attrs,
         requested_nthreads=requested_nthreads,
     )
+    # depend on all prior jobs
+    j.depends_on(*jobs)
+
+    # this job is always added
     jobs.append(j)
 
     # Mark duplicates
@@ -211,6 +215,9 @@ def align(
             job_attrs=job_attrs,
             requested_nthreads=requested_nthreads,
         )
+        # depend on most recent job (sorting)
+        if jobs:
+            j.depends_on(jobs[-1])
         jobs.append(j)
         out_bam = mkdup_bam
     else:
@@ -229,6 +236,9 @@ def align(
             job_attrs=job_attrs,
             requested_nthreads=requested_nthreads,
         )
+
+        # depend on the prior job
+        j.depends_on(jobs[-1])
         jobs.append(j)
         out_cram_path = to_path(output_cram.path)
         b.write_output(out_cram, str(out_cram_path.with_suffix('')))

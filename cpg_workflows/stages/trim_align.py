@@ -3,32 +3,30 @@ Align RNA-seq reads to the genome using STAR.
 """
 
 import logging
-from hailtop.batch import ResourceGroup
-from hailtop.batch.job import Job
-from cpg_utils import Path, to_path
+import re
+from dataclasses import dataclass
+from os.path import basename
+
+from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_workflows import get_batch
-from cpg_workflows.targets import SequencingGroup
-from cpg_workflows.utils import ExpectedResultT
-from cpg_workflows.workflow import (
-    stage,
-    StageInput,
-    StageOutput,
-    SequencingGroupStage,
-)
+from cpg_utils.hail_batch import get_batch
+from hailtop.batch.job import Job
+
 from cpg_workflows.filetypes import (
     FastqPair,
     FastqPairs,
     BamPath,
     CramPath
 )
-from cpg_workflows.jobs import trim
 from cpg_workflows.jobs import align_rna
-from cpg_workflows.jobs import markdups
-from cpg_workflows.jobs import bam_to_cram
-import re
-from os.path import basename
-from dataclasses import dataclass
+from cpg_workflows.jobs import trim
+from cpg_workflows.targets import SequencingGroup
+from cpg_workflows.workflow import (
+    stage,
+    StageInput,
+    StageOutput,
+    SequencingGroupStage,
+)
 
 
 def get_trim_inputs(sequencing_group: SequencingGroup) -> FastqPairs | None:
@@ -154,7 +152,7 @@ class TrimAlignRNA(SequencingGroupStage):
         # Run alignment
         trimmed_fastq_pairs = FastqPairs(trimmed_fastq_pairs)
         aligned_bam_dict = self.expected_tmp_outputs(sequencing_group)
-        alinged_bam = BamPath(
+        aligned_bam = BamPath(
             path=aligned_bam_dict['bam'],
             index_path=aligned_bam_dict['bai'],
         )
@@ -170,7 +168,7 @@ class TrimAlignRNA(SequencingGroupStage):
                 sample_name=sequencing_group.id,
                 genome_prefix=get_config()['references'].get('star_ref_dir'),
                 mark_duplicates=True,
-                output_bam=alinged_bam,
+                output_bam=aligned_bam,
                 output_cram=aligned_cram,
                 job_attrs=self.get_job_attrs(sequencing_group),
                 overwrite=sequencing_group.forced,
