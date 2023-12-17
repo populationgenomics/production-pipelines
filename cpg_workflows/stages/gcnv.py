@@ -4,12 +4,17 @@ Stages that implement GATK-gCNV.
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_workflows.filetypes import CramPath
+from cpg_utils.hail_batch import get_batch
+from cpg_workflows.stages.gatk_sv.gatk_sv_common import get_images
 from cpg_workflows.jobs import gcnv
 from cpg_workflows.targets import SequencingGroup, Cohort
-from cpg_workflows.workflow import stage, StageInput, StageOutput
-from cpg_workflows.workflow import SequencingGroupStage, CohortStage
-from .. import get_batch
+from cpg_workflows.workflow import (
+    stage,
+    CohortStage,
+    SequencingGroupStage,
+    StageInput,
+    StageOutput
+)
 
 
 @stage
@@ -180,3 +185,37 @@ class PrepareVcfsForMerge(SequencingGroupStage):
             output_path=outputs['fixed_intervals']
         )
         return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
+
+
+@stage(required_stages=PrepareVcfsForMerge)
+class FastCombineGCNVs(CohortStage):
+    """
+    Produces final multi-sample VCF results by running a merge
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {
+            'combined_calls': self.prefix / 'gcnv_joint_call.vcf.bgz',
+            'combined_calls_index': self.prefix / 'gcnv_joint_call.vcf.bgz.tbi',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        outputs = self.expected_outputs(cohort)
+
+        # do a slapdash bcftools merge on all input files...
+        gcnv_vcfs = inputs.as_dict_by_target(PrepareVcfsForMerge)
+        all_vcfs = [
+            str(gcnv_vcfs[sgid]['fixed_intervals'])
+            for sgid in cohort.get_sequencing_group_ids()
+        ]
+
+        pipeline_image = get_images(['sv_pipeline_docker'])['sv_pipeline_docker']
+
+        job_or_none = gcnv.merge_calls(
+            get_batch(),
+            sg_vcfs=all_vcfs,
+            docker_image=pipeline_image,
+            job_attrs=self.get_job_attrs(cohort),
+            output_path=outputs['combined_calls'],
+        )
+        return self.make_outputs(cohort, data=outputs, jobs=job_or_none)
