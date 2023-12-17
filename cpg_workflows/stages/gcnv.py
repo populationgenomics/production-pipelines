@@ -150,3 +150,33 @@ class GermlineCNVCalls(SequencingGroupStage):
             output_prefix=str(self.prefix / seqgroup.id),
         )
         return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
+
+
+@stage(required_stages=GermlineCNVCalls)
+class PrepareVcfsForMerge(SequencingGroupStage):
+    """
+    Fixes the GT header in the VCFs produced by gCNV
+    During experimentation these were found to be Integer instead of String
+    This will be fixed in a future release of GATK
+    Also splits multiallelic loci (all sites are called as Dup/Del GTs)
+    Each site needs to have only one Alt allele for the annotation step
+    """
+
+    def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
+        return {
+            'fixed_intervals': self.prefix / f'{seqgroup.id}.fixed_intervals.vcf.bgz',
+            'fixed_intervals_index': self.prefix / f'{seqgroup.id}.fixed_intervals.vcf.bgz.tbi'
+        }
+
+    def queue_jobs(
+        self, seqgroup: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
+        outputs = self.expected_outputs(seqgroup)
+
+        jobs = gcnv.fix_intervals_vcf(
+            get_batch(),
+            inputs.as_path(seqgroup, GermlineCNVCalls, 'intervals'),
+            self.get_job_attrs(seqgroup),
+            output_path=outputs['fixed_intervals']
+        )
+        return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
