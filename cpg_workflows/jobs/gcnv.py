@@ -255,7 +255,7 @@ def postprocess_calls(
     shard_paths: dict[str, Path],
     sample_index: int,
     job_attrs: dict[str, str],
-    output_path: dict[str, Path],
+    output_prefix: str,
 ) -> list[Job]:
     j = b.new_job('Postprocess gCNV calls', job_attrs | {
         'tool': 'gatk PostprocessGermlineCNVCalls',
@@ -279,25 +279,36 @@ def postprocess_calls(
     allosomal_contigs = get_config()['workflow'].get('allosomal_contigs', [])
     allosomal_contigs_args = ' '.join([f'--allosomal-contig {c}' for c in allosomal_contigs])
 
+    # declare all output files in advance
+    j.declare_resource_group(
+        output={
+            'intervals.vcf.gz': '{root}/intervals.vcf.gz',
+            'intervals.vcf.gz.tbi': '{root}/intervals.vcf.gz.tbi',
+            'segments.vcf.gz': '{root}/segments.vcf.gz',
+            'segments.vcf.gz.tbi': '{root}/segments.vcf.gz.tbi',
+            'ratios.tsv': '{root}/ratios.tsv',
+        }
+    )
+
     postprocess_cmd = f"""
     gatk PostprocessGermlineCNVCalls \\
       --sequence-dictionary {reference.dict} {allosomal_contigs_args} \\
       --contig-ploidy-calls $BATCH_TMPDIR/ploidy-calls \\
       {model_shard_args} {calls_shard_args} \\
       --sample-index {sample_index} \\
-      --output-genotyped-intervals {j.intervals} \\
-      --output-genotyped-segments {j.segments} \\
-      --output-denoised-copy-ratios {j.ratios}
+      --output-genotyped-intervals {j.output['intervals.vcf.gz']} \\
+      --output-genotyped-segments {j.output['segments.vcf.gz']} \\
+      --output-denoised-copy-ratios {j.output['ratios.tsv']}
     """
 
-    assert isinstance(j.intervals, JobResourceFile)
-    assert isinstance(j.segments, JobResourceFile)
-    assert isinstance(j.ratios, JobResourceFile)
-    j.intervals.add_extension('.vcf.gz')
-    j.segments.add_extension('.vcf.gz')
-    j.ratios.add_extension('.tsv')
+    # index the output VCFs
+    tabix_cmd = f"""
+    tabix {j.output['intervals.vcf.gz']}
+    tabix {j.output['segments.vcf.gz']}
+    """
 
-    j.command(command([*unpack_cmds, postprocess_cmd], setup_gcp=True))
-    for key, path in output_path.items():
-        b.write_output(j[key], str(path))
+    j.command(command([*unpack_cmds, postprocess_cmd, tabix_cmd], setup_gcp=True))
+
+    b.write_output(j.output, output_prefix)
+
     return [j]
