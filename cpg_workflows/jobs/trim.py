@@ -5,9 +5,8 @@ Trim raw FASTQ reads using cutadapt
 from dataclasses import dataclass
 from enum import Enum
 
-import hailtop.batch as hb
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, image_path
+from cpg_utils.hail_batch import command, image_path, Batch
 from hailtop.batch import ResourceGroup
 from hailtop.batch.job import Job
 
@@ -161,7 +160,7 @@ class Fastp:
 
 
 def trim(
-    b: hb.Batch,
+    b: Batch,
     sequencing_group: SequencingGroup,
     input_fq_pair: FastqPair,
     output_fq_pair: FastqPair | None = None,
