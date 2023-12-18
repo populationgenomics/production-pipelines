@@ -96,16 +96,21 @@ class GatherSampleEvidence(SequencingGroupStage):
         """
         assert sequencing_group.cram, sequencing_group
 
-        input_dict: dict[str, Any] = {
-            'bam_or_cram_file': str(sequencing_group.cram),
-            'bam_or_cram_index': str(sequencing_group.cram) + '.crai',
-            'sample_id': sequencing_group.id,
-            'reference_fasta': str(get_fasta()),
-            'reference_index': str(get_fasta()) + '.fai',
-            'reference_dict': str(get_fasta().with_suffix('.dict')),
-            'reference_version': '38',
-            # 'scramble_part2_threads': 4,  # default = 7
-        }
+        input_dict: dict[str, Any] = dict(
+            bam_or_cram_file=str(sequencing_group.cram),
+            bam_or_cram_index=str(sequencing_group.cram) + '.crai',
+            sample_id=sequencing_group.id,
+            reference_fasta=str(get_fasta()),
+            reference_index=str(get_fasta()) + '.fai',
+            reference_dict=str(get_fasta().with_suffix('.dict')),
+            reference_version='38'
+        )
+
+        # runtime_attr_scramble_part2 = {"mem_gb": 8}
+        # optional override:
+        if (overrides := get_config().get('resource_overrides')) and 'GatherSampleEvidence' in overrides:
+            for key, value in overrides['GatherSampleEvidence'].items():
+                input_dict[key] = value
 
         input_dict |= get_images(
             [
