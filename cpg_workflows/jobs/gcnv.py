@@ -429,7 +429,9 @@ with gzip.open('temp.vcf.bgz', 'rt') as f:
             l_split = line.split('\t')
             original_end = l_split[7]
             end_int = int(l_split[7].removeprefix('END='))
-            l_split[7] = 'SVTYPE=CNV;SVLEN={{length}};{{end}}'.format(
+            alt_allele = l_split[4][1:-1]
+            l_split[7] = 'SVTYPE={{alt}};SVLEN={{length}};{{end}}'.format(
+                alt=alt_allele,
                 length=str(end_int - int(l_split[1])),
                 end=original_end
             )
