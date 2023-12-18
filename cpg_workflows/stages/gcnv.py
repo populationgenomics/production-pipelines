@@ -9,7 +9,7 @@ from cpg_workflows.jobs import gcnv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_images,
     get_references,
-    queue_annotate_sv_jobs
+    queue_annotate_sv_jobs,
 )
 from cpg_workflows.targets import SequencingGroup, Cohort
 from cpg_workflows.workflow import (
@@ -17,7 +17,7 @@ from cpg_workflows.workflow import (
     CohortStage,
     SequencingGroupStage,
     StageInput,
-    StageOutput
+    StageOutput,
 )
 
 
@@ -40,7 +40,7 @@ class PrepareIntervals(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'preprocessed': self.prefix / f'{cohort.name}.preprocessed.interval_list',
-            'annotated':    self.prefix / f'{cohort.name}.annotated.tsv',
+            'annotated': self.prefix / f'{cohort.name}.annotated.tsv',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -62,11 +62,17 @@ class CollectReadCounts(SequencingGroupStage):
 
     def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
         return {
-            'counts': seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.counts.tsv.gz',
-            'index':  seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.counts.tsv.gz.tbi',
+            'counts': seqgroup.dataset.prefix()
+            / 'gcnv'
+            / f'{seqgroup.id}.counts.tsv.gz',
+            'index': seqgroup.dataset.prefix()
+            / 'gcnv'
+            / f'{seqgroup.id}.counts.tsv.gz.tbi',
         }
 
-    def queue_jobs(self, seqgroup: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(
+        self, seqgroup: SequencingGroup, inputs: StageInput
+    ) -> StageOutput | None:
         outputs = self.expected_outputs(seqgroup)
 
         if seqgroup.cram is None:
@@ -93,8 +99,8 @@ class DeterminePloidy(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'filtered': self.tmp_prefix / f'{cohort.name}.filtered.interval_list',
-            'calls':    self.tmp_prefix / f'{cohort.name}-ploidy-calls.tar.gz',
-            'model':    self.tmp_prefix / f'{cohort.name}-ploidy-model.tar.gz',
+            'calls': self.tmp_prefix / f'{cohort.name}-ploidy-calls.tar.gz',
+            'model': self.tmp_prefix / f'{cohort.name}-ploidy-model.tar.gz',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -148,11 +154,19 @@ class GermlineCNVCalls(SequencingGroupStage):
 
     def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
         return {
-            'intervals': seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.intervals.vcf.gz',
-            'intervals_index': seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.intervals.vcf.gz.tbi',
-            'segments':  seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.segments.vcf.gz',
-            'segments_index':  seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.segments.vcf.gz.tbi',
-            'ratios':    seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.ratios.tsv',
+            'intervals': seqgroup.dataset.prefix()
+            / 'gcnv'
+            / f'{seqgroup.id}.intervals.vcf.gz',
+            'intervals_index': seqgroup.dataset.prefix()
+            / 'gcnv'
+            / f'{seqgroup.id}.intervals.vcf.gz.tbi',
+            'segments': seqgroup.dataset.prefix()
+            / 'gcnv'
+            / f'{seqgroup.id}.segments.vcf.gz',
+            'segments_index': seqgroup.dataset.prefix()
+            / 'gcnv'
+            / f'{seqgroup.id}.segments.vcf.gz.tbi',
+            'ratios': seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.ratios.tsv',
         }
 
     def queue_jobs(self, seqgroup: SequencingGroup, inputs: StageInput) -> StageOutput:
@@ -183,7 +197,8 @@ class PrepareVcfsForMerge(SequencingGroupStage):
     def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
         return {
             'fixed_intervals': self.prefix / f'{seqgroup.id}.fixed_intervals.vcf.bgz',
-            'fixed_intervals_index': self.prefix / f'{seqgroup.id}.fixed_intervals.vcf.bgz.tbi'
+            'fixed_intervals_index': self.prefix
+            / f'{seqgroup.id}.fixed_intervals.vcf.bgz.tbi',
         }
 
     def queue_jobs(
@@ -195,7 +210,7 @@ class PrepareVcfsForMerge(SequencingGroupStage):
             get_batch(),
             inputs.as_path(seqgroup, GermlineCNVCalls, 'intervals'),
             self.get_job_attrs(seqgroup),
-            output_path=outputs['fixed_intervals']
+            output_path=outputs['fixed_intervals'],
         )
         return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
 
@@ -232,6 +247,7 @@ class FastCombineGCNVs(CohortStage):
             output_path=outputs['combined_calls'],
         )
         return self.make_outputs(cohort, data=outputs, jobs=job_or_none)
+
 
 @stage(
     required_stages=FastCombineGCNVs,
@@ -280,9 +296,7 @@ class AnnotateCNV(CohortStage):
             batch=get_batch(),
             cohort=cohort,
             cohort_prefix=self.prefix,
-            input_vcf=inputs.as_dict(cohort, FastCombineGCNVs)[
-                'combined_calls'
-            ],
+            input_vcf=inputs.as_dict(cohort, FastCombineGCNVs)['combined_calls'],
             outputs=expected_out,
             labels=billing_labels,
         )
