@@ -48,8 +48,12 @@ def run(
     ht.show()
 
     logging.info('Run sex imputation')
-    sex_ht = impute_sex(vds, ht, tmp_prefix)
-    ht = ht.annotate(**sex_ht[ht.s])
+    try:
+        sex_ht = impute_sex(vds, ht, tmp_prefix)
+        ht = ht.annotate(**sex_ht[ht.s])
+    except BaseException as be:
+        logging.error(f"An error occurred during sex imputation: {be}")
+        raise be
 
     logging.info('Adding soft filters')
     ht = add_soft_filters(ht)
