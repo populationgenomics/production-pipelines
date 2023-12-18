@@ -232,6 +232,7 @@ class FastCombineGCNVs(CohortStage):
         )
         return self.make_outputs(cohort, data=outputs, jobs=job_or_none)
 
+
 @stage(
     required_stages=FastCombineGCNVs,
     analysis_type='sv',
