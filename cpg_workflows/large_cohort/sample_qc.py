@@ -8,10 +8,11 @@ import logging
 import hail as hl
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import reference_path, genome_build
+from cpg_utils.hail_batch import genome_build, reference_path
+from gnomad.sample_qc.pipeline import annotate_sex
+
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
-from gnomad.sample_qc.pipeline import annotate_sex
 
 
 def run(
@@ -44,7 +45,7 @@ def run(
         sqc_ht = sqc_ht.checkpoint(str(sqc_ht_path), overwrite=True)
     ht = ht.annotate(sample_qc=sqc_ht[ht.s])
     logging.info('Sample QC table:')
-    ht.describe()
+    ht.show()
 
     logging.info('Run sex imputation')
     sex_ht = impute_sex(vds, ht, tmp_prefix)
@@ -89,10 +90,10 @@ def impute_sex(
     """
     Impute sex based on coverage.
     """
-    checkpoint_path = tmp_prefix / 'sample_qc' / 'sex.ht'
-    if can_reuse(str(checkpoint_path), overwrite=True):
-        sex_ht = hl.read_table(str(checkpoint_path))
-        return ht.annotate(**sex_ht[ht.s])
+    get_checkpoint_path = lambda step: tmp_prefix / 'sample_qc' / step / 'sex.ht'
+    # if can_reuse(str(checkpoint_path()), overwrite=True):
+    #     sex_ht = hl.read_table(str(checkpoint_path))
+    #     return ht.annotate(**sex_ht[ht.s])
 
     # Load calling intervals
     seq_type = get_config()['workflow']['sequencing_type']
@@ -101,7 +102,7 @@ def impute_sex(
         str(calling_intervals_path), reference_genome=genome_build()
     )
     logging.info('Calling intervals table:')
-    calling_intervals_ht.describe()
+    calling_intervals_ht.show()
 
     # Pre-filter here and setting `variants_filter_lcr` and `variants_filter_segdup`
     # below to `False` to avoid the function calling gnomAD's `resources` module:
@@ -111,6 +112,10 @@ def impute_sex(
             vds = hl.vds.filter_intervals(vds, ht, keep=False)
 
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
+    vds.variant_data.show()
+    vds.write(
+        tmp_prefix / 'sample_qc' / 'pre-annotation' / 'something.vds', overwrite=True
+    )
     sex_ht = annotate_sex(
         vds,
         tmp_prefix=str(tmp_prefix / 'annotate_sex'),
@@ -124,7 +129,8 @@ def impute_sex(
         variants_filter_decoy=False,
     )
     logging.info('Sex table:')
-    sex_ht.describe()
+    sex_ht.show()
+    sex_ht.checkpoint(str(get_checkpoint_path('after-annotation')), overwrite=True)
     sex_ht = sex_ht.transmute(
         impute_sex_stats=hl.struct(
             f_stat=sex_ht.f_stat,
@@ -133,7 +139,9 @@ def impute_sex(
             observed_homs=sex_ht.observed_homs,
         )
     )
-    sex_ht = sex_ht.checkpoint(str(checkpoint_path), overwrite=True)
+    logging.info('Sex table after transmute:')
+    sex_ht.show()
+    sex_ht.checkpoint(str(get_checkpoint_path('after-transmute')), overwrite=True)
     return sex_ht
 
 
