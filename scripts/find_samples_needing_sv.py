@@ -62,6 +62,7 @@ query SG_Query($project: String!) {
 # so they are being screened permanently
 BORKED_SGS = ['CPG1', 'CPG5']
 
+
 def get_all_sgs(project: str, exclude_sgs: set[str] | None = None) -> set[str]:
     """
     find all sgs in the project
