@@ -18,6 +18,7 @@ optional arguments:
     -e <path to json list containing sequencing groups to exclude from search>
     -a <path to json list containing sequencing groups to include specifically>
 """
+import re
 from argparse import ArgumentParser
 from random import sample
 
@@ -57,6 +58,9 @@ query SG_Query($project: String!) {
 }"""
 )
 
+# Sequencing groups matching these patterns have consistently failed
+# so they are being screened permanently
+BORKED_SGS = ['CPG1', 'CPG5']
 
 def get_all_sgs(project: str, exclude_sgs: set[str] | None = None) -> set[str]:
     """
@@ -76,8 +80,11 @@ def get_all_sgs(project: str, exclude_sgs: set[str] | None = None) -> set[str]:
     sgs = set()
 
     for sg in query(GENOME_SGS, {'project': project})['project']['sequencingGroups']:
-        if sg['id'] not in exclude_sgs:
-            sgs.add(sg['id'])
+        if sg['id'] in exclude_sgs:
+            continue
+        if any(sg['id'].startswith(bork) for bork in BORKED_SGS):
+            continue
+        sgs.add(sg['id'])
     return sgs
 
 
