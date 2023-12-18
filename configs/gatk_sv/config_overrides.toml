@@ -6,5 +6,5 @@
 
 # resource overrides for the GatherSampleEvidence stage
 
-[resource_overrides.GatherSampleEvidence.runtime_attr_wham]
+[resource_overrides.GatherSampleEvidence.runtime_attr_scramble_part2]
 mem_gb = 7.5
