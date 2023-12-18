@@ -358,4 +358,3 @@ def fix_intervals_vcf(
     b.write_output(reheader_job.output, str(output_path).removesuffix('.vcf.bgz'))
 
     return reheader_job
-
