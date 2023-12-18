@@ -114,7 +114,7 @@ def impute_sex(
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
     vds.variant_data.show()
     vds.write(
-        tmp_prefix / 'sample_qc' / 'pre-annotation' / 'something.vds', overwrite=True
+        tmp_prefix / 'sample_qc2' / 'pre-annotation' / 'something.vds', overwrite=True
     )
     sex_ht = annotate_sex(
         vds,
