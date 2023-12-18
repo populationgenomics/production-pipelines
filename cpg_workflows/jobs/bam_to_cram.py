@@ -2,9 +2,8 @@
 Convert BAM to CRAM.
 """
 
-import hailtop.batch as hb
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, image_path
+from cpg_utils.hail_batch import command, image_path, Batch
 from hailtop.batch import ResourceGroup
 from hailtop.batch.job import Job
 
@@ -12,16 +11,16 @@ from cpg_workflows.resources import STANDARD
 
 
 def bam_to_cram(
-    b: hb.Batch,
+    b: Batch,
     input_bam: ResourceGroup,
     extra_label: str | None = None,
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
-) -> tuple[Job, hb.ResourceGroup]:
+) -> tuple[Job, ResourceGroup]:
     """
     Convert a BAM file to a CRAM file.
     """
-    
+
     assert isinstance(input_bam, ResourceGroup)
 
     job_name = 'bam_to_cram'
@@ -39,14 +38,11 @@ def bam_to_cram(
         fasta=fasta_path,
         fasta_fai=f'{fasta_path}.fai',
     )
-    
+
     # Set resource requirements
     nthreads = requested_nthreads or 8
-    res = STANDARD.set_resources(
-        j,
-        ncpu=nthreads,
-        storage_gb=50,  # TODO: make configurable
-    )
+    # TODO: make storage configurable
+    res = STANDARD.set_resources(j, ncpu=nthreads, storage_gb=50)
 
     j.declare_resource_group(
         sorted_cram={
