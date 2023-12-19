@@ -29,16 +29,13 @@ class Align(SequencingGroupStage):
         Stage is expected to generate a CRAM file and a corresponding index.
         """
         if sequencing_group.cram:
-            if sequencing_group.cram.index_path:
-                crai_path = sequencing_group.cram.index_path
-            else:
-                crai_path = None
+            cram_path = sequencing_group.cram
         else:
-            crai_path = sequencing_group.make_cram_path().index_path
+            cram_path = sequencing_group.make_cram_path()
 
         return {
-            'cram': sequencing_group.cram or sequencing_group.make_cram_path().path,
-            'crai': crai_path,
+            'cram': cram_path.path,
+            'crai': cram_path.index_path,
         }
 
     def queue_jobs(

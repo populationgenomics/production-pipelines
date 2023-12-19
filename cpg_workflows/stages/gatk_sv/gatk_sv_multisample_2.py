@@ -9,6 +9,7 @@ from typing import Any
 from cpg_utils import Path, to_path
 from cpg_utils.hail_batch import get_batch
 from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
+from cpg_utils.hail_batch import image_path
 
 from cpg_workflows.jobs import ploidy_table_from_ped
 from cpg_workflows.jobs.seqr_loader_sv import (
@@ -87,11 +88,17 @@ class MakeCohortVcf(CohortStage):
         batch_names = get_config()['workflow']['batch_names']
         batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
         pesr_vcfs = [
-            batch_prefix / batch_name / 'GenotypeBatch' / f'{cohort_partial_hash}_pesr.vcf.gz'
+            batch_prefix
+            / batch_name
+            / 'GenotypeBatch'
+            / f'{cohort_partial_hash}_pesr.vcf.gz'
             for batch_name in batch_names
         ]
         depth_vcfs = [
-            batch_prefix / batch_name / 'GenotypeBatch' / f'{cohort_partial_hash}_depth.vcf.gz'
+            batch_prefix
+            / batch_name
+            / 'GenotypeBatch'
+            / f'{cohort_partial_hash}_depth.vcf.gz'
             for batch_name in batch_names
         ]
         sr_pass = [
@@ -109,7 +116,10 @@ class MakeCohortVcf(CohortStage):
             for batch_name in batch_names
         ]
         depth_depth_cutoff = [
-            batch_prefix / batch_name / 'GenotypeBatch' / f'{cohort_partial_hash}_depth.depth_sepcutoff.txt'
+            batch_prefix
+            / batch_name
+            / 'GenotypeBatch'
+            / f'{cohort_partial_hash}_depth.depth_sepcutoff.txt'
             for batch_name in batch_names
         ]
         filter_batch_cutoffs = [
@@ -566,10 +576,7 @@ class AnnotateVcf(CohortStage):
         )
         expected_d = self.expected_outputs(cohort)
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
-        }
+        billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
 
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
@@ -583,6 +590,54 @@ class AnnotateVcf(CohortStage):
 
 
 @stage(required_stages=AnnotateVcf)
+class AnnotateVcfWithStrvctvre(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {
+            'strvctvre_vcf': self.prefix / 'strvctvre_annotated.vcf.gz',
+            'strvctvre_vcf_index': self.prefix / 'strvctvre_annotated.vcf.gz.tbi',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        strv_job = get_batch().new_job(
+            'StrVCTVRE', self.get_job_attrs() | {'tool': 'strvctvre'}
+        )
+
+        strv_job.image(image_path('strvctvre'))
+        strv_job.storage('20Gi')
+
+        strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
+        phylop_in_batch = get_batch().read_input(strvctvre_phylop)
+
+        input_dict = inputs.as_dict(cohort, AnnotateVcf)
+        expected_d = self.expected_outputs(cohort)
+
+        # read vcf and index into the batch
+        input_vcf = get_batch().read_input_group(
+            vcf=str(input_dict['annotated_vcf']),
+            vcf_index=str(input_dict['annotated_vcf_index']),
+        )['vcf']
+
+        strv_job.declare_resource_group(
+            output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+        )
+
+        # run strvctvre
+        strv_job.command(
+            f'python StrVCTVRE.py '
+            f'-i {input_vcf} '
+            f'-o {strv_job.output_vcf["vcf.gz"]} '
+            f'-f vcf '
+            f'-p {phylop_in_batch}'
+        )
+        strv_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')
+
+        get_batch().write_output(
+            strv_job.output_vcf, str(expected_d['strvctvre_vcf']).replace('.vcf.gz', '')
+        )
+        return self.make_outputs(cohort, data=expected_d, jobs=strv_job)
+
+
+@stage(required_stages=AnnotateVcfWithStrvctvre)
 class AnnotateCohortSv(CohortStage):
     """
     What do we want?! SV Data in Seqr!
@@ -606,7 +661,9 @@ class AnnotateCohortSv(CohortStage):
         queue job(s) to rearrange the annotations prior to Seqr transformation
         """
 
-        vcf_path = inputs.as_path(target=cohort, stage=AnnotateVcf, key='annotated_vcf')
+        vcf_path = inputs.as_path(
+            target=cohort, stage=AnnotateVcfWithStrvctvre, key='strvctvre_vcf'
+        )
         checkpoint_prefix = (
             to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
         )

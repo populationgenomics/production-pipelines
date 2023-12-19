@@ -188,7 +188,7 @@ class GatherBatchEvidence(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -276,7 +276,7 @@ class ClusterBatch(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -354,7 +354,7 @@ class GenerateBatchMetrics(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -449,7 +449,7 @@ class FilterBatch(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -521,7 +521,7 @@ class MergeBatchSites(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -583,7 +583,10 @@ class GenotypeBatch(CohortStage):
                 f'genotyped_{mode}_vcf_index': f'{mode}.vcf.gz.tbi',
             }
 
-        return {key: self.prefix / f'{cohort_hash}_{fname}' for key, fname in ending_by_key.items()}
+        return {
+            key: self.prefix / f'{cohort_hash}_{fname}'
+            for key, fname in ending_by_key.items()
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         filterbatch_d = inputs.as_dict(cohort, FilterBatch)
@@ -641,6 +644,6 @@ class GenotypeBatch(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
