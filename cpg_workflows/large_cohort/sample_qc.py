@@ -152,8 +152,11 @@ def impute_sex(
         )
     )
     logging.info('Sex table after transmute:')
+    sex_ht_tmp_outpath = os.path.join(
+        tmp_prefix, 'sample_qc2', 'after-transmute', 'after-transmute.ht'
+    )
     sex_ht.show()
-    sex_ht.checkpoint(str(get_checkpoint_path('after-transmute')), overwrite=True)
+    sex_ht.checkpoint(sex_ht_tmp_outpath, overwrite=True)
     return sex_ht
 
 
