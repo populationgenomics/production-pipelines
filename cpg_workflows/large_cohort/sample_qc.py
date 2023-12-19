@@ -94,7 +94,7 @@ def impute_sex(
     """
     Impute sex based on coverage.
     """
-    get_checkpoint_path = lambda step: tmp_prefix / 'sample_qc' / step / 'sex.ht'
+    # get_checkpoint_path = lambda step: tmp_prefix / 'sample_qc' / step / 'sex.ht'
     # if can_reuse(str(checkpoint_path()), overwrite=True):
     #     sex_ht = hl.read_table(str(checkpoint_path))
     #     return ht.annotate(**sex_ht[ht.s])
@@ -105,7 +105,6 @@ def impute_sex(
     calling_intervals_ht = hl.import_locus_intervals(
         str(calling_intervals_path), reference_genome=genome_build()
     )
-    logging.info('Calling intervals table:')
     calling_intervals_ht.show()
 
     # Pre-filter here and setting `variants_filter_lcr` and `variants_filter_segdup`
@@ -116,10 +115,13 @@ def impute_sex(
             vds = hl.vds.filter_intervals(vds, ht, keep=False)
 
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
-    vds.variant_data.show()
-    vds.write(
-        tmp_prefix / 'sample_qc2' / 'pre-annotation' / 'something.vds', overwrite=True
+    vds_tmp_outpath = str(
+        tmp_prefix / 'sample_qc2' / 'pre-annotation' / 'something.vds'
     )
+    logging.info(f"Writing the VDS to this location: {vds_tmp_outpath}")
+    vds.variant_data.show()
+    vds.write(str(vds_tmp_outpath), overwrite=True)
+    logging.info("I'm about to enter the annotate sex")
     sex_ht = annotate_sex(
         vds,
         tmp_prefix=str(tmp_prefix / 'annotate_sex'),
@@ -133,8 +135,11 @@ def impute_sex(
         variants_filter_decoy=False,
     )
     logging.info('Sex table:')
+    sex_ht_tmp_outpath = str(
+        tmp_prefix / 'sample_qc2' / 'pre-annotation' / 'after-annotation_sex_ht.ht'
+    )
     sex_ht.show()
-    sex_ht.checkpoint(str(get_checkpoint_path('after-annotation')), overwrite=True)
+    sex_ht.checkpoint(str(sex_ht_tmp_outpath), overwrite=True)
     sex_ht = sex_ht.transmute(
         impute_sex_stats=hl.struct(
             f_stat=sex_ht.f_stat,
