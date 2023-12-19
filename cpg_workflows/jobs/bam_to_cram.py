@@ -2,6 +2,7 @@
 Convert BAM to CRAM.
 """
 
+from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, image_path, Batch
 from hailtop.batch import ResourceGroup
@@ -60,6 +61,7 @@ def bam_to_cram(
 def cram_to_bam(
     b: Batch,
     input_cram: ResourceGroup,
+    output_bam: Path | None = None,
     extra_label: str | None = None,
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
@@ -96,5 +98,9 @@ def cram_to_bam(
 
     cmd = f'samtools view -@ {res.get_nthreads() - 1} -b {input_cram.cram} | tee {j.sorted_bam["bam"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_bam["bam.bai"]}'
     j.command(command(cmd, monitor_space=True))
+
+    # Write BAM if requested
+    if output_bam:
+        b.write_output(j.sorted_bam, str(output_bam.with_suffix('')))
 
     return j, j.sorted_bam
