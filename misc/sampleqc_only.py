@@ -6,6 +6,7 @@ from cpg_workflows.large_cohort.sample_qc import run
 dataproc_job(
     job_name='SampleQC',
     function=run,
+    num_workers=8,
     function_path_args=dict(
         vds_path='gs://cpg-bioheart-test/vds/3-1-3.vds',
         out_sample_qc_ht_path=output_path('sample-qc-out'),
