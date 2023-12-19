@@ -4,6 +4,7 @@ Add soft filters for samples.
 """
 
 import logging
+import os
 
 import hail as hl
 from cpg_utils import Path
@@ -135,8 +136,8 @@ def impute_sex(
         variants_filter_decoy=False,
     )
     logging.info('Sex table:')
-    sex_ht_tmp_outpath = str(
-        tmp_prefix / 'sample_qc2' / 'pre-annotation' / 'after-annotation_sex_ht.ht'
+    sex_ht_tmp_outpath = os.path.join(
+        tmp_prefix, 'sample_qc2', 'pre-annotation', 'after-annotation_sex_ht.ht'
     )
     sex_ht.show()
     sex_ht.checkpoint(str(sex_ht_tmp_outpath), overwrite=True)
