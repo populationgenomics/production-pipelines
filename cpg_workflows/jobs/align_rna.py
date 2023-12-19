@@ -186,7 +186,7 @@ def align(
             requested_nthreads=requested_nthreads,
         )
         jobs.append(j)
-        aligned_bams.append(bam.bam)
+        aligned_bams.append(bam)
 
     if merge:
         j, merged_bam = merge_bams(
@@ -196,10 +196,8 @@ def align(
             job_attrs=job_attrs,
             requested_nthreads=requested_nthreads,
         )
-        # depend on all prior jobs, then add to collection
-        j.depends_on(*jobs)
         jobs.append(j)
-        aligned_bam = merged_bam.bam
+        aligned_bam = merged_bam
     else:
         aligned_bam = aligned_bams[0]
 
@@ -210,8 +208,6 @@ def align(
         job_attrs=job_attrs,
         requested_nthreads=requested_nthreads,
     )
-    # depend on all prior jobs
-    j.depends_on(*jobs)
 
     # this job is always added
     jobs.append(j)
@@ -225,9 +221,6 @@ def align(
             job_attrs=job_attrs,
             requested_nthreads=requested_nthreads,
         )
-        # depend on most recent job (sorting)
-        if jobs:
-            j.depends_on(jobs[-1])
         jobs.append(j)
         out_bam = mkdup_bam
     else:
@@ -246,9 +239,6 @@ def align(
             job_attrs=job_attrs,
             requested_nthreads=requested_nthreads,
         )
-
-        # depend on the prior job
-        j.depends_on(jobs[-1])
         jobs.append(j)
         out_cram_path = to_path(output_cram.path)
         b.write_output(out_cram, str(out_cram_path.with_suffix('')))
@@ -264,7 +254,7 @@ def align_fq_pair(
     extra_label: str | None = None,
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
-) -> tuple[Job, hb.ResourceGroup]:
+) -> tuple[Job, hb.ResourceFile]:
     """
     Takes an input FastqPair object, and creates a job to align it using STAR.
     """
@@ -285,19 +275,13 @@ def align_fq_pair(
         storage_gb=200,  # TODO: make configurable
     )
 
-    j.declare_resource_group(
-        output_bam={
-            'bam': '{root}.bam',
-        }
-    )
-
     star_ref = GCPStarReference(b=b, genome_prefix=genome_prefix)
     star = STAR(
         input_fastq_pair=fastq_pair,
         sample_name=sample_name,
         genome=star_ref.genome_res_group,
         nthreads=(res.get_nthreads() - 1),
-        output_path=j.output_bam.bam,
+        output_path=j.output_bam,
         bamout=True,
         sort=True,
         stdout=False,
@@ -313,7 +297,7 @@ def merge_bams(
     extra_label: str | None = None,
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
-) -> tuple[Job, hb.ResourceGroup]:
+) -> tuple[Job, hb.ResourceFile]:
     """
     Merge a list of BAM files into a single BAM file.
     """
@@ -334,13 +318,7 @@ def merge_bams(
         storage_gb=50,  # TODO: make configurable
     )
 
-    j.declare_resource_group(
-        merged_bam={
-            'bam': '{root}.bam',
-        }
-    )
-
-    cmd = f'samtools merge -@ {res.get_nthreads() - 1} -o {j.merged_bam.bam} {" ".join([str(b) for b in input_bams])}'
+    cmd = f'samtools merge -@ {res.get_nthreads() - 1} -o {j.merged_bam} {" ".join([str(b) for b in input_bams])}'
     j.command(command(cmd, monitor_space=True))
     return j, j.merged_bam
 
