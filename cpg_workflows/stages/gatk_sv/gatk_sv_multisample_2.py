@@ -24,7 +24,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_images,
     get_references,
     make_combined_ped,
-    queue_annotate_sv_jobs
+    queue_annotate_sv_jobs,
 )
 from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.workflow import (
