@@ -113,7 +113,7 @@ def impute_sex(
     # below to `False` to avoid the function calling gnomAD's `resources` module:
     from hail.vds.variant_dataset import VariantDataset
 
-    print('count pre filter:', vds.variant_data.count())
+    logging.info(f'count pre filter: {vds.variant_data.count()}')
     for name in ['lcr_intervals_ht', 'seg_dup_intervals_ht']:
         ht = hl.read_table(str(reference_path(f'gnomad/{name}')))
         if ht.count() > 0:
@@ -124,7 +124,7 @@ def impute_sex(
                 ~tmp_variant_data.repeat_region
             )
             vds = VariantDataset(vds.reference_data, tmp_variant_data).checkpoint(str(tmp_prefix/f'check_{name}.vds'))
-            print(f'count post {name} filter:', vds.variant_data.count())
+            logging.info(f'count post {name} filter:{vds.variant_data.count()}')
 
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
     logging.info("Prior to annotate_sex")
