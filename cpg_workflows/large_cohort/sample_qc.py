@@ -116,22 +116,17 @@ def impute_sex(
     for name in ['lcr_intervals_ht', 'seg_dup_intervals_ht']:
         ht = hl.read_table(str(reference_path(f'gnomad/{name}')))
         if ht.count() > 0:
-            # vds = hl.vds.filter_intervals(vds, ht, keep=False)
             tmp_variant_data = vds.variant_data.annotate_rows(
                 repeat_region=hl.is_defined(ht[vds.variant_data.locus])
             )
             tmp_variant_data = tmp_variant_data.filter_rows(
                 ~tmp_variant_data.repeat_region
             )
-            vds = VariantDataset(vds.reference_data, tmp_variant_data)
+            vds = VariantDataset(vds.reference_data, tmp_variant_data).checkpoint(str(tmp_prefix/f'check_{name}.vds'))
 
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
-    vds_tmp_outpath = str(
-        tmp_prefix / 'sample_qc2' / 'pre-annotation' / 'something.vds'
-    )
-    logging.info(f"Not writing, but this is path to VDS if writing: {vds_tmp_outpath}")
+    logging.info("Prior to annotate_sex")
     vds.variant_data.show()
-    logging.info("I'm about to enter the annotate sex")
     sex_ht = annotate_sex(
         vds,
         tmp_prefix=str(tmp_prefix / 'annotate_sex'),
@@ -148,8 +143,8 @@ def impute_sex(
     sex_ht_tmp_outpath = os.path.join(
         tmp_prefix, 'sample_qc2', 'pre-annotation', 'after-annotation_sex_ht.ht'
     )
-    sex_ht.show()
     sex_ht.checkpoint(str(sex_ht_tmp_outpath), overwrite=True)
+    sex_ht.show()
     sex_ht = sex_ht.transmute(
         impute_sex_stats=hl.struct(
             f_stat=sex_ht.f_stat,
@@ -162,8 +157,8 @@ def impute_sex(
     sex_ht_tmp_outpath = os.path.join(
         tmp_prefix, 'sample_qc2', 'after-transmute', 'after-transmute.ht'
     )
-    sex_ht.show()
     sex_ht.checkpoint(sex_ht_tmp_outpath, overwrite=True)
+    sex_ht.show()
     return sex_ht
 
 
