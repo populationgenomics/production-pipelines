@@ -1,0 +1,8 @@
+[workflow]
+sequencing_type = "transcriptome"
+
+[trim]
+adapter_type = "ILLUMINA_TRUSEQ"
+
+[references]
+fasta = "gs://cpg-common-main/references/hg38/v0/Homo_sapiens_assembly38.fasta"

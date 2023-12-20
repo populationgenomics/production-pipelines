@@ -33,6 +33,7 @@ from cpg_workflows.stages.happy_validation import (
     ValidationParseHappy
 )
 from cpg_workflows.stages.mito import MitoReport
+from cpg_workflows.stages.trim_align import TrimAlignRNA
 
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
@@ -56,6 +57,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     ],  # stage to run between FilterBatch & GenotypeBatch
     'gatk_sv_multisample_2': [AnnotateVcf, AnnotateDatasetSv, MtToEsSv],
     'gcnv': [GermlineCNVCalls, FastCombineGCNVs, AnnotateCNV, AnnotateCNVVcfWithStrvctvre],
+    'rare_disease_rnaseq': [TrimAlignRNA],
 }
 
 
