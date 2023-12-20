@@ -7,12 +7,11 @@ import logging
 import os
 
 import hail as hl
-from gnomad.sample_qc.pipeline import annotate_sex
-from hail.vds.variant_dataset import VariantDataset
-
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build, reference_path
+from gnomad.sample_qc.pipeline import annotate_sex
+from hail.vds.variant_dataset import VariantDataset
 
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
@@ -113,15 +112,16 @@ def impute_sex(
 
     # Pre-filter here and setting `variants_filter_lcr` and `variants_filter_segdup`
     # below to `False` to avoid the function calling gnomAD's `resources` module:
+    logging.info(f'count pre filter: {vds.variant_data.count()}')
     for name in ['lcr_intervals_ht', 'seg_dup_intervals_ht']:
         interval_table = hl.read_table(str(reference_path(f'gnomad/{name}')))
         if interval_table.count() > 0:
             # remove all rows where the locus falls within a defined interval
             tmp_variant_data = vds.variant_data.filter_rows(
-                hl.is_defined(interval_table[vds.variant_data.locus]),
-                keep=False
+                hl.is_defined(interval_table[vds.variant_data.locus]), keep=False
             )
             vds = VariantDataset(vds.reference_data, tmp_variant_data)
+            logging.info(f'count post {name} filter:{vds.variant_data.count()}')
 
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
     vds_tmp_outpath = str(
