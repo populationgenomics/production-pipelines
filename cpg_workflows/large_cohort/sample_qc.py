@@ -7,17 +7,11 @@ import logging
 import os
 
 import hail as hl
-from gnomad.sample_qc.pipeline import annotate_sex
-from hail.vds.variant_dataset import VariantDataset
-
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build, reference_path
-<<<<<<< HEAD
 from gnomad.sample_qc.pipeline import annotate_sex
 from hail.vds.variant_dataset import VariantDataset
-=======
->>>>>>> 29a230e06a2981d774b1a7741de8d30ed149d898
 
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
@@ -124,8 +118,7 @@ def impute_sex(
         if interval_table.count() > 0:
             # remove all rows where the locus falls within a defined interval
             tmp_variant_data = vds.variant_data.filter_rows(
-                hl.is_defined(interval_table[vds.variant_data.locus]),
-                keep=False
+                hl.is_defined(interval_table[vds.variant_data.locus]), keep=False
             )
             vds = VariantDataset(vds.reference_data, tmp_variant_data)
             logging.info(f'count post {name} filter:{vds.variant_data.count()}')
