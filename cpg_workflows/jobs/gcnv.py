@@ -20,16 +20,22 @@ def prepare_intervals(
     job_attrs: dict[str, str],
     output_paths: dict[str, Path],
 ) -> list[Job]:
-    j = b.new_job('Prepare intervals', job_attrs | {
-        'tool': 'gatk PreprocessIntervals/AnnotateIntervals',
-    })
+    j = b.new_job(
+        'Prepare intervals',
+        job_attrs
+        | {
+            'tool': 'gatk PreprocessIntervals/AnnotateIntervals',
+        },
+    )
     j.image(image_path('gatk_gcnv'))
 
     sequencing_type = get_config()['workflow']['sequencing_type']
     reference = fasta_res_group(b)
 
     exclude_intervals = get_config()['workflow'].get('exclude_intervals', [])
-    exclude_intervals_args = ' '.join([f'--exclude-intervals {i}' for i in exclude_intervals])
+    exclude_intervals_args = ' '.join(
+        [f'--exclude-intervals {i}' for i in exclude_intervals]
+    )
 
     if sequencing_type == 'exome':
         intervals = b.read_input(get_config()['workflow'].get('intervals_path'))
@@ -77,15 +83,19 @@ def collect_read_counts(
     job_attrs: dict[str, str],
     output_base_path: Path,
 ) -> list[Job]:
-    j = b.new_job('Collect gCNV read counts', job_attrs | {'tool': 'gatk CollectReadCounts'})
+    j = b.new_job(
+        'Collect gCNV read counts', job_attrs | {'tool': 'gatk CollectReadCounts'}
+    )
     j.image(image_path('gatk_gcnv'))
 
     reference = fasta_res_group(b)
 
-    j.declare_resource_group(counts={
-        'counts.tsv.gz': '{root}.counts.tsv.gz',
-        'counts.tsv.gz.tbi': '{root}.counts.tsv.gz.tbi',
-    })
+    j.declare_resource_group(
+        counts={
+            'counts.tsv.gz': '{root}.counts.tsv.gz',
+            'counts.tsv.gz.tbi': '{root}.counts.tsv.gz.tbi',
+        }
+    )
     assert isinstance(j.counts, ResourceGroup)
 
     cmd = f"""
@@ -107,10 +117,12 @@ def collect_read_counts(
 def _counts_input_args(b: hb.Batch, counts_paths: Iterable[Path]) -> str:
     args = ''
     for f in counts_paths:
-        counts = b.read_input_group(**{
-            'counts.tsv.gz': str(f),
-            'counts.tsv.gz.tbi': str(f) + '.tbi',
-        })
+        counts = b.read_input_group(
+            **{
+                'counts.tsv.gz': str(f),
+                'counts.tsv.gz.tbi': str(f) + '.tbi',
+            }
+        )
         args += f' --input {counts["counts.tsv.gz"]}'
 
     return args
@@ -125,9 +137,13 @@ def filter_and_determine_ploidy(
     job_attrs: dict[str, str],
     output_paths: dict[str, Path],
 ) -> list[Job]:
-    j = b.new_job('Filter intervals and determine ploidy', job_attrs | {
-        'tool': 'gatk FilterIntervals/DetermineGermlineContigPloidy',
-    })
+    j = b.new_job(
+        'Filter intervals and determine ploidy',
+        job_attrs
+        | {
+            'tool': 'gatk FilterIntervals/DetermineGermlineContigPloidy',
+        },
+    )
     j.image(image_path('gatk_gcnv'))
 
     counts_input_args = _counts_input_args(b, counts_paths)
@@ -215,10 +231,14 @@ def shard_gcnv(
         if can_reuse(output_paths[name]):
             continue
 
-        j = b.new_job('Call germline CNVs', job_attrs | {
-            'tool': 'gatk GermlineCNVCaller',
-            'part': f'shard {i} of {n}',
-        })
+        j = b.new_job(
+            'Call germline CNVs',
+            job_attrs
+            | {
+                'tool': 'gatk GermlineCNVCaller',
+                'part': f'shard {i} of {n}',
+            },
+        )
         j.image(image_path('gatk_gcnv'))
         j.memory('16Gi')  # TODO revisit limits
 
@@ -257,9 +277,13 @@ def postprocess_calls(
     job_attrs: dict[str, str],
     output_prefix: str,
 ) -> list[Job]:
-    j = b.new_job('Postprocess gCNV calls', job_attrs | {
-        'tool': 'gatk PostprocessGermlineCNVCalls',
-    })
+    j = b.new_job(
+        'Postprocess gCNV calls',
+        job_attrs
+        | {
+            'tool': 'gatk PostprocessGermlineCNVCalls',
+        },
+    )
     j.image(image_path('gatk_gcnv'))
     j.storage('12Gi')  # TODO revisit limits
 
@@ -277,7 +301,9 @@ def postprocess_calls(
         calls_shard_args += f' --calls-shard-path $BATCH_TMPDIR/{name}-calls'
 
     allosomal_contigs = get_config()['workflow'].get('allosomal_contigs', [])
-    allosomal_contigs_args = ' '.join([f'--allosomal-contig {c}' for c in allosomal_contigs])
+    allosomal_contigs_args = ' '.join(
+        [f'--allosomal-contig {c}' for c in allosomal_contigs]
+    )
 
     # declare all output files in advance
     j.declare_resource_group(
@@ -361,7 +387,11 @@ def fix_intervals_vcf(
 
 
 def merge_calls(
-    b: hb.Batch, sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str], output_path: Path
+    b: hb.Batch,
+    sg_vcfs: list[str],
+    docker_image: str,
+    job_attrs: dict[str, str],
+    output_path: Path,
 ):
     """
     This job will run a fast simple merge on per-SGID call files
@@ -411,7 +441,8 @@ def merge_calls(
     j.command(
         f'bcftools merge {" ".join(batch_vcfs)} -Oz -o temp.vcf.bgz --threads 4 -m all -0'
     )
-    j.command(fr"""
+    j.command(
+        fr"""
     python <<CODE
 import gzip
 headers = []
@@ -441,7 +472,8 @@ with open('temp.vcf', 'w') as f:
     f.writelines(headers)
     f.writelines(others)
 CODE
-    """)
+    """
+    )
     j.command(f'bgzip -c temp.vcf > {j.output["vcf.bgz"]}')
     j.command(f'tabix {j.output["vcf.bgz"]}')
 
