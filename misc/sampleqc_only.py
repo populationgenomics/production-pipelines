@@ -9,7 +9,7 @@ dataproc_job(
     function_path_args=dict(
         vds_path='gs://cpg-bioheart-test/vds/3-1-3.vds',
         out_sample_qc_ht_path=output_path('sample-qc-out'),
-        tmp_prefix=output_path('2023-12-18-Harper', 'tmp'),
+        tmp_prefix=output_path('2023-12-18-MW_CasFix', 'tmp'),
     ),
 )
 
