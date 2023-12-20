@@ -7,10 +7,12 @@ import logging
 import os
 
 import hail as hl
+from gnomad.sample_qc.pipeline import annotate_sex
+from hail.vds.variant_dataset import VariantDataset
+
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build, reference_path
-from gnomad.sample_qc.pipeline import annotate_sex
 
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
@@ -111,8 +113,6 @@ def impute_sex(
 
     # Pre-filter here and setting `variants_filter_lcr` and `variants_filter_segdup`
     # below to `False` to avoid the function calling gnomAD's `resources` module:
-    from hail.vds.variant_dataset import VariantDataset
-
     for name in ['lcr_intervals_ht', 'seg_dup_intervals_ht']:
         interval_table = hl.read_table(str(reference_path(f'gnomad/{name}')))
         if interval_table.count() > 0:
