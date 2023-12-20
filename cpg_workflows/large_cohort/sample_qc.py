@@ -55,7 +55,7 @@ def run(
         sex_ht = impute_sex(vds, ht, tmp_prefix)
         ht = ht.annotate(**sex_ht[ht.s])
     except BaseException as be:
-        logging.error(f"An error occurred during sex imputation: {be}")
+        logging.error(f'An error occurred during sex imputation: {be}')
         raise be
 
     logging.info('Adding soft filters')
@@ -103,7 +103,7 @@ def impute_sex(
     #     return ht.annotate(**sex_ht[ht.s])
 
     # Load calling intervals
-    logging.info(f"Here is tmp_prefix: {tmp_prefix}")
+    logging.info(f'Here is tmp_prefix: {tmp_prefix}')
     seq_type = get_config()['workflow']['sequencing_type']
     calling_intervals_path = reference_path(f'broad/{seq_type}_calling_interval_lists')
     calling_intervals_ht = hl.import_locus_intervals(
@@ -127,9 +127,9 @@ def impute_sex(
     vds_tmp_outpath = str(
         tmp_prefix / 'sample_qc2' / 'pre-annotation' / 'something.vds'
     )
-    logging.info(f"Not writing, but this is path to VDS if writing: {vds_tmp_outpath}")
+    logging.info(f'Not writing, but this is path to VDS if writing: {vds_tmp_outpath}')
     vds.variant_data.show()
-    logging.info("I'm about to enter the annotate sex")
+    logging.info('I\'m about to enter the annotate sex')
     sex_ht = annotate_sex(
         vds,
         tmp_prefix=str(tmp_prefix / 'annotate_sex'),
