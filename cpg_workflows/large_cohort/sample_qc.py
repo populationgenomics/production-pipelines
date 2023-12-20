@@ -114,14 +114,12 @@ def impute_sex(
     from hail.vds.variant_dataset import VariantDataset
 
     for name in ['lcr_intervals_ht', 'seg_dup_intervals_ht']:
-        ht = hl.read_table(str(reference_path(f'gnomad/{name}')))
-        if ht.count() > 0:
-            # vds = hl.vds.filter_intervals(vds, ht, keep=False)
-            tmp_variant_data = vds.variant_data.annotate_rows(
-                repeat_region=hl.is_defined(ht[vds.variant_data.locus])
-            )
-            tmp_variant_data = tmp_variant_data.filter_rows(
-                ~tmp_variant_data.repeat_region
+        interval_table = hl.read_table(str(reference_path(f'gnomad/{name}')))
+        if interval_table.count() > 0:
+            # remove all rows where the locus falls within a defined interval
+            tmp_variant_data = vds.variant_data.filter_rows(
+                hl.is_defined(interval_table[vds.variant_data.locus]),
+                keep=False
             )
             vds = VariantDataset(vds.reference_data, tmp_variant_data)
 
