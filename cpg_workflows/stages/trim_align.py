@@ -170,7 +170,7 @@ class TrimAlignRNA(SequencingGroupStage):
                 b=get_batch(),
                 fastq_pairs=trimmed_fastq_pairs,
                 sample_name=sequencing_group.id,
-                genome_prefix=get_config()['references'].get('star_ref_dir'),
+                genome_prefix=get_config()['references']['star'].get('ref_dir'),
                 mark_duplicates=True,
                 output_bam=aligned_bam,
                 output_cram=aligned_cram,
