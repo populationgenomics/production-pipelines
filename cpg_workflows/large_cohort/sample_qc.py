@@ -11,7 +11,6 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build, reference_path
 from gnomad.sample_qc.pipeline import annotate_sex
-from hail.vds.variant_dataset import VariantDataset
 
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
@@ -113,6 +112,7 @@ def impute_sex(
     # Pre-filter here and setting `variants_filter_lcr` and `variants_filter_segdup`
     # below to `False` to avoid the function calling gnomAD's `resources` module:
     logging.info(f'count pre filter: {vds.variant_data.count()}')
+    from hail.vds.variant_dataset import VariantDataset
     for name in ['lcr_intervals_ht', 'seg_dup_intervals_ht']:
         interval_table = hl.read_table(str(reference_path(f'gnomad/{name}')))
         if interval_table.count() > 0:
@@ -120,15 +120,17 @@ def impute_sex(
             tmp_variant_data = vds.variant_data.filter_rows(
                 hl.is_defined(interval_table[vds.variant_data.locus]), keep=False
             )
-            vds = VariantDataset(vds.reference_data, tmp_variant_data)
+            vds = VariantDataset(
+                reference_data=vds.reference_data, variant_data=tmp_variant_data
+            ).checkpoint(str(tmp_prefix / f'{name}_checkpoint.vds'))
             logging.info(f'count post {name} filter:{vds.variant_data.count()}')
 
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
-    vds_tmp_outpath = str(
-        tmp_prefix / 'sample_qc2' / 'pre-annotation' / 'something.vds'
-    )
-    logging.info(f'Not writing, but this is path to VDS if writing: {vds_tmp_outpath}')
-    vds.variant_data.show()
+    # vds_tmp_outpath = str(
+    #     tmp_prefix / 'sample_qc2' / 'pre-annotation' / 'something.vds'
+    # )
+    # logging.info(f'Not writing, but this is path to VDS if writing: {vds_tmp_outpath}')
+    # vds.variant_data.show()
     logging.info('I\'m about to enter the annotate sex')
     sex_ht = annotate_sex(
         vds,
@@ -146,8 +148,8 @@ def impute_sex(
     sex_ht_tmp_outpath = os.path.join(
         tmp_prefix, 'sample_qc2', 'pre-annotation', 'after-annotation_sex_ht.ht'
     )
+    sex_ht = sex_ht.checkpoint(str(sex_ht_tmp_outpath), overwrite=True)
     sex_ht.show()
-    sex_ht.checkpoint(str(sex_ht_tmp_outpath), overwrite=True)
     sex_ht = sex_ht.transmute(
         impute_sex_stats=hl.struct(
             f_stat=sex_ht.f_stat,
@@ -160,8 +162,8 @@ def impute_sex(
     sex_ht_tmp_outpath = os.path.join(
         tmp_prefix, 'sample_qc2', 'after-transmute', 'after-transmute.ht'
     )
+    sex_ht = sex_ht.checkpoint(sex_ht_tmp_outpath, overwrite=True)
     sex_ht.show()
-    sex_ht.checkpoint(sex_ht_tmp_outpath, overwrite=True)
     return sex_ht
 
 
