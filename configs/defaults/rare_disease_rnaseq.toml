@@ -4,6 +4,6 @@ sequencing_type = "transcriptome"
 [trim]
 adapter_type = "ILLUMINA_TRUSEQ"
 
-[references]
-gtf = 'gs://kccg-references/hg38.gtf'
-fasta = "gs://cpg-common-main/references/hg38/v0/Homo_sapiens_assembly38.fasta"
+[references.star]
+gtf = 'gs://cpg-common-main/references/star/hg38/hg38.gtf'
+fasta = "gs://cpg-common-main/references/star/hg38/hg38.fa"
