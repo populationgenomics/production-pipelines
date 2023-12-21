@@ -104,7 +104,7 @@ def impute_sex(
     calling_intervals_ht.describe()
 
     # clunky import due to dataproc execution
-    from hail.vds import VariantDataset
+    from hail.vds.variant_dataset import VariantDataset
 
     # Pre-filter here and setting `variants_filter_lcr` and `variants_filter_segdup`
     # below to `False` to avoid the function calling gnomAD's `resources` module:
