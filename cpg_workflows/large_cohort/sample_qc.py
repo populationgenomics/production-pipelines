@@ -121,11 +121,11 @@ def impute_sex(
             tmp_variant_data = vds.variant_data.filter_rows(
                 hl.is_defined(interval_table[vds.variant_data.locus]), keep=False
             )
-            vds = VariantDataset(vds.reference_data, tmp_variant_data)
+            vds = VariantDataset(
+                reference_data=vds.reference_data, variant_data=tmp_variant_data
+            ).checkpoint(str(tmp_prefix / f'{name}_checkpoint.vds'))
             logging.info(f'count post {name} filter:{vds.variant_data.count()}')
 
-    logging.info(f"Here's the vds.variant_data.show():")
-    vds.variant_data.show()
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
     # vds_tmp_outpath = str(
     #     tmp_prefix / 'sample_qc2' / 'pre-annotation' / 'something.vds'
