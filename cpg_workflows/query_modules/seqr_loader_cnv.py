@@ -2,15 +2,12 @@
 Hail Query functions for seqr loader; SV edition.
 """
 
-import gzip
 import logging
-import requests
 
 import hail as hl
 
-from cpg_utils import to_path
-from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build, reference_path
+from cpg_workflows.query_modules.seqr_loader_sv import get_expr_for_xpos
 from cpg_workflows.utils import read_hail, checkpoint_hail
 
 
@@ -50,9 +47,10 @@ def annotate_cohort_gcnv(
     logger.info(f'Importing SV VCF {vcf_path}')
     mt = hl.import_vcf(
         vcf_path,
+        array_elements_required=False,
+        force_bgz=True,
         reference_genome=genome_build(),
         skip_invalid_loci=True,
-        force_bgz=True,
     )
 
     # add attributes required for Seqr
@@ -64,44 +62,28 @@ def annotate_cohort_gcnv(
         sampleType='WES'
     )
 
+    # apply variant_qc annotations
+    mt = hl.variant_qc(mt)
+
     # reimplementation of
     # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/sv_mt_schema.py
     mt = mt.annotate_rows(
-        sc=mt.info.AC[0],
-        sf=mt.info.AF[0],
-        sn=mt.info.AN,
+        sc=mt.variant_qc.AC[0],
+        sf=mt.variant_qc.AF[0],
+        sn=mt.variant_qc.AN,
         end=mt.info.END,
-        end_locus=hl.if_else(
-            hl.is_defined(mt.info.END2),
-            hl.struct(contig=mt.info.CHR2, position=mt.info.END2),
-            hl.struct(contig=mt.locus.contig, position=mt.info.END),
-        ),
         sv_callset_Het=mt.info.N_HET,
         sv_callset_Hom=mt.info.N_HOMALT,
         gnomad_svs_ID=mt.info['gnomad_v2.1_sv_SVID'],
         gnomad_svs_AF=mt.info['gnomad_v2.1_sv_AF'],
         gnomad_svs_AC=hl.missing('float64'),
         gnomad_svs_AN=hl.missing('float64'),
-        # I DON'T HAVE THESE ANNOTATIONS
-        # gnomad_svs_AC=unsafe_cast_int32(mt.info.gnomAD_V2_AC),
-        # gnomad_svs_AN=unsafe_cast_int32(mt.info.gnomAD_V2_AN),
         StrVCTVRE_score=hl.parse_float(mt.info.StrVCTVRE),
-        filters=hl.or_missing(  # hopefully this plays nicely
-            (mt.filters.filter(lambda x: (x != PASS) & (x != BOTHSIDES_SUPPORT))).size()
-            > 0,
-            mt.filters,
-        ),
-        sv_types=mt.alleles[1].replace('[<>]', ''),
+        svType=mt.alleles[1].replace('[<>]', ''),
     )
 
     # save those changes
     mt = checkpoint_hail(mt, 'initial_annotation_round.mt', checkpoint_prefix)
-
-    # get the Gene-Symbol mapping dict
-    gene_id_mapping_file = download_gencode_gene_id_mapping(
-        get_config().get('gencode_release', '42')
-    )
-    gene_id_mapping = parse_gtf_from_local(gene_id_mapping_file)
 
     # OK, NOW IT'S BUSINESS TIME
     conseq_predicted_gene_cols = [
