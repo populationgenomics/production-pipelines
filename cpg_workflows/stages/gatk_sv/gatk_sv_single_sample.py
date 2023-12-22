@@ -226,6 +226,10 @@ class EvidenceQC(CohortStage):
 
         input_dict |= get_references(['genome_file', 'wgd_scoring_mask'])
 
+        # find any additional arguments to pass to Cromwell
+        if override := get_config()['resource_overrides'].get('EvidenceQC'):
+            input_dict |= override
+
         expected_d = self.expected_outputs(cohort)
 
         billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
