@@ -60,18 +60,9 @@ def annotate_cohort_gcnv(
         sourceFilePath=vcf_path,
         genomeVersion=genome_build().replace('GRCh', ''),
         hail_version=hl.version(),
-        datasetType='SV',
+        datasetType='CNV',
+        sampleType='WES'
     )
-    if sequencing_type := get_config()['workflow'].get('sequencing_type'):
-        # Map to Seqr-style string
-        # https://github.com/broadinstitute/seqr/blob/e0c179c36c0f68c892017de5eab2e4c1b9ffdc92/seqr/models.py#L592-L594
-        mt = mt.annotate_globals(
-            sampleType={
-                'genome': 'WGS',
-                'exome': 'WES',
-                'single_cell': 'RNA',
-            }.get(sequencing_type, ''),
-        )
 
     # reimplementation of
     # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/sv_mt_schema.py
@@ -100,13 +91,7 @@ def annotate_cohort_gcnv(
             > 0,
             mt.filters,
         ),
-        bothsides_support=mt.filters.any(lambda x: x == BOTHSIDES_SUPPORT),
-        algorithms=mt.info.ALGORITHMS,
-        cpx_intervals=hl.or_missing(
-            hl.is_defined(mt.info.CPX_INTERVALS),
-            mt.info.CPX_INTERVALS.map(lambda x: get_cpx_interval(x)),
-        ),
-        sv_types=mt.alleles[1].replace('[<>]', '').split(':', 2),
+        sv_types=mt.alleles[1].replace('[<>]', ''),
     )
 
     # save those changes
