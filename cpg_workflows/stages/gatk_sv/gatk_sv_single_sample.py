@@ -275,10 +275,12 @@ class CreateSampleBatches(CohortStage):
                 'exome': [sg.id for sg in cohort.get_sequencing_groups()]
             }
         # within exomes, divide into PCR- and all other sequencing groups
+        # this logic is currently invalid, as pcr_status isn't populated
+        # TODO resolve issue #575
         else:
             sequencing_group_types = {'positive': [], 'negative': []}
             for sequencing_group in cohort.get_sequencing_groups():
-                if sequencing_group.meta.get('pcr_status', 'unknown') == 'negative':
+                if sequencing_group.meta.get('pcr_status', 'negative') == 'negative':
                     sequencing_group_types['negative'].append(sequencing_group.id)
                 else:
                     sequencing_group_types['positive'].append(sequencing_group.id)
