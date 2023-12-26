@@ -8,3 +8,9 @@
 
 [resource_overrides.GatherSampleEvidence.runtime_attr_scramble_part2]
 mem_gb = 7.5
+
+[resource_overrides.EvidenceQC.wgd_build_runtime_attr]
+disk_gb = 40
+
+[resource_overrides.EvidenceQC.runtime_attr_mediancov]
+disk_gb = 200

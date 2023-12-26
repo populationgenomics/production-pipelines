@@ -138,10 +138,6 @@ class GatherSampleEvidence(SequencingGroupStage):
             ]
         )
 
-        # find any additional arguments to pass to Cromwell
-        if override := get_config()['resource_overrides'].get('GatherSampleEvidence'):
-            input_dict |= override
-
         expected_d = self.expected_outputs(sequencing_group)
 
         # billing labels!
@@ -225,10 +221,6 @@ class EvidenceQC(CohortStage):
         )
 
         input_dict |= get_references(['genome_file', 'wgd_scoring_mask'])
-
-        # find any additional arguments to pass to Cromwell
-        if override := get_config()['resource_overrides'].get('EvidenceQC'):
-            input_dict |= override
 
         expected_d = self.expected_outputs(cohort)
 
