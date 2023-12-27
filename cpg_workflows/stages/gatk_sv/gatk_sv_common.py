@@ -258,9 +258,6 @@ def clean_ped_family_ids(ped_line: str) -> str:
     return '\t'.join(split_line) + '\n'
 
 
-
-
-
 def make_combined_ped(cohort: Cohort, prefix: Path) -> Path:
     """
     Create cohort + ref panel PED.
