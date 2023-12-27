@@ -454,8 +454,8 @@ def merge_calls(
 
     # get the output root to write to
     output_no_suffix = str(output_path).removesuffix('.vcf.bgz')
-    b.write_output(merge_job.output, output_no_suffix)
-    return merge_job
+    b.write_output(third_job.output, output_no_suffix)
+    return [merge_job, pyjob, third_job]
 
 
 def update_vcf_attributes(input_tmp: str, output_file: str):
