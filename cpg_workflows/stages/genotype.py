@@ -33,15 +33,13 @@ class Genotype(SequencingGroupStage):
         Generate a GVCF and corresponding TBI index.
         """
         if sequencing_group.gvcf:
-            if sequencing_group.gvcf.tbi_path:
-                tbi_path = sequencing_group.gvcf.tbi_path
-            else:
-                tbi_path = None
+            gvcf_path = sequencing_group.gvcf
         else:
-            tbi_path = sequencing_group.make_gvcf_path().tbi_path
+            gvcf_path = sequencing_group.make_gvcf_path()
+
         return {
-            'gvcf': sequencing_group.gvcf or sequencing_group.make_gvcf_path().path,
-            'tbi': tbi_path,
+            'gvcf': gvcf_path.path,
+            'tbi': gvcf_path.tbi_path,
         }
 
     def queue_jobs(

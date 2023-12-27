@@ -96,16 +96,21 @@ class GatherSampleEvidence(SequencingGroupStage):
         """
         assert sequencing_group.cram, sequencing_group
 
-        input_dict: dict[str, Any] = {
-            'bam_or_cram_file': str(sequencing_group.cram),
-            'bam_or_cram_index': str(sequencing_group.cram) + '.crai',
-            'sample_id': sequencing_group.id,
-            'reference_fasta': str(get_fasta()),
-            'reference_index': str(get_fasta()) + '.fai',
-            'reference_dict': str(get_fasta().with_suffix('.dict')),
-            'reference_version': '38',
-            # 'scramble_part2_threads': 4,  # default = 7
-        }
+        input_dict: dict[str, Any] = dict(
+            bam_or_cram_file=str(sequencing_group.cram),
+            bam_or_cram_index=str(sequencing_group.cram) + '.crai',
+            sample_id=sequencing_group.id,
+            reference_fasta=str(get_fasta()),
+            reference_index=str(get_fasta()) + '.fai',
+            reference_dict=str(get_fasta().with_suffix('.dict')),
+            reference_version='38'
+        )
+
+        # runtime_attr_scramble_part2 = {"mem_gb": 8}
+        # optional override:
+        if (overrides := get_config().get('resource_overrides')) and 'GatherSampleEvidence' in overrides:
+            for key, value in overrides['GatherSampleEvidence'].items():
+                input_dict[key] = value
 
         input_dict |= get_images(
             [
@@ -146,13 +151,13 @@ class GatherSampleEvidence(SequencingGroupStage):
             'dataset': sequencing_group.dataset.name,  # already lowercase
             'sequencing-group': sequencing_group.id.lower(),  # cpg123123
             'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid()
+            AR_GUID_NAME: try_get_ar_guid(),
         }
 
         # add some max-polling interval jitter for each sample
         # cromwell_status_poll_interval is a number (int, seconds)
         # this is used to determine how often to poll Cromwell for completion status
-        # we alter the per-sample maximum to be between 5 and 15 minutes for this
+        # we alter the per-sample maximum to be between 5 and 30 minutes for this
         # long running job, so samples poll on different intervals, spreading load
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
@@ -162,7 +167,8 @@ class GatherSampleEvidence(SequencingGroupStage):
             expected_out_dict=expected_d,
             sequencing_group_id=sequencing_group.id,
             labels=billing_labels,
-            cromwell_status_poll_interval=randint(300, 900),
+            cromwell_status_min_poll_interval=randint(30, 180),
+            cromwell_status_max_poll_interval=randint(300, 1800),
         )
         return self.make_outputs(sequencing_group, data=expected_d, jobs=jobs)
 
@@ -220,12 +226,13 @@ class EvidenceQC(CohortStage):
 
         input_dict |= get_references(['genome_file', 'wgd_scoring_mask'])
 
+        # find any additional arguments to pass to Cromwell
+        if override := get_config()['resource_overrides'].get('EvidenceQC'):
+            input_dict |= override
+
         expected_d = self.expected_outputs(cohort)
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid()
-        }
+        billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
 
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
@@ -233,12 +240,17 @@ class EvidenceQC(CohortStage):
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=EvidenceQC, analysis_type='sv', analysis_keys=['batch_json_negative', 'batch_json_positive'], tolerate_missing_output=True)
+@stage(
+    required_stages=EvidenceQC,
+    analysis_type='sv',
+    analysis_keys=['batch_json_negative', 'batch_json_positive'],
+    tolerate_missing_output=True,
+)
 class CreateSampleBatches(CohortStage):
     """
     uses the values generated in EvidenceQC
