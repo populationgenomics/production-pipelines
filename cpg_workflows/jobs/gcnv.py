@@ -444,6 +444,7 @@ def merge_calls(
 
     # a third job just to tidy up
     third_job = b.new_job('bgzip and tabix')
+    third_job.image(docker_image)
     third_job.declare_resource_group(
         output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
     )
