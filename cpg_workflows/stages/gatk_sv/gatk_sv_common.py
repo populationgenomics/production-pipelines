@@ -1,6 +1,7 @@
 """
 Common methods for all GATK-SV workflows
 """
+import re
 
 from os.path import join
 from typing import Any
@@ -20,6 +21,7 @@ from cpg_workflows.workflow import Cohort, Dataset
 GATK_SV_COMMIT = '6d6100082297898222dfb69fcf941d373d78eede'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 _FASTA = None
+PED_FAMILY_ID_REGEX = re.compile(r'(^[A-Za-z0-9_]+$)')
 
 
 def _sv_batch_meta(
@@ -230,16 +232,51 @@ def get_ref_panel(keys: list[str] | None = None) -> dict:
     }
 
 
+def clean_ped_family_ids(ped_line: str) -> str:
+    """
+    Takes each line in the pedigree and cleans it up
+    If the family ID already conforms to expectations, no action
+    If the family ID fails, replace all non-alphanumeric/non-underscore
+    characters with underscores
+
+    >>> clean_ped_family_ids('family1\tchild1\t0\t0\t1\t0\\n')
+    'family1\tchild1\t0\t0\t1\t0\\n'
+    >>> clean_ped_family_ids('family-1-dirty\tchild1\t0\t0\t1\t0\\n')
+    'family-1-dirty\tchild1\t0\t0\t1\t0\\n'
+
+    Args:
+        ped_line (str): line from the pedigree file, unsplit
+
+    Returns:
+        the same line with a transformed family id
+    """
+
+    split_line = ped_line.rstrip().split('\t')
+
+    if re.match(PED_FAMILY_ID_REGEX, split_line[0]):
+        return ped_line
+
+    # if the family id is not valid, replace failing characters with underscores
+    split_line[0] = re.sub(r'[^A-Za-z0-9_]', '_', split_line[0])
+
+    # return the rebuilt string, with a newline at the end
+    return '\t'.join(split_line) + '\n'
+
+
 def make_combined_ped(cohort: Cohort, prefix: Path) -> Path:
     """
     Create cohort + ref panel PED.
     Concatenating all samples across all datasets with ref panel
+
+    See #578 - there are restrictions on valid characters in PED file
     """
     combined_ped_path = prefix / 'ped_with_ref_panel.ped'
     conf_ped_path = get_references(['ped_file'])['ped_file']
     with combined_ped_path.open('w') as out:
         with cohort.write_ped_file().open() as f:
-            out.write(f.read())
+            # layer of family ID cleaning
+            for line in f:
+                out.write(clean_ped_family_ids(line))
         # The ref panel PED doesn't have any header, so can safely concatenate:
         with to_path(conf_ped_path).open() as f:
             out.write(f.read())
