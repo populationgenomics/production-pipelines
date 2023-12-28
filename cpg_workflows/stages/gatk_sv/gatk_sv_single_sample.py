@@ -138,10 +138,6 @@ class GatherSampleEvidence(SequencingGroupStage):
             ]
         )
 
-        # find any additional arguments to pass to Cromwell
-        if override := get_config()['resource_overrides'].get('GatherSampleEvidence'):
-            input_dict |= override
-
         expected_d = self.expected_outputs(sequencing_group)
 
         # billing labels!
@@ -226,14 +222,11 @@ class EvidenceQC(CohortStage):
 
         input_dict |= get_references(['genome_file', 'wgd_scoring_mask'])
 
-        # find any additional arguments to pass to Cromwell
-        if override := get_config()['resource_overrides'].get('EvidenceQC'):
-            input_dict |= override
-
         expected_d = self.expected_outputs(cohort)
 
         billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
 
+        # runs for approx 5 hours, depending on sample count
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
@@ -241,6 +234,8 @@ class EvidenceQC(CohortStage):
             input_dict=input_dict,
             expected_out_dict=expected_d,
             labels=billing_labels,
+            cromwell_status_min_poll_interval=100,
+            cromwell_status_max_poll_interval=600
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -283,10 +278,12 @@ class CreateSampleBatches(CohortStage):
                 'exome': [sg.id for sg in cohort.get_sequencing_groups()]
             }
         # within exomes, divide into PCR- and all other sequencing groups
+        # this logic is currently invalid, as pcr_status isn't populated
+        # TODO resolve issue #575
         else:
             sequencing_group_types = {'positive': [], 'negative': []}
             for sequencing_group in cohort.get_sequencing_groups():
-                if sequencing_group.meta.get('pcr_status', 'unknown') == 'negative':
+                if sequencing_group.meta.get('pcr_status', 'negative') == 'negative':
                     sequencing_group_types['negative'].append(sequencing_group.id)
                 else:
                     sequencing_group_types['positive'].append(sequencing_group.id)

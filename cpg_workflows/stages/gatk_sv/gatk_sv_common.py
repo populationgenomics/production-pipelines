@@ -126,6 +126,11 @@ def add_gatk_sv_jobs(
     """
     Generic function to add a job that would run one GATK-SV workflow.
     """
+
+    # If a config section exists for this workflow, apply overrides
+    if override := get_config()['resource_overrides'].get(wfl_name):
+        input_dict |= override
+
     # Where Cromwell writes the output.
     # Will be different from paths in expected_out_dict:
     output_prefix = f'gatk_sv/output/{wfl_name}/{dataset.name}'
