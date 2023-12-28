@@ -226,6 +226,7 @@ class EvidenceQC(CohortStage):
 
         billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
 
+        # runs for approx 5 hours, depending on sample count
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
@@ -233,6 +234,8 @@ class EvidenceQC(CohortStage):
             input_dict=input_dict,
             expected_out_dict=expected_d,
             labels=billing_labels,
+            cromwell_status_min_poll_interval=100,
+            cromwell_status_max_poll_interval=600
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
