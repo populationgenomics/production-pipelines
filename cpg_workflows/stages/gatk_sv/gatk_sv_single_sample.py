@@ -106,12 +106,6 @@ class GatherSampleEvidence(SequencingGroupStage):
             reference_version='38'
         )
 
-        # runtime_attr_scramble_part2 = {"mem_gb": 8}
-        # optional override:
-        if (overrides := get_config().get('resource_overrides')) and 'GatherSampleEvidence' in overrides:
-            for key, value in overrides['GatherSampleEvidence'].items():
-                input_dict[key] = value
-
         input_dict |= get_images(
             [
                 'sv_pipeline_base_docker',
