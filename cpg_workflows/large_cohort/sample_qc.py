@@ -103,12 +103,22 @@ def impute_sex(
     logging.info('Calling intervals table:')
     calling_intervals_ht.describe()
 
+    # clunky import due to dataproc execution
+    from hail.vds.variant_dataset import VariantDataset
+
     # Pre-filter here and setting `variants_filter_lcr` and `variants_filter_segdup`
     # below to `False` to avoid the function calling gnomAD's `resources` module:
     for name in ['lcr_intervals_ht', 'seg_dup_intervals_ht']:
-        ht = hl.read_table(str(reference_path(f'gnomad/{name}')))
-        if ht.count() > 0:
-            vds = hl.vds.filter_intervals(vds, ht, keep=False)
+        interval_table = hl.read_table(str(reference_path(f'gnomad/{name}')))
+        if interval_table.count() > 0:
+            # remove all rows where the locus falls within a defined interval
+            tmp_variant_data = vds.variant_data.filter_rows(
+                hl.is_defined(interval_table[vds.variant_data.locus]), keep=False
+            )
+            vds = VariantDataset(
+                reference_data=vds.reference_data, variant_data=tmp_variant_data
+            ).checkpoint(str(tmp_prefix / f'{name}_checkpoint.vds'))
+            logging.info(f'count post {name} filter:{vds.variant_data.count()}')
 
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
     sex_ht = annotate_sex(
