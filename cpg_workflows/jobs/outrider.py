@@ -2,21 +2,17 @@
 Perform outlier gene expression analysis with Outrider.
 """
 
-import hailtop.batch as hb
-from hailtop.batch.job import Job
-from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import command, image_path
-from cpg_utils.config import get_config
-from cpg_workflows.utils import can_reuse
-from cpg_workflows.resources import STANDARD
-from cpg_workflows.filetypes import (
-    BamPath,
-)
-from cpg_workflows.workflow import (
-    SequencingGroup,
-)
-from textwrap import dedent
 from os.path import basename
+from textwrap import dedent
+
+import hailtop.batch as hb
+from cpg_utils import Path, to_path
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import command, image_path
+from hailtop.batch.job import Job
+
+from cpg_workflows.resources import STANDARD
+from cpg_workflows.utils import can_reuse
 
 
 class Outrider:
@@ -25,16 +21,18 @@ class Outrider:
     """
 
     def __init__(
-            self,
-            input_counts: list[str | Path],
-            output: hb.ResourceGroup,
-            gtf_file: str | Path | None = None,
-            nthreads: int = 8,
-            pval_cutoff: float = 0.05,
-            z_cutoff: float = 0.0,
-        ) -> None:
+        self,
+        input_counts: list[str | Path],
+        output: hb.ResourceGroup,
+        gtf_file: str | Path | None = None,
+        nthreads: int = 8,
+        pval_cutoff: float = 0.05,
+        z_cutoff: float = 0.0,
+    ) -> None:
         self.input_counts = input_counts
-        assert isinstance(self.input_counts, list), f'input_counts must be a list, instead got {self.input_counts}'
+        assert isinstance(
+            self.input_counts, list
+        ), f'input_counts must be a list, instead got {type(self.input_counts)}: {self.input_counts}'
         self.input_counts_r_str = ', '.join([f'"{str(f)}"' for f in self.input_counts])
         self.gtf_file_path = str(gtf_file)
         self.output = output
@@ -282,7 +280,7 @@ class Outrider:
 
     def __str__(self):
         return self.command
-    
+
     def __repr__(self):
         return self.__str__()
 
@@ -295,25 +293,19 @@ def outrider(
     job_attrs: dict[str, str] | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
-) -> Job:
+) -> Job | None:
     """
     Run Outrider.
     """
     # Reuse existing output if possible
     if output_rdata_path and can_reuse(output_rdata_path, overwrite):
-        return []
+        return None
 
     # Localise input files
     assert all([isinstance(f, (str, Path)) for f in input_counts])
-    infiles = {
-        basename(str(f)).replace('.count', ''): str(f)
-        for f in input_counts
-    }
+    infiles = {basename(str(f)).replace('.count', ''): str(f) for f in input_counts}
     infiles_rg = b.read_input_group(**infiles)
-    infiles_localised = [
-        str(infiles_rg[key])
-        for key in infiles.keys()
-    ]
+    infiles_localised = [str(infiles_rg[key]) for key in infiles.keys()]
     gtf_file = get_config()['references'].get('gtf')
     gtf_file = to_path(gtf_file)
     gtf_file_rg = b.read_input_group(gtf=str(gtf_file))
@@ -330,11 +322,7 @@ def outrider(
 
     # Set resource requirements
     nthreads = requested_nthreads or 8
-    res = STANDARD.set_resources(
-        j,
-        ncpu=nthreads,
-        storage_gb=50,
-    )
+    res = STANDARD.set_resources(j, ncpu=nthreads, storage_gb=50)
 
     j.declare_resource_group(
         output={
@@ -367,5 +355,5 @@ def outrider(
     if output_rdata_path:
         # NOTE: j.output is just a placeholder
         b.write_output(j.output, str(to_path(output_rdata_path).with_suffix('')))
-    
+
     return j
