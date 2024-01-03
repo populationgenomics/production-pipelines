@@ -33,8 +33,6 @@ from cpg_workflows.stages.happy_validation import (
     ValidationParseHappy
 )
 from cpg_workflows.stages.mito import MitoReport
-from cpg_workflows.stages.trim_align import TrimAlignRNA
-from cpg_workflows.stages.count import Count
 from cpg_workflows.stages.outrider import Outrider
 
 
