@@ -10,6 +10,7 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, image_path
 from hailtop.batch.job import Job
+
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import can_reuse
 
@@ -31,7 +32,7 @@ class Outrider:
         self.input_counts = input_counts
         assert isinstance(
             self.input_counts, list
-        ), f'input_counts must be a list, instead got {self.input_counts}'
+        ), f'input_counts must be a list, instead got {type(self.input_counts)}: {self.input_counts}'
         self.input_counts_r_str = ', '.join([f'"{str(f)}"' for f in self.input_counts])
         self.gtf_file_path = str(gtf_file)
         self.output = output
@@ -302,15 +303,9 @@ def outrider(
 
     # Localise input files
     assert all([isinstance(f, (str, Path)) for f in input_counts])
-    infiles = {
-        basename(str(f)).replace('.count', ''): str(f)
-        for f in input_counts
-    }
+    infiles = {basename(str(f)).replace('.count', ''): str(f) for f in input_counts}
     infiles_rg = b.read_input_group(**infiles)
-    infiles_localised = [
-        str(infiles_rg[key])
-        for key in infiles.keys()
-    ]
+    infiles_localised = [str(infiles_rg[key]) for key in infiles.keys()]
     gtf_file = get_config()['references']['star'].get('gtf')
     gtf_file = to_path(gtf_file)
     gtf_file_rg = b.read_input_group(gtf=str(gtf_file))
@@ -327,11 +322,7 @@ def outrider(
 
     # Set resource requirements
     nthreads = requested_nthreads or 8
-    res = STANDARD.set_resources(
-        j,
-        ncpu=nthreads,
-        storage_gb=50,
-    )
+    res = STANDARD.set_resources(j, ncpu=nthreads, storage_gb=50)
 
     j.declare_resource_group(
         output={
