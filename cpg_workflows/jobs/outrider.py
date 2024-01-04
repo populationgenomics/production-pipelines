@@ -306,7 +306,7 @@ def outrider(
     infiles = {basename(str(f)).replace('.count', ''): str(f) for f in input_counts}
     infiles_rg = b.read_input_group(**infiles)
     infiles_localised = [str(infiles_rg[key]) for key in infiles.keys()]
-    gtf_file = get_config()['references'].get('gtf')
+    gtf_file = get_config()['references']['star'].get('gtf')
     gtf_file = to_path(gtf_file)
     gtf_file_rg = b.read_input_group(gtf=str(gtf_file))
 
