@@ -557,7 +557,7 @@ class AnnotateVcf(CohortStage):
             batch=get_batch(),
             cohort=cohort,
             cohort_prefix=self.prefix,
-            input_vcf=inputs.as_dict(cohort, MakeCohortVcf)['vcf'],
+            input_vcf=inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf'],
             outputs=expected_out,
             labels=billing_labels,
         )
