@@ -2,4 +2,13 @@
 # this will be used when running:
 # - MergeBatchSites (sandwich stage)
 # - MakeCohortVCF (multisample 2)
-batch_names = ['555b2843b7a3cfbdeb28c5cfbf7d2b3b1ca004_119', 'a5407cc508c8f25f960e1b52be1f31e740d289_119', '57970d24bdbea5ecd73d2bfb198561036db76b_161', 'fdbd58db0fd05246b40a530e2d357b6ca20065_197']
+batch_names = [
+    '555b2843b7a3cfbdeb28c5cfbf7d2b3b1ca004_119',
+    'a5407cc508c8f25f960e1b52be1f31e740d289_119',
+    '57970d24bdbea5ecd73d2bfb198561036db76b_161',
+    'fdbd58db0fd05246b40a530e2d357b6ca20065_197',
+    '53cc421fcfed5a57011666a55906f7980fa47d_249',
+    '37d60e139c4e9bf4e3afcf03e6d19f209b7c44_248',
+    '559487096cd14e497f2eb4e26fa1948a823eff_248',
+    '31dc2d5734b4bcfa023f8c681a72bb0ccbe8c9_248'
+]
