@@ -103,10 +103,12 @@ def main(project: str, sgids: list[str]):
 if __name__ == '__main__':
     # optional direct input of samples
     parser = ArgumentParser(description='Hail Batch FastQE')
-    parser.add_argument('-p', '--project', help='Project name', required=True)
-    parser.add_argument('-sg', nargs='+', help='Sequencing group IDs', required=True)
+    parser.add_argument('--project', help='Project name', required=True)
+    parser.add_argument(
+        '--sgids', nargs='+', help='Sequencing group IDs', required=True
+    )
     args, fails = parser.parse_known_args()
 
     if fails:
         raise ValueError(f'Failed to parse arguments: {fails}')
-    main(project=args.p, sgids=args.sg)
+    main(project=args.project, sgids=args.sgids)
