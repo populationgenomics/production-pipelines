@@ -58,7 +58,7 @@ def main(project: str, sgids: list[str]):
     # so we have access to all variables
 
     # Metamist query for files
-    file_dict = get_assays(project)
+    file_dict = get_assays(project, sgids)
     # endregion
 
     # region: Batch time
