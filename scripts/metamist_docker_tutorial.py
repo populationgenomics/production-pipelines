@@ -83,9 +83,10 @@ def main(project: str, sgids: list[str]):
         # batch.read_input will create a new path like /io/batch/75264c/CPGAAAA_1.fq.gz
         # accessible from inside the job container, and unique to this batch/job
         j.command(
-            f'echo "Hello world, I am a job for {sg}!, using {file_1} and {file_2}"'
-            f'I\'m also creating an output file at {j.output}'
-            f'echo "Some outputs" > {j.output}'
+            # f'echo "Hello world, I am a job for {sg}!, using {file_1} and {file_2}"'
+            # f'I\'m also creating an output file at {j.output}'
+            # f'echo "Some outputs" > {j.output}'
+            f'python3 fastqe {file_1} {file_2} --html > test_fastqe.html',
         )
 
         # read the output out into GCP
