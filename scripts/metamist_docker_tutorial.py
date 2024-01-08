@@ -64,7 +64,7 @@ def create_analysis_entry(
     from metamist.model.analysis import Analysis
     from metamist.model.analysis_status import AnalysisStatus
 
-    project[0] = (get_config()['workflow']['dataset'],)
+    project = get_config()['workflow']['dataset']
     if get_config()['workflow']['access_level'] == 'test' and 'test' not in project:
         project = f'{project}-test'
     output_prefix = get_config()['workflow']['output_prefix']
