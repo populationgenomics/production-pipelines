@@ -6,10 +6,11 @@ from os.path import basename
 from textwrap import dedent
 
 import hailtop.batch as hb
+from hailtop.batch.job import Job
+
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, image_path
-from hailtop.batch.job import Job
 
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import can_reuse

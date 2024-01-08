@@ -2,29 +2,21 @@
 Perform outlier gene expression analysis with Outrider.
 """
 
-import logging
 from cpg_utils import Path
-from cpg_utils.config import get_config
+
 from cpg_workflows import get_batch
+from cpg_workflows.jobs import outrider
+from cpg_workflows.stages.count import Count
 from cpg_workflows.workflow import (
     stage,
     StageInput,
     StageOutput,
-    SequencingGroup,
-    SequencingGroupStage,
     Cohort,
     CohortStage,
 )
-from cpg_workflows.filetypes import (
-    BamPath,
-)
-from cpg_workflows.stages.count import Count
-from cpg_workflows.jobs import outrider
 
 
-@stage(
-    required_stages=Count,
-)
+@stage(required_stages=Count)
 class Outrider(CohortStage):
     """
     Perform outlier gene expression analysis with Outrider.
