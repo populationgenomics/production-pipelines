@@ -74,6 +74,7 @@ def main(project: str, sgids: list[str]):
         # this pulls the image path from the portion of the config
         # populated by the images repository
         j.image(image_path('fastqe'))
+        j.storage('1Gi')
 
         # read data into the batch tmp resource location
         file_1 = b.read_input(files[0])
@@ -82,7 +83,7 @@ def main(project: str, sgids: list[str]):
         # Set the command to run
         # batch.read_input will create a new path like /io/batch/75264c/CPGAAAA_1.fq.gz
         # accessible from inside the job container, and unique to this batch/job
-        cmd = f'python3 fastqe {file_1} {file_2} --html > {j.out_fastqe}'
+        cmd = f'fastqe {file_1} {file_2} --html > {j.out_fastqe}'
         j.command(
             # f'echo "Hello world, I am a job for {sg}!, using {file_1} and {file_2}"'
             # f'I\'m also creating an output file at {j.output}'
