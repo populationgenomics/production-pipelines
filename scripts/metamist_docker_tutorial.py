@@ -78,7 +78,7 @@ def create_analysis_entry(
         '.html',
     )
     AnalysisApi().create_analysis(
-        project=f'{project}',
+        project=f'{project[0]}',
         analysis=Analysis(
             type='web',
             status=AnalysisStatus('completed'),
