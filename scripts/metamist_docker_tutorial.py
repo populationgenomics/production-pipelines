@@ -64,7 +64,7 @@ def create_analysis_entry(
     from metamist.model.analysis import Analysis
     from metamist.model.analysis_status import AnalysisStatus
 
-    project = (get_config()['workflow']['dataset'],)
+    project[0] = (get_config()['workflow']['dataset'],)
     if get_config()['workflow']['access_level'] == 'test' and 'test' not in project:
         project = f'{project}-test'
     output_prefix = get_config()['workflow']['output_prefix']
@@ -78,7 +78,7 @@ def create_analysis_entry(
         '.html',
     )
     AnalysisApi().create_analysis(
-        project=f'{project[0]}',
+        project=f'{project}',
         analysis=Analysis(
             type='web',
             status=AnalysisStatus('completed'),
