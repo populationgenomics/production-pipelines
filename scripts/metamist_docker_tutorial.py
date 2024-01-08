@@ -87,7 +87,7 @@ def main(project: str, sgids: list[str]):
             # f'echo "Hello world, I am a job for {sg}!, using {file_1} and {file_2}"'
             # f'I\'m also creating an output file at {j.output}'
             # f'echo "Some outputs" > {j.output}'
-            command(cmd, setup_gcp=True)
+            command(cmd)
         )
 
         # read the output out into GCP
