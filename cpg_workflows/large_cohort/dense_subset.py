@@ -25,8 +25,7 @@ def run(
     vds = hl.vds.split_multi(vds, filter_changed_loci=True)
 
     logging.info('Filtering variants to predetermined QC variants...')
-    access_level = get_config()['workflow'].get('access_level')
-    sites_table = str(reference_path('gnomad/predetermined_qc_variants_prefix')) + access_level + str(reference_path('gnomad/predetermined_qc_variants_path'))
+    sites_table = reference_path('gnomad/predetermined_qc_variants_table')
     qc_variants_ht = hl.read_table(sites_table)
     vds = hl.vds.filter_variants(vds, qc_variants_ht)
     logging.info('Densifying data...')
