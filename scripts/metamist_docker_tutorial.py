@@ -127,7 +127,7 @@ def main(project: str, sgids: list[str]):
             # f'echo "Some outputs" > {j.output}'
             command(cmd)
         )
-        j2 = b.new_python_job()
+        j2 = b.new_python_job(f'Register analysis output for {sg}')
         j2.image(get_config()['workflow']['driver_image'])
         j2.call(create_analysis_entry, sg)
         j2.depends_on(j)
