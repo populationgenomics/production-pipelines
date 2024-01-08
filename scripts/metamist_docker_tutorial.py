@@ -5,9 +5,6 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, get_batch, image_path, output_path
 from metamist.graphql import gql, query
 
-# PROJECT = get_config()["workflow"]["dataset"]
-PROJECT = "bioheart-test"
-
 SG_ASSAY_QUERY = gql(
     """
     query ($project: String!, $sgids: [String!]) {
