@@ -33,8 +33,7 @@ from cpg_workflows.stages.happy_validation import (
     ValidationParseHappy
 )
 from cpg_workflows.stages.mito import MitoReport
-from cpg_workflows.stages.trim_align import TrimAlignRNA
-from cpg_workflows.stages.count import Count
+from cpg_workflows.stages.outrider import Outrider
 
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
@@ -57,8 +56,8 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         MergeBatchSites
     ],  # stage to run between FilterBatch & GenotypeBatch
     'gatk_sv_multisample_2': [AnnotateVcf, AnnotateDatasetSv, MtToEsSv],
+    'rare_disease_rnaseq': [Outrider],
     'gcnv': [GermlineCNVCalls, FastCombineGCNVs, AnnotateCNV, AnnotateCNVVcfWithStrvctvre],
-    'rare_disease_rnaseq': [Count],
 }
 
 
