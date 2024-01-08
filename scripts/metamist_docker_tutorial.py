@@ -68,7 +68,7 @@ def create_analysis_entry(
     if get_config()['workflow']['access_level'] == 'test' and 'test' not in project:
         project = f'{project}-test'
     output_prefix = get_config()['workflow']['output_prefix']
-    web_path = os.path.join(
+    output_path = os.path.join(
         get_config()['storage']['default']['web'], output_prefix, sgid, '.html'
     )
     display_url = os.path.join(
@@ -83,7 +83,7 @@ def create_analysis_entry(
             type='web',
             status=AnalysisStatus('completed'),
             meta={'display_url': display_url},
-            output=web_path,
+            output=output_path,
             active=active,
         ),
     )
