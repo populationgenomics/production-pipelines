@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 
-from cpg_utils.hail_batch import get_batch, image_path, output_path
+from cpg_utils.hail_batch import command, get_batch, image_path, output_path
 from metamist.graphql import gql, query
 
 # PROJECT = get_config()["workflow"]["dataset"]
@@ -68,7 +68,7 @@ def main(project: str, sgids: list[str]):
         assert len(files) == 2
 
         # Create a job for each sample
-        j = b.new_job(f'Job for {sg}')
+        j = b.new_job('FastQE', {'tool': 'fastqe'})
 
         # Set the docker image to use in this job
         # this pulls the image path from the portion of the config
@@ -82,11 +82,12 @@ def main(project: str, sgids: list[str]):
         # Set the command to run
         # batch.read_input will create a new path like /io/batch/75264c/CPGAAAA_1.fq.gz
         # accessible from inside the job container, and unique to this batch/job
+        cmd = f'python3 fastqe {file_1} {file_2} --html'  # > test_fastqe.html',
         j.command(
             # f'echo "Hello world, I am a job for {sg}!, using {file_1} and {file_2}"'
             # f'I\'m also creating an output file at {j.output}'
             # f'echo "Some outputs" > {j.output}'
-            f'python3 fastqe {file_1} {file_2} --html > test_fastqe.html',
+            command(cmd, setup_gcp=True)
         )
 
         # read the output out into GCP
@@ -97,7 +98,7 @@ def main(project: str, sgids: list[str]):
         # --access_level test
         # output_path('this_file.txt')
         # -> gs://cpg-my-dataset-test/my_output/this_file.txt
-        b.write_output(j.output, output_path(f'/{sg}.txt'))
+        b.write_output(j.out_fastqe, output_path(f'/{sg}.html'))
     # endregion
 
 
