@@ -99,6 +99,7 @@ def main(project: str, sgids: list[str]):
         # output_path('this_file.txt')
         # -> gs://cpg-my-dataset-test/my_output/this_file.txt
         b.write_output(j.out_fastqe, output_path(f'/{sg}.html'))
+    b.run()
     # endregion
 
 
