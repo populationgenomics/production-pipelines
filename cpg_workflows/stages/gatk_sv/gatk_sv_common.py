@@ -55,11 +55,14 @@ def create_polling_intervals() -> dict:
 
     # update if these exist in config
     for job_size in CromwellJobSizes:
-        if job_size.value in get_config()['workflow'].get('cromwell_polling_intervals', {}):
+        if job_size.value in get_config()['workflow'].get(
+            'cromwell_polling_intervals', {}
+        ):
             polling_interval_dict[job_size].update(
                 get_config()['workflow']['cromwell_polling_intervals'][job_size.value]
             )
     return polling_interval_dict
+
 
 def _sv_batch_meta(
     output_path: str,  # pylint: disable=W0613:unused-argument
@@ -167,8 +170,12 @@ def add_gatk_sv_jobs(
     polling_intervals = create_polling_intervals()
 
     # obtain upper and lower polling bounds for this job size
-    polling_minimum = randint(polling_intervals[job_size]['min'], polling_intervals[job_size]['min'] * 2)
-    polling_maximum = randint(polling_intervals[job_size]['max'], polling_intervals[job_size]['max'] * 2)
+    polling_minimum = randint(
+        polling_intervals[job_size]['min'], polling_intervals[job_size]['min'] * 2
+    )
+    polling_maximum = randint(
+        polling_intervals[job_size]['max'], polling_intervals[job_size]['max'] * 2
+    )
 
     # If a config section exists for this workflow, apply overrides
     if override := get_config()['resource_overrides'].get(wfl_name):
