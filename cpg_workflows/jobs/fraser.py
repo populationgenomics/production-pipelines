@@ -477,7 +477,7 @@ def fraser_count_split_reads_one_sample(
     """
     # Reuse existing output if possible
     if can_reuse(output_counts_path):
-        return None, b.read_input(output_counts_path)
+        return None, b.read_input(str(output_counts_path))
 
     # Create FRASER job
     job_name = f'fraser_count_split'
