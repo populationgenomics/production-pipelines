@@ -373,8 +373,7 @@ def fraser_count(
             job_attrs=job_attrs,
             requested_nthreads=requested_nthreads,
         )
-        if sample_j:
-            jobs.append(sample_j)
+        jobs.append(sample_j)
         non_spliced_counts_dict[sample_id] = non_spliced_counts
 
     j, fds_tar = fraser_merge_non_split_reads(
@@ -652,13 +651,11 @@ def fraser_count_non_split_reads_one_sample(
     output_counts_path: Path,
     job_attrs: dict[str, str] | None = None,
     requested_nthreads: int | None = None,
-) -> tuple[Job | None, hb.ResourceFile]:
+) -> tuple[Job, hb.ResourceFile]:
     """
     Run FRASER non-split-read counting for a single sample.
     """
-    # Reuse existing output if possible
-    if can_reuse(output_counts_path):
-        return None, b.read_input(output_counts_path)
+    # NOTE: Can't reuse output, need to count non-split reads for each sample
 
     # Create FRASER job
     job_name = f'fraser_count_non_split'
