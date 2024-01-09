@@ -496,6 +496,12 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
                 # e.g. <DEL> -> DEL
                 alt_allele = l_split[4][1:-1]
 
+                # original ID
+                original_id = l_split[2]
+
+                # make this unique after splitting
+                l_split[2] = f'{original_id}_{alt_allele}'
+
                 # update the INFO field with Length and Type (DUP/DEL, not "CNV")
                 l_split[7] = f'SVTYPE={alt_allele};SVLEN={end_int - original_start};{original_end}'
 
@@ -504,6 +510,7 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
 
                 # bippidy boppidy boo
                 others.append(line)
+
     with open(output_file, 'w') as f:
         f.writelines(headers)
         f.writelines(others)

@@ -287,10 +287,7 @@ class AnnotateCNV(CohortStage):
         """
         expected_out = self.expected_outputs(cohort)
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
-        }
+        billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
 
         job_or_none = queue_annotate_sv_jobs(
             batch=get_batch(),
