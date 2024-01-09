@@ -48,9 +48,9 @@ def create_polling_intervals() -> dict:
 
     # create this dict with default values
     polling_interval_dict = {
-        CromwellJobSizes.SMALL: {'min': 30, 'max': 180},
-        CromwellJobSizes.MEDIUM: {'min': 60, 'max': 600},
-        CromwellJobSizes.LARGE: {'min': 300, 'max': 3600},
+        CromwellJobSizes.SMALL: {'min': 30, 'max': 140},
+        CromwellJobSizes.MEDIUM: {'min': 40, 'max': 400},
+        CromwellJobSizes.LARGE: {'min': 200, 'max': 2000},
     }
 
     # update if these exist in config
