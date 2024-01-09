@@ -50,7 +50,6 @@ def create_polling_intervals() -> dict:
     [cromwell_polling_intervals.medium]
     min = 69
     max = 420
-
     """
 
     # create this dict with default values
@@ -62,9 +61,7 @@ def create_polling_intervals() -> dict:
 
     # update if these exist in config
     for job_size in CromwellJobSizes:
-        if job_size.value in get_config().get(
-            'cromwell_polling_intervals', {}
-        ):
+        if job_size.value in get_config().get('cromwell_polling_intervals', {}):
             polling_interval_dict[job_size].update(
                 get_config()['cromwell_polling_intervals'][job_size.value]
             )
