@@ -23,7 +23,7 @@ def count_res_group(b: hb.Batch) -> hb.ResourceGroup:
     """
     Define resource group for counting.
     """
-    gtf_file = get_config()['references'].get('gtf')
+    gtf_file = get_config()['references']['star'].get('gtf')
     gtf_file = to_path(gtf_file)
     g = {
         'gtf': str(gtf_file),

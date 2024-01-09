@@ -43,16 +43,13 @@ def test_force_stages(mocker: MockFixture, tmp_path):
     dry_run = true
     """
 
-    mocker.patch('cpg_workflows.utils.exists_not_cached', lambda *args: True)
     # dummy mocking to avoid file system scanning
-    mocker.patch('cpg_workflows.workflow.list_all_parent_dirs', lambda *args: {})
-    mocker.patch('cpg_workflows.workflow.list_of_all_dir_contents', lambda *args: {})
-    mocker.patch('cpg_workflows.workflow.missing_from_pre_collected', lambda *args: None)
+    mocker.patch('cpg_workflows.utils.exists_not_cached', lambda *args: True)
     set_config(conf, tmp_path / 'config.toml')
+
+    from cpg_utils.hail_batch import get_batch
+
     run_workflow(mocker)
-
-    from cpg_workflows.workflow import get_batch
-
     print('Job by stage:', get_batch().job_by_stage)
     assert 'A' not in get_batch().job_by_stage
     assert get_batch().job_by_stage['B']['job_n'] == 1

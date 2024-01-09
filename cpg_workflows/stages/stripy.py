@@ -7,16 +7,17 @@ from typing import Any
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_workflows import get_batch
+from cpg_utils.hail_batch import get_batch
+
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import stripy
 from cpg_workflows.stages.align import Align
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.workflow import (
-    stage,
+    SequencingGroupStage,
     StageInput,
     StageOutput,
-    SequencingGroupStage,
+    stage,
 )
 
 
@@ -86,6 +87,7 @@ class Stripy(SequencingGroupStage):
             analysis_type=get_config()['stripy']['analysis_type'],
             out_path=self.expected_outputs(sequencing_group)['stripy_html'],
             json_path=self.expected_outputs(sequencing_group)['stripy_json'],
+            custom_loci_path=get_config()['stripy']['custom_loci_path'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(j)

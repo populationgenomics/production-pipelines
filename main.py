@@ -22,19 +22,23 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_1 import (
     GenotypeBatch,
     MergeBatchSites,
 )
-from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_2 import AnnotateVcf
+from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_2 import AnnotateVcf, AnnotateDatasetSv, MtToEsSv
 from cpg_workflows.stages.gatk_sv.gatk_sv_single_sample import CreateSampleBatches
+from cpg_workflows.stages.gcnv import AnnotateCNV, AnnotateCNVVcfWithStrvctvre, GermlineCNVCalls, FastCombineGCNVs
+from cpg_workflows.stages.aip import GeneratePanelData, QueryPanelapp, RunHailFiltering, ValidateMOI, CreateAIPHTML
 from cpg_workflows.stages.stripy import Stripy
 from cpg_workflows.stages.happy_validation import (
     ValidationMtToVcf,
     ValidationHappyOnVcf,
     ValidationParseHappy
 )
+from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
 from cpg_workflows.stages.fraser import Fraser
 
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
+    'aip': [GeneratePanelData, QueryPanelapp, RunHailFiltering, ValidateMOI, CreateAIPHTML],
     'pre_alignment': [FastQCMultiQC],
     'seqr_loader': [
         DatasetVCF,
@@ -43,6 +47,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         GvcfMultiQC,
         CramMultiQC,
         Stripy,
+        MitoReport
     ],
     'validation': [ValidationMtToVcf, ValidationHappyOnVcf, ValidationParseHappy],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
@@ -51,8 +56,9 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'gatk_sv_sandwich': [
         MergeBatchSites
     ],  # stage to run between FilterBatch & GenotypeBatch
-    'gatk_sv_multisample_2': [AnnotateVcf],
+    'gatk_sv_multisample_2': [AnnotateVcf, AnnotateDatasetSv, MtToEsSv],
     'rare_disease_rnaseq': [Outrider, Fraser],
+    'gcnv': [GermlineCNVCalls, FastCombineGCNVs, AnnotateCNV, AnnotateCNVVcfWithStrvctvre],
 }
 
 

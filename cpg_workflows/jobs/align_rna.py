@@ -2,25 +2,23 @@
 Align RNA-seq reads to the genome using STAR.
 """
 
+import re
+
 import hailtop.batch as hb
-from hailtop.batch.job import Job
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import command, image_path
-from cpg_utils.config import get_config
-from cpg_workflows.utils import can_reuse
-from cpg_workflows.resources import STANDARD, HIGHMEM
+from cpg_utils.hail_batch import command, image_path, Batch
+from hailtop.batch.job import Job
+
 from cpg_workflows.filetypes import (
     FastqPair,
     FastqPairs,
     BamPath,
     CramPath,
 )
-from cpg_workflows.workflow import (
-    SequencingGroup,
-)
-from cpg_workflows.jobs.markdups import markdup
 from cpg_workflows.jobs.bam_to_cram import bam_to_cram
-import re
+from cpg_workflows.jobs.markdups import markdup
+from cpg_workflows.resources import STANDARD, HIGHMEM
+from cpg_workflows.utils import can_reuse
 
 
 class STAR:
@@ -29,16 +27,16 @@ class STAR:
     """
 
     def __init__(
-            self,
-            input_fastq_pair: FastqPair,
-            sample_name: str,
-            genome: hb.ResourceGroup,
-            nthreads: int,
-            read_group: dict[str, str] | None = None,
-            output_path: str | BamPath | Path | None = None,
-            bamout: bool = True,
-            sort: bool = True,
-            stdout: bool = False,
+        self,
+        input_fastq_pair: FastqPair,
+        sample_name: str,
+        genome: hb.ResourceGroup,
+        nthreads: int,
+        read_group: dict[str, str] | None = None,
+        output_path: str | BamPath | Path | None = None,
+        bamout: bool = True,
+        sort: bool = True,
+        stdout: bool = False,
     ):
         self.command = ['STAR']
         # Create read group line
@@ -66,15 +64,25 @@ class STAR:
         # Get output extension
         self.output_extension = 'bam' if bamout else 'sam'
         # Create command
-        self.command.extend([
-            '--runThreadN', str(nthreads),
-            '--genomeDir', f'$(dirname {str(genome.genome)})',
-            '--outSAMtype', self.outSAMtype,
-            '--outStd', self.outStd,
-            '--outSAMattrRGline', self.read_group_line,
-            '--readFilesCommand', 'zcat',
-            '--readFilesIn', str(input_fastq_pair.r1), str(input_fastq_pair.r2),
-        ])
+        self.command.extend(
+            [
+                '--runThreadN',
+                str(nthreads),
+                '--genomeDir',
+                f'$(dirname {str(genome.genome)})',
+                '--outSAMtype',
+                self.outSAMtype,
+                '--outStd',
+                self.outStd,
+                '--outSAMattrRGline',
+                self.read_group_line,
+                '--readFilesCommand',
+                'zcat',
+                '--readFilesIn',
+                str(input_fastq_pair.r1),
+                str(input_fastq_pair.r2),
+            ]
+        )
         if output_path and not stdout:
             self.move_output_command = f'\n\nmv {self.output} {output_path}'
         elif output_path and stdout:
@@ -84,7 +92,7 @@ class STAR:
 
     def __str__(self):
         return ' '.join(self.command) + self.move_output_command
-    
+
     def __repr__(self):
         return self.__str__()
 
@@ -97,14 +105,10 @@ class STAR:
             v_quoted = re.sub(r'(^.*\s.*$)', r'"\1"', v)
             read_group_line += f'{k}:{v_quoted} '
         return read_group_line.strip()
-    
+
 
 class GCPStarReference:
-    def __init__(
-            self,
-            b: hb.Batch,
-            genome_prefix: str | Path
-        ):
+    def __init__(self, b: Batch, genome_prefix: str | Path):
         gp = re.sub(r'/+$', '', genome_prefix)
         self.genome_files = {
             key: f'{gp}/{file}'
@@ -127,10 +131,10 @@ class GCPStarReference:
             }.items()
         }
         self.genome_res_group = b.read_input_group(**self.genome_files)
-    
+
 
 def align(
-    b: hb.Batch,
+    b: Batch,
     fastq_pairs: FastqPairs,
     sample_name: str,
     genome_prefix: str | Path,
@@ -152,20 +156,25 @@ def align(
         return None
     if not output_cram and output_bam and can_reuse(output_bam, overwrite):
         return None
-    
+
     if not isinstance(fastq_pairs, FastqPairs):
-        raise TypeError(f'fastq_pairs must be a FastqPairs object, not {type(fastq_pairs)}')
+        raise TypeError(
+            f'fastq_pairs must be a FastqPairs object, not {type(fastq_pairs)}'
+        )
     if len(fastq_pairs) == 0:
         raise ValueError('fastq_pairs must contain at least one FastqPair')
-    
+
     merge = len(fastq_pairs) > 1
 
     jobs = []
     aligned_bams = []
-    job_idx = 1
-    for fq_pair in fastq_pairs:
+
+    # baseline align jobs, no prior dependencies
+    for job_idx, fq_pair in enumerate(fastq_pairs, 1):
         if not isinstance(fq_pair, FastqPair):
-            raise TypeError(f'fastq_pairs must contain FastqPair objects, not {type(fq_pair)}')
+            raise TypeError(
+                f'fastq_pairs must contain FastqPair objects, not {type(fq_pair)}'
+            )
         label = f'{extra_label} {job_idx}' if extra_label else f'{job_idx}'
         j, bam = align_fq_pair(
             b=b,
@@ -177,9 +186,8 @@ def align(
             requested_nthreads=requested_nthreads,
         )
         jobs.append(j)
-        aligned_bams.append(bam.bam)
-        job_idx += 1
-    
+        aligned_bams.append(bam)
+
     if merge:
         j, merged_bam = merge_bams(
             b=b,
@@ -189,7 +197,7 @@ def align(
             requested_nthreads=requested_nthreads,
         )
         jobs.append(j)
-        aligned_bam = merged_bam.bam
+        aligned_bam = merged_bam
     else:
         aligned_bam = aligned_bams[0]
 
@@ -200,6 +208,8 @@ def align(
         job_attrs=job_attrs,
         requested_nthreads=requested_nthreads,
     )
+
+    # this job is always added
     jobs.append(j)
 
     # Mark duplicates
@@ -237,14 +247,14 @@ def align(
 
 
 def align_fq_pair(
-    b: hb.Batch,
+    b: Batch,
     fastq_pair: FastqPair,
     sample_name: str,
     genome_prefix: str | Path,
     extra_label: str | None = None,
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
-) -> tuple[Job, hb.ResourceGroup]:
+) -> tuple[Job, hb.ResourceFile]:
     """
     Takes an input FastqPair object, and creates a job to align it using STAR.
     """
@@ -256,7 +266,7 @@ def align_fq_pair(
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=align_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
     j.image(image_path('star'))
-    
+
     # Set resource requirements
     nthreads = requested_nthreads or 8
     res = HIGHMEM.set_resources(
@@ -265,19 +275,13 @@ def align_fq_pair(
         storage_gb=200,  # TODO: make configurable
     )
 
-    j.declare_resource_group(
-        output_bam={
-            'bam': '{root}.bam',
-        }
-    )
-
     star_ref = GCPStarReference(b=b, genome_prefix=genome_prefix)
     star = STAR(
         input_fastq_pair=fastq_pair,
         sample_name=sample_name,
         genome=star_ref.genome_res_group,
         nthreads=(res.get_nthreads() - 1),
-        output_path=j.output_bam.bam,
+        output_path=j.output_bam,
         bamout=True,
         sort=True,
         stdout=False,
@@ -285,15 +289,15 @@ def align_fq_pair(
     cmd = str(star)
     j.command(command(cmd, monitor_space=True))
     return j, j.output_bam
-    
+
 
 def merge_bams(
-    b: hb.Batch,
+    b: Batch,
     input_bams: list[str | BamPath | Path],
     extra_label: str | None = None,
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
-) -> tuple[Job, hb.ResourceGroup]:
+) -> tuple[Job, hb.ResourceFile]:
     """
     Merge a list of BAM files into a single BAM file.
     """
@@ -305,7 +309,7 @@ def merge_bams(
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=merge_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
     j.image(image_path('samtools'))
-    
+
     # Set resource requirements
     nthreads = requested_nthreads or 8
     res = STANDARD.set_resources(
@@ -314,19 +318,13 @@ def merge_bams(
         storage_gb=50,  # TODO: make configurable
     )
 
-    j.declare_resource_group(
-        merged_bam={
-            'bam': '{root}.bam',
-        }
-    )
-
-    cmd = f'samtools merge -@ {res.get_nthreads() - 1} -o {j.merged_bam.bam} {" ".join([str(b) for b in input_bams])}'
+    cmd = f'samtools merge -@ {res.get_nthreads() - 1} -o {j.merged_bam} {" ".join([str(b) for b in input_bams])}'
     j.command(command(cmd, monitor_space=True))
     return j, j.merged_bam
 
 
 def sort_index_bam(
-    b: hb.Batch,
+    b: Batch,
     input_bam: str | BamPath | Path,
     extra_label: str | None = None,
     job_attrs: dict | None = None,
@@ -343,7 +341,7 @@ def sort_index_bam(
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=sort_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
     j.image(image_path('samtools'))
-    
+
     # Set resource requirements
     nthreads = requested_nthreads or 8
     res = STANDARD.set_resources(

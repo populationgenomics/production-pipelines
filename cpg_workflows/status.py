@@ -1,17 +1,85 @@
 """
 Metamist wrapper to report analysis progress.
 """
-import inspect
 from abc import ABC, abstractmethod
-from typing import Callable, Any
+from typing import Callable
 
-from cpg_utils import Path
-from cpg_utils.hail_batch import command, image_path
+from cpg_utils.config import get_config
 from hailtop.batch.job import Job
 from hailtop.batch import Batch
 
 from .targets import Target
-from .metamist import get_metamist, AnalysisStatus, MetamistError
+
+
+def complete_analysis_job(
+        output: str,
+        analysis_type: str,
+        sg_ids: list[str],
+        project_name: str,
+        meta: dict,
+        update_analysis_meta: Callable | None = None,
+        tolerate_missing: bool = False
+):
+    """
+    a job to be called within the batch as a pythonJob
+    this will register the analysis outputs from a Stage
+
+    Args:
+        output (str): path to the output file
+        analysis_type (str): metamist analysis type
+        sg_ids (list[str]): all CPG IDs
+        project_name (str): project/dataset name
+        meta (dict): any metadata to add
+        update_analysis_meta (Callable | None): function to update analysis meta
+        tolerate_missing (bool): if True, allow missing output
+
+    Returns:
+
+    """
+    import traceback
+    from cpg_utils import to_path
+    from metamist.apis import AnalysisApi
+    from metamist.exceptions import ApiException
+    from metamist.models import AnalysisStatus, Analysis
+    assert isinstance(output, str)
+    output_cloudpath = to_path(output)
+
+    if update_analysis_meta is not None:
+        meta | update_analysis_meta(output)
+
+    # we know that es indexes are registered names, not files/dirs
+    # skip all relevant checks for this output type
+    if analysis_type != 'es-index':
+
+        if not output_cloudpath.exists():
+            if tolerate_missing:
+                print(f"Output {output} doesn't exist, allowing silent return")
+                return
+            raise ValueError(f"Output {output} doesn't exist")
+
+        # add file size to meta
+        if not output_cloudpath.is_dir():
+            meta |= {'size': output_cloudpath.stat().st_size}
+
+    this_analysis = Analysis(
+        type=analysis_type,
+        status=AnalysisStatus('completed'),
+        output=output,
+        sequencing_group_ids=sg_ids,
+        meta=meta,
+    )
+    aapi = AnalysisApi()
+    try:
+        a_id = aapi.create_analysis(project=project_name, analysis=this_analysis)
+    except ApiException:
+        traceback.print_exc()
+        raise
+    else:
+        print(
+            f'Created Analysis(id={a_id}, type={analysis_type}, '
+            f'output={output}) in {project_name}'
+        )
+        return
 
 
 class StatusReporterError(Exception):
@@ -26,238 +94,71 @@ class StatusReporter(ABC):
     """
 
     @abstractmethod
-    def add_updaters_jobs(
+    def create_analysis(
         self,
         b: Batch,
         output: str,
         analysis_type: str,
         target: Target,
         jobs: list[Job] | None = None,
-        prev_jobs: list[Job] | None = None,
+        job_attr: dict | None = None,
         meta: dict | None = None,
-    ) -> list[Job]:
-        """
-        Add Hail Batch jobs that update the analysis status.
-        """
-
-    @abstractmethod
-    def create_analysis(
-        self,
-        output: str,
-        analysis_type: str,
-        analysis_status: str,
-        target: Target,
-        meta: dict | None = None,
-        project_name: str = None,
-    ) -> int | None:
+        update_analysis_meta: Callable | None = None,
+        tolerate_missing_output: bool = False,
+        project_name: str | None = None,
+    ):
         """
         Record analysis entry.
         """
 
 
-def _calculate_size(output_path: str) -> dict[str, Any]:
-    """
-    Self-contained function to calculate size of an object at given path. If output_path
-    is a directory (e.g. a hail matrix table) the size check is skipped.
-
-    @param output_path: remote path of the output file
-    @return: dictionary to merge into Analysis.meta
-    """
-    from cloudpathlib import CloudPath
-
-    output_cloudpath = CloudPath(str(output_path))
-
-    # Skip size checks for hail outputs (directories)
-    if output_cloudpath.is_dir():
-        return {}
-
-    size = output_cloudpath.stat().st_size
-    return dict(size=size)
-
-
-def _update_analysis_status(
-    analysis_id: int,
-    new_status: AnalysisStatus,
-    updater_funcs: list[Callable[[str], dict[str, Any]]] | None = None,
-    output_path: str | None = None,
-) -> None:
-    """
-    Self-contained function to update Metamist analysis entry.
-    @param analysis_id: ID of Analysis entry
-    @param new_status: new status to assign to the entry
-    @param updater_funcs: list of functions to update the entry's metadata,
-    assuming output_path as input parameter
-    @param output_path: remote path of the output file, to be passed to the updaters
-    """
-    from metamist.apis import AnalysisApi
-    from metamist.models import AnalysisUpdateModel
-    from metamist import exceptions
-    from metamist.models import AnalysisStatus as MmAnalysisStatus
-    import traceback
-
-    meta: dict[str, Any] = dict()
-    if output_path and updater_funcs:
-        for func in updater_funcs or []:
-            meta |= func(output_path)
-
-    aapi = AnalysisApi()
-    try:
-        aapi.update_analysis(
-            analysis_id=analysis_id,
-            analysis_update_model=AnalysisUpdateModel(
-                status=MmAnalysisStatus(new_status.value),
-                meta=meta,
-            ),
-        )
-    except exceptions.ApiException:
-        traceback.print_exc()
-
-
 class MetamistStatusReporter(StatusReporter):
     """
-    Job status reporter. Works through creating and updating metamist Analysis entries.
+    Job status reporter. Works through creating metamist Analysis entries.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-
-    def add_updaters_jobs(
-        self,
-        b: Batch,
-        output: str | Path,
-        analysis_type: str,
-        target: Target,
-        jobs: list[Job] | None = None,
-        prev_jobs: list[Job] | None = None,
-        meta: dict | None = None,
-        job_attrs: dict[str, str] | None = None,
-        update_analysis_meta: Callable[[str], dict] | None = None,
-        project_name: str | None = None,
-    ) -> list[Job]:
-        """
-        Create "queued" analysis and insert "in_progress" and "completed" updater jobs.
-        """
-        if not jobs:
-            return []
-
-        # 1. Create a "queued" analysis
-        if (
-            aid := self.create_analysis(
-                output=str(output),
-                analysis_type=analysis_type,
-                analysis_status='queued',
-                target=target,
-                meta=meta,
-                project_name=project_name,
-            )
-        ) is None:
-            raise MetamistError('Failed to create analysis')
-
-        # 2. Queue a job that updates the status to "in-progress"
-        in_progress_j = self.add_status_updater_job(
-            b,
-            analysis_id=aid,
-            status=AnalysisStatus.IN_PROGRESS,
-            analysis_type=analysis_type,
-            job_attrs=(job_attrs or {}) | dict(tool='metamist'),
-        )
-        # 2. Queue a job that updates the status to "completed"
-        completed_j = self.add_status_updater_job(
-            b,
-            analysis_id=aid,
-            status=AnalysisStatus.COMPLETED,
-            analysis_type=analysis_type,
-            job_attrs=(job_attrs or {}) | dict(tool='metamist'),
-            output=output,
-            update_analysis_meta=update_analysis_meta,
-        )
-
-        if prev_jobs:
-            in_progress_j.depends_on(*prev_jobs)
-        completed_j.depends_on(*jobs)
-        return [in_progress_j, *jobs, completed_j]
 
     def create_analysis(
         self,
+        b: Batch,
         output: str,
         analysis_type: str,
-        analysis_status: str,
         target: Target,
+        jobs: list[Job] | None = None,
+        job_attr: dict | None = None,
         meta: dict | None = None,
-        project_name: str = None,
-    ) -> int | None:
-        """Record analysis entry"""
-        return get_metamist().create_analysis(
-            output=output,
-            type_=analysis_type,
-            status=analysis_status,
-            sequencing_group_ids=target.get_sequencing_group_ids(),
-            meta=meta,
-            dataset=project_name,
+        update_analysis_meta: Callable | None = None,
+        tolerate_missing_output: bool = False,
+        project_name: str | None = None,
+    ):
+        """
+        Create completed analysis job
+        """
+
+        # no jobs means no output, so no need to create analysis
+        if not jobs:
+            return
+
+        if meta is None:
+            meta = {}
+
+        # find all relevant SG IDs
+        sg_ids = target.get_sequencing_group_ids()
+        py_job = b.new_python_job(
+            f'Register analysis output {output}', job_attr or {} | {'tool': 'metamist'}
+        )
+        py_job.image(get_config()['workflow']['driver_image'])
+        py_job.call(
+            complete_analysis_job,
+            str(output),
+            analysis_type,
+            sg_ids,
+            project_name,
+            meta,
+            update_analysis_meta,
+            tolerate_missing_output
         )
 
-    @staticmethod
-    def add_status_updater_job(
-        b: Batch,
-        analysis_id: int,
-        status: AnalysisStatus,
-        analysis_type: str,
-        job_attrs: dict | None = None,
-        output: Path | str | None = None,
-        update_analysis_meta: Callable[[str], dict] | None = None,
-    ) -> Job:
-        """
-        Create a Hail Batch job that updates status of analysis. For status=COMPLETED,
-        adds the size of `output` into `meta.size` if provided.
-        """
-        try:
-            analysis_id_int = int(analysis_id)
-        except ValueError:
-            raise MetamistError('Analysis ID must be int')
-
-        job_name = f'Update status to {status.value}'
-        if analysis_type:
-            job_name += f' (for {analysis_type})'
-
-        j = b.new_job(job_name, job_attrs)
-        j.image(image_path('cpg_workflows'))
-
-        meta_updaters_definitions = ''
-        meta_updaters_funcs: list[Callable[[str], dict]] = []
-        if output:
-            if isinstance(output, Path):
-                meta_updaters_funcs.append(_calculate_size)
-            if update_analysis_meta:
-                meta_updaters_funcs.append(update_analysis_meta)
-
-            for func in meta_updaters_funcs:
-                definition = inspect.getsource(func)
-                if not definition.startswith('def '):
-                    raise MetamistError(
-                        f'Status updater must be a module-level function: {str(func)}'
-                    )
-                meta_updaters_definitions += definition + '\n'
-
-        cmd = f"""
-cat <<EOT >> update.py
-
-from typing import Any, Callable
-from cpg_workflows.metamist import AnalysisStatus
-
-{meta_updaters_definitions}
-
-{inspect.getsource(_update_analysis_status)}
-
-{_update_analysis_status.__name__}(
-    analysis_id={analysis_id_int},
-    new_status=AnalysisStatus("{status.value}"),
-    updater_funcs=[{', '.join(f.__name__ for f in meta_updaters_funcs)}],
-    output_path={'"' + str(output) + '"' if output else 'None'},
-)
-
-EOT
-python3 update.py
-"""
-
-        j.command(command(cmd, rm_leading_space=False, setup_gcp=True))
-        return j
+        py_job.depends_on(*jobs)

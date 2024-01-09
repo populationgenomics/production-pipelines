@@ -1,13 +1,21 @@
 name: Docker
 on:
-  pull_request:
+#  pull_request:
   push:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to use (defaults to "test")'
+        default: "test"
 
+permissions:
+  id-token: write
+  contents: read
+  
 env:
-  VERSION: 1.14.3
+  VERSION: 1.18.20
 
 jobs:
   docker:
@@ -19,19 +27,23 @@ jobs:
       DOCKER_BUILDKIT: 1
       BUILDKIT_PROGRESS: plain
       CLOUDSDK_CORE_DISABLE_PROMPTS: 1
-      IMAGE_NAME: australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows
+      IMAGE_NAME: cpg_workflows
+      DOCKER_DEV: australia-southeast1-docker.pkg.dev/cpg-common/images-dev
+      DOCKER_MAIN: australia-southeast1-docker.pkg.dev/cpg-common/images
     steps:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
 
-      - name: gcloud auth
-        uses: google-github-actions/auth@v0
+      - id: "google-cloud-auth"
+        name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v1"
         with:
-          credentials_json: ${{ secrets.GH_IMAGES_DEPLOYER_JSON }}
-
+          workload_identity_provider: "projects/1051897107465/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
+          service_account: "gh-images-deployer@cpg-common.iam.gserviceaccount.com"
+  
       - name: set up gcloud sdk
-        uses: google-github-actions/setup-gcloud@v0
+        uses: google-github-actions/setup-gcloud@v1
         with:
           project_id: cpg-common
 
@@ -46,13 +58,19 @@ jobs:
       - name: push PR
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:pr-${{ github.event.number }}
-          docker push $IMAGE_NAME:pr-${{ github.event.number }}
-        
-      - name: push latest
-        if: ${{ github.event_name != 'pull_request' }}
+          docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_DEV/$IMAGE_NAME:pr-${{ github.event.number }}
+          docker push $DOCKER_DEV/$IMAGE_NAME:pr-${{ github.event.number }}
+
+      - name: manually triggered build
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
-          docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:$VERSION
-          docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:latest
-          docker push $IMAGE_NAME:$VERSION
-          docker push $IMAGE_NAME:latest
+          docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_DEV/$IMAGE_NAME:${{github.event.inputs.tag}}
+          docker push $DOCKER_DEV/$IMAGE_NAME:${{github.event.inputs.tag}}
+
+      - name: push latest
+        if: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+        run: |
+          docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_MAIN/$IMAGE_NAME:$VERSION
+          docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_MAIN/$IMAGE_NAME:latest
+          docker push $DOCKER_MAIN/$IMAGE_NAME:$VERSION
+          docker push $DOCKER_MAIN/$IMAGE_NAME:latest

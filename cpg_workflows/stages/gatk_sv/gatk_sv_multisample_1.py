@@ -6,25 +6,30 @@ Though, there is a separate process required to merge files
 across batches between FilterBatch and GenotypeBatch
 """
 
-
 from typing import Any
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_workflows.batch import get_batch
-from cpg_workflows.workflow import stage, StageOutput, StageInput, Cohort, CohortStage
+from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
+from cpg_utils.hail_batch import get_batch
 
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
+    SV_CALLERS,
+    _sv_batch_meta,
     add_gatk_sv_jobs,
     get_fasta,
     get_images,
-    get_references,
     get_ref_panel,
+    get_references,
     make_combined_ped,
-    SV_CALLERS,
-    _sv_batch_meta
 )
-from cpg_workflows.workflow import get_workflow
+from cpg_workflows.workflow import (
+    Cohort,
+    CohortStage,
+    StageInput,
+    StageOutput,
+    get_workflow,
+    stage,
+)
 
 
 @stage
@@ -43,7 +48,7 @@ class GatherBatchEvidence(CohortStage):
 
     https://github.com/broadinstitute/gatk-sv#gather-batch-evidence
     https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherBatchEvidence.wdl
-    
+
     it's critical to separate the ending with a dot, e.g.: `*.sr.txt.gz`,
     These files are passed to `gatk PrintSVEvidence`, that determines file
     format based on the file name.
@@ -160,7 +165,9 @@ class GatherBatchEvidence(CohortStage):
             [
                 'sv_base_mini_docker',
                 'sv_base_docker',
+                'sv_pipeline_base_docker',
                 'sv_pipeline_docker',
+                'sv_pipeline_qc_docker',
                 'linux_docker',
                 'condense_counts_docker',
                 'gatk_docker',
@@ -169,12 +176,22 @@ class GatherBatchEvidence(CohortStage):
         )
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
+        # this step runs for approximately 15 hours
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels,
+            cromwell_status_min_poll_interval=500,
+            cromwell_status_max_poll_interval=2000
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -232,7 +249,13 @@ class ClusterBatch(CohortStage):
             )
 
         input_dict |= get_images(
-            ['sv_base_mini_docker', 'sv_pipeline_docker', 'gatk_docker', 'linux_docker']
+            [
+                'linux_docker',
+                'sv_pipeline_base_docker',
+                'gatk_docker',
+                'sv_base_mini_docker',
+                'sv_pipeline_docker',
+            ]
         )
 
         input_dict |= get_references(
@@ -244,12 +267,22 @@ class ClusterBatch(CohortStage):
         )
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
+        # runs for approx 1 hour
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels,
+            cromwell_status_min_poll_interval=100,
+            cromwell_status_max_poll_interval=600
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -296,8 +329,10 @@ class GenerateBatchMetrics(CohortStage):
         input_dict |= get_images(
             [
                 'sv_pipeline_docker',
+                'sv_pipeline_rdtest_docker',
                 'sv_base_mini_docker',
                 'sv_base_docker',
+                'sv_pipeline_base_docker',
                 'linux_docker',
             ]
         )
@@ -313,12 +348,22 @@ class GenerateBatchMetrics(CohortStage):
         )
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
+        # runs for approx 4-5 hours
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels,
+            cromwell_status_min_poll_interval=400,
+            cromwell_status_max_poll_interval=1800
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -387,6 +432,7 @@ class FilterBatch(CohortStage):
 
         input_dict |= get_images(
             [
+                'sv_pipeline_base_docker',
                 'sv_pipeline_docker',
                 'sv_base_mini_docker',
                 'linux_docker',
@@ -400,12 +446,22 @@ class FilterBatch(CohortStage):
         )
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
+        # runs for over an hour
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels,
+            cromwell_status_min_poll_interval=100,
+            cromwell_status_max_poll_interval=600
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -465,12 +521,19 @@ class MergeBatchSites(CohortStage):
         }
         input_dict |= get_images(['sv_pipeline_docker'])
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -479,7 +542,7 @@ class MergeBatchSites(CohortStage):
     required_stages=[FilterBatch, GatherBatchEvidence],
     analysis_type='sv',
     analysis_keys=[f'genotyped_{mode}_vcf' for mode in ['pesr', 'depth']],
-    update_analysis_meta=_sv_batch_meta
+    update_analysis_meta=_sv_batch_meta,
 )
 class GenotypeBatch(CohortStage):
     """
@@ -506,6 +569,20 @@ class GenotypeBatch(CohortStage):
         List of SR pass variants
         List of SR fail variants
         """
+
+        # this workflow requires re-genotyping previous batches with each new
+        # expansion of the cohort.
+        # we want to keep all versions of these outputs generated from separate
+        # inputs, so we incorporate the hash from the MergeBatchSites file into
+        # the files generated by this step to differentiate the outputs
+        if mbs_file := get_config()['workflow']['cohort_depth_vcf']:
+            cohort_hash = mbs_file.split('/')[4][-10:]
+        else:
+            # this method is still run, even if the Stage is skipped
+            # adding a failure here prevents the need for a dummy config variable
+            print('cohort_depth_vcf not found in config, wont run GenotypeBatch')
+            return {}
+
         ending_by_key = {
             'sr_bothside_pass': 'genotype_SR_part2_bothside_pass.txt',
             'sr_background_fail': 'genotype_SR_part2_background_fail.txt',
@@ -523,7 +600,10 @@ class GenotypeBatch(CohortStage):
                 f'genotyped_{mode}_vcf_index': f'{mode}.vcf.gz.tbi',
             }
 
-        return {key: self.prefix / fname for key, fname in ending_by_key.items()}
+        return {
+            key: self.prefix / f'{cohort_hash}_{fname}'
+            for key, fname in ending_by_key.items()
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         filterbatch_d = inputs.as_dict(cohort, FilterBatch)
@@ -531,7 +611,6 @@ class GenotypeBatch(CohortStage):
 
         input_dict: dict[str, Any] = {
             'batch': get_workflow().output_version,
-            'ped_file': make_combined_ped(cohort, self.prefix),
             'n_per_split': 5000,
             'n_RD_genotype_bins': 100000,
             'coveragefile': batchevidence_d['merged_bincov'],  # unsure
@@ -554,18 +633,34 @@ class GenotypeBatch(CohortStage):
             ]
 
         input_dict |= get_images(
-            ['sv_pipeline_docker', 'sv_base_mini_docker', 'linux_docker']
+            [
+                'sv_pipeline_base_docker',
+                'sv_base_mini_docker',
+                'sv_pipeline_docker',
+                'sv_pipeline_rdtest_docker',
+                'linux_docker',
+            ]
         )
         input_dict |= get_references(
             ['primary_contigs_list', 'bin_exclude', 'seed_cutoffs', 'pesr_exclude_list']
         )
+        # 2 additional (optional) references CPG doesn't have:
+        # - sr_hom_cutoff_multiplier
+        # - sr_median_hom_ins
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
