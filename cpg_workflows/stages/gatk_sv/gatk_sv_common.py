@@ -2,7 +2,7 @@
 Common methods for all GATK-SV workflows
 """
 import re
-
+from enum import Enum
 from os.path import join
 from typing import Any
 
@@ -22,6 +22,39 @@ GATK_SV_COMMIT = '6d6100082297898222dfb69fcf941d373d78eede'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 _FASTA = None
 PED_FAMILY_ID_REGEX = re.compile(r'(^[A-Za-z0-9_]+$)')
+POLLING_INTERVALS: dict | None = None
+
+
+class PollingInterval(Enum):
+    """
+    Enum for polling intervals
+    """
+
+    SMALL = 'small'
+    MEDIUM = 'medium'
+    LARGE = 'large'
+
+
+def set_polling_intervals() -> dict:
+    """
+    Set polling intervals for cromwell status
+    """
+
+    # create this dict with default values
+    polling_interval_dict = {
+        PollingInterval.SMALL: {'min': 30, 'max': 180},
+        PollingInterval.MEDIUM: {'min': 60, 'max': 600},
+        PollingInterval.LARGE: {'min': 300, 'max': 3600},
+    }
+
+    # update if these exist in config
+    for interval in PollingInterval:
+        if interval.value in get_config()['workflow'].get('cromwell_polling', {}):
+            polling_interval_dict[interval].update(
+                get_config()['workflow']['cromwell_polling'][interval.value]
+            )
+
+    return polling_interval_dict
 
 
 def _sv_batch_meta(
@@ -120,12 +153,18 @@ def add_gatk_sv_jobs(
     sequencing_group_id: str | None = None,
     driver_image: str | None = None,
     labels: dict[str, str] | None = None,
-    cromwell_status_min_poll_interval: int = 30,
-    cromwell_status_max_poll_interval: int = 100,
+    job_size: PollingInterval = PollingInterval.MEDIUM,
 ) -> list[Job]:
     """
     Generic function to add a job that would run one GATK-SV workflow.
     """
+
+    global POLLING_INTERVALS
+    if POLLING_INTERVALS is None:
+        POLLING_INTERVALS = set_polling_intervals()
+
+    polling_minimum = POLLING_INTERVALS[job_size]['min']
+    polling_maximum = POLLING_INTERVALS[job_size]['max']
 
     # If a config section exists for this workflow, apply overrides
     if override := get_config()['resource_overrides'].get(wfl_name):
@@ -182,8 +221,8 @@ def add_gatk_sv_jobs(
         driver_image=driver_image,
         copy_outputs_to_gcp=copy_outputs,
         labels=labels,
-        min_watch_poll_interval=cromwell_status_min_poll_interval,
-        max_watch_poll_interval=cromwell_status_max_poll_interval,
+        min_watch_poll_interval=polling_minimum,
+        max_watch_poll_interval=polling_maximum,
     )
 
     copy_j = batch.new_job(f'{job_prefix}: copy outputs')

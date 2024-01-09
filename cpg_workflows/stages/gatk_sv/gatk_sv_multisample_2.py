@@ -17,6 +17,7 @@ from cpg_workflows.jobs.seqr_loader_sv import (
     annotate_dataset_jobs_sv,
 )
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
+    PollingInterval,
     SV_CALLERS,
     _sv_filtered_meta,
     add_gatk_sv_jobs,
@@ -218,6 +219,7 @@ class MakeCohortVcf(CohortStage):
             input_dict=input_dict,
             expected_out_dict=expected_d,
             labels=billing_labels,
+            job_size=PollingInterval.MEDIUM,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -267,6 +269,7 @@ class FormatVcfForGatk(CohortStage):
             input_dict=input_dict,
             expected_out_dict=expected_d,
             labels=billing_labels,
+            job_size=PollingInterval.SMALL,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
