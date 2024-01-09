@@ -44,6 +44,13 @@ def create_polling_intervals() -> dict:
     for each job size, there is a min and max value
     analysis-runner implements a backoff-retrier when checking for
     success, with a minimum value, gradually reaching a max ceiling
+
+    a config section containing overrides would look like
+
+    [cromwell_polling_intervals.medium]
+    min = 69
+    max = 420
+
     """
 
     # create this dict with default values
@@ -55,11 +62,11 @@ def create_polling_intervals() -> dict:
 
     # update if these exist in config
     for job_size in CromwellJobSizes:
-        if job_size.value in get_config()['workflow'].get(
+        if job_size.value in get_config().get(
             'cromwell_polling_intervals', {}
         ):
             polling_interval_dict[job_size].update(
-                get_config()['workflow']['cromwell_polling_intervals'][job_size.value]
+                get_config()['cromwell_polling_intervals'][job_size.value]
             )
     return polling_interval_dict
 
