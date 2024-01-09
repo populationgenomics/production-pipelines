@@ -4,6 +4,7 @@ Common methods for all GATK-SV workflows
 import re
 from enum import Enum
 from os.path import join
+from random import randint
 from typing import Any
 
 from analysis_runner.cromwell import (
@@ -53,6 +54,13 @@ def set_polling_intervals() -> dict:
             polling_interval_dict[interval].update(
                 get_config()['workflow']['cromwell_polling'][interval.value]
             )
+
+    # add some jitter (randomness) to the polling intervals, so that tasks don't
+    # always poll at the same time (mostly a concern for per-SG jobs)
+    for interval in PollingInterval:
+        for key in ['min', 'max']:
+            current = polling_interval_dict[interval][key]
+            polling_interval_dict[interval][key] = randint(current, current * 2)
 
     return polling_interval_dict
 
