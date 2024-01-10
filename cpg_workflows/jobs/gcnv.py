@@ -440,6 +440,7 @@ def merge_calls(
 
     # create a python job to do the file content updates
     pyjob = b.new_python_job('Update VCF content')
+    pyjob.storage('10Gi')
     pyjob.call(update_vcf_attributes, merge_job.tmp_vcf, pyjob.output)
 
     # a third job just to tidy up
@@ -468,6 +469,8 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
         output_file (str): path to write uncompressed edited version to
     """
     import gzip
+    import logging
+
     headers = []
     others = []
 
@@ -487,7 +490,6 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
             else:
                 # split on tabs
                 l_split = line.split('\t')
-                print(l_split)
                 original_start = int(l_split[1])
 
                 original_end = l_split[7]
@@ -506,8 +508,6 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
 
                 # update the INFO field with Length and Type (DUP/DEL, not "CNV")
                 l_split[7] = f'SVTYPE={alt_allele};SVLEN={end_int - original_start};{original_end}'
-
-                print(l_split)
 
                 # put it together and what have you got?
                 # bippidy boppidy boo
