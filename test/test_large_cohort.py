@@ -72,7 +72,7 @@ def create_config(
             'genome_build': 'GRCh38',
             'ancestry': {
                 'sites_table': (
-                    gnomad_prefix / 'sample_qc-' / 'pre_ld_pruning_qc_variants.ht'
+                    gnomad_prefix / 'sample_qc-test' / 'pre_ld_pruning_qc_variants.ht'
                     ),
             },
             'gnomad': {
