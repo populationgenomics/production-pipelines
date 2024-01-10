@@ -13,6 +13,7 @@ from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
 from cpg_utils.hail_batch import get_batch
 
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
+    CromwellJobSizes,
     SV_CALLERS,
     _sv_batch_meta,
     add_gatk_sv_jobs,
@@ -190,8 +191,7 @@ class GatherBatchEvidence(CohortStage):
             input_dict=input_dict,
             expected_out_dict=expected_d,
             labels=billing_labels,
-            cromwell_status_min_poll_interval=500,
-            cromwell_status_max_poll_interval=2000
+            job_size=CromwellJobSizes.LARGE,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -281,8 +281,7 @@ class ClusterBatch(CohortStage):
             input_dict=input_dict,
             expected_out_dict=expected_d,
             labels=billing_labels,
-            cromwell_status_min_poll_interval=100,
-            cromwell_status_max_poll_interval=600
+            job_size=CromwellJobSizes.MEDIUM,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -362,8 +361,7 @@ class GenerateBatchMetrics(CohortStage):
             input_dict=input_dict,
             expected_out_dict=expected_d,
             labels=billing_labels,
-            cromwell_status_min_poll_interval=400,
-            cromwell_status_max_poll_interval=1800
+            job_size=CromwellJobSizes.MEDIUM,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -460,8 +458,7 @@ class FilterBatch(CohortStage):
             input_dict=input_dict,
             expected_out_dict=expected_d,
             labels=billing_labels,
-            cromwell_status_min_poll_interval=100,
-            cromwell_status_max_poll_interval=600
+            job_size=CromwellJobSizes.MEDIUM,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
