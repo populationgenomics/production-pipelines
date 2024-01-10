@@ -276,8 +276,8 @@ class AnnotateCNV(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict:
         return {
-            'annotated_vcf': self.prefix / 'unfiltered_annotated.vcf.bgz',
-            'annotated_vcf_index': self.prefix / 'unfiltered_annotated.vcf.bgz.tbi',
+            'annotated_vcf': self.prefix / 'gcnv_annotated.vcf.bgz',
+            'annotated_vcf_index': self.prefix / 'gcnv_annotated.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
