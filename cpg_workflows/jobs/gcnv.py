@@ -487,11 +487,13 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
             else:
                 # split on tabs
                 l_split = line.split('\t')
+                print(l_split)
                 original_start = int(l_split[1])
 
                 original_end = l_split[7]
+
                 # steal the END attribute (only current INFO field, int)
-                end_int = int(l_split[7].removeprefix('END='))
+                end_int = int(original_end.removeprefix('END='))
 
                 # e.g. <DEL> -> DEL
                 alt_allele = l_split[4][1:-1]
@@ -505,11 +507,11 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
                 # update the INFO field with Length and Type (DUP/DEL, not "CNV")
                 l_split[7] = f'SVTYPE={alt_allele};SVLEN={end_int - original_start};{original_end}'
 
-                # put it together and what have you got?
-                line = '\t'.join(l_split)
+                print(l_split)
 
+                # put it together and what have you got?
                 # bippidy boppidy boo
-                others.append(line)
+                others.append('\t'.join(l_split))
 
     with open(output_file, 'w') as f:
         f.writelines(headers)
