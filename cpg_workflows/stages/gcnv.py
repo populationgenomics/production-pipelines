@@ -276,8 +276,8 @@ class AnnotateCNV(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict:
         return {
-            'annotated_vcf': self.prefix / 'unfiltered_annotated.vcf.bgz',
-            'annotated_vcf_index': self.prefix / 'unfiltered_annotated.vcf.bgz.tbi',
+            'annotated_vcf': self.prefix / 'gcnv_annotated.vcf.bgz',
+            'annotated_vcf_index': self.prefix / 'gcnv_annotated.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -287,10 +287,7 @@ class AnnotateCNV(CohortStage):
         """
         expected_out = self.expected_outputs(cohort)
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
-        }
+        billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
 
         job_or_none = queue_annotate_sv_jobs(
             batch=get_batch(),

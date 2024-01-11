@@ -34,7 +34,7 @@ def bam_to_cram(
     j.image(image_path('samtools'))
 
     # Get fasta file
-    fasta_path = str(get_config()['references']['fasta'])
+    fasta_path = str(get_config()['references']['star']['fasta'])
     fasta = b.read_input_group(
         fasta=fasta_path,
         fasta_fai=f'{fasta_path}.fai',

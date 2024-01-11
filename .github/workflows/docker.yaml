@@ -15,7 +15,7 @@ permissions:
   contents: read
   
 env:
-  VERSION: 1.18.19
+  VERSION: 1.18.20
 
 jobs:
   docker:
@@ -55,22 +55,16 @@ jobs:
         run: |
           docker build . -f Dockerfile --tag $IMAGE_NAME:${{ github.sha }}
 
-      - name: push PR
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_DEV/$IMAGE_NAME:pr-${{ github.event.number }}
-          docker push $DOCKER_DEV/$IMAGE_NAME:pr-${{ github.event.number }}
-
-      - name: manually triggered build
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        run: |
-          docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_DEV/$IMAGE_NAME:${{github.event.inputs.tag}}
-          docker push $DOCKER_DEV/$IMAGE_NAME:${{github.event.inputs.tag}}
-
       - name: push latest
-        if: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+        if: ${{ github.ref_name == 'main' }}
         run: |
           docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_MAIN/$IMAGE_NAME:$VERSION
           docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_MAIN/$IMAGE_NAME:latest
           docker push $DOCKER_MAIN/$IMAGE_NAME:$VERSION
           docker push $DOCKER_MAIN/$IMAGE_NAME:latest
+
+      - name: manually triggered build
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref_name != 'main' }}
+        run: |
+          docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_DEV/$IMAGE_NAME:${{github.event.inputs.tag}}
+          docker push $DOCKER_DEV/$IMAGE_NAME:${{github.event.inputs.tag}}

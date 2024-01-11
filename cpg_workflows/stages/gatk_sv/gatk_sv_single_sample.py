@@ -11,6 +11,7 @@ from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
 
 from cpg_workflows.jobs import sample_batching
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
+    CromwellJobSizes,
     SV_CALLERS,
     _sv_individual_meta,
     add_gatk_sv_jobs,
@@ -103,14 +104,8 @@ class GatherSampleEvidence(SequencingGroupStage):
             reference_fasta=str(get_fasta()),
             reference_index=str(get_fasta()) + '.fai',
             reference_dict=str(get_fasta().with_suffix('.dict')),
-            reference_version='38'
+            reference_version='38',
         )
-
-        # runtime_attr_scramble_part2 = {"mem_gb": 8}
-        # optional override:
-        if (overrides := get_config().get('resource_overrides')) and 'GatherSampleEvidence' in overrides:
-            for key, value in overrides['GatherSampleEvidence'].items():
-                input_dict[key] = value
 
         input_dict |= get_images(
             [
@@ -138,10 +133,6 @@ class GatherSampleEvidence(SequencingGroupStage):
             ]
         )
 
-        # find any additional arguments to pass to Cromwell
-        if override := get_config()['resource_overrides'].get('GatherSampleEvidence'):
-            input_dict |= override
-
         expected_d = self.expected_outputs(sequencing_group)
 
         # billing labels!
@@ -158,7 +149,7 @@ class GatherSampleEvidence(SequencingGroupStage):
         # cromwell_status_poll_interval is a number (int, seconds)
         # this is used to determine how often to poll Cromwell for completion status
         # we alter the per-sample maximum to be between 5 and 30 minutes for this
-        # long running job, so samples poll on different intervals, spreading load
+        # long-running job, so samples poll on different intervals, spreading load
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=sequencing_group.dataset,
@@ -167,8 +158,7 @@ class GatherSampleEvidence(SequencingGroupStage):
             expected_out_dict=expected_d,
             sequencing_group_id=sequencing_group.id,
             labels=billing_labels,
-            cromwell_status_min_poll_interval=randint(30, 180),
-            cromwell_status_max_poll_interval=randint(300, 1800),
+            job_size=CromwellJobSizes.LARGE,
         )
         return self.make_outputs(sequencing_group, data=expected_d, jobs=jobs)
 
@@ -226,14 +216,11 @@ class EvidenceQC(CohortStage):
 
         input_dict |= get_references(['genome_file', 'wgd_scoring_mask'])
 
-        # find any additional arguments to pass to Cromwell
-        if override := get_config()['resource_overrides'].get('EvidenceQC'):
-            input_dict |= override
-
         expected_d = self.expected_outputs(cohort)
 
         billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
 
+        # runs for approx 5 hours, depending on sample count
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
@@ -241,6 +228,7 @@ class EvidenceQC(CohortStage):
             input_dict=input_dict,
             expected_out_dict=expected_d,
             labels=billing_labels,
+            job_size=CromwellJobSizes.MEDIUM,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -283,10 +271,12 @@ class CreateSampleBatches(CohortStage):
                 'exome': [sg.id for sg in cohort.get_sequencing_groups()]
             }
         # within exomes, divide into PCR- and all other sequencing groups
+        # this logic is currently invalid, as pcr_status isn't populated
+        # TODO resolve issue #575
         else:
             sequencing_group_types = {'positive': [], 'negative': []}
             for sequencing_group in cohort.get_sequencing_groups():
-                if sequencing_group.meta.get('pcr_status', 'unknown') == 'negative':
+                if sequencing_group.meta.get('pcr_status', 'negative') == 'negative':
                     sequencing_group_types['negative'].append(sequencing_group.id)
                 else:
                     sequencing_group_types['positive'].append(sequencing_group.id)
