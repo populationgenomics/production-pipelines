@@ -64,7 +64,7 @@ jobs:
           docker push $DOCKER_MAIN/$IMAGE_NAME:latest
 
       - name: manually triggered build
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref_name != 'main' }}
         run: |
           docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_DEV/$IMAGE_NAME:${{github.event.inputs.tag}}
           docker push $DOCKER_DEV/$IMAGE_NAME:${{github.event.inputs.tag}}
