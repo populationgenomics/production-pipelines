@@ -330,20 +330,20 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
         )['vcf']
 
         strv_job.declare_resource_group(
-            output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+            output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
         )
 
         # run strvctvre
         strv_job.command(
             f'python StrVCTVRE.py '
             f'-i {input_vcf} '
-            f'-o {strv_job.output_vcf["vcf.gz"]} '
+            f'-o {strv_job.output_vcf["vcf.bgz"]} '
             f'-f vcf '
             f'-p {phylop_in_batch}'
         )
-        strv_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')
+        strv_job.command(f'tabix {strv_job.output_vcf["vcf.bgz"]}')
 
         get_batch().write_output(
-            strv_job.output_vcf, str(expected_d['strvctvre_vcf']).replace('.vcf.gz', '')
+            strv_job.output_vcf, str(expected_d['strvctvre_vcf']).replace('.vcf.bgz', '')
         )
         return self.make_outputs(cohort, data=expected_d, jobs=strv_job)
