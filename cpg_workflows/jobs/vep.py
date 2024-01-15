@@ -13,7 +13,8 @@ from hailtop.batch.job import Job
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, reference_path, query_command
-from cpg_workflows.jobs.vcf import gather_vcfs
+from cpg_workflows.jobs.vcf import gather_vcfs, subset_vcf
+from cpg_workflows.jobs.picard import get_intervals
 from cpg_workflows.utils import can_reuse
 from cpg_workflows.query_modules import vep
 
@@ -21,17 +22,18 @@ from cpg_workflows.query_modules import vep
 def add_vep_jobs(
     b: Batch,
     tmp_prefix: Path,
-    input_vcf_path: Path | None,
+    input_vcf_path: Path | None = None,
     input_split_vcf_part_paths: list[Path] | None = None,
     out_path: Path | None = None,
     job_attrs: dict | None = None,
+    scatter_count: int = 1,
 ) -> list[Job]:
     """
     Runs VEP on provided VCF. Writes a VCF into `out_path` by default,
     unless `out_path` ends with ".ht", in which case writes a Hail table.
 
     requires either `input_vcf_path` or `input_split_vcf_part_paths` to be provided.
-    input_vcf_path - will annotate the provided VCF
+    input_vcf_path - will annotate the provided VCF in `scatter_count` fragments
     input_split_vcf_part_paths - will annotate each split VCF & merge results
     """
     to_hail_table = out_path and out_path.suffix == '.ht'
@@ -43,7 +45,6 @@ def add_vep_jobs(
 
     jobs: list[Job] = []
 
-    # TODO continue
     input_vcf_parts: list[hb.ResourceGroup] = []
     if input_split_vcf_part_paths:
         for path in input_split_vcf_part_paths:
@@ -57,7 +58,7 @@ def add_vep_jobs(
             )
 
     # If there is only one partition, we don't need to split the VCF
-    elif input_vcf_path:
+    elif input_vcf_path and scatter_count == 1:
         input_vcf_parts.append(
             b.read_input_group(
                 **{
@@ -68,7 +69,32 @@ def add_vep_jobs(
         )
 
     else:
-        raise ValueError('This method requires subset VCFs to be provided')
+        localised_input_vcf = b.read_input_group(
+            **{
+                'vcf.gz': str(input_vcf_path),
+                'vcf.gz.tbi': str(input_vcf_path) + '.tbi',
+            }
+        )
+        intervals_j, intervals = get_intervals(
+            b=b,
+            scatter_count=scatter_count,
+            job_attrs=job_attrs,
+            output_prefix=tmp_prefix / f'intervals_{scatter_count}',
+        )
+        if intervals_j:
+            jobs.append(intervals_j)
+
+        # Splitting variant calling by intervals
+        for idx in range(scatter_count):
+            subset_j = subset_vcf(
+                b,
+                vcf=localised_input_vcf,
+                interval=intervals[idx],
+                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
+            )
+            jobs.append(subset_j)
+            assert isinstance(subset_j.output_vcf, hb.ResourceGroup)
+            input_vcf_parts.append(subset_j.output_vcf)
 
     result_parts_bucket = tmp_prefix / 'vep' / 'parts'
     result_part_paths = []
@@ -82,6 +108,7 @@ def add_vep_jobs(
         else:
             result_part_path = result_parts_bucket / f'part{idx + 1}.vcf.gz'
         result_part_paths.append(result_part_path)
+
         if can_reuse(result_part_path):
             continue
 
@@ -116,8 +143,6 @@ def add_vep_jobs(
         for j in gather_jobs:
             j.depends_on(*jobs)
             jobs.append(j)
-
-    # else: gathering as VCF, but no merging required
 
     return jobs
 

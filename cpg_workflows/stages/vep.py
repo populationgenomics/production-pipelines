@@ -40,14 +40,17 @@ class Vep(CohortStage):
         Submit jobs.
         """
         scatter_count = joint_calling_scatter_count(len(cohort.get_sequencing_groups()))
+
+        # pull out the path to the site-only VCF fragments
+        single_fragment_path = inputs.as_str(
+            stage=JointGenotyping,
+            target=cohort,
+            key='split_part_pattern',
+        )
+
+        # create the list of Paths
         input_siteonly_vcf_part_paths = [
-            to_path(
-                inputs.as_str(
-                    stage=JointGenotyping,
-                    target=cohort,
-                    key='split_part_pattern',
-                ).format(idx=idx)
-            )
+            to_path(single_fragment_path.format(idx=idx))
             for idx in range(scatter_count)
         ]
 
