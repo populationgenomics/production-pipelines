@@ -48,7 +48,7 @@ def annotate_cohort(
     )
 
     # we no longer split multiallelics here
-    mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
+    mt = mt.annotate_rows(vep=vep_ht[mt.row_key].vep)
 
     if site_only_vqsr_vcf_path:
         vqsr_ht = load_vqsr(site_only_vqsr_vcf_path)

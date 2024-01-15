@@ -333,12 +333,12 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, vep_version: str):
     # Can't use ht.vep.start for start because it can be modified by VEP (e.g. it
     # happens for indels). So instead parsing POS from the original VCF line stored
     # as ht.vep.input field.
-    original_vcf_line_split = ht.vep.input.split('\t')
     ht = ht.annotate(
         locus=hl.locus(
             ht.vep.seq_region_name,
-            hl.parse_int(original_vcf_line_split[1])
-        )
+            hl.parse_int(ht.vep.input.split('\t')[1])
+        ),
+        alleles=ht.vep.allele_string.split('/')
     )
-    ht = ht.key_by(ht.locus, original_vcf_line_split[4])
+    ht = ht.key_by(ht.locus, ht.alleles)
     ht.write(str(out_path), overwrite=True)
