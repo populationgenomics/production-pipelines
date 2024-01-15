@@ -46,14 +46,9 @@ def annotate_cohort(
     logging.info(
         f'Adding VEP annotations into the Matrix Table from {vep_ht_path}. VEP loaded as {vep_ht.n_partitions()} partitions'
     )
-    mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
 
-    # Splitting multi-allelics. We do not handle AS info fields here - we handle
-    # them when loading VQSR instead, and populate entire "info" from VQSR.
-    mt = hl.split_multi_hts(
-        mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
-    )
-    mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
+    # we no longer split multiallelics here
+    mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
 
     if site_only_vqsr_vcf_path:
         vqsr_ht = load_vqsr(site_only_vqsr_vcf_path)
@@ -77,6 +72,7 @@ def annotate_cohort(
 
     # don't fail if the AC/AF attributes are an inappropriate type
     # don't fail if completely absent either
+    # TODO is this relevant any more?
     for attr in ['AC', 'AF']:
         if attr not in mt.info:
             mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [1]}))
@@ -87,15 +83,11 @@ def annotate_cohort(
         mt = mt.annotate_rows(info=mt.info.annotate(AN=1))
 
     logging.info('Annotating with clinvar and munging annotation fields')
+    # TODO - check how to handle these
     mt = mt.annotate_rows(
-        AC=mt.info.AC[mt.a_index - 1],
-        AF=mt.info.AF[mt.a_index - 1],
+        AC=mt.info.AC,
+        AF=mt.info.AF,
         AN=mt.info.AN,
-        aIndex=mt.a_index,
-        wasSplit=mt.was_split,
-        originalAltAlleles=variant_id.get_expr_for_variant_ids(
-            mt.locus_old, mt.alleles_old
-        ),
         sortedTranscriptConsequences=vep.get_expr_for_vep_sorted_transcript_consequences_array(
             mt.vep
         ),
