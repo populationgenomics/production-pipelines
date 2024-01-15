@@ -3,7 +3,6 @@ Create Hail Batch jobs for joint genotyping.
 """
 
 import logging
-import math
 from enum import Enum
 
 import pandas as pd
