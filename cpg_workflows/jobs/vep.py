@@ -13,24 +13,26 @@ from hailtop.batch.job import Job
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, reference_path, query_command
-from cpg_workflows.jobs.picard import get_intervals
-from cpg_workflows.jobs.vcf import gather_vcfs, subset_vcf
+from cpg_workflows.jobs.vcf import gather_vcfs
 from cpg_workflows.utils import can_reuse
 from cpg_workflows.query_modules import vep
 
 
 def add_vep_jobs(
     b: Batch,
-    input_siteonly_vcf_path: Path,
     tmp_prefix: Path,
-    scatter_count: int,
-    input_siteonly_vcf_part_paths: list[Path] | None = None,
+    input_vcf_path: Path | None,
+    input_split_vcf_part_paths: list[Path] | None = None,
     out_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """
     Runs VEP on provided VCF. Writes a VCF into `out_path` by default,
     unless `out_path` ends with ".ht", in which case writes a Hail table.
+
+    requires either `input_vcf_path` or `input_split_vcf_part_paths` to be provided.
+    input_vcf_path - will annotate the provided VCF
+    input_split_vcf_part_paths - will annotate each split VCF & merge results
     """
     to_hail_table = out_path and out_path.suffix == '.ht'
     if not to_hail_table:
@@ -40,51 +42,40 @@ def add_vep_jobs(
         return []
 
     jobs: list[Job] = []
-    siteonly_vcf = b.read_input_group(
-        **{
-            'vcf.gz': str(input_siteonly_vcf_path),
-            'vcf.gz.tbi': str(input_siteonly_vcf_path) + '.tbi',
-        }
-    )
 
+    # TODO continue
     input_vcf_parts: list[hb.ResourceGroup] = []
-    if input_siteonly_vcf_part_paths:
-        assert len(input_siteonly_vcf_part_paths) == scatter_count
-        for path in input_siteonly_vcf_part_paths:
+    if input_split_vcf_part_paths:
+        for path in input_split_vcf_part_paths:
             input_vcf_parts.append(
                 b.read_input_group(
-                    **{'vcf.gz': str(path), 'vcf.gz.tbi': str(path) + '.tbi'}
+                    **{
+                        'vcf.gz': str(path),
+                        'vcf.gz.tbi': str(path) + '.tbi'
+                    }
                 )
             )
 
     # If there is only one partition, we don't need to split the VCF
-    elif scatter_count == 1:
-        input_vcf_parts.append(siteonly_vcf)
+    elif input_vcf_path:
+        input_vcf_parts.append(
+            b.read_input_group(
+                **{
+                    'vcf.gz': str(input_vcf_path),
+                    'vcf.gz.tbi': str(input_vcf_path) + '.tbi',
+                }
+            )
+        )
 
     else:
-        intervals_j, intervals = get_intervals(
-            b=b,
-            scatter_count=scatter_count,
-            job_attrs=job_attrs,
-            output_prefix=tmp_prefix / f'intervals_{scatter_count}',
-        )
-        if intervals_j:
-            jobs.append(intervals_j)
-
-        # Splitting variant calling by intervals
-        for idx in range(scatter_count):
-            subset_j = subset_vcf(
-                b,
-                vcf=siteonly_vcf,
-                interval=intervals[idx],
-                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
-            )
-            jobs.append(subset_j)
-            assert isinstance(subset_j.output_vcf, hb.ResourceGroup)
-            input_vcf_parts.append(subset_j.output_vcf)
+        raise ValueError('This method requires subset VCFs to be provided')
 
     result_parts_bucket = tmp_prefix / 'vep' / 'parts'
     result_part_paths = []
+
+    # this is a substitute value of scatter_count adapted to input provided
+    scatter_count = len(input_vcf_parts)
+
     for idx, resource in enumerate(input_vcf_parts):
         if to_hail_table:
             result_part_path = result_parts_bucket / f'part{idx + 1}.jsonl'
@@ -110,10 +101,11 @@ def add_vep_jobs(
             b=b,
             vep_results_paths=result_part_paths,
             out_path=out_path,
-            job_attrs=job_attrs,
-            depends_on=jobs,
+            job_attrs=job_attrs
         )
-        gather_jobs = [j]
+        j.depends_on(*jobs)
+        jobs.append(j)
+
     elif scatter_count != 1:
         assert len(result_part_paths) == scatter_count
         gather_jobs = gather_vcfs(
@@ -121,12 +113,12 @@ def add_vep_jobs(
             input_vcfs=result_part_paths,
             out_vcf_path=out_path,
         )
-    else:
-        print('no need to merge VCF results')
-        gather_jobs = []
-    for j in gather_jobs:
-        j.depends_on(*jobs)
-        jobs.append(j)
+        for j in gather_jobs:
+            j.depends_on(*jobs)
+            jobs.append(j)
+
+    # else: gathering as VCF, but no merging required
+
     return jobs
 
 
@@ -135,7 +127,6 @@ def gather_vep_json_to_ht(
     vep_results_paths: list[Path],
     out_path: Path,
     job_attrs: dict | None = None,
-    depends_on: list[hb.job.Job] | None = None,
 ) -> Job:
     """
     Parse results from VEP with annotations formatted in JSON,

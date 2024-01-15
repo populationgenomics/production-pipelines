@@ -34,10 +34,14 @@ class JointGenotyping(CohortStage):
             # writing into perm location for late debugging
             # convert to str to avoid checking existence
             'tmp_prefix': str(self.prefix / 'tmp'),
+            # this will include split multi-allelics
             'vcf': to_path(self.prefix / 'full.vcf.gz'),
             'siteonly': to_path(self.prefix / 'siteonly.vcf.gz'),
             'siteonly_part_pattern': str(
                 self.prefix / 'siteonly_parts' / 'part{idx}.vcf.gz'
+            ),
+            'split_part_pattern': str(
+                self.prefix / 'split_parts' / 'part{idx}.vcf.gz'
             ),
         }
 
@@ -73,6 +77,12 @@ class JointGenotyping(CohortStage):
             )
             for idx in range(scatter_count)
         ]
+        out_split_vcf_part_paths = [
+            to_path(
+                self.expected_outputs(cohort)['split_part_pattern'].format(idx=idx)
+            )
+            for idx in range(scatter_count)
+        ]
 
         jc_jobs = joint_genotyping.make_joint_genotyping_jobs(
             b=get_batch(),
@@ -87,6 +97,7 @@ class JointGenotyping(CohortStage):
             job_attrs=self.get_job_attrs(),
             scatter_count=scatter_count,
             out_siteonly_vcf_part_paths=out_siteonly_vcf_part_paths,
+            out_split_vcf_part_paths=out_split_vcf_part_paths,
         )
         jobs.extend(jc_jobs)
         for job in jobs:

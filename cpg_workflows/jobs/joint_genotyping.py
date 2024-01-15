@@ -44,6 +44,7 @@ def make_joint_genotyping_jobs(
     tool: JointGenotyperTool = JointGenotyperTool.GenotypeGVCFs,
     scatter_count: int | None = None,
     out_siteonly_vcf_part_paths: list[Path] | None = None,
+    out_split_vcf_part_paths: list[Path] | None = None,
     do_filter_excesshet: bool = True,
     intervals_path: Path | None = None,
     job_attrs: dict | None = None,
@@ -51,6 +52,13 @@ def make_joint_genotyping_jobs(
     """
     Adds samples to the GenomicsDB and runs joint genotyping on them.
     Outputs a multi-sample VCF under `output_vcf_path`.
+
+    The eventual VCFs created by this process:
+    - per-interval VCF
+    - per-interval multiallelics-split VCF
+    - per-interval site-only VCF
+    - gathered site-only VCF
+    - gathered multiallelics-split VCF
     """
     if len(gvcf_by_sgid) == 0:
         raise ValueError(
@@ -79,7 +87,14 @@ def make_joint_genotyping_jobs(
     if intervals_j:
         jobs.append(intervals_j)
 
+    # list for holding the unsplit vcf fragments
+    # to be fed into splitting and site-only jobs
+    unsplit_vcfs: list[hb.ResourceGroup] = []
+
+    # list for holding the split vcf fragments
     vcfs: list[hb.ResourceGroup] = []
+
+    # list for holding the site-only vcf fragments
     siteonly_vcfs: list[hb.ResourceGroup] = []
 
     # Preparing inputs for GenomicsDB
@@ -92,11 +107,12 @@ def make_joint_genotyping_jobs(
         with sample_map_bucket_path.open('w') as fp:
             df.to_csv(fp, index=False, header=False, sep='\t')
 
+    # For small callsets, we don't apply the ExcessHet filtering anyway
     do_filter_excesshet = len(gvcf_by_sgid) >= 1000 and do_filter_excesshet
 
     for idx, interval in enumerate(intervals):
         genomicsdb_path = (
-            genomicsdb_bucket / f'interval_{idx + 1}_outof_{scatter_count}.tar'
+                genomicsdb_bucket / f'interval_{idx + 1}_outof_{scatter_count}.tar'
         )
         import_gvcfs_j = genomicsdb(
             b=b,
@@ -116,6 +132,7 @@ def make_joint_genotyping_jobs(
             if scatter_count > 1 and do_filter_excesshet
             else out_vcf_path
         )
+
         if out_siteonly_vcf_part_paths:
             siteonly_jc_vcf_path = out_siteonly_vcf_part_paths[idx]
         else:
@@ -123,6 +140,15 @@ def make_joint_genotyping_jobs(
                 (tmp_bucket / 'siteonly' / 'parts' / f'part{idx + 1}.vcf.gz')
                 if scatter_count > 1
                 else out_siteonly_vcf_path
+            )
+
+        if out_split_vcf_part_paths:
+            split_jc_vcf_path = out_split_vcf_part_paths[idx]
+        else:
+            split_jc_vcf_path = (
+                (tmp_bucket / 'split' / 'parts' / f'part{idx + 1}.vcf.gz')
+                if scatter_count > 1
+                else out_vcf_path
             )
 
         jc_vcf_j, jc_vcf = _add_joint_genotyper_job(
@@ -138,8 +164,7 @@ def make_joint_genotyping_jobs(
             if import_gvcfs_j:
                 jc_vcf_j.depends_on(import_gvcfs_j)
 
-        # For small callsets, we don't apply the ExcessHet filtering anyway
-        if len(gvcf_by_sgid) >= 1000 and do_filter_excesshet:
+        if do_filter_excesshet:
             excess_filter_j, excess_filter_jc_vcf = _add_excess_het_filter(
                 b,
                 input_vcf=jc_vcf,
@@ -151,13 +176,28 @@ def make_joint_genotyping_jobs(
                 jobs.append(excess_filter_j)
                 if jc_vcf_j:
                     excess_filter_j.depends_on(jc_vcf_j)
-            vcfs.append(excess_filter_jc_vcf)
+            unsplit_vcfs.append(excess_filter_jc_vcf)
         else:
-            vcfs.append(jc_vcf)
+            unsplit_vcfs.append(jc_vcf)
+
+        # split multi-allelics for all those VCF fragments
+        # do this before gathering into one huge VCF
+        split_multi_job, split_fragment = add_make_split_multiallelics_job(
+            b=b,
+            input_vcf=unsplit_vcfs[idx],
+            output_vcf_path=split_jc_vcf_path,
+            job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
+        )
+
+        # make a job to split this fragment's multiallelic variantt
+        vcfs.append(split_fragment)
+        if split_multi_job:
+            split_multi_job.depends_on(jobs[-1])
+            jobs.append(split_multi_job)
 
         siteonly_j, siteonly_j_vcf = add_make_sitesonly_job(
             b=b,
-            input_vcf=vcfs[idx],
+            input_vcf=unsplit_vcfs[idx],
             output_vcf_path=siteonly_jc_vcf_path,
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
@@ -508,4 +548,51 @@ def add_make_sitesonly_job(
     )
     if output_vcf_path:
         b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
+    return j, j.output_vcf
+
+
+def add_make_split_multiallelics_job(
+    b: hb.Batch,
+    input_vcf: hb.ResourceGroup,
+    output_vcf_path: Path | None = None,
+    job_attrs: dict | None = None,
+) -> tuple[Job | None, hb.ResourceGroup]:
+    """
+    Create multiallelic-split VCF
+
+    Returns: a Job object with a single output j.split_vcf of type ResourceGroup
+    """
+    if output_vcf_path and can_reuse(output_vcf_path):
+        return None, b.read_input_group(
+            **{
+                'vcf.gz': str(output_vcf_path),
+                'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
+            }
+        )
+
+    j = b.new_job('MakeSitesOnlyVcf', job_attrs or {} | {'tool': 'bcftools norm'})
+    j.image(image_path('bcftools'))
+    j.storage(get_config()['workflow'].get('splitting_gb', '40Gi'))
+
+    j.declare_resource_group(
+        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+    )
+
+    # bcftools norm splits multiallelic variants
+    # -m -any: split all multiallelic variant types
+    # -N: don't left-align indels (NO Normalisation)
+    # -Oz: output compressed VCF
+    # -o: output file
+    j.command(
+        command(
+            f"""
+    bcftools norm -m -any -N {input_vcf} -Ozo {j.output_vcf['vcf.gz']}
+    tabix {j.output_vcf['vcf.gz']}
+    """
+        )
+    )
+
+    if output_vcf_path:
+        b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
+
     return j, j.output_vcf

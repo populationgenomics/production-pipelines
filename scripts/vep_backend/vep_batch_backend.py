@@ -40,10 +40,9 @@ def main(vcf_path: str, output_ht: str, to_mt: bool = False):
     vep_ht = output_path(output_ht)
     vep_jobs = add_vep_jobs(
         b=b,
-        input_siteonly_vcf_path=to_path(vcf_path),
+        input_vcf_path=to_path(vcf_path),
         tmp_prefix=to_path(output_path('vcf_fragments/', 'tmp')),
         out_path=to_path(vep_ht),
-        scatter_count=scatter_count,
     )
     if to_mt:
         assert vep_ht.endswith('.ht')
