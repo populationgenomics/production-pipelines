@@ -158,7 +158,7 @@ def markdup(
 
     assert isinstance(j.output_cram, hb.ResourceGroup)
     cmd = f"""
-    picard MarkDuplicates -Xms{resource.get_java_mem_mb()}M \\
+    picard {resource.java_mem_options()} MarkDuplicates \\
     I={sorted_bam} O={j.temp_bam} M={j.markdup_metrics} \\
     TMP_DIR=$(dirname {j.output_cram.cram})/picard-tmp \\
     ASSUME_SORT_ORDER=coordinate
@@ -221,7 +221,7 @@ def vcf_qc(
         input_file = vcf_or_gvcf['vcf.gz']
 
     cmd = f"""\
-    picard -Xms2000m -Xmx{res.get_java_mem_mb()}m \
+    picard {res.java_mem_options()} \
     CollectVariantCallingMetrics \
     INPUT={input_file} \
     OUTPUT=$BATCH_TMPDIR/prefix \
@@ -289,7 +289,7 @@ def picard_collect_metrics(
     retry_gs_cp {str(cram_path.path)} $CRAM
     retry_gs_cp {str(cram_path.index_path)} $CRAI
 
-    picard -Xmx{res.get_java_mem_mb()}m \\
+    picard {res.java_mem_options()} \\
       CollectMultipleMetrics \\
       INPUT=$CRAM \\
       REFERENCE_SEQUENCE={reference.base} \\
@@ -372,7 +372,7 @@ def picard_hs_metrics(
     O=$BATCH_TMPDIR/intervals.interval_list \\
     SD={reference.dict}
 
-    picard -Xmx{res.get_java_mem_mb()}m \\
+    picard {res.java_mem_options()} \\
       CollectHsMetrics \\
       INPUT=$CRAM \\
       REFERENCE_SEQUENCE={reference.base} \\
@@ -426,7 +426,7 @@ def picard_wgs_metrics(
     retry_gs_cp {str(cram_path.path)} $CRAM
     retry_gs_cp {str(cram_path.index_path)} $CRAI
 
-    picard -Xmx{res.get_java_mem_mb()}m \\
+    picard {res.java_mem_options()} \\
       CollectWgsMetrics \\
       INPUT=$CRAM \\
       VALIDATION_STRINGENCY=SILENT \\
