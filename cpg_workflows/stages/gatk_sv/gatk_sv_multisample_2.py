@@ -86,7 +86,6 @@ class MakeCohortVcf(CohortStage):
 
         return out_dict
 
-
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
         This is a little bit spicy. Instead of taking a direct dependency on the
