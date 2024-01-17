@@ -216,10 +216,11 @@ def add_gatk_sv_jobs(
 
     # sometimes we need to pass inputs on to a sub-workflow, rather than the top
     # level. See the config_overrides toml for an example of how to use this
-    if sub_wfl_inputs := get_config()['sub_workflow_overrides'].get(wfl_name):
-        for sub_wf, sub_section in sub_wfl_inputs.items():
-            for key, value in sub_section.items():
-                paths_as_strings[f'{sub_wf}.{key}'] = value
+    if 'sub_workflow_overrides' in get_config():
+        if sub_wfl_inputs := get_config()['sub_workflow_overrides'].get(wfl_name):
+            for sub_wf, sub_section in sub_wfl_inputs.items():
+                for key, value in sub_section.items():
+                    paths_as_strings[f'{sub_wf}.{key}'] = value
 
     job_prefix = make_job_name(
         wfl_name, sequencing_group=sequencing_group_id, dataset=dataset.name
