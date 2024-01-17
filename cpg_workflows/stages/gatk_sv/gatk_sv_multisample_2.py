@@ -303,7 +303,7 @@ class JoinRawCalls(CohortStage):
         """ """
 
         input_dict: dict[str, Any] = {
-            'formatter_args': '--fix-end',
+            'FormatVcfForGatk.formatter_args': '--fix-end',
             'prefix': cohort.name,
             'ped_file': make_combined_ped(cohort, self.prefix),
             'reference_fasta': get_fasta(),
