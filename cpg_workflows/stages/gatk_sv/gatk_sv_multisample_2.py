@@ -2,8 +2,7 @@
 The second multi-sample workflow, containing the following stages:
 MakeCohortVCF and AnnotateVCF
 """
-
-
+import logging
 from typing import Any
 
 from cpg_utils import Path, to_path
@@ -64,7 +63,7 @@ class MakeCohortVcf(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict:
         """create output paths"""
-        return {
+        out_dict = {
             'vcf': self.prefix / 'cleaned.vcf.gz',
             'vcf_index': self.prefix / 'cleaned.vcf.gz.tbi',
             'vcf_qc': self.prefix / 'cleaned_SV_VCF_QC_output.tar.gz',
@@ -77,6 +76,15 @@ class MakeCohortVcf(CohortStage):
             # 'complex_genotype_vcf': '.complex_genotype.vcf.gz',
             # 'complex_genotype_vcf_index': '.complex_genotype.vcf.gz.tbi',
         }
+
+        # if we don't run metrics, don't expect the outputs
+        # on by default in the WDL file, so expect this to run unless overridden
+        if override := get_config()['resource_overrides'].get('MakeCohortVcf'):
+            if override.get('run_module_metrics', True):
+                metrics_path = str(out_dict.pop('metrics_file_makecohortvcf'))
+                logging.info(f'Will not create metrics file: {metrics_path}')
+
+        return out_dict
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """

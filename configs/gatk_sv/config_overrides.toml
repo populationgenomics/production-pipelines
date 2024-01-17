@@ -12,10 +12,16 @@ disk_gb = 40
 [resource_overrides.EvidenceQC.runtime_attr_mediancov]
 disk_gb = 200
 
+[resource_overrides.MakeCohortVcf]
+run_module_metrics = false
+
 # resource overrides for indirect workflows
 
-# during MakeCohortVcf, we need to override the resource requirements for the
-# MakeCohortVcfMetrics sub-workflow
-[sub_workflow_overrides.MakeCohortVcf.MakeCohortVcfMetrics.runtime_attr_vcf_metrics]
-mem_gb = 20
-disk_gb = 40
+
+[sub_workflow_overrides.EXAMPLE.SubWorkflow.runtime_attr_overrides]
+
+## during MakeCohortVcf, we need to override the resource requirements for the
+## MakeCohortVcfMetrics sub-workflow
+#[sub_workflow_overrides.MakeCohortVcf.MakeCohortVcfMetrics.runtime_attr_vcf_metrics]
+#mem_gb = 20
+#disk_gb = 40
