@@ -80,7 +80,7 @@ class MakeCohortVcf(CohortStage):
         # if we don't run metrics, don't expect the outputs
         # on by default in the WDL file, so expect this to run unless overridden
         if override := get_config()['resource_overrides'].get('MakeCohortVcf'):
-            if override.get('run_module_metrics', True):
+            if not override.get('run_module_metrics', True):
                 metrics_path = str(out_dict.pop('metrics_file_makecohortvcf'))
                 logging.info(f'Will not create metrics file: {metrics_path}')
 
