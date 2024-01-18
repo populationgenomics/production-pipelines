@@ -8,10 +8,11 @@ import logging
 import hail as hl
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import reference_path, genome_build
+from cpg_utils.hail_batch import genome_build, reference_path
+from gnomad.sample_qc.pipeline import annotate_sex
+
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
-from gnomad.sample_qc.pipeline import annotate_sex
 
 
 def run(
@@ -127,8 +128,12 @@ def impute_sex(
         overwrite=not get_config()['workflow'].get('check_intermediates'),
         included_intervals=calling_intervals_ht,
         gt_expr='LGT',
-        variants_only_x_ploidy=True,
-        variants_only_y_ploidy=True,
+        # Using variant sites only for ploidy calculations causes ChrY ploidy inflation.
+        # Setting `variants_only_x_ploidy` and `variants_only_y_ploidy` to `False` (default value) causes
+        # function to use reference blocks for ploidy calculations
+        # https://centrepopgen.slack.com/archives/C018KFBCR1C/p1705539231990829?thread_ts=1704233101.883849&cid=C018KFBCR1C
+        variants_only_x_ploidy=False,
+        variants_only_y_ploidy=False,
         variants_filter_lcr=False,  # already filtered above
         variants_filter_segdup=False,  # already filtered above
         variants_filter_decoy=False,
