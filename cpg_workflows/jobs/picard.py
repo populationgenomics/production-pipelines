@@ -128,7 +128,13 @@ def markdup(
         return None
 
     j.image(image_path('picard'))
-    resource = HIGHMEM.request_resources(ncpu=4)
+
+    # check for a memory override for impossible sequencing groups
+    # if RAM is overridden, update the memory resource setting
+    memory_override = get_config()['resource_overrides'].get('picard_mem_gb')
+    assert isinstance(memory_override, (int, type(None)))
+
+    resource = HIGHMEM.request_resources(ncpu=4, mem_gb=memory_override)
 
     # check for a storage override for unreasonably large sequencing groups
     if (storage_override := get_config()['resource_overrides'].get('picard_storage_gb')) is not None:
@@ -137,14 +143,8 @@ def markdup(
     else:
         # enough for input BAM and output CRAM
         resource.attach_disk_storage_gb = 250
-    resource.set_to_job(j)
 
-    # check for a memory override for impossible sequencing groups
-    # if RAM is overridden, update the memory resource setting
-    if (memory_override := get_config()['resource_overrides'].get('picard_mem_gb')) is not None:
-        assert isinstance(memory_override, int)
-        # Hail will select the right number of CPUs based on RAM request
-        j.memory(f'{memory_override}G')
+    resource.set_to_job(j)
 
     j.declare_resource_group(
         output_cram={
