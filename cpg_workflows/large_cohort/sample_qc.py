@@ -122,7 +122,9 @@ def impute_sex(
             logging.info(f'count post {name} filter:{vds.variant_data.count()}')
 
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
-    inf_ploidy_using_var = get_config()['large_cohort'].get('inf_ploidy_using_var')
+    inf_ploidy_using_var = get_config()['large_cohort'].get(
+        'inf_ploidy_using_var', False
+    )
     sex_ht = annotate_sex(
         vds,
         tmp_prefix=str(tmp_prefix / 'annotate_sex'),
