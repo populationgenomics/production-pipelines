@@ -137,10 +137,6 @@ def impute_sex(
         variants_filter_segdup=False,  # already filtered above
         variants_filter_decoy=False,
     )
-    # Rename  `autosomal_mean_dp` to `var_data_chr20_mean_dp` (not sure if we want to hardcode 'chr20' here)
-    sex_ht = sex_ht.rename(
-        {'autosomal_mean_dp': f'var_data_chr20_mean_dp'}
-    )
     logging.info('Sex table:')
     sex_ht.describe()
     sex_ht = sex_ht.transmute(
