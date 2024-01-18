@@ -2,8 +2,10 @@
 Common methods for all GATK-SV workflows
 """
 import re
-
+from enum import Enum
+from functools import lru_cache
 from os.path import join
+from random import randint
 from typing import Any
 
 from analysis_runner.cromwell import (
@@ -22,6 +24,48 @@ GATK_SV_COMMIT = '6d6100082297898222dfb69fcf941d373d78eede'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 _FASTA = None
 PED_FAMILY_ID_REGEX = re.compile(r'(^[A-Za-z0-9_]+$)')
+
+
+class CromwellJobSizes(Enum):
+    """
+    Enum for polling intervals
+    """
+
+    SMALL = 'small'
+    MEDIUM = 'medium'
+    LARGE = 'large'
+
+
+@lru_cache(maxsize=1)
+def create_polling_intervals() -> dict:
+    """
+    Set polling intervals for cromwell status
+    these values are integers, indicating seconds
+    for each job size, there is a min and max value
+    analysis-runner implements a backoff-retrier when checking for
+    success, with a minimum value, gradually reaching a max ceiling
+
+    a config section containing overrides would look like
+
+    [cromwell_polling_intervals.medium]
+    min = 69
+    max = 420
+    """
+
+    # create this dict with default values
+    polling_interval_dict = {
+        CromwellJobSizes.SMALL: {'min': 30, 'max': 140},
+        CromwellJobSizes.MEDIUM: {'min': 40, 'max': 400},
+        CromwellJobSizes.LARGE: {'min': 200, 'max': 2000},
+    }
+
+    # update if these exist in config
+    for job_size in CromwellJobSizes:
+        if job_size.value in get_config().get('cromwell_polling_intervals', {}):
+            polling_interval_dict[job_size].update(
+                get_config()['cromwell_polling_intervals'][job_size.value]
+            )
+    return polling_interval_dict
 
 
 def _sv_batch_meta(
@@ -120,12 +164,22 @@ def add_gatk_sv_jobs(
     sequencing_group_id: str | None = None,
     driver_image: str | None = None,
     labels: dict[str, str] | None = None,
-    cromwell_status_min_poll_interval: int = 30,
-    cromwell_status_max_poll_interval: int = 100,
+    job_size: CromwellJobSizes = CromwellJobSizes.MEDIUM,
 ) -> list[Job]:
     """
     Generic function to add a job that would run one GATK-SV workflow.
     """
+
+    # create/retrieve dictionary of polling intervals for cromwell status
+    polling_intervals = create_polling_intervals()
+
+    # obtain upper and lower polling bounds for this job size
+    polling_minimum = randint(
+        polling_intervals[job_size]['min'], polling_intervals[job_size]['min'] * 2
+    )
+    polling_maximum = randint(
+        polling_intervals[job_size]['max'], polling_intervals[job_size]['max'] * 2
+    )
 
     # If a config section exists for this workflow, apply overrides
     if override := get_config()['resource_overrides'].get(wfl_name):
@@ -160,6 +214,14 @@ def add_gatk_sv_jobs(
         else:
             paths_as_strings[f'{wfl_name}.{key}'] = value
 
+    # sometimes we need to pass inputs on to a sub-workflow, rather than the top
+    # level. See the config_overrides toml for an example of how to use this
+    if 'sub_workflow_overrides' in get_config():
+        if sub_wfl_inputs := get_config()['sub_workflow_overrides'].get(wfl_name):
+            for sub_wf, sub_section in sub_wfl_inputs.items():
+                for key, value in sub_section.items():
+                    paths_as_strings[f'{sub_wf}.{key}'] = value
+
     job_prefix = make_job_name(
         wfl_name, sequencing_group=sequencing_group_id, dataset=dataset.name
     )
@@ -182,8 +244,8 @@ def add_gatk_sv_jobs(
         driver_image=driver_image,
         copy_outputs_to_gcp=copy_outputs,
         labels=labels,
-        min_watch_poll_interval=cromwell_status_min_poll_interval,
-        max_watch_poll_interval=cromwell_status_max_poll_interval,
+        min_watch_poll_interval=polling_minimum,
+        max_watch_poll_interval=polling_maximum,
     )
 
     copy_j = batch.new_job(f'{job_prefix}: copy outputs')
