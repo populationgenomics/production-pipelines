@@ -422,6 +422,10 @@ class Stage(Generic[TargetT], ABC):
     def prefix(self) -> Path:
         return get_workflow().prefix / self.name
 
+    @property
+    def analysis_prefix(self) -> Path:
+        return get_workflow().analysis_prefix / self.name
+
     def __str__(self):
         res = f'{self._name}'
         if self.skipped:
@@ -922,6 +926,10 @@ class Workflow:
     @property
     def output_version(self) -> str:
         return self._output_version or get_cohort().alignment_inputs_hash()
+
+    @property
+    def analysis_prefix(self) -> Path:
+        return self._prefix(category='analysis')
 
     @property
     def tmp_prefix(self) -> Path:
